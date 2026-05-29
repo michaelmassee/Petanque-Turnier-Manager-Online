@@ -28,14 +28,14 @@
         </div>
         <div class="flex gap-2 shrink-0">
             @if($tournament->isRegistrationOpen())
-                <a href="{{ route('public.tournaments.register', ['locale' => app()->getLocale(), 'tournament' => $tournament]) }}"
+                <a href="{{ lroute('tournaments.register', ['tournament' => $tournament->id]) }}"
                    class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-md">
                     {{ __('tournaments.register') }}
                 </a>
             @endif
-            <a href="{{ route('public.tournaments.ranking', ['locale' => app()->getLocale(), 'tournament' => $tournament]) }}"
+            <a href="{{ lroute('tournaments.ranking', ['tournament' => $tournament->id]) }}"
                class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2 rounded-md">
-                {{ __('tournaments.ranking') }}
+                {{ __('tournaments.zur_rangliste') }}
             </a>
         </div>
     </div>

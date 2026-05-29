@@ -6,14 +6,14 @@
         <p class="text-gray-600 mb-2">{{ $registration->vollstaendigerName() }}</p>
         <p class="text-gray-500 text-sm mb-6">{{ $registration->tournament->name }}</p>
         <div class="flex justify-center gap-4">
-            <form method="POST" action="{{ route('public.registration.cancel', $registration->token) }}">
+            <form method="POST" action="{{ lroute('registration.cancel', $registration->token) }}">
                 @csrf
                 <button type="submit"
                         class="bg-red-600 hover:bg-red-700 text-white font-medium px-5 py-2 rounded-md">
                     {{ __('registrations.yes_cancel') }}
                 </button>
             </form>
-            <a href="{{ route('public.tournaments.index', ['locale' => app()->getLocale()]) }}"
+            <a href="{{ url('/' . app()->getLocale()) }}"
                class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-5 py-2 rounded-md">
                 {{ __('registrations.no_back') }}
             </a>

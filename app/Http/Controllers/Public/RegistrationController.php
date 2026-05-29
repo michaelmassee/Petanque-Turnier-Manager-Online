@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Public;
 use App\Enums\RegistrationStatus;
 use App\Http\Controllers\Controller;
 use App\Mail\RegistrationReceived;
+use App\Mail\WaitlistPromoted;
 use App\Models\Registration;
 use App\Models\Tournament;
 use Illuminate\Http\RedirectResponse;
@@ -14,26 +15,30 @@ use Illuminate\View\View;
 
 class RegistrationController extends Controller
 {
-    public function create(Tournament $tournament): View|RedirectResponse
+    public function create(string $tournament): View|RedirectResponse
     {
-        if (! $tournament->isRegistrationOpen()) {
-            return redirect()->route('public.tournaments.show', $tournament)
+        $t = Tournament::findOrFail($tournament);
+
+        if (! $t->isRegistrationOpen()) {
+            return redirect(url('/' . app()->getLocale()))
                 ->with('error', __('tournaments.registration_closed'));
         }
 
-        return view('public.registrations.create', compact('tournament'));
+        return view('public.registrations.create', ['tournament' => $t]);
     }
 
-    public function store(Request $request, Tournament $tournament): RedirectResponse
+    public function store(Request $request, string $tournament): RedirectResponse
     {
-        if (! $tournament->isRegistrationOpen()) {
+        $t = Tournament::findOrFail($tournament);
+
+        if (! $t->isRegistrationOpen()) {
             return back()->with('error', __('tournaments.registration_closed'));
         }
 
-        $spielerAnzahl = $tournament->formation->spielerAnzahl();
+        $spielerAnzahl = $t->formation->spielerAnzahl();
         $validated = $this->validateRequest($request, $spielerAnzahl);
 
-        $duplikat = Registration::where('tournament_id', $tournament->id)
+        $duplikat = Registration::where('tournament_id', $t->id)
             ->where('email', $validated['email'])
             ->whereNotIn('status', [RegistrationStatus::Cancelled->value])
             ->exists();
@@ -42,12 +47,12 @@ class RegistrationController extends Controller
             return back()->withErrors(['email' => __('registrations.errors.duplicate_email')])->withInput();
         }
 
-        $vollAusgebucht = $tournament->max_registrations > 0
-            && $tournament->registrations()->whereIn('status', ['confirmed', 'pending'])->count() >= $tournament->max_registrations;
+        $vollAusgebucht = $t->max_registrations > 0
+            && $t->registrations()->whereIn('status', ['confirmed', 'pending'])->count() >= $t->max_registrations;
 
         $registration = Registration::create([
             ...$validated,
-            'tournament_id' => $tournament->id,
+            'tournament_id' => $t->id,
             'status' => $vollAusgebucht ? RegistrationStatus::Waitlist : RegistrationStatus::Pending,
             'registered_at' => now(),
             'token' => Registration::generateToken(),
@@ -59,7 +64,7 @@ class RegistrationController extends Controller
             ? __('registrations.waitlist_notice')
             : __('registrations.success.pending');
 
-        return redirect()->route('public.tournaments.show', $tournament)->with('success', $meldung);
+        return redirect(url('/' . app()->getLocale()))->with('success', $meldung);
     }
 
     public function confirm(string $token): RedirectResponse
@@ -67,12 +72,12 @@ class RegistrationController extends Controller
         $registration = Registration::where('token', $token)->firstOrFail();
 
         if ($registration->status === RegistrationStatus::Confirmed) {
-            return redirect()->route('public.tournaments.show', $registration->tournament)
+            return redirect(url('/' . app()->getLocale()))
                 ->with('info', __('registrations.errors.already_confirmed'));
         }
 
         if ($registration->status === RegistrationStatus::Cancelled) {
-            return redirect()->route('public.tournaments.index')
+            return redirect(url('/' . app()->getLocale()))
                 ->with('error', __('registrations.errors.already_cancelled'));
         }
 
@@ -81,7 +86,7 @@ class RegistrationController extends Controller
             'confirmed_at' => now(),
         ]);
 
-        return redirect()->route('public.tournaments.show', $registration->tournament)
+        return redirect(url('/' . app()->getLocale()))
             ->with('success', __('registrations.success.confirmed'));
     }
 
@@ -96,7 +101,7 @@ class RegistrationController extends Controller
         $registration = Registration::where('token', $token)->firstOrFail();
 
         if ($registration->status === RegistrationStatus::Cancelled) {
-            return redirect()->route('public.tournaments.index')
+            return redirect(url('/' . app()->getLocale()))
                 ->with('info', __('registrations.errors.already_cancelled'));
         }
 
@@ -104,7 +109,7 @@ class RegistrationController extends Controller
 
         $this->nachruckerBestaetigen($registration->tournament_id);
 
-        return redirect()->route('public.tournaments.index')
+        return redirect(url('/' . app()->getLocale()))
             ->with('success', __('registrations.success.cancelled'));
     }
 
@@ -124,7 +129,7 @@ class RegistrationController extends Controller
             'confirmed_at' => now(),
         ]);
 
-        Mail::to($naechster->email)->send(new \App\Mail\WaitlistPromoted($naechster));
+        Mail::to($naechster->email)->send(new WaitlistPromoted($naechster));
     }
 
     private function validateRequest(Request $request, int $spielerAnzahl): array

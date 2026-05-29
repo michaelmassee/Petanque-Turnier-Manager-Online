@@ -7,7 +7,7 @@
     'location' => $registration->tournament->location,
 ]) }}
 
-<x-mail::button :url="route('public.registration.cancel.form', $registration->token)" color="error">
+<x-mail::button :url="url('/de/registration/' . $registration->token . '/cancel')" color="error">
 {{ __('emails.confirmed.cancel_button') }}
 </x-mail::button>
 

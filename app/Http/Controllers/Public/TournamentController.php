@@ -22,14 +22,16 @@ class TournamentController extends Controller
         return view('public.tournaments.index', compact('tournaments'));
     }
 
-    public function show(Tournament $tournament): View
+    public function show(string $tournament): View
     {
-        return view('public.tournaments.show', compact('tournament'));
+        $t = Tournament::findOrFail($tournament);
+        return view('public.tournaments.show', ['tournament' => $t]);
     }
 
-    public function ranking(Tournament $tournament): View
+    public function ranking(string $tournament): View
     {
-        $latestResult = $tournament->latestResult;
-        return view('public.tournaments.ranking', compact('tournament', 'latestResult'));
+        $t = Tournament::findOrFail($tournament);
+        $latestResult = $t->latestResult;
+        return view('public.tournaments.ranking', ['tournament' => $t, 'latestResult' => $latestResult]);
     }
 }

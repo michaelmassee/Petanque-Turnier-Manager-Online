@@ -5,7 +5,7 @@
 
 {{ __('emails.received.confirm_hint') }}
 
-<x-mail::button :url="route('public.registration.confirm', $registration->token)" color="success">
+<x-mail::button :url="url('/de/registration/' . $registration->token . '/confirm')" color="success">
 {{ __('emails.received.confirm_button') }}
 </x-mail::button>
 

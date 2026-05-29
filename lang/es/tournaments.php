@@ -4,7 +4,7 @@ return [
     'title' => 'Torneos',
     'upcoming' => 'Próximos torneos',
     'register' => 'Inscribirse',
-    'ranking' => 'Clasificación',
+    'zur_rangliste' => 'Clasificación',
     'no_tournaments' => 'No se encontraron torneos.',
 
     'fields' => [

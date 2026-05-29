@@ -4,29 +4,33 @@ use App\Http\Controllers\Admin;
 use App\Http\Controllers\Public;
 use Illuminate\Support\Facades\Route;
 
-// Öffentliche Routen mit optionalem Sprachpräfix
-Route::prefix('{locale?}')
-    ->where(['locale' => 'de|en|fr|nl|es'])
-    ->group(function () {
+// Startseite ohne Sprachpräfix → Weiterleitung auf Browser-Sprache
+Route::get('/', function () {
+    $supported = ['de', 'en', 'fr', 'nl', 'es'];
+    $browserLang = substr(request()->getPreferredLanguage($supported) ?? '', 0, 2);
+    $locale = in_array($browserLang, $supported) ? $browserLang : 'de';
+    return redirect('/' . $locale);
+})->name('home');
 
-        Route::get('/', [Public\TournamentController::class, 'index'])->name('public.tournaments.index');
+// Öffentliche Routen — alle mit explizitem Sprach-Prefix (KEIN optional!)
+foreach (['de', 'en', 'fr', 'nl', 'es'] as $locale) {
+    Route::prefix($locale)->name("public.{$locale}.")->group(function () use ($locale) {
+        Route::get('/', [Public\TournamentController::class, 'index'])->name('tournaments.index');
 
-        Route::prefix('tournaments')->name('public.tournaments.')->group(function () {
+        Route::prefix('tournaments')->name('tournaments.')->group(function () {
             Route::get('{tournament}', [Public\TournamentController::class, 'show'])->name('show');
             Route::get('{tournament}/ranking', [Public\TournamentController::class, 'ranking'])->name('ranking');
             Route::get('{tournament}/register', [Public\RegistrationController::class, 'create'])->name('register');
             Route::post('{tournament}/register', [Public\RegistrationController::class, 'store'])->name('store');
         });
 
-        Route::prefix('registration')->name('public.registration.')->group(function () {
+        Route::prefix('registration')->name('registration.')->group(function () {
             Route::get('{token}/confirm', [Public\RegistrationController::class, 'confirm'])->name('confirm');
             Route::get('{token}/cancel', [Public\RegistrationController::class, 'cancelForm'])->name('cancel.form');
             Route::post('{token}/cancel', [Public\RegistrationController::class, 'cancel'])->name('cancel');
         });
     });
-
-// Fallback ohne Sprachpräfix — Weiterleitung zur Standard-Sprache
-Route::get('/', fn() => redirect('/' . app()->getLocale()))->name('home');
+}
 
 // Breeze-kompatibler dashboard-Alias
 Route::get('dashboard', fn() => redirect()->route('admin.tournaments.index'))

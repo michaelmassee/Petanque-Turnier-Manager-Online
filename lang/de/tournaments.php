@@ -4,7 +4,7 @@ return [
     'title' => 'Turniere',
     'upcoming' => 'Kommende Turniere',
     'register' => 'Anmelden',
-    'ranking' => 'Rangliste',
+    'zur_rangliste' => 'Rangliste',
     'no_tournaments' => 'Keine Turniere gefunden.',
 
     'fields' => [

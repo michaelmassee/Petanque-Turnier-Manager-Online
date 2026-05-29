@@ -4,7 +4,7 @@ return [
     'title' => 'Tournaments',
     'upcoming' => 'Upcoming Tournaments',
     'register' => 'Register',
-    'ranking' => 'Ranking',
+    'zur_rangliste' => 'Ranking',
     'no_tournaments' => 'No tournaments found.',
 
     'fields' => [

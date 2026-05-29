@@ -7,8 +7,7 @@
             <p class="text-sm text-gray-500 mt-1">{{ __('tournaments.ranking.round', ['round' => $latestResult->round]) }}</p>
         @endif
     </div>
-    <a href="{{ route('public.tournaments.index', ['locale' => app()->getLocale()]) }}"
-       class="text-sm text-gray-500 hover:text-gray-700">← Zurück</a>
+    <a href="{{ url('/' . app()->getLocale()) }}" class="text-sm text-gray-500 hover:text-gray-700">← Zurück</a>
 </div>
 
 @if($latestResult && count($latestResult->data) > 0)
@@ -38,7 +37,6 @@
             </tbody>
         </table>
     </div>
-
     <p class="text-xs text-gray-400 mt-3 text-right">
         {{ __('Aktualisiert') }}: {{ $latestResult->updated_at->format('d.m.Y H:i') }}
         <span class="ml-2 cursor-pointer text-green-600 hover:underline" onclick="location.reload()">↻</span>

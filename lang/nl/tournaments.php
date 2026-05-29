@@ -4,7 +4,7 @@ return [
     'title' => 'Toernooien',
     'upcoming' => 'Komende toernooien',
     'register' => 'Inschrijven',
-    'ranking' => 'Ranglijst',
+    'zur_rangliste' => 'Ranglijst',
     'no_tournaments' => 'Geen toernooien gevonden.',
 
     'fields' => [

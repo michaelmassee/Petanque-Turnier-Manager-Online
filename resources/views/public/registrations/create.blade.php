@@ -6,7 +6,7 @@
 
     <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <form method="POST"
-              action="{{ route('public.tournaments.store', ['locale' => app()->getLocale(), 'tournament' => $tournament]) }}"
+              action="{{ lroute('tournaments.store', ['tournament' => $tournament->id]) }}"
               class="space-y-6">
             @csrf
 
@@ -53,7 +53,6 @@
                 </div>
             </div>
 
-            {{-- Spieler 2 --}}
             @if($tournament->formation->spielerAnzahl() >= 2)
                 <hr class="border-gray-200">
                 <div>
@@ -63,13 +62,11 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.first_name') }} *</label>
                             <input type="text" name="partner_first_name" value="{{ old('partner_first_name') }}" required
                                    class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('partner_first_name') border-red-400 @enderror">
-                            @error('partner_first_name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.last_name') }} *</label>
                             <input type="text" name="partner_last_name" value="{{ old('partner_last_name') }}" required
                                    class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('partner_last_name') border-red-400 @enderror">
-                            @error('partner_last_name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
                     <div class="mt-4">
@@ -80,7 +77,6 @@
                 </div>
             @endif
 
-            {{-- Spieler 3 --}}
             @if($tournament->formation->spielerAnzahl() >= 3)
                 <hr class="border-gray-200">
                 <div>
@@ -90,24 +86,16 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.first_name') }} *</label>
                             <input type="text" name="partner2_first_name" value="{{ old('partner2_first_name') }}" required
                                    class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('partner2_first_name') border-red-400 @enderror">
-                            @error('partner2_first_name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.last_name') }} *</label>
                             <input type="text" name="partner2_last_name" value="{{ old('partner2_last_name') }}" required
                                    class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('partner2_last_name') border-red-400 @enderror">
-                            @error('partner2_last_name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
-                    </div>
-                    <div class="mt-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.email') }}</label>
-                        <input type="email" name="partner2_email" value="{{ old('partner2_email') }}"
-                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
                     </div>
                 </div>
             @endif
 
-            {{-- Teamname (nur bei Doublette/Triplette) --}}
             @if($tournament->formation->spielerAnzahl() > 1)
                 <hr class="border-gray-200">
                 <div>
