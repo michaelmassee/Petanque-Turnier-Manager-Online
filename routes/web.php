@@ -28,6 +28,15 @@ Route::prefix('{locale?}')
 // Fallback ohne Sprachpräfix — Weiterleitung zur Standard-Sprache
 Route::get('/', fn() => redirect('/' . app()->getLocale()))->name('home');
 
+// Breeze-kompatibler dashboard-Alias
+Route::get('dashboard', fn() => redirect()->route('admin.tournaments.index'))
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
+
+Route::get('profile', fn() => redirect()->route('admin.tournaments.index'))
+    ->middleware(['auth'])
+    ->name('profile');
+
 // Admin-Bereich (ohne Sprachpräfix)
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified'])->group(function () {
     Route::get('/', fn() => redirect()->route('admin.tournaments.index'))->name('dashboard');
