@@ -13,50 +13,53 @@ use Illuminate\View\View;
 
 class RegistrationController extends Controller
 {
-    public function index(Tournament $tournament): View
+    public function index(string $tournament): View
     {
-        $registrations = $tournament->registrations()
+        $t = Tournament::findOrFail($tournament);
+        $registrations = $t->registrations()
             ->orderBy('status')
             ->orderBy('registered_at')
             ->get();
 
-        return view('admin.registrations.index', compact('tournament', 'registrations'));
+        return view('admin.registrations.index', ['tournament' => $t, 'registrations' => $registrations]);
     }
 
-    public function updateStatus(Request $request, Registration $registration): RedirectResponse
+    public function updateStatus(Request $request, string $registration): RedirectResponse
     {
+        $r = Registration::findOrFail($registration);
         $validated = $request->validate([
             'status' => ['required', 'string', 'in:' . implode(',', array_column(RegistrationStatus::cases(), 'value'))],
         ]);
 
-        $registration->update($validated);
+        $r->update($validated);
 
         return back()->with('success', __('admin.save') . ' ✓');
     }
 
-    public function updateSeeding(Request $request, Registration $registration): RedirectResponse
+    public function updateSeeding(Request $request, string $registration): RedirectResponse
     {
+        $r = Registration::findOrFail($registration);
         $validated = $request->validate([
             'seeding_position' => ['nullable', 'integer', 'min:1'],
             'ptm_player_nr' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $registration->update($validated);
+        $r->update($validated);
 
         return back()->with('success', __('admin.save') . ' ✓');
     }
 
-    public function exportCsv(Tournament $tournament): Response
+    public function exportCsv(string $tournament): Response
     {
-        $registrations = $tournament->registrations()
+        $t = Tournament::findOrFail($tournament);
+        $registrations = $t->registrations()
             ->where('status', RegistrationStatus::Confirmed)
             ->orderBy('seeding_position')
             ->orderBy('registered_at')
             ->get();
 
-        $csvInhalt = $this->erstelleCsv($tournament, $registrations);
-
-        $dateiname = 'meldeliste_' . str_replace(' ', '_', $tournament->name) . '_' . $tournament->date->format('Y-m-d') . '.csv';
+        $csvInhalt = $this->erstelleCsv($t, $registrations);
+        $dateiname = 'meldeliste_' . str_replace(' ', '_', $t->name) . '_' . $t->date->format('Y-m-d') . '.csv';
 
         return response($csvInhalt, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -105,7 +108,7 @@ class RegistrationController extends Controller
                 $zeile[] = $reg->team_name ?? '';
             }
 
-            $zeilen[] = implode(';', array_map(fn($w) => '"' . str_replace('"', '""', $w) . '"', $zeile));
+            $zeilen[] = implode(';', array_map(fn($w) => '"' . str_replace('"', '""', (string)$w) . '"', $zeile));
             $nr++;
         }
 

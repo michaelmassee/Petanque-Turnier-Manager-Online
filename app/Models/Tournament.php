@@ -17,7 +17,7 @@ class Tournament extends Model
     use HasUlids;
 
     protected $fillable = [
-        'name', 'date', 'location', 'type', 'formation',
+        'name', 'date', 'location', 'type', 'formation', 'api_token',
         'max_registrations', 'registration_open', 'registration_deadline',
         'status', 'config', 'description', 'created_by',
     ];

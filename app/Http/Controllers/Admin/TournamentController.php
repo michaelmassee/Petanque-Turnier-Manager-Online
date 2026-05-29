@@ -43,36 +43,40 @@ class TournamentController extends Controller
             ->with('success', __('admin.save') . ' ✓');
     }
 
-    public function edit(Tournament $tournament): View
+    public function edit(string $tournament): View
     {
+        $t = Tournament::findOrFail($tournament);
+
         return view('admin.tournaments.edit', [
-            'tournament' => $tournament,
+            'tournament' => $t,
             'types' => TournamentType::cases(),
             'formations' => Formation::cases(),
             'statuses' => TournamentStatus::cases(),
         ]);
     }
 
-    public function update(Request $request, Tournament $tournament): RedirectResponse
+    public function update(Request $request, string $tournament): RedirectResponse
     {
-        $tournament->update($this->validateTournament($request));
+        $t = Tournament::findOrFail($tournament);
+        $t->update($this->validateTournament($request));
 
         return redirect()->route('admin.tournaments.index')
             ->with('success', __('admin.save') . ' ✓');
     }
 
-    public function destroy(Tournament $tournament): RedirectResponse
+    public function destroy(string $tournament): RedirectResponse
     {
-        $tournament->delete();
+        Tournament::findOrFail($tournament)->delete();
 
         return redirect()->route('admin.tournaments.index');
     }
 
-    public function generateToken(Tournament $tournament): RedirectResponse
+    public function generateToken(string $tournament): RedirectResponse
     {
-        $token = $tournament->generateApiToken();
+        $t = Tournament::findOrFail($tournament);
+        $token = $t->generateApiToken();
 
-        return redirect()->route('admin.tournaments.edit', $tournament)
+        return redirect()->route('admin.tournaments.edit', $t->id)
             ->with('api_token', $token);
     }
 
