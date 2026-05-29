@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'dashboard' => 'Tableau de bord',
+    'tournaments' => 'Tournois',
+    'new_tournament' => 'Nouveau tournoi',
+    'edit_tournament' => 'Modifier le tournoi',
+    'registrations' => 'Inscriptions',
+    'export_csv' => 'Exporter CSV',
+    'api_token' => 'Jeton API',
+    'generate_token' => 'Générer un jeton',
+    'regenerate_token' => 'Régénérer le jeton',
+    'token_warning' => 'L\'ancien jeton sera invalidé.',
+    'save' => 'Enregistrer',
+    'delete' => 'Supprimer',
+    'confirm_delete' => 'Supprimer vraiment ?',
+    'actions' => 'Actions',
+    'total_registrations' => 'Total inscriptions',
+    'confirmed_registrations' => 'Confirmées',
+    'pending_registrations' => 'En attente',
+    'waitlist_registrations' => 'Liste d\'attente',
+    'seeding_position' => 'Tête de série',
+    'ptm_player_nr' => 'N° PTM',
+    'set_status' => 'Définir le statut',
+    'no_registrations' => 'Aucune inscription pour l\'instant.',
+];

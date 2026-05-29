@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'dashboard' => 'Dashboard',
+    'tournaments' => 'Tournaments',
+    'new_tournament' => 'New Tournament',
+    'edit_tournament' => 'Edit Tournament',
+    'registrations' => 'Registrations',
+    'export_csv' => 'Export CSV',
+    'api_token' => 'API Token',
+    'generate_token' => 'Generate Token',
+    'regenerate_token' => 'Regenerate Token',
+    'token_warning' => 'The old token will become invalid.',
+    'save' => 'Save',
+    'delete' => 'Delete',
+    'confirm_delete' => 'Really delete?',
+    'actions' => 'Actions',
+    'total_registrations' => 'Total Registrations',
+    'confirmed_registrations' => 'Confirmed',
+    'pending_registrations' => 'Pending',
+    'waitlist_registrations' => 'Waitlist',
+    'seeding_position' => 'Seed',
+    'ptm_player_nr' => 'PTM No.',
+    'set_status' => 'Set Status',
+    'no_registrations' => 'No registrations yet.',
+];

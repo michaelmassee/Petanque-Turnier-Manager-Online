@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'dashboard' => 'Dashboard',
+    'tournaments' => 'Toernooien',
+    'new_tournament' => 'Nieuw toernooi',
+    'edit_tournament' => 'Toernooi bewerken',
+    'registrations' => 'Inschrijvingen',
+    'export_csv' => 'CSV exporteren',
+    'api_token' => 'API-token',
+    'generate_token' => 'Token genereren',
+    'regenerate_token' => 'Token opnieuw genereren',
+    'token_warning' => 'Het oude token wordt ongeldig.',
+    'save' => 'Opslaan',
+    'delete' => 'Verwijderen',
+    'confirm_delete' => 'Echt verwijderen?',
+    'actions' => 'Acties',
+    'total_registrations' => 'Totaal inschrijvingen',
+    'confirmed_registrations' => 'Bevestigd',
+    'pending_registrations' => 'In behandeling',
+    'waitlist_registrations' => 'Wachtlijst',
+    'seeding_position' => 'Reekshoofd',
+    'ptm_player_nr' => 'PTM-nr.',
+    'set_status' => 'Status instellen',
+    'no_registrations' => 'Nog geen inschrijvingen.',
+];
