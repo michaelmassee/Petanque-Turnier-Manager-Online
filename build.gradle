@@ -1,0 +1,117 @@
+plugins {
+    id 'org.hidetake.ssh' version '2.11.2'
+}
+
+// ─── SFTP-Verbindungsdaten aus gradle.properties ─────────────────────────────
+// Kopiere gradle.properties.example → gradle.properties und trage deine Daten ein.
+// gradle.properties ist in .gitignore eingetragen und wird nicht eingecheckt.
+ssh.settings {
+    knownHosts = allowAnyHosts   // ggf. durch expliziten known_hosts-Pfad ersetzen
+}
+
+remotes {
+    production {
+        host     = findProperty('sftpHost')     ?: 'localhost'
+        port     = (findProperty('sftpPort')    ?: '22') as int
+        user     = findProperty('sftpUser')     ?: 'deploy'
+        password = findProperty('sftpPassword') ?: ''
+    }
+}
+
+// ─── 1. Frontend-Assets bauen (Vite / Tailwind) ───────────────────────────────
+tasks.register('buildAssets') {
+    group       = 'build'
+    description = 'Baut Frontend-Assets mit npm run build (Vite)'
+    doLast {
+        exec {
+            commandLine 'npm', 'run', 'build'
+            workingDir  projectDir
+        }
+    }
+}
+
+// ─── 2. Composer-Abhängigkeiten für Produktion installieren ──────────────────
+tasks.register('composerInstall') {
+    group       = 'build'
+    description = 'Installiert PHP-Pakete ohne Dev-Abhängigkeiten'
+    doLast {
+        exec {
+            commandLine 'composer', 'install',
+                        '--no-dev', '--optimize-autoloader', '--no-interaction'
+            workingDir  projectDir
+        }
+    }
+}
+
+// ─── 3. Build-Schritte zusammenfassen ────────────────────────────────────────
+tasks.register('prepareDeploy') {
+    group       = 'deploy'
+    description = 'Baut Assets + installiert Composer-Pakete (Vorbereitung Deploy)'
+    dependsOn 'buildAssets', 'composerInstall'
+}
+
+// ─── 4. Vollständiges SFTP-Deployment ────────────────────────────────────────
+tasks.register('deploy') {
+    group       = 'deploy'
+    description = 'Deployt die komplette Laravel-App per SFTP auf den Server'
+    dependsOn   'prepareDeploy'
+
+    doLast {
+        ssh.run {
+            session(remotes.production) {
+
+                println '→ Erstelle Verzeichnisstruktur auf dem Server …'
+                execute "mkdir -p ${sftpRemotePath}/storage/framework/{cache,sessions,views,testing}"
+                execute "mkdir -p ${sftpRemotePath}/storage/logs"
+                execute "mkdir -p ${sftpRemotePath}/bootstrap/cache"
+
+                println '→ Lade PHP-Anwendungsverzeichnisse hoch …'
+                put from: file('app'),       into: sftpRemotePath
+                put from: file('bootstrap'), into: sftpRemotePath
+                put from: file('config'),    into: sftpRemotePath
+                put from: file('database'),  into: sftpRemotePath
+                put from: file('lang'),      into: sftpRemotePath
+                put from: file('resources'), into: sftpRemotePath
+                put from: file('routes'),    into: sftpRemotePath
+                put from: file('vendor'),    into: sftpRemotePath
+
+                println '→ Lade Public-Verzeichnis (inkl. Vite-Assets) hoch …'
+                put from: file('public'),    into: sftpRemotePath
+
+                println '→ Lade Einzeldateien hoch …'
+                put from: file('artisan'),         into: sftpRemotePath
+                put from: file('composer.json'),   into: sftpRemotePath
+                put from: file('composer.lock'),   into: sftpRemotePath
+
+                println '→ Setze Verzeichnisberechtigungen …'
+                execute "chmod -R 775 ${sftpRemotePath}/storage"
+                execute "chmod -R 775 ${sftpRemotePath}/bootstrap/cache"
+                execute "chmod +x    ${sftpRemotePath}/artisan"
+
+                println '→ Laravel-Cache neu aufbauen …'
+                execute "cd ${sftpRemotePath} && php artisan config:cache"
+                execute "cd ${sftpRemotePath} && php artisan route:cache"
+                execute "cd ${sftpRemotePath} && php artisan view:cache"
+
+                println "✓ Deployment abgeschlossen → ${sftpRemotePath}"
+            }
+        }
+    }
+}
+
+// ─── 5. Nur Frontend-Assets hochladen (schnelles CSS/JS-Update) ───────────────
+tasks.register('deployAssets') {
+    group       = 'deploy'
+    description = 'Lädt nur kompilierte Frontend-Assets (public/build) hoch'
+    dependsOn   'buildAssets'
+
+    doLast {
+        ssh.run {
+            session(remotes.production) {
+                println '→ Lade public/build hoch …'
+                put from: file('public/build'), into: "${sftpRemotePath}/public"
+                println '✓ Assets aktualisiert.'
+            }
+        }
+    }
+}

@@ -1,0 +1,11 @@
+# Kopiere diese Datei nach gradle.properties und trage deine Zugangsdaten ein.
+# gradle.properties ist in .gitignore eingetragen und wird NICHT ins Repository eingecheckt.
+
+# SFTP-Verbindungsdaten
+sftpHost=mein-server.example.com
+sftpPort=22
+sftpUser=deploy
+sftpPassword=geheimes-passwort
+
+# Absoluter Pfad zum Laravel-Wurzelverzeichnis auf dem Server
+sftpRemotePath=/var/www/html/petanque-turnier
