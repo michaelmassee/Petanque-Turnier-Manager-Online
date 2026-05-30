@@ -76,4 +76,4 @@ cp gradle.properties.example gradle.properties
 
 ## Lizenz
 
-MIT
+[European Union Public Licence v. 1.2 (EUPL-1.2)](LICENSE)
