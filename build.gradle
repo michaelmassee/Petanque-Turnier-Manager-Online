@@ -93,6 +93,9 @@ tasks.register('deploy') {
                 execute "cd ${sftpRemotePath} && php artisan route:cache"
                 execute "cd ${sftpRemotePath} && php artisan view:cache"
 
+                println '→ Datenbank-Migrationen ausführen …'
+                execute "cd ${sftpRemotePath} && php artisan migrate --force"
+
                 println "✓ Deployment abgeschlossen → ${sftpRemotePath}"
             }
         }
