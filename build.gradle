@@ -2,20 +2,38 @@ plugins {
     id 'org.hidetake.ssh' version '2.11.2'
 }
 
-// ─── SFTP-Verbindungsdaten aus gradle.properties ─────────────────────────────
-// Kopiere gradle.properties.example → gradle.properties und trage deine Daten ein.
-// gradle.properties ist in .gitignore eingetragen und wird nicht eingecheckt.
+// ─── Verbindungsparameter aus gradle.properties ───────────────────────────────
+// deployProtocol: sftp (Standard, empfohlen) oder ftp
+// Alte sftpHost/sftpPort/… Properties werden als Fallback weiterhin akzeptiert.
+def deployProtocol = findProperty('deployProtocol') ?: 'sftp'
+def remoteHost     = findProperty('remoteHost')     ?: findProperty('sftpHost')        ?: 'localhost'
+def remotePort     = (findProperty('remotePort')    ?: findProperty('sftpPort')        ?: (deployProtocol == 'ftp' ? '21' : '22')) as int
+def remoteUser     = findProperty('remoteUser')     ?: findProperty('sftpUser')        ?: 'deploy'
+def remotePassword = findProperty('remotePassword') ?: findProperty('sftpPassword')    ?: ''
+def remotePath     = findProperty('remotePath')     ?: findProperty('sftpRemotePath')  ?: '/var/www/html/petanque-turnier'
+
+// ─── SFTP-Konfiguration ───────────────────────────────────────────────────────
 ssh.settings {
     knownHosts = allowAnyHosts   // ggf. durch expliziten known_hosts-Pfad ersetzen
 }
 
 remotes {
     production {
-        host     = findProperty('sftpHost')     ?: 'localhost'
-        port     = (findProperty('sftpPort')    ?: '22') as int
-        user     = findProperty('sftpUser')     ?: 'deploy'
-        password = findProperty('sftpPassword') ?: ''
+        host     = remoteHost
+        port     = remotePort
+        user     = remoteUser
+        password = remotePassword
     }
+}
+
+// ─── FTP-Abhängigkeit (nur für deployProtocol=ftp benötigt) ──────────────────
+configurations { antFtp }
+
+repositories { mavenCentral() }
+
+dependencies {
+    antFtp 'commons-net:commons-net:3.10.0'
+    antFtp 'org.apache.ant:ant-commons-net:1.10.15'
 }
 
 // ─── 1. Frontend-Assets bauen (Vite / Tailwind) ───────────────────────────────
@@ -50,53 +68,89 @@ tasks.register('prepareDeploy') {
     dependsOn 'buildAssets', 'composerInstall'
 }
 
-// ─── 4. Vollständiges SFTP-Deployment ────────────────────────────────────────
+// ─── 4. Vollständiges Deployment (SFTP oder FTP) ─────────────────────────────
 tasks.register('deploy') {
     group       = 'deploy'
-    description = 'Deployt die komplette Laravel-App per SFTP auf den Server'
+    description = 'Deployt die komplette Laravel-App per SFTP oder FTP (siehe deployProtocol)'
     dependsOn   'prepareDeploy'
 
     doLast {
-        ssh.run {
-            session(remotes.production) {
+        if (deployProtocol == 'ftp') {
+            // ── FTP-Pfad ──────────────────────────────────────────────────────
+            ant.taskdef(name: 'ftp',
+                classname: 'org.apache.tools.ant.taskdefs.optional.net.FTP',
+                classpath: configurations.antFtp.asPath)
 
-                println '→ Erstelle Verzeichnisstruktur auf dem Server …'
-                execute "mkdir -p ${sftpRemotePath}/storage/framework/{cache,sessions,views,testing}"
-                execute "mkdir -p ${sftpRemotePath}/storage/logs"
-                execute "mkdir -p ${sftpRemotePath}/bootstrap/cache"
+            def appDirs = ['app', 'bootstrap', 'config', 'database',
+                           'lang', 'resources', 'routes', 'vendor', 'public']
+            appDirs.each { dir ->
+                println "→ Lade ${dir}/ hoch (FTP) …"
+                ant.ftp(server: remoteHost, port: remotePort,
+                        userid: remoteUser, password: remotePassword,
+                        remotedir: "${remotePath}/${dir}",
+                        passive: 'yes', binary: 'yes') {
+                    fileset(dir: dir) { include(name: '**') }
+                }
+            }
+            ['artisan', 'composer.json', 'composer.lock'].each { f ->
+                println "→ Lade ${f} hoch (FTP) …"
+                ant.ftp(server: remoteHost, port: remotePort,
+                        userid: remoteUser, password: remotePassword,
+                        remotedir: remotePath,
+                        passive: 'yes', binary: 'yes') {
+                    fileset(file: f)
+                }
+            }
+            println ''
+            println '⚠  FTP-Modus: Remote-Befehle können nicht automatisch ausgeführt werden.'
+            println '   Bitte nach dem Upload manuell per SSH/Konsole ausführen:'
+            println "   cd ${remotePath} && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force"
+            println ''
+            println "✓ FTP-Upload abgeschlossen → ${remotePath}"
 
-                println '→ Lade PHP-Anwendungsverzeichnisse hoch …'
-                put from: file('app'),       into: sftpRemotePath
-                put from: file('bootstrap'), into: sftpRemotePath
-                put from: file('config'),    into: sftpRemotePath
-                put from: file('database'),  into: sftpRemotePath
-                put from: file('lang'),      into: sftpRemotePath
-                put from: file('resources'), into: sftpRemotePath
-                put from: file('routes'),    into: sftpRemotePath
-                put from: file('vendor'),    into: sftpRemotePath
+        } else {
+            // ── SFTP-Pfad ─────────────────────────────────────────────────────
+            ssh.run {
+                session(remotes.production) {
 
-                println '→ Lade Public-Verzeichnis (inkl. Vite-Assets) hoch …'
-                put from: file('public'),    into: sftpRemotePath
+                    println '→ Erstelle Verzeichnisstruktur auf dem Server …'
+                    execute "mkdir -p ${remotePath}/storage/framework/{cache,sessions,views,testing}"
+                    execute "mkdir -p ${remotePath}/storage/logs"
+                    execute "mkdir -p ${remotePath}/bootstrap/cache"
 
-                println '→ Lade Einzeldateien hoch …'
-                put from: file('artisan'),         into: sftpRemotePath
-                put from: file('composer.json'),   into: sftpRemotePath
-                put from: file('composer.lock'),   into: sftpRemotePath
+                    println '→ Lade PHP-Anwendungsverzeichnisse hoch …'
+                    put from: file('app'),       into: remotePath
+                    put from: file('bootstrap'), into: remotePath
+                    put from: file('config'),    into: remotePath
+                    put from: file('database'),  into: remotePath
+                    put from: file('lang'),      into: remotePath
+                    put from: file('resources'), into: remotePath
+                    put from: file('routes'),    into: remotePath
+                    put from: file('vendor'),    into: remotePath
 
-                println '→ Setze Verzeichnisberechtigungen …'
-                execute "chmod -R 775 ${sftpRemotePath}/storage"
-                execute "chmod -R 775 ${sftpRemotePath}/bootstrap/cache"
-                execute "chmod +x    ${sftpRemotePath}/artisan"
+                    println '→ Lade Public-Verzeichnis (inkl. Vite-Assets) hoch …'
+                    put from: file('public'),    into: remotePath
 
-                println '→ Laravel-Cache neu aufbauen …'
-                execute "cd ${sftpRemotePath} && php artisan config:cache"
-                execute "cd ${sftpRemotePath} && php artisan route:cache"
-                execute "cd ${sftpRemotePath} && php artisan view:cache"
+                    println '→ Lade Einzeldateien hoch …'
+                    put from: file('artisan'),         into: remotePath
+                    put from: file('composer.json'),   into: remotePath
+                    put from: file('composer.lock'),   into: remotePath
 
-                println '→ Datenbank-Migrationen ausführen …'
-                execute "cd ${sftpRemotePath} && php artisan migrate --force"
+                    println '→ Setze Verzeichnisberechtigungen …'
+                    execute "chmod -R 775 ${remotePath}/storage"
+                    execute "chmod -R 775 ${remotePath}/bootstrap/cache"
+                    execute "chmod +x    ${remotePath}/artisan"
 
-                println "✓ Deployment abgeschlossen → ${sftpRemotePath}"
+                    println '→ Laravel-Cache neu aufbauen …'
+                    execute "cd ${remotePath} && php artisan config:cache"
+                    execute "cd ${remotePath} && php artisan route:cache"
+                    execute "cd ${remotePath} && php artisan view:cache"
+
+                    println '→ Datenbank-Migrationen ausführen …'
+                    execute "cd ${remotePath} && php artisan migrate --force"
+
+                    println "✓ Deployment abgeschlossen → ${remotePath}"
+                }
             }
         }
     }
@@ -109,12 +163,25 @@ tasks.register('deployAssets') {
     dependsOn   'buildAssets'
 
     doLast {
-        ssh.run {
-            session(remotes.production) {
-                println '→ Lade public/build hoch …'
-                put from: file('public/build'), into: "${sftpRemotePath}/public"
-                println '✓ Assets aktualisiert.'
+        if (deployProtocol == 'ftp') {
+            ant.taskdef(name: 'ftp',
+                classname: 'org.apache.tools.ant.taskdefs.optional.net.FTP',
+                classpath: configurations.antFtp.asPath)
+            println '→ Lade public/build hoch (FTP) …'
+            ant.ftp(server: remoteHost, port: remotePort,
+                    userid: remoteUser, password: remotePassword,
+                    remotedir: "${remotePath}/public/build",
+                    passive: 'yes', binary: 'yes') {
+                fileset(dir: 'public/build') { include(name: '**') }
+            }
+        } else {
+            ssh.run {
+                session(remotes.production) {
+                    println '→ Lade public/build hoch …'
+                    put from: file('public/build'), into: "${remotePath}/public"
+                }
             }
         }
+        println '✓ Assets aktualisiert.'
     }
 }

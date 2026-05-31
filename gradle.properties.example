@@ -1,11 +1,18 @@
 # Kopiere diese Datei nach gradle.properties und trage deine Zugangsdaten ein.
 # gradle.properties ist in .gitignore eingetragen und wird NICHT ins Repository eingecheckt.
 
-# SFTP-Verbindungsdaten
-sftpHost=mein-server.example.com
-sftpPort=22
-sftpUser=deploy
-sftpPassword=geheimes-passwort
+# Protokoll: sftp (Standard, empfohlen) oder ftp
+# SFTP: überträgt Dateien und führt Remote-Befehle aus (migrate, cache, chmod)
+# FTP:  überträgt nur Dateien — Remote-Befehle müssen manuell per SSH ausgeführt werden
+deployProtocol=sftp
+
+# Verbindungsdaten (gelten für beide Protokolle)
+remoteHost=mein-server.example.com
+remotePort=22
+# remotePort=21   # FTP-Standardport
+
+remoteUser=deploy
+remotePassword=geheimes-passwort
 
 # Absoluter Pfad zum Laravel-Wurzelverzeichnis auf dem Server
-sftpRemotePath=/var/www/html/petanque-turnier
+remotePath=/var/www/html/petanque-turnier

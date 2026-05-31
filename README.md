@@ -57,6 +57,35 @@ cp gradle.properties.example gradle.properties
 
 `gradle.properties` ist in `.gitignore` und wird nicht eingecheckt.
 
+#### Protokoll wählen: SFTP oder FTP
+
+In `gradle.properties` den Schalter `deployProtocol` setzen:
+
+| Wert | Port | Verhalten |
+|---|---|---|
+| `sftp` | 22 | Dateien hochladen **und** Remote-Befehle ausführen (migrate, cache, chmod) |
+| `ftp` | 21 | Nur Dateien hochladen — Remote-Befehle müssen manuell per SSH nachgeholt werden |
+
+```properties
+# SFTP (Standard, empfohlen)
+deployProtocol=sftp
+remoteHost=mein-server.example.com
+remotePort=22
+remoteUser=deploy
+remotePassword=geheimes-passwort
+remotePath=/var/www/html/petanque-turnier
+
+# FTP
+deployProtocol=ftp
+remoteHost=mein-server.example.com
+remotePort=21
+remoteUser=deploy
+remotePassword=geheimes-passwort
+remotePath=/var/www/html/petanque-turnier
+```
+
+> **Hinweis FTP:** Da FTP keine Befehlsausführung auf dem Server ermöglicht, gibt der `deploy`-Task nach dem Upload die manuell auszuführenden Befehle aus.
+
 ### Datenbank auf dem Server einrichten (Erstinstallation)
 
 Der `deploy`-Task überträgt den Code und führt automatisch `php artisan migrate --force` aus. Damit die Migrationen funktionieren, muss auf dem Server **vor dem ersten Deployment** eine `.env`-Datei mit den Datenbankzugangsdaten existieren.
