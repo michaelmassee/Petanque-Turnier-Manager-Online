@@ -88,7 +88,10 @@ remotePath=/var/www/html/petanque-turnier
 
 ### Datenbank auf dem Server einrichten (Erstinstallation)
 
-Der `deploy`-Task überträgt den Code und führt automatisch `php artisan migrate --force` aus. Damit die Migrationen funktionieren, muss auf dem Server **vor dem ersten Deployment** eine `.env`-Datei mit den Datenbankzugangsdaten existieren.
+Im **SFTP-Modus** führt der `deploy`-Task am Ende automatisch `php artisan migrate --force` aus.
+Im **FTP-Modus** ist das nicht möglich — die Migrationen müssen nach jedem Deployment manuell ausgeführt werden (der Task gibt den genauen Befehl aus).
+
+Damit die Migrationen funktionieren, muss auf dem Server **vor dem ersten Deployment** eine `.env`-Datei mit den Datenbankzugangsdaten existieren.
 
 #### Schritt 1 – `.env` auf dem Server anlegen
 
@@ -129,11 +132,16 @@ php artisan key:generate
 
 | Datei | Wo | Zweck |
 |---|---|---|
-| `gradle.properties` | lokal (nicht eingecheckt) | SFTP-Zugangsdaten, Remote-Pfad |
+| `gradle.properties` | lokal (nicht eingecheckt) | Protokoll, Zugangsdaten, Remote-Pfad |
 | `.env` auf dem Server | Server (nicht eingecheckt) | DB-Zugangsdaten, App-Key, URL |
 | `.env.example` | Repository | Vorlage mit allen verfügbaren Variablen |
 
-> **Hinweis:** `./gradlew deploy` führt am Ende automatisch `php artisan migrate --force` aus. Bei jedem weiteren Deployment werden neue Migrationen eingespielt, ohne dass ein manueller Eingriff nötig ist.
+> **SFTP:** `./gradlew deploy` führt am Ende automatisch `php artisan migrate --force` aus — kein manueller Eingriff nötig.
+>
+> **FTP:** Migrationen müssen nach jedem Upload manuell ausgeführt werden. Der `deploy`-Task gibt den vollständigen Befehl am Ende der Ausgabe aus:
+> ```bash
+> cd /var/www/html/petanque-turnier && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force
+> ```
 
 ### Deployment-Tasks
 
@@ -141,7 +149,7 @@ php artisan key:generate
 |---|---|
 | `./gradlew buildAssets` | Frontend-Assets kompilieren (Vite) |
 | `./gradlew composerInstall` | Composer-Pakete für Produktion installieren |
-| `./gradlew deploy` | Vollständiges Deployment per SFTP inkl. Migrationen |
+| `./gradlew deploy` | Vollständiges Deployment (SFTP: inkl. Migrationen / FTP: nur Upload) |
 | `./gradlew deployAssets` | Nur `public/build` hochladen (schnelles CSS/JS-Update) |
 
 ```bash
