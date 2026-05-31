@@ -57,13 +57,62 @@ cp gradle.properties.example gradle.properties
 
 `gradle.properties` ist in `.gitignore` und wird nicht eingecheckt.
 
+### Datenbank auf dem Server einrichten (Erstinstallation)
+
+Der `deploy`-Task überträgt den Code und führt automatisch `php artisan migrate --force` aus. Damit die Migrationen funktionieren, muss auf dem Server **vor dem ersten Deployment** eine `.env`-Datei mit den Datenbankzugangsdaten existieren.
+
+#### Schritt 1 – `.env` auf dem Server anlegen
+
+Die Datei `.env` wird **nicht** automatisch hochgeladen (sie enthält Secrets). Sie muss manuell auf dem Server erstellt werden, z. B. per SSH:
+
+```bash
+ssh deploy@mein-server.example.com
+cp /var/www/html/petanque-turnier/.env.example \
+   /var/www/html/petanque-turnier/.env
+```
+
+#### Schritt 2 – Datenbankverbindung konfigurieren
+
+In der `.env` auf dem Server die SQLite-Standardwerte durch MySQL ersetzen:
+
+```ini
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://meine-domain.example.com
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=petanque
+DB_USERNAME=dbuser
+DB_PASSWORD=geheimes-passwort
+```
+
+#### Schritt 3 – App-Key generieren
+
+```bash
+# auf dem Server (SSH)
+cd /var/www/html/petanque-turnier
+php artisan key:generate
+```
+
+#### Konfigurationsstellen im Überblick
+
+| Datei | Wo | Zweck |
+|---|---|---|
+| `gradle.properties` | lokal (nicht eingecheckt) | SFTP-Zugangsdaten, Remote-Pfad |
+| `.env` auf dem Server | Server (nicht eingecheckt) | DB-Zugangsdaten, App-Key, URL |
+| `.env.example` | Repository | Vorlage mit allen verfügbaren Variablen |
+
+> **Hinweis:** `./gradlew deploy` führt am Ende automatisch `php artisan migrate --force` aus. Bei jedem weiteren Deployment werden neue Migrationen eingespielt, ohne dass ein manueller Eingriff nötig ist.
+
 ### Deployment-Tasks
 
 | Task | Beschreibung |
 |---|---|
 | `./gradlew buildAssets` | Frontend-Assets kompilieren (Vite) |
 | `./gradlew composerInstall` | Composer-Pakete für Produktion installieren |
-| `./gradlew deploy` | Vollständiges Deployment per SFTP |
+| `./gradlew deploy` | Vollständiges Deployment per SFTP inkl. Migrationen |
 | `./gradlew deployAssets` | Nur `public/build` hochladen (schnelles CSS/JS-Update) |
 
 ```bash
