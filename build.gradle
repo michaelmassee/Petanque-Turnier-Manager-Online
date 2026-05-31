@@ -63,8 +63,8 @@ tasks.register('composerInstall', Exec) {
 // ─── 3. Build-Schritte zusammenfassen ────────────────────────────────────────
 tasks.register('prepareDeploy') {
     group       = 'deploy'
-    description = 'Baut Assets + installiert Composer-Pakete (Vorbereitung Deploy)'
-    dependsOn 'buildAssets', 'composerInstall'
+    description = 'Baut Frontend-Assets (Vorbereitung Deploy)'
+    dependsOn 'buildAssets'
 }
 
 // ─── 4. Vollständiges Deployment (SFTP oder FTP) ─────────────────────────────
@@ -78,8 +78,6 @@ tasks.register('deploy') {
             // ── FTP-Pfad ──────────────────────────────────────────────────────
             registerFtpTask()
 
-            // FTP-Upload in zwei Tranchen: Anwendungscode zuerst, vendor/ separat.
-            // vendor/ enthält tausende kleine Dateien → höhere Retry-Zahl nötig.
             def ftpBase = remotePath ?: '.'
             def ftpArgs = [server: remoteHost, port: remotePort,
                            userid: remoteUser, password: remotePassword,
@@ -94,7 +92,7 @@ tasks.register('deploy') {
                     include(name: 'config/**')
                     include(name: 'database/**')
                     include(name: 'lang/**')
-                    include(name: 'resources/**')
+                    include(name: 'resources/views/**')
                     include(name: 'routes/**')
                     include(name: 'public/**')
                     include(name: 'artisan')
@@ -103,105 +101,10 @@ tasks.register('deploy') {
                 }
             }
 
-            // vendor/ in wenigen Gruppen hochladen (je ~500-900 Dateien pro FTP-Session).
-            // Viele kurze Verbindungen triggern Server-seitige Rate-Limits.
-            def vendorBatches = [
-                // Gruppe 1: kleine Pakete + autoload (~250 Dateien)
-                ['vendor/autoload.php',
-                 'vendor/bin/**',
-                 'vendor/brick/**',
-                 'vendor/carbonphp/**',
-                 'vendor/composer/**',
-                 'vendor/dflydev/**',
-                 'vendor/doctrine/**',
-                 'vendor/dragonmantank/**',
-                 'vendor/egulias/**',
-                 'vendor/fruitcake/**',
-                 'vendor/graham-campbell/**',
-                 'vendor/guzzlehttp/**',
-                 'vendor/monolog/**',
-                 'vendor/phpoption/**',
-                 'vendor/ralouphie/**',
-                 'vendor/tijsverkoyen/**',
-                 'vendor/vlucas/**',
-                 'vendor/voku/**'],
-                // Gruppe 2: nikic, psy, livewire (~995 Dateien)
-                ['vendor/nikic/**',
-                 'vendor/psy/**',
-                 'vendor/livewire/**'],
-                // Gruppe 3: league, nesbot (~1384 Dateien – größte Einzelgruppe)
-                ['vendor/league/**',
-                 'vendor/nesbot/**'],
-                // Gruppe 4: nette, nunomaduro, psr, ramsey (~315 Dateien)
-                ['vendor/nette/**',
-                 'vendor/nunomaduro/**',
-                 'vendor/psr/**',
-                 'vendor/ramsey/**'],
-                // Gruppe 5: symfony (~1243 Dateien)
-                ['vendor/symfony/**'],
-                // Gruppe 6: laravel ohne framework (~104 Dateien)
-                ['vendor/laravel/prompts/**',
-                 'vendor/laravel/serializable-closure/**',
-                 'vendor/laravel/tinker/**'],
-                // Gruppe 7: laravel/framework erste Hälfte (~900 Dateien)
-                ['vendor/laravel/framework/src/Illuminate/Foundation/**',
-                 'vendor/laravel/framework/src/Illuminate/Database/**',
-                 'vendor/laravel/framework/src/Illuminate/Contracts/**',
-                 'vendor/laravel/framework/src/Illuminate/Queue/**'],
-                // Gruppe 8: laravel/framework zweite Hälfte + Rest (~900 Dateien)
-                ['vendor/laravel/framework/src/Illuminate/Support/**',
-                 'vendor/laravel/framework/src/Illuminate/Console/**',
-                 'vendor/laravel/framework/src/Illuminate/Routing/**',
-                 'vendor/laravel/framework/src/Illuminate/Http/**',
-                 'vendor/laravel/framework/src/Illuminate/Cache/**',
-                 'vendor/laravel/framework/src/Illuminate/View/**',
-                 'vendor/laravel/framework/src/Illuminate/Auth/**',
-                 'vendor/laravel/framework/src/Illuminate/Validation/**',
-                 'vendor/laravel/framework/src/Illuminate/Mail/**',
-                 'vendor/laravel/framework/src/Illuminate/Testing/**',
-                 'vendor/laravel/framework/src/Illuminate/Notifications/**',
-                 'vendor/laravel/framework/src/Illuminate/Container/**',
-                 'vendor/laravel/framework/src/Illuminate/Broadcasting/**',
-                 'vendor/laravel/framework/src/Illuminate/Bus/**',
-                 'vendor/laravel/framework/src/Illuminate/Pagination/**',
-                 'vendor/laravel/framework/src/Illuminate/Session/**',
-                 'vendor/laravel/framework/src/Illuminate/Redis/**',
-                 'vendor/laravel/framework/src/Illuminate/Process/**',
-                 'vendor/laravel/framework/src/Illuminate/Log/**',
-                 'vendor/laravel/framework/src/Illuminate/Translation/**',
-                 'vendor/laravel/framework/src/Illuminate/Collections/**',
-                 'vendor/laravel/framework/src/Illuminate/JsonSchema/**',
-                 'vendor/laravel/framework/src/Illuminate/Filesystem/**',
-                 'vendor/laravel/framework/src/Illuminate/Events/**',
-                 'vendor/laravel/framework/src/Illuminate/Hashing/**',
-                 'vendor/laravel/framework/src/Illuminate/Concurrency/**',
-                 'vendor/laravel/framework/src/Illuminate/Cookie/**',
-                 'vendor/laravel/framework/src/Illuminate/Reflection/**',
-                 'vendor/laravel/framework/src/Illuminate/Pipeline/**',
-                 'vendor/laravel/framework/src/Illuminate/Encryption/**',
-                 'vendor/laravel/framework/src/Illuminate/Conditionable/**',
-                 'vendor/laravel/framework/src/Illuminate/Macroable/**',
-                 'vendor/laravel/framework/src/Illuminate/Config/**',
-                 'vendor/laravel/framework/src/Illuminate/*.php',
-                 'vendor/laravel/framework/src/*.php',
-                 'vendor/laravel/framework/*.php',
-                 'vendor/laravel/framework/*.json',
-                 'vendor/laravel/framework/LICENSE.md'],
-            ]
-
-            println "→ Lade vendor/ in ${vendorBatches.size()} Gruppen hoch (FTP) …"
-            vendorBatches.eachWithIndex { patterns, idx ->
-                println "  · Gruppe ${idx + 1}/${vendorBatches.size()} …"
-                ant.ftp(ftpArgs) {
-                    fileset(dir: projectDir.absolutePath) {
-                        patterns.each { p -> include(name: p) }
-                    }
-                }
-            }
             println ''
-            println '⚠  FTP-Modus: Remote-Befehle können nicht automatisch ausgeführt werden.'
-            println '   Bitte nach dem Upload manuell per SSH/Konsole ausführen:'
-            println "   cd ${remotePath ?: '~'} && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force"
+            println '⚠  FTP-Modus: vendor/ wird nicht hochgeladen.'
+            println '   Bitte install.php im Browser aufrufen, um Composer und Datenbank einzurichten:'
+            println '   https://<deine-domain>/install.php'
             println ''
             println "✓ FTP-Upload abgeschlossen → ${ftpBase}"
 
