@@ -13,7 +13,7 @@
                     {{ __('registrations.yes_cancel') }}
                 </button>
             </form>
-            <a href="{{ url('/' . app()->getLocale()) }}"
+            <a href="{{ lroute('tournaments.index') }}"
                class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-5 py-2 rounded-md">
                 {{ __('registrations.no_back') }}
             </a>

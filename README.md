@@ -63,8 +63,8 @@ In `gradle.properties` den Schalter `deployProtocol` setzen:
 
 | Wert | Port | Verhalten |
 |---|---|---|
-| `sftp` | 22 | Dateien hochladen **und** Remote-Befehle ausführen (migrate, cache, chmod) |
-| `ftp` | 21 | Nur Dateien hochladen — Remote-Befehle müssen manuell per SSH nachgeholt werden |
+| `sftp` | 22 | Dateien hochladen |
+| `ftp` | 21 | Dateien hochladen |
 
 ```properties
 # SFTP (Standard, empfohlen)
@@ -73,6 +73,14 @@ remoteHost=mein-server.example.com
 remotePort=22
 remoteUser=deploy
 remotePassword=geheimes-passwort
+installerPassword=langes-zufaelliges-installer-passwort
+installerAppUrl=https://meine-domain.example.com
+installerDbConnection=mysql
+installerDbHost=127.0.0.1
+installerDbPort=3306
+installerDbDatabase=petanque
+installerDbUsername=dbuser
+installerDbPassword=geheimes-db-passwort
 remotePath=/var/www/html/petanque-turnier
 
 # FTP
@@ -81,31 +89,36 @@ remoteHost=mein-server.example.com
 remotePort=21
 remoteUser=deploy
 remotePassword=geheimes-passwort
+installerPassword=langes-zufaelliges-installer-passwort
+installerAppUrl=https://meine-domain.example.com
+installerDbConnection=mysql
+installerDbHost=127.0.0.1
+installerDbPort=3306
+installerDbDatabase=petanque
+installerDbUsername=dbuser
+installerDbPassword=geheimes-db-passwort
 remotePath=/var/www/html/petanque-turnier
 ```
 
-> **Hinweis FTP:** Da FTP keine Befehlsausführung auf dem Server ermöglicht, gibt der `deploy`-Task nach dem Upload die manuell auszuführenden Befehle aus.
+Der `deploy`-Task führt keine Remote-Befehle aus. Nach dem Upload erfolgt die Einrichtung über `https://<deine-domain>/install.php`.
+Das Installer-Passwort kommt aus `installerPassword` in der lokalen `gradle.properties`; im Repository steht nur ein Platzhalter.
+Optionale `installer...`-Werte aus `gradle.properties` werden als Defaultwerte in das Installer-Formular eingetragen.
 
 ### Datenbank auf dem Server einrichten (Erstinstallation)
 
-Im **SFTP-Modus** führt der `deploy`-Task am Ende automatisch `php artisan migrate --force` aus.
-Im **FTP-Modus** ist das nicht möglich — die Migrationen müssen nach jedem Deployment manuell ausgeführt werden (der Task gibt den genauen Befehl aus).
+Der `deploy`-Task baut Assets und Composer-Abhängigkeiten lokal und lädt `vendor/` als mehrere Vendor-Archive hoch. `.env`-Erstellung, Entpacken der Vendor-Archive, App-Key und Migrationen werden danach über den Web-Installer ausgeführt.
 
-Damit die Migrationen funktionieren, muss auf dem Server **vor dem ersten Deployment** eine `.env`-Datei mit den Datenbankzugangsdaten existieren.
+Damit die Installation funktioniert, muss `public/install.php` nach dem Upload im Browser erreichbar sein.
 
-#### Schritt 1 – `.env` auf dem Server anlegen
-
-Die Datei `.env` wird **nicht** automatisch hochgeladen (sie enthält Secrets). Sie muss manuell auf dem Server erstellt werden, z. B. per SSH:
+#### Schritt 1 – Anwendung hochladen
 
 ```bash
-ssh deploy@mein-server.example.com
-cp /var/www/html/petanque-turnier/.env.example \
-   /var/www/html/petanque-turnier/.env
+./gradlew deploy
 ```
 
 #### Schritt 2 – Datenbankverbindung konfigurieren
 
-In der `.env` auf dem Server die SQLite-Standardwerte durch MySQL ersetzen:
+Im Browser `https://<deine-domain>/install.php` öffnen und die Datenbankzugangsdaten eintragen:
 
 ```ini
 APP_ENV=production
@@ -120,28 +133,17 @@ DB_USERNAME=dbuser
 DB_PASSWORD=geheimes-passwort
 ```
 
-#### Schritt 3 – App-Key generieren
+#### Schritt 3 – Installer entfernen
 
-```bash
-# auf dem Server (SSH)
-cd /var/www/html/petanque-turnier
-php artisan key:generate
-```
+Nach erfolgreicher Installation `public/install.php` auf dem Server löschen oder den Zugriff darauf sperren.
 
 #### Konfigurationsstellen im Überblick
 
 | Datei | Wo | Zweck |
 |---|---|---|
 | `gradle.properties` | lokal (nicht eingecheckt) | Protokoll, Zugangsdaten, Remote-Pfad |
-| `.env` auf dem Server | Server (nicht eingecheckt) | DB-Zugangsdaten, App-Key, URL |
+| `.env` auf dem Server | Wird von `install.php` erstellt | DB-Zugangsdaten, App-Key, URL |
 | `.env.example` | Repository | Vorlage mit allen verfügbaren Variablen |
-
-> **SFTP:** `./gradlew deploy` führt am Ende automatisch `php artisan migrate --force` aus — kein manueller Eingriff nötig.
->
-> **FTP:** Migrationen müssen nach jedem Upload manuell ausgeführt werden. Der `deploy`-Task gibt den vollständigen Befehl am Ende der Ausgabe aus:
-> ```bash
-> cd /var/www/html/petanque-turnier && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force
-> ```
 
 ### Deployment-Tasks
 
@@ -149,7 +151,7 @@ php artisan key:generate
 |---|---|
 | `./gradlew buildAssets` | Frontend-Assets kompilieren (Vite) |
 | `./gradlew composerInstall` | Composer-Pakete für Produktion installieren |
-| `./gradlew deploy` | Vollständiges Deployment (SFTP: inkl. Migrationen / FTP: nur Upload) |
+| `./gradlew deploy` | Vollständiger Upload per SFTP oder FTP; Installation über `install.php` |
 | `./gradlew deployAssets` | Nur `public/build` hochladen (schnelles CSS/JS-Update) |
 
 ```bash

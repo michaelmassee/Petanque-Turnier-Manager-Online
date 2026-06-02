@@ -2,8 +2,7 @@
 # gradle.properties ist in .gitignore eingetragen und wird NICHT ins Repository eingecheckt.
 
 # Protokoll: sftp (Standard, empfohlen) oder ftp
-# SFTP: überträgt Dateien und führt Remote-Befehle aus (migrate, cache, chmod)
-# FTP:  überträgt nur Dateien — Remote-Befehle müssen manuell per SSH ausgeführt werden
+# Beide Modi laden nur Dateien hoch. Installation, Composer und Datenbank laufen über public/install.php.
 deployProtocol=sftp
 
 # Verbindungsdaten (gelten für beide Protokolle)
@@ -14,5 +13,29 @@ remotePort=22
 remoteUser=deploy
 remotePassword=geheimes-passwort
 
-# Absoluter Pfad zum Laravel-Wurzelverzeichnis auf dem Server
+# Passwort für public/install.php. Wird erst beim Upload in die generierte Datei eingesetzt.
+installerPassword=bitte-aendern
+
+# Optionale Defaultwerte für das install.php-Formular.
+# Diese Werte werden nur lokal beim Upload in public/install.php eingesetzt.
+installerAppUrl=https://meine-domain.example.com
+installerDbConnection=mysql
+installerDbHost=127.0.0.1
+installerDbPort=3306
+installerDbDatabase=petanque
+installerDbUsername=dbuser
+installerDbPassword=geheimes-db-passwort
+installerMailMailer=log
+installerMailFromAddress=noreply@example.com
+installerMailHost=127.0.0.1
+installerMailPort=587
+installerMailUsername=null
+installerMailPassword=
+
+# SFTP-Upload-Pfad. Bei Chroot-SFTP kann das "/" sein.
 remotePath=/var/www/html/petanque-turnier
+
+# Optional: echter Shell-Pfad zum Laravel-Wurzelverzeichnis.
+# Nur relevant, wenn der Hoster SSH-Kommandos erlaubt.
+# remoteShellPath=/mnt/web.../htdocs/petanque-turnier
+remoteRunArtisan=false

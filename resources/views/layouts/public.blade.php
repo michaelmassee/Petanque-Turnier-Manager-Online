@@ -13,13 +13,13 @@
 
 <nav class="bg-white border-b border-gray-200">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-        <a href="{{ route('public.tournaments.index', ['locale' => app()->getLocale()]) }}"
+        <a href="{{ lroute('tournaments.index') }}"
            class="text-lg font-semibold text-green-700">
             🎯 Pétanque Turnier Manager
         </a>
         <div class="flex items-center gap-3 text-sm">
             @foreach(['de' => '🇩🇪', 'en' => '🇬🇧', 'fr' => '🇫🇷', 'nl' => '🇳🇱', 'es' => '🇪🇸'] as $locale => $flag)
-                <a href="/{{ $locale }}" class="{{ app()->getLocale() === $locale ? 'font-bold' : 'text-gray-500 hover:text-gray-800' }}">
+                <a href="{{ public_locale_route($locale) }}" class="{{ app()->getLocale() === $locale ? 'font-bold' : 'text-gray-500 hover:text-gray-800' }}">
                     {{ $flag }} {{ strtoupper($locale) }}
                 </a>
             @endforeach

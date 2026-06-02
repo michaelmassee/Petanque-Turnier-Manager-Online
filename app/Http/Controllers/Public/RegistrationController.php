@@ -20,7 +20,7 @@ class RegistrationController extends Controller
         $t = Tournament::findOrFail($tournament);
 
         if (! $t->isRegistrationOpen()) {
-            return redirect(url('/' . app()->getLocale()))
+            return redirect(lroute('tournaments.index'))
                 ->with('error', __('tournaments.registration_closed'));
         }
 
@@ -64,7 +64,7 @@ class RegistrationController extends Controller
             ? __('registrations.waitlist_notice')
             : __('registrations.success.pending');
 
-        return redirect(url('/' . app()->getLocale()))->with('success', $meldung);
+        return redirect(lroute('tournaments.index'))->with('success', $meldung);
     }
 
     public function confirm(string $token): RedirectResponse
@@ -72,12 +72,12 @@ class RegistrationController extends Controller
         $registration = Registration::where('token', $token)->firstOrFail();
 
         if ($registration->status === RegistrationStatus::Confirmed) {
-            return redirect(url('/' . app()->getLocale()))
+            return redirect(lroute('tournaments.index'))
                 ->with('info', __('registrations.errors.already_confirmed'));
         }
 
         if ($registration->status === RegistrationStatus::Cancelled) {
-            return redirect(url('/' . app()->getLocale()))
+            return redirect(lroute('tournaments.index'))
                 ->with('error', __('registrations.errors.already_cancelled'));
         }
 
@@ -86,7 +86,7 @@ class RegistrationController extends Controller
             'confirmed_at' => now(),
         ]);
 
-        return redirect(url('/' . app()->getLocale()))
+        return redirect(lroute('tournaments.index'))
             ->with('success', __('registrations.success.confirmed'));
     }
 
@@ -101,7 +101,7 @@ class RegistrationController extends Controller
         $registration = Registration::where('token', $token)->firstOrFail();
 
         if ($registration->status === RegistrationStatus::Cancelled) {
-            return redirect(url('/' . app()->getLocale()))
+            return redirect(lroute('tournaments.index'))
                 ->with('info', __('registrations.errors.already_cancelled'));
         }
 
@@ -109,7 +109,7 @@ class RegistrationController extends Controller
 
         $this->nachruckerBestaetigen($registration->tournament_id);
 
-        return redirect(url('/' . app()->getLocale()))
+        return redirect(lroute('tournaments.index'))
             ->with('success', __('registrations.success.cancelled'));
     }
 

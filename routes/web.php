@@ -9,7 +9,7 @@ Route::get('/', function () {
     $supported = ['de', 'en', 'fr', 'nl', 'es'];
     $browserLang = substr(request()->getPreferredLanguage($supported) ?? '', 0, 2);
     $locale = in_array($browserLang, $supported) ? $browserLang : 'de';
-    return redirect('/' . $locale);
+    return redirect()->route("public.{$locale}.tournaments.index");
 })->name('home');
 
 // Öffentliche Routen — alle mit explizitem Sprach-Prefix (KEIN optional!)

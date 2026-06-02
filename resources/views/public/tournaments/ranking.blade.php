@@ -7,7 +7,7 @@
             <p class="text-sm text-gray-500 mt-1">{{ __('tournaments.ranking.round', ['round' => $latestResult->round]) }}</p>
         @endif
     </div>
-    <a href="{{ url('/' . app()->getLocale()) }}" class="text-sm text-gray-500 hover:text-gray-700">← Zurück</a>
+    <a href="{{ lroute('tournaments.index') }}" class="text-sm text-gray-500 hover:text-gray-700">← Zurück</a>
 </div>
 
 @if($latestResult && count($latestResult->data) > 0)

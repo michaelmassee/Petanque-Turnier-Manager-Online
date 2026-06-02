@@ -4,6 +4,7 @@
 .env.remote
 gradle.properties
 .gradle/
+/build
 .env.backup
 .env.production
 .phpactor.json
