@@ -7,6 +7,44 @@ return [
     'zur_rangliste' => 'Ranglijst',
     'no_tournaments' => 'Geen toernooien gevonden.',
 
+    'start_menu' => [
+        'find_label' => 'Start',
+        'find_title' => 'Toernooi zoeken',
+        'manager_label' => 'Toernooibeheerder',
+        'manager_title' => 'Registreren',
+        'login_label' => 'Toegang',
+        'login_title' => 'Login',
+        'admin_label' => 'Admin',
+        'admin_title' => 'Adminomgeving',
+        'subtitle' => 'Toernooien vinden, inschrijven en resultaten bekijken.',
+    ],
+
+    'filters' => [
+        'search' => 'Zoeken',
+        'search_placeholder' => 'Naam of locatie',
+        'status' => 'Status',
+        'all_statuses' => 'Alle statussen',
+        'period' => 'Periode',
+        'periods' => [
+            'upcoming' => 'Komend',
+            'past' => 'Verleden',
+            'all' => 'Alle',
+        ],
+        'formation' => 'Formatie',
+        'all_formations' => 'Alle formaties',
+        'location' => 'Locatie',
+        'location_placeholder' => 'Speellocatie',
+        'mine' => 'Mijn toernooien',
+        'reset' => 'Resetten',
+        'apply' => 'Filteren',
+    ],
+
+    'list_titles' => [
+        'upcoming' => 'Komende toernooien',
+        'past' => 'Afgelopen toernooien',
+        'all' => 'Alle toernooien',
+    ],
+
     'fields' => [
         'name' => 'Toernooinama',
         'date' => 'Datum',
@@ -18,6 +56,16 @@ return [
         'registration_deadline' => 'Inschrijvingsdeadline',
         'status' => 'Status',
         'description' => 'Beschrijving',
+        'required_participant_fields' => 'Verplichte velden voor deelnemers',
+        'manual_confirmation' => 'Deelnemers moeten door de toernooibeheerder worden bevestigd',
+    ],
+
+    'registration_requirements' => [
+        'club' => 'Club',
+        'license_nr' => 'Licentienummer',
+        'team_name' => 'Teamnaam',
+        'partner_email' => 'E-mail van speler 2',
+        'partner2_email' => 'E-mail van speler 3',
     ],
 
     'type' => [

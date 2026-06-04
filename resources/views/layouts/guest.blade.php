@@ -6,6 +6,8 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>{{ config('app.name', 'Laravel') }}</title>
+        <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/petanqueturniermanager-logo-32px.png') }}">
+        <link rel="apple-touch-icon" sizes="256x256" href="{{ asset('images/petanqueturniermanager-logo-256px.png') }}">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

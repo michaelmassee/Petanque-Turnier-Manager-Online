@@ -33,6 +33,9 @@ def installerTokens = [
     installerDbDatabase     : findProperty('installerDbDatabase') ?: '',
     installerDbUsername     : findProperty('installerDbUsername') ?: '',
     installerDbPassword     : findProperty('installerDbPassword') ?: '',
+    installerAdminName      : findProperty('installerAdminName') ?: 'Administrator',
+    installerAdminEmail     : findProperty('installerAdminEmail') ?: 'admin@example.com',
+    installerAdminPassword  : findProperty('installerAdminPassword') ?: '',
     installerMailMailer     : findProperty('installerMailMailer') ?: 'log',
     installerMailFromAddress: findProperty('installerMailFromAddress') ?: 'noreply@example.com',
     installerMailHost       : findProperty('installerMailHost') ?: '127.0.0.1',
@@ -128,6 +131,126 @@ repositories { mavenCentral() }
 dependencies {
     antFtp 'commons-net:commons-net:3.10.0'
     antFtp 'org.apache.ant:ant-commons-net:1.10.15'
+}
+
+tasks.register('localTest') {
+    group = 'verification'
+    description = 'Fuehrt lokale Checks aus: PHP-Syntax, Laravel-Tests falls installiert, Frontend-Build'
+    dependsOn 'buildAssets'
+
+    doLast {
+        def runLocalCommand = { List<String> command ->
+            def process = new ProcessBuilder(command)
+                .directory(projectDir)
+                .redirectErrorStream(true)
+                .start()
+            def output = new ByteArrayOutputStream()
+            process.inputStream.transferTo(output)
+            def exitCode = process.waitFor()
+            [exitCode: exitCode, output: output.toString('UTF-8').trim()]
+        }
+
+        def phpFiles = fileTree(projectDir) {
+            include '**/*.php'
+            exclude 'vendor/**'
+            exclude 'node_modules/**'
+            exclude 'storage/**'
+            exclude 'bootstrap/cache/**'
+            exclude 'build/**'
+        }.files.sort { it.path }
+
+        println "→ Prüfe PHP-Syntax (${phpFiles.size()} Dateien) …"
+        def syntaxErrors = []
+        phpFiles.each { phpFile ->
+            def result = runLocalCommand(['php', '-l', phpFile.absolutePath])
+
+            if (result.exitCode != 0) {
+                syntaxErrors << result.output
+            }
+        }
+
+        if (syntaxErrors) {
+            throw new GradleException("PHP-Syntaxprüfung fehlgeschlagen:\n" + syntaxErrors.join('\n'))
+        }
+        println '✓ PHP-Syntax ist sauber.'
+
+        if (file('vendor/bin/phpunit').exists()) {
+            println '→ Starte Laravel/PHPUnit-Tests …'
+            def result = runLocalCommand(['composer', 'test'])
+            if (result.output) {
+                println result.output
+            }
+            if (result.exitCode != 0) {
+                throw new GradleException('Laravel/PHPUnit-Tests fehlgeschlagen.')
+            }
+        } else {
+            println '↷ Laravel/PHPUnit-Tests übersprungen: vendor/bin/phpunit fehlt. Dev-Abhängigkeiten mit composer install installieren.'
+        }
+
+        println '✓ Lokale Checks abgeschlossen.'
+    }
+}
+
+tasks.register('localDev') {
+    group = 'application'
+    description = 'Startet lokale Laravel- und Vite-Dev-Server mit Live-Reload'
+
+    doLast {
+        def devHost = (findProperty('localDevHost') ?: '0.0.0.0').toString()
+        def devPublicHost = (findProperty('localDevPublicHost') ?: '192.168.178.46').toString()
+        def laravelPort = (findProperty('localDevLaravelPort') ?: '8000').toString()
+        def vitePort = (findProperty('localDevVitePort') ?: '5173').toString()
+        def commands = [
+            [name: 'laravel', command: ['php', 'artisan', 'serve', "--host=${devHost}", "--port=${laravelPort}"], env: [:]],
+            [name: 'vite', command: ['npm', 'run', 'dev'], env: [VITE_DEV_HOST: devPublicHost, VITE_DEV_PORT: vitePort]],
+        ]
+
+        def processes = []
+        def shutdown = {
+            processes.each { item ->
+                if (item.process.isAlive()) {
+                    item.process.destroy()
+                    if (!item.process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                        item.process.destroyForcibly()
+                    }
+                }
+            }
+        }
+
+        Runtime.runtime.addShutdownHook(new Thread(shutdown))
+
+        try {
+            commands.each { item ->
+                def command = item.command.collect { it.toString() }
+                println "→ Starte ${item.name}: ${command.join(' ')}"
+                def builder = new ProcessBuilder(command)
+                    .directory(projectDir)
+                    .inheritIO()
+                builder.environment().putAll(item.env)
+                def process = builder.start()
+                processes << [name: item.name, process: process]
+            }
+
+            println ''
+            println "✓ Lokale Entwicklung läuft lokal: http://localhost:${laravelPort}"
+            println "✓ Im lokalen Netzwerk: http://${devPublicHost}:${laravelPort}"
+            println '  Vite aktualisiert Blade/CSS/JS-Aenderungen automatisch. Stoppen mit Ctrl+C.'
+
+            while (processes.every { it.process.isAlive() }) {
+                Thread.sleep(1000)
+            }
+
+            def stopped = processes.find { !it.process.isAlive() }
+            def exitCode = stopped.process.exitValue()
+            shutdown()
+
+            if (exitCode != 0) {
+                throw new GradleException("${stopped.name} wurde mit Exit-Code ${exitCode} beendet.")
+            }
+        } finally {
+            shutdown()
+        }
+    }
 }
 
 // Ant-FTP-Task einmalig registrieren (verhindert "override"-Warnung bei Mehrfachaufruf)
@@ -593,7 +716,7 @@ tasks.register('deploy') {
                 runRemoteLaravelInstall()
             } else {
                 println '→ SSH-Artisan übersprungen (remoteRunArtisan=false).'
-                println '  Auf Hostings ohne Shell-Zugriff die Installation im Browser über public/install.php starten.'
+                println '  Auf Hostings ohne Shell-Zugriff die Installation im Browser über install.php starten.'
             }
 
             println ''
@@ -854,6 +977,49 @@ tasks.register('setRemoteDebug') {
         try {
             channel.put(localEnv.absolutePath, remoteChildPath('.env'), ChannelSftp.OVERWRITE)
             println "APP_DEBUG wurde auf ${debugValue} gesetzt."
+        } finally {
+            channel.disconnect()
+            session.disconnect()
+        }
+    }
+}
+
+tasks.register('setRemoteAppUrl') {
+    group       = 'deploy'
+    description = 'Setzt APP_URL in der Remote-.env auf installerAppUrl'
+
+    doLast {
+        if (deployProtocol == 'ftp') {
+            throw new GradleException('setRemoteAppUrl unterstützt aktuell nur SFTP.')
+        }
+
+        def appUrl = (findProperty('installerAppUrl') ?: '').toString().trim()
+        if (!appUrl) {
+            throw new GradleException('installerAppUrl muss gesetzt sein.')
+        }
+
+        def localEnv = layout.buildDirectory.file('remote-logs/env-app-url.txt').get().asFile
+        downloadSftpFile(remoteChildPath('.env'), localEnv)
+        def envText = localEnv.getText('UTF-8')
+        def line = 'APP_URL=' + envQuoteValue(appUrl)
+        if (envText.readLines().any { it.startsWith('APP_URL=') }) {
+            envText = envText.replaceFirst('(?m)^APP_URL=.*$') { line }
+        } else {
+            envText = envText + (envText.endsWith('\n') ? '' : '\n') + line + '\n'
+        }
+        localEnv.setText(envText, 'UTF-8')
+
+        def jsch = new JSch()
+        def session = jsch.getSession(remoteUser, remoteHost, remotePort)
+        session.setPassword(remotePassword)
+        session.setConfig('StrictHostKeyChecking', 'no')
+        session.connect(30000)
+
+        def channel = (ChannelSftp) session.openChannel('sftp')
+        channel.connect(30000)
+        try {
+            channel.put(localEnv.absolutePath, remoteChildPath('.env'), ChannelSftp.OVERWRITE)
+            println "APP_URL wurde auf ${appUrl} gesetzt."
         } finally {
             channel.disconnect()
             session.disconnect()

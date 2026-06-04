@@ -7,6 +7,44 @@ return [
     'zur_rangliste' => 'Classement',
     'no_tournaments' => 'Aucun tournoi trouvé.',
 
+    'start_menu' => [
+        'find_label' => 'Accueil',
+        'find_title' => 'Trouver un tournoi',
+        'manager_label' => 'Gestionnaire',
+        'manager_title' => 'S\'inscrire',
+        'login_label' => 'Accès',
+        'login_title' => 'Connexion',
+        'admin_label' => 'Admin',
+        'admin_title' => 'Administration',
+        'subtitle' => 'Trouver des tournois, s\'inscrire et consulter les résultats.',
+    ],
+
+    'filters' => [
+        'search' => 'Recherche',
+        'search_placeholder' => 'Nom ou lieu',
+        'status' => 'Statut',
+        'all_statuses' => 'Tous les statuts',
+        'period' => 'Période',
+        'periods' => [
+            'upcoming' => 'À venir',
+            'past' => 'Passés',
+            'all' => 'Tous',
+        ],
+        'formation' => 'Formation',
+        'all_formations' => 'Toutes les formations',
+        'location' => 'Lieu',
+        'location_placeholder' => 'Lieu de jeu',
+        'mine' => 'Mes tournois',
+        'reset' => 'Réinitialiser',
+        'apply' => 'Filtrer',
+    ],
+
+    'list_titles' => [
+        'upcoming' => 'Tournois à venir',
+        'past' => 'Tournois passés',
+        'all' => 'Tous les tournois',
+    ],
+
     'fields' => [
         'name' => 'Nom du tournoi',
         'date' => 'Date',
@@ -18,6 +56,16 @@ return [
         'registration_deadline' => 'Date limite d\'inscription',
         'status' => 'Statut',
         'description' => 'Description',
+        'required_participant_fields' => 'Champs obligatoires pour les participants',
+        'manual_confirmation' => 'Les participants doivent être validés par le gestionnaire du tournoi',
+    ],
+
+    'registration_requirements' => [
+        'club' => 'Club',
+        'license_nr' => 'Numéro de licence',
+        'team_name' => 'Nom d\'équipe',
+        'partner_email' => 'E-mail du joueur 2',
+        'partner2_email' => 'E-mail du joueur 3',
     ],
 
     'type' => [

@@ -7,6 +7,44 @@ return [
     'zur_rangliste' => 'Rangliste',
     'no_tournaments' => 'Keine Turniere gefunden.',
 
+    'start_menu' => [
+        'find_label' => 'Start',
+        'find_title' => 'Turnier suchen',
+        'manager_label' => 'Turniermanager',
+        'manager_title' => 'Registrieren',
+        'login_label' => 'Zugang',
+        'login_title' => 'Login',
+        'admin_label' => 'Admin',
+        'admin_title' => 'Adminbereich',
+        'subtitle' => 'Turniere finden, anmelden und Ergebnisse einsehen.',
+    ],
+
+    'filters' => [
+        'search' => 'Suche',
+        'search_placeholder' => 'Name oder Ort',
+        'status' => 'Status',
+        'all_statuses' => 'Alle Status',
+        'period' => 'Zeitraum',
+        'periods' => [
+            'upcoming' => 'Kommend',
+            'past' => 'Vergangen',
+            'all' => 'Alle',
+        ],
+        'formation' => 'Formation',
+        'all_formations' => 'Alle Formationen',
+        'location' => 'Ort',
+        'location_placeholder' => 'Spielort',
+        'mine' => 'Meine Turniere',
+        'reset' => 'Zurücksetzen',
+        'apply' => 'Filtern',
+    ],
+
+    'list_titles' => [
+        'upcoming' => 'Kommende Turniere',
+        'past' => 'Vergangene Turniere',
+        'all' => 'Alle Turniere',
+    ],
+
     'fields' => [
         'name' => 'Turniername',
         'date' => 'Datum',
@@ -18,6 +56,16 @@ return [
         'registration_deadline' => 'Anmeldeschluss',
         'status' => 'Status',
         'description' => 'Beschreibung',
+        'required_participant_fields' => 'Pflichtfelder für Teilnehmer',
+        'manual_confirmation' => 'Teilnehmer müssen vom Turnierverwalter bestätigt werden',
+    ],
+
+    'registration_requirements' => [
+        'club' => 'Verein',
+        'license_nr' => 'Lizenznummer',
+        'team_name' => 'Teamname',
+        'partner_email' => 'E-Mail von Spieler 2',
+        'partner2_email' => 'E-Mail von Spieler 3',
     ],
 
     'type' => [

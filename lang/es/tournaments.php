@@ -7,6 +7,44 @@ return [
     'zur_rangliste' => 'Clasificación',
     'no_tournaments' => 'No se encontraron torneos.',
 
+    'start_menu' => [
+        'find_label' => 'Inicio',
+        'find_title' => 'Buscar torneo',
+        'manager_label' => 'Gestor de torneos',
+        'manager_title' => 'Registrarse',
+        'login_label' => 'Acceso',
+        'login_title' => 'Login',
+        'admin_label' => 'Admin',
+        'admin_title' => 'Administración',
+        'subtitle' => 'Encontrar torneos, inscribirse y ver resultados.',
+    ],
+
+    'filters' => [
+        'search' => 'Buscar',
+        'search_placeholder' => 'Nombre o lugar',
+        'status' => 'Estado',
+        'all_statuses' => 'Todos los estados',
+        'period' => 'Periodo',
+        'periods' => [
+            'upcoming' => 'Próximos',
+            'past' => 'Pasados',
+            'all' => 'Todos',
+        ],
+        'formation' => 'Formación',
+        'all_formations' => 'Todas las formaciones',
+        'location' => 'Lugar',
+        'location_placeholder' => 'Lugar de juego',
+        'mine' => 'Mis torneos',
+        'reset' => 'Restablecer',
+        'apply' => 'Filtrar',
+    ],
+
+    'list_titles' => [
+        'upcoming' => 'Próximos torneos',
+        'past' => 'Torneos pasados',
+        'all' => 'Todos los torneos',
+    ],
+
     'fields' => [
         'name' => 'Nombre del torneo',
         'date' => 'Fecha',
@@ -18,6 +56,16 @@ return [
         'registration_deadline' => 'Fecha límite de inscripción',
         'status' => 'Estado',
         'description' => 'Descripción',
+        'required_participant_fields' => 'Campos obligatorios para participantes',
+        'manual_confirmation' => 'Los participantes deben ser confirmados por el gestor del torneo',
+    ],
+
+    'registration_requirements' => [
+        'club' => 'Club',
+        'license_nr' => 'Número de licencia',
+        'team_name' => 'Nombre del equipo',
+        'partner_email' => 'Correo del jugador 2',
+        'partner2_email' => 'Correo del jugador 3',
     ],
 
     'type' => [
