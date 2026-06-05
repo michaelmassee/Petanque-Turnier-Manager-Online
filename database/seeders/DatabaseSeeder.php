@@ -25,7 +25,7 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => env('LOCAL_ADMIN_NAME', 'Admin'),
                 'password' => Hash::make(env('LOCAL_ADMIN_PASSWORD', 'password')),
-                'roles' => [User::ROLE_ADMIN],
+                'roles' => User::normalizeRoles([User::ROLE_ADMIN]),
                 'approved_at' => now(),
                 'email_verified_at' => now(),
             ],

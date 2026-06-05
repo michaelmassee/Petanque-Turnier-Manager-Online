@@ -31,7 +31,7 @@ class UserFactory extends Factory
             'license_nr' => fake()->boolean(70) ? fake()->unique()->numerify('########') : null,
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
-            'roles' => [User::ROLE_ADMIN],
+            'roles' => User::normalizeRoles([User::ROLE_ADMIN]),
             'approved_at' => now(),
             'remember_token' => Str::random(10),
         ];

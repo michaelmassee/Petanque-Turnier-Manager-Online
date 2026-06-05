@@ -219,13 +219,7 @@ class UserApprovalController extends Controller
      */
     private function normalizedRoles(array $roles): array
     {
-        $roles = array_values(array_unique($roles));
-
-        if (in_array(User::ROLE_TURNIERVERWALTER, $roles, true) && ! in_array(User::ROLE_TEILNEHMER, $roles, true)) {
-            $roles[] = User::ROLE_TEILNEHMER;
-        }
-
-        return array_values(array_intersect(array_keys(User::availableRoles()), $roles));
+        return User::normalizeRoles($roles);
     }
 
     /**

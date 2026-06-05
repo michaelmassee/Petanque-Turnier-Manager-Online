@@ -40,6 +40,19 @@ class AdminAccessTest extends TestCase
         $this->assertFalse($user->fresh()->isApproved());
     }
 
+    public function test_role_hierarchy_is_normalized(): void
+    {
+        $this->assertSame(
+            [User::ROLE_TEILNEHMER, User::ROLE_TURNIERVERWALTER, User::ROLE_ADMIN],
+            User::normalizeRoles([User::ROLE_ADMIN])
+        );
+
+        $this->assertSame(
+            [User::ROLE_TEILNEHMER, User::ROLE_TURNIERVERWALTER],
+            User::normalizeRoles([User::ROLE_TURNIERVERWALTER])
+        );
+    }
+
     public function test_turnierverwalter_can_only_see_own_tournaments(): void
     {
         $owner = User::factory()->turnierverwalter()->create();
@@ -180,6 +193,27 @@ class AdminAccessTest extends TestCase
         $this->assertTrue($user->isApproved());
         $this->assertTrue($user->hasVerifiedEmail());
         $this->assertTrue(Hash::check('new-password', $user->password));
+    }
+
+    public function test_admin_role_includes_tournament_manager_and_participant_roles(): void
+    {
+        $admin = User::factory()->create();
+        $otherAdmin = User::factory()->create();
+
+        $this->actingAs($admin)
+            ->put(route('admin.users.update', $otherAdmin), [
+                'name' => $otherAdmin->name,
+                'email' => $otherAdmin->email,
+                'roles' => [User::ROLE_ADMIN],
+                'approved' => '1',
+                'email_verified' => '1',
+            ])
+            ->assertRedirect(route('admin.users.index'));
+
+        $this->assertSame(
+            [User::ROLE_TEILNEHMER, User::ROLE_TURNIERVERWALTER, User::ROLE_ADMIN],
+            $otherAdmin->fresh()->roles
+        );
     }
 
     public function test_admin_can_update_user_roles_and_password(): void

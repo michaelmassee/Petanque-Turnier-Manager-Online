@@ -16,8 +16,8 @@ return new class extends Migration
 
         DB::table('users')->orderBy('id')->get()->each(function (object $user): void {
             $roles = match ($user->role) {
-                User::ROLE_ADMIN => [User::ROLE_ADMIN],
-                User::ROLE_TURNIERVERWALTER => [User::ROLE_TEILNEHMER, User::ROLE_TURNIERVERWALTER],
+                User::ROLE_ADMIN => User::normalizeRoles([User::ROLE_ADMIN]),
+                User::ROLE_TURNIERVERWALTER => User::normalizeRoles([User::ROLE_TURNIERVERWALTER]),
                 default => [User::ROLE_TEILNEHMER],
             };
 

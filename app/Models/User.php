@@ -42,6 +42,30 @@ class User extends Authenticatable implements MustVerifyEmail
         return in_array($role, $this->roles ?? [], true);
     }
 
+    /**
+     * @param  array<int, string>  $roles
+     * @return array<int, string>
+     */
+    public static function normalizeRoles(array $roles): array
+    {
+        $roles = array_values(array_unique($roles));
+
+        if (in_array(self::ROLE_ADMIN, $roles, true)) {
+            $roles[] = self::ROLE_TURNIERVERWALTER;
+            $roles[] = self::ROLE_TEILNEHMER;
+        }
+
+        if (in_array(self::ROLE_TURNIERVERWALTER, $roles, true)) {
+            $roles[] = self::ROLE_TEILNEHMER;
+        }
+
+        return array_values(array_intersect([
+            self::ROLE_TEILNEHMER,
+            self::ROLE_TURNIERVERWALTER,
+            self::ROLE_ADMIN,
+        ], array_unique($roles)));
+    }
+
     public function isAdmin(): bool
     {
         return $this->hasRole(self::ROLE_ADMIN);
@@ -89,7 +113,7 @@ class User extends Authenticatable implements MustVerifyEmail
         $roles = $this->roles ?? [];
         if (! in_array($role, $roles, true)) {
             $roles[] = $role;
-            $this->roles = array_values($roles);
+            $this->roles = self::normalizeRoles($roles);
         }
     }
 
