@@ -14,9 +14,12 @@ use Illuminate\View\View;
 
 class TournamentController extends Controller
 {
+    private const REGISTRATION_OPTION_FIELDS = ['club', 'license_nr', 'team_name', 'partner_email', 'partner2_email'];
+
     public function index(): View
     {
-        $tournaments = Tournament::where('created_by', Auth::id())
+        $tournaments = $this->manageableTournaments()
+            ->with('creator')
             ->orderByDesc('date')
             ->paginate(20);
 
@@ -45,7 +48,7 @@ class TournamentController extends Controller
 
     public function edit(string $tournament): View
     {
-        $t = Tournament::findOrFail($tournament);
+        $t = $this->findManageableTournament($tournament);
 
         return view('admin.tournaments.edit', [
             'tournament' => $t,
@@ -57,7 +60,7 @@ class TournamentController extends Controller
 
     public function update(Request $request, string $tournament): RedirectResponse
     {
-        $t = Tournament::findOrFail($tournament);
+        $t = $this->findManageableTournament($tournament);
         $t->update($this->validateTournament($request));
 
         return redirect()->route('admin.tournaments.index')
@@ -66,14 +69,14 @@ class TournamentController extends Controller
 
     public function destroy(string $tournament): RedirectResponse
     {
-        Tournament::findOrFail($tournament)->delete();
+        $this->findManageableTournament($tournament)->delete();
 
         return redirect()->route('admin.tournaments.index');
     }
 
     public function generateToken(string $tournament): RedirectResponse
     {
-        $t = Tournament::findOrFail($tournament);
+        $t = $this->findManageableTournament($tournament);
         $token = $t->generateApiToken();
 
         return redirect()->route('admin.tournaments.edit', $t->id)
@@ -82,7 +85,7 @@ class TournamentController extends Controller
 
     private function validateTournament(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:200'],
             'date' => ['required', 'date'],
             'location' => ['required', 'string', 'max:200'],
@@ -93,6 +96,34 @@ class TournamentController extends Controller
             'registration_deadline' => ['nullable', 'date'],
             'status' => ['required', 'string', 'in:' . implode(',', array_column(TournamentStatus::cases(), 'value'))],
             'description' => ['nullable', 'string'],
+            'required_fields' => ['array'],
+            'required_fields.*' => ['string', 'in:' . implode(',', self::REGISTRATION_OPTION_FIELDS)],
+            'manual_confirmation' => ['boolean'],
         ]);
+
+        $validated['config'] = [
+            'required_fields' => array_values($validated['required_fields'] ?? []),
+            'manual_confirmation' => (bool) ($validated['manual_confirmation'] ?? false),
+        ];
+
+        unset($validated['required_fields'], $validated['manual_confirmation']);
+
+        return $validated;
+    }
+
+    private function manageableTournaments()
+    {
+        $query = Tournament::query();
+
+        if (! Auth::user()?->isAdmin()) {
+            $query->where('created_by', Auth::id());
+        }
+
+        return $query;
+    }
+
+    private function findManageableTournament(string $id): Tournament
+    {
+        return $this->manageableTournaments()->findOrFail($id);
     }
 }

@@ -16,6 +16,8 @@ Route::get('/', function () {
 foreach (['de', 'en', 'fr', 'nl', 'es'] as $locale) {
     Route::prefix($locale)->name("public.{$locale}.")->group(function () use ($locale) {
         Route::get('/', [Public\TournamentController::class, 'index'])->name('tournaments.index');
+        Route::view('impressum', 'legal.imprint')->name('legal.imprint');
+        Route::view('datenschutz', 'legal.privacy')->name('legal.privacy');
 
         Route::prefix('tournaments')->name('tournaments.')->group(function () {
             Route::get('{tournament}', [Public\TournamentController::class, 'show'])->name('show');
@@ -25,7 +27,6 @@ foreach (['de', 'en', 'fr', 'nl', 'es'] as $locale) {
         });
 
         Route::prefix('registration')->name('registration.')->group(function () {
-            Route::get('{token}/confirm', [Public\RegistrationController::class, 'confirm'])->name('confirm');
             Route::get('{token}/cancel', [Public\RegistrationController::class, 'cancelForm'])->name('cancel.form');
             Route::post('{token}/cancel', [Public\RegistrationController::class, 'cancel'])->name('cancel');
         });
@@ -34,16 +35,29 @@ foreach (['de', 'en', 'fr', 'nl', 'es'] as $locale) {
 
 // Breeze-kompatibler dashboard-Alias
 Route::get('dashboard', fn() => redirect()->route('admin.tournaments.index'))
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth', 'verified', 'approved'])
     ->name('dashboard');
 
-Route::get('profile', fn() => redirect()->route('admin.tournaments.index'))
+Route::get('approval-pending', fn() => view('auth.approval-pending'))
+    ->middleware(['auth', 'verified'])
+    ->name('approval.pending');
+
+Route::view('profile', 'profile')
     ->middleware(['auth'])
     ->name('profile');
 
 // Admin-Bereich (ohne Sprachpräfix)
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified'])->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::get('/', fn() => redirect()->route('admin.tournaments.index'))->name('dashboard');
+
+    Route::get('users', [Admin\UserApprovalController::class, 'index'])->name('users.index');
+    Route::get('users/create', [Admin\UserApprovalController::class, 'create'])->name('users.create');
+    Route::post('users', [Admin\UserApprovalController::class, 'store'])->name('users.store');
+    Route::get('users/{user}/edit', [Admin\UserApprovalController::class, 'edit'])->name('users.edit');
+    Route::put('users/{user}', [Admin\UserApprovalController::class, 'update'])->name('users.update');
+    Route::delete('users/{user}', [Admin\UserApprovalController::class, 'destroy'])->name('users.destroy');
+    Route::patch('users/{user}/approve', [Admin\UserApprovalController::class, 'approve'])->name('users.approve');
+    Route::patch('users/{user}/revoke', [Admin\UserApprovalController::class, 'revoke'])->name('users.revoke');
 
     Route::prefix('tournaments')->name('tournaments.')->group(function () {
         Route::get('/', [Admin\TournamentController::class, 'index'])->name('index');

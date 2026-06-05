@@ -61,6 +61,10 @@ new #[Layout('layouts.guest')] class extends Component
             </label>
         </div>
 
+        <p class="mt-4 text-xs text-gray-500">
+            {!! __('auth.login_privacy_notice', ['privacy_url' => lroute('legal.privacy')]) !!}
+        </p>
+
         <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             @if (Route::has('password.request'))
                 <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('password.request') }}" wire:navigate>

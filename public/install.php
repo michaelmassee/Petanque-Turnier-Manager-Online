@@ -44,6 +44,9 @@ define('DEFAULT_DB_PORT', '@installerDbPort@');
 define('DEFAULT_DB_DATABASE', '@installerDbDatabase@');
 define('DEFAULT_DB_USERNAME', '@installerDbUsername@');
 define('DEFAULT_DB_PASSWORD', '@installerDbPassword@');
+define('DEFAULT_ADMIN_NAME', '@installerAdminName@');
+define('DEFAULT_ADMIN_EMAIL', '@installerAdminEmail@');
+define('DEFAULT_ADMIN_PASSWORD', '@installerAdminPassword@');
 define('DEFAULT_MAIL_MAILER', '@installerMailMailer@');
 define('DEFAULT_MAIL_FROM_ADDRESS', '@installerMailFromAddress@');
 define('DEFAULT_MAIL_HOST', '@installerMailHost@');
@@ -328,8 +331,8 @@ function validateInstallValues(array $values): array {
     $connection = dbConnection($values);
 
     $requiredFields = $connection === 'sqlite'
-        ? ['APP_URL']
-        : ['APP_URL', 'DB_DATABASE', 'DB_USERNAME'];
+        ? ['APP_URL', 'ADMIN_NAME', 'ADMIN_EMAIL', 'ADMIN_PASSWORD']
+        : ['APP_URL', 'DB_DATABASE', 'DB_USERNAME', 'ADMIN_NAME', 'ADMIN_EMAIL', 'ADMIN_PASSWORD'];
 
     foreach ($requiredFields as $field) {
         if (trim($values[$field] ?? '') === '') {
@@ -339,6 +342,14 @@ function validateInstallValues(array $values): array {
 
     if (!filter_var($values['APP_URL'] ?? '', FILTER_VALIDATE_URL)) {
         $errors[] = 'APP_URL muss eine gültige URL sein.';
+    }
+
+    if (!filter_var($values['ADMIN_EMAIL'] ?? '', FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'ADMIN_EMAIL muss eine gültige E-Mail-Adresse sein.';
+    }
+
+    if (strlen((string) ($values['ADMIN_PASSWORD'] ?? '')) < 8) {
+        $errors[] = 'ADMIN_PASSWORD muss mindestens 8 Zeichen lang sein.';
     }
 
     if ($connection !== 'sqlite' && !preg_match('/^\d{1,5}$/', $values['DB_PORT'] ?? '')) {
@@ -662,6 +673,62 @@ function runArtisanInProcess(string $command, array $arguments = [], ?string $ex
     }
 }
 
+function createAdminUser(array $values): array {
+    installerLog('ADMIN USER SETUP');
+
+    if (!vendorReady()) {
+        return ['output' => 'vendor/ ist unvollständig. Admin-User konnte nicht angelegt werden.', 'ok' => false];
+    }
+
+    $bootstrap = BASE_DIR . '/bootstrap/app.php';
+    if (!file_exists($bootstrap)) {
+        return ['output' => 'bootstrap/app.php fehlt. Admin-User konnte nicht angelegt werden.', 'ok' => false];
+    }
+
+    try {
+        applyInstallerRuntimePaths();
+        require_once AUTOLOAD_FILE;
+        $app = require $bootstrap;
+
+        if (method_exists($app, 'useStoragePath')) {
+            $app->useStoragePath(INSTALL_TEMP_STORAGE_DIR);
+        }
+
+        $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+        $previousReporting = error_reporting();
+        error_reporting($previousReporting & ~E_WARNING & ~E_NOTICE);
+
+        try {
+            $kernel->bootstrap();
+        } finally {
+            error_reporting($previousReporting);
+        }
+
+        $email = trim((string) ($values['ADMIN_EMAIL'] ?? ''));
+        $name = trim((string) ($values['ADMIN_NAME'] ?? ''));
+        $password = (string) ($values['ADMIN_PASSWORD'] ?? '');
+
+        $user = App\Models\User::updateOrCreate(
+            ['email' => $email],
+            [
+                'name' => $name,
+                'password' => Illuminate\Support\Facades\Hash::make($password),
+                'roles' => [App\Models\User::ROLE_ADMIN],
+            ]
+        );
+        $user->forceFill([
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ])->save();
+
+        installerLog('ADMIN USER OK ' . $email);
+        return ['output' => "Admin-User angelegt/aktualisiert: {$email}", 'ok' => true];
+    } catch (Throwable $e) {
+        installerLog('ADMIN USER ERROR ' . $e->getMessage());
+        return ['output' => 'Admin-User konnte nicht angelegt werden: ' . $e->getMessage(), 'ok' => false];
+    }
+}
+
 function runInstallation(array $values, string $progressId = ''): array {
     $results = [];
 
@@ -778,6 +845,13 @@ function runInstallStep(string $stepName, array $values, string $progressId = ''
 
         writeProgress($progressId, $label, 90);
         $result = runArtisanInProcess($command, $arguments, dbConnection($values));
+
+        if ($result['ok']) {
+            writeProgress($progressId, 'Admin-User anlegen', 96);
+            $adminResult = createAdminUser($values);
+            $result['ok'] = $adminResult['ok'];
+            $result['output'] = trim($result['output'] . "\n\n" . $adminResult['output']);
+        }
 
         if (!$result['ok']) {
             writeProgress($progressId, $label . ' fehlgeschlagen', 90, 'error');
@@ -1031,6 +1105,24 @@ if (isAuthenticated()) {
                         Für eine leere Erstinstallation nach fehlgeschlagenem Lauf gedacht.
                     </div>
                     <input type="text" name="FRESH_INSTALL_CONFIRM" placeholder="Zur Bestätigung: TABELLEN LOESCHEN">
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Admin-Zugang</div>
+                <div class="row">
+                    <div class="field">
+                        <label>ADMIN_NAME</label>
+                        <input type="text" name="ADMIN_NAME" value="<?= inputValue(DEFAULT_ADMIN_NAME, 'Administrator') ?>" required>
+                    </div>
+                    <div class="field">
+                        <label>ADMIN_EMAIL</label>
+                        <input type="email" name="ADMIN_EMAIL" value="<?= inputValue(DEFAULT_ADMIN_EMAIL, 'admin@example.com') ?>" required>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>ADMIN_PASSWORD <small>mindestens 8 Zeichen</small></label>
+                    <input type="password" name="ADMIN_PASSWORD" value="<?= inputValue(DEFAULT_ADMIN_PASSWORD) ?>" required>
                 </div>
             </div>
 

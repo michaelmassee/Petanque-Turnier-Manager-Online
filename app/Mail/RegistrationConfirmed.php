@@ -25,7 +25,7 @@ class RegistrationConfirmed extends Mailable
     public function content(): Content
     {
         return new Content(
-            view: 'emails.registration-confirmed',
+            markdown: 'emails.registration-confirmed',
         );
     }
 }

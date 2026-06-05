@@ -5,17 +5,17 @@ return [
     'subtitle' => 'Registration for :tournament',
     'submit' => 'Register Now',
     'cancel_link' => 'Cancel Registration',
-    'confirm_link' => 'Confirm Registration',
 
     'fields' => [
         'first_name' => 'First Name',
         'last_name' => 'Last Name',
         'email' => 'Email Address',
-        'club' => 'Club (optional)',
-        'license_nr' => 'License Number (optional)',
-        'team_name' => 'Team Name (optional)',
+        'club' => 'Club',
+        'license_nr' => 'License Number',
+        'team_name' => 'Team Name',
         'partner' => 'Partner',
         'partner2' => 'Third Player',
+        'status' => 'Status',
     ],
 
     'status' => [
@@ -26,8 +26,9 @@ return [
     ],
 
     'success' => [
-        'pending' => 'Your registration has been received. Please confirm it via the link in the email.',
-        'confirmed' => 'Your registration has been successfully confirmed!',
+        'pending' => 'Your registration has been received. The tournament manager will confirm it separately.',
+        'confirmed' => 'Your registration has been confirmed successfully.',
+        'confirmed_direct' => 'Your registration has been accepted successfully.',
         'cancelled' => 'Your registration has been cancelled.',
     ],
 
@@ -39,6 +40,7 @@ return [
     ],
 
     'waitlist_notice' => 'The tournament is fully booked. You have been added to the waitlist.',
+    'privacy_notice' => 'The entered data is processed to handle the tournament registration and shared with authorized tournament managers. Details are available in the <a class="text-green-700 hover:underline" href=":privacy_url">privacy policy</a>.',
     'confirm_cancel' => 'Do you really want to cancel your registration?',
     'yes_cancel' => 'Yes, cancel',
     'no_back' => 'Back',

@@ -25,7 +25,7 @@ class WaitlistPromoted extends Mailable
     public function content(): Content
     {
         return new Content(
-            view: 'emails.waitlist-promoted',
+            markdown: 'emails.waitlist-promoted',
         );
     }
 }

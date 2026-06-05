@@ -5,17 +5,17 @@ return [
     'subtitle' => 'Inschrijving voor :tournament',
     'submit' => 'Nu inschrijven',
     'cancel_link' => 'Inschrijving annuleren',
-    'confirm_link' => 'Inschrijving bevestigen',
 
     'fields' => [
         'first_name' => 'Voornaam',
         'last_name' => 'Achternaam',
         'email' => 'E-mailadres',
-        'club' => 'Club (optioneel)',
-        'license_nr' => 'Licentienummer (optioneel)',
-        'team_name' => 'Teamnaam (optioneel)',
+        'club' => 'Club',
+        'license_nr' => 'Licentienummer',
+        'team_name' => 'Teamnaam',
         'partner' => 'Partner',
         'partner2' => 'Derde speler',
+        'status' => 'Status',
     ],
 
     'status' => [
@@ -26,8 +26,9 @@ return [
     ],
 
     'success' => [
-        'pending' => 'Je inschrijving is ontvangen. Bevestig deze via de link in de e-mail.',
-        'confirmed' => 'Je inschrijving is succesvol bevestigd!',
+        'pending' => 'Je inschrijving is ontvangen. De toernooibeheerder bevestigt deze apart.',
+        'confirmed' => 'Je inschrijving is succesvol bevestigd.',
+        'confirmed_direct' => 'Je inschrijving is succesvol verwerkt.',
         'cancelled' => 'Je inschrijving is geannuleerd.',
     ],
 
@@ -39,6 +40,7 @@ return [
     ],
 
     'waitlist_notice' => 'Het toernooi is volgeboekt. Je bent op de wachtlijst geplaatst.',
+    'privacy_notice' => 'De ingevoerde gegevens worden verwerkt voor de toernooi-inschrijving en gedeeld met bevoegde toernooibeheerders. Details staan in het <a class="text-green-700 hover:underline" href=":privacy_url">privacybeleid</a>.',
     'confirm_cancel' => 'Wil je je inschrijving echt annuleren?',
     'yes_cancel' => 'Ja, annuleren',
     'no_back' => 'Terug',

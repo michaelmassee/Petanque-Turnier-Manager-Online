@@ -9,10 +9,6 @@
         <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/petanqueturniermanager-logo-32px.png') }}">
         <link rel="apple-touch-icon" sizes="256x256" href="{{ asset('images/petanqueturniermanager-logo-256px.png') }}">
 
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>

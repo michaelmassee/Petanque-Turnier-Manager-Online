@@ -80,3 +80,35 @@
     <textarea name="description" rows="3"
               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">{{ old('description', $tournament->description ?? '') }}</textarea>
 </div>
+
+@php
+    $requiredFields = old('required_fields', data_get($tournament ?? null, 'config.required_fields', []));
+    $manualConfirmation = old('manual_confirmation', data_get($tournament ?? null, 'config.manual_confirmation', false));
+@endphp
+
+<div class="space-y-4">
+    <div>
+        <p class="block text-sm font-medium text-gray-700 mb-2">{{ __('tournaments.fields.required_participant_fields') }}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            @foreach(['club', 'license_nr', 'team_name', 'partner_email', 'partner2_email'] as $field)
+                <label class="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox"
+                           name="required_fields[]"
+                           value="{{ $field }}"
+                           {{ in_array($field, $requiredFields, true) ? 'checked' : '' }}
+                           class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+                    <span>{{ __('tournaments.registration_requirements.' . $field) }}</span>
+                </label>
+            @endforeach
+        </div>
+    </div>
+
+    <label class="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox"
+               name="manual_confirmation"
+               value="1"
+               {{ $manualConfirmation ? 'checked' : '' }}
+               class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+        <span>{{ __('tournaments.fields.manual_confirmation') }}</span>
+    </label>
+</div>

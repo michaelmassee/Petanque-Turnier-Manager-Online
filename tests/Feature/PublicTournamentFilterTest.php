@@ -18,8 +18,40 @@ class PublicTournamentFilterTest extends TestCase
             ->assertOk()
             ->assertSee(route('login', absolute: false))
             ->assertSee('Pétanque Turnier Manager')
+            ->assertSee('petanqueturniermanager-logo-256px.png')
             ->assertDontSee(route('register', absolute: false))
             ->assertDontSee(route('admin.dashboard', absolute: false));
+    }
+
+    public function test_start_page_header_shows_authenticated_user_name(): void
+    {
+        $user = User::factory()->create(['name' => 'Michael Massee']);
+
+        $this->actingAs($user)
+            ->get('/de')
+            ->assertOk()
+            ->assertSee('Michael Massee')
+            ->assertSee('Logout')
+            ->assertSee('Profil')
+            ->assertSee('Turniere')
+            ->assertSee('Benutzer')
+            ->assertSee(route('logout', absolute: false))
+            ->assertSee(route('profile', absolute: false))
+            ->assertSee(route('admin.tournaments.index', absolute: false))
+            ->assertSee(route('admin.users.index', absolute: false));
+    }
+
+    public function test_start_page_header_hides_admin_menu_item_for_tournament_managers(): void
+    {
+        $user = User::factory()->turnierverwalter()->create(['name' => 'Turnier Manager']);
+
+        $this->actingAs($user)
+            ->get('/de')
+            ->assertOk()
+            ->assertSee('Turnier Manager')
+            ->assertSee('Turniere')
+            ->assertSee(route('admin.tournaments.index', absolute: false))
+            ->assertDontSee(route('admin.users.index', absolute: false));
     }
 
     public function test_default_list_shows_public_upcoming_tournaments_only(): void

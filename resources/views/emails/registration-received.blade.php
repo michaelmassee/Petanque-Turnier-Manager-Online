@@ -3,13 +3,9 @@
 
 {{ __('emails.received.body', ['tournament' => $registration->tournament->name]) }}
 
-{{ __('emails.received.confirm_hint') }}
-
-<x-mail::button :url="url('/de/registration/' . $registration->token . '/confirm')" color="success">
-{{ __('emails.received.confirm_button') }}
-</x-mail::button>
-
-{{ __('emails.received.expires') }}
+{{ $registration->tournament->requiresManualConfirmation()
+    ? __('emails.received.manual_confirmation')
+    : __('emails.received.waitlist_hint') }}
 
 {{ config('app.name') }}
 </x-mail::message>

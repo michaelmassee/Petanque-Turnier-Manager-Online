@@ -5,9 +5,8 @@ return [
         'subject' => 'Inschrijving ontvangen – :tournament',
         'greeting' => 'Hallo :name,',
         'body' => 'We hebben je inschrijving voor het toernooi ":tournament" ontvangen.',
-        'confirm_button' => 'Inschrijving bevestigen',
-        'confirm_hint' => 'Klik op de knop om je inschrijving te bevestigen.',
-        'expires' => 'De link is 48 uur geldig.',
+        'manual_confirmation' => 'De toernooibeheerder beoordeelt je inschrijving en bevestigt die apart.',
+        'waitlist_hint' => 'Je staat momenteel op de wachtlijst. Als er een plek vrijkomt, ontvang je nog een e-mail.',
     ],
     'confirmed' => [
         'subject' => 'Inschrijving bevestigd – :tournament',

@@ -1,13 +1,5 @@
 <x-public-layout :title="__('tournaments.title')">
 
-<section class="mb-8 flex flex-col items-center text-center">
-    <x-application-logo class="h-24 w-24 sm:h-28 sm:w-28" />
-    <div class="mt-3">
-        <h1 class="text-2xl font-bold text-gray-950 sm:text-3xl">Pétanque Turnier Manager</h1>
-        <p class="mt-1 text-sm text-gray-600">{{ __('tournaments.start_menu.subtitle') }}</p>
-    </div>
-</section>
-
 <section id="tournaments" class="space-y-5">
     <div>
         <h1 class="text-2xl font-bold">{{ __('tournaments.list_titles.' . $filters['period']) }}</h1>

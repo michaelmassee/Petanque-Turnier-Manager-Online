@@ -29,6 +29,8 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'roles' => [User::ROLE_ADMIN],
+            'approved_at' => now(),
             'remember_token' => Str::random(10),
         ];
     }
@@ -40,6 +42,22 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    public function turnierverwalter(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'roles' => [User::ROLE_TEILNEHMER, User::ROLE_TURNIERVERWALTER],
+            'approved_at' => now(),
+        ]);
+    }
+
+    public function unapproved(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'roles' => [User::ROLE_TEILNEHMER, User::ROLE_TURNIERVERWALTER],
+            'approved_at' => null,
         ]);
     }
 }

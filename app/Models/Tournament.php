@@ -80,4 +80,19 @@ class Tournament extends Model
         $this->update(['api_token' => $token]);
         return $token;
     }
+
+    public function requiredRegistrationFields(): array
+    {
+        return data_get($this->config ?? [], 'required_fields', []);
+    }
+
+    public function requiresRegistrationField(string $field): bool
+    {
+        return in_array($field, $this->requiredRegistrationFields(), true);
+    }
+
+    public function requiresManualConfirmation(): bool
+    {
+        return (bool) data_get($this->config ?? [], 'manual_confirmation', false);
+    }
 }

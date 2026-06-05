@@ -5,9 +5,8 @@ return [
         'subject' => 'Anmeldung erhalten – :tournament',
         'greeting' => 'Hallo :name,',
         'body' => 'Wir haben deine Anmeldung für das Turnier ":tournament" erhalten.',
-        'confirm_button' => 'Anmeldung bestätigen',
-        'confirm_hint' => 'Bitte klicke auf den Button, um deine Anmeldung zu bestätigen.',
-        'expires' => 'Der Link ist 48 Stunden gültig.',
+        'manual_confirmation' => 'Der Turnierverwalter prüft deine Anmeldung und bestätigt sie separat.',
+        'waitlist_hint' => 'Du stehst aktuell auf der Warteliste. Sobald ein Platz frei wird, erhältst du eine weitere E-Mail.',
     ],
     'confirmed' => [
         'subject' => 'Anmeldung bestätigt – :tournament',

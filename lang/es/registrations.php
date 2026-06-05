@@ -5,17 +5,17 @@ return [
     'subtitle' => 'Inscripción para :tournament',
     'submit' => 'Inscribirse ahora',
     'cancel_link' => 'Cancelar inscripción',
-    'confirm_link' => 'Confirmar inscripción',
 
     'fields' => [
         'first_name' => 'Nombre',
         'last_name' => 'Apellido',
         'email' => 'Correo electrónico',
-        'club' => 'Club (opcional)',
-        'license_nr' => 'Número de licencia (opcional)',
-        'team_name' => 'Nombre del equipo (opcional)',
+        'club' => 'Club',
+        'license_nr' => 'Número de licencia',
+        'team_name' => 'Nombre del equipo',
         'partner' => 'Compañero',
         'partner2' => 'Tercer jugador',
+        'status' => 'Estado',
     ],
 
     'status' => [
@@ -26,8 +26,9 @@ return [
     ],
 
     'success' => [
-        'pending' => 'Tu inscripción ha sido recibida. Por favor confírmala mediante el enlace en el correo.',
-        'confirmed' => '¡Tu inscripción ha sido confirmada con éxito!',
+        'pending' => 'Tu inscripción ha sido recibida. El organizador del torneo la confirmará por separado.',
+        'confirmed' => 'Tu inscripción ha sido confirmada con éxito.',
+        'confirmed_direct' => 'Tu inscripción ha sido aceptada con éxito.',
         'cancelled' => 'Tu inscripción ha sido cancelada.',
     ],
 
@@ -39,6 +40,7 @@ return [
     ],
 
     'waitlist_notice' => 'El torneo está completo. Has sido añadido a la lista de espera.',
+    'privacy_notice' => 'Los datos introducidos se procesan para gestionar la inscripción al torneo y se comparten con gestores autorizados. Más detalles en la <a class="text-green-700 hover:underline" href=":privacy_url">política de privacidad</a>.',
     'confirm_cancel' => '¿Realmente quieres cancelar tu inscripción?',
     'yes_cancel' => 'Sí, cancelar',
     'no_back' => 'Volver',

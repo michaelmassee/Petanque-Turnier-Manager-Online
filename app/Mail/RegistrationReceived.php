@@ -25,7 +25,7 @@ class RegistrationReceived extends Mailable
     public function content(): Content
     {
         return new Content(
-            view: 'emails.registration-received',
+            markdown: 'emails.registration-received',
         );
     }
 }

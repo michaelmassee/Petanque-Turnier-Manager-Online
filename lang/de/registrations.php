@@ -5,17 +5,17 @@ return [
     'subtitle' => 'Anmeldung für :tournament',
     'submit' => 'Jetzt anmelden',
     'cancel_link' => 'Anmeldung stornieren',
-    'confirm_link' => 'Anmeldung bestätigen',
 
     'fields' => [
         'first_name' => 'Vorname',
         'last_name' => 'Nachname',
         'email' => 'E-Mail-Adresse',
-        'club' => 'Verein (optional)',
-        'license_nr' => 'Lizenznummer (optional)',
-        'team_name' => 'Teamname (optional)',
+        'club' => 'Verein',
+        'license_nr' => 'Lizenznummer',
+        'team_name' => 'Teamname',
         'partner' => 'Partner',
         'partner2' => 'Dritter Spieler',
+        'status' => 'Status',
     ],
 
     'status' => [
@@ -26,8 +26,9 @@ return [
     ],
 
     'success' => [
-        'pending' => 'Deine Anmeldung wurde erhalten. Bitte bestätige sie über den Link in der E-Mail.',
-        'confirmed' => 'Deine Anmeldung wurde erfolgreich bestätigt!',
+        'pending' => 'Deine Anmeldung wurde erhalten. Der Turnierverwalter bestätigt sie separat.',
+        'confirmed' => 'Deine Anmeldung wurde erfolgreich bestätigt.',
+        'confirmed_direct' => 'Deine Anmeldung wurde erfolgreich übernommen.',
         'cancelled' => 'Deine Anmeldung wurde storniert.',
     ],
 
@@ -39,6 +40,7 @@ return [
     ],
 
     'waitlist_notice' => 'Das Turnier ist ausgebucht. Du wurdest auf die Warteliste gesetzt.',
+    'privacy_notice' => 'Die eingegebenen Daten werden zur Durchführung der Turnieranmeldung verarbeitet und an berechtigte Turniermanager übermittelt. Details stehen in der <a class="text-green-700 hover:underline" href=":privacy_url">Datenschutzerklärung</a>.',
     'confirm_cancel' => 'Möchtest du deine Anmeldung wirklich stornieren?',
     'yes_cancel' => 'Ja, stornieren',
     'no_back' => 'Zurück',

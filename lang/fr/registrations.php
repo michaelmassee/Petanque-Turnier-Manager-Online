@@ -5,17 +5,17 @@ return [
     'subtitle' => 'Inscription pour :tournament',
     'submit' => 'S\'inscrire',
     'cancel_link' => 'Annuler l\'inscription',
-    'confirm_link' => 'Confirmer l\'inscription',
 
     'fields' => [
         'first_name' => 'Prénom',
         'last_name' => 'Nom',
         'email' => 'Adresse e-mail',
-        'club' => 'Club (optionnel)',
-        'license_nr' => 'Numéro de licence (optionnel)',
-        'team_name' => 'Nom d\'équipe (optionnel)',
+        'club' => 'Club',
+        'license_nr' => 'Numéro de licence',
+        'team_name' => 'Nom d\'équipe',
         'partner' => 'Partenaire',
         'partner2' => 'Troisième joueur',
+        'status' => 'Statut',
     ],
 
     'status' => [
@@ -26,8 +26,9 @@ return [
     ],
 
     'success' => [
-        'pending' => 'Votre inscription a été reçue. Veuillez la confirmer via le lien dans l\'e-mail.',
-        'confirmed' => 'Votre inscription a été confirmée avec succès !',
+        'pending' => 'Votre inscription a été reçue. Le gestionnaire du tournoi la confirmera séparément.',
+        'confirmed' => 'Votre inscription a été confirmée avec succès.',
+        'confirmed_direct' => 'Votre inscription a été acceptée avec succès.',
         'cancelled' => 'Votre inscription a été annulée.',
     ],
 
@@ -39,6 +40,7 @@ return [
     ],
 
     'waitlist_notice' => 'Le tournoi est complet. Vous avez été ajouté à la liste d\'attente.',
+    'privacy_notice' => 'Les données saisies sont traitées pour gérer l’inscription au tournoi et transmises aux gestionnaires autorisés. Voir la <a class="text-green-700 hover:underline" href=":privacy_url">politique de confidentialité</a>.',
     'confirm_cancel' => 'Voulez-vous vraiment annuler votre inscription ?',
     'yes_cancel' => 'Oui, annuler',
     'no_back' => 'Retour',

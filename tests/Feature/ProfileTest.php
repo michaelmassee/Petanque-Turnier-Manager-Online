@@ -17,8 +17,7 @@ class ProfileTest extends TestCase
 
         $response = $this->actingAs($user)->get('/profile');
 
-        // /profile leitet ins Admin-Dashboard weiter
-        $response->assertRedirect();
+        $response->assertOk();
     }
 
     public function test_profile_information_can_be_updated(): void

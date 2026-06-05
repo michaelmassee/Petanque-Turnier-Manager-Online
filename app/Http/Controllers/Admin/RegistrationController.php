@@ -9,13 +9,14 @@ use App\Models\Tournament;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class RegistrationController extends Controller
 {
     public function index(string $tournament): View
     {
-        $t = Tournament::findOrFail($tournament);
+        $t = $this->findManageableTournament($tournament);
         $registrations = $t->registrations()
             ->orderBy('status')
             ->orderBy('registered_at')
@@ -26,19 +27,23 @@ class RegistrationController extends Controller
 
     public function updateStatus(Request $request, string $registration): RedirectResponse
     {
-        $r = Registration::findOrFail($registration);
+        $r = $this->findManageableRegistration($registration);
         $validated = $request->validate([
             'status' => ['required', 'string', 'in:' . implode(',', array_column(RegistrationStatus::cases(), 'value'))],
         ]);
 
-        $r->update($validated);
+        $status = RegistrationStatus::from($validated['status']);
+        $r->update([
+            'status' => $status,
+            'confirmed_at' => $status === RegistrationStatus::Confirmed ? ($r->confirmed_at ?? now()) : null,
+        ]);
 
         return back()->with('success', __('admin.save') . ' ✓');
     }
 
     public function updateSeeding(Request $request, string $registration): RedirectResponse
     {
-        $r = Registration::findOrFail($registration);
+        $r = $this->findManageableRegistration($registration);
         $validated = $request->validate([
             'seeding_position' => ['nullable', 'integer', 'min:1'],
             'ptm_player_nr' => ['nullable', 'integer', 'min:1'],
@@ -51,7 +56,7 @@ class RegistrationController extends Controller
 
     public function exportCsv(string $tournament): Response
     {
-        $t = Tournament::findOrFail($tournament);
+        $t = $this->findManageableTournament($tournament);
         $registrations = $t->registrations()
             ->where('status', RegistrationStatus::Confirmed)
             ->orderBy('seeding_position')
@@ -113,5 +118,30 @@ class RegistrationController extends Controller
         }
 
         return "\xEF\xBB\xBF" . implode("\r\n", $zeilen);
+    }
+
+    private function manageableTournaments()
+    {
+        $query = Tournament::query();
+
+        if (! Auth::user()?->isAdmin()) {
+            $query->where('created_by', Auth::id());
+        }
+
+        return $query;
+    }
+
+    private function findManageableTournament(string $id): Tournament
+    {
+        return $this->manageableTournaments()->findOrFail($id);
+    }
+
+    private function findManageableRegistration(string $id): Registration
+    {
+        return Registration::whereHas('tournament', function ($query) {
+            if (! Auth::user()?->isAdmin()) {
+                $query->where('created_by', Auth::id());
+            }
+        })->findOrFail($id);
     }
 }

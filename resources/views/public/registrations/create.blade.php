@@ -1,5 +1,7 @@
 <x-public-layout :title="__('registrations.subtitle', ['tournament' => $tournament->name])">
 
+@php($requiredFields = $tournament->requiredRegistrationFields())
+
 <div class="max-w-2xl mx-auto">
     <h1 class="text-2xl font-bold mb-2">{{ __('registrations.title') }}</h1>
     <p class="text-gray-500 mb-6">{{ __('registrations.subtitle', ['tournament' => $tournament->name]) }}</p>
@@ -34,21 +36,23 @@
                     </div>
                 </div>
                 <div class="mt-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.email') }} *</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.email') }} *</label>
                     <input type="email" name="email" value="{{ old('email') }}" required
                            class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('email') border-red-400 @enderror">
                     @error('email') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div class="grid grid-cols-2 gap-4 mt-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.club') }}</label>
-                        <input type="text" name="club" value="{{ old('club') }}"
-                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.club') }} @if(in_array('club', $requiredFields, true)) * @endif</label>
+                        <input type="text" name="club" value="{{ old('club') }}" {{ in_array('club', $requiredFields, true) ? 'required' : '' }}
+                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('club') border-red-400 @enderror">
+                        @error('club') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.license_nr') }}</label>
-                        <input type="text" name="license_nr" value="{{ old('license_nr') }}"
-                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.license_nr') }} @if(in_array('license_nr', $requiredFields, true)) * @endif</label>
+                        <input type="text" name="license_nr" value="{{ old('license_nr') }}" {{ in_array('license_nr', $requiredFields, true) ? 'required' : '' }}
+                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('license_nr') border-red-400 @enderror">
+                        @error('license_nr') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>
             </div>
@@ -70,9 +74,10 @@
                         </div>
                     </div>
                     <div class="mt-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.email') }}</label>
-                        <input type="email" name="partner_email" value="{{ old('partner_email') }}"
-                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.email') }} @if(in_array('partner_email', $requiredFields, true)) * @endif</label>
+                        <input type="email" name="partner_email" value="{{ old('partner_email') }}" {{ in_array('partner_email', $requiredFields, true) ? 'required' : '' }}
+                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('partner_email') border-red-400 @enderror">
+                        @error('partner_email') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>
             @endif
@@ -93,17 +98,28 @@
                                    class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('partner2_last_name') border-red-400 @enderror">
                         </div>
                     </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.email') }} @if(in_array('partner2_email', $requiredFields, true)) * @endif</label>
+                        <input type="email" name="partner2_email" value="{{ old('partner2_email') }}" {{ in_array('partner2_email', $requiredFields, true) ? 'required' : '' }}
+                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('partner2_email') border-red-400 @enderror">
+                        @error('partner2_email') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+                    </div>
                 </div>
             @endif
 
             @if($tournament->formation->spielerAnzahl() > 1)
                 <hr class="border-gray-200">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.team_name') }}</label>
-                    <input type="text" name="team_name" value="{{ old('team_name') }}"
-                           class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.team_name') }} @if(in_array('team_name', $requiredFields, true)) * @endif</label>
+                    <input type="text" name="team_name" value="{{ old('team_name') }}" {{ in_array('team_name', $requiredFields, true) ? 'required' : '' }}
+                           class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('team_name') border-red-400 @enderror">
+                    @error('team_name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                 </div>
             @endif
+
+            <div class="rounded-md bg-gray-50 p-4 text-sm text-gray-600">
+                {!! __('registrations.privacy_notice', ['privacy_url' => lroute('legal.privacy')]) !!}
+            </div>
 
             <div class="pt-2">
                 <button type="submit"

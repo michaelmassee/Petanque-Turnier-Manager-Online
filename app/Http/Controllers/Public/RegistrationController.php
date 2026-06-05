@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Enums\RegistrationStatus;
 use App\Http\Controllers\Controller;
+use App\Mail\RegistrationConfirmed;
 use App\Mail\RegistrationReceived;
 use App\Mail\WaitlistPromoted;
 use App\Models\Registration;
@@ -36,7 +37,7 @@ class RegistrationController extends Controller
         }
 
         $spielerAnzahl = $t->formation->spielerAnzahl();
-        $validated = $this->validateRequest($request, $spielerAnzahl);
+        $validated = $this->validateRequest($request, $t, $spielerAnzahl);
 
         $duplikat = Registration::where('tournament_id', $t->id)
             ->where('email', $validated['email'])
@@ -48,46 +49,35 @@ class RegistrationController extends Controller
         }
 
         $vollAusgebucht = $t->max_registrations > 0
-            && $t->registrations()->whereIn('status', ['confirmed', 'pending'])->count() >= $t->max_registrations;
+            && $t->registrations()->whereIn('status', [RegistrationStatus::Confirmed->value, RegistrationStatus::Pending->value])->count() >= $t->max_registrations;
+
+        $requiresManualConfirmation = $t->requiresManualConfirmation();
+        $status = $vollAusgebucht
+            ? RegistrationStatus::Waitlist
+            : ($requiresManualConfirmation ? RegistrationStatus::Pending : RegistrationStatus::Confirmed);
 
         $registration = Registration::create([
             ...$validated,
             'tournament_id' => $t->id,
-            'status' => $vollAusgebucht ? RegistrationStatus::Waitlist : RegistrationStatus::Pending,
+            'status' => $status,
             'registered_at' => now(),
+            'confirmed_at' => $status === RegistrationStatus::Confirmed ? now() : null,
             'token' => Registration::generateToken(),
         ]);
 
-        Mail::to($registration->email)->send(new RegistrationReceived($registration));
+        if ($status === RegistrationStatus::Confirmed) {
+            Mail::to($registration->email)->send(new RegistrationConfirmed($registration));
+        } else {
+            Mail::to($registration->email)->send(new RegistrationReceived($registration));
+        }
 
         $meldung = $vollAusgebucht
             ? __('registrations.waitlist_notice')
-            : __('registrations.success.pending');
+            : ($requiresManualConfirmation
+                ? __('registrations.success.pending')
+                : __('registrations.success.confirmed_direct'));
 
         return redirect(lroute('tournaments.index'))->with('success', $meldung);
-    }
-
-    public function confirm(string $token): RedirectResponse
-    {
-        $registration = Registration::where('token', $token)->firstOrFail();
-
-        if ($registration->status === RegistrationStatus::Confirmed) {
-            return redirect(lroute('tournaments.index'))
-                ->with('info', __('registrations.errors.already_confirmed'));
-        }
-
-        if ($registration->status === RegistrationStatus::Cancelled) {
-            return redirect(lroute('tournaments.index'))
-                ->with('error', __('registrations.errors.already_cancelled'));
-        }
-
-        $registration->update([
-            'status' => RegistrationStatus::Confirmed,
-            'confirmed_at' => now(),
-        ]);
-
-        return redirect(lroute('tournaments.index'))
-            ->with('success', __('registrations.success.confirmed'));
     }
 
     public function cancelForm(string $token): View
@@ -115,12 +105,23 @@ class RegistrationController extends Controller
 
     private function nachruckerBestaetigen(string $tournamentId): void
     {
+        $tournament = Tournament::findOrFail($tournamentId);
         $naechster = Registration::where('tournament_id', $tournamentId)
             ->where('status', RegistrationStatus::Waitlist)
             ->orderBy('registered_at')
             ->first();
 
         if ($naechster === null) {
+            return;
+        }
+
+        if ($tournament->requiresManualConfirmation()) {
+            $naechster->update([
+                'status' => RegistrationStatus::Pending,
+                'confirmed_at' => null,
+            ]);
+
+            Mail::to($naechster->email)->send(new RegistrationReceived($naechster));
             return;
         }
 
@@ -132,7 +133,7 @@ class RegistrationController extends Controller
         Mail::to($naechster->email)->send(new WaitlistPromoted($naechster));
     }
 
-    private function validateRequest(Request $request, int $spielerAnzahl): array
+    private function validateRequest(Request $request, Tournament $tournament, int $spielerAnzahl): array
     {
         $rules = [
             'first_name' => ['required', 'string', 'max:100'],
@@ -153,6 +154,23 @@ class RegistrationController extends Controller
             $rules['partner2_first_name'] = ['required', 'string', 'max:100'];
             $rules['partner2_last_name'] = ['required', 'string', 'max:100'];
             $rules['partner2_email'] = ['nullable', 'email', 'max:255'];
+        }
+
+        foreach ($tournament->requiredRegistrationFields() as $field) {
+            if (! array_key_exists($field, $rules)) {
+                continue;
+            }
+
+            $rules[$field][0] = 'required';
+            if ($field === 'team_name' && $spielerAnzahl === 1) {
+                $rules[$field] = ['nullable', 'string', 'max:100'];
+            }
+            if ($field === 'partner_email' && $spielerAnzahl < 2) {
+                $rules[$field] = ['nullable', 'email', 'max:255'];
+            }
+            if ($field === 'partner2_email' && $spielerAnzahl < 3) {
+                $rules[$field] = ['nullable', 'email', 'max:255'];
+            }
         }
 
         return $request->validate($rules);

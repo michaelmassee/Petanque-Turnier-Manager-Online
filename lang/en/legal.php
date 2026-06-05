@@ -1,0 +1,36 @@
+<?php
+
+return [
+    'provider' => 'Provider',
+    'contact' => 'Contact',
+    'controller' => 'Controller',
+    'email' => 'Email',
+    'phone' => 'Phone',
+    'responsible_content' => 'Responsible for content',
+    'imprint' => [
+        'title' => 'Legal Notice',
+        'intro' => 'Provider information according to applicable German digital services and media law.',
+    ],
+    'privacy' => [
+        'title' => 'Privacy Policy',
+        'intro' => 'This notice explains how personal data is processed in this application.',
+        'privacy_contact' => 'Privacy contact',
+        'processed_data_title' => 'Processed data',
+        'data_account' => 'User account: name, email address, password hash, roles and approval status.',
+        'data_registration' => 'Tournament registration: names, email addresses, club, license number, team name, registration status and technical confirmation tokens.',
+        'data_tournament' => 'Tournament management: tournament data, descriptions, results and assignment to the managing user account.',
+        'data_technical' => 'Technical data: session cookies, CSRF protection, server log data and security-relevant events.',
+        'purposes_title' => 'Purposes',
+        'purposes_text' => 'Data is processed to provide accounts, manage tournaments, process registrations, inform participants, display results and keep the application secure.',
+        'legal_basis_title' => 'Legal bases',
+        'legal_basis_text' => 'Processing is based in particular on Art. 6(1)(b), Art. 6(1)(c) and Art. 6(1)(f) GDPR.',
+        'recipients_title' => 'Recipients',
+        'recipients_text' => 'Data is shared only with authorized tournament managers, administrators and technical service providers where required for operation, management or communication. Transfers to third countries are not intended.',
+        'retention_title' => 'Retention',
+        'retention_text' => 'Tournament registrations are generally stored for up to :months months after tournament completion unless legal retention duties or legitimate evidence interests require longer storage.',
+        'cookies_title' => 'Cookies and external services',
+        'cookies_text' => 'Only technically necessary cookies are used for login, session handling, CSRF protection and the optional “remember me” function. No tracking or marketing cookies are set. Fonts and logo files are served locally.',
+        'rights_title' => 'Data subject rights',
+        'rights_text' => 'Data subjects have GDPR rights to access, rectification, erasure, restriction, data portability and objection. They may also complain to the competent supervisory authority: :authority.',
+    ],
+];
