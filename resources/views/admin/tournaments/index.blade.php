@@ -22,6 +22,9 @@
                         <tr>
                             <th class="px-4 py-3 text-left">{{ __('tournaments.fields.name') }}</th>
                             <th class="px-4 py-3 text-left">{{ __('tournaments.fields.date') }}</th>
+                            @if(auth()->user()->isAdmin())
+                                <th class="px-4 py-3 text-left">{{ __('admin.tournament_owner') }}</th>
+                            @endif
                             <th class="px-4 py-3 text-left">{{ __('tournaments.fields.type') }}</th>
                             <th class="px-4 py-3 text-left">{{ __('tournaments.fields.status') }}</th>
                             <th class="px-4 py-3 text-right">{{ __('admin.confirmed_registrations') }}</th>
@@ -33,6 +36,9 @@
                             <tr>
                                 <td class="px-4 py-3 font-medium">{{ $tournament->name }}</td>
                                 <td class="px-4 py-3 text-gray-500">{{ $tournament->date->format('d.m.Y') }}</td>
+                                @if(auth()->user()->isAdmin())
+                                    <td class="px-4 py-3 text-gray-500">{{ $tournament->creator?->name ?? '–' }}</td>
+                                @endif
                                 <td class="px-4 py-3 text-gray-500">{{ $tournament->type->label() }}</td>
                                 <td class="px-4 py-3">
                                     <span class="text-xs px-2 py-0.5 rounded-full
@@ -57,7 +63,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">–</td></tr>
+                            <tr><td colspan="{{ auth()->user()->isAdmin() ? 7 : 6 }}" class="px-4 py-6 text-center text-gray-400">–</td></tr>
                         @endforelse
                     </tbody>
                 </table>

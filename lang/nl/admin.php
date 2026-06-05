@@ -3,6 +3,7 @@
 return [
     'dashboard' => 'Dashboard',
     'tournaments' => 'Toernooien',
+    'tournament_owner' => 'Toernooibeheerder',
     'new_tournament' => 'Nieuw toernooi',
     'edit_tournament' => 'Toernooi bewerken',
     'registrations' => 'Inschrijvingen',

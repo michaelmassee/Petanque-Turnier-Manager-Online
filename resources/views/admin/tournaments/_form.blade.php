@@ -5,6 +5,21 @@
     @error('name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
 </div>
 
+@if(auth()->user()->isAdmin())
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('admin.tournament_owner') }} *</label>
+        <select name="created_by" required
+                class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('created_by') border-red-400 @enderror">
+            @foreach($owners as $owner)
+                <option value="{{ $owner->id }}" {{ (int) old('created_by', $tournament->created_by ?? auth()->id()) === $owner->id ? 'selected' : '' }}>
+                    {{ $owner->name }} ({{ $owner->email }})
+                </option>
+            @endforeach
+        </select>
+        @error('created_by') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+    </div>
+@endif
+
 <div class="grid grid-cols-2 gap-4">
     <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('tournaments.fields.date') }} *</label>

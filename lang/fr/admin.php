@@ -3,6 +3,7 @@
 return [
     'dashboard' => 'Tableau de bord',
     'tournaments' => 'Tournois',
+    'tournament_owner' => 'Gestionnaire du tournoi',
     'new_tournament' => 'Nouveau tournoi',
     'edit_tournament' => 'Modifier le tournoi',
     'registrations' => 'Inscriptions',

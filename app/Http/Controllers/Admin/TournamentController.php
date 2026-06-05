@@ -7,6 +7,7 @@ use App\Enums\TournamentStatus;
 use App\Enums\TournamentType;
 use App\Http\Controllers\Controller;
 use App\Models\Tournament;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,13 +33,16 @@ class TournamentController extends Controller
             'types' => TournamentType::cases(),
             'formations' => Formation::cases(),
             'statuses' => TournamentStatus::cases(),
+            'owners' => $this->ownerOptions(),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $validated = $this->validateTournament($request);
-        $validated['created_by'] = Auth::id();
+        $validated['created_by'] = Auth::user()?->isAdmin()
+            ? (int) $validated['created_by']
+            : Auth::id();
 
         Tournament::create($validated);
 
@@ -55,13 +59,20 @@ class TournamentController extends Controller
             'types' => TournamentType::cases(),
             'formations' => Formation::cases(),
             'statuses' => TournamentStatus::cases(),
+            'owners' => $this->ownerOptions($t->created_by),
         ]);
     }
 
     public function update(Request $request, string $tournament): RedirectResponse
     {
         $t = $this->findManageableTournament($tournament);
-        $t->update($this->validateTournament($request));
+        $validated = $this->validateTournament($request, $t);
+
+        if (Auth::user()?->isAdmin()) {
+            $validated['created_by'] = (int) $validated['created_by'];
+        }
+
+        $t->update($validated);
 
         return redirect()->route('admin.tournaments.index')
             ->with('success', __('admin.save') . ' ✓');
@@ -83,7 +94,7 @@ class TournamentController extends Controller
             ->with('api_token', $token);
     }
 
-    private function validateTournament(Request $request): array
+    private function validateTournament(Request $request, ?Tournament $tournament = null): array
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:200'],
@@ -100,6 +111,12 @@ class TournamentController extends Controller
             'required_fields.*' => ['string', 'in:' . implode(',', self::REGISTRATION_OPTION_FIELDS)],
             'manual_confirmation' => ['boolean'],
         ]);
+
+        if (Auth::user()?->isAdmin()) {
+            $validated += $request->validate([
+                'created_by' => ['required', 'integer', 'in:' . $this->ownerOptions($tournament?->created_by)->pluck('id')->implode(',')],
+            ]);
+        }
 
         $validated['config'] = [
             'required_fields' => array_values($validated['required_fields'] ?? []),
@@ -125,5 +142,22 @@ class TournamentController extends Controller
     private function findManageableTournament(string $id): Tournament
     {
         return $this->manageableTournaments()->findOrFail($id);
+    }
+
+    private function ownerOptions(?int $includeUserId = null)
+    {
+        return User::query()
+            ->where(function ($query): void {
+                $query->whereJsonContains('roles', User::ROLE_ADMIN)
+                    ->orWhere(function ($query): void {
+                        $query->whereJsonContains('roles', User::ROLE_TURNIERVERWALTER)
+                            ->whereNotNull('approved_at');
+                    });
+            })
+            ->when($includeUserId, function ($query) use ($includeUserId): void {
+                $query->orWhere('id', $includeUserId);
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'roles', 'approved_at']);
     }
 }

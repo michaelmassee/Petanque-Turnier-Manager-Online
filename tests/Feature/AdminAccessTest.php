@@ -111,6 +111,48 @@ class AdminAccessTest extends TestCase
             ->assertOk();
     }
 
+    public function test_admin_can_assign_tournament_owner_on_create_and_update(): void
+    {
+        $admin = User::factory()->create();
+        $firstOwner = User::factory()->turnierverwalter()->create(['name' => 'Erster Verwalter']);
+        $secondOwner = User::factory()->turnierverwalter()->create(['name' => 'Zweiter Verwalter']);
+
+        $this->actingAs($admin)
+            ->post(route('admin.tournaments.store'), $this->validTournamentData([
+                'name' => 'Delegiertes Turnier',
+                'created_by' => $firstOwner->id,
+            ]))
+            ->assertRedirect(route('admin.tournaments.index'));
+
+        $tournament = Tournament::where('name', 'Delegiertes Turnier')->firstOrFail();
+
+        $this->assertSame($firstOwner->id, $tournament->created_by);
+
+        $this->actingAs($admin)
+            ->put(route('admin.tournaments.update', $tournament), $this->validTournamentData([
+                'name' => 'Neu delegiertes Turnier',
+                'created_by' => $secondOwner->id,
+            ]))
+            ->assertRedirect(route('admin.tournaments.index'));
+
+        $this->assertSame($secondOwner->id, $tournament->fresh()->created_by);
+    }
+
+    public function test_turnierverwalter_cannot_reassign_tournament_owner(): void
+    {
+        $owner = User::factory()->turnierverwalter()->create();
+        $other = User::factory()->turnierverwalter()->create();
+        $tournament = $this->createTournament($owner);
+
+        $this->actingAs($owner)
+            ->put(route('admin.tournaments.update', $tournament), $this->validTournamentData([
+                'created_by' => $other->id,
+            ]))
+            ->assertRedirect(route('admin.tournaments.index'));
+
+        $this->assertSame($owner->id, $tournament->fresh()->created_by);
+    }
+
     public function test_admin_can_create_user(): void
     {
         $admin = User::factory()->create();

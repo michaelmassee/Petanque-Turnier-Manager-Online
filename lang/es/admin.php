@@ -3,6 +3,7 @@
 return [
     'dashboard' => 'Panel de control',
     'tournaments' => 'Torneos',
+    'tournament_owner' => 'Gestor del torneo',
     'new_tournament' => 'Nuevo torneo',
     'edit_tournament' => 'Editar torneo',
     'registrations' => 'Inscripciones',
