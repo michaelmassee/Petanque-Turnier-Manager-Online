@@ -25,13 +25,13 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.first_name') }} *</label>
-                        <input type="text" name="first_name" value="{{ old('first_name') }}" required
+                        <input type="text" name="first_name" value="{{ old('first_name', $profile?->first_name) }}" required
                                class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('first_name') border-red-400 @enderror">
                         @error('first_name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.last_name') }} *</label>
-                        <input type="text" name="last_name" value="{{ old('last_name') }}" required
+                        <input type="text" name="last_name" value="{{ old('last_name', $profile?->last_name) }}" required
                                class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('last_name') border-red-400 @enderror">
                         @error('last_name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>

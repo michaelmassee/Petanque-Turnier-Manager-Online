@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'club', 'license_nr', 'password', 'roles', 'approved_at'])]
+#[Fillable(['first_name', 'last_name', 'email', 'club', 'license_nr', 'password', 'roles', 'approved_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -21,6 +21,8 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    protected $appends = ['name'];
 
     /**
      * Get the attributes that should be cast.
@@ -40,6 +42,13 @@ class User extends Authenticatable implements MustVerifyEmail
     public function hasRole(string $role): bool
     {
         return in_array($role, $this->roles ?? [], true);
+    }
+
+    public function getNameAttribute(): string
+    {
+        return trim(collect([$this->first_name, $this->last_name])
+            ->filter(fn (?string $part): bool => filled($part))
+            ->implode(' '));
     }
 
     /**

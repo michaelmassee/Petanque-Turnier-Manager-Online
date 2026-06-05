@@ -1,17 +1,24 @@
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('admin.user_name') }} *</label>
-        <input type="text" name="name" value="{{ old('name', $user->name) }}" required
-               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('name') border-red-400 @enderror">
-        @error('name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('admin.user_first_name') }} *</label>
+        <input type="text" name="first_name" value="{{ old('first_name', $user->first_name) }}" required
+               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('first_name') border-red-400 @enderror">
+        @error('first_name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
     </div>
 
     <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('admin.user_email') }} *</label>
-        <input type="email" name="email" value="{{ old('email', $user->email) }}" required
-               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('email') border-red-400 @enderror">
-        @error('email') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('admin.user_last_name') }} *</label>
+        <input type="text" name="last_name" value="{{ old('last_name', $user->last_name) }}" required
+               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('last_name') border-red-400 @enderror">
+        @error('last_name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
     </div>
+</div>
+
+<div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('admin.user_email') }} *</label>
+    <input type="email" name="email" value="{{ old('email', $user->email) }}" required
+           class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('email') border-red-400 @enderror">
+    @error('email') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

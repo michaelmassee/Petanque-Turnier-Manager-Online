@@ -29,6 +29,8 @@ return [
     'edit_user' => 'Edit User',
     'user_approvals' => 'User Approvals',
     'user_name' => 'Name',
+    'user_first_name' => 'First name',
+    'user_last_name' => 'Last name',
     'user_email' => 'Email',
     'user_club' => 'Club',
     'user_license_nr' => 'License no.',

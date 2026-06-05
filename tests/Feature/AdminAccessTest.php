@@ -127,8 +127,8 @@ class AdminAccessTest extends TestCase
     public function test_admin_can_assign_tournament_owner_on_create_and_update(): void
     {
         $admin = User::factory()->create();
-        $firstOwner = User::factory()->turnierverwalter()->create(['name' => 'Erster Verwalter']);
-        $secondOwner = User::factory()->turnierverwalter()->create(['name' => 'Zweiter Verwalter']);
+        $firstOwner = User::factory()->turnierverwalter()->create(['first_name' => 'Erster', 'last_name' => 'Verwalter']);
+        $secondOwner = User::factory()->turnierverwalter()->create(['first_name' => 'Zweiter', 'last_name' => 'Verwalter']);
 
         $this->actingAs($admin)
             ->post(route('admin.tournaments.store'), $this->validTournamentData([
@@ -172,7 +172,8 @@ class AdminAccessTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('admin.users.store'), [
-                'name' => 'Neue Verwaltung',
+                'first_name' => 'Neue',
+                'last_name' => 'Verwaltung',
                 'email' => 'verwaltung@example.com',
                 'club' => 'BC Linden',
                 'license_nr' => '12345678',
@@ -202,7 +203,8 @@ class AdminAccessTest extends TestCase
 
         $this->actingAs($admin)
             ->put(route('admin.users.update', $otherAdmin), [
-                'name' => $otherAdmin->name,
+                'first_name' => $otherAdmin->first_name,
+                'last_name' => $otherAdmin->last_name,
                 'email' => $otherAdmin->email,
                 'roles' => [User::ROLE_ADMIN],
                 'approved' => '1',
@@ -223,7 +225,8 @@ class AdminAccessTest extends TestCase
 
         $this->actingAs($admin)
             ->put(route('admin.users.update', $user), [
-                'name' => 'Nur Teilnehmer',
+                'first_name' => 'Nur',
+                'last_name' => 'Teilnehmer',
                 'email' => 'teilnehmer@example.com',
                 'club' => 'PC Bochum',
                 'license_nr' => '87654321',
@@ -236,6 +239,8 @@ class AdminAccessTest extends TestCase
 
         $user->refresh();
 
+        $this->assertSame('Nur', $user->first_name);
+        $this->assertSame('Teilnehmer', $user->last_name);
         $this->assertSame('Nur Teilnehmer', $user->name);
         $this->assertSame('teilnehmer@example.com', $user->email);
         $this->assertSame('PC Bochum', $user->club);
@@ -252,7 +257,8 @@ class AdminAccessTest extends TestCase
 
         $this->actingAs($admin)
             ->put(route('admin.users.update', $admin), [
-                'name' => $admin->name,
+                'first_name' => $admin->first_name,
+                'last_name' => $admin->last_name,
                 'email' => $admin->email,
                 'roles' => [User::ROLE_TEILNEHMER],
                 'email_verified' => '1',

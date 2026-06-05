@@ -29,6 +29,8 @@ return [
     'edit_user' => 'Gebruiker bewerken',
     'user_approvals' => 'Gebruikersgoedkeuringen',
     'user_name' => 'Naam',
+    'user_first_name' => 'Voornaam',
+    'user_last_name' => 'Achternaam',
     'user_email' => 'E-mail',
     'user_club' => 'Club',
     'user_license_nr' => 'Licentienr.',

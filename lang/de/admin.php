@@ -29,6 +29,8 @@ return [
     'edit_user' => 'Benutzer bearbeiten',
     'user_approvals' => 'Benutzerfreigaben',
     'user_name' => 'Name',
+    'user_first_name' => 'Vorname',
+    'user_last_name' => 'Nachname',
     'user_email' => 'E-Mail',
     'user_club' => 'Verein',
     'user_license_nr' => 'Lizenznr',

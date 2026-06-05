@@ -29,6 +29,8 @@ return [
     'edit_user' => 'Editar usuario',
     'user_approvals' => 'Aprobaciones de usuarios',
     'user_name' => 'Nombre',
+    'user_first_name' => 'Nombre',
+    'user_last_name' => 'Apellido',
     'user_email' => 'Correo electrónico',
     'user_club' => 'Club',
     'user_license_nr' => 'N.º de licencia',

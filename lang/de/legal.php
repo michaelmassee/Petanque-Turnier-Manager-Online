@@ -16,7 +16,7 @@ return [
         'intro' => 'Diese Hinweise informieren über die Verarbeitung personenbezogener Daten in dieser Anwendung.',
         'privacy_contact' => 'Datenschutzkontakt',
         'processed_data_title' => 'Verarbeitete Daten',
-        'data_account' => 'Benutzerkonto: Name, E-Mail-Adresse, Verein, Lizenznummer, Passwort-Hash, Rollen und Freigabestatus.',
+        'data_account' => 'Benutzerkonto: Vorname, Nachname, E-Mail-Adresse, Verein, Lizenznummer, Passwort-Hash, Rollen und Freigabestatus.',
         'data_registration' => 'Turnieranmeldung: Namen, E-Mail-Adressen, Verein, Lizenznummer, Teamname, Anmeldestatus und technische Bestätigungstokens.',
         'data_tournament' => 'Turnierverwaltung: Turnierdaten, Beschreibungen, Ergebnisse und Zuordnung zum verwaltenden Benutzerkonto.',
         'data_technical' => 'Technische Daten: Sitzungs-Cookies, CSRF-Schutz, Server-Logdaten und sicherheitsrelevante Ereignisse.',

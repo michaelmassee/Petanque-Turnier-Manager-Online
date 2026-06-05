@@ -25,7 +25,7 @@ class PublicTournamentFilterTest extends TestCase
 
     public function test_start_page_header_shows_authenticated_user_name(): void
     {
-        $user = User::factory()->create(['name' => 'Michael Massee']);
+        $user = User::factory()->create(['first_name' => 'Michael', 'last_name' => 'Massee']);
 
         $this->actingAs($user)
             ->get('/de')
@@ -43,7 +43,7 @@ class PublicTournamentFilterTest extends TestCase
 
     public function test_start_page_header_hides_admin_menu_item_for_tournament_managers(): void
     {
-        $user = User::factory()->turnierverwalter()->create(['name' => 'Turnier Manager']);
+        $user = User::factory()->turnierverwalter()->create(['first_name' => 'Turnier', 'last_name' => 'Manager']);
 
         $this->actingAs($user)
             ->get('/de')

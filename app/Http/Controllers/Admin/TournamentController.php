@@ -157,7 +157,8 @@ class TournamentController extends Controller
             ->when($includeUserId, function ($query) use ($includeUserId): void {
                 $query->orWhere('id', $includeUserId);
             })
-            ->orderBy('name')
-            ->get(['id', 'name', 'email', 'roles', 'approved_at']);
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name', 'email', 'roles', 'approved_at']);
     }
 }

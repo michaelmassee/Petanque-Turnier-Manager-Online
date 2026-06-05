@@ -44,7 +44,8 @@
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
                         <tr>
-                            <th class="px-4 py-3 text-left">{{ __('admin.user_name') }}</th>
+                            <th class="px-4 py-3 text-left">{{ __('admin.user_first_name') }}</th>
+                            <th class="px-4 py-3 text-left">{{ __('admin.user_last_name') }}</th>
                             <th class="px-4 py-3 text-left">{{ __('admin.user_email') }}</th>
                             <th class="px-4 py-3 text-left">{{ __('admin.user_club') }}</th>
                             <th class="px-4 py-3 text-left">{{ __('admin.user_license_nr') }}</th>
@@ -58,7 +59,8 @@
                     <tbody class="divide-y divide-gray-100">
                         @forelse($users as $user)
                             <tr>
-                                <td class="px-4 py-3 font-medium">{{ $user->name }}</td>
+                                <td class="px-4 py-3 font-medium">{{ $user->first_name }}</td>
+                                <td class="px-4 py-3 font-medium">{{ $user->last_name }}</td>
                                 <td class="px-4 py-3 text-gray-500">{{ $user->email }}</td>
                                 <td class="px-4 py-3 text-gray-500">{{ $user->club ?: '–' }}</td>
                                 <td class="px-4 py-3 text-gray-500">{{ $user->license_nr ?: '–' }}</td>
@@ -99,7 +101,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="9" class="px-4 py-6 text-center text-gray-400">–</td></tr>
+                            <tr><td colspan="10" class="px-4 py-6 text-center text-gray-400">–</td></tr>
                         @endforelse
                     </tbody>
                 </table>

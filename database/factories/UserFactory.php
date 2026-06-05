@@ -24,8 +24,12 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
+        $firstName = fake()->firstName();
+        $lastName = fake()->lastName();
+
         return [
-            'name' => fake()->name(),
+            'first_name' => $firstName,
+            'last_name' => $lastName,
             'email' => fake()->unique()->safeEmail(),
             'club' => fake()->boolean(70) ? fake()->company() : null,
             'license_nr' => fake()->boolean(70) ? fake()->unique()->numerify('########') : null,

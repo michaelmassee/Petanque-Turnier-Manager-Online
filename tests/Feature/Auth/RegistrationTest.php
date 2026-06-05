@@ -23,7 +23,8 @@ class RegistrationTest extends TestCase
     public function test_new_users_can_register(): void
     {
         $component = Volt::test('pages.auth.register')
-            ->set('name', 'Test User')
+            ->set('first_name', 'Test')
+            ->set('last_name', 'User')
             ->set('email', 'test@example.com')
             ->set('club', 'BC Linden')
             ->set('license_nr', '12345678')
@@ -46,7 +47,8 @@ class RegistrationTest extends TestCase
     public function test_new_tournament_managers_register_pending_approval(): void
     {
         $component = Volt::test('pages.auth.register')
-            ->set('name', 'Test Manager')
+            ->set('first_name', 'Test')
+            ->set('last_name', 'Manager')
             ->set('email', 'manager@example.com')
             ->set('password', 'password')
             ->set('password_confirmation', 'password')

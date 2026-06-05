@@ -20,7 +20,8 @@ class UserApprovalController extends Controller
             ->when($request->string('search')->trim()->isNotEmpty(), function ($query) use ($request): void {
                 $search = $request->string('search')->trim()->toString();
                 $query->where(function ($query) use ($search): void {
-                    $query->where('name', 'like', "%{$search}%")
+                    $query->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('club', 'like', "%{$search}%")
                         ->orWhere('license_nr', 'like', "%{$search}%");
@@ -42,7 +43,8 @@ class UserApprovalController extends Controller
             })
             ->withCount('tournaments')
             ->orderByRaw('approved_at is null desc')
-            ->orderBy('name')
+            ->orderBy('last_name')
+            ->orderBy('first_name')
             ->paginate(30)
             ->withQueryString();
 
@@ -70,7 +72,8 @@ class UserApprovalController extends Controller
         $data = $this->validatedData($request);
 
         $user = User::create([
-            'name' => $data['name'],
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
             'email' => $data['email'],
             'club' => $data['club'] ?? null,
             'license_nr' => $data['license_nr'] ?? null,
@@ -112,7 +115,8 @@ class UserApprovalController extends Controller
         }
 
         $user->forceFill([
-            'name' => $data['name'],
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
             'email' => $data['email'],
             'club' => $data['club'] ?? null,
             'license_nr' => $data['license_nr'] ?? null,
@@ -184,12 +188,13 @@ class UserApprovalController extends Controller
     }
 
     /**
-     * @return array{name: string, email: string, club?: ?string, license_nr?: ?string, password?: string, roles: array<int, string>, approved: bool}
+     * @return array{first_name: string, last_name: string, email: string, club?: ?string, license_nr?: ?string, password?: string, roles: array<int, string>, approved: bool}
      */
     private function validatedData(Request $request, ?User $user = null): array
     {
         return $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
             'email' => [
                 'required',
                 'string',
