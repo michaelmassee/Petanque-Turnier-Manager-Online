@@ -1,6 +1,7 @@
 <x-public-layout :title="__('registrations.subtitle', ['tournament' => $tournament->name])">
 
 @php($requiredFields = $tournament->requiredRegistrationFields())
+@php($profile = auth()->user())
 
 <div class="max-w-2xl mx-auto">
     <h1 class="text-2xl font-bold mb-2">{{ __('registrations.title') }}</h1>
@@ -37,20 +38,20 @@
                 </div>
                 <div class="mt-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.email') }} *</label>
-                    <input type="email" name="email" value="{{ old('email') }}" required
+                    <input type="email" name="email" value="{{ old('email', $profile?->email) }}" required
                            class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('email') border-red-400 @enderror">
                     @error('email') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div class="grid grid-cols-2 gap-4 mt-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.club') }} @if(in_array('club', $requiredFields, true)) * @endif</label>
-                        <input type="text" name="club" value="{{ old('club') }}" {{ in_array('club', $requiredFields, true) ? 'required' : '' }}
+                        <input type="text" name="club" value="{{ old('club', $profile?->club) }}" {{ in_array('club', $requiredFields, true) ? 'required' : '' }}
                                class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('club') border-red-400 @enderror">
                         @error('club') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('registrations.fields.license_nr') }} @if(in_array('license_nr', $requiredFields, true)) * @endif</label>
-                        <input type="text" name="license_nr" value="{{ old('license_nr') }}" {{ in_array('license_nr', $requiredFields, true) ? 'required' : '' }}
+                        <input type="text" name="license_nr" value="{{ old('license_nr', $profile?->license_nr) }}" {{ in_array('license_nr', $requiredFields, true) ? 'required' : '' }}
                                class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('license_nr') border-red-400 @enderror">
                         @error('license_nr') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>

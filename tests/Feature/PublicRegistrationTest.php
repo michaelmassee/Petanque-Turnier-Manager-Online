@@ -100,6 +100,23 @@ class PublicRegistrationTest extends TestCase
             ->assertSessionHasErrors('club');
     }
 
+    public function test_registration_form_prefills_authenticated_user_club_and_license(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'spieler@example.com',
+            'club' => 'BC Linden',
+            'license_nr' => '12345678',
+        ]);
+        $tournament = $this->createTournament();
+
+        $this->actingAs($user)
+            ->get("/de/tournaments/{$tournament->id}/register")
+            ->assertOk()
+            ->assertSee('value="spieler@example.com"', false)
+            ->assertSee('value="BC Linden"', false)
+            ->assertSee('value="12345678"', false);
+    }
+
     private function createTournament(array $overrides = []): Tournament
     {
         return Tournament::create(array_merge([

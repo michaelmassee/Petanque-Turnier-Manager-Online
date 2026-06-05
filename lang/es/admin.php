@@ -30,6 +30,8 @@ return [
     'user_approvals' => 'Aprobaciones de usuarios',
     'user_name' => 'Nombre',
     'user_email' => 'Correo electrónico',
+    'user_club' => 'Club',
+    'user_license_nr' => 'N.º de licencia',
     'password' => 'Contraseña',
     'password_confirmation' => 'Confirmar contraseña',
     'leave_password_blank' => 'Déjalo vacío para mantener la contraseña actual.',

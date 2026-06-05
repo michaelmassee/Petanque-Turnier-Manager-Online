@@ -161,6 +161,8 @@ class AdminAccessTest extends TestCase
             ->post(route('admin.users.store'), [
                 'name' => 'Neue Verwaltung',
                 'email' => 'verwaltung@example.com',
+                'club' => 'BC Linden',
+                'license_nr' => '12345678',
                 'password' => 'new-password',
                 'password_confirmation' => 'new-password',
                 'roles' => [User::ROLE_TURNIERVERWALTER],
@@ -173,6 +175,8 @@ class AdminAccessTest extends TestCase
 
         $this->assertTrue($user->isTurnierverwalter());
         $this->assertTrue($user->isTeilnehmer());
+        $this->assertSame('BC Linden', $user->club);
+        $this->assertSame('12345678', $user->license_nr);
         $this->assertTrue($user->isApproved());
         $this->assertTrue($user->hasVerifiedEmail());
         $this->assertTrue(Hash::check('new-password', $user->password));
@@ -187,6 +191,8 @@ class AdminAccessTest extends TestCase
             ->put(route('admin.users.update', $user), [
                 'name' => 'Nur Teilnehmer',
                 'email' => 'teilnehmer@example.com',
+                'club' => 'PC Bochum',
+                'license_nr' => '87654321',
                 'password' => 'changed-password',
                 'password_confirmation' => 'changed-password',
                 'roles' => [User::ROLE_TEILNEHMER],
@@ -198,6 +204,8 @@ class AdminAccessTest extends TestCase
 
         $this->assertSame('Nur Teilnehmer', $user->name);
         $this->assertSame('teilnehmer@example.com', $user->email);
+        $this->assertSame('PC Bochum', $user->club);
+        $this->assertSame('87654321', $user->license_nr);
         $this->assertTrue($user->isTeilnehmer());
         $this->assertFalse($user->isTurnierverwalter());
         $this->assertNull($user->approved_at);

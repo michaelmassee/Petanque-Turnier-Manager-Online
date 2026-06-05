@@ -25,6 +25,8 @@ class RegistrationTest extends TestCase
         $component = Volt::test('pages.auth.register')
             ->set('name', 'Test User')
             ->set('email', 'test@example.com')
+            ->set('club', 'BC Linden')
+            ->set('license_nr', '12345678')
             ->set('password', 'password')
             ->set('password_confirmation', 'password');
 
@@ -35,6 +37,8 @@ class RegistrationTest extends TestCase
         $this->assertAuthenticated();
         $user = User::where('email', 'test@example.com')->firstOrFail();
         $this->assertTrue($user->isTeilnehmer());
+        $this->assertSame('BC Linden', $user->club);
+        $this->assertSame('12345678', $user->license_nr);
         $this->assertFalse($user->isTurnierverwalter());
         $this->assertFalse($user->isApproved());
     }

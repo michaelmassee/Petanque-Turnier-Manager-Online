@@ -16,6 +16,22 @@
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('admin.user_club') }}</label>
+        <input type="text" name="club" value="{{ old('club', $user->club) }}"
+               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('club') border-red-400 @enderror">
+        @error('club') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('admin.user_license_nr') }}</label>
+        <input type="text" name="license_nr" value="{{ old('license_nr', $user->license_nr) }}"
+               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('license_nr') border-red-400 @enderror">
+        @error('license_nr') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('admin.password') }} {{ isset($editing) ? '' : '*' }}</label>
         <input type="password" name="password" autocomplete="new-password" {{ isset($editing) ? '' : 'required' }}
                class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 @error('password') border-red-400 @enderror">

@@ -46,6 +46,8 @@
                         <tr>
                             <th class="px-4 py-3 text-left">{{ __('admin.user_name') }}</th>
                             <th class="px-4 py-3 text-left">{{ __('admin.user_email') }}</th>
+                            <th class="px-4 py-3 text-left">{{ __('admin.user_club') }}</th>
+                            <th class="px-4 py-3 text-left">{{ __('admin.user_license_nr') }}</th>
                             <th class="px-4 py-3 text-left">{{ __('admin.roles') }}</th>
                             <th class="px-4 py-3 text-left">{{ __('admin.email_verified') }}</th>
                             <th class="px-4 py-3 text-left">{{ __('admin.approval_status') }}</th>
@@ -58,6 +60,8 @@
                             <tr>
                                 <td class="px-4 py-3 font-medium">{{ $user->name }}</td>
                                 <td class="px-4 py-3 text-gray-500">{{ $user->email }}</td>
+                                <td class="px-4 py-3 text-gray-500">{{ $user->club ?: '–' }}</td>
+                                <td class="px-4 py-3 text-gray-500">{{ $user->license_nr ?: '–' }}</td>
                                 <td class="px-4 py-3 text-gray-500">
                                     {{ collect($user->roles ?? [])->map(fn (string $role) => __('admin.role_' . $role))->implode(', ') }}
                                 </td>
@@ -95,7 +99,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="px-4 py-6 text-center text-gray-400">–</td></tr>
+                            <tr><td colspan="9" class="px-4 py-6 text-center text-gray-400">–</td></tr>
                         @endforelse
                     </tbody>
                 </table>

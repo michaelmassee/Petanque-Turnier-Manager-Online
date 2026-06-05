@@ -10,6 +10,8 @@ new class extends Component
 {
     public string $name = '';
     public string $email = '';
+    public string $club = '';
+    public string $license_nr = '';
 
     /**
      * Mount the component.
@@ -18,6 +20,8 @@ new class extends Component
     {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->club = Auth::user()->club ?? '';
+        $this->license_nr = Auth::user()->license_nr ?? '';
     }
 
     /**
@@ -30,6 +34,8 @@ new class extends Component
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class)->ignore($user->id)],
+            'club' => ['nullable', 'string', 'max:150'],
+            'license_nr' => ['nullable', 'string', 'max:50', Rule::unique(User::class)->ignore($user->id)],
         ]);
 
         $user->fill($validated);
@@ -102,6 +108,18 @@ new class extends Component
                     @endif
                 </div>
             @endif
+        </div>
+
+        <div>
+            <x-input-label for="club" :value="__('admin.user_club')" />
+            <x-text-input wire:model="club" id="club" name="club" type="text" class="mt-1 block w-full" autocomplete="organization" />
+            <x-input-error class="mt-2" :messages="$errors->get('club')" />
+        </div>
+
+        <div>
+            <x-input-label for="license_nr" :value="__('admin.user_license_nr')" />
+            <x-text-input wire:model="license_nr" id="license_nr" name="license_nr" type="text" class="mt-1 block w-full" autocomplete="off" />
+            <x-input-error class="mt-2" :messages="$errors->get('license_nr')" />
         </div>
 
         <div class="flex items-center gap-4">

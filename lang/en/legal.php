@@ -16,7 +16,7 @@ return [
         'intro' => 'This notice explains how personal data is processed in this application.',
         'privacy_contact' => 'Privacy contact',
         'processed_data_title' => 'Processed data',
-        'data_account' => 'User account: name, email address, password hash, roles and approval status.',
+        'data_account' => 'User account: name, email address, club, license number, password hash, roles and approval status.',
         'data_registration' => 'Tournament registration: names, email addresses, club, license number, team name, registration status and technical confirmation tokens.',
         'data_tournament' => 'Tournament management: tournament data, descriptions, results and assignment to the managing user account.',
         'data_technical' => 'Technical data: session cookies, CSRF protection, server log data and security-relevant events.',

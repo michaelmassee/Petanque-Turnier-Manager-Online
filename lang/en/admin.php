@@ -30,6 +30,8 @@ return [
     'user_approvals' => 'User Approvals',
     'user_name' => 'Name',
     'user_email' => 'Email',
+    'user_club' => 'Club',
+    'user_license_nr' => 'License no.',
     'password' => 'Password',
     'password_confirmation' => 'Confirm Password',
     'leave_password_blank' => 'Leave blank to keep the current password.',

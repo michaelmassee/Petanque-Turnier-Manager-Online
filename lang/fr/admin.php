@@ -30,6 +30,8 @@ return [
     'user_approvals' => 'Validations des utilisateurs',
     'user_name' => 'Nom',
     'user_email' => 'E-mail',
+    'user_club' => 'Club',
+    'user_license_nr' => 'N° de licence',
     'password' => 'Mot de passe',
     'password_confirmation' => 'Confirmer le mot de passe',
     'leave_password_blank' => 'Laisser vide pour conserver le mot de passe actuel.',

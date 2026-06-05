@@ -30,6 +30,8 @@ return [
     'user_approvals' => 'Benutzerfreigaben',
     'user_name' => 'Name',
     'user_email' => 'E-Mail',
+    'user_club' => 'Verein',
+    'user_license_nr' => 'Lizenznr',
     'password' => 'Passwort',
     'password_confirmation' => 'Passwort bestätigen',
     'leave_password_blank' => 'Leer lassen, um das Passwort nicht zu ändern.',

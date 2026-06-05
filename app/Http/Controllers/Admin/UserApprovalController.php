@@ -21,7 +21,9 @@ class UserApprovalController extends Controller
                 $search = $request->string('search')->trim()->toString();
                 $query->where(function ($query) use ($search): void {
                     $query->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('club', 'like', "%{$search}%")
+                        ->orWhere('license_nr', 'like', "%{$search}%");
                 });
             })
             ->when($request->filled('role'), fn ($query) => $query->whereJsonContains('roles', $request->string('role')->toString()))
@@ -70,6 +72,8 @@ class UserApprovalController extends Controller
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
+            'club' => $data['club'] ?? null,
+            'license_nr' => $data['license_nr'] ?? null,
             'password' => $data['password'],
             'roles' => $this->normalizedRoles($data['roles']),
             'approved_at' => $this->approvedAt($data),
@@ -110,6 +114,8 @@ class UserApprovalController extends Controller
         $user->forceFill([
             'name' => $data['name'],
             'email' => $data['email'],
+            'club' => $data['club'] ?? null,
+            'license_nr' => $data['license_nr'] ?? null,
             'roles' => $roles,
             'approved_at' => $this->approvedAt($data),
             'email_verified_at' => $request->boolean('email_verified') ? ($user->email_verified_at ?? now()) : null,
@@ -178,7 +184,7 @@ class UserApprovalController extends Controller
     }
 
     /**
-     * @return array{name: string, email: string, password?: string, roles: array<int, string>, approved: bool}
+     * @return array{name: string, email: string, club?: ?string, license_nr?: ?string, password?: string, roles: array<int, string>, approved: bool}
      */
     private function validatedData(Request $request, ?User $user = null): array
     {
@@ -190,6 +196,13 @@ class UserApprovalController extends Controller
                 'lowercase',
                 'email',
                 'max:255',
+                Rule::unique(User::class)->ignore($user?->id),
+            ],
+            'club' => ['nullable', 'string', 'max:150'],
+            'license_nr' => [
+                'nullable',
+                'string',
+                'max:50',
                 Rule::unique(User::class)->ignore($user?->id),
             ],
             'password' => [$user ? 'nullable' : 'required', 'string', 'min:8', 'confirmed'],

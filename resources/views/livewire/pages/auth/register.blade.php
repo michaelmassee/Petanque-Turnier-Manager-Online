@@ -12,6 +12,8 @@ new #[Layout('layouts.guest')] class extends Component
 {
     public string $name = '';
     public string $email = '';
+    public string $club = '';
+    public string $license_nr = '';
     public string $password = '';
     public string $password_confirmation = '';
     public bool $as_tournament_manager = false;
@@ -24,6 +26,8 @@ new #[Layout('layouts.guest')] class extends Component
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'club' => ['nullable', 'string', 'max:150'],
+            'license_nr' => ['nullable', 'string', 'max:50', 'unique:'.User::class],
             'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
             'as_tournament_manager' => ['boolean'],
         ]);
@@ -61,6 +65,18 @@ new #[Layout('layouts.guest')] class extends Component
             <x-input-label for="email" :value="__('Email')" />
             <x-text-input wire:model="email" id="email" class="block mt-1 w-full" type="email" name="email" required autocomplete="username" />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
+        </div>
+
+        <div class="mt-4">
+            <x-input-label for="club" :value="__('admin.user_club')" />
+            <x-text-input wire:model="club" id="club" class="block mt-1 w-full" type="text" name="club" autocomplete="organization" />
+            <x-input-error :messages="$errors->get('club')" class="mt-2" />
+        </div>
+
+        <div class="mt-4">
+            <x-input-label for="license_nr" :value="__('admin.user_license_nr')" />
+            <x-text-input wire:model="license_nr" id="license_nr" class="block mt-1 w-full" type="text" name="license_nr" autocomplete="off" />
+            <x-input-error :messages="$errors->get('license_nr')" class="mt-2" />
         </div>
 
         <!-- Password -->

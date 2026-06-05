@@ -30,6 +30,8 @@ return [
     'user_approvals' => 'Gebruikersgoedkeuringen',
     'user_name' => 'Naam',
     'user_email' => 'E-mail',
+    'user_club' => 'Club',
+    'user_license_nr' => 'Licentienr.',
     'password' => 'Wachtwoord',
     'password_confirmation' => 'Wachtwoord bevestigen',
     'leave_password_blank' => 'Laat leeg om het huidige wachtwoord te behouden.',
