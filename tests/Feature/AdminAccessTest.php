@@ -124,6 +124,41 @@ class AdminAccessTest extends TestCase
             ->assertOk();
     }
 
+    public function test_tournament_create_type_options_match_main_project(): void
+    {
+        $admin = User::factory()->create();
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.tournaments.create'))
+            ->assertOk();
+
+        foreach ([
+            'formule_x',
+            'jeder_gegen_jeden',
+            'ko',
+            'kaskaden',
+            'liga',
+            'maastrichter',
+            'poule_ab',
+            'schweizer',
+            'supermelee',
+            'trip_tete',
+        ] as $value) {
+            $response->assertSee('value="' . $value . '"', false);
+        }
+
+        foreach ([
+            'daenisch',
+            'monrad',
+            'arena',
+            'crazy_melee',
+            'koelner_sextet',
+            'tete_series',
+        ] as $value) {
+            $response->assertDontSee('value="' . $value . '"', false);
+        }
+    }
+
     public function test_admin_can_assign_tournament_owner_on_create_and_update(): void
     {
         $admin = User::factory()->create();
@@ -133,13 +168,17 @@ class AdminAccessTest extends TestCase
         $this->actingAs($admin)
             ->post(route('admin.tournaments.store'), $this->validTournamentData([
                 'name' => 'Delegiertes Turnier',
+                'type' => 'liga',
                 'created_by' => $firstOwner->id,
+                'allow_waitlist' => '1',
             ]))
             ->assertRedirect(route('admin.tournaments.index'));
 
         $tournament = Tournament::where('name', 'Delegiertes Turnier')->firstOrFail();
 
         $this->assertSame($firstOwner->id, $tournament->created_by);
+        $this->assertSame('liga', $tournament->type->value);
+        $this->assertTrue($tournament->allowsWaitlist());
 
         $this->actingAs($admin)
             ->put(route('admin.tournaments.update', $tournament), $this->validTournamentData([
@@ -249,6 +288,32 @@ class AdminAccessTest extends TestCase
         $this->assertFalse($user->isTurnierverwalter());
         $this->assertNull($user->approved_at);
         $this->assertTrue(Hash::check('changed-password', $user->password));
+    }
+
+    public function test_admin_can_store_approval_flag_for_participant_without_granting_admin_access(): void
+    {
+        $admin = User::factory()->create();
+        $user = User::factory()->create([
+            'roles' => [User::ROLE_TEILNEHMER],
+            'approved_at' => null,
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('admin.users.update', $user), [
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'email' => $user->email,
+                'roles' => [User::ROLE_TEILNEHMER],
+                'approved' => '1',
+                'email_verified' => '1',
+            ])
+            ->assertRedirect(route('admin.users.index'));
+
+        $user->refresh();
+
+        $this->assertNotNull($user->approved_at);
+        $this->assertTrue($user->isApproved());
+        $this->assertFalse($user->canAccessAdmin());
     }
 
     public function test_admin_cannot_remove_own_admin_role(): void

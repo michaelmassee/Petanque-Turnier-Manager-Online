@@ -30,7 +30,7 @@ class TournamentController extends Controller
     public function create(): View
     {
         return view('admin.tournaments.create', [
-            'types' => TournamentType::cases(),
+            'types' => TournamentType::availableCases(),
             'formations' => Formation::cases(),
             'statuses' => TournamentStatus::cases(),
             'owners' => $this->ownerOptions(),
@@ -56,7 +56,7 @@ class TournamentController extends Controller
 
         return view('admin.tournaments.edit', [
             'tournament' => $t,
-            'types' => TournamentType::cases(),
+            'types' => $this->typeOptions($t),
             'formations' => Formation::cases(),
             'statuses' => TournamentStatus::cases(),
             'owners' => $this->ownerOptions($t->created_by),
@@ -100,16 +100,16 @@ class TournamentController extends Controller
             'name' => ['required', 'string', 'max:200'],
             'date' => ['required', 'date'],
             'location' => ['required', 'string', 'max:200'],
-            'type' => ['required', 'string', 'in:' . implode(',', array_column(TournamentType::cases(), 'value'))],
+            'type' => ['required', 'string', 'in:' . implode(',', array_column($this->typeOptions($tournament), 'value'))],
             'formation' => ['required', 'string', 'in:' . implode(',', array_column(Formation::cases(), 'value'))],
             'max_registrations' => ['required', 'integer', 'min:0'],
-            'registration_open' => ['boolean'],
             'registration_deadline' => ['nullable', 'date'],
             'status' => ['required', 'string', 'in:' . implode(',', array_column(TournamentStatus::cases(), 'value'))],
             'description' => ['nullable', 'string'],
             'required_fields' => ['array'],
             'required_fields.*' => ['string', 'in:' . implode(',', self::REGISTRATION_OPTION_FIELDS)],
             'manual_confirmation' => ['boolean'],
+            'allow_waitlist' => ['boolean'],
         ]);
 
         if (Auth::user()?->isAdmin()) {
@@ -121,11 +121,24 @@ class TournamentController extends Controller
         $validated['config'] = [
             'required_fields' => array_values($validated['required_fields'] ?? []),
             'manual_confirmation' => (bool) ($validated['manual_confirmation'] ?? false),
+            'allow_waitlist' => (bool) ($validated['allow_waitlist'] ?? false),
         ];
+        $validated['registration_open'] = $validated['status'] === TournamentStatus::Registration->value;
 
-        unset($validated['required_fields'], $validated['manual_confirmation']);
+        unset($validated['required_fields'], $validated['manual_confirmation'], $validated['allow_waitlist']);
 
         return $validated;
+    }
+
+    private function typeOptions(?Tournament $tournament = null): array
+    {
+        $types = TournamentType::availableCases();
+
+        if ($tournament && ! in_array($tournament->type, $types, true)) {
+            $types[] = $tournament->type;
+        }
+
+        return $types;
     }
 
     private function manageableTournaments()

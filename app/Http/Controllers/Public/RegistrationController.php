@@ -51,6 +51,10 @@ class RegistrationController extends Controller
         $vollAusgebucht = $t->max_registrations > 0
             && $t->registrations()->whereIn('status', [RegistrationStatus::Confirmed->value, RegistrationStatus::Pending->value])->count() >= $t->max_registrations;
 
+        if ($vollAusgebucht && ! $t->allowsWaitlist()) {
+            return back()->with('error', __('tournaments.registration_full'));
+        }
+
         $requiresManualConfirmation = $t->requiresManualConfirmation();
         $status = $vollAusgebucht
             ? RegistrationStatus::Waitlist

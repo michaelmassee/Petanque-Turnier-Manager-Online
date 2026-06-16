@@ -56,20 +56,20 @@ new #[Layout('layouts.guest')] class extends Component
 <div>
     <form wire:submit="register">
         <div>
-            <x-input-label for="first_name" :value="__('admin.user_first_name')" />
+            <x-input-label for="first_name" :value="__('admin.user_first_name') . ' *'" />
             <x-text-input wire:model="first_name" id="first_name" class="block mt-1 w-full" type="text" name="first_name" required autofocus autocomplete="given-name" />
             <x-input-error :messages="$errors->get('first_name')" class="mt-2" />
         </div>
 
         <div class="mt-4">
-            <x-input-label for="last_name" :value="__('admin.user_last_name')" />
+            <x-input-label for="last_name" :value="__('admin.user_last_name') . ' *'" />
             <x-text-input wire:model="last_name" id="last_name" class="block mt-1 w-full" type="text" name="last_name" required autocomplete="family-name" />
             <x-input-error :messages="$errors->get('last_name')" class="mt-2" />
         </div>
 
         <!-- Email Address -->
         <div class="mt-4">
-            <x-input-label for="email" :value="__('Email')" />
+            <x-input-label for="email" :value="__('Email') . ' *'" />
             <x-text-input wire:model="email" id="email" class="block mt-1 w-full" type="email" name="email" required autocomplete="username" />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
@@ -88,7 +88,7 @@ new #[Layout('layouts.guest')] class extends Component
 
         <!-- Password -->
         <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
+            <x-input-label for="password" :value="__('Password') . ' *'" />
 
             <x-text-input wire:model="password" id="password" class="block mt-1 w-full"
                             type="password"
@@ -100,7 +100,7 @@ new #[Layout('layouts.guest')] class extends Component
 
         <!-- Confirm Password -->
         <div class="mt-4">
-            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
+            <x-input-label for="password_confirmation" :value="__('Confirm Password') . ' *'" />
 
             <x-text-input wire:model="password_confirmation" id="password_confirmation" class="block mt-1 w-full"
                             type="password"

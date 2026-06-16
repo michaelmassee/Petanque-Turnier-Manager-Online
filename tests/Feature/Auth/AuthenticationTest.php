@@ -20,6 +20,20 @@ class AuthenticationTest extends TestCase
             ->assertSeeVolt('pages.auth.login');
     }
 
+    public function test_login_screen_uses_translated_labels(): void
+    {
+        $this->get('/login', ['Accept-Language' => 'de'])
+            ->assertOk()
+            ->assertSee('E-Mail')
+            ->assertSee('Passwort')
+            ->assertSee('Angemeldet bleiben')
+            ->assertSee('Passwort vergessen?')
+            ->assertSee('Einloggen')
+            ->assertDontSee('Remember me')
+            ->assertDontSee('Forgot your password?')
+            ->assertDontSee('Log in');
+    }
+
     public function test_users_can_authenticate_using_the_login_screen(): void
     {
         $user = User::factory()->create();

@@ -15,9 +15,10 @@ return new class extends Migration
             $table->date('date');
             $table->string('location');
             $table->enum('type', [
-                'supermelee', 'schweizer', 'maastrichter', 'ko', 'poule_ab',
-                'formule_x', 'trip_tete', 'daenisch', 'monrad', 'arena',
-                'crazy_melee', 'koelner_sextet', 'tete_series', 'kaskaden',
+                'formule_x', 'jeder_gegen_jeden', 'ko', 'kaskaden', 'liga',
+                'maastrichter', 'poule_ab', 'schweizer', 'supermelee', 'trip_tete',
+                'daenisch', 'monrad', 'arena',
+                'crazy_melee', 'koelner_sextet', 'tete_series',
             ]);
             $table->enum('formation', ['tete', 'doublette', 'triplette']);
             $table->unsignedInteger('max_registrations')->default(0);

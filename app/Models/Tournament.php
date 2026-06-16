@@ -57,14 +57,15 @@ class Tournament extends Model
 
     public function isRegistrationOpen(): bool
     {
-        if (! $this->registration_open || $this->status !== TournamentStatus::Registration) {
+        if ($this->status !== TournamentStatus::Registration) {
             return false;
         }
         if ($this->registration_deadline && $this->registration_deadline->isPast()) {
             return false;
         }
         if ($this->max_registrations > 0) {
-            return $this->registrations()->whereIn('status', ['confirmed', 'pending'])->count() < $this->max_registrations;
+            return $this->registrations()->whereIn('status', ['confirmed', 'pending'])->count() < $this->max_registrations
+                || $this->allowsWaitlist();
         }
         return true;
     }
@@ -94,5 +95,10 @@ class Tournament extends Model
     public function requiresManualConfirmation(): bool
     {
         return (bool) data_get($this->config ?? [], 'manual_confirmation', false);
+    }
+
+    public function allowsWaitlist(): bool
+    {
+        return (bool) data_get($this->config ?? [], 'allow_waitlist', false);
     }
 }

@@ -82,12 +82,6 @@
                value="{{ old('registration_deadline', isset($tournament) && $tournament->registration_deadline ? $tournament->registration_deadline->format('Y-m-d\TH:i') : '') }}"
                class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
     </div>
-    <div class="flex items-center gap-2 mt-6">
-        <input type="checkbox" name="registration_open" value="1" id="reg_open"
-               {{ old('registration_open', $tournament->registration_open ?? false) ? 'checked' : '' }}
-               class="rounded border-gray-300 text-green-600 focus:ring-green-500">
-        <label for="reg_open" class="text-sm text-gray-700">{{ __('tournaments.fields.registration_open') }}</label>
-    </div>
 </div>
 
 <div>
@@ -99,6 +93,7 @@
 @php
     $requiredFields = old('required_fields', data_get($tournament ?? null, 'config.required_fields', []));
     $manualConfirmation = old('manual_confirmation', data_get($tournament ?? null, 'config.manual_confirmation', false));
+    $allowWaitlist = old('allow_waitlist', data_get($tournament ?? null, 'config.allow_waitlist', false));
 @endphp
 
 <div class="space-y-4">
@@ -125,5 +120,14 @@
                {{ $manualConfirmation ? 'checked' : '' }}
                class="rounded border-gray-300 text-green-600 focus:ring-green-500">
         <span>{{ __('tournaments.fields.manual_confirmation') }}</span>
+    </label>
+
+    <label class="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox"
+               name="allow_waitlist"
+               value="1"
+               {{ $allowWaitlist ? 'checked' : '' }}
+               class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+        <span>{{ __('tournaments.fields.allow_waitlist') }}</span>
     </label>
 </div>

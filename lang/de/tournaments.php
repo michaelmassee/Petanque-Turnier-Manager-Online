@@ -58,6 +58,7 @@ return [
         'description' => 'Beschreibung',
         'required_participant_fields' => 'Pflichtfelder für Teilnehmer',
         'manual_confirmation' => 'Teilnehmer müssen vom Turnierverwalter bestätigt werden',
+        'allow_waitlist' => 'Warteliste aktivieren',
     ],
 
     'registration_requirements' => [
@@ -70,9 +71,9 @@ return [
 
     'type' => [
         'supermelee' => 'Supermêlée',
-        'schweizer' => 'Schweizer System',
-        'maastrichter' => 'Maastrichter System',
-        'ko' => 'K.O.-System',
+        'schweizer' => 'Schweizer',
+        'maastrichter' => 'Maastrichter',
+        'ko' => 'K.-O.',
         'poule_ab' => 'Poule A/B',
         'formule_x' => 'Formule X',
         'trip_tete' => 'Trip-Tête',
@@ -83,6 +84,8 @@ return [
         'koelner_sextet' => 'Kölner Sextet',
         'tete_series' => 'Tête-Series',
         'kaskaden' => 'Kaskaden-KO',
+        'jeder_gegen_jeden' => 'Jeder gegen Jeden',
+        'liga' => 'Liga',
     ],
 
     'formation' => [

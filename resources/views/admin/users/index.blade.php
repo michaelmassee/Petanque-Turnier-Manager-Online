@@ -40,8 +40,8 @@
                 </div>
             </form>
 
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-                <table class="w-full text-sm">
+            <div class="overflow-x-auto rounded-lg bg-white shadow">
+                <table class="min-w-[92rem] text-sm">
                     <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
                         <tr>
                             <th class="px-4 py-3 text-left">{{ __('admin.user_first_name') }}</th>
@@ -76,28 +76,29 @@
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-right text-gray-500">{{ $user->tournaments_count }}</td>
-                                <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-                                    <a href="{{ route('admin.users.edit', $user) }}"
-                                       class="text-gray-600 hover:underline text-xs">{{ __('admin.edit_user') }}</a>
-                                    @if($user->isTurnierverwalter() && $user->isApproved())
-                                        <form method="POST" action="{{ route('admin.users.revoke', $user) }}" class="inline">
-                                            @csrf @method('PATCH')
-                                            <button class="text-red-500 hover:underline text-xs">{{ __('admin.revoke_approval') }}</button>
-                                        </form>
-                                    @elseif($user->isTurnierverwalter())
-                                        <form method="POST" action="{{ route('admin.users.approve', $user) }}" class="inline">
-                                            @csrf @method('PATCH')
-                                            <button class="text-green-600 hover:underline text-xs">{{ __('admin.approve_user') }}</button>
-                                        </form>
-                                    @endif
-                                    @unless($user->is(auth()->user()))
-                                        <form method="POST" action="{{ route('admin.users.destroy', $user) }}"
-                                              class="inline"
-                                              onsubmit="return confirm('{{ __('admin.confirm_delete_user') }}')">
-                                            @csrf @method('DELETE')
-                                            <button class="text-red-500 hover:underline text-xs">{{ __('admin.delete') }}</button>
-                                        </form>
-                                    @endunless
+                                <td class="px-4 py-3">
+                                    <div class="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 whitespace-nowrap">
+                                        <a href="{{ route('admin.users.edit', $user) }}"
+                                           class="text-gray-600 hover:underline text-xs">{{ __('admin.edit_user') }}</a>
+                                        @if($user->isTurnierverwalter() && $user->isApproved())
+                                            <form method="POST" action="{{ route('admin.users.revoke', $user) }}">
+                                                @csrf @method('PATCH')
+                                                <button class="text-red-500 hover:underline text-xs">{{ __('admin.revoke_approval') }}</button>
+                                            </form>
+                                        @elseif($user->isTurnierverwalter())
+                                            <form method="POST" action="{{ route('admin.users.approve', $user) }}">
+                                                @csrf @method('PATCH')
+                                                <button class="text-green-600 hover:underline text-xs">{{ __('admin.approve_user') }}</button>
+                                            </form>
+                                        @endif
+                                        @unless($user->is(auth()->user()))
+                                            <form method="POST" action="{{ route('admin.users.destroy', $user) }}"
+                                                  onsubmit="return confirm('{{ __('admin.confirm_delete_user') }}')">
+                                                @csrf @method('DELETE')
+                                                <button class="text-red-500 hover:underline text-xs">{{ __('admin.delete') }}</button>
+                                            </form>
+                                        @endunless
+                                    </div>
                                 </td>
                             </tr>
                         @empty

@@ -117,6 +117,82 @@ class PublicRegistrationTest extends TestCase
             ->assertSee('value="12345678"', false);
     }
 
+    public function test_full_tournament_accepts_waitlist_registration_when_enabled(): void
+    {
+        Mail::fake();
+        $tournament = $this->createTournament([
+            'max_registrations' => 1,
+            'config' => [
+                'manual_confirmation' => false,
+                'required_fields' => [],
+                'allow_waitlist' => true,
+            ],
+        ]);
+        Registration::create([
+            'tournament_id' => $tournament->id,
+            'first_name' => 'Erika',
+            'last_name' => 'Beispiel',
+            'email' => 'erika@example.com',
+            'status' => 'confirmed',
+            'registered_at' => now(),
+            'confirmed_at' => now(),
+            'token' => Registration::generateToken(),
+        ]);
+
+        $response = $this->post("/de/tournaments/{$tournament->id}/register", [
+            'first_name' => 'Max',
+            'last_name' => 'Muster',
+            'email' => 'max@example.com',
+        ]);
+
+        $response->assertRedirect('/de');
+        $this->assertDatabaseHas('registrations', [
+            'tournament_id' => $tournament->id,
+            'email' => 'max@example.com',
+            'status' => 'waitlist',
+        ]);
+        Mail::assertSent(RegistrationReceived::class);
+    }
+
+    public function test_full_tournament_rejects_registration_when_waitlist_is_disabled(): void
+    {
+        Mail::fake();
+        $tournament = $this->createTournament([
+            'max_registrations' => 1,
+            'config' => [
+                'manual_confirmation' => false,
+                'required_fields' => [],
+                'allow_waitlist' => false,
+            ],
+        ]);
+        Registration::create([
+            'tournament_id' => $tournament->id,
+            'first_name' => 'Erika',
+            'last_name' => 'Beispiel',
+            'email' => 'erika@example.com',
+            'status' => 'confirmed',
+            'registered_at' => now(),
+            'confirmed_at' => now(),
+            'token' => Registration::generateToken(),
+        ]);
+
+        $response = $this->from("/de/tournaments/{$tournament->id}/register")
+            ->post("/de/tournaments/{$tournament->id}/register", [
+                'first_name' => 'Max',
+                'last_name' => 'Muster',
+                'email' => 'max@example.com',
+            ]);
+
+        $response
+            ->assertRedirect("/de/tournaments/{$tournament->id}/register")
+            ->assertSessionHas('error', __('tournaments.registration_closed'));
+        $this->assertDatabaseMissing('registrations', [
+            'tournament_id' => $tournament->id,
+            'email' => 'max@example.com',
+        ]);
+        Mail::assertNothingSent();
+    }
+
     private function createTournament(array $overrides = []): Tournament
     {
         return Tournament::create(array_merge([
@@ -133,6 +209,7 @@ class PublicRegistrationTest extends TestCase
             'config' => [
                 'manual_confirmation' => false,
                 'required_fields' => [],
+                'allow_waitlist' => false,
             ],
             'created_by' => User::factory()->create()->id,
         ], $overrides));

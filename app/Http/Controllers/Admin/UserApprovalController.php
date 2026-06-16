@@ -238,7 +238,7 @@ class UserApprovalController extends Controller
             return now();
         }
 
-        if (in_array(User::ROLE_TURNIERVERWALTER, $roles, true) && ($data['approved'] ?? false)) {
+        if ($data['approved'] ?? false) {
             return now();
         }
 

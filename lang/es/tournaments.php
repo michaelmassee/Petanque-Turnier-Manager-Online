@@ -58,6 +58,7 @@ return [
         'description' => 'Descripción',
         'required_participant_fields' => 'Campos obligatorios para participantes',
         'manual_confirmation' => 'Los participantes deben ser confirmados por el gestor del torneo',
+        'allow_waitlist' => 'Activar lista de espera',
     ],
 
     'registration_requirements' => [
@@ -71,8 +72,8 @@ return [
     'type' => [
         'supermelee' => 'Supermêlée',
         'schweizer' => 'Sistema suizo',
-        'maastrichter' => 'Sistema de Maastricht',
-        'ko' => 'Eliminación directa',
+        'maastrichter' => 'Maastrichter',
+        'ko' => 'Eliminatoria',
         'poule_ab' => 'Poule A/B',
         'formule_x' => 'Fórmula X',
         'trip_tete' => 'Trip-Tête',
@@ -82,7 +83,9 @@ return [
         'crazy_melee' => 'Crazy Mêlée',
         'koelner_sextet' => 'Sexteto de Colonia',
         'tete_series' => 'Tête-Series',
-        'kaskaden' => 'KO en cascada',
+        'kaskaden' => 'KO en Cascada',
+        'jeder_gegen_jeden' => 'Todos contra todos',
+        'liga' => 'Liga',
     ],
 
     'formation' => [

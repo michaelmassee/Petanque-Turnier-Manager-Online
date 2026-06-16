@@ -58,6 +58,7 @@ return [
         'description' => 'Beschrijving',
         'required_participant_fields' => 'Verplichte velden voor deelnemers',
         'manual_confirmation' => 'Deelnemers moeten door de toernooibeheerder worden bevestigd',
+        'allow_waitlist' => 'Wachtlijst inschakelen',
     ],
 
     'registration_requirements' => [
@@ -70,8 +71,8 @@ return [
 
     'type' => [
         'supermelee' => 'Supermêlée',
-        'schweizer' => 'Zwitsers systeem',
-        'maastrichter' => 'Maastrichts systeem',
+        'schweizer' => 'Zwitsers',
+        'maastrichter' => 'Maastrichter',
         'ko' => 'Knock-out',
         'poule_ab' => 'Poule A/B',
         'formule_x' => 'Formule X',
@@ -82,7 +83,9 @@ return [
         'crazy_melee' => 'Crazy Mêlée',
         'koelner_sextet' => 'Kölner Sextet',
         'tete_series' => 'Tête-Series',
-        'kaskaden' => 'Cascade KO',
+        'kaskaden' => 'Cascades KO',
+        'jeder_gegen_jeden' => 'Iedereen tegen iedereen',
+        'liga' => 'Liga',
     ],
 
     'formation' => [

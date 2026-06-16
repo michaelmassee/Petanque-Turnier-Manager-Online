@@ -109,12 +109,12 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isApproved(): bool
     {
-        return $this->isAdmin() || ($this->isTurnierverwalter() && $this->approved_at !== null);
+        return $this->isAdmin() || $this->approved_at !== null;
     }
 
     public function canAccessAdmin(): bool
     {
-        return $this->isAdmin() || $this->isApproved();
+        return $this->isAdmin() || ($this->isTurnierverwalter() && $this->isApproved());
     }
 
     public function grantRole(string $role): void
