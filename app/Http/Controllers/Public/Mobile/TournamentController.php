@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Public;
+namespace App\Http\Controllers\Public\Mobile;
 
 use App\Enums\TournamentStatus;
 use App\Http\Controllers\Controller;
@@ -10,7 +10,7 @@ use Illuminate\View\View;
 
 class TournamentController extends Controller
 {
-    public function index(Request $request): View
+    public function search(Request $request): View
     {
         $visibleStatuses = [
             TournamentStatus::Registration->value,
@@ -30,28 +30,33 @@ class TournamentController extends Controller
                 ? $request->query('formation')
                 : '',
             'location' => trim((string) $request->query('location', '')),
-            'mine' => $request->boolean('mine') && $request->user() !== null,
+            'mine' => $request->boolean('mine'),
         ];
 
         $tournaments = Tournament::visibleQuery($filters, $request->user())
-            ->paginate(20)
+            ->paginate(15)
             ->withQueryString();
 
-        return view('public.tournaments.index', compact('tournaments', 'filters'));
+        return view('public.mobile.tournaments.search', compact('tournaments', 'filters'));
     }
 
     public function show(string $tournament): View
     {
         $t = Tournament::findOrFail($tournament);
 
-        return view('public.tournaments.show', ['tournament' => $t]);
+        return view('public.mobile.tournaments.show', ['tournament' => $t]);
     }
 
-    public function ranking(string $tournament): View
+    public function mine(Request $request): View
     {
-        $t = Tournament::findOrFail($tournament);
-        $latestResult = $t->latestResult;
+        $user = $request->user();
 
-        return view('public.tournaments.ranking', ['tournament' => $t, 'latestResult' => $latestResult]);
+        $registrations = $user->registrations()->with('tournament')->latest('registered_at')->get();
+
+        $ownedTournaments = $user->isTurnierverwalter()
+            ? $user->tournaments()->orderBy('date')->get()
+            : collect();
+
+        return view('public.mobile.tournaments.my', compact('registrations', 'ownedTournaments'));
     }
 }

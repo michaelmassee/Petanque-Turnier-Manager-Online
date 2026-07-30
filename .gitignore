@@ -3,6 +3,8 @@
 .env
 .env.remote
 gradle.properties
+test-users.md
+/storage/local-https/
 .gradle/
 /build
 .env.backup

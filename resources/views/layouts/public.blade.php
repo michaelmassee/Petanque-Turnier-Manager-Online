@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? config('app.name') }} — Pétanque Turnier Manager</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/petanqueturniermanager-logo-32px.png') }}">
-    <link rel="apple-touch-icon" sizes="256x256" href="{{ asset('images/petanqueturniermanager-logo-256px.png') }}">
+    <x-pwa-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="font-sans antialiased bg-gray-50 text-gray-900">

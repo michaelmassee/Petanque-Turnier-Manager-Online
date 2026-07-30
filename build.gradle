@@ -200,6 +200,21 @@ tasks.register('localDev') {
         def devPublicHost = (findProperty('localDevPublicHost') ?: '192.168.178.46').toString()
         def laravelPort = (findProperty('localDevLaravelPort') ?: '8000').toString()
         def vitePort = (findProperty('localDevVitePort') ?: '5173').toString()
+        def ensurePortAvailable = { String label, String host, String port, String propertyName ->
+            def socket = new java.net.ServerSocket()
+            try {
+                socket.reuseAddress = false
+                socket.bind(new java.net.InetSocketAddress(host, port.toInteger()))
+            } catch (IOException ex) {
+                throw new GradleException("${label}-Port ${port} ist bereits belegt. Anderen Port mit -P${propertyName}=... setzen oder den laufenden Prozess beenden.", ex)
+            } finally {
+                socket.close()
+            }
+        }
+
+        ensurePortAvailable('Laravel', devHost, laravelPort, 'localDevLaravelPort')
+        ensurePortAvailable('Vite', '0.0.0.0', vitePort, 'localDevVitePort')
+
         def commands = [
             [name: 'laravel', command: ['php', 'artisan', 'serve', "--host=${devHost}", "--port=${laravelPort}"], env: [:]],
             [name: 'vite', command: ['npm', 'run', 'dev'], env: [VITE_DEV_HOST: devPublicHost, VITE_DEV_PORT: vitePort]],
@@ -842,7 +857,7 @@ tasks.register('removeRemoteDiagnostics') {
         def channel = (ChannelSftp) session.openChannel('sftp')
         channel.connect(30000)
         try {
-            ['public/ptm_diag.php'].each { path ->
+            ['public/ptm_diag.php', 'public/install.php'].each { path ->
                 try {
                     channel.rm(remoteChildPath(path))
                     println "gelöscht: ${path}"

@@ -17,6 +17,8 @@ class AuthenticationTest extends TestCase
 
         $response
             ->assertOk()
+            ->assertSee('manifest.webmanifest')
+            ->assertSee('service-worker.js')
             ->assertSeeVolt('pages.auth.login');
     }
 

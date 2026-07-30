@@ -16,7 +16,9 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable implements MustVerifyEmail
 {
     public const ROLE_ADMIN = 'admin';
+
     public const ROLE_TURNIERVERWALTER = 'turnierverwalter';
+
     public const ROLE_TEILNEHMER = 'teilnehmer';
 
     /** @use HasFactory<UserFactory> */
@@ -105,6 +107,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function tournaments(): HasMany
     {
         return $this->hasMany(Tournament::class, 'created_by');
+    }
+
+    public function registrations(): HasMany
+    {
+        return $this->hasMany(Registration::class);
     }
 
     public function isApproved(): bool

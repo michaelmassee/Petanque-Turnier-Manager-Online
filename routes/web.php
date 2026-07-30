@@ -9,12 +9,13 @@ Route::get('/', function () {
     $supported = ['de', 'en', 'fr', 'nl', 'es'];
     $browserLang = substr(request()->getPreferredLanguage($supported) ?? '', 0, 2);
     $locale = in_array($browserLang, $supported) ? $browserLang : 'de';
+
     return redirect()->route("public.{$locale}.tournaments.index");
 })->name('home');
 
 // Öffentliche Routen — alle mit explizitem Sprach-Prefix (KEIN optional!)
 foreach (['de', 'en', 'fr', 'nl', 'es'] as $locale) {
-    Route::prefix($locale)->name("public.{$locale}.")->group(function () use ($locale) {
+    Route::prefix($locale)->name("public.{$locale}.")->group(function () {
         Route::get('/', [Public\TournamentController::class, 'index'])->name('tournaments.index');
         Route::view('impressum', 'legal.imprint')->name('legal.imprint');
         Route::view('datenschutz', 'legal.privacy')->name('legal.privacy');
@@ -30,15 +31,25 @@ foreach (['de', 'en', 'fr', 'nl', 'es'] as $locale) {
             Route::get('{token}/cancel', [Public\RegistrationController::class, 'cancelForm'])->name('cancel.form');
             Route::post('{token}/cancel', [Public\RegistrationController::class, 'cancel'])->name('cancel');
         });
+
+        // Mobiler Teilnehmer-Bereich ("PTM Handy") — eingeloggte Teilnehmer, kein Admin-Freigabe-Gate
+        Route::prefix('app')->name('app.')->middleware('auth')->group(function () {
+            Route::get('/', [Public\Mobile\TournamentController::class, 'search'])->name('tournaments.search');
+            Route::get('tournaments/{tournament}', [Public\Mobile\TournamentController::class, 'show'])->name('tournaments.show');
+            Route::get('tournaments/{tournament}/register', [Public\Mobile\RegistrationController::class, 'create'])->name('registrations.create');
+            Route::post('tournaments/{tournament}/register', [Public\Mobile\RegistrationController::class, 'store'])->name('registrations.store');
+            Route::get('my-tournaments', [Public\Mobile\TournamentController::class, 'mine'])->name('tournaments.my');
+            Route::get('tournament-day', fn () => view('public.mobile.tournament-day'))->name('tournament-day');
+        });
     });
 }
 
 // Breeze-kompatibler dashboard-Alias
-Route::get('dashboard', fn() => redirect()->route('admin.tournaments.index'))
+Route::get('dashboard', fn () => redirect()->route('admin.tournaments.index'))
     ->middleware(['auth', 'verified', 'approved'])
     ->name('dashboard');
 
-Route::get('approval-pending', fn() => view('auth.approval-pending'))
+Route::get('approval-pending', fn () => view('auth.approval-pending'))
     ->middleware(['auth', 'verified'])
     ->name('approval.pending');
 
@@ -48,7 +59,7 @@ Route::view('profile', 'profile')
 
 // Admin-Bereich (ohne Sprachpräfix)
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'approved'])->group(function () {
-    Route::get('/', fn() => redirect()->route('admin.tournaments.index'))->name('dashboard');
+    Route::get('/', fn () => redirect()->route('admin.tournaments.index'))->name('dashboard');
 
     Route::get('users', [Admin\UserApprovalController::class, 'index'])->name('users.index');
     Route::get('users/create', [Admin\UserApprovalController::class, 'create'])->name('users.create');

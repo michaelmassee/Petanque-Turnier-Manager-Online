@@ -19,6 +19,8 @@ class PublicTournamentFilterTest extends TestCase
             ->assertSee(route('login', absolute: false))
             ->assertSee('Pétanque Turnier Manager')
             ->assertSee('petanqueturniermanager-logo-256px.png')
+            ->assertSee('manifest.webmanifest')
+            ->assertSee('service-worker.js')
             ->assertDontSee(route('register', absolute: false))
             ->assertDontSee(route('admin.dashboard', absolute: false));
     }

@@ -87,6 +87,7 @@ class RegistrationController extends Controller
     public function cancelForm(string $token): View
     {
         $registration = Registration::where('token', $token)->firstOrFail();
+
         return view('public.registrations.cancel', compact('registration'));
     }
 
@@ -107,7 +108,7 @@ class RegistrationController extends Controller
             ->with('success', __('registrations.success.cancelled'));
     }
 
-    private function nachruckerBestaetigen(string $tournamentId): void
+    protected function nachruckerBestaetigen(string $tournamentId): void
     {
         $tournament = Tournament::findOrFail($tournamentId);
         $naechster = Registration::where('tournament_id', $tournamentId)
@@ -126,6 +127,7 @@ class RegistrationController extends Controller
             ]);
 
             Mail::to($naechster->email)->send(new RegistrationReceived($naechster));
+
             return;
         }
 
@@ -137,7 +139,7 @@ class RegistrationController extends Controller
         Mail::to($naechster->email)->send(new WaitlistPromoted($naechster));
     }
 
-    private function validateRequest(Request $request, Tournament $tournament, int $spielerAnzahl): array
+    protected function validateRequest(Request $request, Tournament $tournament, int $spielerAnzahl): array
     {
         $rules = [
             'first_name' => ['required', 'string', 'max:100'],

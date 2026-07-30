@@ -13,7 +13,7 @@ class Registration extends Model
     use HasUlids;
 
     protected $fillable = [
-        'tournament_id',
+        'tournament_id', 'user_id',
         'first_name', 'last_name', 'email', 'club', 'license_nr',
         'partner_first_name', 'partner_last_name', 'partner_email',
         'partner2_first_name', 'partner2_last_name', 'partner2_email',
@@ -35,9 +35,14 @@ class Registration extends Model
         return $this->belongsTo(Tournament::class);
     }
 
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
     public function vollstaendigerName(): string
     {
-        return $this->first_name . ' ' . $this->last_name;
+        return $this->first_name.' '.$this->last_name;
     }
 
     public static function generateToken(): string
