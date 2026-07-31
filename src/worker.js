@@ -1,4 +1,20 @@
 const ROLES = ['admin', 'user', 'turnierleiter'];
+const TOURNAMENT_TYPES = [
+  'formule_x',
+  'jeder_gegen_jeden',
+  'ko',
+  'kaskaden',
+  'liga',
+  'maastrichter',
+  'poule_ab',
+  'schweizer',
+  'supermelee',
+  'trip_tete',
+];
+const FORMATIONS = ['tete', 'doublette', 'triplette'];
+const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
+const VISIBILITIES = ['public', 'private'];
+const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
 const SESSION_COOKIE = 'ptm_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 const RESET_TTL_SECONDS = 60 * 30;
@@ -52,7 +68,7 @@ export default {
         }
 
         if (request.method === 'POST') {
-          return createUser(request, env.DB, session.user.id);
+          return createUser(request, env.DB);
         }
       }
 
@@ -66,6 +82,82 @@ export default {
 
         if (request.method === 'DELETE') {
           return deleteUser(env.DB, userMatch[1], session.user.id);
+        }
+      }
+
+      if (url.pathname === '/api/tournaments') {
+        const session = await optionalSession(request, env.DB);
+
+        if (request.method === 'GET') {
+          return listTournaments(env.DB, session?.user || null);
+        }
+
+        if (request.method === 'POST') {
+          requireTournamentManager(session);
+          return createTournament(request, env.DB, session.user);
+        }
+      }
+
+      const tournamentRegistrationsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registrations$/);
+      if (tournamentRegistrationsMatch) {
+        const tournament = await getTournamentById(env.DB, tournamentRegistrationsMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Tournament not found');
+        }
+
+        if (request.method === 'GET') {
+          const session = await requireSession(request, env.DB);
+          assertCanManageTournament(tournament, session.user);
+          return listRegistrations(env.DB, tournament.id);
+        }
+
+        if (request.method === 'POST') {
+          return createRegistration(request, env.DB, tournament);
+        }
+      }
+
+      const tournamentMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)$/);
+      if (tournamentMatch) {
+        const tournament = await getTournamentById(env.DB, tournamentMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Tournament not found');
+        }
+
+        if (request.method === 'GET') {
+          const session = await optionalSession(request, env.DB);
+          if (!canViewTournament(tournament, session?.user || null)) {
+            throw new HttpError(403, 'Access denied');
+          }
+          return json({ tournament: toPublicTournament(tournament, session?.user || null) });
+        }
+
+        const session = await requireSession(request, env.DB);
+        assertCanManageTournament(tournament, session.user);
+
+        if (request.method === 'PUT') {
+          return updateTournament(request, env.DB, tournament, session.user);
+        }
+
+        if (request.method === 'DELETE') {
+          return deleteTournament(env.DB, tournament.id);
+        }
+      }
+
+      const registrationMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)$/);
+      if (registrationMatch) {
+        const session = await requireSession(request, env.DB);
+        const registration = await getRegistrationWithTournament(env.DB, registrationMatch[1]);
+        if (!registration) {
+          throw new HttpError(404, 'Registration not found');
+        }
+        assertCanManageTournament(registration, session.user);
+
+        if (request.method === 'PUT') {
+          return updateRegistration(request, env.DB, registration);
+        }
+
+        if (request.method === 'DELETE') {
+          return deleteRegistration(env.DB, registration.id);
         }
       }
 
@@ -337,12 +429,329 @@ async function deleteUser(db, id, currentUserId) {
   return json({ ok: true });
 }
 
+async function listTournaments(db, user) {
+  const rows = await db
+    .prepare(
+      `SELECT tournaments.*, users.name AS manager_name,
+        (
+          SELECT COUNT(*)
+          FROM registrations
+          WHERE registrations.tournament_id = tournaments.id
+            AND registrations.status IN ('pending', 'confirmed')
+        ) AS active_registrations,
+        (
+          SELECT COUNT(*)
+          FROM registrations
+          WHERE registrations.tournament_id = tournaments.id
+            AND registrations.status = 'waitlist'
+        ) AS waitlist_registrations
+       FROM tournaments
+       LEFT JOIN users ON users.id = tournaments.manager_id
+       WHERE (?1 IS NOT NULL AND ?1 = 'admin')
+          OR (?1 IS NOT NULL AND ?1 = 'turnierleiter' AND (tournaments.created_by = ?2 OR tournaments.manager_id = ?2 OR tournaments.visibility = 'public'))
+          OR tournaments.visibility = 'public'
+       ORDER BY tournaments.date DESC, tournaments.name COLLATE NOCASE`,
+    )
+    .bind(user?.role || null, user?.id || null)
+    .all();
+
+  return json({ tournaments: rows.results.map((row) => toPublicTournament(row, user)) });
+}
+
+async function createTournament(request, db, user) {
+  const body = await readJson(request);
+  const tournament = normalizeTournamentInput(body);
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  const managerId = user.role === 'admin' ? tournament.managerId || user.id : user.id;
+
+  await db
+    .prepare(
+      `INSERT INTO tournaments (
+        id, created_by, manager_id, name, date, start_time, location, description, type, formation, status,
+        max_registrations, registration_deadline, entry_fee_cents, contact_name, contact_email, contact_phone,
+        visibility, internal_notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      id,
+      user.id,
+      managerId,
+      tournament.name,
+      tournament.date,
+      tournament.startTime,
+      tournament.location,
+      tournament.description,
+      tournament.type,
+      tournament.formation,
+      tournament.status,
+      tournament.maxRegistrations,
+      tournament.registrationDeadline,
+      tournament.entryFeeCents,
+      tournament.contactName,
+      tournament.contactEmail,
+      tournament.contactPhone,
+      tournament.visibility,
+      tournament.internalNotes,
+      now,
+      now,
+    )
+    .run();
+
+  const created = await getTournamentById(db, id);
+  return json({ tournament: toPublicTournament(created, user) }, 201);
+}
+
+async function updateTournament(request, db, existing, user) {
+  const body = await readJson(request);
+  const tournament = normalizeTournamentInput(body);
+  const now = new Date().toISOString();
+  const managerId = user.role === 'admin' ? tournament.managerId || existing.manager_id || user.id : existing.manager_id || user.id;
+
+  await db
+    .prepare(
+      `UPDATE tournaments
+       SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
+           formation = ?, status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?,
+           contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(
+      managerId,
+      tournament.name,
+      tournament.date,
+      tournament.startTime,
+      tournament.location,
+      tournament.description,
+      tournament.type,
+      tournament.formation,
+      tournament.status,
+      tournament.maxRegistrations,
+      tournament.registrationDeadline,
+      tournament.entryFeeCents,
+      tournament.contactName,
+      tournament.contactEmail,
+      tournament.contactPhone,
+      tournament.visibility,
+      tournament.internalNotes,
+      now,
+      existing.id,
+    )
+    .run();
+
+  const updated = await getTournamentById(db, existing.id);
+  return json({ tournament: toPublicTournament(updated, user) });
+}
+
+async function deleteTournament(db, id) {
+  const result = await db.prepare('DELETE FROM tournaments WHERE id = ?').bind(id).run();
+  if (result.meta.changes === 0) {
+    throw new HttpError(404, 'Tournament not found');
+  }
+  return json({ ok: true });
+}
+
+async function listRegistrations(db, tournamentId) {
+  const result = await db
+    .prepare('SELECT * FROM registrations WHERE tournament_id = ? ORDER BY registered_at DESC')
+    .bind(tournamentId)
+    .all();
+  return json({ registrations: result.results.map(toPublicRegistration) });
+}
+
+async function createRegistration(request, db, tournament) {
+  if (tournament.visibility !== 'public' || tournament.status !== 'registration') {
+    throw new HttpError(403, 'Registration is closed');
+  }
+
+  if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < Date.now()) {
+    throw new HttpError(403, 'Registration deadline has passed');
+  }
+
+  const body = await readJson(request);
+  const registration = normalizeRegistrationInput(body, { requireStatus: false });
+  const status = await initialRegistrationStatus(db, tournament);
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+
+  await db
+    .prepare(
+      `INSERT INTO registrations (
+        id, tournament_id, first_name, last_name, email, club, license_nr,
+        partner_first_name, partner_last_name, partner_email,
+        partner2_first_name, partner2_last_name, partner2_email,
+        team_name, seeding_position, status, registered_at, confirmed_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      id,
+      tournament.id,
+      registration.firstName,
+      registration.lastName,
+      registration.email,
+      registration.club,
+      registration.licenseNr,
+      registration.partnerFirstName,
+      registration.partnerLastName,
+      registration.partnerEmail,
+      registration.partner2FirstName,
+      registration.partner2LastName,
+      registration.partner2Email,
+      registration.teamName,
+      registration.seedingPosition,
+      status,
+      now,
+      status === 'confirmed' ? now : null,
+      now,
+      now,
+    )
+    .run();
+
+  const created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
+  return json({ registration: toPublicRegistration(created) }, 201);
+}
+
+async function updateRegistration(request, db, existing) {
+  const body = await readJson(request);
+  const registration = normalizeRegistrationInput(body, { requireStatus: true });
+  const now = new Date().toISOString();
+  const confirmedAt = registration.status === 'confirmed' ? existing.confirmed_at || now : null;
+
+  await db
+    .prepare(
+      `UPDATE registrations
+       SET first_name = ?, last_name = ?, email = ?, club = ?, license_nr = ?,
+           partner_first_name = ?, partner_last_name = ?, partner_email = ?,
+           partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?,
+           team_name = ?, seeding_position = ?, status = ?, confirmed_at = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(
+      registration.firstName,
+      registration.lastName,
+      registration.email,
+      registration.club,
+      registration.licenseNr,
+      registration.partnerFirstName,
+      registration.partnerLastName,
+      registration.partnerEmail,
+      registration.partner2FirstName,
+      registration.partner2LastName,
+      registration.partner2Email,
+      registration.teamName,
+      registration.seedingPosition,
+      registration.status,
+      confirmedAt,
+      now,
+      existing.id,
+    )
+    .run();
+
+  const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
+  return json({ registration: toPublicRegistration(updated) });
+}
+
+async function deleteRegistration(db, id) {
+  const result = await db.prepare('DELETE FROM registrations WHERE id = ?').bind(id).run();
+  if (result.meta.changes === 0) {
+    throw new HttpError(404, 'Registration not found');
+  }
+  return json({ ok: true });
+}
+
+async function initialRegistrationStatus(db, tournament) {
+  if (!Number(tournament.max_registrations)) {
+    return 'pending';
+  }
+
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM registrations
+       WHERE tournament_id = ? AND status IN ('pending', 'confirmed')`,
+    )
+    .bind(tournament.id)
+    .first();
+
+  return Number(row?.count || 0) >= Number(tournament.max_registrations) ? 'waitlist' : 'pending';
+}
+
+async function getTournamentById(db, id) {
+  return db
+    .prepare(
+      `SELECT tournaments.*, users.name AS manager_name,
+        (
+          SELECT COUNT(*)
+          FROM registrations
+          WHERE registrations.tournament_id = tournaments.id
+            AND registrations.status IN ('pending', 'confirmed')
+        ) AS active_registrations,
+        (
+          SELECT COUNT(*)
+          FROM registrations
+          WHERE registrations.tournament_id = tournaments.id
+            AND registrations.status = 'waitlist'
+        ) AS waitlist_registrations
+       FROM tournaments
+       LEFT JOIN users ON users.id = tournaments.manager_id
+       WHERE tournaments.id = ?`,
+    )
+    .bind(id)
+    .first();
+}
+
+async function getRegistrationWithTournament(db, id) {
+  return db
+    .prepare(
+      `SELECT registrations.*, tournaments.created_by, tournaments.manager_id, tournaments.visibility
+       FROM registrations
+       JOIN tournaments ON tournaments.id = registrations.tournament_id
+       WHERE registrations.id = ?`,
+    )
+    .bind(id)
+    .first();
+}
+
+function requireTournamentManager(session) {
+  if (!session || !['admin', 'turnierleiter'].includes(session.user.role)) {
+    throw new HttpError(403, 'Admin or Turnierleiter role required');
+  }
+}
+
+function canViewTournament(tournament, user) {
+  return tournament.visibility === 'public' || canManageTournament(tournament, user);
+}
+
+function canManageTournament(tournament, user) {
+  if (!user) {
+    return false;
+  }
+  return user.role === 'admin' || (user.role === 'turnierleiter' && (tournament.created_by === user.id || tournament.manager_id === user.id));
+}
+
+function assertCanManageTournament(tournament, user) {
+  if (!canManageTournament(tournament, user)) {
+    throw new HttpError(403, 'Access denied');
+  }
+}
+
 async function requireAdmin(request, db) {
   const session = await requireSession(request, db);
   if (session.user.role !== 'admin') {
     throw new HttpError(403, 'Admin role required');
   }
   return session;
+}
+
+async function optionalSession(request, db) {
+  try {
+    return await requireSession(request, db);
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 401) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function requireSession(request, db) {
@@ -396,7 +805,7 @@ function normalizeUserInput(body, { requirePassword }) {
     throw new HttpError(400, 'Name must contain at least 2 characters');
   }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!isEmail(email)) {
     throw new HttpError(400, 'A valid email is required');
   }
 
@@ -413,6 +822,116 @@ function normalizeUserInput(body, { requirePassword }) {
   }
 
   return { name, email, role, password };
+}
+
+function normalizeTournamentInput(body) {
+  const tournament = {
+    name: text(body.name),
+    date: text(body.date),
+    startTime: nullableText(body.startTime),
+    location: text(body.location),
+    description: nullableText(body.description),
+    type: text(body.type || 'supermelee'),
+    formation: text(body.formation || 'doublette'),
+    status: text(body.status || 'draft'),
+    maxRegistrations: nonNegativeInteger(body.maxRegistrations),
+    registrationDeadline: nullableText(body.registrationDeadline),
+    entryFeeCents: nonNegativeInteger(body.entryFeeCents),
+    contactName: nullableText(body.contactName),
+    contactEmail: nullableText(body.contactEmail),
+    contactPhone: nullableText(body.contactPhone),
+    visibility: text(body.visibility || 'private'),
+    internalNotes: nullableText(body.internalNotes),
+    managerId: nullableText(body.managerId),
+  };
+
+  if (tournament.name.length < 2) {
+    throw new HttpError(400, 'Tournament name must contain at least 2 characters');
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tournament.date)) {
+    throw new HttpError(400, 'A valid tournament date is required');
+  }
+  if (tournament.startTime && !/^\d{2}:\d{2}$/.test(tournament.startTime)) {
+    throw new HttpError(400, 'A valid start time is required');
+  }
+  if (tournament.location.length < 2) {
+    throw new HttpError(400, 'Location must contain at least 2 characters');
+  }
+  if (!TOURNAMENT_TYPES.includes(tournament.type)) {
+    throw new HttpError(400, 'Invalid tournament type');
+  }
+  if (!FORMATIONS.includes(tournament.formation)) {
+    throw new HttpError(400, 'Invalid formation');
+  }
+  if (!TOURNAMENT_STATUSES.includes(tournament.status)) {
+    throw new HttpError(400, 'Invalid tournament status');
+  }
+  if (!VISIBILITIES.includes(tournament.visibility)) {
+    throw new HttpError(400, 'Invalid visibility');
+  }
+  if (tournament.contactEmail && !isEmail(tournament.contactEmail)) {
+    throw new HttpError(400, 'A valid contact email is required');
+  }
+
+  return tournament;
+}
+
+function normalizeRegistrationInput(body, { requireStatus }) {
+  const registration = {
+    firstName: text(body.firstName),
+    lastName: text(body.lastName),
+    email: text(body.email).toLowerCase(),
+    club: nullableText(body.club),
+    licenseNr: nullableText(body.licenseNr),
+    partnerFirstName: nullableText(body.partnerFirstName),
+    partnerLastName: nullableText(body.partnerLastName),
+    partnerEmail: nullableText(body.partnerEmail)?.toLowerCase() || null,
+    partner2FirstName: nullableText(body.partner2FirstName),
+    partner2LastName: nullableText(body.partner2LastName),
+    partner2Email: nullableText(body.partner2Email)?.toLowerCase() || null,
+    teamName: nullableText(body.teamName),
+    seedingPosition: body.seedingPosition === '' || body.seedingPosition === undefined ? null : nonNegativeInteger(body.seedingPosition),
+    status: text(body.status || 'pending'),
+  };
+
+  if (registration.firstName.length < 2 || registration.lastName.length < 2) {
+    throw new HttpError(400, 'First name and last name are required');
+  }
+  if (!isEmail(registration.email)) {
+    throw new HttpError(400, 'A valid email is required');
+  }
+  if (registration.partnerEmail && !isEmail(registration.partnerEmail)) {
+    throw new HttpError(400, 'A valid partner email is required');
+  }
+  if (registration.partner2Email && !isEmail(registration.partner2Email)) {
+    throw new HttpError(400, 'A valid second partner email is required');
+  }
+  if (requireStatus && !REGISTRATION_STATUSES.includes(registration.status)) {
+    throw new HttpError(400, 'Invalid registration status');
+  }
+
+  return registration;
+}
+
+function text(value) {
+  return String(value || '').trim();
+}
+
+function nullableText(value) {
+  const normalized = text(value);
+  return normalized || null;
+}
+
+function nonNegativeInteger(value) {
+  const number = Number(value || 0);
+  if (!Number.isInteger(number) || number < 0) {
+    throw new HttpError(400, 'A non-negative integer is required');
+  }
+  return number;
+}
+
+function isEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 async function hashPassword(password) {
@@ -492,6 +1011,61 @@ function toPublicUser(row) {
     name: row.name,
     email: row.email,
     role: row.role,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toPublicTournament(row, user) {
+  return {
+    id: row.id,
+    createdBy: row.created_by,
+    managerId: row.manager_id,
+    managerName: row.manager_name,
+    name: row.name,
+    date: row.date,
+    startTime: row.start_time,
+    location: row.location,
+    description: row.description,
+    type: row.type,
+    formation: row.formation,
+    status: row.status,
+    maxRegistrations: Number(row.max_registrations || 0),
+    registrationDeadline: row.registration_deadline,
+    entryFeeCents: Number(row.entry_fee_cents || 0),
+    contactName: row.contact_name,
+    contactEmail: row.contact_email,
+    contactPhone: row.contact_phone,
+    visibility: row.visibility,
+    internalNotes: canManageTournament(row, user) ? row.internal_notes : null,
+    activeRegistrations: Number(row.active_registrations || 0),
+    waitlistRegistrations: Number(row.waitlist_registrations || 0),
+    canManage: canManageTournament(row, user),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toPublicRegistration(row) {
+  return {
+    id: row.id,
+    tournamentId: row.tournament_id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    club: row.club,
+    licenseNr: row.license_nr,
+    partnerFirstName: row.partner_first_name,
+    partnerLastName: row.partner_last_name,
+    partnerEmail: row.partner_email,
+    partner2FirstName: row.partner2_first_name,
+    partner2LastName: row.partner2_last_name,
+    partner2Email: row.partner2_email,
+    teamName: row.team_name,
+    seedingPosition: row.seeding_position,
+    status: row.status,
+    registeredAt: row.registered_at,
+    confirmedAt: row.confirmed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

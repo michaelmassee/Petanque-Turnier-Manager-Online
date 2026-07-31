@@ -1,13 +1,22 @@
 # Petanque Turnier Manager Online
 
-React app for Cloudflare Workers Static Assets with a small Worker API, D1 user
-database, login, password reset flow and role-based user management.
+React app for Cloudflare Workers Static Assets with a Worker API, D1 database,
+login, password reset flow, role-based user management, tournament management,
+public registrations and installable PWA shell.
 
 Roles:
 
 - Admin
 - User
 - Turnierleiter
+
+Languages:
+
+- DE
+- NL
+- EN
+- ES
+- FR
 
 ## Local development
 
@@ -25,6 +34,15 @@ npm run build
 
 The production build is written to `dist/`.
 
+## Features
+
+- User management with Admin, User and Turnierleiter roles
+- Tournament CRUD managed directly in PTM Online
+- Public tournament list and public registration form
+- Registration management with pending, confirmed, waitlist and cancelled states
+- Installable mobile PWA with manifest, app icon and service worker
+- Runtime language switcher for DE/NL/EN/ES/FR
+
 ## Cloudflare
 
 Connect this repository in the Cloudflare dashboard and use:
@@ -38,6 +56,9 @@ Apply the D1 migration before first production use:
 ```bash
 npm run db:migrate:remote
 ```
+
+When new migrations are added, run the same command again before using the new
+feature in production.
 
 For local CLI deploys:
 
