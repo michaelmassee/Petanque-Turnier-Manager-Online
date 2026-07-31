@@ -29,10 +29,22 @@ npm run dev
 ## Build
 
 ```bash
+npm run security:check
 npm run build
 ```
 
 The production build is written to `dist/`.
+
+## Security
+
+This repository is public. Follow `SECURITY.md` and `CONTRIBUTING.md` before
+committing or pushing changes. At minimum:
+
+```bash
+npm run security:check
+npm run build
+npm audit --audit-level=high
+```
 
 ## Features
 

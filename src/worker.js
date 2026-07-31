@@ -19,16 +19,28 @@ const SESSION_COOKIE = 'ptm_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 const RESET_TTL_SECONDS = 60 * 30;
 const PASSWORD_ITERATIONS = 210000;
+const UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
+const SECURITY_HEADERS = {
+  'Content-Security-Policy':
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests",
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+};
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
     if (!url.pathname.startsWith('/api/')) {
-      return env.ASSETS.fetch(request);
+      return withSecurityHeaders(await env.ASSETS.fetch(request));
     }
 
     try {
+      assertSameOriginForUnsafeMethods(request, url);
       await cleanupExpiredSessions(env.DB);
 
       if (request.method === 'GET' && url.pathname === '/api/bootstrap') {
@@ -1093,9 +1105,30 @@ function json(payload, status = 200, headers = {}) {
     status,
     headers: {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      ...SECURITY_HEADERS,
       ...headers,
     },
   });
+}
+
+function withSecurityHeaders(response) {
+  const secured = new Response(response.body, response);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    secured.headers.set(name, value);
+  }
+  return secured;
+}
+
+function assertSameOriginForUnsafeMethods(request, url) {
+  if (!UNSAFE_METHODS.includes(request.method)) {
+    return;
+  }
+
+  const origin = request.headers.get('Origin');
+  if (origin && origin !== url.origin) {
+    throw new HttpError(403, 'Cross-origin request denied');
+  }
 }
 
 class HttpError extends Error {
