@@ -1,19 +1,22 @@
 {
-    "$schema": "https://www.schemastore.org/package.json",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "build": "vite build",
-        "dev": "vite"
-    },
-    "devDependencies": {
-        "@tailwindcss/forms": "^0.5.2",
-        "@tailwindcss/vite": "^4.0.0",
-        "autoprefixer": "^10.4.2",
-        "concurrently": "^9.0.1",
-        "laravel-vite-plugin": "^3.1",
-        "postcss": "^8.4.31",
-        "tailwindcss": "^4.3.0",
-        "vite": "^8.0.0"
-    }
+  "name": "petanque-turnier-manager-online",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "^5.8.0",
+    "vite": "^7.0.0",
+    "wrangler": "^4.0.0"
+  }
 }

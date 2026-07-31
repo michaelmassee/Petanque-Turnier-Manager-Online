@@ -1,7 +1,0 @@
-@import "tailwindcss";
-
-@plugin "@tailwindcss/forms";
-
-@theme {
-    --font-family-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
-}
