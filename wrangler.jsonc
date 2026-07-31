@@ -1,9 +1,16 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "petanque-turnier-manager-online",
+  "main": "src/worker.js",
   "compatibility_date": "2026-07-31",
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "petanque-turnier-manager-online"
+    }
+  ]
 }
