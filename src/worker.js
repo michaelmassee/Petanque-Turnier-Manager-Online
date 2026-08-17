@@ -15,9 +15,11 @@ const FORMATIONS = ['tete', 'doublette', 'triplette'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
 const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
+const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
 const SESSION_COOKIE = 'ptm_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 const RESET_TTL_SECONDS = 60 * 30;
+const EMAIL_VERIFICATION_TTL_SECONDS = 60 * 60 * 24;
 const PASSWORD_ITERATIONS = 210000;
 const UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 const SECURITY_HEADERS = {
@@ -29,6 +31,28 @@ const SECURITY_HEADERS = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
+};
+const EMAIL_VERIFICATION_EMAILS = {
+  de: {
+    subject: 'E-Mail-Adresse bestätigen',
+    text: (verificationUrl) => `Bitte bestätige deine E-Mail-Adresse über diesen Link:\n\n${verificationUrl}\n\nDer Link ist 24 Stunden gültig.`,
+  },
+  nl: {
+    subject: 'E-mailadres bevestigen',
+    text: (verificationUrl) => `Bevestig je e-mailadres via deze link:\n\n${verificationUrl}\n\nDe link is 24 uur geldig.`,
+  },
+  en: {
+    subject: 'Verify your email address',
+    text: (verificationUrl) => `Verify your email address with this link:\n\n${verificationUrl}\n\nThe link is valid for 24 hours.`,
+  },
+  es: {
+    subject: 'Confirmar correo electronico',
+    text: (verificationUrl) => `Confirma tu correo electronico con este enlace:\n\n${verificationUrl}\n\nEl enlace es valido durante 24 horas.`,
+  },
+  fr: {
+    subject: 'Confirmer l’adresse e-mail',
+    text: (verificationUrl) => `Confirme ton adresse e-mail avec ce lien:\n\n${verificationUrl}\n\nLe lien est valable 24 heures.`,
+  },
 };
 
 export default {
@@ -48,23 +72,31 @@ export default {
       }
 
       if (request.method === 'POST' && url.pathname === '/api/setup') {
-        return setupAdmin(request, env.DB);
+        return await setupAdmin(request, env.DB);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/login') {
-        return login(request, env.DB);
+        return await login(request, env.DB);
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/register') {
+        return await registerUser(request, env, url);
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/email/verify') {
+        return await verifyEmail(request, env.DB);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/password/forgot') {
-        return forgotPassword(request, env, url);
+        return await forgotPassword(request, env, url);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/password/reset') {
-        return resetPassword(request, env.DB);
+        return await resetPassword(request, env.DB);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/logout') {
-        return logout(request, env.DB);
+        return await logout(request, env.DB);
       }
 
       if (request.method === 'GET' && url.pathname === '/api/session') {
@@ -76,11 +108,11 @@ export default {
         const session = await requireAdmin(request, env.DB);
 
         if (request.method === 'GET') {
-          return listUsers(env.DB);
+          return await listUsers(env.DB);
         }
 
         if (request.method === 'POST') {
-          return createUser(request, env.DB);
+          return await createUser(request, env.DB);
         }
       }
 
@@ -89,11 +121,11 @@ export default {
         const session = await requireAdmin(request, env.DB);
 
         if (request.method === 'PUT') {
-          return updateUser(request, env.DB, userMatch[1], session.user.id);
+          return await updateUser(request, env.DB, userMatch[1], session.user.id);
         }
 
         if (request.method === 'DELETE') {
-          return deleteUser(env.DB, userMatch[1], session.user.id);
+          return await deleteUser(env.DB, userMatch[1], session.user.id);
         }
       }
 
@@ -101,12 +133,12 @@ export default {
         const session = await optionalSession(request, env.DB);
 
         if (request.method === 'GET') {
-          return listTournaments(env.DB, session?.user || null);
+          return await listTournaments(env.DB, session?.user || null);
         }
 
         if (request.method === 'POST') {
           requireTournamentManager(session);
-          return createTournament(request, env.DB, session.user);
+          return await createTournament(request, env.DB, session.user);
         }
       }
 
@@ -120,11 +152,11 @@ export default {
         if (request.method === 'GET') {
           const session = await requireSession(request, env.DB);
           assertCanManageTournament(tournament, session.user);
-          return listRegistrations(env.DB, tournament.id);
+          return await listRegistrations(env.DB, tournament.id);
         }
 
         if (request.method === 'POST') {
-          return createRegistration(request, env.DB, tournament);
+          return await createRegistration(request, env.DB, tournament);
         }
       }
 
@@ -147,11 +179,11 @@ export default {
         assertCanManageTournament(tournament, session.user);
 
         if (request.method === 'PUT') {
-          return updateTournament(request, env.DB, tournament, session.user);
+          return await updateTournament(request, env.DB, tournament, session.user);
         }
 
         if (request.method === 'DELETE') {
-          return deleteTournament(env.DB, tournament.id);
+          return await deleteTournament(env.DB, tournament.id);
         }
       }
 
@@ -165,11 +197,11 @@ export default {
         assertCanManageTournament(registration, session.user);
 
         if (request.method === 'PUT') {
-          return updateRegistration(request, env.DB, registration);
+          return await updateRegistration(request, env.DB, registration);
         }
 
         if (request.method === 'DELETE') {
-          return deleteRegistration(env.DB, registration.id);
+          return await deleteRegistration(env.DB, registration.id);
         }
       }
 
@@ -203,15 +235,15 @@ async function setupAdmin(request, db) {
 
   await db
     .prepare(
-      `INSERT INTO users (id, name, email, role, password_salt, password_hash, created_at, updated_at)
-       VALUES (?, ?, ?, 'admin', ?, ?, ?, ?)`,
+      `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, created_at, updated_at)
+       VALUES (?, ?, ?, 'admin', ?, ?, ?, ?, ?)`,
     )
-    .bind(id, user.name, user.email, password.salt, password.hash, now, now)
+    .bind(id, user.name, user.email, password.salt, password.hash, now, now, now)
     .run();
 
   const session = await createSession(db, id);
   return json(
-    { user: toPublicUser({ id, name: user.name, email: user.email, role: 'admin', created_at: now, updated_at: now }) },
+    { user: toPublicUser({ id, name: user.name, email: user.email, role: 'admin', email_verified_at: now, created_at: now, updated_at: now }) },
     201,
     { 'Set-Cookie': sessionCookie(session.id, session.expiresAt) },
   );
@@ -231,8 +263,79 @@ async function login(request, db) {
     throw new HttpError(401, 'Invalid login');
   }
 
+  if (!row.email_verified_at) {
+    return json({ error: 'Bitte bestätige zuerst deine E-Mail-Adresse.' }, 403);
+  }
+
   const session = await createSession(db, row.id);
   return json({ user: toPublicUser(row) }, 200, { 'Set-Cookie': sessionCookie(session.id, session.expiresAt) });
+}
+
+async function registerUser(request, env, url) {
+  const db = env.DB;
+  const body = await readJson(request);
+  const user = normalizeUserInput({ ...body, role: 'user' }, { requirePassword: true });
+  const language = normalizeLanguage(body.language);
+  const password = await hashPassword(user.password);
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+
+  try {
+    await db
+      .prepare(
+        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, created_at, updated_at)
+         VALUES (?, ?, ?, 'user', ?, ?, NULL, ?, ?)`,
+      )
+      .bind(id, user.name, user.email, password.salt, password.hash, now, now)
+      .run();
+  } catch (error) {
+    if (String(error.message || '').includes('UNIQUE')) {
+      throw new HttpError(409, 'Email already exists');
+    }
+    throw error;
+  }
+
+  const verificationUrl = await createEmailVerification(db, env, url, id, user.email, language);
+  const response = {
+    message: 'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.',
+  };
+
+  if (['localhost', '127.0.0.1'].includes(url.hostname)) {
+    response.verificationUrl = verificationUrl;
+  }
+
+  return json(response, 201);
+}
+
+async function verifyEmail(request, db) {
+  const body = await readJson(request);
+  const token = String(body.token || '').trim();
+
+  if (!token) {
+    throw new HttpError(400, 'Bestätigungs-Token ist erforderlich');
+  }
+
+  const tokenHash = await sha256Hex(token);
+  const verification = await db
+    .prepare(
+      `SELECT token_hash, user_id, expires_at, used_at
+       FROM email_verification_tokens
+       WHERE token_hash = ?`,
+    )
+    .bind(tokenHash)
+    .first();
+
+  if (!verification || verification.used_at || new Date(verification.expires_at).getTime() <= Date.now()) {
+    throw new HttpError(400, 'Bestätigungs-Link ist ungültig oder abgelaufen');
+  }
+
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare('UPDATE users SET email_verified_at = ?, updated_at = ? WHERE id = ?').bind(now, now, verification.user_id),
+    db.prepare('UPDATE email_verification_tokens SET used_at = ? WHERE token_hash = ?').bind(now, tokenHash),
+  ]);
+
+  return json({ ok: true });
 }
 
 async function logout(request, db) {
@@ -283,6 +386,53 @@ async function forgotPassword(request, env, url) {
   }
 
   return json(response);
+}
+
+async function createEmailVerification(db, env, url, userId, email, language) {
+  await db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').bind(userId).run();
+
+  const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+  const tokenHash = await sha256Hex(token);
+  const createdAt = new Date();
+  const expiresAt = new Date(createdAt.getTime() + EMAIL_VERIFICATION_TTL_SECONDS * 1000);
+
+  await db
+    .prepare(
+      `INSERT INTO email_verification_tokens (token_hash, user_id, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+    .bind(tokenHash, userId, expiresAt.toISOString(), createdAt.toISOString())
+    .run();
+
+  const verificationUrl = `${url.origin}/?verify_token=${encodeURIComponent(token)}`;
+  await sendEmailVerificationEmail(env, email, verificationUrl, language);
+  return verificationUrl;
+}
+
+async function sendEmailVerificationEmail(env, email, verificationUrl, language) {
+  if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
+    console.log(`Email verification link for ${email}: ${verificationUrl}`);
+    return;
+  }
+
+  const emailText = EMAIL_VERIFICATION_EMAILS[language] || EMAIL_VERIFICATION_EMAILS.de;
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: env.MAIL_FROM,
+      to: email,
+      subject: emailText.subject,
+      text: emailText.text(verificationUrl),
+    }),
+  });
+
+  if (!response.ok) {
+    console.error(`Email verification email failed for ${email}: ${response.status}`);
+  }
 }
 
 async function sendPasswordResetEmail(env, email, resetUrl) {
@@ -353,7 +503,7 @@ async function resetPassword(request, db) {
 
 async function listUsers(db) {
   const result = await db
-    .prepare('SELECT id, name, email, role, created_at, updated_at FROM users ORDER BY name COLLATE NOCASE')
+    .prepare('SELECT id, name, email, role, email_verified_at, created_at, updated_at FROM users ORDER BY name COLLATE NOCASE')
     .all();
   return json({ users: result.results.map(toPublicUser) });
 }
@@ -368,10 +518,10 @@ async function createUser(request, db) {
   try {
     await db
       .prepare(
-        `INSERT INTO users (id, name, email, role, password_salt, password_hash, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, user.name, user.email, user.role, password.salt, password.hash, now, now)
+      .bind(id, user.name, user.email, user.role, password.salt, password.hash, now, now, now)
       .run();
   } catch (error) {
     if (String(error.message || '').includes('UNIQUE')) {
@@ -380,7 +530,7 @@ async function createUser(request, db) {
     throw error;
   }
 
-  return json({ user: toPublicUser({ id, name: user.name, email: user.email, role: user.role, created_at: now, updated_at: now }) }, 201);
+  return json({ user: toPublicUser({ id, name: user.name, email: user.email, role: user.role, email_verified_at: now, created_at: now, updated_at: now }) }, 201);
 }
 
 async function updateUser(request, db, id, currentUserId) {
@@ -403,15 +553,15 @@ async function updateUser(request, db, id, currentUserId) {
       await db
         .prepare(
           `UPDATE users
-           SET name = ?, email = ?, role = ?, password_salt = ?, password_hash = ?, updated_at = ?
+           SET name = ?, email = ?, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, updated_at = ?
            WHERE id = ?`,
         )
-        .bind(user.name, user.email, user.role, password.salt, password.hash, now, id)
+        .bind(user.name, user.email, user.role, password.salt, password.hash, user.email === existing.email ? existing.email_verified_at : now, now, id)
         .run();
     } else {
       await db
-        .prepare('UPDATE users SET name = ?, email = ?, role = ?, updated_at = ? WHERE id = ?')
-        .bind(user.name, user.email, user.role, now, id)
+        .prepare('UPDATE users SET name = ?, email = ?, role = ?, email_verified_at = ?, updated_at = ? WHERE id = ?')
+        .bind(user.name, user.email, user.role, user.email === existing.email ? existing.email_verified_at : now, now, id)
         .run();
     }
   } catch (error) {
@@ -422,7 +572,7 @@ async function updateUser(request, db, id, currentUserId) {
   }
 
   const updated = await db
-    .prepare('SELECT id, name, email, role, created_at, updated_at FROM users WHERE id = ?')
+    .prepare('SELECT id, name, email, role, email_verified_at, created_at, updated_at FROM users WHERE id = ?')
     .bind(id)
     .first();
   return json({ user: toPublicUser(updated) });
@@ -774,7 +924,7 @@ async function requireSession(request, db) {
 
   const row = await db
     .prepare(
-      `SELECT users.id, users.name, users.email, users.role, users.created_at, users.updated_at, sessions.expires_at
+      `SELECT users.id, users.name, users.email, users.role, users.email_verified_at, users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
        WHERE sessions.id = ?`,
@@ -805,6 +955,7 @@ async function createSession(db, userId) {
 async function cleanupExpiredSessions(db) {
   await db.prepare('DELETE FROM sessions WHERE expires_at <= ?').bind(new Date().toISOString()).run();
   await db.prepare('DELETE FROM password_reset_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').bind(new Date().toISOString()).run();
+  await db.prepare('DELETE FROM email_verification_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').bind(new Date().toISOString()).run();
 }
 
 function normalizeUserInput(body, { requirePassword }) {
@@ -834,6 +985,11 @@ function normalizeUserInput(body, { requirePassword }) {
   }
 
   return { name, email, role, password };
+}
+
+function normalizeLanguage(value) {
+  const language = String(value || 'de').trim().toLowerCase();
+  return LANGUAGES.includes(language) ? language : 'de';
 }
 
 function normalizeTournamentInput(body) {
@@ -1023,6 +1179,7 @@ function toPublicUser(row) {
     name: row.name,
     email: row.email,
     role: row.role,
+    emailVerifiedAt: row.email_verified_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

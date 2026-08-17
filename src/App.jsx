@@ -99,6 +99,9 @@ const EMPTY_REGISTRATION_FORM = {
   status: 'pending',
 };
 
+const REGISTER_SUCCESS = 'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.';
+const VERIFY_SUCCESS = 'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.';
+
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState(() => localStorage.getItem('ptm_language') || 'de');
@@ -127,9 +130,13 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const resetToken = params.get('reset_token');
+    const verifyToken = params.get('verify_token');
     if (resetToken) {
       setAuthView('reset');
       setAuthForm((previous) => ({ ...previous, token: resetToken }));
+    } else if (verifyToken) {
+      setAuthView('verify');
+      setAuthForm((previous) => ({ ...previous, token: verifyToken }));
     }
     initialize();
   }, []);
@@ -251,6 +258,48 @@ export default function App() {
       setAuthForm(EMPTY_AUTH_FORM);
       setMessage('Angemeldet.');
       await loadTournaments();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function handleRegister(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+
+    if (authForm.password !== authForm.passwordConfirm) {
+      setError('Die Passwörter stimmen nicht überein.');
+      return;
+    }
+
+    try {
+      const data = await api('/api/register', {
+        method: 'POST',
+        body: JSON.stringify({ ...authForm, language }),
+      });
+      setAuthForm(EMPTY_AUTH_FORM);
+      setAuthView('login');
+      setMessage(data.verificationUrl ? `${translateText(REGISTER_SUCCESS, language)} ${data.verificationUrl}` : translateText(REGISTER_SUCCESS, language));
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function handleVerifyEmail(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+
+    try {
+      await api('/api/email/verify', {
+        method: 'POST',
+        body: JSON.stringify({ token: authForm.token }),
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+      setAuthForm(EMPTY_AUTH_FORM);
+      setAuthView('login');
+      setMessage(translateText(VERIFY_SUCCESS, language));
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -528,6 +577,22 @@ export default function App() {
               setAuthView('forgot');
               clearFeedback();
             }}
+            onRegister={() => {
+              setAuthView('register');
+              clearFeedback();
+            }}
+          />
+        )}
+
+        {!needsSetup && authView === 'register' && (
+          <RegisterForm
+            form={authForm}
+            setForm={setAuthForm}
+            onSubmit={handleRegister}
+            onBack={() => {
+              setAuthView('login');
+              clearFeedback();
+            }}
           />
         )}
 
@@ -548,6 +613,18 @@ export default function App() {
             form={authForm}
             setForm={setAuthForm}
             onSubmit={handleResetPassword}
+            onBack={() => {
+              setAuthView('login');
+              clearFeedback();
+            }}
+          />
+        )}
+
+        {!needsSetup && authView === 'verify' && (
+          <VerifyEmailForm
+            form={authForm}
+            setForm={setAuthForm}
+            onSubmit={handleVerifyEmail}
             onBack={() => {
               setAuthView('login');
               clearFeedback();
@@ -707,7 +784,12 @@ export default function App() {
                     <strong>{user.name}</strong>
                     <span>{user.email}</span>
                   </div>
-                  <span className={`role role-${user.role}`}>{roleName(user.role)}</span>
+                  <div className="badges">
+                    <span className={`role role-${user.role}`}>{roleName(user.role)}</span>
+                    <span className={user.emailVerifiedAt ? 'status registration-confirmed' : 'status registration-pending'}>
+                      {user.emailVerifiedAt ? 'E-Mail bestätigt' : 'E-Mail offen'}
+                    </span>
+                  </div>
                   <div className="row-actions">
                     <Button variant="secondary" onClick={() => editUser(user)}>
                       Bearbeiten
@@ -770,14 +852,32 @@ function SetupForm({ form, setForm, onSubmit }) {
   );
 }
 
-function LoginForm({ form, setForm, onSubmit, onForgot }) {
+function LoginForm({ form, setForm, onSubmit, onForgot, onRegister }) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <TextField label="Passwort" type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required />
       <Button type="submit">Anmelden</Button>
+      <button className="link-button" type="button" onClick={onRegister}>
+        Neu registrieren
+      </button>
       <button className="link-button" type="button" onClick={onForgot}>
         Passwort vergessen?
+      </button>
+    </form>
+  );
+}
+
+function RegisterForm({ form, setForm, onSubmit, onBack }) {
+  return (
+    <form className="form" onSubmit={onSubmit}>
+      <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+      <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+      <TextField label="Passwort" type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required minLength={8} />
+      <TextField label="Passwort bestätigen" type="password" value={form.passwordConfirm} onChange={(passwordConfirm) => setForm({ ...form, passwordConfirm })} required minLength={8} />
+      <Button type="submit">Registrieren</Button>
+      <button className="link-button" type="button" onClick={onBack}>
+        Zurück zur Anmeldung
       </button>
     </form>
   );
@@ -802,6 +902,18 @@ function ResetPasswordForm({ form, setForm, onSubmit, onBack }) {
       <TextField label="Neues Passwort" type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required minLength={8} />
       <TextField label="Passwort bestätigen" type="password" value={form.passwordConfirm} onChange={(passwordConfirm) => setForm({ ...form, passwordConfirm })} required minLength={8} />
       <Button type="submit">Passwort ändern</Button>
+      <button className="link-button" type="button" onClick={onBack}>
+        Zurück zur Anmeldung
+      </button>
+    </form>
+  );
+}
+
+function VerifyEmailForm({ form, setForm, onSubmit, onBack }) {
+  return (
+    <form className="form" onSubmit={onSubmit}>
+      <TextField label="Bestätigungs-Token" value={form.token} onChange={(token) => setForm({ ...form, token })} required />
+      <Button type="submit">E-Mail bestätigen</Button>
       <button className="link-button" type="button" onClick={onBack}>
         Zurück zur Anmeldung
       </button>
@@ -1069,8 +1181,14 @@ function authTitle(needsSetup, authView) {
   if (authView === 'forgot') {
     return 'Passwort vergessen';
   }
+  if (authView === 'register') {
+    return 'Neu registrieren';
+  }
   if (authView === 'reset') {
     return 'Passwort ändern';
+  }
+  if (authView === 'verify') {
+    return 'E-Mail bestätigen';
   }
   if (authView === 'publicRegistration') {
     return 'Turnieranmeldung';
@@ -1085,8 +1203,14 @@ function authSubtitle(needsSetup, authView) {
   if (authView === 'forgot') {
     return 'Fordere einen Link zum Zurücksetzen deines Passworts an.';
   }
+  if (authView === 'register') {
+    return 'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.';
+  }
   if (authView === 'reset') {
     return 'Setze mit deinem Reset-Token ein neues Passwort.';
+  }
+  if (authView === 'verify') {
+    return 'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.';
   }
   if (authView === 'publicRegistration') {
     return 'Melde dich für ein öffentliches Turnier an.';
@@ -1175,7 +1299,7 @@ async function api(path, options = {}) {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.error || 'Request failed');
+    throw new Error(translateText(payload.error || 'Request failed', localStorage.getItem('ptm_language') || 'de'));
   }
 
   return payload;
@@ -1187,11 +1311,15 @@ const TRANSLATIONS = {
     'Ersten Admin anlegen': 'Eerste admin aanmaken',
     'Passwort vergessen': 'Wachtwoord vergeten',
     'Passwort ändern': 'Wachtwoord wijzigen',
+    'Neu registrieren': 'Nieuw registreren',
+    'E-Mail bestätigen': 'E-mail bevestigen',
     'Turnieranmeldung': 'Toernooi-inschrijving',
     Anmelden: 'Aanmelden',
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Maak de eerste admin-gebruiker voor dit nieuwe project aan.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Vraag een link aan om je wachtwoord opnieuw in te stellen.',
+    'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Registreer je gebruikersaccount. Vrijgave gebeurt pas na e-mailbevestiging.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Stel met je reset-token een nieuw wachtwoord in.',
+    'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Bevestig je e-mailadres om je gebruikersaccount vrij te geven.',
     'Melde dich für ein öffentliches Turnier an.': 'Schrijf je in voor een openbaar toernooi.',
     'Melde dich mit deinem Benutzerkonto an.': 'Meld je aan met je gebruikersaccount.',
     Sprache: 'Taal',
@@ -1202,8 +1330,25 @@ const TRANSLATIONS = {
     'Admin anlegen': 'Admin aanmaken',
     'Passwort vergessen?': 'Wachtwoord vergeten?',
     'Reset-Link anfordern': 'Reset-link aanvragen',
+    Registrieren: 'Registreren',
     'Zurück zur Anmeldung': 'Terug naar aanmelden',
     'Reset-Token': 'Reset-token',
+    'Bestätigungs-Token': 'Bevestigingstoken',
+    'E-Mail bestätigt': 'E-mail bevestigd',
+    'E-Mail offen': 'E-mail open',
+    'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'E-mailadres is bevestigd. Je kunt je nu aanmelden.',
+    'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registratie opgeslagen. Bevestig je e-mailadres via de link in de e-mail.',
+    'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Bevestig eerst je e-mailadres.',
+    'Bestätigungs-Token ist erforderlich': 'Bevestigingstoken is verplicht',
+    'Bestätigungs-Link ist ungültig oder abgelaufen': 'Bevestigingslink is ongeldig of verlopen',
+    'Die Passwörter stimmen nicht überein.': 'De wachtwoorden komen niet overeen.',
+    'Email already exists': 'E-mail bestaat al',
+    'Email and password are required': 'E-mail en wachtwoord zijn verplicht',
+    'Invalid login': 'Ongeldige aanmelding',
+    'Name must contain at least 2 characters': 'Naam moet minstens 2 tekens bevatten',
+    'A valid email is required': 'Een geldig e-mailadres is verplicht',
+    'Password must contain at least 8 characters': 'Wachtwoord moet minstens 8 tekens bevatten',
+    'Request failed': 'Aanvraag mislukt',
     'Neues Passwort': 'Nieuw wachtwoord',
     'Öffentliche Turniere': 'Openbare toernooien',
     'Anmeldung senden': 'Inschrijving verzenden',
@@ -1276,11 +1421,15 @@ const TRANSLATIONS = {
     'Ersten Admin anlegen': 'Create first admin',
     'Passwort vergessen': 'Forgot password',
     'Passwort ändern': 'Change password',
+    'Neu registrieren': 'Register',
+    'E-Mail bestätigen': 'Verify email',
     'Turnieranmeldung': 'Tournament registration',
     Anmelden: 'Sign in',
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Create the first admin user for this new project.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Request a link to reset your password.',
+    'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Register your user account. Access is enabled only after email verification.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Set a new password with your reset token.',
+    'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Verify your email address to enable your user account.',
     'Melde dich für ein öffentliches Turnier an.': 'Register for a public tournament.',
     'Melde dich mit deinem Benutzerkonto an.': 'Sign in with your user account.',
     Sprache: 'Language',
@@ -1291,8 +1440,25 @@ const TRANSLATIONS = {
     'Admin anlegen': 'Create admin',
     'Passwort vergessen?': 'Forgot password?',
     'Reset-Link anfordern': 'Request reset link',
+    Registrieren: 'Register',
     'Zurück zur Anmeldung': 'Back to sign in',
     'Reset-Token': 'Reset token',
+    'Bestätigungs-Token': 'Verification token',
+    'E-Mail bestätigt': 'Email verified',
+    'E-Mail offen': 'Email pending',
+    'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'Email address verified. You can sign in now.',
+    'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registration saved. Please verify your email address using the link in the email.',
+    'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Please verify your email address first.',
+    'Bestätigungs-Token ist erforderlich': 'Verification token is required',
+    'Bestätigungs-Link ist ungültig oder abgelaufen': 'Verification link is invalid or expired',
+    'Die Passwörter stimmen nicht überein.': 'The passwords do not match.',
+    'Email already exists': 'Email already exists',
+    'Email and password are required': 'Email and password are required',
+    'Invalid login': 'Invalid login',
+    'Name must contain at least 2 characters': 'Name must contain at least 2 characters',
+    'A valid email is required': 'A valid email is required',
+    'Password must contain at least 8 characters': 'Password must contain at least 8 characters',
+    'Request failed': 'Request failed',
     'Neues Passwort': 'New password',
     'Öffentliche Turniere': 'Public tournaments',
     'Anmeldung senden': 'Submit registration',
@@ -1365,11 +1531,15 @@ const TRANSLATIONS = {
     'Ersten Admin anlegen': 'Crear primer admin',
     'Passwort vergessen': 'Contraseña olvidada',
     'Passwort ändern': 'Cambiar contraseña',
+    'Neu registrieren': 'Registrarse',
+    'E-Mail bestätigen': 'Confirmar correo',
     'Turnieranmeldung': 'Inscripción al torneo',
     Anmelden: 'Iniciar sesión',
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Crea el primer usuario administrador para este nuevo proyecto.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Solicita un enlace para restablecer tu contraseña.',
+    'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Registra tu cuenta. El acceso se activa solo después de confirmar el correo.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Define una nueva contraseña con tu token.',
+    'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Confirma tu correo para activar tu cuenta.',
     'Melde dich für ein öffentliches Turnier an.': 'Inscríbete en un torneo público.',
     'Melde dich mit deinem Benutzerkonto an.': 'Inicia sesión con tu cuenta.',
     Sprache: 'Idioma',
@@ -1380,8 +1550,25 @@ const TRANSLATIONS = {
     'Admin anlegen': 'Crear admin',
     'Passwort vergessen?': '¿Contraseña olvidada?',
     'Reset-Link anfordern': 'Solicitar enlace',
+    Registrieren: 'Registrarse',
     'Zurück zur Anmeldung': 'Volver al inicio',
     'Reset-Token': 'Token',
+    'Bestätigungs-Token': 'Token de confirmación',
+    'E-Mail bestätigt': 'Correo confirmado',
+    'E-Mail offen': 'Correo pendiente',
+    'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'Correo confirmado. Ya puedes iniciar sesión.',
+    'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registro guardado. Confirma tu correo con el enlace del email.',
+    'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Confirma primero tu correo.',
+    'Bestätigungs-Token ist erforderlich': 'El token de confirmación es obligatorio',
+    'Bestätigungs-Link ist ungültig oder abgelaufen': 'El enlace de confirmación no es válido o ha caducado',
+    'Die Passwörter stimmen nicht überein.': 'Las contraseñas no coinciden.',
+    'Email already exists': 'El correo ya existe',
+    'Email and password are required': 'Correo y contraseña son obligatorios',
+    'Invalid login': 'Inicio de sesión no válido',
+    'Name must contain at least 2 characters': 'El nombre debe tener al menos 2 caracteres',
+    'A valid email is required': 'Se requiere un correo válido',
+    'Password must contain at least 8 characters': 'La contraseña debe tener al menos 8 caracteres',
+    'Request failed': 'La solicitud ha fallado',
     'Neues Passwort': 'Nueva contraseña',
     'Öffentliche Turniere': 'Torneos públicos',
     'Anmeldung senden': 'Enviar inscripción',
@@ -1454,11 +1641,15 @@ const TRANSLATIONS = {
     'Ersten Admin anlegen': 'Créer le premier admin',
     'Passwort vergessen': 'Mot de passe oublié',
     'Passwort ändern': 'Modifier le mot de passe',
+    'Neu registrieren': 'Créer un compte',
+    'E-Mail bestätigen': 'Confirmer l’e-mail',
     'Turnieranmeldung': 'Inscription au tournoi',
     Anmelden: 'Connexion',
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Crée le premier utilisateur administrateur pour ce nouveau projet.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Demande un lien de réinitialisation.',
+    'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Crée ton compte. L’accès est activé seulement après confirmation de l’e-mail.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Définis un nouveau mot de passe avec ton jeton.',
+    'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Confirme ton adresse e-mail pour activer ton compte.',
     'Melde dich für ein öffentliches Turnier an.': 'Inscris-toi à un tournoi public.',
     'Melde dich mit deinem Benutzerkonto an.': 'Connecte-toi avec ton compte.',
     Sprache: 'Langue',
@@ -1469,8 +1660,25 @@ const TRANSLATIONS = {
     'Admin anlegen': 'Créer admin',
     'Passwort vergessen?': 'Mot de passe oublié ?',
     'Reset-Link anfordern': 'Demander le lien',
+    Registrieren: 'Créer le compte',
     'Zurück zur Anmeldung': 'Retour à la connexion',
     'Reset-Token': 'Jeton',
+    'Bestätigungs-Token': 'Jeton de confirmation',
+    'E-Mail bestätigt': 'E-mail confirmé',
+    'E-Mail offen': 'E-mail en attente',
+    'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'Adresse e-mail confirmée. Tu peux maintenant te connecter.',
+    'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Compte créé. Confirme ton adresse e-mail avec le lien envoyé.',
+    'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Confirme d’abord ton adresse e-mail.',
+    'Bestätigungs-Token ist erforderlich': 'Le jeton de confirmation est obligatoire',
+    'Bestätigungs-Link ist ungültig oder abgelaufen': 'Le lien de confirmation est invalide ou expiré',
+    'Die Passwörter stimmen nicht überein.': 'Les mots de passe ne correspondent pas.',
+    'Email already exists': 'L’e-mail existe déjà',
+    'Email and password are required': 'E-mail et mot de passe obligatoires',
+    'Invalid login': 'Connexion invalide',
+    'Name must contain at least 2 characters': 'Le nom doit contenir au moins 2 caractères',
+    'A valid email is required': 'Une adresse e-mail valide est obligatoire',
+    'Password must contain at least 8 characters': 'Le mot de passe doit contenir au moins 8 caractères',
+    'Request failed': 'La demande a échoué',
     'Neues Passwort': 'Nouveau mot de passe',
     'Öffentliche Turniere': 'Tournois publics',
     'Anmeldung senden': 'Envoyer l’inscription',
@@ -1545,7 +1753,6 @@ function translateDom(language) {
     return;
   }
 
-  const dictionary = TRANSLATIONS[language] || {};
   const root = document.getElementById('root');
   if (!root) {
     return;
@@ -1559,15 +1766,24 @@ function translateDom(language) {
 
   for (const node of nodes) {
     const source = node.nodeValue.trim();
-    if (dictionary[source]) {
-      node.nodeValue = node.nodeValue.replace(source, dictionary[source]);
+    const translated = translateText(source, language);
+    if (translated !== source) {
+      node.nodeValue = node.nodeValue.replace(source, translated);
     }
   }
 
   for (const element of root.querySelectorAll('[placeholder]')) {
     const source = element.getAttribute('placeholder');
-    if (dictionary[source]) {
-      element.setAttribute('placeholder', dictionary[source]);
+    const translated = translateText(source, language);
+    if (translated !== source) {
+      element.setAttribute('placeholder', translated);
     }
   }
+}
+
+function translateText(source, language) {
+  if (language === 'de') {
+    return source;
+  }
+  return TRANSLATIONS[language]?.[source] || source;
 }
