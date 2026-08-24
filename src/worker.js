@@ -20,7 +20,7 @@ const SESSION_COOKIE = 'ptm_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 const RESET_TTL_SECONDS = 60 * 30;
 const EMAIL_VERIFICATION_TTL_SECONDS = 60 * 60 * 24;
-const PASSWORD_ITERATIONS = 210000;
+const PASSWORD_ITERATIONS = 100000;
 const UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 const SECURITY_HEADERS = {
   'Content-Security-Policy':
@@ -57,6 +57,11 @@ const EMAIL_VERIFICATION_EMAILS = {
 
 export default {
   async fetch(request, env) {
+    const authResponse = await requireBasicAuth(request, env);
+    if (authResponse) {
+      return authResponse;
+    }
+
     const url = new URL(request.url);
 
     if (!url.pathname.startsWith('/api/')) {
@@ -216,6 +221,58 @@ export default {
     }
   },
 };
+
+async function requireBasicAuth(request, env) {
+  const expectedUser = env.BASIC_AUTH_USER;
+  const expectedPassword = env.BASIC_AUTH_PASSWORD;
+
+  if (!expectedUser || !expectedPassword) {
+    return null;
+  }
+
+  const header = request.headers.get('Authorization') || '';
+  const [scheme, encoded] = header.split(' ');
+
+  if (scheme === 'Basic' && encoded) {
+    let decoded = '';
+    try {
+      decoded = atob(encoded);
+    } catch {
+      decoded = '';
+    }
+
+    const separatorIndex = decoded.indexOf(':');
+    const user = separatorIndex === -1 ? decoded : decoded.slice(0, separatorIndex);
+    const password = separatorIndex === -1 ? '' : decoded.slice(separatorIndex + 1);
+
+    const userMatches = await constantTimeEquals(user, expectedUser);
+    const passwordMatches = await constantTimeEquals(password, expectedPassword);
+
+    if (userMatches && passwordMatches) {
+      return null;
+    }
+  }
+
+  return new Response('Authentication required', {
+    status: 401,
+    headers: { 'WWW-Authenticate': 'Basic realm="Petanque Turnier Manager"' },
+  });
+}
+
+async function constantTimeEquals(a, b) {
+  const [hashA, hashB] = await Promise.all([sha256Hex(a), sha256Hex(b)]);
+
+  if (hashA.length !== hashB.length) {
+    return false;
+  }
+
+  let mismatch = 0;
+  for (let i = 0; i < hashA.length; i += 1) {
+    mismatch |= hashA.charCodeAt(i) ^ hashB.charCodeAt(i);
+  }
+
+  return mismatch === 0;
+}
 
 async function needsSetup(db) {
   const row = await db.prepare('SELECT COUNT(*) AS count FROM users').first();

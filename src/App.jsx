@@ -1748,11 +1748,9 @@ const TRANSLATIONS = {
   },
 };
 
-function translateDom(language) {
-  if (language === 'de') {
-    return;
-  }
+const ORIGINAL_TEXT = new WeakMap();
 
+function translateDom(language) {
   const root = document.getElementById('root');
   if (!root) {
     return;
@@ -1765,19 +1763,22 @@ function translateDom(language) {
   }
 
   for (const node of nodes) {
-    const source = node.nodeValue.trim();
-    const translated = translateText(source, language);
-    if (translated !== source) {
-      node.nodeValue = node.nodeValue.replace(source, translated);
+    if (!ORIGINAL_TEXT.has(node)) {
+      ORIGINAL_TEXT.set(node, node.nodeValue);
     }
+    const original = ORIGINAL_TEXT.get(node);
+    const source = original.trim();
+    const translated = translateText(source, language);
+    node.nodeValue = original.replace(source, translated);
   }
 
   for (const element of root.querySelectorAll('[placeholder]')) {
-    const source = element.getAttribute('placeholder');
-    const translated = translateText(source, language);
-    if (translated !== source) {
-      element.setAttribute('placeholder', translated);
+    if (!ORIGINAL_TEXT.has(element)) {
+      ORIGINAL_TEXT.set(element, element.getAttribute('placeholder'));
     }
+    const source = ORIGINAL_TEXT.get(element);
+    const translated = translateText(source, language);
+    element.setAttribute('placeholder', translated);
   }
 }
 
