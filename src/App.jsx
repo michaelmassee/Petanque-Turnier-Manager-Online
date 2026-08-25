@@ -654,11 +654,15 @@ export default function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">Petanque Turnier Manager Online</p>
-          <h1>{activeTab === 'users' ? 'Benutzerverwaltung' : 'Turnierverwaltung'}</h1>
+        <div className="brand">
+          <img src="/icons/logo.png" alt="Petanque Turnier Manager Online" className="brand-logo" />
+          <div>
+            <p className="eyebrow">Petanque Turnier Manager Online</p>
+            <h1>{activeTab === 'users' ? 'Benutzerverwaltung' : 'Turnierverwaltung'}</h1>
+          </div>
         </div>
         <div className="account">
+          <InstallAppButton />
           <LanguageSelect language={language} setLanguage={setLanguage} />
           <span>{currentUser.name}</span>
           <strong>{roleLabel}</strong>
@@ -813,9 +817,10 @@ function AuthShell({ title, subtitle, children, language, setLanguage }) {
     <main className="page">
       <section className="auth-panel" aria-labelledby="page-title">
         <div className="language-bar">
+          <InstallAppButton />
           <LanguageSelect language={language} setLanguage={setLanguage} />
         </div>
-        <img src="/icons/icon.svg" alt="" className="app-icon" />
+        <img src="/icons/logo.png" alt="Petanque Turnier Manager Online" className="app-icon" />
         <p className="eyebrow">Petanque Turnier Manager Online</p>
         <h1 id="page-title">{title}</h1>
         <p className="subtitle">{subtitle}</p>
@@ -1156,6 +1161,80 @@ function SelectField({ label, value, onChange, options }) {
       </select>
     </label>
   );
+}
+
+function useInstallPrompt() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [installed, setInstalled] = useState(
+    () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true,
+  );
+
+  useEffect(() => {
+    function onBeforeInstall(event) {
+      event.preventDefault();
+      setDeferredPrompt(event);
+    }
+    function onInstalled() {
+      setInstalled(true);
+      setDeferredPrompt(null);
+    }
+    window.addEventListener('beforeinstallprompt', onBeforeInstall);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  async function promptInstall() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    setDeferredPrompt(null);
+  }
+
+  return { canInstall: Boolean(deferredPrompt), installed, promptInstall };
+}
+
+function isIosSafari() {
+  const ua = window.navigator.userAgent;
+  const isIos = /iphone|ipad|ipod/i.test(ua);
+  const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios/i.test(ua);
+  return isIos && isSafari;
+}
+
+function InstallAppButton({ variant = 'secondary' }) {
+  const { canInstall, installed, promptInstall } = useInstallPrompt();
+  const [showIosHint, setShowIosHint] = useState(false);
+
+  if (installed) {
+    return null;
+  }
+
+  if (canInstall) {
+    return (
+      <Button variant={variant} onClick={promptInstall}>
+        App installieren
+      </Button>
+    );
+  }
+
+  if (isIosSafari()) {
+    return (
+      <div className="install-hint">
+        <Button variant={variant} onClick={() => setShowIosHint((prev) => !prev)}>
+          App installieren
+        </Button>
+        {showIosHint && (
+          <p className="install-hint-text">
+            Tippe unten auf <strong>Teilen</strong> und dann auf <strong>„Zum Home-Bildschirm“</strong>.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function Button({ children, type = 'button', variant = 'primary', ...props }) {

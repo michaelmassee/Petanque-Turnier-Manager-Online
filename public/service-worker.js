@@ -1,5 +1,14 @@
-const CACHE_NAME = 'ptm-online-v1';
-const APP_SHELL = ['/', '/manifest.webmanifest', '/icons/icon.svg'];
+const CACHE_NAME = 'ptm-online-v3';
+const APP_SHELL = [
+  '/',
+  '/manifest.webmanifest',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/maskable-icon-192.png',
+  '/icons/maskable-icon-512.png',
+  '/icons/apple-touch-icon.png',
+  '/icons/favicon.ico',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

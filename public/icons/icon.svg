@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PTM Online">
-  <rect width="512" height="512" rx="96" fill="#1677ff"/>
-  <circle cx="168" cy="184" r="70" fill="#fff0d6"/>
-  <circle cx="316" cy="168" r="46" fill="#ffffff"/>
-  <circle cx="344" cy="322" r="84" fill="#eaf8ef"/>
-  <path fill="#172033" d="M124 392h264v34H124zM148 108h34v152h-34zM300 98h34v120h-34zM328 258h34v112h-34z"/>
-</svg>
