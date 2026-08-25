@@ -243,12 +243,227 @@ textarea:focus {
 }
 
 .topbar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
   margin: 0 auto 18px;
   max-width: 1180px;
+}
+
+.hamburger-btn {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 1px solid #c7d0df;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.hamburger-btn span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: #172033;
+}
+
+.nav-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgb(23 32 51 / 35%);
+}
+
+.nav-drawer {
+  position: absolute;
+  z-index: 11;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  gap: 10px;
+  width: min(280px, 90vw);
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgb(23 32 51 / 16%);
+  padding: 16px;
+}
+
+.drawer-user {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e7f0;
+  color: #53627a;
+}
+
+.drawer-link {
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: #f4f6fa;
+  color: #172033;
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 800;
+}
+
+.drawer-link.active {
+  background: #1677ff;
+  color: #ffffff;
+}
+
+.home-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 20px;
+  max-width: 1180px;
+  margin: 0 auto 20px;
+}
+
+.home-search input[type="search"] {
+  max-width: 420px;
+}
+
+.checkbox-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.checkbox-field input {
+  width: auto;
+  min-height: 0;
+}
+
+.home-tournaments {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.load-more-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.filter-panel {
+  display: grid;
+  gap: 12px;
+  max-width: 1180px;
+  margin: 0 auto 20px;
+  padding: 16px;
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tip-list {
+  max-width: 1180px;
+  margin: 24px auto 0;
+  border-top: 1px solid #e2e7f0;
+  padding-top: 22px;
+}
+
+.tip-card,
+.tip-moderation-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.tournament-detail-page {
+  display: grid;
+  gap: 18px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.tournament-detail-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.tournament-detail-tab {
+  flex: 1;
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #53627a;
+  font-weight: 800;
+}
+
+.tournament-detail-tab.active {
+  background: #1677ff;
+  color: #ffffff;
+}
+
+.participants-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.participants-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgb(23 32 51 / 45%);
+  padding: 20px;
+}
+
+.modal-panel {
+  position: relative;
+  width: min(100%, 480px);
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgb(23 32 51 / 20%);
+  padding: 28px;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: #f4f6fa;
+  color: #364258;
+  font-size: 1.2rem;
+  line-height: 1;
 }
 
 .topbar h1 {
@@ -285,36 +500,6 @@ textarea:focus {
 .account strong {
   background: #ecf4ff;
   color: #0a5fd1;
-}
-
-.tabs {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  gap: 8px;
-  max-width: 1180px;
-  margin: 0 auto 20px;
-  padding: 8px;
-  border: 1px solid #d7deea;
-  border-radius: 8px;
-  background: rgb(255 255 255 / 92%);
-  backdrop-filter: blur(10px);
-}
-
-.tabs button {
-  flex: 1;
-  min-height: 40px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: #53627a;
-  font-weight: 800;
-}
-
-.tabs button.active {
-  background: #1677ff;
-  color: #ffffff;
 }
 
 .admin-grid,
@@ -360,20 +545,13 @@ textarea:focus {
   font-weight: 800;
 }
 
-.user-list,
-.public-list {
+.user-list {
   display: grid;
   gap: 12px;
   margin-top: 20px;
 }
 
-.public-list {
-  border-top: 1px solid #e2e7f0;
-  padding-top: 22px;
-}
-
-.data-row,
-.compact-tournament {
+.data-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
@@ -381,10 +559,6 @@ textarea:focus {
   border: 1px solid #e2e7f0;
   border-radius: 8px;
   padding: 14px;
-}
-
-.compact-tournament {
-  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .data-row.selected {
@@ -403,15 +577,13 @@ textarea:focus {
   text-align: left;
 }
 
-.data-row div:first-child,
-.compact-tournament div:first-child {
+.data-row div:first-child {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
-.data-row span,
-.compact-tournament span {
+.data-row span {
   color: #53627a;
   overflow-wrap: anywhere;
 }
@@ -481,14 +653,7 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
-  .tabs {
-    bottom: 0;
-    top: auto;
-    margin-bottom: 0;
-  }
-
-  .data-row,
-  .compact-tournament {
+  .data-row {
     grid-template-columns: 1fr;
   }
 
@@ -511,8 +676,16 @@ textarea:focus {
 
   .auth-panel,
   .panel,
-  .public-registration {
+  .public-registration,
+  .modal-panel {
     padding: 20px;
+  }
+
+  .nav-drawer {
+    top: calc(100% + 6px);
+    right: -6px;
+    left: -6px;
+    width: auto;
   }
 
   .form-grid,

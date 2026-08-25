@@ -23,6 +23,44 @@ const FORMATIONS = [
   { value: 'tete', label: 'Tête' },
   { value: 'doublette', label: 'Doublette' },
   { value: 'triplette', label: 'Triplette' },
+  { value: 'doublette_mixed', label: 'Doublette gemischt' },
+  { value: 'triplette_mixed', label: 'Triplette gemischt' },
+];
+
+const REGIONS = [
+  'Baden-Württemberg',
+  'Bayern',
+  'Berlin',
+  'Brandenburg',
+  'Bremen',
+  'Hamburg',
+  'Hessen',
+  'Mecklenburg-Vorpommern',
+  'Niedersachsen',
+  'Nordrhein-Westfalen',
+  'Rheinland-Pfalz',
+  'Saarland',
+  'Sachsen',
+  'Sachsen-Anhalt',
+  'Schleswig-Holstein',
+  'Thüringen',
+];
+
+const REGION_OPTIONS = [{ value: '', label: 'Keine Angabe' }, ...REGIONS.map((region) => ({ value: region, label: region }))];
+
+const MONTHS = [
+  { value: '01', label: 'Januar' },
+  { value: '02', label: 'Februar' },
+  { value: '03', label: 'März' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'Mai' },
+  { value: '06', label: 'Juni' },
+  { value: '07', label: 'Juli' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'Oktober' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'Dezember' },
 ];
 
 const TOURNAMENT_STATUSES = [
@@ -78,6 +116,22 @@ const EMPTY_TOURNAMENT_FORM = {
   contactPhone: '',
   visibility: 'private',
   internalNotes: '',
+  region: '',
+  participantsPublic: false,
+};
+
+const EMPTY_TOURNAMENT_TIP_FORM = {
+  name: '',
+  date: '',
+  startTime: '',
+  location: '',
+  formation: 'doublette',
+  info: '',
+  externalLink: '',
+  flyerLink: '',
+  submitterName: '',
+  submitterEmail: '',
+  consent: false,
 };
 
 const EMPTY_REGISTRATION_FORM = {
@@ -106,8 +160,22 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState(() => localStorage.getItem('ptm_language') || 'de');
   const [needsSetup, setNeedsSetup] = useState(false);
-  const [authView, setAuthView] = useState('login');
-  const [activeTab, setActiveTab] = useState('tournaments');
+  const [authView, setAuthView] = useState('home');
+  const [activeTab, setActiveTab] = useState('home');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [homeQuery, setHomeQuery] = useState('');
+  const [homeOnlyMine, setHomeOnlyMine] = useState(false);
+  const [homeVisibleCount, setHomeVisibleCount] = useState(10);
+  const [homeFilterOpen, setHomeFilterOpen] = useState(false);
+  const [homeFilterMonth, setHomeFilterMonth] = useState('');
+  const [homeFilterRegion, setHomeFilterRegion] = useState('');
+  const [homeFilterFormation, setHomeFilterFormation] = useState('');
+  const [homeFilterOpenOnly, setHomeFilterOpenOnly] = useState(false);
+  const [homeFilterHideWeekdayEvenings, setHomeFilterHideWeekdayEvenings] = useState(false);
+  const [path, navigate] = usePath();
+  const [tournamentTips, setTournamentTips] = useState([]);
+  const [pendingTips, setPendingTips] = useState([]);
+  const [tournamentTipForm, setTournamentTipForm] = useState(EMPTY_TOURNAMENT_TIP_FORM);
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [tournaments, setTournaments] = useState([]);
@@ -127,16 +195,71 @@ export default function App() {
   const canManageTournaments = currentUser && ['admin', 'turnierleiter'].includes(currentUser.role);
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
 
+  const homeHeading = 'Öffentliche Turniere';
+
+  const filteredHomeTournaments = useMemo(() => {
+    const query = homeQuery.trim().toLowerCase();
+    return tournaments.filter((tournament) => {
+      if (tournament.visibility !== 'public' || !isUpcoming(tournament)) {
+        return false;
+      }
+      if (homeOnlyMine && !isOwnTournament(tournament, currentUser)) {
+        return false;
+      }
+      if (homeFilterMonth && tournament.date.slice(5, 7) !== homeFilterMonth) {
+        return false;
+      }
+      if (homeFilterRegion && tournament.region !== homeFilterRegion) {
+        return false;
+      }
+      if (homeFilterFormation && tournament.formation !== homeFilterFormation) {
+        return false;
+      }
+      if (homeFilterOpenOnly && !hasOpenRegistration(tournament)) {
+        return false;
+      }
+      if (homeFilterHideWeekdayEvenings && isWeekdayEveningTournament(tournament)) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      return [tournament.name, tournament.location, labelFor(TOURNAMENT_TYPES, tournament.type)].some((value) =>
+        (value || '').toLowerCase().includes(query),
+      );
+    });
+  }, [
+    tournaments,
+    homeQuery,
+    homeOnlyMine,
+    currentUser,
+    homeFilterMonth,
+    homeFilterRegion,
+    homeFilterFormation,
+    homeFilterOpenOnly,
+    homeFilterHideWeekdayEvenings,
+  ]);
+
+  const visibleHomeTournaments = filteredHomeTournaments.slice(0, homeVisibleCount);
+  const hasMoreHomeTournaments = filteredHomeTournaments.length > homeVisibleCount;
+
+  useEffect(() => {
+    setHomeVisibleCount(10);
+  }, [homeQuery, homeOnlyMine, homeFilterMonth, homeFilterRegion, homeFilterFormation, homeFilterOpenOnly, homeFilterHideWeekdayEvenings]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const resetToken = params.get('reset_token');
     const verifyToken = params.get('verify_token');
+    const tipVerifyToken = params.get('tip_verify_token');
     if (resetToken) {
       setAuthView('reset');
       setAuthForm((previous) => ({ ...previous, token: resetToken }));
     } else if (verifyToken) {
       setAuthView('verify');
       setAuthForm((previous) => ({ ...previous, token: verifyToken }));
+    } else if (tipVerifyToken) {
+      verifyTournamentTipToken(tipVerifyToken);
     }
     initialize();
   }, []);
@@ -156,6 +279,7 @@ export default function App() {
   useEffect(() => {
     if (isAdmin) {
       loadUsers();
+      loadPendingTournamentTips();
     }
   }, [isAdmin]);
 
@@ -175,6 +299,7 @@ export default function App() {
       const bootstrap = await api('/api/bootstrap');
       setNeedsSetup(bootstrap.needsSetup);
       await loadTournaments();
+      await loadApprovedTournamentTips();
 
       if (!bootstrap.needsSetup) {
         try {
@@ -214,6 +339,24 @@ export default function App() {
     try {
       const data = await api(`/api/tournaments/${tournamentId}/registrations`);
       setRegistrations(data.registrations);
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function loadApprovedTournamentTips() {
+    try {
+      const data = await api('/api/tournament-tips/approved');
+      setTournamentTips(data.tips);
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function loadPendingTournamentTips() {
+    try {
+      const data = await api('/api/tournament-tips/pending');
+      setPendingTips(data.tips);
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -305,6 +448,71 @@ export default function App() {
     }
   }
 
+  async function verifyTournamentTipToken(token) {
+    setError('');
+    setMessage('');
+
+    try {
+      await api('/api/tournament-tips/verify', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+      setMessage('Deine Turniermeldung wurde bestätigt und wartet nun auf Freigabe.');
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function handleSubmitTournamentTip(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+
+    try {
+      const data = await api('/api/tournament-tips', {
+        method: 'POST',
+        body: JSON.stringify({ ...tournamentTipForm, language }),
+      });
+      setTournamentTipForm(EMPTY_TOURNAMENT_TIP_FORM);
+      setMessage(data.verificationUrl ? `${data.message} ${data.verificationUrl}` : data.message);
+      navigate('/');
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function handleModerateTournamentTip(tip, status) {
+    setError('');
+    setMessage('');
+
+    try {
+      await api(`/api/tournament-tips/${tip.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      });
+      setMessage(status === 'approved' ? 'Turniermeldung wurde freigegeben.' : 'Turniermeldung wurde abgelehnt.');
+      await loadPendingTournamentTips();
+      await loadApprovedTournamentTips();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function handleDeleteTournamentTip(tip) {
+    setError('');
+    setMessage('');
+
+    try {
+      await api(`/api/tournament-tips/${tip.id}`, { method: 'DELETE' });
+      setMessage('Turniermeldung wurde gelöscht.');
+      await loadPendingTournamentTips();
+      await loadApprovedTournamentTips();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
   async function handleForgotPassword(event) {
     event.preventDefault();
     setError('');
@@ -360,6 +568,9 @@ export default function App() {
     setUserMode('create');
     setTournamentMode('create');
     setRegistrationMode('create');
+    setAuthView('home');
+    setActiveTab('home');
+    setHomeOnlyMine(false);
     setMessage('');
     setError('');
     await loadTournaments();
@@ -468,6 +679,7 @@ export default function App() {
 
       setRegistrationForm(EMPTY_REGISTRATION_FORM);
       setRegistrationMode('create');
+      setAuthView('home');
       await loadTournaments();
       if (selectedTournament?.canManage) {
         await loadRegistrations(selectedTournament.id);
@@ -523,6 +735,8 @@ export default function App() {
       contactPhone: tournament.contactPhone || '',
       visibility: tournament.visibility || 'private',
       internalNotes: tournament.internalNotes || '',
+      region: tournament.region || '',
+      participantsPublic: Boolean(tournament.participantsPublic),
     });
     setActiveTab('tournaments');
     clearFeedback();
@@ -557,136 +771,383 @@ export default function App() {
     setMessage('');
   }
 
+  function resetHomeFilters() {
+    setHomeFilterMonth('');
+    setHomeFilterRegion('');
+    setHomeFilterFormation('');
+    setHomeFilterOpenOnly(false);
+    setHomeFilterHideWeekdayEvenings(false);
+  }
+
   const roleLabel = useMemo(() => roleName(currentUser?.role), [currentUser]);
 
   if (loading) {
     return <AuthShell title="Petanque Turnier Manager Online" subtitle="App wird geladen." language={language} setLanguage={setLanguage} />;
   }
 
-  if (!currentUser) {
+  const tournamentRoute = matchTournamentRoute(path);
+
+  if (!needsSetup && tournamentRoute) {
     return (
-      <AuthShell title={authTitle(needsSetup, authView)} subtitle={authSubtitle(needsSetup, authView)} language={language} setLanguage={setLanguage}>
-        {needsSetup && <SetupForm form={authForm} setForm={setAuthForm} onSubmit={handleSetup} />}
+      <TournamentDetailPage
+        route={tournamentRoute}
+        tournaments={tournaments}
+        currentUser={currentUser}
+        language={language}
+        setLanguage={setLanguage}
+        navigate={navigate}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        registrationForm={registrationForm}
+        setRegistrationForm={setRegistrationForm}
+        onSubmitRegistration={handleRegistrationSubmit}
+        message={message}
+        error={error}
+        onLogout={handleLogout}
+      />
+    );
+  }
 
-        {!needsSetup && authView === 'login' && (
-          <LoginForm
-            form={authForm}
-            setForm={setAuthForm}
-            onSubmit={handleLogin}
-            onForgot={() => {
-              setAuthView('forgot');
+  if (!needsSetup && path === '/turnier-melden') {
+    return (
+      <SubmitTournamentTipPage
+        language={language}
+        setLanguage={setLanguage}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        navigate={navigate}
+        form={tournamentTipForm}
+        setForm={setTournamentTipForm}
+        onSubmit={handleSubmitTournamentTip}
+        message={message}
+        error={error}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  if (!currentUser) {
+    if (needsSetup) {
+      return (
+        <AuthShell title={authTitle(needsSetup, authView)} subtitle={authSubtitle(needsSetup, authView)} language={language} setLanguage={setLanguage}>
+          <SetupForm form={authForm} setForm={setAuthForm} onSubmit={handleSetup} />
+          <Feedback message={message} error={error} />
+        </AuthShell>
+      );
+    }
+
+    const closeAuthModal = () => {
+      setAuthView('home');
+      clearFeedback();
+    };
+
+    return (
+      <main className="app-shell">
+        <AppHeader
+          heading="Turniere"
+          language={language}
+          setLanguage={setLanguage}
+          menuOpen={menuOpen}
+          onToggleMenu={() => setMenuOpen((open) => !open)}
+          onCloseMenu={() => setMenuOpen(false)}
+        >
+          <button
+            className="drawer-link"
+            type="button"
+            onClick={() => {
+              setAuthView('login');
+              setMenuOpen(false);
               clearFeedback();
             }}
-            onRegister={() => {
+          >
+            Anmelden
+          </button>
+          <button
+            className="drawer-link"
+            type="button"
+            onClick={() => {
               setAuthView('register');
+              setMenuOpen(false);
               clearFeedback();
             }}
-          />
-        )}
-
-        {!needsSetup && authView === 'register' && (
-          <RegisterForm
-            form={authForm}
-            setForm={setAuthForm}
-            onSubmit={handleRegister}
-            onBack={() => {
-              setAuthView('login');
-              clearFeedback();
-            }}
-          />
-        )}
-
-        {!needsSetup && authView === 'forgot' && (
-          <ForgotPasswordForm
-            form={authForm}
-            setForm={setAuthForm}
-            onSubmit={handleForgotPassword}
-            onBack={() => {
-              setAuthView('login');
-              clearFeedback();
-            }}
-          />
-        )}
-
-        {!needsSetup && authView === 'reset' && (
-          <ResetPasswordForm
-            form={authForm}
-            setForm={setAuthForm}
-            onSubmit={handleResetPassword}
-            onBack={() => {
-              setAuthView('login');
-              clearFeedback();
-            }}
-          />
-        )}
-
-        {!needsSetup && authView === 'verify' && (
-          <VerifyEmailForm
-            form={authForm}
-            setForm={setAuthForm}
-            onSubmit={handleVerifyEmail}
-            onBack={() => {
-              setAuthView('login');
-              clearFeedback();
-            }}
-          />
-        )}
+          >
+            Neu registrieren
+          </button>
+        </AppHeader>
 
         <Feedback message={message} error={error} />
-        <PublicTournamentList tournaments={tournaments} onRegister={(tournament) => {
-          setSelectedTournamentId(tournament.id);
-          setRegistrationForm({ ...EMPTY_REGISTRATION_FORM, tournamentId: tournament.id });
-          setAuthView('publicRegistration');
-        }} />
-        {authView === 'publicRegistration' && selectedTournament && (
+
+        <HomeTournaments
+          heading={homeHeading}
+          language={language}
+          query={homeQuery}
+          setQuery={setHomeQuery}
+          showMineFilter={false}
+          onlyMine={false}
+          setOnlyMine={() => {}}
+          filterOpen={homeFilterOpen}
+          setFilterOpen={setHomeFilterOpen}
+          filterMonth={homeFilterMonth}
+          setFilterMonth={setHomeFilterMonth}
+          filterRegion={homeFilterRegion}
+          setFilterRegion={setHomeFilterRegion}
+          filterFormation={homeFilterFormation}
+          setFilterFormation={setHomeFilterFormation}
+          filterOpenOnly={homeFilterOpenOnly}
+          setFilterOpenOnly={setHomeFilterOpenOnly}
+          filterHideWeekdayEvenings={homeFilterHideWeekdayEvenings}
+          setFilterHideWeekdayEvenings={setHomeFilterHideWeekdayEvenings}
+          onResetFilters={resetHomeFilters}
+          tournaments={visibleHomeTournaments}
+          total={filteredHomeTournaments.length}
+          hasMore={hasMoreHomeTournaments}
+          onLoadMore={() => setHomeVisibleCount((count) => count + 10)}
+          onOpenTournament={(tournament) => navigate(`/turniere/${tournament.id}`)}
+          tips={tournamentTips}
+          navigate={navigate}
+          onRegister={(tournament) => {
+            setSelectedTournamentId(tournament.id);
+            setRegistrationForm({ ...EMPTY_REGISTRATION_FORM, tournamentId: tournament.id });
+            setAuthView('publicRegistration');
+            clearFeedback();
+          }}
+        />
+
+        {authView !== 'home' && (
+          <AuthModal title={authTitle(needsSetup, authView)} subtitle={authSubtitle(needsSetup, authView)} onClose={closeAuthModal}>
+            {authView === 'login' && (
+              <LoginForm
+                form={authForm}
+                setForm={setAuthForm}
+                onSubmit={handleLogin}
+                onForgot={() => {
+                  setAuthView('forgot');
+                  clearFeedback();
+                }}
+                onRegister={() => {
+                  setAuthView('register');
+                  clearFeedback();
+                }}
+              />
+            )}
+
+            {authView === 'register' && (
+              <RegisterForm
+                form={authForm}
+                setForm={setAuthForm}
+                onSubmit={handleRegister}
+                onBack={() => {
+                  setAuthView('login');
+                  clearFeedback();
+                }}
+              />
+            )}
+
+            {authView === 'forgot' && (
+              <ForgotPasswordForm
+                form={authForm}
+                setForm={setAuthForm}
+                onSubmit={handleForgotPassword}
+                onBack={() => {
+                  setAuthView('login');
+                  clearFeedback();
+                }}
+              />
+            )}
+
+            {authView === 'reset' && (
+              <ResetPasswordForm
+                form={authForm}
+                setForm={setAuthForm}
+                onSubmit={handleResetPassword}
+                onBack={() => {
+                  setAuthView('login');
+                  clearFeedback();
+                }}
+              />
+            )}
+
+            {authView === 'verify' && (
+              <VerifyEmailForm
+                form={authForm}
+                setForm={setAuthForm}
+                onSubmit={handleVerifyEmail}
+                onBack={() => {
+                  setAuthView('login');
+                  clearFeedback();
+                }}
+              />
+            )}
+
+            {authView === 'publicRegistration' && selectedTournament && (
+              <PublicRegistrationPanel
+                tournament={selectedTournament}
+                form={registrationForm}
+                setForm={setRegistrationForm}
+                onSubmit={handleRegistrationSubmit}
+                onCancel={closeAuthModal}
+              />
+            )}
+          </AuthModal>
+        )}
+      </main>
+    );
+  }
+
+  const activeTabHeading =
+    activeTab === 'users'
+      ? 'Benutzerverwaltung'
+      : activeTab === 'tips'
+        ? 'Turnier-Vorschläge'
+        : activeTab === 'registrations'
+          ? 'Anmeldungen'
+          : activeTab === 'tournaments'
+            ? 'Turnierverwaltung'
+            : homeHeading;
+
+  return (
+    <main className="app-shell">
+      <AppHeader
+        heading={activeTabHeading}
+        language={language}
+        setLanguage={setLanguage}
+        menuOpen={menuOpen}
+        onToggleMenu={() => setMenuOpen((open) => !open)}
+        onCloseMenu={() => setMenuOpen(false)}
+      >
+        <div className="drawer-user">
+          <span>{currentUser.name}</span>
+          <strong>{roleLabel}</strong>
+        </div>
+        <button
+          className={`drawer-link ${activeTab === 'home' ? 'active' : ''}`}
+          type="button"
+          onClick={() => {
+            setActiveTab('home');
+            setMenuOpen(false);
+          }}
+        >
+          Startseite
+        </button>
+        {canManageTournaments && (
+          <button
+            className={`drawer-link ${activeTab === 'tournaments' ? 'active' : ''}`}
+            type="button"
+            onClick={() => {
+              setActiveTab('tournaments');
+              setMenuOpen(false);
+            }}
+          >
+            Turnierverwaltung
+          </button>
+        )}
+        <button
+          className={`drawer-link ${activeTab === 'registrations' ? 'active' : ''}`}
+          type="button"
+          onClick={() => {
+            setActiveTab('registrations');
+            setMenuOpen(false);
+          }}
+        >
+          Anmeldungen
+        </button>
+        {isAdmin && (
+          <button
+            className={`drawer-link ${activeTab === 'users' ? 'active' : ''}`}
+            type="button"
+            onClick={() => {
+              setActiveTab('users');
+              setMenuOpen(false);
+            }}
+          >
+            Benutzer
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            className={`drawer-link ${activeTab === 'tips' ? 'active' : ''}`}
+            type="button"
+            onClick={() => {
+              setActiveTab('tips');
+              setMenuOpen(false);
+            }}
+          >
+            Turnier-Vorschläge
+          </button>
+        )}
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setMenuOpen(false);
+            handleLogout();
+          }}
+        >
+          Abmelden
+        </Button>
+      </AppHeader>
+
+      <Feedback message={message} error={error} />
+
+      {activeTab === 'home' && (
+        <HomeTournaments
+          heading={homeHeading}
+          language={language}
+          query={homeQuery}
+          setQuery={setHomeQuery}
+          showMineFilter={canManageTournaments}
+          onlyMine={homeOnlyMine}
+          setOnlyMine={setHomeOnlyMine}
+          filterOpen={homeFilterOpen}
+          setFilterOpen={setHomeFilterOpen}
+          filterMonth={homeFilterMonth}
+          setFilterMonth={setHomeFilterMonth}
+          filterRegion={homeFilterRegion}
+          setFilterRegion={setHomeFilterRegion}
+          filterFormation={homeFilterFormation}
+          setFilterFormation={setHomeFilterFormation}
+          filterOpenOnly={homeFilterOpenOnly}
+          setFilterOpenOnly={setHomeFilterOpenOnly}
+          filterHideWeekdayEvenings={homeFilterHideWeekdayEvenings}
+          setFilterHideWeekdayEvenings={setHomeFilterHideWeekdayEvenings}
+          onResetFilters={resetHomeFilters}
+          tournaments={visibleHomeTournaments}
+          total={filteredHomeTournaments.length}
+          hasMore={hasMoreHomeTournaments}
+          onLoadMore={() => setHomeVisibleCount((count) => count + 10)}
+          onOpenTournament={(tournament) => navigate(`/turniere/${tournament.id}`)}
+          tips={tournamentTips}
+          navigate={navigate}
+          onRegister={(tournament) => {
+            setSelectedTournamentId(tournament.id);
+            setRegistrationForm({ ...EMPTY_REGISTRATION_FORM, tournamentId: tournament.id });
+            setAuthView('publicRegistration');
+            clearFeedback();
+          }}
+        />
+      )}
+
+      {authView === 'publicRegistration' && selectedTournament && (
+        <AuthModal
+          title={authTitle(needsSetup, authView)}
+          subtitle={authSubtitle(needsSetup, authView)}
+          onClose={() => {
+            setAuthView('home');
+            clearFeedback();
+          }}
+        >
           <PublicRegistrationPanel
             tournament={selectedTournament}
             form={registrationForm}
             setForm={setRegistrationForm}
             onSubmit={handleRegistrationSubmit}
-            onCancel={() => setAuthView('login')}
+            onCancel={() => {
+              setAuthView('home');
+              clearFeedback();
+            }}
           />
-        )}
-      </AuthShell>
-    );
-  }
-
-  return (
-    <main className="app-shell">
-      <header className="topbar">
-        <div className="brand">
-          <img src="/icons/logo.png" alt="Petanque Turnier Manager Online" className="brand-logo" />
-          <div>
-            <p className="eyebrow">Petanque Turnier Manager Online</p>
-            <h1>{activeTab === 'users' ? 'Benutzerverwaltung' : 'Turnierverwaltung'}</h1>
-          </div>
-        </div>
-        <div className="account">
-          <InstallAppButton />
-          <LanguageSelect language={language} setLanguage={setLanguage} />
-          <span>{currentUser.name}</span>
-          <strong>{roleLabel}</strong>
-          <Button variant="secondary" onClick={handleLogout}>
-            Abmelden
-          </Button>
-        </div>
-      </header>
-
-      <nav className="tabs" aria-label="Bereiche">
-        <button className={activeTab === 'tournaments' ? 'active' : ''} onClick={() => setActiveTab('tournaments')} type="button">
-          Turniere
-        </button>
-        <button className={activeTab === 'registrations' ? 'active' : ''} onClick={() => setActiveTab('registrations')} type="button">
-          Anmeldungen
-        </button>
-        {isAdmin && (
-          <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')} type="button">
-            Benutzer
-          </button>
-        )}
-      </nav>
-
-      <Feedback message={message} error={error} />
+        </AuthModal>
+      )}
 
       {activeTab === 'tournaments' && (
         <section className={canManageTournaments ? 'admin-grid wide' : 'single-column'}>
@@ -808,6 +1269,17 @@ export default function App() {
           </div>
         </section>
       )}
+
+      {activeTab === 'tips' && isAdmin && (
+        <section className="single-column">
+          <TournamentTipModeration
+            tips={pendingTips}
+            onApprove={(tip) => handleModerateTournamentTip(tip, 'approved')}
+            onReject={(tip) => handleModerateTournamentTip(tip, 'rejected')}
+            onDelete={handleDeleteTournamentTip}
+          />
+        </section>
+      )}
     </main>
   );
 }
@@ -926,26 +1398,602 @@ function VerifyEmailForm({ form, setForm, onSubmit, onBack }) {
   );
 }
 
-function PublicTournamentList({ tournaments, onRegister }) {
-  const publicTournaments = tournaments.filter((tournament) => tournament.visibility === 'public');
-  if (!publicTournaments.length) {
-    return null;
+function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, children }) {
+  return (
+    <header className="topbar">
+      <div className="brand">
+        <img src="/icons/logo.png" alt="Petanque Turnier Manager Online" className="brand-logo" />
+        <div>
+          <p className="eyebrow">Petanque Turnier Manager Online</p>
+          <h1>{heading}</h1>
+        </div>
+      </div>
+      <button
+        className="hamburger-btn"
+        type="button"
+        aria-label="Menü öffnen"
+        aria-expanded={menuOpen}
+        onClick={onToggleMenu}
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+      {menuOpen && (
+        <>
+          <div className="nav-drawer-backdrop" onClick={onCloseMenu} />
+          <nav className="nav-drawer" aria-label="Hauptmenü">
+            <InstallAppButton />
+            <LanguageSelect language={language} setLanguage={setLanguage} />
+            {children}
+          </nav>
+        </>
+      )}
+    </header>
+  );
+}
+
+function AuthModal({ title, subtitle, onClose, children }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={(event) => event.stopPropagation()}>
+        <button className="modal-close" type="button" onClick={onClose} aria-label="Schließen">
+          ×
+        </button>
+        <h2 id="modal-title">{title}</h2>
+        {subtitle && <p className="subtitle">{subtitle}</p>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function StandalonePageHeader({ heading, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
+  return (
+    <AppHeader
+      heading={heading}
+      language={language}
+      setLanguage={setLanguage}
+      menuOpen={menuOpen}
+      onToggleMenu={() => setMenuOpen((open) => !open)}
+      onCloseMenu={() => setMenuOpen(false)}
+    >
+      <button
+        className="drawer-link"
+        type="button"
+        onClick={() => {
+          setMenuOpen(false);
+          navigate('/');
+        }}
+      >
+        Zur Startseite
+      </button>
+      {currentUser && (
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setMenuOpen(false);
+            onLogout();
+          }}
+        >
+          Abmelden
+        </Button>
+      )}
+    </AppHeader>
+  );
+}
+
+function useRoutedTournament(id, tournaments) {
+  const [fetched, setFetched] = useState(null);
+  const [notFound, setNotFound] = useState(false);
+  const existing = tournaments.find((tournament) => tournament.id === id) || null;
+
+  useEffect(() => {
+    if (existing) {
+      setFetched(null);
+      setNotFound(false);
+      return;
+    }
+
+    let cancelled = false;
+    setNotFound(false);
+    api(`/api/tournaments/${id}`)
+      .then((data) => {
+        if (!cancelled) {
+          setFetched(data.tournament);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNotFound(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, existing]);
+
+  return { tournament: existing || fetched, notFound: notFound && !existing };
+}
+
+function TournamentDetailPage({
+  route,
+  tournaments,
+  currentUser,
+  language,
+  setLanguage,
+  navigate,
+  menuOpen,
+  setMenuOpen,
+  registrationForm,
+  setRegistrationForm,
+  onSubmitRegistration,
+  message,
+  error,
+  onLogout,
+}) {
+  const { tournament, notFound } = useRoutedTournament(route.id, tournaments);
+
+  if (notFound) {
+    return (
+      <main className="app-shell">
+        <StandalonePageHeader
+          heading="Turnier nicht gefunden"
+          language={language}
+          setLanguage={setLanguage}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          navigate={navigate}
+          currentUser={currentUser}
+          onLogout={onLogout}
+        />
+        <section className="home-tournaments">
+          <p className="muted">Dieses Turnier existiert nicht oder ist nicht öffentlich sichtbar.</p>
+          <button className="link-button" type="button" onClick={() => navigate('/')}>
+            Zur Startseite
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (!tournament) {
+    return (
+      <main className="app-shell">
+        <StandalonePageHeader
+          heading="Turnier wird geladen…"
+          language={language}
+          setLanguage={setLanguage}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          navigate={navigate}
+          currentUser={currentUser}
+          onLogout={onLogout}
+        />
+      </main>
+    );
+  }
+
+  const canRegister = tournament.status === 'registration' && tournament.visibility === 'public';
+  const canShowParticipants = tournament.participantsPublic || tournament.canManage;
+
+  return (
+    <main className="app-shell">
+      <StandalonePageHeader
+        heading={tournament.name}
+        language={language}
+        setLanguage={setLanguage}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        navigate={navigate}
+        currentUser={currentUser}
+        onLogout={onLogout}
+      />
+
+      <Feedback message={message} error={error} />
+
+      <section className="tournament-detail-page">
+        <nav className="tournament-detail-tabs" aria-label="Turnierdetails">
+          <button
+            className={`tournament-detail-tab ${route.view === 'info' ? 'active' : ''}`}
+            type="button"
+            onClick={() => navigate(`/turniere/${tournament.id}/info`)}
+          >
+            Info
+          </button>
+          {canRegister && (
+            <button
+              className={`tournament-detail-tab ${route.view === 'anmelden' ? 'active' : ''}`}
+              type="button"
+              onClick={() => navigate(`/turniere/${tournament.id}/anmelden`)}
+            >
+              Anmelden
+            </button>
+          )}
+          {canShowParticipants && (
+            <button
+              className={`tournament-detail-tab ${route.view === 'teilnehmer' ? 'active' : ''}`}
+              type="button"
+              onClick={() => navigate(`/turniere/${tournament.id}/teilnehmer`)}
+            >
+              Teilnehmer
+            </button>
+          )}
+        </nav>
+
+        <div className="tournament-detail-content">
+          {route.view === 'info' && <TournamentInfo tournament={tournament} />}
+
+          {route.view === 'anmelden' && canRegister && (
+            <PublicRegistrationPanel
+              tournament={tournament}
+              form={registrationForm}
+              setForm={setRegistrationForm}
+              onSubmit={onSubmitRegistration}
+              onCancel={() => navigate(`/turniere/${tournament.id}/info`)}
+            />
+          )}
+
+          {route.view === 'teilnehmer' && canShowParticipants && <TournamentParticipants tournamentId={tournament.id} />}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function TournamentInfo({ tournament }) {
+  return (
+    <div className="panel">
+      <p>
+        <strong>Datum</strong>: {formatDate(tournament.date)} {tournament.startTime || ''}
+      </p>
+      <p>
+        <strong>Ort</strong>: {tournament.location}
+        {tournament.region ? ` (${tournament.region})` : ''}
+      </p>
+      <p>
+        <strong>Turniersystem</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
+      </p>
+      <p>
+        <strong>Formation</strong>: {labelFor(FORMATIONS, tournament.formation)}
+      </p>
+      {tournament.description && <p>{tournament.description}</p>}
+      {Boolean(tournament.entryFeeCents) && (
+        <p>
+          <strong>Startgeld</strong>: {centsToEuro(tournament.entryFeeCents)} €
+        </p>
+      )}
+      {tournament.registrationDeadline && (
+        <p>
+          <strong>Meldefrist</strong>: {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(tournament.registrationDeadline))}
+        </p>
+      )}
+      <p>
+        <strong>Max. Meldungen</strong>: {tournament.maxRegistrations || '∞'}
+      </p>
+      {(tournament.contactName || tournament.contactEmail || tournament.contactPhone) && (
+        <p>
+          <strong>Kontakt</strong>: {[tournament.contactName, tournament.contactEmail, tournament.contactPhone].filter(Boolean).join(' · ')}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function TournamentParticipants({ tournamentId }) {
+  const [participants, setParticipants] = useState(null);
+  const [forbidden, setForbidden] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setForbidden(false);
+    api(`/api/tournaments/${tournamentId}/participants`)
+      .then((data) => {
+        if (!cancelled) {
+          setParticipants(data.participants);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setForbidden(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId]);
+
+  if (forbidden) {
+    return <p className="muted">Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.</p>;
+  }
+
+  if (!participants) {
+    return <p className="muted">Teilnehmerliste wird geladen…</p>;
+  }
+
+  if (!participants.length) {
+    return <p className="muted">Noch keine Anmeldungen.</p>;
   }
 
   return (
-    <section className="public-list">
-      <h2>Öffentliche Turniere</h2>
-      {publicTournaments.map((tournament) => (
-        <article className="compact-tournament" key={tournament.id}>
+    <div className="participants-list">
+      {participants.map((participant, index) => (
+        <article className="data-row participants-row" key={`${participant.firstName}-${participant.lastName}-${index}`}>
           <div>
-            <strong>{tournament.name}</strong>
-            <span>{formatDate(tournament.date)} · {tournament.location}</span>
+            <strong>
+              {participant.firstName} {participant.lastName}
+            </strong>
+            <span>{participant.club}</span>
           </div>
-          <Button variant="secondary" onClick={() => onRegister(tournament)} disabled={tournament.status !== 'registration'}>
-            Anmelden
-          </Button>
+          {(participant.partnerFirstName || participant.partnerLastName) && (
+            <div>
+              <strong>
+                {participant.partnerFirstName} {participant.partnerLastName}
+              </strong>
+            </div>
+          )}
         </article>
       ))}
+    </div>
+  );
+}
+
+function SubmitTournamentTipPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, form, setForm, onSubmit, message, error, currentUser, onLogout }) {
+  return (
+    <main className="app-shell">
+      <StandalonePageHeader
+        heading="Turnier melden"
+        language={language}
+        setLanguage={setLanguage}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        navigate={navigate}
+        currentUser={currentUser}
+        onLogout={onLogout}
+      />
+
+      <Feedback message={message} error={error} />
+
+      <section className="home-tournaments">
+        <div className="panel">
+          <p className="muted">
+            Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.
+          </p>
+          <form className="form dense" onSubmit={onSubmit}>
+            <TextField label="Turniername" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+            <div className="form-grid">
+              <TextField label="Datum" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
+              <TextField label="Startzeit" type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
+            </div>
+            <TextField label="Ort" value={form.location} onChange={(location) => setForm({ ...form, location })} />
+            <SelectField label="Formation" value={form.formation} onChange={(formation) => setForm({ ...form, formation })} options={FORMATIONS} />
+            <TextArea label="Weitere Infos" value={form.info} onChange={(info) => setForm({ ...form, info })} />
+            <TextField
+              label="Link zur Website"
+              type="url"
+              value={form.externalLink}
+              onChange={(externalLink) => setForm({ ...form, externalLink })}
+              required
+            />
+            <TextField label="Flyer-Link (PDF)" type="url" value={form.flyerLink} onChange={(flyerLink) => setForm({ ...form, flyerLink })} />
+            <div className="form-grid">
+              <TextField label="Dein Name" value={form.submitterName} onChange={(submitterName) => setForm({ ...form, submitterName })} required minLength={2} />
+              <TextField
+                label="Deine E-Mail"
+                type="email"
+                value={form.submitterEmail}
+                onChange={(submitterEmail) => setForm({ ...form, submitterEmail })}
+                required
+              />
+            </div>
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={form.consent}
+                onChange={(event) => setForm({ ...form, consent: event.target.checked })}
+                required
+              />
+              Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.
+            </label>
+            <Button type="submit">Turnier melden</Button>
+          </form>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function TournamentTipModeration({ tips, onApprove, onReject, onDelete }) {
+  return (
+    <div className="panel">
+      <div className="section-title">
+        <h2>Turnier-Vorschläge</h2>
+        <span className="counter">{tips.length}</span>
+      </div>
+      {!tips.length && <p className="muted">Keine offenen Vorschläge.</p>}
+      <div className="user-list">
+        {tips.map((tip) => (
+          <article className="data-row tip-moderation-row" key={tip.id}>
+            <div>
+              <strong>{tip.name}</strong>
+              <span>{formatDate(tip.date)} {tip.startTime || ''} · {tip.location || ''}</span>
+              <small>
+                {labelFor(FORMATIONS, tip.formation)} · {tip.submitterName} ({tip.submitterEmail})
+              </small>
+            </div>
+            <div className="row-actions">
+              <Button variant="secondary" onClick={() => onApprove(tip)}>
+                Freigeben
+              </Button>
+              <Button variant="danger" onClick={() => onReject(tip)}>
+                Ablehnen
+              </Button>
+              <Button variant="danger" onClick={() => onDelete(tip)}>
+                Löschen
+              </Button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HomeTournaments({
+  heading,
+  language,
+  query,
+  setQuery,
+  showMineFilter,
+  onlyMine,
+  setOnlyMine,
+  filterOpen,
+  setFilterOpen,
+  filterMonth,
+  setFilterMonth,
+  filterRegion,
+  setFilterRegion,
+  filterFormation,
+  setFilterFormation,
+  filterOpenOnly,
+  setFilterOpenOnly,
+  filterHideWeekdayEvenings,
+  setFilterHideWeekdayEvenings,
+  onResetFilters,
+  tournaments,
+  total,
+  hasMore,
+  onLoadMore,
+  onRegister,
+  onOpenTournament,
+  tips,
+  navigate,
+}) {
+  return (
+    <section className="home-tournaments">
+      <div className="home-search">
+        <label>
+          Turnier suchen
+          <input
+            type="search"
+            placeholder="Name, Ort oder Turniersystem"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+        {showMineFilter && (
+          <label className="checkbox-field">
+            <input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} />
+            Nur meine Turniere
+          </label>
+        )}
+        <Button variant="secondary" onClick={() => setFilterOpen((open) => !open)}>
+          {filterOpen ? 'Filter ausblenden' : 'Filter anzeigen'}
+        </Button>
+        <Button variant="secondary" onClick={() => navigate('/turnier-melden')}>
+          Turnier melden
+        </Button>
+      </div>
+
+      {filterOpen && (
+        <div className="filter-panel">
+          <div className="filter-grid">
+            <SelectField
+              label="Monat"
+              value={filterMonth}
+              onChange={setFilterMonth}
+              options={[{ value: '', label: 'Alle Monate' }, ...MONTHS]}
+            />
+            <SelectField label="Bundesland" value={filterRegion} onChange={setFilterRegion} options={REGION_OPTIONS} />
+            <SelectField
+              label="Formation"
+              value={filterFormation}
+              onChange={setFilterFormation}
+              options={[{ value: '', label: 'Alle Formationen' }, ...FORMATIONS]}
+            />
+          </div>
+          <label className="checkbox-field">
+            <input type="checkbox" checked={filterOpenOnly} onChange={(event) => setFilterOpenOnly(event.target.checked)} />
+            Anmeldung möglich
+          </label>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={filterHideWeekdayEvenings}
+              onChange={(event) => setFilterHideWeekdayEvenings(event.target.checked)}
+            />
+            Wochentags-Abendturniere ausblenden
+          </label>
+          <div className="filter-actions">
+            <button className="link-button" type="button" onClick={onResetFilters}>
+              Zurücksetzen
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="section-title">
+        <h2>{heading}</h2>
+        <span className="counter">{total}</span>
+      </div>
+
+      {!tournaments.length && <p className="muted">Keine Turniere gefunden.</p>}
+
+      <div className="user-list">
+        {tournaments.map((tournament) => (
+          <article className="data-row" key={tournament.id}>
+            <button className="row-main" type="button" onClick={() => onOpenTournament(tournament)}>
+              <strong>{tournament.name}</strong>
+              <span>{formatDate(tournament.date)} {tournament.startTime || ''} · {tournament.location}</span>
+              <small>
+                {labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)}
+                {tournament.region ? ` · ${tournament.region}` : ''}
+              </small>
+            </button>
+            <span className={`status status-${tournament.status}`}>{registrationStatusLabel(tournament, language)}</span>
+            <Button
+              variant="secondary"
+              onClick={() => onRegister(tournament)}
+              disabled={tournament.status !== 'registration' || tournament.visibility !== 'public'}
+            >
+              Anmelden
+            </Button>
+          </article>
+        ))}
+      </div>
+
+      {hasMore && (
+        <div className="load-more-wrap">
+          <Button variant="secondary" onClick={onLoadMore}>
+            Weitere Turniere laden
+          </Button>
+        </div>
+      )}
+
+      {tips.length > 0 && (
+        <div className="tip-list">
+          <div className="section-title">
+            <h2>Vorgeschlagene Turniere</h2>
+            <span className="counter">{tips.length}</span>
+          </div>
+          <p className="muted">Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns &mdash; Anmeldung erfolgt extern.</p>
+          <div className="user-list">
+            {tips.map((tip) => (
+              <article className="data-row tip-card" key={tip.id}>
+                <div>
+                  <strong>{tip.name}</strong>
+                  <span>{formatDate(tip.date)} {tip.startTime || ''} · {tip.location || ''}</span>
+                  <small>{labelFor(FORMATIONS, tip.formation)}</small>
+                </div>
+                <a className="button button-secondary" href={tip.externalLink} target="_blank" rel="noreferrer">
+                  Zur Anmeldung
+                </a>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -980,6 +2028,7 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
         <SelectField label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={TOURNAMENT_STATUSES} />
         <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(visibility) => setForm({ ...form, visibility })} options={VISIBILITIES} />
       </div>
+      <SelectField label="Bundesland" value={form.region} onChange={(region) => setForm({ ...form, region })} options={REGION_OPTIONS} />
       <div className="form-grid">
         <TextField label="Max. Meldungen" type="number" min="0" value={form.maxRegistrations} onChange={(maxRegistrations) => setForm({ ...form, maxRegistrations })} />
         <TextField label="Startgeld EUR" inputMode="decimal" value={form.entryFeeEuro} onChange={(entryFeeEuro) => setForm({ ...form, entryFeeEuro })} />
@@ -992,6 +2041,14 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
       <TextField label="Kontakt-Telefon" value={form.contactPhone} onChange={(contactPhone) => setForm({ ...form, contactPhone })} />
       <TextArea label="Beschreibung" value={form.description} onChange={(description) => setForm({ ...form, description })} />
       <TextArea label="Interne Notizen" value={form.internalNotes} onChange={(internalNotes) => setForm({ ...form, internalNotes })} />
+      <label className="checkbox-field">
+        <input
+          type="checkbox"
+          checked={form.participantsPublic}
+          onChange={(event) => setForm({ ...form, participantsPublic: event.target.checked })}
+        />
+        Teilnehmerliste öffentlich sichtbar
+      </label>
       <Button type="submit">{mode === 'edit' ? 'Turnier speichern' : 'Turnier anlegen'}</Button>
     </form>
   );
@@ -1163,6 +2220,42 @@ function SelectField({ label, value, onChange, options }) {
   );
 }
 
+function usePath() {
+  const [path, setPath] = useState(() => window.location.pathname);
+
+  useEffect(() => {
+    function onPopState() {
+      setPath(window.location.pathname);
+    }
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  function navigate(next) {
+    if (next !== window.location.pathname) {
+      window.history.pushState({}, '', next);
+    }
+    setPath(next);
+  }
+
+  return [path, navigate];
+}
+
+function matchTournamentRoute(path) {
+  const segments = path.split('/').filter(Boolean);
+  if (segments[0] !== 'turniere' || !segments[1]) {
+    return null;
+  }
+
+  const id = decodeURIComponent(segments[1]);
+  const sub = segments[2] || 'info';
+  if (!['info', 'anmelden', 'teilnehmer'].includes(sub)) {
+    return null;
+  }
+
+  return { id, view: sub };
+}
+
 function useInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [installed, setInstalled] = useState(
@@ -1315,6 +2408,8 @@ function tournamentPayload(form) {
     contactPhone: form.contactPhone || null,
     visibility: form.visibility,
     internalNotes: form.internalNotes || null,
+    region: form.region || null,
+    participantsPublic: Boolean(form.participantsPublic),
   };
 }
 
@@ -1343,6 +2438,68 @@ function roleName(value) {
 
 function labelFor(options, value) {
   return options.find((option) => option.value === value)?.label || value;
+}
+
+function isOwnTournament(tournament, user) {
+  return Boolean(user) && (tournament.createdBy === user.id || tournament.managerId === user.id);
+}
+
+function isUpcoming(tournament) {
+  if (tournament.status === 'finished') {
+    return false;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  return tournament.date >= today;
+}
+
+function hasOpenRegistration(tournament) {
+  if (tournament.status !== 'registration') {
+    return false;
+  }
+  if (tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now()) {
+    return false;
+  }
+  if (!tournament.maxRegistrations) {
+    return true;
+  }
+  return tournament.activeRegistrations < tournament.maxRegistrations || tournament.waitlistRegistrations > 0;
+}
+
+function isWeekdayEveningTournament(tournament) {
+  if (!tournament.startTime) {
+    return false;
+  }
+  const day = new Date(`${tournament.date}T00:00:00`).getDay();
+  const isWeekday = day >= 1 && day <= 5;
+  return isWeekday && tournament.startTime >= '17:00';
+}
+
+const SLOTS_FREE_TEMPLATES = {
+  de: (free, max) => `${free} von ${max} Plätzen frei`,
+  nl: (free, max) => `${free} van ${max} plaatsen vrij`,
+  en: (free, max) => `${free} of ${max} spots free`,
+  es: (free, max) => `${free} de ${max} plazas libres`,
+  fr: (free, max) => `${free} sur ${max} places libres`,
+};
+
+function registrationStatusLabel(tournament, language) {
+  const deadlinePassed = tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now();
+  const isFull = Boolean(tournament.maxRegistrations) && tournament.activeRegistrations >= tournament.maxRegistrations;
+  const registrationOpen = tournament.status === 'registration' && !deadlinePassed;
+
+  if (!registrationOpen || isFull) {
+    if (isFull && tournament.waitlistRegistrations > 0) {
+      return translateText('Anmeldung Warteliste möglich', language);
+    }
+    return translateText('Anmeldung nicht mehr möglich', language);
+  }
+
+  if (!tournament.maxRegistrations) {
+    return translateText('Anmeldung läuft', language);
+  }
+
+  const free = tournament.maxRegistrations - tournament.activeRegistrations;
+  return (SLOTS_FREE_TEMPLATES[language] || SLOTS_FREE_TEMPLATES.de)(free, tournament.maxRegistrations);
 }
 
 function formatDate(value) {
@@ -1494,6 +2651,82 @@ const TRANSLATIONS = {
     Warteliste: 'Wachtlijst',
     Storniert: 'Geannuleerd',
     'Leer lassen, wenn unverändert': 'Leeg laten als ongewijzigd',
+    'Doublette gemischt': 'Doublette gemengd',
+    'Triplette gemischt': 'Triplette gemengd',
+    Januar: 'Januari',
+    Februar: 'Februari',
+    März: 'Maart',
+    April: 'April',
+    Mai: 'Mei',
+    Juni: 'Juni',
+    Juli: 'Juli',
+    August: 'Augustus',
+    September: 'September',
+    Oktober: 'Oktober',
+    November: 'November',
+    Dezember: 'December',
+    'Keine Angabe': 'Geen opgave',
+    Bundesland: 'Deelstaat',
+    'Teilnehmerliste öffentlich sichtbar': 'Deelnemerslijst openbaar zichtbaar',
+    'Nur meine Turniere': 'Alleen mijn toernooien',
+    'Turnier suchen': 'Toernooi zoeken',
+    'Name, Ort oder Turniersystem': 'Naam, plaats of toernooisysteem',
+    'Filter ausblenden': 'Filter verbergen',
+    'Filter anzeigen': 'Filter tonen',
+    'Turnier melden': 'Toernooi melden',
+    Monat: 'Maand',
+    'Alle Monate': 'Alle maanden',
+    'Alle Formationen': 'Alle formaties',
+    'Anmeldung möglich': 'Inschrijving mogelijk',
+    'Wochentags-Abendturniere ausblenden': 'Doordeweekse avondtoernooien verbergen',
+    Zurücksetzen: 'Resetten',
+    'Vorgeschlagene Turniere': 'Voorgestelde toernooien',
+    'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
+      'Door verenigingen gemelde toernooien zonder online inschrijving bij ons — inschrijving verloopt extern.',
+    'Zur Anmeldung': 'Naar inschrijving',
+    'Anmeldung Warteliste möglich': 'Inschrijving wachtlijst mogelijk',
+    'Anmeldung nicht mehr möglich': 'Inschrijving niet meer mogelijk',
+    'Anmeldung läuft': 'Inschrijving loopt',
+    'Zur Startseite': 'Naar startpagina',
+    Startseite: 'Startpagina',
+    'Turnier nicht gefunden': 'Toernooi niet gevonden',
+    'Dieses Turnier existiert nicht oder ist nicht öffentlich sichtbar.': 'Dit toernooi bestaat niet of is niet openbaar zichtbaar.',
+    'Turnier wird geladen…': 'Toernooi wordt geladen…',
+    Info: 'Info',
+    Teilnehmer: 'Deelnemers',
+    Startgeld: 'Inschrijfgeld',
+    Kontakt: 'Contact',
+    'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'De deelnemerslijst is voor dit toernooi niet openbaar.',
+    'Teilnehmerliste wird geladen…': 'Deelnemerslijst wordt geladen…',
+    'Noch keine Anmeldungen.': 'Nog geen inschrijvingen.',
+    'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
+      'Staat jullie toernooi nog niet bij ons? Meld het hier aan als kalendervermelding met link naar externe inschrijving.',
+    Turniername: 'Toernooinaam',
+    'Weitere Infos': 'Meer info',
+    'Link zur Website': 'Link naar website',
+    'Flyer-Link (PDF)': 'Flyer-link (PDF)',
+    'Dein Name': 'Jouw naam',
+    'Deine E-Mail': 'Jouw e-mail',
+    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'Ik heb het privacybeleid gelezen en ga ermee akkoord.',
+    'Turnier-Vorschläge': 'Toernooivoorstellen',
+    'Keine offenen Vorschläge.': 'Geen openstaande voorstellen.',
+    Freigeben: 'Vrijgeven',
+    Ablehnen: 'Afwijzen',
+    'Turniermeldung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.':
+      'Toernooimelding opgeslagen. Bevestig je e-mailadres via de link in de e-mail.',
+    'Deine Turniermeldung wurde bestätigt und wartet nun auf Freigabe.': 'Je toernooimelding is bevestigd en wacht nu op goedkeuring.',
+    'Turniermeldung wurde freigegeben.': 'Toernooimelding is vrijgegeven.',
+    'Turniermeldung wurde abgelehnt.': 'Toernooimelding is afgewezen.',
+    'Turniermeldung wurde gelöscht.': 'Toernooimelding is verwijderd.',
+    'A valid external link is required': 'Een geldige link is verplicht',
+    'Submitter name must contain at least 2 characters': 'Naam moet minstens 2 tekens bevatten',
+    'A valid submitter email is required': 'Een geldig e-mailadres is verplicht',
+    'Invalid status': 'Ongeldige status',
+    'Tournament tip not found or not pending review': 'Toernooimelding niet gevonden of niet in afwachting',
+    'Tournament tip not found': 'Toernooimelding niet gevonden',
+    'Invalid formation': 'Ongeldige formatie',
+    'A valid tournament date is required': 'Een geldige datum is verplicht',
+    'Tournament name must contain at least 2 characters': 'Toernooinaam moet minstens 2 tekens bevatten',
   },
   en: {
     'App wird geladen.': 'App is loading.',
@@ -1604,6 +2837,83 @@ const TRANSLATIONS = {
     Warteliste: 'Waitlist',
     Storniert: 'Cancelled',
     'Leer lassen, wenn unverändert': 'Leave empty if unchanged',
+    'Doublette gemischt': 'Doublette mixed',
+    'Triplette gemischt': 'Triplette mixed',
+    Januar: 'January',
+    Februar: 'February',
+    März: 'March',
+    April: 'April',
+    Mai: 'May',
+    Juni: 'June',
+    Juli: 'July',
+    August: 'August',
+    September: 'September',
+    Oktober: 'October',
+    November: 'November',
+    Dezember: 'December',
+    'Keine Angabe': 'Not specified',
+    Bundesland: 'Federal state',
+    'Teilnehmerliste öffentlich sichtbar': 'Participant list publicly visible',
+    'Nur meine Turniere': 'Only my tournaments',
+    'Turnier suchen': 'Search tournament',
+    'Name, Ort oder Turniersystem': 'Name, location or tournament system',
+    'Filter ausblenden': 'Hide filter',
+    'Filter anzeigen': 'Show filter',
+    'Turnier melden': 'Submit tournament',
+    Monat: 'Month',
+    'Alle Monate': 'All months',
+    'Alle Formationen': 'All formations',
+    'Anmeldung möglich': 'Registration possible',
+    'Wochentags-Abendturniere ausblenden': 'Hide weekday evening tournaments',
+    Zurücksetzen: 'Reset',
+    'Vorgeschlagene Turniere': 'Suggested tournaments',
+    'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
+      'Tournaments submitted by clubs without online registration with us — registration happens externally.',
+    'Zur Anmeldung': 'To registration',
+    'Anmeldung Warteliste möglich': 'Registration waitlist possible',
+    'Anmeldung nicht mehr möglich': 'Registration no longer possible',
+    'Anmeldung läuft': 'Registration open',
+    'Zur Startseite': 'To home page',
+    Startseite: 'Home',
+    'Turnier nicht gefunden': 'Tournament not found',
+    'Dieses Turnier existiert nicht oder ist nicht öffentlich sichtbar.': 'This tournament does not exist or is not publicly visible.',
+    'Turnier wird geladen…': 'Loading tournament…',
+    Info: 'Info',
+    Teilnehmer: 'Participants',
+    Startgeld: 'Entry fee',
+    Kontakt: 'Contact',
+    'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'The participant list is not public for this tournament.',
+    'Teilnehmerliste wird geladen…': 'Loading participant list…',
+    'Noch keine Anmeldungen.': 'No registrations yet.',
+    'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
+      'Is your tournament not yet listed with us? Submit it here as a calendar entry with a link to external registration.',
+    Turniername: 'Tournament name',
+    'Weitere Infos': 'More info',
+    'Link zur Website': 'Link to website',
+    'Flyer-Link (PDF)': 'Flyer link (PDF)',
+    'Dein Name': 'Your name',
+    'Deine E-Mail': 'Your email',
+    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'I have read the privacy policy and accept it.',
+    'Turnier-Vorschläge': 'Tournament suggestions',
+    'Keine offenen Vorschläge.': 'No pending suggestions.',
+    Freigeben: 'Approve',
+    Ablehnen: 'Reject',
+    'Turniermeldung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.':
+      'Tournament submission saved. Please confirm your email address using the link in the email.',
+    'Deine Turniermeldung wurde bestätigt und wartet nun auf Freigabe.':
+      'Your tournament submission has been confirmed and is now awaiting approval.',
+    'Turniermeldung wurde freigegeben.': 'Tournament submission has been approved.',
+    'Turniermeldung wurde abgelehnt.': 'Tournament submission has been rejected.',
+    'Turniermeldung wurde gelöscht.': 'Tournament submission has been deleted.',
+    'A valid external link is required': 'A valid external link is required',
+    'Submitter name must contain at least 2 characters': 'Submitter name must contain at least 2 characters',
+    'A valid submitter email is required': 'A valid submitter email is required',
+    'Invalid status': 'Invalid status',
+    'Tournament tip not found or not pending review': 'Tournament tip not found or not pending review',
+    'Tournament tip not found': 'Tournament tip not found',
+    'Invalid formation': 'Invalid formation',
+    'A valid tournament date is required': 'A valid tournament date is required',
+    'Tournament name must contain at least 2 characters': 'Tournament name must contain at least 2 characters',
   },
   es: {
     'App wird geladen.': 'La app se está cargando.',
@@ -1714,6 +3024,82 @@ const TRANSLATIONS = {
     Warteliste: 'Lista de espera',
     Storniert: 'Cancelado',
     'Leer lassen, wenn unverändert': 'Dejar vacío si no cambia',
+    'Doublette gemischt': 'Doublette mixto',
+    'Triplette gemischt': 'Triplette mixto',
+    Januar: 'Enero',
+    Februar: 'Febrero',
+    März: 'Marzo',
+    April: 'Abril',
+    Mai: 'Mayo',
+    Juni: 'Junio',
+    Juli: 'Julio',
+    August: 'Agosto',
+    September: 'Septiembre',
+    Oktober: 'Octubre',
+    November: 'Noviembre',
+    Dezember: 'Diciembre',
+    'Keine Angabe': 'Sin especificar',
+    Bundesland: 'Estado federado',
+    'Teilnehmerliste öffentlich sichtbar': 'Lista de participantes visible públicamente',
+    'Nur meine Turniere': 'Solo mis torneos',
+    'Turnier suchen': 'Buscar torneo',
+    'Name, Ort oder Turniersystem': 'Nombre, lugar o sistema',
+    'Filter ausblenden': 'Ocultar filtro',
+    'Filter anzeigen': 'Mostrar filtro',
+    'Turnier melden': 'Notificar torneo',
+    Monat: 'Mes',
+    'Alle Monate': 'Todos los meses',
+    'Alle Formationen': 'Todas las formaciones',
+    'Anmeldung möglich': 'Inscripción posible',
+    'Wochentags-Abendturniere ausblenden': 'Ocultar torneos entre semana por la tarde',
+    Zurücksetzen: 'Restablecer',
+    'Vorgeschlagene Turniere': 'Torneos sugeridos',
+    'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
+      'Torneos notificados por clubes sin inscripción online con nosotros — la inscripción se realiza externamente.',
+    'Zur Anmeldung': 'Ir a la inscripción',
+    'Anmeldung Warteliste möglich': 'Inscripción en lista de espera posible',
+    'Anmeldung nicht mehr möglich': 'Inscripción ya no es posible',
+    'Anmeldung läuft': 'Inscripción abierta',
+    'Zur Startseite': 'A la página de inicio',
+    Startseite: 'Inicio',
+    'Turnier nicht gefunden': 'Torneo no encontrado',
+    'Dieses Turnier existiert nicht oder ist nicht öffentlich sichtbar.': 'Este torneo no existe o no es visible públicamente.',
+    'Turnier wird geladen…': 'Cargando torneo…',
+    Info: 'Info',
+    Teilnehmer: 'Participantes',
+    Startgeld: 'Cuota',
+    Kontakt: 'Contacto',
+    'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'La lista de participantes no es pública para este torneo.',
+    'Teilnehmerliste wird geladen…': 'Cargando lista de participantes…',
+    'Noch keine Anmeldungen.': 'Aún no hay inscripciones.',
+    'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
+      '¿Vuestro torneo aún no está en nuestro calendario? Notificadlo aquí como entrada con enlace a la inscripción externa.',
+    Turniername: 'Nombre del torneo',
+    'Weitere Infos': 'Más información',
+    'Link zur Website': 'Enlace al sitio web',
+    'Flyer-Link (PDF)': 'Enlace al folleto (PDF)',
+    'Dein Name': 'Tu nombre',
+    'Deine E-Mail': 'Tu correo',
+    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'He leído la política de privacidad y la acepto.',
+    'Turnier-Vorschläge': 'Propuestas de torneos',
+    'Keine offenen Vorschläge.': 'No hay propuestas pendientes.',
+    Freigeben: 'Aprobar',
+    Ablehnen: 'Rechazar',
+    'Turniermeldung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.':
+      'Aviso de torneo guardado. Confirma tu correo con el enlace del email.',
+    'Deine Turniermeldung wurde bestätigt und wartet nun auf Freigabe.': 'Tu aviso de torneo ha sido confirmado y ahora espera aprobación.',
+    'Turniermeldung wurde freigegeben.': 'El aviso de torneo ha sido aprobado.',
+    'Turniermeldung wurde abgelehnt.': 'El aviso de torneo ha sido rechazado.',
+    'Turniermeldung wurde gelöscht.': 'El aviso de torneo ha sido eliminado.',
+    'A valid external link is required': 'Se requiere un enlace válido',
+    'Submitter name must contain at least 2 characters': 'El nombre debe tener al menos 2 caracteres',
+    'A valid submitter email is required': 'Se requiere un correo válido',
+    'Invalid status': 'Estado no válido',
+    'Tournament tip not found or not pending review': 'Aviso de torneo no encontrado o no pendiente de revisión',
+    'Tournament tip not found': 'Aviso de torneo no encontrado',
+    'Invalid formation': 'Formación no válida',
+    'A valid tournament date is required': 'Se requiere una fecha válida',
+    'Tournament name must contain at least 2 characters': 'El nombre del torneo debe tener al menos 2 caracteres',
   },
   fr: {
     'App wird geladen.': 'Chargement de l’application.',
@@ -1824,6 +3210,83 @@ const TRANSLATIONS = {
     Warteliste: 'Liste d’attente',
     Storniert: 'Annulé',
     'Leer lassen, wenn unverändert': 'Laisser vide si inchangé',
+    'Doublette gemischt': 'Doublette mixte',
+    'Triplette gemischt': 'Triplette mixte',
+    Januar: 'Janvier',
+    Februar: 'Février',
+    März: 'Mars',
+    April: 'Avril',
+    Mai: 'Mai',
+    Juni: 'Juin',
+    Juli: 'Juillet',
+    August: 'Août',
+    September: 'Septembre',
+    Oktober: 'Octobre',
+    November: 'Novembre',
+    Dezember: 'Décembre',
+    'Keine Angabe': 'Non précisé',
+    Bundesland: 'Land (région)',
+    'Teilnehmerliste öffentlich sichtbar': 'Liste des participants visible publiquement',
+    'Nur meine Turniere': 'Seulement mes tournois',
+    'Turnier suchen': 'Rechercher un tournoi',
+    'Name, Ort oder Turniersystem': 'Nom, lieu ou système',
+    'Filter ausblenden': 'Masquer le filtre',
+    'Filter anzeigen': 'Afficher le filtre',
+    'Turnier melden': 'Signaler un tournoi',
+    Monat: 'Mois',
+    'Alle Monate': 'Tous les mois',
+    'Alle Formationen': 'Toutes les formations',
+    'Anmeldung möglich': 'Inscription possible',
+    'Wochentags-Abendturniere ausblenden': 'Masquer les tournois en semaine le soir',
+    Zurücksetzen: 'Réinitialiser',
+    'Vorgeschlagene Turniere': 'Tournois proposés',
+    'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
+      'Tournois signalés par des clubs sans inscription en ligne chez nous — l’inscription se fait en externe.',
+    'Zur Anmeldung': 'Vers l’inscription',
+    'Anmeldung Warteliste möglich': 'Inscription en liste d’attente possible',
+    'Anmeldung nicht mehr möglich': 'Inscription plus possible',
+    'Anmeldung läuft': 'Inscription en cours',
+    'Zur Startseite': 'Vers la page d’accueil',
+    Startseite: 'Accueil',
+    'Turnier nicht gefunden': 'Tournoi introuvable',
+    'Dieses Turnier existiert nicht oder ist nicht öffentlich sichtbar.': 'Ce tournoi n’existe pas ou n’est pas visible publiquement.',
+    'Turnier wird geladen…': 'Chargement du tournoi…',
+    Info: 'Infos',
+    Teilnehmer: 'Participants',
+    Startgeld: 'Frais d’inscription',
+    Kontakt: 'Contact',
+    'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'La liste des participants n’est pas publique pour ce tournoi.',
+    'Teilnehmerliste wird geladen…': 'Chargement de la liste des participants…',
+    'Noch keine Anmeldungen.': 'Pas encore d’inscriptions.',
+    'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
+      'Votre tournoi n’est pas encore chez nous ? Signalez-le ici comme entrée de calendrier avec un lien vers l’inscription externe.',
+    Turniername: 'Nom du tournoi',
+    'Weitere Infos': 'Plus d’infos',
+    'Link zur Website': 'Lien vers le site web',
+    'Flyer-Link (PDF)': 'Lien du flyer (PDF)',
+    'Dein Name': 'Ton nom',
+    'Deine E-Mail': 'Ton e-mail',
+    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'J’ai lu la politique de confidentialité et je l’accepte.',
+    'Turnier-Vorschläge': 'Propositions de tournois',
+    'Keine offenen Vorschläge.': 'Aucune proposition en attente.',
+    Freigeben: 'Approuver',
+    Ablehnen: 'Rejeter',
+    'Turniermeldung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.':
+      'Signalement du tournoi enregistré. Confirme ton adresse e-mail via le lien dans l’e-mail.',
+    'Deine Turniermeldung wurde bestätigt und wartet nun auf Freigabe.':
+      'Ton signalement de tournoi a été confirmé et attend désormais l’approbation.',
+    'Turniermeldung wurde freigegeben.': 'Le signalement du tournoi a été approuvé.',
+    'Turniermeldung wurde abgelehnt.': 'Le signalement du tournoi a été rejeté.',
+    'Turniermeldung wurde gelöscht.': 'Le signalement du tournoi a été supprimé.',
+    'A valid external link is required': 'Un lien valide est requis',
+    'Submitter name must contain at least 2 characters': 'Le nom doit contenir au moins 2 caractères',
+    'A valid submitter email is required': 'Une adresse e-mail valide est requise',
+    'Invalid status': 'Statut invalide',
+    'Tournament tip not found or not pending review': 'Signalement introuvable ou non en attente de validation',
+    'Tournament tip not found': 'Signalement de tournoi introuvable',
+    'Invalid formation': 'Formation invalide',
+    'A valid tournament date is required': 'Une date valide est requise',
+    'Tournament name must contain at least 2 characters': 'Le nom du tournoi doit contenir au moins 2 caractères',
   },
 };
 
@@ -1842,21 +3305,27 @@ function translateDom(language) {
   }
 
   for (const node of nodes) {
-    if (!ORIGINAL_TEXT.has(node)) {
-      ORIGINAL_TEXT.set(node, node.nodeValue);
+    const cached = ORIGINAL_TEXT.get(node);
+    const currentValue = node.nodeValue;
+    if (!cached || (currentValue !== cached.original && currentValue !== cached.translated)) {
+      ORIGINAL_TEXT.set(node, { original: currentValue });
     }
-    const original = ORIGINAL_TEXT.get(node);
-    const source = original.trim();
-    const translated = translateText(source, language);
-    node.nodeValue = original.replace(source, translated);
+    const entry = ORIGINAL_TEXT.get(node);
+    const source = entry.original.trim();
+    const translated = entry.original.replace(source, translateText(source, language));
+    entry.translated = translated;
+    node.nodeValue = translated;
   }
 
   for (const element of root.querySelectorAll('[placeholder]')) {
-    if (!ORIGINAL_TEXT.has(element)) {
-      ORIGINAL_TEXT.set(element, element.getAttribute('placeholder'));
+    const cached = ORIGINAL_TEXT.get(element);
+    const currentValue = element.getAttribute('placeholder');
+    if (!cached || (currentValue !== cached.original && currentValue !== cached.translated)) {
+      ORIGINAL_TEXT.set(element, { original: currentValue });
     }
-    const source = ORIGINAL_TEXT.get(element);
-    const translated = translateText(source, language);
+    const entry = ORIGINAL_TEXT.get(element);
+    const translated = translateText(entry.original, language);
+    entry.translated = translated;
     element.setAttribute('placeholder', translated);
   }
 }

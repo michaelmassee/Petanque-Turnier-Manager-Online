@@ -11,7 +11,8 @@
     "deploy": "npm run build && wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "security:check": "node scripts/security-check.mjs"
+    "security:check": "node scripts/security-check.mjs && node scripts/i18n-check.mjs",
+    "i18n:check": "node scripts/i18n-check.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
