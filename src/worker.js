@@ -20,6 +20,8 @@ const SESSION_COOKIE = 'ptm_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 const RESET_TTL_SECONDS = 60 * 30;
 const EMAIL_VERIFICATION_TTL_SECONDS = 60 * 60 * 24;
+// Changing this invalidates every stored password_hash (verifyPassword re-derives with the
+// current value). Any seeded/test users must be re-hashed and re-seeded after a change.
 const PASSWORD_ITERATIONS = 100000;
 const UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 const SECURITY_HEADERS = {
