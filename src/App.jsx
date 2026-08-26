@@ -2049,7 +2049,7 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
   return (
     <form className="public-registration" onSubmit={onSubmit}>
       <h2>Anmeldung: {tournament.name}</h2>
-      <RegistrationFields form={form} setForm={setForm} showStatus={false} />
+      <RegistrationFields form={form} setForm={setForm} showStatus={false} formation={tournament.formation} />
       <div className="row-actions stretch">
         <Button type="submit">Anmeldung senden</Button>
         <Button variant="secondary" onClick={onCancel}>Abbrechen</Button>
@@ -2136,17 +2136,30 @@ function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete })
 function RegistrationForm({ form, setForm, onSubmit, tournaments, selectedTournamentId, manageMode }) {
   const selectedValue = form.tournamentId || selectedTournamentId;
   const options = tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }));
+  const selectedTournament = tournaments.find((tournament) => tournament.id === selectedValue);
 
   return (
     <form className="form dense" onSubmit={onSubmit}>
       <SelectField label="Turnier" value={selectedValue} onChange={(tournamentId) => setForm({ ...form, tournamentId })} options={options} />
-      <RegistrationFields form={form} setForm={setForm} showStatus={manageMode} />
+      <RegistrationFields form={form} setForm={setForm} showStatus={manageMode} formation={selectedTournament?.formation} />
       <Button type="submit">{form.id ? 'Anmeldung speichern' : 'Anmeldung erfassen'}</Button>
     </form>
   );
 }
 
-function RegistrationFields({ form, setForm, showStatus }) {
+function RegistrationFields({ form, setForm, showStatus, formation }) {
+  const allowsPartner = formation ? formation !== 'tete' : true;
+  const allowsPartner2 = formation === 'triplette';
+
+  useEffect(() => {
+    if (!allowsPartner && (form.partnerFirstName || form.partnerLastName || form.partnerEmail || form.partner2FirstName || form.partner2LastName || form.partner2Email)) {
+      setForm((current) => ({ ...current, partnerFirstName: '', partnerLastName: '', partnerEmail: '', partner2FirstName: '', partner2LastName: '', partner2Email: '' }));
+    } else if (allowsPartner && !allowsPartner2 && (form.partner2FirstName || form.partner2LastName || form.partner2Email)) {
+      setForm((current) => ({ ...current, partner2FirstName: '', partner2LastName: '', partner2Email: '' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowsPartner, allowsPartner2]);
+
   return (
     <>
       <div className="form-grid">
@@ -2159,16 +2172,24 @@ function RegistrationFields({ form, setForm, showStatus }) {
         <TextField label="Lizenznummer" value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
       </div>
       <TextField label="Teamname" value={form.teamName} onChange={(teamName) => setForm({ ...form, teamName })} />
-      <div className="form-grid">
-        <TextField label="Partner Vorname" value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} />
-        <TextField label="Partner Nachname" value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} />
-      </div>
-      <TextField label="Partner E-Mail" type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
-      <div className="form-grid">
-        <TextField label="Partner 2 Vorname" value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} />
-        <TextField label="Partner 2 Nachname" value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} />
-      </div>
-      <TextField label="Partner 2 E-Mail" type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
+      {allowsPartner && (
+        <>
+          <div className="form-grid">
+            <TextField label="Partner Vorname" value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} required minLength={2} />
+            <TextField label="Partner Nachname" value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} required minLength={2} />
+          </div>
+          <TextField label="Partner E-Mail" type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
+        </>
+      )}
+      {allowsPartner2 && (
+        <>
+          <div className="form-grid">
+            <TextField label="Partner 2 Vorname" value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required minLength={2} />
+            <TextField label="Partner 2 Nachname" value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} required minLength={2} />
+          </div>
+          <TextField label="Partner 2 E-Mail" type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
+        </>
+      )}
       {showStatus && (
         <div className="form-grid">
           <TextField label="Setzposition" type="number" min="0" value={form.seedingPosition} onChange={(seedingPosition) => setForm({ ...form, seedingPosition })} />
@@ -3010,6 +3031,10 @@ const TRANSLATIONS = {
     'Tournament tip not found or not pending review': 'Toernooimelding niet gevonden of niet in afwachting',
     'Tournament tip not found': 'Toernooimelding niet gevonden',
     'Invalid formation': 'Ongeldige formatie',
+    'Formation tete allows only a single participant, no partner': 'Formatie tete staat maar een deelnemer toe, geen partner',
+    'Formation doublette requires exactly one partner': 'Formatie doublette vereist precies een partner',
+    'Formation doublette allows only one partner': 'Formatie doublette staat maar een partner toe',
+    'Formation triplette requires exactly two partners': 'Formatie triplette vereist precies twee partners',
     'A valid tournament date is required': 'Een geldige datum is verplicht',
     'Tournament name must contain at least 2 characters': 'Toernooinaam moet minstens 2 tekens bevatten',
     'API-Zugänge': 'API-toegangen',
@@ -3239,6 +3264,10 @@ const TRANSLATIONS = {
     'Tournament tip not found or not pending review': 'Tournament tip not found or not pending review',
     'Tournament tip not found': 'Tournament tip not found',
     'Invalid formation': 'Invalid formation',
+    'Formation tete allows only a single participant, no partner': 'Formation tete allows only a single participant, no partner',
+    'Formation doublette requires exactly one partner': 'Formation doublette requires exactly one partner',
+    'Formation doublette allows only one partner': 'Formation doublette allows only one partner',
+    'Formation triplette requires exactly two partners': 'Formation triplette requires exactly two partners',
     'A valid tournament date is required': 'A valid tournament date is required',
     'Tournament name must contain at least 2 characters': 'Tournament name must contain at least 2 characters',
     'API-Zugänge': 'API access',
@@ -3467,6 +3496,10 @@ const TRANSLATIONS = {
     'Tournament tip not found or not pending review': 'Aviso de torneo no encontrado o no pendiente de revisión',
     'Tournament tip not found': 'Aviso de torneo no encontrado',
     'Invalid formation': 'Formación no válida',
+    'Formation tete allows only a single participant, no partner': 'La formación tete solo admite un participante, sin pareja',
+    'Formation doublette requires exactly one partner': 'La formación doublette requiere exactamente una pareja',
+    'Formation doublette allows only one partner': 'La formación doublette solo admite una pareja',
+    'Formation triplette requires exactly two partners': 'La formación triplette requiere exactamente dos parejas',
     'A valid tournament date is required': 'Se requiere una fecha válida',
     'Tournament name must contain at least 2 characters': 'El nombre del torneo debe tener al menos 2 caracteres',
     'API-Zugänge': 'Accesos API',
@@ -3696,6 +3729,10 @@ const TRANSLATIONS = {
     'Tournament tip not found or not pending review': 'Signalement introuvable ou non en attente de validation',
     'Tournament tip not found': 'Signalement de tournoi introuvable',
     'Invalid formation': 'Formation invalide',
+    'Formation tete allows only a single participant, no partner': 'La formation tete n’autorise qu’un seul participant, sans partenaire',
+    'Formation doublette requires exactly one partner': 'La formation doublette requiert exactement un partenaire',
+    'Formation doublette allows only one partner': 'La formation doublette n’autorise qu’un seul partenaire',
+    'Formation triplette requires exactly two partners': 'La formation triplette requiert exactement deux partenaires',
     'A valid tournament date is required': 'Une date valide est requise',
     'Tournament name must contain at least 2 characters': 'Le nom du tournoi doit contenir au moins 2 caractères',
     'API-Zugänge': 'Accès API',

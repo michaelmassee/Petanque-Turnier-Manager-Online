@@ -954,6 +954,7 @@ async function createRegistration(request, db, tournament) {
 
   const body = await readJson(request);
   const registration = normalizeRegistrationInput(body, { requireStatus: false });
+  assertPartnerCountMatchesFormation(tournament.formation, registration);
   const status = await initialRegistrationStatus(db, tournament);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -998,6 +999,7 @@ async function createRegistration(request, db, tournament) {
 async function updateRegistration(request, db, existing) {
   const body = await readJson(request);
   const registration = normalizeRegistrationInput(body, { requireStatus: true });
+  assertPartnerCountMatchesFormation(existing.formation, registration);
   const now = new Date().toISOString();
   const confirmedAt = registration.status === 'confirmed' ? existing.confirmed_at || now : null;
 
@@ -1502,7 +1504,7 @@ async function getTournamentById(db, id) {
 async function getRegistrationWithTournament(db, id) {
   return db
     .prepare(
-      `SELECT registrations.*, tournaments.created_by, tournaments.manager_id, tournaments.visibility
+      `SELECT registrations.*, tournaments.created_by, tournaments.manager_id, tournaments.visibility, tournaments.formation
        FROM registrations
        JOIN tournaments ON tournaments.id = registrations.tournament_id
        WHERE registrations.id = ?`,
@@ -1768,6 +1770,32 @@ function normalizeRegistrationInput(body, { requireStatus }) {
   }
 
   return registration;
+}
+
+function assertPartnerCountMatchesFormation(formation, registration) {
+  const hasPartner = Boolean(registration.partnerFirstName && registration.partnerLastName);
+  const hasPartner2 = Boolean(registration.partner2FirstName && registration.partner2LastName);
+
+  if (formation === 'tete') {
+    if (hasPartner || hasPartner2) {
+      throw new HttpError(400, 'Formation tete allows only a single participant, no partner');
+    }
+    return;
+  }
+
+  if (formation === 'doublette') {
+    if (!hasPartner) {
+      throw new HttpError(400, 'Formation doublette requires exactly one partner');
+    }
+    if (hasPartner2) {
+      throw new HttpError(400, 'Formation doublette allows only one partner');
+    }
+    return;
+  }
+
+  if (formation === 'triplette' && (!hasPartner || !hasPartner2)) {
+    throw new HttpError(400, 'Formation triplette requires exactly two partners');
+  }
 }
 
 function text(value) {
