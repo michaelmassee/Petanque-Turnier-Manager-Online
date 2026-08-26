@@ -771,6 +771,34 @@ export default function App() {
     );
   }
 
+  if (!needsSetup && path === '/impressum') {
+    return (
+      <ImpressumPage
+        language={language}
+        setLanguage={setLanguage}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        navigate={navigate}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  if (!needsSetup && path === '/datenschutz') {
+    return (
+      <DatenschutzPage
+        language={language}
+        setLanguage={setLanguage}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        navigate={navigate}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
   if (!needsSetup && path === '/turnier-melden') {
     return (
       <SubmitTournamentTipPage
@@ -814,6 +842,7 @@ export default function App() {
           menuOpen={menuOpen}
           onToggleMenu={() => setMenuOpen((open) => !open)}
           onCloseMenu={() => setMenuOpen(false)}
+          navigate={navigate}
         >
           <button
             className="drawer-link"
@@ -896,6 +925,7 @@ export default function App() {
                 form={authForm}
                 setForm={setAuthForm}
                 onSubmit={handleRegister}
+                navigate={navigate}
                 onBack={() => {
                   setAuthView('login');
                   clearFeedback();
@@ -946,6 +976,7 @@ export default function App() {
                 setForm={setRegistrationForm}
                 onSubmit={handleRegistrationSubmit}
                 onCancel={closeAuthModal}
+                navigate={navigate}
               />
             )}
           </AuthModal>
@@ -976,6 +1007,7 @@ export default function App() {
         menuOpen={menuOpen}
         onToggleMenu={() => setMenuOpen((open) => !open)}
         onCloseMenu={() => setMenuOpen(false)}
+        navigate={navigate}
       >
         <div className="drawer-user">
           <span>{currentUser.name}</span>
@@ -1114,6 +1146,7 @@ export default function App() {
               setAuthView('home');
               clearFeedback();
             }}
+            navigate={navigate}
           />
         </AuthModal>
       )}
@@ -1320,13 +1353,19 @@ function LoginForm({ form, setForm, onSubmit, onForgot, onRegister }) {
   );
 }
 
-function RegisterForm({ form, setForm, onSubmit, onBack }) {
+function RegisterForm({ form, setForm, onSubmit, onBack, navigate }) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <TextField label="Passwort" type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required minLength={8} />
       <TextField label="Passwort bestätigen" type="password" value={form.passwordConfirm} onChange={(passwordConfirm) => setForm({ ...form, passwordConfirm })} required minLength={8} />
+      <p className="hint">
+        Mit der Registrierung stimmst du der Verarbeitung deiner Daten gemäß unserer Datenschutzerklärung zu.
+      </p>
+      <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
+        Datenschutzerklärung lesen
+      </button>
       <Button type="submit">Registrieren</Button>
       <button className="link-button" type="button" onClick={onBack}>
         Zurück zur Anmeldung
@@ -1373,7 +1412,7 @@ function VerifyEmailForm({ form, setForm, onSubmit, onBack }) {
   );
 }
 
-function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, children }) {
+function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, children }) {
   return (
     <header className="topbar">
       <div className="brand">
@@ -1403,6 +1442,30 @@ function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onC
             <InstallAppButton />
             <LanguageSelect language={language} setLanguage={setLanguage} />
             {children}
+            {navigate && (
+              <div className="drawer-legal-links">
+                <button
+                  className="link-button"
+                  type="button"
+                  onClick={() => {
+                    onCloseMenu();
+                    navigate('/impressum');
+                  }}
+                >
+                  Impressum
+                </button>
+                <button
+                  className="link-button"
+                  type="button"
+                  onClick={() => {
+                    onCloseMenu();
+                    navigate('/datenschutz');
+                  }}
+                >
+                  Datenschutz
+                </button>
+              </div>
+            )}
           </nav>
         </>
       )}
@@ -1434,6 +1497,7 @@ function StandalonePageHeader({ heading, language, setLanguage, menuOpen, setMen
       menuOpen={menuOpen}
       onToggleMenu={() => setMenuOpen((open) => !open)}
       onCloseMenu={() => setMenuOpen(false)}
+      navigate={navigate}
     >
       <button
         className="drawer-link"
@@ -1609,10 +1673,18 @@ function TournamentDetailPage({
               setForm={setRegistrationForm}
               onSubmit={onSubmitRegistration}
               onCancel={() => navigate(`/turniere/${tournament.id}/info`)}
+              navigate={navigate}
             />
           )}
 
-          {route.view === 'teilnehmer' && canShowParticipants && <TournamentParticipants tournamentId={tournament.id} />}
+          {route.view === 'teilnehmer' && canShowParticipants && (
+            <>
+              <p className="hint">
+                Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.
+              </p>
+              <TournamentParticipants tournamentId={tournament.id} />
+            </>
+          )}
         </div>
       </section>
     </main>
@@ -1788,6 +1860,9 @@ function SubmitTournamentTipPage({ language, setLanguage, menuOpen, setMenuOpen,
               </div>
             </fieldset>
 
+            <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
+              Datenschutzerklärung lesen
+            </button>
             <label className="checkbox-field">
               <input
                 type="checkbox"
@@ -1799,6 +1874,152 @@ function SubmitTournamentTipPage({ language, setLanguage, menuOpen, setMenuOpen,
             </label>
             <Button type="submit">Turnier melden</Button>
           </form>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function ImpressumPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
+  return (
+    <main className="app-shell">
+      <StandalonePageHeader
+        heading="Impressum"
+        language={language}
+        setLanguage={setLanguage}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        navigate={navigate}
+        currentUser={currentUser}
+        onLogout={onLogout}
+      />
+
+      <section className="single-column legal-page">
+        <div className="panel">
+          <h2>Angaben gemäß § 5 DDG</h2>
+          <p>Michael Massee</p>
+          <p>An der Ziegelei 21</p>
+          <p>35440 Linden</p>
+          <p>Deutschland</p>
+
+          <h2>Kontakt</h2>
+          <p>E-Mail: michael.massee@gmail.com</p>
+
+          <h2>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
+          <p>Michael Massee (Anschrift wie oben)</p>
+
+          <h2>Haftung für Inhalte</h2>
+          <p>
+            Turnierdaten, Anmeldungen und Turniermeldungen auf dieser Plattform werden von den jeweiligen Turnierleitern bzw. Nutzern eigenverantwortlich erstellt und gepflegt. Für die Richtigkeit, Vollständigkeit und Aktualität dieser Inhalte sind allein die jeweiligen Turnierleiter bzw. Einsender verantwortlich, nicht der Betreiber dieser Plattform.
+          </p>
+          <p>
+            Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Bei Bekanntwerden entsprechender Rechtsverletzungen werden wir die betroffenen Inhalte umgehend entfernen.
+          </p>
+
+          <h2>Haftung für Links</h2>
+          <p>
+            Turniermeldungen können Links zu externen Websites Dritter enthalten, etwa zu Anmeldeseiten der jeweiligen Veranstalter, auf deren Inhalte wir keinen Einfluss haben. Für diese fremden Inhalte können wir daher keine Gewähr übernehmen; für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich. Eine permanente inhaltliche Kontrolle der verlinkten Seiten ist ohne konkrete Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend entfernen.
+          </p>
+
+          <h2>Hinweis</h2>
+          <p>
+            Dieses Angebot wird als nicht-kommerzielles Privatprojekt betrieben. Es werden keine Waren oder Dienstleistungen gegen Entgelt über diese Website angeboten oder abgewickelt.
+          </p>
+
+          <h2>Streitschlichtung</h2>
+          <p>
+            Als Privatperson bieten wir kein kommerzielles Angebot an und nehmen daher nicht an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teil.
+          </p>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
+  return (
+    <main className="app-shell">
+      <StandalonePageHeader
+        heading="Datenschutzerklärung"
+        language={language}
+        setLanguage={setLanguage}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        navigate={navigate}
+        currentUser={currentUser}
+        onLogout={onLogout}
+      />
+
+      <section className="single-column legal-page">
+        <div className="panel">
+          <h2>1. Verantwortlicher</h2>
+          <p>Verantwortlich für die Datenverarbeitung auf dieser Website ist:</p>
+          <p>Michael Massee, An der Ziegelei 21, 35440 Linden, E-Mail: michael.massee@gmail.com</p>
+
+          <h2>2. Allgemeines zur Datenverarbeitung</h2>
+          <p>
+            Wir verarbeiten personenbezogene Daten unserer Nutzer grundsätzlich nur, soweit dies zur Bereitstellung einer funktionsfähigen Website sowie unserer Inhalte und Leistungen erforderlich ist.
+          </p>
+          <p>
+            Rechtsgrundlage ist, je nach Verarbeitungsvorgang, die Erfüllung eines Vertrags bzw. vorvertraglicher Maßnahmen (Art. 6 Abs. 1 lit. b DSGVO), eine erteilte Einwilligung (Art. 6 Abs. 1 lit. a DSGVO) oder unser berechtigtes Interesse an einem sicheren und funktionsfähigen Betrieb der Website (Art. 6 Abs. 1 lit. f DSGVO).
+          </p>
+
+          <h2>3. Bereitstellung der Website und Hosting</h2>
+          <p>
+            Diese Website wird über Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, USA) als Hosting- und Content-Delivery-Anbieter bereitgestellt. Cloudflare verarbeitet dabei technisch notwendige Daten wie IP-Adresse, Datum und Uhrzeit der Anfrage sowie Browser-Informationen (Server-Logfiles), um die Website sicher und zuverlässig auszuliefern (Art. 6 Abs. 1 lit. f DSGVO).
+          </p>
+          <p>
+            Da Cloudflare auch Server außerhalb der EU nutzen kann, erfolgt die Datenübermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.
+          </p>
+
+          <h2>4. Registrierung und Benutzerkonto</h2>
+          <p>
+            Wenn du dich als Turnierleiter oder Administrator registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.
+          </p>
+
+          <h2>5. Turnieranmeldungen und öffentliche Teilnehmerlisten</h2>
+          <p>
+            Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).
+          </p>
+          <p>
+            Turnierleiter können die Teilnehmerliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.
+          </p>
+
+          <h2>6. Turniermeldungen</h2>
+          <p>
+            Wenn du ein fremdes Turnier zur Veröffentlichung vorschlägst, verarbeiten wir deinen Namen und deine E-Mail-Adresse zur Rückfrage und Bestätigung sowie zur Moderation durch unsere Administratoren (Art. 6 Abs. 1 lit. a, lit. f DSGVO).
+          </p>
+
+          <h2>7. Cookies und lokaler Speicher</h2>
+          <p>
+            Diese Website verwendet ein technisch notwendiges Session-Cookie (ptm_session), um dich nach der Anmeldung für bis zu 14 Tage eingeloggt zu halten. Das Cookie ist HttpOnly, Secure und SameSite=Lax gesetzt und wird ausschließlich für den Login-Status verwendet. Da dieses Cookie technisch notwendig ist, ist gemäß § 25 Abs. 2 TTDSG keine Einwilligung erforderlich.
+          </p>
+          <p>
+            Zusätzlich speichern wir deine gewählte Sprache in deinem Browser (localStorage), um sie bei deinem nächsten Besuch beizubehalten. Diese Daten verlassen dein Gerät nicht.
+          </p>
+          <p>Wir setzen keine Analyse-, Marketing- oder Tracking-Cookies ein.</p>
+
+          <h2>8. Versand von E-Mails</h2>
+          <p>
+            Für den Versand von Bestätigungs-, Registrierungs- und Passwort-Zurücksetzen-E-Mails nutzen wir den Dienst Resend (Resend, Inc., USA). Hierbei werden die E-Mail-Adresse sowie der jeweilige E-Mail-Inhalt an Resend übermittelt (Art. 6 Abs. 1 lit. b DSGVO). Auch hier erfolgt die Übermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.
+          </p>
+
+          <h2>9. Speicherdauer</h2>
+          <p>
+            Bestätigungslinks für die E-Mail-Verifizierung und Turniermeldungen sind 24 Stunden gültig, Links zum Zurücksetzen des Passworts 30 Minuten. Danach werden die zugehörigen Token automatisch gelöscht. Benutzerkonten und Turnieranmeldungen speichern wir, solange dein Konto besteht bzw. das Turnier organisiert wird, oder bis du eine Löschung beantragst.
+          </p>
+
+          <h2>10. Deine Rechte</h2>
+          <p>
+            Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16 DSGVO), Löschung (Art. 17 DSGVO), Einschränkung der Verarbeitung (Art. 18 DSGVO), Datenübertragbarkeit (Art. 20 DSGVO) sowie Widerspruch gegen die Verarbeitung (Art. 21 DSGVO). Eine erteilte Einwilligung kannst du jederzeit mit Wirkung für die Zukunft widerrufen (Art. 7 Abs. 3 DSGVO).
+          </p>
+          <p>Bitte wende dich hierfür an: michael.massee@gmail.com</p>
+          <p>
+            Außerdem hast du das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren, zum Beispiel beim Hessischen Beauftragten für Datenschutz und Informationsfreiheit.
+          </p>
+
+          <h2>11. Stand</h2>
+          <p>Diese Datenschutzerklärung wurde zuletzt am 26. August 2026 aktualisiert.</p>
         </div>
       </section>
     </main>
@@ -2045,10 +2266,16 @@ function HomeTournaments({
   );
 }
 
-function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel }) {
+function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate }) {
   return (
     <form className="public-registration" onSubmit={onSubmit}>
       <h2>Anmeldung: {tournament.name}</h2>
+      <p className="hint">
+        Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.
+      </p>
+      <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
+        Datenschutzerklärung lesen
+      </button>
       <RegistrationFields form={form} setForm={setForm} showStatus={false} formation={tournament.formation} />
       <div className="row-actions stretch">
         <Button type="submit">Anmeldung senden</Button>
@@ -3056,6 +3283,80 @@ const TRANSLATIONS = {
     'API-Schlüssel wirklich widerrufen?': 'API-sleutel echt intrekken?',
     Ausstehend: 'In behandeling',
     Freigeschaltet: 'Goedgekeurd',
+    Impressum: 'Colofon',
+    Datenschutz: 'Privacy',
+    'Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.':
+      'Deze deelnemerslijst is openbaar zichtbaar en kan zonder aanmelding worden bekeken. Wie hier niet vermeld wil worden, neemt contact op met de organisator van dit toernooi.',
+    'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
+      'Let op: bij inschrijving via dit platform kunnen je naam en eventueel vereniging, teamnaam en de namen van je partner(s) op de openbare toernooipagina worden gepubliceerd, als de organisator de deelnemerslijst openbaar zichtbaar maakt. Wie dat niet wil, neemt rechtstreeks contact op met de organisator van dit toernooi – de contactgegevens vind je op de toernooipagina.',
+    'Datenschutzerklärung lesen': 'Privacybeleid lezen',
+    'Mit der Registrierung stimmst du der Verarbeitung deiner Daten gemäß unserer Datenschutzerklärung zu.':
+      'Met de registratie ga je akkoord met de verwerking van je gegevens conform ons privacybeleid.',
+    'Angaben gemäß § 5 DDG': 'Gegevens conform § 5 DDG (Duitse wet digitale diensten)',
+    Deutschland: 'Duitsland',
+    'E-Mail: michael.massee@gmail.com': 'E-mail: michael.massee@gmail.com',
+    'Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV': 'Verantwoordelijk voor de inhoud conform § 18 lid 2 MStV (Duits mediastaatsverdrag)',
+    'Michael Massee (Anschrift wie oben)': 'Michael Massee (adres zoals hierboven)',
+    'Haftung für Inhalte': 'Aansprakelijkheid voor inhoud',
+    'Turnierdaten, Anmeldungen und Turniermeldungen auf dieser Plattform werden von den jeweiligen Turnierleitern bzw. Nutzern eigenverantwortlich erstellt und gepflegt. Für die Richtigkeit, Vollständigkeit und Aktualität dieser Inhalte sind allein die jeweiligen Turnierleiter bzw. Einsender verantwortlich, nicht der Betreiber dieser Plattform.':
+      'Toernooigegevens, inschrijvingen en toernooimeldingen op dit platform worden door de betreffende toernooileiders resp. gebruikers op eigen verantwoordelijkheid aangemaakt en onderhouden. Voor de juistheid, volledigheid en actualiteit van deze inhoud zijn uitsluitend de betreffende toernooileiders resp. inzenders verantwoordelijk, niet de beheerder van dit platform.',
+    'Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Bei Bekanntwerden entsprechender Rechtsverletzungen werden wir die betroffenen Inhalte umgehend entfernen.':
+      'Als dienstverlener zijn wij conform § 7 lid 1 DDG verantwoordelijk voor eigen inhoud op deze pagina\'s volgens de algemene wetten. Conform §§ 8 tot 10 DDG zijn wij echter niet verplicht om doorgegeven of opgeslagen informatie van derden te controleren of te onderzoeken op omstandigheden die op onrechtmatige activiteiten wijzen. Zodra wij kennis krijgen van dergelijke inbreuken, verwijderen wij de betreffende inhoud onmiddellijk.',
+    'Haftung für Links': 'Aansprakelijkheid voor links',
+    'Turniermeldungen können Links zu externen Websites Dritter enthalten, etwa zu Anmeldeseiten der jeweiligen Veranstalter, auf deren Inhalte wir keinen Einfluss haben. Für diese fremden Inhalte können wir daher keine Gewähr übernehmen; für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich. Eine permanente inhaltliche Kontrolle der verlinkten Seiten ist ohne konkrete Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend entfernen.':
+      'Toernooimeldingen kunnen links naar externe websites van derden bevatten, bijvoorbeeld naar inschrijfpagina\'s van de betreffende organisatoren, waarop wij geen invloed hebben. Voor deze externe inhoud kunnen wij daarom geen garantie geven; voor de inhoud van de gelinkte pagina\'s is steeds de betreffende aanbieder of beheerder verantwoordelijk. Een permanente inhoudelijke controle van de gelinkte pagina\'s is zonder concrete aanwijzingen van een inbreuk niet redelijk. Zodra wij kennis krijgen van inbreuken, verwijderen wij dergelijke links onmiddellijk.',
+    Hinweis: 'Let op',
+    'Dieses Angebot wird als nicht-kommerzielles Privatprojekt betrieben. Es werden keine Waren oder Dienstleistungen gegen Entgelt über diese Website angeboten oder abgewickelt.':
+      'Dit aanbod wordt als niet-commercieel privéproject beheerd. Er worden via deze website geen goederen of diensten tegen betaling aangeboden of afgehandeld.',
+    Streitschlichtung: 'Geschillenbeslechting',
+    'Als Privatperson bieten wir kein kommerzielles Angebot an und nehmen daher nicht an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teil.':
+      'Als privépersoon bieden wij geen commercieel aanbod aan en nemen wij daarom niet deel aan geschillenbeslechtingsprocedures voor een consumentengeschillencommissie.',
+    Datenschutzerklärung: 'Privacybeleid',
+    '1. Verantwortlicher': '1. Verwerkingsverantwoordelijke',
+    'Verantwortlich für die Datenverarbeitung auf dieser Website ist:': 'Verantwoordelijk voor de gegevensverwerking op deze website is:',
+    'Michael Massee, An der Ziegelei 21, 35440 Linden, E-Mail: michael.massee@gmail.com':
+      'Michael Massee, An der Ziegelei 21, 35440 Linden, e-mail: michael.massee@gmail.com',
+    '2. Allgemeines zur Datenverarbeitung': '2. Algemeen over gegevensverwerking',
+    'Wir verarbeiten personenbezogene Daten unserer Nutzer grundsätzlich nur, soweit dies zur Bereitstellung einer funktionsfähigen Website sowie unserer Inhalte und Leistungen erforderlich ist.':
+      'Wij verwerken persoonsgegevens van onze gebruikers in principe alleen voor zover dit nodig is om een functionerende website en onze inhoud en diensten aan te bieden.',
+    'Rechtsgrundlage ist, je nach Verarbeitungsvorgang, die Erfüllung eines Vertrags bzw. vorvertraglicher Maßnahmen (Art. 6 Abs. 1 lit. b DSGVO), eine erteilte Einwilligung (Art. 6 Abs. 1 lit. a DSGVO) oder unser berechtigtes Interesse an einem sicheren und funktionsfähigen Betrieb der Website (Art. 6 Abs. 1 lit. f DSGVO).':
+      'Rechtsgrondslag is, afhankelijk van de verwerking, de uitvoering van een overeenkomst resp. precontractuele maatregelen (art. 6 lid 1 sub b AVG), een gegeven toestemming (art. 6 lid 1 sub a AVG) of ons gerechtvaardigd belang bij een veilige en functionerende werking van de website (art. 6 lid 1 sub f AVG).',
+    '3. Bereitstellung der Website und Hosting': '3. Beschikbaarstelling van de website en hosting',
+    'Diese Website wird über Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, USA) als Hosting- und Content-Delivery-Anbieter bereitgestellt. Cloudflare verarbeitet dabei technisch notwendige Daten wie IP-Adresse, Datum und Uhrzeit der Anfrage sowie Browser-Informationen (Server-Logfiles), um die Website sicher und zuverlässig auszuliefern (Art. 6 Abs. 1 lit. f DSGVO).':
+      'Deze website wordt gehost via Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, VS) als hosting- en content-delivery-provider. Cloudflare verwerkt daarbij technisch noodzakelijke gegevens zoals IP-adres, datum en tijdstip van het verzoek en browserinformatie (serverlogbestanden), om de website veilig en betrouwbaar te leveren (art. 6 lid 1 sub f AVG).',
+    'Da Cloudflare auch Server außerhalb der EU nutzen kann, erfolgt die Datenübermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
+      'Omdat Cloudflare ook servers buiten de EU kan gebruiken, vindt de gegevensoverdracht plaats op basis van EU-standaardcontractbepalingen conform art. 46 AVG.',
+    '4. Registrierung und Benutzerkonto': '4. Registratie en gebruikersaccount',
+    'Wenn du dich als Turnierleiter oder Administrator registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
+      'Wanneer je je als toernooileider of beheerder registreert, verzamelen wij naam, e-mailadres en een veilig gehasht wachtwoord. Deze gegevens worden verwerkt om je gebruikersaccount aan te bieden en je toernooien te beheren (art. 6 lid 1 sub b AVG). Na de registratie sturen we je ter bevestiging van je e-mailadres een e-mail met een 24 uur geldige bevestigingslink.',
+    '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Toernooi-inschrijvingen en openbare deelnemerslijsten',
+    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
+      'Wanneer je je via deze website voor een toernooi inschrijft, verwerken wij voornaam, achternaam, e-mailadres en optioneel vereniging, licentienummer en gegevens over je partner(s) (doublette/triplette). Deze gegevens worden doorgegeven aan de betreffende toernooileider voor de organisatie van het toernooi (art. 6 lid 1 sub b AVG).',
+    'Turnierleiter können die Teilnehmerliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.':
+      'Toernooileiders kunnen de deelnemerslijst van een toernooi openbaar zichtbaar maken. In dat geval zijn voornaam, achternaam, vereniging en de namen van je partner(s) zichtbaar voor elke bezoeker van de toernooipagina, zonder dat aanmelding vereist is. Als je dit niet wilt, neem dan rechtstreeks contact op met de organisator (toernooileider) van het betreffende toernooi, wiens contactgegevens op de toernooipagina staan vermeld.',
+    '6. Turniermeldungen': '6. Toernooimeldingen',
+    'Wenn du ein fremdes Turnier zur Veröffentlichung vorschlägst, verarbeiten wir deinen Namen und deine E-Mail-Adresse zur Rückfrage und Bestätigung sowie zur Moderation durch unsere Administratoren (Art. 6 Abs. 1 lit. a, lit. f DSGVO).':
+      'Wanneer je een extern toernooi voordraagt voor publicatie, verwerken wij je naam en e-mailadres voor terugvragen en bevestiging, alsook voor moderatie door onze beheerders (art. 6 lid 1 sub a, sub f AVG).',
+    '7. Cookies und lokaler Speicher': '7. Cookies en lokale opslag',
+    'Diese Website verwendet ein technisch notwendiges Session-Cookie (ptm_session), um dich nach der Anmeldung für bis zu 14 Tage eingeloggt zu halten. Das Cookie ist HttpOnly, Secure und SameSite=Lax gesetzt und wird ausschließlich für den Login-Status verwendet. Da dieses Cookie technisch notwendig ist, ist gemäß § 25 Abs. 2 TTDSG keine Einwilligung erforderlich.':
+      'Deze website gebruikt een technisch noodzakelijk sessiecookie (ptm_session) om je na het inloggen tot 14 dagen ingelogd te houden. Het cookie is HttpOnly, Secure en SameSite=Lax ingesteld en wordt uitsluitend gebruikt voor de inlogstatus. Omdat dit cookie technisch noodzakelijk is, is conform § 25 lid 2 TTDSG (Duitse telecommunicatie- en telemediagegevensbeschermingswet) geen toestemming vereist.',
+    'Zusätzlich speichern wir deine gewählte Sprache in deinem Browser (localStorage), um sie bei deinem nächsten Besuch beizubehalten. Diese Daten verlassen dein Gerät nicht.':
+      'Daarnaast slaan we je gekozen taal op in je browser (localStorage), zodat deze bij je volgende bezoek behouden blijft. Deze gegevens verlaten je apparaat niet.',
+    'Wir setzen keine Analyse-, Marketing- oder Tracking-Cookies ein.': 'Wij gebruiken geen analyse-, marketing- of trackingcookies.',
+    '8. Versand von E-Mails': '8. Verzending van e-mails',
+    'Für den Versand von Bestätigungs-, Registrierungs- und Passwort-Zurücksetzen-E-Mails nutzen wir den Dienst Resend (Resend, Inc., USA). Hierbei werden die E-Mail-Adresse sowie der jeweilige E-Mail-Inhalt an Resend übermittelt (Art. 6 Abs. 1 lit. b DSGVO). Auch hier erfolgt die Übermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
+      'Voor het verzenden van bevestigings-, registratie- en wachtwoord-resetmails gebruiken we de dienst Resend (Resend, Inc., VS). Hierbij worden het e-mailadres en de betreffende e-mailinhoud aan Resend doorgegeven (art. 6 lid 1 sub b AVG). Ook hier vindt de doorgifte plaats op basis van EU-standaardcontractbepalingen conform art. 46 AVG.',
+    '9. Speicherdauer': '9. Bewaartermijn',
+    'Bestätigungslinks für die E-Mail-Verifizierung und Turniermeldungen sind 24 Stunden gültig, Links zum Zurücksetzen des Passworts 30 Minuten. Danach werden die zugehörigen Token automatisch gelöscht. Benutzerkonten und Turnieranmeldungen speichern wir, solange dein Konto besteht bzw. das Turnier organisiert wird, oder bis du eine Löschung beantragst.':
+      'Bevestigingslinks voor e-mailverificatie en toernooimeldingen zijn 24 uur geldig, links voor het resetten van je wachtwoord 30 minuten. Daarna worden de bijbehorende tokens automatisch verwijderd. Gebruikersaccounts en toernooi-inschrijvingen bewaren we zolang je account bestaat resp. het toernooi wordt georganiseerd, of totdat je verwijdering aanvraagt.',
+    '10. Deine Rechte': '10. Jouw rechten',
+    'Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16 DSGVO), Löschung (Art. 17 DSGVO), Einschränkung der Verarbeitung (Art. 18 DSGVO), Datenübertragbarkeit (Art. 20 DSGVO) sowie Widerspruch gegen die Verarbeitung (Art. 21 DSGVO). Eine erteilte Einwilligung kannst du jederzeit mit Wirkung für die Zukunft widerrufen (Art. 7 Abs. 3 DSGVO).':
+      'Je hebt recht op inzage (art. 15 AVG), rectificatie (art. 16 AVG), verwijdering (art. 17 AVG), beperking van de verwerking (art. 18 AVG), gegevensoverdraagbaarheid (art. 20 AVG) en bezwaar tegen de verwerking (art. 21 AVG). Een gegeven toestemming kun je te allen tijde met werking voor de toekomst intrekken (art. 7 lid 3 AVG).',
+    'Bitte wende dich hierfür an: michael.massee@gmail.com': 'Neem hiervoor contact op met: michael.massee@gmail.com',
+    'Außerdem hast du das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren, zum Beispiel beim Hessischen Beauftragten für Datenschutz und Informationsfreiheit.':
+      'Daarnaast heb je het recht om een klacht in te dienen bij een toezichthoudende autoriteit voor gegevensbescherming, bijvoorbeeld bij de Hessische functionaris voor gegevensbescherming en informatievrijheid.',
+    '11. Stand': '11. Datum',
+    'Diese Datenschutzerklärung wurde zuletzt am 26. August 2026 aktualisiert.': 'Dit privacybeleid is voor het laatst bijgewerkt op 26 augustus 2026.',
   },
   en: {
     'App wird geladen.': 'App is loading.',
@@ -3289,6 +3590,80 @@ const TRANSLATIONS = {
     'API-Schlüssel wirklich widerrufen?': 'Really revoke this API key?',
     Ausstehend: 'Pending',
     Freigeschaltet: 'Approved',
+    Impressum: 'Legal Notice',
+    Datenschutz: 'Privacy',
+    'Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.':
+      'This participant list is publicly visible and can be viewed without logging in. If you do not want to be listed here, please contact the organizer of this tournament directly.',
+    'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
+      'Note: When registering via this platform, your name and, where applicable, club, team name and the names of your partner(s) may be published on the public tournament page if the organizer makes the participant list publicly visible. If you do not want this, please contact the organizer of this tournament directly – contact details can be found on the tournament page.',
+    'Datenschutzerklärung lesen': 'Read privacy policy',
+    'Mit der Registrierung stimmst du der Verarbeitung deiner Daten gemäß unserer Datenschutzerklärung zu.':
+      'By registering, you agree to the processing of your data in accordance with our privacy policy.',
+    'Angaben gemäß § 5 DDG': 'Information according to § 5 DDG (German Digital Services Act)',
+    Deutschland: 'Germany',
+    'E-Mail: michael.massee@gmail.com': 'Email: michael.massee@gmail.com',
+    'Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV': 'Responsible for content according to § 18 (2) MStV (German Interstate Media Treaty)',
+    'Michael Massee (Anschrift wie oben)': 'Michael Massee (address as above)',
+    'Haftung für Inhalte': 'Liability for content',
+    'Turnierdaten, Anmeldungen und Turniermeldungen auf dieser Plattform werden von den jeweiligen Turnierleitern bzw. Nutzern eigenverantwortlich erstellt und gepflegt. Für die Richtigkeit, Vollständigkeit und Aktualität dieser Inhalte sind allein die jeweiligen Turnierleiter bzw. Einsender verantwortlich, nicht der Betreiber dieser Plattform.':
+      'Tournament data, registrations and tournament submissions on this platform are created and maintained independently by the respective tournament organizers or users. The respective tournament organizers or submitters, not the operator of this platform, are solely responsible for the accuracy, completeness and timeliness of this content.',
+    'Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Bei Bekanntwerden entsprechender Rechtsverletzungen werden wir die betroffenen Inhalte umgehend entfernen.':
+      'As a service provider, we are responsible for our own content on these pages under general law pursuant to § 7 (1) DDG. However, pursuant to §§ 8 to 10 DDG, we are not obligated to monitor transmitted or stored third-party information or to investigate circumstances that indicate unlawful activity. Upon becoming aware of any such infringements, we will remove the affected content immediately.',
+    'Haftung für Links': 'Liability for links',
+    'Turniermeldungen können Links zu externen Websites Dritter enthalten, etwa zu Anmeldeseiten der jeweiligen Veranstalter, auf deren Inhalte wir keinen Einfluss haben. Für diese fremden Inhalte können wir daher keine Gewähr übernehmen; für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich. Eine permanente inhaltliche Kontrolle der verlinkten Seiten ist ohne konkrete Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend entfernen.':
+      'Tournament submissions may contain links to external third-party websites, such as registration pages of the respective organizers, over whose content we have no influence. We therefore cannot accept any liability for this third-party content; the respective provider or operator of the linked pages is always responsible for their content. Permanent monitoring of the content of linked pages is not reasonable without concrete evidence of an infringement. Upon becoming aware of any infringements, we will remove such links immediately.',
+    Hinweis: 'Notice',
+    'Dieses Angebot wird als nicht-kommerzielles Privatprojekt betrieben. Es werden keine Waren oder Dienstleistungen gegen Entgelt über diese Website angeboten oder abgewickelt.':
+      'This offering is operated as a non-commercial private project. No goods or services are offered or processed for payment via this website.',
+    Streitschlichtung: 'Dispute resolution',
+    'Als Privatperson bieten wir kein kommerzielles Angebot an und nehmen daher nicht an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teil.':
+      'As a private individual, we do not offer any commercial services and therefore do not participate in dispute resolution proceedings before a consumer arbitration board.',
+    Datenschutzerklärung: 'Privacy Policy',
+    '1. Verantwortlicher': '1. Controller',
+    'Verantwortlich für die Datenverarbeitung auf dieser Website ist:': 'The controller responsible for data processing on this website is:',
+    'Michael Massee, An der Ziegelei 21, 35440 Linden, E-Mail: michael.massee@gmail.com':
+      'Michael Massee, An der Ziegelei 21, 35440 Linden, Germany, email: michael.massee@gmail.com',
+    '2. Allgemeines zur Datenverarbeitung': '2. General information on data processing',
+    'Wir verarbeiten personenbezogene Daten unserer Nutzer grundsätzlich nur, soweit dies zur Bereitstellung einer funktionsfähigen Website sowie unserer Inhalte und Leistungen erforderlich ist.':
+      "We generally only process our users' personal data to the extent necessary to provide a functional website and our content and services.",
+    'Rechtsgrundlage ist, je nach Verarbeitungsvorgang, die Erfüllung eines Vertrags bzw. vorvertraglicher Maßnahmen (Art. 6 Abs. 1 lit. b DSGVO), eine erteilte Einwilligung (Art. 6 Abs. 1 lit. a DSGVO) oder unser berechtigtes Interesse an einem sicheren und funktionsfähigen Betrieb der Website (Art. 6 Abs. 1 lit. f DSGVO).':
+      'Depending on the processing operation, the legal basis is the performance of a contract or pre-contractual measures (Art. 6(1)(b) GDPR), consent given (Art. 6(1)(a) GDPR), or our legitimate interest in the secure and functional operation of the website (Art. 6(1)(f) GDPR).',
+    '3. Bereitstellung der Website und Hosting': '3. Provision of the website and hosting',
+    'Diese Website wird über Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, USA) als Hosting- und Content-Delivery-Anbieter bereitgestellt. Cloudflare verarbeitet dabei technisch notwendige Daten wie IP-Adresse, Datum und Uhrzeit der Anfrage sowie Browser-Informationen (Server-Logfiles), um die Website sicher und zuverlässig auszuliefern (Art. 6 Abs. 1 lit. f DSGVO).':
+      'This website is provided via Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, USA) as our hosting and content delivery provider. Cloudflare processes technically necessary data such as IP address, date and time of the request, and browser information (server log files) in order to deliver the website securely and reliably (Art. 6(1)(f) GDPR).',
+    'Da Cloudflare auch Server außerhalb der EU nutzen kann, erfolgt die Datenübermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
+      'Since Cloudflare may also use servers outside the EU, data transfer takes place on the basis of EU Standard Contractual Clauses pursuant to Art. 46 GDPR.',
+    '4. Registrierung und Benutzerkonto': '4. Registration and user account',
+    'Wenn du dich als Turnierleiter oder Administrator registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
+      'If you register as a tournament organizer or administrator, we collect your name, email address and a securely hashed password. This data is processed to provide your user account and to manage your tournaments (Art. 6(1)(b) GDPR). After registration, we send you an email with a confirmation link valid for 24 hours to verify your email address.',
+    '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Tournament registrations and public participant lists',
+    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
+      'If you register for a tournament via this website, we process your first name, last name, email address, and optionally club, license number, and details about your partner(s) (doublette/triplette). This data is passed on to the respective tournament organizer for the purpose of organizing the tournament (Art. 6(1)(b) GDPR).',
+    'Turnierleiter können die Teilnehmerliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.':
+      "Tournament organizers can make a tournament's participant list publicly visible. In this case, the first name, last name, club and the names of your partner(s) are visible to every visitor of the tournament page, without requiring login. If you do not want this, please contact the organizer (tournament director) of the respective tournament directly; their contact details are provided on the tournament page.",
+    '6. Turniermeldungen': '6. Tournament submissions',
+    'Wenn du ein fremdes Turnier zur Veröffentlichung vorschlägst, verarbeiten wir deinen Namen und deine E-Mail-Adresse zur Rückfrage und Bestätigung sowie zur Moderation durch unsere Administratoren (Art. 6 Abs. 1 lit. a, lit. f DSGVO).':
+      'If you submit a third-party tournament for publication, we process your name and email address to follow up and confirm the submission, as well as for moderation by our administrators (Art. 6(1)(a), (f) GDPR).',
+    '7. Cookies und lokaler Speicher': '7. Cookies and local storage',
+    'Diese Website verwendet ein technisch notwendiges Session-Cookie (ptm_session), um dich nach der Anmeldung für bis zu 14 Tage eingeloggt zu halten. Das Cookie ist HttpOnly, Secure und SameSite=Lax gesetzt und wird ausschließlich für den Login-Status verwendet. Da dieses Cookie technisch notwendig ist, ist gemäß § 25 Abs. 2 TTDSG keine Einwilligung erforderlich.':
+      'This website uses a technically necessary session cookie (ptm_session) to keep you logged in for up to 14 days after login. The cookie is set as HttpOnly, Secure and SameSite=Lax and is used exclusively for the login status. As this cookie is technically necessary, no consent is required pursuant to § 25(2) TTDSG (German Telecommunications and Telemedia Data Protection Act).',
+    'Zusätzlich speichern wir deine gewählte Sprache in deinem Browser (localStorage), um sie bei deinem nächsten Besuch beizubehalten. Diese Daten verlassen dein Gerät nicht.':
+      'In addition, we store your selected language in your browser (localStorage) so it is retained on your next visit. This data does not leave your device.',
+    'Wir setzen keine Analyse-, Marketing- oder Tracking-Cookies ein.': 'We do not use any analytics, marketing or tracking cookies.',
+    '8. Versand von E-Mails': '8. Sending emails',
+    'Für den Versand von Bestätigungs-, Registrierungs- und Passwort-Zurücksetzen-E-Mails nutzen wir den Dienst Resend (Resend, Inc., USA). Hierbei werden die E-Mail-Adresse sowie der jeweilige E-Mail-Inhalt an Resend übermittelt (Art. 6 Abs. 1 lit. b DSGVO). Auch hier erfolgt die Übermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
+      'We use the service Resend (Resend, Inc., USA) to send confirmation, registration and password-reset emails. In doing so, the email address and the respective email content are transmitted to Resend (Art. 6(1)(b) GDPR). Here too, transmission takes place on the basis of EU Standard Contractual Clauses pursuant to Art. 46 GDPR.',
+    '9. Speicherdauer': '9. Storage period',
+    'Bestätigungslinks für die E-Mail-Verifizierung und Turniermeldungen sind 24 Stunden gültig, Links zum Zurücksetzen des Passworts 30 Minuten. Danach werden die zugehörigen Token automatisch gelöscht. Benutzerkonten und Turnieranmeldungen speichern wir, solange dein Konto besteht bzw. das Turnier organisiert wird, oder bis du eine Löschung beantragst.':
+      'Confirmation links for email verification and tournament submissions are valid for 24 hours, password reset links for 30 minutes. After that, the associated tokens are automatically deleted. We store user accounts and tournament registrations for as long as your account exists or the tournament is being organized, or until you request deletion.',
+    '10. Deine Rechte': '10. Your rights',
+    'Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16 DSGVO), Löschung (Art. 17 DSGVO), Einschränkung der Verarbeitung (Art. 18 DSGVO), Datenübertragbarkeit (Art. 20 DSGVO) sowie Widerspruch gegen die Verarbeitung (Art. 21 DSGVO). Eine erteilte Einwilligung kannst du jederzeit mit Wirkung für die Zukunft widerrufen (Art. 7 Abs. 3 DSGVO).':
+      'You have the right to access (Art. 15 GDPR), rectification (Art. 16 GDPR), erasure (Art. 17 GDPR), restriction of processing (Art. 18 GDPR), data portability (Art. 20 GDPR), and objection to processing (Art. 21 GDPR). You can withdraw any consent given at any time with effect for the future (Art. 7(3) GDPR).',
+    'Bitte wende dich hierfür an: michael.massee@gmail.com': 'Please contact us at: michael.massee@gmail.com',
+    'Außerdem hast du das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren, zum Beispiel beim Hessischen Beauftragten für Datenschutz und Informationsfreiheit.':
+      'You also have the right to lodge a complaint with a data protection supervisory authority, for example the Hessian Commissioner for Data Protection and Freedom of Information.',
+    '11. Stand': '11. Last updated',
+    'Diese Datenschutzerklärung wurde zuletzt am 26. August 2026 aktualisiert.': 'This privacy policy was last updated on 26 August 2026.',
   },
   es: {
     'App wird geladen.': 'La app se está cargando.',
@@ -3521,6 +3896,80 @@ const TRANSLATIONS = {
     'API-Schlüssel wirklich widerrufen?': 'Revocar realmente esta clave API?',
     Ausstehend: 'Pendiente',
     Freigeschaltet: 'Aprobada',
+    Impressum: 'Aviso legal',
+    Datenschutz: 'Privacidad',
+    'Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.':
+      'Esta lista de participantes es visible públicamente y se puede consultar sin necesidad de iniciar sesión. Quien no desee aparecer aquí debe ponerse en contacto directamente con el organizador de este torneo.',
+    'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
+      'Aviso: al inscribirte a través de esta plataforma, tu nombre y, en su caso, el club, el nombre del equipo y los nombres de tu(s) compañero(s) pueden publicarse en la página pública del torneo si el organizador hace visible la lista de participantes. Si no lo deseas, ponte en contacto directamente con el organizador de este torneo; los datos de contacto están disponibles en la página del torneo.',
+    'Datenschutzerklärung lesen': 'Leer política de privacidad',
+    'Mit der Registrierung stimmst du der Verarbeitung deiner Daten gemäß unserer Datenschutzerklärung zu.':
+      'Al registrarte, aceptas el tratamiento de tus datos conforme a nuestra política de privacidad.',
+    'Angaben gemäß § 5 DDG': 'Información conforme al § 5 DDG (Ley alemana de servicios digitales)',
+    Deutschland: 'Alemania',
+    'E-Mail: michael.massee@gmail.com': 'Correo electrónico: michael.massee@gmail.com',
+    'Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV': 'Responsable del contenido conforme al § 18, apartado 2 MStV (Tratado interestatal alemán de medios)',
+    'Michael Massee (Anschrift wie oben)': 'Michael Massee (dirección como arriba)',
+    'Haftung für Inhalte': 'Responsabilidad por el contenido',
+    'Turnierdaten, Anmeldungen und Turniermeldungen auf dieser Plattform werden von den jeweiligen Turnierleitern bzw. Nutzern eigenverantwortlich erstellt und gepflegt. Für die Richtigkeit, Vollständigkeit und Aktualität dieser Inhalte sind allein die jeweiligen Turnierleiter bzw. Einsender verantwortlich, nicht der Betreiber dieser Plattform.':
+      'Los datos de los torneos, las inscripciones y los avisos de torneo en esta plataforma son creados y mantenidos de forma autónoma por los respectivos organizadores o usuarios. Los respectivos organizadores o remitentes, y no el operador de esta plataforma, son los únicos responsables de la exactitud, integridad y actualidad de estos contenidos.',
+    'Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Bei Bekanntwerden entsprechender Rechtsverletzungen werden wir die betroffenen Inhalte umgehend entfernen.':
+      'Como prestador de servicios, somos responsables de nuestros propios contenidos en estas páginas conforme a la legislación general según el § 7, apartado 1 DDG. Sin embargo, conforme a los §§ 8 a 10 DDG, no estamos obligados a supervisar la información de terceros transmitida o almacenada ni a investigar circunstancias que indiquen una actividad ilícita. En cuanto tengamos conocimiento de tales infracciones, eliminaremos de inmediato el contenido correspondiente.',
+    'Haftung für Links': 'Responsabilidad por los enlaces',
+    'Turniermeldungen können Links zu externen Websites Dritter enthalten, etwa zu Anmeldeseiten der jeweiligen Veranstalter, auf deren Inhalte wir keinen Einfluss haben. Für diese fremden Inhalte können wir daher keine Gewähr übernehmen; für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich. Eine permanente inhaltliche Kontrolle der verlinkten Seiten ist ohne konkrete Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend entfernen.':
+      'Los avisos de torneo pueden contener enlaces a sitios web externos de terceros, por ejemplo páginas de inscripción de los respectivos organizadores, sobre cuyo contenido no tenemos ninguna influencia. Por ello, no podemos asumir ninguna responsabilidad por estos contenidos ajenos; el respectivo proveedor u operador de las páginas enlazadas es siempre responsable de su contenido. Un control permanente del contenido de las páginas enlazadas no es razonable sin indicios concretos de una infracción. En cuanto tengamos conocimiento de infracciones, eliminaremos dichos enlaces de inmediato.',
+    Hinweis: 'Aviso',
+    'Dieses Angebot wird als nicht-kommerzielles Privatprojekt betrieben. Es werden keine Waren oder Dienstleistungen gegen Entgelt über diese Website angeboten oder abgewickelt.':
+      'Esta oferta se gestiona como un proyecto privado sin ánimo de lucro. A través de este sitio web no se ofrecen ni se tramitan bienes o servicios a cambio de una contraprestación económica.',
+    Streitschlichtung: 'Resolución de litigios',
+    'Als Privatperson bieten wir kein kommerzielles Angebot an und nehmen daher nicht an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teil.':
+      'Como persona particular, no ofrecemos ninguna oferta comercial y, por lo tanto, no participamos en procedimientos de resolución de litigios ante una entidad de resolución de conflictos con consumidores.',
+    Datenschutzerklärung: 'Política de privacidad',
+    '1. Verantwortlicher': '1. Responsable del tratamiento',
+    'Verantwortlich für die Datenverarbeitung auf dieser Website ist:': 'El responsable del tratamiento de datos en este sitio web es:',
+    'Michael Massee, An der Ziegelei 21, 35440 Linden, E-Mail: michael.massee@gmail.com':
+      'Michael Massee, An der Ziegelei 21, 35440 Linden, Alemania, correo electrónico: michael.massee@gmail.com',
+    '2. Allgemeines zur Datenverarbeitung': '2. Información general sobre el tratamiento de datos',
+    'Wir verarbeiten personenbezogene Daten unserer Nutzer grundsätzlich nur, soweit dies zur Bereitstellung einer funktionsfähigen Website sowie unserer Inhalte und Leistungen erforderlich ist.':
+      'Por lo general, solo tratamos los datos personales de nuestros usuarios en la medida necesaria para ofrecer un sitio web funcional, así como nuestros contenidos y servicios.',
+    'Rechtsgrundlage ist, je nach Verarbeitungsvorgang, die Erfüllung eines Vertrags bzw. vorvertraglicher Maßnahmen (Art. 6 Abs. 1 lit. b DSGVO), eine erteilte Einwilligung (Art. 6 Abs. 1 lit. a DSGVO) oder unser berechtigtes Interesse an einem sicheren und funktionsfähigen Betrieb der Website (Art. 6 Abs. 1 lit. f DSGVO).':
+      'La base jurídica es, según la operación de tratamiento, la ejecución de un contrato o medidas precontractuales (art. 6, apartado 1, letra b RGPD), un consentimiento otorgado (art. 6, apartado 1, letra a RGPD) o nuestro interés legítimo en un funcionamiento seguro y funcional del sitio web (art. 6, apartado 1, letra f RGPD).',
+    '3. Bereitstellung der Website und Hosting': '3. Puesta a disposición del sitio web y alojamiento',
+    'Diese Website wird über Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, USA) als Hosting- und Content-Delivery-Anbieter bereitgestellt. Cloudflare verarbeitet dabei technisch notwendige Daten wie IP-Adresse, Datum und Uhrzeit der Anfrage sowie Browser-Informationen (Server-Logfiles), um die Website sicher und zuverlässig auszuliefern (Art. 6 Abs. 1 lit. f DSGVO).':
+      'Este sitio web se proporciona a través de Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, EE. UU.) como proveedor de alojamiento y distribución de contenidos. Cloudflare trata datos técnicamente necesarios como la dirección IP, la fecha y hora de la solicitud, así como información del navegador (archivos de registro del servidor), para entregar el sitio web de forma segura y fiable (art. 6, apartado 1, letra f RGPD).',
+    'Da Cloudflare auch Server außerhalb der EU nutzen kann, erfolgt die Datenübermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
+      'Dado que Cloudflare también puede utilizar servidores fuera de la UE, la transferencia de datos se realiza sobre la base de las cláusulas contractuales tipo de la UE conforme al art. 46 RGPD.',
+    '4. Registrierung und Benutzerkonto': '4. Registro y cuenta de usuario',
+    'Wenn du dich als Turnierleiter oder Administrator registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
+      'Si te registras como organizador de torneos o administrador, recopilamos tu nombre, dirección de correo electrónico y una contraseña cifrada de forma segura. Estos datos se tratan para ofrecerte tu cuenta de usuario y gestionar tus torneos (art. 6, apartado 1, letra b RGPD). Tras el registro, te enviamos un correo electrónico con un enlace de confirmación válido durante 24 horas para verificar tu dirección de correo electrónico.',
+    '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Inscripciones a torneos y listas públicas de participantes',
+    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
+      'Cuando te inscribes en un torneo a través de este sitio web, tratamos tu nombre, apellidos, dirección de correo electrónico y, opcionalmente, club, número de licencia y datos de tu(s) compañero(s) (doublette/triplette). Estos datos se transmiten al respectivo organizador del torneo para su organización (art. 6, apartado 1, letra b RGPD).',
+    'Turnierleiter können die Teilnehmerliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.':
+      'Los organizadores de torneos pueden hacer visible públicamente la lista de participantes de un torneo. En ese caso, el nombre, los apellidos, el club y los nombres de tu(s) compañero(s) serán visibles para cualquier visitante de la página del torneo, sin necesidad de iniciar sesión. Si no lo deseas, ponte en contacto directamente con el organizador (director del torneo) del torneo correspondiente, cuyos datos de contacto figuran en la página del torneo.',
+    '6. Turniermeldungen': '6. Avisos de torneo',
+    'Wenn du ein fremdes Turnier zur Veröffentlichung vorschlägst, verarbeiten wir deinen Namen und deine E-Mail-Adresse zur Rückfrage und Bestätigung sowie zur Moderation durch unsere Administratoren (Art. 6 Abs. 1 lit. a, lit. f DSGVO).':
+      'Si propones un torneo externo para su publicación, tratamos tu nombre y tu dirección de correo electrónico para consultas y confirmación, así como para la moderación por parte de nuestros administradores (art. 6, apartado 1, letras a y f RGPD).',
+    '7. Cookies und lokaler Speicher': '7. Cookies y almacenamiento local',
+    'Diese Website verwendet ein technisch notwendiges Session-Cookie (ptm_session), um dich nach der Anmeldung für bis zu 14 Tage eingeloggt zu halten. Das Cookie ist HttpOnly, Secure und SameSite=Lax gesetzt und wird ausschließlich für den Login-Status verwendet. Da dieses Cookie technisch notwendig ist, ist gemäß § 25 Abs. 2 TTDSG keine Einwilligung erforderlich.':
+      'Este sitio web utiliza una cookie de sesión técnicamente necesaria (ptm_session) para mantenerte conectado hasta 14 días después de iniciar sesión. La cookie está configurada como HttpOnly, Secure y SameSite=Lax y se utiliza exclusivamente para el estado de inicio de sesión. Dado que esta cookie es técnicamente necesaria, no se requiere consentimiento conforme al § 25, apartado 2 TTDSG (ley alemana de protección de datos en telecomunicaciones y telemedios).',
+    'Zusätzlich speichern wir deine gewählte Sprache in deinem Browser (localStorage), um sie bei deinem nächsten Besuch beizubehalten. Diese Daten verlassen dein Gerät nicht.':
+      'Además, guardamos el idioma que has seleccionado en tu navegador (localStorage) para mantenerlo en tu próxima visita. Estos datos no salen de tu dispositivo.',
+    'Wir setzen keine Analyse-, Marketing- oder Tracking-Cookies ein.': 'No utilizamos cookies de análisis, marketing o seguimiento.',
+    '8. Versand von E-Mails': '8. Envío de correos electrónicos',
+    'Für den Versand von Bestätigungs-, Registrierungs- und Passwort-Zurücksetzen-E-Mails nutzen wir den Dienst Resend (Resend, Inc., USA). Hierbei werden die E-Mail-Adresse sowie der jeweilige E-Mail-Inhalt an Resend übermittelt (Art. 6 Abs. 1 lit. b DSGVO). Auch hier erfolgt die Übermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
+      'Para el envío de correos de confirmación, registro y restablecimiento de contraseña utilizamos el servicio Resend (Resend, Inc., EE. UU.). En este proceso se transmiten a Resend la dirección de correo electrónico y el contenido correspondiente del correo (art. 6, apartado 1, letra b RGPD). También en este caso la transmisión se realiza sobre la base de las cláusulas contractuales tipo de la UE conforme al art. 46 RGPD.',
+    '9. Speicherdauer': '9. Plazo de conservación',
+    'Bestätigungslinks für die E-Mail-Verifizierung und Turniermeldungen sind 24 Stunden gültig, Links zum Zurücksetzen des Passworts 30 Minuten. Danach werden die zugehörigen Token automatisch gelöscht. Benutzerkonten und Turnieranmeldungen speichern wir, solange dein Konto besteht bzw. das Turnier organisiert wird, oder bis du eine Löschung beantragst.':
+      'Los enlaces de confirmación para la verificación de correo electrónico y los avisos de torneo son válidos durante 24 horas, y los enlaces para restablecer la contraseña durante 30 minutos. Después, los tokens correspondientes se eliminan automáticamente. Conservamos las cuentas de usuario y las inscripciones a torneos mientras exista tu cuenta o se organice el torneo, o hasta que solicites su eliminación.',
+    '10. Deine Rechte': '10. Tus derechos',
+    'Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16 DSGVO), Löschung (Art. 17 DSGVO), Einschränkung der Verarbeitung (Art. 18 DSGVO), Datenübertragbarkeit (Art. 20 DSGVO) sowie Widerspruch gegen die Verarbeitung (Art. 21 DSGVO). Eine erteilte Einwilligung kannst du jederzeit mit Wirkung für die Zukunft widerrufen (Art. 7 Abs. 3 DSGVO).':
+      'Tienes derecho de acceso (art. 15 RGPD), rectificación (art. 16 RGPD), supresión (art. 17 RGPD), limitación del tratamiento (art. 18 RGPD), portabilidad de los datos (art. 20 RGPD) y oposición al tratamiento (art. 21 RGPD). Puedes revocar en cualquier momento, con efectos para el futuro, un consentimiento otorgado (art. 7, apartado 3 RGPD).',
+    'Bitte wende dich hierfür an: michael.massee@gmail.com': 'Para ello, ponte en contacto con: michael.massee@gmail.com',
+    'Außerdem hast du das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren, zum Beispiel beim Hessischen Beauftragten für Datenschutz und Informationsfreiheit.':
+      'Además, tienes derecho a presentar una reclamación ante una autoridad de control de protección de datos, por ejemplo ante el comisionado de protección de datos y libertad de información de Hesse.',
+    '11. Stand': '11. Última actualización',
+    'Diese Datenschutzerklärung wurde zuletzt am 26. August 2026 aktualisiert.': 'Esta política de privacidad se actualizó por última vez el 26 de agosto de 2026.',
   },
   fr: {
     'App wird geladen.': 'Chargement de l’application.',
@@ -3754,6 +4203,80 @@ const TRANSLATIONS = {
     'API-Schlüssel wirklich widerrufen?': 'Vraiment révoquer cette clé API ?',
     Ausstehend: 'En attente',
     Freigeschaltet: 'Approuvée',
+    Impressum: 'Mentions légales',
+    Datenschutz: 'Confidentialité',
+    'Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.':
+      "Cette liste de participants est visible publiquement et consultable sans connexion. Toute personne ne souhaitant pas y figurer est priée de contacter directement l'organisateur de ce tournoi.",
+    'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
+      "Remarque : lors de l'inscription via cette plateforme, ton nom ainsi que, le cas échéant, le club, le nom d'équipe et les noms de tes partenaires peuvent être publiés sur la page publique du tournoi si l'organisateur rend la liste des participants publiquement visible. Si tu ne le souhaites pas, merci de contacter directement l'organisateur de ce tournoi – les coordonnées figurent sur la page du tournoi.",
+    'Datenschutzerklärung lesen': 'Lire la politique de confidentialité',
+    'Mit der Registrierung stimmst du der Verarbeitung deiner Daten gemäß unserer Datenschutzerklärung zu.':
+      "En t'inscrivant, tu acceptes le traitement de tes données conformément à notre politique de confidentialité.",
+    'Angaben gemäß § 5 DDG': 'Informations conformément au § 5 DDG (loi allemande sur les services numériques)',
+    Deutschland: 'Allemagne',
+    'E-Mail: michael.massee@gmail.com': 'E-mail : michael.massee@gmail.com',
+    'Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV': 'Responsable du contenu conformément au § 18, al. 2 MStV (traité interétatique allemand sur les médias)',
+    'Michael Massee (Anschrift wie oben)': 'Michael Massee (adresse comme ci-dessus)',
+    'Haftung für Inhalte': 'Responsabilité du contenu',
+    'Turnierdaten, Anmeldungen und Turniermeldungen auf dieser Plattform werden von den jeweiligen Turnierleitern bzw. Nutzern eigenverantwortlich erstellt und gepflegt. Für die Richtigkeit, Vollständigkeit und Aktualität dieser Inhalte sind allein die jeweiligen Turnierleiter bzw. Einsender verantwortlich, nicht der Betreiber dieser Plattform.':
+      "Les données de tournois, les inscriptions et les signalements de tournois sur cette plateforme sont créés et gérés de manière autonome par les organisateurs de tournois ou les utilisateurs concernés. Seuls les organisateurs de tournois ou les auteurs des signalements concernés, et non l'exploitant de cette plateforme, sont responsables de l'exactitude, de l'exhaustivité et de l'actualité de ce contenu.",
+    'Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Bei Bekanntwerden entsprechender Rechtsverletzungen werden wir die betroffenen Inhalte umgehend entfernen.':
+      'En tant que fournisseur de services, nous sommes responsables de notre propre contenu sur ces pages conformément aux lois générales, en vertu du § 7, al. 1 DDG. Toutefois, conformément aux §§ 8 à 10 DDG, nous ne sommes pas tenus de surveiller les informations de tiers transmises ou stockées, ni de rechercher des circonstances indiquant une activité illégale. Dès que nous prenons connaissance de telles violations, nous supprimons immédiatement le contenu concerné.',
+    'Haftung für Links': 'Responsabilité des liens',
+    'Turniermeldungen können Links zu externen Websites Dritter enthalten, etwa zu Anmeldeseiten der jeweiligen Veranstalter, auf deren Inhalte wir keinen Einfluss haben. Für diese fremden Inhalte können wir daher keine Gewähr übernehmen; für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich. Eine permanente inhaltliche Kontrolle der verlinkten Seiten ist ohne konkrete Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend entfernen.':
+      "Les signalements de tournois peuvent contenir des liens vers des sites web externes de tiers, par exemple des pages d'inscription des organisateurs concernés, sur le contenu desquels nous n'avons aucune influence. Nous ne pouvons donc assumer aucune responsabilité pour ce contenu tiers ; le fournisseur ou l'exploitant respectif des pages liées est toujours responsable de leur contenu. Un contrôle permanent du contenu des pages liées n'est pas raisonnable en l'absence d'indices concrets d'une violation. Dès que nous prenons connaissance de violations, nous supprimons immédiatement ces liens.",
+    Hinweis: 'Remarque',
+    'Dieses Angebot wird als nicht-kommerzielles Privatprojekt betrieben. Es werden keine Waren oder Dienstleistungen gegen Entgelt über diese Website angeboten oder abgewickelt.':
+      "Cette offre est exploitée en tant que projet privé à but non lucratif. Aucun bien ou service n'est proposé ou traité contre rémunération via ce site web.",
+    Streitschlichtung: 'Règlement des litiges',
+    'Als Privatperson bieten wir kein kommerzielles Angebot an und nehmen daher nicht an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teil.':
+      'En tant que particulier, nous ne proposons aucune offre commerciale et ne participons donc pas aux procédures de règlement des litiges devant un organisme de médiation de la consommation.',
+    Datenschutzerklärung: 'Politique de confidentialité',
+    '1. Verantwortlicher': '1. Responsable du traitement',
+    'Verantwortlich für die Datenverarbeitung auf dieser Website ist:': 'Le responsable du traitement des données sur ce site web est :',
+    'Michael Massee, An der Ziegelei 21, 35440 Linden, E-Mail: michael.massee@gmail.com':
+      'Michael Massee, An der Ziegelei 21, 35440 Linden, Allemagne, e-mail : michael.massee@gmail.com',
+    '2. Allgemeines zur Datenverarbeitung': '2. Informations générales sur le traitement des données',
+    'Wir verarbeiten personenbezogene Daten unserer Nutzer grundsätzlich nur, soweit dies zur Bereitstellung einer funktionsfähigen Website sowie unserer Inhalte und Leistungen erforderlich ist.':
+      "Nous ne traitons en principe les données personnelles de nos utilisateurs que dans la mesure où cela est nécessaire pour fournir un site web fonctionnel ainsi que nos contenus et services.",
+    'Rechtsgrundlage ist, je nach Verarbeitungsvorgang, die Erfüllung eines Vertrags bzw. vorvertraglicher Maßnahmen (Art. 6 Abs. 1 lit. b DSGVO), eine erteilte Einwilligung (Art. 6 Abs. 1 lit. a DSGVO) oder unser berechtigtes Interesse an einem sicheren und funktionsfähigen Betrieb der Website (Art. 6 Abs. 1 lit. f DSGVO).':
+      "La base juridique est, selon l'opération de traitement, l'exécution d'un contrat ou de mesures précontractuelles (art. 6, § 1, point b RGPD), un consentement donné (art. 6, § 1, point a RGPD) ou notre intérêt légitime à un fonctionnement sûr et fonctionnel du site web (art. 6, § 1, point f RGPD).",
+    '3. Bereitstellung der Website und Hosting': '3. Fourniture du site web et hébergement',
+    'Diese Website wird über Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, USA) als Hosting- und Content-Delivery-Anbieter bereitgestellt. Cloudflare verarbeitet dabei technisch notwendige Daten wie IP-Adresse, Datum und Uhrzeit der Anfrage sowie Browser-Informationen (Server-Logfiles), um die Website sicher und zuverlässig auszuliefern (Art. 6 Abs. 1 lit. f DSGVO).':
+      "Ce site web est fourni via Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, États-Unis) en tant que fournisseur d'hébergement et de diffusion de contenu. Cloudflare traite à cette occasion des données techniquement nécessaires telles que l'adresse IP, la date et l'heure de la requête ainsi que des informations sur le navigateur (fichiers journaux du serveur), afin de fournir le site web de manière sûre et fiable (art. 6, § 1, point f RGPD).",
+    'Da Cloudflare auch Server außerhalb der EU nutzen kann, erfolgt die Datenübermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
+      "Étant donné que Cloudflare peut également utiliser des serveurs situés en dehors de l'UE, le transfert de données s'effectue sur la base de clauses contractuelles types de l'UE conformément à l'art. 46 RGPD.",
+    '4. Registrierung und Benutzerkonto': '4. Inscription et compte utilisateur',
+    'Wenn du dich als Turnierleiter oder Administrator registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
+      "Si tu t'inscris en tant qu'organisateur de tournoi ou administrateur, nous collectons ton nom, ton adresse e-mail et un mot de passe haché de manière sécurisée. Ces données sont traitées pour fournir ton compte utilisateur et gérer tes tournois (art. 6, § 1, point b RGPD). Après l'inscription, nous t'envoyons un e-mail contenant un lien de confirmation valable 24 heures afin de vérifier ton adresse e-mail.",
+    '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Inscriptions aux tournois et listes de participants publiques',
+    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
+      "Lorsque tu t'inscris à un tournoi via ce site web, nous traitons ton prénom, ton nom, ton adresse e-mail ainsi que, le cas échéant, ton club, ton numéro de licence et des informations sur ton/tes partenaire(s) (doublette/triplette). Ces données sont transmises à l'organisateur du tournoi concerné pour l'organisation du tournoi (art. 6, § 1, point b RGPD).",
+    'Turnierleiter können die Teilnehmerliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.':
+      "Les organisateurs de tournois peuvent rendre la liste des participants d'un tournoi publiquement visible. Dans ce cas, le prénom, le nom, le club et les noms de tes partenaires sont visibles par tout visiteur de la page du tournoi, sans connexion requise. Si tu ne le souhaites pas, merci de contacter directement l'organisateur (directeur du tournoi) du tournoi concerné, dont les coordonnées figurent sur la page du tournoi.",
+    '6. Turniermeldungen': '6. Signalements de tournois',
+    'Wenn du ein fremdes Turnier zur Veröffentlichung vorschlägst, verarbeiten wir deinen Namen und deine E-Mail-Adresse zur Rückfrage und Bestätigung sowie zur Moderation durch unsere Administratoren (Art. 6 Abs. 1 lit. a, lit. f DSGVO).':
+      "Lorsque tu proposes un tournoi externe pour publication, nous traitons ton nom et ton adresse e-mail pour les questions de suivi et la confirmation, ainsi que pour la modération par nos administrateurs (art. 6, § 1, points a et f RGPD).",
+    '7. Cookies und lokaler Speicher': '7. Cookies et stockage local',
+    'Diese Website verwendet ein technisch notwendiges Session-Cookie (ptm_session), um dich nach der Anmeldung für bis zu 14 Tage eingeloggt zu halten. Das Cookie ist HttpOnly, Secure und SameSite=Lax gesetzt und wird ausschließlich für den Login-Status verwendet. Da dieses Cookie technisch notwendig ist, ist gemäß § 25 Abs. 2 TTDSG keine Einwilligung erforderlich.':
+      "Ce site web utilise un cookie de session techniquement nécessaire (ptm_session) pour te maintenir connecté(e) jusqu'à 14 jours après la connexion. Le cookie est défini en HttpOnly, Secure et SameSite=Lax et n'est utilisé que pour le statut de connexion. Ce cookie étant techniquement nécessaire, aucun consentement n'est requis conformément au § 25, al. 2 TTDSG (loi allemande sur la protection des données dans les télécommunications et les télémédias).",
+    'Zusätzlich speichern wir deine gewählte Sprache in deinem Browser (localStorage), um sie bei deinem nächsten Besuch beizubehalten. Diese Daten verlassen dein Gerät nicht.':
+      'Nous enregistrons également la langue que tu as choisie dans ton navigateur (localStorage) afin de la conserver lors de ta prochaine visite. Ces données ne quittent pas ton appareil.',
+    'Wir setzen keine Analyse-, Marketing- oder Tracking-Cookies ein.': "Nous n'utilisons aucun cookie d'analyse, de marketing ou de suivi.",
+    '8. Versand von E-Mails': "8. Envoi d'e-mails",
+    'Für den Versand von Bestätigungs-, Registrierungs- und Passwort-Zurücksetzen-E-Mails nutzen wir den Dienst Resend (Resend, Inc., USA). Hierbei werden die E-Mail-Adresse sowie der jeweilige E-Mail-Inhalt an Resend übermittelt (Art. 6 Abs. 1 lit. b DSGVO). Auch hier erfolgt die Übermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
+      "Pour l'envoi des e-mails de confirmation, d'inscription et de réinitialisation de mot de passe, nous utilisons le service Resend (Resend, Inc., États-Unis). L'adresse e-mail ainsi que le contenu de l'e-mail concerné sont alors transmis à Resend (art. 6, § 1, point b RGPD). Ici aussi, la transmission s'effectue sur la base de clauses contractuelles types de l'UE conformément à l'art. 46 RGPD.",
+    '9. Speicherdauer': '9. Durée de conservation',
+    'Bestätigungslinks für die E-Mail-Verifizierung und Turniermeldungen sind 24 Stunden gültig, Links zum Zurücksetzen des Passworts 30 Minuten. Danach werden die zugehörigen Token automatisch gelöscht. Benutzerkonten und Turnieranmeldungen speichern wir, solange dein Konto besteht bzw. das Turnier organisiert wird, oder bis du eine Löschung beantragst.':
+      "Les liens de confirmation pour la vérification de l'e-mail et les signalements de tournois sont valables 24 heures, les liens de réinitialisation du mot de passe 30 minutes. Passé ce délai, les jetons correspondants sont automatiquement supprimés. Nous conservons les comptes utilisateurs et les inscriptions aux tournois tant que ton compte existe ou que le tournoi est organisé, ou jusqu'à ce que tu demandes leur suppression.",
+    '10. Deine Rechte': '10. Tes droits',
+    'Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16 DSGVO), Löschung (Art. 17 DSGVO), Einschränkung der Verarbeitung (Art. 18 DSGVO), Datenübertragbarkeit (Art. 20 DSGVO) sowie Widerspruch gegen die Verarbeitung (Art. 21 DSGVO). Eine erteilte Einwilligung kannst du jederzeit mit Wirkung für die Zukunft widerrufen (Art. 7 Abs. 3 DSGVO).':
+      "Tu disposes d'un droit d'accès (art. 15 RGPD), de rectification (art. 16 RGPD), d'effacement (art. 17 RGPD), de limitation du traitement (art. 18 RGPD), de portabilité des données (art. 20 RGPD) ainsi que d'opposition au traitement (art. 21 RGPD). Tu peux révoquer à tout moment, avec effet pour l'avenir, un consentement donné (art. 7, § 3 RGPD).",
+    'Bitte wende dich hierfür an: michael.massee@gmail.com': 'Merci de nous contacter à cet effet à l’adresse : michael.massee@gmail.com',
+    'Außerdem hast du das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren, zum Beispiel beim Hessischen Beauftragten für Datenschutz und Informationsfreiheit.':
+      'Tu as également le droit de déposer une réclamation auprès d’une autorité de contrôle de la protection des données, par exemple auprès du commissaire hessois à la protection des données et à la liberté d’information.',
+    '11. Stand': '11. Date de mise à jour',
+    'Diese Datenschutzerklärung wurde zuletzt am 26. August 2026 aktualisiert.': 'Cette politique de confidentialité a été mise à jour pour la dernière fois le 26 août 2026.',
   },
 };
 

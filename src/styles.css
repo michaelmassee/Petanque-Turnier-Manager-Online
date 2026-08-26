@@ -395,6 +395,19 @@ textarea:focus {
   color: #ffffff;
 }
 
+.drawer-legal-links {
+  display: flex;
+  gap: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e7f0;
+}
+
+.drawer-legal-links .link-button {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #53627a;
+}
+
 .checkbox-field {
   display: flex;
   flex-direction: row;
