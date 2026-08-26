@@ -959,11 +959,13 @@ export default function App() {
       ? 'Benutzerverwaltung'
       : activeTab === 'tips'
         ? 'Turnier-Vorschläge'
-        : activeTab === 'registrations'
-          ? 'Anmeldungen'
-          : activeTab === 'tournaments'
-            ? 'Turnierverwaltung'
-            : homeHeading;
+        : activeTab === 'apikeys'
+          ? 'API-Zugänge'
+          : activeTab === 'registrations'
+            ? 'Anmeldungen'
+            : activeTab === 'tournaments'
+              ? 'Turnierverwaltung'
+              : homeHeading;
 
   return (
     <main className="app-shell">
@@ -1033,6 +1035,18 @@ export default function App() {
             }}
           >
             Turnier-Vorschläge
+          </button>
+        )}
+        {canManageTournaments && (
+          <button
+            className={`drawer-link ${activeTab === 'apikeys' ? 'active' : ''}`}
+            type="button"
+            onClick={() => {
+              setActiveTab('apikeys');
+              setMenuOpen(false);
+            }}
+          >
+            API-Zugänge
           </button>
         )}
         <Button
@@ -1233,6 +1247,12 @@ export default function App() {
             onReject={(tip) => handleModerateTournamentTip(tip, 'rejected')}
             onDelete={handleDeleteTournamentTip}
           />
+        </section>
+      )}
+
+      {activeTab === 'apikeys' && canManageTournaments && (
+        <section className="single-column">
+          <ApiKeysPanel isAdmin={isAdmin} />
         </section>
       )}
     </main>
@@ -2518,6 +2538,232 @@ function registrationStatusLabel(tournament, language) {
   return (SLOTS_FREE_TEMPLATES[language] || SLOTS_FREE_TEMPLATES.de)(free, tournament.maxRegistrations);
 }
 
+const API_KEY_STATUS_LABELS = {
+  pending: 'Ausstehend',
+  approved: 'Freigeschaltet',
+  revoked: 'Widerrufen',
+};
+
+function formatDateTime(value) {
+  if (!value) {
+    return '';
+  }
+  return new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+}
+
+function ApiKeysPanel({ isAdmin }) {
+  const [apiKeys, setApiKeys] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [label, setLabel] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [panelError, setPanelError] = useState('');
+  const [revealedSecret, setRevealedSecret] = useState(null);
+
+  async function loadOwnKeys() {
+    try {
+      const data = await api('/api/api-keys');
+      setApiKeys(data.apiKeys);
+    } catch (err) {
+      setPanelError(err.message);
+    }
+  }
+
+  async function loadPendingRequests() {
+    if (!isAdmin) {
+      return;
+    }
+    try {
+      const data = await api('/api/admin/api-keys?status=pending');
+      setPendingRequests(data.apiKeys);
+    } catch (err) {
+      setPanelError(err.message);
+    }
+  }
+
+  useEffect(() => {
+    loadOwnKeys();
+    loadPendingRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
+
+  async function handleRequest(event) {
+    event.preventDefault();
+    if (!label.trim()) {
+      return;
+    }
+    setBusy(true);
+    setPanelError('');
+    try {
+      await api('/api/api-keys/request', { method: 'POST', body: JSON.stringify({ label: label.trim() }) });
+      setLabel('');
+      await loadOwnKeys();
+    } catch (err) {
+      setPanelError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRevealSecret(id) {
+    setPanelError('');
+    try {
+      const data = await api(`/api/api-keys/${id}/secret`);
+      setRevealedSecret({ id, secret: data.secret });
+      await loadOwnKeys();
+    } catch (err) {
+      setPanelError(err.message);
+    }
+  }
+
+  async function handleRevoke(id) {
+    if (!window.confirm('API-Schlüssel wirklich widerrufen?')) {
+      return;
+    }
+    setPanelError('');
+    try {
+      await api(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
+      await loadOwnKeys();
+    } catch (err) {
+      setPanelError(err.message);
+    }
+  }
+
+  async function handleApprove(id) {
+    setPanelError('');
+    try {
+      await api(`/api/admin/api-keys/${id}/approve`, { method: 'POST' });
+      await Promise.all([loadPendingRequests(), loadOwnKeys()]);
+    } catch (err) {
+      setPanelError(err.message);
+    }
+  }
+
+  async function handleReject(id) {
+    setPanelError('');
+    try {
+      await api(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
+      await loadPendingRequests();
+    } catch (err) {
+      setPanelError(err.message);
+    }
+  }
+
+  return (
+    <>
+      <div className="panel">
+        <div className="section-title">
+          <h2>API-Zugänge</h2>
+        </div>
+        <p className="hint">
+          Externe Turnierleitungs-Software (z.B. das PTM-Hauptprogramm auf deinem Rechner) braucht einen
+          freigeschalteten API-Schlüssel, um Turniere anzulegen und Anmeldungen abzugleichen. Ein Administrator muss
+          jede Installation einzeln genehmigen.
+        </p>
+
+        <form className="form" onSubmit={handleRequest}>
+          <input
+            type="text"
+            placeholder="Bezeichnung der Installation, z.B. Bürorechner"
+            value={label}
+            onChange={(event) => setLabel(event.target.value)}
+          />
+          <Button type="submit" disabled={busy || !label.trim()}>
+            Schlüssel beantragen
+          </Button>
+        </form>
+
+        {panelError && <p className="feedback error">{panelError}</p>}
+
+        {revealedSecret && (
+          <div className="api-key-secret-box">
+            <p>Speichere diesen Schlüssel jetzt sicher ab. Er wird nicht erneut angezeigt.</p>
+            <code>{revealedSecret.secret}</code>
+          </div>
+        )}
+
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Bezeichnung</th>
+              <th>Status</th>
+              <th>Beantragt am</th>
+              <th>Zuletzt genutzt</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {apiKeys.map((key) => (
+              <tr key={key.id}>
+                <td>{key.label}</td>
+                <td>{API_KEY_STATUS_LABELS[key.status] || key.status}</td>
+                <td>{formatDateTime(key.requestedAt)}</td>
+                <td>{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : '–'}</td>
+                <td>
+                  {key.status === 'approved' && key.secretAvailable && (
+                    <Button variant="secondary" onClick={() => handleRevealSecret(key.id)}>
+                      Schlüssel abholen
+                    </Button>
+                  )}
+                  {key.status === 'approved' && (
+                    <Button variant="secondary" onClick={() => handleRevoke(key.id)}>
+                      Widerrufen
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {apiKeys.length === 0 && (
+              <tr>
+                <td colSpan={5}>Noch keine API-Schlüssel beantragt.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {isAdmin && (
+        <div className="panel">
+          <div className="section-title">
+            <h2>Offene Freischaltungsanfragen</h2>
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Turnierleiter</th>
+                <th>Bezeichnung</th>
+                <th>Beantragt am</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {pendingRequests.map((key) => (
+                <tr key={key.id}>
+                  <td>
+                    {key.userName} ({key.userEmail})
+                  </td>
+                  <td>{key.label}</td>
+                  <td>{formatDateTime(key.requestedAt)}</td>
+                  <td>
+                    <Button onClick={() => handleApprove(key.id)}>Genehmigen</Button>
+                    <Button variant="secondary" onClick={() => handleReject(key.id)}>
+                      Ablehnen
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+              {pendingRequests.length === 0 && (
+                <tr>
+                  <td colSpan={4}>Keine offenen Anfragen.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
 function formatDate(value) {
   if (!value) {
     return '';
@@ -2766,6 +3012,25 @@ const TRANSLATIONS = {
     'Invalid formation': 'Ongeldige formatie',
     'A valid tournament date is required': 'Een geldige datum is verplicht',
     'Tournament name must contain at least 2 characters': 'Toernooinaam moet minstens 2 tekens bevatten',
+    'API-Zugänge': 'API-toegangen',
+    'Externe Turnierleitungs-Software (z.B. das PTM-Hauptprogramm auf deinem Rechner) braucht einen freigeschalteten API-Schlüssel, um Turniere anzulegen und Anmeldungen abzugleichen. Ein Administrator muss jede Installation einzeln genehmigen.':
+      'Externe toernooisoftware (bijv. het PTM-hoofdprogramma op je computer) heeft een goedgekeurde API-sleutel nodig om toernooien aan te maken en inschrijvingen te synchroniseren. Een beheerder moet elke installatie apart goedkeuren.',
+    'Bezeichnung der Installation, z.B. Bürorechner': 'Naam van de installatie, bijv. kantoorcomputer',
+    'Schlüssel beantragen': 'Sleutel aanvragen',
+    'Speichere diesen Schlüssel jetzt sicher ab. Er wird nicht erneut angezeigt.':
+      'Bewaar deze sleutel nu veilig. Hij wordt niet opnieuw getoond.',
+    Bezeichnung: 'Naam',
+    'Beantragt am': 'Aangevraagd op',
+    'Zuletzt genutzt': 'Laatst gebruikt',
+    'Schlüssel abholen': 'Sleutel ophalen',
+    Widerrufen: 'Intrekken',
+    'Noch keine API-Schlüssel beantragt.': 'Nog geen API-sleutels aangevraagd.',
+    'Offene Freischaltungsanfragen': 'Openstaande goedkeuringsverzoeken',
+    Genehmigen: 'Goedkeuren',
+    'Keine offenen Anfragen.': 'Geen openstaande verzoeken.',
+    'API-Schlüssel wirklich widerrufen?': 'API-sleutel echt intrekken?',
+    Ausstehend: 'In behandeling',
+    Freigeschaltet: 'Goedgekeurd',
   },
   en: {
     'App wird geladen.': 'App is loading.',
@@ -2976,6 +3241,25 @@ const TRANSLATIONS = {
     'Invalid formation': 'Invalid formation',
     'A valid tournament date is required': 'A valid tournament date is required',
     'Tournament name must contain at least 2 characters': 'Tournament name must contain at least 2 characters',
+    'API-Zugänge': 'API access',
+    'Externe Turnierleitungs-Software (z.B. das PTM-Hauptprogramm auf deinem Rechner) braucht einen freigeschalteten API-Schlüssel, um Turniere anzulegen und Anmeldungen abzugleichen. Ein Administrator muss jede Installation einzeln genehmigen.':
+      'External tournament-management software (e.g. the PTM main program on your computer) needs an approved API key to create tournaments and sync registrations. An administrator must approve each installation individually.',
+    'Bezeichnung der Installation, z.B. Bürorechner': 'Name of the installation, e.g. office computer',
+    'Schlüssel beantragen': 'Request key',
+    'Speichere diesen Schlüssel jetzt sicher ab. Er wird nicht erneut angezeigt.':
+      'Save this key securely now. It will not be shown again.',
+    Bezeichnung: 'Label',
+    'Beantragt am': 'Requested on',
+    'Zuletzt genutzt': 'Last used',
+    'Schlüssel abholen': 'Retrieve key',
+    Widerrufen: 'Revoke',
+    'Noch keine API-Schlüssel beantragt.': 'No API keys requested yet.',
+    'Offene Freischaltungsanfragen': 'Pending approval requests',
+    Genehmigen: 'Approve',
+    'Keine offenen Anfragen.': 'No pending requests.',
+    'API-Schlüssel wirklich widerrufen?': 'Really revoke this API key?',
+    Ausstehend: 'Pending',
+    Freigeschaltet: 'Approved',
   },
   es: {
     'App wird geladen.': 'La app se está cargando.',
@@ -3185,6 +3469,25 @@ const TRANSLATIONS = {
     'Invalid formation': 'Formación no válida',
     'A valid tournament date is required': 'Se requiere una fecha válida',
     'Tournament name must contain at least 2 characters': 'El nombre del torneo debe tener al menos 2 caracteres',
+    'API-Zugänge': 'Accesos API',
+    'Externe Turnierleitungs-Software (z.B. das PTM-Hauptprogramm auf deinem Rechner) braucht einen freigeschalteten API-Schlüssel, um Turniere anzulegen und Anmeldungen abzugleichen. Ein Administrator muss jede Installation einzeln genehmigen.':
+      'El software externo de gestión de torneos (p.ej. el programa principal PTM en tu ordenador) necesita una clave API aprobada para crear torneos y sincronizar inscripciones. Un administrador debe aprobar cada instalación individualmente.',
+    'Bezeichnung der Installation, z.B. Bürorechner': 'Nombre de la instalación, p.ej. ordenador de oficina',
+    'Schlüssel beantragen': 'Solicitar clave',
+    'Speichere diesen Schlüssel jetzt sicher ab. Er wird nicht erneut angezeigt.':
+      'Guarda esta clave de forma segura ahora. No se volverá a mostrar.',
+    Bezeichnung: 'Nombre',
+    'Beantragt am': 'Solicitado el',
+    'Zuletzt genutzt': 'Ultimo uso',
+    'Schlüssel abholen': 'Obtener clave',
+    Widerrufen: 'Revocar',
+    'Noch keine API-Schlüssel beantragt.': 'Aun no se han solicitado claves API.',
+    'Offene Freischaltungsanfragen': 'Solicitudes de aprobacion pendientes',
+    Genehmigen: 'Aprobar',
+    'Keine offenen Anfragen.': 'No hay solicitudes pendientes.',
+    'API-Schlüssel wirklich widerrufen?': 'Revocar realmente esta clave API?',
+    Ausstehend: 'Pendiente',
+    Freigeschaltet: 'Aprobada',
   },
   fr: {
     'App wird geladen.': 'Chargement de l’application.',
@@ -3395,6 +3698,25 @@ const TRANSLATIONS = {
     'Invalid formation': 'Formation invalide',
     'A valid tournament date is required': 'Une date valide est requise',
     'Tournament name must contain at least 2 characters': 'Le nom du tournoi doit contenir au moins 2 caractères',
+    'API-Zugänge': 'Accès API',
+    'Externe Turnierleitungs-Software (z.B. das PTM-Hauptprogramm auf deinem Rechner) braucht einen freigeschalteten API-Schlüssel, um Turniere anzulegen und Anmeldungen abzugleichen. Ein Administrator muss jede Installation einzeln genehmigen.':
+      'Un logiciel externe de gestion de tournois (p. ex. le programme principal PTM sur ton ordinateur) a besoin d’une clé API approuvée pour créer des tournois et synchroniser les inscriptions. Un administrateur doit approuver chaque installation individuellement.',
+    'Bezeichnung der Installation, z.B. Bürorechner': 'Nom de l’installation, p. ex. ordinateur de bureau',
+    'Schlüssel beantragen': 'Demander une clé',
+    'Speichere diesen Schlüssel jetzt sicher ab. Er wird nicht erneut angezeigt.':
+      'Enregistre cette clé en lieu sûr maintenant. Elle ne sera plus affichée.',
+    Bezeichnung: 'Nom',
+    'Beantragt am': 'Demandée le',
+    'Zuletzt genutzt': 'Dernière utilisation',
+    'Schlüssel abholen': 'Récupérer la clé',
+    Widerrufen: 'Révoquer',
+    'Noch keine API-Schlüssel beantragt.': 'Aucune clé API demandée pour le moment.',
+    'Offene Freischaltungsanfragen': 'Demandes d’approbation en attente',
+    Genehmigen: 'Approuver',
+    'Keine offenen Anfragen.': 'Aucune demande en attente.',
+    'API-Schlüssel wirklich widerrufen?': 'Vraiment révoquer cette clé API ?',
+    Ausstehend: 'En attente',
+    Freigeschaltet: 'Approuvée',
   },
 };
 

@@ -242,6 +242,23 @@ textarea:focus {
   padding: 28px;
 }
 
+.api-key-secret-box {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: #fff8e1;
+  border: 1px solid #e8c766;
+}
+
+.api-key-secret-box code {
+  display: block;
+  margin-top: 6px;
+  padding: 8px;
+  background: #fff;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
 .topbar {
   position: relative;
   display: flex;

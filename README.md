@@ -54,6 +54,7 @@ npm audit --audit-level=high
 - Registration management with pending, confirmed, waitlist and cancelled states
 - Installable mobile PWA with manifest, app icon and service worker
 - Runtime language switcher for DE/NL/EN/ES/FR
+- REST API access for authorized external tournament-management software (API keys, admin-approved, `Authorization: Bearer ptm_...`) to create tournaments and sync registrations/results, see `SECURITY.md`
 
 ## Cloudflare
 

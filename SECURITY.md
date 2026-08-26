@@ -49,6 +49,9 @@ Commits must follow these rules:
 - Mutating API requests are rejected when an `Origin` header is present and not same-origin.
 - Role checks keep user management and tournament management separate.
 - Public registrations are only accepted for public tournaments with status `registration`.
+- Programmatic access (external tournament-management software) requires an approved API key (`Authorization: Bearer ptm_...`). Keys start in status `pending` and only work once an admin explicitly approves them (`/api/admin/api-keys/{id}/approve`) — unapproved or revoked keys are rejected with `401`.
+- API key secrets are never stored in plaintext beyond the single retrieval window: only a SHA-256 hash is kept for authentication, and the plaintext secret is deleted from the database as soon as the owning turnierleiter retrieves it once (`/api/api-keys/{id}/secret`, `410` on repeat).
+- API-key-authenticated requests are scoped the same way as session requests: `canManageTournament()` still restricts access to the caller's own tournaments; API keys cannot manage users.
 
 ## Secret Handling
 

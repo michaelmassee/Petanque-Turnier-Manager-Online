@@ -166,16 +166,55 @@ export default {
         }
       }
 
-      if (url.pathname === '/api/tournaments') {
-        const session = await optionalSession(request, env.DB);
+      if (url.pathname === '/api/api-keys') {
+        const session = await requireSession(request, env.DB);
+        requireTournamentManager(session);
 
         if (request.method === 'GET') {
+          return await listOwnApiKeys(env.DB, session.user.id);
+        }
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/api-keys/request') {
+        const session = await requireSession(request, env.DB);
+        requireTournamentManager(session);
+        return await requestApiKey(request, env.DB, session.user);
+      }
+
+      const apiKeySecretMatch = url.pathname.match(/^\/api\/api-keys\/([^/]+)\/secret$/);
+      if (apiKeySecretMatch && request.method === 'GET') {
+        const session = await requireSession(request, env.DB);
+        requireTournamentManager(session);
+        return await retrieveApiKeySecret(env.DB, apiKeySecretMatch[1], session.user.id);
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/admin/api-keys') {
+        await requireAdmin(request, env.DB);
+        return await listAllApiKeys(env.DB, url);
+      }
+
+      const adminApiKeyApproveMatch = url.pathname.match(/^\/api\/admin\/api-keys\/([^/]+)\/approve$/);
+      if (adminApiKeyApproveMatch && request.method === 'POST') {
+        const session = await requireAdmin(request, env.DB);
+        return await approveApiKey(env.DB, adminApiKeyApproveMatch[1], session.user.id);
+      }
+
+      const adminApiKeyRevokeMatch = url.pathname.match(/^\/api\/admin\/api-keys\/([^/]+)\/revoke$/);
+      if (adminApiKeyRevokeMatch && request.method === 'POST') {
+        await requireAdmin(request, env.DB);
+        return await revokeApiKey(env.DB, adminApiKeyRevokeMatch[1]);
+      }
+
+      if (url.pathname === '/api/tournaments') {
+        if (request.method === 'GET') {
+          const session = await optionalSession(request, env.DB);
           return await listTournaments(env.DB, session?.user || null);
         }
 
         if (request.method === 'POST') {
-          requireTournamentManager(session);
-          return await createTournament(request, env.DB, session.user);
+          const auth = await requireManagerAuth(request, env.DB);
+          requireTournamentManager(auth);
+          return await createTournament(request, env.DB, auth.user);
         }
       }
 
@@ -242,12 +281,12 @@ export default {
 
       const registrationMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)$/);
       if (registrationMatch) {
-        const session = await requireSession(request, env.DB);
+        const auth = await requireManagerAuth(request, env.DB);
         const registration = await getRegistrationWithTournament(env.DB, registrationMatch[1]);
         if (!registration) {
           throw new HttpError(404, 'Registration not found');
         }
-        assertCanManageTournament(registration, session.user);
+        assertCanManageTournament(registration, auth.user);
 
         if (request.method === 'PUT') {
           return await updateRegistration(request, env.DB, registration);
@@ -286,6 +325,28 @@ export default {
         if (request.method === 'DELETE') {
           return await deleteTournamentTip(env.DB, tipMatch[1]);
         }
+      }
+
+      const syncRegistrationsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registrations$/);
+      if (syncRegistrationsMatch && request.method === 'GET') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getTournamentById(env.DB, syncRegistrationsMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Tournament not found');
+        }
+        assertCanManageTournament(tournament, auth.user);
+        return await syncGetRegistrations(env.DB, tournament.id, url);
+      }
+
+      const syncResultsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/results$/);
+      if (syncResultsMatch && request.method === 'POST') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getTournamentById(env.DB, syncResultsMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Tournament not found');
+        }
+        assertCanManageTournament(tournament, auth.user);
+        return await syncPostResults(request, env.DB, tournament.id);
       }
 
       return json({ error: 'Not found' }, 404);
@@ -982,6 +1043,180 @@ async function deleteRegistration(db, id) {
   return json({ ok: true });
 }
 
+async function requestApiKey(request, db, user) {
+  const body = await readJson(request);
+  const label = String(body.label || '').trim();
+
+  if (label.length < 2 || label.length > 120) {
+    throw new HttpError(400, 'Label must contain between 2 and 120 characters');
+  }
+
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  await db
+    .prepare(
+      `INSERT INTO api_keys (id, user_id, key_hash, label, status, requested_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
+    )
+    .bind(id, user.id, `pending:${id}`, label, now, now, now)
+    .run();
+
+  const created = await db.prepare('SELECT * FROM api_keys WHERE id = ?').bind(id).first();
+  return json({ apiKey: toPublicApiKey(created) }, 201);
+}
+
+async function listOwnApiKeys(db, userId) {
+  const result = await db
+    .prepare('SELECT * FROM api_keys WHERE user_id = ? ORDER BY requested_at DESC')
+    .bind(userId)
+    .all();
+  return json({ apiKeys: result.results.map(toPublicApiKey) });
+}
+
+async function listAllApiKeys(db, url) {
+  const status = url.searchParams.get('status');
+  const statement =
+    status && ['pending', 'approved', 'revoked'].includes(status)
+      ? db
+          .prepare(
+            `SELECT api_keys.*, users.name AS user_name, users.email AS user_email
+             FROM api_keys JOIN users ON users.id = api_keys.user_id
+             WHERE api_keys.status = ? ORDER BY api_keys.requested_at DESC`,
+          )
+          .bind(status)
+      : db.prepare(
+          `SELECT api_keys.*, users.name AS user_name, users.email AS user_email
+           FROM api_keys JOIN users ON users.id = api_keys.user_id
+           ORDER BY api_keys.requested_at DESC`,
+        );
+
+  const result = await statement.all();
+  return json({
+    apiKeys: result.results.map((row) => ({
+      ...toPublicApiKey(row),
+      userName: row.user_name,
+      userEmail: row.user_email,
+    })),
+  });
+}
+
+async function approveApiKey(db, id, adminUserId) {
+  const existing = await db.prepare('SELECT * FROM api_keys WHERE id = ?').bind(id).first();
+  if (!existing) {
+    throw new HttpError(404, 'API key not found');
+  }
+  if (existing.status !== 'pending') {
+    throw new HttpError(409, 'API key is not pending approval');
+  }
+
+  const secret = `ptm_${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '')}`;
+  const keyHash = await sha256Hex(secret);
+  const now = new Date().toISOString();
+
+  await db
+    .prepare(
+      `UPDATE api_keys
+       SET key_hash = ?, status = 'approved', approved_at = ?, approved_by = ?, pending_secret = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(keyHash, now, adminUserId, secret, now, id)
+    .run();
+
+  const updated = await db.prepare('SELECT * FROM api_keys WHERE id = ?').bind(id).first();
+  return json({ apiKey: toPublicApiKey(updated) });
+}
+
+async function revokeApiKey(db, id) {
+  const now = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `UPDATE api_keys
+       SET status = 'revoked', revoked_at = ?, pending_secret = NULL, updated_at = ?
+       WHERE id = ? AND status != 'revoked'`,
+    )
+    .bind(now, now, id)
+    .run();
+
+  if (result.meta.changes === 0) {
+    throw new HttpError(404, 'API key not found or already revoked');
+  }
+  return json({ ok: true });
+}
+
+async function retrieveApiKeySecret(db, id, userId) {
+  const existing = await db.prepare('SELECT * FROM api_keys WHERE id = ? AND user_id = ?').bind(id, userId).first();
+  if (!existing) {
+    throw new HttpError(404, 'API key not found');
+  }
+  if (existing.status !== 'approved' || !existing.pending_secret) {
+    throw new HttpError(410, 'Secret already retrieved or not available');
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .prepare('UPDATE api_keys SET pending_secret = NULL, secret_retrieved_at = ?, updated_at = ? WHERE id = ?')
+    .bind(now, now, id)
+    .run();
+
+  return json({ secret: existing.pending_secret });
+}
+
+async function syncGetRegistrations(db, tournamentId, url) {
+  const since = url.searchParams.get('since');
+  const sinceIso = since && !Number.isNaN(new Date(since).getTime()) ? new Date(since).toISOString() : new Date(0).toISOString();
+
+  const result = await db
+    .prepare('SELECT * FROM registrations WHERE tournament_id = ? AND updated_at > ? ORDER BY updated_at ASC')
+    .bind(tournamentId, sinceIso)
+    .all();
+
+  const registrations = result.results.map(toPublicRegistration);
+  const cursor = registrations.length > 0 ? registrations[registrations.length - 1].updatedAt : sinceIso;
+  return json({ registrations, cursor });
+}
+
+async function syncPostResults(request, db, tournamentId) {
+  const body = await readJson(request);
+  const entries = Array.isArray(body.registrations) ? body.registrations : [];
+  if (entries.length === 0) {
+    throw new HttpError(400, 'registrations must be a non-empty array');
+  }
+
+  const now = new Date().toISOString();
+  let updatedCount = 0;
+
+  for (const entry of entries) {
+    const id = String(entry.id || '');
+    if (!id) {
+      continue;
+    }
+
+    const status = entry.status !== undefined ? String(entry.status) : null;
+    if (status !== null && !REGISTRATION_STATUSES.includes(status)) {
+      throw new HttpError(400, `Invalid status for registration ${id}`);
+    }
+
+    const seedingPosition =
+      entry.seedingPosition === undefined || entry.seedingPosition === null
+        ? null
+        : Number.parseInt(entry.seedingPosition, 10);
+
+    const result = await db
+      .prepare(
+        `UPDATE registrations
+         SET status = COALESCE(?, status), seeding_position = ?, updated_at = ?
+         WHERE id = ? AND tournament_id = ?`,
+      )
+      .bind(status, seedingPosition, now, id, tournamentId)
+      .run();
+
+    updatedCount += result.meta.changes;
+  }
+
+  return json({ updatedCount });
+}
+
 async function submitTournamentTip(request, env, url) {
   const db = env.DB;
   const body = await readJson(request);
@@ -1312,6 +1547,49 @@ async function requireAdmin(request, db) {
     throw new HttpError(403, 'Admin role required');
   }
   return session;
+}
+
+async function requireApiKey(request, db) {
+  const authHeader = request.headers.get('Authorization') || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    throw new HttpError(401, 'API key required');
+  }
+
+  const secret = authHeader.slice('Bearer '.length).trim();
+  if (!secret) {
+    throw new HttpError(401, 'API key required');
+  }
+
+  const keyHash = await sha256Hex(secret);
+  const row = await db
+    .prepare(
+      `SELECT api_keys.id AS api_key_id, users.id, users.name, users.email, users.role,
+              users.email_verified_at, users.created_at, users.updated_at
+       FROM api_keys
+       JOIN users ON users.id = api_keys.user_id
+       WHERE api_keys.key_hash = ? AND api_keys.status = 'approved'`,
+    )
+    .bind(keyHash)
+    .first();
+
+  if (!row) {
+    throw new HttpError(401, 'Invalid or inactive API key');
+  }
+
+  await db
+    .prepare('UPDATE api_keys SET last_used_at = ? WHERE id = ?')
+    .bind(new Date().toISOString(), row.api_key_id)
+    .run();
+
+  return { user: toPublicUser(row), apiKeyId: row.api_key_id };
+}
+
+async function requireManagerAuth(request, db) {
+  const authHeader = request.headers.get('Authorization') || '';
+  if (authHeader.startsWith('Bearer ')) {
+    return await requireApiKey(request, db);
+  }
+  return await requireSession(request, db);
 }
 
 async function optionalSession(request, db) {
@@ -1647,6 +1925,23 @@ function toPublicRegistration(row) {
     status: row.status,
     registeredAt: row.registered_at,
     confirmedAt: row.confirmed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toPublicApiKey(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    label: row.label,
+    status: row.status,
+    requestedAt: row.requested_at,
+    approvedAt: row.approved_at,
+    revokedAt: row.revoked_at,
+    secretAvailable: Boolean(row.pending_secret),
+    secretRetrievedAt: row.secret_retrieved_at,
+    lastUsedAt: row.last_used_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
