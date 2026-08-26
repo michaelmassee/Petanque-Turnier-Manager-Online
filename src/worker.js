@@ -11,7 +11,7 @@ const TOURNAMENT_TYPES = [
   'supermelee',
   'trip_tete',
 ];
-const FORMATIONS = ['tete', 'doublette', 'triplette', 'doublette_mixed', 'triplette_mixed'];
+const FORMATIONS = ['tete', 'doublette', 'triplette'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
 const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
@@ -97,7 +97,7 @@ export default {
     }
 
     if (!url.pathname.startsWith('/api/')) {
-      return withSecurityHeaders(await env.ASSETS.fetch(request));
+      return withSecurityHeaders(await env.ASSETS.fetch(request), url);
     }
 
     try {
@@ -109,11 +109,11 @@ export default {
       }
 
       if (request.method === 'POST' && url.pathname === '/api/setup') {
-        return await setupAdmin(request, env.DB);
+        return await setupAdmin(request, env.DB, url);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/login') {
-        return await login(request, env.DB);
+        return await login(request, env.DB, url);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/register') {
@@ -133,7 +133,7 @@ export default {
       }
 
       if (request.method === 'POST' && url.pathname === '/api/logout') {
-        return await logout(request, env.DB);
+        return await logout(request, env.DB, url);
       }
 
       if (request.method === 'GET' && url.pathname === '/api/session') {
@@ -333,7 +333,7 @@ async function requireBasicAuth(request, env) {
 
   return new Response('Authentication required', {
     status: 401,
-    headers: { 'WWW-Authenticate': 'Basic realm="Petanque Turnier Manager"' },
+    headers: { 'WWW-Authenticate': 'Basic realm="Pétanque Turnier Manager"' },
   });
 }
 
@@ -357,7 +357,7 @@ async function needsSetup(db) {
   return Number(row?.count || 0) === 0;
 }
 
-async function setupAdmin(request, db) {
+async function setupAdmin(request, db, url) {
   if (!(await needsSetup(db))) {
     throw new HttpError(409, 'Setup already completed');
   }
@@ -380,11 +380,11 @@ async function setupAdmin(request, db) {
   return json(
     { user: toPublicUser({ id, name: user.name, email: user.email, role: 'admin', email_verified_at: now, created_at: now, updated_at: now }) },
     201,
-    { 'Set-Cookie': sessionCookie(session.id, session.expiresAt) },
+    { 'Set-Cookie': sessionCookie(session.id, session.expiresAt, url) },
   );
 }
 
-async function login(request, db) {
+async function login(request, db, url) {
   const body = await readJson(request);
   const email = String(body.email || '').trim().toLowerCase();
   const password = String(body.password || '');
@@ -403,7 +403,7 @@ async function login(request, db) {
   }
 
   const session = await createSession(db, row.id);
-  return json({ user: toPublicUser(row) }, 200, { 'Set-Cookie': sessionCookie(session.id, session.expiresAt) });
+  return json({ user: toPublicUser(row) }, 200, { 'Set-Cookie': sessionCookie(session.id, session.expiresAt, url) });
 }
 
 async function registerUser(request, env, url) {
@@ -473,13 +473,13 @@ async function verifyEmail(request, db) {
   return json({ ok: true });
 }
 
-async function logout(request, db) {
+async function logout(request, db, url) {
   const sessionId = getCookie(request, SESSION_COOKIE);
   if (sessionId) {
     await db.prepare('DELETE FROM sessions WHERE id = ?').bind(sessionId).run();
   }
 
-  return json({ ok: true }, 200, { 'Set-Cookie': expiredSessionCookie() });
+  return json({ ok: true }, 200, { 'Set-Cookie': expiredSessionCookie(url) });
 }
 
 async function forgotPassword(request, env, url) {
@@ -767,8 +767,8 @@ async function createTournament(request, db, user) {
       `INSERT INTO tournaments (
         id, created_by, manager_id, name, date, start_time, location, description, type, formation, status,
         max_registrations, registration_deadline, entry_fee_cents, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, region, participants_public, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        visibility, internal_notes, participants_public, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -790,7 +790,6 @@ async function createTournament(request, db, user) {
       tournament.contactPhone,
       tournament.visibility,
       tournament.internalNotes,
-      tournament.region,
       tournament.participantsPublic ? 1 : 0,
       now,
       now,
@@ -813,7 +812,7 @@ async function updateTournament(request, db, existing, user) {
        SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
-           region = ?, participants_public = ?, updated_at = ?
+           participants_public = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -834,7 +833,6 @@ async function updateTournament(request, db, existing, user) {
       tournament.contactPhone,
       tournament.visibility,
       tournament.internalNotes,
-      tournament.region,
       tournament.participantsPublic ? 1 : 0,
       now,
       existing.id,
@@ -1423,7 +1421,6 @@ function normalizeTournamentInput(body) {
     visibility: text(body.visibility || 'private'),
     internalNotes: nullableText(body.internalNotes),
     managerId: nullableText(body.managerId),
-    region: nullableText(body.region),
     participantsPublic: Boolean(body.participantsPublic),
   };
 
@@ -1621,7 +1618,6 @@ function toPublicTournament(row, user) {
     contactPhone: row.contact_phone,
     visibility: row.visibility,
     internalNotes: canManageTournament(row, user) ? row.internal_notes : null,
-    region: row.region,
     participantsPublic: Boolean(Number(row.participants_public)),
     activeRegistrations: Number(row.active_registrations || 0),
     waitlistRegistrations: Number(row.waitlist_registrations || 0),
@@ -1665,12 +1661,14 @@ function getCookie(request, name) {
     ?.slice(name.length + 1);
 }
 
-function sessionCookie(value, expiresAt) {
-  return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Secure; Expires=${expiresAt.toUTCString()}`;
+function sessionCookie(value, expiresAt, url) {
+  const secure = !url || url.protocol === 'https:' ? '; Secure' : '';
+  return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax${secure}; Expires=${expiresAt.toUTCString()}`;
 }
 
-function expiredSessionCookie() {
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0`;
+function expiredSessionCookie(url) {
+  const secure = !url || url.protocol === 'https:' ? '; Secure' : '';
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=0`;
 }
 
 function json(payload, status = 200, headers = {}) {
@@ -1685,10 +1683,22 @@ function json(payload, status = 200, headers = {}) {
   });
 }
 
-function withSecurityHeaders(response) {
+function withSecurityHeaders(response, url) {
   const secured = new Response(response.body, response);
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
     secured.headers.set(name, value);
+  }
+  if (url && url.protocol !== 'https:') {
+    // upgrade-insecure-requests forces same-origin assets (JS/CSS) to load over
+    // HTTPS even when the page itself was served over plain HTTP. That breaks
+    // local/LAN dev access (wrangler dev has no TLS listener), leaving a blank
+    // page, without adding any protection for a connection that is already
+    // non-HTTPS. Only applies to non-HTTPS requests, so deployed HTTPS traffic
+    // is unaffected.
+    secured.headers.set(
+      'Content-Security-Policy',
+      SECURITY_HEADERS['Content-Security-Policy'].replace(/;\s*upgrade-insecure-requests/, ''),
+    );
   }
   return secured;
 }

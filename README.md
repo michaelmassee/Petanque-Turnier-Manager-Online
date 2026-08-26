@@ -1,4 +1,4 @@
-# Petanque Turnier Manager Online
+# Pétanque Turnier Manager Online
 
 React app for Cloudflare Workers Static Assets with a Worker API, D1 database,
 login, password reset flow, role-based user management, tournament management,

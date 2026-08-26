@@ -23,30 +23,7 @@ const FORMATIONS = [
   { value: 'tete', label: 'Tête' },
   { value: 'doublette', label: 'Doublette' },
   { value: 'triplette', label: 'Triplette' },
-  { value: 'doublette_mixed', label: 'Doublette gemischt' },
-  { value: 'triplette_mixed', label: 'Triplette gemischt' },
 ];
-
-const REGIONS = [
-  'Baden-Württemberg',
-  'Bayern',
-  'Berlin',
-  'Brandenburg',
-  'Bremen',
-  'Hamburg',
-  'Hessen',
-  'Mecklenburg-Vorpommern',
-  'Niedersachsen',
-  'Nordrhein-Westfalen',
-  'Rheinland-Pfalz',
-  'Saarland',
-  'Sachsen',
-  'Sachsen-Anhalt',
-  'Schleswig-Holstein',
-  'Thüringen',
-];
-
-const REGION_OPTIONS = [{ value: '', label: 'Keine Angabe' }, ...REGIONS.map((region) => ({ value: region, label: region }))];
 
 const MONTHS = [
   { value: '01', label: 'Januar' },
@@ -116,7 +93,6 @@ const EMPTY_TOURNAMENT_FORM = {
   contactPhone: '',
   visibility: 'private',
   internalNotes: '',
-  region: '',
   participantsPublic: false,
 };
 
@@ -168,10 +144,8 @@ export default function App() {
   const [homeVisibleCount, setHomeVisibleCount] = useState(10);
   const [homeFilterOpen, setHomeFilterOpen] = useState(false);
   const [homeFilterMonth, setHomeFilterMonth] = useState('');
-  const [homeFilterRegion, setHomeFilterRegion] = useState('');
   const [homeFilterFormation, setHomeFilterFormation] = useState('');
   const [homeFilterOpenOnly, setHomeFilterOpenOnly] = useState(false);
-  const [homeFilterHideWeekdayEvenings, setHomeFilterHideWeekdayEvenings] = useState(false);
   const [path, navigate] = usePath();
   const [tournamentTips, setTournamentTips] = useState([]);
   const [pendingTips, setPendingTips] = useState([]);
@@ -209,16 +183,10 @@ export default function App() {
       if (homeFilterMonth && tournament.date.slice(5, 7) !== homeFilterMonth) {
         return false;
       }
-      if (homeFilterRegion && tournament.region !== homeFilterRegion) {
-        return false;
-      }
       if (homeFilterFormation && tournament.formation !== homeFilterFormation) {
         return false;
       }
       if (homeFilterOpenOnly && !hasOpenRegistration(tournament)) {
-        return false;
-      }
-      if (homeFilterHideWeekdayEvenings && isWeekdayEveningTournament(tournament)) {
         return false;
       }
       if (!query) {
@@ -234,10 +202,8 @@ export default function App() {
     homeOnlyMine,
     currentUser,
     homeFilterMonth,
-    homeFilterRegion,
     homeFilterFormation,
     homeFilterOpenOnly,
-    homeFilterHideWeekdayEvenings,
   ]);
 
   const visibleHomeTournaments = filteredHomeTournaments.slice(0, homeVisibleCount);
@@ -245,7 +211,7 @@ export default function App() {
 
   useEffect(() => {
     setHomeVisibleCount(10);
-  }, [homeQuery, homeOnlyMine, homeFilterMonth, homeFilterRegion, homeFilterFormation, homeFilterOpenOnly, homeFilterHideWeekdayEvenings]);
+  }, [homeQuery, homeOnlyMine, homeFilterMonth, homeFilterFormation, homeFilterOpenOnly]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -735,7 +701,6 @@ export default function App() {
       contactPhone: tournament.contactPhone || '',
       visibility: tournament.visibility || 'private',
       internalNotes: tournament.internalNotes || '',
-      region: tournament.region || '',
       participantsPublic: Boolean(tournament.participantsPublic),
     });
     setActiveTab('tournaments');
@@ -773,16 +738,14 @@ export default function App() {
 
   function resetHomeFilters() {
     setHomeFilterMonth('');
-    setHomeFilterRegion('');
     setHomeFilterFormation('');
     setHomeFilterOpenOnly(false);
-    setHomeFilterHideWeekdayEvenings(false);
   }
 
   const roleLabel = useMemo(() => roleName(currentUser?.role), [currentUser]);
 
   if (loading) {
-    return <AuthShell title="Petanque Turnier Manager Online" subtitle="App wird geladen." language={language} setLanguage={setLanguage} />;
+    return <AuthShell title="Pétanque Turnier Manager Online" subtitle="App wird geladen." language={language} setLanguage={setLanguage} />;
   }
 
   const tournamentRoute = matchTournamentRoute(path);
@@ -890,14 +853,10 @@ export default function App() {
           setFilterOpen={setHomeFilterOpen}
           filterMonth={homeFilterMonth}
           setFilterMonth={setHomeFilterMonth}
-          filterRegion={homeFilterRegion}
-          setFilterRegion={setHomeFilterRegion}
           filterFormation={homeFilterFormation}
           setFilterFormation={setHomeFilterFormation}
           filterOpenOnly={homeFilterOpenOnly}
           setFilterOpenOnly={setHomeFilterOpenOnly}
-          filterHideWeekdayEvenings={homeFilterHideWeekdayEvenings}
-          setFilterHideWeekdayEvenings={setHomeFilterHideWeekdayEvenings}
           onResetFilters={resetHomeFilters}
           tournaments={visibleHomeTournaments}
           total={filteredHomeTournaments.length}
@@ -1102,14 +1061,10 @@ export default function App() {
           setFilterOpen={setHomeFilterOpen}
           filterMonth={homeFilterMonth}
           setFilterMonth={setHomeFilterMonth}
-          filterRegion={homeFilterRegion}
-          setFilterRegion={setHomeFilterRegion}
           filterFormation={homeFilterFormation}
           setFilterFormation={setHomeFilterFormation}
           filterOpenOnly={homeFilterOpenOnly}
           setFilterOpenOnly={setHomeFilterOpenOnly}
-          filterHideWeekdayEvenings={homeFilterHideWeekdayEvenings}
-          setFilterHideWeekdayEvenings={setHomeFilterHideWeekdayEvenings}
           onResetFilters={resetHomeFilters}
           tournaments={visibleHomeTournaments}
           total={filteredHomeTournaments.length}
@@ -1292,8 +1247,8 @@ function AuthShell({ title, subtitle, children, language, setLanguage }) {
           <InstallAppButton />
           <LanguageSelect language={language} setLanguage={setLanguage} />
         </div>
-        <img src="/icons/logo.png" alt="Petanque Turnier Manager Online" className="app-icon" />
-        <p className="eyebrow">Petanque Turnier Manager Online</p>
+        <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="app-icon" />
+        <p className="eyebrow">Pétanque Turnier Manager Online</p>
         <h1 id="page-title">{title}</h1>
         <p className="subtitle">{subtitle}</p>
         {children}
@@ -1402,9 +1357,9 @@ function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onC
   return (
     <header className="topbar">
       <div className="brand">
-        <img src="/icons/logo.png" alt="Petanque Turnier Manager Online" className="brand-logo" />
+        <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="brand-logo" />
         <div>
-          <p className="eyebrow">Petanque Turnier Manager Online</p>
+          <p className="eyebrow">Pétanque Turnier Manager Online</p>
           <h1>{heading}</h1>
         </div>
       </div>
@@ -1415,9 +1370,11 @@ function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onC
         aria-expanded={menuOpen}
         onClick={onToggleMenu}
       >
-        <span />
-        <span />
-        <span />
+        <span className="hamburger-icon" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
       </button>
       {menuOpen && (
         <>
@@ -1650,7 +1607,6 @@ function TournamentInfo({ tournament }) {
       </p>
       <p>
         <strong>Ort</strong>: {tournament.location}
-        {tournament.region ? ` (${tournament.region})` : ''}
       </p>
       <p>
         <strong>Turniersystem</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
@@ -1755,38 +1711,63 @@ function SubmitTournamentTipPage({ language, setLanguage, menuOpen, setMenuOpen,
 
       <Feedback message={message} error={error} />
 
-      <section className="home-tournaments">
-        <div className="panel">
+      <section className="submit-tip-page">
+        <div className="submit-tip-intro">
+          <div>
+            <p className="eyebrow">Kalendereintrag für externe Anmeldung</p>
+            <h2>Turnier einreichen</h2>
+            <p className="subtitle">
+              Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.
+            </p>
+          </div>
+          <button className="link-button" type="button" onClick={() => navigate('/')}>
+            Zur Startseite
+          </button>
+        </div>
+
+        <div className="panel submit-tip-panel">
           <p className="muted">
-            Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.
+            Wir veröffentlichen bestätigte Meldungen nach kurzer Prüfung in der öffentlichen Turniersuche.
           </p>
           <form className="form dense" onSubmit={onSubmit}>
-            <TextField label="Turniername" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
-            <div className="form-grid">
-              <TextField label="Datum" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
-              <TextField label="Startzeit" type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
-            </div>
-            <TextField label="Ort" value={form.location} onChange={(location) => setForm({ ...form, location })} />
-            <SelectField label="Formation" value={form.formation} onChange={(formation) => setForm({ ...form, formation })} options={FORMATIONS} />
-            <TextArea label="Weitere Infos" value={form.info} onChange={(info) => setForm({ ...form, info })} />
-            <TextField
-              label="Link zur Website"
-              type="url"
-              value={form.externalLink}
-              onChange={(externalLink) => setForm({ ...form, externalLink })}
-              required
-            />
-            <TextField label="Flyer-Link (PDF)" type="url" value={form.flyerLink} onChange={(flyerLink) => setForm({ ...form, flyerLink })} />
-            <div className="form-grid">
-              <TextField label="Dein Name" value={form.submitterName} onChange={(submitterName) => setForm({ ...form, submitterName })} required minLength={2} />
+            <fieldset className="form-section">
+              <legend>Turnierdaten</legend>
+              <TextField label="Turniername" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+              <div className="form-grid">
+                <TextField label="Datum" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
+                <TextField label="Startzeit" type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
+              </div>
+              <TextField label="Ort" value={form.location} onChange={(location) => setForm({ ...form, location })} />
+              <SelectField label="Formation" value={form.formation} onChange={(formation) => setForm({ ...form, formation })} options={FORMATIONS} />
+              <TextArea label="Weitere Infos" value={form.info} onChange={(info) => setForm({ ...form, info })} />
+            </fieldset>
+
+            <fieldset className="form-section">
+              <legend>Anmeldelink</legend>
               <TextField
-                label="Deine E-Mail"
-                type="email"
-                value={form.submitterEmail}
-                onChange={(submitterEmail) => setForm({ ...form, submitterEmail })}
+                label="Link zur Website"
+                type="url"
+                value={form.externalLink}
+                onChange={(externalLink) => setForm({ ...form, externalLink })}
                 required
               />
-            </div>
+              <TextField label="Flyer-Link (PDF)" type="url" value={form.flyerLink} onChange={(flyerLink) => setForm({ ...form, flyerLink })} />
+            </fieldset>
+
+            <fieldset className="form-section">
+              <legend>Kontakt für Rückfragen</legend>
+              <div className="form-grid">
+                <TextField label="Dein Name" value={form.submitterName} onChange={(submitterName) => setForm({ ...form, submitterName })} required minLength={2} />
+                <TextField
+                  label="Deine E-Mail"
+                  type="email"
+                  value={form.submitterEmail}
+                  onChange={(submitterEmail) => setForm({ ...form, submitterEmail })}
+                  required
+                />
+              </div>
+            </fieldset>
+
             <label className="checkbox-field">
               <input
                 type="checkbox"
@@ -1852,14 +1833,10 @@ function HomeTournaments({
   setFilterOpen,
   filterMonth,
   setFilterMonth,
-  filterRegion,
-  setFilterRegion,
   filterFormation,
   setFilterFormation,
   filterOpenOnly,
   setFilterOpenOnly,
-  filterHideWeekdayEvenings,
-  setFilterHideWeekdayEvenings,
   onResetFilters,
   tournaments,
   total,
@@ -1870,10 +1847,40 @@ function HomeTournaments({
   tips,
   navigate,
 }) {
+  const activeFilterCount = [
+    showMineFilter && onlyMine,
+    filterMonth,
+    filterFormation,
+    filterOpenOnly,
+  ].filter(Boolean).length;
+  const nextTournament = tournaments[0] || null;
+
   return (
     <section className="home-tournaments">
-      <div className="home-search">
-        <label>
+      <div className="home-finder">
+        <div className="home-finder-copy">
+          <p className="eyebrow">Pétanque Turnier Manager Online</p>
+          <h2>Finde dein nächstes Pétanque-Turnier</h2>
+          <p className="subtitle">Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.</p>
+        </div>
+        <div className="home-finder-stats" aria-label="Turniersuche Übersicht">
+          <div>
+            <strong>{total}</strong>
+            <span>Gefundene Turniere</span>
+          </div>
+          <div>
+            <strong>{nextTournament ? formatDate(nextTournament.date) : 'keiner'}</strong>
+            <span>Nächster Termin</span>
+          </div>
+          <div>
+            <strong>{activeFilterCount > 0 ? 'Filter aktiv' : 'Keine Filter aktiv'}</strong>
+            <span>Finder</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="home-search-panel">
+        <label className="home-search-field">
           Turnier suchen
           <input
             type="search"
@@ -1882,83 +1889,94 @@ function HomeTournaments({
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        {showMineFilter && (
-          <label className="checkbox-field">
-            <input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} />
-            Nur meine Turniere
-          </label>
+        <div className="home-search-actions">
+          {showMineFilter && (
+            <label className="checkbox-field">
+              <input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} />
+              Nur meine Turniere
+            </label>
+          )}
+          <Button variant="secondary" onClick={() => setFilterOpen((open) => !open)}>
+            {filterOpen ? 'Filter ausblenden' : 'Filter anzeigen'}
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/turnier-melden')}>
+            Turnier melden
+          </Button>
+        </div>
+
+        {filterOpen && (
+          <div className="filter-panel">
+            <div className="filter-grid">
+              <SelectField
+                label="Monat"
+                value={filterMonth}
+                onChange={setFilterMonth}
+                options={[{ value: '', label: 'Alle Monate' }, ...MONTHS]}
+              />
+              <SelectField
+                label="Formation"
+                value={filterFormation}
+                onChange={setFilterFormation}
+                options={[{ value: '', label: 'Alle Formationen' }, ...FORMATIONS]}
+              />
+            </div>
+            <label className="checkbox-field">
+              <input type="checkbox" checked={filterOpenOnly} onChange={(event) => setFilterOpenOnly(event.target.checked)} />
+              Anmeldung möglich
+            </label>
+            <div className="filter-actions">
+              <button className="link-button" type="button" onClick={onResetFilters}>
+                Zurücksetzen
+              </button>
+            </div>
+          </div>
         )}
-        <Button variant="secondary" onClick={() => setFilterOpen((open) => !open)}>
-          {filterOpen ? 'Filter ausblenden' : 'Filter anzeigen'}
-        </Button>
-        <Button variant="secondary" onClick={() => navigate('/turnier-melden')}>
-          Turnier melden
-        </Button>
       </div>
 
-      {filterOpen && (
-        <div className="filter-panel">
-          <div className="filter-grid">
-            <SelectField
-              label="Monat"
-              value={filterMonth}
-              onChange={setFilterMonth}
-              options={[{ value: '', label: 'Alle Monate' }, ...MONTHS]}
-            />
-            <SelectField label="Bundesland" value={filterRegion} onChange={setFilterRegion} options={REGION_OPTIONS} />
-            <SelectField
-              label="Formation"
-              value={filterFormation}
-              onChange={setFilterFormation}
-              options={[{ value: '', label: 'Alle Formationen' }, ...FORMATIONS]}
-            />
-          </div>
-          <label className="checkbox-field">
-            <input type="checkbox" checked={filterOpenOnly} onChange={(event) => setFilterOpenOnly(event.target.checked)} />
-            Anmeldung möglich
-          </label>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={filterHideWeekdayEvenings}
-              onChange={(event) => setFilterHideWeekdayEvenings(event.target.checked)}
-            />
-            Wochentags-Abendturniere ausblenden
-          </label>
-          <div className="filter-actions">
-            <button className="link-button" type="button" onClick={onResetFilters}>
-              Zurücksetzen
-            </button>
-          </div>
+      <div className="section-title home-results-title">
+        <div>
+          <p className="eyebrow">Alle passenden Turniere</p>
+          <h2>{heading}</h2>
         </div>
-      )}
-
-      <div className="section-title">
-        <h2>{heading}</h2>
         <span className="counter">{total}</span>
       </div>
 
-      {!tournaments.length && <p className="muted">Keine Turniere gefunden.</p>}
+      {!tournaments.length && (
+        <div className="empty-state">
+          <strong>Keine Turniere gefunden.</strong>
+          <p className="muted">Passe die Suche an oder melde ein Turnier, das im Kalender fehlt.</p>
+          <Button variant="secondary" onClick={() => navigate('/turnier-melden')}>
+            Turnier melden
+          </Button>
+        </div>
+      )}
 
-      <div className="user-list">
+      <div className="tournament-card-list">
         {tournaments.map((tournament) => (
-          <article className="data-row" key={tournament.id}>
-            <button className="row-main" type="button" onClick={() => onOpenTournament(tournament)}>
-              <strong>{tournament.name}</strong>
-              <span>{formatDate(tournament.date)} {tournament.startTime || ''} · {tournament.location}</span>
-              <small>
-                {labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)}
-                {tournament.region ? ` · ${tournament.region}` : ''}
-              </small>
+          <article className="tournament-card" key={tournament.id}>
+            <button className="tournament-card-main" type="button" onClick={() => onOpenTournament(tournament)}>
+              <span className="tournament-card-date">
+                <strong>{formatDate(tournament.date)}</strong>
+                <small>{tournament.startTime || 'Ganztägig'}</small>
+              </span>
+              <span className="tournament-card-copy">
+                <strong>{tournament.name}</strong>
+                <span>{tournament.location}</span>
+                <small>
+                  {labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)}
+                </small>
+              </span>
             </button>
-            <span className={`status status-${tournament.status}`}>{registrationStatusLabel(tournament, language)}</span>
-            <Button
-              variant="secondary"
-              onClick={() => onRegister(tournament)}
-              disabled={tournament.status !== 'registration' || tournament.visibility !== 'public'}
-            >
-              Anmelden
-            </Button>
+            <div className="tournament-card-meta">
+              <span className={`status status-${tournament.status}`}>{registrationStatusLabel(tournament, language)}</span>
+              <Button
+                variant="secondary"
+                onClick={() => onRegister(tournament)}
+                disabled={tournament.status !== 'registration' || tournament.visibility !== 'public'}
+              >
+                Anmelden
+              </Button>
+            </div>
           </article>
         ))}
       </div>
@@ -1974,17 +1992,26 @@ function HomeTournaments({
       {tips.length > 0 && (
         <div className="tip-list">
           <div className="section-title">
-            <h2>Vorgeschlagene Turniere</h2>
+            <div>
+              <p className="eyebrow">Extern gemeldet</p>
+              <h2>Vorgeschlagene Turniere</h2>
+            </div>
             <span className="counter">{tips.length}</span>
           </div>
-          <p className="muted">Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns &mdash; Anmeldung erfolgt extern.</p>
-          <div className="user-list">
+          <p className="muted">Kalendereinträge von Vereinen mit Anmeldung auf deren eigener Seite.</p>
+          <div className="tournament-card-list compact">
             {tips.map((tip) => (
-              <article className="data-row tip-card" key={tip.id}>
-                <div>
-                  <strong>{tip.name}</strong>
-                  <span>{formatDate(tip.date)} {tip.startTime || ''} · {tip.location || ''}</span>
-                  <small>{labelFor(FORMATIONS, tip.formation)}</small>
+              <article className="tournament-card tip-card" key={tip.id}>
+                <div className="tournament-card-main">
+                  <span className="tournament-card-date">
+                    <strong>{formatDate(tip.date)}</strong>
+                    <small>{tip.startTime || 'Ganztägig'}</small>
+                  </span>
+                  <span className="tournament-card-copy">
+                    <strong>{tip.name}</strong>
+                    <span>{tip.location || ''}</span>
+                    <small>{labelFor(FORMATIONS, tip.formation)}</small>
+                  </span>
                 </div>
                 <a className="button button-secondary" href={tip.externalLink} target="_blank" rel="noreferrer">
                   Zur Anmeldung
@@ -2028,7 +2055,6 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
         <SelectField label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={TOURNAMENT_STATUSES} />
         <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(visibility) => setForm({ ...form, visibility })} options={VISIBILITIES} />
       </div>
-      <SelectField label="Bundesland" value={form.region} onChange={(region) => setForm({ ...form, region })} options={REGION_OPTIONS} />
       <div className="form-grid">
         <TextField label="Max. Meldungen" type="number" min="0" value={form.maxRegistrations} onChange={(maxRegistrations) => setForm({ ...form, maxRegistrations })} />
         <TextField label="Startgeld EUR" inputMode="decimal" value={form.entryFeeEuro} onChange={(entryFeeEuro) => setForm({ ...form, entryFeeEuro })} />
@@ -2408,7 +2434,6 @@ function tournamentPayload(form) {
     contactPhone: form.contactPhone || null,
     visibility: form.visibility,
     internalNotes: form.internalNotes || null,
-    region: form.region || null,
     participantsPublic: Boolean(form.participantsPublic),
   };
 }
@@ -2463,15 +2488,6 @@ function hasOpenRegistration(tournament) {
     return true;
   }
   return tournament.activeRegistrations < tournament.maxRegistrations || tournament.waitlistRegistrations > 0;
-}
-
-function isWeekdayEveningTournament(tournament) {
-  if (!tournament.startTime) {
-    return false;
-  }
-  const day = new Date(`${tournament.date}T00:00:00`).getDay();
-  const isWeekday = day >= 1 && day <= 5;
-  return isWeekday && tournament.startTime >= '17:00';
 }
 
 const SLOTS_FREE_TEMPLATES = {
@@ -2666,7 +2682,6 @@ const TRANSLATIONS = {
     November: 'November',
     Dezember: 'December',
     'Keine Angabe': 'Geen opgave',
-    Bundesland: 'Deelstaat',
     'Teilnehmerliste öffentlich sichtbar': 'Deelnemerslijst openbaar zichtbaar',
     'Nur meine Turniere': 'Alleen mijn toernooien',
     'Turnier suchen': 'Toernooi zoeken',
@@ -2674,11 +2689,28 @@ const TRANSLATIONS = {
     'Filter ausblenden': 'Filter verbergen',
     'Filter anzeigen': 'Filter tonen',
     'Turnier melden': 'Toernooi melden',
+    'Finde dein nächstes Pétanque-Turnier': 'Vind je volgende pétanquetoernooi',
+    'Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.':
+      'Zoek op plaats, vereniging of toernooisysteem en schrijf je direct online in.',
+    'Gefundene Turniere': 'Gevonden toernooien',
+    keiner: 'geen',
+    'Nächster Termin': 'Volgende datum',
+    'Filter aktiv': 'Filter actief',
+    'Keine Filter aktiv': 'Geen filter actief',
+    Finder: 'Zoeker',
+    'Alle passenden Turniere': 'Alle passende toernooien',
+    'Keine Turniere gefunden.': 'Geen toernooien gevonden.',
+    'Passe die Suche an oder melde ein Turnier, das im Kalender fehlt.':
+      'Pas de zoekopdracht aan of meld een toernooi dat in de kalender ontbreekt.',
+    Ganztägig: 'Hele dag',
+    'Weitere Turniere laden': 'Meer toernooien laden',
+    'Extern gemeldet': 'Extern gemeld',
+    'Kalendereinträge von Vereinen mit Anmeldung auf deren eigener Seite.':
+      'Kalendervermeldingen van verenigingen met inschrijving op hun eigen website.',
     Monat: 'Maand',
     'Alle Monate': 'Alle maanden',
     'Alle Formationen': 'Alle formaties',
     'Anmeldung möglich': 'Inschrijving mogelijk',
-    'Wochentags-Abendturniere ausblenden': 'Doordeweekse avondtoernooien verbergen',
     Zurücksetzen: 'Resetten',
     'Vorgeschlagene Turniere': 'Voorgestelde toernooien',
     'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
@@ -2699,8 +2731,15 @@ const TRANSLATIONS = {
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'De deelnemerslijst is voor dit toernooi niet openbaar.',
     'Teilnehmerliste wird geladen…': 'Deelnemerslijst wordt geladen…',
     'Noch keine Anmeldungen.': 'Nog geen inschrijvingen.',
+    'Kalendereintrag für externe Anmeldung': 'Kalendervermelding voor externe inschrijving',
+    'Turnier einreichen': 'Toernooi indienen',
     'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
       'Staat jullie toernooi nog niet bij ons? Meld het hier aan als kalendervermelding met link naar externe inschrijving.',
+    'Wir veröffentlichen bestätigte Meldungen nach kurzer Prüfung in der öffentlichen Turniersuche.':
+      'We publiceren bevestigde meldingen na een korte controle in de openbare toernooizoekfunctie.',
+    Turnierdaten: 'Toernooigegevens',
+    Anmeldelink: 'Inschrijflink',
+    'Kontakt für Rückfragen': 'Contact voor vragen',
     Turniername: 'Toernooinaam',
     'Weitere Infos': 'Meer info',
     'Link zur Website': 'Link naar website',
@@ -2852,7 +2891,6 @@ const TRANSLATIONS = {
     November: 'November',
     Dezember: 'December',
     'Keine Angabe': 'Not specified',
-    Bundesland: 'Federal state',
     'Teilnehmerliste öffentlich sichtbar': 'Participant list publicly visible',
     'Nur meine Turniere': 'Only my tournaments',
     'Turnier suchen': 'Search tournament',
@@ -2860,11 +2898,28 @@ const TRANSLATIONS = {
     'Filter ausblenden': 'Hide filter',
     'Filter anzeigen': 'Show filter',
     'Turnier melden': 'Submit tournament',
+    'Finde dein nächstes Pétanque-Turnier': 'Find your next pétanque tournament',
+    'Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.':
+      'Search by location, club or tournament system and register online.',
+    'Gefundene Turniere': 'Found tournaments',
+    keiner: 'none',
+    'Nächster Termin': 'Next date',
+    'Filter aktiv': 'Filter active',
+    'Keine Filter aktiv': 'No filter active',
+    Finder: 'Finder',
+    'Alle passenden Turniere': 'All matching tournaments',
+    'Keine Turniere gefunden.': 'No tournaments found.',
+    'Passe die Suche an oder melde ein Turnier, das im Kalender fehlt.':
+      'Adjust the search or submit a tournament that is missing from the calendar.',
+    Ganztägig: 'All day',
+    'Weitere Turniere laden': 'Load more tournaments',
+    'Extern gemeldet': 'Submitted externally',
+    'Kalendereinträge von Vereinen mit Anmeldung auf deren eigener Seite.':
+      'Calendar entries from clubs with registration on their own website.',
     Monat: 'Month',
     'Alle Monate': 'All months',
     'Alle Formationen': 'All formations',
     'Anmeldung möglich': 'Registration possible',
-    'Wochentags-Abendturniere ausblenden': 'Hide weekday evening tournaments',
     Zurücksetzen: 'Reset',
     'Vorgeschlagene Turniere': 'Suggested tournaments',
     'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
@@ -2885,8 +2940,15 @@ const TRANSLATIONS = {
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'The participant list is not public for this tournament.',
     'Teilnehmerliste wird geladen…': 'Loading participant list…',
     'Noch keine Anmeldungen.': 'No registrations yet.',
+    'Kalendereintrag für externe Anmeldung': 'Calendar entry for external registration',
+    'Turnier einreichen': 'Submit tournament',
     'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
       'Is your tournament not yet listed with us? Submit it here as a calendar entry with a link to external registration.',
+    'Wir veröffentlichen bestätigte Meldungen nach kurzer Prüfung in der öffentlichen Turniersuche.':
+      'We publish confirmed submissions in the public tournament search after a short review.',
+    Turnierdaten: 'Tournament details',
+    Anmeldelink: 'Registration link',
+    'Kontakt für Rückfragen': 'Contact for questions',
     Turniername: 'Tournament name',
     'Weitere Infos': 'More info',
     'Link zur Website': 'Link to website',
@@ -3039,7 +3101,6 @@ const TRANSLATIONS = {
     November: 'Noviembre',
     Dezember: 'Diciembre',
     'Keine Angabe': 'Sin especificar',
-    Bundesland: 'Estado federado',
     'Teilnehmerliste öffentlich sichtbar': 'Lista de participantes visible públicamente',
     'Nur meine Turniere': 'Solo mis torneos',
     'Turnier suchen': 'Buscar torneo',
@@ -3047,11 +3108,28 @@ const TRANSLATIONS = {
     'Filter ausblenden': 'Ocultar filtro',
     'Filter anzeigen': 'Mostrar filtro',
     'Turnier melden': 'Notificar torneo',
+    'Finde dein nächstes Pétanque-Turnier': 'Encuentra tu próximo torneo de petanca',
+    'Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.':
+      'Busca por lugar, club o sistema de torneo e inscríbete online.',
+    'Gefundene Turniere': 'Torneos encontrados',
+    keiner: 'ninguno',
+    'Nächster Termin': 'Próxima fecha',
+    'Filter aktiv': 'Filtro activo',
+    'Keine Filter aktiv': 'Sin filtro activo',
+    Finder: 'Buscador',
+    'Alle passenden Turniere': 'Todos los torneos coincidentes',
+    'Keine Turniere gefunden.': 'No se encontraron torneos.',
+    'Passe die Suche an oder melde ein Turnier, das im Kalender fehlt.':
+      'Ajusta la búsqueda o notifica un torneo que falte en el calendario.',
+    Ganztägig: 'Todo el día',
+    'Weitere Turniere laden': 'Cargar más torneos',
+    'Extern gemeldet': 'Notificado externamente',
+    'Kalendereinträge von Vereinen mit Anmeldung auf deren eigener Seite.':
+      'Entradas de calendario de clubes con inscripción en su propia web.',
     Monat: 'Mes',
     'Alle Monate': 'Todos los meses',
     'Alle Formationen': 'Todas las formaciones',
     'Anmeldung möglich': 'Inscripción posible',
-    'Wochentags-Abendturniere ausblenden': 'Ocultar torneos entre semana por la tarde',
     Zurücksetzen: 'Restablecer',
     'Vorgeschlagene Turniere': 'Torneos sugeridos',
     'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
@@ -3072,8 +3150,15 @@ const TRANSLATIONS = {
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'La lista de participantes no es pública para este torneo.',
     'Teilnehmerliste wird geladen…': 'Cargando lista de participantes…',
     'Noch keine Anmeldungen.': 'Aún no hay inscripciones.',
+    'Kalendereintrag für externe Anmeldung': 'Entrada de calendario para inscripción externa',
+    'Turnier einreichen': 'Enviar torneo',
     'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
       '¿Vuestro torneo aún no está en nuestro calendario? Notificadlo aquí como entrada con enlace a la inscripción externa.',
+    'Wir veröffentlichen bestätigte Meldungen nach kurzer Prüfung in der öffentlichen Turniersuche.':
+      'Publicamos avisos confirmados en la búsqueda pública de torneos tras una breve revisión.',
+    Turnierdaten: 'Datos del torneo',
+    Anmeldelink: 'Enlace de inscripción',
+    'Kontakt für Rückfragen': 'Contacto para preguntas',
     Turniername: 'Nombre del torneo',
     'Weitere Infos': 'Más información',
     'Link zur Website': 'Enlace al sitio web',
@@ -3225,7 +3310,6 @@ const TRANSLATIONS = {
     November: 'Novembre',
     Dezember: 'Décembre',
     'Keine Angabe': 'Non précisé',
-    Bundesland: 'Land (région)',
     'Teilnehmerliste öffentlich sichtbar': 'Liste des participants visible publiquement',
     'Nur meine Turniere': 'Seulement mes tournois',
     'Turnier suchen': 'Rechercher un tournoi',
@@ -3233,11 +3317,28 @@ const TRANSLATIONS = {
     'Filter ausblenden': 'Masquer le filtre',
     'Filter anzeigen': 'Afficher le filtre',
     'Turnier melden': 'Signaler un tournoi',
+    'Finde dein nächstes Pétanque-Turnier': 'Trouve ton prochain tournoi de pétanque',
+    'Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.':
+      'Recherche par lieu, club ou système de tournoi et inscris-toi directement en ligne.',
+    'Gefundene Turniere': 'Tournois trouvés',
+    keiner: 'aucun',
+    'Nächster Termin': 'Prochaine date',
+    'Filter aktiv': 'Filtre actif',
+    'Keine Filter aktiv': 'Aucun filtre actif',
+    Finder: 'Recherche',
+    'Alle passenden Turniere': 'Tous les tournois correspondants',
+    'Keine Turniere gefunden.': 'Aucun tournoi trouvé.',
+    'Passe die Suche an oder melde ein Turnier, das im Kalender fehlt.':
+      'Ajuste la recherche ou signale un tournoi absent du calendrier.',
+    Ganztägig: 'Toute la journée',
+    'Weitere Turniere laden': 'Charger plus de tournois',
+    'Extern gemeldet': 'Signalé en externe',
+    'Kalendereinträge von Vereinen mit Anmeldung auf deren eigener Seite.':
+      'Entrées de calendrier de clubs avec inscription sur leur propre site.',
     Monat: 'Mois',
     'Alle Monate': 'Tous les mois',
     'Alle Formationen': 'Toutes les formations',
     'Anmeldung möglich': 'Inscription possible',
-    'Wochentags-Abendturniere ausblenden': 'Masquer les tournois en semaine le soir',
     Zurücksetzen: 'Réinitialiser',
     'Vorgeschlagene Turniere': 'Tournois proposés',
     'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
@@ -3258,8 +3359,15 @@ const TRANSLATIONS = {
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'La liste des participants n’est pas publique pour ce tournoi.',
     'Teilnehmerliste wird geladen…': 'Chargement de la liste des participants…',
     'Noch keine Anmeldungen.': 'Pas encore d’inscriptions.',
+    'Kalendereintrag für externe Anmeldung': 'Entrée de calendrier pour inscription externe',
+    'Turnier einreichen': 'Soumettre un tournoi',
     'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
       'Votre tournoi n’est pas encore chez nous ? Signalez-le ici comme entrée de calendrier avec un lien vers l’inscription externe.',
+    'Wir veröffentlichen bestätigte Meldungen nach kurzer Prüfung in der öffentlichen Turniersuche.':
+      'Nous publions les signalements confirmés dans la recherche publique de tournois après une courte vérification.',
+    Turnierdaten: 'Données du tournoi',
+    Anmeldelink: 'Lien d’inscription',
+    'Kontakt für Rückfragen': 'Contact pour questions',
     Turniername: 'Nom du tournoi',
     'Weitere Infos': 'Plus d’infos',
     'Link zur Website': 'Lien vers le site web',

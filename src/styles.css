@@ -255,20 +255,79 @@ textarea:focus {
 .hamburger-btn {
   display: grid;
   place-items: center;
-  gap: 4px;
   width: 44px;
   height: 44px;
   flex-shrink: 0;
-  border: 1px solid #c7d0df;
+  border: 1px solid #bcc8d9;
   border-radius: 6px;
   background: #ffffff;
+  color: #172033;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
-.hamburger-btn span {
+.hamburger-btn:hover {
+  border-color: #1677ff;
+  background: #f7fbff;
+}
+
+.hamburger-btn:focus-visible {
+  border-color: #1677ff;
+  outline: 3px solid rgb(22 119 255 / 18%);
+}
+
+.hamburger-btn[aria-expanded="true"] {
+  border-color: #1677ff;
+  background: #ecf4ff;
+  box-shadow: 0 0 0 3px rgb(22 119 255 / 12%);
+}
+
+.hamburger-icon {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  width: 22px;
+}
+
+.hamburger-icon::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #1677ff;
+  transform: translateY(-50%);
+}
+
+.hamburger-icon span {
   display: block;
-  width: 20px;
+  width: 22px;
   height: 2px;
-  background: #172033;
+  border-radius: 999px;
+  background: currentColor;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.hamburger-btn[aria-expanded="true"] .hamburger-icon::before {
+  opacity: 0;
+}
+
+.hamburger-btn[aria-expanded="true"] .hamburger-icon span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.hamburger-btn[aria-expanded="true"] .hamburger-icon span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-btn[aria-expanded="true"] .hamburger-icon span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
 }
 
 .nav-drawer-backdrop {
@@ -319,19 +378,6 @@ textarea:focus {
   color: #ffffff;
 }
 
-.home-search {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 20px;
-  max-width: 1180px;
-  margin: 0 auto 20px;
-}
-
-.home-search input[type="search"] {
-  max-width: 420px;
-}
-
 .checkbox-field {
   display: flex;
   flex-direction: row;
@@ -350,6 +396,99 @@ textarea:focus {
   margin: 0 auto;
 }
 
+.home-finder {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 20px;
+  align-items: stretch;
+  margin-bottom: 20px;
+}
+
+.home-finder-copy,
+.home-finder-stats,
+.home-search-panel,
+.empty-state,
+.submit-tip-intro {
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.home-finder-copy {
+  display: grid;
+  align-content: center;
+  min-height: 220px;
+  padding: 30px;
+  background:
+    linear-gradient(135deg, rgb(239 247 255 / 94%), rgb(255 255 255 / 94%)),
+    url("/icons/logo.png") right 28px center / 150px auto no-repeat;
+}
+
+.home-finder-copy h2 {
+  max-width: 620px;
+  margin-bottom: 12px;
+  font-size: 2.05rem;
+  line-height: 1.1;
+}
+
+.home-finder-copy .subtitle {
+  max-width: 560px;
+  margin-bottom: 0;
+}
+
+.home-finder-stats {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  background: #d7deea;
+}
+
+.home-finder-stats div {
+  display: grid;
+  align-content: center;
+  min-height: 72px;
+  padding: 18px;
+  background: #ffffff;
+}
+
+.home-finder-stats strong {
+  color: #172033;
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.home-finder-stats span {
+  color: #53627a;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.home-search-panel {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding: 18px;
+}
+
+.home-search-field input[type="search"] {
+  min-height: 50px;
+}
+
+.home-search-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-results-title {
+  align-items: flex-end;
+}
+
+.home-results-title .eyebrow {
+  margin-bottom: 6px;
+}
+
 .load-more-wrap {
   display: flex;
   justify-content: center;
@@ -359,12 +498,11 @@ textarea:focus {
 .filter-panel {
   display: grid;
   gap: 12px;
-  max-width: 1180px;
-  margin: 0 auto 20px;
+  margin-top: 2px;
   padding: 16px;
   border: 1px solid #d7deea;
   border-radius: 8px;
-  background: #ffffff;
+  background: #f8fafc;
 }
 
 .filter-grid {
@@ -380,14 +518,147 @@ textarea:focus {
 
 .tip-list {
   max-width: 1180px;
-  margin: 24px auto 0;
+  margin: 28px auto 0;
   border-top: 1px solid #e2e7f0;
-  padding-top: 22px;
+  padding-top: 24px;
+}
+
+.tournament-card-list {
+  display: grid;
+  gap: 12px;
+}
+
+.tournament-card-list.compact {
+  gap: 10px;
+}
+
+.tournament-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #dfe6f0;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+  box-shadow: 0 10px 26px rgb(23 32 51 / 5%);
+}
+
+.tournament-card-main {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.tournament-card-date {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-height: 72px;
+  border-radius: 8px;
+  background: #f4f6fa;
+  padding: 12px;
+}
+
+.tournament-card-date strong {
+  color: #172033;
+  line-height: 1.2;
+}
+
+.tournament-card-date small,
+.tournament-card-copy small {
+  color: #53627a;
+  line-height: 1.35;
+}
+
+.tournament-card-copy {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tournament-card-copy strong {
+  overflow-wrap: anywhere;
+}
+
+.tournament-card-copy span {
+  color: #364258;
+  overflow-wrap: anywhere;
+}
+
+.tournament-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .tip-card,
 .tip-moderation-row {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.empty-state {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  margin-bottom: 12px;
+  padding: 22px;
+}
+
+.empty-state strong {
+  font-size: 1.05rem;
+}
+
+.submit-tip-page {
+  display: grid;
+  gap: 18px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.submit-tip-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px;
+}
+
+.submit-tip-intro h2 {
+  margin-bottom: 8px;
+  font-size: 1.55rem;
+}
+
+.submit-tip-intro .subtitle {
+  margin-bottom: 0;
+}
+
+.submit-tip-panel {
+  box-shadow: none;
+}
+
+.form-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid #e2e7f0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.form-section legend {
+  padding: 0 6px;
+  color: #172033;
+  font-weight: 800;
 }
 
 .tournament-detail-page {
@@ -647,7 +918,8 @@ textarea:focus {
   .topbar,
   .account,
   .admin-grid,
-  .admin-grid.wide {
+  .admin-grid.wide,
+  .home-finder {
     align-items: stretch;
     display: grid;
     grid-template-columns: 1fr;
@@ -658,11 +930,21 @@ textarea:focus {
   }
 
   .badges,
-  .row-actions {
+  .row-actions,
+  .tournament-card-meta {
     justify-content: stretch;
   }
 
   .row-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tournament-card {
+    grid-template-columns: 1fr;
+  }
+
+  .tournament-card-meta {
     display: grid;
     grid-template-columns: 1fr 1fr;
   }
@@ -690,8 +972,30 @@ textarea:focus {
 
   .form-grid,
   .row-actions,
-  .row-actions.stretch {
+  .row-actions.stretch,
+  .filter-grid,
+  .tournament-card-main,
+  .tournament-card-meta,
+  .submit-tip-intro {
     grid-template-columns: 1fr;
+  }
+
+  .home-finder-copy {
+    min-height: 0;
+    padding: 22px;
+    background:
+      linear-gradient(135deg, rgb(239 247 255 / 96%), rgb(255 255 255 / 96%)),
+      url("/icons/logo.png") right 18px top 18px / 82px auto no-repeat;
+  }
+
+  .home-finder-copy h2 {
+    max-width: 240px;
+    font-size: 1.55rem;
+  }
+
+  .home-search-actions,
+  .submit-tip-intro {
+    display: grid;
   }
 
   h1 {
