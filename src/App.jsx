@@ -1303,7 +1303,7 @@ function AuthShell({ title, subtitle, children, language, setLanguage }) {
     <main className="page">
       <section className="auth-panel" aria-labelledby="page-title">
         <div className="language-bar">
-          <InstallAppButton />
+          <InstallAppButton className="button button-secondary install-link" />
           <LanguageSelect language={language} setLanguage={setLanguage} />
         </div>
         <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="app-icon" />
@@ -1445,9 +1445,9 @@ function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onC
         <>
           <div className="nav-drawer-backdrop" onClick={onCloseMenu} />
           <nav className="nav-drawer" aria-label="Hauptmenü">
-            <InstallAppButton />
             <LanguageSelect language={language} setLanguage={setLanguage} />
             {children}
+            <InstallAppButton />
             {navigate && (
               <div className="drawer-legal-links">
                 <button
@@ -2605,7 +2605,7 @@ function isIosSafari() {
   return isIos && isSafari;
 }
 
-function InstallAppButton({ variant = 'secondary' }) {
+function InstallAppButton({ className = 'drawer-link install-link' }) {
   const { canInstall, installed, promptInstall } = useInstallPrompt();
   const [showIosHint, setShowIosHint] = useState(false);
 
@@ -2615,18 +2615,18 @@ function InstallAppButton({ variant = 'secondary' }) {
 
   if (canInstall) {
     return (
-      <Button variant={variant} onClick={promptInstall}>
+      <button className={className} type="button" onClick={promptInstall}>
         App installieren
-      </Button>
+      </button>
     );
   }
 
   if (isIosSafari()) {
     return (
       <div className="install-hint">
-        <Button variant={variant} onClick={() => setShowIosHint((prev) => !prev)}>
+        <button className={className} type="button" onClick={() => setShowIosHint((prev) => !prev)}>
           App installieren
-        </Button>
+        </button>
         {showIosHint && (
           <p className="install-hint-text">
             Tippe unten auf <strong>Teilen</strong> und dann auf <strong>„Zum Home-Bildschirm“</strong>.
