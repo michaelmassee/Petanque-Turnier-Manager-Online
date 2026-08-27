@@ -42,6 +42,7 @@ Commits must follow these rules:
 - HTTP-only, `Secure`, `SameSite=Lax` session cookies.
 - PBKDF2 password hashing with per-password random salt.
 - Password reset tokens are hashed in D1 and expire after 30 minutes.
+- Login is rate-limited: `/api/login` rejects with `429` after 5 failed attempts per email or 20 per IP within a 15-minute window; a successful login clears the counter for that email.
 - API responses use `Cache-Control: no-store`.
 - Worker responses include CSP, frame, referrer, permissions and MIME-sniffing headers.
 - Static assets define the same browser security headers in `public/_headers`.

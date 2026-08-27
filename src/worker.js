@@ -21,6 +21,9 @@ const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
 const SESSION_COOKIE = 'ptm_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 const RESET_TTL_SECONDS = 60 * 30;
+const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 60 * 15;
+const LOGIN_RATE_LIMIT_MAX_PER_EMAIL = 5;
+const LOGIN_RATE_LIMIT_MAX_PER_IP = 20;
 const EMAIL_VERIFICATION_TTL_SECONDS = 60 * 60 * 24;
 // Changing this invalidates every stored password_hash (verifyPassword re-derives with the
 // current value). Any seeded/test users must be re-hashed and re-seeded after a change.
@@ -115,6 +118,7 @@ export default {
       if (request.method === 'POST' && url.pathname === '/api/login') {
         return await login(request, env.DB, url);
       }
+
 
       if (request.method === 'POST' && url.pathname === '/api/register') {
         return await registerUser(request, env, url);
@@ -449,19 +453,26 @@ async function login(request, db, url) {
   const body = await readJson(request);
   const email = String(body.email || '').trim().toLowerCase();
   const password = String(body.password || '');
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
 
   if (!email || !password) {
     throw new HttpError(400, 'Email and password are required');
   }
 
+  await enforceLoginRateLimit(db, email, ip);
+
   const row = await db.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
   if (!row || !(await verifyPassword(password, row.password_salt, row.password_hash))) {
+    await recordLoginAttempt(db, email, ip);
     throw new HttpError(401, 'Invalid login');
   }
 
   if (!row.email_verified_at) {
+    await recordLoginAttempt(db, email, ip);
     return json({ error: 'Bitte bestätige zuerst deine E-Mail-Adresse.' }, 403);
   }
+
+  await clearLoginAttempts(db, email);
 
   const session = await createSession(db, row.id);
   return json({ user: toPublicUser(row) }, 200, { 'Set-Cookie': sessionCookie(session.id, session.expiresAt, url) });
@@ -1654,6 +1665,36 @@ async function cleanupExpiredSessions(db) {
   await db.prepare('DELETE FROM password_reset_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').bind(new Date().toISOString()).run();
   await db.prepare('DELETE FROM email_verification_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').bind(new Date().toISOString()).run();
   await db.prepare('DELETE FROM tournament_tip_verification_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').bind(new Date().toISOString()).run();
+  const attemptsCutoff = new Date(Date.now() - LOGIN_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
+  await db.prepare('DELETE FROM login_attempts WHERE created_at <= ?').bind(attemptsCutoff).run();
+}
+
+async function enforceLoginRateLimit(db, email, ip) {
+  const windowStart = new Date(Date.now() - LOGIN_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
+
+  const emailCount = await db
+    .prepare('SELECT COUNT(*) AS count FROM login_attempts WHERE email = ? AND created_at > ?')
+    .bind(email, windowStart)
+    .first();
+  const ipCount = await db
+    .prepare('SELECT COUNT(*) AS count FROM login_attempts WHERE ip = ? AND created_at > ?')
+    .bind(ip, windowStart)
+    .first();
+
+  if (Number(emailCount?.count || 0) >= LOGIN_RATE_LIMIT_MAX_PER_EMAIL || Number(ipCount?.count || 0) >= LOGIN_RATE_LIMIT_MAX_PER_IP) {
+    throw new HttpError(429, 'Zu viele Anmeldeversuche. Bitte versuche es später erneut.');
+  }
+}
+
+async function recordLoginAttempt(db, email, ip) {
+  await db
+    .prepare('INSERT INTO login_attempts (id, email, ip, created_at) VALUES (?, ?, ?, ?)')
+    .bind(crypto.randomUUID(), email, ip, new Date().toISOString())
+    .run();
+}
+
+async function clearLoginAttempts(db, email) {
+  await db.prepare('DELETE FROM login_attempts WHERE email = ?').bind(email).run();
 }
 
 function normalizeUserInput(body, { requirePassword }) {
