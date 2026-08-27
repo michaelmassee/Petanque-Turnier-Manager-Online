@@ -808,7 +808,7 @@ async function listTournaments(db, user) {
        WHERE (?1 IS NOT NULL AND ?1 = 'admin')
           OR (?1 IS NOT NULL AND ?1 = 'turnierleiter' AND (tournaments.created_by = ?2 OR tournaments.manager_id = ?2 OR tournaments.visibility = 'public'))
           OR tournaments.visibility = 'public'
-       ORDER BY tournaments.date DESC, tournaments.name COLLATE NOCASE`,
+       ORDER BY tournaments.date ASC, tournaments.start_time ASC, tournaments.name COLLATE NOCASE`,
     )
     .bind(user?.role || null, user?.id || null)
     .all();
