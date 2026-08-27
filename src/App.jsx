@@ -127,6 +127,7 @@ const EMPTY_REGISTRATION_FORM = {
   teamName: '',
   seedingPosition: '',
   status: 'pending',
+  publicationNoticeAccepted: false,
 };
 
 const REGISTER_SUCCESS = 'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.';
@@ -1870,7 +1871,7 @@ function SubmitTournamentTipPage({ language, setLanguage, menuOpen, setMenuOpen,
                 onChange={(event) => setForm({ ...form, consent: event.target.checked })}
                 required
               />
-              Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.
+              Ich habe die Datenschutzerklärung gelesen und akzeptiere sie. Mir ist bekannt, dass die gemeldeten Turnierdaten nach Prüfung öffentlich angezeigt werden und der jeweilige Veranstalter für die Inhalte verantwortlich ist.
             </label>
             <Button type="submit">Turnier melden</Button>
           </form>
@@ -2277,6 +2278,15 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
         Datenschutzerklärung lesen
       </button>
       <RegistrationFields form={form} setForm={setForm} showStatus={false} formation={tournament.formation} />
+      <label className="checkbox-field">
+        <input
+          type="checkbox"
+          checked={form.publicationNoticeAccepted}
+          onChange={(event) => setForm({ ...form, publicationNoticeAccepted: event.target.checked })}
+          required
+        />
+        Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.
+      </label>
       <div className="row-actions stretch">
         <Button type="submit">Anmeldung senden</Button>
         <Button variant="secondary" onClick={onCancel}>Abbrechen</Button>
@@ -2320,7 +2330,7 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
           checked={form.participantsPublic}
           onChange={(event) => setForm({ ...form, participantsPublic: event.target.checked })}
         />
-        Teilnehmerliste öffentlich sichtbar
+        Teilnehmerliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.
       </label>
       <Button type="submit">{mode === 'edit' ? 'Turnier speichern' : 'Turnier anlegen'}</Button>
     </form>
@@ -2722,6 +2732,7 @@ function registrationPayload(form) {
     teamName: form.teamName || null,
     seedingPosition: form.seedingPosition === '' ? null : Number(form.seedingPosition),
     status: form.status,
+    publicationNoticeAccepted: Boolean(form.publicationNoticeAccepted),
   };
 }
 
@@ -3177,6 +3188,8 @@ const TRANSLATIONS = {
     Dezember: 'December',
     'Keine Angabe': 'Geen opgave',
     'Teilnehmerliste öffentlich sichtbar': 'Deelnemerslijst openbaar zichtbaar',
+    'Teilnehmerliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.':
+      'Deelnemerslijst openbaar zichtbaar. Ik bevestig dat ik als toernooimaker verantwoordelijk ben voor deze publicatie en de deelnemers hier uitdrukkelijk op moet wijzen.',
     'Nur meine Turniere': 'Alleen mijn toernooien',
     'Turnier suchen': 'Toernooi zoeken',
     'Name, Ort oder Turniersystem': 'Naam, plaats of toernooisysteem',
@@ -3241,6 +3254,8 @@ const TRANSLATIONS = {
     'Dein Name': 'Jouw naam',
     'Deine E-Mail': 'Jouw e-mail',
     'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'Ik heb het privacybeleid gelezen en ga ermee akkoord.',
+    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie. Mir ist bekannt, dass die gemeldeten Turnierdaten nach Prüfung öffentlich angezeigt werden und der jeweilige Veranstalter für die Inhalte verantwortlich ist.':
+      'Ik heb het privacybeleid gelezen en ga ermee akkoord. Ik weet dat de gemelde toernooigegevens na controle openbaar worden getoond en dat de betreffende organisator verantwoordelijk is voor de inhoud.',
     'Turnier-Vorschläge': 'Toernooivoorstellen',
     'Keine offenen Vorschläge.': 'Geen openstaande voorstellen.',
     Freigeben: 'Vrijgeven',
@@ -3254,6 +3269,8 @@ const TRANSLATIONS = {
     'A valid external link is required': 'Een geldige link is verplicht',
     'Submitter name must contain at least 2 characters': 'Naam moet minstens 2 tekens bevatten',
     'A valid submitter email is required': 'Een geldig e-mailadres is verplicht',
+    'Die Datenschutzerklärung und der Veröffentlichungshinweis müssen akzeptiert werden':
+      'Het privacybeleid en de publicatie-informatie moeten worden geaccepteerd',
     'Invalid status': 'Ongeldige status',
     'Tournament tip not found or not pending review': 'Toernooimelding niet gevonden of niet in afwachting',
     'Tournament tip not found': 'Toernooimelding niet gevonden',
@@ -3289,6 +3306,10 @@ const TRANSLATIONS = {
       'Deze deelnemerslijst is openbaar zichtbaar en kan zonder aanmelding worden bekeken. Wie hier niet vermeld wil worden, neemt contact op met de organisator van dit toernooi.',
     'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
       'Let op: bij inschrijving via dit platform kunnen je naam en eventueel vereniging, teamnaam en de namen van je partner(s) op de openbare toernooipagina worden gepubliceerd, als de organisator de deelnemerslijst openbaar zichtbaar maakt. Wie dat niet wil, neemt rechtstreeks contact op met de organisator van dit toernooi – de contactgegevens vind je op de toernooipagina.',
+    'Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.':
+      'Ik heb begrepen dat mijn inschrijfgegevens voor de organisatie van het toernooi worden verwerkt en dat mijn naam en eventueel vereniging, teamnaam en partnernamen op de openbare toernooipagina kunnen verschijnen als de organisator de deelnemerslijst openbaar zichtbaar maakt.',
+    'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden':
+      'De informatie over de mogelijke publicatie van inschrijfgegevens moet worden bevestigd',
     'Datenschutzerklärung lesen': 'Privacybeleid lezen',
     'Mit der Registrierung stimmst du der Verarbeitung deiner Daten gemäß unserer Datenschutzerklärung zu.':
       'Met de registratie ga je akkoord met de verwerking van je gegevens conform ons privacybeleid.',
@@ -3483,6 +3504,8 @@ const TRANSLATIONS = {
     Dezember: 'December',
     'Keine Angabe': 'Not specified',
     'Teilnehmerliste öffentlich sichtbar': 'Participant list publicly visible',
+    'Teilnehmerliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.':
+      'Participant list publicly visible. I confirm that, as the tournament creator, I am responsible for this publication and must expressly inform the participants about it.',
     'Nur meine Turniere': 'Only my tournaments',
     'Turnier suchen': 'Search tournament',
     'Name, Ort oder Turniersystem': 'Name, location or tournament system',
@@ -3547,6 +3570,8 @@ const TRANSLATIONS = {
     'Dein Name': 'Your name',
     'Deine E-Mail': 'Your email',
     'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'I have read the privacy policy and accept it.',
+    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie. Mir ist bekannt, dass die gemeldeten Turnierdaten nach Prüfung öffentlich angezeigt werden und der jeweilige Veranstalter für die Inhalte verantwortlich ist.':
+      'I have read the privacy policy and accept it. I understand that the submitted tournament data will be shown publicly after review and that the respective organizer is responsible for the content.',
     'Turnier-Vorschläge': 'Tournament suggestions',
     'Keine offenen Vorschläge.': 'No pending suggestions.',
     Freigeben: 'Approve',
@@ -3561,6 +3586,8 @@ const TRANSLATIONS = {
     'A valid external link is required': 'A valid external link is required',
     'Submitter name must contain at least 2 characters': 'Submitter name must contain at least 2 characters',
     'A valid submitter email is required': 'A valid submitter email is required',
+    'Die Datenschutzerklärung und der Veröffentlichungshinweis müssen akzeptiert werden':
+      'The privacy policy and publication notice must be accepted',
     'Invalid status': 'Invalid status',
     'Tournament tip not found or not pending review': 'Tournament tip not found or not pending review',
     'Tournament tip not found': 'Tournament tip not found',
@@ -3596,6 +3623,10 @@ const TRANSLATIONS = {
       'This participant list is publicly visible and can be viewed without logging in. If you do not want to be listed here, please contact the organizer of this tournament directly.',
     'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
       'Note: When registering via this platform, your name and, where applicable, club, team name and the names of your partner(s) may be published on the public tournament page if the organizer makes the participant list publicly visible. If you do not want this, please contact the organizer of this tournament directly – contact details can be found on the tournament page.',
+    'Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.':
+      'I understand that my registration data will be processed for tournament organization and that my name and, where applicable, club, team name and partner names may appear on the public tournament page if the organizer makes the participant list publicly visible.',
+    'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden':
+      'The notice about possible publication of registration data must be confirmed',
     'Datenschutzerklärung lesen': 'Read privacy policy',
     'Mit der Registrierung stimmst du der Verarbeitung deiner Daten gemäß unserer Datenschutzerklärung zu.':
       'By registering, you agree to the processing of your data in accordance with our privacy policy.',
@@ -3790,6 +3821,8 @@ const TRANSLATIONS = {
     Dezember: 'Diciembre',
     'Keine Angabe': 'Sin especificar',
     'Teilnehmerliste öffentlich sichtbar': 'Lista de participantes visible públicamente',
+    'Teilnehmerliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.':
+      'Lista de participantes visible públicamente. Confirmo que, como creador del torneo, soy responsable de esta publicación y debo informar expresamente de ello a los participantes.',
     'Nur meine Turniere': 'Solo mis torneos',
     'Turnier suchen': 'Buscar torneo',
     'Name, Ort oder Turniersystem': 'Nombre, lugar o sistema',
@@ -3854,6 +3887,8 @@ const TRANSLATIONS = {
     'Dein Name': 'Tu nombre',
     'Deine E-Mail': 'Tu correo',
     'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'He leído la política de privacidad y la acepto.',
+    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie. Mir ist bekannt, dass die gemeldeten Turnierdaten nach Prüfung öffentlich angezeigt werden und der jeweilige Veranstalter für die Inhalte verantwortlich ist.':
+      'He leído la política de privacidad y la acepto. Entiendo que los datos del torneo enviado se mostrarán públicamente tras la revisión y que el organizador correspondiente es responsable del contenido.',
     'Turnier-Vorschläge': 'Propuestas de torneos',
     'Keine offenen Vorschläge.': 'No hay propuestas pendientes.',
     Freigeben: 'Aprobar',
@@ -3867,6 +3902,8 @@ const TRANSLATIONS = {
     'A valid external link is required': 'Se requiere un enlace válido',
     'Submitter name must contain at least 2 characters': 'El nombre debe tener al menos 2 caracteres',
     'A valid submitter email is required': 'Se requiere un correo válido',
+    'Die Datenschutzerklärung und der Veröffentlichungshinweis müssen akzeptiert werden':
+      'Deben aceptarse la política de privacidad y el aviso de publicación',
     'Invalid status': 'Estado no válido',
     'Tournament tip not found or not pending review': 'Aviso de torneo no encontrado o no pendiente de revisión',
     'Tournament tip not found': 'Aviso de torneo no encontrado',
@@ -3902,6 +3939,10 @@ const TRANSLATIONS = {
       'Esta lista de participantes es visible públicamente y se puede consultar sin necesidad de iniciar sesión. Quien no desee aparecer aquí debe ponerse en contacto directamente con el organizador de este torneo.',
     'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
       'Aviso: al inscribirte a través de esta plataforma, tu nombre y, en su caso, el club, el nombre del equipo y los nombres de tu(s) compañero(s) pueden publicarse en la página pública del torneo si el organizador hace visible la lista de participantes. Si no lo deseas, ponte en contacto directamente con el organizador de este torneo; los datos de contacto están disponibles en la página del torneo.',
+    'Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.':
+      'Entiendo que mis datos de inscripción se tratarán para la organización del torneo y que mi nombre y, en su caso, el club, el nombre del equipo y los nombres de mis compañeros pueden aparecer en la página pública del torneo si el organizador hace visible la lista de participantes.',
+    'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden':
+      'Debe confirmarse el aviso sobre la posible publicación de los datos de inscripción',
     'Datenschutzerklärung lesen': 'Leer política de privacidad',
     'Mit der Registrierung stimmst du der Verarbeitung deiner Daten gemäß unserer Datenschutzerklärung zu.':
       'Al registrarte, aceptas el tratamiento de tus datos conforme a nuestra política de privacidad.',
@@ -4096,6 +4137,8 @@ const TRANSLATIONS = {
     Dezember: 'Décembre',
     'Keine Angabe': 'Non précisé',
     'Teilnehmerliste öffentlich sichtbar': 'Liste des participants visible publiquement',
+    'Teilnehmerliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.':
+      'Liste des participants visible publiquement. Je confirme qu’en tant que créateur du tournoi, je suis responsable de cette publication et dois en informer expressément les participants.',
     'Nur meine Turniere': 'Seulement mes tournois',
     'Turnier suchen': 'Rechercher un tournoi',
     'Name, Ort oder Turniersystem': 'Nom, lieu ou système',
@@ -4160,6 +4203,8 @@ const TRANSLATIONS = {
     'Dein Name': 'Ton nom',
     'Deine E-Mail': 'Ton e-mail',
     'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'J’ai lu la politique de confidentialité et je l’accepte.',
+    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie. Mir ist bekannt, dass die gemeldeten Turnierdaten nach Prüfung öffentlich angezeigt werden und der jeweilige Veranstalter für die Inhalte verantwortlich ist.':
+      'J’ai lu la politique de confidentialité et je l’accepte. Je comprends que les données du tournoi signalé seront affichées publiquement après vérification et que l’organisateur concerné est responsable du contenu.',
     'Turnier-Vorschläge': 'Propositions de tournois',
     'Keine offenen Vorschläge.': 'Aucune proposition en attente.',
     Freigeben: 'Approuver',
@@ -4174,6 +4219,8 @@ const TRANSLATIONS = {
     'A valid external link is required': 'Un lien valide est requis',
     'Submitter name must contain at least 2 characters': 'Le nom doit contenir au moins 2 caractères',
     'A valid submitter email is required': 'Une adresse e-mail valide est requise',
+    'Die Datenschutzerklärung und der Veröffentlichungshinweis müssen akzeptiert werden':
+      'La politique de confidentialité et l’avis de publication doivent être acceptés',
     'Invalid status': 'Statut invalide',
     'Tournament tip not found or not pending review': 'Signalement introuvable ou non en attente de validation',
     'Tournament tip not found': 'Signalement de tournoi introuvable',
@@ -4209,6 +4256,10 @@ const TRANSLATIONS = {
       "Cette liste de participants est visible publiquement et consultable sans connexion. Toute personne ne souhaitant pas y figurer est priée de contacter directement l'organisateur de ce tournoi.",
     'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
       "Remarque : lors de l'inscription via cette plateforme, ton nom ainsi que, le cas échéant, le club, le nom d'équipe et les noms de tes partenaires peuvent être publiés sur la page publique du tournoi si l'organisateur rend la liste des participants publiquement visible. Si tu ne le souhaites pas, merci de contacter directement l'organisateur de ce tournoi – les coordonnées figurent sur la page du tournoi.",
+    'Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.':
+      "Je comprends que mes données d'inscription seront traitées pour l'organisation du tournoi et que mon nom ainsi que, le cas échéant, mon club, le nom d'équipe et les noms de mes partenaires peuvent apparaître sur la page publique du tournoi si l'organisateur rend la liste des participants publiquement visible.",
+    'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden':
+      "L'avis relatif à la publication possible des données d'inscription doit être confirmé",
     'Datenschutzerklärung lesen': 'Lire la politique de confidentialité',
     'Mit der Registrierung stimmst du der Verarbeitung deiner Daten gemäß unserer Datenschutzerklärung zu.':
       "En t'inscrivant, tu acceptes le traitement de tes données conformément à notre politique de confidentialité.",

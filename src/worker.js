@@ -953,6 +953,10 @@ async function createRegistration(request, db, tournament) {
   }
 
   const body = await readJson(request);
+  if (body.publicationNoticeAccepted !== true) {
+    throw new HttpError(400, 'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden');
+  }
+
   const registration = normalizeRegistrationInput(body, { requireStatus: false });
   assertPartnerCountMatchesFormation(tournament.formation, registration);
   const status = await initialRegistrationStatus(db, tournament);
@@ -1411,6 +1415,7 @@ function normalizeTournamentTipInput(body) {
     flyerLink: nullableText(body.flyerLink),
     submitterName: text(body.submitterName),
     submitterEmail: String(body.submitterEmail || '').trim().toLowerCase(),
+    consent: body.consent === true,
   };
 
   if (tip.name.length < 2) {
@@ -1430,6 +1435,9 @@ function normalizeTournamentTipInput(body) {
   }
   if (!isEmail(tip.submitterEmail)) {
     throw new HttpError(400, 'A valid submitter email is required');
+  }
+  if (!tip.consent) {
+    throw new HttpError(400, 'Die Datenschutzerklärung und der Veröffentlichungshinweis müssen akzeptiert werden');
   }
 
   return tip;
