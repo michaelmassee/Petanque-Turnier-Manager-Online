@@ -210,6 +210,11 @@ export default function App() {
   const visibleHomeTournaments = filteredHomeTournaments.slice(0, homeVisibleCount);
   const hasMoreHomeTournaments = filteredHomeTournaments.length > homeVisibleCount;
 
+  const manageableTournaments = useMemo(
+    () => tournaments.filter((tournament) => tournament.canManage),
+    [tournaments],
+  );
+
   useEffect(() => {
     setHomeVisibleCount(10);
   }, [homeQuery, homeOnlyMine, homeFilterMonth, homeFilterFormation, homeFilterOpenOnly]);
@@ -1172,7 +1177,7 @@ export default function App() {
           )}
 
           <TournamentList
-            tournaments={tournaments}
+            tournaments={manageableTournaments}
             selectedId={selectedTournamentId}
             onSelect={setSelectedTournamentId}
             onEdit={editTournament}
@@ -1199,7 +1204,7 @@ export default function App() {
               form={registrationForm}
               setForm={setRegistrationForm}
               onSubmit={handleRegistrationSubmit}
-              tournaments={tournaments}
+              tournaments={manageableTournaments}
               selectedTournamentId={selectedTournamentId}
               manageMode={Boolean(selectedTournament?.canManage)}
             />
@@ -1209,7 +1214,7 @@ export default function App() {
             tournament={selectedTournament}
             registrations={registrations}
             onTournamentChange={setSelectedTournamentId}
-            tournaments={tournaments}
+            tournaments={manageableTournaments}
             onEdit={editRegistration}
             onDelete={handleDeleteRegistration}
           />
