@@ -1303,7 +1303,6 @@ function AuthShell({ title, subtitle, children, language, setLanguage }) {
     <main className="page">
       <section className="auth-panel" aria-labelledby="page-title">
         <div className="language-bar">
-          <InstallAppButton className="button button-secondary install-link" />
           <LanguageSelect language={language} setLanguage={setLanguage} />
         </div>
         <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="app-icon" />
@@ -2605,7 +2604,7 @@ function isIosSafari() {
   return isIos && isSafari;
 }
 
-function InstallAppButton({ className = 'drawer-link install-link' }) {
+function InstallAppButton() {
   const { canInstall, installed, promptInstall } = useInstallPrompt();
   const [showIosHint, setShowIosHint] = useState(false);
 
@@ -2615,7 +2614,7 @@ function InstallAppButton({ className = 'drawer-link install-link' }) {
 
   if (canInstall) {
     return (
-      <button className={className} type="button" onClick={promptInstall}>
+      <button className="drawer-link install-link" type="button" onClick={promptInstall}>
         App installieren
       </button>
     );
@@ -2624,7 +2623,7 @@ function InstallAppButton({ className = 'drawer-link install-link' }) {
   if (isIosSafari()) {
     return (
       <div className="install-hint">
-        <button className={className} type="button" onClick={() => setShowIosHint((prev) => !prev)}>
+        <button className="drawer-link install-link" type="button" onClick={() => setShowIosHint((prev) => !prev)}>
           App installieren
         </button>
         {showIosHint && (
