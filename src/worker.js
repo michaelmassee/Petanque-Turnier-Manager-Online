@@ -62,6 +62,29 @@ const EMAIL_VERIFICATION_EMAILS = {
   },
 };
 
+const EMAIL_CHANGE_EMAILS = {
+  de: {
+    subject: 'Neue E-Mail-Adresse bestätigen',
+    text: (verificationUrl) => `Bitte bestätige deine neue E-Mail-Adresse über diesen Link:\n\n${verificationUrl}\n\nDer Link ist 24 Stunden gültig. Falls du diese Änderung nicht angefordert hast, kannst du diese E-Mail ignorieren.`,
+  },
+  nl: {
+    subject: 'Nieuw e-mailadres bevestigen',
+    text: (verificationUrl) => `Bevestig je nieuwe e-mailadres via deze link:\n\n${verificationUrl}\n\nDe link is 24 uur geldig. Als je deze wijziging niet hebt aangevraagd, kun je deze e-mail negeren.`,
+  },
+  en: {
+    subject: 'Confirm your new email address',
+    text: (verificationUrl) => `Confirm your new email address with this link:\n\n${verificationUrl}\n\nThe link is valid for 24 hours. If you did not request this change, you can ignore this email.`,
+  },
+  es: {
+    subject: 'Confirmar nueva direccion de correo',
+    text: (verificationUrl) => `Confirma tu nueva direccion de correo con este enlace:\n\n${verificationUrl}\n\nEl enlace es valido durante 24 horas. Si no solicitaste este cambio, puedes ignorar este correo.`,
+  },
+  fr: {
+    subject: 'Confirmer la nouvelle adresse e-mail',
+    text: (verificationUrl) => `Confirme ta nouvelle adresse e-mail avec ce lien :\n\n${verificationUrl}\n\nLe lien est valable 24 heures. Si tu n’es pas à l’origine de cette demande, tu peux ignorer cet e-mail.`,
+  },
+};
+
 const TOURNAMENT_TIP_VERIFICATION_EMAILS = {
   de: {
     subject: 'Turniermeldung bestätigen',
@@ -147,6 +170,11 @@ export default {
       if (request.method === 'GET' && url.pathname === '/api/session') {
         const session = await requireSession(request, env.DB);
         return json({ user: session.user });
+      }
+
+      if (request.method === 'PUT' && url.pathname === '/api/me') {
+        const session = await requireSession(request, env.DB);
+        return await updateOwnProfile(request, env, url, session.user.id);
       }
 
       if (url.pathname === '/api/users') {
@@ -558,7 +586,7 @@ async function verifyEmail(request, db) {
   const tokenHash = await sha256Hex(token);
   const verification = await db
     .prepare(
-      `SELECT token_hash, user_id, expires_at, used_at
+      `SELECT token_hash, user_id, expires_at, used_at, new_email
        FROM email_verification_tokens
        WHERE token_hash = ?`,
     )
@@ -570,6 +598,24 @@ async function verifyEmail(request, db) {
   }
 
   const now = new Date().toISOString();
+
+  if (verification.new_email) {
+    try {
+      await db.batch([
+        db
+          .prepare('UPDATE users SET email = ?, pending_email = NULL, email_verified_at = ?, updated_at = ? WHERE id = ?')
+          .bind(verification.new_email, now, now, verification.user_id),
+        db.prepare('UPDATE email_verification_tokens SET used_at = ? WHERE token_hash = ?').bind(now, tokenHash),
+      ]);
+    } catch (error) {
+      if (String(error.message || '').includes('UNIQUE')) {
+        throw new HttpError(409, 'Email already exists');
+      }
+      throw error;
+    }
+    return json({ ok: true });
+  }
+
   await db.batch([
     db.prepare('UPDATE users SET email_verified_at = ?, updated_at = ? WHERE id = ?').bind(now, now, verification.user_id),
     db.prepare('UPDATE email_verification_tokens SET used_at = ? WHERE token_hash = ?').bind(now, tokenHash),
@@ -635,7 +681,7 @@ async function forgotPassword(request, env, url) {
   return json(response);
 }
 
-async function createEmailVerification(db, env, url, userId, email, language) {
+async function createEmailVerification(db, env, url, userId, email, language, newEmail = null) {
   await db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').bind(userId).run();
 
   const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
@@ -645,19 +691,19 @@ async function createEmailVerification(db, env, url, userId, email, language) {
 
   await db
     .prepare(
-      `INSERT INTO email_verification_tokens (token_hash, user_id, expires_at, created_at)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO email_verification_tokens (token_hash, user_id, expires_at, created_at, new_email)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    .bind(tokenHash, userId, expiresAt.toISOString(), createdAt.toISOString())
+    .bind(tokenHash, userId, expiresAt.toISOString(), createdAt.toISOString(), newEmail)
     .run();
 
   const verificationUrl = `${url.origin}/?verify_token=${encodeURIComponent(token)}`;
-  await sendEmailVerificationEmail(env, email, verificationUrl, language, isLocalhost(url));
+  await sendEmailVerificationEmail(env, email, verificationUrl, language, isLocalhost(url), Boolean(newEmail));
   return verificationUrl;
 }
 
-async function sendEmailVerificationEmail(env, email, verificationUrl, language, allowLogFallback) {
-  const emailText = EMAIL_VERIFICATION_EMAILS[language] || EMAIL_VERIFICATION_EMAILS.de;
+async function sendEmailVerificationEmail(env, email, verificationUrl, language, allowLogFallback, isEmailChange = false) {
+  const emailText = (isEmailChange ? EMAIL_CHANGE_EMAILS[language] : EMAIL_VERIFICATION_EMAILS[language]) || (isEmailChange ? EMAIL_CHANGE_EMAILS.de : EMAIL_VERIFICATION_EMAILS.de);
   await sendTransactionalEmail(env, {
     to: email,
     subject: emailText.subject,
@@ -688,9 +734,7 @@ async function resetPassword(request, db) {
     throw new HttpError(400, 'Reset token is required');
   }
 
-  if (password.length < 8) {
-    throw new HttpError(400, 'Password must contain at least 8 characters');
-  }
+  assertPasswordStrength(password);
 
   const tokenHash = await sha256Hex(token);
   const reset = await db
@@ -722,7 +766,7 @@ async function resetPassword(request, db) {
 
 async function listUsers(db) {
   const result = await db
-    .prepare('SELECT id, name, email, role, email_verified_at, password_change_required, created_at, updated_at FROM users ORDER BY name COLLATE NOCASE')
+    .prepare('SELECT id, name, email, pending_email, role, email_verified_at, password_change_required, created_at, updated_at FROM users ORDER BY name COLLATE NOCASE')
     .all();
   return json({ users: result.results.map(toPublicUser) });
 }
@@ -790,14 +834,16 @@ async function updateUser(request, db, id, currentUserId) {
       await db
         .prepare(
           `UPDATE users
-           SET name = ?, email = ?, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, updated_at = ?
+           SET name = ?, email = ?, pending_email = NULL, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, updated_at = ?
            WHERE id = ?`,
         )
         .bind(user.name, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, now, id)
         .run();
     } else {
       await db
-        .prepare('UPDATE users SET name = ?, email = ?, role = ?, email_verified_at = ?, password_change_required = ?, updated_at = ? WHERE id = ?')
+        .prepare(
+          'UPDATE users SET name = ?, email = ?, pending_email = NULL, role = ?, email_verified_at = ?, password_change_required = ?, updated_at = ? WHERE id = ?',
+        )
         .bind(user.name, user.email, user.role, emailVerifiedAt, passwordChangeRequired, now, id)
         .run();
     }
@@ -809,10 +855,99 @@ async function updateUser(request, db, id, currentUserId) {
   }
 
   const updated = await db
-    .prepare('SELECT id, name, email, role, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?')
+    .prepare('SELECT id, name, email, pending_email, role, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?')
     .bind(id)
     .first();
   return json({ user: toPublicUser(updated) });
+}
+
+async function updateOwnProfile(request, env, url, userId) {
+  const db = env.DB;
+  const existing = await db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  if (!existing) {
+    throw new HttpError(404, 'User not found');
+  }
+
+  const body = await readJson(request);
+  const name = String(body.name || '').trim();
+  const email = String(body.email || '').trim().toLowerCase();
+  const currentPassword = String(body.currentPassword || '');
+  const newPassword = body.newPassword === undefined ? '' : String(body.newPassword);
+  const language = normalizeLanguage(body.language);
+
+  if (name.length < 2) {
+    throw new HttpError(400, 'Name must contain at least 2 characters');
+  }
+
+  if (!isEmail(email)) {
+    throw new HttpError(400, 'A valid email is required');
+  }
+
+  const emailChanged = email !== existing.email;
+  const passwordChanged = newPassword.length > 0;
+
+  if (emailChanged || passwordChanged) {
+    if (!currentPassword || !(await verifyPassword(currentPassword, existing.password_salt, existing.password_hash))) {
+      throw new HttpError(401, 'Aktuelles Passwort ist erforderlich oder falsch');
+    }
+  }
+
+  if (passwordChanged) {
+    assertPasswordStrength(newPassword);
+  }
+
+  if (passwordChanged && (await verifyPassword(newPassword, existing.password_salt, existing.password_hash))) {
+    throw new HttpError(400, 'Neues Passwort darf nicht mit dem aktuellen Passwort übereinstimmen');
+  }
+
+  const now = new Date().toISOString();
+  const pendingEmail = emailChanged ? email : null;
+  const currentSessionId = getCookie(request, SESSION_COOKIE);
+
+  try {
+    if (passwordChanged) {
+      const password = await hashPassword(newPassword);
+      await db.batch([
+        db
+          .prepare(
+            `UPDATE users
+             SET name = ?, pending_email = ?, password_salt = ?, password_hash = ?, updated_at = ?
+             WHERE id = ?`,
+          )
+          .bind(name, pendingEmail, password.salt, password.hash, now, userId),
+        db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(userId, currentSessionId || ''),
+      ]);
+    } else {
+      await db
+        .prepare('UPDATE users SET name = ?, pending_email = ?, updated_at = ? WHERE id = ?')
+        .bind(name, pendingEmail, now, userId)
+        .run();
+    }
+  } catch (error) {
+    if (String(error.message || '').includes('UNIQUE')) {
+      throw new HttpError(409, 'Email already exists');
+    }
+    throw error;
+  }
+
+  let verificationUrl = null;
+  if (emailChanged) {
+    verificationUrl = await createEmailVerification(db, env, url, userId, email, language, email);
+  } else if (existing.pending_email) {
+    // Reverting to the current email cancels an outstanding email-change confirmation link.
+    await db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').bind(userId).run();
+  }
+
+  const updated = await db
+    .prepare('SELECT id, name, email, pending_email, role, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?')
+    .bind(userId)
+    .first();
+
+  const response = { user: toPublicUser(updated) };
+  if (emailChanged && isLocalhost(url)) {
+    response.verificationUrl = verificationUrl;
+  }
+  return json(response);
 }
 
 async function deleteUser(db, id, currentUserId) {
@@ -1821,7 +1956,7 @@ async function requireSession(request, db) {
 
   const row = await db
     .prepare(
-      `SELECT users.id, users.name, users.email, users.role, users.email_verified_at, users.password_change_required,
+      `SELECT users.id, users.name, users.email, users.pending_email, users.role, users.email_verified_at, users.password_change_required,
               users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
@@ -1905,12 +2040,8 @@ function normalizeUserInput(body, { requirePassword }) {
     throw new HttpError(400, 'Invalid role');
   }
 
-  if (requirePassword && password.length < 8) {
-    throw new HttpError(400, 'Password must contain at least 8 characters');
-  }
-
-  if (!requirePassword && password && password.length < 8) {
-    throw new HttpError(400, 'Password must contain at least 8 characters');
+  if (requirePassword || password) {
+    assertPasswordStrength(password);
   }
 
   return { name, email, role, password };
@@ -2068,6 +2199,21 @@ function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function assertPasswordStrength(password) {
+  if (
+    password.length < 8 ||
+    !/[0-9]/.test(password) ||
+    !/[a-z]/.test(password) ||
+    !/[A-Z]/.test(password) ||
+    !/[^A-Za-z0-9]/.test(password)
+  ) {
+    throw new HttpError(
+      400,
+      'Das Passwort muss mindestens 8 Zeichen lang sein und mindestens eine Zahl, einen Kleinbuchstaben, einen Großbuchstaben und ein Sonderzeichen enthalten',
+    );
+  }
+}
+
 async function hashPassword(password) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await importPasswordKey(password);
@@ -2144,6 +2290,7 @@ function toPublicUser(row) {
     id: row.id,
     name: row.name,
     email: row.email,
+    pendingEmail: row.pending_email || null,
     role: row.role,
     emailVerifiedAt: row.email_verified_at || null,
     passwordChangeRequired: Boolean(Number(row.password_change_required || 0)),

@@ -69,6 +69,14 @@ const EMPTY_USER_FORM = {
   passwordChangeRequired: false,
 };
 
+const EMPTY_PROFILE_FORM = {
+  name: '',
+  email: '',
+  currentPassword: '',
+  newPassword: '',
+  newPasswordConfirm: '',
+};
+
 const EMPTY_AUTH_FORM = {
   name: '',
   email: '',
@@ -139,6 +147,9 @@ const EMPTY_REGISTRATION_FORM = {
 
 const REGISTER_SUCCESS = 'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.';
 const VERIFY_SUCCESS = 'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.';
+const PROFILE_UPDATE_SUCCESS = 'Deine Daten wurden gespeichert.';
+const PROFILE_EMAIL_CHANGE_PENDING =
+  'Deine Daten wurden gespeichert. Bitte bestätige deine neue E-Mail-Adresse über den Link, den wir dir zugeschickt haben.';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -168,6 +179,7 @@ export default function App() {
   const [registrations, setRegistrations] = useState([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState('');
   const [userForm, setUserForm] = useState(EMPTY_USER_FORM);
+  const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
   const [authForm, setAuthForm] = useState(EMPTY_AUTH_FORM);
   const [turnierleiterAccessForm, setTurnierleiterAccessForm] = useState(EMPTY_TURNIERLEITER_ACCESS_FORM);
   const [tournamentForm, setTournamentForm] = useState(EMPTY_TOURNAMENT_FORM);
@@ -400,6 +412,11 @@ export default function App() {
       return;
     }
 
+    if (!isPasswordStrong(authForm.password)) {
+      setError(PASSWORD_STRENGTH_ERROR);
+      return;
+    }
+
     try {
       const data = await api('/api/setup', {
         method: 'POST',
@@ -450,6 +467,11 @@ export default function App() {
       return;
     }
 
+    if (!isPasswordStrong(authForm.password)) {
+      setError(PASSWORD_STRENGTH_ERROR);
+      return;
+    }
+
     try {
       const data = await api('/api/register', {
         method: 'POST',
@@ -497,6 +519,55 @@ export default function App() {
       setAuthForm(EMPTY_AUTH_FORM);
       setAuthView('login');
       setMessage(translateText(VERIFY_SUCCESS, language));
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function handleUpdateProfile(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+
+    if (profileForm.newPassword && profileForm.newPassword !== profileForm.newPasswordConfirm) {
+      setError(translateText('Die Passwörter stimmen nicht überein.', language));
+      return;
+    }
+
+    if (profileForm.newPassword && !isPasswordStrong(profileForm.newPassword)) {
+      setError(translateText(PASSWORD_STRENGTH_ERROR, language));
+      return;
+    }
+
+    if (profileForm.newPassword && profileForm.newPassword === profileForm.currentPassword) {
+      setError(translateText('Neues Passwort darf nicht mit dem aktuellen Passwort übereinstimmen', language));
+      return;
+    }
+
+    try {
+      const data = await api('/api/me', {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: profileForm.name,
+          email: profileForm.email,
+          currentPassword: profileForm.currentPassword,
+          newPassword: profileForm.newPassword,
+          language,
+        }),
+      });
+      setCurrentUser(data.user);
+      setProfileForm({
+        name: data.user.name,
+        email: data.user.pendingEmail || data.user.email,
+        currentPassword: '',
+        newPassword: '',
+        newPasswordConfirm: '',
+      });
+      setMessage(
+        data.user.pendingEmail
+          ? translateText(PROFILE_EMAIL_CHANGE_PENDING, language) + (data.verificationUrl ? ` ${data.verificationUrl}` : '')
+          : translateText(PROFILE_UPDATE_SUCCESS, language),
+      );
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -594,6 +665,11 @@ export default function App() {
       return;
     }
 
+    if (!isPasswordStrong(authForm.password)) {
+      setError(PASSWORD_STRENGTH_ERROR);
+      return;
+    }
+
     try {
       await api('/api/password/reset', {
         method: 'POST',
@@ -638,6 +714,11 @@ export default function App() {
     const payload = { ...userForm };
     if (userMode === 'edit' && !payload.password) {
       delete payload.password;
+    }
+
+    if (payload.password && !isPasswordStrong(payload.password)) {
+      setError(PASSWORD_STRENGTH_ERROR);
+      return;
     }
 
     try {
@@ -1114,7 +1195,9 @@ export default function App() {
   }
 
   const activeTabHeading =
-    activeTab === 'users'
+    activeTab === 'profile'
+      ? 'Mein Profil'
+      : activeTab === 'users'
       ? 'Benutzerverwaltung'
       : activeTab === 'tips'
         ? 'Turnier-Vorschläge'
@@ -1209,6 +1292,24 @@ export default function App() {
             API-Zugänge
           </button>
         )}
+        <button
+          className={`drawer-link ${activeTab === 'profile' ? 'active' : ''}`}
+          type="button"
+          onClick={() => {
+            setProfileForm({
+              name: currentUser.name,
+              email: currentUser.pendingEmail || currentUser.email,
+              currentPassword: '',
+              newPassword: '',
+              newPasswordConfirm: '',
+            });
+            setActiveTab('profile');
+            setMenuOpen(false);
+            clearFeedback();
+          }}
+        >
+          Mein Profil
+        </button>
         <Button
           variant="secondary"
           onClick={() => {
@@ -1384,6 +1485,12 @@ export default function App() {
           <ApiKeysPanel isAdmin={isAdmin} />
         </section>
       )}
+
+      {activeTab === 'profile' && (
+        <section className="single-column">
+          <ProfilePanel currentUser={currentUser} form={profileForm} setForm={setProfileForm} onSubmit={handleUpdateProfile} />
+        </section>
+      )}
     </main>
   );
 }
@@ -1454,6 +1561,7 @@ function RegisterForm({ form, setForm, onSubmit, onBack, navigate }) {
       <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <TextField label="Passwort" type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required minLength={8} />
+      <p className="hint">{PASSWORD_STRENGTH_HINT}</p>
       <TextField label="Passwort bestätigen" type="password" value={form.passwordConfirm} onChange={(passwordConfirm) => setForm({ ...form, passwordConfirm })} required minLength={8} />
       <p className="hint">
         Mit der Registrierung stimmst du der Verarbeitung deiner Daten gemäß unserer Datenschutzerklärung zu.
@@ -1502,6 +1610,7 @@ function ResetPasswordForm({ form, setForm, onSubmit, onBack }) {
     <form className="form" onSubmit={onSubmit}>
       <TextField label="Reset-Token" value={form.token} onChange={(token) => setForm({ ...form, token })} required />
       <TextField label="Neues Passwort" type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required minLength={8} />
+      <p className="hint">{PASSWORD_STRENGTH_HINT}</p>
       <TextField label="Passwort bestätigen" type="password" value={form.passwordConfirm} onChange={(passwordConfirm) => setForm({ ...form, passwordConfirm })} required minLength={8} />
       <Button type="submit">Passwort ändern</Button>
       <button className="link-button" type="button" onClick={onBack}>
@@ -2588,6 +2697,49 @@ const USER_STATUS_FILTERS = [
   { value: 'password_change_required', label: 'Passwortwechsel nötig' },
 ];
 
+function ProfilePanel({ currentUser, form, setForm, onSubmit }) {
+  return (
+    <div className="panel">
+      <div className="section-title">
+        <h2>Mein Profil</h2>
+      </div>
+      <p className="muted">Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.</p>
+      {currentUser.pendingEmail && (
+        <p className="hint">
+          {`Bestätigung ausstehend für ${currentUser.pendingEmail}. Bitte prüfe dein Postfach, um die Änderung abzuschließen.`}
+        </p>
+      )}
+      <form className="form" onSubmit={onSubmit}>
+        <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+        <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+        <TextField
+          label="Aktuelles Passwort"
+          type="password"
+          value={form.currentPassword}
+          onChange={(currentPassword) => setForm({ ...form, currentPassword })}
+        />
+        <p className="hint">Nur erforderlich, wenn du deine E-Mail-Adresse oder dein Passwort änderst.</p>
+        <TextField
+          label="Neues Passwort"
+          type="password"
+          value={form.newPassword}
+          onChange={(newPassword) => setForm({ ...form, newPassword })}
+          minLength={8}
+        />
+        <p className="hint">{PASSWORD_STRENGTH_HINT}</p>
+        <TextField
+          label="Passwort bestätigen"
+          type="password"
+          value={form.newPasswordConfirm}
+          onChange={(newPasswordConfirm) => setForm({ ...form, newPasswordConfirm })}
+          minLength={8}
+        />
+        <Button type="submit">Speichern</Button>
+      </form>
+    </div>
+  );
+}
+
 function UserManagementPanel({
   users,
   stats,
@@ -2767,6 +2919,7 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, passwordLabel, p
         minLength={passwordRequired ? 8 : undefined}
         placeholder={passwordRequired ? '' : 'Leer lassen, wenn unverändert'}
       />
+      <p className="hint">{PASSWORD_STRENGTH_HINT}</p>
       <Button type="submit">{submitLabel}</Button>
     </form>
   );
@@ -3367,6 +3520,20 @@ function euroToCents(value) {
   return Math.round(Number(normalized) * 100);
 }
 
+const PASSWORD_STRENGTH_ERROR =
+  'Das Passwort muss mindestens 8 Zeichen lang sein und mindestens eine Zahl, einen Kleinbuchstaben, einen Großbuchstaben und ein Sonderzeichen enthalten';
+const PASSWORD_STRENGTH_HINT = 'Mindestens 8 Zeichen, ein Groß- und Kleinbuchstabe, eine Zahl und ein Sonderzeichen.';
+
+function isPasswordStrong(password) {
+  return (
+    password.length >= 8 &&
+    /[0-9]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /[^A-Za-z0-9]/.test(password)
+  );
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: {
@@ -3433,6 +3600,21 @@ const TRANSLATIONS = {
     'Bestätigungs-Token ist erforderlich': 'Bevestigingstoken is verplicht',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'Bevestigingslink is ongeldig of verlopen',
     'Die Passwörter stimmen nicht überein.': 'De wachtwoorden komen niet overeen.',
+    'Mein Profil': 'Mijn profiel',
+    'Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.': 'Bewerk je naam, e-mailadres en wachtwoord.',
+    'Aktuelles Passwort': 'Huidig wachtwoord',
+    'Nur erforderlich, wenn du deine E-Mail-Adresse oder dein Passwort änderst.':
+      'Alleen nodig als je je e-mailadres of wachtwoord wijzigt.',
+    'Deine Daten wurden gespeichert.': 'Je gegevens zijn opgeslagen.',
+    'Deine Daten wurden gespeichert. Bitte bestätige deine neue E-Mail-Adresse über den Link, den wir dir zugeschickt haben.':
+      'Je gegevens zijn opgeslagen. Bevestig je nieuwe e-mailadres via de link die we je hebben gestuurd.',
+    'Aktuelles Passwort ist erforderlich oder falsch': 'Huidig wachtwoord is vereist of onjuist',
+    'Das Passwort muss mindestens 8 Zeichen lang sein und mindestens eine Zahl, einen Kleinbuchstaben, einen Großbuchstaben und ein Sonderzeichen enthalten':
+      'Het wachtwoord moet minstens 8 tekens bevatten en minstens één cijfer, één kleine letter, één hoofdletter en één speciaal teken bevatten',
+    'Mindestens 8 Zeichen, ein Groß- und Kleinbuchstabe, eine Zahl und ein Sonderzeichen.':
+      'Minstens 8 tekens, een hoofdletter en kleine letter, een cijfer en een speciaal teken.',
+    'Neues Passwort darf nicht mit dem aktuellen Passwort übereinstimmen':
+      'Nieuw wachtwoord mag niet hetzelfde zijn als het huidige wachtwoord',
     'Email already exists': 'E-mail bestaat al',
     'Email and password are required': 'E-mail en wachtwoord zijn verplicht',
     'Invalid login': 'Ongeldige aanmelding',
@@ -3783,6 +3965,21 @@ const TRANSLATIONS = {
     'Bestätigungs-Token ist erforderlich': 'Verification token is required',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'Verification link is invalid or expired',
     'Die Passwörter stimmen nicht überein.': 'The passwords do not match.',
+    'Mein Profil': 'My profile',
+    'Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.': 'Edit your name, email address and password.',
+    'Aktuelles Passwort': 'Current password',
+    'Nur erforderlich, wenn du deine E-Mail-Adresse oder dein Passwort änderst.':
+      'Only required when you change your email address or password.',
+    'Deine Daten wurden gespeichert.': 'Your data has been saved.',
+    'Deine Daten wurden gespeichert. Bitte bestätige deine neue E-Mail-Adresse über den Link, den wir dir zugeschickt haben.':
+      'Your data has been saved. Please confirm your new email address using the link we sent you.',
+    'Aktuelles Passwort ist erforderlich oder falsch': 'Current password is required or incorrect',
+    'Das Passwort muss mindestens 8 Zeichen lang sein und mindestens eine Zahl, einen Kleinbuchstaben, einen Großbuchstaben und ein Sonderzeichen enthalten':
+      'The password must contain at least 8 characters, including one number, one lowercase letter, one uppercase letter and one special character',
+    'Mindestens 8 Zeichen, ein Groß- und Kleinbuchstabe, eine Zahl und ein Sonderzeichen.':
+      'At least 8 characters, one uppercase and lowercase letter, one number and one special character.',
+    'Neues Passwort darf nicht mit dem aktuellen Passwort übereinstimmen':
+      'New password must not match the current password',
     'Email already exists': 'Email already exists',
     'Email and password are required': 'Email and password are required',
     'Invalid login': 'Invalid login',
@@ -4134,6 +4331,21 @@ const TRANSLATIONS = {
     'Bestätigungs-Token ist erforderlich': 'El token de confirmación es obligatorio',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'El enlace de confirmación no es válido o ha caducado',
     'Die Passwörter stimmen nicht überein.': 'Las contraseñas no coinciden.',
+    'Mein Profil': 'Mi perfil',
+    'Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.': 'Edita tu nombre, tu correo electrónico y tu contraseña.',
+    'Aktuelles Passwort': 'Contraseña actual',
+    'Nur erforderlich, wenn du deine E-Mail-Adresse oder dein Passwort änderst.':
+      'Solo es necesario si cambias tu correo electrónico o tu contraseña.',
+    'Deine Daten wurden gespeichert.': 'Tus datos han sido guardados.',
+    'Deine Daten wurden gespeichert. Bitte bestätige deine neue E-Mail-Adresse über den Link, den wir dir zugeschickt haben.':
+      'Tus datos han sido guardados. Confirma tu nueva dirección de correo con el enlace que te hemos enviado.',
+    'Aktuelles Passwort ist erforderlich oder falsch': 'La contraseña actual es obligatoria o incorrecta',
+    'Das Passwort muss mindestens 8 Zeichen lang sein und mindestens eine Zahl, einen Kleinbuchstaben, einen Großbuchstaben und ein Sonderzeichen enthalten':
+      'La contraseña debe tener al menos 8 caracteres e incluir al menos un número, una minúscula, una mayúscula y un carácter especial',
+    'Mindestens 8 Zeichen, ein Groß- und Kleinbuchstabe, eine Zahl und ein Sonderzeichen.':
+      'Al menos 8 caracteres, una mayúscula y una minúscula, un número y un carácter especial.',
+    'Neues Passwort darf nicht mit dem aktuellen Passwort übereinstimmen':
+      'La nueva contraseña no puede coincidir con la contraseña actual',
     'Email already exists': 'El correo ya existe',
     'Email and password are required': 'Correo y contraseña son obligatorios',
     'Invalid login': 'Inicio de sesión no válido',
@@ -4484,6 +4696,21 @@ const TRANSLATIONS = {
     'Bestätigungs-Token ist erforderlich': 'Le jeton de confirmation est obligatoire',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'Le lien de confirmation est invalide ou expiré',
     'Die Passwörter stimmen nicht überein.': 'Les mots de passe ne correspondent pas.',
+    'Mein Profil': 'Mon profil',
+    'Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.': 'Modifie ton nom, ton adresse e-mail et ton mot de passe.',
+    'Aktuelles Passwort': 'Mot de passe actuel',
+    'Nur erforderlich, wenn du deine E-Mail-Adresse oder dein Passwort änderst.':
+      'Nécessaire uniquement si tu modifies ton adresse e-mail ou ton mot de passe.',
+    'Deine Daten wurden gespeichert.': 'Tes données ont été enregistrées.',
+    'Deine Daten wurden gespeichert. Bitte bestätige deine neue E-Mail-Adresse über den Link, den wir dir zugeschickt haben.':
+      'Tes données ont été enregistrées. Confirme ta nouvelle adresse e-mail avec le lien que nous t’avons envoyé.',
+    'Aktuelles Passwort ist erforderlich oder falsch': 'Le mot de passe actuel est requis ou incorrect',
+    'Das Passwort muss mindestens 8 Zeichen lang sein und mindestens eine Zahl, einen Kleinbuchstaben, einen Großbuchstaben und ein Sonderzeichen enthalten':
+      'Le mot de passe doit contenir au moins 8 caractères, un chiffre, une minuscule, une majuscule et un caractère spécial',
+    'Mindestens 8 Zeichen, ein Groß- und Kleinbuchstabe, eine Zahl und ein Sonderzeichen.':
+      'Au moins 8 caractères, une majuscule et une minuscule, un chiffre et un caractère spécial.',
+    'Neues Passwort darf nicht mit dem aktuellen Passwort übereinstimmen':
+      'Le nouveau mot de passe ne doit pas être identique au mot de passe actuel',
     'Email already exists': 'L’e-mail existe déjà',
     'Email and password are required': 'E-mail et mot de passe obligatoires',
     'Invalid login': 'Connexion invalide',
