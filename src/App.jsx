@@ -154,6 +154,9 @@ export default function App() {
   const [homeFilterMonth, setHomeFilterMonth] = useState('');
   const [homeFilterFormation, setHomeFilterFormation] = useState('');
   const [homeFilterOpenOnly, setHomeFilterOpenOnly] = useState(false);
+  const [userQuery, setUserQuery] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('');
+  const [userStatusFilter, setUserStatusFilter] = useState('');
   const [path, navigate] = usePath();
   const [tournamentTips, setTournamentTips] = useState([]);
   const [pendingTips, setPendingTips] = useState([]);
@@ -222,6 +225,40 @@ export default function App() {
   const manageableTournaments = useMemo(
     () => tournaments.filter((tournament) => tournament.canManage),
     [tournaments],
+  );
+
+  const filteredUsers = useMemo(() => {
+    const query = userQuery.trim().toLowerCase();
+    return users.filter((user) => {
+      if (query && ![user.name, user.email].some((value) => (value || '').toLowerCase().includes(query))) {
+        return false;
+      }
+      if (userRoleFilter && user.role !== userRoleFilter) {
+        return false;
+      }
+      if (userStatusFilter === 'verified' && !user.emailVerifiedAt) {
+        return false;
+      }
+      if (userStatusFilter === 'unverified' && user.emailVerifiedAt) {
+        return false;
+      }
+      if (userStatusFilter === 'password_change_required' && !user.passwordChangeRequired) {
+        return false;
+      }
+      return true;
+    });
+  }, [users, userQuery, userRoleFilter, userStatusFilter]);
+
+  const userStats = useMemo(
+    () => ({
+      total: users.length,
+      admins: users.filter((user) => user.role === 'admin').length,
+      turnierleiter: users.filter((user) => user.role === 'turnierleiter').length,
+      unverified: users.filter((user) => !user.emailVerifiedAt).length,
+      passwordChangeRequired: users.filter((user) => user.passwordChangeRequired).length,
+      pendingAccessRequests: pendingTurnierleiterAccessRequests.length,
+    }),
+    [users, pendingTurnierleiterAccessRequests],
   );
 
   useEffect(() => {
@@ -1307,67 +1344,28 @@ export default function App() {
       )}
 
       {activeTab === 'users' && isAdmin && (
-        <section className="admin-grid">
-          <TurnierleiterAccessRequestsPanel
-            requests={pendingTurnierleiterAccessRequests}
-            onApprove={handleApproveTurnierleiterAccessRequest}
-            onReject={handleRejectTurnierleiterAccessRequest}
-          />
-
-          <div className="panel">
-            <div className="section-title">
-              <h2>{userMode === 'edit' ? 'Benutzer bearbeiten' : 'Benutzer anlegen'}</h2>
-              {userMode === 'edit' && (
-                <Button variant="secondary" onClick={() => {
-                  setUserMode('create');
-                  setUserForm(EMPTY_USER_FORM);
-                }}>
-                  Neu
-                </Button>
-              )}
-            </div>
-            <UserEditorForm
-              form={userForm}
-              setForm={setUserForm}
-              submitLabel={userMode === 'edit' ? 'Speichern' : 'Anlegen'}
-              onSubmit={handleUserSubmit}
-              passwordLabel={userMode === 'edit' ? 'Neues Passwort' : 'Passwort'}
-              passwordRequired={userMode === 'create'}
-            />
-          </div>
-
-          <div className="panel">
-            <div className="section-title">
-              <h2>Benutzer</h2>
-              <span className="counter">{users.length}</span>
-            </div>
-            <div className="user-list">
-              {users.map((user) => (
-                <article className="data-row" key={user.id}>
-                  <div>
-                    <strong>{user.name}</strong>
-                    <span>{user.email}</span>
-                  </div>
-                  <div className="badges">
-                    <span className={`role role-${user.role}`}>{roleName(user.role)}</span>
-                    <span className={user.emailVerifiedAt ? 'status registration-confirmed' : 'status registration-pending'}>
-                      {user.emailVerifiedAt ? 'E-Mail bestätigt' : 'E-Mail offen'}
-                    </span>
-                    {user.passwordChangeRequired && <span className="status registration-pending">Passwortwechsel nötig</span>}
-                  </div>
-                  <div className="row-actions">
-                    <Button variant="secondary" onClick={() => editUser(user)}>
-                      Bearbeiten
-                    </Button>
-                    <Button variant="danger" onClick={() => handleDeleteUser(user)} disabled={user.id === currentUser.id}>
-                      Löschen
-                    </Button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
+        <UserManagementPanel
+          users={filteredUsers}
+          stats={userStats}
+          totalUsers={users.length}
+          userMode={userMode}
+          currentUser={currentUser}
+          userForm={userForm}
+          setUserForm={setUserForm}
+          setUserMode={setUserMode}
+          userQuery={userQuery}
+          setUserQuery={setUserQuery}
+          userRoleFilter={userRoleFilter}
+          setUserRoleFilter={setUserRoleFilter}
+          userStatusFilter={userStatusFilter}
+          setUserStatusFilter={setUserStatusFilter}
+          requests={pendingTurnierleiterAccessRequests}
+          onApproveRequest={handleApproveTurnierleiterAccessRequest}
+          onRejectRequest={handleRejectTurnierleiterAccessRequest}
+          onSubmitUser={handleUserSubmit}
+          onEditUser={editUser}
+          onDeleteUser={handleDeleteUser}
+        />
       )}
 
       {activeTab === 'tips' && isAdmin && (
@@ -2583,6 +2581,161 @@ function RegistrationsPanel({ tournament, registrations, tournaments, onTourname
   );
 }
 
+const USER_STATUS_FILTERS = [
+  { value: '', label: 'Alle Status' },
+  { value: 'verified', label: 'E-Mail bestätigt' },
+  { value: 'unverified', label: 'E-Mail offen' },
+  { value: 'password_change_required', label: 'Passwortwechsel nötig' },
+];
+
+function UserManagementPanel({
+  users,
+  stats,
+  totalUsers,
+  userMode,
+  currentUser,
+  userForm,
+  setUserForm,
+  setUserMode,
+  userQuery,
+  setUserQuery,
+  userRoleFilter,
+  setUserRoleFilter,
+  userStatusFilter,
+  setUserStatusFilter,
+  requests,
+  onApproveRequest,
+  onRejectRequest,
+  onSubmitUser,
+  onEditUser,
+  onDeleteUser,
+}) {
+  const filtered = users.length !== totalUsers;
+  const roleOptions = [{ value: '', label: 'Alle Rollen' }, ...ROLES];
+
+  function resetUserFilters() {
+    setUserQuery('');
+    setUserRoleFilter('');
+    setUserStatusFilter('');
+  }
+
+  return (
+    <section className="user-management">
+      <div className="user-management-header">
+        <div>
+          <h2>Benutzerverwaltung</h2>
+          <p className="muted">Konten, Rollen und Freischaltungen zentral bearbeiten.</p>
+        </div>
+        <div className="user-stat-grid">
+          <UserStat label="Benutzer" value={stats.total} />
+          <UserStat label="Admins" value={stats.admins} />
+          <UserStat label="Turnierleiter" value={stats.turnierleiter} />
+          <UserStat label="E-Mail offen" value={stats.unverified} />
+          <UserStat label="Passwortwechsel" value={stats.passwordChangeRequired} />
+          <UserStat label="Anfragen" value={stats.pendingAccessRequests} />
+        </div>
+      </div>
+
+      <TurnierleiterAccessRequestsPanel requests={requests} onApprove={onApproveRequest} onReject={onRejectRequest} />
+
+      <div className="user-management-grid">
+        <div className="panel user-list-panel">
+          <div className="section-title">
+            <h2>Benutzer</h2>
+            <span className="counter">{filtered ? `${users.length}/${totalUsers}` : totalUsers}</span>
+          </div>
+          <div className="user-toolbar">
+            <input
+              type="search"
+              placeholder="Name oder E-Mail suchen"
+              value={userQuery}
+              onChange={(event) => setUserQuery(event.target.value)}
+            />
+            <SelectField label="Rolle filtern" value={userRoleFilter} onChange={setUserRoleFilter} options={roleOptions} />
+            <SelectField label="Status filtern" value={userStatusFilter} onChange={setUserStatusFilter} options={USER_STATUS_FILTERS} />
+            <Button variant="secondary" onClick={resetUserFilters} disabled={!filtered}>
+              Filter zurücksetzen
+            </Button>
+          </div>
+          <div className="user-list">
+            {users.map((user) => (
+              <UserRow
+                key={user.id}
+                user={user}
+                currentUser={currentUser}
+                selected={userMode === 'edit' && user.id === userForm.id}
+                onEdit={onEditUser}
+                onDelete={onDeleteUser}
+              />
+            ))}
+            {users.length === 0 && <p className="muted">Keine Benutzer gefunden.</p>}
+          </div>
+        </div>
+
+        <div className="panel user-editor-panel">
+          <div className="section-title">
+            <h2>{userMode === 'edit' ? 'Benutzer bearbeiten' : 'Benutzer anlegen'}</h2>
+            {userMode === 'edit' && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setUserMode('create');
+                  setUserForm(EMPTY_USER_FORM);
+                }}
+              >
+                Neu
+              </Button>
+            )}
+          </div>
+          <UserEditorForm
+            form={userForm}
+            setForm={setUserForm}
+            submitLabel={userMode === 'edit' ? 'Speichern' : 'Anlegen'}
+            onSubmit={onSubmitUser}
+            passwordLabel={userMode === 'edit' ? 'Neues Passwort' : 'Passwort'}
+            passwordRequired={userMode === 'create'}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function UserStat({ label, value }) {
+  return (
+    <div className="user-stat">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
+  return (
+    <article className={`data-row user-row ${selected ? 'selected' : ''}`}>
+      <div>
+        <strong>{user.name}</strong>
+        <span>{user.email}</span>
+      </div>
+      <div className="badges">
+        <span className={`role role-${user.role}`}>{roleName(user.role)}</span>
+        <span className={user.emailVerifiedAt ? 'status registration-confirmed' : 'status registration-pending'}>
+          {user.emailVerifiedAt ? 'E-Mail bestätigt' : 'E-Mail offen'}
+        </span>
+        {user.passwordChangeRequired && <span className="status registration-pending">Passwortwechsel nötig</span>}
+      </div>
+      <div className="row-actions">
+        <Button variant="secondary" onClick={() => onEdit(user)}>
+          Bearbeiten
+        </Button>
+        <Button variant="danger" onClick={() => onDelete(user)} disabled={user.id === currentUser.id}>
+          Löschen
+        </Button>
+      </div>
+    </article>
+  );
+}
+
 function UserEditorForm({ form, setForm, submitLabel, onSubmit, passwordLabel, passwordRequired }) {
   return (
     <form className="form" onSubmit={onSubmit}>
@@ -3307,6 +3460,17 @@ const TRANSLATIONS = {
     Benutzer: 'Gebruikers',
     Turnierverwaltung: 'Toernooibeheer',
     Benutzerverwaltung: 'Gebruikersbeheer',
+    'Konten, Rollen und Freischaltungen zentral bearbeiten.': 'Accounts, rollen en vrijgaven centraal beheren.',
+    Admins: 'Admins',
+    Passwortwechsel: 'Wachtwoordwijziging',
+    Anfragen: 'Aanvragen',
+    'Name oder E-Mail suchen': 'Naam of e-mail zoeken',
+    'Rolle filtern': 'Rol filteren',
+    'Status filtern': 'Status filteren',
+    'Alle Rollen': 'Alle rollen',
+    'Alle Status': 'Alle statussen',
+    'Filter zurücksetzen': 'Filters resetten',
+    'Keine Benutzer gefunden.': 'Geen gebruikers gevonden.',
     Abmelden: 'Afmelden',
     'Turnier bearbeiten': 'Toernooi bewerken',
     'Turnier anlegen': 'Toernooi aanmaken',
@@ -3646,6 +3810,17 @@ const TRANSLATIONS = {
     Benutzer: 'Users',
     Turnierverwaltung: 'Tournament management',
     Benutzerverwaltung: 'User management',
+    'Konten, Rollen und Freischaltungen zentral bearbeiten.': 'Manage accounts, roles, and approvals in one place.',
+    Admins: 'Admins',
+    Passwortwechsel: 'Password changes',
+    Anfragen: 'Requests',
+    'Name oder E-Mail suchen': 'Search name or email',
+    'Rolle filtern': 'Filter role',
+    'Status filtern': 'Filter status',
+    'Alle Rollen': 'All roles',
+    'Alle Status': 'All statuses',
+    'Filter zurücksetzen': 'Reset filters',
+    'Keine Benutzer gefunden.': 'No users found.',
     Abmelden: 'Sign out',
     'Turnier bearbeiten': 'Edit tournament',
     'Turnier anlegen': 'Create tournament',
@@ -3986,6 +4161,17 @@ const TRANSLATIONS = {
     Benutzer: 'Usuarios',
     Turnierverwaltung: 'Gestión de torneos',
     Benutzerverwaltung: 'Gestión de usuarios',
+    'Konten, Rollen und Freischaltungen zentral bearbeiten.': 'Gestiona cuentas, roles y aprobaciones en un solo lugar.',
+    Admins: 'Admins',
+    Passwortwechsel: 'Cambios de contraseña',
+    Anfragen: 'Solicitudes',
+    'Name oder E-Mail suchen': 'Buscar nombre o correo',
+    'Rolle filtern': 'Filtrar rol',
+    'Status filtern': 'Filtrar estado',
+    'Alle Rollen': 'Todos los roles',
+    'Alle Status': 'Todos los estados',
+    'Filter zurücksetzen': 'Restablecer filtros',
+    'Keine Benutzer gefunden.': 'No se encontraron usuarios.',
     Abmelden: 'Cerrar sesión',
     'Turnier bearbeiten': 'Editar torneo',
     'Turnier anlegen': 'Crear torneo',
@@ -4325,6 +4511,17 @@ const TRANSLATIONS = {
     Benutzer: 'Utilisateurs',
     Turnierverwaltung: 'Gestion des tournois',
     Benutzerverwaltung: 'Gestion des utilisateurs',
+    'Konten, Rollen und Freischaltungen zentral bearbeiten.': 'Gérer les comptes, rôles et validations au même endroit.',
+    Admins: 'Admins',
+    Passwortwechsel: 'Changements de mot de passe',
+    Anfragen: 'Demandes',
+    'Name oder E-Mail suchen': 'Rechercher nom ou e-mail',
+    'Rolle filtern': 'Filtrer le rôle',
+    'Status filtern': 'Filtrer le statut',
+    'Alle Rollen': 'Tous les rôles',
+    'Alle Status': 'Tous les statuts',
+    'Filter zurücksetzen': 'Réinitialiser les filtres',
+    'Keine Benutzer gefunden.': 'Aucun utilisateur trouvé.',
     Abmelden: 'Déconnexion',
     'Turnier bearbeiten': 'Modifier le tournoi',
     'Turnier anlegen': 'Créer un tournoi',
