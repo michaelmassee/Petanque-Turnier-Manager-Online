@@ -14,5 +14,8 @@
       "binding": "DB",
       "database_name": "petanque-turnier-manager-online"
     }
-  ]
+  ],
+  "vars": {
+    "MAIL_FROM": "onboarding@resend.dev"
+  }
 }

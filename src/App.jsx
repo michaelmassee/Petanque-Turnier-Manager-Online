@@ -65,6 +65,8 @@ const EMPTY_USER_FORM = {
   email: '',
   role: 'user',
   password: '',
+  emailVerified: true,
+  passwordChangeRequired: false,
 };
 
 const EMPTY_AUTH_FORM = {
@@ -73,6 +75,11 @@ const EMPTY_AUTH_FORM = {
   password: '',
   passwordConfirm: '',
   token: '',
+};
+
+const EMPTY_TURNIERLEITER_ACCESS_FORM = {
+  email: '',
+  message: '',
 };
 
 const EMPTY_TOURNAMENT_FORM = {
@@ -150,6 +157,7 @@ export default function App() {
   const [path, navigate] = usePath();
   const [tournamentTips, setTournamentTips] = useState([]);
   const [pendingTips, setPendingTips] = useState([]);
+  const [pendingTurnierleiterAccessRequests, setPendingTurnierleiterAccessRequests] = useState([]);
   const [tournamentTipForm, setTournamentTipForm] = useState(EMPTY_TOURNAMENT_TIP_FORM);
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
@@ -158,6 +166,7 @@ export default function App() {
   const [selectedTournamentId, setSelectedTournamentId] = useState('');
   const [userForm, setUserForm] = useState(EMPTY_USER_FORM);
   const [authForm, setAuthForm] = useState(EMPTY_AUTH_FORM);
+  const [turnierleiterAccessForm, setTurnierleiterAccessForm] = useState(EMPTY_TURNIERLEITER_ACCESS_FORM);
   const [tournamentForm, setTournamentForm] = useState(EMPTY_TOURNAMENT_FORM);
   const [registrationForm, setRegistrationForm] = useState(EMPTY_REGISTRATION_FORM);
   const [userMode, setUserMode] = useState('create');
@@ -252,6 +261,7 @@ export default function App() {
     if (isAdmin) {
       loadUsers();
       loadPendingTournamentTips();
+      loadPendingTurnierleiterAccessRequests();
     }
   }, [isAdmin]);
 
@@ -292,6 +302,15 @@ export default function App() {
     try {
       const data = await api('/api/users');
       setUsers(data.users);
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function loadPendingTurnierleiterAccessRequests() {
+    try {
+      const data = await api('/api/admin/turnierleiter-access-requests?status=pending');
+      setPendingTurnierleiterAccessRequests(data.requests);
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -374,6 +393,12 @@ export default function App() {
       setMessage('Angemeldet.');
       await loadTournaments();
     } catch (requestError) {
+      if (requestError.payload?.passwordChangeRequired && requestError.payload.resetToken) {
+        setAuthForm({ ...EMPTY_AUTH_FORM, token: requestError.payload.resetToken });
+        setAuthView('reset');
+        setMessage(requestError.message);
+        return;
+      }
       setError(requestError.message);
     }
   }
@@ -393,9 +418,29 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({ ...authForm, language }),
       });
+      const registeredEmail = authForm.email;
       setAuthForm(EMPTY_AUTH_FORM);
-      setAuthView('login');
+      setTurnierleiterAccessForm({ ...EMPTY_TURNIERLEITER_ACCESS_FORM, email: registeredEmail });
+      setAuthView('registerSuccess');
       setMessage(data.verificationUrl ? `${translateText(REGISTER_SUCCESS, language)} ${data.verificationUrl}` : translateText(REGISTER_SUCCESS, language));
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function handleTurnierleiterAccessRequest(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+
+    try {
+      const data = await api('/api/turnierleiter-access-requests', {
+        method: 'POST',
+        body: JSON.stringify(turnierleiterAccessForm),
+      });
+      setTurnierleiterAccessForm(EMPTY_TURNIERLEITER_ACCESS_FORM);
+      setAuthView('login');
+      setMessage(data.message || 'Turnierleiter-Zugang wurde angefragt.');
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -594,6 +639,32 @@ export default function App() {
     }
   }
 
+  async function handleApproveTurnierleiterAccessRequest(request) {
+    setError('');
+    setMessage('');
+
+    try {
+      await api(`/api/admin/turnierleiter-access-requests/${request.id}/approve`, { method: 'POST' });
+      setMessage('Turnierleiter-Zugang wurde freigeschaltet.');
+      await Promise.all([loadUsers(), loadPendingTurnierleiterAccessRequests()]);
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function handleRejectTurnierleiterAccessRequest(request) {
+    setError('');
+    setMessage('');
+
+    try {
+      await api(`/api/admin/turnierleiter-access-requests/${request.id}/reject`, { method: 'POST' });
+      setMessage('Turnierleiter-Zugang wurde abgelehnt.');
+      await loadPendingTurnierleiterAccessRequests();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
   async function handleTournamentSubmit(event) {
     event.preventDefault();
     setError('');
@@ -683,6 +754,8 @@ export default function App() {
       email: user.email,
       role: user.role,
       password: '',
+      emailVerified: Boolean(user.emailVerifiedAt),
+      passwordChangeRequired: Boolean(user.passwordChangeRequired),
     });
     clearFeedback();
   }
@@ -932,6 +1005,18 @@ export default function App() {
                 setForm={setAuthForm}
                 onSubmit={handleRegister}
                 navigate={navigate}
+                onBack={() => {
+                  setAuthView('login');
+                  clearFeedback();
+                }}
+              />
+            )}
+
+            {authView === 'registerSuccess' && (
+              <TurnierleiterAccessRequestForm
+                form={turnierleiterAccessForm}
+                setForm={setTurnierleiterAccessForm}
+                onSubmit={handleTurnierleiterAccessRequest}
                 onBack={() => {
                   setAuthView('login');
                   clearFeedback();
@@ -1223,6 +1308,12 @@ export default function App() {
 
       {activeTab === 'users' && isAdmin && (
         <section className="admin-grid">
+          <TurnierleiterAccessRequestsPanel
+            requests={pendingTurnierleiterAccessRequests}
+            onApprove={handleApproveTurnierleiterAccessRequest}
+            onReject={handleRejectTurnierleiterAccessRequest}
+          />
+
           <div className="panel">
             <div className="section-title">
               <h2>{userMode === 'edit' ? 'Benutzer bearbeiten' : 'Benutzer anlegen'}</h2>
@@ -1262,6 +1353,7 @@ export default function App() {
                     <span className={user.emailVerifiedAt ? 'status registration-confirmed' : 'status registration-pending'}>
                       {user.emailVerifiedAt ? 'E-Mail bestätigt' : 'E-Mail offen'}
                     </span>
+                    {user.passwordChangeRequired && <span className="status registration-pending">Passwortwechsel nötig</span>}
                   </div>
                   <div className="row-actions">
                     <Button variant="secondary" onClick={() => editUser(user)}>
@@ -1372,6 +1464,22 @@ function RegisterForm({ form, setForm, onSubmit, onBack, navigate }) {
         Datenschutzerklärung lesen
       </button>
       <Button type="submit">Registrieren</Button>
+      <button className="link-button" type="button" onClick={onBack}>
+        Zurück zur Anmeldung
+      </button>
+    </form>
+  );
+}
+
+function TurnierleiterAccessRequestForm({ form, setForm, onSubmit, onBack }) {
+  return (
+    <form className="form" onSubmit={onSubmit}>
+      <p className="hint">
+        {'Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse. Wenn du eigene Turniere verwalten möchtest, kannst du jetzt Turnierleiter-Zugang anfragen.'}
+      </p>
+      <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+      <TextArea label="Verein oder kurze Begründung" value={form.message} onChange={(message) => setForm({ ...form, message })} />
+      <Button type="submit">Turnierleiter-Zugang anfragen</Button>
       <button className="link-button" type="button" onClick={onBack}>
         Zurück zur Anmeldung
       </button>
@@ -2481,6 +2589,22 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, passwordLabel, p
       <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <SelectField label="Rolle" value={form.role} onChange={(role) => setForm({ ...form, role })} options={ROLES} />
+      <label className="checkbox-row">
+        <input
+          type="checkbox"
+          checked={form.emailVerified}
+          onChange={(event) => setForm({ ...form, emailVerified: event.target.checked })}
+        />
+        <span>E-Mail bestätigt setzen</span>
+      </label>
+      <label className="checkbox-row">
+        <input
+          type="checkbox"
+          checked={form.passwordChangeRequired}
+          onChange={(event) => setForm({ ...form, passwordChangeRequired: event.target.checked })}
+        />
+        <span>Passwortänderung beim nächsten Login erzwingen</span>
+      </label>
       <TextField
         label={passwordLabel}
         type="password"
@@ -2492,6 +2616,41 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, passwordLabel, p
       />
       <Button type="submit">{submitLabel}</Button>
     </form>
+  );
+}
+
+function TurnierleiterAccessRequestsPanel({ requests, onApprove, onReject }) {
+  return (
+    <div className="panel">
+      <div className="section-title">
+        <h2>Turnierleiter-Zugänge</h2>
+        <span className="counter">{requests.length}</span>
+      </div>
+      <div className="user-list">
+        {requests.map((request) => (
+          <article className="data-row" key={request.id}>
+            <div>
+              <strong>{request.userName || request.userEmail}</strong>
+              <span>{request.userEmail}</span>
+              {request.message && <small>{request.message}</small>}
+              <small><span>Beantragt am</span> {formatDateTime(request.requestedAt)}</small>
+            </div>
+            <div className="badges">
+              <span className={request.userEmailVerifiedAt ? 'status registration-confirmed' : 'status registration-pending'}>
+                {request.userEmailVerifiedAt ? 'E-Mail bestätigt' : 'E-Mail offen'}
+              </span>
+            </div>
+            <div className="row-actions">
+              <Button onClick={() => onApprove(request)}>Freigeben</Button>
+              <Button variant="secondary" onClick={() => onReject(request)}>
+                Ablehnen
+              </Button>
+            </div>
+          </article>
+        ))}
+        {requests.length === 0 && <p className="muted">Keine offenen Turnierleiter-Anfragen.</p>}
+      </div>
+    </div>
   );
 }
 
@@ -2664,6 +2823,9 @@ function authTitle(needsSetup, authView) {
   if (authView === 'register') {
     return 'Neu registrieren';
   }
+  if (authView === 'registerSuccess') {
+    return 'Registrierung gespeichert';
+  }
   if (authView === 'reset') {
     return 'Passwort ändern';
   }
@@ -2685,6 +2847,9 @@ function authSubtitle(needsSetup, authView) {
   }
   if (authView === 'register') {
     return 'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.';
+  }
+  if (authView === 'registerSuccess') {
+    return 'Frage bei Bedarf einen Turnierleiter-Zugang an.';
   }
   if (authView === 'reset') {
     return 'Setze mit deinem Reset-Token ein neues Passwort.';
@@ -3060,7 +3225,9 @@ async function api(path, options = {}) {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(translateText(payload.error || 'Request failed', localStorage.getItem('ptm_language') || 'de'));
+    const error = new Error(translateText(payload.error || 'Request failed', localStorage.getItem('ptm_language') || 'de'));
+    error.payload = payload;
+    throw error;
   }
 
   return payload;
@@ -3073,12 +3240,14 @@ const TRANSLATIONS = {
     'Passwort vergessen': 'Wachtwoord vergeten',
     'Passwort ändern': 'Wachtwoord wijzigen',
     'Neu registrieren': 'Nieuw registreren',
+    'Registrierung gespeichert': 'Registratie opgeslagen',
     'E-Mail bestätigen': 'E-mail bevestigen',
     'Turnieranmeldung': 'Toernooi-inschrijving',
     Anmelden: 'Aanmelden',
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Maak de eerste admin-gebruiker voor dit nieuwe project aan.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Vraag een link aan om je wachtwoord opnieuw in te stellen.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Registreer je gebruikersaccount. Vrijgave gebeurt pas na e-mailbevestiging.',
+    'Frage bei Bedarf einen Turnierleiter-Zugang an.': 'Vraag indien nodig toegang als toernooileider aan.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Stel met je reset-token een nieuw wachtwoord in.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Bevestig je e-mailadres om je gebruikersaccount vrij te geven.',
     'Melde dich für ein öffentliches Turnier an.': 'Schrijf je in voor een openbaar toernooi.',
@@ -3088,6 +3257,10 @@ const TRANSLATIONS = {
     'E-Mail': 'E-mail',
     Passwort: 'Wachtwoord',
     'Passwort bestätigen': 'Wachtwoord bevestigen',
+    'Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse. Wenn du eigene Turniere verwalten möchtest, kannst du jetzt Turnierleiter-Zugang anfragen.':
+      'Je gebruikersaccount is aangemaakt. Bevestig eerst je e-mailadres. Als je eigen toernooien wilt beheren, kun je nu toegang als toernooileider aanvragen.',
+    'Verein oder kurze Begründung': 'Vereniging of korte reden',
+    'Turnierleiter-Zugang anfragen': 'Toegang als toernooileider aanvragen',
     'Admin anlegen': 'Admin aanmaken',
     'Passwort vergessen?': 'Wachtwoord vergeten?',
     'Reset-Link anfordern': 'Reset-link aanvragen',
@@ -3097,9 +3270,13 @@ const TRANSLATIONS = {
     'Bestätigungs-Token': 'Bevestigingstoken',
     'E-Mail bestätigt': 'E-mail bevestigd',
     'E-Mail offen': 'E-mail open',
+    'E-Mail bestätigt setzen': 'E-mail als bevestigd markeren',
+    'Passwortänderung beim nächsten Login erzwingen': 'Wachtwoordwijziging bij volgende aanmelding afdwingen',
+    'Passwortwechsel nötig': 'Wachtwoordwijziging nodig',
     'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'E-mailadres is bevestigd. Je kunt je nu aanmelden.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registratie opgeslagen. Bevestig je e-mailadres via de link in de e-mail.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Bevestig eerst je e-mailadres.',
+    'Bitte ändere dein Passwort, bevor du fortfährst.': 'Wijzig je wachtwoord voordat je verdergaat.',
     'Bestätigungs-Token ist erforderlich': 'Bevestigingstoken is verplicht',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'Bevestigingslink is ongeldig of verlopen',
     'Die Passwörter stimmen nicht überein.': 'De wachtwoorden komen niet overeen.',
@@ -3109,6 +3286,17 @@ const TRANSLATIONS = {
     'Name must contain at least 2 characters': 'Naam moet minstens 2 tekens bevatten',
     'A valid email is required': 'Een geldig e-mailadres is verplicht',
     'Password must contain at least 8 characters': 'Wachtwoord moet minstens 8 tekens bevatten',
+    'E-Mail-Versand ist nicht konfiguriert.': 'E-mailverzending is niet geconfigureerd.',
+    'E-Mail konnte nicht versendet werden.': 'E-mail kon niet worden verzonden.',
+    'Turnierleiter-Zugang wurde angefragt.': 'Toegang als toernooileider is aangevraagd.',
+    'Turnierleiter-Zugang wurde bereits angefragt.': 'Toegang als toernooileider is al aangevraagd.',
+    'Turnierleiter-Zugang wurde freigeschaltet.': 'Toegang als toernooileider is geactiveerd.',
+    'Turnierleiter-Zugang wurde abgelehnt.': 'Toegang als toernooileider is afgewezen.',
+    'Die Nachricht darf maximal 1000 Zeichen enthalten.': 'Het bericht mag maximaal 1000 tekens bevatten.',
+    'Benutzer nicht gefunden.': 'Gebruiker niet gevonden.',
+    'Dieser Benutzer hat bereits Turnierleiter-Zugang.': 'Deze gebruiker heeft al toegang als toernooileider.',
+    'Turnierleiter-Anfrage nicht gefunden.': 'Aanvraag voor toernooileider niet gevonden.',
+    'Turnierleiter-Anfrage ist nicht offen.': 'Aanvraag voor toernooileider staat niet open.',
     'Request failed': 'Aanvraag mislukt',
     'Neues Passwort': 'Nieuw wachtwoord',
     'Öffentliche Turniere': 'Openbare toernooien',
@@ -3176,6 +3364,8 @@ const TRANSLATIONS = {
     Warteliste: 'Wachtlijst',
     Storniert: 'Geannuleerd',
     'Leer lassen, wenn unverändert': 'Leeg laten als ongewijzigd',
+    'Turnierleiter-Zugänge': 'Toegang als toernooileider',
+    'Keine offenen Turnierleiter-Anfragen.': 'Geen open aanvragen voor toernooileiders.',
     'Doublette gemischt': 'Doublette gemengd',
     'Triplette gemischt': 'Triplette gemengd',
     Januar: 'Januari',
@@ -3389,12 +3579,14 @@ const TRANSLATIONS = {
     'Passwort vergessen': 'Forgot password',
     'Passwort ändern': 'Change password',
     'Neu registrieren': 'Register',
+    'Registrierung gespeichert': 'Registration saved',
     'E-Mail bestätigen': 'Verify email',
     'Turnieranmeldung': 'Tournament registration',
     Anmelden: 'Sign in',
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Create the first admin user for this new project.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Request a link to reset your password.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Register your user account. Access is enabled only after email verification.',
+    'Frage bei Bedarf einen Turnierleiter-Zugang an.': 'Request tournament director access if needed.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Set a new password with your reset token.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Verify your email address to enable your user account.',
     'Melde dich für ein öffentliches Turnier an.': 'Register for a public tournament.',
@@ -3404,6 +3596,10 @@ const TRANSLATIONS = {
     'E-Mail': 'Email',
     Passwort: 'Password',
     'Passwort bestätigen': 'Confirm password',
+    'Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse. Wenn du eigene Turniere verwalten möchtest, kannst du jetzt Turnierleiter-Zugang anfragen.':
+      'Your user account has been created. Please verify your email address first. If you want to manage your own tournaments, you can request tournament director access now.',
+    'Verein oder kurze Begründung': 'Club or short reason',
+    'Turnierleiter-Zugang anfragen': 'Request tournament director access',
     'Admin anlegen': 'Create admin',
     'Passwort vergessen?': 'Forgot password?',
     'Reset-Link anfordern': 'Request reset link',
@@ -3413,9 +3609,13 @@ const TRANSLATIONS = {
     'Bestätigungs-Token': 'Verification token',
     'E-Mail bestätigt': 'Email verified',
     'E-Mail offen': 'Email pending',
+    'E-Mail bestätigt setzen': 'Mark email as verified',
+    'Passwortänderung beim nächsten Login erzwingen': 'Require password change on next login',
+    'Passwortwechsel nötig': 'Password change required',
     'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'Email address verified. You can sign in now.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registration saved. Please verify your email address using the link in the email.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Please verify your email address first.',
+    'Bitte ändere dein Passwort, bevor du fortfährst.': 'Please change your password before continuing.',
     'Bestätigungs-Token ist erforderlich': 'Verification token is required',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'Verification link is invalid or expired',
     'Die Passwörter stimmen nicht überein.': 'The passwords do not match.',
@@ -3425,6 +3625,17 @@ const TRANSLATIONS = {
     'Name must contain at least 2 characters': 'Name must contain at least 2 characters',
     'A valid email is required': 'A valid email is required',
     'Password must contain at least 8 characters': 'Password must contain at least 8 characters',
+    'E-Mail-Versand ist nicht konfiguriert.': 'Email delivery is not configured.',
+    'E-Mail konnte nicht versendet werden.': 'Email could not be sent.',
+    'Turnierleiter-Zugang wurde angefragt.': 'Tournament director access has been requested.',
+    'Turnierleiter-Zugang wurde bereits angefragt.': 'Tournament director access has already been requested.',
+    'Turnierleiter-Zugang wurde freigeschaltet.': 'Tournament director access has been enabled.',
+    'Turnierleiter-Zugang wurde abgelehnt.': 'Tournament director access has been rejected.',
+    'Die Nachricht darf maximal 1000 Zeichen enthalten.': 'The message may contain at most 1000 characters.',
+    'Benutzer nicht gefunden.': 'User not found.',
+    'Dieser Benutzer hat bereits Turnierleiter-Zugang.': 'This user already has tournament director access.',
+    'Turnierleiter-Anfrage nicht gefunden.': 'Tournament director request not found.',
+    'Turnierleiter-Anfrage ist nicht offen.': 'Tournament director request is not pending.',
     'Request failed': 'Request failed',
     'Neues Passwort': 'New password',
     'Öffentliche Turniere': 'Public tournaments',
@@ -3492,6 +3703,8 @@ const TRANSLATIONS = {
     Warteliste: 'Waitlist',
     Storniert: 'Cancelled',
     'Leer lassen, wenn unverändert': 'Leave empty if unchanged',
+    'Turnierleiter-Zugänge': 'Tournament director access',
+    'Keine offenen Turnierleiter-Anfragen.': 'No open tournament director requests.',
     'Doublette gemischt': 'Doublette mixed',
     'Triplette gemischt': 'Triplette mixed',
     Januar: 'January',
@@ -3706,12 +3919,14 @@ const TRANSLATIONS = {
     'Passwort vergessen': 'Contraseña olvidada',
     'Passwort ändern': 'Cambiar contraseña',
     'Neu registrieren': 'Registrarse',
+    'Registrierung gespeichert': 'Registro guardado',
     'E-Mail bestätigen': 'Confirmar correo',
     'Turnieranmeldung': 'Inscripción al torneo',
     Anmelden: 'Iniciar sesión',
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Crea el primer usuario administrador para este nuevo proyecto.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Solicita un enlace para restablecer tu contraseña.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Registra tu cuenta. El acceso se activa solo después de confirmar el correo.',
+    'Frage bei Bedarf einen Turnierleiter-Zugang an.': 'Solicita acceso como director de torneo si lo necesitas.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Define una nueva contraseña con tu token.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Confirma tu correo para activar tu cuenta.',
     'Melde dich für ein öffentliches Turnier an.': 'Inscríbete en un torneo público.',
@@ -3721,6 +3936,10 @@ const TRANSLATIONS = {
     'E-Mail': 'Correo',
     Passwort: 'Contraseña',
     'Passwort bestätigen': 'Confirmar contraseña',
+    'Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse. Wenn du eigene Turniere verwalten möchtest, kannst du jetzt Turnierleiter-Zugang anfragen.':
+      'Tu cuenta de usuario ha sido creada. Confirma primero tu correo. Si quieres gestionar tus propios torneos, puedes solicitar ahora acceso como director de torneo.',
+    'Verein oder kurze Begründung': 'Club o breve motivo',
+    'Turnierleiter-Zugang anfragen': 'Solicitar acceso como director',
     'Admin anlegen': 'Crear admin',
     'Passwort vergessen?': '¿Contraseña olvidada?',
     'Reset-Link anfordern': 'Solicitar enlace',
@@ -3730,9 +3949,13 @@ const TRANSLATIONS = {
     'Bestätigungs-Token': 'Token de confirmación',
     'E-Mail bestätigt': 'Correo confirmado',
     'E-Mail offen': 'Correo pendiente',
+    'E-Mail bestätigt setzen': 'Marcar correo como confirmado',
+    'Passwortänderung beim nächsten Login erzwingen': 'Exigir cambio de contraseña en el próximo inicio',
+    'Passwortwechsel nötig': 'Cambio de contraseña necesario',
     'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'Correo confirmado. Ya puedes iniciar sesión.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registro guardado. Confirma tu correo con el enlace del email.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Confirma primero tu correo.',
+    'Bitte ändere dein Passwort, bevor du fortfährst.': 'Cambia tu contraseña antes de continuar.',
     'Bestätigungs-Token ist erforderlich': 'El token de confirmación es obligatorio',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'El enlace de confirmación no es válido o ha caducado',
     'Die Passwörter stimmen nicht überein.': 'Las contraseñas no coinciden.',
@@ -3742,6 +3965,17 @@ const TRANSLATIONS = {
     'Name must contain at least 2 characters': 'El nombre debe tener al menos 2 caracteres',
     'A valid email is required': 'Se requiere un correo válido',
     'Password must contain at least 8 characters': 'La contraseña debe tener al menos 8 caracteres',
+    'E-Mail-Versand ist nicht konfiguriert.': 'El envío de correos no está configurado.',
+    'E-Mail konnte nicht versendet werden.': 'No se pudo enviar el correo.',
+    'Turnierleiter-Zugang wurde angefragt.': 'Se ha solicitado el acceso como director de torneo.',
+    'Turnierleiter-Zugang wurde bereits angefragt.': 'El acceso como director de torneo ya ha sido solicitado.',
+    'Turnierleiter-Zugang wurde freigeschaltet.': 'El acceso como director de torneo ha sido activado.',
+    'Turnierleiter-Zugang wurde abgelehnt.': 'El acceso como director de torneo ha sido rechazado.',
+    'Die Nachricht darf maximal 1000 Zeichen enthalten.': 'El mensaje puede tener como máximo 1000 caracteres.',
+    'Benutzer nicht gefunden.': 'Usuario no encontrado.',
+    'Dieser Benutzer hat bereits Turnierleiter-Zugang.': 'Este usuario ya tiene acceso como director de torneo.',
+    'Turnierleiter-Anfrage nicht gefunden.': 'Solicitud de director de torneo no encontrada.',
+    'Turnierleiter-Anfrage ist nicht offen.': 'La solicitud de director de torneo no está pendiente.',
     'Request failed': 'La solicitud ha fallado',
     'Neues Passwort': 'Nueva contraseña',
     'Öffentliche Turniere': 'Torneos públicos',
@@ -3809,6 +4043,8 @@ const TRANSLATIONS = {
     Warteliste: 'Lista de espera',
     Storniert: 'Cancelado',
     'Leer lassen, wenn unverändert': 'Dejar vacío si no cambia',
+    'Turnierleiter-Zugänge': 'Accesos de directores de torneo',
+    'Keine offenen Turnierleiter-Anfragen.': 'No hay solicitudes abiertas de directores de torneo.',
     'Doublette gemischt': 'Doublette mixto',
     'Triplette gemischt': 'Triplette mixto',
     Januar: 'Enero',
@@ -4022,12 +4258,14 @@ const TRANSLATIONS = {
     'Passwort vergessen': 'Mot de passe oublié',
     'Passwort ändern': 'Modifier le mot de passe',
     'Neu registrieren': 'Créer un compte',
+    'Registrierung gespeichert': 'Inscription enregistrée',
     'E-Mail bestätigen': 'Confirmer l’e-mail',
     'Turnieranmeldung': 'Inscription au tournoi',
     Anmelden: 'Connexion',
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Crée le premier utilisateur administrateur pour ce nouveau projet.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Demande un lien de réinitialisation.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Crée ton compte. L’accès est activé seulement après confirmation de l’e-mail.',
+    'Frage bei Bedarf einen Turnierleiter-Zugang an.': 'Demande un accès organisateur de tournoi si nécessaire.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Définis un nouveau mot de passe avec ton jeton.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Confirme ton adresse e-mail pour activer ton compte.',
     'Melde dich für ein öffentliches Turnier an.': 'Inscris-toi à un tournoi public.',
@@ -4037,6 +4275,10 @@ const TRANSLATIONS = {
     'E-Mail': 'E-mail',
     Passwort: 'Mot de passe',
     'Passwort bestätigen': 'Confirmer le mot de passe',
+    'Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse. Wenn du eigene Turniere verwalten möchtest, kannst du jetzt Turnierleiter-Zugang anfragen.':
+      'Ton compte utilisateur a été créé. Confirme d’abord ton adresse e-mail. Si tu veux gérer tes propres tournois, tu peux maintenant demander un accès organisateur de tournoi.',
+    'Verein oder kurze Begründung': 'Club ou courte justification',
+    'Turnierleiter-Zugang anfragen': 'Demander un accès organisateur',
     'Admin anlegen': 'Créer admin',
     'Passwort vergessen?': 'Mot de passe oublié ?',
     'Reset-Link anfordern': 'Demander le lien',
@@ -4046,9 +4288,13 @@ const TRANSLATIONS = {
     'Bestätigungs-Token': 'Jeton de confirmation',
     'E-Mail bestätigt': 'E-mail confirmé',
     'E-Mail offen': 'E-mail en attente',
+    'E-Mail bestätigt setzen': 'Marquer l’e-mail comme confirmé',
+    'Passwortänderung beim nächsten Login erzwingen': 'Exiger un changement de mot de passe à la prochaine connexion',
+    'Passwortwechsel nötig': 'Changement de mot de passe requis',
     'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'Adresse e-mail confirmée. Tu peux maintenant te connecter.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Compte créé. Confirme ton adresse e-mail avec le lien envoyé.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Confirme d’abord ton adresse e-mail.',
+    'Bitte ändere dein Passwort, bevor du fortfährst.': 'Modifie ton mot de passe avant de continuer.',
     'Bestätigungs-Token ist erforderlich': 'Le jeton de confirmation est obligatoire',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'Le lien de confirmation est invalide ou expiré',
     'Die Passwörter stimmen nicht überein.': 'Les mots de passe ne correspondent pas.',
@@ -4058,6 +4304,17 @@ const TRANSLATIONS = {
     'Name must contain at least 2 characters': 'Le nom doit contenir au moins 2 caractères',
     'A valid email is required': 'Une adresse e-mail valide est obligatoire',
     'Password must contain at least 8 characters': 'Le mot de passe doit contenir au moins 8 caractères',
+    'E-Mail-Versand ist nicht konfiguriert.': "L'envoi d'e-mails n'est pas configuré.",
+    'E-Mail konnte nicht versendet werden.': "L'e-mail n'a pas pu être envoyé.",
+    'Turnierleiter-Zugang wurde angefragt.': 'L’accès organisateur de tournoi a été demandé.',
+    'Turnierleiter-Zugang wurde bereits angefragt.': 'L’accès organisateur de tournoi a déjà été demandé.',
+    'Turnierleiter-Zugang wurde freigeschaltet.': 'L’accès organisateur de tournoi a été activé.',
+    'Turnierleiter-Zugang wurde abgelehnt.': 'L’accès organisateur de tournoi a été refusé.',
+    'Die Nachricht darf maximal 1000 Zeichen enthalten.': 'Le message peut contenir au maximum 1000 caractères.',
+    'Benutzer nicht gefunden.': 'Utilisateur introuvable.',
+    'Dieser Benutzer hat bereits Turnierleiter-Zugang.': 'Cet utilisateur a déjà un accès organisateur de tournoi.',
+    'Turnierleiter-Anfrage nicht gefunden.': 'Demande organisateur de tournoi introuvable.',
+    'Turnierleiter-Anfrage ist nicht offen.': 'La demande organisateur de tournoi n’est pas en attente.',
     'Request failed': 'La demande a échoué',
     'Neues Passwort': 'Nouveau mot de passe',
     'Öffentliche Turniere': 'Tournois publics',
@@ -4125,6 +4382,8 @@ const TRANSLATIONS = {
     Warteliste: 'Liste d’attente',
     Storniert: 'Annulé',
     'Leer lassen, wenn unverändert': 'Laisser vide si inchangé',
+    'Turnierleiter-Zugänge': 'Accès organisateur de tournoi',
+    'Keine offenen Turnierleiter-Anfragen.': 'Aucune demande organisateur de tournoi en attente.',
     'Doublette gemischt': 'Doublette mixte',
     'Triplette gemischt': 'Triplette mixte',
     Januar: 'Janvier',

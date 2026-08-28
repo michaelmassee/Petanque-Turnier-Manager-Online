@@ -124,6 +124,10 @@ export default {
         return await registerUser(request, env, url);
       }
 
+      if (request.method === 'POST' && url.pathname === '/api/turnierleiter-access-requests') {
+        return await requestTurnierleiterAccess(request, env.DB);
+      }
+
       if (request.method === 'POST' && url.pathname === '/api/email/verify') {
         return await verifyEmail(request, env.DB);
       }
@@ -168,6 +172,23 @@ export default {
         if (request.method === 'DELETE') {
           return await deleteUser(env.DB, userMatch[1], session.user.id);
         }
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/admin/turnierleiter-access-requests') {
+        await requireAdmin(request, env.DB);
+        return await listTurnierleiterAccessRequests(env.DB, url);
+      }
+
+      const turnierleiterAccessApproveMatch = url.pathname.match(/^\/api\/admin\/turnierleiter-access-requests\/([^/]+)\/approve$/);
+      if (turnierleiterAccessApproveMatch && request.method === 'POST') {
+        const session = await requireAdmin(request, env.DB);
+        return await approveTurnierleiterAccessRequest(env.DB, turnierleiterAccessApproveMatch[1], session.user.id);
+      }
+
+      const turnierleiterAccessRejectMatch = url.pathname.match(/^\/api\/admin\/turnierleiter-access-requests\/([^/]+)\/reject$/);
+      if (turnierleiterAccessRejectMatch && request.method === 'POST') {
+        const session = await requireAdmin(request, env.DB);
+        return await rejectTurnierleiterAccessRequest(env.DB, turnierleiterAccessRejectMatch[1], session.user.id);
       }
 
       if (url.pathname === '/api/api-keys') {
@@ -474,6 +495,18 @@ async function login(request, db, url) {
 
   await clearLoginAttempts(db, email);
 
+  if (Number(row.password_change_required || 0)) {
+    const token = await createPasswordResetToken(db, row.id);
+    return json(
+      {
+        error: 'Bitte ändere dein Passwort, bevor du fortfährst.',
+        passwordChangeRequired: true,
+        resetToken: token,
+      },
+      403,
+    );
+  }
+
   const session = await createSession(db, row.id);
   return json({ user: toPublicUser(row) }, 200, { 'Set-Cookie': sessionCookie(session.id, session.expiresAt, url) });
 }
@@ -507,7 +540,7 @@ async function registerUser(request, env, url) {
     message: 'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.',
   };
 
-  if (['localhost', '127.0.0.1'].includes(url.hostname)) {
+  if (isLocalhost(url)) {
     response.verificationUrl = verificationUrl;
   }
 
@@ -545,6 +578,25 @@ async function verifyEmail(request, db) {
   return json({ ok: true });
 }
 
+async function createPasswordResetToken(db, userId) {
+  await db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').bind(userId).run();
+
+  const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+  const tokenHash = await sha256Hex(token);
+  const createdAt = new Date();
+  const expiresAt = new Date(createdAt.getTime() + RESET_TTL_SECONDS * 1000);
+
+  await db
+    .prepare(
+      `INSERT INTO password_reset_tokens (token_hash, user_id, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+    .bind(tokenHash, userId, expiresAt.toISOString(), createdAt.toISOString())
+    .run();
+
+  return token;
+}
+
 async function logout(request, db, url) {
   const sessionId = getCookie(request, SESSION_COOKIE);
   if (sessionId) {
@@ -572,23 +624,11 @@ async function forgotPassword(request, env, url) {
     return json(response);
   }
 
-  const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
-  const tokenHash = await sha256Hex(token);
-  const createdAt = new Date();
-  const expiresAt = new Date(createdAt.getTime() + RESET_TTL_SECONDS * 1000);
-
-  await db
-    .prepare(
-      `INSERT INTO password_reset_tokens (token_hash, user_id, expires_at, created_at)
-       VALUES (?, ?, ?, ?)`,
-    )
-    .bind(tokenHash, row.id, expiresAt.toISOString(), createdAt.toISOString())
-    .run();
-
+  const token = await createPasswordResetToken(db, row.id);
   const resetUrl = `${url.origin}/?reset_token=${encodeURIComponent(token)}`;
-  await sendPasswordResetEmail(env, email, resetUrl);
+  await sendPasswordResetEmail(env, email, resetUrl, isLocalhost(url));
 
-  if (['localhost', '127.0.0.1'].includes(url.hostname)) {
+  if (isLocalhost(url)) {
     response.resetUrl = resetUrl;
   }
 
@@ -612,59 +652,31 @@ async function createEmailVerification(db, env, url, userId, email, language) {
     .run();
 
   const verificationUrl = `${url.origin}/?verify_token=${encodeURIComponent(token)}`;
-  await sendEmailVerificationEmail(env, email, verificationUrl, language);
+  await sendEmailVerificationEmail(env, email, verificationUrl, language, isLocalhost(url));
   return verificationUrl;
 }
 
-async function sendEmailVerificationEmail(env, email, verificationUrl, language) {
-  if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
-    console.log(`Email verification link for ${email}: ${verificationUrl}`);
-    return;
-  }
-
+async function sendEmailVerificationEmail(env, email, verificationUrl, language, allowLogFallback) {
   const emailText = EMAIL_VERIFICATION_EMAILS[language] || EMAIL_VERIFICATION_EMAILS.de;
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: env.MAIL_FROM,
-      to: email,
-      subject: emailText.subject,
-      text: emailText.text(verificationUrl),
-    }),
+  await sendTransactionalEmail(env, {
+    to: email,
+    subject: emailText.subject,
+    text: emailText.text(verificationUrl),
+    logFallback: `Email verification link for ${email}: ${verificationUrl}`,
+    failureContext: `email verification email for ${email}`,
+    allowLogFallback,
   });
-
-  if (!response.ok) {
-    console.error(`Email verification email failed for ${email}: ${response.status}`);
-  }
 }
 
-async function sendPasswordResetEmail(env, email, resetUrl) {
-  if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
-    console.log(`Password reset link for ${email}: ${resetUrl}`);
-    return;
-  }
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: env.MAIL_FROM,
-      to: email,
-      subject: 'Passwort zurücksetzen',
-      text: `Du kannst dein Passwort über diesen Link zurücksetzen:\n\n${resetUrl}\n\nDer Link ist 30 Minuten gültig.`,
-    }),
+async function sendPasswordResetEmail(env, email, resetUrl, allowLogFallback) {
+  await sendTransactionalEmail(env, {
+    to: email,
+    subject: 'Passwort zurücksetzen',
+    text: `Du kannst dein Passwort über diesen Link zurücksetzen:\n\n${resetUrl}\n\nDer Link ist 30 Minuten gültig.`,
+    logFallback: `Password reset link for ${email}: ${resetUrl}`,
+    failureContext: `password reset email for ${email}`,
+    allowLogFallback,
   });
-
-  if (!response.ok) {
-    console.error(`Password reset email failed for ${email}: ${response.status}`);
-  }
 }
 
 async function resetPassword(request, db) {
@@ -699,7 +711,7 @@ async function resetPassword(request, db) {
 
   await db.batch([
     db
-      .prepare('UPDATE users SET password_salt = ?, password_hash = ?, updated_at = ? WHERE id = ?')
+      .prepare('UPDATE users SET password_salt = ?, password_hash = ?, password_change_required = 0, updated_at = ? WHERE id = ?')
       .bind(hashedPassword.salt, hashedPassword.hash, now, reset.user_id),
     db.prepare('UPDATE password_reset_tokens SET used_at = ? WHERE token_hash = ?').bind(now, tokenHash),
     db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(reset.user_id),
@@ -710,7 +722,7 @@ async function resetPassword(request, db) {
 
 async function listUsers(db) {
   const result = await db
-    .prepare('SELECT id, name, email, role, email_verified_at, created_at, updated_at FROM users ORDER BY name COLLATE NOCASE')
+    .prepare('SELECT id, name, email, role, email_verified_at, password_change_required, created_at, updated_at FROM users ORDER BY name COLLATE NOCASE')
     .all();
   return json({ users: result.results.map(toPublicUser) });
 }
@@ -721,14 +733,16 @@ async function createUser(request, db) {
   const password = await hashPassword(user.password);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
+  const emailVerifiedAt = body.emailVerified === false ? null : now;
+  const passwordChangeRequired = body.passwordChangeRequired === true ? 1 : 0;
 
   try {
     await db
       .prepare(
-        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, password_change_required, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, user.name, user.email, user.role, password.salt, password.hash, now, now, now)
+      .bind(id, user.name, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, now, now)
       .run();
   } catch (error) {
     if (String(error.message || '').includes('UNIQUE')) {
@@ -737,7 +751,21 @@ async function createUser(request, db) {
     throw error;
   }
 
-  return json({ user: toPublicUser({ id, name: user.name, email: user.email, role: user.role, email_verified_at: now, created_at: now, updated_at: now }) }, 201);
+  return json(
+    {
+      user: toPublicUser({
+        id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        email_verified_at: emailVerifiedAt,
+        password_change_required: passwordChangeRequired,
+        created_at: now,
+        updated_at: now,
+      }),
+    },
+    201,
+  );
 }
 
 async function updateUser(request, db, id, currentUserId) {
@@ -749,6 +777,8 @@ async function updateUser(request, db, id, currentUserId) {
   const body = await readJson(request);
   const user = normalizeUserInput(body, { requirePassword: false });
   const now = new Date().toISOString();
+  const emailVerifiedAt = resolveAdminEmailVerifiedAt(body, existing, user, now);
+  const passwordChangeRequired = body.passwordChangeRequired === true ? 1 : 0;
 
   if (id === currentUserId && user.role !== 'admin') {
     throw new HttpError(400, 'You cannot remove your own admin role');
@@ -760,15 +790,15 @@ async function updateUser(request, db, id, currentUserId) {
       await db
         .prepare(
           `UPDATE users
-           SET name = ?, email = ?, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, updated_at = ?
+           SET name = ?, email = ?, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, updated_at = ?
            WHERE id = ?`,
         )
-        .bind(user.name, user.email, user.role, password.salt, password.hash, user.email === existing.email ? existing.email_verified_at : now, now, id)
+        .bind(user.name, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, now, id)
         .run();
     } else {
       await db
-        .prepare('UPDATE users SET name = ?, email = ?, role = ?, email_verified_at = ?, updated_at = ? WHERE id = ?')
-        .bind(user.name, user.email, user.role, user.email === existing.email ? existing.email_verified_at : now, now, id)
+        .prepare('UPDATE users SET name = ?, email = ?, role = ?, email_verified_at = ?, password_change_required = ?, updated_at = ? WHERE id = ?')
+        .bind(user.name, user.email, user.role, emailVerifiedAt, passwordChangeRequired, now, id)
         .run();
     }
   } catch (error) {
@@ -779,7 +809,7 @@ async function updateUser(request, db, id, currentUserId) {
   }
 
   const updated = await db
-    .prepare('SELECT id, name, email, role, email_verified_at, created_at, updated_at FROM users WHERE id = ?')
+    .prepare('SELECT id, name, email, role, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?')
     .bind(id)
     .first();
   return json({ user: toPublicUser(updated) });
@@ -796,6 +826,143 @@ async function deleteUser(db, id, currentUserId) {
   }
 
   return json({ ok: true });
+}
+
+async function requestTurnierleiterAccess(request, db) {
+  const body = await readJson(request);
+  const email = String(body.email || '').trim().toLowerCase();
+  const message = nullableText(body.message);
+
+  if (!isEmail(email)) {
+    throw new HttpError(400, 'A valid email is required');
+  }
+
+  if (message && message.length > 1000) {
+    throw new HttpError(400, 'Die Nachricht darf maximal 1000 Zeichen enthalten.');
+  }
+
+  const user = await db.prepare('SELECT id, role FROM users WHERE email = ?').bind(email).first();
+  if (!user) {
+    throw new HttpError(404, 'Benutzer nicht gefunden.');
+  }
+  if (user.role === 'turnierleiter' || user.role === 'admin') {
+    throw new HttpError(409, 'Dieser Benutzer hat bereits Turnierleiter-Zugang.');
+  }
+
+  const existing = await db
+    .prepare(
+      `SELECT *
+       FROM turnierleiter_access_requests
+       WHERE user_id = ? AND status = 'pending'
+       ORDER BY requested_at DESC
+       LIMIT 1`,
+    )
+    .bind(user.id)
+    .first();
+
+  if (existing) {
+    return json({
+      request: toPublicTurnierleiterAccessRequest(existing),
+      message: 'Turnierleiter-Zugang wurde bereits angefragt.',
+    });
+  }
+
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  await db
+    .prepare(
+      `INSERT INTO turnierleiter_access_requests (id, user_id, status, message, requested_at, decided_at, decided_by, updated_at)
+       VALUES (?, ?, 'pending', ?, ?, NULL, NULL, ?)`,
+    )
+    .bind(id, user.id, message, now, now)
+    .run();
+
+  const created = await db.prepare('SELECT * FROM turnierleiter_access_requests WHERE id = ?').bind(id).first();
+  return json(
+    {
+      request: toPublicTurnierleiterAccessRequest(created),
+      message: 'Turnierleiter-Zugang wurde angefragt.',
+    },
+    201,
+  );
+}
+
+async function listTurnierleiterAccessRequests(db, url) {
+  const status = url.searchParams.get('status');
+  const statement =
+    status && ['pending', 'approved', 'rejected'].includes(status)
+      ? db
+          .prepare(
+            `SELECT turnierleiter_access_requests.*, users.name AS user_name, users.email AS user_email,
+                    users.role AS user_role, users.email_verified_at AS user_email_verified_at,
+                    admins.name AS decided_by_name
+             FROM turnierleiter_access_requests
+             JOIN users ON users.id = turnierleiter_access_requests.user_id
+             LEFT JOIN users admins ON admins.id = turnierleiter_access_requests.decided_by
+             WHERE turnierleiter_access_requests.status = ?
+             ORDER BY turnierleiter_access_requests.requested_at DESC`,
+          )
+          .bind(status)
+      : db.prepare(
+          `SELECT turnierleiter_access_requests.*, users.name AS user_name, users.email AS user_email,
+                  users.role AS user_role, users.email_verified_at AS user_email_verified_at,
+                  admins.name AS decided_by_name
+           FROM turnierleiter_access_requests
+           JOIN users ON users.id = turnierleiter_access_requests.user_id
+           LEFT JOIN users admins ON admins.id = turnierleiter_access_requests.decided_by
+           ORDER BY turnierleiter_access_requests.requested_at DESC`,
+        );
+
+  const result = await statement.all();
+  return json({ requests: result.results.map(toPublicTurnierleiterAccessRequest) });
+}
+
+async function approveTurnierleiterAccessRequest(db, id, adminUserId) {
+  const existing = await db.prepare('SELECT * FROM turnierleiter_access_requests WHERE id = ?').bind(id).first();
+  if (!existing) {
+    throw new HttpError(404, 'Turnierleiter-Anfrage nicht gefunden.');
+  }
+  if (existing.status !== 'pending') {
+    throw new HttpError(409, 'Turnierleiter-Anfrage ist nicht offen.');
+  }
+
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare("UPDATE users SET role = 'turnierleiter', updated_at = ? WHERE id = ?").bind(now, existing.user_id),
+    db
+      .prepare(
+        `UPDATE turnierleiter_access_requests
+         SET status = 'approved', decided_at = ?, decided_by = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .bind(now, adminUserId, now, id),
+  ]);
+
+  const updated = await db.prepare('SELECT * FROM turnierleiter_access_requests WHERE id = ?').bind(id).first();
+  return json({ request: toPublicTurnierleiterAccessRequest(updated) });
+}
+
+async function rejectTurnierleiterAccessRequest(db, id, adminUserId) {
+  const existing = await db.prepare('SELECT * FROM turnierleiter_access_requests WHERE id = ?').bind(id).first();
+  if (!existing) {
+    throw new HttpError(404, 'Turnierleiter-Anfrage nicht gefunden.');
+  }
+  if (existing.status !== 'pending') {
+    throw new HttpError(409, 'Turnierleiter-Anfrage ist nicht offen.');
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .prepare(
+      `UPDATE turnierleiter_access_requests
+       SET status = 'rejected', decided_at = ?, decided_by = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(now, adminUserId, now, id)
+    .run();
+
+  const updated = await db.prepare('SELECT * FROM turnierleiter_access_requests WHERE id = ?').bind(id).first();
+  return json({ request: toPublicTurnierleiterAccessRequest(updated) });
 }
 
 async function listTournaments(db, user) {
@@ -1271,7 +1438,7 @@ async function submitTournamentTip(request, env, url) {
     message: 'Turniermeldung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.',
   };
 
-  if (['localhost', '127.0.0.1'].includes(url.hostname)) {
+  if (isLocalhost(url)) {
     response.verificationUrl = verificationUrl;
   }
 
@@ -1295,33 +1462,55 @@ async function createTournamentTipVerification(db, env, url, tipId, email, langu
     .run();
 
   const verificationUrl = `${url.origin}/?tip_verify_token=${encodeURIComponent(token)}`;
-  await sendTournamentTipVerificationEmail(env, email, verificationUrl, language);
+  await sendTournamentTipVerificationEmail(env, email, verificationUrl, language, isLocalhost(url));
   return verificationUrl;
 }
 
-async function sendTournamentTipVerificationEmail(env, email, verificationUrl, language) {
+async function sendTournamentTipVerificationEmail(env, email, verificationUrl, language, allowLogFallback) {
+  const emailText = TOURNAMENT_TIP_VERIFICATION_EMAILS[language] || TOURNAMENT_TIP_VERIFICATION_EMAILS.de;
+  await sendTransactionalEmail(env, {
+    to: email,
+    subject: emailText.subject,
+    text: emailText.text(verificationUrl),
+    logFallback: `Tournament tip verification link for ${email}: ${verificationUrl}`,
+    failureContext: `tournament tip verification email for ${email}`,
+    allowLogFallback,
+  });
+}
+
+async function sendTransactionalEmail(env, { to, subject, text, logFallback, failureContext, allowLogFallback = false }) {
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
-    console.log(`Tournament tip verification link for ${email}: ${verificationUrl}`);
-    return;
+    console.log(logFallback);
+    if (allowLogFallback) {
+      return;
+    }
+    throw new HttpError(503, 'E-Mail-Versand ist nicht konfiguriert.');
   }
 
-  const emailText = TOURNAMENT_TIP_VERIFICATION_EMAILS[language] || TOURNAMENT_TIP_VERIFICATION_EMAILS.de;
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: env.MAIL_FROM,
-      to: email,
-      subject: emailText.subject,
-      text: emailText.text(verificationUrl),
-    }),
-  });
+  let response;
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: env.MAIL_FROM,
+        to,
+        subject,
+        text,
+      }),
+    });
+  } catch (error) {
+    console.error(`Resend request failed for ${failureContext}`, error);
+    throw new HttpError(503, 'E-Mail konnte nicht versendet werden.');
+  }
 
   if (!response.ok) {
-    console.error(`Tournament tip verification email failed for ${email}: ${response.status}`);
+    const errorText = await response.text().catch(() => '');
+    console.error(`Resend failed to send ${failureContext}: ${response.status} ${errorText}`);
+    throw new HttpError(503, 'E-Mail konnte nicht versendet werden.');
   }
 }
 
@@ -1585,7 +1774,7 @@ async function requireApiKey(request, db) {
   const row = await db
     .prepare(
       `SELECT api_keys.id AS api_key_id, users.id, users.name, users.email, users.role,
-              users.email_verified_at, users.created_at, users.updated_at
+              users.email_verified_at, users.password_change_required, users.created_at, users.updated_at
        FROM api_keys
        JOIN users ON users.id = api_keys.user_id
        WHERE api_keys.key_hash = ? AND api_keys.status = 'approved'`,
@@ -1632,7 +1821,8 @@ async function requireSession(request, db) {
 
   const row = await db
     .prepare(
-      `SELECT users.id, users.name, users.email, users.role, users.email_verified_at, users.created_at, users.updated_at, sessions.expires_at
+      `SELECT users.id, users.name, users.email, users.role, users.email_verified_at, users.password_change_required,
+              users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
        WHERE sessions.id = ?`,
@@ -1724,6 +1914,16 @@ function normalizeUserInput(body, { requirePassword }) {
   }
 
   return { name, email, role, password };
+}
+
+function resolveAdminEmailVerifiedAt(body, existing, user, now) {
+  if (body.emailVerified === true) {
+    return existing.email_verified_at || now;
+  }
+  if (body.emailVerified === false) {
+    return null;
+  }
+  return user.email === existing.email ? existing.email_verified_at : now;
 }
 
 function normalizeLanguage(value) {
@@ -1946,7 +2146,26 @@ function toPublicUser(row) {
     email: row.email,
     role: row.role,
     emailVerifiedAt: row.email_verified_at || null,
+    passwordChangeRequired: Boolean(Number(row.password_change_required || 0)),
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toPublicTurnierleiterAccessRequest(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    userName: row.user_name || null,
+    userEmail: row.user_email || null,
+    userRole: row.user_role || null,
+    userEmailVerifiedAt: row.user_email_verified_at || null,
+    status: row.status,
+    message: row.message || '',
+    requestedAt: row.requested_at,
+    decidedAt: row.decided_at || null,
+    decidedBy: row.decided_by || null,
+    decidedByName: row.decided_by_name || null,
     updatedAt: row.updated_at,
   };
 }
@@ -2084,6 +2303,10 @@ function assertSameOriginForUnsafeMethods(request, url) {
   if (origin && origin !== url.origin) {
     throw new HttpError(403, 'Cross-origin request denied');
   }
+}
+
+function isLocalhost(url) {
+  return ['localhost', '127.0.0.1'].includes(url.hostname);
 }
 
 class HttpError extends Error {
