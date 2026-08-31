@@ -58,6 +58,8 @@ const REGISTRATION_STATUSES = [
   { value: 'cancelled', label: 'Storniert' },
 ];
 
+const DEFAULT_TOURNAMENT_LIMIT = 5;
+
 const EMPTY_USER_FORM = {
   id: '',
   name: '',
@@ -66,6 +68,7 @@ const EMPTY_USER_FORM = {
   password: '',
   emailVerified: true,
   passwordChangeRequired: false,
+  tournamentLimit: DEFAULT_TOURNAMENT_LIMIT,
 };
 
 const EMPTY_PROFILE_FORM = {
@@ -808,6 +811,7 @@ export default function App() {
       password: '',
       emailVerified: Boolean(user.emailVerifiedAt),
       passwordChangeRequired: Boolean(user.passwordChangeRequired),
+      tournamentLimit: user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT,
     });
     clearFeedback();
   }
@@ -2793,6 +2797,7 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
           {user.emailVerifiedAt ? 'E-Mail bestätigt' : 'E-Mail offen'}
         </span>
         {user.passwordChangeRequired && <span className="status registration-pending">Passwortwechsel nötig</span>}
+        {user.role !== 'admin' && <span className="status">Turnier-Limit: {user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT}</span>}
       </div>
       <div className="row-actions">
         <Button variant="secondary" onClick={() => onEdit(user)}>
@@ -2828,6 +2833,14 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, passwordLabel, p
         />
         <span>Passwortänderung beim nächsten Login erzwingen</span>
       </label>
+      <TextField
+        label="Turnier-Limit"
+        type="number"
+        min={0}
+        value={form.tournamentLimit}
+        onChange={(value) => setForm({ ...form, tournamentLimit: value === '' ? '' : Number(value) })}
+      />
+      <p className="hint">Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).</p>
       <TextField
         label={passwordLabel}
         type="password"

@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN tournament_limit INTEGER NOT NULL DEFAULT 5;

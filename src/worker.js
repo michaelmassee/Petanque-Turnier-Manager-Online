@@ -1,4 +1,5 @@
 const ROLES = ['admin', 'user'];
+const DEFAULT_TOURNAMENT_LIMIT = 5;
 const TOURNAMENT_TYPES = [
   'formule_x',
   'jeder_gegen_jeden',
@@ -741,7 +742,9 @@ async function resetPassword(request, db) {
 
 async function listUsers(db) {
   const result = await db
-    .prepare('SELECT id, name, email, pending_email, role, email_verified_at, password_change_required, created_at, updated_at FROM users ORDER BY name COLLATE NOCASE')
+    .prepare(
+      'SELECT id, name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, created_at, updated_at FROM users ORDER BY name COLLATE NOCASE',
+    )
     .all();
   return json({ users: result.results.map(toPublicUser) });
 }
@@ -754,14 +757,15 @@ async function createUser(request, db) {
   const id = crypto.randomUUID();
   const emailVerifiedAt = body.emailVerified === false ? null : now;
   const passwordChangeRequired = body.passwordChangeRequired === true ? 1 : 0;
+  const tournamentLimit = resolveTournamentLimit(body, DEFAULT_TOURNAMENT_LIMIT);
 
   try {
     await db
       .prepare(
-        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, password_change_required, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, user.name, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, now, now)
+      .bind(id, user.name, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, now)
       .run();
   } catch (error) {
     if (String(error.message || '').includes('UNIQUE')) {
@@ -779,6 +783,7 @@ async function createUser(request, db) {
         role: user.role,
         email_verified_at: emailVerifiedAt,
         password_change_required: passwordChangeRequired,
+        tournament_limit: tournamentLimit,
         created_at: now,
         updated_at: now,
       }),
@@ -798,6 +803,7 @@ async function updateUser(request, db, id, currentUserId) {
   const now = new Date().toISOString();
   const emailVerifiedAt = resolveAdminEmailVerifiedAt(body, existing, user, now);
   const passwordChangeRequired = body.passwordChangeRequired === true ? 1 : 0;
+  const tournamentLimit = resolveTournamentLimit(body, existing.tournament_limit ?? DEFAULT_TOURNAMENT_LIMIT);
 
   if (id === currentUserId && user.role !== 'admin') {
     throw new HttpError(400, 'You cannot remove your own admin role');
@@ -809,17 +815,17 @@ async function updateUser(request, db, id, currentUserId) {
       await db
         .prepare(
           `UPDATE users
-           SET name = ?, email = ?, pending_email = NULL, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, updated_at = ?
+           SET name = ?, email = ?, pending_email = NULL, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, updated_at = ?
            WHERE id = ?`,
         )
-        .bind(user.name, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, now, id)
+        .bind(user.name, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, id)
         .run();
     } else {
       await db
         .prepare(
-          'UPDATE users SET name = ?, email = ?, pending_email = NULL, role = ?, email_verified_at = ?, password_change_required = ?, updated_at = ? WHERE id = ?',
+          'UPDATE users SET name = ?, email = ?, pending_email = NULL, role = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, updated_at = ? WHERE id = ?',
         )
-        .bind(user.name, user.email, user.role, emailVerifiedAt, passwordChangeRequired, now, id)
+        .bind(user.name, user.email, user.role, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, id)
         .run();
     }
   } catch (error) {
@@ -830,7 +836,9 @@ async function updateUser(request, db, id, currentUserId) {
   }
 
   const updated = await db
-    .prepare('SELECT id, name, email, pending_email, role, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?')
+    .prepare(
+      'SELECT id, name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, created_at, updated_at FROM users WHERE id = ?',
+    )
     .bind(id)
     .first();
   return json({ user: toPublicUser(updated) });
@@ -968,6 +976,14 @@ async function listTournaments(db, user) {
 }
 
 async function createTournament(request, db, user) {
+  if (user.role !== 'admin') {
+    const limit = user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT;
+    const { count } = await db.prepare('SELECT COUNT(*) AS count FROM tournaments WHERE created_by = ?').bind(user.id).first();
+    if (count >= limit) {
+      throw new HttpError(403, 'Turnier-Limit erreicht. Bitte bei einem Admin um mehr Turniere bitten.');
+    }
+  }
+
   const body = await readJson(request);
   const tournament = normalizeTournamentInput(body);
   const now = new Date().toISOString();
@@ -1741,7 +1757,7 @@ async function requireApiKey(request, db) {
   const row = await db
     .prepare(
       `SELECT api_keys.id AS api_key_id, users.id, users.name, users.email, users.role,
-              users.email_verified_at, users.password_change_required, users.created_at, users.updated_at
+              users.email_verified_at, users.password_change_required, users.tournament_limit, users.created_at, users.updated_at
        FROM api_keys
        JOIN users ON users.id = api_keys.user_id
        WHERE api_keys.key_hash = ? AND api_keys.status = 'approved'`,
@@ -1789,7 +1805,7 @@ async function requireSession(request, db) {
   const row = await db
     .prepare(
       `SELECT users.id, users.name, users.email, users.pending_email, users.role, users.email_verified_at, users.password_change_required,
-              users.created_at, users.updated_at, sessions.expires_at
+              users.tournament_limit, users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
        WHERE sessions.id = ?`,
@@ -1877,6 +1893,17 @@ function normalizeUserInput(body, { requirePassword }) {
   }
 
   return { name, email, role, password };
+}
+
+function resolveTournamentLimit(body, fallback) {
+  if (body.tournamentLimit === undefined || body.tournamentLimit === null || body.tournamentLimit === '') {
+    return fallback;
+  }
+  const value = Number(body.tournamentLimit);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new HttpError(400, 'Invalid tournament limit');
+  }
+  return value;
 }
 
 function resolveAdminEmailVerifiedAt(body, existing, user, now) {
@@ -2126,6 +2153,7 @@ function toPublicUser(row) {
     role: row.role,
     emailVerifiedAt: row.email_verified_at || null,
     passwordChangeRequired: Boolean(Number(row.password_change_required || 0)),
+    tournamentLimit: row.tournament_limit === undefined || row.tournament_limit === null ? DEFAULT_TOURNAMENT_LIMIT : Number(row.tournament_limit),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
