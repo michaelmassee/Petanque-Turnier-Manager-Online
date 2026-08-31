@@ -1136,6 +1136,7 @@ export default function App() {
                 onSubmit={handleRegistrationSubmit}
                 onCancel={closeAuthModal}
                 navigate={navigate}
+                embedded
               />
             )}
           </AuthModal>
@@ -1343,6 +1344,7 @@ export default function App() {
               clearFeedback();
             }}
             navigate={navigate}
+            embedded
           />
         </AuthModal>
       )}
@@ -2378,9 +2380,9 @@ function HomeTournaments({
   );
 }
 
-function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate }) {
+function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, embedded = false }) {
   return (
-    <form className="public-registration" onSubmit={onSubmit}>
+    <form className={embedded ? 'public-registration public-registration--embedded' : 'public-registration'} onSubmit={onSubmit}>
       <h2>Anmeldung: {tournament.name}</h2>
       <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
         Datenschutzerklärung lesen
