@@ -58,6 +58,14 @@ const REGISTRATION_STATUSES = [
   { value: 'cancelled', label: 'Storniert' },
 ];
 
+const RADIUS_OPTIONS = [
+  { value: '5', label: '5 km' },
+  { value: '10', label: '10 km' },
+  { value: '25', label: '25 km' },
+  { value: '50', label: '50 km' },
+  { value: '100', label: '100 km' },
+];
+
 const DEFAULT_TOURNAMENT_LIMIT = 5;
 
 const EMPTY_USER_FORM = {
@@ -93,6 +101,9 @@ const EMPTY_TOURNAMENT_FORM = {
   date: '',
   startTime: '',
   location: '',
+  latitude: '',
+  longitude: '',
+  overrideCoordinates: false,
   description: '',
   type: 'supermelee',
   formation: 'doublette',
@@ -162,6 +173,11 @@ export default function App() {
   const [homeFilterMonth, setHomeFilterMonth] = useState('');
   const [homeFilterFormation, setHomeFilterFormation] = useState('');
   const [homeFilterOpenOnly, setHomeFilterOpenOnly] = useState(false);
+  const [searchOrigin, setSearchOrigin] = useState(null);
+  const [searchOriginQuery, setSearchOriginQuery] = useState('');
+  const [searchRadiusKm, setSearchRadiusKm] = useState('25');
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoError, setGeoError] = useState('');
   const [userQuery, setUserQuery] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState('');
@@ -193,7 +209,7 @@ export default function App() {
 
   const filteredHomeTournaments = useMemo(() => {
     const query = homeQuery.trim().toLowerCase();
-    return tournaments.filter((tournament) => {
+    let results = tournaments.filter((tournament) => {
       if (tournament.visibility !== 'public' || !isUpcoming(tournament)) {
         return false;
       }
@@ -216,6 +232,20 @@ export default function App() {
         (value || '').toLowerCase().includes(query),
       );
     });
+
+    if (searchOrigin) {
+      const radius = Number(searchRadiusKm);
+      results = results
+        .filter((tournament) => tournament.latitude !== null && tournament.longitude !== null)
+        .map((tournament) => ({
+          ...tournament,
+          distanceKm: distanceKm(searchOrigin.lat, searchOrigin.lng, tournament.latitude, tournament.longitude),
+        }))
+        .filter((tournament) => tournament.distanceKm <= radius)
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+    }
+
+    return results;
   }, [
     tournaments,
     homeQuery,
@@ -224,6 +254,8 @@ export default function App() {
     homeFilterMonth,
     homeFilterFormation,
     homeFilterOpenOnly,
+    searchOrigin,
+    searchRadiusKm,
   ]);
 
   const visibleHomeTournaments = filteredHomeTournaments.slice(0, homeVisibleCount);
@@ -824,6 +856,9 @@ export default function App() {
       date: tournament.date || '',
       startTime: tournament.startTime || '',
       location: tournament.location || '',
+      latitude: tournament.latitude ?? '',
+      longitude: tournament.longitude ?? '',
+      overrideCoordinates: false,
       description: tournament.description || '',
       type: tournament.type || 'supermelee',
       formation: tournament.formation || 'doublette',
@@ -875,6 +910,57 @@ export default function App() {
     setHomeFilterMonth('');
     setHomeFilterFormation('');
     setHomeFilterOpenOnly(false);
+  }
+
+  function handleUseMyLocation() {
+    setGeoError('');
+    if (!navigator.geolocation) {
+      setGeoError('Geolocation wird von diesem Browser nicht unterstützt.');
+      return;
+    }
+    setGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setSearchOrigin({ lat: position.coords.latitude, lng: position.coords.longitude, label: 'Mein Standort' });
+        setSearchOriginQuery('');
+        setGeoLoading(false);
+      },
+      () => {
+        setGeoError('Standort konnte nicht ermittelt werden.');
+        setGeoLoading(false);
+      },
+    );
+  }
+
+  async function handleSearchOriginSubmit(event) {
+    event.preventDefault();
+    const query = searchOriginQuery.trim();
+    if (!query) {
+      setSearchOrigin(null);
+      return;
+    }
+
+    setGeoError('');
+    setGeoLoading(true);
+    try {
+      const data = await api('/api/geocode', { method: 'POST', body: JSON.stringify({ query }) });
+      if (data.lat === null || data.lng === null) {
+        setSearchOrigin(null);
+        setGeoError('Kein Ort gefunden.');
+      } else {
+        setSearchOrigin({ lat: data.lat, lng: data.lng, label: data.displayName || query });
+      }
+    } catch (requestError) {
+      setGeoError(requestError.message);
+    } finally {
+      setGeoLoading(false);
+    }
+  }
+
+  function handleClearSearchOrigin() {
+    setSearchOrigin(null);
+    setSearchOriginQuery('');
+    setGeoError('');
   }
 
   const roleLabel = useMemo(() => roleName(currentUser?.role), [currentUser]);
@@ -1022,6 +1108,16 @@ export default function App() {
           filterOpenOnly={homeFilterOpenOnly}
           setFilterOpenOnly={setHomeFilterOpenOnly}
           onResetFilters={resetHomeFilters}
+          searchOrigin={searchOrigin}
+          searchOriginQuery={searchOriginQuery}
+          setSearchOriginQuery={setSearchOriginQuery}
+          onSearchOriginSubmit={handleSearchOriginSubmit}
+          onUseMyLocation={handleUseMyLocation}
+          onClearSearchOrigin={handleClearSearchOrigin}
+          searchRadiusKm={searchRadiusKm}
+          setSearchRadiusKm={setSearchRadiusKm}
+          geoLoading={geoLoading}
+          geoError={geoError}
           tournaments={visibleHomeTournaments}
           total={filteredHomeTournaments.length}
           hasMore={hasMoreHomeTournaments}
@@ -1276,6 +1372,16 @@ export default function App() {
           filterOpenOnly={homeFilterOpenOnly}
           setFilterOpenOnly={setHomeFilterOpenOnly}
           onResetFilters={resetHomeFilters}
+          searchOrigin={searchOrigin}
+          searchOriginQuery={searchOriginQuery}
+          setSearchOriginQuery={setSearchOriginQuery}
+          onSearchOriginSubmit={handleSearchOriginSubmit}
+          onUseMyLocation={handleUseMyLocation}
+          onClearSearchOrigin={handleClearSearchOrigin}
+          searchRadiusKm={searchRadiusKm}
+          setSearchRadiusKm={setSearchRadiusKm}
+          geoLoading={geoLoading}
+          geoError={geoError}
           tournaments={visibleHomeTournaments}
           total={filteredHomeTournaments.length}
           hasMore={hasMoreHomeTournaments}
@@ -2236,6 +2342,16 @@ function HomeTournaments({
   onOpenTournament,
   tips,
   navigate,
+  searchOrigin,
+  searchOriginQuery,
+  setSearchOriginQuery,
+  onSearchOriginSubmit,
+  onUseMyLocation,
+  onClearSearchOrigin,
+  searchRadiusKm,
+  setSearchRadiusKm,
+  geoLoading,
+  geoError,
 }) {
   const activeFilterCount = [
     showMineFilter && onlyMine,
@@ -2293,6 +2409,34 @@ function HomeTournaments({
             Turnier melden
           </Button>
         </div>
+
+        <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
+          <label className="home-search-field">
+            Umkreissuche: Von diesem Ort aus suchen
+            <input
+              type="search"
+              placeholder="Ort oder PLZ eingeben"
+              value={searchOriginQuery}
+              onChange={(event) => setSearchOriginQuery(event.target.value)}
+            />
+          </label>
+          <Button type="submit" variant="secondary" disabled={geoLoading}>
+            Suchen
+          </Button>
+          <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading}>
+            Meinen Standort verwenden
+          </Button>
+          {searchOrigin && (
+            <>
+              <SelectField label="Umkreis" value={searchRadiusKm} onChange={setSearchRadiusKm} options={RADIUS_OPTIONS} />
+              <span className="search-origin-label">Ausgangspunkt: {searchOrigin.label}</span>
+              <button className="link-button" type="button" onClick={onClearSearchOrigin}>
+                Umkreissuche beenden
+              </button>
+            </>
+          )}
+        </form>
+        {geoError && <p className="feedback error">{geoError}</p>}
 
         {filterOpen && (
           <div className="filter-panel">
@@ -2354,6 +2498,13 @@ function HomeTournaments({
                 <span>{tournament.location}</span>
                 <small>
                   {labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)}
+                  {typeof tournament.distanceKm === 'number' && (
+                    <>
+                      {' · '}
+                      {Math.round(tournament.distanceKm)}
+                      {' km entfernt'}
+                    </>
+                  )}
                 </small>
               </span>
             </button>
@@ -2452,6 +2603,32 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
         <TextField label="Startzeit" type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
       </div>
       <TextField label="Ort" value={form.location} onChange={(location) => setForm({ ...form, location })} required minLength={2} />
+      <label className="checkbox-field">
+        <input
+          type="checkbox"
+          checked={form.overrideCoordinates}
+          onChange={(event) => setForm({ ...form, overrideCoordinates: event.target.checked })}
+        />
+        Koordinaten manuell anpassen
+      </label>
+      {form.overrideCoordinates && (
+        <div className="form-grid">
+          <TextField
+            label="Breitengrad"
+            type="number"
+            inputMode="decimal"
+            value={form.latitude}
+            onChange={(latitude) => setForm({ ...form, latitude })}
+          />
+          <TextField
+            label="Längengrad"
+            type="number"
+            inputMode="decimal"
+            value={form.longitude}
+            onChange={(longitude) => setForm({ ...form, longitude })}
+          />
+        </div>
+      )}
       <div className="form-grid">
         <SelectField label="Turniersystem" value={form.type} onChange={(type) => setForm({ ...form, type })} options={TOURNAMENT_TYPES} />
         <SelectField label="Formation" value={form.formation} onChange={(formation) => setForm({ ...form, formation })} options={FORMATIONS} />
@@ -3071,6 +3248,8 @@ function tournamentPayload(form) {
     date: form.date,
     startTime: form.startTime || null,
     location: form.location,
+    latitude: form.overrideCoordinates && form.latitude !== '' ? Number(form.latitude) : undefined,
+    longitude: form.overrideCoordinates && form.longitude !== '' ? Number(form.longitude) : undefined,
     description: form.description || null,
     type: form.type,
     formation: form.formation,
@@ -3125,6 +3304,16 @@ function isUpcoming(tournament) {
   }
   const today = new Date().toISOString().slice(0, 10);
   return tournament.date >= today;
+}
+
+function distanceKm(lat1, lng1, lat2, lng2) {
+  const earthRadiusKm = 6371;
+  const toRad = (degrees) => (degrees * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function hasOpenRegistration(tournament) {
@@ -3800,6 +3989,26 @@ const TRANSLATIONS = {
       'Daarnaast heb je het recht om een klacht in te dienen bij een toezichthoudende autoriteit voor gegevensbescherming, bijvoorbeeld bij de Hessische functionaris voor gegevensbescherming en informatievrijheid.',
     '11. Stand': '11. Datum',
     'Diese Datenschutzerklärung wurde zuletzt am 26. August 2026 aktualisiert.': 'Dit privacybeleid is voor het laatst bijgewerkt op 26 augustus 2026.',
+    'Koordinaten manuell anpassen': 'Coördinaten handmatig aanpassen',
+    Breitengrad: 'Breedtegraad',
+    Längengrad: 'Lengtegraad',
+    'Umkreissuche: Von diesem Ort aus suchen': 'Straal zoeken: vanaf deze plaats zoeken',
+    'Ort oder PLZ eingeben': 'Plaats of postcode invoeren',
+    Suchen: 'Zoeken',
+    'Meinen Standort verwenden': 'Mijn locatie gebruiken',
+    Umkreis: 'Straal',
+    'Ausgangspunkt:': 'Startpunt:',
+    'Umkreissuche beenden': 'Straal zoeken beëindigen',
+    'Mein Standort': 'Mijn locatie',
+    'km entfernt': 'km verwijderd',
+    'Geolocation wird von diesem Browser nicht unterstützt.': 'Geolocatie wordt niet ondersteund door deze browser.',
+    'Standort konnte nicht ermittelt werden.': 'Locatie kon niet worden bepaald.',
+    'Kein Ort gefunden.': 'Geen plaats gevonden.',
+    '5 km': '5 km',
+    '10 km': '10 km',
+    '25 km': '25 km',
+    '50 km': '50 km',
+    '100 km': '100 km',
   },
   en: {
     'App wird geladen.': 'App is loading.',
@@ -4152,6 +4361,26 @@ const TRANSLATIONS = {
       'You also have the right to lodge a complaint with a data protection supervisory authority, for example the Hessian Commissioner for Data Protection and Freedom of Information.',
     '11. Stand': '11. Last updated',
     'Diese Datenschutzerklärung wurde zuletzt am 26. August 2026 aktualisiert.': 'This privacy policy was last updated on 26 August 2026.',
+    'Koordinaten manuell anpassen': 'Adjust coordinates manually',
+    Breitengrad: 'Latitude',
+    Längengrad: 'Longitude',
+    'Umkreissuche: Von diesem Ort aus suchen': 'Radius search: search from this place',
+    'Ort oder PLZ eingeben': 'Enter a place or postal code',
+    Suchen: 'Search',
+    'Meinen Standort verwenden': 'Use my location',
+    Umkreis: 'Radius',
+    'Ausgangspunkt:': 'Starting point:',
+    'Umkreissuche beenden': 'Stop radius search',
+    'Mein Standort': 'My location',
+    'km entfernt': 'km away',
+    'Geolocation wird von diesem Browser nicht unterstützt.': 'Geolocation is not supported by this browser.',
+    'Standort konnte nicht ermittelt werden.': 'Could not determine your location.',
+    'Kein Ort gefunden.': 'No place found.',
+    '5 km': '5 km',
+    '10 km': '10 km',
+    '25 km': '25 km',
+    '50 km': '50 km',
+    '100 km': '100 km',
   },
   es: {
     'App wird geladen.': 'La app se está cargando.',
@@ -4503,6 +4732,26 @@ const TRANSLATIONS = {
       'Además, tienes derecho a presentar una reclamación ante una autoridad de control de protección de datos, por ejemplo ante el comisionado de protección de datos y libertad de información de Hesse.',
     '11. Stand': '11. Última actualización',
     'Diese Datenschutzerklärung wurde zuletzt am 26. August 2026 aktualisiert.': 'Esta política de privacidad se actualizó por última vez el 26 de agosto de 2026.',
+    'Koordinaten manuell anpassen': 'Ajustar coordenadas manualmente',
+    Breitengrad: 'Latitud',
+    Längengrad: 'Longitud',
+    'Umkreissuche: Von diesem Ort aus suchen': 'Búsqueda por radio: buscar desde este lugar',
+    'Ort oder PLZ eingeben': 'Introduce un lugar o código postal',
+    Suchen: 'Buscar',
+    'Meinen Standort verwenden': 'Usar mi ubicación',
+    Umkreis: 'Radio',
+    'Ausgangspunkt:': 'Punto de partida:',
+    'Umkreissuche beenden': 'Finalizar búsqueda por radio',
+    'Mein Standort': 'Mi ubicación',
+    'km entfernt': 'km de distancia',
+    'Geolocation wird von diesem Browser nicht unterstützt.': 'Este navegador no admite la geolocalización.',
+    'Standort konnte nicht ermittelt werden.': 'No se pudo determinar la ubicación.',
+    'Kein Ort gefunden.': 'No se encontró ningún lugar.',
+    '5 km': '5 km',
+    '10 km': '10 km',
+    '25 km': '25 km',
+    '50 km': '50 km',
+    '100 km': '100 km',
   },
   fr: {
     'App wird geladen.': 'Chargement de l’application.',
@@ -4855,6 +5104,26 @@ const TRANSLATIONS = {
       'Tu as également le droit de déposer une réclamation auprès d’une autorité de contrôle de la protection des données, par exemple auprès du commissaire hessois à la protection des données et à la liberté d’information.',
     '11. Stand': '11. Date de mise à jour',
     'Diese Datenschutzerklärung wurde zuletzt am 26. August 2026 aktualisiert.': 'Cette politique de confidentialité a été mise à jour pour la dernière fois le 26 août 2026.',
+    'Koordinaten manuell anpassen': 'Ajuster les coordonnées manuellement',
+    Breitengrad: 'Latitude',
+    Längengrad: 'Longitude',
+    'Umkreissuche: Von diesem Ort aus suchen': 'Recherche par rayon : rechercher depuis ce lieu',
+    'Ort oder PLZ eingeben': 'Saisir un lieu ou un code postal',
+    Suchen: 'Rechercher',
+    'Meinen Standort verwenden': 'Utiliser ma position',
+    Umkreis: 'Rayon',
+    'Ausgangspunkt:': 'Point de départ :',
+    'Umkreissuche beenden': 'Terminer la recherche par rayon',
+    'Mein Standort': 'Ma position',
+    'km entfernt': 'km',
+    'Geolocation wird von diesem Browser nicht unterstützt.': "La géolocalisation n'est pas prise en charge par ce navigateur.",
+    'Standort konnte nicht ermittelt werden.': 'Impossible de déterminer la position.',
+    'Kein Ort gefunden.': 'Aucun lieu trouvé.',
+    '5 km': '5 km',
+    '10 km': '10 km',
+    '25 km': '25 km',
+    '50 km': '50 km',
+    '100 km': '100 km',
   },
 };
 

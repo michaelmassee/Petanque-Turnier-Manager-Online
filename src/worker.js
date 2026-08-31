@@ -35,7 +35,7 @@ const SECURITY_HEADERS = {
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests",
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(self), payment=(), usb=()',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
@@ -245,6 +245,16 @@ export default {
           const auth = await requireManagerAuth(request, env.DB);
           return await createTournament(request, env.DB, auth.user);
         }
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/geocode') {
+        const body = await readJson(request);
+        const result = await geocodeLocation(body.query);
+        return json({
+          lat: result?.lat ?? null,
+          lng: result?.lng ?? null,
+          displayName: result?.displayName ?? null,
+        });
       }
 
       const tournamentRegistrationsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registrations$/);
@@ -975,6 +985,21 @@ async function listTournaments(db, user) {
   return json({ tournaments: rows.results.map((row) => toPublicTournament(row, user)) });
 }
 
+async function resolveTournamentGeolocation(tournament, existing, now) {
+  if (tournament.latitude !== null && tournament.longitude !== null) {
+    return { latitude: tournament.latitude, longitude: tournament.longitude, geocodedAt: null };
+  }
+  if (existing && existing.location === tournament.location && existing.latitude !== null && existing.latitude !== undefined) {
+    return { latitude: existing.latitude, longitude: existing.longitude, geocodedAt: existing.geocoded_at };
+  }
+
+  const result = await geocodeLocation(tournament.location);
+  if (!result) {
+    return { latitude: null, longitude: null, geocodedAt: null };
+  }
+  return { latitude: result.lat, longitude: result.lng, geocodedAt: now };
+}
+
 async function createTournament(request, db, user) {
   if (user.role !== 'admin') {
     const limit = user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT;
@@ -989,14 +1014,15 @@ async function createTournament(request, db, user) {
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   const managerId = user.role === 'admin' ? tournament.managerId || user.id : user.id;
+  const geo = await resolveTournamentGeolocation(tournament, null, now);
 
   await db
     .prepare(
       `INSERT INTO tournaments (
         id, created_by, manager_id, name, date, start_time, location, description, type, formation, status,
         max_registrations, registration_deadline, entry_fee_cents, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        visibility, internal_notes, participants_public, latitude, longitude, geocoded_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1019,6 +1045,9 @@ async function createTournament(request, db, user) {
       tournament.visibility,
       tournament.internalNotes,
       tournament.participantsPublic ? 1 : 0,
+      geo.latitude,
+      geo.longitude,
+      geo.geocodedAt,
       now,
       now,
     )
@@ -1033,6 +1062,7 @@ async function updateTournament(request, db, existing, user) {
   const tournament = normalizeTournamentInput(body);
   const now = new Date().toISOString();
   const managerId = user.role === 'admin' ? tournament.managerId || existing.manager_id || user.id : existing.manager_id || user.id;
+  const geo = await resolveTournamentGeolocation(tournament, existing, now);
 
   await db
     .prepare(
@@ -1040,7 +1070,7 @@ async function updateTournament(request, db, existing, user) {
        SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
-           participants_public = ?, updated_at = ?
+           participants_public = ?, latitude = ?, longitude = ?, geocoded_at = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -1062,6 +1092,9 @@ async function updateTournament(request, db, existing, user) {
       tournament.visibility,
       tournament.internalNotes,
       tournament.participantsPublic ? 1 : 0,
+      geo.latitude,
+      geo.longitude,
+      geo.geocodedAt,
       now,
       existing.id,
     )
@@ -1503,6 +1536,48 @@ async function sendTransactionalEmail(env, { to, subject, text, logFallback, fai
   }
 }
 
+async function geocodeLocation(query) {
+  const trimmed = String(query || '').trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  let response;
+  try {
+    response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(trimmed)}`,
+      {
+        headers: {
+          'User-Agent': 'Petanque-Turnier-Manager-Online (https://github.com/massee/Petanque-Turnier-Manager-Online)',
+          Accept: 'application/json',
+        },
+      },
+    );
+  } catch (error) {
+    console.error(`Geocoding request failed for "${trimmed}"`, error);
+    return null;
+  }
+
+  if (!response.ok) {
+    console.error(`Geocoding failed for "${trimmed}": ${response.status}`);
+    return null;
+  }
+
+  const results = await response.json().catch(() => []);
+  const match = Array.isArray(results) ? results[0] : null;
+  if (!match) {
+    return null;
+  }
+
+  const lat = Number(match.lat);
+  const lng = Number(match.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return { lat, lng, displayName: match.display_name || trimmed };
+}
+
 async function verifyTournamentTip(request, db) {
   const body = await readJson(request);
   const token = String(body.token || '').trim();
@@ -1941,6 +2016,8 @@ function normalizeTournamentInput(body) {
     internalNotes: nullableText(body.internalNotes),
     managerId: nullableText(body.managerId),
     participantsPublic: Boolean(body.participantsPublic),
+    latitude: nullableCoordinate(body.latitude, -90, 90),
+    longitude: nullableCoordinate(body.longitude, -180, 180),
   };
 
   if (tournament.name.length < 2) {
@@ -1969,6 +2046,9 @@ function normalizeTournamentInput(body) {
   }
   if (tournament.contactEmail && !isEmail(tournament.contactEmail)) {
     throw new HttpError(400, 'A valid contact email is required');
+  }
+  if ((tournament.latitude === null) !== (tournament.longitude === null)) {
+    throw new HttpError(400, 'Latitude and longitude must be set together');
   }
 
   return tournament;
@@ -2044,6 +2124,17 @@ function text(value) {
 function nullableText(value) {
   const normalized = text(value);
   return normalized || null;
+}
+
+function nullableCoordinate(value, min, max) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < min || number > max) {
+    throw new HttpError(400, 'Invalid coordinate');
+  }
+  return number;
 }
 
 function nonNegativeInteger(value) {
@@ -2169,6 +2260,8 @@ function toPublicTournament(row, user) {
     date: row.date,
     startTime: row.start_time,
     location: row.location,
+    latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
+    longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
     description: row.description,
     type: row.type,
     formation: row.formation,
