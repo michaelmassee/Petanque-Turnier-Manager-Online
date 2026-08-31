@@ -119,20 +119,6 @@ const EMPTY_TOURNAMENT_FORM = {
   participantsPublic: false,
 };
 
-const EMPTY_TOURNAMENT_TIP_FORM = {
-  name: '',
-  date: '',
-  startTime: '',
-  location: '',
-  formation: 'doublette',
-  info: '',
-  externalLink: '',
-  flyerLink: '',
-  submitterName: '',
-  submitterEmail: '',
-  consent: false,
-};
-
 const EMPTY_REGISTRATION_FORM = {
   id: '',
   tournamentId: '',
@@ -182,9 +168,6 @@ export default function App() {
   const [userRoleFilter, setUserRoleFilter] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState('');
   const [path, navigate] = usePath();
-  const [tournamentTips, setTournamentTips] = useState([]);
-  const [pendingTips, setPendingTips] = useState([]);
-  const [tournamentTipForm, setTournamentTipForm] = useState(EMPTY_TOURNAMENT_TIP_FORM);
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [tournaments, setTournaments] = useState([]);
@@ -306,15 +289,12 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const resetToken = params.get('reset_token');
     const verifyToken = params.get('verify_token');
-    const tipVerifyToken = params.get('tip_verify_token');
     if (resetToken) {
       setAuthView('reset');
       setAuthForm((previous) => ({ ...previous, token: resetToken }));
     } else if (verifyToken) {
       setAuthView('verify');
       setAuthForm((previous) => ({ ...previous, token: verifyToken }));
-    } else if (tipVerifyToken) {
-      verifyTournamentTipToken(tipVerifyToken);
     }
     initialize();
   }, []);
@@ -334,7 +314,6 @@ export default function App() {
   useEffect(() => {
     if (isAdmin) {
       loadUsers();
-      loadPendingTournamentTips();
     }
   }, [isAdmin]);
 
@@ -354,7 +333,6 @@ export default function App() {
       const bootstrap = await api('/api/bootstrap');
       setNeedsSetup(bootstrap.needsSetup);
       await loadTournaments();
-      await loadApprovedTournamentTips();
 
       if (!bootstrap.needsSetup) {
         try {
@@ -394,24 +372,6 @@ export default function App() {
     try {
       const data = await api(`/api/tournaments/${tournamentId}/registrations`);
       setRegistrations(data.registrations);
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function loadApprovedTournamentTips() {
-    try {
-      const data = await api('/api/tournament-tips/approved');
-      setTournamentTips(data.tips);
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function loadPendingTournamentTips() {
-    try {
-      const data = await api('/api/tournament-tips/pending');
-      setPendingTips(data.tips);
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -563,71 +523,6 @@ export default function App() {
           ? translateText(PROFILE_EMAIL_CHANGE_PENDING, language) + (data.verificationUrl ? ` ${data.verificationUrl}` : '')
           : translateText(PROFILE_UPDATE_SUCCESS, language),
       );
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function verifyTournamentTipToken(token) {
-    setError('');
-    setMessage('');
-
-    try {
-      await api('/api/tournament-tips/verify', {
-        method: 'POST',
-        body: JSON.stringify({ token }),
-      });
-      window.history.replaceState({}, '', window.location.pathname);
-      setMessage('Deine Turniermeldung wurde bestätigt und wartet nun auf Freigabe.');
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function handleSubmitTournamentTip(event) {
-    event.preventDefault();
-    setError('');
-    setMessage('');
-
-    try {
-      const data = await api('/api/tournament-tips', {
-        method: 'POST',
-        body: JSON.stringify({ ...tournamentTipForm, language }),
-      });
-      setTournamentTipForm(EMPTY_TOURNAMENT_TIP_FORM);
-      setMessage(data.verificationUrl ? `${data.message} ${data.verificationUrl}` : data.message);
-      navigate('/');
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function handleModerateTournamentTip(tip, status) {
-    setError('');
-    setMessage('');
-
-    try {
-      await api(`/api/tournament-tips/${tip.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ status }),
-      });
-      setMessage(status === 'approved' ? 'Turniermeldung wurde freigegeben.' : 'Turniermeldung wurde abgelehnt.');
-      await loadPendingTournamentTips();
-      await loadApprovedTournamentTips();
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function handleDeleteTournamentTip(tip) {
-    setError('');
-    setMessage('');
-
-    try {
-      await api(`/api/tournament-tips/${tip.id}`, { method: 'DELETE' });
-      setMessage('Turniermeldung wurde gelöscht.');
-      await loadPendingTournamentTips();
-      await loadApprovedTournamentTips();
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -1020,25 +915,6 @@ export default function App() {
     );
   }
 
-  if (!needsSetup && path === '/turnier-melden') {
-    return (
-      <SubmitTournamentTipPage
-        language={language}
-        setLanguage={setLanguage}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
-        navigate={navigate}
-        form={tournamentTipForm}
-        setForm={setTournamentTipForm}
-        onSubmit={handleSubmitTournamentTip}
-        message={message}
-        error={error}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-      />
-    );
-  }
-
   if (!currentUser) {
     if (needsSetup) {
       return (
@@ -1092,7 +968,6 @@ export default function App() {
         <Feedback message={message} error={error} />
 
         <HomeTournaments
-          heading={homeHeading}
           language={language}
           query={homeQuery}
           setQuery={setHomeQuery}
@@ -1123,7 +998,6 @@ export default function App() {
           hasMore={hasMoreHomeTournaments}
           onLoadMore={() => setHomeVisibleCount((count) => count + 10)}
           onOpenTournament={(tournament) => navigate(`/turniere/${tournament.id}`)}
-          tips={tournamentTips}
           navigate={navigate}
           onRegister={(tournament) => {
             setSelectedTournamentId(tournament.id);
@@ -1230,15 +1104,13 @@ export default function App() {
       ? 'Mein Profil'
       : activeTab === 'users'
       ? 'Benutzerverwaltung'
-      : activeTab === 'tips'
-        ? 'Turnier-Vorschläge'
-        : activeTab === 'apikeys'
-          ? 'API-Zugänge'
-          : activeTab === 'registrations'
-            ? 'Anmeldungen'
-            : activeTab === 'tournaments'
-              ? 'Turnierverwaltung'
-              : homeHeading;
+      : activeTab === 'apikeys'
+        ? 'API-Zugänge'
+        : activeTab === 'registrations'
+          ? 'Anmeldungen'
+          : activeTab === 'tournaments'
+            ? 'Turnierverwaltung'
+            : homeHeading;
 
   return (
     <main className="app-shell">
@@ -1299,18 +1171,6 @@ export default function App() {
             Benutzer
           </button>
         )}
-        {isAdmin && (
-          <button
-            className={`drawer-link ${activeTab === 'tips' ? 'active' : ''}`}
-            type="button"
-            onClick={() => {
-              setActiveTab('tips');
-              setMenuOpen(false);
-            }}
-          >
-            Turnier-Vorschläge
-          </button>
-        )}
         {canManageTournaments && (
           <button
             className={`drawer-link ${activeTab === 'apikeys' ? 'active' : ''}`}
@@ -1356,7 +1216,6 @@ export default function App() {
 
       {activeTab === 'home' && (
         <HomeTournaments
-          heading={homeHeading}
           language={language}
           query={homeQuery}
           setQuery={setHomeQuery}
@@ -1387,7 +1246,6 @@ export default function App() {
           hasMore={hasMoreHomeTournaments}
           onLoadMore={() => setHomeVisibleCount((count) => count + 10)}
           onOpenTournament={(tournament) => navigate(`/turniere/${tournament.id}`)}
-          tips={tournamentTips}
           navigate={navigate}
           onRegister={(tournament) => {
             setSelectedTournamentId(tournament.id);
@@ -1505,17 +1363,6 @@ export default function App() {
           onEditUser={editUser}
           onDeleteUser={handleDeleteUser}
         />
-      )}
-
-      {activeTab === 'tips' && isAdmin && (
-        <section className="single-column">
-          <TournamentTipModeration
-            tips={pendingTips}
-            onApprove={(tip) => handleModerateTournamentTip(tip, 'approved')}
-            onReject={(tip) => handleModerateTournamentTip(tip, 'rejected')}
-            onDelete={handleDeleteTournamentTip}
-          />
-        </section>
       )}
 
       {activeTab === 'apikeys' && canManageTournaments && (
@@ -1672,7 +1519,7 @@ function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onC
     <header className="topbar">
       <div className="brand">
         <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="brand-logo" />
-        <div>
+        <div className="brand-text">
           <p className="eyebrow">Pétanque Turnier Manager Online</p>
           <h1>{heading}</h1>
         </div>
@@ -2042,99 +1889,6 @@ function TournamentParticipants({ tournamentId }) {
   );
 }
 
-function SubmitTournamentTipPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, form, setForm, onSubmit, message, error, currentUser, onLogout }) {
-  return (
-    <main className="app-shell">
-      <StandalonePageHeader
-        heading="Turnier melden"
-        language={language}
-        setLanguage={setLanguage}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
-        navigate={navigate}
-        currentUser={currentUser}
-        onLogout={onLogout}
-      />
-
-      <Feedback message={message} error={error} />
-
-      <section className="submit-tip-page">
-        <div className="submit-tip-intro">
-          <div>
-            <p className="eyebrow">Kalendereintrag für externe Anmeldung</p>
-            <h2>Turnier einreichen</h2>
-            <p className="subtitle">
-              Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.
-            </p>
-          </div>
-          <button className="link-button" type="button" onClick={() => navigate('/')}>
-            Zur Startseite
-          </button>
-        </div>
-
-        <div className="panel submit-tip-panel">
-          <p className="muted">
-            Wir veröffentlichen bestätigte Meldungen nach kurzer Prüfung in der öffentlichen Turniersuche.
-          </p>
-          <form className="form dense" onSubmit={onSubmit}>
-            <fieldset className="form-section">
-              <legend>Turnierdaten</legend>
-              <TextField label="Turniername" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
-              <div className="form-grid">
-                <TextField label="Datum" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
-                <TextField label="Startzeit" type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
-              </div>
-              <TextField label="Ort" value={form.location} onChange={(location) => setForm({ ...form, location })} />
-              <SelectField label="Formation" value={form.formation} onChange={(formation) => setForm({ ...form, formation })} options={FORMATIONS} />
-              <TextArea label="Weitere Infos" value={form.info} onChange={(info) => setForm({ ...form, info })} />
-            </fieldset>
-
-            <fieldset className="form-section">
-              <legend>Anmeldelink</legend>
-              <TextField
-                label="Link zur Website"
-                type="url"
-                value={form.externalLink}
-                onChange={(externalLink) => setForm({ ...form, externalLink })}
-                required
-              />
-              <TextField label="Flyer-Link (PDF)" type="url" value={form.flyerLink} onChange={(flyerLink) => setForm({ ...form, flyerLink })} />
-            </fieldset>
-
-            <fieldset className="form-section">
-              <legend>Kontakt für Rückfragen</legend>
-              <div className="form-grid">
-                <TextField label="Dein Name" value={form.submitterName} onChange={(submitterName) => setForm({ ...form, submitterName })} required minLength={2} />
-                <TextField
-                  label="Deine E-Mail"
-                  type="email"
-                  value={form.submitterEmail}
-                  onChange={(submitterEmail) => setForm({ ...form, submitterEmail })}
-                  required
-                />
-              </div>
-            </fieldset>
-
-            <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
-              Datenschutzerklärung lesen
-            </button>
-            <label className="checkbox-field">
-              <input
-                type="checkbox"
-                checked={form.consent}
-                onChange={(event) => setForm({ ...form, consent: event.target.checked })}
-                required
-              />
-              Ich habe die Datenschutzerklärung gelesen und akzeptiere sie. Mir ist bekannt, dass die gemeldeten Turnierdaten nach Prüfung öffentlich angezeigt werden und der jeweilige Veranstalter für die Inhalte verantwortlich ist.
-            </label>
-            <Button type="submit">Turnier melden</Button>
-          </form>
-        </div>
-      </section>
-    </main>
-  );
-}
-
 function ImpressumPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
   return (
     <main className="app-shell">
@@ -2281,44 +2035,7 @@ function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, navigat
   );
 }
 
-function TournamentTipModeration({ tips, onApprove, onReject, onDelete }) {
-  return (
-    <div className="panel">
-      <div className="section-title">
-        <h2>Turnier-Vorschläge</h2>
-        <span className="counter">{tips.length}</span>
-      </div>
-      {!tips.length && <p className="muted">Keine offenen Vorschläge.</p>}
-      <div className="user-list">
-        {tips.map((tip) => (
-          <article className="data-row tip-moderation-row" key={tip.id}>
-            <div>
-              <strong>{tip.name}</strong>
-              <span>{formatDate(tip.date)} {tip.startTime || ''} · {tip.location || ''}</span>
-              <small>
-                {labelFor(FORMATIONS, tip.formation)} · {tip.submitterName} ({tip.submitterEmail})
-              </small>
-            </div>
-            <div className="row-actions">
-              <Button variant="secondary" onClick={() => onApprove(tip)}>
-                Freigeben
-              </Button>
-              <Button variant="danger" onClick={() => onReject(tip)}>
-                Ablehnen
-              </Button>
-              <Button variant="danger" onClick={() => onDelete(tip)}>
-                Löschen
-              </Button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function HomeTournaments({
-  heading,
   language,
   query,
   setQuery,
@@ -2340,7 +2057,6 @@ function HomeTournaments({
   onLoadMore,
   onRegister,
   onOpenTournament,
-  tips,
   navigate,
   searchOrigin,
   searchOriginQuery,
@@ -2405,9 +2121,6 @@ function HomeTournaments({
           <Button variant="secondary" onClick={() => setFilterOpen((open) => !open)}>
             {filterOpen ? 'Filter ausblenden' : 'Filter anzeigen'}
           </Button>
-          <Button variant="secondary" onClick={() => navigate('/turnier-melden')}>
-            Turnier melden
-          </Button>
         </div>
 
         <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
@@ -2468,20 +2181,14 @@ function HomeTournaments({
       </div>
 
       <div className="section-title home-results-title">
-        <div>
-          <p className="eyebrow">Alle passenden Turniere</p>
-          <h2>{heading}</h2>
-        </div>
+        <p className="eyebrow">Alle passenden Turniere</p>
         <span className="counter">{total}</span>
       </div>
 
       {!tournaments.length && (
         <div className="empty-state">
           <strong>Keine Turniere gefunden.</strong>
-          <p className="muted">Passe die Suche an oder melde ein Turnier, das im Kalender fehlt.</p>
-          <Button variant="secondary" onClick={() => navigate('/turnier-melden')}>
-            Turnier melden
-          </Button>
+          <p className="muted">Passe die Suche an.</p>
         </div>
       )}
 
@@ -2530,38 +2237,6 @@ function HomeTournaments({
         </div>
       )}
 
-      {tips.length > 0 && (
-        <div className="tip-list">
-          <div className="section-title">
-            <div>
-              <p className="eyebrow">Extern gemeldet</p>
-              <h2>Vorgeschlagene Turniere</h2>
-            </div>
-            <span className="counter">{tips.length}</span>
-          </div>
-          <p className="muted">Kalendereinträge von Vereinen mit Anmeldung auf deren eigener Seite.</p>
-          <div className="tournament-card-list compact">
-            {tips.map((tip) => (
-              <article className="tournament-card tip-card" key={tip.id}>
-                <div className="tournament-card-main">
-                  <span className="tournament-card-date">
-                    <strong>{formatDate(tip.date)}</strong>
-                    <small>{tip.startTime || 'Ganztägig'}</small>
-                  </span>
-                  <span className="tournament-card-copy">
-                    <strong>{tip.name}</strong>
-                    <span>{tip.location || ''}</span>
-                    <small>{labelFor(FORMATIONS, tip.formation)}</small>
-                  </span>
-                </div>
-                <a className="button button-secondary" href={tip.externalLink} target="_blank" rel="noreferrer">
-                  Zur Anmeldung
-                </a>
-              </article>
-            ))}
-          </div>
-        </div>
-      )}
     </section>
   );
 }
@@ -2570,9 +2245,6 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
   return (
     <form className="public-registration" onSubmit={onSubmit}>
       <h2>Anmeldung: {tournament.name}</h2>
-      <p className="hint">
-        Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.
-      </p>
       <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
         Datenschutzerklärung lesen
       </button>
@@ -3806,7 +3478,6 @@ const TRANSLATIONS = {
     'Name, Ort oder Turniersystem': 'Naam, plaats of toernooisysteem',
     'Filter ausblenden': 'Filter verbergen',
     'Filter anzeigen': 'Filter tonen',
-    'Turnier melden': 'Toernooi melden',
     'Finde dein nächstes Pétanque-Turnier': 'Vind je volgende pétanquetoernooi',
     'Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.':
       'Zoek op plaats, vereniging of toernooisysteem en schrijf je direct online in.',
@@ -3818,22 +3489,13 @@ const TRANSLATIONS = {
     Finder: 'Zoeker',
     'Alle passenden Turniere': 'Alle passende toernooien',
     'Keine Turniere gefunden.': 'Geen toernooien gevonden.',
-    'Passe die Suche an oder melde ein Turnier, das im Kalender fehlt.':
-      'Pas de zoekopdracht aan of meld een toernooi dat in de kalender ontbreekt.',
     Ganztägig: 'Hele dag',
     'Weitere Turniere laden': 'Meer toernooien laden',
-    'Extern gemeldet': 'Extern gemeld',
-    'Kalendereinträge von Vereinen mit Anmeldung auf deren eigener Seite.':
-      'Kalendervermeldingen van verenigingen met inschrijving op hun eigen website.',
     Monat: 'Maand',
     'Alle Monate': 'Alle maanden',
     'Alle Formationen': 'Alle formaties',
     'Anmeldung möglich': 'Inschrijving mogelijk',
     Zurücksetzen: 'Resetten',
-    'Vorgeschlagene Turniere': 'Voorgestelde toernooien',
-    'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
-      'Door verenigingen gemelde toernooien zonder online inschrijving bij ons — inschrijving verloopt extern.',
-    'Zur Anmeldung': 'Naar inschrijving',
     'Anmeldung Warteliste möglich': 'Inschrijving wachtlijst mogelijk',
     'Anmeldung nicht mehr möglich': 'Inschrijving niet meer mogelijk',
     'Anmeldung läuft': 'Inschrijving loopt',
@@ -3849,42 +3511,6 @@ const TRANSLATIONS = {
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'De deelnemerslijst is voor dit toernooi niet openbaar.',
     'Teilnehmerliste wird geladen…': 'Deelnemerslijst wordt geladen…',
     'Noch keine Anmeldungen.': 'Nog geen inschrijvingen.',
-    'Kalendereintrag für externe Anmeldung': 'Kalendervermelding voor externe inschrijving',
-    'Turnier einreichen': 'Toernooi indienen',
-    'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
-      'Staat jullie toernooi nog niet bij ons? Meld het hier aan als kalendervermelding met link naar externe inschrijving.',
-    'Wir veröffentlichen bestätigte Meldungen nach kurzer Prüfung in der öffentlichen Turniersuche.':
-      'We publiceren bevestigde meldingen na een korte controle in de openbare toernooizoekfunctie.',
-    Turnierdaten: 'Toernooigegevens',
-    Anmeldelink: 'Inschrijflink',
-    'Kontakt für Rückfragen': 'Contact voor vragen',
-    Turniername: 'Toernooinaam',
-    'Weitere Infos': 'Meer info',
-    'Link zur Website': 'Link naar website',
-    'Flyer-Link (PDF)': 'Flyer-link (PDF)',
-    'Dein Name': 'Jouw naam',
-    'Deine E-Mail': 'Jouw e-mail',
-    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'Ik heb het privacybeleid gelezen en ga ermee akkoord.',
-    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie. Mir ist bekannt, dass die gemeldeten Turnierdaten nach Prüfung öffentlich angezeigt werden und der jeweilige Veranstalter für die Inhalte verantwortlich ist.':
-      'Ik heb het privacybeleid gelezen en ga ermee akkoord. Ik weet dat de gemelde toernooigegevens na controle openbaar worden getoond en dat de betreffende organisator verantwoordelijk is voor de inhoud.',
-    'Turnier-Vorschläge': 'Toernooivoorstellen',
-    'Keine offenen Vorschläge.': 'Geen openstaande voorstellen.',
-    Freigeben: 'Vrijgeven',
-    Ablehnen: 'Afwijzen',
-    'Turniermeldung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.':
-      'Toernooimelding opgeslagen. Bevestig je e-mailadres via de link in de e-mail.',
-    'Deine Turniermeldung wurde bestätigt und wartet nun auf Freigabe.': 'Je toernooimelding is bevestigd en wacht nu op goedkeuring.',
-    'Turniermeldung wurde freigegeben.': 'Toernooimelding is vrijgegeven.',
-    'Turniermeldung wurde abgelehnt.': 'Toernooimelding is afgewezen.',
-    'Turniermeldung wurde gelöscht.': 'Toernooimelding is verwijderd.',
-    'A valid external link is required': 'Een geldige link is verplicht',
-    'Submitter name must contain at least 2 characters': 'Naam moet minstens 2 tekens bevatten',
-    'A valid submitter email is required': 'Een geldig e-mailadres is verplicht',
-    'Die Datenschutzerklärung und der Veröffentlichungshinweis müssen akzeptiert werden':
-      'Het privacybeleid en de publicatie-informatie moeten worden geaccepteerd',
-    'Invalid status': 'Ongeldige status',
-    'Tournament tip not found or not pending review': 'Toernooimelding niet gevonden of niet in afwachting',
-    'Tournament tip not found': 'Toernooimelding niet gevonden',
     'Invalid formation': 'Ongeldige formatie',
     'Formation tete allows only a single participant, no partner': 'Formatie tete staat maar een deelnemer toe, geen partner',
     'Formation doublette requires exactly one partner': 'Formatie doublette vereist precies een partner',
@@ -3915,8 +3541,6 @@ const TRANSLATIONS = {
     Datenschutz: 'Privacy',
     'Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.':
       'Deze deelnemerslijst is openbaar zichtbaar en kan zonder aanmelding worden bekeken. Wie hier niet vermeld wil worden, neemt contact op met de organisator van dit toernooi.',
-    'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
-      'Let op: bij inschrijving via dit platform kunnen je naam en eventueel vereniging, teamnaam en de namen van je partner(s) op de openbare toernooipagina worden gepubliceerd, als de organisator de deelnemerslijst openbaar zichtbaar maakt. Wie dat niet wil, neemt rechtstreeks contact op met de organisator van dit toernooi – de contactgegevens vind je op de toernooipagina.',
     'Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.':
       'Ik heb begrepen dat mijn inschrijfgegevens voor de organisatie van het toernooi worden verwerkt en dat mijn naam en eventueel vereniging, teamnaam en partnernamen op de openbare toernooipagina kunnen verschijnen als de organisator de deelnemerslijst openbaar zichtbaar maakt.',
     'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden':
@@ -4177,7 +3801,6 @@ const TRANSLATIONS = {
     'Name, Ort oder Turniersystem': 'Name, location or tournament system',
     'Filter ausblenden': 'Hide filter',
     'Filter anzeigen': 'Show filter',
-    'Turnier melden': 'Submit tournament',
     'Finde dein nächstes Pétanque-Turnier': 'Find your next pétanque tournament',
     'Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.':
       'Search by location, club or tournament system and register online.',
@@ -4189,22 +3812,13 @@ const TRANSLATIONS = {
     Finder: 'Finder',
     'Alle passenden Turniere': 'All matching tournaments',
     'Keine Turniere gefunden.': 'No tournaments found.',
-    'Passe die Suche an oder melde ein Turnier, das im Kalender fehlt.':
-      'Adjust the search or submit a tournament that is missing from the calendar.',
     Ganztägig: 'All day',
     'Weitere Turniere laden': 'Load more tournaments',
-    'Extern gemeldet': 'Submitted externally',
-    'Kalendereinträge von Vereinen mit Anmeldung auf deren eigener Seite.':
-      'Calendar entries from clubs with registration on their own website.',
     Monat: 'Month',
     'Alle Monate': 'All months',
     'Alle Formationen': 'All formations',
     'Anmeldung möglich': 'Registration possible',
     Zurücksetzen: 'Reset',
-    'Vorgeschlagene Turniere': 'Suggested tournaments',
-    'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
-      'Tournaments submitted by clubs without online registration with us — registration happens externally.',
-    'Zur Anmeldung': 'To registration',
     'Anmeldung Warteliste möglich': 'Registration waitlist possible',
     'Anmeldung nicht mehr möglich': 'Registration no longer possible',
     'Anmeldung läuft': 'Registration open',
@@ -4220,43 +3834,6 @@ const TRANSLATIONS = {
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'The participant list is not public for this tournament.',
     'Teilnehmerliste wird geladen…': 'Loading participant list…',
     'Noch keine Anmeldungen.': 'No registrations yet.',
-    'Kalendereintrag für externe Anmeldung': 'Calendar entry for external registration',
-    'Turnier einreichen': 'Submit tournament',
-    'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
-      'Is your tournament not yet listed with us? Submit it here as a calendar entry with a link to external registration.',
-    'Wir veröffentlichen bestätigte Meldungen nach kurzer Prüfung in der öffentlichen Turniersuche.':
-      'We publish confirmed submissions in the public tournament search after a short review.',
-    Turnierdaten: 'Tournament details',
-    Anmeldelink: 'Registration link',
-    'Kontakt für Rückfragen': 'Contact for questions',
-    Turniername: 'Tournament name',
-    'Weitere Infos': 'More info',
-    'Link zur Website': 'Link to website',
-    'Flyer-Link (PDF)': 'Flyer link (PDF)',
-    'Dein Name': 'Your name',
-    'Deine E-Mail': 'Your email',
-    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'I have read the privacy policy and accept it.',
-    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie. Mir ist bekannt, dass die gemeldeten Turnierdaten nach Prüfung öffentlich angezeigt werden und der jeweilige Veranstalter für die Inhalte verantwortlich ist.':
-      'I have read the privacy policy and accept it. I understand that the submitted tournament data will be shown publicly after review and that the respective organizer is responsible for the content.',
-    'Turnier-Vorschläge': 'Tournament suggestions',
-    'Keine offenen Vorschläge.': 'No pending suggestions.',
-    Freigeben: 'Approve',
-    Ablehnen: 'Reject',
-    'Turniermeldung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.':
-      'Tournament submission saved. Please confirm your email address using the link in the email.',
-    'Deine Turniermeldung wurde bestätigt und wartet nun auf Freigabe.':
-      'Your tournament submission has been confirmed and is now awaiting approval.',
-    'Turniermeldung wurde freigegeben.': 'Tournament submission has been approved.',
-    'Turniermeldung wurde abgelehnt.': 'Tournament submission has been rejected.',
-    'Turniermeldung wurde gelöscht.': 'Tournament submission has been deleted.',
-    'A valid external link is required': 'A valid external link is required',
-    'Submitter name must contain at least 2 characters': 'Submitter name must contain at least 2 characters',
-    'A valid submitter email is required': 'A valid submitter email is required',
-    'Die Datenschutzerklärung und der Veröffentlichungshinweis müssen akzeptiert werden':
-      'The privacy policy and publication notice must be accepted',
-    'Invalid status': 'Invalid status',
-    'Tournament tip not found or not pending review': 'Tournament tip not found or not pending review',
-    'Tournament tip not found': 'Tournament tip not found',
     'Invalid formation': 'Invalid formation',
     'Formation tete allows only a single participant, no partner': 'Formation tete allows only a single participant, no partner',
     'Formation doublette requires exactly one partner': 'Formation doublette requires exactly one partner',
@@ -4287,8 +3864,6 @@ const TRANSLATIONS = {
     Datenschutz: 'Privacy',
     'Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.':
       'This participant list is publicly visible and can be viewed without logging in. If you do not want to be listed here, please contact the organizer of this tournament directly.',
-    'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
-      'Note: When registering via this platform, your name and, where applicable, club, team name and the names of your partner(s) may be published on the public tournament page if the organizer makes the participant list publicly visible. If you do not want this, please contact the organizer of this tournament directly – contact details can be found on the tournament page.',
     'Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.':
       'I understand that my registration data will be processed for tournament organization and that my name and, where applicable, club, team name and partner names may appear on the public tournament page if the organizer makes the participant list publicly visible.',
     'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden':
@@ -4549,7 +4124,6 @@ const TRANSLATIONS = {
     'Name, Ort oder Turniersystem': 'Nombre, lugar o sistema',
     'Filter ausblenden': 'Ocultar filtro',
     'Filter anzeigen': 'Mostrar filtro',
-    'Turnier melden': 'Notificar torneo',
     'Finde dein nächstes Pétanque-Turnier': 'Encuentra tu próximo torneo de petanca',
     'Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.':
       'Busca por lugar, club o sistema de torneo e inscríbete online.',
@@ -4561,22 +4135,13 @@ const TRANSLATIONS = {
     Finder: 'Buscador',
     'Alle passenden Turniere': 'Todos los torneos coincidentes',
     'Keine Turniere gefunden.': 'No se encontraron torneos.',
-    'Passe die Suche an oder melde ein Turnier, das im Kalender fehlt.':
-      'Ajusta la búsqueda o notifica un torneo que falte en el calendario.',
     Ganztägig: 'Todo el día',
     'Weitere Turniere laden': 'Cargar más torneos',
-    'Extern gemeldet': 'Notificado externamente',
-    'Kalendereinträge von Vereinen mit Anmeldung auf deren eigener Seite.':
-      'Entradas de calendario de clubes con inscripción en su propia web.',
     Monat: 'Mes',
     'Alle Monate': 'Todos los meses',
     'Alle Formationen': 'Todas las formaciones',
     'Anmeldung möglich': 'Inscripción posible',
     Zurücksetzen: 'Restablecer',
-    'Vorgeschlagene Turniere': 'Torneos sugeridos',
-    'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
-      'Torneos notificados por clubes sin inscripción online con nosotros — la inscripción se realiza externamente.',
-    'Zur Anmeldung': 'Ir a la inscripción',
     'Anmeldung Warteliste möglich': 'Inscripción en lista de espera posible',
     'Anmeldung nicht mehr möglich': 'Inscripción ya no es posible',
     'Anmeldung läuft': 'Inscripción abierta',
@@ -4592,42 +4157,6 @@ const TRANSLATIONS = {
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'La lista de participantes no es pública para este torneo.',
     'Teilnehmerliste wird geladen…': 'Cargando lista de participantes…',
     'Noch keine Anmeldungen.': 'Aún no hay inscripciones.',
-    'Kalendereintrag für externe Anmeldung': 'Entrada de calendario para inscripción externa',
-    'Turnier einreichen': 'Enviar torneo',
-    'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
-      '¿Vuestro torneo aún no está en nuestro calendario? Notificadlo aquí como entrada con enlace a la inscripción externa.',
-    'Wir veröffentlichen bestätigte Meldungen nach kurzer Prüfung in der öffentlichen Turniersuche.':
-      'Publicamos avisos confirmados en la búsqueda pública de torneos tras una breve revisión.',
-    Turnierdaten: 'Datos del torneo',
-    Anmeldelink: 'Enlace de inscripción',
-    'Kontakt für Rückfragen': 'Contacto para preguntas',
-    Turniername: 'Nombre del torneo',
-    'Weitere Infos': 'Más información',
-    'Link zur Website': 'Enlace al sitio web',
-    'Flyer-Link (PDF)': 'Enlace al folleto (PDF)',
-    'Dein Name': 'Tu nombre',
-    'Deine E-Mail': 'Tu correo',
-    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'He leído la política de privacidad y la acepto.',
-    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie. Mir ist bekannt, dass die gemeldeten Turnierdaten nach Prüfung öffentlich angezeigt werden und der jeweilige Veranstalter für die Inhalte verantwortlich ist.':
-      'He leído la política de privacidad y la acepto. Entiendo que los datos del torneo enviado se mostrarán públicamente tras la revisión y que el organizador correspondiente es responsable del contenido.',
-    'Turnier-Vorschläge': 'Propuestas de torneos',
-    'Keine offenen Vorschläge.': 'No hay propuestas pendientes.',
-    Freigeben: 'Aprobar',
-    Ablehnen: 'Rechazar',
-    'Turniermeldung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.':
-      'Aviso de torneo guardado. Confirma tu correo con el enlace del email.',
-    'Deine Turniermeldung wurde bestätigt und wartet nun auf Freigabe.': 'Tu aviso de torneo ha sido confirmado y ahora espera aprobación.',
-    'Turniermeldung wurde freigegeben.': 'El aviso de torneo ha sido aprobado.',
-    'Turniermeldung wurde abgelehnt.': 'El aviso de torneo ha sido rechazado.',
-    'Turniermeldung wurde gelöscht.': 'El aviso de torneo ha sido eliminado.',
-    'A valid external link is required': 'Se requiere un enlace válido',
-    'Submitter name must contain at least 2 characters': 'El nombre debe tener al menos 2 caracteres',
-    'A valid submitter email is required': 'Se requiere un correo válido',
-    'Die Datenschutzerklärung und der Veröffentlichungshinweis müssen akzeptiert werden':
-      'Deben aceptarse la política de privacidad y el aviso de publicación',
-    'Invalid status': 'Estado no válido',
-    'Tournament tip not found or not pending review': 'Aviso de torneo no encontrado o no pendiente de revisión',
-    'Tournament tip not found': 'Aviso de torneo no encontrado',
     'Invalid formation': 'Formación no válida',
     'Formation tete allows only a single participant, no partner': 'La formación tete solo admite un participante, sin pareja',
     'Formation doublette requires exactly one partner': 'La formación doublette requiere exactamente una pareja',
@@ -4658,8 +4187,6 @@ const TRANSLATIONS = {
     Datenschutz: 'Privacidad',
     'Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.':
       'Esta lista de participantes es visible públicamente y se puede consultar sin necesidad de iniciar sesión. Quien no desee aparecer aquí debe ponerse en contacto directamente con el organizador de este torneo.',
-    'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
-      'Aviso: al inscribirte a través de esta plataforma, tu nombre y, en su caso, el club, el nombre del equipo y los nombres de tu(s) compañero(s) pueden publicarse en la página pública del torneo si el organizador hace visible la lista de participantes. Si no lo deseas, ponte en contacto directamente con el organizador de este torneo; los datos de contacto están disponibles en la página del torneo.',
     'Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.':
       'Entiendo que mis datos de inscripción se tratarán para la organización del torneo y que mi nombre y, en su caso, el club, el nombre del equipo y los nombres de mis compañeros pueden aparecer en la página pública del torneo si el organizador hace visible la lista de participantes.',
     'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden':
@@ -4920,7 +4447,6 @@ const TRANSLATIONS = {
     'Name, Ort oder Turniersystem': 'Nom, lieu ou système',
     'Filter ausblenden': 'Masquer le filtre',
     'Filter anzeigen': 'Afficher le filtre',
-    'Turnier melden': 'Signaler un tournoi',
     'Finde dein nächstes Pétanque-Turnier': 'Trouve ton prochain tournoi de pétanque',
     'Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.':
       'Recherche par lieu, club ou système de tournoi et inscris-toi directement en ligne.',
@@ -4932,22 +4458,13 @@ const TRANSLATIONS = {
     Finder: 'Recherche',
     'Alle passenden Turniere': 'Tous les tournois correspondants',
     'Keine Turniere gefunden.': 'Aucun tournoi trouvé.',
-    'Passe die Suche an oder melde ein Turnier, das im Kalender fehlt.':
-      'Ajuste la recherche ou signale un tournoi absent du calendrier.',
     Ganztägig: 'Toute la journée',
     'Weitere Turniere laden': 'Charger plus de tournois',
-    'Extern gemeldet': 'Signalé en externe',
-    'Kalendereinträge von Vereinen mit Anmeldung auf deren eigener Seite.':
-      'Entrées de calendrier de clubs avec inscription sur leur propre site.',
     Monat: 'Mois',
     'Alle Monate': 'Tous les mois',
     'Alle Formationen': 'Toutes les formations',
     'Anmeldung möglich': 'Inscription possible',
     Zurücksetzen: 'Réinitialiser',
-    'Vorgeschlagene Turniere': 'Tournois proposés',
-    'Von Vereinen gemeldete Turniere ohne Online-Anmeldung bei uns — Anmeldung erfolgt extern.':
-      'Tournois signalés par des clubs sans inscription en ligne chez nous — l’inscription se fait en externe.',
-    'Zur Anmeldung': 'Vers l’inscription',
     'Anmeldung Warteliste möglich': 'Inscription en liste d’attente possible',
     'Anmeldung nicht mehr möglich': 'Inscription plus possible',
     'Anmeldung läuft': 'Inscription en cours',
@@ -4963,43 +4480,6 @@ const TRANSLATIONS = {
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'La liste des participants n’est pas publique pour ce tournoi.',
     'Teilnehmerliste wird geladen…': 'Chargement de la liste des participants…',
     'Noch keine Anmeldungen.': 'Pas encore d’inscriptions.',
-    'Kalendereintrag für externe Anmeldung': 'Entrée de calendrier pour inscription externe',
-    'Turnier einreichen': 'Soumettre un tournoi',
-    'Euer Turnier ist noch nicht bei uns angelegt? Meldet es hier als Kalendereintrag mit Link zur externen Anmeldung.':
-      'Votre tournoi n’est pas encore chez nous ? Signalez-le ici comme entrée de calendrier avec un lien vers l’inscription externe.',
-    'Wir veröffentlichen bestätigte Meldungen nach kurzer Prüfung in der öffentlichen Turniersuche.':
-      'Nous publions les signalements confirmés dans la recherche publique de tournois après une courte vérification.',
-    Turnierdaten: 'Données du tournoi',
-    Anmeldelink: 'Lien d’inscription',
-    'Kontakt für Rückfragen': 'Contact pour questions',
-    Turniername: 'Nom du tournoi',
-    'Weitere Infos': 'Plus d’infos',
-    'Link zur Website': 'Lien vers le site web',
-    'Flyer-Link (PDF)': 'Lien du flyer (PDF)',
-    'Dein Name': 'Ton nom',
-    'Deine E-Mail': 'Ton e-mail',
-    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie.': 'J’ai lu la politique de confidentialité et je l’accepte.',
-    'Ich habe die Datenschutzerklärung gelesen und akzeptiere sie. Mir ist bekannt, dass die gemeldeten Turnierdaten nach Prüfung öffentlich angezeigt werden und der jeweilige Veranstalter für die Inhalte verantwortlich ist.':
-      'J’ai lu la politique de confidentialité et je l’accepte. Je comprends que les données du tournoi signalé seront affichées publiquement après vérification et que l’organisateur concerné est responsable du contenu.',
-    'Turnier-Vorschläge': 'Propositions de tournois',
-    'Keine offenen Vorschläge.': 'Aucune proposition en attente.',
-    Freigeben: 'Approuver',
-    Ablehnen: 'Rejeter',
-    'Turniermeldung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.':
-      'Signalement du tournoi enregistré. Confirme ton adresse e-mail via le lien dans l’e-mail.',
-    'Deine Turniermeldung wurde bestätigt und wartet nun auf Freigabe.':
-      'Ton signalement de tournoi a été confirmé et attend désormais l’approbation.',
-    'Turniermeldung wurde freigegeben.': 'Le signalement du tournoi a été approuvé.',
-    'Turniermeldung wurde abgelehnt.': 'Le signalement du tournoi a été rejeté.',
-    'Turniermeldung wurde gelöscht.': 'Le signalement du tournoi a été supprimé.',
-    'A valid external link is required': 'Un lien valide est requis',
-    'Submitter name must contain at least 2 characters': 'Le nom doit contenir au moins 2 caractères',
-    'A valid submitter email is required': 'Une adresse e-mail valide est requise',
-    'Die Datenschutzerklärung und der Veröffentlichungshinweis müssen akzeptiert werden':
-      'La politique de confidentialité et l’avis de publication doivent être acceptés',
-    'Invalid status': 'Statut invalide',
-    'Tournament tip not found or not pending review': 'Signalement introuvable ou non en attente de validation',
-    'Tournament tip not found': 'Signalement de tournoi introuvable',
     'Invalid formation': 'Formation invalide',
     'Formation tete allows only a single participant, no partner': 'La formation tete n’autorise qu’un seul participant, sans partenaire',
     'Formation doublette requires exactly one partner': 'La formation doublette requiert exactement un partenaire',
@@ -5030,8 +4510,6 @@ const TRANSLATIONS = {
     Datenschutz: 'Confidentialité',
     'Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.':
       "Cette liste de participants est visible publiquement et consultable sans connexion. Toute personne ne souhaitant pas y figurer est priée de contacter directement l'organisateur de ce tournoi.",
-    'Hinweis: Bei der Anmeldung über diese Plattform können dein Name sowie ggf. Verein, Teamname und die Namen deiner Partner auf der öffentlichen Turnierseite veröffentlicht werden, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet. Wer das nicht möchte, wende sich bitte direkt an den Veranstalter dieses Turniers – die Kontaktdaten findest du auf der Turnierseite.':
-      "Remarque : lors de l'inscription via cette plateforme, ton nom ainsi que, le cas échéant, le club, le nom d'équipe et les noms de tes partenaires peuvent être publiés sur la page publique du tournoi si l'organisateur rend la liste des participants publiquement visible. Si tu ne le souhaites pas, merci de contacter directement l'organisateur de ce tournoi – les coordonnées figurent sur la page du tournoi.",
     'Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.':
       "Je comprends que mes données d'inscription seront traitées pour l'organisation du tournoi et que mon nom ainsi que, le cas échéant, mon club, le nom d'équipe et les noms de mes partenaires peuvent apparaître sur la page publique du tournoi si l'organisateur rend la liste des participants publiquement visible.",
     'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden':

@@ -16,8 +16,6 @@ const FORMATIONS = ['tete', 'doublette', 'triplette'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
 const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
-const TOURNAMENT_TIP_STATUSES = ['pending_verification', 'pending_review', 'approved', 'rejected'];
-const TOURNAMENT_TIP_VERIFICATION_TTL_SECONDS = 60 * 60 * 24;
 const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
 const SESSION_COOKIE = 'ptm_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
@@ -83,29 +81,6 @@ const EMAIL_CHANGE_EMAILS = {
   fr: {
     subject: 'Confirmer la nouvelle adresse e-mail',
     text: (verificationUrl) => `Confirme ta nouvelle adresse e-mail avec ce lien :\n\n${verificationUrl}\n\nLe lien est valable 24 heures. Si tu n’es pas à l’origine de cette demande, tu peux ignorer cet e-mail.`,
-  },
-};
-
-const TOURNAMENT_TIP_VERIFICATION_EMAILS = {
-  de: {
-    subject: 'Turniermeldung bestätigen',
-    text: (verificationUrl) => `Bitte bestätige deine Turniermeldung über diesen Link:\n\n${verificationUrl}\n\nDer Link ist 24 Stunden gültig.`,
-  },
-  nl: {
-    subject: 'Toernooimelding bevestigen',
-    text: (verificationUrl) => `Bevestig je toernooimelding via deze link:\n\n${verificationUrl}\n\nDe link is 24 uur geldig.`,
-  },
-  en: {
-    subject: 'Confirm your tournament submission',
-    text: (verificationUrl) => `Please confirm your tournament submission with this link:\n\n${verificationUrl}\n\nThe link is valid for 24 hours.`,
-  },
-  es: {
-    subject: 'Confirmar aviso de torneo',
-    text: (verificationUrl) => `Confirma tu aviso de torneo con este enlace:\n\n${verificationUrl}\n\nEl enlace es valido durante 24 horas.`,
-  },
-  fr: {
-    subject: 'Confirmer le signalement du tournoi',
-    text: (verificationUrl) => `Confirme le signalement de ton tournoi avec ce lien :\n\n${verificationUrl}\n\nLe lien est valable 24 heures.`,
   },
 };
 
@@ -333,36 +308,6 @@ export default {
 
         if (request.method === 'DELETE') {
           return await deleteRegistration(env.DB, registration.id);
-        }
-      }
-
-      if (request.method === 'POST' && url.pathname === '/api/tournament-tips') {
-        return await submitTournamentTip(request, env, url);
-      }
-
-      if (request.method === 'POST' && url.pathname === '/api/tournament-tips/verify') {
-        return await verifyTournamentTip(request, env.DB);
-      }
-
-      if (request.method === 'GET' && url.pathname === '/api/tournament-tips/approved') {
-        return await listApprovedTournamentTips(env.DB);
-      }
-
-      if (request.method === 'GET' && url.pathname === '/api/tournament-tips/pending') {
-        await requireAdmin(request, env.DB);
-        return await listPendingTournamentTips(env.DB);
-      }
-
-      const tipMatch = url.pathname.match(/^\/api\/tournament-tips\/([^/]+)$/);
-      if (tipMatch) {
-        await requireAdmin(request, env.DB);
-
-        if (request.method === 'PUT') {
-          return await updateTournamentTipStatus(request, env.DB, tipMatch[1]);
-        }
-
-        if (request.method === 'DELETE') {
-          return await deleteTournamentTip(env.DB, tipMatch[1]);
         }
       }
 
@@ -1423,83 +1368,6 @@ async function syncPostResults(request, db, tournamentId) {
   return json({ updatedCount });
 }
 
-async function submitTournamentTip(request, env, url) {
-  const db = env.DB;
-  const body = await readJson(request);
-  const tip = normalizeTournamentTipInput(body);
-  const language = normalizeLanguage(body.language);
-  const now = new Date().toISOString();
-  const id = crypto.randomUUID();
-
-  await db
-    .prepare(
-      `INSERT INTO tournament_tips (
-        id, name, date, start_time, location, formation, info, external_link, flyer_link,
-        submitter_name, submitter_email, status, created_at, verified_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_verification', ?, NULL, ?)`,
-    )
-    .bind(
-      id,
-      tip.name,
-      tip.date,
-      tip.startTime,
-      tip.location,
-      tip.formation,
-      tip.info,
-      tip.externalLink,
-      tip.flyerLink,
-      tip.submitterName,
-      tip.submitterEmail,
-      now,
-      now,
-    )
-    .run();
-
-  const verificationUrl = await createTournamentTipVerification(db, env, url, id, tip.submitterEmail, language);
-  const response = {
-    message: 'Turniermeldung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.',
-  };
-
-  if (isLocalhost(url)) {
-    response.verificationUrl = verificationUrl;
-  }
-
-  return json(response, 201);
-}
-
-async function createTournamentTipVerification(db, env, url, tipId, email, language) {
-  await db.prepare('DELETE FROM tournament_tip_verification_tokens WHERE tip_id = ?').bind(tipId).run();
-
-  const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
-  const tokenHash = await sha256Hex(token);
-  const createdAt = new Date();
-  const expiresAt = new Date(createdAt.getTime() + TOURNAMENT_TIP_VERIFICATION_TTL_SECONDS * 1000);
-
-  await db
-    .prepare(
-      `INSERT INTO tournament_tip_verification_tokens (token_hash, tip_id, expires_at, created_at)
-       VALUES (?, ?, ?, ?)`,
-    )
-    .bind(tokenHash, tipId, expiresAt.toISOString(), createdAt.toISOString())
-    .run();
-
-  const verificationUrl = `${url.origin}/?tip_verify_token=${encodeURIComponent(token)}`;
-  await sendTournamentTipVerificationEmail(env, email, verificationUrl, language, isLocalhost(url));
-  return verificationUrl;
-}
-
-async function sendTournamentTipVerificationEmail(env, email, verificationUrl, language, allowLogFallback) {
-  const emailText = TOURNAMENT_TIP_VERIFICATION_EMAILS[language] || TOURNAMENT_TIP_VERIFICATION_EMAILS.de;
-  await sendTransactionalEmail(env, {
-    to: email,
-    subject: emailText.subject,
-    text: emailText.text(verificationUrl),
-    logFallback: `Tournament tip verification link for ${email}: ${verificationUrl}`,
-    failureContext: `tournament tip verification email for ${email}`,
-    allowLogFallback,
-  });
-}
-
 async function sendTransactionalEmail(env, { to, subject, text, logFallback, failureContext, allowLogFallback = false }) {
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
     console.log(logFallback);
@@ -1576,160 +1444,6 @@ async function geocodeLocation(query) {
   }
 
   return { lat, lng, displayName: match.display_name || trimmed };
-}
-
-async function verifyTournamentTip(request, db) {
-  const body = await readJson(request);
-  const token = String(body.token || '').trim();
-
-  if (!token) {
-    throw new HttpError(400, 'Bestätigungs-Token ist erforderlich');
-  }
-
-  const tokenHash = await sha256Hex(token);
-  const verification = await db
-    .prepare(
-      `SELECT token_hash, tip_id, expires_at, used_at
-       FROM tournament_tip_verification_tokens
-       WHERE token_hash = ?`,
-    )
-    .bind(tokenHash)
-    .first();
-
-  if (!verification || verification.used_at || new Date(verification.expires_at).getTime() <= Date.now()) {
-    throw new HttpError(400, 'Bestätigungs-Link ist ungültig oder abgelaufen');
-  }
-
-  const now = new Date().toISOString();
-  await db.batch([
-    db
-      .prepare("UPDATE tournament_tips SET status = 'pending_review', verified_at = ?, updated_at = ? WHERE id = ?")
-      .bind(now, now, verification.tip_id),
-    db.prepare('UPDATE tournament_tip_verification_tokens SET used_at = ? WHERE token_hash = ?').bind(now, tokenHash),
-  ]);
-
-  return json({ ok: true });
-}
-
-async function listApprovedTournamentTips(db) {
-  const today = new Date().toISOString().slice(0, 10);
-  const result = await db
-    .prepare(
-      `SELECT id, name, date, start_time, location, formation, info, external_link, flyer_link, created_at
-       FROM tournament_tips
-       WHERE status = 'approved' AND date >= ?
-       ORDER BY date ASC`,
-    )
-    .bind(today)
-    .all();
-
-  return json({ tips: result.results.map(toPublicTournamentTip) });
-}
-
-async function listPendingTournamentTips(db) {
-  const result = await db
-    .prepare(
-      `SELECT * FROM tournament_tips
-       WHERE status = 'pending_review'
-       ORDER BY created_at ASC`,
-    )
-    .all();
-
-  return json({ tips: result.results.map(toModerationTournamentTip) });
-}
-
-async function updateTournamentTipStatus(request, db, id) {
-  const body = await readJson(request);
-  const status = String(body.status || '').trim();
-
-  if (!['approved', 'rejected'].includes(status)) {
-    throw new HttpError(400, 'Invalid status');
-  }
-
-  const now = new Date().toISOString();
-  const result = await db
-    .prepare('UPDATE tournament_tips SET status = ?, updated_at = ? WHERE id = ? AND status = ?')
-    .bind(status, now, id, 'pending_review')
-    .run();
-
-  if (result.meta.changes === 0) {
-    throw new HttpError(404, 'Tournament tip not found or not pending review');
-  }
-
-  return json({ ok: true });
-}
-
-async function deleteTournamentTip(db, id) {
-  const result = await db.prepare('DELETE FROM tournament_tips WHERE id = ?').bind(id).run();
-  if (result.meta.changes === 0) {
-    throw new HttpError(404, 'Tournament tip not found');
-  }
-  return json({ ok: true });
-}
-
-function normalizeTournamentTipInput(body) {
-  const tip = {
-    name: text(body.name),
-    date: text(body.date),
-    startTime: nullableText(body.startTime),
-    location: nullableText(body.location),
-    formation: text(body.formation || 'doublette'),
-    info: nullableText(body.info),
-    externalLink: text(body.externalLink),
-    flyerLink: nullableText(body.flyerLink),
-    submitterName: text(body.submitterName),
-    submitterEmail: String(body.submitterEmail || '').trim().toLowerCase(),
-    consent: body.consent === true,
-  };
-
-  if (tip.name.length < 2) {
-    throw new HttpError(400, 'Tournament name must contain at least 2 characters');
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(tip.date)) {
-    throw new HttpError(400, 'A valid tournament date is required');
-  }
-  if (!FORMATIONS.includes(tip.formation)) {
-    throw new HttpError(400, 'Invalid formation');
-  }
-  if (!tip.externalLink || !/^https?:\/\//.test(tip.externalLink)) {
-    throw new HttpError(400, 'A valid external link is required');
-  }
-  if (tip.submitterName.length < 2) {
-    throw new HttpError(400, 'Submitter name must contain at least 2 characters');
-  }
-  if (!isEmail(tip.submitterEmail)) {
-    throw new HttpError(400, 'A valid submitter email is required');
-  }
-  if (!tip.consent) {
-    throw new HttpError(400, 'Die Datenschutzerklärung und der Veröffentlichungshinweis müssen akzeptiert werden');
-  }
-
-  return tip;
-}
-
-function toPublicTournamentTip(row) {
-  return {
-    id: row.id,
-    name: row.name,
-    date: row.date,
-    startTime: row.start_time,
-    location: row.location,
-    formation: row.formation,
-    info: row.info,
-    externalLink: row.external_link,
-    flyerLink: row.flyer_link,
-  };
-}
-
-function toModerationTournamentTip(row) {
-  return {
-    ...toPublicTournamentTip(row),
-    submitterName: row.submitter_name,
-    submitterEmail: row.submitter_email,
-    status: row.status,
-    createdAt: row.created_at,
-    verifiedAt: row.verified_at,
-  };
 }
 
 async function initialRegistrationStatus(db, tournament) {
@@ -1912,7 +1626,6 @@ async function cleanupExpiredSessions(db) {
   await db.prepare('DELETE FROM sessions WHERE expires_at <= ?').bind(new Date().toISOString()).run();
   await db.prepare('DELETE FROM password_reset_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').bind(new Date().toISOString()).run();
   await db.prepare('DELETE FROM email_verification_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').bind(new Date().toISOString()).run();
-  await db.prepare('DELETE FROM tournament_tip_verification_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').bind(new Date().toISOString()).run();
   const attemptsCutoff = new Date(Date.now() - LOGIN_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
   await db.prepare('DELETE FROM login_attempts WHERE created_at <= ?').bind(attemptsCutoff).run();
 }
