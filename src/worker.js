@@ -1,4 +1,4 @@
-const ROLES = ['admin', 'user', 'turnierleiter'];
+const ROLES = ['admin', 'user'];
 const TOURNAMENT_TYPES = [
   'formule_x',
   'jeder_gegen_jeden',
@@ -147,10 +147,6 @@ export default {
         return await registerUser(request, env, url);
       }
 
-      if (request.method === 'POST' && url.pathname === '/api/turnierleiter-access-requests') {
-        return await requestTurnierleiterAccess(request, env.DB);
-      }
-
       if (request.method === 'POST' && url.pathname === '/api/email/verify') {
         return await verifyEmail(request, env.DB);
       }
@@ -202,26 +198,8 @@ export default {
         }
       }
 
-      if (request.method === 'GET' && url.pathname === '/api/admin/turnierleiter-access-requests') {
-        await requireAdmin(request, env.DB);
-        return await listTurnierleiterAccessRequests(env.DB, url);
-      }
-
-      const turnierleiterAccessApproveMatch = url.pathname.match(/^\/api\/admin\/turnierleiter-access-requests\/([^/]+)\/approve$/);
-      if (turnierleiterAccessApproveMatch && request.method === 'POST') {
-        const session = await requireAdmin(request, env.DB);
-        return await approveTurnierleiterAccessRequest(env.DB, turnierleiterAccessApproveMatch[1], session.user.id);
-      }
-
-      const turnierleiterAccessRejectMatch = url.pathname.match(/^\/api\/admin\/turnierleiter-access-requests\/([^/]+)\/reject$/);
-      if (turnierleiterAccessRejectMatch && request.method === 'POST') {
-        const session = await requireAdmin(request, env.DB);
-        return await rejectTurnierleiterAccessRequest(env.DB, turnierleiterAccessRejectMatch[1], session.user.id);
-      }
-
       if (url.pathname === '/api/api-keys') {
         const session = await requireSession(request, env.DB);
-        requireTournamentManager(session);
 
         if (request.method === 'GET') {
           return await listOwnApiKeys(env.DB, session.user.id);
@@ -230,14 +208,12 @@ export default {
 
       if (request.method === 'POST' && url.pathname === '/api/api-keys/request') {
         const session = await requireSession(request, env.DB);
-        requireTournamentManager(session);
         return await requestApiKey(request, env.DB, session.user);
       }
 
       const apiKeySecretMatch = url.pathname.match(/^\/api\/api-keys\/([^/]+)\/secret$/);
       if (apiKeySecretMatch && request.method === 'GET') {
         const session = await requireSession(request, env.DB);
-        requireTournamentManager(session);
         return await retrieveApiKeySecret(env.DB, apiKeySecretMatch[1], session.user.id);
       }
 
@@ -266,7 +242,6 @@ export default {
 
         if (request.method === 'POST') {
           const auth = await requireManagerAuth(request, env.DB);
-          requireTournamentManager(auth);
           return await createTournament(request, env.DB, auth.user);
         }
       }
@@ -963,143 +938,6 @@ async function deleteUser(db, id, currentUserId) {
   return json({ ok: true });
 }
 
-async function requestTurnierleiterAccess(request, db) {
-  const body = await readJson(request);
-  const email = String(body.email || '').trim().toLowerCase();
-  const message = nullableText(body.message);
-
-  if (!isEmail(email)) {
-    throw new HttpError(400, 'A valid email is required');
-  }
-
-  if (message && message.length > 1000) {
-    throw new HttpError(400, 'Die Nachricht darf maximal 1000 Zeichen enthalten.');
-  }
-
-  const user = await db.prepare('SELECT id, role FROM users WHERE email = ?').bind(email).first();
-  if (!user) {
-    throw new HttpError(404, 'Benutzer nicht gefunden.');
-  }
-  if (user.role === 'turnierleiter' || user.role === 'admin') {
-    throw new HttpError(409, 'Dieser Benutzer hat bereits Turnierleiter-Zugang.');
-  }
-
-  const existing = await db
-    .prepare(
-      `SELECT *
-       FROM turnierleiter_access_requests
-       WHERE user_id = ? AND status = 'pending'
-       ORDER BY requested_at DESC
-       LIMIT 1`,
-    )
-    .bind(user.id)
-    .first();
-
-  if (existing) {
-    return json({
-      request: toPublicTurnierleiterAccessRequest(existing),
-      message: 'Turnierleiter-Zugang wurde bereits angefragt.',
-    });
-  }
-
-  const now = new Date().toISOString();
-  const id = crypto.randomUUID();
-  await db
-    .prepare(
-      `INSERT INTO turnierleiter_access_requests (id, user_id, status, message, requested_at, decided_at, decided_by, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, NULL, NULL, ?)`,
-    )
-    .bind(id, user.id, message, now, now)
-    .run();
-
-  const created = await db.prepare('SELECT * FROM turnierleiter_access_requests WHERE id = ?').bind(id).first();
-  return json(
-    {
-      request: toPublicTurnierleiterAccessRequest(created),
-      message: 'Turnierleiter-Zugang wurde angefragt.',
-    },
-    201,
-  );
-}
-
-async function listTurnierleiterAccessRequests(db, url) {
-  const status = url.searchParams.get('status');
-  const statement =
-    status && ['pending', 'approved', 'rejected'].includes(status)
-      ? db
-          .prepare(
-            `SELECT turnierleiter_access_requests.*, users.name AS user_name, users.email AS user_email,
-                    users.role AS user_role, users.email_verified_at AS user_email_verified_at,
-                    admins.name AS decided_by_name
-             FROM turnierleiter_access_requests
-             JOIN users ON users.id = turnierleiter_access_requests.user_id
-             LEFT JOIN users admins ON admins.id = turnierleiter_access_requests.decided_by
-             WHERE turnierleiter_access_requests.status = ?
-             ORDER BY turnierleiter_access_requests.requested_at DESC`,
-          )
-          .bind(status)
-      : db.prepare(
-          `SELECT turnierleiter_access_requests.*, users.name AS user_name, users.email AS user_email,
-                  users.role AS user_role, users.email_verified_at AS user_email_verified_at,
-                  admins.name AS decided_by_name
-           FROM turnierleiter_access_requests
-           JOIN users ON users.id = turnierleiter_access_requests.user_id
-           LEFT JOIN users admins ON admins.id = turnierleiter_access_requests.decided_by
-           ORDER BY turnierleiter_access_requests.requested_at DESC`,
-        );
-
-  const result = await statement.all();
-  return json({ requests: result.results.map(toPublicTurnierleiterAccessRequest) });
-}
-
-async function approveTurnierleiterAccessRequest(db, id, adminUserId) {
-  const existing = await db.prepare('SELECT * FROM turnierleiter_access_requests WHERE id = ?').bind(id).first();
-  if (!existing) {
-    throw new HttpError(404, 'Turnierleiter-Anfrage nicht gefunden.');
-  }
-  if (existing.status !== 'pending') {
-    throw new HttpError(409, 'Turnierleiter-Anfrage ist nicht offen.');
-  }
-
-  const now = new Date().toISOString();
-  await db.batch([
-    db.prepare("UPDATE users SET role = 'turnierleiter', updated_at = ? WHERE id = ?").bind(now, existing.user_id),
-    db
-      .prepare(
-        `UPDATE turnierleiter_access_requests
-         SET status = 'approved', decided_at = ?, decided_by = ?, updated_at = ?
-         WHERE id = ?`,
-      )
-      .bind(now, adminUserId, now, id),
-  ]);
-
-  const updated = await db.prepare('SELECT * FROM turnierleiter_access_requests WHERE id = ?').bind(id).first();
-  return json({ request: toPublicTurnierleiterAccessRequest(updated) });
-}
-
-async function rejectTurnierleiterAccessRequest(db, id, adminUserId) {
-  const existing = await db.prepare('SELECT * FROM turnierleiter_access_requests WHERE id = ?').bind(id).first();
-  if (!existing) {
-    throw new HttpError(404, 'Turnierleiter-Anfrage nicht gefunden.');
-  }
-  if (existing.status !== 'pending') {
-    throw new HttpError(409, 'Turnierleiter-Anfrage ist nicht offen.');
-  }
-
-  const now = new Date().toISOString();
-  await db
-    .prepare(
-      `UPDATE turnierleiter_access_requests
-       SET status = 'rejected', decided_at = ?, decided_by = ?, updated_at = ?
-       WHERE id = ?`,
-    )
-    .bind(now, adminUserId, now, id)
-    .run();
-
-  const updated = await db.prepare('SELECT * FROM turnierleiter_access_requests WHERE id = ?').bind(id).first();
-  return json({ request: toPublicTurnierleiterAccessRequest(updated) });
-}
-
 async function listTournaments(db, user) {
   const rows = await db
     .prepare(
@@ -1119,7 +957,7 @@ async function listTournaments(db, user) {
        FROM tournaments
        LEFT JOIN users ON users.id = tournaments.manager_id
        WHERE (?1 IS NOT NULL AND ?1 = 'admin')
-          OR (?1 IS NOT NULL AND ?1 = 'turnierleiter' AND (tournaments.created_by = ?2 OR tournaments.manager_id = ?2 OR tournaments.visibility = 'public'))
+          OR (?2 IS NOT NULL AND (tournaments.created_by = ?2 OR tournaments.manager_id = ?2))
           OR tournaments.visibility = 'public'
        ORDER BY tournaments.date ASC, tournaments.start_time ASC, tournaments.name COLLATE NOCASE`,
     )
@@ -1856,12 +1694,6 @@ async function getRegistrationWithTournament(db, id) {
     .first();
 }
 
-function requireTournamentManager(session) {
-  if (!session || !['admin', 'turnierleiter'].includes(session.user.role)) {
-    throw new HttpError(403, 'Admin or Turnierleiter role required');
-  }
-}
-
 function canViewTournament(tournament, user) {
   return tournament.visibility === 'public' || canManageTournament(tournament, user);
 }
@@ -1877,7 +1709,7 @@ function canManageTournament(tournament, user) {
   if (!user) {
     return false;
   }
-  return user.role === 'admin' || (user.role === 'turnierleiter' && (tournament.created_by === user.id || tournament.manager_id === user.id));
+  return user.role === 'admin' || tournament.created_by === user.id || tournament.manager_id === user.id;
 }
 
 function assertCanManageTournament(tournament, user) {
@@ -2295,24 +2127,6 @@ function toPublicUser(row) {
     emailVerifiedAt: row.email_verified_at || null,
     passwordChangeRequired: Boolean(Number(row.password_change_required || 0)),
     createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-function toPublicTurnierleiterAccessRequest(row) {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    userName: row.user_name || null,
-    userEmail: row.user_email || null,
-    userRole: row.user_role || null,
-    userEmailVerifiedAt: row.user_email_verified_at || null,
-    status: row.status,
-    message: row.message || '',
-    requestedAt: row.requested_at,
-    decidedAt: row.decided_at || null,
-    decidedBy: row.decided_by || null,
-    decidedByName: row.decided_by_name || null,
     updatedAt: row.updated_at,
   };
 }

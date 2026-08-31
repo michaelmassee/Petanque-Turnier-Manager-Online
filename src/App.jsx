@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 const ROLES = [
   { value: 'admin', label: 'Admin' },
   { value: 'user', label: 'User' },
-  { value: 'turnierleiter', label: 'Turnierleiter' },
 ];
 
 const TOURNAMENT_TYPES = [
@@ -83,11 +82,6 @@ const EMPTY_AUTH_FORM = {
   password: '',
   passwordConfirm: '',
   token: '',
-};
-
-const EMPTY_TURNIERLEITER_ACCESS_FORM = {
-  email: '',
-  message: '',
 };
 
 const EMPTY_TOURNAMENT_FORM = {
@@ -171,7 +165,6 @@ export default function App() {
   const [path, navigate] = usePath();
   const [tournamentTips, setTournamentTips] = useState([]);
   const [pendingTips, setPendingTips] = useState([]);
-  const [pendingTurnierleiterAccessRequests, setPendingTurnierleiterAccessRequests] = useState([]);
   const [tournamentTipForm, setTournamentTipForm] = useState(EMPTY_TOURNAMENT_TIP_FORM);
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
@@ -181,7 +174,6 @@ export default function App() {
   const [userForm, setUserForm] = useState(EMPTY_USER_FORM);
   const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
   const [authForm, setAuthForm] = useState(EMPTY_AUTH_FORM);
-  const [turnierleiterAccessForm, setTurnierleiterAccessForm] = useState(EMPTY_TURNIERLEITER_ACCESS_FORM);
   const [tournamentForm, setTournamentForm] = useState(EMPTY_TOURNAMENT_FORM);
   const [registrationForm, setRegistrationForm] = useState(EMPTY_REGISTRATION_FORM);
   const [userMode, setUserMode] = useState('create');
@@ -191,7 +183,7 @@ export default function App() {
   const [error, setError] = useState('');
 
   const isAdmin = currentUser?.role === 'admin';
-  const canManageTournaments = currentUser && ['admin', 'turnierleiter'].includes(currentUser.role);
+  const canManageTournaments = Boolean(currentUser);
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
 
   const homeHeading = 'Öffentliche Turniere';
@@ -265,12 +257,10 @@ export default function App() {
     () => ({
       total: users.length,
       admins: users.filter((user) => user.role === 'admin').length,
-      turnierleiter: users.filter((user) => user.role === 'turnierleiter').length,
       unverified: users.filter((user) => !user.emailVerifiedAt).length,
       passwordChangeRequired: users.filter((user) => user.passwordChangeRequired).length,
-      pendingAccessRequests: pendingTurnierleiterAccessRequests.length,
     }),
-    [users, pendingTurnierleiterAccessRequests],
+    [users],
   );
 
   useEffect(() => {
@@ -310,7 +300,6 @@ export default function App() {
     if (isAdmin) {
       loadUsers();
       loadPendingTournamentTips();
-      loadPendingTurnierleiterAccessRequests();
     }
   }, [isAdmin]);
 
@@ -351,15 +340,6 @@ export default function App() {
     try {
       const data = await api('/api/users');
       setUsers(data.users);
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function loadPendingTurnierleiterAccessRequests() {
-    try {
-      const data = await api('/api/admin/turnierleiter-access-requests?status=pending');
-      setPendingTurnierleiterAccessRequests(data.requests);
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -477,29 +457,9 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({ ...authForm, language }),
       });
-      const registeredEmail = authForm.email;
       setAuthForm(EMPTY_AUTH_FORM);
-      setTurnierleiterAccessForm({ ...EMPTY_TURNIERLEITER_ACCESS_FORM, email: registeredEmail });
       setAuthView('registerSuccess');
       setMessage(data.verificationUrl ? `${translateText(REGISTER_SUCCESS, language)} ${data.verificationUrl}` : translateText(REGISTER_SUCCESS, language));
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function handleTurnierleiterAccessRequest(event) {
-    event.preventDefault();
-    setError('');
-    setMessage('');
-
-    try {
-      const data = await api('/api/turnierleiter-access-requests', {
-        method: 'POST',
-        body: JSON.stringify(turnierleiterAccessForm),
-      });
-      setTurnierleiterAccessForm(EMPTY_TURNIERLEITER_ACCESS_FORM);
-      setAuthView('login');
-      setMessage(data.message || 'Turnierleiter-Zugang wurde angefragt.');
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -752,32 +712,6 @@ export default function App() {
       await api(`/api/users/${user.id}`, { method: 'DELETE' });
       setMessage('Benutzer wurde gelöscht.');
       await loadUsers();
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function handleApproveTurnierleiterAccessRequest(request) {
-    setError('');
-    setMessage('');
-
-    try {
-      await api(`/api/admin/turnierleiter-access-requests/${request.id}/approve`, { method: 'POST' });
-      setMessage('Turnierleiter-Zugang wurde freigeschaltet.');
-      await Promise.all([loadUsers(), loadPendingTurnierleiterAccessRequests()]);
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function handleRejectTurnierleiterAccessRequest(request) {
-    setError('');
-    setMessage('');
-
-    try {
-      await api(`/api/admin/turnierleiter-access-requests/${request.id}/reject`, { method: 'POST' });
-      setMessage('Turnierleiter-Zugang wurde abgelehnt.');
-      await loadPendingTurnierleiterAccessRequests();
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -1131,10 +1065,7 @@ export default function App() {
             )}
 
             {authView === 'registerSuccess' && (
-              <TurnierleiterAccessRequestForm
-                form={turnierleiterAccessForm}
-                setForm={setTurnierleiterAccessForm}
-                onSubmit={handleTurnierleiterAccessRequest}
+              <RegisterSuccessNotice
                 onBack={() => {
                   setAuthView('login');
                   clearFeedback();
@@ -1460,9 +1391,6 @@ export default function App() {
           setUserRoleFilter={setUserRoleFilter}
           userStatusFilter={userStatusFilter}
           setUserStatusFilter={setUserStatusFilter}
-          requests={pendingTurnierleiterAccessRequests}
-          onApproveRequest={handleApproveTurnierleiterAccessRequest}
-          onRejectRequest={handleRejectTurnierleiterAccessRequest}
           onSubmitUser={handleUserSubmit}
           onEditUser={editUser}
           onDeleteUser={handleDeleteUser}
@@ -1577,19 +1505,16 @@ function RegisterForm({ form, setForm, onSubmit, onBack, navigate }) {
   );
 }
 
-function TurnierleiterAccessRequestForm({ form, setForm, onSubmit, onBack }) {
+function RegisterSuccessNotice({ onBack }) {
   return (
-    <form className="form" onSubmit={onSubmit}>
+    <div className="form">
       <p className="hint">
-        {'Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse. Wenn du eigene Turniere verwalten möchtest, kannst du jetzt Turnierleiter-Zugang anfragen.'}
+        {'Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse über den Link in der Bestätigungs-E-Mail. Danach kannst du dich anmelden und eigene Turniere erstellen.'}
       </p>
-      <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
-      <TextArea label="Verein oder kurze Begründung" value={form.message} onChange={(message) => setForm({ ...form, message })} />
-      <Button type="submit">Turnierleiter-Zugang anfragen</Button>
-      <button className="link-button" type="button" onClick={onBack}>
+      <Button type="button" onClick={onBack}>
         Zurück zur Anmeldung
-      </button>
-    </form>
+      </Button>
+    </div>
   );
 }
 
@@ -2194,7 +2119,7 @@ function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, navigat
 
           <h2>4. Registrierung und Benutzerkonto</h2>
           <p>
-            Wenn du dich als Turnierleiter oder Administrator registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.
+            Wenn du dich registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.
           </p>
 
           <h2>5. Turnieranmeldungen und öffentliche Teilnehmerlisten</h2>
@@ -2755,9 +2680,6 @@ function UserManagementPanel({
   setUserRoleFilter,
   userStatusFilter,
   setUserStatusFilter,
-  requests,
-  onApproveRequest,
-  onRejectRequest,
   onSubmitUser,
   onEditUser,
   onDeleteUser,
@@ -2776,19 +2698,15 @@ function UserManagementPanel({
       <div className="user-management-header">
         <div>
           <h2>Benutzerverwaltung</h2>
-          <p className="muted">Konten, Rollen und Freischaltungen zentral bearbeiten.</p>
+          <p className="muted">Konten und Rollen zentral bearbeiten.</p>
         </div>
         <div className="user-stat-grid">
           <UserStat label="Benutzer" value={stats.total} />
           <UserStat label="Admins" value={stats.admins} />
-          <UserStat label="Turnierleiter" value={stats.turnierleiter} />
           <UserStat label="E-Mail offen" value={stats.unverified} />
           <UserStat label="Passwortwechsel" value={stats.passwordChangeRequired} />
-          <UserStat label="Anfragen" value={stats.pendingAccessRequests} />
         </div>
       </div>
-
-      <TurnierleiterAccessRequestsPanel requests={requests} onApprove={onApproveRequest} onReject={onRejectRequest} />
 
       <div className="user-management-grid">
         <div className="panel user-list-panel">
@@ -2922,41 +2840,6 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, passwordLabel, p
       <p className="hint">{PASSWORD_STRENGTH_HINT}</p>
       <Button type="submit">{submitLabel}</Button>
     </form>
-  );
-}
-
-function TurnierleiterAccessRequestsPanel({ requests, onApprove, onReject }) {
-  return (
-    <div className="panel">
-      <div className="section-title">
-        <h2>Turnierleiter-Zugänge</h2>
-        <span className="counter">{requests.length}</span>
-      </div>
-      <div className="user-list">
-        {requests.map((request) => (
-          <article className="data-row" key={request.id}>
-            <div>
-              <strong>{request.userName || request.userEmail}</strong>
-              <span>{request.userEmail}</span>
-              {request.message && <small>{request.message}</small>}
-              <small><span>Beantragt am</span> {formatDateTime(request.requestedAt)}</small>
-            </div>
-            <div className="badges">
-              <span className={request.userEmailVerifiedAt ? 'status registration-confirmed' : 'status registration-pending'}>
-                {request.userEmailVerifiedAt ? 'E-Mail bestätigt' : 'E-Mail offen'}
-              </span>
-            </div>
-            <div className="row-actions">
-              <Button onClick={() => onApprove(request)}>Freigeben</Button>
-              <Button variant="secondary" onClick={() => onReject(request)}>
-                Ablehnen
-              </Button>
-            </div>
-          </article>
-        ))}
-        {requests.length === 0 && <p className="muted">Keine offenen Turnierleiter-Anfragen.</p>}
-      </div>
-    </div>
   );
 }
 
@@ -3152,10 +3035,10 @@ function authSubtitle(needsSetup, authView) {
     return 'Fordere einen Link zum Zurücksetzen deines Passworts an.';
   }
   if (authView === 'register') {
-    return 'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.';
+    return 'Registriere dein Benutzerkonto. Nach der E-Mail-Bestätigung kannst du dich anmelden.';
   }
   if (authView === 'registerSuccess') {
-    return 'Frage bei Bedarf einen Turnierleiter-Zugang an.';
+    return 'Bitte bestätige deine E-Mail-Adresse.';
   }
   if (authView === 'reset') {
     return 'Setze mit deinem Reset-Token ein neues Passwort.';
@@ -3567,7 +3450,6 @@ const TRANSLATIONS = {
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Maak de eerste admin-gebruiker voor dit nieuwe project aan.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Vraag een link aan om je wachtwoord opnieuw in te stellen.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Registreer je gebruikersaccount. Vrijgave gebeurt pas na e-mailbevestiging.',
-    'Frage bei Bedarf einen Turnierleiter-Zugang an.': 'Vraag indien nodig toegang als toernooileider aan.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Stel met je reset-token een nieuw wachtwoord in.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Bevestig je e-mailadres om je gebruikersaccount vrij te geven.',
     'Melde dich für ein öffentliches Turnier an.': 'Schrijf je in voor een openbaar toernooi.',
@@ -3577,10 +3459,7 @@ const TRANSLATIONS = {
     'E-Mail': 'E-mail',
     Passwort: 'Wachtwoord',
     'Passwort bestätigen': 'Wachtwoord bevestigen',
-    'Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse. Wenn du eigene Turniere verwalten möchtest, kannst du jetzt Turnierleiter-Zugang anfragen.':
-      'Je gebruikersaccount is aangemaakt. Bevestig eerst je e-mailadres. Als je eigen toernooien wilt beheren, kun je nu toegang als toernooileider aanvragen.',
     'Verein oder kurze Begründung': 'Vereniging of korte reden',
-    'Turnierleiter-Zugang anfragen': 'Toegang als toernooileider aanvragen',
     'Admin anlegen': 'Admin aanmaken',
     'Passwort vergessen?': 'Wachtwoord vergeten?',
     'Reset-Link anfordern': 'Reset-link aanvragen',
@@ -3623,15 +3502,8 @@ const TRANSLATIONS = {
     'Password must contain at least 8 characters': 'Wachtwoord moet minstens 8 tekens bevatten',
     'E-Mail-Versand ist nicht konfiguriert.': 'E-mailverzending is niet geconfigureerd.',
     'E-Mail konnte nicht versendet werden.': 'E-mail kon niet worden verzonden.',
-    'Turnierleiter-Zugang wurde angefragt.': 'Toegang als toernooileider is aangevraagd.',
-    'Turnierleiter-Zugang wurde bereits angefragt.': 'Toegang als toernooileider is al aangevraagd.',
-    'Turnierleiter-Zugang wurde freigeschaltet.': 'Toegang als toernooileider is geactiveerd.',
-    'Turnierleiter-Zugang wurde abgelehnt.': 'Toegang als toernooileider is afgewezen.',
     'Die Nachricht darf maximal 1000 Zeichen enthalten.': 'Het bericht mag maximaal 1000 tekens bevatten.',
     'Benutzer nicht gefunden.': 'Gebruiker niet gevonden.',
-    'Dieser Benutzer hat bereits Turnierleiter-Zugang.': 'Deze gebruiker heeft al toegang als toernooileider.',
-    'Turnierleiter-Anfrage nicht gefunden.': 'Aanvraag voor toernooileider niet gevonden.',
-    'Turnierleiter-Anfrage ist nicht offen.': 'Aanvraag voor toernooileider staat niet open.',
     'Request failed': 'Aanvraag mislukt',
     'Neues Passwort': 'Nieuw wachtwoord',
     'Öffentliche Turniere': 'Openbare toernooien',
@@ -3698,7 +3570,6 @@ const TRANSLATIONS = {
     Anlegen: 'Aanmaken',
     Admin: 'Admin',
     User: 'Gebruiker',
-    Turnierleiter: 'Toernooileider',
     Entwurf: 'Concept',
     'Anmeldung offen': 'Inschrijving open',
     Läuft: 'Loopt',
@@ -3710,8 +3581,6 @@ const TRANSLATIONS = {
     Warteliste: 'Wachtlijst',
     Storniert: 'Geannuleerd',
     'Leer lassen, wenn unverändert': 'Leeg laten als ongewijzigd',
-    'Turnierleiter-Zugänge': 'Toegang als toernooileider',
-    'Keine offenen Turnierleiter-Anfragen.': 'Geen open aanvragen voor toernooileiders.',
     'Doublette gemischt': 'Doublette gemengd',
     'Triplette gemischt': 'Triplette gemengd',
     Januar: 'Januari',
@@ -3888,7 +3757,7 @@ const TRANSLATIONS = {
     'Da Cloudflare auch Server außerhalb der EU nutzen kann, erfolgt die Datenübermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
       'Omdat Cloudflare ook servers buiten de EU kan gebruiken, vindt de gegevensoverdracht plaats op basis van EU-standaardcontractbepalingen conform art. 46 AVG.',
     '4. Registrierung und Benutzerkonto': '4. Registratie en gebruikersaccount',
-    'Wenn du dich als Turnierleiter oder Administrator registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
+    'Wenn du dich registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
       'Wanneer je je als toernooileider of beheerder registreert, verzamelen wij naam, e-mailadres en een veilig gehasht wachtwoord. Deze gegevens worden verwerkt om je gebruikersaccount aan te bieden en je toernooien te beheren (art. 6 lid 1 sub b AVG). Na de registratie sturen we je ter bevestiging van je e-mailadres een e-mail met een 24 uur geldige bevestigingslink.',
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Toernooi-inschrijvingen en openbare deelnemerslijsten',
     'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
@@ -3932,7 +3801,6 @@ const TRANSLATIONS = {
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Create the first admin user for this new project.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Request a link to reset your password.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Register your user account. Access is enabled only after email verification.',
-    'Frage bei Bedarf einen Turnierleiter-Zugang an.': 'Request tournament director access if needed.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Set a new password with your reset token.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Verify your email address to enable your user account.',
     'Melde dich für ein öffentliches Turnier an.': 'Register for a public tournament.',
@@ -3942,10 +3810,7 @@ const TRANSLATIONS = {
     'E-Mail': 'Email',
     Passwort: 'Password',
     'Passwort bestätigen': 'Confirm password',
-    'Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse. Wenn du eigene Turniere verwalten möchtest, kannst du jetzt Turnierleiter-Zugang anfragen.':
-      'Your user account has been created. Please verify your email address first. If you want to manage your own tournaments, you can request tournament director access now.',
     'Verein oder kurze Begründung': 'Club or short reason',
-    'Turnierleiter-Zugang anfragen': 'Request tournament director access',
     'Admin anlegen': 'Create admin',
     'Passwort vergessen?': 'Forgot password?',
     'Reset-Link anfordern': 'Request reset link',
@@ -3988,15 +3853,8 @@ const TRANSLATIONS = {
     'Password must contain at least 8 characters': 'Password must contain at least 8 characters',
     'E-Mail-Versand ist nicht konfiguriert.': 'Email delivery is not configured.',
     'E-Mail konnte nicht versendet werden.': 'Email could not be sent.',
-    'Turnierleiter-Zugang wurde angefragt.': 'Tournament director access has been requested.',
-    'Turnierleiter-Zugang wurde bereits angefragt.': 'Tournament director access has already been requested.',
-    'Turnierleiter-Zugang wurde freigeschaltet.': 'Tournament director access has been enabled.',
-    'Turnierleiter-Zugang wurde abgelehnt.': 'Tournament director access has been rejected.',
     'Die Nachricht darf maximal 1000 Zeichen enthalten.': 'The message may contain at most 1000 characters.',
     'Benutzer nicht gefunden.': 'User not found.',
-    'Dieser Benutzer hat bereits Turnierleiter-Zugang.': 'This user already has tournament director access.',
-    'Turnierleiter-Anfrage nicht gefunden.': 'Tournament director request not found.',
-    'Turnierleiter-Anfrage ist nicht offen.': 'Tournament director request is not pending.',
     'Request failed': 'Request failed',
     'Neues Passwort': 'New password',
     'Öffentliche Turniere': 'Public tournaments',
@@ -4063,7 +3921,6 @@ const TRANSLATIONS = {
     Anlegen: 'Create',
     Admin: 'Admin',
     User: 'User',
-    Turnierleiter: 'Tournament director',
     Entwurf: 'Draft',
     'Anmeldung offen': 'Registration open',
     Läuft: 'Running',
@@ -4075,8 +3932,6 @@ const TRANSLATIONS = {
     Warteliste: 'Waitlist',
     Storniert: 'Cancelled',
     'Leer lassen, wenn unverändert': 'Leave empty if unchanged',
-    'Turnierleiter-Zugänge': 'Tournament director access',
-    'Keine offenen Turnierleiter-Anfragen.': 'No open tournament director requests.',
     'Doublette gemischt': 'Doublette mixed',
     'Triplette gemischt': 'Triplette mixed',
     Januar: 'January',
@@ -4254,7 +4109,7 @@ const TRANSLATIONS = {
     'Da Cloudflare auch Server außerhalb der EU nutzen kann, erfolgt die Datenübermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
       'Since Cloudflare may also use servers outside the EU, data transfer takes place on the basis of EU Standard Contractual Clauses pursuant to Art. 46 GDPR.',
     '4. Registrierung und Benutzerkonto': '4. Registration and user account',
-    'Wenn du dich als Turnierleiter oder Administrator registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
+    'Wenn du dich registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
       'If you register as a tournament organizer or administrator, we collect your name, email address and a securely hashed password. This data is processed to provide your user account and to manage your tournaments (Art. 6(1)(b) GDPR). After registration, we send you an email with a confirmation link valid for 24 hours to verify your email address.',
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Tournament registrations and public participant lists',
     'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
@@ -4298,7 +4153,6 @@ const TRANSLATIONS = {
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Crea el primer usuario administrador para este nuevo proyecto.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Solicita un enlace para restablecer tu contraseña.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Registra tu cuenta. El acceso se activa solo después de confirmar el correo.',
-    'Frage bei Bedarf einen Turnierleiter-Zugang an.': 'Solicita acceso como director de torneo si lo necesitas.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Define una nueva contraseña con tu token.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Confirma tu correo para activar tu cuenta.',
     'Melde dich für ein öffentliches Turnier an.': 'Inscríbete en un torneo público.',
@@ -4308,10 +4162,7 @@ const TRANSLATIONS = {
     'E-Mail': 'Correo',
     Passwort: 'Contraseña',
     'Passwort bestätigen': 'Confirmar contraseña',
-    'Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse. Wenn du eigene Turniere verwalten möchtest, kannst du jetzt Turnierleiter-Zugang anfragen.':
-      'Tu cuenta de usuario ha sido creada. Confirma primero tu correo. Si quieres gestionar tus propios torneos, puedes solicitar ahora acceso como director de torneo.',
     'Verein oder kurze Begründung': 'Club o breve motivo',
-    'Turnierleiter-Zugang anfragen': 'Solicitar acceso como director',
     'Admin anlegen': 'Crear admin',
     'Passwort vergessen?': '¿Contraseña olvidada?',
     'Reset-Link anfordern': 'Solicitar enlace',
@@ -4354,15 +4205,8 @@ const TRANSLATIONS = {
     'Password must contain at least 8 characters': 'La contraseña debe tener al menos 8 caracteres',
     'E-Mail-Versand ist nicht konfiguriert.': 'El envío de correos no está configurado.',
     'E-Mail konnte nicht versendet werden.': 'No se pudo enviar el correo.',
-    'Turnierleiter-Zugang wurde angefragt.': 'Se ha solicitado el acceso como director de torneo.',
-    'Turnierleiter-Zugang wurde bereits angefragt.': 'El acceso como director de torneo ya ha sido solicitado.',
-    'Turnierleiter-Zugang wurde freigeschaltet.': 'El acceso como director de torneo ha sido activado.',
-    'Turnierleiter-Zugang wurde abgelehnt.': 'El acceso como director de torneo ha sido rechazado.',
     'Die Nachricht darf maximal 1000 Zeichen enthalten.': 'El mensaje puede tener como máximo 1000 caracteres.',
     'Benutzer nicht gefunden.': 'Usuario no encontrado.',
-    'Dieser Benutzer hat bereits Turnierleiter-Zugang.': 'Este usuario ya tiene acceso como director de torneo.',
-    'Turnierleiter-Anfrage nicht gefunden.': 'Solicitud de director de torneo no encontrada.',
-    'Turnierleiter-Anfrage ist nicht offen.': 'La solicitud de director de torneo no está pendiente.',
     'Request failed': 'La solicitud ha fallado',
     'Neues Passwort': 'Nueva contraseña',
     'Öffentliche Turniere': 'Torneos públicos',
@@ -4429,7 +4273,6 @@ const TRANSLATIONS = {
     Anlegen: 'Crear',
     Admin: 'Admin',
     User: 'Usuario',
-    Turnierleiter: 'Director',
     Entwurf: 'Borrador',
     'Anmeldung offen': 'Inscripción abierta',
     Läuft: 'En curso',
@@ -4441,8 +4284,6 @@ const TRANSLATIONS = {
     Warteliste: 'Lista de espera',
     Storniert: 'Cancelado',
     'Leer lassen, wenn unverändert': 'Dejar vacío si no cambia',
-    'Turnierleiter-Zugänge': 'Accesos de directores de torneo',
-    'Keine offenen Turnierleiter-Anfragen.': 'No hay solicitudes abiertas de directores de torneo.',
     'Doublette gemischt': 'Doublette mixto',
     'Triplette gemischt': 'Triplette mixto',
     Januar: 'Enero',
@@ -4619,7 +4460,7 @@ const TRANSLATIONS = {
     'Da Cloudflare auch Server außerhalb der EU nutzen kann, erfolgt die Datenübermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
       'Dado que Cloudflare también puede utilizar servidores fuera de la UE, la transferencia de datos se realiza sobre la base de las cláusulas contractuales tipo de la UE conforme al art. 46 RGPD.',
     '4. Registrierung und Benutzerkonto': '4. Registro y cuenta de usuario',
-    'Wenn du dich als Turnierleiter oder Administrator registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
+    'Wenn du dich registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
       'Si te registras como organizador de torneos o administrador, recopilamos tu nombre, dirección de correo electrónico y una contraseña cifrada de forma segura. Estos datos se tratan para ofrecerte tu cuenta de usuario y gestionar tus torneos (art. 6, apartado 1, letra b RGPD). Tras el registro, te enviamos un correo electrónico con un enlace de confirmación válido durante 24 horas para verificar tu dirección de correo electrónico.',
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Inscripciones a torneos y listas públicas de participantes',
     'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
@@ -4663,7 +4504,6 @@ const TRANSLATIONS = {
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Crée le premier utilisateur administrateur pour ce nouveau projet.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Demande un lien de réinitialisation.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Crée ton compte. L’accès est activé seulement après confirmation de l’e-mail.',
-    'Frage bei Bedarf einen Turnierleiter-Zugang an.': 'Demande un accès organisateur de tournoi si nécessaire.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Définis un nouveau mot de passe avec ton jeton.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Confirme ton adresse e-mail pour activer ton compte.',
     'Melde dich für ein öffentliches Turnier an.': 'Inscris-toi à un tournoi public.',
@@ -4673,10 +4513,7 @@ const TRANSLATIONS = {
     'E-Mail': 'E-mail',
     Passwort: 'Mot de passe',
     'Passwort bestätigen': 'Confirmer le mot de passe',
-    'Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse. Wenn du eigene Turniere verwalten möchtest, kannst du jetzt Turnierleiter-Zugang anfragen.':
-      'Ton compte utilisateur a été créé. Confirme d’abord ton adresse e-mail. Si tu veux gérer tes propres tournois, tu peux maintenant demander un accès organisateur de tournoi.',
     'Verein oder kurze Begründung': 'Club ou courte justification',
-    'Turnierleiter-Zugang anfragen': 'Demander un accès organisateur',
     'Admin anlegen': 'Créer admin',
     'Passwort vergessen?': 'Mot de passe oublié ?',
     'Reset-Link anfordern': 'Demander le lien',
@@ -4719,15 +4556,8 @@ const TRANSLATIONS = {
     'Password must contain at least 8 characters': 'Le mot de passe doit contenir au moins 8 caractères',
     'E-Mail-Versand ist nicht konfiguriert.': "L'envoi d'e-mails n'est pas configuré.",
     'E-Mail konnte nicht versendet werden.': "L'e-mail n'a pas pu être envoyé.",
-    'Turnierleiter-Zugang wurde angefragt.': 'L’accès organisateur de tournoi a été demandé.',
-    'Turnierleiter-Zugang wurde bereits angefragt.': 'L’accès organisateur de tournoi a déjà été demandé.',
-    'Turnierleiter-Zugang wurde freigeschaltet.': 'L’accès organisateur de tournoi a été activé.',
-    'Turnierleiter-Zugang wurde abgelehnt.': 'L’accès organisateur de tournoi a été refusé.',
     'Die Nachricht darf maximal 1000 Zeichen enthalten.': 'Le message peut contenir au maximum 1000 caractères.',
     'Benutzer nicht gefunden.': 'Utilisateur introuvable.',
-    'Dieser Benutzer hat bereits Turnierleiter-Zugang.': 'Cet utilisateur a déjà un accès organisateur de tournoi.',
-    'Turnierleiter-Anfrage nicht gefunden.': 'Demande organisateur de tournoi introuvable.',
-    'Turnierleiter-Anfrage ist nicht offen.': 'La demande organisateur de tournoi n’est pas en attente.',
     'Request failed': 'La demande a échoué',
     'Neues Passwort': 'Nouveau mot de passe',
     'Öffentliche Turniere': 'Tournois publics',
@@ -4794,7 +4624,6 @@ const TRANSLATIONS = {
     Anlegen: 'Créer',
     Admin: 'Admin',
     User: 'Utilisateur',
-    Turnierleiter: 'Directeur',
     Entwurf: 'Brouillon',
     'Anmeldung offen': 'Inscription ouverte',
     Läuft: 'En cours',
@@ -4806,8 +4635,6 @@ const TRANSLATIONS = {
     Warteliste: 'Liste d’attente',
     Storniert: 'Annulé',
     'Leer lassen, wenn unverändert': 'Laisser vide si inchangé',
-    'Turnierleiter-Zugänge': 'Accès organisateur de tournoi',
-    'Keine offenen Turnierleiter-Anfragen.': 'Aucune demande organisateur de tournoi en attente.',
     'Doublette gemischt': 'Doublette mixte',
     'Triplette gemischt': 'Triplette mixte',
     Januar: 'Janvier',
@@ -4985,7 +4812,7 @@ const TRANSLATIONS = {
     'Da Cloudflare auch Server außerhalb der EU nutzen kann, erfolgt die Datenübermittlung auf Grundlage von EU-Standardvertragsklauseln gemäß Art. 46 DSGVO.':
       "Étant donné que Cloudflare peut également utiliser des serveurs situés en dehors de l'UE, le transfert de données s'effectue sur la base de clauses contractuelles types de l'UE conformément à l'art. 46 RGPD.",
     '4. Registrierung und Benutzerkonto': '4. Inscription et compte utilisateur',
-    'Wenn du dich als Turnierleiter oder Administrator registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
+    'Wenn du dich registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
       "Si tu t'inscris en tant qu'organisateur de tournoi ou administrateur, nous collectons ton nom, ton adresse e-mail et un mot de passe haché de manière sécurisée. Ces données sont traitées pour fournir ton compte utilisateur et gérer tes tournois (art. 6, § 1, point b RGPD). Après l'inscription, nous t'envoyons un e-mail contenant un lien de confirmation valable 24 heures afin de vérifier ton adresse e-mail.",
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Inscriptions aux tournois et listes de participants publiques',
     'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':

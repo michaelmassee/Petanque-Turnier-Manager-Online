@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS idx_turnierleiter_access_requests_status;
+DROP INDEX IF EXISTS idx_turnierleiter_access_requests_pending_user;
+DROP TABLE IF EXISTS turnierleiter_access_requests;
