@@ -1011,17 +1011,14 @@ export default function App() {
           >
             Anmelden
           </button>
-          <button
+          <a
             className="drawer-link"
-            type="button"
-            onClick={() => {
-              setAuthView('register');
-              setMenuOpen(false);
-              clearFeedback();
-            }}
+            href="https://michaelmassee.github.io/Petanque-Turnier-Manager/"
+            target="_blank"
+            rel="noreferrer"
           >
-            Neu registrieren
-          </button>
+            Turniersoftware
+          </a>
         </AppHeader>
 
         <Feedback message={message} error={error} />
@@ -3496,6 +3493,7 @@ const TRANSLATIONS = {
     'Passwort vergessen': 'Wachtwoord vergeten',
     'Passwort ändern': 'Wachtwoord wijzigen',
     'Neu registrieren': 'Nieuw registreren',
+    'Turniersoftware': 'Toernooisoftware',
     'Registrierung gespeichert': 'Registratie opgeslagen',
     'E-Mail bestätigen': 'E-mail bevestigen',
     'Turnieranmeldung': 'Toernooi-inschrijving',
@@ -3833,6 +3831,7 @@ const TRANSLATIONS = {
     'Passwort vergessen': 'Forgot password',
     'Passwort ändern': 'Change password',
     'Neu registrieren': 'Register',
+    'Turniersoftware': 'Tournament software',
     'Registrierung gespeichert': 'Registration saved',
     'E-Mail bestätigen': 'Verify email',
     'Turnieranmeldung': 'Tournament registration',
@@ -4170,6 +4169,7 @@ const TRANSLATIONS = {
     'Passwort vergessen': 'Contraseña olvidada',
     'Passwort ändern': 'Cambiar contraseña',
     'Neu registrieren': 'Registrarse',
+    'Turniersoftware': 'Software de torneos',
     'Registrierung gespeichert': 'Registro guardado',
     'E-Mail bestätigen': 'Confirmar correo',
     'Turnieranmeldung': 'Inscripción al torneo',
@@ -4507,6 +4507,7 @@ const TRANSLATIONS = {
     'Passwort vergessen': 'Mot de passe oublié',
     'Passwort ändern': 'Modifier le mot de passe',
     'Neu registrieren': 'Créer un compte',
+    'Turniersoftware': 'Logiciel de tournoi',
     'Registrierung gespeichert': 'Inscription enregistrée',
     'E-Mail bestätigen': 'Confirmer l’e-mail',
     'Turnieranmeldung': 'Inscription au tournoi',
