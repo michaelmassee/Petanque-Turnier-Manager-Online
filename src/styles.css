@@ -209,6 +209,15 @@ textarea:focus {
   color: #a92d2d;
 }
 
+.maps-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  margin: 0 0 16px;
+  text-decoration: none;
+}
+
 .link-button {
   min-height: 32px;
   border: 0;
@@ -217,6 +226,41 @@ textarea:focus {
   padding: 0;
   text-align: left;
   font-weight: 800;
+}
+
+.google-login-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 40px;
+  border: 1px solid #c7d0df;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172033;
+  padding: 8px 14px;
+  font-weight: 800;
+}
+
+.google-login-button:hover,
+.google-login-button:focus-visible {
+  border-color: #1677ff;
+  background: #f7fbff;
+}
+
+.google-login-button:focus-visible {
+  outline: 3px solid rgb(22 119 255 / 18%);
+}
+
+.google-login-button span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #d7deea;
+  border-radius: 999px;
+  color: #0a5fd1;
+  font-weight: 900;
 }
 
 .feedback {
@@ -273,6 +317,14 @@ textarea:focus {
   background: #f4f6fa;
 }
 
+.topbar-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .hamburger-btn {
   display: grid;
   place-items: center;
@@ -303,6 +355,91 @@ textarea:focus {
   border-color: #1677ff;
   background: #ecf4ff;
   box-shadow: 0 0 0 3px rgb(22 119 255 / 12%);
+}
+
+.search-menu {
+  position: static;
+}
+
+.search-menu-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #bcc8d9;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172033;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.search-menu-btn:hover {
+  border-color: #1677ff;
+  background: #f7fbff;
+}
+
+.search-menu-btn:focus-visible {
+  border-color: #1677ff;
+  outline: 3px solid rgb(22 119 255 / 18%);
+}
+
+.search-menu-btn[aria-expanded="true"] {
+  border-color: #1677ff;
+  background: #ecf4ff;
+  box-shadow: 0 0 0 3px rgb(22 119 255 / 12%);
+}
+
+.search-icon {
+  position: relative;
+  width: 17px;
+  height: 17px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+}
+
+.search-icon::after {
+  content: "";
+  position: absolute;
+  right: -7px;
+  bottom: -5px;
+  width: 9px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: rotate(45deg);
+  transform-origin: left center;
+}
+
+.search-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: transparent;
+}
+
+.search-menu-panel {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  gap: 16px;
+  width: min(560px, calc(100vw - 56px));
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgb(23 32 51 / 16%);
+  padding: 18px;
+}
+
+.search-menu-panel .feedback {
+  margin: 0;
+  max-width: none;
 }
 
 .hamburger-icon {
@@ -1061,6 +1198,18 @@ textarea:focus {
 
   .topbar {
     padding-block: 10px;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .search-menu-panel {
+    top: calc(100% + 6px);
+    right: 0;
+    width: calc(100vw - 28px);
+    max-height: calc(100vh - 92px);
+    padding: 14px;
   }
 
   .auth-panel,

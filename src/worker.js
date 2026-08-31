@@ -18,7 +18,9 @@ const VISIBILITIES = ['public', 'private'];
 const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
 const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
 const SESSION_COOKIE = 'ptm_session';
+const GOOGLE_OAUTH_STATE_COOKIE = 'ptm_google_oauth_state';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
+const GOOGLE_OAUTH_STATE_TTL_SECONDS = 60 * 10;
 const RESET_TTL_SECONDS = 60 * 30;
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 60 * 15;
 const LOGIN_RATE_LIMIT_MAX_PER_EMAIL = 5;
@@ -118,6 +120,13 @@ export default {
         return await login(request, env.DB, url);
       }
 
+      if (request.method === 'GET' && url.pathname === '/api/auth/google/start') {
+        return await startGoogleLogin(env, url);
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/auth/google/callback') {
+        return await completeGoogleLogin(request, env, url);
+      }
 
       if (request.method === 'POST' && url.pathname === '/api/register') {
         return await registerUser(request, env, url);
@@ -468,6 +477,166 @@ async function login(request, db, url) {
 
   const session = await createSession(db, row.id);
   return json({ user: toPublicUser(row) }, 200, { 'Set-Cookie': sessionCookie(session.id, session.expiresAt, url) });
+}
+
+async function startGoogleLogin(env, url) {
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+    return redirectWithAuthError(url, 'google_not_configured');
+  }
+
+  const state = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+  const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  authUrl.searchParams.set('client_id', env.GOOGLE_CLIENT_ID);
+  authUrl.searchParams.set('redirect_uri', googleRedirectUri(url));
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('scope', 'openid email profile');
+  authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('prompt', 'select_account');
+
+  return redirect(authUrl.toString(), 302, {
+    'Set-Cookie': googleOAuthStateCookie(state, url),
+  });
+}
+
+async function completeGoogleLogin(request, env, url) {
+  const expectedState = getCookie(request, GOOGLE_OAUTH_STATE_COOKIE);
+  const returnedState = url.searchParams.get('state') || '';
+  const code = url.searchParams.get('code') || '';
+
+  if (!expectedState || !returnedState || !timingSafeEqual(expectedState, returnedState) || !code) {
+    return redirectWithAuthError(url, 'google_login_failed');
+  }
+
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+    return redirectWithAuthError(url, 'google_not_configured');
+  }
+
+  try {
+    const token = await exchangeGoogleCode(env, url, code);
+    const profile = await fetchGoogleProfile(token.access_token);
+    const user = await findOrCreateGoogleUser(env.DB, profile);
+    const session = await createSession(env.DB, user.id);
+    const response = redirect(`${url.origin}/?auth=google_success`);
+    response.headers.append('Set-Cookie', sessionCookie(session.id, session.expiresAt, url));
+    response.headers.append('Set-Cookie', expiredGoogleOAuthStateCookie(url));
+    return response;
+  } catch (error) {
+    console.error('Google login failed', error);
+    return redirectWithAuthError(url, 'google_login_failed');
+  }
+}
+
+async function exchangeGoogleCode(env, url, code) {
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: env.GOOGLE_CLIENT_ID,
+      client_secret: env.GOOGLE_CLIENT_SECRET,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: googleRedirectUri(url),
+    }),
+  });
+
+  const token = await response.json().catch(() => ({}));
+  if (!response.ok || !token.access_token) {
+    throw new HttpError(502, 'Google Anmeldung fehlgeschlagen.');
+  }
+  return token;
+}
+
+async function fetchGoogleProfile(accessToken) {
+  const response = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const profile = await response.json().catch(() => ({}));
+
+  if (!response.ok || !profile.sub || !profile.email || profile.email_verified !== true) {
+    throw new HttpError(502, 'Google Anmeldung fehlgeschlagen.');
+  }
+
+  return {
+    providerUserId: String(profile.sub),
+    email: String(profile.email).trim().toLowerCase(),
+    name: String(profile.name || profile.email).trim(),
+  };
+}
+
+async function findOrCreateGoogleUser(db, profile) {
+  const linked = await db
+    .prepare(
+      `SELECT users.*
+       FROM oauth_accounts
+       JOIN users ON users.id = oauth_accounts.user_id
+       WHERE oauth_accounts.provider = 'google' AND oauth_accounts.provider_user_id = ?`,
+    )
+    .bind(profile.providerUserId)
+    .first();
+
+  const now = new Date().toISOString();
+  if (linked) {
+    await db.batch([
+      db
+        .prepare('UPDATE oauth_accounts SET email = ?, updated_at = ? WHERE provider = ? AND provider_user_id = ?')
+        .bind(profile.email, now, 'google', profile.providerUserId),
+      db
+        .prepare('UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?')
+        .bind(now, now, linked.id),
+    ]);
+    return { ...linked, email_verified_at: linked.email_verified_at || now, updated_at: now };
+  }
+
+  const existing = await db.prepare('SELECT * FROM users WHERE email = ?').bind(profile.email).first();
+  if (existing) {
+    await db.batch([
+      db
+        .prepare('UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?')
+        .bind(now, now, existing.id),
+      googleAccountInsert(db, existing.id, profile, now),
+    ]);
+    return { ...existing, email_verified_at: existing.email_verified_at || now, updated_at: now };
+  }
+
+  const password = await hashPassword(crypto.randomUUID() + crypto.randomUUID());
+  const userId = crypto.randomUUID();
+  const userName = profile.name.length >= 2 ? profile.name : profile.email;
+
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, created_at, updated_at)
+         VALUES (?, ?, ?, 'user', ?, ?, ?, 0, ?, ?, ?)`,
+      )
+      .bind(userId, userName, profile.email, password.salt, password.hash, now, DEFAULT_TOURNAMENT_LIMIT, now, now),
+    db
+      .prepare(
+        `INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, email, created_at, updated_at)
+         VALUES (?, ?, 'google', ?, ?, ?, ?)`,
+      )
+      .bind(crypto.randomUUID(), userId, profile.providerUserId, profile.email, now, now),
+  ]);
+
+  return {
+    id: userId,
+    name: userName,
+    email: profile.email,
+    role: 'user',
+    email_verified_at: now,
+    password_change_required: 0,
+    tournament_limit: DEFAULT_TOURNAMENT_LIMIT,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+function googleAccountInsert(db, userId, profile, now) {
+  return db
+    .prepare(
+      `INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, email, created_at, updated_at)
+       VALUES (?, ?, 'google', ?, ?, ?, ?)`,
+    )
+    .bind(crypto.randomUUID(), userId, profile.providerUserId, profile.email, now, now);
 }
 
 async function registerUser(request, env, url) {
@@ -966,8 +1135,8 @@ async function createTournament(request, db, user) {
       `INSERT INTO tournaments (
         id, created_by, manager_id, name, date, start_time, location, description, type, formation, status,
         max_registrations, registration_deadline, entry_fee_cents, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, latitude, longitude, geocoded_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        visibility, internal_notes, participants_public, license_required, latitude, longitude, geocoded_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -990,6 +1159,7 @@ async function createTournament(request, db, user) {
       tournament.visibility,
       tournament.internalNotes,
       tournament.participantsPublic ? 1 : 0,
+      tournament.licenseRequired ? 1 : 0,
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
@@ -1015,7 +1185,7 @@ async function updateTournament(request, db, existing, user) {
        SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
-           participants_public = ?, latitude = ?, longitude = ?, geocoded_at = ?, updated_at = ?
+           participants_public = ?, license_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -1037,6 +1207,7 @@ async function updateTournament(request, db, existing, user) {
       tournament.visibility,
       tournament.internalNotes,
       tournament.participantsPublic ? 1 : 0,
+      tournament.licenseRequired ? 1 : 0,
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
@@ -1104,6 +1275,7 @@ async function createRegistration(request, db, tournament) {
 
   const registration = normalizeRegistrationInput(body, { requireStatus: false });
   assertPartnerCountMatchesFormation(tournament.formation, registration);
+  assertLicenseMatchesTournament(tournament, registration);
   const status = await initialRegistrationStatus(db, tournament);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -1149,6 +1321,7 @@ async function updateRegistration(request, db, existing) {
   const body = await readJson(request);
   const registration = normalizeRegistrationInput(body, { requireStatus: true });
   assertPartnerCountMatchesFormation(existing.formation, registration);
+  assertLicenseMatchesTournament(existing, registration);
   const now = new Date().toISOString();
   const confirmedAt = registration.status === 'confirmed' ? existing.confirmed_at || now : null;
 
@@ -1490,7 +1663,8 @@ async function getTournamentById(db, id) {
 async function getRegistrationWithTournament(db, id) {
   return db
     .prepare(
-      `SELECT registrations.*, tournaments.created_by, tournaments.manager_id, tournaments.visibility, tournaments.formation
+      `SELECT registrations.*, tournaments.created_by, tournaments.manager_id, tournaments.visibility, tournaments.formation,
+              tournaments.license_required
        FROM registrations
        JOIN tournaments ON tournaments.id = registrations.tournament_id
        WHERE registrations.id = ?`,
@@ -1729,6 +1903,7 @@ function normalizeTournamentInput(body) {
     internalNotes: nullableText(body.internalNotes),
     managerId: nullableText(body.managerId),
     participantsPublic: Boolean(body.participantsPublic),
+    licenseRequired: Boolean(body.licenseRequired),
     latitude: nullableCoordinate(body.latitude, -90, 90),
     longitude: nullableCoordinate(body.longitude, -180, 180),
   };
@@ -1827,6 +2002,12 @@ function assertPartnerCountMatchesFormation(formation, registration) {
 
   if (formation === 'triplette' && (!hasPartner || !hasPartner2)) {
     throw new HttpError(400, 'Formation triplette requires exactly two partners');
+  }
+}
+
+function assertLicenseMatchesTournament(tournament, registration) {
+  if (Number(tournament.license_required || 0) && !registration.licenseNr) {
+    throw new HttpError(400, 'Lizenznummer ist erforderlich');
   }
 }
 
@@ -1988,6 +2169,7 @@ function toPublicTournament(row, user) {
     visibility: row.visibility,
     internalNotes: canManageTournament(row, user) ? row.internal_notes : null,
     participantsPublic: Boolean(Number(row.participants_public)),
+    licenseRequired: Boolean(Number(row.license_required || 0)),
     activeRegistrations: Number(row.active_registrations || 0),
     waitlistRegistrations: Number(row.waitlist_registrations || 0),
     canManage: canManageTournament(row, user),
@@ -2052,9 +2234,19 @@ function sessionCookie(value, expiresAt, url) {
   return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax${secure}; Expires=${expiresAt.toUTCString()}`;
 }
 
+function googleOAuthStateCookie(value, url) {
+  const secure = !url || url.protocol === 'https:' ? '; Secure' : '';
+  return `${GOOGLE_OAUTH_STATE_COOKIE}=${value}; Path=/api/auth/google; HttpOnly; SameSite=Lax${secure}; Max-Age=${GOOGLE_OAUTH_STATE_TTL_SECONDS}`;
+}
+
 function expiredSessionCookie(url) {
   const secure = !url || url.protocol === 'https:' ? '; Secure' : '';
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=0`;
+}
+
+function expiredGoogleOAuthStateCookie(url) {
+  const secure = !url || url.protocol === 'https:' ? '; Secure' : '';
+  return `${GOOGLE_OAUTH_STATE_COOKIE}=; Path=/api/auth/google; HttpOnly; SameSite=Lax${secure}; Max-Age=0`;
 }
 
 function json(payload, status = 200, headers = {}) {
@@ -2067,6 +2259,28 @@ function json(payload, status = 200, headers = {}) {
       ...headers,
     },
   });
+}
+
+function redirect(location, status = 302, headers = {}) {
+  return new Response(null, {
+    status,
+    headers: {
+      Location: location,
+      'Cache-Control': 'no-store',
+      ...SECURITY_HEADERS,
+      ...headers,
+    },
+  });
+}
+
+function redirectWithAuthError(url, error) {
+  const response = redirect(`${url.origin}/?auth_error=${encodeURIComponent(error)}`);
+  response.headers.append('Set-Cookie', expiredGoogleOAuthStateCookie(url));
+  return response;
+}
+
+function googleRedirectUri(url) {
+  return `${url.origin}/api/auth/google/callback`;
 }
 
 function withSecurityHeaders(response, url) {

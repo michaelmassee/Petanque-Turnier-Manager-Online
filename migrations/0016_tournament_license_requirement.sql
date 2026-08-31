@@ -1,0 +1,1 @@
+ALTER TABLE tournaments ADD COLUMN license_required INTEGER NOT NULL DEFAULT 0;

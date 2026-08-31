@@ -117,6 +117,7 @@ const EMPTY_TOURNAMENT_FORM = {
   visibility: 'private',
   internalNotes: '',
   participantsPublic: false,
+  licenseRequired: false,
 };
 
 const EMPTY_REGISTRATION_FORM = {
@@ -152,6 +153,7 @@ export default function App() {
   const [authView, setAuthView] = useState('home');
   const [activeTab, setActiveTab] = useState('home');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchMenuOpen, setSearchMenuOpen] = useState(false);
   const [homeQuery, setHomeQuery] = useState('');
   const [homeOnlyMine, setHomeOnlyMine] = useState(false);
   const [homeVisibleCount, setHomeVisibleCount] = useState(10);
@@ -289,14 +291,32 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const resetToken = params.get('reset_token');
     const verifyToken = params.get('verify_token');
+    const authResult = params.get('auth');
+    const authError = params.get('auth_error');
+    let pendingAuthMessage = '';
+    let pendingAuthError = '';
     if (resetToken) {
       setAuthView('reset');
       setAuthForm((previous) => ({ ...previous, token: resetToken }));
     } else if (verifyToken) {
       setAuthView('verify');
       setAuthForm((previous) => ({ ...previous, token: verifyToken }));
+    } else if (authResult === 'google_success') {
+      pendingAuthMessage = translateText('Mit Google angemeldet.', language);
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (authError) {
+      setAuthView('login');
+      pendingAuthError = translateText(authErrorMessage(authError), language);
+      window.history.replaceState({}, '', window.location.pathname);
     }
-    initialize();
+    initialize().then(() => {
+      if (pendingAuthMessage) {
+        setMessage(pendingAuthMessage);
+      }
+      if (pendingAuthError) {
+        setError(pendingAuthError);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -767,6 +787,7 @@ export default function App() {
       visibility: tournament.visibility || 'private',
       internalNotes: tournament.internalNotes || '',
       participantsPublic: Boolean(tournament.participantsPublic),
+      licenseRequired: Boolean(tournament.licenseRequired),
     });
     setActiveTab('tournaments');
     clearFeedback();
@@ -937,9 +958,47 @@ export default function App() {
           language={language}
           setLanguage={setLanguage}
           menuOpen={menuOpen}
-          onToggleMenu={() => setMenuOpen((open) => !open)}
+          onToggleMenu={() => {
+            setSearchMenuOpen(false);
+            setMenuOpen((open) => !open);
+          }}
           onCloseMenu={() => setMenuOpen(false)}
           navigate={navigate}
+          searchControl={
+            <SearchMenuControl
+              language={language}
+              open={searchMenuOpen}
+              onToggle={() => {
+                setMenuOpen(false);
+                setSearchMenuOpen((open) => !open);
+              }}
+              onClose={() => setSearchMenuOpen(false)}
+              query={homeQuery}
+              setQuery={setHomeQuery}
+              showMineFilter={false}
+              onlyMine={false}
+              setOnlyMine={() => {}}
+              filterOpen={homeFilterOpen}
+              setFilterOpen={setHomeFilterOpen}
+              filterMonth={homeFilterMonth}
+              setFilterMonth={setHomeFilterMonth}
+              filterFormation={homeFilterFormation}
+              setFilterFormation={setHomeFilterFormation}
+              filterOpenOnly={homeFilterOpenOnly}
+              setFilterOpenOnly={setHomeFilterOpenOnly}
+              onResetFilters={resetHomeFilters}
+              searchOrigin={searchOrigin}
+              searchOriginQuery={searchOriginQuery}
+              setSearchOriginQuery={setSearchOriginQuery}
+              onSearchOriginSubmit={handleSearchOriginSubmit}
+              onUseMyLocation={handleUseMyLocation}
+              onClearSearchOrigin={handleClearSearchOrigin}
+              searchRadiusKm={searchRadiusKm}
+              setSearchRadiusKm={setSearchRadiusKm}
+              geoLoading={geoLoading}
+              geoError={geoError}
+            />
+          }
         >
           <button
             className="drawer-link"
@@ -969,30 +1028,13 @@ export default function App() {
 
         <HomeTournaments
           language={language}
-          query={homeQuery}
-          setQuery={setHomeQuery}
           showMineFilter={false}
           onlyMine={false}
-          setOnlyMine={() => {}}
-          filterOpen={homeFilterOpen}
-          setFilterOpen={setHomeFilterOpen}
           filterMonth={homeFilterMonth}
-          setFilterMonth={setHomeFilterMonth}
           filterFormation={homeFilterFormation}
-          setFilterFormation={setHomeFilterFormation}
           filterOpenOnly={homeFilterOpenOnly}
-          setFilterOpenOnly={setHomeFilterOpenOnly}
-          onResetFilters={resetHomeFilters}
           searchOrigin={searchOrigin}
-          searchOriginQuery={searchOriginQuery}
-          setSearchOriginQuery={setSearchOriginQuery}
-          onSearchOriginSubmit={handleSearchOriginSubmit}
-          onUseMyLocation={handleUseMyLocation}
-          onClearSearchOrigin={handleClearSearchOrigin}
           searchRadiusKm={searchRadiusKm}
-          setSearchRadiusKm={setSearchRadiusKm}
-          geoLoading={geoLoading}
-          geoError={geoError}
           tournaments={visibleHomeTournaments}
           total={filteredHomeTournaments.length}
           hasMore={hasMoreHomeTournaments}
@@ -1014,6 +1056,9 @@ export default function App() {
                 form={authForm}
                 setForm={setAuthForm}
                 onSubmit={handleLogin}
+                onGoogleLogin={() => {
+                  window.location.href = '/api/auth/google/start';
+                }}
                 onForgot={() => {
                   setAuthView('forgot');
                   clearFeedback();
@@ -1119,9 +1164,49 @@ export default function App() {
         language={language}
         setLanguage={setLanguage}
         menuOpen={menuOpen}
-        onToggleMenu={() => setMenuOpen((open) => !open)}
+        onToggleMenu={() => {
+          setSearchMenuOpen(false);
+          setMenuOpen((open) => !open);
+        }}
         onCloseMenu={() => setMenuOpen(false)}
         navigate={navigate}
+        searchControl={
+          activeTab === 'home' ? (
+            <SearchMenuControl
+              language={language}
+              open={searchMenuOpen}
+              onToggle={() => {
+                setMenuOpen(false);
+                setSearchMenuOpen((open) => !open);
+              }}
+              onClose={() => setSearchMenuOpen(false)}
+              query={homeQuery}
+              setQuery={setHomeQuery}
+              showMineFilter={canManageTournaments}
+              onlyMine={homeOnlyMine}
+              setOnlyMine={setHomeOnlyMine}
+              filterOpen={homeFilterOpen}
+              setFilterOpen={setHomeFilterOpen}
+              filterMonth={homeFilterMonth}
+              setFilterMonth={setHomeFilterMonth}
+              filterFormation={homeFilterFormation}
+              setFilterFormation={setHomeFilterFormation}
+              filterOpenOnly={homeFilterOpenOnly}
+              setFilterOpenOnly={setHomeFilterOpenOnly}
+              onResetFilters={resetHomeFilters}
+              searchOrigin={searchOrigin}
+              searchOriginQuery={searchOriginQuery}
+              setSearchOriginQuery={setSearchOriginQuery}
+              onSearchOriginSubmit={handleSearchOriginSubmit}
+              onUseMyLocation={handleUseMyLocation}
+              onClearSearchOrigin={handleClearSearchOrigin}
+              searchRadiusKm={searchRadiusKm}
+              setSearchRadiusKm={setSearchRadiusKm}
+              geoLoading={geoLoading}
+              geoError={geoError}
+            />
+          ) : null
+        }
       >
         <div className="drawer-user">
           <span>{currentUser.name}</span>
@@ -1217,30 +1302,13 @@ export default function App() {
       {activeTab === 'home' && (
         <HomeTournaments
           language={language}
-          query={homeQuery}
-          setQuery={setHomeQuery}
           showMineFilter={canManageTournaments}
           onlyMine={homeOnlyMine}
-          setOnlyMine={setHomeOnlyMine}
-          filterOpen={homeFilterOpen}
-          setFilterOpen={setHomeFilterOpen}
           filterMonth={homeFilterMonth}
-          setFilterMonth={setHomeFilterMonth}
           filterFormation={homeFilterFormation}
-          setFilterFormation={setHomeFilterFormation}
           filterOpenOnly={homeFilterOpenOnly}
-          setFilterOpenOnly={setHomeFilterOpenOnly}
-          onResetFilters={resetHomeFilters}
           searchOrigin={searchOrigin}
-          searchOriginQuery={searchOriginQuery}
-          setSearchOriginQuery={setSearchOriginQuery}
-          onSearchOriginSubmit={handleSearchOriginSubmit}
-          onUseMyLocation={handleUseMyLocation}
-          onClearSearchOrigin={handleClearSearchOrigin}
           searchRadiusKm={searchRadiusKm}
-          setSearchRadiusKm={setSearchRadiusKm}
-          geoLoading={geoLoading}
-          geoError={geoError}
           tournaments={visibleHomeTournaments}
           total={filteredHomeTournaments.length}
           hasMore={hasMoreHomeTournaments}
@@ -1424,12 +1492,16 @@ function SetupForm({ form, setForm, onSubmit }) {
   );
 }
 
-function LoginForm({ form, setForm, onSubmit, onForgot, onRegister }) {
+function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, onRegister }) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <TextField label="Passwort" type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required />
       <Button type="submit">Anmelden</Button>
+      <button className="google-login-button" type="button" onClick={onGoogleLogin}>
+        <span aria-hidden="true">G</span>
+        Mit Google anmelden
+      </button>
       <button className="link-button" type="button" onClick={onRegister}>
         Neu registrieren
       </button>
@@ -1514,7 +1586,7 @@ function VerifyEmailForm({ form, setForm, onSubmit, onBack }) {
   );
 }
 
-function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, children }) {
+function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, searchControl, children }) {
   return (
     <header className="topbar">
       <div className="brand">
@@ -1524,19 +1596,22 @@ function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onC
           <h1>{heading}</h1>
         </div>
       </div>
-      <button
-        className="hamburger-btn"
-        type="button"
-        aria-label="Menü öffnen"
-        aria-expanded={menuOpen}
-        onClick={onToggleMenu}
-      >
-        <span className="hamburger-icon" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </span>
-      </button>
+      <div className="topbar-actions">
+        {searchControl}
+        <button
+          className="hamburger-btn"
+          type="button"
+          aria-label="Menü öffnen"
+          aria-expanded={menuOpen}
+          onClick={onToggleMenu}
+        >
+          <span className="hamburger-icon" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+        </button>
+      </div>
       {menuOpen && (
         <>
           <div className="nav-drawer-backdrop" onClick={onCloseMenu} />
@@ -1572,6 +1647,136 @@ function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onC
         </>
       )}
     </header>
+  );
+}
+
+function SearchMenuControl({
+  language,
+  open,
+  onToggle,
+  onClose,
+  query,
+  setQuery,
+  showMineFilter,
+  onlyMine,
+  setOnlyMine,
+  filterOpen,
+  setFilterOpen,
+  filterMonth,
+  setFilterMonth,
+  filterFormation,
+  setFilterFormation,
+  filterOpenOnly,
+  setFilterOpenOnly,
+  onResetFilters,
+  searchOrigin,
+  searchOriginQuery,
+  setSearchOriginQuery,
+  onSearchOriginSubmit,
+  onUseMyLocation,
+  onClearSearchOrigin,
+  searchRadiusKm,
+  setSearchRadiusKm,
+  geoLoading,
+  geoError,
+}) {
+  return (
+    <div className="search-menu">
+      <button
+        className="search-menu-btn"
+        type="button"
+        aria-label={translateText(open ? 'Suche schließen' : 'Suche öffnen', language)}
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <span className="search-icon" aria-hidden="true" />
+      </button>
+      {open && (
+        <>
+          <div className="search-menu-backdrop" onClick={onClose} />
+          <div className="search-menu-panel" role="search">
+            <label className="home-search-field">
+              Turnier suchen
+              <input
+                type="search"
+                placeholder="Name, Ort oder Turniersystem"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            <div className="home-search-actions">
+              {showMineFilter && (
+                <label className="checkbox-field">
+                  <input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} />
+                  Nur meine Turniere
+                </label>
+              )}
+              <Button variant="secondary" onClick={() => setFilterOpen((active) => !active)}>
+                {filterOpen ? 'Filter ausblenden' : 'Filter anzeigen'}
+              </Button>
+            </div>
+
+            <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
+              <label className="home-search-field">
+                Umkreissuche: Von diesem Ort aus suchen
+                <input
+                  type="search"
+                  placeholder="Ort oder PLZ eingeben"
+                  value={searchOriginQuery}
+                  onChange={(event) => setSearchOriginQuery(event.target.value)}
+                />
+              </label>
+              <Button type="submit" variant="secondary" disabled={geoLoading}>
+                Suchen
+              </Button>
+              <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading}>
+                Meinen Standort verwenden
+              </Button>
+              {searchOrigin && (
+                <>
+                  <SelectField label="Umkreis" value={searchRadiusKm} onChange={setSearchRadiusKm} options={RADIUS_OPTIONS} />
+                  <span className="search-origin-label">
+                    {translateText('Ausgangspunkt:', language)} {searchOrigin.label}
+                  </span>
+                  <button className="link-button" type="button" onClick={onClearSearchOrigin}>
+                    Umkreissuche beenden
+                  </button>
+                </>
+              )}
+            </form>
+            {geoError && <p className="feedback error">{geoError}</p>}
+
+            {filterOpen && (
+              <div className="filter-panel">
+                <div className="filter-grid">
+                  <SelectField
+                    label="Monat"
+                    value={filterMonth}
+                    onChange={setFilterMonth}
+                    options={[{ value: '', label: 'Alle Monate' }, ...MONTHS]}
+                  />
+                  <SelectField
+                    label="Formation"
+                    value={filterFormation}
+                    onChange={setFilterFormation}
+                    options={[{ value: '', label: 'Alle Formationen' }, ...FORMATIONS]}
+                  />
+                </div>
+                <label className="checkbox-field">
+                  <input type="checkbox" checked={filterOpenOnly} onChange={(event) => setFilterOpenOnly(event.target.checked)} />
+                  Anmeldung möglich
+                </label>
+                <div className="filter-actions">
+                  <button className="link-button" type="button" onClick={onResetFilters}>
+                    Zurücksetzen
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -1794,6 +1999,8 @@ function TournamentDetailPage({
 }
 
 function TournamentInfo({ tournament }) {
+  const mapsUrl = googleMapsUrl(tournament);
+
   return (
     <div className="panel">
       <p>
@@ -1802,6 +2009,9 @@ function TournamentInfo({ tournament }) {
       <p>
         <strong>Ort</strong>: {tournament.location}
       </p>
+      <a className="button button-secondary maps-link" href={mapsUrl} target="_blank" rel="noreferrer">
+        Spielort in Google Maps öffnen
+      </a>
       <p>
         <strong>Turniersystem</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
       </p>
@@ -1985,10 +2195,13 @@ function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, navigat
           <p>
             Wenn du dich registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.
           </p>
+          <p>
+            Wenn du die Google Anmeldung nutzt, erhalten wir von Google deine verifizierte E-Mail-Adresse, deinen Namen und eine technische Google-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Google-Konto deinem Benutzerkonto zuzuordnen.
+          </p>
 
           <h2>5. Turnieranmeldungen und öffentliche Teilnehmerlisten</h2>
           <p>
-            Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).
+            Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).
           </p>
           <p>
             Turnierleiter können die Teilnehmerliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.
@@ -2037,37 +2250,19 @@ function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, navigat
 
 function HomeTournaments({
   language,
-  query,
-  setQuery,
   showMineFilter,
   onlyMine,
-  setOnlyMine,
-  filterOpen,
-  setFilterOpen,
   filterMonth,
-  setFilterMonth,
   filterFormation,
-  setFilterFormation,
   filterOpenOnly,
-  setFilterOpenOnly,
-  onResetFilters,
+  searchOrigin,
+  searchRadiusKm,
   tournaments,
   total,
   hasMore,
   onLoadMore,
   onRegister,
   onOpenTournament,
-  navigate,
-  searchOrigin,
-  searchOriginQuery,
-  setSearchOriginQuery,
-  onSearchOriginSubmit,
-  onUseMyLocation,
-  onClearSearchOrigin,
-  searchRadiusKm,
-  setSearchRadiusKm,
-  geoLoading,
-  geoError,
 }) {
   const activeFilterCount = [
     showMineFilter && onlyMine,
@@ -2076,6 +2271,7 @@ function HomeTournaments({
     filterOpenOnly,
   ].filter(Boolean).length;
   const nextTournament = tournaments[0] || null;
+  const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);
 
   return (
     <section className="home-tournaments">
@@ -2098,86 +2294,27 @@ function HomeTournaments({
             <strong>{activeFilterCount > 0 ? 'Filter aktiv' : 'Keine Filter aktiv'}</strong>
             <span>Finder</span>
           </div>
-        </div>
-      </div>
-
-      <div className="home-search-panel">
-        <label className="home-search-field">
-          Turnier suchen
-          <input
-            type="search"
-            placeholder="Name, Ort oder Turniersystem"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-        <div className="home-search-actions">
-          {showMineFilter && (
-            <label className="checkbox-field">
-              <input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} />
-              Nur meine Turniere
-            </label>
-          )}
-          <Button variant="secondary" onClick={() => setFilterOpen((open) => !open)}>
-            {filterOpen ? 'Filter ausblenden' : 'Filter anzeigen'}
-          </Button>
-        </div>
-
-        <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
-          <label className="home-search-field">
-            Umkreissuche: Von diesem Ort aus suchen
-            <input
-              type="search"
-              placeholder="Ort oder PLZ eingeben"
-              value={searchOriginQuery}
-              onChange={(event) => setSearchOriginQuery(event.target.value)}
-            />
-          </label>
-          <Button type="submit" variant="secondary" disabled={geoLoading}>
-            Suchen
-          </Button>
-          <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading}>
-            Meinen Standort verwenden
-          </Button>
-          {searchOrigin && (
-            <>
-              <SelectField label="Umkreis" value={searchRadiusKm} onChange={setSearchRadiusKm} options={RADIUS_OPTIONS} />
-              <span className="search-origin-label">Ausgangspunkt: {searchOrigin.label}</span>
-              <button className="link-button" type="button" onClick={onClearSearchOrigin}>
-                Umkreissuche beenden
-              </button>
-            </>
-          )}
-        </form>
-        {geoError && <p className="feedback error">{geoError}</p>}
-
-        {filterOpen && (
-          <div className="filter-panel">
-            <div className="filter-grid">
-              <SelectField
-                label="Monat"
-                value={filterMonth}
-                onChange={setFilterMonth}
-                options={[{ value: '', label: 'Alle Monate' }, ...MONTHS]}
-              />
-              <SelectField
-                label="Formation"
-                value={filterFormation}
-                onChange={setFilterFormation}
-                options={[{ value: '', label: 'Alle Formationen' }, ...FORMATIONS]}
-              />
-            </div>
-            <label className="checkbox-field">
-              <input type="checkbox" checked={filterOpenOnly} onChange={(event) => setFilterOpenOnly(event.target.checked)} />
-              Anmeldung möglich
-            </label>
-            <div className="filter-actions">
-              <button className="link-button" type="button" onClick={onResetFilters}>
-                Zurücksetzen
-              </button>
-            </div>
+          <div>
+            <strong>
+              {searchOrigin ? (
+                <>
+                  {radiusLabel} {translateText('Umkreis', language)}
+                </>
+              ) : (
+                'Umkreissuche aus'
+              )}
+            </strong>
+            <span>
+              {searchOrigin ? (
+                <>
+                  {translateText('Ausgangspunkt:', language)} {searchOrigin.label}
+                </>
+              ) : (
+                'Umkreis'
+              )}
+            </span>
           </div>
-        )}
+        </div>
       </div>
 
       <div className="section-title home-results-title">
@@ -2248,7 +2385,13 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
       <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
         Datenschutzerklärung lesen
       </button>
-      <RegistrationFields form={form} setForm={setForm} showStatus={false} formation={tournament.formation} />
+      <RegistrationFields
+        form={form}
+        setForm={setForm}
+        showStatus={false}
+        formation={tournament.formation}
+        licenseRequired={tournament.licenseRequired}
+      />
       <label className="checkbox-field">
         <input
           type="checkbox"
@@ -2324,6 +2467,14 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
       <label className="checkbox-field">
         <input
           type="checkbox"
+          checked={form.licenseRequired}
+          onChange={(event) => setForm({ ...form, licenseRequired: event.target.checked })}
+        />
+        Lizenznummer erforderlich
+      </label>
+      <label className="checkbox-field">
+        <input
+          type="checkbox"
           checked={form.participantsPublic}
           onChange={(event) => setForm({ ...form, participantsPublic: event.target.checked })}
         />
@@ -2375,13 +2526,19 @@ function RegistrationForm({ form, setForm, onSubmit, tournaments, selectedTourna
   return (
     <form className="form dense" onSubmit={onSubmit}>
       <SelectField label="Turnier" value={selectedValue} onChange={(tournamentId) => setForm({ ...form, tournamentId })} options={options} />
-      <RegistrationFields form={form} setForm={setForm} showStatus={manageMode} formation={selectedTournament?.formation} />
+      <RegistrationFields
+        form={form}
+        setForm={setForm}
+        showStatus={manageMode}
+        formation={selectedTournament?.formation}
+        licenseRequired={selectedTournament?.licenseRequired}
+      />
       <Button type="submit">{form.id ? 'Anmeldung speichern' : 'Anmeldung erfassen'}</Button>
     </form>
   );
 }
 
-function RegistrationFields({ form, setForm, showStatus, formation }) {
+function RegistrationFields({ form, setForm, showStatus, formation, licenseRequired }) {
   const allowsPartner = formation ? formation !== 'tete' : true;
   const allowsPartner2 = formation === 'triplette';
 
@@ -2403,7 +2560,12 @@ function RegistrationFields({ form, setForm, showStatus, formation }) {
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <div className="form-grid">
         <TextField label="Verein" value={form.club} onChange={(club) => setForm({ ...form, club })} />
-        <TextField label="Lizenznummer" value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
+        <TextField
+          label="Lizenznummer"
+          value={form.licenseNr}
+          onChange={(licenseNr) => setForm({ ...form, licenseNr })}
+          required={Boolean(licenseRequired)}
+        />
       </div>
       <TextField label="Teamname" value={form.teamName} onChange={(teamName) => setForm({ ...form, teamName })} />
       {allowsPartner && (
@@ -2914,6 +3076,20 @@ function authSubtitle(needsSetup, authView) {
   return 'Melde dich mit deinem Benutzerkonto an.';
 }
 
+function authErrorMessage(code) {
+  if (code === 'google_not_configured') {
+    return 'Google Anmeldung ist nicht konfiguriert.';
+  }
+  return 'Google Anmeldung fehlgeschlagen.';
+}
+
+function googleMapsUrl(tournament) {
+  if (typeof tournament.latitude === 'number' && typeof tournament.longitude === 'number') {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${tournament.latitude},${tournament.longitude}`)}`;
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tournament.location || '')}`;
+}
+
 function tournamentPayload(form) {
   return {
     name: form.name,
@@ -2935,6 +3111,7 @@ function tournamentPayload(form) {
     visibility: form.visibility,
     internalNotes: form.internalNotes || null,
     participantsPublic: Boolean(form.participantsPublic),
+    licenseRequired: Boolean(form.licenseRequired),
   };
 }
 
@@ -3324,6 +3501,8 @@ const TRANSLATIONS = {
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Maak de eerste admin-gebruiker voor dit nieuwe project aan.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Vraag een link aan om je wachtwoord opnieuw in te stellen.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Registreer je gebruikersaccount. Vrijgave gebeurt pas na e-mailbevestiging.',
+    'Registriere dein Benutzerkonto. Nach der E-Mail-Bestätigung kannst du dich anmelden.':
+      'Registreer je gebruikersaccount. Na de e-mailbevestiging kun je je aanmelden.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Stel met je reset-token een nieuw wachtwoord in.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Bevestig je e-mailadres om je gebruikersaccount vrij te geven.',
     'Melde dich für ein öffentliches Turnier an.': 'Schrijf je in voor een openbaar toernooi.',
@@ -3347,6 +3526,10 @@ const TRANSLATIONS = {
     'Passwortänderung beim nächsten Login erzwingen': 'Wachtwoordwijziging bij volgende aanmelding afdwingen',
     'Passwortwechsel nötig': 'Wachtwoordwijziging nodig',
     'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'E-mailadres is bevestigd. Je kunt je nu aanmelden.',
+    'Mit Google anmelden': 'Aanmelden met Google',
+    'Mit Google angemeldet.': 'Aangemeld met Google.',
+    'Google Anmeldung ist nicht konfiguriert.': 'Aanmelden met Google is niet geconfigureerd.',
+    'Google Anmeldung fehlgeschlagen.': 'Aanmelden met Google is mislukt.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registratie opgeslagen. Bevestig je e-mailadres via de link in de e-mail.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Bevestig eerst je e-mailadres.',
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Wijzig je wachtwoord voordat je verdergaat.',
@@ -3419,6 +3602,8 @@ const TRANSLATIONS = {
     Beschreibung: 'Beschrijving',
     'Interne Notizen': 'Interne notities',
     'Turnier speichern': 'Toernooi opslaan',
+    'Lizenznummer erforderlich': 'Licentienummer verplicht',
+    'Lizenznummer ist erforderlich': 'Licentienummer is verplicht',
     Bearbeiten: 'Bewerken',
     Löschen: 'Verwijderen',
     'Anmeldung bearbeiten': 'Inschrijving bewerken',
@@ -3476,6 +3661,8 @@ const TRANSLATIONS = {
     'Nur meine Turniere': 'Alleen mijn toernooien',
     'Turnier suchen': 'Toernooi zoeken',
     'Name, Ort oder Turniersystem': 'Naam, plaats of toernooisysteem',
+    'Suche öffnen': 'Zoeken openen',
+    'Suche schließen': 'Zoeken sluiten',
     'Filter ausblenden': 'Filter verbergen',
     'Filter anzeigen': 'Filter tonen',
     'Finde dein nächstes Pétanque-Turnier': 'Vind je volgende pétanquetoernooi',
@@ -3487,6 +3674,7 @@ const TRANSLATIONS = {
     'Filter aktiv': 'Filter actief',
     'Keine Filter aktiv': 'Geen filter actief',
     Finder: 'Zoeker',
+    'Umkreissuche aus': 'Straal zoeken uit',
     'Alle passenden Turniere': 'Alle passende toernooien',
     'Keine Turniere gefunden.': 'Geen toernooien gevonden.',
     Ganztägig: 'Hele dag',
@@ -3508,6 +3696,7 @@ const TRANSLATIONS = {
     Teilnehmer: 'Deelnemers',
     Startgeld: 'Inschrijfgeld',
     Kontakt: 'Contact',
+    'Spielort in Google Maps öffnen': 'Speellocatie in Google Maps openen',
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'De deelnemerslijst is voor dit toernooi niet openbaar.',
     'Teilnehmerliste wird geladen…': 'Deelnemerslijst wordt geladen…',
     'Noch keine Anmeldungen.': 'Nog geen inschrijvingen.',
@@ -3585,9 +3774,11 @@ const TRANSLATIONS = {
     '4. Registrierung und Benutzerkonto': '4. Registratie en gebruikersaccount',
     'Wenn du dich registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
       'Wanneer je je als toernooileider of beheerder registreert, verzamelen wij naam, e-mailadres en een veilig gehasht wachtwoord. Deze gegevens worden verwerkt om je gebruikersaccount aan te bieden en je toernooien te beheren (art. 6 lid 1 sub b AVG). Na de registratie sturen we je ter bevestiging van je e-mailadres een e-mail met een 24 uur geldige bevestigingslink.',
+    'Wenn du die Google Anmeldung nutzt, erhalten wir von Google deine verifizierte E-Mail-Adresse, deinen Namen und eine technische Google-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Google-Konto deinem Benutzerkonto zuzuordnen.':
+      'Als je Google-login gebruikt, ontvangen wij van Google je geverifieerde e-mailadres, je naam en een technische Google-account-ID. Wij gebruiken deze gegevens alleen om je gebruikersaccount aan te maken, je aan te melden en je Google-account aan je gebruikersaccount te koppelen.',
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Toernooi-inschrijvingen en openbare deelnemerslijsten',
-    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
-      'Wanneer je je via deze website voor een toernooi inschrijft, verwerken wij voornaam, achternaam, e-mailadres en optioneel vereniging, licentienummer en gegevens over je partner(s) (doublette/triplette). Deze gegevens worden doorgegeven aan de betreffende toernooileider voor de organisatie van het toernooi (art. 6 lid 1 sub b AVG).',
+    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
+      'Wanneer je je via deze website voor een toernooi inschrijft, verwerken wij voornaam, achternaam, e-mailadres en afhankelijk van het toernooi optioneel of verplicht vereniging, licentienummer en gegevens over je partner(s) (doublette/triplette). Deze gegevens worden doorgegeven aan de betreffende toernooileider voor de organisatie van het toernooi (art. 6 lid 1 sub b AVG).',
     'Turnierleiter können die Teilnehmerliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.':
       'Toernooileiders kunnen de deelnemerslijst van een toernooi openbaar zichtbaar maken. In dat geval zijn voornaam, achternaam, vereniging en de namen van je partner(s) zichtbaar voor elke bezoeker van de toernooipagina, zonder dat aanmelding vereist is. Als je dit niet wilt, neem dan rechtstreeks contact op met de organisator (toernooileider) van het betreffende toernooi, wiens contactgegevens op de toernooipagina staan vermeld.',
     '6. Turniermeldungen': '6. Toernooimeldingen',
@@ -3647,6 +3838,8 @@ const TRANSLATIONS = {
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Create the first admin user for this new project.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Request a link to reset your password.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Register your user account. Access is enabled only after email verification.',
+    'Registriere dein Benutzerkonto. Nach der E-Mail-Bestätigung kannst du dich anmelden.':
+      'Register your user account. You can sign in after email verification.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Set a new password with your reset token.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Verify your email address to enable your user account.',
     'Melde dich für ein öffentliches Turnier an.': 'Register for a public tournament.',
@@ -3670,6 +3863,10 @@ const TRANSLATIONS = {
     'Passwortänderung beim nächsten Login erzwingen': 'Require password change on next login',
     'Passwortwechsel nötig': 'Password change required',
     'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'Email address verified. You can sign in now.',
+    'Mit Google anmelden': 'Sign in with Google',
+    'Mit Google angemeldet.': 'Signed in with Google.',
+    'Google Anmeldung ist nicht konfiguriert.': 'Google sign-in is not configured.',
+    'Google Anmeldung fehlgeschlagen.': 'Google sign-in failed.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registration saved. Please verify your email address using the link in the email.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Please verify your email address first.',
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Please change your password before continuing.',
@@ -3742,6 +3939,8 @@ const TRANSLATIONS = {
     Beschreibung: 'Description',
     'Interne Notizen': 'Internal notes',
     'Turnier speichern': 'Save tournament',
+    'Lizenznummer erforderlich': 'License number required',
+    'Lizenznummer ist erforderlich': 'License number is required',
     Bearbeiten: 'Edit',
     Löschen: 'Delete',
     'Anmeldung bearbeiten': 'Edit registration',
@@ -3799,6 +3998,8 @@ const TRANSLATIONS = {
     'Nur meine Turniere': 'Only my tournaments',
     'Turnier suchen': 'Search tournament',
     'Name, Ort oder Turniersystem': 'Name, location or tournament system',
+    'Suche öffnen': 'Open search',
+    'Suche schließen': 'Close search',
     'Filter ausblenden': 'Hide filter',
     'Filter anzeigen': 'Show filter',
     'Finde dein nächstes Pétanque-Turnier': 'Find your next pétanque tournament',
@@ -3810,6 +4011,7 @@ const TRANSLATIONS = {
     'Filter aktiv': 'Filter active',
     'Keine Filter aktiv': 'No filter active',
     Finder: 'Finder',
+    'Umkreissuche aus': 'Radius search off',
     'Alle passenden Turniere': 'All matching tournaments',
     'Keine Turniere gefunden.': 'No tournaments found.',
     Ganztägig: 'All day',
@@ -3831,6 +4033,7 @@ const TRANSLATIONS = {
     Teilnehmer: 'Participants',
     Startgeld: 'Entry fee',
     Kontakt: 'Contact',
+    'Spielort in Google Maps öffnen': 'Open venue in Google Maps',
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'The participant list is not public for this tournament.',
     'Teilnehmerliste wird geladen…': 'Loading participant list…',
     'Noch keine Anmeldungen.': 'No registrations yet.',
@@ -3908,9 +4111,11 @@ const TRANSLATIONS = {
     '4. Registrierung und Benutzerkonto': '4. Registration and user account',
     'Wenn du dich registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
       'If you register as a tournament organizer or administrator, we collect your name, email address and a securely hashed password. This data is processed to provide your user account and to manage your tournaments (Art. 6(1)(b) GDPR). After registration, we send you an email with a confirmation link valid for 24 hours to verify your email address.',
+    'Wenn du die Google Anmeldung nutzt, erhalten wir von Google deine verifizierte E-Mail-Adresse, deinen Namen und eine technische Google-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Google-Konto deinem Benutzerkonto zuzuordnen.':
+      'If you use Google sign-in, we receive your verified email address, your name and a technical Google account ID from Google. We use this data only to create your user account, sign you in and link your Google account to your user account.',
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Tournament registrations and public participant lists',
-    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
-      'If you register for a tournament via this website, we process your first name, last name, email address, and optionally club, license number, and details about your partner(s) (doublette/triplette). This data is passed on to the respective tournament organizer for the purpose of organizing the tournament (Art. 6(1)(b) GDPR).',
+    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
+      'If you register for a tournament via this website, we process your first name, last name, email address, and depending on the tournament optionally or mandatorily club, license number, and details about your partner(s) (doublette/triplette). This data is passed on to the respective tournament organizer for the purpose of organizing the tournament (Art. 6(1)(b) GDPR).',
     'Turnierleiter können die Teilnehmerliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.':
       "Tournament organizers can make a tournament's participant list publicly visible. In this case, the first name, last name, club and the names of your partner(s) are visible to every visitor of the tournament page, without requiring login. If you do not want this, please contact the organizer (tournament director) of the respective tournament directly; their contact details are provided on the tournament page.",
     '6. Turniermeldungen': '6. Tournament submissions',
@@ -3970,6 +4175,8 @@ const TRANSLATIONS = {
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Crea el primer usuario administrador para este nuevo proyecto.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Solicita un enlace para restablecer tu contraseña.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Registra tu cuenta. El acceso se activa solo después de confirmar el correo.',
+    'Registriere dein Benutzerkonto. Nach der E-Mail-Bestätigung kannst du dich anmelden.':
+      'Registra tu cuenta. Puedes iniciar sesión después de confirmar el correo.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Define una nueva contraseña con tu token.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Confirma tu correo para activar tu cuenta.',
     'Melde dich für ein öffentliches Turnier an.': 'Inscríbete en un torneo público.',
@@ -3993,6 +4200,10 @@ const TRANSLATIONS = {
     'Passwortänderung beim nächsten Login erzwingen': 'Exigir cambio de contraseña en el próximo inicio',
     'Passwortwechsel nötig': 'Cambio de contraseña necesario',
     'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'Correo confirmado. Ya puedes iniciar sesión.',
+    'Mit Google anmelden': 'Iniciar sesión con Google',
+    'Mit Google angemeldet.': 'Sesión iniciada con Google.',
+    'Google Anmeldung ist nicht konfiguriert.': 'El inicio de sesión con Google no está configurado.',
+    'Google Anmeldung fehlgeschlagen.': 'Error al iniciar sesión con Google.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registro guardado. Confirma tu correo con el enlace del email.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Confirma primero tu correo.',
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Cambia tu contraseña antes de continuar.',
@@ -4065,6 +4276,8 @@ const TRANSLATIONS = {
     Beschreibung: 'Descripción',
     'Interne Notizen': 'Notas internas',
     'Turnier speichern': 'Guardar torneo',
+    'Lizenznummer erforderlich': 'Licencia obligatoria',
+    'Lizenznummer ist erforderlich': 'La licencia es obligatoria',
     Bearbeiten: 'Editar',
     Löschen: 'Eliminar',
     'Anmeldung bearbeiten': 'Editar inscripción',
@@ -4122,6 +4335,8 @@ const TRANSLATIONS = {
     'Nur meine Turniere': 'Solo mis torneos',
     'Turnier suchen': 'Buscar torneo',
     'Name, Ort oder Turniersystem': 'Nombre, lugar o sistema',
+    'Suche öffnen': 'Abrir búsqueda',
+    'Suche schließen': 'Cerrar búsqueda',
     'Filter ausblenden': 'Ocultar filtro',
     'Filter anzeigen': 'Mostrar filtro',
     'Finde dein nächstes Pétanque-Turnier': 'Encuentra tu próximo torneo de petanca',
@@ -4133,6 +4348,7 @@ const TRANSLATIONS = {
     'Filter aktiv': 'Filtro activo',
     'Keine Filter aktiv': 'Sin filtro activo',
     Finder: 'Buscador',
+    'Umkreissuche aus': 'Búsqueda por radio desactivada',
     'Alle passenden Turniere': 'Todos los torneos coincidentes',
     'Keine Turniere gefunden.': 'No se encontraron torneos.',
     Ganztägig: 'Todo el día',
@@ -4154,6 +4370,7 @@ const TRANSLATIONS = {
     Teilnehmer: 'Participantes',
     Startgeld: 'Cuota',
     Kontakt: 'Contacto',
+    'Spielort in Google Maps öffnen': 'Abrir sede en Google Maps',
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'La lista de participantes no es pública para este torneo.',
     'Teilnehmerliste wird geladen…': 'Cargando lista de participantes…',
     'Noch keine Anmeldungen.': 'Aún no hay inscripciones.',
@@ -4231,9 +4448,11 @@ const TRANSLATIONS = {
     '4. Registrierung und Benutzerkonto': '4. Registro y cuenta de usuario',
     'Wenn du dich registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
       'Si te registras como organizador de torneos o administrador, recopilamos tu nombre, dirección de correo electrónico y una contraseña cifrada de forma segura. Estos datos se tratan para ofrecerte tu cuenta de usuario y gestionar tus torneos (art. 6, apartado 1, letra b RGPD). Tras el registro, te enviamos un correo electrónico con un enlace de confirmación válido durante 24 horas para verificar tu dirección de correo electrónico.',
+    'Wenn du die Google Anmeldung nutzt, erhalten wir von Google deine verifizierte E-Mail-Adresse, deinen Namen und eine technische Google-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Google-Konto deinem Benutzerkonto zuzuordnen.':
+      'Si utilizas el inicio de sesión con Google, recibimos de Google tu dirección de correo verificada, tu nombre y un identificador técnico de cuenta de Google. Usamos estos datos solo para crear tu cuenta, iniciar tu sesión y vincular tu cuenta de Google con tu cuenta de usuario.',
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Inscripciones a torneos y listas públicas de participantes',
-    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
-      'Cuando te inscribes en un torneo a través de este sitio web, tratamos tu nombre, apellidos, dirección de correo electrónico y, opcionalmente, club, número de licencia y datos de tu(s) compañero(s) (doublette/triplette). Estos datos se transmiten al respectivo organizador del torneo para su organización (art. 6, apartado 1, letra b RGPD).',
+    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
+      'Cuando te inscribes en un torneo a través de este sitio web, tratamos tu nombre, apellidos, dirección de correo electrónico y, según el torneo, de forma opcional u obligatoria, club, número de licencia y datos de tu(s) compañero(s) (doublette/triplette). Estos datos se transmiten al respectivo organizador del torneo para su organización (art. 6, apartado 1, letra b RGPD).',
     'Turnierleiter können die Teilnehmerliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.':
       'Los organizadores de torneos pueden hacer visible públicamente la lista de participantes de un torneo. En ese caso, el nombre, los apellidos, el club y los nombres de tu(s) compañero(s) serán visibles para cualquier visitante de la página del torneo, sin necesidad de iniciar sesión. Si no lo deseas, ponte en contacto directamente con el organizador (director del torneo) del torneo correspondiente, cuyos datos de contacto figuran en la página del torneo.',
     '6. Turniermeldungen': '6. Avisos de torneo',
@@ -4293,6 +4512,8 @@ const TRANSLATIONS = {
     'Lege den ersten Admin-Benutzer für dieses neue Projekt an.': 'Crée le premier utilisateur administrateur pour ce nouveau projet.',
     'Fordere einen Link zum Zurücksetzen deines Passworts an.': 'Demande un lien de réinitialisation.',
     'Registriere dein Benutzerkonto. Die Freischaltung erfolgt erst nach E-Mail-Bestätigung.': 'Crée ton compte. L’accès est activé seulement après confirmation de l’e-mail.',
+    'Registriere dein Benutzerkonto. Nach der E-Mail-Bestätigung kannst du dich anmelden.':
+      'Crée ton compte. Tu peux te connecter après confirmation de l’e-mail.',
     'Setze mit deinem Reset-Token ein neues Passwort.': 'Définis un nouveau mot de passe avec ton jeton.',
     'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.': 'Confirme ton adresse e-mail pour activer ton compte.',
     'Melde dich für ein öffentliches Turnier an.': 'Inscris-toi à un tournoi public.',
@@ -4316,6 +4537,10 @@ const TRANSLATIONS = {
     'Passwortänderung beim nächsten Login erzwingen': 'Exiger un changement de mot de passe à la prochaine connexion',
     'Passwortwechsel nötig': 'Changement de mot de passe requis',
     'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.': 'Adresse e-mail confirmée. Tu peux maintenant te connecter.',
+    'Mit Google anmelden': 'Se connecter avec Google',
+    'Mit Google angemeldet.': 'Connecté avec Google.',
+    'Google Anmeldung ist nicht konfiguriert.': 'La connexion Google n’est pas configurée.',
+    'Google Anmeldung fehlgeschlagen.': 'Échec de la connexion Google.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Compte créé. Confirme ton adresse e-mail avec le lien envoyé.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Confirme d’abord ton adresse e-mail.',
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Modifie ton mot de passe avant de continuer.',
@@ -4388,6 +4613,8 @@ const TRANSLATIONS = {
     Beschreibung: 'Description',
     'Interne Notizen': 'Notes internes',
     'Turnier speichern': 'Enregistrer',
+    'Lizenznummer erforderlich': 'Licence obligatoire',
+    'Lizenznummer ist erforderlich': 'La licence est obligatoire',
     Bearbeiten: 'Modifier',
     Löschen: 'Supprimer',
     'Anmeldung bearbeiten': 'Modifier inscription',
@@ -4445,6 +4672,8 @@ const TRANSLATIONS = {
     'Nur meine Turniere': 'Seulement mes tournois',
     'Turnier suchen': 'Rechercher un tournoi',
     'Name, Ort oder Turniersystem': 'Nom, lieu ou système',
+    'Suche öffnen': 'Ouvrir la recherche',
+    'Suche schließen': 'Fermer la recherche',
     'Filter ausblenden': 'Masquer le filtre',
     'Filter anzeigen': 'Afficher le filtre',
     'Finde dein nächstes Pétanque-Turnier': 'Trouve ton prochain tournoi de pétanque',
@@ -4456,6 +4685,7 @@ const TRANSLATIONS = {
     'Filter aktiv': 'Filtre actif',
     'Keine Filter aktiv': 'Aucun filtre actif',
     Finder: 'Recherche',
+    'Umkreissuche aus': 'Recherche par rayon désactivée',
     'Alle passenden Turniere': 'Tous les tournois correspondants',
     'Keine Turniere gefunden.': 'Aucun tournoi trouvé.',
     Ganztägig: 'Toute la journée',
@@ -4477,6 +4707,7 @@ const TRANSLATIONS = {
     Teilnehmer: 'Participants',
     Startgeld: 'Frais d’inscription',
     Kontakt: 'Contact',
+    'Spielort in Google Maps öffnen': 'Ouvrir le lieu dans Google Maps',
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'La liste des participants n’est pas publique pour ce tournoi.',
     'Teilnehmerliste wird geladen…': 'Chargement de la liste des participants…',
     'Noch keine Anmeldungen.': 'Pas encore d’inscriptions.',
@@ -4554,9 +4785,11 @@ const TRANSLATIONS = {
     '4. Registrierung und Benutzerkonto': '4. Inscription et compte utilisateur',
     'Wenn du dich registrierst, erheben wir Name, E-Mail-Adresse und ein sicher gehashtes Passwort. Diese Daten werden zur Bereitstellung deines Benutzerkontos und zur Verwaltung deiner Turniere verarbeitet (Art. 6 Abs. 1 lit. b DSGVO). Nach der Registrierung senden wir dir zur Bestätigung deiner E-Mail-Adresse eine E-Mail mit einem 24 Stunden gültigen Bestätigungslink.':
       "Si tu t'inscris en tant qu'organisateur de tournoi ou administrateur, nous collectons ton nom, ton adresse e-mail et un mot de passe haché de manière sécurisée. Ces données sont traitées pour fournir ton compte utilisateur et gérer tes tournois (art. 6, § 1, point b RGPD). Après l'inscription, nous t'envoyons un e-mail contenant un lien de confirmation valable 24 heures afin de vérifier ton adresse e-mail.",
+    'Wenn du die Google Anmeldung nutzt, erhalten wir von Google deine verifizierte E-Mail-Adresse, deinen Namen und eine technische Google-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Google-Konto deinem Benutzerkonto zuzuordnen.':
+      'Si tu utilises la connexion Google, nous recevons de Google ton adresse e-mail vérifiée, ton nom et un identifiant technique de compte Google. Nous utilisons ces données uniquement pour créer ton compte utilisateur, te connecter et associer ton compte Google à ton compte utilisateur.',
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Inscriptions aux tournois et listes de participants publiques',
-    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie optional Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
-      "Lorsque tu t'inscris à un tournoi via ce site web, nous traitons ton prénom, ton nom, ton adresse e-mail ainsi que, le cas échéant, ton club, ton numéro de licence et des informations sur ton/tes partenaire(s) (doublette/triplette). Ces données sont transmises à l'organisateur du tournoi concerné pour l'organisation du tournoi (art. 6, § 1, point b RGPD).",
+    'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
+      "Lorsque tu t'inscris à un tournoi via ce site web, nous traitons ton prénom, ton nom, ton adresse e-mail ainsi que, selon le tournoi, de manière facultative ou obligatoire, ton club, ton numéro de licence et des informations sur ton/tes partenaire(s) (doublette/triplette). Ces données sont transmises à l'organisateur du tournoi concerné pour l'organisation du tournoi (art. 6, § 1, point b RGPD).",
     'Turnierleiter können die Teilnehmerliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.':
       "Les organisateurs de tournois peuvent rendre la liste des participants d'un tournoi publiquement visible. Dans ce cas, le prénom, le nom, le club et les noms de tes partenaires sont visibles par tout visiteur de la page du tournoi, sans connexion requise. Si tu ne le souhaites pas, merci de contacter directement l'organisateur (directeur du tournoi) du tournoi concerné, dont les coordonnées figurent sur la page du tournoi.",
     '6. Turniermeldungen': '6. Signalements de tournois',

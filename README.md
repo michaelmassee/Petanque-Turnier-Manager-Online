@@ -90,3 +90,29 @@ these Worker secrets or variables:
 Without those values, reset links are logged by the Worker. During local
 development on `localhost` or `127.0.0.1`, the reset URL is also returned in the
 API response for testing.
+
+## Google login
+
+Google login uses the same `ptm_session` cookie as password login. Configure the
+OAuth client with this redirect URI:
+
+```text
+https://<your-domain>/api/auth/google/callback
+```
+
+For local Worker development, also allow:
+
+```text
+http://127.0.0.1:8787/api/auth/google/callback
+```
+
+If Wrangler starts on a different local port, add the same callback URL with
+that exact port.
+
+Configure these Worker values before using Google login:
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+
+Store `GOOGLE_CLIENT_SECRET` as a Worker secret or in ignored local development
+configuration, not in tracked files.
