@@ -1064,9 +1064,6 @@ export default function App() {
                 onGoogleLogin={() => {
                   window.location.href = '/api/auth/google/start';
                 }}
-                onFacebookLogin={() => {
-                  window.location.href = '/api/auth/facebook/start';
-                }}
                 onForgot={() => {
                   setAuthView('forgot');
                   clearFeedback();
@@ -1507,7 +1504,7 @@ function SetupForm({ form, setForm, onSubmit }) {
   );
 }
 
-function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onFacebookLogin, onForgot, onRegister }) {
+function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, onRegister }) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
@@ -1516,10 +1513,6 @@ function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onFacebookLogin, on
       <button className="google-login-button" type="button" onClick={onGoogleLogin}>
         <span aria-hidden="true">G</span>
         Mit Google anmelden
-      </button>
-      <button className="facebook-login-button" type="button" onClick={onFacebookLogin}>
-        <span aria-hidden="true">f</span>
-        Mit Facebook anmelden
       </button>
       <button className="link-button" type="button" onClick={onRegister}>
         Neu registrieren
