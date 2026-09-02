@@ -4931,7 +4931,9 @@ function translateDom(language) {
     const source = entry.original.trim();
     const translated = entry.original.replace(source, translateText(source, language));
     entry.translated = translated;
-    node.nodeValue = translated;
+    if (node.nodeValue !== translated) {
+      node.nodeValue = translated;
+    }
   }
 
   for (const element of root.querySelectorAll('[placeholder]')) {
@@ -4943,7 +4945,9 @@ function translateDom(language) {
     const entry = ORIGINAL_TEXT.get(element);
     const translated = translateText(entry.original, language);
     entry.translated = translated;
-    element.setAttribute('placeholder', translated);
+    if (element.getAttribute('placeholder') !== translated) {
+      element.setAttribute('placeholder', translated);
+    }
   }
 }
 
