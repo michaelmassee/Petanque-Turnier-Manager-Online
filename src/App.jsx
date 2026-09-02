@@ -304,6 +304,9 @@ export default function App() {
     } else if (authResult === 'google_success') {
       pendingAuthMessage = translateText('Mit Google angemeldet.', language);
       window.history.replaceState({}, '', window.location.pathname);
+    } else if (authResult === 'facebook_success') {
+      pendingAuthMessage = translateText('Mit Facebook angemeldet.', language);
+      window.history.replaceState({}, '', window.location.pathname);
     } else if (authError) {
       setAuthView('login');
       pendingAuthError = translateText(authErrorMessage(authError), language);
@@ -1061,6 +1064,9 @@ export default function App() {
                 onGoogleLogin={() => {
                   window.location.href = '/api/auth/google/start';
                 }}
+                onFacebookLogin={() => {
+                  window.location.href = '/api/auth/facebook/start';
+                }}
                 onForgot={() => {
                   setAuthView('forgot');
                   clearFeedback();
@@ -1501,7 +1507,7 @@ function SetupForm({ form, setForm, onSubmit }) {
   );
 }
 
-function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, onRegister }) {
+function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onFacebookLogin, onForgot, onRegister }) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
@@ -1510,6 +1516,10 @@ function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, onRegiste
       <button className="google-login-button" type="button" onClick={onGoogleLogin}>
         <span aria-hidden="true">G</span>
         Mit Google anmelden
+      </button>
+      <button className="facebook-login-button" type="button" onClick={onFacebookLogin}>
+        <span aria-hidden="true">f</span>
+        Mit Facebook anmelden
       </button>
       <button className="link-button" type="button" onClick={onRegister}>
         Neu registrieren
@@ -2206,6 +2216,9 @@ function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, navigat
           </p>
           <p>
             Wenn du die Google Anmeldung nutzt, erhalten wir von Google deine verifizierte E-Mail-Adresse, deinen Namen und eine technische Google-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Google-Konto deinem Benutzerkonto zuzuordnen.
+          </p>
+          <p>
+            Wenn du die Facebook Anmeldung nutzt, erhalten wir von Facebook deine E-Mail-Adresse, deinen Namen und eine technische Facebook-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Facebook-Konto deinem Benutzerkonto zuzuordnen.
           </p>
 
           <h2>5. Turnieranmeldungen und öffentliche Teilnehmerlisten</h2>
@@ -3109,6 +3122,12 @@ function authErrorMessage(code) {
   if (code === 'google_not_configured') {
     return 'Google Anmeldung ist nicht konfiguriert.';
   }
+  if (code === 'facebook_not_configured') {
+    return 'Facebook Anmeldung ist nicht konfiguriert.';
+  }
+  if (code === 'facebook_login_failed') {
+    return 'Facebook Anmeldung fehlgeschlagen.';
+  }
   return 'Google Anmeldung fehlgeschlagen.';
 }
 
@@ -3560,6 +3579,10 @@ const TRANSLATIONS = {
     'Mit Google angemeldet.': 'Aangemeld met Google.',
     'Google Anmeldung ist nicht konfiguriert.': 'Aanmelden met Google is niet geconfigureerd.',
     'Google Anmeldung fehlgeschlagen.': 'Aanmelden met Google is mislukt.',
+    'Mit Facebook anmelden': 'Aanmelden met Facebook',
+    'Mit Facebook angemeldet.': 'Aangemeld met Facebook.',
+    'Facebook Anmeldung ist nicht konfiguriert.': 'Aanmelden met Facebook is niet geconfigureerd.',
+    'Facebook Anmeldung fehlgeschlagen.': 'Aanmelden met Facebook is mislukt.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registratie opgeslagen. Bevestig je e-mailadres via de link in de e-mail.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Bevestig eerst je e-mailadres.',
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Wijzig je wachtwoord voordat je verdergaat.',
@@ -3806,6 +3829,8 @@ const TRANSLATIONS = {
       'Wanneer je je als toernooileider of beheerder registreert, verzamelen wij naam, e-mailadres en een veilig gehasht wachtwoord. Deze gegevens worden verwerkt om je gebruikersaccount aan te bieden en je toernooien te beheren (art. 6 lid 1 sub b AVG). Na de registratie sturen we je ter bevestiging van je e-mailadres een e-mail met een 24 uur geldige bevestigingslink.',
     'Wenn du die Google Anmeldung nutzt, erhalten wir von Google deine verifizierte E-Mail-Adresse, deinen Namen und eine technische Google-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Google-Konto deinem Benutzerkonto zuzuordnen.':
       'Als je Google-login gebruikt, ontvangen wij van Google je geverifieerde e-mailadres, je naam en een technische Google-account-ID. Wij gebruiken deze gegevens alleen om je gebruikersaccount aan te maken, je aan te melden en je Google-account aan je gebruikersaccount te koppelen.',
+    'Wenn du die Facebook Anmeldung nutzt, erhalten wir von Facebook deine E-Mail-Adresse, deinen Namen und eine technische Facebook-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Facebook-Konto deinem Benutzerkonto zuzuordnen.':
+      'Als je Facebook-login gebruikt, ontvangen wij van Facebook je e-mailadres, je naam en een technische Facebook-account-ID. Wij gebruiken deze gegevens alleen om je gebruikersaccount aan te maken, je aan te melden en je Facebook-account aan je gebruikersaccount te koppelen.',
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Toernooi-inschrijvingen en openbare deelnemerslijsten',
     'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
       'Wanneer je je via deze website voor een toernooi inschrijft, verwerken wij voornaam, achternaam, e-mailadres en afhankelijk van het toernooi optioneel of verplicht vereniging, licentienummer en gegevens over je partner(s) (doublette/triplette). Deze gegevens worden doorgegeven aan de betreffende toernooileider voor de organisatie van het toernooi (art. 6 lid 1 sub b AVG).',
@@ -3898,6 +3923,10 @@ const TRANSLATIONS = {
     'Mit Google angemeldet.': 'Signed in with Google.',
     'Google Anmeldung ist nicht konfiguriert.': 'Google sign-in is not configured.',
     'Google Anmeldung fehlgeschlagen.': 'Google sign-in failed.',
+    'Mit Facebook anmelden': 'Sign in with Facebook',
+    'Mit Facebook angemeldet.': 'Signed in with Facebook.',
+    'Facebook Anmeldung ist nicht konfiguriert.': 'Facebook sign-in is not configured.',
+    'Facebook Anmeldung fehlgeschlagen.': 'Facebook sign-in failed.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registration saved. Please verify your email address using the link in the email.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Please verify your email address first.',
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Please change your password before continuing.',
@@ -4144,6 +4173,8 @@ const TRANSLATIONS = {
       'If you register as a tournament organizer or administrator, we collect your name, email address and a securely hashed password. This data is processed to provide your user account and to manage your tournaments (Art. 6(1)(b) GDPR). After registration, we send you an email with a confirmation link valid for 24 hours to verify your email address.',
     'Wenn du die Google Anmeldung nutzt, erhalten wir von Google deine verifizierte E-Mail-Adresse, deinen Namen und eine technische Google-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Google-Konto deinem Benutzerkonto zuzuordnen.':
       'If you use Google sign-in, we receive your verified email address, your name and a technical Google account ID from Google. We use this data only to create your user account, sign you in and link your Google account to your user account.',
+    'Wenn du die Facebook Anmeldung nutzt, erhalten wir von Facebook deine E-Mail-Adresse, deinen Namen und eine technische Facebook-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Facebook-Konto deinem Benutzerkonto zuzuordnen.':
+      'If you use Facebook sign-in, we receive your email address, your name and a technical Facebook account ID from Facebook. We use this data only to create your user account, sign you in and link your Facebook account to your user account.',
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Tournament registrations and public participant lists',
     'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
       'If you register for a tournament via this website, we process your first name, last name, email address, and depending on the tournament optionally or mandatorily club, license number, and details about your partner(s) (doublette/triplette). This data is passed on to the respective tournament organizer for the purpose of organizing the tournament (Art. 6(1)(b) GDPR).',
@@ -4236,6 +4267,10 @@ const TRANSLATIONS = {
     'Mit Google angemeldet.': 'Sesión iniciada con Google.',
     'Google Anmeldung ist nicht konfiguriert.': 'El inicio de sesión con Google no está configurado.',
     'Google Anmeldung fehlgeschlagen.': 'Error al iniciar sesión con Google.',
+    'Mit Facebook anmelden': 'Iniciar sesión con Facebook',
+    'Mit Facebook angemeldet.': 'Sesión iniciada con Facebook.',
+    'Facebook Anmeldung ist nicht konfiguriert.': 'El inicio de sesión con Facebook no está configurado.',
+    'Facebook Anmeldung fehlgeschlagen.': 'Error al iniciar sesión con Facebook.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Registro guardado. Confirma tu correo con el enlace del email.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Confirma primero tu correo.',
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Cambia tu contraseña antes de continuar.',
@@ -4482,6 +4517,8 @@ const TRANSLATIONS = {
       'Si te registras como organizador de torneos o administrador, recopilamos tu nombre, dirección de correo electrónico y una contraseña cifrada de forma segura. Estos datos se tratan para ofrecerte tu cuenta de usuario y gestionar tus torneos (art. 6, apartado 1, letra b RGPD). Tras el registro, te enviamos un correo electrónico con un enlace de confirmación válido durante 24 horas para verificar tu dirección de correo electrónico.',
     'Wenn du die Google Anmeldung nutzt, erhalten wir von Google deine verifizierte E-Mail-Adresse, deinen Namen und eine technische Google-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Google-Konto deinem Benutzerkonto zuzuordnen.':
       'Si utilizas el inicio de sesión con Google, recibimos de Google tu dirección de correo verificada, tu nombre y un identificador técnico de cuenta de Google. Usamos estos datos solo para crear tu cuenta, iniciar tu sesión y vincular tu cuenta de Google con tu cuenta de usuario.',
+    'Wenn du die Facebook Anmeldung nutzt, erhalten wir von Facebook deine E-Mail-Adresse, deinen Namen und eine technische Facebook-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Facebook-Konto deinem Benutzerkonto zuzuordnen.':
+      'Si utilizas el inicio de sesión con Facebook, recibimos de Facebook tu dirección de correo, tu nombre y un identificador técnico de cuenta de Facebook. Usamos estos datos solo para crear tu cuenta, iniciar tu sesión y vincular tu cuenta de Facebook con tu cuenta de usuario.',
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Inscripciones a torneos y listas públicas de participantes',
     'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
       'Cuando te inscribes en un torneo a través de este sitio web, tratamos tu nombre, apellidos, dirección de correo electrónico y, según el torneo, de forma opcional u obligatoria, club, número de licencia y datos de tu(s) compañero(s) (doublette/triplette). Estos datos se transmiten al respectivo organizador del torneo para su organización (art. 6, apartado 1, letra b RGPD).',
@@ -4574,6 +4611,10 @@ const TRANSLATIONS = {
     'Mit Google angemeldet.': 'Connecté avec Google.',
     'Google Anmeldung ist nicht konfiguriert.': 'La connexion Google n’est pas configurée.',
     'Google Anmeldung fehlgeschlagen.': 'Échec de la connexion Google.',
+    'Mit Facebook anmelden': 'Se connecter avec Facebook',
+    'Mit Facebook angemeldet.': 'Connecté avec Facebook.',
+    'Facebook Anmeldung ist nicht konfiguriert.': 'La connexion Facebook n’est pas configurée.',
+    'Facebook Anmeldung fehlgeschlagen.': 'Échec de la connexion Facebook.',
     'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.': 'Compte créé. Confirme ton adresse e-mail avec le lien envoyé.',
     'Bitte bestätige zuerst deine E-Mail-Adresse.': 'Confirme d’abord ton adresse e-mail.',
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Modifie ton mot de passe avant de continuer.',
@@ -4820,6 +4861,8 @@ const TRANSLATIONS = {
       "Si tu t'inscris en tant qu'organisateur de tournoi ou administrateur, nous collectons ton nom, ton adresse e-mail et un mot de passe haché de manière sécurisée. Ces données sont traitées pour fournir ton compte utilisateur et gérer tes tournois (art. 6, § 1, point b RGPD). Après l'inscription, nous t'envoyons un e-mail contenant un lien de confirmation valable 24 heures afin de vérifier ton adresse e-mail.",
     'Wenn du die Google Anmeldung nutzt, erhalten wir von Google deine verifizierte E-Mail-Adresse, deinen Namen und eine technische Google-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Google-Konto deinem Benutzerkonto zuzuordnen.':
       'Si tu utilises la connexion Google, nous recevons de Google ton adresse e-mail vérifiée, ton nom et un identifiant technique de compte Google. Nous utilisons ces données uniquement pour créer ton compte utilisateur, te connecter et associer ton compte Google à ton compte utilisateur.',
+    'Wenn du die Facebook Anmeldung nutzt, erhalten wir von Facebook deine E-Mail-Adresse, deinen Namen und eine technische Facebook-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Facebook-Konto deinem Benutzerkonto zuzuordnen.':
+      'Si tu utilises la connexion Facebook, nous recevons de Facebook ton adresse e-mail, ton nom et un identifiant technique de compte Facebook. Nous utilisons ces données uniquement pour créer ton compte utilisateur, te connecter et associer ton compte Facebook à ton compte utilisateur.',
     '5. Turnieranmeldungen und öffentliche Teilnehmerlisten': '5. Inscriptions aux tournois et listes de participants publiques',
     'Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).':
       "Lorsque tu t'inscris à un tournoi via ce site web, nous traitons ton prénom, ton nom, ton adresse e-mail ainsi que, selon le tournoi, de manière facultative ou obligatoire, ton club, ton numéro de licence et des informations sur ton/tes partenaire(s) (doublette/triplette). Ces données sont transmises à l'organisateur du tournoi concerné pour l'organisation du tournoi (art. 6, § 1, point b RGPD).",

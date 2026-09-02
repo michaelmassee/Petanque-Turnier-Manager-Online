@@ -116,3 +116,29 @@ Configure these Worker values before using Google login:
 
 Store `GOOGLE_CLIENT_SECRET` as a Worker secret or in ignored local development
 configuration, not in tracked files.
+
+## Facebook login
+
+Facebook login uses the same `ptm_session` cookie as password and Google login.
+Configure the Facebook app's OAuth redirect URI:
+
+```text
+https://<your-domain>/api/auth/facebook/callback
+```
+
+For local Worker development, also allow:
+
+```text
+http://127.0.0.1:8787/api/auth/facebook/callback
+```
+
+If Wrangler starts on a different local port, add the same callback URL with
+that exact port.
+
+Configure these Worker values before using Facebook login:
+
+- `FACEBOOK_APP_ID`
+- `FACEBOOK_APP_SECRET`
+
+Store `FACEBOOK_APP_SECRET` as a Worker secret or in ignored local development
+configuration, not in tracked files.

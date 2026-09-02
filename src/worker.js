@@ -19,8 +19,11 @@ const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
 const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
 const SESSION_COOKIE = 'ptm_session';
 const GOOGLE_OAUTH_STATE_COOKIE = 'ptm_google_oauth_state';
+const FACEBOOK_OAUTH_STATE_COOKIE = 'ptm_facebook_oauth_state';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 const GOOGLE_OAUTH_STATE_TTL_SECONDS = 60 * 10;
+const FACEBOOK_OAUTH_STATE_TTL_SECONDS = 60 * 10;
+const FACEBOOK_GRAPH_API_VERSION = 'v21.0';
 const RESET_TTL_SECONDS = 60 * 30;
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 60 * 15;
 const LOGIN_RATE_LIMIT_MAX_PER_EMAIL = 5;
@@ -132,6 +135,14 @@ export default {
 
       if (request.method === 'GET' && url.pathname === '/api/auth/google/callback') {
         return await completeGoogleLogin(request, env, url);
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/auth/facebook/start') {
+        return await startFacebookLogin(env, url);
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/auth/facebook/callback') {
+        return await completeFacebookLogin(request, env, url);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/register') {
@@ -520,7 +531,7 @@ async function completeGoogleLogin(request, env, url) {
   try {
     const token = await exchangeGoogleCode(env, url, code);
     const profile = await fetchGoogleProfile(token.access_token);
-    const user = await findOrCreateGoogleUser(env.DB, profile);
+    const user = await findOrCreateOAuthUser(env.DB, 'google', profile);
     const session = await createSession(env.DB, user.id);
     const response = redirect(`${url.origin}/?auth=google_success`);
     response.headers.append('Set-Cookie', sessionCookie(session.id, session.expiresAt, url));
@@ -530,6 +541,86 @@ async function completeGoogleLogin(request, env, url) {
     console.error('Google login failed', error);
     return redirectWithAuthError(url, 'google_login_failed');
   }
+}
+
+async function startFacebookLogin(env, url) {
+  if (!env.FACEBOOK_APP_ID || !env.FACEBOOK_APP_SECRET) {
+    return redirectWithAuthError(url, 'facebook_not_configured');
+  }
+
+  const state = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+  const authUrl = new URL(`https://www.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/dialog/oauth`);
+  authUrl.searchParams.set('client_id', env.FACEBOOK_APP_ID);
+  authUrl.searchParams.set('redirect_uri', facebookRedirectUri(url));
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('scope', 'email public_profile');
+  authUrl.searchParams.set('state', state);
+
+  return redirect(authUrl.toString(), 302, {
+    'Set-Cookie': facebookOAuthStateCookie(state, url),
+  });
+}
+
+async function completeFacebookLogin(request, env, url) {
+  const expectedState = getCookie(request, FACEBOOK_OAUTH_STATE_COOKIE);
+  const returnedState = url.searchParams.get('state') || '';
+  const code = url.searchParams.get('code') || '';
+
+  if (!expectedState || !returnedState || !timingSafeEqual(expectedState, returnedState) || !code) {
+    return redirectWithAuthError(url, 'facebook_login_failed');
+  }
+
+  if (!env.FACEBOOK_APP_ID || !env.FACEBOOK_APP_SECRET) {
+    return redirectWithAuthError(url, 'facebook_not_configured');
+  }
+
+  try {
+    const token = await exchangeFacebookCode(env, url, code);
+    const profile = await fetchFacebookProfile(token.access_token);
+    const user = await findOrCreateOAuthUser(env.DB, 'facebook', profile);
+    const session = await createSession(env.DB, user.id);
+    const response = redirect(`${url.origin}/?auth=facebook_success`);
+    response.headers.append('Set-Cookie', sessionCookie(session.id, session.expiresAt, url));
+    response.headers.append('Set-Cookie', expiredFacebookOAuthStateCookie(url));
+    return response;
+  } catch (error) {
+    console.error('Facebook login failed', error);
+    return redirectWithAuthError(url, 'facebook_login_failed');
+  }
+}
+
+async function exchangeFacebookCode(env, url, code) {
+  const tokenUrl = new URL(`https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/oauth/access_token`);
+  tokenUrl.searchParams.set('client_id', env.FACEBOOK_APP_ID);
+  tokenUrl.searchParams.set('client_secret', env.FACEBOOK_APP_SECRET);
+  tokenUrl.searchParams.set('code', code);
+  tokenUrl.searchParams.set('redirect_uri', facebookRedirectUri(url));
+
+  const response = await fetch(tokenUrl.toString());
+  const token = await response.json().catch(() => ({}));
+  if (!response.ok || !token.access_token) {
+    throw new HttpError(502, 'Facebook Anmeldung fehlgeschlagen.');
+  }
+  return token;
+}
+
+async function fetchFacebookProfile(accessToken) {
+  const profileUrl = new URL(`https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/me`);
+  profileUrl.searchParams.set('fields', 'id,name,email');
+  profileUrl.searchParams.set('access_token', accessToken);
+
+  const response = await fetch(profileUrl.toString());
+  const profile = await response.json().catch(() => ({}));
+
+  if (!response.ok || !profile.id || !profile.email) {
+    throw new HttpError(502, 'Facebook Anmeldung fehlgeschlagen.');
+  }
+
+  return {
+    providerUserId: String(profile.id),
+    email: String(profile.email).trim().toLowerCase(),
+    name: String(profile.name || profile.email).trim(),
+  };
 }
 
 async function exchangeGoogleCode(env, url, code) {
@@ -569,15 +660,15 @@ async function fetchGoogleProfile(accessToken) {
   };
 }
 
-async function findOrCreateGoogleUser(db, profile) {
+async function findOrCreateOAuthUser(db, provider, profile) {
   const linked = await db
     .prepare(
       `SELECT users.*
        FROM oauth_accounts
        JOIN users ON users.id = oauth_accounts.user_id
-       WHERE oauth_accounts.provider = 'google' AND oauth_accounts.provider_user_id = ?`,
+       WHERE oauth_accounts.provider = ? AND oauth_accounts.provider_user_id = ?`,
     )
-    .bind(profile.providerUserId)
+    .bind(provider, profile.providerUserId)
     .first();
 
   const now = new Date().toISOString();
@@ -585,7 +676,7 @@ async function findOrCreateGoogleUser(db, profile) {
     await db.batch([
       db
         .prepare('UPDATE oauth_accounts SET email = ?, updated_at = ? WHERE provider = ? AND provider_user_id = ?')
-        .bind(profile.email, now, 'google', profile.providerUserId),
+        .bind(profile.email, now, provider, profile.providerUserId),
       db
         .prepare('UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?')
         .bind(now, now, linked.id),
@@ -599,7 +690,7 @@ async function findOrCreateGoogleUser(db, profile) {
       db
         .prepare('UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?')
         .bind(now, now, existing.id),
-      googleAccountInsert(db, existing.id, profile, now),
+      oauthAccountInsert(db, existing.id, provider, profile, now),
     ]);
     return { ...existing, email_verified_at: existing.email_verified_at || now, updated_at: now };
   }
@@ -615,12 +706,7 @@ async function findOrCreateGoogleUser(db, profile) {
          VALUES (?, ?, ?, 'user', ?, ?, ?, 0, ?, ?, ?)`,
       )
       .bind(userId, userName, profile.email, password.salt, password.hash, now, DEFAULT_TOURNAMENT_LIMIT, now, now),
-    db
-      .prepare(
-        `INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, email, created_at, updated_at)
-         VALUES (?, ?, 'google', ?, ?, ?, ?)`,
-      )
-      .bind(crypto.randomUUID(), userId, profile.providerUserId, profile.email, now, now),
+    oauthAccountInsert(db, userId, provider, profile, now),
   ]);
 
   return {
@@ -636,13 +722,13 @@ async function findOrCreateGoogleUser(db, profile) {
   };
 }
 
-function googleAccountInsert(db, userId, profile, now) {
+function oauthAccountInsert(db, userId, provider, profile, now) {
   return db
     .prepare(
       `INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, email, created_at, updated_at)
-       VALUES (?, ?, 'google', ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(crypto.randomUUID(), userId, profile.providerUserId, profile.email, now, now);
+    .bind(crypto.randomUUID(), userId, provider, profile.providerUserId, profile.email, now, now);
 }
 
 async function registerUser(request, env, url) {
@@ -2255,6 +2341,16 @@ function expiredGoogleOAuthStateCookie(url) {
   return `${GOOGLE_OAUTH_STATE_COOKIE}=; Path=/api/auth/google; HttpOnly; SameSite=Lax${secure}; Max-Age=0`;
 }
 
+function facebookOAuthStateCookie(value, url) {
+  const secure = !url || url.protocol === 'https:' ? '; Secure' : '';
+  return `${FACEBOOK_OAUTH_STATE_COOKIE}=${value}; Path=/api/auth/facebook; HttpOnly; SameSite=Lax${secure}; Max-Age=${FACEBOOK_OAUTH_STATE_TTL_SECONDS}`;
+}
+
+function expiredFacebookOAuthStateCookie(url) {
+  const secure = !url || url.protocol === 'https:' ? '; Secure' : '';
+  return `${FACEBOOK_OAUTH_STATE_COOKIE}=; Path=/api/auth/facebook; HttpOnly; SameSite=Lax${secure}; Max-Age=0`;
+}
+
 function json(payload, status = 200, headers = {}) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -2282,11 +2378,16 @@ function redirect(location, status = 302, headers = {}) {
 function redirectWithAuthError(url, error) {
   const response = redirect(`${url.origin}/?auth_error=${encodeURIComponent(error)}`);
   response.headers.append('Set-Cookie', expiredGoogleOAuthStateCookie(url));
+  response.headers.append('Set-Cookie', expiredFacebookOAuthStateCookie(url));
   return response;
 }
 
 function googleRedirectUri(url) {
   return `${url.origin}/api/auth/google/callback`;
+}
+
+function facebookRedirectUri(url) {
+  return `${url.origin}/api/auth/facebook/callback`;
 }
 
 function withSecurityHeaders(response, url) {

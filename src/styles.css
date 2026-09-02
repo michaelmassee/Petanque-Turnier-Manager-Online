@@ -263,6 +263,41 @@ textarea:focus {
   font-weight: 900;
 }
 
+.facebook-login-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 40px;
+  border: 1px solid #c7d0df;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172033;
+  padding: 8px 14px;
+  font-weight: 800;
+}
+
+.facebook-login-button:hover,
+.facebook-login-button:focus-visible {
+  border-color: #1877f2;
+  background: #f5f9ff;
+}
+
+.facebook-login-button:focus-visible {
+  outline: 3px solid rgb(24 119 242 / 18%);
+}
+
+.facebook-login-button span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #1877f2;
+  color: #ffffff;
+  font-weight: 900;
+}
+
 .feedback {
   margin: 16px auto;
   max-width: 1180px;
