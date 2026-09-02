@@ -628,12 +628,32 @@ textarea:focus {
   background: #d7deea;
 }
 
-.home-finder-stats div {
+.home-finder-stats button {
   display: grid;
   align-content: center;
   min-height: 72px;
   padding: 18px;
   background: #ffffff;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.home-finder-stats button:hover:not(:disabled) {
+  background: #f7fbff;
+}
+
+.home-finder-stats button:focus-visible {
+  outline: 3px solid rgb(22 119 255 / 18%);
+  outline-offset: -3px;
+}
+
+.home-finder-stats button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .home-finder-stats strong {

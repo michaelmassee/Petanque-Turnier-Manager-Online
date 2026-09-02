@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const ROLES = [
   { value: 'admin', label: 'Admin' },
@@ -1044,6 +1044,11 @@ export default function App() {
             setAuthView('publicRegistration');
             clearFeedback();
           }}
+          onOpenFilters={() => {
+            setSearchMenuOpen(true);
+            setHomeFilterOpen(true);
+          }}
+          onOpenRadiusSearch={() => setSearchMenuOpen(true)}
         />
 
         {authView !== 'home' && (
@@ -1319,6 +1324,11 @@ export default function App() {
             setAuthView('publicRegistration');
             clearFeedback();
           }}
+          onOpenFilters={() => {
+            setSearchMenuOpen(true);
+            setHomeFilterOpen(true);
+          }}
+          onOpenRadiusSearch={() => setSearchMenuOpen(true)}
         />
       )}
 
@@ -2262,6 +2272,8 @@ function HomeTournaments({
   onLoadMore,
   onRegister,
   onOpenTournament,
+  onOpenFilters,
+  onOpenRadiusSearch,
 }) {
   const activeFilterCount = [
     showMineFilter && onlyMine,
@@ -2271,6 +2283,7 @@ function HomeTournaments({
   ].filter(Boolean).length;
   const nextTournament = tournaments[0] || null;
   const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);
+  const resultsRef = useRef(null);
 
   return (
     <section className="home-tournaments">
@@ -2281,19 +2294,36 @@ function HomeTournaments({
           <p className="subtitle">Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.</p>
         </div>
         <div className="home-finder-stats" aria-label="Turniersuche Übersicht">
-          <div>
+          <button
+            type="button"
+            onClick={() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            aria-label={`${total} gefundene Turniere – zur Liste springen`}
+          >
             <strong>{total}</strong>
             <span>Gefundene Turniere</span>
-          </div>
-          <div>
+          </button>
+          <button
+            type="button"
+            onClick={() => nextTournament && onOpenTournament(nextTournament)}
+            disabled={!nextTournament}
+            aria-label={
+              nextTournament
+                ? `Nächster Termin ${formatDate(nextTournament.date)} – Turnier öffnen`
+                : 'Kein nächster Termin'
+            }
+          >
             <strong>{nextTournament ? formatDate(nextTournament.date) : 'keiner'}</strong>
             <span>Nächster Termin</span>
-          </div>
-          <div>
+          </button>
+          <button
+            type="button"
+            onClick={onOpenFilters}
+            aria-label={`${activeFilterCount > 0 ? 'Filter aktiv' : 'Keine Filter aktiv'} – Filter öffnen`}
+          >
             <strong>{activeFilterCount > 0 ? 'Filter aktiv' : 'Keine Filter aktiv'}</strong>
             <span>Finder</span>
-          </div>
-          <div>
+          </button>
+          <button type="button" onClick={onOpenRadiusSearch} aria-label="Umkreissuche öffnen">
             <strong>
               {searchOrigin ? (
                 <>
@@ -2312,11 +2342,11 @@ function HomeTournaments({
                 'Umkreis'
               )}
             </span>
-          </div>
+          </button>
         </div>
       </div>
 
-      <div className="section-title home-results-title">
+      <div className="section-title home-results-title" ref={resultsRef}>
         <p className="eyebrow">Alle passenden Turniere</p>
         <span className="counter">{total}</span>
       </div>
