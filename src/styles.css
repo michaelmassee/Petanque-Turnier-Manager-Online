@@ -658,37 +658,50 @@ textarea:focus {
 
 .home-finder-stats {
   display: grid;
-  gap: 1px;
-  overflow: hidden;
-  background: #d7deea;
+  gap: 10px;
+  padding: 10px;
+  background: transparent;
+  border: 0;
 }
 
 .home-finder-stats button {
   display: grid;
   align-content: center;
   min-height: 72px;
-  padding: 18px;
+  padding: 16px 18px;
   background: #ffffff;
-  border: 0;
+  border: 1px solid #c7d0df;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgb(23 32 51 / 6%);
   color: inherit;
   text-align: left;
   font: inherit;
   cursor: pointer;
-  transition: background-color 140ms ease;
+  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .home-finder-stats button:hover:not(:disabled) {
   background: #f7fbff;
+  border-color: #1677ff;
+  box-shadow: 0 4px 10px rgb(22 119 255 / 14%);
+  transform: translateY(-1px);
+}
+
+.home-finder-stats button:active:not(:disabled) {
+  background: #eef6ff;
+  box-shadow: 0 1px 2px rgb(23 32 51 / 8%);
+  transform: translateY(0);
 }
 
 .home-finder-stats button:focus-visible {
   outline: 3px solid rgb(22 119 255 / 18%);
-  outline-offset: -3px;
+  outline-offset: 2px;
 }
 
 .home-finder-stats button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+  box-shadow: none;
 }
 
 .home-finder-stats strong {
