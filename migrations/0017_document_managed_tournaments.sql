@@ -1,0 +1,1 @@
+ALTER TABLE tournaments ADD COLUMN document_managed INTEGER NOT NULL DEFAULT 0;

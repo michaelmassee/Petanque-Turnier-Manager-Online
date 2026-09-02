@@ -2542,7 +2542,11 @@ function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete })
             </div>
             {tournament.canManage && (
               <div className="row-actions">
-                <Button variant="secondary" onClick={() => onEdit(tournament)}>Bearbeiten</Button>
+                {tournament.documentManaged ? (
+                  <span className="muted">Eckdaten im Turnierdokument</span>
+                ) : (
+                  <Button variant="secondary" onClick={() => onEdit(tournament)}>Bearbeiten</Button>
+                )}
                 <Button variant="danger" onClick={() => onDelete(tournament)}>Löschen</Button>
               </div>
             )}
@@ -3530,6 +3534,7 @@ async function api(path, options = {}) {
 
 const TRANSLATIONS = {
   nl: {
+    'Eckdaten im Turnierdokument': 'Toernooigegevens in het toernooidocument',
     'App wird geladen.': 'App wordt geladen.',
     'Ersten Admin anlegen': 'Eerste admin aanmaken',
     'Passwort vergessen': 'Wachtwoord vergeten',
@@ -3874,6 +3879,7 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   en: {
+    'Eckdaten im Turnierdokument': 'Tournament details in the tournament document',
     'App wird geladen.': 'App is loading.',
     'Ersten Admin anlegen': 'Create first admin',
     'Passwort vergessen': 'Forgot password',
@@ -4218,6 +4224,7 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   es: {
+    'Eckdaten im Turnierdokument': 'Datos del torneo en el documento del torneo',
     'App wird geladen.': 'La app se está cargando.',
     'Ersten Admin anlegen': 'Crear primer admin',
     'Passwort vergessen': 'Contraseña olvidada',
@@ -4562,6 +4569,7 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   fr: {
+    'Eckdaten im Turnierdokument': 'Informations du tournoi dans le document du tournoi',
     'App wird geladen.': 'Chargement de l’application.',
     'Ersten Admin anlegen': 'Créer le premier admin',
     'Passwort vergessen': 'Mot de passe oublié',

@@ -359,6 +359,17 @@ export default {
         return await syncPostResults(request, env.DB, tournament.id);
       }
 
+      const syncMetadataMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/metadata$/);
+      if (syncMetadataMatch && request.method === 'PUT') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getTournamentById(env.DB, syncMetadataMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Tournament not found');
+        }
+        assertCanManageTournament(tournament, auth.user);
+        return await syncPutTournamentMetadata(request, env.DB, tournament, auth.user);
+      }
+
       return json({ error: 'Not found' }, 404);
     } catch (error) {
       if (error instanceof HttpError) {
@@ -1265,6 +1276,9 @@ async function createTournament(request, db, user) {
 }
 
 async function updateTournament(request, db, existing, user) {
+  if (Number(existing.document_managed || 0) === 1) {
+    throw new HttpError(409, 'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.');
+  }
   const body = await readJson(request);
   const tournament = normalizeTournamentInput(body);
   const now = new Date().toISOString();
@@ -1307,6 +1321,32 @@ async function updateTournament(request, db, existing, user) {
       existing.id,
     )
     .run();
+
+  const updated = await getTournamentById(db, existing.id);
+  return json({ tournament: toPublicTournament(updated, user) });
+}
+
+/** PTM Calc is the exclusive writer for the metadata of a linked tournament. */
+async function syncPutTournamentMetadata(request, db, existing, user) {
+  const body = await readJson(request);
+  const tournament = normalizeTournamentInput(body);
+  const now = new Date().toISOString();
+  const geo = await resolveTournamentGeolocation(tournament, existing, now);
+
+  await db.prepare(
+    `UPDATE tournaments
+     SET name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?, formation = ?,
+         status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?, contact_name = ?,
+         contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?, participants_public = ?,
+         license_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, document_managed = 1, updated_at = ?
+     WHERE id = ?`,
+  ).bind(
+    tournament.name, tournament.date, tournament.startTime, tournament.location, tournament.description,
+    tournament.type, tournament.formation, tournament.status, tournament.maxRegistrations,
+    tournament.registrationDeadline, tournament.entryFeeCents, tournament.contactName, tournament.contactEmail,
+    tournament.contactPhone, tournament.visibility, tournament.internalNotes, tournament.participantsPublic ? 1 : 0,
+    tournament.licenseRequired ? 1 : 0, geo.latitude, geo.longitude, geo.geocodedAt, now, existing.id,
+  ).run();
 
   const updated = await getTournamentById(db, existing.id);
   return json({ tournament: toPublicTournament(updated, user) });
@@ -2262,6 +2302,7 @@ function toPublicTournament(row, user) {
     internalNotes: canManageTournament(row, user) ? row.internal_notes : null,
     participantsPublic: Boolean(Number(row.participants_public)),
     licenseRequired: Boolean(Number(row.license_required || 0)),
+    documentManaged: Boolean(Number(row.document_managed || 0)),
     activeRegistrations: Number(row.active_registrations || 0),
     waitlistRegistrations: Number(row.waitlist_registrations || 0),
     canManage: canManageTournament(row, user),
