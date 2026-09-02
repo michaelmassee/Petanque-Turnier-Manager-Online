@@ -3,12 +3,17 @@
   "name": "petanque-turnier-manager-online",
   "main": "src/worker.js",
   "compatibility_date": "2026-07-31",
+  "workers_dev": true,
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist",
     "not_found_handling": "single-page-application",
     "run_worker_first": true
   },
+  "routes": [
+    { "pattern": "ptmonline.org", "custom_domain": true },
+    { "pattern": "www.ptmonline.org", "custom_domain": true }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
