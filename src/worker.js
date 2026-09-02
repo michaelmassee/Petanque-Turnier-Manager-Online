@@ -91,6 +91,12 @@ const PWA_INSTALL_PATHS = ['/manifest.webmanifest', '/service-worker.js'];
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.hostname === 'www.ptmonline.org') {
+      url.hostname = 'ptmonline.org';
+      return redirect(url.toString(), 301);
+    }
+
     const isPwaInstallAsset = PWA_INSTALL_PATHS.includes(url.pathname) || url.pathname.startsWith('/icons/');
 
     if (!isPwaInstallAsset) {
