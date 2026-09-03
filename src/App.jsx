@@ -2093,7 +2093,7 @@ function TournamentDetailPage({
         </nav>
 
         <div className="tournament-detail-content">
-          {route.view === 'info' && <TournamentInfo tournament={tournament} />}
+          {route.view === 'info' && <TournamentInfo tournament={tournament} language={language} />}
 
           {route.view === 'anmelden' && canRegister && (
             <PublicRegistrationPanel
@@ -2120,8 +2120,11 @@ function TournamentDetailPage({
   );
 }
 
-function TournamentInfo({ tournament }) {
+function TournamentInfo({ tournament, language }) {
   const mapsUrl = googleMapsUrl(tournament);
+  const freeSlots = tournament.maxRegistrations
+    ? Math.max(tournament.maxRegistrations - tournament.activeRegistrations, 0)
+    : null;
 
   return (
     <div className="panel">
@@ -2162,7 +2165,13 @@ function TournamentInfo({ tournament }) {
         </p>
       )}
       <p>
-        <strong>Max. Meldungen</strong>: {tournament.maxRegistrations || '∞'}
+        <strong>{translateText('Max. Meldungen', language)}</strong>: {tournament.maxRegistrations || '∞'}
+      </p>
+      <p>
+        <strong>{translateText('Noch frei', language)}</strong>: {freeSlots === null ? '∞' : freeSlots}
+      </p>
+      <p>
+        <strong>{translateText('Warteliste', language)}</strong>: {tournament.waitlistRegistrations || 0}
       </p>
       {(tournament.contactName || tournament.contactEmail || tournament.contactPhone) && (
         <p>
@@ -3892,6 +3901,7 @@ const TRANSLATIONS = {
     Status: 'Status',
     Sichtbarkeit: 'Zichtbaarheid',
     'Max. Meldungen': 'Max. inschrijvingen',
+    'Noch frei': 'Nog vrij',
     'Startgeld EUR': 'Inschrijfgeld EUR',
     Meldefrist: 'Inschrijfdeadline',
     Kontaktname: 'Contactnaam',
@@ -4259,6 +4269,7 @@ const TRANSLATIONS = {
     Status: 'Status',
     Sichtbarkeit: 'Visibility',
     'Max. Meldungen': 'Max. registrations',
+    'Noch frei': 'Spots free',
     'Startgeld EUR': 'Entry fee EUR',
     Meldefrist: 'Registration deadline',
     Kontaktname: 'Contact name',
@@ -4626,6 +4637,7 @@ const TRANSLATIONS = {
     Status: 'Estado',
     Sichtbarkeit: 'Visibilidad',
     'Max. Meldungen': 'Máx. inscripciones',
+    'Noch frei': 'Plazas libres',
     'Startgeld EUR': 'Cuota EUR',
     Meldefrist: 'Fecha límite',
     Kontaktname: 'Contacto',
@@ -4993,6 +5005,7 @@ const TRANSLATIONS = {
     Status: 'Statut',
     Sichtbarkeit: 'Visibilité',
     'Max. Meldungen': 'Max. inscriptions',
+    'Noch frei': 'Places libres',
     'Startgeld EUR': 'Frais EUR',
     Meldefrist: 'Date limite',
     Kontaktname: 'Contact',
