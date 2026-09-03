@@ -568,6 +568,23 @@ export default function App() {
     }
   }
 
+  async function handleResendVerification(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+
+    try {
+      const data = await api('/api/email/resend', {
+        method: 'POST',
+        body: JSON.stringify({ email: authForm.email, language }),
+      });
+      setMessage(data.verificationUrl ? `${data.message} ${data.verificationUrl}` : data.message);
+      setAuthForm(EMPTY_AUTH_FORM);
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
   async function handleResetPassword(event) {
     event.preventDefault();
     setError('');
@@ -1072,6 +1089,10 @@ export default function App() {
                   setAuthView('register');
                   clearFeedback();
                 }}
+                onResendVerification={() => {
+                  setAuthView('resendVerification');
+                  clearFeedback();
+                }}
               />
             )}
 
@@ -1094,6 +1115,10 @@ export default function App() {
                   setAuthView('login');
                   clearFeedback();
                 }}
+                onResendVerification={() => {
+                  setAuthView('resendVerification');
+                  clearFeedback();
+                }}
               />
             )}
 
@@ -1102,6 +1127,18 @@ export default function App() {
                 form={authForm}
                 setForm={setAuthForm}
                 onSubmit={handleForgotPassword}
+                onBack={() => {
+                  setAuthView('login');
+                  clearFeedback();
+                }}
+              />
+            )}
+
+            {authView === 'resendVerification' && (
+              <ResendVerificationForm
+                form={authForm}
+                setForm={setAuthForm}
+                onSubmit={handleResendVerification}
                 onBack={() => {
                   setAuthView('login');
                   clearFeedback();
@@ -1504,7 +1541,7 @@ function SetupForm({ form, setForm, onSubmit }) {
   );
 }
 
-function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, onRegister }) {
+function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, onRegister, onResendVerification }) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
@@ -1519,6 +1556,9 @@ function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, onRegiste
       </button>
       <button className="link-button" type="button" onClick={onForgot}>
         Passwort vergessen?
+      </button>
+      <button className="link-button" type="button" onClick={onResendVerification}>
+        Bestätigungs-E-Mail nicht erhalten?
       </button>
     </form>
   );
@@ -1546,7 +1586,7 @@ function RegisterForm({ form, setForm, onSubmit, onBack, navigate }) {
   );
 }
 
-function RegisterSuccessNotice({ onBack }) {
+function RegisterSuccessNotice({ onBack, onResendVerification }) {
   return (
     <div className="form">
       <p className="hint">
@@ -1555,6 +1595,9 @@ function RegisterSuccessNotice({ onBack }) {
       <Button type="button" onClick={onBack}>
         Zurück zur Anmeldung
       </Button>
+      <button className="link-button" type="button" onClick={onResendVerification}>
+        Bestätigungs-E-Mail nicht erhalten?
+      </button>
     </div>
   );
 }
@@ -1564,6 +1607,18 @@ function ForgotPasswordForm({ form, setForm, onSubmit, onBack }) {
     <form className="form" onSubmit={onSubmit}>
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <Button type="submit">Reset-Link anfordern</Button>
+      <button className="link-button" type="button" onClick={onBack}>
+        Zurück zur Anmeldung
+      </button>
+    </form>
+  );
+}
+
+function ResendVerificationForm({ form, setForm, onSubmit, onBack }) {
+  return (
+    <form className="form" onSubmit={onSubmit}>
+      <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+      <Button type="submit">Bestätigungslink erneut senden</Button>
       <button className="link-button" type="button" onClick={onBack}>
         Zurück zur Anmeldung
       </button>
@@ -3084,6 +3139,9 @@ function authTitle(needsSetup, authView) {
   if (authView === 'verify') {
     return 'E-Mail bestätigen';
   }
+  if (authView === 'resendVerification') {
+    return 'Bestätigungslink erneut anfordern';
+  }
   if (authView === 'publicRegistration') {
     return 'Turnieranmeldung';
   }
@@ -3108,6 +3166,9 @@ function authSubtitle(needsSetup, authView) {
   }
   if (authView === 'verify') {
     return 'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.';
+  }
+  if (authView === 'resendVerification') {
+    return 'Fordere einen neuen Bestätigungslink für dein Benutzerkonto an.';
   }
   if (authView === 'publicRegistration') {
     return 'Melde dich für ein öffentliches Turnier an.';
@@ -3586,6 +3647,12 @@ const TRANSLATIONS = {
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Wijzig je wachtwoord voordat je verdergaat.',
     'Bestätigungs-Token ist erforderlich': 'Bevestigingstoken is verplicht',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'Bevestigingslink is ongeldig of verlopen',
+    'Bestätigungs-E-Mail nicht erhalten?': 'Geen bevestigingsmail ontvangen?',
+    'Bestätigungslink erneut senden': 'Bevestigingslink opnieuw versturen',
+    'Bestätigungslink erneut anfordern': 'Bevestigingslink opnieuw aanvragen',
+    'Fordere einen neuen Bestätigungslink für dein Benutzerkonto an.': 'Vraag een nieuwe bevestigingslink voor je account aan.',
+    'Wenn ein unbestätigtes Konto mit dieser E-Mail-Adresse existiert, wurde ein neuer Bestätigungslink gesendet.':
+      'Als er een onbevestigd account met dit e-mailadres bestaat, is een nieuwe bevestigingslink verstuurd.',
     'Die Passwörter stimmen nicht überein.': 'De wachtwoorden komen niet overeen.',
     'Mein Profil': 'Mijn profiel',
     'Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.': 'Bewerk je naam, e-mailadres en wachtwoord.',
@@ -3931,6 +3998,12 @@ const TRANSLATIONS = {
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Please change your password before continuing.',
     'Bestätigungs-Token ist erforderlich': 'Verification token is required',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'Verification link is invalid or expired',
+    'Bestätigungs-E-Mail nicht erhalten?': "Didn't receive the confirmation email?",
+    'Bestätigungslink erneut senden': 'Resend verification link',
+    'Bestätigungslink erneut anfordern': 'Request verification link again',
+    'Fordere einen neuen Bestätigungslink für dein Benutzerkonto an.': 'Request a new verification link for your account.',
+    'Wenn ein unbestätigtes Konto mit dieser E-Mail-Adresse existiert, wurde ein neuer Bestätigungslink gesendet.':
+      'If an unverified account exists with this email address, a new verification link has been sent.',
     'Die Passwörter stimmen nicht überein.': 'The passwords do not match.',
     'Mein Profil': 'My profile',
     'Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.': 'Edit your name, email address and password.',
@@ -4276,6 +4349,12 @@ const TRANSLATIONS = {
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Cambia tu contraseña antes de continuar.',
     'Bestätigungs-Token ist erforderlich': 'El token de confirmación es obligatorio',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'El enlace de confirmación no es válido o ha caducado',
+    'Bestätigungs-E-Mail nicht erhalten?': '¿No recibiste el correo de confirmación?',
+    'Bestätigungslink erneut senden': 'Reenviar enlace de confirmación',
+    'Bestätigungslink erneut anfordern': 'Solicitar de nuevo el enlace de confirmación',
+    'Fordere einen neuen Bestätigungslink für dein Benutzerkonto an.': 'Solicita un nuevo enlace de confirmación para tu cuenta.',
+    'Wenn ein unbestätigtes Konto mit dieser E-Mail-Adresse existiert, wurde ein neuer Bestätigungslink gesendet.':
+      'Si existe una cuenta no confirmada con esta dirección de correo, se ha enviado un nuevo enlace de confirmación.',
     'Die Passwörter stimmen nicht überein.': 'Las contraseñas no coinciden.',
     'Mein Profil': 'Mi perfil',
     'Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.': 'Edita tu nombre, tu correo electrónico y tu contraseña.',
@@ -4621,6 +4700,12 @@ const TRANSLATIONS = {
     'Bitte ändere dein Passwort, bevor du fortfährst.': 'Modifie ton mot de passe avant de continuer.',
     'Bestätigungs-Token ist erforderlich': 'Le jeton de confirmation est obligatoire',
     'Bestätigungs-Link ist ungültig oder abgelaufen': 'Le lien de confirmation est invalide ou expiré',
+    'Bestätigungs-E-Mail nicht erhalten?': 'Tu n’as pas reçu l’e-mail de confirmation ?',
+    'Bestätigungslink erneut senden': 'Renvoyer le lien de confirmation',
+    'Bestätigungslink erneut anfordern': 'Redemander le lien de confirmation',
+    'Fordere einen neuen Bestätigungslink für dein Benutzerkonto an.': 'Demande un nouveau lien de confirmation pour ton compte.',
+    'Wenn ein unbestätigtes Konto mit dieser E-Mail-Adresse existiert, wurde ein neuer Bestätigungslink gesendet.':
+      'Si un compte non confirmé existe avec cette adresse e-mail, un nouveau lien de confirmation a été envoyé.',
     'Die Passwörter stimmen nicht überein.': 'Les mots de passe ne correspondent pas.',
     'Mein Profil': 'Mon profil',
     'Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.': 'Modifie ton nom, ton adresse e-mail et ton mot de passe.',

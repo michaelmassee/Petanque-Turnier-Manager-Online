@@ -31,6 +31,7 @@ const LOGIN_RATE_LIMIT_MAX_PER_IP = 20;
 const GEOCODE_RATE_LIMIT_WINDOW_SECONDS = 60 * 15;
 const GEOCODE_RATE_LIMIT_MAX_PER_IP = 30;
 const EMAIL_VERIFICATION_TTL_SECONDS = 60 * 60 * 24;
+const EMAIL_RESEND_COOLDOWN_SECONDS = 60;
 // Changing this invalidates every stored password_hash (verifyPassword re-derives with the
 // current value). Any seeded/test users must be re-hashed and re-seeded after a change.
 const PASSWORD_ITERATIONS = 100000;
@@ -158,6 +159,10 @@ export default {
 
       if (request.method === 'POST' && url.pathname === '/api/email/verify') {
         return await verifyEmail(request, env.DB);
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/email/resend') {
+        return await resendVerificationEmail(request, env, url);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/password/forgot') {
@@ -839,6 +844,43 @@ async function verifyEmail(request, db) {
   ]);
 
   return json({ ok: true });
+}
+
+async function resendVerificationEmail(request, env, url) {
+  const db = env.DB;
+  const body = await readJson(request);
+  const email = String(body.email || '').trim().toLowerCase();
+  const language = normalizeLanguage(body.language);
+
+  if (!email) {
+    throw new HttpError(400, 'Email is required');
+  }
+
+  const response = {
+    message: 'Wenn ein unbestätigtes Konto mit dieser E-Mail-Adresse existiert, wurde ein neuer Bestätigungslink gesendet.',
+  };
+
+  const row = await db.prepare('SELECT id, email_verified_at FROM users WHERE email = ?').bind(email).first();
+  if (!row || row.email_verified_at) {
+    return json(response);
+  }
+
+  const lastToken = await db
+    .prepare('SELECT created_at FROM email_verification_tokens WHERE user_id = ? ORDER BY created_at DESC LIMIT 1')
+    .bind(row.id)
+    .first();
+
+  if (lastToken && Date.now() - new Date(lastToken.created_at).getTime() < EMAIL_RESEND_COOLDOWN_SECONDS * 1000) {
+    return json(response);
+  }
+
+  const verificationUrl = await createEmailVerification(db, env, url, row.id, email, language);
+
+  if (isLocalhost(url)) {
+    response.verificationUrl = verificationUrl;
+  }
+
+  return json(response);
 }
 
 async function createPasswordResetToken(db, userId) {
@@ -1950,6 +1992,11 @@ async function cleanupExpiredSessions(db) {
   await db.prepare('DELETE FROM login_attempts WHERE created_at <= ?').bind(attemptsCutoff).run();
   const geocodeAttemptsCutoff = new Date(Date.now() - GEOCODE_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
   await db.prepare('DELETE FROM geocode_attempts WHERE created_at <= ?').bind(geocodeAttemptsCutoff).run();
+  const unverifiedAccountCutoff = new Date(Date.now() - EMAIL_VERIFICATION_TTL_SECONDS * 1000).toISOString();
+  await db
+    .prepare('DELETE FROM users WHERE email_verified_at IS NULL AND created_at <= ?')
+    .bind(unverifiedAccountCutoff)
+    .run();
 }
 
 async function enforceLoginRateLimit(db, email, ip) {
