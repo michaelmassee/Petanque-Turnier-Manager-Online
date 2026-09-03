@@ -967,7 +967,6 @@ export default function App() {
         message={message}
         error={error}
         onLogout={handleLogout}
-        onTournamentUpdated={loadTournaments}
       />
     );
   }
@@ -1991,7 +1990,6 @@ function TournamentDetailPage({
   message,
   error,
   onLogout,
-  onTournamentUpdated,
 }) {
   const { tournament, notFound } = useRoutedTournament(route.id, tournaments);
 
@@ -2080,23 +2078,10 @@ function TournamentDetailPage({
               Teilnehmer
             </button>
           )}
-          {tournament.canManage && (
-            <button
-              className={`tournament-detail-tab ${route.view === 'praesentation' ? 'active' : ''}`}
-              type="button"
-              onClick={() => navigate(`/turniere/${tournament.id}/praesentation`)}
-            >
-              Präsentation
-            </button>
-          )}
         </nav>
 
         <div className="tournament-detail-content">
           {route.view === 'info' && <TournamentInfo tournament={tournament} />}
-
-          {route.view === 'praesentation' && tournament.canManage && (
-            <TournamentPresentationForm tournament={tournament} onSaved={onTournamentUpdated} />
-          )}
 
           {route.view === 'anmelden' && canRegister && (
             <PublicRegistrationPanel
@@ -2114,7 +2099,7 @@ function TournamentDetailPage({
               <p className="hint">
                 Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.
               </p>
-              <TournamentParticipants tournamentId={tournament.id} />
+              <TournamentParticipants tournamentId={tournament.id} logoUrl={tournament.logoUrl} />
             </>
           )}
         </div>
@@ -2128,16 +2113,6 @@ function TournamentInfo({ tournament }) {
 
   return (
     <div className="panel">
-      {tournament.logoUrl && (
-        <img
-          className="tournament-logo"
-          src={tournament.logoUrl}
-          alt=""
-          onError={(event) => {
-            event.target.style.display = 'none';
-          }}
-        />
-      )}
       <p>
         <strong>Datum</strong>: {formatDate(tournament.date)} {tournament.startTime || ''}
       </p>
@@ -2152,6 +2127,11 @@ function TournamentInfo({ tournament }) {
           Website öffnen
         </a>
       )}
+      {tournament.flyerUrl && (
+        <a className="button button-secondary" href={tournament.flyerUrl} target="_blank" rel="noreferrer">
+          Flyer öffnen
+        </a>
+      )}
       <p>
         <strong>Turniersystem</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
       </p>
@@ -2159,18 +2139,6 @@ function TournamentInfo({ tournament }) {
         <strong>Formation</strong>: {labelFor(FORMATIONS, tournament.formation)}
       </p>
       {tournament.description && <p>{tournament.description}</p>}
-      {tournament.flyerUrl && (
-        <a className="tournament-flyer-link" href={tournament.flyerUrl} target="_blank" rel="noreferrer">
-          <img
-            className="tournament-flyer"
-            src={tournament.flyerUrl}
-            alt=""
-            onError={(event) => {
-              event.target.parentElement.style.display = 'none';
-            }}
-          />
-        </a>
-      )}
       {Boolean(tournament.entryFeeCents) && (
         <p>
           <strong>Startgeld</strong>: {centsToEuro(tournament.entryFeeCents)} €
@@ -2193,103 +2161,7 @@ function TournamentInfo({ tournament }) {
   );
 }
 
-function TournamentPresentationForm({ tournament, onSaved }) {
-  const [form, setForm] = useState({
-    websiteUrl: tournament.websiteUrl || '',
-    logoUrl: tournament.logoUrl || '',
-    flyerUrl: tournament.flyerUrl || '',
-  });
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    setForm({
-      websiteUrl: tournament.websiteUrl || '',
-      logoUrl: tournament.logoUrl || '',
-      flyerUrl: tournament.flyerUrl || '',
-    });
-  }, [tournament.id, tournament.websiteUrl, tournament.logoUrl, tournament.flyerUrl]);
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setError('');
-    setMessage('');
-
-    try {
-      await api(`/api/tournaments/${tournament.id}/presentation`, {
-        method: 'PUT',
-        body: JSON.stringify(form),
-      });
-      setMessage('Präsentation wurde gespeichert.');
-      await onSaved?.();
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  return (
-    <div className="panel">
-      <p className="hint">
-        Website, Logo und Flyer sind unabhängig von den Turnier-Eckdaten und können auch bei
-        dokument-verwalteten Turnieren jederzeit hier gepflegt werden. Logo und Flyer werden als Link zu einem
-        bereits online gehosteten Bild eingebunden, nicht hochgeladen.
-      </p>
-      <form className="form dense" onSubmit={handleSubmit}>
-        <TextField
-          label="Website"
-          type="url"
-          placeholder="https://…"
-          value={form.websiteUrl}
-          onChange={(websiteUrl) => setForm({ ...form, websiteUrl })}
-        />
-        <TextField
-          label="Logo-Bildlink"
-          type="url"
-          placeholder="https://…"
-          value={form.logoUrl}
-          onChange={(logoUrl) => setForm({ ...form, logoUrl })}
-        />
-        {form.logoUrl && (
-          <img
-            className="tournament-logo-preview"
-            src={form.logoUrl}
-            alt=""
-            onError={(event) => {
-              event.target.style.display = 'none';
-            }}
-            onLoad={(event) => {
-              event.target.style.display = '';
-            }}
-          />
-        )}
-        <TextField
-          label="Flyer-Bildlink"
-          type="url"
-          placeholder="https://…"
-          value={form.flyerUrl}
-          onChange={(flyerUrl) => setForm({ ...form, flyerUrl })}
-        />
-        {form.flyerUrl && (
-          <img
-            className="tournament-flyer-preview"
-            src={form.flyerUrl}
-            alt=""
-            onError={(event) => {
-              event.target.style.display = 'none';
-            }}
-            onLoad={(event) => {
-              event.target.style.display = '';
-            }}
-          />
-        )}
-        <Feedback message={message} error={error} />
-        <Button type="submit">Präsentation speichern</Button>
-      </form>
-    </div>
-  );
-}
-
-function TournamentParticipants({ tournamentId }) {
+function TournamentParticipants({ tournamentId, logoUrl }) {
   const [participants, setParticipants] = useState(null);
   const [forbidden, setForbidden] = useState(false);
 
@@ -2312,20 +2184,47 @@ function TournamentParticipants({ tournamentId }) {
     };
   }, [tournamentId]);
 
+  const logo = logoUrl && (
+    <img
+      className="tournament-logo"
+      src={logoUrl}
+      alt=""
+      onError={(event) => {
+        event.target.style.display = 'none';
+      }}
+    />
+  );
+
   if (forbidden) {
-    return <p className="muted">Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.</p>;
+    return (
+      <>
+        {logo}
+        <p className="muted">Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.</p>
+      </>
+    );
   }
 
   if (!participants) {
-    return <p className="muted">Teilnehmerliste wird geladen…</p>;
+    return (
+      <>
+        {logo}
+        <p className="muted">Teilnehmerliste wird geladen…</p>
+      </>
+    );
   }
 
   if (!participants.length) {
-    return <p className="muted">Noch keine Anmeldungen.</p>;
+    return (
+      <>
+        {logo}
+        <p className="muted">Noch keine Anmeldungen.</p>
+      </>
+    );
   }
 
   return (
     <div className="participants-list">
+      {logo}
       {participants.map((participant, index) => (
         <article className="data-row participants-row" key={`${participant.firstName}-${participant.lastName}-${index}`}>
           <div>
@@ -3242,7 +3141,7 @@ function matchTournamentRoute(path) {
 
   const id = decodeURIComponent(segments[1]);
   const sub = segments[2] || 'info';
-  if (!['info', 'anmelden', 'teilnehmer', 'praesentation'].includes(sub)) {
+  if (!['info', 'anmelden', 'teilnehmer'].includes(sub)) {
     return null;
   }
 
