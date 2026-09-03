@@ -1014,6 +1014,21 @@ textarea:focus {
   gap: 14px;
 }
 
+.brand-link {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.brand-link:focus-visible {
+  outline: 3px solid rgb(22 119 255 / 18%);
+  outline-offset: 4px;
+}
+
 .brand-logo {
   width: 48px;
   height: auto;

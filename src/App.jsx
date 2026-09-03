@@ -1256,6 +1256,7 @@ export default function App() {
         }}
         onCloseMenu={() => setMenuOpen(false)}
         navigate={navigate}
+        onLogoClick={() => setActiveTab('home')}
         searchControl={
           activeTab === 'home' ? (
             <SearchMenuControl
@@ -1696,16 +1697,27 @@ function VerifyEmailForm({ form, setForm, onSubmit, onBack }) {
   );
 }
 
-function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, searchControl, children }) {
+function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, children }) {
   return (
     <header className="topbar">
-      <div className="brand">
+      <button
+        className="brand brand-link"
+        type="button"
+        onClick={() => {
+          onCloseMenu();
+          if (onLogoClick) {
+            onLogoClick();
+          } else if (navigate) {
+            navigate('/');
+          }
+        }}
+      >
         <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="brand-logo" />
         <div className="brand-text">
           <p className="eyebrow">Pétanque Turnier Manager Online</p>
           <h1>{heading}</h1>
         </div>
-      </div>
+      </button>
       <div className="topbar-actions">
         {searchControl}
         <button
