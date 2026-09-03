@@ -28,10 +28,17 @@ const RESET_TTL_SECONDS = 60 * 30;
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 60 * 15;
 const LOGIN_RATE_LIMIT_MAX_PER_EMAIL = 5;
 const LOGIN_RATE_LIMIT_MAX_PER_IP = 20;
+const GEOCODE_RATE_LIMIT_WINDOW_SECONDS = 60 * 15;
+const GEOCODE_RATE_LIMIT_MAX_PER_IP = 30;
 const EMAIL_VERIFICATION_TTL_SECONDS = 60 * 60 * 24;
 // Changing this invalidates every stored password_hash (verifyPassword re-derives with the
 // current value). Any seeded/test users must be re-hashed and re-seeded after a change.
 const PASSWORD_ITERATIONS = 100000;
+// Fixed salt/hash used to run a real PBKDF2 verification for unknown emails during login, so
+// the response time does not leak whether an email address is registered. Never used to
+// authenticate anything.
+const DUMMY_PASSWORD_SALT = 'aa8f6b0c2e9d4a3f1b7c5d6e8f9a0b1c';
+const DUMMY_PASSWORD_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
 const UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 const SECURITY_HEADERS = {
   'Content-Security-Policy':
@@ -249,6 +256,8 @@ export default {
       }
 
       if (request.method === 'POST' && url.pathname === '/api/geocode') {
+        const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+        await enforceGeocodeRateLimit(env.DB, ip);
         const body = await readJson(request);
         const result = await geocodeLocation(body.query);
         return json({
@@ -479,7 +488,12 @@ async function login(request, db, url) {
   await enforceLoginRateLimit(db, email, ip);
 
   const row = await db.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
-  if (!row || !(await verifyPassword(password, row.password_salt, row.password_hash))) {
+  // Always run a PBKDF2 verification, even for an unknown email, so response timing does not
+  // reveal whether the address is registered.
+  const passwordMatches = row
+    ? await verifyPassword(password, row.password_salt, row.password_hash)
+    : await verifyPassword(password, DUMMY_PASSWORD_SALT, DUMMY_PASSWORD_HASH);
+  if (!row || !passwordMatches) {
     await recordLoginAttempt(db, email, ip);
     throw new HttpError(401, 'Invalid login');
   }
@@ -1934,6 +1948,8 @@ async function cleanupExpiredSessions(db) {
   await db.prepare('DELETE FROM email_verification_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').bind(new Date().toISOString()).run();
   const attemptsCutoff = new Date(Date.now() - LOGIN_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
   await db.prepare('DELETE FROM login_attempts WHERE created_at <= ?').bind(attemptsCutoff).run();
+  const geocodeAttemptsCutoff = new Date(Date.now() - GEOCODE_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
+  await db.prepare('DELETE FROM geocode_attempts WHERE created_at <= ?').bind(geocodeAttemptsCutoff).run();
 }
 
 async function enforceLoginRateLimit(db, email, ip) {
@@ -1951,6 +1967,24 @@ async function enforceLoginRateLimit(db, email, ip) {
   if (Number(emailCount?.count || 0) >= LOGIN_RATE_LIMIT_MAX_PER_EMAIL || Number(ipCount?.count || 0) >= LOGIN_RATE_LIMIT_MAX_PER_IP) {
     throw new HttpError(429, 'Zu viele Anmeldeversuche. Bitte versuche es später erneut.');
   }
+}
+
+async function enforceGeocodeRateLimit(db, ip) {
+  const windowStart = new Date(Date.now() - GEOCODE_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
+
+  const ipCount = await db
+    .prepare('SELECT COUNT(*) AS count FROM geocode_attempts WHERE ip = ? AND created_at > ?')
+    .bind(ip, windowStart)
+    .first();
+
+  if (Number(ipCount?.count || 0) >= GEOCODE_RATE_LIMIT_MAX_PER_IP) {
+    throw new HttpError(429, 'Zu viele Geocoding-Anfragen. Bitte versuche es später erneut.');
+  }
+
+  await db
+    .prepare('INSERT INTO geocode_attempts (id, ip, created_at) VALUES (?, ?, ?)')
+    .bind(crypto.randomUUID(), ip, new Date().toISOString())
+    .run();
 }
 
 async function recordLoginAttempt(db, email, ip) {

@@ -21,6 +21,6 @@
     }
   ],
   "vars": {
-    "MAIL_FROM": "onboarding@resend.dev"
+    "MAIL_FROM": "noreply@ptmonline.org"
   }
 }
