@@ -675,6 +675,10 @@ export default function App() {
   }
 
   async function handleDeleteUser(user) {
+    if (!window.confirm(`Benutzer "${user.name}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) {
+      return;
+    }
+
     setError('');
     setMessage('');
 
@@ -711,6 +715,14 @@ export default function App() {
   }
 
   async function handleDeleteTournament(tournament) {
+    if (
+      !window.confirm(
+        `Turnier "${tournament.name}" wirklich löschen? Alle Anmeldungen dieses Turniers werden mitgelöscht und das kann nicht rückgängig gemacht werden.`,
+      )
+    ) {
+      return;
+    }
+
     setError('');
     setMessage('');
 
@@ -755,6 +767,11 @@ export default function App() {
   }
 
   async function handleDeleteRegistration(registration) {
+    const registrationLabel = [registration.firstName, registration.lastName].filter(Boolean).join(' ') || registration.teamName;
+    if (!window.confirm(`Anmeldung "${registrationLabel}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) {
+      return;
+    }
+
     setError('');
     setMessage('');
 
