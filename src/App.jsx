@@ -3080,6 +3080,32 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, passwordLabel, p
 }
 
 function TextField({ label, value, onChange, type = 'text', ...props }) {
+  const [passwordVisible, setPasswordVisible] = useState(false);
+
+  if (type === 'password') {
+    return (
+      <label>
+        {label}
+        <div className="password-field">
+          <input
+            type={passwordVisible ? 'text' : 'password'}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            {...props}
+          />
+          <button
+            className="password-toggle"
+            type="button"
+            onClick={() => setPasswordVisible((visible) => !visible)}
+            aria-label={passwordVisible ? 'Passwort verbergen' : 'Passwort anzeigen'}
+          >
+            {passwordVisible ? 'Verbergen' : 'Anzeigen'}
+          </button>
+        </div>
+      </label>
+    );
+  }
+
   return (
     <label>
       {label}
@@ -3738,6 +3764,10 @@ const TRANSLATIONS = {
     Name: 'Naam',
     'E-Mail': 'E-mail',
     Passwort: 'Wachtwoord',
+    Anzeigen: 'Tonen',
+    Verbergen: 'Verbergen',
+    'Passwort anzeigen': 'Wachtwoord tonen',
+    'Passwort verbergen': 'Wachtwoord verbergen',
     'Passwort bestätigen': 'Wachtwoord bevestigen',
     'Verein oder kurze Begründung': 'Vereniging of korte reden',
     'Admin anlegen': 'Admin aanmaken',
@@ -4101,6 +4131,10 @@ const TRANSLATIONS = {
     Name: 'Name',
     'E-Mail': 'Email',
     Passwort: 'Password',
+    Anzeigen: 'Show',
+    Verbergen: 'Hide',
+    'Passwort anzeigen': 'Show password',
+    'Passwort verbergen': 'Hide password',
     'Passwort bestätigen': 'Confirm password',
     'Verein oder kurze Begründung': 'Club or short reason',
     'Admin anlegen': 'Create admin',
@@ -4464,6 +4498,10 @@ const TRANSLATIONS = {
     Name: 'Nombre',
     'E-Mail': 'Correo',
     Passwort: 'Contraseña',
+    Anzeigen: 'Mostrar',
+    Verbergen: 'Ocultar',
+    'Passwort anzeigen': 'Mostrar contraseña',
+    'Passwort verbergen': 'Ocultar contraseña',
     'Passwort bestätigen': 'Confirmar contraseña',
     'Verein oder kurze Begründung': 'Club o breve motivo',
     'Admin anlegen': 'Crear admin',
@@ -4827,6 +4865,10 @@ const TRANSLATIONS = {
     Name: 'Nom',
     'E-Mail': 'E-mail',
     Passwort: 'Mot de passe',
+    Anzeigen: 'Afficher',
+    Verbergen: 'Masquer',
+    'Passwort anzeigen': 'Afficher le mot de passe',
+    'Passwort verbergen': 'Masquer le mot de passe',
     'Passwort bestätigen': 'Confirmer le mot de passe',
     'Verein oder kurze Begründung': 'Club ou courte justification',
     'Admin anlegen': 'Créer admin',

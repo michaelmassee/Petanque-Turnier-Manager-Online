@@ -195,6 +195,28 @@ textarea:focus {
   outline: 3px solid rgb(22 119 255 / 18%);
 }
 
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 84px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: #1677ff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
 .button {
   min-height: 40px;
   border-radius: 6px;
