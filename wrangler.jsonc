@@ -22,5 +22,8 @@
   ],
   "vars": {
     "MAIL_FROM": "noreply@ptmonline.org"
+  },
+  "triggers": {
+    "crons": ["0 6 * * *"]
   }
 }

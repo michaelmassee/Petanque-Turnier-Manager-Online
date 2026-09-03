@@ -97,9 +97,220 @@ const EMAIL_CHANGE_EMAILS = {
   },
 };
 
+const REGISTRATION_CONFIRMATION_EMAILS = {
+  de: {
+    subject: (name) => `Anmeldebestätigung: ${name}`,
+    text: (name, dateTimeLabel, location, link) =>
+      `Deine Anmeldung für "${name}" ist eingegangen.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.`,
+  },
+  nl: {
+    subject: (name) => `Inschrijvingsbevestiging: ${name}`,
+    text: (name, dateTimeLabel, location, link) =>
+      `Je inschrijving voor "${name}" is ontvangen.\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}\n\nAlle informatie over het toernooi:\n${link}\n\nEen agenda-afspraak vind je als bijlage bij deze e-mail.`,
+  },
+  en: {
+    subject: (name) => `Registration confirmation: ${name}`,
+    text: (name, dateTimeLabel, location, link) =>
+      `Your registration for "${name}" has been received.\n\nDate: ${dateTimeLabel}\nLocation: ${location}\n\nAll tournament details:\n${link}\n\nA calendar event is attached to this email.`,
+  },
+  es: {
+    subject: (name) => `Confirmación de inscripción: ${name}`,
+    text: (name, dateTimeLabel, location, link) =>
+      `Tu inscripción para "${name}" se ha recibido.\n\nFecha: ${dateTimeLabel}\nLugar: ${location}\n\nToda la información del torneo:\n${link}\n\nEncontrarás una cita de calendario adjunta a este correo.`,
+  },
+  fr: {
+    subject: (name) => `Confirmation d'inscription : ${name}`,
+    text: (name, dateTimeLabel, location, link) =>
+      `Ton inscription pour « ${name} » a bien été reçue.\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nUn rendez-vous de calendrier est joint à cet e-mail.`,
+  },
+};
+
+const TOURNAMENT_REMINDER_EMAILS = {
+  de: {
+    subject: (name) => `Erinnerung: ${name} in 2 Tagen`,
+    text: (name, dateTimeLabel, location, link) =>
+      `Nur noch 2 Tage bis "${name}"!\n\nTermin: ${dateTimeLabel}\nOrt: ${location}\n\nAlle Infos zum Turnier:\n${link}\n\nDen Kalendereintrag findest du im Anhang dieser E-Mail.`,
+  },
+  nl: {
+    subject: (name) => `Herinnering: ${name} over 2 dagen`,
+    text: (name, dateTimeLabel, location, link) =>
+      `Nog maar 2 dagen tot "${name}"!\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}\n\nAlle informatie over het toernooi:\n${link}\n\nDe agenda-afspraak vind je als bijlage bij deze e-mail.`,
+  },
+  en: {
+    subject: (name) => `Reminder: ${name} in 2 days`,
+    text: (name, dateTimeLabel, location, link) =>
+      `Only 2 days left until "${name}"!\n\nDate: ${dateTimeLabel}\nLocation: ${location}\n\nAll tournament details:\n${link}\n\nThe calendar event is attached to this email.`,
+  },
+  es: {
+    subject: (name) => `Recordatorio: ${name} en 2 días`,
+    text: (name, dateTimeLabel, location, link) =>
+      `¡Solo quedan 2 días para "${name}"!\n\nFecha: ${dateTimeLabel}\nLugar: ${location}\n\nToda la información del torneo:\n${link}\n\nEncontrarás la cita de calendario adjunta a este correo.`,
+  },
+  fr: {
+    subject: (name) => `Rappel : ${name} dans 2 jours`,
+    text: (name, dateTimeLabel, location, link) =>
+      `Plus que 2 jours avant « ${name} » !\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nLe rendez-vous de calendrier est joint à cet e-mail.`,
+  },
+};
+
+const EMAIL_LOCALES = { de: 'de-DE', nl: 'nl-NL', en: 'en-GB', es: 'es-ES', fr: 'fr-FR' };
+
+function formatTournamentDateTime(tournament, language) {
+  const locale = EMAIL_LOCALES[language] || EMAIL_LOCALES.de;
+  const date = new Date(`${tournament.date}T${tournament.start_time || '00:00'}:00`);
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    ...(tournament.start_time ? { timeStyle: 'short' } : {}),
+  }).format(date);
+}
+
+function icsEscapeText(value) {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n');
+}
+
+function icsCompactDate(date) {
+  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function icsCompactDateTime(date) {
+  return `${icsCompactDate(date)}T${String(date.getHours()).padStart(2, '0')}${String(date.getMinutes()).padStart(2, '0')}00`;
+}
+
+function buildTournamentIcs(tournament, appOrigin) {
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Petanque Turnier Manager Online//DE',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${tournament.id}@ptmonline.org`,
+    `DTSTAMP:${icsCompactDateTime(new Date())}Z`,
+  ];
+
+  if (tournament.start_time) {
+    const start = new Date(`${tournament.date}T${tournament.start_time}:00`);
+    const end = new Date(start.getTime() + 4 * 60 * 60 * 1000);
+    lines.push(`DTSTART;TZID=Europe/Berlin:${icsCompactDateTime(start)}`);
+    lines.push(`DTEND;TZID=Europe/Berlin:${icsCompactDateTime(end)}`);
+  } else {
+    const start = new Date(`${tournament.date}T00:00:00`);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    lines.push(`DTSTART;VALUE=DATE:${icsCompactDate(start)}`);
+    lines.push(`DTEND;VALUE=DATE:${icsCompactDate(end)}`);
+  }
+
+  lines.push(`SUMMARY:${icsEscapeText(tournament.name)}`);
+  lines.push(`LOCATION:${icsEscapeText(tournament.location)}`);
+  lines.push(`DESCRIPTION:${icsEscapeText(`${appOrigin}/turniere/${tournament.id}/info`)}`);
+  lines.push('END:VEVENT');
+  lines.push('END:VCALENDAR');
+
+  return lines.join('\r\n');
+}
+
+function base64Encode(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+/**
+ * A registration email doesn't necessarily belong to a platform account (most public
+ * registrants are guests). If their email matches a known user, honor that account's language;
+ * otherwise fall back to the tournament creator's language rather than a hardcoded default, since
+ * that's the best available signal for who a given tournament's guest audience is.
+ */
+async function resolveEmailLanguage(db, tournament, registration) {
+  const matchingUser = await db.prepare('SELECT language FROM users WHERE email = ?').bind(registration.email).first();
+  if (matchingUser) {
+    return matchingUser.language || registration.language || 'de';
+  }
+  const creator = await db.prepare('SELECT language FROM users WHERE id = ?').bind(tournament.created_by).first();
+  return creator?.language || registration.language || 'de';
+}
+
+async function sendRegistrationConfirmationEmail(env, tournament, registration, appOrigin) {
+  const language = await resolveEmailLanguage(env.DB, tournament, registration);
+  const templates = REGISTRATION_CONFIRMATION_EMAILS[language] || REGISTRATION_CONFIRMATION_EMAILS.de;
+  const dateTimeLabel = formatTournamentDateTime(tournament, language);
+  const link = `${appOrigin}/turniere/${tournament.id}/info`;
+  const ics = buildTournamentIcs(tournament, appOrigin);
+
+  await sendTransactionalEmail(env, {
+    to: registration.email,
+    subject: templates.subject(tournament.name),
+    text: templates.text(tournament.name, dateTimeLabel, tournament.location, link),
+    attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
+    logFallback: `Registration confirmation email for ${registration.email} (tournament ${tournament.id})`,
+    failureContext: `registration confirmation for registration ${registration.id}`,
+    allowLogFallback: true,
+  });
+}
+
+const TOURNAMENT_REMINDER_LEAD_DAYS = 2;
+const APP_ORIGIN = 'https://ptmonline.org';
+
+async function sendTournamentReminders(env) {
+  const target = new Date();
+  target.setUTCDate(target.getUTCDate() + TOURNAMENT_REMINDER_LEAD_DAYS);
+  const targetDate = target.toISOString().slice(0, 10);
+
+  const tournaments = await env.DB.prepare("SELECT * FROM tournaments WHERE date = ? AND status != 'draft'").bind(targetDate).all();
+
+  for (const tournament of tournaments.results || []) {
+    const registrations = await env.DB
+      .prepare(
+        `SELECT * FROM registrations
+         WHERE tournament_id = ? AND status IN ('pending', 'confirmed') AND reminder_sent_at IS NULL`,
+      )
+      .bind(tournament.id)
+      .all();
+
+    for (const registration of registrations.results || []) {
+      const recipients = [...new Set(
+        [registration.email, registration.partner_email, registration.partner2_email].filter(Boolean).map((email) => email.toLowerCase()),
+      )];
+      const language = await resolveEmailLanguage(env.DB, tournament, registration);
+      const templates = TOURNAMENT_REMINDER_EMAILS[language] || TOURNAMENT_REMINDER_EMAILS.de;
+      const dateTimeLabel = formatTournamentDateTime(tournament, language);
+      const link = `${APP_ORIGIN}/turniere/${tournament.id}/info`;
+      const ics = buildTournamentIcs(tournament, APP_ORIGIN);
+
+      try {
+        await sendTransactionalEmail(env, {
+          to: recipients,
+          subject: templates.subject(tournament.name),
+          text: templates.text(tournament.name, dateTimeLabel, tournament.location, link),
+          attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
+          logFallback: `Tournament reminder email for registration ${registration.id} (tournament ${tournament.id})`,
+          failureContext: `tournament reminder for registration ${registration.id}`,
+          allowLogFallback: true,
+        });
+      } catch (error) {
+        console.error(`Failed to send tournament reminder for registration ${registration.id}`, error);
+        continue;
+      }
+
+      await env.DB.prepare('UPDATE registrations SET reminder_sent_at = ? WHERE id = ?').bind(new Date().toISOString(), registration.id).run();
+    }
+  }
+}
+
 const PWA_INSTALL_PATHS = ['/manifest.webmanifest', '/service-worker.js'];
 
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(sendTournamentReminders(env));
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
 
@@ -287,7 +498,7 @@ export default {
         }
 
         if (request.method === 'POST') {
-          return await createRegistration(request, env.DB, tournament);
+          return await createRegistration(request, env, tournament);
         }
       }
 
@@ -798,10 +1009,10 @@ async function registerUser(request, env, url) {
   try {
     await db
       .prepare(
-        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, created_at, updated_at)
-         VALUES (?, ?, ?, 'user', ?, ?, NULL, ?, ?)`,
+        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, language, created_at, updated_at)
+         VALUES (?, ?, ?, 'user', ?, ?, NULL, ?, ?, ?)`,
       )
-      .bind(id, user.name, user.email, password.salt, password.hash, now, now)
+      .bind(id, user.name, user.email, password.salt, password.hash, language, now, now)
       .run();
   } catch (error) {
     if (String(error.message || '').includes('UNIQUE')) {
@@ -1637,7 +1848,9 @@ async function listPublicParticipants(db, tournamentId) {
   });
 }
 
-async function createRegistration(request, db, tournament) {
+async function createRegistration(request, env, tournament) {
+  const db = env.DB;
+
   if (tournament.visibility !== 'public' || tournament.status !== 'registration') {
     throw new HttpError(403, 'Registration is closed');
   }
@@ -1652,6 +1865,7 @@ async function createRegistration(request, db, tournament) {
   }
 
   const registration = normalizeRegistrationInput(body, { requireStatus: false });
+  const language = normalizeLanguage(body.language);
   assertPartnerCountMatchesFormation(tournament.formation, registration);
   assertLicenseMatchesTournament(tournament, registration);
   const status = await initialRegistrationStatus(db, tournament);
@@ -1664,8 +1878,8 @@ async function createRegistration(request, db, tournament) {
         id, tournament_id, first_name, last_name, email, club, license_nr,
         partner_first_name, partner_last_name, partner_email,
         partner2_first_name, partner2_last_name, partner2_email,
-        team_name, seeding_position, status, registered_at, confirmed_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        team_name, seeding_position, status, language, registered_at, confirmed_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1684,6 +1898,7 @@ async function createRegistration(request, db, tournament) {
       registration.teamName,
       registration.seedingPosition,
       status,
+      language,
       now,
       status === 'confirmed' ? now : null,
       now,
@@ -1692,6 +1907,13 @@ async function createRegistration(request, db, tournament) {
     .run();
 
   const created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
+
+  try {
+    await sendRegistrationConfirmationEmail(env, tournament, created, new URL(request.url).origin);
+  } catch (error) {
+    console.error(`Failed to send registration confirmation email for registration ${id}`, error);
+  }
+
   return json({ registration: toPublicRegistration(created) }, 201);
 }
 
@@ -1919,7 +2141,7 @@ async function syncPostResults(request, db, tournamentId) {
   return json({ updatedCount });
 }
 
-async function sendTransactionalEmail(env, { to, subject, text, logFallback, failureContext, allowLogFallback = false }) {
+async function sendTransactionalEmail(env, { to, subject, text, attachments, logFallback, failureContext, allowLogFallback = false }) {
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
     console.log(logFallback);
     if (allowLogFallback) {
@@ -1941,6 +2163,7 @@ async function sendTransactionalEmail(env, { to, subject, text, logFallback, fai
         to,
         subject,
         text,
+        ...(attachments ? { attachments } : {}),
       }),
     });
   } catch (error) {

@@ -765,7 +765,7 @@ export default function App() {
     setMessage('');
 
     const tournamentId = registrationForm.tournamentId || selectedTournamentId;
-    const payload = registrationPayload({ ...registrationForm, tournamentId });
+    const payload = registrationPayload({ ...registrationForm, tournamentId }, language);
 
     try {
       if (registrationMode === 'edit') {
@@ -3406,7 +3406,7 @@ function tournamentPayload(form) {
   };
 }
 
-function registrationPayload(form) {
+function registrationPayload(form, language) {
   return {
     firstName: form.firstName,
     lastName: form.lastName,
@@ -3423,6 +3423,7 @@ function registrationPayload(form) {
     seedingPosition: form.seedingPosition === '' ? null : Number(form.seedingPosition),
     status: form.status,
     publicationNoticeAccepted: Boolean(form.publicationNoticeAccepted),
+    language,
   };
 }
 
