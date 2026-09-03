@@ -908,10 +908,15 @@ export default function App() {
         setSearchOriginQuery('');
         setGeoLoading(false);
       },
-      () => {
-        setGeoError('Standort konnte nicht ermittelt werden.');
+      (error) => {
+        setGeoError(
+          error.code === error.PERMISSION_DENIED
+            ? 'Standort-Zugriff wurde verweigert. Bitte erlaube den Zugriff in den Einstellungen deines Geräts unter Datenschutz > Ortungsdienste.'
+            : 'Standort konnte nicht ermittelt werden.',
+        );
         setGeoLoading(false);
       },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
     );
   }
 
@@ -4199,6 +4204,8 @@ const TRANSLATIONS = {
     'km entfernt': 'km verwijderd',
     'Geolocation wird von diesem Browser nicht unterstützt.': 'Geolocatie wordt niet ondersteund door deze browser.',
     'Standort konnte nicht ermittelt werden.': 'Locatie kon niet worden bepaald.',
+    'Standort-Zugriff wurde verweigert. Bitte erlaube den Zugriff in den Einstellungen deines Geräts unter Datenschutz > Ortungsdienste.':
+      'Locatietoegang is geweigerd. Sta toegang toe in de instellingen van je apparaat onder Privacy > Locatievoorzieningen.',
     'Kein Ort gefunden.': 'Geen plaats gevonden.',
     '5 km': '5 km',
     '10 km': '10 km',
@@ -4568,6 +4575,8 @@ const TRANSLATIONS = {
     'km entfernt': 'km away',
     'Geolocation wird von diesem Browser nicht unterstützt.': 'Geolocation is not supported by this browser.',
     'Standort konnte nicht ermittelt werden.': 'Could not determine your location.',
+    'Standort-Zugriff wurde verweigert. Bitte erlaube den Zugriff in den Einstellungen deines Geräts unter Datenschutz > Ortungsdienste.':
+      'Location access was denied. Please allow access in your device settings under Privacy > Location Services.',
     'Kein Ort gefunden.': 'No place found.',
     '5 km': '5 km',
     '10 km': '10 km',
@@ -4937,6 +4946,8 @@ const TRANSLATIONS = {
     'km entfernt': 'km de distancia',
     'Geolocation wird von diesem Browser nicht unterstützt.': 'Este navegador no admite la geolocalización.',
     'Standort konnte nicht ermittelt werden.': 'No se pudo determinar la ubicación.',
+    'Standort-Zugriff wurde verweigert. Bitte erlaube den Zugriff in den Einstellungen deines Geräts unter Datenschutz > Ortungsdienste.':
+      'Se ha denegado el acceso a la ubicación. Permite el acceso en los ajustes de tu dispositivo, en Privacidad > Servicios de localización.',
     'Kein Ort gefunden.': 'No se encontró ningún lugar.',
     '5 km': '5 km',
     '10 km': '10 km',
@@ -5306,6 +5317,8 @@ const TRANSLATIONS = {
     'km entfernt': 'km',
     'Geolocation wird von diesem Browser nicht unterstützt.': "La géolocalisation n'est pas prise en charge par ce navigateur.",
     'Standort konnte nicht ermittelt werden.': 'Impossible de déterminer la position.',
+    'Standort-Zugriff wurde verweigert. Bitte erlaube den Zugriff in den Einstellungen deines Geräts unter Datenschutz > Ortungsdienste.':
+      "L'accès à la position a été refusé. Autorise l'accès dans les réglages de ton appareil sous Confidentialité > Service de localisation.",
     'Kein Ort gefunden.': 'Aucun lieu trouvé.',
     '5 km': '5 km',
     '10 km': '10 km',
