@@ -208,7 +208,8 @@ export default {
         }
 
         if (request.method === 'DELETE') {
-          return await deleteUser(env.DB, userMatch[1], session.user.id);
+          const deleteTournaments = url.searchParams.get('deleteTournaments') === 'true';
+          return await deleteUser(env.DB, userMatch[1], session.user.id, deleteTournaments);
         }
       }
 
@@ -1227,9 +1228,20 @@ async function updateOwnProfile(request, env, url, userId) {
   return json(response);
 }
 
-async function deleteUser(db, id, currentUserId) {
+async function deleteUser(db, id, currentUserId, deleteTournaments) {
   if (id === currentUserId) {
     throw new HttpError(400, 'You cannot delete your own user');
+  }
+
+  const now = new Date().toISOString();
+
+  if (deleteTournaments) {
+    await db.prepare('DELETE FROM tournaments WHERE created_by = ? OR manager_id = ?').bind(id, id).run();
+  } else {
+    // Reassign to the admin performing the deletion instead of leaving created_by/manager_id
+    // pointing at a user row that no longer exists.
+    await db.prepare('UPDATE tournaments SET created_by = ?, updated_at = ? WHERE created_by = ?').bind(currentUserId, now, id).run();
+    await db.prepare('UPDATE tournaments SET manager_id = ?, updated_at = ? WHERE manager_id = ?').bind(currentUserId, now, id).run();
   }
 
   const result = await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();

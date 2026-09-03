@@ -679,13 +679,22 @@ export default function App() {
       return;
     }
 
+    const ownedTournaments = tournaments.filter((tournament) => tournament.createdBy === user.id || tournament.managerId === user.id);
+    let deleteTournaments = false;
+    if (ownedTournaments.length > 0) {
+      deleteTournaments = window.confirm(
+        `Dieser Benutzer besitzt ${ownedTournaments.length} Turnier(e). OK = diese Turniere ebenfalls löschen. Abbrechen = die Turniere werden dir als Admin zugewiesen und bleiben erhalten.`,
+      );
+    }
+
     setError('');
     setMessage('');
 
     try {
-      await api(`/api/users/${user.id}`, { method: 'DELETE' });
+      await api(`/api/users/${user.id}${deleteTournaments ? '?deleteTournaments=true' : ''}`, { method: 'DELETE' });
       setMessage('Benutzer wurde gelöscht.');
       await loadUsers();
+      await loadTournaments();
     } catch (requestError) {
       setError(requestError.message);
     }
