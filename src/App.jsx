@@ -2187,7 +2187,7 @@ function TournamentParticipants({ tournamentId, logoUrl }) {
   const logo = logoUrl && (
     <img
       className="tournament-logo"
-      src={logoUrl}
+      src={tournamentImageUrl(tournamentId, 'logo')}
       alt=""
       onError={(event) => {
         event.target.style.display = 'none';
@@ -2398,6 +2398,62 @@ function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, navigat
   );
 }
 
+function tournamentImageUrl(tournamentId, field) {
+  return `/api/tournaments/${tournamentId}/image?field=${field}`;
+}
+
+function TournamentCard({ tournament, onOpenTournament, onRegister, language }) {
+  const [logoBroken, setLogoBroken] = useState(false);
+  const hasLogo = Boolean(tournament.logoUrl) && !logoBroken;
+
+  return (
+    <article className="tournament-card">
+      <button
+        className={`tournament-card-main${hasLogo ? ' has-logo' : ''}`}
+        type="button"
+        onClick={() => onOpenTournament(tournament)}
+      >
+        {hasLogo && (
+          <img
+            className="tournament-card-logo"
+            src={tournamentImageUrl(tournament.id, 'logo')}
+            alt=""
+            onError={() => setLogoBroken(true)}
+          />
+        )}
+        <span className="tournament-card-date">
+          <strong>{formatDate(tournament.date)}</strong>
+          <small>{tournament.startTime || 'Ganztägig'}</small>
+        </span>
+        <span className="tournament-card-copy">
+          <strong>{tournament.name}</strong>
+          <span>{tournament.location}</span>
+          <small>
+            {labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)}
+            {typeof tournament.distanceKm === 'number' && (
+              <>
+                {' · '}
+                {Math.round(tournament.distanceKm)}
+                {' km entfernt'}
+              </>
+            )}
+          </small>
+        </span>
+      </button>
+      <div className="tournament-card-meta">
+        <span className={`status status-${tournament.status}`}>{registrationStatusLabel(tournament, language)}</span>
+        <Button
+          variant="secondary"
+          onClick={() => onRegister(tournament)}
+          disabled={tournament.status !== 'registration' || tournament.visibility !== 'public'}
+        >
+          Anmelden
+        </Button>
+      </div>
+    </article>
+  );
+}
+
 function HomeTournaments({
   language,
   showMineFilter,
@@ -2501,52 +2557,13 @@ function HomeTournaments({
 
       <div className="tournament-card-list">
         {tournaments.map((tournament) => (
-          <article className="tournament-card" key={tournament.id}>
-            <button
-              className={`tournament-card-main${tournament.logoUrl ? ' has-logo' : ''}`}
-              type="button"
-              onClick={() => onOpenTournament(tournament)}
-            >
-              {tournament.logoUrl && (
-                <img
-                  className="tournament-card-logo"
-                  src={tournament.logoUrl}
-                  alt=""
-                  onError={(event) => {
-                    event.target.style.display = 'none';
-                  }}
-                />
-              )}
-              <span className="tournament-card-date">
-                <strong>{formatDate(tournament.date)}</strong>
-                <small>{tournament.startTime || 'Ganztägig'}</small>
-              </span>
-              <span className="tournament-card-copy">
-                <strong>{tournament.name}</strong>
-                <span>{tournament.location}</span>
-                <small>
-                  {labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)}
-                  {typeof tournament.distanceKm === 'number' && (
-                    <>
-                      {' · '}
-                      {Math.round(tournament.distanceKm)}
-                      {' km entfernt'}
-                    </>
-                  )}
-                </small>
-              </span>
-            </button>
-            <div className="tournament-card-meta">
-              <span className={`status status-${tournament.status}`}>{registrationStatusLabel(tournament, language)}</span>
-              <Button
-                variant="secondary"
-                onClick={() => onRegister(tournament)}
-                disabled={tournament.status !== 'registration' || tournament.visibility !== 'public'}
-              >
-                Anmelden
-              </Button>
-            </div>
-          </article>
+          <TournamentCard
+            key={tournament.id}
+            tournament={tournament}
+            onOpenTournament={onOpenTournament}
+            onRegister={onRegister}
+            language={language}
+          />
         ))}
       </div>
 

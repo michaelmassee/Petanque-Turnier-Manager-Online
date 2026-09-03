@@ -345,6 +345,19 @@ export default {
         return await updateTournamentPresentation(request, env.DB, tournament, session.user);
       }
 
+      const imageProxyMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/image$/);
+      if (imageProxyMatch && request.method === 'GET') {
+        const tournament = await getTournamentById(env.DB, imageProxyMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Tournament not found');
+        }
+        const session = await optionalSession(request, env.DB);
+        if (!canViewTournament(tournament, session?.user || null)) {
+          throw new HttpError(403, 'Access denied');
+        }
+        return await proxyTournamentImage(tournament, url.searchParams.get('field'));
+      }
+
       const registrationMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)$/);
       if (registrationMatch) {
         const auth = await requireManagerAuth(request, env.DB);
@@ -1425,6 +1438,115 @@ function normalizePresentationUrl(value) {
     throw new HttpError(400, 'Eine gültige URL (http:// oder https://) ist erforderlich');
   }
   return trimmed;
+}
+
+const PROXY_IMAGE_FIELDS = { logo: 'logo_url', website: 'website_url', flyer: 'flyer_url' };
+const IMAGE_PROXY_TIMEOUT_MS = 8000;
+const IMAGE_PROXY_MAX_BYTES = 8 * 1024 * 1024;
+const IMAGE_PROXY_CACHE_SECONDS = 60 * 60 * 6;
+
+/**
+ * Streams an externally hosted tournament image (logo/website/flyer) through our own origin so
+ * it satisfies the strict `img-src 'self'` CSP instead of loosening that policy to arbitrary
+ * external hosts.
+ */
+async function proxyTournamentImage(tournament, field) {
+  const column = PROXY_IMAGE_FIELDS[field];
+  if (!column) {
+    throw new HttpError(400, 'Unbekanntes Bildfeld');
+  }
+  const targetUrl = tournament[column];
+  if (!targetUrl || !isHttpUrl(targetUrl)) {
+    throw new HttpError(404, 'Kein Bild hinterlegt');
+  }
+  if (isUnsafeImageTarget(targetUrl)) {
+    throw new HttpError(400, 'Ziel-URL nicht erlaubt');
+  }
+
+  const cache = caches.default;
+  const cacheKey = new Request(`https://image-proxy.internal/tournaments/${tournament.id}/${field}`);
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  let upstream;
+  try {
+    upstream = await fetch(targetUrl, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(IMAGE_PROXY_TIMEOUT_MS),
+      headers: { Accept: 'image/*' },
+    });
+  } catch (error) {
+    console.error(`Image proxy fetch failed for "${targetUrl}"`, error);
+    throw new HttpError(502, 'Bild konnte nicht geladen werden');
+  }
+
+  if (upstream.status >= 300 && upstream.status < 400) {
+    throw new HttpError(502, 'Bild konnte nicht geladen werden');
+  }
+  if (!upstream.ok) {
+    throw new HttpError(502, 'Bild konnte nicht geladen werden');
+  }
+
+  const contentType = upstream.headers.get('Content-Type') || '';
+  if (!/^image\//i.test(contentType)) {
+    throw new HttpError(415, 'Ungültiger Bildtyp');
+  }
+
+  const contentLength = Number(upstream.headers.get('Content-Length') || 0);
+  if (contentLength && contentLength > IMAGE_PROXY_MAX_BYTES) {
+    throw new HttpError(413, 'Bild zu groß');
+  }
+
+  const response = new Response(upstream.body, {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Cache-Control': `public, max-age=${IMAGE_PROXY_CACHE_SECONDS}`,
+      ...SECURITY_HEADERS,
+    },
+  });
+  await cache.put(cacheKey, response.clone());
+  return response;
+}
+
+const BLOCKED_IMAGE_PROXY_HOSTNAMES = new Set(['localhost', '0.0.0.0', 'metadata.google.internal']);
+
+/**
+ * Defense-in-depth SSRF guard. Cloudflare Workers already block outbound requests to
+ * RFC1918/loopback/link-local ranges at the platform level, but this catches the common case of
+ * a stored URL directly containing a private/loopback host without relying solely on that.
+ */
+function isUnsafeImageTarget(targetUrl) {
+  let parsed;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    return true;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return true;
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  return BLOCKED_IMAGE_PROXY_HOSTNAMES.has(hostname) || isPrivateIpLiteral(hostname);
+}
+
+function isPrivateIpLiteral(hostname) {
+  const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const a = Number(ipv4[1]);
+    const b = Number(ipv4[2]);
+    if (a === 127 || a === 10 || a === 0) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    return false;
+  }
+  if (hostname === '::1' || hostname.startsWith('fc') || hostname.startsWith('fd') || hostname.startsWith('fe80')) {
+    return true;
+  }
+  return false;
 }
 
 /**
