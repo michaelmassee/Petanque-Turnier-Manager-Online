@@ -1326,8 +1326,8 @@ async function createTournament(request, db, user) {
       `INSERT INTO tournaments (
         id, created_by, manager_id, name, date, start_time, location, description, type, formation, status,
         max_registrations, registration_deadline, entry_fee_cents, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, latitude, longitude, geocoded_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, latitude, longitude, geocoded_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1351,6 +1351,7 @@ async function createTournament(request, db, user) {
       tournament.internalNotes,
       tournament.participantsPublic ? 1 : 0,
       tournament.licenseRequired ? 1 : 0,
+      tournament.teamNameEnabled ? 1 : 0,
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
@@ -1379,7 +1380,7 @@ async function updateTournament(request, db, existing, user) {
        SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
-           participants_public = ?, license_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, updated_at = ?
+           participants_public = ?, license_required = ?, team_name_enabled = ?, latitude = ?, longitude = ?, geocoded_at = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -1402,6 +1403,7 @@ async function updateTournament(request, db, existing, user) {
       tournament.internalNotes,
       tournament.participantsPublic ? 1 : 0,
       tournament.licenseRequired ? 1 : 0,
+      tournament.teamNameEnabled ? 1 : 0,
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
@@ -2183,6 +2185,7 @@ function normalizeTournamentInput(body) {
     managerId: nullableText(body.managerId),
     participantsPublic: Boolean(body.participantsPublic),
     licenseRequired: Boolean(body.licenseRequired),
+    teamNameEnabled: Boolean(body.teamNameEnabled),
     latitude: nullableCoordinate(body.latitude, -90, 90),
     longitude: nullableCoordinate(body.longitude, -180, 180),
   };
@@ -2204,6 +2207,9 @@ function normalizeTournamentInput(body) {
   }
   if (!FORMATIONS.includes(tournament.formation)) {
     throw new HttpError(400, 'Invalid formation');
+  }
+  if (tournament.type === 'supermelee' && tournament.formation !== 'tete') {
+    throw new HttpError(400, 'Supermêlée ist nur mit der Formation Tête möglich');
   }
   if (!TOURNAMENT_STATUSES.includes(tournament.status)) {
     throw new HttpError(400, 'Invalid tournament status');
@@ -2458,6 +2464,7 @@ function toPublicTournament(row, user) {
     internalNotes: canManageTournament(row, user) ? row.internal_notes : null,
     participantsPublic: Boolean(Number(row.participants_public)),
     licenseRequired: Boolean(Number(row.license_required || 0)),
+    teamNameEnabled: Boolean(Number(row.team_name_enabled || 0)),
     documentManaged: Boolean(Number(row.document_managed || 0)),
     websiteUrl: row.website_url || null,
     logoUrl: row.logo_url || null,

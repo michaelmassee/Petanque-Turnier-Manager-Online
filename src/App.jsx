@@ -118,6 +118,10 @@ const EMPTY_TOURNAMENT_FORM = {
   internalNotes: '',
   participantsPublic: false,
   licenseRequired: false,
+  teamNameEnabled: false,
+  websiteUrl: '',
+  logoUrl: '',
+  flyerUrl: '',
 };
 
 const EMPTY_REGISTRATION_FORM = {
@@ -713,6 +717,15 @@ export default function App() {
           ? await api(`/api/tournaments/${tournamentForm.id}`, { method: 'PUT', body: JSON.stringify(payload) })
           : await api('/api/tournaments', { method: 'POST', body: JSON.stringify(payload) });
 
+      await api(`/api/tournaments/${data.tournament.id}/presentation`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          websiteUrl: tournamentForm.websiteUrl,
+          logoUrl: tournamentForm.logoUrl,
+          flyerUrl: tournamentForm.flyerUrl,
+        }),
+      });
+
       setMessage(tournamentMode === 'edit' ? 'Turnier wurde aktualisiert.' : 'Turnier wurde angelegt.');
       setTournamentForm(EMPTY_TOURNAMENT_FORM);
       setTournamentMode('create');
@@ -822,7 +835,7 @@ export default function App() {
       overrideCoordinates: false,
       description: tournament.description || '',
       type: tournament.type || 'supermelee',
-      formation: tournament.formation || 'doublette',
+      formation: tournament.type === 'supermelee' ? 'tete' : tournament.formation || 'doublette',
       status: tournament.status || 'draft',
       maxRegistrations: tournament.maxRegistrations || 0,
       registrationDeadline: tournament.registrationDeadline || '',
@@ -834,6 +847,10 @@ export default function App() {
       internalNotes: tournament.internalNotes || '',
       participantsPublic: Boolean(tournament.participantsPublic),
       licenseRequired: Boolean(tournament.licenseRequired),
+      teamNameEnabled: Boolean(tournament.teamNameEnabled),
+      websiteUrl: tournament.websiteUrl || '',
+      logoUrl: tournament.logoUrl || '',
+      flyerUrl: tournament.flyerUrl || '',
     });
     setActiveTab('tournaments');
     clearFeedback();
@@ -2659,6 +2676,7 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
         showStatus={false}
         formation={tournament.formation}
         licenseRequired={tournament.licenseRequired}
+        teamNameEnabled={tournament.teamNameEnabled}
       />
       <label className="checkbox-field">
         <input
@@ -2713,8 +2731,19 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
         </div>
       )}
       <div className="form-grid">
-        <SelectField label="Turniersystem" value={form.type} onChange={(type) => setForm({ ...form, type })} options={TOURNAMENT_TYPES} />
-        <SelectField label="Formation" value={form.formation} onChange={(formation) => setForm({ ...form, formation })} options={FORMATIONS} />
+        <SelectField
+          label="Turniersystem"
+          value={form.type}
+          onChange={(type) => setForm({ ...form, type, formation: type === 'supermelee' ? 'tete' : form.formation })}
+          options={TOURNAMENT_TYPES}
+        />
+        <SelectField
+          label="Formation"
+          value={form.formation}
+          onChange={(formation) => setForm({ ...form, formation })}
+          options={form.type === 'supermelee' ? FORMATIONS.filter((option) => option.value === 'tete') : FORMATIONS}
+          disabled={form.type === 'supermelee'}
+        />
       </div>
       <div className="form-grid">
         <SelectField label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={TOURNAMENT_STATUSES} />
@@ -2743,11 +2772,22 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
       <label className="checkbox-field">
         <input
           type="checkbox"
+          checked={form.teamNameEnabled}
+          onChange={(event) => setForm({ ...form, teamNameEnabled: event.target.checked })}
+        />
+        Teamname abfragen
+      </label>
+      <label className="checkbox-field">
+        <input
+          type="checkbox"
           checked={form.participantsPublic}
           onChange={(event) => setForm({ ...form, participantsPublic: event.target.checked })}
         />
         Teilnehmerliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.
       </label>
+      <TextField label="Website" type="url" placeholder="https://…" value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} />
+      <TextField label="Logo-Bildlink" type="url" placeholder="https://…" value={form.logoUrl} onChange={(logoUrl) => setForm({ ...form, logoUrl })} />
+      <TextField label="Flyer-Bildlink" type="url" placeholder="https://…" value={form.flyerUrl} onChange={(flyerUrl) => setForm({ ...form, flyerUrl })} />
       <Button type="submit">{mode === 'edit' ? 'Turnier speichern' : 'Turnier anlegen'}</Button>
     </form>
   );
@@ -2804,13 +2844,14 @@ function RegistrationForm({ form, setForm, onSubmit, tournaments, selectedTourna
         showStatus={manageMode}
         formation={selectedTournament?.formation}
         licenseRequired={selectedTournament?.licenseRequired}
+        teamNameEnabled={selectedTournament?.teamNameEnabled}
       />
       <Button type="submit">{form.id ? 'Anmeldung speichern' : 'Anmeldung erfassen'}</Button>
     </form>
   );
 }
 
-function RegistrationFields({ form, setForm, showStatus, formation, licenseRequired }) {
+function RegistrationFields({ form, setForm, showStatus, formation, licenseRequired, teamNameEnabled }) {
   const allowsPartner = formation ? formation !== 'tete' : true;
   const allowsPartner2 = formation === 'triplette';
 
@@ -2839,7 +2880,7 @@ function RegistrationFields({ form, setForm, showStatus, formation, licenseRequi
           required={Boolean(licenseRequired)}
         />
       </div>
-      <TextField label="Teamname" value={form.teamName} onChange={(teamName) => setForm({ ...form, teamName })} />
+      {teamNameEnabled && <TextField label="Teamname" value={form.teamName} onChange={(teamName) => setForm({ ...form, teamName })} />}
       {allowsPartner && (
         <>
           <div className="form-grid">
@@ -3157,11 +3198,11 @@ function TextArea({ label, value, onChange }) {
   );
 }
 
-function SelectField({ label, value, onChange, options }) {
+function SelectField({ label, value, onChange, options, disabled }) {
   return (
     <label>
       {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
+      <select value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -3396,6 +3437,7 @@ function tournamentPayload(form) {
     internalNotes: form.internalNotes || null,
     participantsPublic: Boolean(form.participantsPublic),
     licenseRequired: Boolean(form.licenseRequired),
+    teamNameEnabled: Boolean(form.teamNameEnabled),
   };
 }
 
@@ -3899,6 +3941,8 @@ const TRANSLATIONS = {
     'Interne Notizen': 'Interne notities',
     'Turnier speichern': 'Toernooi opslaan',
     'Lizenznummer erforderlich': 'Licentienummer verplicht',
+    'Teamname abfragen': 'Teamnaam vragen',
+    'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée is alleen mogelijk met de formatie Tête',
     'Lizenznummer ist erforderlich': 'Licentienummer is verplicht',
     Bearbeiten: 'Bewerken',
     Löschen: 'Verwijderen',
@@ -4260,6 +4304,8 @@ const TRANSLATIONS = {
     'Interne Notizen': 'Internal notes',
     'Turnier speichern': 'Save tournament',
     'Lizenznummer erforderlich': 'License number required',
+    'Teamname abfragen': 'Ask for team name',
+    'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée is only possible with the Tête formation',
     'Lizenznummer ist erforderlich': 'License number is required',
     Bearbeiten: 'Edit',
     Löschen: 'Delete',
@@ -4621,6 +4667,8 @@ const TRANSLATIONS = {
     'Interne Notizen': 'Notas internas',
     'Turnier speichern': 'Guardar torneo',
     'Lizenznummer erforderlich': 'Licencia obligatoria',
+    'Teamname abfragen': 'Solicitar nombre de equipo',
+    'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée solo es posible con la formación Tête',
     'Lizenznummer ist erforderlich': 'La licencia es obligatoria',
     Bearbeiten: 'Editar',
     Löschen: 'Eliminar',
@@ -4982,6 +5030,8 @@ const TRANSLATIONS = {
     'Interne Notizen': 'Notes internes',
     'Turnier speichern': 'Enregistrer',
     'Lizenznummer erforderlich': 'Licence obligatoire',
+    'Teamname abfragen': 'Demander le nom d’équipe',
+    'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée n’est possible qu’avec la formation Tête',
     'Lizenznummer ist erforderlich': 'La licence est obligatoire',
     Bearbeiten: 'Modifier',
     Löschen: 'Supprimer',

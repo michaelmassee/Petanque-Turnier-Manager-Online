@@ -1,0 +1,1 @@
+ALTER TABLE tournaments ADD COLUMN team_name_enabled INTEGER NOT NULL DEFAULT 0;
