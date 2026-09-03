@@ -864,7 +864,7 @@ textarea:focus {
 .tournament-card-date {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
   min-height: 72px;
   border-radius: 8px;
