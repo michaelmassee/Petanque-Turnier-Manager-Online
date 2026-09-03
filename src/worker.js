@@ -1897,7 +1897,7 @@ async function listRegistrations(db, tournamentId) {
 async function listPublicParticipants(db, tournamentId, currentUserEmail) {
   const result = await db
     .prepare(
-      `SELECT id, email, first_name, last_name, club, team_name, partner_first_name, partner_last_name
+      `SELECT id, email, first_name, last_name, club, team_name, partner_first_name, partner_last_name, is_vip
        FROM registrations
        WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
        ORDER BY registered_at ASC`,
@@ -1918,6 +1918,7 @@ async function listPublicParticipants(db, tournamentId, currentUserEmail) {
         teamName: row.team_name,
         partnerFirstName: row.partner_first_name,
         partnerLastName: row.partner_last_name,
+        isVip: Boolean(row.is_vip),
       };
     }),
   });

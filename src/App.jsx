@@ -2278,6 +2278,7 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
         <article className="data-row participants-row" key={`${participant.firstName}-${participant.lastName}-${index}`}>
           <div>
             <strong>
+              {participant.isVip && <span className="vip-badge" title="VIP">★</span>}
               {participant.firstName} {participant.lastName}
             </strong>
             <span>{participant.club}</span>
