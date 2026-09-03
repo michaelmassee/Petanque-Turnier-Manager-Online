@@ -1271,6 +1271,12 @@ textarea:focus {
   color: #995800;
 }
 
+.vip-badge {
+  color: #c9971c;
+  margin-right: 4px;
+  font-size: 0.9em;
+}
+
 .public-registration {
   margin-top: 18px;
   box-shadow: none;

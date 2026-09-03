@@ -125,6 +125,44 @@ const REGISTRATION_CONFIRMATION_EMAILS = {
   },
 };
 
+const REGISTRATION_DISPLACED_EMAILS = {
+  de: {
+    subject: (name) => `Änderung deiner Anmeldung: ${name}`,
+    textWaitlisted: (name, link) =>
+      `Für "${name}" hat sich ein VIP-Teilnehmer angemeldet, für den kein regulärer Platz mehr frei war. Deine Anmeldung wurde daher auf die Warteliste verschoben.\n\nAlle Infos zum Turnier:\n${link}`,
+    textCancelled: (name, link) =>
+      `Für "${name}" hat sich ein VIP-Teilnehmer angemeldet, für den kein regulärer Platz mehr frei war. Da für dieses Turnier keine Warteliste aktiviert ist, wurde deine Anmeldung leider storniert.\n\nAlle Infos zum Turnier:\n${link}`,
+  },
+  nl: {
+    subject: (name) => `Wijziging van je inschrijving: ${name}`,
+    textWaitlisted: (name, link) =>
+      `Voor "${name}" heeft een VIP-deelnemer zich ingeschreven, waarvoor geen reguliere plaats meer vrij was. Je inschrijving is daarom op de wachtlijst geplaatst.\n\nAlle informatie over het toernooi:\n${link}`,
+    textCancelled: (name, link) =>
+      `Voor "${name}" heeft een VIP-deelnemer zich ingeschreven, waarvoor geen reguliere plaats meer vrij was. Omdat er voor dit toernooi geen wachtlijst is geactiveerd, is je inschrijving helaas geannuleerd.\n\nAlle informatie over het toernooi:\n${link}`,
+  },
+  en: {
+    subject: (name) => `Change to your registration: ${name}`,
+    textWaitlisted: (name, link) =>
+      `A VIP participant has registered for "${name}" and no regular spot was left. Your registration has therefore been moved to the waiting list.\n\nAll tournament details:\n${link}`,
+    textCancelled: (name, link) =>
+      `A VIP participant has registered for "${name}" and no regular spot was left. Since no waiting list is enabled for this tournament, your registration has unfortunately been cancelled.\n\nAll tournament details:\n${link}`,
+  },
+  es: {
+    subject: (name) => `Cambio en tu inscripción: ${name}`,
+    textWaitlisted: (name, link) =>
+      `Un participante VIP se ha inscrito para "${name}" y no quedaba ninguna plaza regular. Por ello, tu inscripción se ha trasladado a la lista de espera.\n\nToda la información del torneo:\n${link}`,
+    textCancelled: (name, link) =>
+      `Un participante VIP se ha inscrito para "${name}" y no quedaba ninguna plaza regular. Como no hay lista de espera activada para este torneo, lamentablemente tu inscripción ha sido cancelada.\n\nToda la información del torneo:\n${link}`,
+  },
+  fr: {
+    subject: (name) => `Modification de ton inscription : ${name}`,
+    textWaitlisted: (name, link) =>
+      `Un participant VIP s'est inscrit pour « ${name} » et il ne restait plus de place normale. Ton inscription a donc été placée sur liste d'attente.\n\nToutes les informations sur le tournoi :\n${link}`,
+    textCancelled: (name, link) =>
+      `Un participant VIP s'est inscrit pour « ${name} » et il ne restait plus de place normale. Comme aucune liste d'attente n'est activée pour ce tournoi, ton inscription a malheureusement été annulée.\n\nToutes les informations sur le tournoi :\n${link}`,
+  },
+};
+
 const TOURNAMENT_REMINDER_EMAILS = {
   de: {
     subject: (name) => `Erinnerung: ${name} in 2 Tagen`,
@@ -251,6 +289,21 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
     attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
     logFallback: `Registration confirmation email for ${registration.email} (tournament ${tournament.id})`,
     failureContext: `registration confirmation for registration ${registration.id}`,
+    allowLogFallback: true,
+  });
+}
+
+async function sendDisplacementEmail(env, tournament, registration, wasCancelled, appOrigin) {
+  const language = await resolveEmailLanguage(env.DB, tournament, registration);
+  const templates = REGISTRATION_DISPLACED_EMAILS[language] || REGISTRATION_DISPLACED_EMAILS.de;
+  const link = `${appOrigin}/turniere/${tournament.id}/info`;
+
+  await sendTransactionalEmail(env, {
+    to: registration.email,
+    subject: templates.subject(tournament.name),
+    text: wasCancelled ? templates.textCancelled(tournament.name, link) : templates.textWaitlisted(tournament.name, link),
+    logFallback: `Displacement email for ${registration.email} (tournament ${tournament.id}, cancelled=${wasCancelled})`,
+    failureContext: `displacement notice for registration ${registration.id}`,
     allowLogFallback: true,
   });
 }
@@ -593,7 +646,7 @@ export default {
         assertCanManageTournament(registration, auth.user);
 
         if (request.method === 'PUT') {
-          return await updateRegistration(request, env.DB, registration);
+          return await updateRegistration(request, env, registration);
         }
 
         if (request.method === 'DELETE') {
@@ -1900,9 +1953,10 @@ async function createRegistration(request, env, tournament) {
   const language = normalizeLanguage(body.language);
   assertPartnerCountMatchesFormation(tournament.formation, registration);
   assertLicenseMatchesTournament(tournament, registration);
-  const status = await initialRegistrationStatus(db, tournament);
+  const { status, displace } = await initialRegistrationStatus(db, tournament, registration.isVip);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
+  const appOrigin = new URL(request.url).origin;
 
   await db
     .prepare(
@@ -1910,8 +1964,8 @@ async function createRegistration(request, env, tournament) {
         id, tournament_id, first_name, last_name, email, club, license_nr,
         partner_first_name, partner_last_name, partner_email,
         partner2_first_name, partner2_last_name, partner2_email,
-        team_name, seeding_position, status, language, registered_at, confirmed_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        team_name, seeding_position, status, is_vip, language, registered_at, confirmed_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1930,6 +1984,7 @@ async function createRegistration(request, env, tournament) {
       registration.teamName,
       registration.seedingPosition,
       status,
+      registration.isVip ? 1 : 0,
       language,
       now,
       status === 'confirmed' ? now : null,
@@ -1940,8 +1995,12 @@ async function createRegistration(request, env, tournament) {
 
   const created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
 
+  if (displace) {
+    await displaceRegistration(env, tournament, displace, appOrigin);
+  }
+
   try {
-    await sendRegistrationConfirmationEmail(env, tournament, created, new URL(request.url).origin);
+    await sendRegistrationConfirmationEmail(env, tournament, created, appOrigin);
   } catch (error) {
     console.error(`Failed to send registration confirmation email for registration ${id}`, error);
   }
@@ -1949,7 +2008,8 @@ async function createRegistration(request, env, tournament) {
   return json({ registration: toPublicRegistration(created) }, 201);
 }
 
-async function updateRegistration(request, db, existing) {
+async function updateRegistration(request, env, existing) {
+  const db = env.DB;
   const body = await readJson(request);
   const registration = normalizeRegistrationInput(body, { requireStatus: true });
   assertPartnerCountMatchesFormation(existing.formation, registration);
@@ -1963,7 +2023,7 @@ async function updateRegistration(request, db, existing) {
        SET first_name = ?, last_name = ?, email = ?, club = ?, license_nr = ?,
            partner_first_name = ?, partner_last_name = ?, partner_email = ?,
            partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?,
-           team_name = ?, seeding_position = ?, status = ?, confirmed_at = ?, updated_at = ?
+           team_name = ?, seeding_position = ?, status = ?, is_vip = ?, confirmed_at = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -1981,14 +2041,72 @@ async function updateRegistration(request, db, existing) {
       registration.teamName,
       registration.seedingPosition,
       registration.status,
+      registration.isVip ? 1 : 0,
       confirmedAt,
       now,
       existing.id,
     )
     .run();
 
+  if (registration.isVip && Number(existing.max_registrations)) {
+    await enforceVipPriorityOnUpdate(env, existing, new URL(request.url).origin);
+  }
+
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
   return json({ registration: toPublicRegistration(updated) });
+}
+
+async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
+  const db = env.DB;
+  const current = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
+  if (!current || !Number(current.is_vip)) {
+    return;
+  }
+
+  const tournament = {
+    id: existing.tournament_id,
+    created_by: existing.created_by,
+    waitlist_enabled: existing.waitlist_enabled,
+    name: existing.name,
+    date: existing.date,
+    start_time: existing.start_time,
+    location: existing.location,
+  };
+
+  const activeCountRow = await db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM registrations
+       WHERE tournament_id = ? AND status IN ('pending', 'confirmed') AND id != ?`,
+    )
+    .bind(existing.tournament_id, existing.id)
+    .first();
+  const activeCount = Number(activeCountRow?.count || 0);
+  const isCurrentlyActive = current.status === 'pending' || current.status === 'confirmed';
+  const overCapacity = activeCount + 1 > Number(existing.max_registrations);
+
+  if (!overCapacity) {
+    if (!isCurrentlyActive) {
+      await db
+        .prepare("UPDATE registrations SET status = 'pending', updated_at = ? WHERE id = ?")
+        .bind(new Date().toISOString(), existing.id)
+        .run();
+    }
+    return;
+  }
+
+  const displace = await findDisplaceableNonVip(db, existing.tournament_id, existing.id);
+  if (!displace) {
+    return;
+  }
+
+  if (!isCurrentlyActive) {
+    await db
+      .prepare("UPDATE registrations SET status = 'pending', updated_at = ? WHERE id = ?")
+      .bind(new Date().toISOString(), existing.id)
+      .run();
+  }
+
+  await displaceRegistration(env, tournament, displace, appOrigin);
 }
 
 async function deleteRegistration(db, id) {
@@ -2252,9 +2370,35 @@ async function geocodeLocation(query) {
   return { lat, lng, displayName: match.display_name || trimmed };
 }
 
-async function initialRegistrationStatus(db, tournament) {
+async function findDisplaceableNonVip(db, tournamentId, excludeId) {
+  return db
+    .prepare(
+      `SELECT * FROM registrations
+       WHERE tournament_id = ? AND status IN ('pending', 'confirmed') AND is_vip = 0 AND id != ?
+       ORDER BY registered_at DESC LIMIT 1`,
+    )
+    .bind(tournamentId, excludeId || '')
+    .first();
+}
+
+async function displaceRegistration(env, tournament, registrationToDisplace, appOrigin) {
+  const wasCancelled = !Number(tournament.waitlist_enabled ?? 1);
+  const now = new Date().toISOString();
+  await env.DB
+    .prepare('UPDATE registrations SET status = ?, updated_at = ? WHERE id = ?')
+    .bind(wasCancelled ? 'cancelled' : 'waitlist', now, registrationToDisplace.id)
+    .run();
+
+  try {
+    await sendDisplacementEmail(env, tournament, registrationToDisplace, wasCancelled, appOrigin);
+  } catch (error) {
+    console.error(`Failed to send displacement email for registration ${registrationToDisplace.id}`, error);
+  }
+}
+
+async function initialRegistrationStatus(db, tournament, isVip) {
   if (!Number(tournament.max_registrations)) {
-    return 'pending';
+    return { status: 'pending', displace: null };
   }
 
   const row = await db
@@ -2268,12 +2412,18 @@ async function initialRegistrationStatus(db, tournament) {
 
   const isFull = Number(row?.count || 0) >= Number(tournament.max_registrations);
   if (!isFull) {
-    return 'pending';
+    return { status: 'pending', displace: null };
+  }
+  if (isVip) {
+    const displace = await findDisplaceableNonVip(db, tournament.id, null);
+    if (displace) {
+      return { status: 'pending', displace };
+    }
   }
   if (!Number(tournament.waitlist_enabled ?? 1)) {
     throw new HttpError(403, 'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.');
   }
-  return 'waitlist';
+  return { status: 'waitlist', displace: null };
 }
 
 async function getTournamentById(db, id) {
@@ -2304,7 +2454,8 @@ async function getRegistrationWithTournament(db, id) {
   return db
     .prepare(
       `SELECT registrations.*, tournaments.created_by, tournaments.manager_id, tournaments.visibility, tournaments.formation,
-              tournaments.license_required
+              tournaments.license_required, tournaments.max_registrations, tournaments.waitlist_enabled,
+              tournaments.name, tournaments.date, tournaments.start_time, tournaments.location
        FROM registrations
        JOIN tournaments ON tournaments.id = registrations.tournament_id
        WHERE registrations.id = ?`,
@@ -2628,6 +2779,7 @@ function normalizeRegistrationInput(body, { requireStatus }) {
     teamName: nullableText(body.teamName),
     seedingPosition: body.seedingPosition === '' || body.seedingPosition === undefined ? null : nonNegativeInteger(body.seedingPosition),
     status: text(body.status || 'pending'),
+    isVip: Boolean(body.isVip),
   };
 
   if (registration.firstName.length < 2 || registration.lastName.length < 2) {
@@ -2881,6 +3033,7 @@ function toPublicRegistration(row) {
     teamName: row.team_name,
     seedingPosition: row.seeding_position,
     status: row.status,
+    isVip: Boolean(row.is_vip),
     registeredAt: row.registered_at,
     confirmedAt: row.confirmed_at,
     createdAt: row.created_at,

@@ -142,6 +142,7 @@ const EMPTY_REGISTRATION_FORM = {
   teamName: '',
   seedingPosition: '',
   status: 'pending',
+  isVip: false,
   publicationNoticeAccepted: false,
 };
 
@@ -877,6 +878,7 @@ export default function App() {
       teamName: registration.teamName || '',
       seedingPosition: registration.seedingPosition || '',
       status: registration.status || 'pending',
+      isVip: Boolean(registration.isVip),
     });
     setActiveTab('registrations');
     clearFeedback();
@@ -2878,10 +2880,20 @@ function RegistrationFields({ form, setForm, showStatus, formation, licenseRequi
         </>
       )}
       {showStatus && (
-        <div className="form-grid">
-          <TextField label="Setzposition" type="number" min="0" value={form.seedingPosition} onChange={(seedingPosition) => setForm({ ...form, seedingPosition })} />
-          <SelectField label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={REGISTRATION_STATUSES} />
-        </div>
+        <>
+          <div className="form-grid">
+            <TextField label="Setzposition" type="number" min="0" value={form.seedingPosition} onChange={(seedingPosition) => setForm({ ...form, seedingPosition })} />
+            <SelectField label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={REGISTRATION_STATUSES} />
+          </div>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={form.isVip}
+              onChange={(event) => setForm({ ...form, isVip: event.target.checked })}
+            />
+            VIP
+          </label>
+        </>
       )}
     </>
   );
@@ -2905,7 +2917,10 @@ function RegistrationsPanel({ tournament, registrations, tournaments, onTourname
         {registrations.map((registration) => (
           <article className="data-row" key={registration.id}>
             <div>
-              <strong>{registration.firstName} {registration.lastName}</strong>
+              <strong>
+                {registration.isVip && <span className="vip-badge" title="VIP">★</span>}
+                {registration.firstName} {registration.lastName}
+              </strong>
               <span>{registration.email}</span>
               {registration.teamName && <small>{registration.teamName}</small>}
             </div>
@@ -3462,6 +3477,7 @@ function registrationPayload(form, language) {
     teamName: form.teamName || null,
     seedingPosition: form.seedingPosition === '' ? null : Number(form.seedingPosition),
     status: form.status,
+    isVip: Boolean(form.isVip),
     publicationNoticeAccepted: Boolean(form.publicationNoticeAccepted),
     language,
   };
@@ -3940,6 +3956,7 @@ const TRANSLATIONS = {
     Turniersystem: 'Toernooisysteem',
     Formation: 'Formatie',
     Status: 'Status',
+    VIP: 'VIP',
     Sichtbarkeit: 'Zichtbaarheid',
     'Max. Meldungen': 'Max. inschrijvingen',
     'Noch frei': 'Nog vrij',
@@ -4308,6 +4325,7 @@ const TRANSLATIONS = {
     Turniersystem: 'Tournament system',
     Formation: 'Formation',
     Status: 'Status',
+    VIP: 'VIP',
     Sichtbarkeit: 'Visibility',
     'Max. Meldungen': 'Max. registrations',
     'Noch frei': 'Spots free',
@@ -4676,6 +4694,7 @@ const TRANSLATIONS = {
     Turniersystem: 'Sistema',
     Formation: 'Formación',
     Status: 'Estado',
+    VIP: 'VIP',
     Sichtbarkeit: 'Visibilidad',
     'Max. Meldungen': 'Máx. inscripciones',
     'Noch frei': 'Plazas libres',
@@ -5044,6 +5063,7 @@ const TRANSLATIONS = {
     Turniersystem: 'Système',
     Formation: 'Formation',
     Status: 'Statut',
+    VIP: 'VIP',
     Sichtbarkeit: 'Visibilité',
     'Max. Meldungen': 'Max. inscriptions',
     'Noch frei': 'Places libres',
