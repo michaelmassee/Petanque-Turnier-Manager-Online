@@ -1236,7 +1236,16 @@ async function deleteUser(db, id, currentUserId, deleteTournaments) {
   const now = new Date().toISOString();
 
   if (deleteTournaments) {
-    await db.prepare('DELETE FROM tournaments WHERE created_by = ? OR manager_id = ?').bind(id, id).run();
+    await db.batch([
+      db
+        .prepare(
+          `DELETE FROM registrations WHERE tournament_id IN (
+            SELECT id FROM tournaments WHERE created_by = ? OR manager_id = ?
+          )`,
+        )
+        .bind(id, id),
+      db.prepare('DELETE FROM tournaments WHERE created_by = ? OR manager_id = ?').bind(id, id),
+    ]);
   } else {
     // Reassign to the admin performing the deletion instead of leaving created_by/manager_id
     // pointing at a user row that no longer exists.
@@ -1463,8 +1472,11 @@ async function syncPutTournamentMetadata(request, db, existing, user) {
 }
 
 async function deleteTournament(db, id) {
-  const result = await db.prepare('DELETE FROM tournaments WHERE id = ?').bind(id).run();
-  if (result.meta.changes === 0) {
+  const [, tournamentResult] = await db.batch([
+    db.prepare('DELETE FROM registrations WHERE tournament_id = ?').bind(id),
+    db.prepare('DELETE FROM tournaments WHERE id = ?').bind(id),
+  ]);
+  if (tournamentResult.meta.changes === 0) {
     throw new HttpError(404, 'Tournament not found');
   }
   return json({ ok: true });
