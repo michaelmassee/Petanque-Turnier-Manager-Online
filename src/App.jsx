@@ -2409,21 +2409,23 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
   return (
     <article className="tournament-card">
       <button
-        className={`tournament-card-main${hasLogo ? ' has-logo' : ''}`}
+        className="tournament-card-main"
         type="button"
         onClick={() => onOpenTournament(tournament)}
       >
-        {hasLogo && (
-          <img
-            className="tournament-card-logo"
-            src={tournamentImageUrl(tournament.id, 'logo')}
-            alt=""
-            onError={() => setLogoBroken(true)}
-          />
-        )}
-        <span className="tournament-card-date">
-          <strong>{formatDate(tournament.date)}</strong>
-          <small>{tournament.startTime || 'Ganztägig'}</small>
+        <span className={`tournament-card-date${hasLogo ? ' has-logo' : ''}`}>
+          <span className="tournament-card-date-text">
+            <strong>{formatDate(tournament.date)}</strong>
+            <small>{tournament.startTime || 'Ganztägig'}</small>
+          </span>
+          {hasLogo && (
+            <img
+              className="tournament-card-logo"
+              src={tournamentImageUrl(tournament.id, 'logo')}
+              alt=""
+              onError={() => setLogoBroken(true)}
+            />
+          )}
         </span>
         <span className="tournament-card-copy">
           <strong>{tournament.name}</strong>

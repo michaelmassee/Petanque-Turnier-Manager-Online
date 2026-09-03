@@ -842,7 +842,7 @@ textarea:focus {
 
 .tournament-card-main {
   display: grid;
-  grid-template-columns: 130px minmax(0, 1fr);
+  grid-template-columns: 160px minmax(0, 1fr);
   gap: 14px;
   min-width: 0;
   border: 0;
@@ -852,27 +852,34 @@ textarea:focus {
   text-align: left;
 }
 
-.tournament-card-main.has-logo {
-  grid-template-columns: 48px 130px minmax(0, 1fr);
-}
-
 .tournament-card-logo {
-  width: 48px;
-  height: 48px;
-  align-self: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
   border-radius: 8px;
   object-fit: contain;
-  background: #f4f6fa;
+  background: #ffffff;
 }
 
 .tournament-card-date {
-  display: grid;
-  align-content: center;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 72px;
   border-radius: 8px;
   background: #f4f6fa;
   padding: 12px;
+}
+
+.tournament-card-date.has-logo {
+  justify-content: space-between;
+}
+
+.tournament-card-date-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
 }
 
 .tournament-card-date strong {
@@ -1359,13 +1366,8 @@ textarea:focus {
   .filter-grid,
   .user-stat-grid,
   .tournament-card-main,
-  .tournament-card-main.has-logo,
   .tournament-card-meta {
     grid-template-columns: 1fr;
-  }
-
-  .tournament-card-logo {
-    justify-self: start;
   }
 
   .home-finder-copy {
