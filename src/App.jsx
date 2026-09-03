@@ -1119,7 +1119,7 @@ export default function App() {
         />
 
         {authView !== 'home' && (
-          <AuthModal title={authTitle(needsSetup, authView)} subtitle={authSubtitle(needsSetup, authView)} onClose={closeAuthModal}>
+          <AuthModal title={authTitle(needsSetup, authView)} subtitle={authSubtitle(needsSetup, authView)} message={message} error={error} onClose={closeAuthModal}>
             {authView === 'login' && (
               <LoginForm
                 form={authForm}
@@ -1424,6 +1424,8 @@ export default function App() {
         <AuthModal
           title={authTitle(needsSetup, authView)}
           subtitle={authSubtitle(needsSetup, authView)}
+          message={message}
+          error={error}
           onClose={() => {
             setAuthView('home');
             clearFeedback();
@@ -1906,7 +1908,7 @@ function SearchMenuControl({
   );
 }
 
-function AuthModal({ title, subtitle, onClose, children }) {
+function AuthModal({ title, subtitle, message, error, onClose, children }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={(event) => event.stopPropagation()}>
@@ -1915,6 +1917,7 @@ function AuthModal({ title, subtitle, onClose, children }) {
         </button>
         <h2 id="modal-title">{title}</h2>
         {subtitle && <p className="subtitle">{subtitle}</p>}
+        <Feedback message={message} error={error} />
         {children}
       </div>
     </div>
