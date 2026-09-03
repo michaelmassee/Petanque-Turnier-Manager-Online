@@ -514,8 +514,22 @@ export default {
           if (!canViewParticipants(tournament, session?.user || null)) {
             throw new HttpError(403, 'Access denied');
           }
-          return await listPublicParticipants(env.DB, tournament.id);
+          return await listPublicParticipants(env.DB, tournament.id, session?.user?.email || null);
         }
+      }
+
+      const registrationCancelMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/cancel$/);
+      if (registrationCancelMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        const registration = await getRegistrationWithTournament(env.DB, registrationCancelMatch[1]);
+        if (!registration) {
+          throw new HttpError(404, 'Registration not found');
+        }
+        const isOwnRegistration = registration.email.toLowerCase() === session.user.email.toLowerCase();
+        if (!isOwnRegistration && !canManageTournament(registration, session.user)) {
+          throw new HttpError(403, 'Access denied');
+        }
+        return await cancelRegistration(env.DB, registration.id);
       }
 
       const tournamentMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)$/);
@@ -1550,8 +1564,8 @@ async function createTournament(request, db, user) {
       `INSERT INTO tournaments (
         id, created_by, manager_id, name, date, start_time, location, description, type, formation, status,
         max_registrations, registration_deadline, entry_fee_cents, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, latitude, longitude, geocoded_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, latitude, longitude, geocoded_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1576,6 +1590,7 @@ async function createTournament(request, db, user) {
       tournament.participantsPublic ? 1 : 0,
       tournament.licenseRequired ? 1 : 0,
       tournament.teamNameEnabled ? 1 : 0,
+      tournament.waitlistEnabled ? 1 : 0,
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
@@ -1604,7 +1619,7 @@ async function updateTournament(request, db, existing, user) {
        SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
-           participants_public = ?, license_required = ?, team_name_enabled = ?, latitude = ?, longitude = ?, geocoded_at = ?, updated_at = ?
+           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, latitude = ?, longitude = ?, geocoded_at = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -1628,6 +1643,7 @@ async function updateTournament(request, db, existing, user) {
       tournament.participantsPublic ? 1 : 0,
       tournament.licenseRequired ? 1 : 0,
       tournament.teamNameEnabled ? 1 : 0,
+      tournament.waitlistEnabled ? 1 : 0,
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
@@ -1825,10 +1841,10 @@ async function listRegistrations(db, tournamentId) {
   return json({ registrations: result.results.map(toPublicRegistration) });
 }
 
-async function listPublicParticipants(db, tournamentId) {
+async function listPublicParticipants(db, tournamentId, currentUserEmail) {
   const result = await db
     .prepare(
-      `SELECT first_name, last_name, club, team_name, partner_first_name, partner_last_name
+      `SELECT id, email, first_name, last_name, club, team_name, partner_first_name, partner_last_name
        FROM registrations
        WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
        ORDER BY registered_at ASC`,
@@ -1836,16 +1852,32 @@ async function listPublicParticipants(db, tournamentId) {
     .bind(tournamentId)
     .all();
 
+  const normalizedCurrentEmail = currentUserEmail ? currentUserEmail.toLowerCase() : null;
+
   return json({
-    participants: result.results.map((row) => ({
-      firstName: row.first_name,
-      lastName: row.last_name,
-      club: row.club,
-      teamName: row.team_name,
-      partnerFirstName: row.partner_first_name,
-      partnerLastName: row.partner_last_name,
-    })),
+    participants: result.results.map((row) => {
+      const isMine = normalizedCurrentEmail !== null && row.email.toLowerCase() === normalizedCurrentEmail;
+      return {
+        registrationId: isMine ? row.id : null,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        club: row.club,
+        teamName: row.team_name,
+        partnerFirstName: row.partner_first_name,
+        partnerLastName: row.partner_last_name,
+      };
+    }),
   });
+}
+
+async function cancelRegistration(db, id) {
+  const now = new Date().toISOString();
+  const result = await db.prepare("UPDATE registrations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(now, id).run();
+  if (result.meta.changes === 0) {
+    throw new HttpError(404, 'Registration not found');
+  }
+  const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
+  return json({ registration: toPublicRegistration(updated) });
 }
 
 async function createRegistration(request, env, tournament) {
@@ -2234,7 +2266,14 @@ async function initialRegistrationStatus(db, tournament) {
     .bind(tournament.id)
     .first();
 
-  return Number(row?.count || 0) >= Number(tournament.max_registrations) ? 'waitlist' : 'pending';
+  const isFull = Number(row?.count || 0) >= Number(tournament.max_registrations);
+  if (!isFull) {
+    return 'pending';
+  }
+  if (!Number(tournament.waitlist_enabled ?? 1)) {
+    throw new HttpError(403, 'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.');
+  }
+  return 'waitlist';
 }
 
 async function getTournamentById(db, id) {
@@ -2531,6 +2570,7 @@ function normalizeTournamentInput(body) {
     participantsPublic: Boolean(body.participantsPublic),
     licenseRequired: Boolean(body.licenseRequired),
     teamNameEnabled: Boolean(body.teamNameEnabled),
+    waitlistEnabled: body.waitlistEnabled === undefined ? true : Boolean(body.waitlistEnabled),
     latitude: nullableCoordinate(body.latitude, -90, 90),
     longitude: nullableCoordinate(body.longitude, -180, 180),
   };
@@ -2810,6 +2850,7 @@ function toPublicTournament(row, user) {
     participantsPublic: Boolean(Number(row.participants_public)),
     licenseRequired: Boolean(Number(row.license_required || 0)),
     teamNameEnabled: Boolean(Number(row.team_name_enabled || 0)),
+    waitlistEnabled: Boolean(Number(row.waitlist_enabled ?? 1)),
     documentManaged: Boolean(Number(row.document_managed || 0)),
     websiteUrl: row.website_url || null,
     logoUrl: row.logo_url || null,

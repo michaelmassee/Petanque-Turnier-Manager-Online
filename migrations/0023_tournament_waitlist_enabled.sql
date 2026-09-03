@@ -1,0 +1,1 @@
+ALTER TABLE tournaments ADD COLUMN waitlist_enabled INTEGER NOT NULL DEFAULT 1;

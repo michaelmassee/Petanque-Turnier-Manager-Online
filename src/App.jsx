@@ -119,6 +119,7 @@ const EMPTY_TOURNAMENT_FORM = {
   participantsPublic: false,
   licenseRequired: false,
   teamNameEnabled: false,
+  waitlistEnabled: true,
   websiteUrl: '',
   logoUrl: '',
   flyerUrl: '',
@@ -848,6 +849,7 @@ export default function App() {
       participantsPublic: Boolean(tournament.participantsPublic),
       licenseRequired: Boolean(tournament.licenseRequired),
       teamNameEnabled: Boolean(tournament.teamNameEnabled),
+      waitlistEnabled: tournament.waitlistEnabled === undefined ? true : Boolean(tournament.waitlistEnabled),
       websiteUrl: tournament.websiteUrl || '',
       logoUrl: tournament.logoUrl || '',
       flyerUrl: tournament.flyerUrl || '',
@@ -966,6 +968,8 @@ export default function App() {
         onSubmitRegistration={handleRegistrationSubmit}
         message={message}
         error={error}
+        setMessage={setMessage}
+        setError={setError}
         onLogout={handleLogout}
       />
     );
@@ -2001,6 +2005,8 @@ function TournamentDetailPage({
   onSubmitRegistration,
   message,
   error,
+  setMessage,
+  setError,
   onLogout,
 }) {
   const { tournament, notFound } = useRoutedTournament(route.id, tournaments);
@@ -2111,7 +2117,7 @@ function TournamentDetailPage({
               <p className="hint">
                 Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.
               </p>
-              <TournamentParticipants tournamentId={tournament.id} logoUrl={tournament.logoUrl} />
+              <TournamentParticipants tournamentId={tournament.id} logoUrl={tournament.logoUrl} onMessage={setMessage} onError={setError} />
             </>
           )}
         </div>
@@ -2182,9 +2188,10 @@ function TournamentInfo({ tournament, language }) {
   );
 }
 
-function TournamentParticipants({ tournamentId, logoUrl }) {
+function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
   const [participants, setParticipants] = useState(null);
   const [forbidden, setForbidden] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -2203,7 +2210,23 @@ function TournamentParticipants({ tournamentId, logoUrl }) {
     return () => {
       cancelled = true;
     };
-  }, [tournamentId]);
+  }, [tournamentId, reloadKey]);
+
+  async function handleCancelOwnRegistration(participant) {
+    const label = [participant.firstName, participant.lastName].filter(Boolean).join(' ');
+    if (!window.confirm(`Anmeldung "${label}" wirklich absagen?`)) {
+      return;
+    }
+    onError?.('');
+    onMessage?.('');
+    try {
+      await api(`/api/registrations/${participant.registrationId}/cancel`, { method: 'POST' });
+      onMessage?.('Anmeldung wurde abgesagt.');
+      setReloadKey((key) => key + 1);
+    } catch (requestError) {
+      onError?.(requestError.message);
+    }
+  }
 
   const logo = logoUrl && (
     <img
@@ -2260,6 +2283,11 @@ function TournamentParticipants({ tournamentId, logoUrl }) {
                 {participant.partnerFirstName} {participant.partnerLastName}
               </strong>
             </div>
+          )}
+          {participant.registrationId && (
+            <Button variant="secondary" onClick={() => handleCancelOwnRegistration(participant)}>
+              Absagen
+            </Button>
           )}
         </article>
       ))}
@@ -2715,6 +2743,14 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
           onChange={(event) => setForm({ ...form, teamNameEnabled: event.target.checked })}
         />
         Teamname abfragen
+      </label>
+      <label className="checkbox-field">
+        <input
+          type="checkbox"
+          checked={form.waitlistEnabled}
+          onChange={(event) => setForm({ ...form, waitlistEnabled: event.target.checked })}
+        />
+        Warteliste ermöglichen
       </label>
       <label className="checkbox-field">
         <input
@@ -3403,6 +3439,7 @@ function tournamentPayload(form) {
     participantsPublic: Boolean(form.participantsPublic),
     licenseRequired: Boolean(form.licenseRequired),
     teamNameEnabled: Boolean(form.teamNameEnabled),
+    waitlistEnabled: Boolean(form.waitlistEnabled),
   };
 }
 
@@ -3467,7 +3504,7 @@ function hasOpenRegistration(tournament) {
   if (!tournament.maxRegistrations) {
     return true;
   }
-  return tournament.activeRegistrations < tournament.maxRegistrations || tournament.waitlistRegistrations > 0;
+  return tournament.activeRegistrations < tournament.maxRegistrations || Boolean(tournament.waitlistEnabled);
 }
 
 const SLOTS_FREE_TEMPLATES = {
