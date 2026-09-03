@@ -60,6 +60,35 @@ button:disabled {
   margin-bottom: 18px;
 }
 
+.tournament-logo,
+.tournament-logo-preview {
+  display: block;
+  max-width: 160px;
+  max-height: 160px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.tournament-flyer-link {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.tournament-flyer,
+.tournament-flyer-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid #d7deea;
+}
+
 .language-bar {
   display: flex;
   align-items: center;
@@ -819,6 +848,19 @@ textarea:focus {
   text-align: left;
 }
 
+.tournament-card-main.has-logo {
+  grid-template-columns: 48px 130px minmax(0, 1fr);
+}
+
+.tournament-card-logo {
+  width: 48px;
+  height: 48px;
+  align-self: center;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #f4f6fa;
+}
+
 .tournament-card-date {
   display: grid;
   align-content: center;
@@ -1313,8 +1355,13 @@ textarea:focus {
   .filter-grid,
   .user-stat-grid,
   .tournament-card-main,
+  .tournament-card-main.has-logo,
   .tournament-card-meta {
     grid-template-columns: 1fr;
+  }
+
+  .tournament-card-logo {
+    justify-self: start;
   }
 
   .home-finder-copy {

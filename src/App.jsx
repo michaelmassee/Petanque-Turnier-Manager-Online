@@ -924,6 +924,7 @@ export default function App() {
         message={message}
         error={error}
         onLogout={handleLogout}
+        onTournamentUpdated={loadTournaments}
       />
     );
   }
@@ -1947,6 +1948,7 @@ function TournamentDetailPage({
   message,
   error,
   onLogout,
+  onTournamentUpdated,
 }) {
   const { tournament, notFound } = useRoutedTournament(route.id, tournaments);
 
@@ -2035,10 +2037,23 @@ function TournamentDetailPage({
               Teilnehmer
             </button>
           )}
+          {tournament.canManage && (
+            <button
+              className={`tournament-detail-tab ${route.view === 'praesentation' ? 'active' : ''}`}
+              type="button"
+              onClick={() => navigate(`/turniere/${tournament.id}/praesentation`)}
+            >
+              Präsentation
+            </button>
+          )}
         </nav>
 
         <div className="tournament-detail-content">
           {route.view === 'info' && <TournamentInfo tournament={tournament} />}
+
+          {route.view === 'praesentation' && tournament.canManage && (
+            <TournamentPresentationForm tournament={tournament} onSaved={onTournamentUpdated} />
+          )}
 
           {route.view === 'anmelden' && canRegister && (
             <PublicRegistrationPanel
@@ -2070,6 +2085,16 @@ function TournamentInfo({ tournament }) {
 
   return (
     <div className="panel">
+      {tournament.logoUrl && (
+        <img
+          className="tournament-logo"
+          src={tournament.logoUrl}
+          alt=""
+          onError={(event) => {
+            event.target.style.display = 'none';
+          }}
+        />
+      )}
       <p>
         <strong>Datum</strong>: {formatDate(tournament.date)} {tournament.startTime || ''}
       </p>
@@ -2079,6 +2104,11 @@ function TournamentInfo({ tournament }) {
       <a className="button button-secondary maps-link" href={mapsUrl} target="_blank" rel="noreferrer">
         Spielort in Google Maps öffnen
       </a>
+      {tournament.websiteUrl && (
+        <a className="button button-secondary" href={tournament.websiteUrl} target="_blank" rel="noreferrer">
+          Website öffnen
+        </a>
+      )}
       <p>
         <strong>Turniersystem</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
       </p>
@@ -2086,6 +2116,18 @@ function TournamentInfo({ tournament }) {
         <strong>Formation</strong>: {labelFor(FORMATIONS, tournament.formation)}
       </p>
       {tournament.description && <p>{tournament.description}</p>}
+      {tournament.flyerUrl && (
+        <a className="tournament-flyer-link" href={tournament.flyerUrl} target="_blank" rel="noreferrer">
+          <img
+            className="tournament-flyer"
+            src={tournament.flyerUrl}
+            alt=""
+            onError={(event) => {
+              event.target.parentElement.style.display = 'none';
+            }}
+          />
+        </a>
+      )}
       {Boolean(tournament.entryFeeCents) && (
         <p>
           <strong>Startgeld</strong>: {centsToEuro(tournament.entryFeeCents)} €
@@ -2104,6 +2146,102 @@ function TournamentInfo({ tournament }) {
           <strong>Kontakt</strong>: {[tournament.contactName, tournament.contactEmail, tournament.contactPhone].filter(Boolean).join(' · ')}
         </p>
       )}
+    </div>
+  );
+}
+
+function TournamentPresentationForm({ tournament, onSaved }) {
+  const [form, setForm] = useState({
+    websiteUrl: tournament.websiteUrl || '',
+    logoUrl: tournament.logoUrl || '',
+    flyerUrl: tournament.flyerUrl || '',
+  });
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setForm({
+      websiteUrl: tournament.websiteUrl || '',
+      logoUrl: tournament.logoUrl || '',
+      flyerUrl: tournament.flyerUrl || '',
+    });
+  }, [tournament.id, tournament.websiteUrl, tournament.logoUrl, tournament.flyerUrl]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+
+    try {
+      await api(`/api/tournaments/${tournament.id}/presentation`, {
+        method: 'PUT',
+        body: JSON.stringify(form),
+      });
+      setMessage('Präsentation wurde gespeichert.');
+      await onSaved?.();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  return (
+    <div className="panel">
+      <p className="hint">
+        Website, Logo und Flyer sind unabhängig von den Turnier-Eckdaten und können auch bei
+        dokument-verwalteten Turnieren jederzeit hier gepflegt werden. Logo und Flyer werden als Link zu einem
+        bereits online gehosteten Bild eingebunden, nicht hochgeladen.
+      </p>
+      <form className="form dense" onSubmit={handleSubmit}>
+        <TextField
+          label="Website"
+          type="url"
+          placeholder="https://…"
+          value={form.websiteUrl}
+          onChange={(websiteUrl) => setForm({ ...form, websiteUrl })}
+        />
+        <TextField
+          label="Logo-Bildlink"
+          type="url"
+          placeholder="https://…"
+          value={form.logoUrl}
+          onChange={(logoUrl) => setForm({ ...form, logoUrl })}
+        />
+        {form.logoUrl && (
+          <img
+            className="tournament-logo-preview"
+            src={form.logoUrl}
+            alt=""
+            onError={(event) => {
+              event.target.style.display = 'none';
+            }}
+            onLoad={(event) => {
+              event.target.style.display = '';
+            }}
+          />
+        )}
+        <TextField
+          label="Flyer-Bildlink"
+          type="url"
+          placeholder="https://…"
+          value={form.flyerUrl}
+          onChange={(flyerUrl) => setForm({ ...form, flyerUrl })}
+        />
+        {form.flyerUrl && (
+          <img
+            className="tournament-flyer-preview"
+            src={form.flyerUrl}
+            alt=""
+            onError={(event) => {
+              event.target.style.display = 'none';
+            }}
+            onLoad={(event) => {
+              event.target.style.display = '';
+            }}
+          />
+        )}
+        <Feedback message={message} error={error} />
+        <Button type="submit">Präsentation speichern</Button>
+      </form>
     </div>
   );
 }
@@ -2422,7 +2560,21 @@ function HomeTournaments({
       <div className="tournament-card-list">
         {tournaments.map((tournament) => (
           <article className="tournament-card" key={tournament.id}>
-            <button className="tournament-card-main" type="button" onClick={() => onOpenTournament(tournament)}>
+            <button
+              className={`tournament-card-main${tournament.logoUrl ? ' has-logo' : ''}`}
+              type="button"
+              onClick={() => onOpenTournament(tournament)}
+            >
+              {tournament.logoUrl && (
+                <img
+                  className="tournament-card-logo"
+                  src={tournament.logoUrl}
+                  alt=""
+                  onError={(event) => {
+                    event.target.style.display = 'none';
+                  }}
+                />
+              )}
               <span className="tournament-card-date">
                 <strong>{formatDate(tournament.date)}</strong>
                 <small>{tournament.startTime || 'Ganztägig'}</small>
@@ -3023,7 +3175,7 @@ function matchTournamentRoute(path) {
 
   const id = decodeURIComponent(segments[1]);
   const sub = segments[2] || 'info';
-  if (!['info', 'anmelden', 'teilnehmer'].includes(sub)) {
+  if (!['info', 'anmelden', 'teilnehmer', 'praesentation'].includes(sub)) {
     return null;
   }
 
@@ -3815,6 +3967,16 @@ const TRANSLATIONS = {
     Startgeld: 'Inschrijfgeld',
     Kontakt: 'Contact',
     'Spielort in Google Maps öffnen': 'Speellocatie in Google Maps openen',
+    Präsentation: 'Presentatie',
+    'Website öffnen': 'Website openen',
+    Website: 'Website',
+    'Logo-Bildlink': 'Logo-afbeeldingslink',
+    'Flyer-Bildlink': 'Flyer-afbeeldingslink',
+    'Präsentation speichern': 'Presentatie opslaan',
+    'Präsentation wurde gespeichert.': 'Presentatie is opgeslagen.',
+    'Website, Logo und Flyer sind unabhängig von den Turnier-Eckdaten und können auch bei dokument-verwalteten Turnieren jederzeit hier gepflegt werden. Logo und Flyer werden als Link zu einem bereits online gehosteten Bild eingebunden, nicht hochgeladen.':
+      'Website, logo en flyer staan los van de kerngegevens van het toernooi en kunnen ook bij document-beheerde toernooien altijd hier worden ingesteld. Logo en flyer worden als link naar een al online gehoste afbeelding ingebonden, niet geüpload.',
+    'Eine gültige URL (http:// oder https://) ist erforderlich': 'Een geldige URL (http:// of https://) is verplicht',
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'De deelnemerslijst is voor dit toernooi niet openbaar.',
     'Teilnehmerliste wird geladen…': 'Deelnemerslijst wordt geladen…',
     'Noch keine Anmeldungen.': 'Nog geen inschrijvingen.',
@@ -4166,6 +4328,16 @@ const TRANSLATIONS = {
     Startgeld: 'Entry fee',
     Kontakt: 'Contact',
     'Spielort in Google Maps öffnen': 'Open venue in Google Maps',
+    Präsentation: 'Presentation',
+    'Website öffnen': 'Open website',
+    Website: 'Website',
+    'Logo-Bildlink': 'Logo image link',
+    'Flyer-Bildlink': 'Flyer image link',
+    'Präsentation speichern': 'Save presentation',
+    'Präsentation wurde gespeichert.': 'Presentation was saved.',
+    'Website, Logo und Flyer sind unabhängig von den Turnier-Eckdaten und können auch bei dokument-verwalteten Turnieren jederzeit hier gepflegt werden. Logo und Flyer werden als Link zu einem bereits online gehosteten Bild eingebunden, nicht hochgeladen.':
+      'Website, logo and flyer are independent of the tournament core data and can always be managed here, even for document-managed tournaments. Logo and flyer are embedded as a link to an already hosted image, not uploaded.',
+    'Eine gültige URL (http:// oder https://) ist erforderlich': 'A valid URL (http:// or https://) is required',
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'The participant list is not public for this tournament.',
     'Teilnehmerliste wird geladen…': 'Loading participant list…',
     'Noch keine Anmeldungen.': 'No registrations yet.',
@@ -4517,6 +4689,16 @@ const TRANSLATIONS = {
     Startgeld: 'Cuota',
     Kontakt: 'Contacto',
     'Spielort in Google Maps öffnen': 'Abrir sede en Google Maps',
+    Präsentation: 'Presentación',
+    'Website öffnen': 'Abrir sitio web',
+    Website: 'Sitio web',
+    'Logo-Bildlink': 'Enlace de imagen del logo',
+    'Flyer-Bildlink': 'Enlace de imagen del flyer',
+    'Präsentation speichern': 'Guardar presentación',
+    'Präsentation wurde gespeichert.': 'La presentación se ha guardado.',
+    'Website, Logo und Flyer sind unabhängig von den Turnier-Eckdaten und können auch bei dokument-verwalteten Turnieren jederzeit hier gepflegt werden. Logo und Flyer werden als Link zu einem bereits online gehosteten Bild eingebunden, nicht hochgeladen.':
+      'El sitio web, el logo y el flyer son independientes de los datos básicos del torneo y siempre se pueden gestionar aquí, incluso en torneos gestionados por documento. El logo y el flyer se insertan como enlace a una imagen ya alojada en línea, no se suben.',
+    'Eine gültige URL (http:// oder https://) ist erforderlich': 'Se requiere una URL válida (http:// o https://)',
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'La lista de participantes no es pública para este torneo.',
     'Teilnehmerliste wird geladen…': 'Cargando lista de participantes…',
     'Noch keine Anmeldungen.': 'Aún no hay inscripciones.',
@@ -4868,6 +5050,16 @@ const TRANSLATIONS = {
     Startgeld: 'Frais d’inscription',
     Kontakt: 'Contact',
     'Spielort in Google Maps öffnen': 'Ouvrir le lieu dans Google Maps',
+    Präsentation: 'Présentation',
+    'Website öffnen': 'Ouvrir le site web',
+    Website: 'Site web',
+    'Logo-Bildlink': 'Lien de l’image du logo',
+    'Flyer-Bildlink': 'Lien de l’image du flyer',
+    'Präsentation speichern': 'Enregistrer la présentation',
+    'Präsentation wurde gespeichert.': 'La présentation a été enregistrée.',
+    'Website, Logo und Flyer sind unabhängig von den Turnier-Eckdaten und können auch bei dokument-verwalteten Turnieren jederzeit hier gepflegt werden. Logo und Flyer werden als Link zu einem bereits online gehosteten Bild eingebunden, nicht hochgeladen.':
+      'Le site web, le logo et le flyer sont indépendants des données de base du tournoi et peuvent toujours être gérés ici, même pour les tournois gérés par document. Le logo et le flyer sont intégrés sous forme de lien vers une image déjà hébergée en ligne, et non téléversés.',
+    'Eine gültige URL (http:// oder https://) ist erforderlich': 'Une URL valide (http:// ou https://) est requise',
     'Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.': 'La liste des participants n’est pas publique pour ce tournoi.',
     'Teilnehmerliste wird geladen…': 'Chargement de la liste des participants…',
     'Noch keine Anmeldungen.': 'Pas encore d’inscriptions.',

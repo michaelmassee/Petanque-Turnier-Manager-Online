@@ -333,6 +333,17 @@ export default {
         }
       }
 
+      const presentationMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/presentation$/);
+      if (presentationMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, presentationMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Tournament not found');
+        }
+        assertCanManageTournament(tournament, session.user);
+        return await updateTournamentPresentation(request, env.DB, tournament, session.user);
+      }
+
       const registrationMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)$/);
       if (registrationMatch) {
         const auth = await requireManagerAuth(request, env.DB);
@@ -1382,6 +1393,37 @@ async function updateTournament(request, db, existing, user) {
   return json({ tournament: toPublicTournament(updated, user) });
 }
 
+function normalizePresentationUrl(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (!isHttpUrl(trimmed)) {
+    throw new HttpError(400, 'Eine gültige URL (http:// oder https://) ist erforderlich');
+  }
+  return trimmed;
+}
+
+/**
+ * Website/Logo/Flyer are presentation-only extras, not part of the tournament document's core
+ * data, so this bypasses the document_managed lock enforced by updateTournament.
+ */
+async function updateTournamentPresentation(request, db, existing, user) {
+  const body = await readJson(request);
+  const websiteUrl = normalizePresentationUrl(body.websiteUrl);
+  const logoUrl = normalizePresentationUrl(body.logoUrl);
+  const flyerUrl = normalizePresentationUrl(body.flyerUrl);
+  const now = new Date().toISOString();
+
+  await db
+    .prepare('UPDATE tournaments SET website_url = ?, logo_url = ?, flyer_url = ?, updated_at = ? WHERE id = ?')
+    .bind(websiteUrl, logoUrl, flyerUrl, now, existing.id)
+    .run();
+
+  const updated = await getTournamentById(db, existing.id);
+  return json({ tournament: toPublicTournament(updated, user) });
+}
+
 /** PTM Calc is the exclusive writer for the metadata of a linked tournament. */
 async function syncPutTournamentMetadata(request, db, existing, user) {
   const body = await readJson(request);
@@ -2256,6 +2298,15 @@ function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function isHttpUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function assertPasswordStrength(password) {
   if (
     password.length < 8 ||
@@ -2384,6 +2435,9 @@ function toPublicTournament(row, user) {
     participantsPublic: Boolean(Number(row.participants_public)),
     licenseRequired: Boolean(Number(row.license_required || 0)),
     documentManaged: Boolean(Number(row.document_managed || 0)),
+    websiteUrl: row.website_url || null,
+    logoUrl: row.logo_url || null,
+    flyerUrl: row.flyer_url || null,
     activeRegistrations: Number(row.active_registrations || 0),
     waitlistRegistrations: Number(row.waitlist_registrations || 0),
     canManage: canManageTournament(row, user),
