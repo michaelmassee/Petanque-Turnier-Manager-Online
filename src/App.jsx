@@ -184,6 +184,8 @@ export default function App() {
   const [homeFilterOpen, setHomeFilterOpen] = useState(false);
   const [homeFilterMonth, setHomeFilterMonth] = useState('');
   const [homeFilterFormation, setHomeFilterFormation] = useState('');
+  const [homeFilterRegistrationType, setHomeFilterRegistrationType] = useState('');
+  const [homeFilterType, setHomeFilterType] = useState('');
   const [homeFilterOpenOnly, setHomeFilterOpenOnly] = useState(false);
   const [searchOrigin, setSearchOrigin] = useState(null);
   const [searchOriginQuery, setSearchOriginQuery] = useState('');
@@ -245,6 +247,12 @@ export default function App() {
       if (homeFilterFormation && tournament.formation !== homeFilterFormation) {
         return false;
       }
+      if (homeFilterRegistrationType && tournament.registrationType !== homeFilterRegistrationType) {
+        return false;
+      }
+      if (homeFilterType && tournament.type !== homeFilterType) {
+        return false;
+      }
       if (homeFilterOpenOnly && !hasOpenRegistration(tournament)) {
         return false;
       }
@@ -277,6 +285,8 @@ export default function App() {
     isAdmin,
     homeFilterMonth,
     homeFilterFormation,
+    homeFilterRegistrationType,
+    homeFilterType,
     homeFilterOpenOnly,
     searchOrigin,
     searchRadiusKm,
@@ -324,7 +334,15 @@ export default function App() {
 
   useEffect(() => {
     setHomeVisibleCount(10);
-  }, [homeQuery, homeOnlyMine, homeFilterMonth, homeFilterFormation, homeFilterOpenOnly]);
+  }, [
+    homeQuery,
+    homeOnlyMine,
+    homeFilterMonth,
+    homeFilterFormation,
+    homeFilterRegistrationType,
+    homeFilterType,
+    homeFilterOpenOnly,
+  ]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -937,6 +955,8 @@ export default function App() {
   function resetHomeFilters() {
     setHomeFilterMonth('');
     setHomeFilterFormation('');
+    setHomeFilterRegistrationType('');
+    setHomeFilterType('');
     setHomeFilterOpenOnly(false);
   }
 
@@ -1103,6 +1123,10 @@ export default function App() {
               setFilterMonth={setHomeFilterMonth}
               filterFormation={homeFilterFormation}
               setFilterFormation={setHomeFilterFormation}
+              filterRegistrationType={homeFilterRegistrationType}
+              setFilterRegistrationType={setHomeFilterRegistrationType}
+              filterType={homeFilterType}
+              setFilterType={setHomeFilterType}
               filterOpenOnly={homeFilterOpenOnly}
               setFilterOpenOnly={setHomeFilterOpenOnly}
               onResetFilters={resetHomeFilters}
@@ -1148,6 +1172,8 @@ export default function App() {
           onlyMine={false}
           filterMonth={homeFilterMonth}
           filterFormation={homeFilterFormation}
+          filterRegistrationType={homeFilterRegistrationType}
+          filterType={homeFilterType}
           filterOpenOnly={homeFilterOpenOnly}
           searchOrigin={searchOrigin}
           searchRadiusKm={searchRadiusKm}
@@ -1335,6 +1361,10 @@ export default function App() {
               setFilterMonth={setHomeFilterMonth}
               filterFormation={homeFilterFormation}
               setFilterFormation={setHomeFilterFormation}
+              filterRegistrationType={homeFilterRegistrationType}
+              setFilterRegistrationType={setHomeFilterRegistrationType}
+              filterType={homeFilterType}
+              setFilterType={setHomeFilterType}
               filterOpenOnly={homeFilterOpenOnly}
               setFilterOpenOnly={setHomeFilterOpenOnly}
               onResetFilters={resetHomeFilters}
@@ -1453,6 +1483,8 @@ export default function App() {
           onlyMine={homeOnlyMine}
           filterMonth={homeFilterMonth}
           filterFormation={homeFilterFormation}
+          filterRegistrationType={homeFilterRegistrationType}
+          filterType={homeFilterType}
           filterOpenOnly={homeFilterOpenOnly}
           searchOrigin={searchOrigin}
           searchRadiusKm={searchRadiusKm}
@@ -1867,6 +1899,10 @@ function SearchMenuControl({
   setFilterMonth,
   filterFormation,
   setFilterFormation,
+  filterRegistrationType,
+  setFilterRegistrationType,
+  filterType,
+  setFilterType,
   filterOpenOnly,
   setFilterOpenOnly,
   onResetFilters,
@@ -1961,6 +1997,18 @@ function SearchMenuControl({
                     value={filterFormation}
                     onChange={setFilterFormation}
                     options={[{ value: '', label: 'Alle Formationen' }, ...FORMATIONS]}
+                  />
+                  <SelectField
+                    label="Anmeldetyp"
+                    value={filterRegistrationType}
+                    onChange={setFilterRegistrationType}
+                    options={[{ value: '', label: 'Alle Anmeldetypen' }, ...REGISTRATION_TYPES]}
+                  />
+                  <SelectField
+                    label="Turniersystem"
+                    value={filterType}
+                    onChange={setFilterType}
+                    options={[{ value: '', label: 'Alle Turniersysteme' }, ...TOURNAMENT_TYPES]}
                   />
                 </div>
                 <label className="checkbox-field">
@@ -2291,13 +2339,13 @@ function TournamentInfo({ tournament, language, onShare }) {
         <strong>Ort</strong>: {tournament.location}
       </p>
       <p>
-        <strong>Turniersystem</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
-      </p>
-      <p>
         <strong>Formation</strong>: {labelFor(FORMATIONS, tournament.formation)}
       </p>
       <p>
         <strong>Anmeldetyp</strong>: {labelFor(REGISTRATION_TYPES, tournament.registrationType)}
+      </p>
+      <p>
+        <strong>Turniersystem</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
       </p>
       <p>
         <strong>{translateText('Lizenz', language)}</strong>: {translateText(tournament.licenseRequired ? 'Ja' : 'Nein', language)}
@@ -2643,7 +2691,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
           </strong>
           <span>{tournament.location}</span>
           <small>
-            {labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)}
+            {labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}
             {typeof tournament.distanceKm === 'number' && (
               <>
                 {' · '}
@@ -2674,6 +2722,8 @@ function HomeTournaments({
   onlyMine,
   filterMonth,
   filterFormation,
+  filterRegistrationType,
+  filterType,
   filterOpenOnly,
   searchOrigin,
   searchRadiusKm,
@@ -2690,6 +2740,8 @@ function HomeTournaments({
     showMineFilter && onlyMine,
     filterMonth,
     filterFormation,
+    filterRegistrationType,
+    filterType,
     filterOpenOnly,
   ].filter(Boolean).length;
   const nextTournament = tournaments[0] || null;
@@ -3113,7 +3165,7 @@ function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete, i
             <button className="row-main" type="button" onClick={() => onSelect(tournament.id)}>
               <strong>{tournament.name}</strong>
               <span>{formatDate(tournament.date)} {tournament.startTime || ''} · {tournament.location}</span>
-              <small>{labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)}</small>
+              <small>{labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</small>
               {isAdmin && tournament.managerName && <small>Turnierleiter: {tournament.managerName}</small>}
             </button>
             <div className="badges">
@@ -3266,12 +3318,81 @@ function RegistrationFields({ form, setForm, showStatus, formation, registration
   );
 }
 
+const REGISTRATION_CSV_COLUMNS = [
+  'id',
+  'firstName',
+  'lastName',
+  'email',
+  'club',
+  'licenseNr',
+  'partnerFirstName',
+  'partnerLastName',
+  'partnerEmail',
+  'partnerLicenseNr',
+  'partner2FirstName',
+  'partner2LastName',
+  'partner2Email',
+  'partner2LicenseNr',
+  'teamName',
+  'seedingPosition',
+  'status',
+  'isVip',
+  'registeredAt',
+  'confirmedAt',
+  'createdAt',
+  'updatedAt',
+];
+
+function csvField(value) {
+  const text = value === null || value === undefined ? '' : String(value);
+  if (/[",\r\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function registrationsToCsv(registrations) {
+  const lines = [REGISTRATION_CSV_COLUMNS.map(csvField).join(',')];
+  for (const registration of registrations) {
+    lines.push(REGISTRATION_CSV_COLUMNS.map((column) => csvField(registration[column])).join(','));
+  }
+  return `﻿${lines.join('\r\n')}\r\n`;
+}
+
+function tournamentFileSlug(name) {
+  return (name || 'turnier')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'turnier';
+}
+
+function downloadRegistrationsCsv(tournament, registrations) {
+  const csv = registrationsToCsv(registrations);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  link.href = url;
+  link.download = `meldeliste-${tournamentFileSlug(tournament?.name)}-${date}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function RegistrationsPanel({ tournament, registrations, tournaments, onTournamentChange, onEdit, onDelete }) {
   return (
     <div className="panel">
       <div className="section-title">
         <h2>Anmeldungen</h2>
         <span className="counter">{registrations.length}</span>
+        <Button
+          variant="secondary"
+          disabled={registrations.length === 0}
+          onClick={() => downloadRegistrationsCsv(tournament, registrations)}
+        >
+          CSV exportieren
+        </Button>
       </div>
       <SelectField
         label="Turnier anzeigen"
@@ -4239,6 +4360,7 @@ async function api(path, options = {}) {
 
 const TRANSLATIONS = {
   nl: {
+    'CSV exportieren': 'CSV exporteren',
     'Eckdaten im Turnierdokument': 'Toernooigegevens in het toernooidocument',
     'App wird geladen.': 'App wordt geladen.',
     'Ersten Admin anlegen': 'Eerste admin aanmaken',
@@ -4473,6 +4595,8 @@ const TRANSLATIONS = {
     Monat: 'Maand',
     'Alle Monate': 'Alle maanden',
     'Alle Formationen': 'Alle formaties',
+    'Alle Anmeldetypen': 'Alle inschrijftypes',
+    'Alle Turniersysteme': 'Alle toernooisystemen',
     'Anmeldung möglich': 'Inschrijving mogelijk',
     Zurücksetzen: 'Resetten',
     'Anmeldung Warteliste möglich': 'Inschrijving wachtlijst mogelijk',
@@ -4631,6 +4755,7 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   en: {
+    'CSV exportieren': 'Export CSV',
     'Eckdaten im Turnierdokument': 'Tournament details in the tournament document',
     'App wird geladen.': 'App is loading.',
     'Ersten Admin anlegen': 'Create first admin',
@@ -4865,6 +4990,8 @@ const TRANSLATIONS = {
     Monat: 'Month',
     'Alle Monate': 'All months',
     'Alle Formationen': 'All formations',
+    'Alle Anmeldetypen': 'All registration types',
+    'Alle Turniersysteme': 'All tournament systems',
     'Anmeldung möglich': 'Registration possible',
     Zurücksetzen: 'Reset',
     'Anmeldung Warteliste möglich': 'Registration waitlist possible',
@@ -5023,6 +5150,7 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   es: {
+    'CSV exportieren': 'Exportar CSV',
     'Eckdaten im Turnierdokument': 'Datos del torneo en el documento del torneo',
     'App wird geladen.': 'La app se está cargando.',
     'Ersten Admin anlegen': 'Crear primer admin',
@@ -5257,6 +5385,8 @@ const TRANSLATIONS = {
     Monat: 'Mes',
     'Alle Monate': 'Todos los meses',
     'Alle Formationen': 'Todas las formaciones',
+    'Alle Anmeldetypen': 'Todos los tipos de inscripción',
+    'Alle Turniersysteme': 'Todos los sistemas de torneo',
     'Anmeldung möglich': 'Inscripción posible',
     Zurücksetzen: 'Restablecer',
     'Anmeldung Warteliste möglich': 'Inscripción en lista de espera posible',
@@ -5415,6 +5545,7 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   fr: {
+    'CSV exportieren': 'Exporter en CSV',
     'Eckdaten im Turnierdokument': 'Informations du tournoi dans le document du tournoi',
     'App wird geladen.': 'Chargement de l’application.',
     'Ersten Admin anlegen': 'Créer le premier admin',
@@ -5649,6 +5780,8 @@ const TRANSLATIONS = {
     Monat: 'Mois',
     'Alle Monate': 'Tous les mois',
     'Alle Formationen': 'Toutes les formations',
+    'Alle Anmeldetypen': "Tous les types d'inscription",
+    'Alle Turniersysteme': 'Tous les systèmes de tournoi',
     'Anmeldung möglich': 'Inscription possible',
     Zurücksetzen: 'Réinitialiser',
     'Anmeldung Warteliste möglich': 'Inscription en liste d’attente possible',
