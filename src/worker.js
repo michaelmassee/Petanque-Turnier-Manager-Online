@@ -1615,6 +1615,11 @@ async function createTournament(request, db, user) {
 
   const body = await readJson(request);
   const tournament = normalizeTournamentInput(body);
+  const presentation = {
+    websiteUrl: normalizePresentationUrl(body.websiteUrl),
+    logoUrl: normalizePresentationUrl(body.logoUrl),
+    flyerUrl: normalizePresentationUrl(body.flyerUrl),
+  };
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   const managerId = user.role === 'admin' ? tournament.managerId || user.id : user.id;
@@ -1625,8 +1630,9 @@ async function createTournament(request, db, user) {
       `INSERT INTO tournaments (
         id, created_by, manager_id, name, date, start_time, location, description, type, formation, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, latitude, longitude, geocoded_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, website_url, logo_url, flyer_url,
+        latitude, longitude, geocoded_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1654,6 +1660,9 @@ async function createTournament(request, db, user) {
       tournament.licenseRequired ? 1 : 0,
       tournament.teamNameEnabled ? 1 : 0,
       tournament.waitlistEnabled ? 1 : 0,
+      presentation.websiteUrl,
+      presentation.logoUrl,
+      presentation.flyerUrl,
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
@@ -1756,7 +1765,9 @@ async function proxyTournamentImage(tournament, field) {
   }
 
   const cache = caches.default;
-  const cacheKey = new Request(`https://image-proxy.internal/tournaments/${tournament.id}/${field}`);
+  const cacheKey = new Request(
+    `https://image-proxy.internal/tournaments/${tournament.id}/${field}?source=${encodeURIComponent(targetUrl)}`,
+  );
   const cached = await cache.match(cacheKey);
   if (cached) {
     return cached;

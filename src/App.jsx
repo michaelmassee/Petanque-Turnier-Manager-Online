@@ -771,19 +771,20 @@ export default function App() {
     const payload = tournamentPayload(tournamentForm);
 
     try {
-      const data =
-        tournamentMode === 'edit'
-          ? await api(`/api/tournaments/${tournamentForm.id}`, { method: 'PUT', body: JSON.stringify(payload) })
-          : await api('/api/tournaments', { method: 'POST', body: JSON.stringify(payload) });
-
-      await api(`/api/tournaments/${data.tournament.id}/presentation`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          websiteUrl: tournamentForm.websiteUrl,
-          logoUrl: tournamentForm.logoUrl,
-          flyerUrl: tournamentForm.flyerUrl,
-        }),
-      });
+      let data;
+      if (tournamentMode === 'edit') {
+        data = await api(`/api/tournaments/${tournamentForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        await api(`/api/tournaments/${data.tournament.id}/presentation`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            websiteUrl: tournamentForm.websiteUrl,
+            logoUrl: tournamentForm.logoUrl,
+            flyerUrl: tournamentForm.flyerUrl,
+          }),
+        });
+      } else {
+        data = await api('/api/tournaments', { method: 'POST', body: JSON.stringify(payload) });
+      }
 
       setMessage(tournamentMode === 'edit' ? 'Turnier wurde aktualisiert.' : 'Turnier wurde angelegt.');
       setTournamentForm(EMPTY_TOURNAMENT_FORM);
@@ -3344,7 +3345,12 @@ const REGISTRATION_CSV_COLUMNS = [
 ];
 
 function csvField(value) {
-  const text = value === null || value === undefined ? '' : String(value);
+  let text = value === null || value === undefined ? '' : String(value);
+  // Spreadsheet applications evaluate cells beginning with these characters as formulas,
+  // even when the CSV field is quoted. Preserve participant input as literal text instead.
+  if (/^[=+\-@]/.test(text)) {
+    text = `'${text}`;
+  }
   if (/[",\r\n]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;
   }
@@ -3959,6 +3965,9 @@ function tournamentPayload(form) {
     licenseRequired: Boolean(form.licenseRequired),
     teamNameEnabled: Boolean(form.teamNameEnabled),
     waitlistEnabled: Boolean(form.waitlistEnabled),
+    websiteUrl: form.websiteUrl || null,
+    logoUrl: form.logoUrl || null,
+    flyerUrl: form.flyerUrl || null,
   };
 }
 
