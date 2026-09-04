@@ -1,0 +1,11 @@
+#!/bin/sh
+# Quality gate: blocks the commit unless build, tests, i18n-check and
+# security-check all pass. Activated via `git config core.hooksPath .githooks`
+# (done automatically by `npm install`, see package.json "postinstall").
+npm run --silent quality-gate
+status=$?
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "Commit abgebrochen: 'npm run quality-gate' ist fehlgeschlagen (siehe oben)."
+  exit $status
+fi

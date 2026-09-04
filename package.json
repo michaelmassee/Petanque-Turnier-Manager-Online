@@ -4,16 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "git config core.hooksPath .githooks || true",
     "dev": "npm run build && npm run db:migrate:local && wrangler dev --ip 0.0.0.0",
     "dev:vite": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && npm run db:migrate:remote && wrangler deploy",
+    "deploy": "npm run quality-gate && npm run db:migrate:remote && wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "security:check": "node scripts/security-check.mjs && node scripts/i18n-check.mjs",
     "i18n:check": "node scripts/i18n-check.mjs",
-    "test": "node scripts/formation-registration-type-check.mjs && node scripts/timezone-check.mjs"
+    "test": "node scripts/formation-registration-type-check.mjs && node scripts/timezone-check.mjs",
+    "quality-gate": "npm run build && npm test && npm run security:check"
   },
   "dependencies": {
     "react": "^19.0.0",
