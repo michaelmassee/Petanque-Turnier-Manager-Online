@@ -844,7 +844,7 @@ export default function App() {
         await loadRegistrations(selectedTournament.id);
       }
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -901,8 +901,8 @@ export default function App() {
       registrationType: tournament.registrationType || 'forme',
       status: tournament.status || 'draft',
       maxRegistrations: tournament.maxRegistrations || 0,
-      registrationDeadline: tournament.registrationDeadline || '',
-      registrationOpensAt: tournament.registrationOpensAt || '',
+      registrationDeadline: isoToLocalDateTimeInput(tournament.registrationDeadline),
+      registrationOpensAt: isoToLocalDateTimeInput(tournament.registrationOpensAt),
       entryFeeEuro: centsToEuro(tournament.entryFeeCents),
       contactName: tournament.contactName || '',
       contactEmail: tournament.contactEmail || '',
@@ -3953,8 +3953,8 @@ function tournamentPayload(form) {
     registrationType: form.registrationType,
     status: form.status,
     maxRegistrations: Number(form.maxRegistrations || 0),
-    registrationDeadline: form.registrationDeadline || null,
-    registrationOpensAt: form.registrationOpensAt || null,
+    registrationDeadline: localDateTimeToIso(form.registrationDeadline),
+    registrationOpensAt: localDateTimeToIso(form.registrationOpensAt),
     entryFeeCents: euroToCents(form.entryFeeEuro),
     contactName: form.contactName || null,
     contactEmail: form.contactEmail || null,
@@ -4334,6 +4334,29 @@ function euroToCents(value) {
   return Math.round(Number(normalized) * 100);
 }
 
+// datetime-local liefert einen Wert ohne Zeitzone, der vom Browser als lokale Zeit
+// interpretiert wird. Beim Speichern wandeln wir das explizit in einen UTC-ISO-String
+// um, damit der Vergleich mit Date.now() im Worker (der in UTC läuft) korrekt bleibt.
+function localDateTimeToIso(value) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function isoToLocalDateTimeInput(value) {
+  if (!value) {
+    return '';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 const PASSWORD_STRENGTH_ERROR =
   'Das Passwort muss mindestens 8 Zeichen lang sein und mindestens eine Zahl, einen Kleinbuchstaben, einen Großbuchstaben und ein Sonderzeichen enthalten';
 const PASSWORD_STRENGTH_HINT = 'Mindestens 8 Zeichen, ein Groß- und Kleinbuchstabe, eine Zahl und ein Sonderzeichen.';
@@ -4369,6 +4392,9 @@ async function api(path, options = {}) {
 
 const TRANSLATIONS = {
   nl: {
+    'Die Anmeldung ist geschlossen': 'De inschrijving is gesloten',
+    'Die Meldefrist ist abgelaufen': 'De inschrijftermijn is verstreken',
+    'Die Anmeldung ist noch nicht geöffnet': 'De inschrijving is nog niet geopend',
     'CSV exportieren': 'CSV exporteren',
     'Eckdaten im Turnierdokument': 'Toernooigegevens in het toernooidocument',
     'App wird geladen.': 'App wordt geladen.',
@@ -4764,6 +4790,9 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   en: {
+    'Die Anmeldung ist geschlossen': 'Registration is closed',
+    'Die Meldefrist ist abgelaufen': 'The registration deadline has passed',
+    'Die Anmeldung ist noch nicht geöffnet': 'Registration has not opened yet',
     'CSV exportieren': 'Export CSV',
     'Eckdaten im Turnierdokument': 'Tournament details in the tournament document',
     'App wird geladen.': 'App is loading.',
@@ -5159,6 +5188,9 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   es: {
+    'Die Anmeldung ist geschlossen': 'La inscripción está cerrada',
+    'Die Meldefrist ist abgelaufen': 'El plazo de inscripción ha vencido',
+    'Die Anmeldung ist noch nicht geöffnet': 'La inscripción todavía no está abierta',
     'CSV exportieren': 'Exportar CSV',
     'Eckdaten im Turnierdokument': 'Datos del torneo en el documento del torneo',
     'App wird geladen.': 'La app se está cargando.',
@@ -5554,6 +5586,9 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   fr: {
+    'Die Anmeldung ist geschlossen': "L'inscription est fermée",
+    'Die Meldefrist ist abgelaufen': "Le délai d'inscription est dépassé",
+    'Die Anmeldung ist noch nicht geöffnet': "L'inscription n'est pas encore ouverte",
     'CSV exportieren': 'Exporter en CSV',
     'Eckdaten im Turnierdokument': 'Informations du tournoi dans le document du tournoi',
     'App wird geladen.': 'Chargement de l’application.',

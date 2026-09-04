@@ -1961,15 +1961,15 @@ async function createRegistration(request, env, tournament) {
   const db = env.DB;
 
   if (tournament.visibility !== 'public' || tournament.status !== 'registration') {
-    throw new HttpError(403, 'Registration is closed');
+    throw new HttpError(403, 'Die Anmeldung ist geschlossen');
   }
 
   if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < Date.now()) {
-    throw new HttpError(403, 'Registration deadline has passed');
+    throw new HttpError(403, 'Die Meldefrist ist abgelaufen');
   }
 
   if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > Date.now()) {
-    throw new HttpError(403, 'Registration has not opened yet');
+    throw new HttpError(403, 'Die Anmeldung ist noch nicht geöffnet');
   }
 
   const body = await readJson(request);
