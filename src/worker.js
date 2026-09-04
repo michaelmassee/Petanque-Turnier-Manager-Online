@@ -2028,19 +2028,36 @@ async function cancelRegistration(db, id) {
   return json({ registration: toPublicRegistration(updated) });
 }
 
+// Reine, testbare Freischaltungslogik: prüft anhand des übergebenen `now`-Zeitpunkts
+// (Default: aktueller Server-Zeitpunkt), ob eine Anmeldung erlaubt ist. Nutzt
+// ausschließlich UTC-Instant-Vergleiche (registration_opens_at/-deadline sind bereits
+// korrekt in UTC gespeichert, siehe zonedDateTimeToUtcIso) – die Zeitzone des
+// betrachtenden Browsers oder des Servers spielt für das Ergebnis keine Rolle.
+export function registrationOpenStatus(tournament, now = new Date()) {
+  if (tournament.visibility !== 'public' || tournament.status !== 'registration') {
+    return 'closed';
+  }
+  if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < now.getTime()) {
+    return 'deadline_passed';
+  }
+  if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > now.getTime()) {
+    return 'not_yet_open';
+  }
+  return 'open';
+}
+
+const REGISTRATION_CLOSED_MESSAGES = {
+  closed: 'Die Anmeldung ist geschlossen',
+  deadline_passed: 'Die Meldefrist ist abgelaufen',
+  not_yet_open: 'Die Anmeldung ist noch nicht geöffnet',
+};
+
 async function createRegistration(request, env, tournament) {
   const db = env.DB;
 
-  if (tournament.visibility !== 'public' || tournament.status !== 'registration') {
-    throw new HttpError(403, 'Die Anmeldung ist geschlossen');
-  }
-
-  if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < Date.now()) {
-    throw new HttpError(403, 'Die Meldefrist ist abgelaufen');
-  }
-
-  if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > Date.now()) {
-    throw new HttpError(403, 'Die Anmeldung ist noch nicht geöffnet');
+  const openStatus = registrationOpenStatus(tournament);
+  if (openStatus !== 'open') {
+    throw new HttpError(403, REGISTRATION_CLOSED_MESSAGES[openStatus]);
   }
 
   const body = await readJson(request);
