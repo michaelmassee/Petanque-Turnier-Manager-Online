@@ -1,0 +1,1 @@
+ALTER TABLE tournaments ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR';

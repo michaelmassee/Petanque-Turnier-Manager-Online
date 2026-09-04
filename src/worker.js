@@ -1,4 +1,5 @@
 import tzlookup from 'tz-lookup';
+import { CURRENCY_CODES } from './currencies.js';
 
 const ROLES = ['admin', 'user'];
 const DEFAULT_TOURNAMENT_LIMIT = 5;
@@ -1690,10 +1691,10 @@ async function createTournament(request, db, user) {
     .prepare(
       `INSERT INTO tournaments (
         id, created_by, manager_id, name, date, start_time, location, description, type, formation, registration_type, status,
-        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, contact_name, contact_email, contact_phone,
+        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, website_url, logo_url, flyer_url,
         latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1712,6 +1713,7 @@ async function createTournament(request, db, user) {
       registrationTimes.registrationDeadline,
       registrationTimes.registrationOpensAt,
       tournament.entryFeeCents,
+      tournament.currency,
       tournament.contactName,
       tournament.contactEmail,
       tournament.contactPhone,
@@ -1753,7 +1755,7 @@ async function updateTournament(request, db, existing, user) {
     .prepare(
       `UPDATE tournaments
        SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
-           formation = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?,
+           formation = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
            participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, updated_at = ?
        WHERE id = ?`,
@@ -1773,6 +1775,7 @@ async function updateTournament(request, db, existing, user) {
       registrationTimes.registrationDeadline,
       registrationTimes.registrationOpensAt,
       tournament.entryFeeCents,
+      tournament.currency,
       tournament.contactName,
       tournament.contactEmail,
       tournament.contactPhone,
@@ -1950,14 +1953,14 @@ async function syncPutTournamentMetadata(request, db, existing, user) {
   await db.prepare(
     `UPDATE tournaments
      SET name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?, formation = ?, registration_type = ?,
-         status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, contact_name = ?,
+         status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, contact_name = ?,
          contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?, participants_public = ?,
          license_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, document_managed = 1, updated_at = ?
      WHERE id = ?`,
   ).bind(
     tournament.name, tournament.date, tournament.startTime, tournament.location, tournament.description,
     tournament.type, tournament.formation, tournament.registrationType, tournament.status, tournament.maxRegistrations,
-    registrationTimes.registrationDeadline, registrationTimes.registrationOpensAt, tournament.entryFeeCents, tournament.contactName, tournament.contactEmail,
+    registrationTimes.registrationDeadline, registrationTimes.registrationOpensAt, tournament.entryFeeCents, tournament.currency, tournament.contactName, tournament.contactEmail,
     tournament.contactPhone, tournament.visibility, tournament.internalNotes, tournament.participantsPublic ? 1 : 0,
     tournament.licenseRequired ? 1 : 0, geo.latitude, geo.longitude, geo.geocodedAt, timezone, now, existing.id,
   ).run();
@@ -2828,6 +2831,7 @@ export function normalizeTournamentInput(body, { legacyRegistrationTimes = false
     registrationDeadline: normalizeRegistrationDateTime(body.registrationDeadline, { legacyUtc: legacyRegistrationTimes }),
     registrationOpensAt: normalizeRegistrationDateTime(body.registrationOpensAt, { legacyUtc: legacyRegistrationTimes }),
     entryFeeCents: nonNegativeInteger(body.entryFeeCents),
+    currency: text(body.currency || 'EUR').toUpperCase(),
     contactName: nullableText(body.contactName),
     contactEmail: nullableText(body.contactEmail),
     contactPhone: nullableText(body.contactPhone),
@@ -2883,6 +2887,9 @@ export function normalizeTournamentInput(body, { legacyRegistrationTimes = false
   }
   if ((tournament.latitude === null) !== (tournament.longitude === null)) {
     throw new HttpError(400, 'Breiten- und Längengrad müssen gemeinsam gesetzt werden');
+  }
+  if (!CURRENCY_CODES.includes(tournament.currency)) {
+    throw new HttpError(400, 'Ungültige Währung');
   }
   if (
     tournament.registrationOpensAt &&
@@ -3165,6 +3172,7 @@ function toPublicTournament(row, user) {
     registrationOpensAt: row.registration_opens_at,
     timezone: row.timezone || 'Europe/Berlin',
     entryFeeCents: Number(row.entry_fee_cents || 0),
+    currency: row.currency || 'EUR',
     contactName: row.contact_name,
     contactEmail: row.contact_email,
     contactPhone: row.contact_phone,

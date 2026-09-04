@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { CURRENCY_CODES, currencyDecimals } from './currencies.js';
 
 const ROLES = [
   { value: 'admin', label: 'Admin' },
@@ -127,7 +128,8 @@ const EMPTY_TOURNAMENT_FORM = {
   registrationDeadline: '',
   registrationOpensAt: '',
   timezone: '',
-  entryFeeEuro: '',
+  entryFeeAmount: '',
+  currency: 'EUR',
   contactName: '',
   contactEmail: '',
   contactPhone: '',
@@ -905,7 +907,8 @@ export default function App() {
       registrationDeadline: utcIsoToZonedDateTimeInput(tournament.registrationDeadline, tournament.timezone),
       registrationOpensAt: utcIsoToZonedDateTimeInput(tournament.registrationOpensAt, tournament.timezone),
       timezone: tournament.timezone || '',
-      entryFeeEuro: centsToEuro(tournament.entryFeeCents),
+      entryFeeAmount: minorUnitsToAmount(tournament.entryFeeCents, tournament.currency || 'EUR'),
+      currency: tournament.currency || 'EUR',
       contactName: tournament.contactName || '',
       contactEmail: tournament.contactEmail || '',
       contactPhone: tournament.contactPhone || '',
@@ -2364,7 +2367,7 @@ function TournamentInfo({ tournament, language, onShare }) {
       {tournament.description && <p>{tournament.description}</p>}
       {Boolean(tournament.entryFeeCents) && (
         <p>
-          <strong>Startgeld</strong>: {centsToEuro(tournament.entryFeeCents)} €
+          <strong>{translateText('Startgeld', language)}</strong>: {formatMoney(tournament.entryFeeCents, tournament.currency, language)}
         </p>
       )}
       {tournament.registrationOpensAt && (
@@ -3110,7 +3113,10 @@ function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users, languag
       </div>
       <div className="form-grid">
         <TextField label="Max. Meldungen" type="number" min="0" value={form.maxRegistrations} onChange={(maxRegistrations) => setForm({ ...form, maxRegistrations })} />
-        <TextField label="Startgeld EUR" inputMode="decimal" value={form.entryFeeEuro} onChange={(entryFeeEuro) => setForm({ ...form, entryFeeEuro })} />
+      </div>
+      <div className="form-grid">
+        <TextField label={translateText('Startgeld', language)} inputMode="decimal" value={form.entryFeeAmount} onChange={(entryFeeAmount) => setForm({ ...form, entryFeeAmount })} />
+        <SelectField label={translateText('Währung', language)} value={form.currency} onChange={(currency) => setForm({ ...form, currency })} options={currencyOptions(language)} />
       </div>
       <div className="form-grid">
         <TextField label={translateText('Anmeldung möglich ab', language)} type="datetime-local" value={form.registrationOpensAt} onChange={(registrationOpensAt) => setForm({ ...form, registrationOpensAt })} />
@@ -3967,7 +3973,8 @@ function tournamentPayload(form) {
     maxRegistrations: Number(form.maxRegistrations || 0),
     registrationDeadline: form.registrationDeadline || null,
     registrationOpensAt: form.registrationOpensAt || null,
-    entryFeeCents: euroToCents(form.entryFeeEuro),
+    entryFeeCents: amountToMinorUnits(form.entryFeeAmount, form.currency || 'EUR'),
+    currency: form.currency || 'EUR',
     contactName: form.contactName || null,
     contactEmail: form.contactEmail || null,
     contactPhone: form.contactPhone || null,
@@ -4388,19 +4395,48 @@ function formatTournamentStartTime(tournament, language) {
   return `${tournament.startTime} ${timezoneAbbrev(anchor, zone, DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de)}`;
 }
 
-function centsToEuro(cents) {
-  if (!cents) {
+function minorUnitsToAmount(units, currency) {
+  if (!units) {
     return '';
   }
-  return (Number(cents) / 100).toFixed(2).replace('.', ',');
+  const decimals = currencyDecimals(currency);
+  return (Number(units) / 10 ** decimals).toFixed(decimals).replace('.', ',');
 }
 
-function euroToCents(value) {
+function amountToMinorUnits(value, currency) {
   if (!value) {
     return 0;
   }
+  const decimals = currencyDecimals(currency);
   const normalized = String(value).replace(',', '.');
-  return Math.round(Number(normalized) * 100);
+  return Math.round(Number(normalized) * 10 ** decimals);
+}
+
+function currencyOptions(language) {
+  const locale = DISPLAY_LOCALES[language] || 'de-DE';
+  let displayNames = null;
+  try {
+    displayNames = new Intl.DisplayNames([locale], { type: 'currency' });
+  } catch {
+    displayNames = null;
+  }
+  return CURRENCY_CODES.map((code) => ({
+    value: code,
+    label: displayNames ? `${code} – ${displayNames.of(code)}` : code,
+  }));
+}
+
+function formatMoney(units, currency, language) {
+  if (!units) {
+    return '';
+  }
+  const decimals = currencyDecimals(currency);
+  const amount = Number(units) / 10 ** decimals;
+  try {
+    return new Intl.NumberFormat(DISPLAY_LOCALES[language] || 'de-DE', { style: 'currency', currency: currency || 'EUR' }).format(amount);
+  } catch {
+    return `${amount} ${currency}`;
+  }
 }
 
 function utcIsoToZonedDateTimeInput(value, timeZone) {
@@ -4456,6 +4492,7 @@ async function api(path, options = {}) {
 
 const TRANSLATIONS = {
   nl: {
+    'Währung': 'Valuta',
     'API-Schlüssel nicht gefunden': 'API-sleutel niet gevonden',
     'API-Schlüssel nicht gefunden oder bereits widerrufen': 'API-sleutel niet gevonden of al ingetrokken',
     'API-Schlüssel wartet nicht auf Freischaltung': 'API-sleutel wacht niet op goedkeuring',
@@ -4656,7 +4693,6 @@ const TRANSLATIONS = {
     'Max. Meldungen': 'Max. inschrijvingen',
     'Noch frei': 'Nog vrij',
     Angemeldet: 'Aangemeld',
-    'Startgeld EUR': 'Inschrijfgeld EUR',
     Meldefrist: 'Inschrijfdeadline',
     Kontaktname: 'Contactnaam',
     'Kontakt-E-Mail': 'Contact-e-mail',
@@ -4918,6 +4954,7 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   en: {
+    'Währung': 'Currency',
     'API-Schlüssel nicht gefunden': 'API key not found',
     'API-Schlüssel nicht gefunden oder bereits widerrufen': 'API key not found or already revoked',
     'API-Schlüssel wartet nicht auf Freischaltung': 'API key is not pending approval',
@@ -5118,7 +5155,6 @@ const TRANSLATIONS = {
     'Max. Meldungen': 'Max. registrations',
     'Noch frei': 'Spots free',
     Angemeldet: 'Registered',
-    'Startgeld EUR': 'Entry fee EUR',
     Meldefrist: 'Registration deadline',
     Kontaktname: 'Contact name',
     'Kontakt-E-Mail': 'Contact email',
@@ -5380,6 +5416,7 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   es: {
+    'Währung': 'Moneda',
     'API-Schlüssel nicht gefunden': 'Clave de API no encontrada',
     'API-Schlüssel nicht gefunden oder bereits widerrufen': 'Clave de API no encontrada o ya revocada',
     'API-Schlüssel wartet nicht auf Freischaltung': 'La clave de API no está pendiente de aprobación',
@@ -5580,7 +5617,6 @@ const TRANSLATIONS = {
     'Max. Meldungen': 'Máx. inscripciones',
     'Noch frei': 'Plazas libres',
     Angemeldet: 'Inscritos',
-    'Startgeld EUR': 'Cuota EUR',
     Meldefrist: 'Fecha límite',
     Kontaktname: 'Contacto',
     'Kontakt-E-Mail': 'Correo de contacto',
@@ -5842,6 +5878,7 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   fr: {
+    'Währung': 'Devise',
     'API-Schlüssel nicht gefunden': 'Clé API introuvable',
     'API-Schlüssel nicht gefunden oder bereits widerrufen': 'Clé API introuvable ou déjà révoquée',
     'API-Schlüssel wartet nicht auf Freischaltung': 'La clé API n\'est pas en attente d\'approbation',
@@ -6042,7 +6079,6 @@ const TRANSLATIONS = {
     'Max. Meldungen': 'Max. inscriptions',
     'Noch frei': 'Places libres',
     Angemeldet: 'Inscrits',
-    'Startgeld EUR': 'Frais EUR',
     Meldefrist: 'Date limite',
     Kontaktname: 'Contact',
     'Kontakt-E-Mail': 'E-mail contact',
