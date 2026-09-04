@@ -109,6 +109,7 @@ const EMPTY_AUTH_FORM = {
 
 const EMPTY_TOURNAMENT_FORM = {
   id: '',
+  managerId: '',
   name: '',
   date: '',
   startTime: '',
@@ -851,6 +852,7 @@ export default function App() {
     setTournamentMode('edit');
     setTournamentForm({
       id: tournament.id,
+      managerId: tournament.managerId || '',
       name: tournament.name || '',
       date: tournament.date || '',
       startTime: tournament.startTime || '',
@@ -1500,7 +1502,7 @@ export default function App() {
                   </Button>
                 )}
               </div>
-              <TournamentForm form={tournamentForm} setForm={setTournamentForm} onSubmit={handleTournamentSubmit} mode={tournamentMode} />
+              <TournamentForm form={tournamentForm} setForm={setTournamentForm} onSubmit={handleTournamentSubmit} mode={tournamentMode} isAdmin={isAdmin} users={users} />
             </div>
           )}
 
@@ -1510,6 +1512,7 @@ export default function App() {
             onSelect={setSelectedTournamentId}
             onEdit={editTournament}
             onDelete={handleDeleteTournament}
+            isAdmin={isAdmin}
           />
         </section>
       )}
@@ -2837,10 +2840,23 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
   );
 }
 
-function TournamentForm({ form, setForm, onSubmit, mode }) {
+function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users }) {
+  const managerOptions = [
+    { value: '', label: '(ich selbst)' },
+    ...users.map((user) => ({ value: user.id, label: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email })),
+  ];
+
   return (
     <form className="form dense" onSubmit={onSubmit}>
       <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+      {isAdmin && (
+        <SelectField
+          label="Turnierleiter"
+          value={form.managerId}
+          onChange={(managerId) => setForm({ ...form, managerId })}
+          options={managerOptions}
+        />
+      )}
       <div className="form-grid">
         <TextField label="Datum" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
         <TextField label="Startzeit" type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
@@ -2960,7 +2976,7 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
   );
 }
 
-function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete }) {
+function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete, isAdmin }) {
   return (
     <div className="panel">
       <div className="section-title">
@@ -2974,6 +2990,7 @@ function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete })
               <strong>{tournament.name}</strong>
               <span>{formatDate(tournament.date)} {tournament.startTime || ''} · {tournament.location}</span>
               <small>{labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)}</small>
+              {isAdmin && tournament.managerName && <small>Turnierleiter: {tournament.managerName}</small>}
             </button>
             <div className="badges">
               <span className={`status status-${tournament.status}`}>{labelFor(TOURNAMENT_STATUSES, tournament.status)}</span>
@@ -3665,6 +3682,7 @@ function googleMapsUrl(tournament) {
 
 function tournamentPayload(form) {
   return {
+    managerId: form.managerId || null,
     name: form.name,
     date: form.date,
     startTime: form.startTime || null,
