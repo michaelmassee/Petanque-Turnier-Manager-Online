@@ -1606,7 +1606,7 @@ async function resolveTournamentGeolocation(tournament, existing, now) {
   return { latitude: result.lat, longitude: result.lng, geocodedAt: now };
 }
 
-function resolveTournamentTimezone(geo, fallback = 'UTC') {
+function resolveTournamentTimezone(geo, fallback = 'Europe/Berlin') {
   if (!Number.isFinite(geo.latitude) || !Number.isFinite(geo.longitude)) return fallback;
   try {
     return tzlookup(geo.latitude, geo.longitude);
@@ -1652,14 +1652,11 @@ export function zonedDateTimeToUtcIso(value, timeZone) {
 function legacyUtcIso(value) {
   if (!value) return null;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) throw new HttpError(400, 'A valid registration date-time is required');
+  if (Number.isNaN(date.getTime())) throw new HttpError(400, 'Ein gültiger Anmeldezeitpunkt ist erforderlich');
   return date.toISOString();
 }
 
 function resolveRegistrationTimes(tournament, timezone, { legacyUtc = false } = {}) {
-  if ((tournament.registrationDeadline || tournament.registrationOpensAt) && !timezone) {
-    throw new HttpError(400, 'Für Anmeldezeiten muss der Turnierort geocodiert werden können.');
-  }
   return {
     registrationDeadline: legacyUtc ? legacyUtcIso(tournament.registrationDeadline) : zonedDateTimeToUtcIso(tournament.registrationDeadline, timezone),
     registrationOpensAt: legacyUtc ? legacyUtcIso(tournament.registrationOpensAt) : zonedDateTimeToUtcIso(tournament.registrationOpensAt, timezone),
@@ -1687,7 +1684,7 @@ async function createTournament(request, db, user) {
   const managerId = user.role === 'admin' ? tournament.managerId || user.id : user.id;
   const geo = await resolveTournamentGeolocation(tournament, null, now);
   const timezone = resolveTournamentTimezone(geo);
-  const registrationTimes = resolveRegistrationTimes(tournament, Number.isFinite(geo.latitude) ? timezone : null);
+  const registrationTimes = resolveRegistrationTimes(tournament, timezone);
 
   await db
     .prepare(
@@ -1749,8 +1746,8 @@ async function updateTournament(request, db, existing, user) {
   const now = new Date().toISOString();
   const managerId = user.role === 'admin' ? tournament.managerId || existing.manager_id || user.id : existing.manager_id || user.id;
   const geo = await resolveTournamentGeolocation(tournament, existing, now);
-  const timezone = resolveTournamentTimezone(geo, existing.timezone || 'UTC');
-  const registrationTimes = resolveRegistrationTimes(tournament, Number.isFinite(geo.latitude) ? timezone : null);
+  const timezone = resolveTournamentTimezone(geo, existing.timezone || 'Europe/Berlin');
+  const registrationTimes = resolveRegistrationTimes(tournament, timezone);
 
   await db
     .prepare(
@@ -1947,8 +1944,8 @@ async function syncPutTournamentMetadata(request, db, existing, user) {
   const tournament = normalizeTournamentInput(body, { legacyRegistrationTimes });
   const now = new Date().toISOString();
   const geo = await resolveTournamentGeolocation(tournament, existing, now);
-  const timezone = resolveTournamentTimezone(geo, existing.timezone || 'UTC');
-  const registrationTimes = resolveRegistrationTimes(tournament, Number.isFinite(geo.latitude) ? timezone : null, { legacyUtc: legacyRegistrationTimes });
+  const timezone = resolveTournamentTimezone(geo, existing.timezone || 'Europe/Berlin');
+  const registrationTimes = resolveRegistrationTimes(tournament, timezone, { legacyUtc: legacyRegistrationTimes });
 
   await db.prepare(
     `UPDATE tournaments
@@ -2846,25 +2843,25 @@ export function normalizeTournamentInput(body, { legacyRegistrationTimes = false
   };
 
   if (tournament.name.length < 2) {
-    throw new HttpError(400, 'Tournament name must contain at least 2 characters');
+    throw new HttpError(400, 'Der Turniername muss mindestens 2 Zeichen enthalten');
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(tournament.date)) {
-    throw new HttpError(400, 'A valid tournament date is required');
+    throw new HttpError(400, 'Ein gültiges Turnierdatum ist erforderlich');
   }
   if (tournament.startTime && !/^\d{2}:\d{2}$/.test(tournament.startTime)) {
-    throw new HttpError(400, 'A valid start time is required');
+    throw new HttpError(400, 'Eine gültige Startzeit ist erforderlich');
   }
   if (tournament.location.length < 2) {
-    throw new HttpError(400, 'Location must contain at least 2 characters');
+    throw new HttpError(400, 'Der Ort muss mindestens 2 Zeichen enthalten');
   }
   if (!TOURNAMENT_TYPES.includes(tournament.type)) {
-    throw new HttpError(400, 'Invalid tournament type');
+    throw new HttpError(400, 'Ungültiges Turniersystem');
   }
   if (!FORMATIONS.includes(tournament.formation)) {
-    throw new HttpError(400, 'Invalid formation');
+    throw new HttpError(400, 'Ungültige Formation');
   }
   if (!REGISTRATION_TYPES.includes(tournament.registrationType)) {
-    throw new HttpError(400, 'Invalid registration type');
+    throw new HttpError(400, 'Ungültiger Anmeldetyp');
   }
   if (tournament.formation === 'tete' && tournament.registrationType !== 'forme') {
     throw new HttpError(400, 'Formation Tête ist nur mit dem Anmeldetyp Formée möglich');
@@ -2876,16 +2873,16 @@ export function normalizeTournamentInput(body, { legacyRegistrationTimes = false
     throw new HttpError(400, 'Supermêlée erfordert das Turniersystem Rangliste');
   }
   if (!TOURNAMENT_STATUSES.includes(tournament.status)) {
-    throw new HttpError(400, 'Invalid tournament status');
+    throw new HttpError(400, 'Ungültiger Turnierstatus');
   }
   if (!VISIBILITIES.includes(tournament.visibility)) {
-    throw new HttpError(400, 'Invalid visibility');
+    throw new HttpError(400, 'Ungültige Sichtbarkeit');
   }
   if (tournament.contactEmail && !isEmail(tournament.contactEmail)) {
-    throw new HttpError(400, 'A valid contact email is required');
+    throw new HttpError(400, 'Eine gültige Kontakt-E-Mail ist erforderlich');
   }
   if ((tournament.latitude === null) !== (tournament.longitude === null)) {
-    throw new HttpError(400, 'Latitude and longitude must be set together');
+    throw new HttpError(400, 'Breiten- und Längengrad müssen gemeinsam gesetzt werden');
   }
   if (
     tournament.registrationOpensAt &&
@@ -2903,16 +2900,16 @@ function normalizeRegistrationDateTime(value, { legacyUtc }) {
   if (!normalized) return null;
   if (legacyUtc) {
     if (Number.isNaN(new Date(normalized).getTime())) {
-      throw new HttpError(400, 'A valid registration date-time is required');
+      throw new HttpError(400, 'Ein gültiger Anmeldezeitpunkt ist erforderlich');
     }
     return normalized;
   }
   const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
-  if (!match) throw new HttpError(400, 'A valid local registration date-time is required');
+  if (!match) throw new HttpError(400, 'Ein gültiger lokaler Anmeldezeitpunkt ist erforderlich');
   const [year, month, day, hour, minute] = match.slice(1).map(Number);
   const date = new Date(Date.UTC(year, month - 1, day, hour, minute));
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day || hour > 23 || minute > 59) {
-    throw new HttpError(400, 'A valid local registration date-time is required');
+    throw new HttpError(400, 'Ein gültiger lokaler Anmeldezeitpunkt ist erforderlich');
   }
   return normalized;
 }
@@ -3166,7 +3163,7 @@ function toPublicTournament(row, user) {
     maxRegistrations: Number(row.max_registrations || 0),
     registrationDeadline: row.registration_deadline,
     registrationOpensAt: row.registration_opens_at,
-    timezone: row.timezone || 'UTC',
+    timezone: row.timezone || 'Europe/Berlin',
     entryFeeCents: Number(row.entry_fee_cents || 0),
     contactName: row.contact_name,
     contactEmail: row.contact_email,

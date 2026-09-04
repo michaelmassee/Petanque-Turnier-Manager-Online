@@ -85,7 +85,7 @@ expectInvalid(
 );
 
 // --- Old "supermelee" tournament-system value is gone ---
-expectInvalid('type=supermelee no longer a valid Turniersystem', { formation: 'tete', registrationType: 'forme', type: 'supermelee' }, 'Invalid tournament type');
+expectInvalid('type=supermelee no longer a valid Turniersystem', { formation: 'tete', registrationType: 'forme', type: 'supermelee' }, 'Ungültiges Turniersystem');
 
 // --- Partner fields: only expected for registrationType "forme" ---
 const partnerRegistration = { partnerFirstName: 'Max', partnerLastName: 'Muster' };
