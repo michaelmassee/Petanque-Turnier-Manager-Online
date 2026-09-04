@@ -24,6 +24,11 @@ const FORMATIONS = [
   { value: 'triplette', label: 'Triplette' },
 ];
 
+const REGISTRATION_TYPES = [
+  { value: 'melee', label: 'Mêlée' },
+  { value: 'forme', label: 'Formé' },
+];
+
 const MONTHS = [
   { value: '01', label: 'Januar' },
   { value: '02', label: 'Februar' },
@@ -112,6 +117,7 @@ const EMPTY_TOURNAMENT_FORM = {
   description: '',
   type: 'supermelee',
   formation: 'doublette',
+  registrationType: 'melee',
   status: 'draft',
   maxRegistrations: 0,
   registrationDeadline: '',
@@ -852,6 +858,7 @@ export default function App() {
       description: tournament.description || '',
       type: tournament.type || 'supermelee',
       formation: tournament.type === 'supermelee' ? 'tete' : tournament.formation || 'doublette',
+      registrationType: tournament.type === 'supermelee' ? 'melee' : tournament.registrationType || 'forme',
       status: tournament.status || 'draft',
       maxRegistrations: tournament.maxRegistrations || 0,
       registrationDeadline: tournament.registrationDeadline || '',
@@ -2267,6 +2274,9 @@ function TournamentInfo({ tournament, language, onShare }) {
         <strong>Formation</strong>: {labelFor(FORMATIONS, tournament.formation)}
       </p>
       <p>
+        <strong>Anmeldetyp</strong>: {labelFor(REGISTRATION_TYPES, tournament.registrationType)}
+      </p>
+      <p>
         <strong>{translateText('Lizenz', language)}</strong>: {translateText(tournament.licenseRequired ? 'Ja' : 'Nein', language)}
       </p>
       {tournament.description && <p>{tournament.description}</p>}
@@ -2782,6 +2792,7 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
         setForm={setForm}
         showStatus={false}
         formation={tournament.formation}
+        registrationType={tournament.registrationType}
         licenseRequired={tournament.licenseRequired}
         teamNameEnabled={tournament.teamNameEnabled}
       />
@@ -2841,7 +2852,12 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
         <SelectField
           label="Turniersystem"
           value={form.type}
-          onChange={(type) => setForm({ ...form, type, formation: type === 'supermelee' ? 'tete' : form.formation })}
+          onChange={(type) => setForm({
+            ...form,
+            type,
+            formation: type === 'supermelee' ? 'tete' : form.formation,
+            registrationType: type === 'supermelee' ? 'melee' : (form.type === 'supermelee' ? 'forme' : form.registrationType),
+          })}
           options={TOURNAMENT_TYPES}
         />
         <SelectField
@@ -2853,7 +2869,16 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
         />
       </div>
       <div className="form-grid">
+        <SelectField
+          label="Anmeldetyp"
+          value={form.registrationType}
+          onChange={(registrationType) => setForm({ ...form, registrationType })}
+          options={form.type === 'supermelee' ? REGISTRATION_TYPES.filter((option) => option.value === 'melee') : REGISTRATION_TYPES}
+          disabled={form.type === 'supermelee'}
+        />
         <SelectField label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={TOURNAMENT_STATUSES} />
+      </div>
+      <div className="form-grid">
         <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(visibility) => setForm({ ...form, visibility })} options={VISIBILITIES} />
       </div>
       <div className="form-grid">
@@ -2921,7 +2946,7 @@ function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete })
             <button className="row-main" type="button" onClick={() => onSelect(tournament.id)}>
               <strong>{tournament.name}</strong>
               <span>{formatDate(tournament.date)} {tournament.startTime || ''} · {tournament.location}</span>
-              <small>{labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)}</small>
+              <small>{labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)}</small>
             </button>
             <div className="badges">
               <span className={`status status-${tournament.status}`}>{labelFor(TOURNAMENT_STATUSES, tournament.status)}</span>
@@ -2958,6 +2983,7 @@ function RegistrationForm({ form, setForm, onSubmit, tournaments, selectedTourna
         setForm={setForm}
         showStatus={manageMode}
         formation={selectedTournament?.formation}
+        registrationType={selectedTournament?.registrationType}
         licenseRequired={selectedTournament?.licenseRequired}
         teamNameEnabled={selectedTournament?.teamNameEnabled}
       />
@@ -2966,9 +2992,10 @@ function RegistrationForm({ form, setForm, onSubmit, tournaments, selectedTourna
   );
 }
 
-function RegistrationFields({ form, setForm, showStatus, formation, licenseRequired, teamNameEnabled }) {
-  const allowsPartner = formation ? formation !== 'tete' : true;
-  const allowsPartner2 = formation === 'triplette';
+function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled }) {
+  const allowsPartner = registrationType === 'melee' ? false : (formation ? formation !== 'tete' : true);
+  const allowsPartner2 = registrationType === 'melee' ? false : formation === 'triplette';
+  const showMeleeNotice = registrationType === 'melee' && formation && formation !== 'tete';
 
   useEffect(() => {
     if (!allowsPartner && (form.partnerFirstName || form.partnerLastName || form.partnerEmail || form.partnerLicenseNr || form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2LicenseNr)) {
@@ -3005,6 +3032,9 @@ function RegistrationFields({ form, setForm, showStatus, formation, licenseRequi
         )}
       </div>
       {teamNameEnabled && <TextField label="Teamname" value={form.teamName} onChange={(teamName) => setForm({ ...form, teamName })} />}
+      {showMeleeNotice && (
+        <p className="muted">Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.</p>
+      )}
       {allowsPartner && (
         <>
           <div className="form-grid">
@@ -3617,6 +3647,7 @@ function tournamentPayload(form) {
     description: form.description || null,
     type: form.type,
     formation: form.formation,
+    registrationType: form.registrationType,
     status: form.status,
     maxRegistrations: Number(form.maxRegistrations || 0),
     registrationDeadline: form.registrationDeadline || null,
@@ -4129,6 +4160,11 @@ const TRANSLATIONS = {
     Ort: 'Plaats',
     Turniersystem: 'Toernooisysteem',
     Formation: 'Formatie',
+    Anmeldetyp: 'Inschrijftype',
+    Mêlée: 'Mêlée',
+    Formé: 'Formé',
+    'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
+      'Dit toernooi wordt als mêlée gespeeld – partners worden ter plaatse geloot.',
     Status: 'Status',
     VIP: 'VIP',
     Sichtbarkeit: 'Zichtbaarheid',
@@ -4510,6 +4546,11 @@ const TRANSLATIONS = {
     Ort: 'Location',
     Turniersystem: 'Tournament system',
     Formation: 'Formation',
+    Anmeldetyp: 'Registration type',
+    Mêlée: 'Mêlée',
+    Formé: 'Formé',
+    'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
+      'This tournament is played as mêlée – partners will be drawn on site.',
     Status: 'Status',
     VIP: 'VIP',
     Sichtbarkeit: 'Visibility',
@@ -4891,6 +4932,11 @@ const TRANSLATIONS = {
     Ort: 'Lugar',
     Turniersystem: 'Sistema',
     Formation: 'Formación',
+    Anmeldetyp: 'Tipo de inscripción',
+    Mêlée: 'Mêlée',
+    Formé: 'Formé',
+    'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
+      'Este torneo se juega como mêlée – los compañeros se sortean in situ.',
     Status: 'Estado',
     VIP: 'VIP',
     Sichtbarkeit: 'Visibilidad',
@@ -5272,6 +5318,11 @@ const TRANSLATIONS = {
     Ort: 'Lieu',
     Turniersystem: 'Système',
     Formation: 'Formation',
+    Anmeldetyp: "Type d'inscription",
+    Mêlée: 'Mêlée',
+    Formé: 'Formé',
+    'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
+      "Ce tournoi se joue en mêlée – les partenaires seront tirés au sort sur place.",
     Status: 'Statut',
     VIP: 'VIP',
     Sichtbarkeit: 'Visibilité',

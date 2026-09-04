@@ -13,6 +13,7 @@ const TOURNAMENT_TYPES = [
   'trip_tete',
 ];
 const FORMATIONS = ['tete', 'doublette', 'triplette'];
+const REGISTRATION_TYPES = ['melee', 'forme'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
 const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
@@ -1622,10 +1623,10 @@ async function createTournament(request, db, user) {
   await db
     .prepare(
       `INSERT INTO tournaments (
-        id, created_by, manager_id, name, date, start_time, location, description, type, formation, status,
+        id, created_by, manager_id, name, date, start_time, location, description, type, formation, registration_type, status,
         max_registrations, registration_deadline, entry_fee_cents, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, latitude, longitude, geocoded_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1638,6 +1639,7 @@ async function createTournament(request, db, user) {
       tournament.description,
       tournament.type,
       tournament.formation,
+      tournament.registrationType,
       tournament.status,
       tournament.maxRegistrations,
       tournament.registrationDeadline,
@@ -1677,7 +1679,7 @@ async function updateTournament(request, db, existing, user) {
     .prepare(
       `UPDATE tournaments
        SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
-           formation = ?, status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?,
+           formation = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
            participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, latitude = ?, longitude = ?, geocoded_at = ?, updated_at = ?
        WHERE id = ?`,
@@ -1691,6 +1693,7 @@ async function updateTournament(request, db, existing, user) {
       tournament.description,
       tournament.type,
       tournament.formation,
+      tournament.registrationType,
       tournament.status,
       tournament.maxRegistrations,
       tournament.registrationDeadline,
@@ -1865,14 +1868,14 @@ async function syncPutTournamentMetadata(request, db, existing, user) {
 
   await db.prepare(
     `UPDATE tournaments
-     SET name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?, formation = ?,
+     SET name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?, formation = ?, registration_type = ?,
          status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?, contact_name = ?,
          contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?, participants_public = ?,
          license_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, document_managed = 1, updated_at = ?
      WHERE id = ?`,
   ).bind(
     tournament.name, tournament.date, tournament.startTime, tournament.location, tournament.description,
-    tournament.type, tournament.formation, tournament.status, tournament.maxRegistrations,
+    tournament.type, tournament.formation, tournament.registrationType, tournament.status, tournament.maxRegistrations,
     tournament.registrationDeadline, tournament.entryFeeCents, tournament.contactName, tournament.contactEmail,
     tournament.contactPhone, tournament.visibility, tournament.internalNotes, tournament.participantsPublic ? 1 : 0,
     tournament.licenseRequired ? 1 : 0, geo.latitude, geo.longitude, geo.geocodedAt, now, existing.id,
@@ -1959,7 +1962,7 @@ async function createRegistration(request, env, tournament) {
 
   const registration = normalizeRegistrationInput(body, { requireStatus: false });
   const language = normalizeLanguage(body.language);
-  assertPartnerCountMatchesFormation(tournament.formation, registration);
+  assertPartnerCountMatchesFormation(tournament, registration);
   assertLicenseMatchesTournament(tournament, registration);
   const { status, displace } = await initialRegistrationStatus(db, tournament, registration.isVip);
   const now = new Date().toISOString();
@@ -2022,7 +2025,7 @@ async function updateRegistration(request, env, existing) {
   const db = env.DB;
   const body = await readJson(request);
   const registration = normalizeRegistrationInput(body, { requireStatus: true });
-  assertPartnerCountMatchesFormation(existing.formation, registration);
+  assertPartnerCountMatchesFormation(existing, registration);
   assertLicenseMatchesTournament(existing, registration);
   const now = new Date().toISOString();
   const confirmedAt = registration.status === 'confirmed' ? existing.confirmed_at || now : null;
@@ -2466,7 +2469,7 @@ async function getRegistrationWithTournament(db, id) {
   return db
     .prepare(
       `SELECT registrations.*, tournaments.created_by, tournaments.manager_id, tournaments.visibility, tournaments.formation,
-              tournaments.license_required, tournaments.max_registrations, tournaments.waitlist_enabled,
+              tournaments.registration_type, tournaments.license_required, tournaments.max_registrations, tournaments.waitlist_enabled,
               tournaments.name, tournaments.date, tournaments.start_time, tournaments.location
        FROM registrations
        JOIN tournaments ON tournaments.id = registrations.tournament_id
@@ -2730,6 +2733,7 @@ function normalizeTournamentInput(body) {
     description: nullableText(body.description),
     type: text(body.type || 'supermelee'),
     formation: text(body.formation || 'doublette'),
+    registrationType: text(body.registrationType || 'forme'),
     status: text(body.status || 'draft'),
     maxRegistrations: nonNegativeInteger(body.maxRegistrations),
     registrationDeadline: nullableText(body.registrationDeadline),
@@ -2766,8 +2770,14 @@ function normalizeTournamentInput(body) {
   if (!FORMATIONS.includes(tournament.formation)) {
     throw new HttpError(400, 'Invalid formation');
   }
+  if (!REGISTRATION_TYPES.includes(tournament.registrationType)) {
+    throw new HttpError(400, 'Invalid registration type');
+  }
   if (tournament.type === 'supermelee' && tournament.formation !== 'tete') {
     throw new HttpError(400, 'Supermêlée ist nur mit der Formation Tête möglich');
+  }
+  if (tournament.type === 'supermelee' && tournament.registrationType !== 'melee') {
+    throw new HttpError(400, 'Supermêlée erfordert den Anmeldetyp Mêlée');
   }
   if (!TOURNAMENT_STATUSES.includes(tournament.status)) {
     throw new HttpError(400, 'Invalid tournament status');
@@ -2825,7 +2835,8 @@ function normalizeRegistrationInput(body, { requireStatus }) {
   return registration;
 }
 
-function assertPartnerCountMatchesFormation(formation, registration) {
+function assertPartnerCountMatchesFormation(tournament, registration) {
+  const formation = tournament.registration_type === 'melee' ? 'tete' : tournament.formation;
   const hasPartner = Boolean(registration.partnerFirstName && registration.partnerLastName);
   const hasPartner2 = Boolean(registration.partner2FirstName && registration.partner2LastName);
 
@@ -3026,6 +3037,7 @@ function toPublicTournament(row, user) {
     description: row.description,
     type: row.type,
     formation: row.formation,
+    registrationType: row.registration_type || 'forme',
     status: row.status,
     maxRegistrations: Number(row.max_registrations || 0),
     registrationDeadline: row.registration_deadline,
