@@ -207,8 +207,22 @@ export default function App() {
   const [userMode, setUserMode] = useState('create');
   const [tournamentMode, setTournamentMode] = useState('create');
   const [registrationMode, setRegistrationMode] = useState('create');
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [message, setMessageState] = useState('');
+  const [error, setErrorState] = useState('');
+
+  function setMessage(text) {
+    setMessageState(text);
+    if (text) {
+      window.scrollTo(0, 0);
+    }
+  }
+
+  function setError(text) {
+    setErrorState(text);
+    if (text) {
+      window.scrollTo(0, 0);
+    }
+  }
 
   const isAdmin = currentUser?.role === 'admin';
   const canManageTournaments = Boolean(currentUser);
@@ -3599,6 +3613,7 @@ function usePath() {
   useEffect(() => {
     function onPopState() {
       setPath(window.location.pathname);
+      window.scrollTo(0, 0);
     }
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -3609,6 +3624,7 @@ function usePath() {
       window.history.pushState({}, '', next);
     }
     setPath(next);
+    window.scrollTo(0, 0);
   }
 
   return [path, navigate];
