@@ -218,7 +218,7 @@ export default function App() {
   const filteredHomeTournaments = useMemo(() => {
     const query = homeQuery.trim().toLowerCase();
     let results = tournaments.filter((tournament) => {
-      if (tournament.visibility !== 'public' || tournament.status === 'draft' || !isUpcoming(tournament)) {
+      if ((tournament.visibility !== 'public' && !isAdmin) || tournament.status === 'draft' || !isUpcoming(tournament)) {
         return false;
       }
       if (homeOnlyMine && !isOwnTournament(tournament, currentUser)) {
@@ -259,6 +259,7 @@ export default function App() {
     homeQuery,
     homeOnlyMine,
     currentUser,
+    isAdmin,
     homeFilterMonth,
     homeFilterFormation,
     homeFilterOpenOnly,
@@ -2613,6 +2614,9 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
           <strong>
             {tournament.licenseRequired && (
               <span className="license-badge" title={translateText('Lizenznummer erforderlich', language)}>🪪</span>
+            )}
+            {tournament.visibility === 'private' && (
+              <span className="license-badge" title="Nur für Admins sichtbar (Privat)">🔒</span>
             )}
             {tournament.name}
           </strong>
