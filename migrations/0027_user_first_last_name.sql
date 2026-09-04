@@ -1,36 +1,12 @@
--- Splits users.name into first_name/last_name. SQLite/D1 cannot DROP a column
--- or add a NOT NULL column without a default pre-3.35, so rebuild the table.
-CREATE TABLE users_new (
-  id TEXT PRIMARY KEY,
-  first_name TEXT NOT NULL,
-  last_name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'user', 'turnierleiter')),
-  password_salt TEXT NOT NULL,
-  password_hash TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  email_verified_at TEXT,
-  password_change_required INTEGER NOT NULL DEFAULT 0,
-  pending_email TEXT,
-  tournament_limit INTEGER NOT NULL DEFAULT 5,
-  language TEXT NOT NULL DEFAULT 'de',
-  license_nr TEXT
-);
+-- Splits users.name into first_name/last_name without rebuilding the table
+-- (DROP TABLE + rename would cascade-delete tournaments/registrations via
+-- their ON DELETE CASCADE foreign keys to users). SQLite/D1 supports
+-- ALTER TABLE ... DROP COLUMN directly (3.35+), so no rebuild is needed.
+ALTER TABLE users ADD COLUMN first_name TEXT;
+ALTER TABLE users ADD COLUMN last_name TEXT;
 
-INSERT INTO users_new (
-  id, first_name, last_name, email, role, password_salt, password_hash,
-  created_at, updated_at, email_verified_at, password_change_required,
-  pending_email, tournament_limit, language, license_nr
-)
-SELECT
-  id,
-  CASE WHEN instr(trim(name), ' ') > 0 THEN substr(trim(name), 1, instr(trim(name), ' ') - 1) ELSE trim(name) END,
-  CASE WHEN instr(trim(name), ' ') > 0 THEN trim(substr(trim(name), instr(trim(name), ' ') + 1)) ELSE '' END,
-  email, role, password_salt, password_hash, created_at, updated_at,
-  email_verified_at, password_change_required, pending_email, tournament_limit,
-  language, license_nr
-FROM users;
+UPDATE users
+SET first_name = CASE WHEN instr(trim(name), ' ') > 0 THEN substr(trim(name), 1, instr(trim(name), ' ') - 1) ELSE trim(name) END,
+    last_name = CASE WHEN instr(trim(name), ' ') > 0 THEN trim(substr(trim(name), instr(trim(name), ' ') + 1)) ELSE '' END;
 
-DROP TABLE users;
-ALTER TABLE users_new RENAME TO users;
+ALTER TABLE users DROP COLUMN name;
