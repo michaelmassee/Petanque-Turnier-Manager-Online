@@ -217,7 +217,7 @@ export default function App() {
   const filteredHomeTournaments = useMemo(() => {
     const query = homeQuery.trim().toLowerCase();
     let results = tournaments.filter((tournament) => {
-      if (tournament.visibility !== 'public' || !isUpcoming(tournament)) {
+      if (tournament.visibility !== 'public' || tournament.status === 'draft' || !isUpcoming(tournament)) {
         return false;
       }
       if (homeOnlyMine && !isOwnTournament(tournament, currentUser)) {
