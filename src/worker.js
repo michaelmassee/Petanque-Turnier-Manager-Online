@@ -1624,9 +1624,9 @@ async function createTournament(request, db, user) {
     .prepare(
       `INSERT INTO tournaments (
         id, created_by, manager_id, name, date, start_time, location, description, type, formation, registration_type, status,
-        max_registrations, registration_deadline, entry_fee_cents, contact_name, contact_email, contact_phone,
+        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, latitude, longitude, geocoded_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1643,6 +1643,7 @@ async function createTournament(request, db, user) {
       tournament.status,
       tournament.maxRegistrations,
       tournament.registrationDeadline,
+      tournament.registrationOpensAt,
       tournament.entryFeeCents,
       tournament.contactName,
       tournament.contactEmail,
@@ -1679,7 +1680,7 @@ async function updateTournament(request, db, existing, user) {
     .prepare(
       `UPDATE tournaments
        SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
-           formation = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?,
+           formation = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
            participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, latitude = ?, longitude = ?, geocoded_at = ?, updated_at = ?
        WHERE id = ?`,
@@ -1697,6 +1698,7 @@ async function updateTournament(request, db, existing, user) {
       tournament.status,
       tournament.maxRegistrations,
       tournament.registrationDeadline,
+      tournament.registrationOpensAt,
       tournament.entryFeeCents,
       tournament.contactName,
       tournament.contactEmail,
@@ -1869,14 +1871,14 @@ async function syncPutTournamentMetadata(request, db, existing, user) {
   await db.prepare(
     `UPDATE tournaments
      SET name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?, formation = ?, registration_type = ?,
-         status = ?, max_registrations = ?, registration_deadline = ?, entry_fee_cents = ?, contact_name = ?,
+         status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, contact_name = ?,
          contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?, participants_public = ?,
          license_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, document_managed = 1, updated_at = ?
      WHERE id = ?`,
   ).bind(
     tournament.name, tournament.date, tournament.startTime, tournament.location, tournament.description,
     tournament.type, tournament.formation, tournament.registrationType, tournament.status, tournament.maxRegistrations,
-    tournament.registrationDeadline, tournament.entryFeeCents, tournament.contactName, tournament.contactEmail,
+    tournament.registrationDeadline, tournament.registrationOpensAt, tournament.entryFeeCents, tournament.contactName, tournament.contactEmail,
     tournament.contactPhone, tournament.visibility, tournament.internalNotes, tournament.participantsPublic ? 1 : 0,
     tournament.licenseRequired ? 1 : 0, geo.latitude, geo.longitude, geo.geocodedAt, now, existing.id,
   ).run();
@@ -1953,6 +1955,10 @@ async function createRegistration(request, env, tournament) {
 
   if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < Date.now()) {
     throw new HttpError(403, 'Registration deadline has passed');
+  }
+
+  if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > Date.now()) {
+    throw new HttpError(403, 'Registration has not opened yet');
   }
 
   const body = await readJson(request);
@@ -2737,6 +2743,7 @@ function normalizeTournamentInput(body) {
     status: text(body.status || 'draft'),
     maxRegistrations: nonNegativeInteger(body.maxRegistrations),
     registrationDeadline: nullableText(body.registrationDeadline),
+    registrationOpensAt: nullableText(body.registrationOpensAt),
     entryFeeCents: nonNegativeInteger(body.entryFeeCents),
     contactName: nullableText(body.contactName),
     contactEmail: nullableText(body.contactEmail),
@@ -2790,6 +2797,13 @@ function normalizeTournamentInput(body) {
   }
   if ((tournament.latitude === null) !== (tournament.longitude === null)) {
     throw new HttpError(400, 'Latitude and longitude must be set together');
+  }
+  if (
+    tournament.registrationOpensAt &&
+    tournament.registrationDeadline &&
+    new Date(tournament.registrationOpensAt).getTime() > new Date(tournament.registrationDeadline).getTime()
+  ) {
+    throw new HttpError(400, 'Anmeldung möglich ab darf nicht nach der Meldefrist liegen');
   }
 
   return tournament;
@@ -3041,6 +3055,7 @@ function toPublicTournament(row, user) {
     status: row.status,
     maxRegistrations: Number(row.max_registrations || 0),
     registrationDeadline: row.registration_deadline,
+    registrationOpensAt: row.registration_opens_at,
     entryFeeCents: Number(row.entry_fee_cents || 0),
     contactName: row.contact_name,
     contactEmail: row.contact_email,

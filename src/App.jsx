@@ -69,6 +69,8 @@ const RADIUS_OPTIONS = [
   { value: '25', label: '25 km' },
   { value: '50', label: '50 km' },
   { value: '100', label: '100 km' },
+  { value: '200', label: '200 km' },
+  { value: '500', label: '500 km' },
 ];
 
 const DEFAULT_TOURNAMENT_LIMIT = 5;
@@ -121,6 +123,7 @@ const EMPTY_TOURNAMENT_FORM = {
   status: 'draft',
   maxRegistrations: 0,
   registrationDeadline: '',
+  registrationOpensAt: '',
   entryFeeEuro: '',
   contactName: '',
   contactEmail: '',
@@ -862,6 +865,7 @@ export default function App() {
       status: tournament.status || 'draft',
       maxRegistrations: tournament.maxRegistrations || 0,
       registrationDeadline: tournament.registrationDeadline || '',
+      registrationOpensAt: tournament.registrationOpensAt || '',
       entryFeeEuro: centsToEuro(tournament.entryFeeCents),
       contactName: tournament.contactName || '',
       contactEmail: tournament.contactEmail || '',
@@ -2285,6 +2289,11 @@ function TournamentInfo({ tournament, language, onShare }) {
           <strong>Startgeld</strong>: {centsToEuro(tournament.entryFeeCents)} €
         </p>
       )}
+      {tournament.registrationOpensAt && (
+        <p>
+          <strong>Anmeldung möglich ab</strong>: {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(tournament.registrationOpensAt))}
+        </p>
+      )}
       {tournament.registrationDeadline && (
         <p>
           <strong>Meldefrist</strong>: {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(tournament.registrationDeadline))}
@@ -2622,7 +2631,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
         <Button
           variant="secondary"
           onClick={() => onRegister(tournament)}
-          disabled={tournament.status !== 'registration' || tournament.visibility !== 'public'}
+          disabled={tournament.status !== 'registration' || tournament.visibility !== 'public' || registrationNotYetOpen(tournament)}
         >
           Anmelden
         </Button>
@@ -2781,34 +2790,49 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournament.id, currentUser]);
 
+  const notYetOpen = registrationNotYetOpen(tournament);
+
   return (
     <form className={embedded ? 'public-registration public-registration--embedded' : 'public-registration'} onSubmit={onSubmit}>
       <h2>Anmeldung: {tournament.name}</h2>
-      <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
-        Datenschutzerklärung lesen
-      </button>
-      <RegistrationFields
-        form={form}
-        setForm={setForm}
-        showStatus={false}
-        formation={tournament.formation}
-        registrationType={tournament.registrationType}
-        licenseRequired={tournament.licenseRequired}
-        teamNameEnabled={tournament.teamNameEnabled}
-      />
-      <label className="checkbox-field">
-        <input
-          type="checkbox"
-          checked={form.publicationNoticeAccepted}
-          onChange={(event) => setForm({ ...form, publicationNoticeAccepted: event.target.checked })}
-          required
-        />
-        Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.
-      </label>
-      <div className="row-actions stretch">
-        <Button type="submit">Anmeldung senden</Button>
-        <Button variant="secondary" onClick={onCancel}>Abbrechen</Button>
-      </div>
+      {notYetOpen ? (
+        <>
+          <p className="hint">
+            Die Anmeldung für dieses Turnier ist ab {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(tournament.registrationOpensAt))} möglich.
+          </p>
+          <div className="row-actions stretch">
+            <Button variant="secondary" onClick={onCancel}>Abbrechen</Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
+            Datenschutzerklärung lesen
+          </button>
+          <RegistrationFields
+            form={form}
+            setForm={setForm}
+            showStatus={false}
+            formation={tournament.formation}
+            registrationType={tournament.registrationType}
+            licenseRequired={tournament.licenseRequired}
+            teamNameEnabled={tournament.teamNameEnabled}
+          />
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={form.publicationNoticeAccepted}
+              onChange={(event) => setForm({ ...form, publicationNoticeAccepted: event.target.checked })}
+              required
+            />
+            Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.
+          </label>
+          <div className="row-actions stretch">
+            <Button type="submit">Anmeldung senden</Button>
+            <Button variant="secondary" onClick={onCancel}>Abbrechen</Button>
+          </div>
+        </>
+      )}
     </form>
   );
 }
@@ -2885,7 +2909,10 @@ function TournamentForm({ form, setForm, onSubmit, mode }) {
         <TextField label="Max. Meldungen" type="number" min="0" value={form.maxRegistrations} onChange={(maxRegistrations) => setForm({ ...form, maxRegistrations })} />
         <TextField label="Startgeld EUR" inputMode="decimal" value={form.entryFeeEuro} onChange={(entryFeeEuro) => setForm({ ...form, entryFeeEuro })} />
       </div>
-      <TextField label="Meldefrist" type="datetime-local" value={form.registrationDeadline} onChange={(registrationDeadline) => setForm({ ...form, registrationDeadline })} />
+      <div className="form-grid">
+        <TextField label="Anmeldung möglich ab" type="datetime-local" value={form.registrationOpensAt} onChange={(registrationOpensAt) => setForm({ ...form, registrationOpensAt })} />
+        <TextField label="Meldefrist" type="datetime-local" value={form.registrationDeadline} onChange={(registrationDeadline) => setForm({ ...form, registrationDeadline })} />
+      </div>
       <div className="form-grid">
         <TextField label="Kontaktname" value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} />
         <TextField label="Kontakt-E-Mail" type="email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} />
@@ -3651,6 +3678,7 @@ function tournamentPayload(form) {
     status: form.status,
     maxRegistrations: Number(form.maxRegistrations || 0),
     registrationDeadline: form.registrationDeadline || null,
+    registrationOpensAt: form.registrationOpensAt || null,
     entryFeeCents: euroToCents(form.entryFeeEuro),
     contactName: form.contactName || null,
     contactEmail: form.contactEmail || null,
@@ -3718,8 +3746,15 @@ function distanceKm(lat1, lng1, lat2, lng2) {
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function registrationNotYetOpen(tournament) {
+  return Boolean(tournament.registrationOpensAt) && new Date(tournament.registrationOpensAt).getTime() > Date.now();
+}
+
 function hasOpenRegistration(tournament) {
   if (tournament.status !== 'registration') {
+    return false;
+  }
+  if (registrationNotYetOpen(tournament)) {
     return false;
   }
   if (tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now()) {
@@ -3740,6 +3775,11 @@ const SLOTS_FREE_TEMPLATES = {
 };
 
 function registrationStatusLabel(tournament, language) {
+  if (tournament.status === 'registration' && registrationNotYetOpen(tournament)) {
+    const opensAt = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(tournament.registrationOpensAt));
+    return `Anmeldung ab ${opensAt}`;
+  }
+
   const deadlinePassed = tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now();
   const isFull = Boolean(tournament.maxRegistrations) && tournament.activeRegistrations >= tournament.maxRegistrations;
   const registrationOpen = tournament.status === 'registration' && !deadlinePassed;
