@@ -1447,6 +1447,7 @@ async function updateOwnProfile(request, env, url, userId) {
   const newPassword = body.newPassword === undefined ? '' : String(body.newPassword);
   const language = normalizeLanguage(body.language);
   const licenseNr = nullableText(body.licenseNr);
+  const club = nullableText(body.club);
 
   if (firstName.length < 2 || lastName.length < 2) {
     throw new HttpError(400, 'First name and last name must contain at least 2 characters');
@@ -1484,16 +1485,16 @@ async function updateOwnProfile(request, env, url, userId) {
         db
           .prepare(
             `UPDATE users
-             SET first_name = ?, last_name = ?, pending_email = ?, license_nr = ?, password_salt = ?, password_hash = ?, updated_at = ?
+             SET first_name = ?, last_name = ?, pending_email = ?, club = ?, license_nr = ?, password_salt = ?, password_hash = ?, updated_at = ?
              WHERE id = ?`,
           )
-          .bind(firstName, lastName, pendingEmail, licenseNr, password.salt, password.hash, now, userId),
+          .bind(firstName, lastName, pendingEmail, club, licenseNr, password.salt, password.hash, now, userId),
         db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(userId, currentSessionId || ''),
       ]);
     } else {
       await db
-        .prepare('UPDATE users SET first_name = ?, last_name = ?, pending_email = ?, license_nr = ?, updated_at = ? WHERE id = ?')
-        .bind(firstName, lastName, pendingEmail, licenseNr, now, userId)
+        .prepare('UPDATE users SET first_name = ?, last_name = ?, pending_email = ?, club = ?, license_nr = ?, updated_at = ? WHERE id = ?')
+        .bind(firstName, lastName, pendingEmail, club, licenseNr, now, userId)
         .run();
     }
   } catch (error) {
@@ -1513,7 +1514,7 @@ async function updateOwnProfile(request, env, url, userId) {
 
   const updated = await db
     .prepare(
-      'SELECT id, first_name, last_name, email, pending_email, role, license_nr, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, email, pending_email, role, club, license_nr, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?',
     )
     .bind(userId)
     .first();
@@ -2521,7 +2522,7 @@ async function requireApiKey(request, db) {
   const keyHash = await sha256Hex(secret);
   const row = await db
     .prepare(
-      `SELECT api_keys.id AS api_key_id, users.id, users.first_name, users.last_name, users.email, users.role, users.license_nr,
+      `SELECT api_keys.id AS api_key_id, users.id, users.first_name, users.last_name, users.email, users.role, users.club, users.license_nr,
               users.email_verified_at, users.password_change_required, users.tournament_limit, users.created_at, users.updated_at
        FROM api_keys
        JOIN users ON users.id = api_keys.user_id
@@ -2569,7 +2570,7 @@ async function requireSession(request, db) {
 
   const row = await db
     .prepare(
-      `SELECT users.id, users.first_name, users.last_name, users.email, users.pending_email, users.role, users.license_nr, users.email_verified_at, users.password_change_required,
+      `SELECT users.id, users.first_name, users.last_name, users.email, users.pending_email, users.role, users.club, users.license_nr, users.email_verified_at, users.password_change_required,
               users.tournament_limit, users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
@@ -3000,6 +3001,7 @@ function toPublicUser(row) {
     email: row.email,
     pendingEmail: row.pending_email || null,
     role: row.role,
+    club: row.club || null,
     licenseNr: row.license_nr || null,
     emailVerifiedAt: row.email_verified_at || null,
     passwordChangeRequired: Boolean(Number(row.password_change_required || 0)),
