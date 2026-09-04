@@ -1,3 +1,5 @@
+import tzlookup from 'tz-lookup';
+
 const ROLES = ['admin', 'user'];
 const DEFAULT_TOURNAMENT_LIMIT = 5;
 const TOURNAMENT_TYPES = [
@@ -1604,6 +1606,66 @@ async function resolveTournamentGeolocation(tournament, existing, now) {
   return { latitude: result.lat, longitude: result.lng, geocodedAt: now };
 }
 
+function resolveTournamentTimezone(geo, fallback = 'UTC') {
+  if (!Number.isFinite(geo.latitude) || !Number.isFinite(geo.longitude)) return fallback;
+  try {
+    return tzlookup(geo.latitude, geo.longitude);
+  } catch (error) {
+    console.error('Could not resolve tournament timezone', error);
+    return fallback;
+  }
+}
+
+function localDateTimeParts(date, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date);
+  const value = (type) => parts.find((part) => part.type === type)?.value;
+  return `${value('year')}-${value('month')}-${value('day')}T${value('hour')}:${value('minute')}`;
+}
+
+export function zonedDateTimeToUtcIso(value, timeZone) {
+  if (!value) return null;
+  const [datePart, timePart] = value.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = timePart.split(':').map(Number);
+  const naiveMillis = Date.UTC(year, month - 1, day, hour, minute);
+  const offsets = new Set([-86400000, 0, 86400000].map((delta) => {
+    const instant = new Date(naiveMillis + delta);
+    const rendered = localDateTimeParts(instant, timeZone);
+    const [renderedDate, renderedTime] = rendered.split('T');
+    const [renderedYear, renderedMonth, renderedDay] = renderedDate.split('-').map(Number);
+    const [renderedHour, renderedMinute] = renderedTime.split(':').map(Number);
+    return (Date.UTC(renderedYear, renderedMonth - 1, renderedDay, renderedHour, renderedMinute) - instant.getTime()) / 60000;
+  }));
+  const matches = [...offsets]
+    .map((offsetMinutes) => new Date(naiveMillis - offsetMinutes * 60000))
+    .filter((candidate) => localDateTimeParts(candidate, timeZone) === value)
+    .sort((left, right) => left.getTime() - right.getTime());
+  if (matches.length === 0) {
+    throw new HttpError(400, 'Die eingegebene Ortszeit existiert wegen der Sommerzeitumstellung nicht.');
+  }
+  return matches[0].toISOString();
+}
+
+function legacyUtcIso(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new HttpError(400, 'A valid registration date-time is required');
+  return date.toISOString();
+}
+
+function resolveRegistrationTimes(tournament, timezone, { legacyUtc = false } = {}) {
+  if ((tournament.registrationDeadline || tournament.registrationOpensAt) && !timezone) {
+    throw new HttpError(400, 'Für Anmeldezeiten muss der Turnierort geocodiert werden können.');
+  }
+  return {
+    registrationDeadline: legacyUtc ? legacyUtcIso(tournament.registrationDeadline) : zonedDateTimeToUtcIso(tournament.registrationDeadline, timezone),
+    registrationOpensAt: legacyUtc ? legacyUtcIso(tournament.registrationOpensAt) : zonedDateTimeToUtcIso(tournament.registrationOpensAt, timezone),
+  };
+}
+
 async function createTournament(request, db, user) {
   if (user.role !== 'admin') {
     const limit = user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT;
@@ -1624,6 +1686,8 @@ async function createTournament(request, db, user) {
   const id = crypto.randomUUID();
   const managerId = user.role === 'admin' ? tournament.managerId || user.id : user.id;
   const geo = await resolveTournamentGeolocation(tournament, null, now);
+  const timezone = resolveTournamentTimezone(geo);
+  const registrationTimes = resolveRegistrationTimes(tournament, Number.isFinite(geo.latitude) ? timezone : null);
 
   await db
     .prepare(
@@ -1631,8 +1695,8 @@ async function createTournament(request, db, user) {
         id, created_by, manager_id, name, date, start_time, location, description, type, formation, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, website_url, logo_url, flyer_url,
-        latitude, longitude, geocoded_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        latitude, longitude, geocoded_at, timezone, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1648,8 +1712,8 @@ async function createTournament(request, db, user) {
       tournament.registrationType,
       tournament.status,
       tournament.maxRegistrations,
-      tournament.registrationDeadline,
-      tournament.registrationOpensAt,
+      registrationTimes.registrationDeadline,
+      registrationTimes.registrationOpensAt,
       tournament.entryFeeCents,
       tournament.contactName,
       tournament.contactEmail,
@@ -1666,6 +1730,7 @@ async function createTournament(request, db, user) {
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
+      timezone,
       now,
       now,
     )
@@ -1684,6 +1749,8 @@ async function updateTournament(request, db, existing, user) {
   const now = new Date().toISOString();
   const managerId = user.role === 'admin' ? tournament.managerId || existing.manager_id || user.id : existing.manager_id || user.id;
   const geo = await resolveTournamentGeolocation(tournament, existing, now);
+  const timezone = resolveTournamentTimezone(geo, existing.timezone || 'UTC');
+  const registrationTimes = resolveRegistrationTimes(tournament, Number.isFinite(geo.latitude) ? timezone : null);
 
   await db
     .prepare(
@@ -1691,7 +1758,7 @@ async function updateTournament(request, db, existing, user) {
        SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
-           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, latitude = ?, longitude = ?, geocoded_at = ?, updated_at = ?
+           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -1706,8 +1773,8 @@ async function updateTournament(request, db, existing, user) {
       tournament.registrationType,
       tournament.status,
       tournament.maxRegistrations,
-      tournament.registrationDeadline,
-      tournament.registrationOpensAt,
+      registrationTimes.registrationDeadline,
+      registrationTimes.registrationOpensAt,
       tournament.entryFeeCents,
       tournament.contactName,
       tournament.contactEmail,
@@ -1721,6 +1788,7 @@ async function updateTournament(request, db, existing, user) {
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
+      timezone,
       now,
       existing.id,
     )
@@ -1875,23 +1943,26 @@ async function updateTournamentPresentation(request, db, existing, user) {
 /** PTM Calc is the exclusive writer for the metadata of a linked tournament. */
 async function syncPutTournamentMetadata(request, db, existing, user) {
   const body = await readJson(request);
-  const tournament = normalizeTournamentInput(body);
+  const legacyRegistrationTimes = body.registrationTimeSemantics !== 'tournament-local-v1';
+  const tournament = normalizeTournamentInput(body, { legacyRegistrationTimes });
   const now = new Date().toISOString();
   const geo = await resolveTournamentGeolocation(tournament, existing, now);
+  const timezone = resolveTournamentTimezone(geo, existing.timezone || 'UTC');
+  const registrationTimes = resolveRegistrationTimes(tournament, Number.isFinite(geo.latitude) ? timezone : null, { legacyUtc: legacyRegistrationTimes });
 
   await db.prepare(
     `UPDATE tournaments
      SET name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?, formation = ?, registration_type = ?,
          status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, contact_name = ?,
          contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?, participants_public = ?,
-         license_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, document_managed = 1, updated_at = ?
+         license_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, document_managed = 1, updated_at = ?
      WHERE id = ?`,
   ).bind(
     tournament.name, tournament.date, tournament.startTime, tournament.location, tournament.description,
     tournament.type, tournament.formation, tournament.registrationType, tournament.status, tournament.maxRegistrations,
-    tournament.registrationDeadline, tournament.registrationOpensAt, tournament.entryFeeCents, tournament.contactName, tournament.contactEmail,
+    registrationTimes.registrationDeadline, registrationTimes.registrationOpensAt, tournament.entryFeeCents, tournament.contactName, tournament.contactEmail,
     tournament.contactPhone, tournament.visibility, tournament.internalNotes, tournament.participantsPublic ? 1 : 0,
-    tournament.licenseRequired ? 1 : 0, geo.latitude, geo.longitude, geo.geocodedAt, now, existing.id,
+    tournament.licenseRequired ? 1 : 0, geo.latitude, geo.longitude, geo.geocodedAt, timezone, now, existing.id,
   ).run();
 
   const updated = await getTournamentById(db, existing.id);
@@ -2745,7 +2816,7 @@ function normalizeLanguage(value) {
   return LANGUAGES.includes(language) ? language : 'de';
 }
 
-export function normalizeTournamentInput(body) {
+export function normalizeTournamentInput(body, { legacyRegistrationTimes = false } = {}) {
   const tournament = {
     name: text(body.name),
     date: text(body.date),
@@ -2757,8 +2828,8 @@ export function normalizeTournamentInput(body) {
     registrationType: text(body.registrationType || 'forme'),
     status: text(body.status || 'draft'),
     maxRegistrations: nonNegativeInteger(body.maxRegistrations),
-    registrationDeadline: nullableText(body.registrationDeadline),
-    registrationOpensAt: nullableText(body.registrationOpensAt),
+    registrationDeadline: normalizeRegistrationDateTime(body.registrationDeadline, { legacyUtc: legacyRegistrationTimes }),
+    registrationOpensAt: normalizeRegistrationDateTime(body.registrationOpensAt, { legacyUtc: legacyRegistrationTimes }),
     entryFeeCents: nonNegativeInteger(body.entryFeeCents),
     contactName: nullableText(body.contactName),
     contactEmail: nullableText(body.contactEmail),
@@ -2825,6 +2896,25 @@ export function normalizeTournamentInput(body) {
   }
 
   return tournament;
+}
+
+function normalizeRegistrationDateTime(value, { legacyUtc }) {
+  const normalized = nullableText(value);
+  if (!normalized) return null;
+  if (legacyUtc) {
+    if (Number.isNaN(new Date(normalized).getTime())) {
+      throw new HttpError(400, 'A valid registration date-time is required');
+    }
+    return normalized;
+  }
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) throw new HttpError(400, 'A valid local registration date-time is required');
+  const [year, month, day, hour, minute] = match.slice(1).map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day || hour > 23 || minute > 59) {
+    throw new HttpError(400, 'A valid local registration date-time is required');
+  }
+  return normalized;
 }
 
 function normalizeRegistrationInput(body, { requireStatus }) {
@@ -3076,6 +3166,7 @@ function toPublicTournament(row, user) {
     maxRegistrations: Number(row.max_registrations || 0),
     registrationDeadline: row.registration_deadline,
     registrationOpensAt: row.registration_opens_at,
+    timezone: row.timezone || 'UTC',
     entryFeeCents: Number(row.entry_fee_cents || 0),
     contactName: row.contact_name,
     contactEmail: row.contact_email,

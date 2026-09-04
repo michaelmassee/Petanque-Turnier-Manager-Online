@@ -126,6 +126,7 @@ const EMPTY_TOURNAMENT_FORM = {
   maxRegistrations: 0,
   registrationDeadline: '',
   registrationOpensAt: '',
+  timezone: '',
   entryFeeEuro: '',
   contactName: '',
   contactEmail: '',
@@ -901,8 +902,9 @@ export default function App() {
       registrationType: tournament.registrationType || 'forme',
       status: tournament.status || 'draft',
       maxRegistrations: tournament.maxRegistrations || 0,
-      registrationDeadline: isoToLocalDateTimeInput(tournament.registrationDeadline),
-      registrationOpensAt: isoToLocalDateTimeInput(tournament.registrationOpensAt),
+      registrationDeadline: utcIsoToZonedDateTimeInput(tournament.registrationDeadline, tournament.timezone),
+      registrationOpensAt: utcIsoToZonedDateTimeInput(tournament.registrationOpensAt, tournament.timezone),
+      timezone: tournament.timezone || '',
       entryFeeEuro: centsToEuro(tournament.entryFeeCents),
       contactName: tournament.contactName || '',
       contactEmail: tournament.contactEmail || '',
@@ -1304,6 +1306,7 @@ export default function App() {
                 onSubmit={handleRegistrationSubmit}
                 onCancel={closeAuthModal}
                 navigate={navigate}
+                language={language}
                 currentUser={currentUser}
                 embedded
               />
@@ -1530,6 +1533,7 @@ export default function App() {
               clearFeedback();
             }}
             navigate={navigate}
+            language={language}
             currentUser={currentUser}
             embedded
           />
@@ -1551,7 +1555,7 @@ export default function App() {
                   </Button>
                 )}
               </div>
-              <TournamentForm form={tournamentForm} setForm={setTournamentForm} onSubmit={handleTournamentSubmit} mode={tournamentMode} isAdmin={isAdmin} users={users} />
+              <TournamentForm form={tournamentForm} setForm={setTournamentForm} onSubmit={handleTournamentSubmit} mode={tournamentMode} isAdmin={isAdmin} users={users} language={language} />
             </div>
           )}
 
@@ -1562,6 +1566,7 @@ export default function App() {
             onEdit={editTournament}
             onDelete={handleDeleteTournament}
             isAdmin={isAdmin}
+            language={language}
           />
         </section>
       )}
@@ -2254,6 +2259,7 @@ function TournamentDetailPage({
               onSubmit={onSubmitRegistration}
               onCancel={() => navigate(`/turniere/${tournament.id}/info`)}
               navigate={navigate}
+              language={language}
               currentUser={currentUser}
             />
           )}
@@ -2282,6 +2288,9 @@ function ShareIcon() {
 
 function TournamentInfo({ tournament, language, onShare }) {
   const mapsUrl = googleMapsUrl(tournament);
+  const viewerTimeZone = detectViewerTimeZone();
+  const tournamentTimeZone = tournament.timezone || 'UTC';
+  const showTimezoneHint = Boolean(viewerTimeZone && viewerTimeZone !== tournamentTimeZone);
   const freeSlots = tournament.maxRegistrations
     ? Math.max(tournament.maxRegistrations - tournament.activeRegistrations, 0)
     : null;
@@ -2333,8 +2342,9 @@ function TournamentInfo({ tournament, language, onShare }) {
           </a>
         )}
       </div>
+      {showTimezoneHint && <p className="hint">{(TIMEZONE_HINT_TEMPLATES[language] || TIMEZONE_HINT_TEMPLATES.de)(tournamentTimeZone)}</p>}
       <p>
-        <strong>Datum</strong>: {formatDate(tournament.date)} {tournament.startTime || ''}
+        <strong>{translateText('Datum', language)}</strong>: {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
       </p>
       <p>
         <strong>Ort</strong>: {tournament.location}
@@ -2359,12 +2369,12 @@ function TournamentInfo({ tournament, language, onShare }) {
       )}
       {tournament.registrationOpensAt && (
         <p>
-          <strong>Anmeldung möglich ab</strong>: {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(tournament.registrationOpensAt))}
+          <strong>{translateText('Anmeldung möglich ab', language)}</strong>: {formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}
         </p>
       )}
       {tournament.registrationDeadline && (
         <p>
-          <strong>Meldefrist</strong>: {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(tournament.registrationDeadline))}
+          <strong>{translateText('Meldefrist', language)}</strong>: {formatTournamentDateTime(tournament.registrationDeadline, language, tournament.timezone)}
         </p>
       )}
       <p>
@@ -2668,8 +2678,8 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
       >
         <span className={`tournament-card-date${hasLogo ? ' has-logo' : ''}`}>
           <span className="tournament-card-date-text">
-            <strong>{formatDate(tournament.date)}</strong>
-            <small>{tournament.startTime || 'Ganztägig'}</small>
+            <strong>{formatDate(tournament.date, language)}</strong>
+            <small>{formatTournamentStartTime(tournament, language)}</small>
           </span>
           {hasLogo && (
             <img
@@ -2772,11 +2782,11 @@ function HomeTournaments({
             disabled={!nextTournament}
             aria-label={
               nextTournament
-                ? `Nächster Termin ${formatDate(nextTournament.date)} – Turnier öffnen`
+                ? `Nächster Termin ${formatDate(nextTournament.date, language)} – Turnier öffnen`
                 : 'Kein nächster Termin'
             }
           >
-            <strong>{nextTournament ? formatDate(nextTournament.date) : 'keiner'}</strong>
+            <strong>{nextTournament ? formatDate(nextTournament.date, language) : 'keiner'}</strong>
             <span>Nächster Termin</span>
           </button>
           <button
@@ -2846,7 +2856,7 @@ function HomeTournaments({
   );
 }
 
-function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, embedded = false, currentUser = null }) {
+function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, language, embedded = false, currentUser = null }) {
   useEffect(() => {
     if (form.id || !currentUser) {
       return;
@@ -2879,7 +2889,7 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
       {notYetOpen ? (
         <>
           <p className="hint">
-            Die Anmeldung für dieses Turnier ist ab {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(tournament.registrationOpensAt))} möglich.
+            {(REGISTRATION_OPENS_TEMPLATES[language] || REGISTRATION_OPENS_TEMPLATES.de)(formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone))}
           </p>
           <div className="row-actions stretch">
             <Button variant="secondary" onClick={onCancel}>Abbrechen</Button>
@@ -3005,7 +3015,7 @@ function FormationHelpDialog({ onClose }) {
   );
 }
 
-function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users }) {
+function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users, language }) {
   const [showFormationHelp, setShowFormationHelp] = useState(false);
   const managerOptions = [
     { value: '', label: '(ich selbst)' },
@@ -3103,9 +3113,11 @@ function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users }) {
         <TextField label="Startgeld EUR" inputMode="decimal" value={form.entryFeeEuro} onChange={(entryFeeEuro) => setForm({ ...form, entryFeeEuro })} />
       </div>
       <div className="form-grid">
-        <TextField label="Anmeldung möglich ab" type="datetime-local" value={form.registrationOpensAt} onChange={(registrationOpensAt) => setForm({ ...form, registrationOpensAt })} />
-        <TextField label="Meldefrist" type="datetime-local" value={form.registrationDeadline} onChange={(registrationDeadline) => setForm({ ...form, registrationDeadline })} />
+        <TextField label={translateText('Anmeldung möglich ab', language)} type="datetime-local" value={form.registrationOpensAt} onChange={(registrationOpensAt) => setForm({ ...form, registrationOpensAt })} />
+        <TextField label={translateText('Meldefrist', language)} type="datetime-local" value={form.registrationDeadline} onChange={(registrationDeadline) => setForm({ ...form, registrationDeadline })} />
       </div>
+      <p className="hint">{translateText('Die Uhrzeiten gelten als Ortszeit am Turnierstandort und werden automatisch der passenden Zeitzone zugeordnet.', language)}</p>
+      {mode === 'edit' && form.timezone && <p className="hint">{translateText('Erkannte Zeitzone:', language)} {form.timezone}</p>}
       <div className="form-grid">
         <TextField label="Kontaktname" value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} />
         <TextField label="Kontakt-E-Mail" type="email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} />
@@ -3153,7 +3165,7 @@ function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users }) {
   );
 }
 
-function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete, isAdmin }) {
+function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete, isAdmin, language }) {
   return (
     <div className="panel">
       <div className="section-title">
@@ -3165,7 +3177,7 @@ function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete, i
           <article className={`data-row tournament-row ${selectedId === tournament.id ? 'selected' : ''}`} key={tournament.id}>
             <button className="row-main" type="button" onClick={() => onSelect(tournament.id)}>
               <strong>{tournament.name}</strong>
-              <span>{formatDate(tournament.date)} {tournament.startTime || ''} · {tournament.location}</span>
+              <span>{formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)} · {tournament.location}</span>
               <small>{labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</small>
               {isAdmin && tournament.managerName && <small>Turnierleiter: {tournament.managerName}</small>}
             </button>
@@ -3953,8 +3965,8 @@ function tournamentPayload(form) {
     registrationType: form.registrationType,
     status: form.status,
     maxRegistrations: Number(form.maxRegistrations || 0),
-    registrationDeadline: localDateTimeToIso(form.registrationDeadline),
-    registrationOpensAt: localDateTimeToIso(form.registrationOpensAt),
+    registrationDeadline: form.registrationDeadline || null,
+    registrationOpensAt: form.registrationOpensAt || null,
     entryFeeCents: euroToCents(form.entryFeeEuro),
     contactName: form.contactName || null,
     contactEmail: form.contactEmail || null,
@@ -4063,8 +4075,7 @@ const REGISTERED_COUNT_TEMPLATES = {
 
 function registrationStatusLabel(tournament, language) {
   if (tournament.status === 'registration' && registrationNotYetOpen(tournament)) {
-    const opensAt = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(tournament.registrationOpensAt));
-    return `Anmeldung ab ${opensAt}`;
+    return `${translateText('Anmeldung ab', language)} ${formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}`;
   }
 
   const deadlinePassed = tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now();
@@ -4312,11 +4323,69 @@ function ApiKeysPanel({ isAdmin }) {
   );
 }
 
-function formatDate(value) {
+const DISPLAY_LOCALES = { de: 'de-DE', nl: 'nl-NL', en: 'en-US', es: 'es-ES', fr: 'fr-FR' };
+
+const TIMEZONE_HINT_TEMPLATES = {
+  de: (timeZone) => `Hinweis: Datum, Startzeit und Anmeldezeiten dieses Turniers gelten in der Zeitzone des Turnierstandorts: ${timeZone}. Deine Zeitzone weicht davon ab.`,
+  nl: (timeZone) => `Let op: datum, starttijd en inschrijftijden van dit toernooi gelden in de tijdzone van de toernooilocatie: ${timeZone}. Jouw tijdzone wijkt hiervan af.`,
+  en: (timeZone) => `Note: this tournament's date, start time and registration times are in the tournament location's time zone: ${timeZone}. Your time zone differs.`,
+  es: (timeZone) => `Aviso: la fecha, hora de inicio y horarios de inscripción de este torneo son en la zona horaria de la sede: ${timeZone}. Tu zona horaria es diferente.`,
+  fr: (timeZone) => `Remarque : la date, l'heure de début et les horaires d'inscription de ce tournoi sont dans le fuseau horaire du lieu : ${timeZone}. Votre fuseau horaire est différent.`,
+};
+
+const REGISTRATION_OPENS_TEMPLATES = {
+  de: (dateTime) => `Die Anmeldung für dieses Turnier ist ab ${dateTime} möglich.`,
+  nl: (dateTime) => `Inschrijving voor dit toernooi is mogelijk vanaf ${dateTime}.`,
+  en: (dateTime) => `Registration for this tournament is available from ${dateTime} onwards.`,
+  es: (dateTime) => `La inscripción para este torneo está disponible desde ${dateTime}.`,
+  fr: (dateTime) => `Les inscriptions pour ce tournoi sont possibles à partir du ${dateTime}.`,
+};
+
+function detectViewerTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
+function formatDate(value, language = 'de') {
   if (!value) {
     return '';
   }
-  return new Intl.DateTimeFormat('de-DE').format(new Date(`${value}T00:00:00`));
+  const [year, month, day] = value.split('-').map(Number);
+  return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, { timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function timezoneAbbrev(date, timeZone, locale) {
+  try {
+    return new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: 'short' })
+      .formatToParts(date)
+      .find((part) => part.type === 'timeZoneName')?.value || timeZone;
+  } catch {
+    return timeZone;
+  }
+}
+
+function formatTournamentDateTime(value, language, timeZone) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const zone = timeZone || 'UTC';
+  const viewerZone = detectViewerTimeZone();
+  return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, {
+    dateStyle: 'medium', timeStyle: 'short', timeZone: zone,
+    ...(viewerZone && viewerZone !== zone ? { timeZoneName: 'short' } : {}),
+  }).format(date);
+}
+
+function formatTournamentStartTime(tournament, language) {
+  if (!tournament.startTime) return translateText('Ganztägig', language);
+  const zone = tournament.timezone || 'UTC';
+  const viewerZone = detectViewerTimeZone();
+  if (!viewerZone || viewerZone === zone) return tournament.startTime;
+  const anchor = new Date(`${tournament.date}T${tournament.startTime}:00Z`);
+  return `${tournament.startTime} ${timezoneAbbrev(anchor, zone, DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de)}`;
 }
 
 function centsToEuro(cents) {
@@ -4334,27 +4403,22 @@ function euroToCents(value) {
   return Math.round(Number(normalized) * 100);
 }
 
-// datetime-local liefert einen Wert ohne Zeitzone, der vom Browser als lokale Zeit
-// interpretiert wird. Beim Speichern wandeln wir das explizit in einen UTC-ISO-String
-// um, damit der Vergleich mit Date.now() im Worker (der in UTC läuft) korrekt bleibt.
-function localDateTimeToIso(value) {
-  if (!value) {
-    return null;
-  }
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function isoToLocalDateTimeInput(value) {
+function utcIsoToZonedDateTimeInput(value, timeZone) {
   if (!value) {
     return '';
   }
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  if (Number.isNaN(date.getTime())) return '';
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone || 'UTC',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(date);
+    const valueFor = (type) => parts.find((part) => part.type === type)?.value;
+    return `${valueFor('year')}-${valueFor('month')}-${valueFor('day')}T${valueFor('hour')}:${valueFor('minute')}`;
+  } catch {
     return '';
   }
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 const PASSWORD_STRENGTH_ERROR =
@@ -4393,6 +4457,10 @@ async function api(path, options = {}) {
 const TRANSLATIONS = {
   nl: {
     'Die Anmeldung ist geschlossen': 'De inschrijving is gesloten',
+    'Anmeldung ab': 'Inschrijving vanaf',
+    'Anmeldung möglich ab': 'Inschrijving mogelijk vanaf',
+    'Die Uhrzeiten gelten als Ortszeit am Turnierstandort und werden automatisch der passenden Zeitzone zugeordnet.': 'De tijden gelden als lokale tijd op de toernooilocatie en worden automatisch aan de juiste tijdzone toegewezen.',
+    'Erkannte Zeitzone:': 'Herkenbare tijdzone:',
     'Die Meldefrist ist abgelaufen': 'De inschrijftermijn is verstreken',
     'Die Anmeldung ist noch nicht geöffnet': 'De inschrijving is nog niet geopend',
     'CSV exportieren': 'CSV exporteren',
@@ -4791,6 +4859,10 @@ const TRANSLATIONS = {
   },
   en: {
     'Die Anmeldung ist geschlossen': 'Registration is closed',
+    'Anmeldung ab': 'Registration from',
+    'Anmeldung möglich ab': 'Registration opens at',
+    'Die Uhrzeiten gelten als Ortszeit am Turnierstandort und werden automatisch der passenden Zeitzone zugeordnet.': 'Times are interpreted as local time at the tournament location and automatically assigned to the appropriate time zone.',
+    'Erkannte Zeitzone:': 'Detected time zone:',
     'Die Meldefrist ist abgelaufen': 'The registration deadline has passed',
     'Die Anmeldung ist noch nicht geöffnet': 'Registration has not opened yet',
     'CSV exportieren': 'Export CSV',
@@ -5189,6 +5261,10 @@ const TRANSLATIONS = {
   },
   es: {
     'Die Anmeldung ist geschlossen': 'La inscripción está cerrada',
+    'Anmeldung ab': 'Inscripción desde',
+    'Anmeldung möglich ab': 'Inscripción posible desde',
+    'Die Uhrzeiten gelten als Ortszeit am Turnierstandort und werden automatisch der passenden Zeitzone zugeordnet.': 'Las horas se interpretan como hora local en la sede del torneo y se asignan automáticamente a la zona horaria adecuada.',
+    'Erkannte Zeitzone:': 'Zona horaria detectada:',
     'Die Meldefrist ist abgelaufen': 'El plazo de inscripción ha vencido',
     'Die Anmeldung ist noch nicht geöffnet': 'La inscripción todavía no está abierta',
     'CSV exportieren': 'Exportar CSV',
@@ -5587,6 +5663,10 @@ const TRANSLATIONS = {
   },
   fr: {
     'Die Anmeldung ist geschlossen': "L'inscription est fermée",
+    'Anmeldung ab': 'Inscriptions à partir du',
+    'Anmeldung möglich ab': 'Inscriptions possibles à partir du',
+    'Die Uhrzeiten gelten als Ortszeit am Turnierstandort und werden automatisch der passenden Zeitzone zugeordnet.': 'Les heures sont interprétées comme l’heure locale du lieu du tournoi et automatiquement affectées au fuseau horaire approprié.',
+    'Erkannte Zeitzone:': 'Fuseau horaire détecté :',
     'Die Meldefrist ist abgelaufen': "Le délai d'inscription est dépassé",
     'Die Anmeldung ist noch nicht geöffnet': "L'inscription n'est pas encore ouverte",
     'CSV exportieren': 'Exporter en CSV',

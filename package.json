@@ -13,11 +13,12 @@
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "security:check": "node scripts/security-check.mjs && node scripts/i18n-check.mjs",
     "i18n:check": "node scripts/i18n-check.mjs",
-    "test": "node scripts/formation-registration-type-check.mjs"
+    "test": "node scripts/formation-registration-type-check.mjs && node scripts/timezone-check.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "tz-lookup": "^6.1.25"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.0",
