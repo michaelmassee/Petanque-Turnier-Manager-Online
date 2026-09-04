@@ -1580,7 +1580,7 @@ async function listTournaments(db, user) {
        LEFT JOIN users ON users.id = tournaments.manager_id
        WHERE (?1 IS NOT NULL AND ?1 = 'admin')
           OR (?2 IS NOT NULL AND (tournaments.created_by = ?2 OR tournaments.manager_id = ?2))
-          OR tournaments.visibility = 'public'
+          OR (tournaments.visibility = 'public' AND tournaments.status != 'draft')
        ORDER BY tournaments.date ASC, tournaments.start_time ASC, tournaments.name COLLATE NOCASE`,
     )
     .bind(user?.role || null, user?.id || null)
@@ -2485,12 +2485,16 @@ async function getRegistrationWithTournament(db, id) {
     .first();
 }
 
+function isPubliclyVisible(tournament) {
+  return tournament.visibility === 'public' && tournament.status !== 'draft';
+}
+
 function canViewTournament(tournament, user) {
-  return tournament.visibility === 'public' || canManageTournament(tournament, user);
+  return isPubliclyVisible(tournament) || canManageTournament(tournament, user);
 }
 
 function canViewParticipants(tournament, user) {
-  if (tournament.visibility === 'public' && Number(tournament.participants_public)) {
+  if (isPubliclyVisible(tournament) && Number(tournament.participants_public)) {
     return true;
   }
   return canManageTournament(tournament, user);
