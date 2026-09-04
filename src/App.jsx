@@ -2307,9 +2307,15 @@ function TournamentInfo({ tournament, language, onShare }) {
       <p>
         <strong>{translateText('Max. Meldungen', language)}</strong>: {tournament.maxRegistrations || '∞'}
       </p>
-      <p>
-        <strong>{translateText('Noch frei', language)}</strong>: {freeSlots === null ? '∞' : freeSlots}
-      </p>
+      {freeSlots === null ? (
+        <p>
+          <strong>{translateText('Angemeldet', language)}</strong>: {tournament.activeRegistrations || 0}
+        </p>
+      ) : (
+        <p>
+          <strong>{translateText('Noch frei', language)}</strong>: {freeSlots}
+        </p>
+      )}
       <p>
         <strong>{translateText('Warteliste', language)}</strong>: {tournament.waitlistRegistrations || 0}
       </p>
@@ -3901,6 +3907,14 @@ const SLOTS_FREE_TEMPLATES = {
   fr: (free, max) => `${free} sur ${max} places libres`,
 };
 
+const REGISTERED_COUNT_TEMPLATES = {
+  de: (count) => `${count} angemeldet`,
+  nl: (count) => `${count} aangemeld`,
+  en: (count) => `${count} registered`,
+  es: (count) => `${count} inscritos`,
+  fr: (count) => `${count} inscrits`,
+};
+
 function registrationStatusLabel(tournament, language) {
   if (tournament.status === 'registration' && registrationNotYetOpen(tournament)) {
     const opensAt = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(tournament.registrationOpensAt));
@@ -3919,7 +3933,7 @@ function registrationStatusLabel(tournament, language) {
   }
 
   if (!tournament.maxRegistrations) {
-    return translateText('Anmeldung läuft', language);
+    return (REGISTERED_COUNT_TEMPLATES[language] || REGISTERED_COUNT_TEMPLATES.de)(tournament.activeRegistrations || 0);
   }
 
   const free = tournament.maxRegistrations - tournament.activeRegistrations;
@@ -4340,6 +4354,7 @@ const TRANSLATIONS = {
     Sichtbarkeit: 'Zichtbaarheid',
     'Max. Meldungen': 'Max. inschrijvingen',
     'Noch frei': 'Nog vrij',
+    Angemeldet: 'Aangemeld',
     'Startgeld EUR': 'Inschrijfgeld EUR',
     Meldefrist: 'Inschrijfdeadline',
     Kontaktname: 'Contactnaam',
@@ -4731,6 +4746,7 @@ const TRANSLATIONS = {
     Sichtbarkeit: 'Visibility',
     'Max. Meldungen': 'Max. registrations',
     'Noch frei': 'Spots free',
+    Angemeldet: 'Registered',
     'Startgeld EUR': 'Entry fee EUR',
     Meldefrist: 'Registration deadline',
     Kontaktname: 'Contact name',
@@ -5122,6 +5138,7 @@ const TRANSLATIONS = {
     Sichtbarkeit: 'Visibilidad',
     'Max. Meldungen': 'Máx. inscripciones',
     'Noch frei': 'Plazas libres',
+    Angemeldet: 'Inscritos',
     'Startgeld EUR': 'Cuota EUR',
     Meldefrist: 'Fecha límite',
     Kontaktname: 'Contacto',
@@ -5513,6 +5530,7 @@ const TRANSLATIONS = {
     Sichtbarkeit: 'Visibilité',
     'Max. Meldungen': 'Max. inscriptions',
     'Noch frei': 'Places libres',
+    Angemeldet: 'Inscrits',
     'Startgeld EUR': 'Frais EUR',
     Meldefrist: 'Date limite',
     Kontaktname: 'Contact',
