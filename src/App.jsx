@@ -13,8 +13,8 @@ const TOURNAMENT_TYPES = [
   { value: 'liga', label: 'Liga' },
   { value: 'maastrichter', label: 'Maastrichter' },
   { value: 'poule_ab', label: 'Poule A/B' },
+  { value: 'rangliste', label: 'Rangliste' },
   { value: 'schweizer', label: 'Schweizer' },
-  { value: 'supermelee', label: 'Supermêlée' },
   { value: 'trip_tete', label: 'Trip-Tête' },
 ];
 
@@ -25,8 +25,9 @@ const FORMATIONS = [
 ];
 
 const REGISTRATION_TYPES = [
+  { value: 'supermelee', label: 'Supermêlée' },
   { value: 'melee', label: 'Mêlée' },
-  { value: 'forme', label: 'Formé' },
+  { value: 'forme', label: 'Formée' },
 ];
 
 const MONTHS = [
@@ -118,9 +119,9 @@ const EMPTY_TOURNAMENT_FORM = {
   longitude: '',
   overrideCoordinates: false,
   description: '',
-  type: 'supermelee',
+  type: 'formule_x',
   formation: 'doublette',
-  registrationType: 'melee',
+  registrationType: 'forme',
   status: 'draft',
   maxRegistrations: 0,
   registrationDeadline: '',
@@ -862,9 +863,9 @@ export default function App() {
       longitude: tournament.longitude ?? '',
       overrideCoordinates: false,
       description: tournament.description || '',
-      type: tournament.type || 'supermelee',
-      formation: tournament.type === 'supermelee' ? 'tete' : tournament.formation || 'doublette',
-      registrationType: tournament.type === 'supermelee' ? 'melee' : tournament.registrationType || 'forme',
+      type: tournament.type || 'formule_x',
+      formation: tournament.formation || 'doublette',
+      registrationType: tournament.registrationType || 'forme',
       status: tournament.status || 'draft',
       maxRegistrations: tournament.maxRegistrations || 0,
       registrationDeadline: tournament.registrationDeadline || '',
@@ -2894,31 +2895,35 @@ function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users }) {
       )}
       <div className="form-grid">
         <SelectField
-          label="Turniersystem"
-          value={form.type}
-          onChange={(type) => setForm({
-            ...form,
-            type,
-            formation: type === 'supermelee' ? 'tete' : form.formation,
-            registrationType: type === 'supermelee' ? 'melee' : (form.type === 'supermelee' ? 'forme' : form.registrationType),
-          })}
-          options={TOURNAMENT_TYPES}
-        />
-        <SelectField
           label="Formation"
           value={form.formation}
-          onChange={(formation) => setForm({ ...form, formation })}
-          options={form.type === 'supermelee' ? FORMATIONS.filter((option) => option.value === 'tete') : FORMATIONS}
-          disabled={form.type === 'supermelee'}
+          onChange={(formation) => setForm({
+            ...form,
+            formation,
+            registrationType: formation === 'tete' ? 'forme' : form.registrationType,
+          })}
+          options={form.registrationType === 'supermelee' ? FORMATIONS.filter((option) => option.value !== 'tete') : FORMATIONS}
+        />
+        <SelectField
+          label="Anmeldetyp"
+          value={form.registrationType}
+          onChange={(registrationType) => setForm({
+            ...form,
+            registrationType,
+            type: registrationType === 'supermelee' ? 'rangliste' : form.type,
+            formation: registrationType === 'supermelee' && form.formation === 'tete' ? 'doublette' : form.formation,
+          })}
+          options={form.formation === 'tete' ? REGISTRATION_TYPES.filter((option) => option.value === 'forme') : REGISTRATION_TYPES}
+          disabled={form.formation === 'tete'}
         />
       </div>
       <div className="form-grid">
         <SelectField
-          label="Anmeldetyp"
-          value={form.registrationType}
-          onChange={(registrationType) => setForm({ ...form, registrationType })}
-          options={form.type === 'supermelee' ? REGISTRATION_TYPES.filter((option) => option.value === 'melee') : REGISTRATION_TYPES}
-          disabled={form.type === 'supermelee'}
+          label="Turniersystem"
+          value={form.registrationType === 'supermelee' ? 'rangliste' : form.type}
+          onChange={(type) => setForm({ ...form, type })}
+          options={TOURNAMENT_TYPES}
+          disabled={form.registrationType === 'supermelee'}
         />
         <SelectField label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={TOURNAMENT_STATUSES} />
       </div>
@@ -3041,9 +3046,10 @@ function RegistrationForm({ form, setForm, onSubmit, tournaments, selectedTourna
 }
 
 function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled }) {
-  const allowsPartner = registrationType === 'melee' ? false : (formation ? formation !== 'tete' : true);
-  const allowsPartner2 = registrationType === 'melee' ? false : formation === 'triplette';
-  const showMeleeNotice = registrationType === 'melee' && formation && formation !== 'tete';
+  const isDrawnTeam = registrationType === 'melee' || registrationType === 'supermelee';
+  const allowsPartner = isDrawnTeam ? false : (formation ? formation !== 'tete' : true);
+  const allowsPartner2 = isDrawnTeam ? false : formation === 'triplette';
+  const showMeleeNotice = isDrawnTeam && formation && formation !== 'tete';
 
   useEffect(() => {
     if (!allowsPartner && (form.partnerFirstName || form.partnerLastName || form.partnerEmail || form.partnerLicenseNr || form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2LicenseNr)) {
@@ -3081,7 +3087,11 @@ function RegistrationFields({ form, setForm, showStatus, formation, registration
       </div>
       {teamNameEnabled && <TextField label="Teamname" value={form.teamName} onChange={(teamName) => setForm({ ...form, teamName })} />}
       {showMeleeNotice && (
-        <p className="muted">Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.</p>
+        <p className="muted">
+          {registrationType === 'supermelee'
+            ? 'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.'
+            : 'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.'}
+        </p>
       )}
       {allowsPartner && (
         <>
@@ -4223,10 +4233,13 @@ const TRANSLATIONS = {
     Turniersystem: 'Toernooisysteem',
     Formation: 'Formatie',
     Anmeldetyp: 'Inschrijftype',
+    Supermêlée: 'Supermêlée',
     Mêlée: 'Mêlée',
-    Formé: 'Formé',
+    Formée: 'Formée',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       'Dit toernooi wordt als mêlée gespeeld – partners worden ter plaatse geloot.',
+    'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':
+      'Dit toernooi wordt als supermêlée gespeeld – de teams worden voor elke ronde opnieuw geloot.',
     Status: 'Status',
     VIP: 'VIP',
     Sichtbarkeit: 'Zichtbaarheid',
@@ -4242,7 +4255,9 @@ const TRANSLATIONS = {
     'Turnier speichern': 'Toernooi opslaan',
     'Lizenznummer erforderlich': 'Licentienummer verplicht',
     'Teamname abfragen': 'Teamnaam vragen',
-    'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée is alleen mogelijk met de formatie Tête',
+    'Formation Tête ist nur mit dem Anmeldetyp Formée möglich': 'De formatie Tête is alleen mogelijk met het aanmeldtype Formée',
+    'Supermêlée ist nur mit Doublette oder Triplette möglich': 'Supermêlée is alleen mogelijk met Doublette of Triplette',
+    'Supermêlée erfordert das Turniersystem Rangliste': 'Supermêlée vereist het toernooisysteem Rangliste',
     'Lizenznummer ist erforderlich': 'Licentienummer is verplicht',
     'Lizenznummer für Partner ist erforderlich': 'Licentienummer voor partner is verplicht',
     'Lizenznummer für Partner 2 ist erforderlich': 'Licentienummer voor partner 2 is verplicht',
@@ -4609,10 +4624,13 @@ const TRANSLATIONS = {
     Turniersystem: 'Tournament system',
     Formation: 'Formation',
     Anmeldetyp: 'Registration type',
+    Supermêlée: 'Supermêlée',
     Mêlée: 'Mêlée',
-    Formé: 'Formé',
+    Formée: 'Formée',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       'This tournament is played as mêlée – partners will be drawn on site.',
+    'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':
+      'This tournament is played as supermêlée – teams are redrawn before every round.',
     Status: 'Status',
     VIP: 'VIP',
     Sichtbarkeit: 'Visibility',
@@ -4628,7 +4646,9 @@ const TRANSLATIONS = {
     'Turnier speichern': 'Save tournament',
     'Lizenznummer erforderlich': 'License number required',
     'Teamname abfragen': 'Ask for team name',
-    'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée is only possible with the Tête formation',
+    'Formation Tête ist nur mit dem Anmeldetyp Formée möglich': 'The Tête formation is only possible with the Formée registration type',
+    'Supermêlée ist nur mit Doublette oder Triplette möglich': 'Supermêlée is only possible with Doublette or Triplette',
+    'Supermêlée erfordert das Turniersystem Rangliste': 'Supermêlée requires the Rangliste tournament system',
     'Lizenznummer ist erforderlich': 'License number is required',
     'Lizenznummer für Partner ist erforderlich': 'License number for partner is required',
     'Lizenznummer für Partner 2 ist erforderlich': 'License number for partner 2 is required',
@@ -4995,10 +5015,13 @@ const TRANSLATIONS = {
     Turniersystem: 'Sistema',
     Formation: 'Formación',
     Anmeldetyp: 'Tipo de inscripción',
+    Supermêlée: 'Supermêlée',
     Mêlée: 'Mêlée',
-    Formé: 'Formé',
+    Formée: 'Formée',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       'Este torneo se juega como mêlée – los compañeros se sortean in situ.',
+    'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':
+      'Este torneo se juega como supermêlée – los equipos se sortean de nuevo antes de cada ronda.',
     Status: 'Estado',
     VIP: 'VIP',
     Sichtbarkeit: 'Visibilidad',
@@ -5014,7 +5037,9 @@ const TRANSLATIONS = {
     'Turnier speichern': 'Guardar torneo',
     'Lizenznummer erforderlich': 'Licencia obligatoria',
     'Teamname abfragen': 'Solicitar nombre de equipo',
-    'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée solo es posible con la formación Tête',
+    'Formation Tête ist nur mit dem Anmeldetyp Formée möglich': 'La formación Tête solo es posible con el tipo de inscripción Formée',
+    'Supermêlée ist nur mit Doublette oder Triplette möglich': 'Supermêlée solo es posible con Doublette o Triplette',
+    'Supermêlée erfordert das Turniersystem Rangliste': 'Supermêlée requiere el sistema de torneo Rangliste',
     'Lizenznummer ist erforderlich': 'La licencia es obligatoria',
     'Lizenznummer für Partner ist erforderlich': 'La licencia de la pareja es obligatoria',
     'Lizenznummer für Partner 2 ist erforderlich': 'La licencia de la pareja 2 es obligatoria',
@@ -5381,10 +5406,13 @@ const TRANSLATIONS = {
     Turniersystem: 'Système',
     Formation: 'Formation',
     Anmeldetyp: "Type d'inscription",
+    Supermêlée: 'Supermêlée',
     Mêlée: 'Mêlée',
-    Formé: 'Formé',
+    Formée: 'Formée',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       "Ce tournoi se joue en mêlée – les partenaires seront tirés au sort sur place.",
+    'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':
+      "Ce tournoi se joue en supermêlée – les équipes sont retirées au sort avant chaque manche.",
     Status: 'Statut',
     VIP: 'VIP',
     Sichtbarkeit: 'Visibilité',
@@ -5400,7 +5428,9 @@ const TRANSLATIONS = {
     'Turnier speichern': 'Enregistrer',
     'Lizenznummer erforderlich': 'Licence obligatoire',
     'Teamname abfragen': 'Demander le nom d’équipe',
-    'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée n’est possible qu’avec la formation Tête',
+    'Formation Tête ist nur mit dem Anmeldetyp Formée möglich': 'La formation Tête n’est possible qu’avec le type d’inscription Formée',
+    'Supermêlée ist nur mit Doublette oder Triplette möglich': 'Supermêlée n’est possible qu’avec Doublette ou Triplette',
+    'Supermêlée erfordert das Turniersystem Rangliste': 'Supermêlée nécessite le système de tournoi Rangliste',
     'Lizenznummer ist erforderlich': 'La licence est obligatoire',
     'Lizenznummer für Partner ist erforderlich': 'La licence du partenaire est obligatoire',
     'Lizenznummer für Partner 2 ist erforderlich': 'La licence du partenaire 2 est obligatoire',

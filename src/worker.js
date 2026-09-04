@@ -8,12 +8,12 @@ const TOURNAMENT_TYPES = [
   'liga',
   'maastrichter',
   'poule_ab',
+  'rangliste',
   'schweizer',
-  'supermelee',
   'trip_tete',
 ];
 const FORMATIONS = ['tete', 'doublette', 'triplette'];
-const REGISTRATION_TYPES = ['melee', 'forme'];
+const REGISTRATION_TYPES = ['supermelee', 'melee', 'forme'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
 const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
@@ -2741,7 +2741,7 @@ function normalizeTournamentInput(body) {
     startTime: nullableText(body.startTime),
     location: text(body.location),
     description: nullableText(body.description),
-    type: text(body.type || 'supermelee'),
+    type: text(body.type || 'formule_x'),
     formation: text(body.formation || 'doublette'),
     registrationType: text(body.registrationType || 'forme'),
     status: text(body.status || 'draft'),
@@ -2784,11 +2784,14 @@ function normalizeTournamentInput(body) {
   if (!REGISTRATION_TYPES.includes(tournament.registrationType)) {
     throw new HttpError(400, 'Invalid registration type');
   }
-  if (tournament.type === 'supermelee' && tournament.formation !== 'tete') {
-    throw new HttpError(400, 'Supermêlée ist nur mit der Formation Tête möglich');
+  if (tournament.formation === 'tete' && tournament.registrationType !== 'forme') {
+    throw new HttpError(400, 'Formation Tête ist nur mit dem Anmeldetyp Formée möglich');
   }
-  if (tournament.type === 'supermelee' && tournament.registrationType !== 'melee') {
-    throw new HttpError(400, 'Supermêlée erfordert den Anmeldetyp Mêlée');
+  if (tournament.registrationType === 'supermelee' && tournament.formation === 'tete') {
+    throw new HttpError(400, 'Supermêlée ist nur mit Doublette oder Triplette möglich');
+  }
+  if (tournament.registrationType === 'supermelee' && tournament.type !== 'rangliste') {
+    throw new HttpError(400, 'Supermêlée erfordert das Turniersystem Rangliste');
   }
   if (!TOURNAMENT_STATUSES.includes(tournament.status)) {
     throw new HttpError(400, 'Invalid tournament status');
@@ -2854,7 +2857,9 @@ function normalizeRegistrationInput(body, { requireStatus }) {
 }
 
 function assertPartnerCountMatchesFormation(tournament, registration) {
-  const formation = tournament.registration_type === 'melee' ? 'tete' : tournament.formation;
+  const formation = tournament.registration_type === 'melee' || tournament.registration_type === 'supermelee'
+    ? 'tete'
+    : tournament.formation;
   const hasPartner = Boolean(registration.partnerFirstName && registration.partnerLastName);
   const hasPartner2 = Boolean(registration.partner2FirstName && registration.partner2LastName);
 
