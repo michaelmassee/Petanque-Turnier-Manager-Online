@@ -424,7 +424,7 @@ export default function App() {
         }
       }
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     } finally {
       setLoading(false);
     }
@@ -435,7 +435,7 @@ export default function App() {
       const data = await api('/api/users');
       setUsers(data.users);
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -445,7 +445,7 @@ export default function App() {
       setTournaments(data.tournaments);
       setSelectedTournamentId((previous) => previous || data.tournaments[0]?.id || '');
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -454,7 +454,7 @@ export default function App() {
       const data = await api(`/api/tournaments/${tournamentId}/registrations`);
       setRegistrations(data.registrations);
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -484,7 +484,7 @@ export default function App() {
       setMessage('Admin wurde angelegt.');
       await loadTournaments();
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -506,10 +506,10 @@ export default function App() {
       if (requestError.payload?.passwordChangeRequired && requestError.payload.resetToken) {
         setAuthForm({ ...EMPTY_AUTH_FORM, token: requestError.payload.resetToken });
         setAuthView('reset');
-        setMessage(requestError.message);
+        setMessage(translateText(requestError.message, language));
         return;
       }
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -537,7 +537,7 @@ export default function App() {
       setAuthView('registerSuccess');
       setMessage(data.verificationUrl ? `${translateText(REGISTER_SUCCESS, language)} ${data.verificationUrl}` : translateText(REGISTER_SUCCESS, language));
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -556,7 +556,7 @@ export default function App() {
       setAuthView('login');
       setMessage(translateText(VERIFY_SUCCESS, language));
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -611,7 +611,7 @@ export default function App() {
           : translateText(PROFILE_UPDATE_SUCCESS, language),
       );
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -628,7 +628,7 @@ export default function App() {
       setMessage(data.resetUrl ? `${data.message} ${data.resetUrl}` : data.message);
       setAuthForm(EMPTY_AUTH_FORM);
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -645,7 +645,7 @@ export default function App() {
       setMessage(data.verificationUrl ? `${data.message} ${data.verificationUrl}` : data.message);
       setAuthForm(EMPTY_AUTH_FORM);
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -677,7 +677,7 @@ export default function App() {
       setAuthView('login');
       setMessage('Passwort wurde geändert. Du kannst dich jetzt anmelden.');
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -734,7 +734,7 @@ export default function App() {
       setUserMode('create');
       await loadUsers();
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -760,7 +760,7 @@ export default function App() {
       await loadUsers();
       await loadTournaments();
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -816,7 +816,7 @@ export default function App() {
       setRegistrations([]);
       await loadTournaments();
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -864,7 +864,7 @@ export default function App() {
       await loadRegistrations(registration.tournamentId);
       await loadTournaments();
     } catch (requestError) {
-      setError(requestError.message);
+      setError(translateText(requestError.message, language));
     }
   }
 
@@ -1007,7 +1007,7 @@ export default function App() {
         setSearchOrigin({ lat: data.lat, lng: data.lng, label: data.displayName || query });
       }
     } catch (requestError) {
-      setGeoError(requestError.message);
+      setGeoError(translateText(requestError.message, language));
     } finally {
       setGeoLoading(false);
     }
@@ -1630,7 +1630,7 @@ export default function App() {
 
       {activeTab === 'apikeys' && canManageTournaments && (
         <section className="single-column">
-          <ApiKeysPanel isAdmin={isAdmin} />
+          <ApiKeysPanel isAdmin={isAdmin} language={language} />
         </section>
       )}
 
@@ -2269,7 +2269,7 @@ function TournamentDetailPage({
               <p className="hint">
                 Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.
               </p>
-              <TournamentParticipants tournamentId={tournament.id} logoUrl={tournament.logoUrl} onMessage={setMessage} onError={setError} />
+              <TournamentParticipants tournamentId={tournament.id} logoUrl={tournament.logoUrl} onMessage={setMessage} onError={setError} language={language} />
             </>
           )}
         </div>
@@ -2401,7 +2401,7 @@ function TournamentInfo({ tournament, language, onShare }) {
   );
 }
 
-function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
+function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError, language }) {
   const [participants, setParticipants] = useState(null);
   const [forbidden, setForbidden] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -2437,7 +2437,7 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
       onMessage?.('Anmeldung wurde abgesagt.');
       setReloadKey((key) => key + 1);
     } catch (requestError) {
-      onError?.(requestError.message);
+      onError?.(translateText(requestError.message, language));
     }
   }
 
@@ -4110,7 +4110,7 @@ function formatDateTime(value) {
   return new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 }
 
-function ApiKeysPanel({ isAdmin }) {
+function ApiKeysPanel({ isAdmin, language }) {
   const [apiKeys, setApiKeys] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [label, setLabel] = useState('');
@@ -4123,7 +4123,7 @@ function ApiKeysPanel({ isAdmin }) {
       const data = await api('/api/api-keys');
       setApiKeys(data.apiKeys);
     } catch (err) {
-      setPanelError(err.message);
+      setPanelError(translateText(err.message, language));
     }
   }
 
@@ -4135,7 +4135,7 @@ function ApiKeysPanel({ isAdmin }) {
       const data = await api('/api/admin/api-keys?status=pending');
       setPendingRequests(data.apiKeys);
     } catch (err) {
-      setPanelError(err.message);
+      setPanelError(translateText(err.message, language));
     }
   }
 
@@ -4157,7 +4157,7 @@ function ApiKeysPanel({ isAdmin }) {
       setLabel('');
       await loadOwnKeys();
     } catch (err) {
-      setPanelError(err.message);
+      setPanelError(translateText(err.message, language));
     } finally {
       setBusy(false);
     }
@@ -4170,7 +4170,7 @@ function ApiKeysPanel({ isAdmin }) {
       setRevealedSecret({ id, secret: data.secret });
       await loadOwnKeys();
     } catch (err) {
-      setPanelError(err.message);
+      setPanelError(translateText(err.message, language));
     }
   }
 
@@ -4183,7 +4183,7 @@ function ApiKeysPanel({ isAdmin }) {
       await api(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
       await loadOwnKeys();
     } catch (err) {
-      setPanelError(err.message);
+      setPanelError(translateText(err.message, language));
     }
   }
 
@@ -4193,7 +4193,7 @@ function ApiKeysPanel({ isAdmin }) {
       await api(`/api/admin/api-keys/${id}/approve`, { method: 'POST' });
       await Promise.all([loadPendingRequests(), loadOwnKeys()]);
     } catch (err) {
-      setPanelError(err.message);
+      setPanelError(translateText(err.message, language));
     }
   }
 
@@ -4203,7 +4203,7 @@ function ApiKeysPanel({ isAdmin }) {
       await api(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
       await loadPendingRequests();
     } catch (err) {
-      setPanelError(err.message);
+      setPanelError(translateText(err.message, language));
     }
   }
 
@@ -4456,6 +4456,49 @@ async function api(path, options = {}) {
 
 const TRANSLATIONS = {
   nl: {
+    'API-Schlüssel nicht gefunden': 'API-sleutel niet gevonden',
+    'API-Schlüssel nicht gefunden oder bereits widerrufen': 'API-sleutel niet gevonden of al ingetrokken',
+    'API-Schlüssel wartet nicht auf Freischaltung': 'API-sleutel wacht niet op goedkeuring',
+    'Admin-Rolle erforderlich': 'Beheerdersrol vereist',
+    'Anmeldung erforderlich': 'Aanmelding vereist',
+    'Anmeldung nicht gefunden': 'Inschrijving niet gevonden',
+    'Anmeldungen müssen als nicht-leeres Array übergeben werden': 'Inschrijvingen moeten als niet-lege array worden opgegeven',
+    'Benutzer nicht gefunden': 'Gebruiker niet gevonden',
+    'Bild konnte nicht geladen werden': 'Afbeelding kon niet worden geladen',
+    'Bild zu groß': 'Afbeelding te groot',
+    'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.': 'Het toernooi is volgeboekt. Er is geen wachtlijst geactiveerd voor dit toernooi.',
+    'Du kannst deine eigene Admin-Rolle nicht entfernen': 'Je kunt je eigen beheerdersrol niet verwijderen',
+    'Du kannst deinen eigenen Benutzer nicht löschen': 'Je kunt je eigen account niet verwijderen',
+    'E-Mail ist erforderlich': 'E-mail is vereist',
+    'E-Mail und Passwort sind erforderlich': 'E-mail en wachtwoord zijn vereist',
+    'E-Mail-Adresse bereits vergeben': 'E-mailadres al in gebruik',
+    'Eine gültige E-Mail ist erforderlich': 'Een geldig e-mailadres is vereist',
+    'Eine gültige Partner-E-Mail ist erforderlich': 'Een geldig e-mailadres van de partner is vereist',
+    'Eine gültige zweite Partner-E-Mail ist erforderlich': 'Een geldig e-mailadres van de tweede partner is vereist',
+    'Eine nicht-negative Ganzzahl ist erforderlich': 'Een niet-negatief geheel getal is vereist',
+    'Einrichtung bereits abgeschlossen': 'Installatie al voltooid',
+    'Formation Doublette erfordert genau einen Partner': 'Formatie Doublette vereist precies één partner',
+    'Formation Doublette erlaubt nur einen Partner': 'Formatie Doublette staat slechts één partner toe',
+    'Formation Triplette erfordert genau zwei Partner': 'Formatie Triplette vereist precies twee partners',
+    'Formation Tête erlaubt nur einen Teilnehmer, keinen Partner': 'Formatie Tête staat slechts één deelnemer toe, geen partner',
+    'Kein Bild hinterlegt': 'Geen afbeelding opgeslagen',
+    'Label muss zwischen 2 und 120 Zeichen enthalten': 'Label moet tussen 2 en 120 tekens bevatten',
+    'Reset-Token ist erforderlich': 'Reset-token is vereist',
+    'Secret bereits abgerufen oder nicht verfügbar': 'Secret al opgehaald of niet beschikbaar',
+    'Unbekanntes Bildfeld': 'Onbekend afbeeldingsveld',
+    'Ungültige Anmeldedaten': 'Ongeldige inloggegevens',
+    'Ungültige Koordinate': 'Ongeldige coördinaat',
+    'Ungültige Rolle': 'Ongeldige rol',
+    'Ungültiger Anmeldestatus': 'Ongeldige inschrijfstatus',
+    'Ungültiger Bildtyp': 'Ongeldig afbeeldingstype',
+    'Ungültiger oder abgelaufener Reset-Token': 'Ongeldig of verlopen reset-token',
+    'Ungültiges Turnier-Limit': 'Ongeldige toernooilimiet',
+    'Vorname und Nachname müssen mindestens 2 Zeichen enthalten': 'Voor- en achternaam moeten minimaal 2 tekens bevatten',
+    'Vorname und Nachname sind erforderlich': 'Voor- en achternaam zijn vereist',
+    'Ziel-URL nicht erlaubt': 'Doel-URL niet toegestaan',
+    'Zu viele Anmeldeversuche. Bitte versuche es später erneut.': 'Te veel inlogpogingen. Probeer het later opnieuw.',
+    'Zu viele Geocoding-Anfragen. Bitte versuche es später erneut.': 'Te veel geocoderingsverzoeken. Probeer het later opnieuw.',
+    'Zugriff verweigert': 'Toegang geweigerd',
     'Der Turniername muss mindestens 2 Zeichen enthalten': 'De toernooinaam moet minimaal 2 tekens bevatten',
     'Ein gültiges Turnierdatum ist erforderlich': 'Een geldige toernooidatum is vereist',
     'Eine gültige Startzeit ist erforderlich': 'Een geldige starttijd is vereist',
@@ -4875,6 +4918,49 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   en: {
+    'API-Schlüssel nicht gefunden': 'API key not found',
+    'API-Schlüssel nicht gefunden oder bereits widerrufen': 'API key not found or already revoked',
+    'API-Schlüssel wartet nicht auf Freischaltung': 'API key is not pending approval',
+    'Admin-Rolle erforderlich': 'Admin role required',
+    'Anmeldung erforderlich': 'Login required',
+    'Anmeldung nicht gefunden': 'Registration not found',
+    'Anmeldungen müssen als nicht-leeres Array übergeben werden': 'Registrations must be provided as a non-empty array',
+    'Benutzer nicht gefunden': 'User not found',
+    'Bild konnte nicht geladen werden': 'Image could not be loaded',
+    'Bild zu groß': 'Image too large',
+    'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.': 'The tournament is fully booked. A waiting list is not enabled for this tournament.',
+    'Du kannst deine eigene Admin-Rolle nicht entfernen': 'You cannot remove your own admin role',
+    'Du kannst deinen eigenen Benutzer nicht löschen': 'You cannot delete your own user',
+    'E-Mail ist erforderlich': 'Email is required',
+    'E-Mail und Passwort sind erforderlich': 'Email and password are required',
+    'E-Mail-Adresse bereits vergeben': 'Email address already in use',
+    'Eine gültige E-Mail ist erforderlich': 'A valid email is required',
+    'Eine gültige Partner-E-Mail ist erforderlich': 'A valid partner email is required',
+    'Eine gültige zweite Partner-E-Mail ist erforderlich': 'A valid second partner email is required',
+    'Eine nicht-negative Ganzzahl ist erforderlich': 'A non-negative integer is required',
+    'Einrichtung bereits abgeschlossen': 'Setup already completed',
+    'Formation Doublette erfordert genau einen Partner': 'Formation Doublette requires exactly one partner',
+    'Formation Doublette erlaubt nur einen Partner': 'Formation Doublette allows only one partner',
+    'Formation Triplette erfordert genau zwei Partner': 'Formation Triplette requires exactly two partners',
+    'Formation Tête erlaubt nur einen Teilnehmer, keinen Partner': 'Formation Tête allows only a single participant, no partner',
+    'Kein Bild hinterlegt': 'No image on file',
+    'Label muss zwischen 2 und 120 Zeichen enthalten': 'Label must contain between 2 and 120 characters',
+    'Reset-Token ist erforderlich': 'Reset token is required',
+    'Secret bereits abgerufen oder nicht verfügbar': 'Secret already retrieved or not available',
+    'Unbekanntes Bildfeld': 'Unknown image field',
+    'Ungültige Anmeldedaten': 'Invalid login',
+    'Ungültige Koordinate': 'Invalid coordinate',
+    'Ungültige Rolle': 'Invalid role',
+    'Ungültiger Anmeldestatus': 'Invalid registration status',
+    'Ungültiger Bildtyp': 'Invalid image type',
+    'Ungültiger oder abgelaufener Reset-Token': 'Invalid or expired reset token',
+    'Ungültiges Turnier-Limit': 'Invalid tournament limit',
+    'Vorname und Nachname müssen mindestens 2 Zeichen enthalten': 'First name and last name must contain at least 2 characters',
+    'Vorname und Nachname sind erforderlich': 'First name and last name are required',
+    'Ziel-URL nicht erlaubt': 'Target URL not allowed',
+    'Zu viele Anmeldeversuche. Bitte versuche es später erneut.': 'Too many login attempts. Please try again later.',
+    'Zu viele Geocoding-Anfragen. Bitte versuche es später erneut.': 'Too many geocoding requests. Please try again later.',
+    'Zugriff verweigert': 'Access denied',
     'Der Turniername muss mindestens 2 Zeichen enthalten': 'The tournament name must contain at least 2 characters',
     'Ein gültiges Turnierdatum ist erforderlich': 'A valid tournament date is required',
     'Eine gültige Startzeit ist erforderlich': 'A valid start time is required',
@@ -5294,6 +5380,49 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   es: {
+    'API-Schlüssel nicht gefunden': 'Clave de API no encontrada',
+    'API-Schlüssel nicht gefunden oder bereits widerrufen': 'Clave de API no encontrada o ya revocada',
+    'API-Schlüssel wartet nicht auf Freischaltung': 'La clave de API no está pendiente de aprobación',
+    'Admin-Rolle erforderlich': 'Se requiere el rol de administrador',
+    'Anmeldung erforderlich': 'Se requiere iniciar sesión',
+    'Anmeldung nicht gefunden': 'Inscripción no encontrada',
+    'Anmeldungen müssen als nicht-leeres Array übergeben werden': 'Las inscripciones deben enviarse como una matriz no vacía',
+    'Benutzer nicht gefunden': 'Usuario no encontrado',
+    'Bild konnte nicht geladen werden': 'No se pudo cargar la imagen',
+    'Bild zu groß': 'Imagen demasiado grande',
+    'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.': 'El torneo está completo. No hay lista de espera activada para este torneo.',
+    'Du kannst deine eigene Admin-Rolle nicht entfernen': 'No puedes eliminar tu propio rol de administrador',
+    'Du kannst deinen eigenen Benutzer nicht löschen': 'No puedes eliminar tu propio usuario',
+    'E-Mail ist erforderlich': 'Se requiere el correo electrónico',
+    'E-Mail und Passwort sind erforderlich': 'Se requieren correo electrónico y contraseña',
+    'E-Mail-Adresse bereits vergeben': 'La dirección de correo electrónico ya está en uso',
+    'Eine gültige E-Mail ist erforderlich': 'Se requiere un correo electrónico válido',
+    'Eine gültige Partner-E-Mail ist erforderlich': 'Se requiere un correo electrónico de compañero válido',
+    'Eine gültige zweite Partner-E-Mail ist erforderlich': 'Se requiere un correo electrónico válido del segundo compañero',
+    'Eine nicht-negative Ganzzahl ist erforderlich': 'Se requiere un número entero no negativo',
+    'Einrichtung bereits abgeschlossen': 'La configuración ya se ha completado',
+    'Formation Doublette erfordert genau einen Partner': 'La formación Doublette requiere exactamente un compañero',
+    'Formation Doublette erlaubt nur einen Partner': 'La formación Doublette solo permite un compañero',
+    'Formation Triplette erfordert genau zwei Partner': 'La formación Triplette requiere exactamente dos compañeros',
+    'Formation Tête erlaubt nur einen Teilnehmer, keinen Partner': 'La formación Tête solo permite un participante, sin compañero',
+    'Kein Bild hinterlegt': 'No hay ninguna imagen guardada',
+    'Label muss zwischen 2 und 120 Zeichen enthalten': 'La etiqueta debe contener entre 2 y 120 caracteres',
+    'Reset-Token ist erforderlich': 'Se requiere el token de restablecimiento',
+    'Secret bereits abgerufen oder nicht verfügbar': 'El secreto ya se ha obtenido o no está disponible',
+    'Unbekanntes Bildfeld': 'Campo de imagen desconocido',
+    'Ungültige Anmeldedaten': 'Credenciales de acceso no válidas',
+    'Ungültige Koordinate': 'Coordenada no válida',
+    'Ungültige Rolle': 'Rol no válido',
+    'Ungültiger Anmeldestatus': 'Estado de inscripción no válido',
+    'Ungültiger Bildtyp': 'Tipo de imagen no válido',
+    'Ungültiger oder abgelaufener Reset-Token': 'Token de restablecimiento no válido o caducado',
+    'Ungültiges Turnier-Limit': 'Límite de torneos no válido',
+    'Vorname und Nachname müssen mindestens 2 Zeichen enthalten': 'El nombre y el apellido deben contener al menos 2 caracteres',
+    'Vorname und Nachname sind erforderlich': 'Se requieren el nombre y el apellido',
+    'Ziel-URL nicht erlaubt': 'URL de destino no permitida',
+    'Zu viele Anmeldeversuche. Bitte versuche es später erneut.': 'Demasiados intentos de inicio de sesión. Inténtalo de nuevo más tarde.',
+    'Zu viele Geocoding-Anfragen. Bitte versuche es später erneut.': 'Demasiadas solicitudes de geocodificación. Inténtalo de nuevo más tarde.',
+    'Zugriff verweigert': 'Acceso denegado',
     'Der Turniername muss mindestens 2 Zeichen enthalten': 'El nombre del torneo debe contener al menos 2 caracteres',
     'Ein gültiges Turnierdatum ist erforderlich': 'Se requiere una fecha de torneo válida',
     'Eine gültige Startzeit ist erforderlich': 'Se requiere una hora de inicio válida',
@@ -5713,6 +5842,49 @@ const TRANSLATIONS = {
     '100 km': '100 km',
   },
   fr: {
+    'API-Schlüssel nicht gefunden': 'Clé API introuvable',
+    'API-Schlüssel nicht gefunden oder bereits widerrufen': 'Clé API introuvable ou déjà révoquée',
+    'API-Schlüssel wartet nicht auf Freischaltung': 'La clé API n\'est pas en attente d\'approbation',
+    'Admin-Rolle erforderlich': 'Rôle d\'administrateur requis',
+    'Anmeldung erforderlich': 'Connexion requise',
+    'Anmeldung nicht gefunden': 'Inscription introuvable',
+    'Anmeldungen müssen als nicht-leeres Array übergeben werden': 'Les inscriptions doivent être fournies sous forme de tableau non vide',
+    'Benutzer nicht gefunden': 'Utilisateur introuvable',
+    'Bild konnte nicht geladen werden': 'L\'image n\'a pas pu être chargée',
+    'Bild zu groß': 'Image trop volumineuse',
+    'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.': 'Le tournoi est complet. Aucune liste d\'attente n\'est activée pour ce tournoi.',
+    'Du kannst deine eigene Admin-Rolle nicht entfernen': 'Vous ne pouvez pas retirer votre propre rôle d\'administrateur',
+    'Du kannst deinen eigenen Benutzer nicht löschen': 'Vous ne pouvez pas supprimer votre propre utilisateur',
+    'E-Mail ist erforderlich': 'L\'e-mail est requis',
+    'E-Mail und Passwort sind erforderlich': 'L\'e-mail et le mot de passe sont requis',
+    'E-Mail-Adresse bereits vergeben': 'Adresse e-mail déjà utilisée',
+    'Eine gültige E-Mail ist erforderlich': 'Une adresse e-mail valide est requise',
+    'Eine gültige Partner-E-Mail ist erforderlich': 'Une adresse e-mail valide du partenaire est requise',
+    'Eine gültige zweite Partner-E-Mail ist erforderlich': 'Une adresse e-mail valide du deuxième partenaire est requise',
+    'Eine nicht-negative Ganzzahl ist erforderlich': 'Un entier non négatif est requis',
+    'Einrichtung bereits abgeschlossen': 'Configuration déjà terminée',
+    'Formation Doublette erfordert genau einen Partner': 'La formation Doublette nécessite exactement un partenaire',
+    'Formation Doublette erlaubt nur einen Partner': 'La formation Doublette n\'autorise qu\'un seul partenaire',
+    'Formation Triplette erfordert genau zwei Partner': 'La formation Triplette nécessite exactement deux partenaires',
+    'Formation Tête erlaubt nur einen Teilnehmer, keinen Partner': 'La formation Tête n\'autorise qu\'un seul participant, sans partenaire',
+    'Kein Bild hinterlegt': 'Aucune image enregistrée',
+    'Label muss zwischen 2 und 120 Zeichen enthalten': 'L\'étiquette doit contenir entre 2 et 120 caractères',
+    'Reset-Token ist erforderlich': 'Le jeton de réinitialisation est requis',
+    'Secret bereits abgerufen oder nicht verfügbar': 'Le secret a déjà été récupéré ou est indisponible',
+    'Unbekanntes Bildfeld': 'Champ d\'image inconnu',
+    'Ungültige Anmeldedaten': 'Identifiants de connexion invalides',
+    'Ungültige Koordinate': 'Coordonnée invalide',
+    'Ungültige Rolle': 'Rôle invalide',
+    'Ungültiger Anmeldestatus': 'Statut d\'inscription invalide',
+    'Ungültiger Bildtyp': 'Type d\'image invalide',
+    'Ungültiger oder abgelaufener Reset-Token': 'Jeton de réinitialisation invalide ou expiré',
+    'Ungültiges Turnier-Limit': 'Limite de tournois invalide',
+    'Vorname und Nachname müssen mindestens 2 Zeichen enthalten': 'Le prénom et le nom doivent contenir au moins 2 caractères',
+    'Vorname und Nachname sind erforderlich': 'Le prénom et le nom sont requis',
+    'Ziel-URL nicht erlaubt': 'URL de destination non autorisée',
+    'Zu viele Anmeldeversuche. Bitte versuche es später erneut.': 'Trop de tentatives de connexion. Veuillez réessayer plus tard.',
+    'Zu viele Geocoding-Anfragen. Bitte versuche es später erneut.': 'Trop de requêtes de géocodage. Veuillez réessayer plus tard.',
+    'Zugriff verweigert': 'Accès refusé',
     'Der Turniername muss mindestens 2 Zeichen enthalten': 'Le nom du tournoi doit contenir au moins 2 caractères',
     'Ein gültiges Turnierdatum ist erforderlich': 'Une date de tournoi valide est requise',
     'Eine gültige Startzeit ist erforderlich': 'Une heure de début valide est requise',

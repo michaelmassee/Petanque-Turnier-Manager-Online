@@ -544,7 +544,7 @@ export default {
       if (tournamentRegistrationsMatch) {
         const tournament = await getTournamentById(env.DB, tournamentRegistrationsMatch[1]);
         if (!tournament) {
-          throw new HttpError(404, 'Tournament not found');
+          throw new HttpError(404, 'Turnier nicht gefunden');
         }
 
         if (request.method === 'GET') {
@@ -562,13 +562,13 @@ export default {
       if (tournamentParticipantsMatch) {
         const tournament = await getTournamentById(env.DB, tournamentParticipantsMatch[1]);
         if (!tournament) {
-          throw new HttpError(404, 'Tournament not found');
+          throw new HttpError(404, 'Turnier nicht gefunden');
         }
 
         if (request.method === 'GET') {
           const session = await optionalSession(request, env.DB);
           if (!canViewParticipants(tournament, session?.user || null)) {
-            throw new HttpError(403, 'Access denied');
+            throw new HttpError(403, 'Zugriff verweigert');
           }
           return await listPublicParticipants(env.DB, tournament.id, session?.user?.email || null);
         }
@@ -579,11 +579,11 @@ export default {
         const session = await requireSession(request, env.DB);
         const registration = await getRegistrationWithTournament(env.DB, registrationCancelMatch[1]);
         if (!registration) {
-          throw new HttpError(404, 'Registration not found');
+          throw new HttpError(404, 'Anmeldung nicht gefunden');
         }
         const isOwnRegistration = registration.email.toLowerCase() === session.user.email.toLowerCase();
         if (!isOwnRegistration && !canManageTournament(registration, session.user)) {
-          throw new HttpError(403, 'Access denied');
+          throw new HttpError(403, 'Zugriff verweigert');
         }
         return await cancelRegistration(env.DB, registration.id);
       }
@@ -592,13 +592,13 @@ export default {
       if (tournamentMatch) {
         const tournament = await getTournamentById(env.DB, tournamentMatch[1]);
         if (!tournament) {
-          throw new HttpError(404, 'Tournament not found');
+          throw new HttpError(404, 'Turnier nicht gefunden');
         }
 
         if (request.method === 'GET') {
           const session = await optionalSession(request, env.DB);
           if (!canViewTournament(tournament, session?.user || null)) {
-            throw new HttpError(403, 'Access denied');
+            throw new HttpError(403, 'Zugriff verweigert');
           }
           return json({ tournament: toPublicTournament(tournament, session?.user || null) });
         }
@@ -620,7 +620,7 @@ export default {
         const session = await requireSession(request, env.DB);
         const tournament = await getTournamentById(env.DB, presentationMatch[1]);
         if (!tournament) {
-          throw new HttpError(404, 'Tournament not found');
+          throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, session.user);
         return await updateTournamentPresentation(request, env.DB, tournament, session.user);
@@ -630,11 +630,11 @@ export default {
       if (imageProxyMatch && request.method === 'GET') {
         const tournament = await getTournamentById(env.DB, imageProxyMatch[1]);
         if (!tournament) {
-          throw new HttpError(404, 'Tournament not found');
+          throw new HttpError(404, 'Turnier nicht gefunden');
         }
         const session = await optionalSession(request, env.DB);
         if (!canViewTournament(tournament, session?.user || null)) {
-          throw new HttpError(403, 'Access denied');
+          throw new HttpError(403, 'Zugriff verweigert');
         }
         return await proxyTournamentImage(tournament, url.searchParams.get('field'));
       }
@@ -644,7 +644,7 @@ export default {
         const auth = await requireManagerAuth(request, env.DB);
         const registration = await getRegistrationWithTournament(env.DB, registrationMatch[1]);
         if (!registration) {
-          throw new HttpError(404, 'Registration not found');
+          throw new HttpError(404, 'Anmeldung nicht gefunden');
         }
         assertCanManageTournament(registration, auth.user);
 
@@ -662,7 +662,7 @@ export default {
         const auth = await requireApiKey(request, env.DB);
         const tournament = await getTournamentById(env.DB, syncRegistrationsMatch[1]);
         if (!tournament) {
-          throw new HttpError(404, 'Tournament not found');
+          throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
         return await syncGetRegistrations(env.DB, tournament.id, url);
@@ -673,7 +673,7 @@ export default {
         const auth = await requireApiKey(request, env.DB);
         const tournament = await getTournamentById(env.DB, syncResultsMatch[1]);
         if (!tournament) {
-          throw new HttpError(404, 'Tournament not found');
+          throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
         return await syncPostResults(request, env.DB, tournament.id);
@@ -684,7 +684,7 @@ export default {
         const auth = await requireApiKey(request, env.DB);
         const tournament = await getTournamentById(env.DB, syncMetadataMatch[1]);
         if (!tournament) {
-          throw new HttpError(404, 'Tournament not found');
+          throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
         return await syncPutTournamentMetadata(request, env.DB, tournament, auth.user);
@@ -761,7 +761,7 @@ async function needsSetup(db) {
 
 async function setupAdmin(request, db, url) {
   if (!(await needsSetup(db))) {
-    throw new HttpError(409, 'Setup already completed');
+    throw new HttpError(409, 'Einrichtung bereits abgeschlossen');
   }
 
   const body = await readJson(request);
@@ -793,7 +793,7 @@ async function login(request, db, url) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
 
   if (!email || !password) {
-    throw new HttpError(400, 'Email and password are required');
+    throw new HttpError(400, 'E-Mail und Passwort sind erforderlich');
   }
 
   await enforceLoginRateLimit(db, email, ip);
@@ -806,7 +806,7 @@ async function login(request, db, url) {
     : await verifyPassword(password, DUMMY_PASSWORD_SALT, DUMMY_PASSWORD_HASH);
   if (!row || !passwordMatches) {
     await recordLoginAttempt(db, email, ip);
-    throw new HttpError(401, 'Invalid login');
+    throw new HttpError(401, 'Ungültige Anmeldedaten');
   }
 
   if (!row.email_verified_at) {
@@ -1087,7 +1087,7 @@ async function registerUser(request, env, url) {
       .run();
   } catch (error) {
     if (String(error.message || '').includes('UNIQUE')) {
-      throw new HttpError(409, 'Email already exists');
+      throw new HttpError(409, 'E-Mail-Adresse bereits vergeben');
     }
     throw error;
   }
@@ -1138,7 +1138,7 @@ async function verifyEmail(request, db) {
       ]);
     } catch (error) {
       if (String(error.message || '').includes('UNIQUE')) {
-        throw new HttpError(409, 'Email already exists');
+        throw new HttpError(409, 'E-Mail-Adresse bereits vergeben');
       }
       throw error;
     }
@@ -1160,7 +1160,7 @@ async function resendVerificationEmail(request, env, url) {
   const language = normalizeLanguage(body.language);
 
   if (!email) {
-    throw new HttpError(400, 'Email is required');
+    throw new HttpError(400, 'E-Mail ist erforderlich');
   }
 
   const response = {
@@ -1224,7 +1224,7 @@ async function forgotPassword(request, env, url) {
   const email = String(body.email || '').trim().toLowerCase();
 
   if (!email) {
-    throw new HttpError(400, 'Email is required');
+    throw new HttpError(400, 'E-Mail ist erforderlich');
   }
 
   const row = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
@@ -1297,7 +1297,7 @@ async function resetPassword(request, db) {
   const password = String(body.password || '');
 
   if (!token) {
-    throw new HttpError(400, 'Reset token is required');
+    throw new HttpError(400, 'Reset-Token ist erforderlich');
   }
 
   assertPasswordStrength(password);
@@ -1313,7 +1313,7 @@ async function resetPassword(request, db) {
     .first();
 
   if (!reset || reset.used_at || new Date(reset.expires_at).getTime() <= Date.now()) {
-    throw new HttpError(400, 'Invalid or expired reset token');
+    throw new HttpError(400, 'Ungültiger oder abgelaufener Reset-Token');
   }
 
   const hashedPassword = await hashPassword(password);
@@ -1359,7 +1359,7 @@ async function createUser(request, db) {
       .run();
   } catch (error) {
     if (String(error.message || '').includes('UNIQUE')) {
-      throw new HttpError(409, 'Email already exists');
+      throw new HttpError(409, 'E-Mail-Adresse bereits vergeben');
     }
     throw error;
   }
@@ -1386,7 +1386,7 @@ async function createUser(request, db) {
 async function updateUser(request, db, id, currentUserId) {
   const existing = await db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
   if (!existing) {
-    throw new HttpError(404, 'User not found');
+    throw new HttpError(404, 'Benutzer nicht gefunden');
   }
 
   const body = await readJson(request);
@@ -1397,7 +1397,7 @@ async function updateUser(request, db, id, currentUserId) {
   const tournamentLimit = resolveTournamentLimit(body, existing.tournament_limit ?? DEFAULT_TOURNAMENT_LIMIT);
 
   if (id === currentUserId && user.role !== 'admin') {
-    throw new HttpError(400, 'You cannot remove your own admin role');
+    throw new HttpError(400, 'Du kannst deine eigene Admin-Rolle nicht entfernen');
   }
 
   try {
@@ -1421,7 +1421,7 @@ async function updateUser(request, db, id, currentUserId) {
     }
   } catch (error) {
     if (String(error.message || '').includes('UNIQUE')) {
-      throw new HttpError(409, 'Email already exists');
+      throw new HttpError(409, 'E-Mail-Adresse bereits vergeben');
     }
     throw error;
   }
@@ -1439,7 +1439,7 @@ async function updateOwnProfile(request, env, url, userId) {
   const db = env.DB;
   const existing = await db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
   if (!existing) {
-    throw new HttpError(404, 'User not found');
+    throw new HttpError(404, 'Benutzer nicht gefunden');
   }
 
   const body = await readJson(request);
@@ -1453,11 +1453,11 @@ async function updateOwnProfile(request, env, url, userId) {
   const club = nullableText(body.club);
 
   if (firstName.length < 2 || lastName.length < 2) {
-    throw new HttpError(400, 'First name and last name must contain at least 2 characters');
+    throw new HttpError(400, 'Vorname und Nachname müssen mindestens 2 Zeichen enthalten');
   }
 
   if (!isEmail(email)) {
-    throw new HttpError(400, 'A valid email is required');
+    throw new HttpError(400, 'Eine gültige E-Mail ist erforderlich');
   }
 
   const emailChanged = email !== existing.email;
@@ -1502,7 +1502,7 @@ async function updateOwnProfile(request, env, url, userId) {
     }
   } catch (error) {
     if (String(error.message || '').includes('UNIQUE')) {
-      throw new HttpError(409, 'Email already exists');
+      throw new HttpError(409, 'E-Mail-Adresse bereits vergeben');
     }
     throw error;
   }
@@ -1531,7 +1531,7 @@ async function updateOwnProfile(request, env, url, userId) {
 
 async function deleteUser(db, id, currentUserId, deleteTournaments) {
   if (id === currentUserId) {
-    throw new HttpError(400, 'You cannot delete your own user');
+    throw new HttpError(400, 'Du kannst deinen eigenen Benutzer nicht löschen');
   }
 
   const now = new Date().toISOString();
@@ -1556,7 +1556,7 @@ async function deleteUser(db, id, currentUserId, deleteTournaments) {
 
   const result = await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
   if (result.meta.changes === 0) {
-    throw new HttpError(404, 'User not found');
+    throw new HttpError(404, 'Benutzer nicht gefunden');
   }
 
   return json({ ok: true });
@@ -1972,7 +1972,7 @@ async function deleteTournament(db, id) {
     db.prepare('DELETE FROM tournaments WHERE id = ?').bind(id),
   ]);
   if (tournamentResult.meta.changes === 0) {
-    throw new HttpError(404, 'Tournament not found');
+    throw new HttpError(404, 'Turnier nicht gefunden');
   }
   return json({ ok: true });
 }
@@ -2019,7 +2019,7 @@ async function cancelRegistration(db, id) {
   const now = new Date().toISOString();
   const result = await db.prepare("UPDATE registrations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(now, id).run();
   if (result.meta.changes === 0) {
-    throw new HttpError(404, 'Registration not found');
+    throw new HttpError(404, 'Anmeldung nicht gefunden');
   }
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
   return json({ registration: toPublicRegistration(updated) });
@@ -2212,7 +2212,7 @@ async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
 async function deleteRegistration(db, id) {
   const result = await db.prepare('DELETE FROM registrations WHERE id = ?').bind(id).run();
   if (result.meta.changes === 0) {
-    throw new HttpError(404, 'Registration not found');
+    throw new HttpError(404, 'Anmeldung nicht gefunden');
   }
   return json({ ok: true });
 }
@@ -2222,7 +2222,7 @@ async function requestApiKey(request, db, user) {
   const label = String(body.label || '').trim();
 
   if (label.length < 2 || label.length > 120) {
-    throw new HttpError(400, 'Label must contain between 2 and 120 characters');
+    throw new HttpError(400, 'Label muss zwischen 2 und 120 Zeichen enthalten');
   }
 
   const id = crypto.randomUUID();
@@ -2278,10 +2278,10 @@ async function listAllApiKeys(db, url) {
 async function approveApiKey(db, id, adminUserId) {
   const existing = await db.prepare('SELECT * FROM api_keys WHERE id = ?').bind(id).first();
   if (!existing) {
-    throw new HttpError(404, 'API key not found');
+    throw new HttpError(404, 'API-Schlüssel nicht gefunden');
   }
   if (existing.status !== 'pending') {
-    throw new HttpError(409, 'API key is not pending approval');
+    throw new HttpError(409, 'API-Schlüssel wartet nicht auf Freischaltung');
   }
 
   const secret = `ptm_${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '')}`;
@@ -2313,7 +2313,7 @@ async function revokeApiKey(db, id) {
     .run();
 
   if (result.meta.changes === 0) {
-    throw new HttpError(404, 'API key not found or already revoked');
+    throw new HttpError(404, 'API-Schlüssel nicht gefunden oder bereits widerrufen');
   }
   return json({ ok: true });
 }
@@ -2321,10 +2321,10 @@ async function revokeApiKey(db, id) {
 async function retrieveApiKeySecret(db, id, userId) {
   const existing = await db.prepare('SELECT * FROM api_keys WHERE id = ? AND user_id = ?').bind(id, userId).first();
   if (!existing) {
-    throw new HttpError(404, 'API key not found');
+    throw new HttpError(404, 'API-Schlüssel nicht gefunden');
   }
   if (existing.status !== 'approved' || !existing.pending_secret) {
-    throw new HttpError(410, 'Secret already retrieved or not available');
+    throw new HttpError(410, 'Secret bereits abgerufen oder nicht verfügbar');
   }
 
   const now = new Date().toISOString();
@@ -2354,7 +2354,7 @@ async function syncPostResults(request, db, tournamentId) {
   const body = await readJson(request);
   const entries = Array.isArray(body.registrations) ? body.registrations : [];
   if (entries.length === 0) {
-    throw new HttpError(400, 'registrations must be a non-empty array');
+    throw new HttpError(400, 'Anmeldungen müssen als nicht-leeres Array übergeben werden');
   }
 
   const now = new Date().toISOString();
@@ -2368,7 +2368,7 @@ async function syncPostResults(request, db, tournamentId) {
 
     const status = entry.status !== undefined ? String(entry.status) : null;
     if (status !== null && !REGISTRATION_STATUSES.includes(status)) {
-      throw new HttpError(400, `Invalid status for registration ${id}`);
+      throw new HttpError(400, `Ungültiger Status für Anmeldung ${id}`);
     }
 
     const seedingPosition =
@@ -2588,14 +2588,14 @@ function canManageTournament(tournament, user) {
 
 function assertCanManageTournament(tournament, user) {
   if (!canManageTournament(tournament, user)) {
-    throw new HttpError(403, 'Access denied');
+    throw new HttpError(403, 'Zugriff verweigert');
   }
 }
 
 async function requireAdmin(request, db) {
   const session = await requireSession(request, db);
   if (session.user.role !== 'admin') {
-    throw new HttpError(403, 'Admin role required');
+    throw new HttpError(403, 'Admin-Rolle erforderlich');
   }
   return session;
 }
@@ -2657,7 +2657,7 @@ async function optionalSession(request, db) {
 async function requireSession(request, db) {
   const sessionId = getCookie(request, SESSION_COOKIE);
   if (!sessionId) {
-    throw new HttpError(401, 'Login required');
+    throw new HttpError(401, 'Anmeldung erforderlich');
   }
 
   const row = await db
@@ -2672,7 +2672,7 @@ async function requireSession(request, db) {
     .first();
 
   if (!row || new Date(row.expires_at).getTime() <= Date.now()) {
-    throw new HttpError(401, 'Login required');
+    throw new HttpError(401, 'Anmeldung erforderlich');
   }
 
   return { user: toPublicUser(row) };
@@ -2769,15 +2769,15 @@ function normalizeUserInput(body, { requirePassword }) {
   const password = body.password === undefined ? '' : String(body.password);
 
   if (firstName.length < 2 || lastName.length < 2) {
-    throw new HttpError(400, 'First name and last name must contain at least 2 characters');
+    throw new HttpError(400, 'Vorname und Nachname müssen mindestens 2 Zeichen enthalten');
   }
 
   if (!isEmail(email)) {
-    throw new HttpError(400, 'A valid email is required');
+    throw new HttpError(400, 'Eine gültige E-Mail ist erforderlich');
   }
 
   if (!ROLES.includes(role)) {
-    throw new HttpError(400, 'Invalid role');
+    throw new HttpError(400, 'Ungültige Rolle');
   }
 
   if (requirePassword || password) {
@@ -2793,7 +2793,7 @@ function resolveTournamentLimit(body, fallback) {
   }
   const value = Number(body.tournamentLimit);
   if (!Number.isInteger(value) || value < 0) {
-    throw new HttpError(400, 'Invalid tournament limit');
+    throw new HttpError(400, 'Ungültiges Turnier-Limit');
   }
   return value;
 }
@@ -2936,19 +2936,19 @@ function normalizeRegistrationInput(body, { requireStatus }) {
   };
 
   if (registration.firstName.length < 2 || registration.lastName.length < 2) {
-    throw new HttpError(400, 'First name and last name are required');
+    throw new HttpError(400, 'Vorname und Nachname sind erforderlich');
   }
   if (!isEmail(registration.email)) {
-    throw new HttpError(400, 'A valid email is required');
+    throw new HttpError(400, 'Eine gültige E-Mail ist erforderlich');
   }
   if (registration.partnerEmail && !isEmail(registration.partnerEmail)) {
-    throw new HttpError(400, 'A valid partner email is required');
+    throw new HttpError(400, 'Eine gültige Partner-E-Mail ist erforderlich');
   }
   if (registration.partner2Email && !isEmail(registration.partner2Email)) {
-    throw new HttpError(400, 'A valid second partner email is required');
+    throw new HttpError(400, 'Eine gültige zweite Partner-E-Mail ist erforderlich');
   }
   if (requireStatus && !REGISTRATION_STATUSES.includes(registration.status)) {
-    throw new HttpError(400, 'Invalid registration status');
+    throw new HttpError(400, 'Ungültiger Anmeldestatus');
   }
 
   return registration;
@@ -2963,23 +2963,23 @@ export function assertPartnerCountMatchesFormation(tournament, registration) {
 
   if (formation === 'tete') {
     if (hasPartner || hasPartner2) {
-      throw new HttpError(400, 'Formation tete allows only a single participant, no partner');
+      throw new HttpError(400, 'Formation Tête erlaubt nur einen Teilnehmer, keinen Partner');
     }
     return;
   }
 
   if (formation === 'doublette') {
     if (!hasPartner) {
-      throw new HttpError(400, 'Formation doublette requires exactly one partner');
+      throw new HttpError(400, 'Formation Doublette erfordert genau einen Partner');
     }
     if (hasPartner2) {
-      throw new HttpError(400, 'Formation doublette allows only one partner');
+      throw new HttpError(400, 'Formation Doublette erlaubt nur einen Partner');
     }
     return;
   }
 
   if (formation === 'triplette' && (!hasPartner || !hasPartner2)) {
-    throw new HttpError(400, 'Formation triplette requires exactly two partners');
+    throw new HttpError(400, 'Formation Triplette erfordert genau zwei Partner');
   }
 }
 
@@ -3013,7 +3013,7 @@ function nullableCoordinate(value, min, max) {
   }
   const number = Number(value);
   if (!Number.isFinite(number) || number < min || number > max) {
-    throw new HttpError(400, 'Invalid coordinate');
+    throw new HttpError(400, 'Ungültige Koordinate');
   }
   return number;
 }
@@ -3021,7 +3021,7 @@ function nullableCoordinate(value, min, max) {
 function nonNegativeInteger(value) {
   const number = Number(value || 0);
   if (!Number.isInteger(number) || number < 0) {
-    throw new HttpError(400, 'A non-negative integer is required');
+    throw new HttpError(400, 'Eine nicht-negative Ganzzahl ist erforderlich');
   }
   return number;
 }
