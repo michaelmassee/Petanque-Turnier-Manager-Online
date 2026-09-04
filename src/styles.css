@@ -107,10 +107,21 @@ button:disabled {
   font-weight: 800;
 }
 
-.language-select select {
-  width: auto;
-  min-height: 34px;
-  padding: 5px 8px;
+.language-flag-button {
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 8px;
+  padding: 2px 4px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.language-flag-button.active {
+  opacity: 1;
+  border-color: #c7cfe0;
+  background: #eef1f8;
 }
 
 .eyebrow {
@@ -1275,6 +1286,17 @@ textarea:focus {
   color: #c9971c;
   margin-right: 4px;
   font-size: 0.9em;
+}
+
+.license-badge {
+  margin-right: 4px;
+  font-size: 0.9em;
+}
+
+.tournament-share-row {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
 }
 
 .public-registration {

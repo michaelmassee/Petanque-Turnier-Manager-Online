@@ -70,7 +70,8 @@ const DEFAULT_TOURNAMENT_LIMIT = 5;
 
 const EMPTY_USER_FORM = {
   id: '',
-  name: '',
+  firstName: '',
+  lastName: '',
   email: '',
   role: 'user',
   password: '',
@@ -80,15 +81,18 @@ const EMPTY_USER_FORM = {
 };
 
 const EMPTY_PROFILE_FORM = {
-  name: '',
+  firstName: '',
+  lastName: '',
   email: '',
+  licenseNr: '',
   currentPassword: '',
   newPassword: '',
   newPasswordConfirm: '',
 };
 
 const EMPTY_AUTH_FORM = {
-  name: '',
+  firstName: '',
+  lastName: '',
   email: '',
   password: '',
   passwordConfirm: '',
@@ -136,9 +140,11 @@ const EMPTY_REGISTRATION_FORM = {
   partnerFirstName: '',
   partnerLastName: '',
   partnerEmail: '',
+  partnerLicenseNr: '',
   partner2FirstName: '',
   partner2LastName: '',
   partner2Email: '',
+  partner2LicenseNr: '',
   teamName: '',
   seedingPosition: '',
   status: 'pending',
@@ -260,7 +266,7 @@ export default function App() {
   const filteredUsers = useMemo(() => {
     const query = userQuery.trim().toLowerCase();
     return users.filter((user) => {
-      if (query && ![user.name, user.email].some((value) => (value || '').toLowerCase().includes(query))) {
+      if (query && ![user.firstName, user.lastName, user.email].some((value) => (value || '').toLowerCase().includes(query))) {
         return false;
       }
       if (userRoleFilter && user.role !== userRoleFilter) {
@@ -532,8 +538,10 @@ export default function App() {
       const data = await api('/api/me', {
         method: 'PUT',
         body: JSON.stringify({
-          name: profileForm.name,
+          firstName: profileForm.firstName,
+          lastName: profileForm.lastName,
           email: profileForm.email,
+          licenseNr: profileForm.licenseNr,
           currentPassword: profileForm.currentPassword,
           newPassword: profileForm.newPassword,
           language,
@@ -541,8 +549,10 @@ export default function App() {
       });
       setCurrentUser(data.user);
       setProfileForm({
-        name: data.user.name,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName,
         email: data.user.pendingEmail || data.user.email,
+        licenseNr: data.user.licenseNr || '',
         currentPassword: '',
         newPassword: '',
         newPasswordConfirm: '',
@@ -681,7 +691,7 @@ export default function App() {
   }
 
   async function handleDeleteUser(user) {
-    if (!window.confirm(`Benutzer "${user.name}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) {
+    if (!window.confirm(`Benutzer "${user.firstName} ${user.lastName}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) {
       return;
     }
 
@@ -813,7 +823,8 @@ export default function App() {
     setUserMode('edit');
     setUserForm({
       id: user.id,
-      name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
       email: user.email,
       role: user.role,
       password: '',
@@ -872,9 +883,11 @@ export default function App() {
       partnerFirstName: registration.partnerFirstName || '',
       partnerLastName: registration.partnerLastName || '',
       partnerEmail: registration.partnerEmail || '',
+      partnerLicenseNr: registration.partnerLicenseNr || '',
       partner2FirstName: registration.partner2FirstName || '',
       partner2LastName: registration.partner2LastName || '',
       partner2Email: registration.partner2Email || '',
+      partner2LicenseNr: registration.partner2LicenseNr || '',
       teamName: registration.teamName || '',
       seedingPosition: registration.seedingPosition || '',
       status: registration.status || 'pending',
@@ -1232,6 +1245,7 @@ export default function App() {
                 onSubmit={handleRegistrationSubmit}
                 onCancel={closeAuthModal}
                 navigate={navigate}
+                currentUser={currentUser}
                 embedded
               />
             )}
@@ -1307,7 +1321,7 @@ export default function App() {
         }
       >
         <div className="drawer-user">
-          <span>{currentUser.name}</span>
+          <span>{currentUser.firstName} {currentUser.lastName}</span>
           <strong>{roleLabel}</strong>
         </div>
         <button
@@ -1371,8 +1385,10 @@ export default function App() {
           type="button"
           onClick={() => {
             setProfileForm({
-              name: currentUser.name,
+              firstName: currentUser.firstName,
+              lastName: currentUser.lastName,
               email: currentUser.pendingEmail || currentUser.email,
+              licenseNr: currentUser.licenseNr || '',
               currentPassword: '',
               newPassword: '',
               newPasswordConfirm: '',
@@ -1448,6 +1464,7 @@ export default function App() {
               clearFeedback();
             }}
             navigate={navigate}
+            currentUser={currentUser}
             embedded
           />
         </AuthModal>
@@ -1571,25 +1588,39 @@ function AuthShell({ title, subtitle, children, language, setLanguage }) {
   );
 }
 
+const LANGUAGE_FLAGS = [
+  { value: 'de', flag: '🇩🇪', label: 'Deutsch' },
+  { value: 'nl', flag: '🇳🇱', label: 'Nederlands' },
+  { value: 'en', flag: '🇬🇧', label: 'English' },
+  { value: 'es', flag: '🇪🇸', label: 'Español' },
+  { value: 'fr', flag: '🇫🇷', label: 'Français' },
+];
+
 function LanguageSelect({ language, setLanguage }) {
   return (
-    <label className="language-select">
-      Sprache
-      <select value={language} onChange={(event) => setLanguage(event.target.value)}>
-        <option value="de">DE</option>
-        <option value="nl">NL</option>
-        <option value="en">EN</option>
-        <option value="es">ES</option>
-        <option value="fr">FR</option>
-      </select>
-    </label>
+    <div className="language-select" role="group" aria-label="Sprache">
+      {LANGUAGE_FLAGS.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          className={`language-flag-button${option.value === language ? ' active' : ''}`}
+          title={option.label}
+          aria-label={option.label}
+          aria-pressed={option.value === language}
+          onClick={() => setLanguage(option.value)}
+        >
+          {option.flag}
+        </button>
+      ))}
+    </div>
   );
 }
 
 function SetupForm({ form, setForm, onSubmit }) {
   return (
     <form className="form" onSubmit={onSubmit}>
-      <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+      <TextField label="Vorname" value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
+      <TextField label="Nachname" value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <TextField label="Passwort" type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required minLength={8} />
       <TextField label="Passwort bestätigen" type="password" value={form.passwordConfirm} onChange={(passwordConfirm) => setForm({ ...form, passwordConfirm })} required minLength={8} />
@@ -1624,7 +1655,8 @@ function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, onRegiste
 function RegisterForm({ form, setForm, onSubmit, onBack, navigate }) {
   return (
     <form className="form" onSubmit={onSubmit}>
-      <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+      <TextField label="Vorname" value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
+      <TextField label="Nachname" value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <TextField label="Passwort" type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required minLength={8} />
       <p className="hint">{PASSWORD_STRENGTH_HINT}</p>
@@ -2064,6 +2096,26 @@ function TournamentDetailPage({
   const canRegister = tournament.status === 'registration' && tournament.visibility === 'public';
   const canShowParticipants = tournament.participantsPublic || tournament.canManage;
 
+  async function handleShare() {
+    const shareUrl = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: tournament.name, url: shareUrl });
+      } catch (shareError) {
+        if (shareError.name !== 'AbortError') {
+          setError(shareError.message);
+        }
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setMessage(translateText('Link kopiert', language));
+    } catch {
+      setError(translateText('Teilen wird von diesem Gerät nicht unterstützt', language));
+    }
+  }
+
   return (
     <main className="app-shell">
       <StandalonePageHeader
@@ -2078,6 +2130,12 @@ function TournamentDetailPage({
       />
 
       <Feedback message={message} error={error} />
+
+      <div className="tournament-share-row">
+        <Button variant="secondary" onClick={handleShare}>
+          {translateText('Turnier teilen', language)}
+        </Button>
+      </div>
 
       <section className="tournament-detail-page">
         <nav className="tournament-detail-tabs" aria-label="Turnierdetails">
@@ -2119,6 +2177,7 @@ function TournamentDetailPage({
               onSubmit={onSubmitRegistration}
               onCancel={() => navigate(`/turniere/${tournament.id}/info`)}
               navigate={navigate}
+              currentUser={currentUser}
             />
           )}
 
@@ -2168,6 +2227,9 @@ function TournamentInfo({ tournament, language }) {
       </p>
       <p>
         <strong>Formation</strong>: {labelFor(FORMATIONS, tournament.formation)}
+      </p>
+      <p>
+        <strong>{translateText('Lizenz', language)}</strong>: {translateText(tournament.licenseRequired ? 'Ja' : 'Nein', language)}
       </p>
       {tournament.description && <p>{tournament.description}</p>}
       {Boolean(tournament.entryFeeCents) && (
@@ -2488,7 +2550,12 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
           )}
         </span>
         <span className="tournament-card-copy">
-          <strong>{tournament.name}</strong>
+          <strong>
+            {tournament.licenseRequired && (
+              <span className="license-badge" title={translateText('Lizenznummer erforderlich', language)}>🪪</span>
+            )}
+            {tournament.name}
+          </strong>
           <span>{tournament.location}</span>
           <small>
             {labelFor(TOURNAMENT_TYPES, tournament.type)} · {labelFor(FORMATIONS, tournament.formation)}
@@ -2641,7 +2708,25 @@ function HomeTournaments({
   );
 }
 
-function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, embedded = false }) {
+function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, embedded = false, currentUser = null }) {
+  useEffect(() => {
+    if (form.id || !currentUser) {
+      return;
+    }
+    const updates = {};
+    if (!form.firstName && !form.lastName && currentUser.firstName && currentUser.lastName) {
+      updates.firstName = currentUser.firstName;
+      updates.lastName = currentUser.lastName;
+    }
+    if (!form.licenseNr && currentUser.licenseNr) {
+      updates.licenseNr = currentUser.licenseNr;
+    }
+    if (Object.keys(updates).length > 0) {
+      setForm((current) => ({ ...current, ...updates }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournament.id, currentUser]);
+
   return (
     <form className={embedded ? 'public-registration public-registration--embedded' : 'public-registration'} onSubmit={onSubmit}>
       <h2>Anmeldung: {tournament.name}</h2>
@@ -2842,13 +2927,20 @@ function RegistrationFields({ form, setForm, showStatus, formation, licenseRequi
   const allowsPartner2 = formation === 'triplette';
 
   useEffect(() => {
-    if (!allowsPartner && (form.partnerFirstName || form.partnerLastName || form.partnerEmail || form.partner2FirstName || form.partner2LastName || form.partner2Email)) {
-      setForm((current) => ({ ...current, partnerFirstName: '', partnerLastName: '', partnerEmail: '', partner2FirstName: '', partner2LastName: '', partner2Email: '' }));
-    } else if (allowsPartner && !allowsPartner2 && (form.partner2FirstName || form.partner2LastName || form.partner2Email)) {
-      setForm((current) => ({ ...current, partner2FirstName: '', partner2LastName: '', partner2Email: '' }));
+    if (!allowsPartner && (form.partnerFirstName || form.partnerLastName || form.partnerEmail || form.partnerLicenseNr || form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2LicenseNr)) {
+      setForm((current) => ({ ...current, partnerFirstName: '', partnerLastName: '', partnerEmail: '', partnerLicenseNr: '', partner2FirstName: '', partner2LastName: '', partner2Email: '', partner2LicenseNr: '' }));
+    } else if (allowsPartner && !allowsPartner2 && (form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2LicenseNr)) {
+      setForm((current) => ({ ...current, partner2FirstName: '', partner2LastName: '', partner2Email: '', partner2LicenseNr: '' }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowsPartner, allowsPartner2]);
+
+  useEffect(() => {
+    if (!licenseRequired && (form.licenseNr || form.partnerLicenseNr || form.partner2LicenseNr)) {
+      setForm((current) => ({ ...current, licenseNr: '', partnerLicenseNr: '', partner2LicenseNr: '' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [licenseRequired]);
 
   return (
     <>
@@ -2859,12 +2951,14 @@ function RegistrationFields({ form, setForm, showStatus, formation, licenseRequi
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <div className="form-grid">
         <TextField label="Verein" value={form.club} onChange={(club) => setForm({ ...form, club })} />
-        <TextField
-          label="Lizenznummer"
-          value={form.licenseNr}
-          onChange={(licenseNr) => setForm({ ...form, licenseNr })}
-          required={Boolean(licenseRequired)}
-        />
+        {licenseRequired && (
+          <TextField
+            label="Lizenznummer"
+            value={form.licenseNr}
+            onChange={(licenseNr) => setForm({ ...form, licenseNr })}
+            required
+          />
+        )}
       </div>
       {teamNameEnabled && <TextField label="Teamname" value={form.teamName} onChange={(teamName) => setForm({ ...form, teamName })} />}
       {allowsPartner && (
@@ -2873,7 +2967,17 @@ function RegistrationFields({ form, setForm, showStatus, formation, licenseRequi
             <TextField label="Partner Vorname" value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} required minLength={2} />
             <TextField label="Partner Nachname" value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} required minLength={2} />
           </div>
-          <TextField label="Partner E-Mail" type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
+          <div className="form-grid">
+            <TextField label="Partner E-Mail" type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
+            {licenseRequired && (
+              <TextField
+                label="Partner Lizenznummer"
+                value={form.partnerLicenseNr}
+                onChange={(partnerLicenseNr) => setForm({ ...form, partnerLicenseNr })}
+                required
+              />
+            )}
+          </div>
         </>
       )}
       {allowsPartner2 && (
@@ -2882,7 +2986,17 @@ function RegistrationFields({ form, setForm, showStatus, formation, licenseRequi
             <TextField label="Partner 2 Vorname" value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required minLength={2} />
             <TextField label="Partner 2 Nachname" value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} required minLength={2} />
           </div>
-          <TextField label="Partner 2 E-Mail" type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
+          <div className="form-grid">
+            <TextField label="Partner 2 E-Mail" type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
+            {licenseRequired && (
+              <TextField
+                label="Partner 2 Lizenznummer"
+                value={form.partner2LicenseNr}
+                onChange={(partner2LicenseNr) => setForm({ ...form, partner2LicenseNr })}
+                required
+              />
+            )}
+          </div>
         </>
       )}
       {showStatus && (
@@ -2962,8 +3076,14 @@ function ProfilePanel({ currentUser, form, setForm, onSubmit }) {
         </p>
       )}
       <form className="form" onSubmit={onSubmit}>
-        <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+        <TextField label="Vorname" value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
+        <TextField label="Nachname" value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
         <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+        <TextField
+          label="Lizenznummer"
+          value={form.licenseNr}
+          onChange={(licenseNr) => setForm({ ...form, licenseNr })}
+        />
         <TextField
           label="Aktuelles Passwort"
           type="password"
@@ -3111,7 +3231,7 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
   return (
     <article className={`data-row user-row ${selected ? 'selected' : ''}`}>
       <div>
-        <strong>{user.name}</strong>
+        <strong>{user.firstName} {user.lastName}</strong>
         <span>{user.email}</span>
       </div>
       <div className="badges">
@@ -3137,7 +3257,8 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
 function UserEditorForm({ form, setForm, submitLabel, onSubmit, passwordLabel, passwordRequired }) {
   return (
     <form className="form" onSubmit={onSubmit}>
-      <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+      <TextField label="Vorname" value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
+      <TextField label="Nachname" value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
       <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <SelectField label="Rolle" value={form.role} onChange={(role) => setForm({ ...form, role })} options={ROLES} />
       <label className="checkbox-row">
@@ -3477,9 +3598,11 @@ function registrationPayload(form, language) {
     partnerFirstName: form.partnerFirstName || null,
     partnerLastName: form.partnerLastName || null,
     partnerEmail: form.partnerEmail || null,
+    partnerLicenseNr: form.partnerLicenseNr || null,
     partner2FirstName: form.partner2FirstName || null,
     partner2LastName: form.partner2LastName || null,
     partner2Email: form.partner2Email || null,
+    partner2LicenseNr: form.partner2LicenseNr || null,
     teamName: form.teamName || null,
     seedingPosition: form.seedingPosition === '' ? null : Number(form.seedingPosition),
     status: form.status,
@@ -3978,6 +4101,8 @@ const TRANSLATIONS = {
     'Teamname abfragen': 'Teamnaam vragen',
     'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée is alleen mogelijk met de formatie Tête',
     'Lizenznummer ist erforderlich': 'Licentienummer is verplicht',
+    'Lizenznummer für Partner ist erforderlich': 'Licentienummer voor partner is verplicht',
+    'Lizenznummer für Partner 2 ist erforderlich': 'Licentienummer voor partner 2 is verplicht',
     Bearbeiten: 'Bewerken',
     Löschen: 'Verwijderen',
     'Anmeldung bearbeiten': 'Inschrijving bewerken',
@@ -3987,13 +4112,21 @@ const TRANSLATIONS = {
     Nachname: 'Achternaam',
     Verein: 'Vereniging',
     Lizenznummer: 'Licentienummer',
+    Lizenz: 'Licentie',
+    Ja: 'Ja',
+    Nein: 'Nee',
+    'Turnier teilen': 'Toernooi delen',
+    'Link kopiert': 'Link gekopieerd',
+    'Teilen wird von diesem Gerät nicht unterstützt': 'Delen wordt niet ondersteund op dit apparaat',
     Teamname: 'Teamnaam',
     'Partner Vorname': 'Partner voornaam',
     'Partner Nachname': 'Partner achternaam',
     'Partner E-Mail': 'Partner e-mail',
+    'Partner Lizenznummer': 'Partner licentienummer',
     'Partner 2 Vorname': 'Partner 2 voornaam',
     'Partner 2 Nachname': 'Partner 2 achternaam',
     'Partner 2 E-Mail': 'Partner 2 e-mail',
+    'Partner 2 Lizenznummer': 'Partner 2 licentienummer',
     Setzposition: 'Plaatsingspositie',
     'Anmeldung speichern': 'Inschrijving opslaan',
     'Benutzer bearbeiten': 'Gebruiker bewerken',
@@ -4349,6 +4482,8 @@ const TRANSLATIONS = {
     'Teamname abfragen': 'Ask for team name',
     'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée is only possible with the Tête formation',
     'Lizenznummer ist erforderlich': 'License number is required',
+    'Lizenznummer für Partner ist erforderlich': 'License number for partner is required',
+    'Lizenznummer für Partner 2 ist erforderlich': 'License number for partner 2 is required',
     Bearbeiten: 'Edit',
     Löschen: 'Delete',
     'Anmeldung bearbeiten': 'Edit registration',
@@ -4358,13 +4493,21 @@ const TRANSLATIONS = {
     Nachname: 'Last name',
     Verein: 'Club',
     Lizenznummer: 'License number',
+    Lizenz: 'License',
+    Ja: 'Yes',
+    Nein: 'No',
+    'Turnier teilen': 'Share tournament',
+    'Link kopiert': 'Link copied',
+    'Teilen wird von diesem Gerät nicht unterstützt': 'Sharing is not supported on this device',
     Teamname: 'Team name',
     'Partner Vorname': 'Partner first name',
     'Partner Nachname': 'Partner last name',
     'Partner E-Mail': 'Partner email',
+    'Partner Lizenznummer': 'Partner license number',
     'Partner 2 Vorname': 'Partner 2 first name',
     'Partner 2 Nachname': 'Partner 2 last name',
     'Partner 2 E-Mail': 'Partner 2 email',
+    'Partner 2 Lizenznummer': 'Partner 2 license number',
     Setzposition: 'Seeding position',
     'Anmeldung speichern': 'Save registration',
     'Benutzer bearbeiten': 'Edit user',
@@ -4720,6 +4863,8 @@ const TRANSLATIONS = {
     'Teamname abfragen': 'Solicitar nombre de equipo',
     'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée solo es posible con la formación Tête',
     'Lizenznummer ist erforderlich': 'La licencia es obligatoria',
+    'Lizenznummer für Partner ist erforderlich': 'La licencia de la pareja es obligatoria',
+    'Lizenznummer für Partner 2 ist erforderlich': 'La licencia de la pareja 2 es obligatoria',
     Bearbeiten: 'Editar',
     Löschen: 'Eliminar',
     'Anmeldung bearbeiten': 'Editar inscripción',
@@ -4729,13 +4874,21 @@ const TRANSLATIONS = {
     Nachname: 'Apellido',
     Verein: 'Club',
     Lizenznummer: 'Licencia',
+    Lizenz: 'Licencia',
+    Ja: 'Sí',
+    Nein: 'No',
+    'Turnier teilen': 'Compartir torneo',
+    'Link kopiert': 'Enlace copiado',
+    'Teilen wird von diesem Gerät nicht unterstützt': 'Este dispositivo no admite compartir',
     Teamname: 'Equipo',
     'Partner Vorname': 'Nombre pareja',
     'Partner Nachname': 'Apellido pareja',
     'Partner E-Mail': 'Correo pareja',
+    'Partner Lizenznummer': 'Licencia pareja',
     'Partner 2 Vorname': 'Nombre pareja 2',
     'Partner 2 Nachname': 'Apellido pareja 2',
     'Partner 2 E-Mail': 'Correo pareja 2',
+    'Partner 2 Lizenznummer': 'Licencia pareja 2',
     Setzposition: 'Cabeza de serie',
     'Anmeldung speichern': 'Guardar inscripción',
     'Benutzer bearbeiten': 'Editar usuario',
@@ -5091,6 +5244,8 @@ const TRANSLATIONS = {
     'Teamname abfragen': 'Demander le nom d’équipe',
     'Supermêlée ist nur mit der Formation Tête möglich': 'Supermêlée n’est possible qu’avec la formation Tête',
     'Lizenznummer ist erforderlich': 'La licence est obligatoire',
+    'Lizenznummer für Partner ist erforderlich': 'La licence du partenaire est obligatoire',
+    'Lizenznummer für Partner 2 ist erforderlich': 'La licence du partenaire 2 est obligatoire',
     Bearbeiten: 'Modifier',
     Löschen: 'Supprimer',
     'Anmeldung bearbeiten': 'Modifier inscription',
@@ -5100,13 +5255,21 @@ const TRANSLATIONS = {
     Nachname: 'Nom',
     Verein: 'Club',
     Lizenznummer: 'Licence',
+    Lizenz: 'Licence',
+    Ja: 'Oui',
+    Nein: 'Non',
+    'Turnier teilen': 'Partager le tournoi',
+    'Link kopiert': 'Lien copié',
+    'Teilen wird von diesem Gerät nicht unterstützt': 'Le partage n’est pas pris en charge sur cet appareil',
     Teamname: 'Équipe',
     'Partner Vorname': 'Prénom partenaire',
     'Partner Nachname': 'Nom partenaire',
     'Partner E-Mail': 'E-mail partenaire',
+    'Partner Lizenznummer': 'Licence partenaire',
     'Partner 2 Vorname': 'Prénom partenaire 2',
     'Partner 2 Nachname': 'Nom partenaire 2',
     'Partner 2 E-Mail': 'E-mail partenaire 2',
+    'Partner 2 Lizenznummer': 'Licence partenaire 2',
     Setzposition: 'Tête de série',
     'Anmeldung speichern': 'Enregistrer inscription',
     'Benutzer bearbeiten': 'Modifier utilisateur',

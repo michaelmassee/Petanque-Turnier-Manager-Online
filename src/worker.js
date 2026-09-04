@@ -769,15 +769,15 @@ async function setupAdmin(request, db, url) {
 
   await db
     .prepare(
-      `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, created_at, updated_at)
-       VALUES (?, ?, ?, 'admin', ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'admin', ?, ?, ?, ?, ?)`,
     )
-    .bind(id, user.name, user.email, password.salt, password.hash, now, now, now)
+    .bind(id, user.firstName, user.lastName, user.email, password.salt, password.hash, now, now, now)
     .run();
 
   const session = await createSession(db, id);
   return json(
-    { user: toPublicUser({ id, name: user.name, email: user.email, role: 'admin', email_verified_at: now, created_at: now, updated_at: now }) },
+    { user: toPublicUser({ id, first_name: user.firstName, last_name: user.lastName, email: user.email, role: 'admin', email_verified_at: now, created_at: now, updated_at: now }) },
     201,
     { 'Set-Cookie': sessionCookie(session.id, session.expiresAt, url) },
   );
@@ -1030,15 +1030,16 @@ async function findOrCreateOAuthUser(db, provider, profile) {
 
   const password = await hashPassword(crypto.randomUUID() + crypto.randomUUID());
   const userId = crypto.randomUUID();
-  const userName = profile.name.length >= 2 ? profile.name : profile.email;
+  const userFullName = profile.name.length >= 2 ? profile.name : profile.email;
+  const { firstName: userFirstName, lastName: userLastName } = splitFullName(userFullName);
 
   await db.batch([
     db
       .prepare(
-        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, created_at, updated_at)
-         VALUES (?, ?, ?, 'user', ?, ?, ?, 0, ?, ?, ?)`,
+        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'user', ?, ?, ?, 0, ?, ?, ?)`,
       )
-      .bind(userId, userName, profile.email, password.salt, password.hash, now, DEFAULT_TOURNAMENT_LIMIT, now, now),
+      .bind(userId, userFirstName, userLastName, profile.email, password.salt, password.hash, now, DEFAULT_TOURNAMENT_LIMIT, now, now),
     oauthAccountInsert(db, userId, provider, profile, now),
   ]);
 
@@ -1076,10 +1077,10 @@ async function registerUser(request, env, url) {
   try {
     await db
       .prepare(
-        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, language, created_at, updated_at)
-         VALUES (?, ?, ?, 'user', ?, ?, NULL, ?, ?, ?)`,
+        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, language, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'user', ?, ?, NULL, ?, ?, ?)`,
       )
-      .bind(id, user.name, user.email, password.salt, password.hash, language, now, now)
+      .bind(id, user.firstName, user.lastName, user.email, password.salt, password.hash, language, now, now)
       .run();
   } catch (error) {
     if (String(error.message || '').includes('UNIQUE')) {
@@ -1329,7 +1330,7 @@ async function resetPassword(request, db) {
 async function listUsers(db) {
   const result = await db
     .prepare(
-      'SELECT id, name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, created_at, updated_at FROM users ORDER BY name COLLATE NOCASE',
+      'SELECT id, first_name, last_name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
     )
     .all();
   return json({ users: result.results.map(toPublicUser) });
@@ -1348,10 +1349,10 @@ async function createUser(request, db) {
   try {
     await db
       .prepare(
-        `INSERT INTO users (id, name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, user.name, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, now)
+      .bind(id, user.firstName, user.lastName, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, now)
       .run();
   } catch (error) {
     if (String(error.message || '').includes('UNIQUE')) {
@@ -1364,7 +1365,8 @@ async function createUser(request, db) {
     {
       user: toPublicUser({
         id,
-        name: user.name,
+        first_name: user.firstName,
+        last_name: user.lastName,
         email: user.email,
         role: user.role,
         email_verified_at: emailVerifiedAt,
@@ -1401,17 +1403,17 @@ async function updateUser(request, db, id, currentUserId) {
       await db
         .prepare(
           `UPDATE users
-           SET name = ?, email = ?, pending_email = NULL, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, updated_at = ?
+           SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, updated_at = ?
            WHERE id = ?`,
         )
-        .bind(user.name, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, id)
+        .bind(user.firstName, user.lastName, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, id)
         .run();
     } else {
       await db
         .prepare(
-          'UPDATE users SET name = ?, email = ?, pending_email = NULL, role = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, updated_at = ? WHERE id = ?',
+          'UPDATE users SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, role = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, updated_at = ? WHERE id = ?',
         )
-        .bind(user.name, user.email, user.role, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, id)
+        .bind(user.firstName, user.lastName, user.email, user.role, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, id)
         .run();
     }
   } catch (error) {
@@ -1423,7 +1425,7 @@ async function updateUser(request, db, id, currentUserId) {
 
   const updated = await db
     .prepare(
-      'SELECT id, name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, created_at, updated_at FROM users WHERE id = ?',
     )
     .bind(id)
     .first();
@@ -1438,14 +1440,16 @@ async function updateOwnProfile(request, env, url, userId) {
   }
 
   const body = await readJson(request);
-  const name = String(body.name || '').trim();
+  const firstName = String(body.firstName || '').trim();
+  const lastName = String(body.lastName || '').trim();
   const email = String(body.email || '').trim().toLowerCase();
   const currentPassword = String(body.currentPassword || '');
   const newPassword = body.newPassword === undefined ? '' : String(body.newPassword);
   const language = normalizeLanguage(body.language);
+  const licenseNr = nullableText(body.licenseNr);
 
-  if (name.length < 2) {
-    throw new HttpError(400, 'Name must contain at least 2 characters');
+  if (firstName.length < 2 || lastName.length < 2) {
+    throw new HttpError(400, 'First name and last name must contain at least 2 characters');
   }
 
   if (!isEmail(email)) {
@@ -1480,16 +1484,16 @@ async function updateOwnProfile(request, env, url, userId) {
         db
           .prepare(
             `UPDATE users
-             SET name = ?, pending_email = ?, password_salt = ?, password_hash = ?, updated_at = ?
+             SET first_name = ?, last_name = ?, pending_email = ?, license_nr = ?, password_salt = ?, password_hash = ?, updated_at = ?
              WHERE id = ?`,
           )
-          .bind(name, pendingEmail, password.salt, password.hash, now, userId),
+          .bind(firstName, lastName, pendingEmail, licenseNr, password.salt, password.hash, now, userId),
         db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(userId, currentSessionId || ''),
       ]);
     } else {
       await db
-        .prepare('UPDATE users SET name = ?, pending_email = ?, updated_at = ? WHERE id = ?')
-        .bind(name, pendingEmail, now, userId)
+        .prepare('UPDATE users SET first_name = ?, last_name = ?, pending_email = ?, license_nr = ?, updated_at = ? WHERE id = ?')
+        .bind(firstName, lastName, pendingEmail, licenseNr, now, userId)
         .run();
     }
   } catch (error) {
@@ -1508,7 +1512,9 @@ async function updateOwnProfile(request, env, url, userId) {
   }
 
   const updated = await db
-    .prepare('SELECT id, name, email, pending_email, role, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?')
+    .prepare(
+      'SELECT id, first_name, last_name, email, pending_email, role, license_nr, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?',
+    )
     .bind(userId)
     .first();
 
@@ -1555,7 +1561,7 @@ async function deleteUser(db, id, currentUserId, deleteTournaments) {
 async function listTournaments(db, user) {
   const rows = await db
     .prepare(
-      `SELECT tournaments.*, users.name AS manager_name,
+      `SELECT tournaments.*, (users.first_name || ' ' || users.last_name) AS manager_name,
         (
           SELECT COUNT(*)
           FROM registrations
@@ -1963,10 +1969,10 @@ async function createRegistration(request, env, tournament) {
     .prepare(
       `INSERT INTO registrations (
         id, tournament_id, first_name, last_name, email, club, license_nr,
-        partner_first_name, partner_last_name, partner_email,
-        partner2_first_name, partner2_last_name, partner2_email,
+        partner_first_name, partner_last_name, partner_email, partner_license_nr,
+        partner2_first_name, partner2_last_name, partner2_email, partner2_license_nr,
         team_name, seeding_position, status, is_vip, language, registered_at, confirmed_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1979,9 +1985,11 @@ async function createRegistration(request, env, tournament) {
       registration.partnerFirstName,
       registration.partnerLastName,
       registration.partnerEmail,
+      registration.partnerLicenseNr,
       registration.partner2FirstName,
       registration.partner2LastName,
       registration.partner2Email,
+      registration.partner2LicenseNr,
       registration.teamName,
       registration.seedingPosition,
       status,
@@ -2022,8 +2030,8 @@ async function updateRegistration(request, env, existing) {
     .prepare(
       `UPDATE registrations
        SET first_name = ?, last_name = ?, email = ?, club = ?, license_nr = ?,
-           partner_first_name = ?, partner_last_name = ?, partner_email = ?,
-           partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?,
+           partner_first_name = ?, partner_last_name = ?, partner_email = ?, partner_license_nr = ?,
+           partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?, partner2_license_nr = ?,
            team_name = ?, seeding_position = ?, status = ?, is_vip = ?, confirmed_at = ?, updated_at = ?
        WHERE id = ?`,
     )
@@ -2036,9 +2044,11 @@ async function updateRegistration(request, env, existing) {
       registration.partnerFirstName,
       registration.partnerLastName,
       registration.partnerEmail,
+      registration.partnerLicenseNr,
       registration.partner2FirstName,
       registration.partner2LastName,
       registration.partner2Email,
+      registration.partner2LicenseNr,
       registration.teamName,
       registration.seedingPosition,
       registration.status,
@@ -2155,13 +2165,13 @@ async function listAllApiKeys(db, url) {
     status && ['pending', 'approved', 'revoked'].includes(status)
       ? db
           .prepare(
-            `SELECT api_keys.*, users.name AS user_name, users.email AS user_email
+            `SELECT api_keys.*, (users.first_name || ' ' || users.last_name) AS user_name, users.email AS user_email
              FROM api_keys JOIN users ON users.id = api_keys.user_id
              WHERE api_keys.status = ? ORDER BY api_keys.requested_at DESC`,
           )
           .bind(status)
       : db.prepare(
-          `SELECT api_keys.*, users.name AS user_name, users.email AS user_email
+          `SELECT api_keys.*, (users.first_name || ' ' || users.last_name) AS user_name, users.email AS user_email
            FROM api_keys JOIN users ON users.id = api_keys.user_id
            ORDER BY api_keys.requested_at DESC`,
         );
@@ -2430,7 +2440,7 @@ async function initialRegistrationStatus(db, tournament, isVip) {
 async function getTournamentById(db, id) {
   return db
     .prepare(
-      `SELECT tournaments.*, users.name AS manager_name,
+      `SELECT tournaments.*, (users.first_name || ' ' || users.last_name) AS manager_name,
         (
           SELECT COUNT(*)
           FROM registrations
@@ -2511,7 +2521,7 @@ async function requireApiKey(request, db) {
   const keyHash = await sha256Hex(secret);
   const row = await db
     .prepare(
-      `SELECT api_keys.id AS api_key_id, users.id, users.name, users.email, users.role,
+      `SELECT api_keys.id AS api_key_id, users.id, users.first_name, users.last_name, users.email, users.role, users.license_nr,
               users.email_verified_at, users.password_change_required, users.tournament_limit, users.created_at, users.updated_at
        FROM api_keys
        JOIN users ON users.id = api_keys.user_id
@@ -2559,7 +2569,7 @@ async function requireSession(request, db) {
 
   const row = await db
     .prepare(
-      `SELECT users.id, users.name, users.email, users.pending_email, users.role, users.email_verified_at, users.password_change_required,
+      `SELECT users.id, users.first_name, users.last_name, users.email, users.pending_email, users.role, users.license_nr, users.email_verified_at, users.password_change_required,
               users.tournament_limit, users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
@@ -2649,14 +2659,24 @@ async function clearLoginAttempts(db, email) {
   await db.prepare('DELETE FROM login_attempts WHERE email = ?').bind(email).run();
 }
 
+function splitFullName(fullName) {
+  const trimmed = String(fullName || '').trim();
+  const spaceIndex = trimmed.indexOf(' ');
+  if (spaceIndex === -1) {
+    return { firstName: trimmed, lastName: '' };
+  }
+  return { firstName: trimmed.slice(0, spaceIndex), lastName: trimmed.slice(spaceIndex + 1).trim() };
+}
+
 function normalizeUserInput(body, { requirePassword }) {
-  const name = String(body.name || '').trim();
+  const firstName = String(body.firstName || '').trim();
+  const lastName = String(body.lastName || '').trim();
   const email = String(body.email || '').trim().toLowerCase();
   const role = String(body.role || 'user').trim().toLowerCase();
   const password = body.password === undefined ? '' : String(body.password);
 
-  if (name.length < 2) {
-    throw new HttpError(400, 'Name must contain at least 2 characters');
+  if (firstName.length < 2 || lastName.length < 2) {
+    throw new HttpError(400, 'First name and last name must contain at least 2 characters');
   }
 
   if (!isEmail(email)) {
@@ -2671,7 +2691,7 @@ function normalizeUserInput(body, { requirePassword }) {
     assertPasswordStrength(password);
   }
 
-  return { name, email, role, password };
+  return { firstName, lastName, email, role, password };
 }
 
 function resolveTournamentLimit(body, fallback) {
@@ -2774,9 +2794,11 @@ function normalizeRegistrationInput(body, { requireStatus }) {
     partnerFirstName: nullableText(body.partnerFirstName),
     partnerLastName: nullableText(body.partnerLastName),
     partnerEmail: nullableText(body.partnerEmail)?.toLowerCase() || null,
+    partnerLicenseNr: nullableText(body.partnerLicenseNr),
     partner2FirstName: nullableText(body.partner2FirstName),
     partner2LastName: nullableText(body.partner2LastName),
     partner2Email: nullableText(body.partner2Email)?.toLowerCase() || null,
+    partner2LicenseNr: nullableText(body.partner2LicenseNr),
     teamName: nullableText(body.teamName),
     seedingPosition: body.seedingPosition === '' || body.seedingPosition === undefined ? null : nonNegativeInteger(body.seedingPosition),
     status: text(body.status || 'pending'),
@@ -2829,8 +2851,17 @@ function assertPartnerCountMatchesFormation(formation, registration) {
 }
 
 function assertLicenseMatchesTournament(tournament, registration) {
-  if (Number(tournament.license_required || 0) && !registration.licenseNr) {
+  if (!Number(tournament.license_required || 0)) {
+    return;
+  }
+  if (!registration.licenseNr) {
     throw new HttpError(400, 'Lizenznummer ist erforderlich');
+  }
+  if (registration.partnerFirstName && !registration.partnerLicenseNr) {
+    throw new HttpError(400, 'Lizenznummer für Partner ist erforderlich');
+  }
+  if (registration.partner2FirstName && !registration.partner2LicenseNr) {
+    throw new HttpError(400, 'Lizenznummer für Partner 2 ist erforderlich');
   }
 }
 
@@ -2964,10 +2995,12 @@ async function readJson(request) {
 function toPublicUser(row) {
   return {
     id: row.id,
-    name: row.name,
+    firstName: row.first_name,
+    lastName: row.last_name,
     email: row.email,
     pendingEmail: row.pending_email || null,
     role: row.role,
+    licenseNr: row.license_nr || null,
     emailVerifiedAt: row.email_verified_at || null,
     passwordChangeRequired: Boolean(Number(row.password_change_required || 0)),
     tournamentLimit: row.tournament_limit === undefined || row.tournament_limit === null ? DEFAULT_TOURNAMENT_LIMIT : Number(row.tournament_limit),
@@ -3028,9 +3061,11 @@ function toPublicRegistration(row) {
     partnerFirstName: row.partner_first_name,
     partnerLastName: row.partner_last_name,
     partnerEmail: row.partner_email,
+    partnerLicenseNr: row.partner_license_nr,
     partner2FirstName: row.partner2_first_name,
     partner2LastName: row.partner2_last_name,
     partner2Email: row.partner2_email,
+    partner2LicenseNr: row.partner2_license_nr,
     teamName: row.team_name,
     seedingPosition: row.seeding_position,
     status: row.status,
