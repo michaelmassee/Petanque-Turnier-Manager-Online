@@ -2131,12 +2131,6 @@ function TournamentDetailPage({
 
       <Feedback message={message} error={error} />
 
-      <div className="tournament-share-row">
-        <Button variant="secondary" onClick={handleShare}>
-          {translateText('Turnier teilen', language)}
-        </Button>
-      </div>
-
       <section className="tournament-detail-page">
         <nav className="tournament-detail-tabs" aria-label="Turnierdetails">
           <button
@@ -2167,7 +2161,7 @@ function TournamentDetailPage({
         </nav>
 
         <div className="tournament-detail-content">
-          {route.view === 'info' && <TournamentInfo tournament={tournament} language={language} />}
+          {route.view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} />}
 
           {route.view === 'anmelden' && canRegister && (
             <PublicRegistrationPanel
@@ -2195,7 +2189,7 @@ function TournamentDetailPage({
   );
 }
 
-function TournamentInfo({ tournament, language }) {
+function TournamentInfo({ tournament, language, onShare }) {
   const mapsUrl = googleMapsUrl(tournament);
   const freeSlots = tournament.maxRegistrations
     ? Math.max(tournament.maxRegistrations - tournament.activeRegistrations, 0)
@@ -2203,25 +2197,57 @@ function TournamentInfo({ tournament, language }) {
 
   return (
     <div className="panel">
+      <div className="tournament-icon-bar">
+        <button
+          type="button"
+          className="icon-bar-button"
+          title={translateText('Turnier teilen', language)}
+          aria-label={translateText('Turnier teilen', language)}
+          onClick={onShare}
+        >
+          📤
+        </button>
+        <a
+          className="icon-bar-button"
+          href={mapsUrl}
+          target="_blank"
+          rel="noreferrer"
+          title={translateText('Spielort in Google Maps öffnen', language)}
+          aria-label={translateText('Spielort in Google Maps öffnen', language)}
+        >
+          📍
+        </a>
+        {tournament.websiteUrl && (
+          <a
+            className="icon-bar-button"
+            href={tournament.websiteUrl}
+            target="_blank"
+            rel="noreferrer"
+            title={translateText('Website öffnen', language)}
+            aria-label={translateText('Website öffnen', language)}
+          >
+            🌐
+          </a>
+        )}
+        {tournament.flyerUrl && (
+          <a
+            className="icon-bar-button"
+            href={tournament.flyerUrl}
+            target="_blank"
+            rel="noreferrer"
+            title={translateText('Flyer öffnen', language)}
+            aria-label={translateText('Flyer öffnen', language)}
+          >
+            📄
+          </a>
+        )}
+      </div>
       <p>
         <strong>Datum</strong>: {formatDate(tournament.date)} {tournament.startTime || ''}
       </p>
       <p>
         <strong>Ort</strong>: {tournament.location}
       </p>
-      <a className="button button-secondary maps-link" href={mapsUrl} target="_blank" rel="noreferrer">
-        Spielort in Google Maps öffnen
-      </a>
-      {tournament.websiteUrl && (
-        <a className="button button-secondary" href={tournament.websiteUrl} target="_blank" rel="noreferrer">
-          Website öffnen
-        </a>
-      )}
-      {tournament.flyerUrl && (
-        <a className="button button-secondary" href={tournament.flyerUrl} target="_blank" rel="noreferrer">
-          Flyer öffnen
-        </a>
-      )}
       <p>
         <strong>Turniersystem</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
       </p>
