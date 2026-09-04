@@ -12,7 +12,8 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "security:check": "node scripts/security-check.mjs && node scripts/i18n-check.mjs",
-    "i18n:check": "node scripts/i18n-check.mjs"
+    "i18n:check": "node scripts/i18n-check.mjs",
+    "test": "node scripts/formation-registration-type-check.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",

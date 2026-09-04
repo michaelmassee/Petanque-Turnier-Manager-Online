@@ -2734,7 +2734,7 @@ function normalizeLanguage(value) {
   return LANGUAGES.includes(language) ? language : 'de';
 }
 
-function normalizeTournamentInput(body) {
+export function normalizeTournamentInput(body) {
   const tournament = {
     name: text(body.name),
     date: text(body.date),
@@ -2856,7 +2856,7 @@ function normalizeRegistrationInput(body, { requireStatus }) {
   return registration;
 }
 
-function assertPartnerCountMatchesFormation(tournament, registration) {
+export function assertPartnerCountMatchesFormation(tournament, registration) {
   const formation = tournament.registration_type === 'melee' || tournament.registration_type === 'supermelee'
     ? 'tete'
     : tournament.formation;

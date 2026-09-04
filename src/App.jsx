@@ -2845,7 +2845,95 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
   );
 }
 
+function FormationHelpDialog({ onClose }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal-panel modal-panel--wide"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="formation-help-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button className="modal-close" type="button" onClick={onClose} aria-label="Schließen">
+          ×
+        </button>
+        <h2 id="formation-help-title">Formation, Anmeldetyp &amp; Turniersystem</h2>
+        <p>
+          Die <strong>Formation</strong> bestimmt die Teamgröße (wie viele Spieler gemeinsam antreten). Der{' '}
+          <strong>Anmeldetyp</strong> bestimmt die Teambildung (wann und wie die Teams gebildet werden). Das{' '}
+          <strong>Turniersystem</strong> bestimmt anschließend, wie diese Teams gegeneinander spielen.
+        </p>
+        <ul>
+          <li>
+            <strong>Tête (1 Spieler):</strong> Keine Teambildung nötig – jeder Spieler ist sein eigenes Team. Anmeldetyp
+            ist deshalb fest auf <strong>Formée</strong> gesetzt; jedes Turniersystem ist möglich.
+          </li>
+          <li>
+            <strong>Doublette / Triplette (2 bzw. 3 Spieler):</strong>
+            <ul>
+              <li><strong>Formée</strong> – Teams werden von den Teilnehmern vorgegeben und bleiben fest.</li>
+              <li><strong>Mêlée</strong> – Spieler melden sich einzeln an, Teams werden einmal vor Turnierbeginn ausgelost und bleiben dann fest.</li>
+              <li><strong>Supermêlée</strong> – Spieler melden sich einzeln an, Teams werden vor jeder Runde neu ausgelost.</li>
+            </ul>
+          </li>
+          <li>
+            Feste Teams (Tête, Formée, Mêlée nach der Auslosung) sind mit jedem normalen Turniersystem kombinierbar.
+            <strong> Supermêlée</strong> setzt voraus, dass Teams nicht dauerhaft fest sind, und ist deshalb auf das
+            Turniersystem <strong>Rangliste</strong> festgelegt.
+          </li>
+        </ul>
+        <div className="table-scroll">
+          <table className="matrix-table">
+            <thead>
+              <tr>
+                <th>Formation</th>
+                <th>Anmeldetyp</th>
+                <th>Teambildung</th>
+                <th>Turniersystem</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Tête</td>
+                <td>Formée</td>
+                <td>keine (jeder Spieler ist sein eigenes Team)</td>
+                <td>alle geeigneten Turniersysteme</td>
+              </tr>
+              <tr>
+                <td>Tête</td>
+                <td>Mêlée / Supermêlée</td>
+                <td className="no">nicht möglich</td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td>Doublette / Triplette</td>
+                <td>Formée</td>
+                <td>von Teilnehmern vorgegeben, fest</td>
+                <td>alle geeigneten Turniersysteme</td>
+              </tr>
+              <tr>
+                <td>Doublette / Triplette</td>
+                <td>Mêlée</td>
+                <td>einmal vor Turnierbeginn ausgelost, dann fest</td>
+                <td>alle geeigneten Turniersysteme</td>
+              </tr>
+              <tr>
+                <td>Doublette / Triplette</td>
+                <td>Supermêlée</td>
+                <td>vor jeder Runde neu ausgelost</td>
+                <td>nur Rangliste</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users }) {
+  const [showFormationHelp, setShowFormationHelp] = useState(false);
   const managerOptions = [
     { value: '', label: '(ich selbst)' },
     ...users.map((user) => ({ value: user.id, label: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email })),
@@ -2893,7 +2981,13 @@ function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users }) {
           />
         </div>
       )}
-      <div className="form-grid">
+      <div className="form-section-header">
+        <span>Formation, Anmeldetyp &amp; Turniersystem</span>
+        <button type="button" className="help-btn" onClick={() => setShowFormationHelp(true)} aria-label="Hilfe zu Formation, Anmeldetyp und Turniersystem">
+          ? Hilfe
+        </button>
+      </div>
+      <div className="form-grid-3">
         <SelectField
           label="Formation"
           value={form.formation}
@@ -2916,8 +3010,6 @@ function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users }) {
           options={form.formation === 'tete' ? REGISTRATION_TYPES.filter((option) => option.value === 'forme') : REGISTRATION_TYPES}
           disabled={form.formation === 'tete'}
         />
-      </div>
-      <div className="form-grid">
         <SelectField
           label="Turniersystem"
           value={form.registrationType === 'supermelee' ? 'rangliste' : form.type}
@@ -2925,9 +3017,12 @@ function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users }) {
           options={TOURNAMENT_TYPES}
           disabled={form.registrationType === 'supermelee'}
         />
-        <SelectField label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={TOURNAMENT_STATUSES} />
       </div>
+      {showFormationHelp && (
+        <FormationHelpDialog onClose={() => setShowFormationHelp(false)} />
+      )}
       <div className="form-grid">
+        <SelectField label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={TOURNAMENT_STATUSES} />
         <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(visibility) => setForm({ ...form, visibility })} options={VISIBILITIES} />
       </div>
       <div className="form-grid">
