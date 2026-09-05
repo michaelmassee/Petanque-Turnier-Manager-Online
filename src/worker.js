@@ -223,6 +223,21 @@ const REGISTRATION_CANCELLED_EMAILS = {
   },
 };
 
+const DESKTOP_APP_URL = 'https://michaelmassee.github.io/Petanque-Turnier-Manager/';
+
+const EMAIL_FOOTERS = {
+  de: `Pétanque Turnier Manager Online\n\nFinde dein nächstes Pétanque-Turnier\nSuche nach Ort, Verein oder Turniersystem und melde dich direkt online an.\n\nund die Desktop App\n\n${DESKTOP_APP_URL}`,
+  nl: `Pétanque Turnier Manager Online\n\nVind je volgende petanquetoernooi\nZoek op locatie, club of toernooisysteem en schrijf je direct online in.\n\nEn de desktop-app\n\n${DESKTOP_APP_URL}`,
+  en: `Pétanque Turnier Manager Online\n\nFind your next pétanque tournament\nSearch by location, club or tournament system and register directly online.\n\nAnd the desktop app\n\n${DESKTOP_APP_URL}`,
+  es: `Pétanque Turnier Manager Online\n\nEncuentra tu próximo torneo de petanca\nBusca por lugar, club o sistema de torneo e inscríbete directamente en línea.\n\nY la aplicación de escritorio\n\n${DESKTOP_APP_URL}`,
+  fr: `Pétanque Turnier Manager Online\n\nTrouve ton prochain tournoi de pétanque\nRecherche par lieu, club ou système de tournoi et inscris-toi directement en ligne.\n\nEt l'application de bureau\n\n${DESKTOP_APP_URL}`,
+};
+
+export function appendEmailFooter(text, language) {
+  const footer = EMAIL_FOOTERS[language] || EMAIL_FOOTERS.de;
+  return `${text}\n\n----------\n\n${footer}`;
+}
+
 const EMAIL_LOCALES = { de: 'de-DE', nl: 'nl-NL', en: 'en-GB', es: 'es-ES', fr: 'fr-FR' };
 
 function formatTournamentDateTime(tournament, language) {
@@ -342,6 +357,7 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
       to: recipient.email,
       subject: templates.subject(tournament.name),
       text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link, cancelLink),
+      language,
       attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
       logFallback: `Registration confirmation email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `registration confirmation for registration ${registration.id}`,
@@ -363,6 +379,7 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
       text: wasCancelled
         ? templates.textCancelled(recipient.firstName, tournament.name, link)
         : templates.textWaitlisted(recipient.firstName, tournament.name, link, cancelLink),
+      language,
       logFallback: `Displacement email for ${recipient.email} (tournament ${tournament.id}, cancelled=${wasCancelled})`,
       failureContext: `displacement notice for registration ${registration.id}`,
       allowLogFallback: true,
@@ -380,6 +397,7 @@ async function sendCancellationEmail(env, tournament, registration, appOrigin) {
       to: recipient.email,
       subject: templates.subject(tournament.name),
       text: templates.text(recipient.firstName, tournament.name, link),
+      language,
       logFallback: `Cancellation email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `cancellation notice for registration ${registration.id}`,
       allowLogFallback: true,
@@ -431,6 +449,7 @@ async function sendTournamentReminders(env) {
               to: recipient.email,
               subject: templates.subject(tournament.name),
               text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link, cancelLink),
+              language,
               attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
               logFallback: `Tournament reminder email for registration ${registration.id} (tournament ${tournament.id})`,
               failureContext: `tournament reminder for registration ${registration.id}`,
@@ -1375,6 +1394,7 @@ async function sendEmailVerificationEmail(env, email, verificationUrl, language,
     to: email,
     subject: emailText.subject,
     text: emailText.text(verificationUrl),
+    language,
     logFallback: `Email verification link for ${email}: ${verificationUrl}`,
     failureContext: `email verification email for ${email}`,
     allowLogFallback,
@@ -2541,7 +2561,7 @@ async function syncPostResults(request, db, tournamentId) {
   return json({ updatedCount });
 }
 
-async function sendTransactionalEmail(env, { to, subject, text, attachments, logFallback, failureContext, allowLogFallback = false }) {
+async function sendTransactionalEmail(env, { to, subject, text, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
     console.log(logFallback);
     if (allowLogFallback) {
@@ -2562,7 +2582,7 @@ async function sendTransactionalEmail(env, { to, subject, text, attachments, log
         from: env.MAIL_FROM,
         to,
         subject,
-        text,
+        text: appendEmailFooter(text, language),
         ...(attachments ? { attachments } : {}),
       }),
     });
