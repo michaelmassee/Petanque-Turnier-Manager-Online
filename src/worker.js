@@ -104,94 +104,122 @@ const EMAIL_CHANGE_EMAILS = {
 const REGISTRATION_CONFIRMATION_EMAILS = {
   de: {
     subject: (name) => `Anmeldebestätigung: ${name}`,
-    text: (name, dateTimeLabel, location, link) =>
-      `Deine Anmeldung für "${name}" ist eingegangen.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.`,
+    text: (firstName, name, dateTimeLabel, location, link) =>
+      `Hallo ${firstName},\n\nDeine Anmeldung für "${name}" ist eingegangen.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.`,
   },
   nl: {
     subject: (name) => `Inschrijvingsbevestiging: ${name}`,
-    text: (name, dateTimeLabel, location, link) =>
-      `Je inschrijving voor "${name}" is ontvangen.\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}\n\nAlle informatie over het toernooi:\n${link}\n\nEen agenda-afspraak vind je als bijlage bij deze e-mail.`,
+    text: (firstName, name, dateTimeLabel, location, link) =>
+      `Hallo ${firstName},\n\nJe inschrijving voor "${name}" is ontvangen.\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}\n\nAlle informatie over het toernooi:\n${link}\n\nEen agenda-afspraak vind je als bijlage bij deze e-mail.`,
   },
   en: {
     subject: (name) => `Registration confirmation: ${name}`,
-    text: (name, dateTimeLabel, location, link) =>
-      `Your registration for "${name}" has been received.\n\nDate: ${dateTimeLabel}\nLocation: ${location}\n\nAll tournament details:\n${link}\n\nA calendar event is attached to this email.`,
+    text: (firstName, name, dateTimeLabel, location, link) =>
+      `Hi ${firstName},\n\nYour registration for "${name}" has been received.\n\nDate: ${dateTimeLabel}\nLocation: ${location}\n\nAll tournament details:\n${link}\n\nA calendar event is attached to this email.`,
   },
   es: {
     subject: (name) => `Confirmación de inscripción: ${name}`,
-    text: (name, dateTimeLabel, location, link) =>
-      `Tu inscripción para "${name}" se ha recibido.\n\nFecha: ${dateTimeLabel}\nLugar: ${location}\n\nToda la información del torneo:\n${link}\n\nEncontrarás una cita de calendario adjunta a este correo.`,
+    text: (firstName, name, dateTimeLabel, location, link) =>
+      `Hola ${firstName},\n\nTu inscripción para "${name}" se ha recibido.\n\nFecha: ${dateTimeLabel}\nLugar: ${location}\n\nToda la información del torneo:\n${link}\n\nEncontrarás una cita de calendario adjunta a este correo.`,
   },
   fr: {
     subject: (name) => `Confirmation d'inscription : ${name}`,
-    text: (name, dateTimeLabel, location, link) =>
-      `Ton inscription pour « ${name} » a bien été reçue.\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nUn rendez-vous de calendrier est joint à cet e-mail.`,
+    text: (firstName, name, dateTimeLabel, location, link) =>
+      `Bonjour ${firstName},\n\nTon inscription pour « ${name} » a bien été reçue.\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nUn rendez-vous de calendrier est joint à cet e-mail.`,
   },
 };
 
 const REGISTRATION_DISPLACED_EMAILS = {
   de: {
     subject: (name) => `Änderung deiner Anmeldung: ${name}`,
-    textWaitlisted: (name, link) =>
-      `Für "${name}" hat sich ein VIP-Teilnehmer angemeldet, für den kein regulärer Platz mehr frei war. Deine Anmeldung wurde daher auf die Warteliste verschoben.\n\nAlle Infos zum Turnier:\n${link}`,
-    textCancelled: (name, link) =>
-      `Für "${name}" hat sich ein VIP-Teilnehmer angemeldet, für den kein regulärer Platz mehr frei war. Da für dieses Turnier keine Warteliste aktiviert ist, wurde deine Anmeldung leider storniert.\n\nAlle Infos zum Turnier:\n${link}`,
+    textWaitlisted: (firstName, name, link) =>
+      `Hallo ${firstName},\n\nFür "${name}" hat sich ein VIP-Teilnehmer angemeldet, für den kein regulärer Platz mehr frei war. Deine Anmeldung wurde daher auf die Warteliste verschoben.\n\nAlle Infos zum Turnier:\n${link}`,
+    textCancelled: (firstName, name, link) =>
+      `Hallo ${firstName},\n\nFür "${name}" hat sich ein VIP-Teilnehmer angemeldet, für den kein regulärer Platz mehr frei war. Da für dieses Turnier keine Warteliste aktiviert ist, wurde deine Anmeldung leider storniert.\n\nAlle Infos zum Turnier:\n${link}`,
   },
   nl: {
     subject: (name) => `Wijziging van je inschrijving: ${name}`,
-    textWaitlisted: (name, link) =>
-      `Voor "${name}" heeft een VIP-deelnemer zich ingeschreven, waarvoor geen reguliere plaats meer vrij was. Je inschrijving is daarom op de wachtlijst geplaatst.\n\nAlle informatie over het toernooi:\n${link}`,
-    textCancelled: (name, link) =>
-      `Voor "${name}" heeft een VIP-deelnemer zich ingeschreven, waarvoor geen reguliere plaats meer vrij was. Omdat er voor dit toernooi geen wachtlijst is geactiveerd, is je inschrijving helaas geannuleerd.\n\nAlle informatie over het toernooi:\n${link}`,
+    textWaitlisted: (firstName, name, link) =>
+      `Hallo ${firstName},\n\nVoor "${name}" heeft een VIP-deelnemer zich ingeschreven, waarvoor geen reguliere plaats meer vrij was. Je inschrijving is daarom op de wachtlijst geplaatst.\n\nAlle informatie over het toernooi:\n${link}`,
+    textCancelled: (firstName, name, link) =>
+      `Hallo ${firstName},\n\nVoor "${name}" heeft een VIP-deelnemer zich ingeschreven, waarvoor geen reguliere plaats meer vrij was. Omdat er voor dit toernooi geen wachtlijst is geactiveerd, is je inschrijving helaas geannuleerd.\n\nAlle informatie over het toernooi:\n${link}`,
   },
   en: {
     subject: (name) => `Change to your registration: ${name}`,
-    textWaitlisted: (name, link) =>
-      `A VIP participant has registered for "${name}" and no regular spot was left. Your registration has therefore been moved to the waiting list.\n\nAll tournament details:\n${link}`,
-    textCancelled: (name, link) =>
-      `A VIP participant has registered for "${name}" and no regular spot was left. Since no waiting list is enabled for this tournament, your registration has unfortunately been cancelled.\n\nAll tournament details:\n${link}`,
+    textWaitlisted: (firstName, name, link) =>
+      `Hi ${firstName},\n\nA VIP participant has registered for "${name}" and no regular spot was left. Your registration has therefore been moved to the waiting list.\n\nAll tournament details:\n${link}`,
+    textCancelled: (firstName, name, link) =>
+      `Hi ${firstName},\n\nA VIP participant has registered for "${name}" and no regular spot was left. Since no waiting list is enabled for this tournament, your registration has unfortunately been cancelled.\n\nAll tournament details:\n${link}`,
   },
   es: {
     subject: (name) => `Cambio en tu inscripción: ${name}`,
-    textWaitlisted: (name, link) =>
-      `Un participante VIP se ha inscrito para "${name}" y no quedaba ninguna plaza regular. Por ello, tu inscripción se ha trasladado a la lista de espera.\n\nToda la información del torneo:\n${link}`,
-    textCancelled: (name, link) =>
-      `Un participante VIP se ha inscrito para "${name}" y no quedaba ninguna plaza regular. Como no hay lista de espera activada para este torneo, lamentablemente tu inscripción ha sido cancelada.\n\nToda la información del torneo:\n${link}`,
+    textWaitlisted: (firstName, name, link) =>
+      `Hola ${firstName},\n\nUn participante VIP se ha inscrito para "${name}" y no quedaba ninguna plaza regular. Por ello, tu inscripción se ha trasladado a la lista de espera.\n\nToda la información del torneo:\n${link}`,
+    textCancelled: (firstName, name, link) =>
+      `Hola ${firstName},\n\nUn participante VIP se ha inscrito para "${name}" y no quedaba ninguna plaza regular. Como no hay lista de espera activada para este torneo, lamentablemente tu inscripción ha sido cancelada.\n\nToda la información del torneo:\n${link}`,
   },
   fr: {
     subject: (name) => `Modification de ton inscription : ${name}`,
-    textWaitlisted: (name, link) =>
-      `Un participant VIP s'est inscrit pour « ${name} » et il ne restait plus de place normale. Ton inscription a donc été placée sur liste d'attente.\n\nToutes les informations sur le tournoi :\n${link}`,
-    textCancelled: (name, link) =>
-      `Un participant VIP s'est inscrit pour « ${name} » et il ne restait plus de place normale. Comme aucune liste d'attente n'est activée pour ce tournoi, ton inscription a malheureusement été annulée.\n\nToutes les informations sur le tournoi :\n${link}`,
+    textWaitlisted: (firstName, name, link) =>
+      `Bonjour ${firstName},\n\nUn participant VIP s'est inscrit pour « ${name} » et il ne restait plus de place normale. Ton inscription a donc été placée sur liste d'attente.\n\nToutes les informations sur le tournoi :\n${link}`,
+    textCancelled: (firstName, name, link) =>
+      `Bonjour ${firstName},\n\nUn participant VIP s'est inscrit pour « ${name} » et il ne restait plus de place normale. Comme aucune liste d'attente n'est activée pour ce tournoi, ton inscription a malheureusement été annulée.\n\nToutes les informations sur le tournoi :\n${link}`,
   },
 };
 
 const TOURNAMENT_REMINDER_EMAILS = {
   de: {
     subject: (name) => `Erinnerung: ${name} in 2 Tagen`,
-    text: (name, dateTimeLabel, location, link) =>
-      `Nur noch 2 Tage bis "${name}"!\n\nTermin: ${dateTimeLabel}\nOrt: ${location}\n\nAlle Infos zum Turnier:\n${link}\n\nDen Kalendereintrag findest du im Anhang dieser E-Mail.`,
+    text: (firstName, name, dateTimeLabel, location, link) =>
+      `Hallo ${firstName},\n\nNur noch 2 Tage bis "${name}"!\n\nTermin: ${dateTimeLabel}\nOrt: ${location}\n\nAlle Infos zum Turnier:\n${link}\n\nDen Kalendereintrag findest du im Anhang dieser E-Mail.`,
   },
   nl: {
     subject: (name) => `Herinnering: ${name} over 2 dagen`,
-    text: (name, dateTimeLabel, location, link) =>
-      `Nog maar 2 dagen tot "${name}"!\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}\n\nAlle informatie over het toernooi:\n${link}\n\nDe agenda-afspraak vind je als bijlage bij deze e-mail.`,
+    text: (firstName, name, dateTimeLabel, location, link) =>
+      `Hallo ${firstName},\n\nNog maar 2 dagen tot "${name}"!\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}\n\nAlle informatie over het toernooi:\n${link}\n\nDe agenda-afspraak vind je als bijlage bij deze e-mail.`,
   },
   en: {
     subject: (name) => `Reminder: ${name} in 2 days`,
-    text: (name, dateTimeLabel, location, link) =>
-      `Only 2 days left until "${name}"!\n\nDate: ${dateTimeLabel}\nLocation: ${location}\n\nAll tournament details:\n${link}\n\nThe calendar event is attached to this email.`,
+    text: (firstName, name, dateTimeLabel, location, link) =>
+      `Hi ${firstName},\n\nOnly 2 days left until "${name}"!\n\nDate: ${dateTimeLabel}\nLocation: ${location}\n\nAll tournament details:\n${link}\n\nThe calendar event is attached to this email.`,
   },
   es: {
     subject: (name) => `Recordatorio: ${name} en 2 días`,
-    text: (name, dateTimeLabel, location, link) =>
-      `¡Solo quedan 2 días para "${name}"!\n\nFecha: ${dateTimeLabel}\nLugar: ${location}\n\nToda la información del torneo:\n${link}\n\nEncontrarás la cita de calendario adjunta a este correo.`,
+    text: (firstName, name, dateTimeLabel, location, link) =>
+      `Hola ${firstName},\n\n¡Solo quedan 2 días para "${name}"!\n\nFecha: ${dateTimeLabel}\nLugar: ${location}\n\nToda la información del torneo:\n${link}\n\nEncontrarás la cita de calendario adjunta a este correo.`,
   },
   fr: {
     subject: (name) => `Rappel : ${name} dans 2 jours`,
-    text: (name, dateTimeLabel, location, link) =>
-      `Plus que 2 jours avant « ${name} » !\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nLe rendez-vous de calendrier est joint à cet e-mail.`,
+    text: (firstName, name, dateTimeLabel, location, link) =>
+      `Bonjour ${firstName},\n\nPlus que 2 jours avant « ${name} » !\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nLe rendez-vous de calendrier est joint à cet e-mail.`,
+  },
+};
+
+const REGISTRATION_CANCELLED_EMAILS = {
+  de: {
+    subject: (name) => `Abmeldung bestätigt: ${name}`,
+    text: (firstName, name, link) =>
+      `Hallo ${firstName},\n\nDeine Abmeldung von "${name}" wurde bestätigt.\n\nAlle Infos zum Turnier:\n${link}`,
+  },
+  nl: {
+    subject: (name) => `Afmelding bevestigd: ${name}`,
+    text: (firstName, name, link) =>
+      `Hallo ${firstName},\n\nJe afmelding voor "${name}" is bevestigd.\n\nAlle informatie over het toernooi:\n${link}`,
+  },
+  en: {
+    subject: (name) => `Withdrawal confirmed: ${name}`,
+    text: (firstName, name, link) =>
+      `Hi ${firstName},\n\nYour withdrawal from "${name}" has been confirmed.\n\nAll tournament details:\n${link}`,
+  },
+  es: {
+    subject: (name) => `Baja confirmada: ${name}`,
+    text: (firstName, name, link) =>
+      `Hola ${firstName},\n\nTu baja de "${name}" ha sido confirmada.\n\nToda la información del torneo:\n${link}`,
+  },
+  fr: {
+    subject: (name) => `Désinscription confirmée : ${name}`,
+    text: (firstName, name, link) =>
+      `Bonjour ${firstName},\n\nTa désinscription de « ${name} » a été confirmée.\n\nToutes les informations sur le tournoi :\n${link}`,
   },
 };
 
@@ -279,6 +307,24 @@ async function resolveEmailLanguage(db, tournament, registration) {
   return creator?.language || registration.language || 'de';
 }
 
+function buildTeamRecipients(registration) {
+  const entries = [
+    { email: registration.email, firstName: registration.first_name },
+    { email: registration.partner_email, firstName: registration.partner_first_name },
+    { email: registration.partner2_email, firstName: registration.partner2_first_name },
+  ];
+  const seen = new Set();
+  const recipients = [];
+  for (const entry of entries) {
+    if (!entry.email) continue;
+    const key = entry.email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    recipients.push(entry);
+  }
+  return recipients;
+}
+
 async function sendRegistrationConfirmationEmail(env, tournament, registration, appOrigin) {
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_CONFIRMATION_EMAILS[language] || REGISTRATION_CONFIRMATION_EMAILS.de;
@@ -286,15 +332,17 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
   const ics = buildTournamentIcs(tournament, appOrigin);
 
-  await sendTransactionalEmail(env, {
-    to: registration.email,
-    subject: templates.subject(tournament.name),
-    text: templates.text(tournament.name, dateTimeLabel, tournament.location, link),
-    attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
-    logFallback: `Registration confirmation email for ${registration.email} (tournament ${tournament.id})`,
-    failureContext: `registration confirmation for registration ${registration.id}`,
-    allowLogFallback: true,
-  });
+  for (const recipient of buildTeamRecipients(registration)) {
+    await sendTransactionalEmail(env, {
+      to: recipient.email,
+      subject: templates.subject(tournament.name),
+      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link),
+      attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
+      logFallback: `Registration confirmation email for ${recipient.email} (tournament ${tournament.id})`,
+      failureContext: `registration confirmation for registration ${registration.id}`,
+      allowLogFallback: true,
+    });
+  }
 }
 
 async function sendDisplacementEmail(env, tournament, registration, wasCancelled, appOrigin) {
@@ -302,14 +350,35 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
   const templates = REGISTRATION_DISPLACED_EMAILS[language] || REGISTRATION_DISPLACED_EMAILS.de;
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
 
-  await sendTransactionalEmail(env, {
-    to: registration.email,
-    subject: templates.subject(tournament.name),
-    text: wasCancelled ? templates.textCancelled(tournament.name, link) : templates.textWaitlisted(tournament.name, link),
-    logFallback: `Displacement email for ${registration.email} (tournament ${tournament.id}, cancelled=${wasCancelled})`,
-    failureContext: `displacement notice for registration ${registration.id}`,
-    allowLogFallback: true,
-  });
+  for (const recipient of buildTeamRecipients(registration)) {
+    await sendTransactionalEmail(env, {
+      to: recipient.email,
+      subject: templates.subject(tournament.name),
+      text: wasCancelled
+        ? templates.textCancelled(recipient.firstName, tournament.name, link)
+        : templates.textWaitlisted(recipient.firstName, tournament.name, link),
+      logFallback: `Displacement email for ${recipient.email} (tournament ${tournament.id}, cancelled=${wasCancelled})`,
+      failureContext: `displacement notice for registration ${registration.id}`,
+      allowLogFallback: true,
+    });
+  }
+}
+
+async function sendCancellationEmail(env, tournament, registration, appOrigin) {
+  const language = await resolveEmailLanguage(env.DB, tournament, registration);
+  const templates = REGISTRATION_CANCELLED_EMAILS[language] || REGISTRATION_CANCELLED_EMAILS.de;
+  const link = `${appOrigin}/turniere/${tournament.id}/info`;
+
+  for (const recipient of buildTeamRecipients(registration)) {
+    await sendTransactionalEmail(env, {
+      to: recipient.email,
+      subject: templates.subject(tournament.name),
+      text: templates.text(recipient.firstName, tournament.name, link),
+      logFallback: `Cancellation email for ${recipient.email} (tournament ${tournament.id})`,
+      failureContext: `cancellation notice for registration ${registration.id}`,
+      allowLogFallback: true,
+    });
+  }
 }
 
 const TOURNAMENT_REMINDER_LEAD_DAYS = 2;
@@ -331,31 +400,40 @@ async function sendTournamentReminders(env) {
       .bind(tournament.id)
       .all();
 
-    for (const registration of registrations.results || []) {
-      const recipients = [...new Set(
-        [registration.email, registration.partner_email, registration.partner2_email].filter(Boolean).map((email) => email.toLowerCase()),
-      )];
-      const language = await resolveEmailLanguage(env.DB, tournament, registration);
-      const templates = TOURNAMENT_REMINDER_EMAILS[language] || TOURNAMENT_REMINDER_EMAILS.de;
-      const dateTimeLabel = formatTournamentDateTime(tournament, language);
-      const link = `${APP_ORIGIN}/turniere/${tournament.id}/info`;
-      const ics = buildTournamentIcs(tournament, APP_ORIGIN);
+    const notifiedEmails = new Set();
 
-      try {
-        await sendTransactionalEmail(env, {
-          to: recipients,
-          subject: templates.subject(tournament.name),
-          text: templates.text(tournament.name, dateTimeLabel, tournament.location, link),
-          attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
-          logFallback: `Tournament reminder email for registration ${registration.id} (tournament ${tournament.id})`,
-          failureContext: `tournament reminder for registration ${registration.id}`,
-          allowLogFallback: true,
-        });
-      } catch (error) {
-        console.error(`Failed to send tournament reminder for registration ${registration.id}`, error);
-        continue;
+    for (const registration of registrations.results || []) {
+      const allRecipients = buildTeamRecipients(registration);
+      const recipients = allRecipients.filter((recipient) => !notifiedEmails.has(recipient.email.toLowerCase()));
+
+      if (recipients.length > 0) {
+        const language = await resolveEmailLanguage(env.DB, tournament, registration);
+        const templates = TOURNAMENT_REMINDER_EMAILS[language] || TOURNAMENT_REMINDER_EMAILS.de;
+        const dateTimeLabel = formatTournamentDateTime(tournament, language);
+        const link = `${APP_ORIGIN}/turniere/${tournament.id}/info`;
+        const ics = buildTournamentIcs(tournament, APP_ORIGIN);
+
+        try {
+          for (const recipient of recipients) {
+            await sendTransactionalEmail(env, {
+              to: recipient.email,
+              subject: templates.subject(tournament.name),
+              text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link),
+              attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
+              logFallback: `Tournament reminder email for registration ${registration.id} (tournament ${tournament.id})`,
+              failureContext: `tournament reminder for registration ${registration.id}`,
+              allowLogFallback: true,
+            });
+          }
+        } catch (error) {
+          console.error(`Failed to send tournament reminder for registration ${registration.id}`, error);
+          continue;
+        }
+
+        recipients.forEach((recipient) => notifiedEmails.add(recipient.email.toLowerCase()));
       }
 
+      allRecipients.forEach((recipient) => notifiedEmails.add(recipient.email.toLowerCase()));
       await env.DB.prepare('UPDATE registrations SET reminder_sent_at = ? WHERE id = ?').bind(new Date().toISOString(), registration.id).run();
     }
   }
@@ -586,7 +664,13 @@ export default {
         if (!isOwnRegistration && !canManageTournament(registration, session.user)) {
           throw new HttpError(403, 'Zugriff verweigert');
         }
-        return await cancelRegistration(env.DB, registration.id);
+        const result = await cancelRegistration(env.DB, registration.id);
+        try {
+          await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name }, registration, APP_ORIGIN);
+        } catch (error) {
+          console.error(`Failed to send cancellation email for registration ${registration.id}`, error);
+        }
+        return result;
       }
 
       const tournamentMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)$/);
