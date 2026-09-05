@@ -2861,6 +2861,13 @@ function HomeTournaments({
 
 function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, language, embedded = false, currentUser = null }) {
   useEffect(() => {
+    if (!form.id && form.tournamentId !== tournament.id) {
+      setForm({ ...EMPTY_REGISTRATION_FORM, tournamentId: tournament.id });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournament.id]);
+
+  useEffect(() => {
     if (form.id || !currentUser) {
       return;
     }

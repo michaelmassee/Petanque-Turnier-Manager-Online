@@ -1944,7 +1944,10 @@ async function updateTournamentPresentation(request, db, existing, user) {
 async function syncPutTournamentMetadata(request, db, existing, user) {
   const body = await readJson(request);
   const legacyRegistrationTimes = body.registrationTimeSemantics !== 'tournament-local-v1';
-  const tournament = normalizeTournamentInput(body, { legacyRegistrationTimes });
+  const tournament = normalizeTournamentInput(body, {
+    legacyRegistrationTimes,
+    registrationTypeDefault: existing.registration_type || 'forme',
+  });
   const now = new Date().toISOString();
   const geo = await resolveTournamentGeolocation(tournament, existing, now);
   const timezone = resolveTournamentTimezone(geo, existing.timezone || 'Europe/Berlin');
@@ -2833,7 +2836,7 @@ function normalizeLanguage(value) {
   return LANGUAGES.includes(language) ? language : 'de';
 }
 
-export function normalizeTournamentInput(body, { legacyRegistrationTimes = false } = {}) {
+export function normalizeTournamentInput(body, { legacyRegistrationTimes = false, registrationTypeDefault = 'forme' } = {}) {
   const tournament = {
     name: text(body.name),
     date: text(body.date),
@@ -2842,7 +2845,7 @@ export function normalizeTournamentInput(body, { legacyRegistrationTimes = false
     description: nullableText(body.description),
     type: text(body.type || 'formule_x'),
     formation: text(body.formation || 'doublette'),
-    registrationType: text(body.registrationType || 'forme'),
+    registrationType: text(body.registrationType || registrationTypeDefault),
     status: text(body.status || 'draft'),
     maxRegistrations: nonNegativeInteger(body.maxRegistrations),
     registrationDeadline: normalizeRegistrationDateTime(body.registrationDeadline, { legacyUtc: legacyRegistrationTimes }),

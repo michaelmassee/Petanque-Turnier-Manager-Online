@@ -87,6 +87,36 @@ expectInvalid(
 // --- Old "supermelee" tournament-system value is gone ---
 expectInvalid('type=supermelee no longer a valid Turniersystem', { formation: 'tete', registrationType: 'forme', type: 'supermelee' }, 'Ungültiges Turniersystem');
 
+// --- Sync-Metadata-Writer (PTM Calc) darf registrationType nicht stillschweigend
+// auf "forme" zuruecksetzen, wenn das Desktop-Programm das Feld (noch) nicht sendet ---
+{
+  const syncedWithoutRegistrationType = normalizeTournamentInput(
+    { ...BASE_BODY, formation: 'triplette', type: 'rangliste' },
+    { registrationTypeDefault: 'supermelee' },
+  );
+  if (syncedWithoutRegistrationType.registrationType !== 'supermelee') {
+    failures += 1;
+    console.error(
+      `FAIL sync without registrationType keeps existing supermelee: got "${syncedWithoutRegistrationType.registrationType}"`,
+    );
+  } else {
+    console.log('ok   sync without registrationType keeps existing supermelee');
+  }
+
+  const syncedWithExplicitRegistrationType = normalizeTournamentInput(
+    { ...BASE_BODY, formation: 'doublette', registrationType: 'forme' },
+    { registrationTypeDefault: 'supermelee' },
+  );
+  if (syncedWithExplicitRegistrationType.registrationType !== 'forme') {
+    failures += 1;
+    console.error(
+      `FAIL sync with explicit registrationType overrides default: got "${syncedWithExplicitRegistrationType.registrationType}"`,
+    );
+  } else {
+    console.log('ok   sync with explicit registrationType overrides default');
+  }
+}
+
 // --- Partner fields: only expected for registrationType "forme" ---
 const partnerRegistration = { partnerFirstName: 'Max', partnerLastName: 'Muster' };
 const noPartnerRegistration = {};
