@@ -169,6 +169,8 @@ const EMPTY_REGISTRATION_FORM = {
 
 const REGISTER_SUCCESS = 'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.';
 const VERIFY_SUCCESS = 'E-Mail-Adresse wurde bestätigt. Du kannst dich jetzt anmelden.';
+const CANCEL_REGISTRATION_EXPLANATION = 'Möchtest du deine Turnieranmeldung wirklich stornieren?';
+const CANCEL_REGISTRATION_SUCCESS = 'Deine Anmeldung wurde storniert.';
 const PROFILE_UPDATE_SUCCESS = 'Deine Daten wurden gespeichert.';
 const PROFILE_EMAIL_CHANGE_PENDING =
   'Deine Daten wurden gespeichert. Bitte bestätige deine neue E-Mail-Adresse über den Link, den wir dir zugeschickt haben.';
@@ -351,6 +353,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const resetToken = params.get('reset_token');
     const verifyToken = params.get('verify_token');
+    const cancelToken = params.get('cancel_token');
     const authResult = params.get('auth');
     const authError = params.get('auth_error');
     let pendingAuthMessage = '';
@@ -361,6 +364,9 @@ export default function App() {
     } else if (verifyToken) {
       setAuthView('verify');
       setAuthForm((previous) => ({ ...previous, token: verifyToken }));
+    } else if (cancelToken) {
+      setAuthView('cancelRegistration');
+      setAuthForm((previous) => ({ ...previous, token: cancelToken }));
     } else if (authResult === 'google_success') {
       pendingAuthMessage = translateText('Mit Google angemeldet.', language);
       window.history.replaceState({}, '', window.location.pathname);
@@ -557,6 +563,25 @@ export default function App() {
       setAuthForm(EMPTY_AUTH_FORM);
       setAuthView('login');
       setMessage(translateText(VERIFY_SUCCESS, language));
+    } catch (requestError) {
+      setError(translateText(requestError.message, language));
+    }
+  }
+
+  async function handleCancelRegistration(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+
+    try {
+      await api('/api/registrations/cancel-by-token', {
+        method: 'POST',
+        body: JSON.stringify({ token: authForm.token }),
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+      setAuthForm(EMPTY_AUTH_FORM);
+      setAuthView('login');
+      setMessage(translateText(CANCEL_REGISTRATION_SUCCESS, language));
     } catch (requestError) {
       setError(translateText(requestError.message, language));
     }
@@ -1301,6 +1326,17 @@ export default function App() {
               />
             )}
 
+            {authView === 'cancelRegistration' && (
+              <CancelRegistrationForm
+                onSubmit={handleCancelRegistration}
+                onBack={() => {
+                  setAuthView('login');
+                  clearFeedback();
+                }}
+                language={language}
+              />
+            )}
+
             {authView === 'publicRegistration' && selectedTournament && (
               <PublicRegistrationPanel
                 tournament={selectedTournament}
@@ -1812,6 +1848,20 @@ function VerifyEmailForm({ form, setForm, onSubmit, onBack }) {
       <Button type="submit">E-Mail bestätigen</Button>
       <button className="link-button" type="button" onClick={onBack}>
         Zurück zur Anmeldung
+      </button>
+    </form>
+  );
+}
+
+function CancelRegistrationForm({ onSubmit, onBack }) {
+  return (
+    <form className="form" onSubmit={onSubmit}>
+      <p>{CANCEL_REGISTRATION_EXPLANATION}</p>
+      <Button type="submit" variant="danger">
+        Anmeldung stornieren
+      </Button>
+      <button className="link-button" type="button" onClick={onBack}>
+        Abbrechen
       </button>
     </form>
   );
@@ -3912,6 +3962,9 @@ function authTitle(needsSetup, authView) {
   if (authView === 'publicRegistration') {
     return 'Turnieranmeldung';
   }
+  if (authView === 'cancelRegistration') {
+    return 'Anmeldung stornieren';
+  }
   return 'Anmelden';
 }
 
@@ -3939,6 +3992,9 @@ function authSubtitle(needsSetup, authView) {
   }
   if (authView === 'publicRegistration') {
     return 'Melde dich für ein öffentliches Turnier an.';
+  }
+  if (authView === 'cancelRegistration') {
+    return 'Storniere deine Turnieranmeldung über den Link aus deiner E-Mail.';
   }
   return 'Melde dich mit deinem Benutzerkonto an.';
 }
@@ -4959,6 +5015,10 @@ const TRANSLATIONS = {
     '25 km': '25 km',
     '50 km': '50 km',
     '100 km': '100 km',
+    'Anmeldung stornieren': 'Inschrijving annuleren',
+    'Storniere deine Turnieranmeldung über den Link aus deiner E-Mail.': 'Annuleer je toernooi-inschrijving via de link uit je e-mail.',
+    'Möchtest du deine Turnieranmeldung wirklich stornieren?': 'Weet je zeker dat je je toernooi-inschrijving wilt annuleren?',
+    'Deine Anmeldung wurde storniert.': 'Je inschrijving is geannuleerd.',
   },
   en: {
     'Währung': 'Currency',
@@ -5421,6 +5481,10 @@ const TRANSLATIONS = {
     '25 km': '25 km',
     '50 km': '50 km',
     '100 km': '100 km',
+    'Anmeldung stornieren': 'Cancel registration',
+    'Storniere deine Turnieranmeldung über den Link aus deiner E-Mail.': 'Cancel your tournament registration using the link from your email.',
+    'Möchtest du deine Turnieranmeldung wirklich stornieren?': 'Are you sure you want to cancel your tournament registration?',
+    'Deine Anmeldung wurde storniert.': 'Your registration has been cancelled.',
   },
   es: {
     'Währung': 'Moneda',
@@ -5883,6 +5947,10 @@ const TRANSLATIONS = {
     '25 km': '25 km',
     '50 km': '50 km',
     '100 km': '100 km',
+    'Anmeldung stornieren': 'Cancelar inscripción',
+    'Storniere deine Turnieranmeldung über den Link aus deiner E-Mail.': 'Cancela tu inscripción al torneo mediante el enlace de tu correo.',
+    'Möchtest du deine Turnieranmeldung wirklich stornieren?': '¿Seguro que quieres cancelar tu inscripción al torneo?',
+    'Deine Anmeldung wurde storniert.': 'Tu inscripción ha sido cancelada.',
   },
   fr: {
     'Währung': 'Devise',
@@ -6345,6 +6413,10 @@ const TRANSLATIONS = {
     '25 km': '25 km',
     '50 km': '50 km',
     '100 km': '100 km',
+    'Anmeldung stornieren': "Annuler l'inscription",
+    'Storniere deine Turnieranmeldung über den Link aus deiner E-Mail.': "Annule ton inscription au tournoi via le lien de ton e-mail.",
+    'Möchtest du deine Turnieranmeldung wirklich stornieren?': 'Veux-tu vraiment annuler ton inscription au tournoi ?',
+    'Deine Anmeldung wurde storniert.': 'Ton inscription a été annulée.',
   },
 };
 

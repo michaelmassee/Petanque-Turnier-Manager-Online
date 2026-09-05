@@ -104,28 +104,28 @@ const EMAIL_CHANGE_EMAILS = {
 const REGISTRATION_CONFIRMATION_EMAILS = {
   de: {
     subject: (name) => `Anmeldebestätigung: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link) =>
-      `Hallo ${firstName},\n\nDeine Anmeldung für "${name}" ist eingegangen.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
+      `Hallo ${firstName},\n\nDeine Anmeldung für "${name}" ist eingegangen.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
   },
   nl: {
     subject: (name) => `Inschrijvingsbevestiging: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link) =>
-      `Hallo ${firstName},\n\nJe inschrijving voor "${name}" is ontvangen.\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}\n\nAlle informatie over het toernooi:\n${link}\n\nEen agenda-afspraak vind je als bijlage bij deze e-mail.`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
+      `Hallo ${firstName},\n\nJe inschrijving voor "${name}" is ontvangen.\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}\n\nAlle informatie over het toernooi:\n${link}\n\nEen agenda-afspraak vind je als bijlage bij deze e-mail.\n\nWil je je weer afmelden? Gebruik deze link:\n${cancelLink}`,
   },
   en: {
     subject: (name) => `Registration confirmation: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link) =>
-      `Hi ${firstName},\n\nYour registration for "${name}" has been received.\n\nDate: ${dateTimeLabel}\nLocation: ${location}\n\nAll tournament details:\n${link}\n\nA calendar event is attached to this email.`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
+      `Hi ${firstName},\n\nYour registration for "${name}" has been received.\n\nDate: ${dateTimeLabel}\nLocation: ${location}\n\nAll tournament details:\n${link}\n\nA calendar event is attached to this email.\n\nWant to withdraw again? Use this link:\n${cancelLink}`,
   },
   es: {
     subject: (name) => `Confirmación de inscripción: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link) =>
-      `Hola ${firstName},\n\nTu inscripción para "${name}" se ha recibido.\n\nFecha: ${dateTimeLabel}\nLugar: ${location}\n\nToda la información del torneo:\n${link}\n\nEncontrarás una cita de calendario adjunta a este correo.`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
+      `Hola ${firstName},\n\nTu inscripción para "${name}" se ha recibido.\n\nFecha: ${dateTimeLabel}\nLugar: ${location}\n\nToda la información del torneo:\n${link}\n\nEncontrarás una cita de calendario adjunta a este correo.\n\n¿Quieres darte de baja de nuevo? Usa este enlace:\n${cancelLink}`,
   },
   fr: {
     subject: (name) => `Confirmation d'inscription : ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link) =>
-      `Bonjour ${firstName},\n\nTon inscription pour « ${name} » a bien été reçue.\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nUn rendez-vous de calendrier est joint à cet e-mail.`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
+      `Bonjour ${firstName},\n\nTon inscription pour « ${name} » a bien été reçue.\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nUn rendez-vous de calendrier est joint à cet e-mail.\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
   },
 };
 
@@ -170,28 +170,28 @@ const REGISTRATION_DISPLACED_EMAILS = {
 const TOURNAMENT_REMINDER_EMAILS = {
   de: {
     subject: (name) => `Erinnerung: ${name} in 2 Tagen`,
-    text: (firstName, name, dateTimeLabel, location, link) =>
-      `Hallo ${firstName},\n\nNur noch 2 Tage bis "${name}"!\n\nTermin: ${dateTimeLabel}\nOrt: ${location}\n\nAlle Infos zum Turnier:\n${link}\n\nDen Kalendereintrag findest du im Anhang dieser E-Mail.`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
+      `Hallo ${firstName},\n\nNur noch 2 Tage bis "${name}"!\n\nTermin: ${dateTimeLabel}\nOrt: ${location}\n\nAlle Infos zum Turnier:\n${link}\n\nDen Kalendereintrag findest du im Anhang dieser E-Mail.\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
   },
   nl: {
     subject: (name) => `Herinnering: ${name} over 2 dagen`,
-    text: (firstName, name, dateTimeLabel, location, link) =>
-      `Hallo ${firstName},\n\nNog maar 2 dagen tot "${name}"!\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}\n\nAlle informatie over het toernooi:\n${link}\n\nDe agenda-afspraak vind je als bijlage bij deze e-mail.`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
+      `Hallo ${firstName},\n\nNog maar 2 dagen tot "${name}"!\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}\n\nAlle informatie over het toernooi:\n${link}\n\nDe agenda-afspraak vind je als bijlage bij deze e-mail.\n\nWil je je weer afmelden? Gebruik deze link:\n${cancelLink}`,
   },
   en: {
     subject: (name) => `Reminder: ${name} in 2 days`,
-    text: (firstName, name, dateTimeLabel, location, link) =>
-      `Hi ${firstName},\n\nOnly 2 days left until "${name}"!\n\nDate: ${dateTimeLabel}\nLocation: ${location}\n\nAll tournament details:\n${link}\n\nThe calendar event is attached to this email.`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
+      `Hi ${firstName},\n\nOnly 2 days left until "${name}"!\n\nDate: ${dateTimeLabel}\nLocation: ${location}\n\nAll tournament details:\n${link}\n\nThe calendar event is attached to this email.\n\nWant to withdraw again? Use this link:\n${cancelLink}`,
   },
   es: {
     subject: (name) => `Recordatorio: ${name} en 2 días`,
-    text: (firstName, name, dateTimeLabel, location, link) =>
-      `Hola ${firstName},\n\n¡Solo quedan 2 días para "${name}"!\n\nFecha: ${dateTimeLabel}\nLugar: ${location}\n\nToda la información del torneo:\n${link}\n\nEncontrarás la cita de calendario adjunta a este correo.`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
+      `Hola ${firstName},\n\n¡Solo quedan 2 días para "${name}"!\n\nFecha: ${dateTimeLabel}\nLugar: ${location}\n\nToda la información del torneo:\n${link}\n\nEncontrarás la cita de calendario adjunta a este correo.\n\n¿Quieres darte de baja de nuevo? Usa este enlace:\n${cancelLink}`,
   },
   fr: {
     subject: (name) => `Rappel : ${name} dans 2 jours`,
-    text: (firstName, name, dateTimeLabel, location, link) =>
-      `Bonjour ${firstName},\n\nPlus que 2 jours avant « ${name} » !\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nLe rendez-vous de calendrier est joint à cet e-mail.`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
+      `Bonjour ${firstName},\n\nPlus que 2 jours avant « ${name} » !\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nLe rendez-vous de calendrier est joint à cet e-mail.\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
   },
 };
 
@@ -325,18 +325,23 @@ function buildTeamRecipients(registration) {
   return recipients;
 }
 
+function buildCancelLink(appOrigin, token) {
+  return `${appOrigin}/?cancel_token=${encodeURIComponent(token)}`;
+}
+
 async function sendRegistrationConfirmationEmail(env, tournament, registration, appOrigin) {
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_CONFIRMATION_EMAILS[language] || REGISTRATION_CONFIRMATION_EMAILS.de;
   const dateTimeLabel = formatTournamentDateTime(tournament, language);
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
+  const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
   const ics = buildTournamentIcs(tournament, appOrigin);
 
   for (const recipient of buildTeamRecipients(registration)) {
     await sendTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link),
+      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link, cancelLink),
       attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
       logFallback: `Registration confirmation email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `registration confirmation for registration ${registration.id}`,
@@ -403,6 +408,11 @@ async function sendTournamentReminders(env) {
     const notifiedEmails = new Set();
 
     for (const registration of registrations.results || []) {
+      if (!registration.cancel_token) {
+        registration.cancel_token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+        await env.DB.prepare('UPDATE registrations SET cancel_token = ? WHERE id = ?').bind(registration.cancel_token, registration.id).run();
+      }
+
       const allRecipients = buildTeamRecipients(registration);
       const recipients = allRecipients.filter((recipient) => !notifiedEmails.has(recipient.email.toLowerCase()));
 
@@ -411,6 +421,7 @@ async function sendTournamentReminders(env) {
         const templates = TOURNAMENT_REMINDER_EMAILS[language] || TOURNAMENT_REMINDER_EMAILS.de;
         const dateTimeLabel = formatTournamentDateTime(tournament, language);
         const link = `${APP_ORIGIN}/turniere/${tournament.id}/info`;
+        const cancelLink = buildCancelLink(APP_ORIGIN, registration.cancel_token);
         const ics = buildTournamentIcs(tournament, APP_ORIGIN);
 
         try {
@@ -418,7 +429,7 @@ async function sendTournamentReminders(env) {
             await sendTransactionalEmail(env, {
               to: recipient.email,
               subject: templates.subject(tournament.name),
-              text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link),
+              text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link, cancelLink),
               attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
               logFallback: `Tournament reminder email for registration ${registration.id} (tournament ${tournament.id})`,
               failureContext: `tournament reminder for registration ${registration.id}`,
@@ -722,6 +733,10 @@ export default {
           throw new HttpError(403, 'Zugriff verweigert');
         }
         return await proxyTournamentImage(tournament, url.searchParams.get('field'));
+      }
+
+      if (url.pathname === '/api/registrations/cancel-by-token' && request.method === 'POST') {
+        return await cancelRegistrationByToken(request, env);
       }
 
       const registrationMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)$/);
@@ -2115,6 +2130,31 @@ async function cancelRegistration(db, id) {
   return json({ registration: toPublicRegistration(updated) });
 }
 
+async function cancelRegistrationByToken(request, env) {
+  const body = await readJson(request);
+  const token = typeof body.token === 'string' ? body.token.trim() : '';
+  if (!token) {
+    throw new HttpError(400, 'Ungültiger Abmelde-Link');
+  }
+
+  const registration = await getRegistrationByCancelToken(env.DB, token);
+  if (!registration) {
+    throw new HttpError(404, 'Anmeldung nicht gefunden');
+  }
+
+  if (registration.status === 'cancelled') {
+    return json({ registration: toPublicRegistration(registration) });
+  }
+
+  const result = await cancelRegistration(env.DB, registration.id);
+  try {
+    await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name }, registration, APP_ORIGIN);
+  } catch (error) {
+    console.error(`Failed to send cancellation email for registration ${registration.id}`, error);
+  }
+  return result;
+}
+
 // Reine, testbare Freischaltungslogik: prüft anhand des übergebenen `now`-Zeitpunkts
 // (Default: aktueller Server-Zeitpunkt), ob eine Anmeldung erlaubt ist. Nutzt
 // ausschließlich UTC-Instant-Vergleiche (registration_opens_at/-deadline sind bereits
@@ -2159,6 +2199,7 @@ async function createRegistration(request, env, tournament) {
   const { status, displace } = await initialRegistrationStatus(db, tournament, registration.isVip);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
+  const cancelToken = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
   const appOrigin = new URL(request.url).origin;
 
   await db
@@ -2167,8 +2208,8 @@ async function createRegistration(request, env, tournament) {
         id, tournament_id, first_name, last_name, email, club, license_nr,
         partner_first_name, partner_last_name, partner_email, partner_license_nr,
         partner2_first_name, partner2_last_name, partner2_email, partner2_license_nr,
-        team_name, seeding_position, status, is_vip, language, registered_at, confirmed_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        team_name, seeding_position, status, is_vip, language, registered_at, confirmed_at, created_at, updated_at, cancel_token
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -2195,6 +2236,7 @@ async function createRegistration(request, env, tournament) {
       status === 'confirmed' ? now : null,
       now,
       now,
+      cancelToken,
     )
     .run();
 
@@ -2668,6 +2710,18 @@ async function getRegistrationWithTournament(db, id) {
        WHERE registrations.id = ?`,
     )
     .bind(id)
+    .first();
+}
+
+async function getRegistrationByCancelToken(db, token) {
+  return db
+    .prepare(
+      `SELECT registrations.*, tournaments.name, tournaments.date, tournaments.start_time, tournaments.location
+       FROM registrations
+       JOIN tournaments ON tournaments.id = registrations.tournament_id
+       WHERE registrations.cancel_token = ?`,
+    )
+    .bind(token)
     .first();
 }
 
