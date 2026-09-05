@@ -205,6 +205,9 @@ export default function App() {
   const [users, setUsers] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [registrations, setRegistrations] = useState([]);
+  const tournamentFormRef = useRef(null);
+  const registrationFormRef = useRef(null);
+  const userFormRef = useRef(null);
   const [selectedTournamentId, setSelectedTournamentId] = useState('');
   const [userForm, setUserForm] = useState(EMPTY_USER_FORM);
   const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
@@ -909,6 +912,7 @@ export default function App() {
       tournamentLimit: user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT,
     });
     clearFeedback();
+    userFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function editTournament(tournament) {
@@ -949,6 +953,7 @@ export default function App() {
     });
     setActiveTab('tournaments');
     clearFeedback();
+    tournamentFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function editRegistration(registration) {
@@ -976,6 +981,7 @@ export default function App() {
     });
     setActiveTab('registrations');
     clearFeedback();
+    registrationFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function clearFeedback() {
@@ -1582,7 +1588,7 @@ export default function App() {
       {activeTab === 'tournaments' && (
         <section className={canManageTournaments ? 'admin-grid wide' : 'single-column'}>
           {canManageTournaments && (
-            <div className="panel">
+            <div className="panel" ref={tournamentFormRef}>
               <div className="section-title">
                 <h2>{tournamentMode === 'edit' ? 'Turnier bearbeiten' : 'Turnier anlegen'}</h2>
                 {tournamentMode === 'edit' && (
@@ -1612,7 +1618,7 @@ export default function App() {
 
       {activeTab === 'registrations' && (
         <section className="admin-grid wide">
-          <div className="panel">
+          <div className="panel" ref={registrationFormRef}>
             <div className="section-title">
               <h2>{registrationMode === 'edit' ? 'Anmeldung bearbeiten' : 'Anmeldung erfassen'}</h2>
               {registrationMode === 'edit' && (
@@ -1647,6 +1653,7 @@ export default function App() {
 
       {activeTab === 'users' && isAdmin && (
         <UserManagementPanel
+          formRef={userFormRef}
           users={filteredUsers}
           stats={userStats}
           totalUsers={users.length}
@@ -3563,6 +3570,7 @@ function ProfilePanel({ currentUser, form, setForm, onSubmit }) {
 }
 
 function UserManagementPanel({
+  formRef,
   users,
   stats,
   totalUsers,
@@ -3639,7 +3647,7 @@ function UserManagementPanel({
           </div>
         </div>
 
-        <div className="panel user-editor-panel">
+        <div className="panel user-editor-panel" ref={formRef}>
           <div className="section-title">
             <h2>{userMode === 'edit' ? 'Benutzer bearbeiten' : 'Benutzer anlegen'}</h2>
             {userMode === 'edit' && (
