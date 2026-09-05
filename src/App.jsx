@@ -573,6 +573,9 @@ export default function App() {
 
   async function handleCancelRegistration(event) {
     event.preventDefault();
+    if (!window.confirm(translateText(CANCEL_REGISTRATION_EXPLANATION, language))) {
+      return;
+    }
     setError('');
     setMessage('');
 
@@ -1109,6 +1112,38 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
       />
+    );
+  }
+
+  if (currentUser && authView === 'cancelRegistration') {
+    return (
+      <main className="app-shell">
+        <StandalonePageHeader
+          heading={authTitle(needsSetup, authView)}
+          language={language}
+          setLanguage={setLanguage}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          navigate={navigate}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+        />
+        <section className="single-column">
+          <div className="panel">
+            <p className="subtitle">{authSubtitle(needsSetup, authView)}</p>
+            <CancelRegistrationForm
+              onSubmit={handleCancelRegistration}
+              onBack={() => {
+                window.history.replaceState({}, '', window.location.pathname);
+                setAuthForm(EMPTY_AUTH_FORM);
+                setAuthView('home');
+                clearFeedback();
+              }}
+            />
+            <Feedback message={message} error={error} />
+          </div>
+        </section>
+      </main>
     );
   }
 
