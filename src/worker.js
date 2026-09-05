@@ -101,7 +101,7 @@ const EMAIL_CHANGE_EMAILS = {
   },
 };
 
-const REGISTRATION_CONFIRMATION_EMAILS = {
+export const REGISTRATION_CONFIRMATION_EMAILS = {
   de: {
     subject: (name) => `Anmeldebestätigung: ${name}`,
     text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
@@ -129,45 +129,45 @@ const REGISTRATION_CONFIRMATION_EMAILS = {
   },
 };
 
-const REGISTRATION_DISPLACED_EMAILS = {
+export const REGISTRATION_DISPLACED_EMAILS = {
   de: {
     subject: (name) => `Änderung deiner Anmeldung: ${name}`,
-    textWaitlisted: (firstName, name, link) =>
-      `Hallo ${firstName},\n\nFür "${name}" hat sich ein VIP-Teilnehmer angemeldet, für den kein regulärer Platz mehr frei war. Deine Anmeldung wurde daher auf die Warteliste verschoben.\n\nAlle Infos zum Turnier:\n${link}`,
+    textWaitlisted: (firstName, name, link, cancelLink) =>
+      `Hallo ${firstName},\n\nFür "${name}" hat sich ein VIP-Teilnehmer angemeldet, für den kein regulärer Platz mehr frei war. Deine Anmeldung wurde daher auf die Warteliste verschoben.\n\nAlle Infos zum Turnier:\n${link}\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
     textCancelled: (firstName, name, link) =>
       `Hallo ${firstName},\n\nFür "${name}" hat sich ein VIP-Teilnehmer angemeldet, für den kein regulärer Platz mehr frei war. Da für dieses Turnier keine Warteliste aktiviert ist, wurde deine Anmeldung leider storniert.\n\nAlle Infos zum Turnier:\n${link}`,
   },
   nl: {
     subject: (name) => `Wijziging van je inschrijving: ${name}`,
-    textWaitlisted: (firstName, name, link) =>
-      `Hallo ${firstName},\n\nVoor "${name}" heeft een VIP-deelnemer zich ingeschreven, waarvoor geen reguliere plaats meer vrij was. Je inschrijving is daarom op de wachtlijst geplaatst.\n\nAlle informatie over het toernooi:\n${link}`,
+    textWaitlisted: (firstName, name, link, cancelLink) =>
+      `Hallo ${firstName},\n\nVoor "${name}" heeft een VIP-deelnemer zich ingeschreven, waarvoor geen reguliere plaats meer vrij was. Je inschrijving is daarom op de wachtlijst geplaatst.\n\nAlle informatie over het toernooi:\n${link}\n\nWil je je weer afmelden? Gebruik deze link:\n${cancelLink}`,
     textCancelled: (firstName, name, link) =>
       `Hallo ${firstName},\n\nVoor "${name}" heeft een VIP-deelnemer zich ingeschreven, waarvoor geen reguliere plaats meer vrij was. Omdat er voor dit toernooi geen wachtlijst is geactiveerd, is je inschrijving helaas geannuleerd.\n\nAlle informatie over het toernooi:\n${link}`,
   },
   en: {
     subject: (name) => `Change to your registration: ${name}`,
-    textWaitlisted: (firstName, name, link) =>
-      `Hi ${firstName},\n\nA VIP participant has registered for "${name}" and no regular spot was left. Your registration has therefore been moved to the waiting list.\n\nAll tournament details:\n${link}`,
+    textWaitlisted: (firstName, name, link, cancelLink) =>
+      `Hi ${firstName},\n\nA VIP participant has registered for "${name}" and no regular spot was left. Your registration has therefore been moved to the waiting list.\n\nAll tournament details:\n${link}\n\nWant to withdraw again? Use this link:\n${cancelLink}`,
     textCancelled: (firstName, name, link) =>
       `Hi ${firstName},\n\nA VIP participant has registered for "${name}" and no regular spot was left. Since no waiting list is enabled for this tournament, your registration has unfortunately been cancelled.\n\nAll tournament details:\n${link}`,
   },
   es: {
     subject: (name) => `Cambio en tu inscripción: ${name}`,
-    textWaitlisted: (firstName, name, link) =>
-      `Hola ${firstName},\n\nUn participante VIP se ha inscrito para "${name}" y no quedaba ninguna plaza regular. Por ello, tu inscripción se ha trasladado a la lista de espera.\n\nToda la información del torneo:\n${link}`,
+    textWaitlisted: (firstName, name, link, cancelLink) =>
+      `Hola ${firstName},\n\nUn participante VIP se ha inscrito para "${name}" y no quedaba ninguna plaza regular. Por ello, tu inscripción se ha trasladado a la lista de espera.\n\nToda la información del torneo:\n${link}\n\n¿Quieres darte de baja de nuevo? Usa este enlace:\n${cancelLink}`,
     textCancelled: (firstName, name, link) =>
       `Hola ${firstName},\n\nUn participante VIP se ha inscrito para "${name}" y no quedaba ninguna plaza regular. Como no hay lista de espera activada para este torneo, lamentablemente tu inscripción ha sido cancelada.\n\nToda la información del torneo:\n${link}`,
   },
   fr: {
     subject: (name) => `Modification de ton inscription : ${name}`,
-    textWaitlisted: (firstName, name, link) =>
-      `Bonjour ${firstName},\n\nUn participant VIP s'est inscrit pour « ${name} » et il ne restait plus de place normale. Ton inscription a donc été placée sur liste d'attente.\n\nToutes les informations sur le tournoi :\n${link}`,
+    textWaitlisted: (firstName, name, link, cancelLink) =>
+      `Bonjour ${firstName},\n\nUn participant VIP s'est inscrit pour « ${name} » et il ne restait plus de place normale. Ton inscription a donc été placée sur liste d'attente.\n\nToutes les informations sur le tournoi :\n${link}\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
     textCancelled: (firstName, name, link) =>
       `Bonjour ${firstName},\n\nUn participant VIP s'est inscrit pour « ${name} » et il ne restait plus de place normale. Comme aucune liste d'attente n'est activée pour ce tournoi, ton inscription a malheureusement été annulée.\n\nToutes les informations sur le tournoi :\n${link}`,
   },
 };
 
-const TOURNAMENT_REMINDER_EMAILS = {
+export const TOURNAMENT_REMINDER_EMAILS = {
   de: {
     subject: (name) => `Erinnerung: ${name} in 2 Tagen`,
     text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
@@ -325,7 +325,7 @@ function buildTeamRecipients(registration) {
   return recipients;
 }
 
-function buildCancelLink(appOrigin, token) {
+export function buildCancelLink(appOrigin, token) {
   return `${appOrigin}/?cancel_token=${encodeURIComponent(token)}`;
 }
 
@@ -354,6 +354,7 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_DISPLACED_EMAILS[language] || REGISTRATION_DISPLACED_EMAILS.de;
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
+  const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
 
   for (const recipient of buildTeamRecipients(registration)) {
     await sendTransactionalEmail(env, {
@@ -361,7 +362,7 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
       subject: templates.subject(tournament.name),
       text: wasCancelled
         ? templates.textCancelled(recipient.firstName, tournament.name, link)
-        : templates.textWaitlisted(recipient.firstName, tournament.name, link),
+        : templates.textWaitlisted(recipient.firstName, tournament.name, link, cancelLink),
       logFallback: `Displacement email for ${recipient.email} (tournament ${tournament.id}, cancelled=${wasCancelled})`,
       failureContext: `displacement notice for registration ${registration.id}`,
       allowLogFallback: true,
