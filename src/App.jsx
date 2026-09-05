@@ -1898,7 +1898,6 @@ function VerifyEmailForm({ form, setForm, onSubmit, onBack }) {
 function CancelRegistrationForm({ onSubmit, onBack }) {
   return (
     <form className="form" onSubmit={onSubmit}>
-      <p>{CANCEL_REGISTRATION_EXPLANATION}</p>
       <Button type="submit" variant="danger">
         Anmeldung stornieren
       </Button>
