@@ -25,7 +25,7 @@ for (const language of LANGUAGES) {
 }
 
 // Unknown/missing language falls back to German rather than dropping the footer.
-expectContains('Footer-Fallback auf Deutsch bei unbekannter Sprache', appendEmailFooter('x', 'xx'), 'Finde dein nächstes Pétanque-Turnier');
+expectContains('Footer-Fallback auf Deutsch bei unbekannter Sprache', appendEmailFooter('x', 'xx'), 'Finde dein nächstes Turnier');
 
 if (failures > 0) process.exit(1);
 console.log('\nemail footer check passed.');

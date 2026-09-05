@@ -226,11 +226,11 @@ const REGISTRATION_CANCELLED_EMAILS = {
 const DESKTOP_APP_URL = 'https://michaelmassee.github.io/Petanque-Turnier-Manager/';
 
 const EMAIL_FOOTERS = {
-  de: `Pétanque Turnier Manager Online\n\nFinde dein nächstes Pétanque-Turnier\nSuche nach Ort, Verein oder Turniersystem und melde dich direkt online an.\n\nund die Desktop App\n\n${DESKTOP_APP_URL}`,
-  nl: `Pétanque Turnier Manager Online\n\nVind je volgende petanquetoernooi\nZoek op locatie, club of toernooisysteem en schrijf je direct online in.\n\nEn de desktop-app\n\n${DESKTOP_APP_URL}`,
-  en: `Pétanque Turnier Manager Online\n\nFind your next pétanque tournament\nSearch by location, club or tournament system and register directly online.\n\nAnd the desktop app\n\n${DESKTOP_APP_URL}`,
-  es: `Pétanque Turnier Manager Online\n\nEncuentra tu próximo torneo de petanca\nBusca por lugar, club o sistema de torneo e inscríbete directamente en línea.\n\nY la aplicación de escritorio\n\n${DESKTOP_APP_URL}`,
-  fr: `Pétanque Turnier Manager Online\n\nTrouve ton prochain tournoi de pétanque\nRecherche par lieu, club ou système de tournoi et inscris-toi directement en ligne.\n\nEt l'application de bureau\n\n${DESKTOP_APP_URL}`,
+  de: `Pétanque Turnier Manager Online\nFinde dein nächstes Turnier – nach Ort, Verein oder Turniersystem – und melde dich direkt online an.\n\nLieber am Rechner? Die Desktop-App gibt's hier:\n${DESKTOP_APP_URL}`,
+  nl: `Pétanque Turnier Manager Online\nVind je volgende toernooi – op locatie, club of toernooisysteem – en schrijf je direct online in.\n\nLiever op de computer? De desktop-app vind je hier:\n${DESKTOP_APP_URL}`,
+  en: `Pétanque Turnier Manager Online\nFind your next tournament – by location, club or tournament system – and register directly online.\n\nPrefer your desktop? Get the app here:\n${DESKTOP_APP_URL}`,
+  es: `Pétanque Turnier Manager Online\nEncuentra tu próximo torneo – por lugar, club o sistema de torneo – e inscríbete directamente en línea.\n\n¿Prefieres el escritorio? Aquí tienes la aplicación:\n${DESKTOP_APP_URL}`,
+  fr: `Pétanque Turnier Manager Online\nTrouve ton prochain tournoi – par lieu, club ou système de tournoi – et inscris-toi directement en ligne.\n\nTu préfères l'ordinateur ? Voici l'application de bureau :\n${DESKTOP_APP_URL}`,
 };
 
 export function appendEmailFooter(text, language) {
