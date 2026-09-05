@@ -226,11 +226,11 @@ const REGISTRATION_CANCELLED_EMAILS = {
 const DESKTOP_APP_URL = 'https://michaelmassee.github.io/Petanque-Turnier-Manager/';
 
 const EMAIL_FOOTERS = {
-  de: `Pétanque Turnier Manager Online\nFinde dein nächstes Turnier – nach Ort, Verein oder Turniersystem – und melde dich direkt online an.\n\nLieber am Rechner? Die Desktop-App gibt's hier:\n${DESKTOP_APP_URL}`,
-  nl: `Pétanque Turnier Manager Online\nVind je volgende toernooi – op locatie, club of toernooisysteem – en schrijf je direct online in.\n\nLiever op de computer? De desktop-app vind je hier:\n${DESKTOP_APP_URL}`,
-  en: `Pétanque Turnier Manager Online\nFind your next tournament – by location, club or tournament system – and register directly online.\n\nPrefer your desktop? Get the app here:\n${DESKTOP_APP_URL}`,
-  es: `Pétanque Turnier Manager Online\nEncuentra tu próximo torneo – por lugar, club o sistema de torneo – e inscríbete directamente en línea.\n\n¿Prefieres el escritorio? Aquí tienes la aplicación:\n${DESKTOP_APP_URL}`,
-  fr: `Pétanque Turnier Manager Online\nTrouve ton prochain tournoi – par lieu, club ou système de tournoi – et inscris-toi directement en ligne.\n\nTu préfères l'ordinateur ? Voici l'application de bureau :\n${DESKTOP_APP_URL}`,
+  de: `Pétanque Turnier Manager Online\nFinde dein nächstes Turnier – nach Ort, Verein oder Turniersystem – und melde dich direkt online an.\n\nFür Turnierleiter: Der Pétanque Turnier Manager ist die Profi-Software zur Turnierverwaltung:\n${DESKTOP_APP_URL}`,
+  nl: `Pétanque Turnier Manager Online\nVind je volgende toernooi – op locatie, club of toernooisysteem – en schrijf je direct online in.\n\nVoor toernooileiders: Pétanque Turnier Manager is de professionele software voor toernooibeheer:\n${DESKTOP_APP_URL}`,
+  en: `Pétanque Turnier Manager Online\nFind your next tournament – by location, club or tournament system – and register directly online.\n\nFor tournament directors: Pétanque Turnier Manager is the professional software for running tournaments:\n${DESKTOP_APP_URL}`,
+  es: `Pétanque Turnier Manager Online\nEncuentra tu próximo torneo – por lugar, club o sistema de torneo – e inscríbete directamente en línea.\n\nPara directores de torneo: Pétanque Turnier Manager es el software profesional para gestionar torneos:\n${DESKTOP_APP_URL}`,
+  fr: `Pétanque Turnier Manager Online\nTrouve ton prochain tournoi – par lieu, club ou système de tournoi – et inscris-toi directement en ligne.\n\nPour les organisateurs de tournois : Pétanque Turnier Manager est le logiciel professionnel de gestion de tournois :\n${DESKTOP_APP_URL}`,
 };
 
 export function appendEmailFooter(text, language) {
