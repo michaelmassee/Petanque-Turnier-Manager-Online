@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .wrangler/
+.vitest/
 .idea/
 .env
 .env.*

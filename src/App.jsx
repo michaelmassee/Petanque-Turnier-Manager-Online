@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { CURRENCY_CODES, currencyDecimals } from './currencies.js';
 
 const ROLES = [
@@ -77,7 +77,7 @@ const RADIUS_OPTIONS = [
 
 const DEFAULT_TOURNAMENT_LIMIT = 5;
 
-const EMPTY_USER_FORM = {
+export const EMPTY_USER_FORM = {
   id: '',
   firstName: '',
   lastName: '',
@@ -109,7 +109,7 @@ const EMPTY_AUTH_FORM = {
   token: '',
 };
 
-const EMPTY_TOURNAMENT_FORM = {
+export const EMPTY_TOURNAMENT_FORM = {
   id: '',
   managerId: '',
   name: '',
@@ -144,7 +144,7 @@ const EMPTY_TOURNAMENT_FORM = {
   flyerUrl: '',
 };
 
-const EMPTY_REGISTRATION_FORM = {
+export const EMPTY_REGISTRATION_FORM = {
   id: '',
   tournamentId: '',
   firstName: '',
@@ -175,6 +175,56 @@ const PROFILE_UPDATE_SUCCESS = 'Deine Daten wurden gespeichert.';
 const PROFILE_EMAIL_CHANGE_PENDING =
   'Deine Daten wurden gespeichert. Bitte bestätige deine neue E-Mail-Adresse über den Link, den wir dir zugeschickt haben.';
 
+export function filterTournaments(tournaments, query, statusFilter) {
+  const normalizedQuery = (query || '').trim().toLowerCase();
+  return tournaments.filter((tournament) => {
+    if (statusFilter && tournament.status !== statusFilter) {
+      return false;
+    }
+    if (!normalizedQuery) {
+      return true;
+    }
+    return [tournament.name, tournament.location].some((value) => (value || '').toLowerCase().includes(normalizedQuery));
+  });
+}
+
+export function filterRegistrations(registrations, query, statusFilter) {
+  const normalizedQuery = (query || '').trim().toLowerCase();
+  return registrations.filter((registration) => {
+    if (statusFilter && registration.status !== statusFilter) {
+      return false;
+    }
+    if (!normalizedQuery) {
+      return true;
+    }
+    return [registration.firstName, registration.lastName, registration.teamName].some((value) =>
+      (value || '').toLowerCase().includes(normalizedQuery),
+    );
+  });
+}
+
+export function filterUsers(users, query, roleFilter, statusFilter) {
+  const normalizedQuery = (query || '').trim().toLowerCase();
+  return users.filter((user) => {
+    if (normalizedQuery && ![user.firstName, user.lastName, user.email].some((value) => (value || '').toLowerCase().includes(normalizedQuery))) {
+      return false;
+    }
+    if (roleFilter && user.role !== roleFilter) {
+      return false;
+    }
+    if (statusFilter === 'verified' && !user.emailVerifiedAt) {
+      return false;
+    }
+    if (statusFilter === 'unverified' && user.emailVerifiedAt) {
+      return false;
+    }
+    if (statusFilter === 'password_change_required' && !user.passwordChangeRequired) {
+      return false;
+    }
+    return true;
+  });
+}
+
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState(() => localStorage.getItem('ptm_language') || 'de');
@@ -200,14 +250,18 @@ export default function App() {
   const [userQuery, setUserQuery] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState('');
+  const [tournamentQuery, setTournamentQuery] = useState('');
+  const [tournamentStatusFilter, setTournamentStatusFilter] = useState('');
+  const [registrationQuery, setRegistrationQuery] = useState('');
+  const [registrationStatusFilter, setRegistrationStatusFilter] = useState('');
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [tournamentDialogOpen, setTournamentDialogOpen] = useState(false);
+  const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
   const [path, navigate] = usePath();
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [registrations, setRegistrations] = useState([]);
-  const tournamentFormRef = useRef(null);
-  const registrationFormRef = useRef(null);
-  const userFormRef = useRef(null);
   const [selectedTournamentId, setSelectedTournamentId] = useState('');
   const [userForm, setUserForm] = useState(EMPTY_USER_FORM);
   const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
@@ -308,27 +362,20 @@ export default function App() {
     [tournaments],
   );
 
-  const filteredUsers = useMemo(() => {
-    const query = userQuery.trim().toLowerCase();
-    return users.filter((user) => {
-      if (query && ![user.firstName, user.lastName, user.email].some((value) => (value || '').toLowerCase().includes(query))) {
-        return false;
-      }
-      if (userRoleFilter && user.role !== userRoleFilter) {
-        return false;
-      }
-      if (userStatusFilter === 'verified' && !user.emailVerifiedAt) {
-        return false;
-      }
-      if (userStatusFilter === 'unverified' && user.emailVerifiedAt) {
-        return false;
-      }
-      if (userStatusFilter === 'password_change_required' && !user.passwordChangeRequired) {
-        return false;
-      }
-      return true;
-    });
-  }, [users, userQuery, userRoleFilter, userStatusFilter]);
+  const filteredTournaments = useMemo(
+    () => filterTournaments(manageableTournaments, tournamentQuery, tournamentStatusFilter),
+    [manageableTournaments, tournamentQuery, tournamentStatusFilter],
+  );
+
+  const filteredRegistrations = useMemo(
+    () => filterRegistrations(registrations, registrationQuery, registrationStatusFilter),
+    [registrations, registrationQuery, registrationStatusFilter],
+  );
+
+  const filteredUsers = useMemo(
+    () => filterUsers(users, userQuery, userRoleFilter, userStatusFilter),
+    [users, userQuery, userRoleFilter, userStatusFilter],
+  );
 
   const userStats = useMemo(
     () => ({
@@ -725,6 +772,9 @@ export default function App() {
     setUserMode('create');
     setTournamentMode('create');
     setRegistrationMode('create');
+    setUserDialogOpen(false);
+    setTournamentDialogOpen(false);
+    setRegistrationDialogOpen(false);
     setAuthView('home');
     setActiveTab('home');
     setHomeOnlyMine(false);
@@ -765,6 +815,7 @@ export default function App() {
 
       setUserForm(EMPTY_USER_FORM);
       setUserMode('create');
+      setUserDialogOpen(false);
       await loadUsers();
     } catch (requestError) {
       setError(translateText(requestError.message, language));
@@ -823,6 +874,7 @@ export default function App() {
       setMessage(tournamentMode === 'edit' ? 'Turnier wurde aktualisiert.' : 'Turnier wurde angelegt.');
       setTournamentForm(EMPTY_TOURNAMENT_FORM);
       setTournamentMode('create');
+      setTournamentDialogOpen(false);
       await loadTournaments();
       setSelectedTournamentId(data.tournament.id);
     } catch (requestError) {
@@ -872,6 +924,7 @@ export default function App() {
 
       setRegistrationForm(EMPTY_REGISTRATION_FORM);
       setRegistrationMode('create');
+      setRegistrationDialogOpen(false);
       setAuthView('home');
       await loadTournaments();
       if (selectedTournament?.canManage) {
@@ -901,6 +954,13 @@ export default function App() {
     }
   }
 
+  function newUser() {
+    setUserMode('create');
+    setUserForm(EMPTY_USER_FORM);
+    clearFeedback();
+    setUserDialogOpen(true);
+  }
+
   function editUser(user) {
     setUserMode('edit');
     setUserForm({
@@ -915,7 +975,21 @@ export default function App() {
       tournamentLimit: user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT,
     });
     clearFeedback();
-    userFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setUserDialogOpen(true);
+  }
+
+  function closeUserDialog() {
+    setUserDialogOpen(false);
+    setUserMode('create');
+    setUserForm(EMPTY_USER_FORM);
+  }
+
+  function newTournament() {
+    setTournamentMode('create');
+    setTournamentForm(EMPTY_TOURNAMENT_FORM);
+    setActiveTab('tournaments');
+    clearFeedback();
+    setTournamentDialogOpen(true);
   }
 
   function editTournament(tournament) {
@@ -956,7 +1030,21 @@ export default function App() {
     });
     setActiveTab('tournaments');
     clearFeedback();
-    tournamentFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTournamentDialogOpen(true);
+  }
+
+  function closeTournamentDialog() {
+    setTournamentDialogOpen(false);
+    setTournamentMode('create');
+    setTournamentForm(EMPTY_TOURNAMENT_FORM);
+  }
+
+  function newRegistration() {
+    setRegistrationMode('create');
+    setRegistrationForm({ ...EMPTY_REGISTRATION_FORM, tournamentId: selectedTournamentId });
+    setActiveTab('registrations');
+    clearFeedback();
+    setRegistrationDialogOpen(true);
   }
 
   function editRegistration(registration) {
@@ -984,7 +1072,13 @@ export default function App() {
     });
     setActiveTab('registrations');
     clearFeedback();
-    registrationFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setRegistrationDialogOpen(true);
+  }
+
+  function closeRegistrationDialog() {
+    setRegistrationDialogOpen(false);
+    setRegistrationMode('create');
+    setRegistrationForm(EMPTY_REGISTRATION_FORM);
   }
 
   function clearFeedback() {
@@ -1621,74 +1715,91 @@ export default function App() {
       )}
 
       {activeTab === 'tournaments' && (
-        <section className={canManageTournaments ? 'admin-grid wide' : 'single-column'}>
-          {canManageTournaments && (
-            <div className="panel" ref={tournamentFormRef}>
-              <div className="section-title">
-                <h2>{tournamentMode === 'edit' ? 'Turnier bearbeiten' : 'Turnier anlegen'}</h2>
-                {tournamentMode === 'edit' && (
-                  <Button variant="secondary" onClick={() => {
-                    setTournamentMode('create');
-                    setTournamentForm(EMPTY_TOURNAMENT_FORM);
-                  }}>
-                    Neu
-                  </Button>
-                )}
-              </div>
-              <TournamentForm form={tournamentForm} setForm={setTournamentForm} onSubmit={handleTournamentSubmit} mode={tournamentMode} isAdmin={isAdmin} users={users} language={language} />
-            </div>
-          )}
-
+        <section className="single-column">
           <TournamentList
-            tournaments={manageableTournaments}
+            tournaments={filteredTournaments}
+            totalTournaments={manageableTournaments.length}
             selectedId={selectedTournamentId}
             onSelect={setSelectedTournamentId}
             onEdit={editTournament}
             onDelete={handleDeleteTournament}
             isAdmin={isAdmin}
             language={language}
+            onCreate={newTournament}
+            query={tournamentQuery}
+            onQueryChange={setTournamentQuery}
+            statusFilter={tournamentStatusFilter}
+            onStatusFilterChange={setTournamentStatusFilter}
+            onResetFilters={() => {
+              setTournamentQuery('');
+              setTournamentStatusFilter('');
+            }}
           />
+
+          {canManageTournaments && (
+            <EditDialog
+              open={tournamentDialogOpen}
+              wide
+              title={tournamentMode === 'edit' ? 'Turnier bearbeiten' : 'Turnier anlegen'}
+              onClose={closeTournamentDialog}
+            >
+              <TournamentForm
+                form={tournamentForm}
+                setForm={setTournamentForm}
+                onSubmit={handleTournamentSubmit}
+                onCancel={closeTournamentDialog}
+                mode={tournamentMode}
+                isAdmin={isAdmin}
+                users={users}
+                language={language}
+              />
+            </EditDialog>
+          )}
         </section>
       )}
 
       {activeTab === 'registrations' && (
-        <section className="admin-grid wide">
-          <div className="panel" ref={registrationFormRef}>
-            <div className="section-title">
-              <h2>{registrationMode === 'edit' ? 'Anmeldung bearbeiten' : 'Anmeldung erfassen'}</h2>
-              {registrationMode === 'edit' && (
-                <Button variant="secondary" onClick={() => {
-                  setRegistrationMode('create');
-                  setRegistrationForm(EMPTY_REGISTRATION_FORM);
-                }}>
-                  Neu
-                </Button>
-              )}
-            </div>
+        <section className="single-column">
+          <RegistrationsPanel
+            tournament={selectedTournament}
+            registrations={registrations}
+            filteredRegistrations={filteredRegistrations}
+            onTournamentChange={setSelectedTournamentId}
+            tournaments={manageableTournaments}
+            onCreate={newRegistration}
+            query={registrationQuery}
+            onQueryChange={setRegistrationQuery}
+            statusFilter={registrationStatusFilter}
+            onStatusFilterChange={setRegistrationStatusFilter}
+            onResetFilters={() => {
+              setRegistrationQuery('');
+              setRegistrationStatusFilter('');
+            }}
+            onEdit={editRegistration}
+            onDelete={handleDeleteRegistration}
+          />
+
+          <EditDialog
+            open={registrationDialogOpen}
+            wide
+            title={registrationMode === 'edit' ? 'Anmeldung bearbeiten' : 'Anmeldung erfassen'}
+            onClose={closeRegistrationDialog}
+          >
             <RegistrationForm
               form={registrationForm}
               setForm={setRegistrationForm}
               onSubmit={handleRegistrationSubmit}
+              onCancel={closeRegistrationDialog}
               tournaments={manageableTournaments}
               selectedTournamentId={selectedTournamentId}
               manageMode={Boolean(selectedTournament?.canManage)}
             />
-          </div>
-
-          <RegistrationsPanel
-            tournament={selectedTournament}
-            registrations={registrations}
-            onTournamentChange={setSelectedTournamentId}
-            tournaments={manageableTournaments}
-            onEdit={editRegistration}
-            onDelete={handleDeleteRegistration}
-          />
+          </EditDialog>
         </section>
       )}
 
       {activeTab === 'users' && isAdmin && (
         <UserManagementPanel
-          formRef={userFormRef}
           users={filteredUsers}
           stats={userStats}
           totalUsers={users.length}
@@ -1696,13 +1807,15 @@ export default function App() {
           currentUser={currentUser}
           userForm={userForm}
           setUserForm={setUserForm}
-          setUserMode={setUserMode}
           userQuery={userQuery}
           setUserQuery={setUserQuery}
           userRoleFilter={userRoleFilter}
           setUserRoleFilter={setUserRoleFilter}
           userStatusFilter={userStatusFilter}
           setUserStatusFilter={setUserStatusFilter}
+          dialogOpen={userDialogOpen}
+          onCloseDialog={closeUserDialog}
+          onCreateUser={newUser}
           onSubmitUser={handleUserSubmit}
           onEditUser={editUser}
           onDeleteUser={handleDeleteUser}
@@ -2129,19 +2242,39 @@ function SearchMenuControl({
   );
 }
 
-function AuthModal({ title, subtitle, message, error, onClose, children }) {
+export function EditDialog({ open = true, title, subtitle, message, error, onClose, wide, nested, children }) {
+  const titleId = useId();
+
+  if (!open) {
+    return null;
+  }
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={(event) => event.stopPropagation()}>
+    <div className={`modal-backdrop${nested ? ' modal-backdrop--nested' : ''}`} onClick={onClose}>
+      <div
+        className={`modal-panel${wide ? ' modal-panel--wide' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(event) => event.stopPropagation()}
+      >
         <button className="modal-close" type="button" onClick={onClose} aria-label="Schließen">
           ×
         </button>
-        <h2 id="modal-title">{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         {subtitle && <p className="subtitle">{subtitle}</p>}
         <Feedback message={message} error={error} />
         {children}
       </div>
     </div>
+  );
+}
+
+function AuthModal({ title, subtitle, message, error, onClose, children }) {
+  return (
+    <EditDialog title={title} subtitle={subtitle} message={message} error={error} onClose={onClose}>
+      {children}
+    </EditDialog>
   );
 }
 
@@ -3031,19 +3164,8 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
 
 function FormationHelpDialog({ onClose }) {
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal-panel modal-panel--wide"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="formation-help-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <button className="modal-close" type="button" onClick={onClose} aria-label="Schließen">
-          ×
-        </button>
-        <h2 id="formation-help-title">Formation, Anmeldetyp &amp; Turniersystem</h2>
-        <p>
+    <EditDialog wide nested title="Formation, Anmeldetyp & Turniersystem" onClose={onClose}>
+      <p>
           Die <strong>Formation</strong> bestimmt die Teamgröße (wie viele Spieler gemeinsam antreten). Der{' '}
           <strong>Anmeldetyp</strong> bestimmt die Teambildung (wann und wie die Teams gebildet werden). Das{' '}
           <strong>Turniersystem</strong> bestimmt anschließend, wie diese Teams gegeneinander spielen.
@@ -3111,12 +3233,11 @@ function FormationHelpDialog({ onClose }) {
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
+    </EditDialog>
   );
 }
 
-function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users, language }) {
+export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, users, language }) {
   const [showFormationHelp, setShowFormationHelp] = useState(false);
   const managerOptions = [
     { value: '', label: '(ich selbst)' },
@@ -3264,18 +3385,49 @@ function TournamentForm({ form, setForm, onSubmit, mode, isAdmin, users, languag
       <TextField label="Website" type="url" placeholder="https://…" value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} />
       <TextField label="Logo-Bildlink" type="url" placeholder="https://…" value={form.logoUrl} onChange={(logoUrl) => setForm({ ...form, logoUrl })} />
       <TextField label="Flyer-Bildlink" type="url" placeholder="https://…" value={form.flyerUrl} onChange={(flyerUrl) => setForm({ ...form, flyerUrl })} />
-      <Button type="submit">{mode === 'edit' ? 'Turnier speichern' : 'Turnier anlegen'}</Button>
+      <div className="dialog-actions">
+        <Button variant="secondary" type="button" onClick={onCancel}>Abbrechen</Button>
+        <Button type="submit">{mode === 'edit' ? 'Turnier speichern' : 'Turnier anlegen'}</Button>
+      </div>
     </form>
   );
 }
 
-function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete, isAdmin, language }) {
+export function TournamentList({
+  tournaments,
+  totalTournaments,
+  selectedId,
+  onSelect,
+  onEdit,
+  onDelete,
+  isAdmin,
+  language,
+  onCreate,
+  query,
+  onQueryChange,
+  statusFilter,
+  onStatusFilterChange,
+  onResetFilters,
+}) {
+  const filtered = tournaments.length !== totalTournaments;
+
   return (
     <div className="panel">
       <div className="section-title">
         <h2>Turniere</h2>
-        <span className="counter">{tournaments.length}</span>
+        <span className="counter">{filtered ? `${tournaments.length}/${totalTournaments}` : totalTournaments}</span>
+        <Button onClick={onCreate}>Neues Turnier</Button>
       </div>
+      <ListToolbar
+        query={query}
+        onQueryChange={onQueryChange}
+        searchPlaceholder="Name oder Ort suchen"
+        filters={[
+          { label: 'Status filtern', value: statusFilter, onChange: onStatusFilterChange, options: [{ value: '', label: 'Alle Status' }, ...TOURNAMENT_STATUSES] },
+        ]}
+        onReset={onResetFilters}
+        resetDisabled={!filtered}
+      />
       <div className="user-list">
         {tournaments.map((tournament) => (
           <article className={`data-row tournament-row ${selectedId === tournament.id ? 'selected' : ''}`} key={tournament.id}>
@@ -3302,12 +3454,13 @@ function TournamentList({ tournaments, selectedId, onSelect, onEdit, onDelete, i
             )}
           </article>
         ))}
+        {tournaments.length === 0 && <p className="muted">Keine Turniere gefunden.</p>}
       </div>
     </div>
   );
 }
 
-function RegistrationForm({ form, setForm, onSubmit, tournaments, selectedTournamentId, manageMode }) {
+export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode }) {
   const selectedValue = form.tournamentId || selectedTournamentId;
   const options = tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }));
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedValue);
@@ -3324,7 +3477,10 @@ function RegistrationForm({ form, setForm, onSubmit, tournaments, selectedTourna
         licenseRequired={selectedTournament?.licenseRequired}
         teamNameEnabled={selectedTournament?.teamNameEnabled}
       />
-      <Button type="submit">{form.id ? 'Anmeldung speichern' : 'Anmeldung erfassen'}</Button>
+      <div className="dialog-actions">
+        {onCancel && <Button variant="secondary" type="button" onClick={onCancel}>Abbrechen</Button>}
+        <Button type="submit">{form.id ? 'Anmeldung speichern' : 'Anmeldung erfassen'}</Button>
+      </div>
     </form>
   );
 }
@@ -3502,12 +3658,28 @@ function downloadRegistrationsCsv(tournament, registrations) {
   URL.revokeObjectURL(url);
 }
 
-function RegistrationsPanel({ tournament, registrations, tournaments, onTournamentChange, onEdit, onDelete }) {
+export function RegistrationsPanel({
+  tournament,
+  registrations,
+  filteredRegistrations,
+  tournaments,
+  onTournamentChange,
+  onCreate,
+  query,
+  onQueryChange,
+  statusFilter,
+  onStatusFilterChange,
+  onResetFilters,
+  onEdit,
+  onDelete,
+}) {
+  const filtered = filteredRegistrations.length !== registrations.length;
+
   return (
     <div className="panel">
       <div className="section-title">
         <h2>Anmeldungen</h2>
-        <span className="counter">{registrations.length}</span>
+        <span className="counter">{filtered ? `${filteredRegistrations.length}/${registrations.length}` : registrations.length}</span>
         <Button
           variant="secondary"
           disabled={registrations.length === 0}
@@ -3515,6 +3687,7 @@ function RegistrationsPanel({ tournament, registrations, tournaments, onTourname
         >
           CSV exportieren
         </Button>
+        <Button onClick={onCreate}>Neue Anmeldung</Button>
       </div>
       <SelectField
         label="Turnier anzeigen"
@@ -3523,8 +3696,18 @@ function RegistrationsPanel({ tournament, registrations, tournaments, onTourname
         options={tournaments.map((item) => ({ value: item.id, label: item.name }))}
       />
       {!tournament?.canManage && <p className="muted">Für dieses Turnier sind Anmeldungen nur für Admins und zuständige Turnierleiter sichtbar.</p>}
+      <ListToolbar
+        query={query}
+        onQueryChange={onQueryChange}
+        searchPlaceholder="Name oder Team suchen"
+        filters={[
+          { label: 'Status filtern', value: statusFilter, onChange: onStatusFilterChange, options: [{ value: '', label: 'Alle Status' }, ...REGISTRATION_STATUSES] },
+        ]}
+        onReset={onResetFilters}
+        resetDisabled={!filtered}
+      />
       <div className="user-list">
-        {registrations.map((registration) => (
+        {filteredRegistrations.map((registration) => (
           <article className="data-row" key={registration.id}>
             <div>
               <strong>
@@ -3541,7 +3724,27 @@ function RegistrationsPanel({ tournament, registrations, tournaments, onTourname
             </div>
           </article>
         ))}
+        {filteredRegistrations.length === 0 && <p className="muted">Keine Anmeldungen gefunden.</p>}
       </div>
+    </div>
+  );
+}
+
+export function ListToolbar({ query, onQueryChange, searchPlaceholder, filters = [], onReset, resetDisabled }) {
+  return (
+    <div className="user-toolbar">
+      <input
+        type="search"
+        placeholder={searchPlaceholder}
+        value={query}
+        onChange={(event) => onQueryChange(event.target.value)}
+      />
+      {filters.map((filter) => (
+        <SelectField key={filter.label} label={filter.label} value={filter.value} onChange={filter.onChange} options={filter.options} />
+      ))}
+      <Button variant="secondary" onClick={onReset} disabled={resetDisabled}>
+        Filter zurücksetzen
+      </Button>
     </div>
   );
 }
@@ -3603,8 +3806,7 @@ function ProfilePanel({ currentUser, form, setForm, onSubmit }) {
   );
 }
 
-function UserManagementPanel({
-  formRef,
+export function UserManagementPanel({
   users,
   stats,
   totalUsers,
@@ -3612,13 +3814,15 @@ function UserManagementPanel({
   currentUser,
   userForm,
   setUserForm,
-  setUserMode,
   userQuery,
   setUserQuery,
   userRoleFilter,
   setUserRoleFilter,
   userStatusFilter,
   setUserStatusFilter,
+  dialogOpen,
+  onCloseDialog,
+  onCreateUser,
   onSubmitUser,
   onEditUser,
   onDeleteUser,
@@ -3647,65 +3851,53 @@ function UserManagementPanel({
         </div>
       </div>
 
-      <div className="user-management-grid">
-        <div className="panel user-list-panel">
-          <div className="section-title">
-            <h2>Benutzer</h2>
-            <span className="counter">{filtered ? `${users.length}/${totalUsers}` : totalUsers}</span>
-          </div>
-          <div className="user-toolbar">
-            <input
-              type="search"
-              placeholder="Name oder E-Mail suchen"
-              value={userQuery}
-              onChange={(event) => setUserQuery(event.target.value)}
-            />
-            <SelectField label="Rolle filtern" value={userRoleFilter} onChange={setUserRoleFilter} options={roleOptions} />
-            <SelectField label="Status filtern" value={userStatusFilter} onChange={setUserStatusFilter} options={USER_STATUS_FILTERS} />
-            <Button variant="secondary" onClick={resetUserFilters} disabled={!filtered}>
-              Filter zurücksetzen
-            </Button>
-          </div>
-          <div className="user-list">
-            {users.map((user) => (
-              <UserRow
-                key={user.id}
-                user={user}
-                currentUser={currentUser}
-                selected={userMode === 'edit' && user.id === userForm.id}
-                onEdit={onEditUser}
-                onDelete={onDeleteUser}
-              />
-            ))}
-            {users.length === 0 && <p className="muted">Keine Benutzer gefunden.</p>}
-          </div>
+      <div className="panel user-list-panel">
+        <div className="section-title">
+          <h2>Benutzer</h2>
+          <span className="counter">{filtered ? `${users.length}/${totalUsers}` : totalUsers}</span>
+          <Button onClick={onCreateUser}>Neuer Benutzer</Button>
         </div>
-
-        <div className="panel user-editor-panel" ref={formRef}>
-          <div className="section-title">
-            <h2>{userMode === 'edit' ? 'Benutzer bearbeiten' : 'Benutzer anlegen'}</h2>
-            {userMode === 'edit' && (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setUserMode('create');
-                  setUserForm(EMPTY_USER_FORM);
-                }}
-              >
-                Neu
-              </Button>
-            )}
-          </div>
-          <UserEditorForm
-            form={userForm}
-            setForm={setUserForm}
-            submitLabel={userMode === 'edit' ? 'Speichern' : 'Anlegen'}
-            onSubmit={onSubmitUser}
-            passwordLabel={userMode === 'edit' ? 'Neues Passwort' : 'Passwort'}
-            passwordRequired={userMode === 'create'}
-          />
+        <ListToolbar
+          query={userQuery}
+          onQueryChange={setUserQuery}
+          searchPlaceholder="Name oder E-Mail suchen"
+          filters={[
+            { label: 'Rolle filtern', value: userRoleFilter, onChange: setUserRoleFilter, options: roleOptions },
+            { label: 'Status filtern', value: userStatusFilter, onChange: setUserStatusFilter, options: USER_STATUS_FILTERS },
+          ]}
+          onReset={resetUserFilters}
+          resetDisabled={!filtered}
+        />
+        <div className="user-list">
+          {users.map((user) => (
+            <UserRow
+              key={user.id}
+              user={user}
+              currentUser={currentUser}
+              selected={userMode === 'edit' && user.id === userForm.id}
+              onEdit={onEditUser}
+              onDelete={onDeleteUser}
+            />
+          ))}
+          {users.length === 0 && <p className="muted">Keine Benutzer gefunden.</p>}
         </div>
       </div>
+
+      <EditDialog
+        open={dialogOpen}
+        title={userMode === 'edit' ? 'Benutzer bearbeiten' : 'Benutzer anlegen'}
+        onClose={onCloseDialog}
+      >
+        <UserEditorForm
+          form={userForm}
+          setForm={setUserForm}
+          submitLabel={userMode === 'edit' ? 'Speichern' : 'Anlegen'}
+          onSubmit={onSubmitUser}
+          onCancel={onCloseDialog}
+          passwordLabel={userMode === 'edit' ? 'Neues Passwort' : 'Passwort'}
+          passwordRequired={userMode === 'create'}
+        />
+      </EditDialog>
     </section>
   );
 }
@@ -3746,7 +3938,7 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
   );
 }
 
-function UserEditorForm({ form, setForm, submitLabel, onSubmit, passwordLabel, passwordRequired }) {
+function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwordLabel, passwordRequired }) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <TextField label="Vorname" value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
@@ -3787,7 +3979,10 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, passwordLabel, p
         placeholder={passwordRequired ? '' : 'Leer lassen, wenn unverändert'}
       />
       <p className="hint">{PASSWORD_STRENGTH_HINT}</p>
-      <Button type="submit">{submitLabel}</Button>
+      <div className="dialog-actions">
+        <Button variant="secondary" type="button" onClick={onCancel}>Abbrechen</Button>
+        <Button type="submit">{submitLabel}</Button>
+      </div>
     </form>
   );
 }
@@ -4775,6 +4970,12 @@ const TRANSLATIONS = {
     'Alle Status': 'Alle statussen',
     'Filter zurücksetzen': 'Filters resetten',
     'Keine Benutzer gefunden.': 'Geen gebruikers gevonden.',
+    'Neuer Benutzer': 'Nieuwe gebruiker',
+    'Neues Turnier': 'Nieuw toernooi',
+    'Neue Anmeldung': 'Nieuwe inschrijving',
+    'Keine Anmeldungen gefunden.': 'Geen inschrijvingen gevonden.',
+    'Name oder Ort suchen': 'Naam of locatie zoeken',
+    'Name oder Team suchen': 'Naam of team zoeken',
     Abmelden: 'Afmelden',
     'Turnier bearbeiten': 'Toernooi bewerken',
     'Turnier anlegen': 'Toernooi aanmaken',
@@ -5241,6 +5442,12 @@ const TRANSLATIONS = {
     'Alle Status': 'All statuses',
     'Filter zurücksetzen': 'Reset filters',
     'Keine Benutzer gefunden.': 'No users found.',
+    'Neuer Benutzer': 'New user',
+    'Neues Turnier': 'New tournament',
+    'Neue Anmeldung': 'New registration',
+    'Keine Anmeldungen gefunden.': 'No registrations found.',
+    'Name oder Ort suchen': 'Search name or location',
+    'Name oder Team suchen': 'Search name or team',
     Abmelden: 'Sign out',
     'Turnier bearbeiten': 'Edit tournament',
     'Turnier anlegen': 'Create tournament',
@@ -5707,6 +5914,12 @@ const TRANSLATIONS = {
     'Alle Status': 'Todos los estados',
     'Filter zurücksetzen': 'Restablecer filtros',
     'Keine Benutzer gefunden.': 'No se encontraron usuarios.',
+    'Neuer Benutzer': 'Nuevo usuario',
+    'Neues Turnier': 'Nuevo torneo',
+    'Neue Anmeldung': 'Nueva inscripción',
+    'Keine Anmeldungen gefunden.': 'No se encontraron inscripciones.',
+    'Name oder Ort suchen': 'Buscar nombre o ubicación',
+    'Name oder Team suchen': 'Buscar nombre o equipo',
     Abmelden: 'Cerrar sesión',
     'Turnier bearbeiten': 'Editar torneo',
     'Turnier anlegen': 'Crear torneo',
@@ -6173,6 +6386,12 @@ const TRANSLATIONS = {
     'Alle Status': 'Tous les statuts',
     'Filter zurücksetzen': 'Réinitialiser les filtres',
     'Keine Benutzer gefunden.': 'Aucun utilisateur trouvé.',
+    'Neuer Benutzer': 'Nouvel utilisateur',
+    'Neues Turnier': 'Nouveau tournoi',
+    'Neue Anmeldung': 'Nouvelle inscription',
+    'Keine Anmeldungen gefunden.': 'Aucune inscription trouvée.',
+    'Name oder Ort suchen': 'Rechercher nom ou lieu',
+    'Name oder Team suchen': 'Rechercher nom ou équipe',
     Abmelden: 'Déconnexion',
     'Turnier bearbeiten': 'Modifier le tournoi',
     'Turnier anlegen': 'Créer un tournoi',
