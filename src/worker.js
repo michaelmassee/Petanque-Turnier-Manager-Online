@@ -358,6 +358,17 @@ async function resolveEmailLanguage(db, tournament, registration) {
   return creator?.language || registration.language || 'de';
 }
 
+/**
+ * E-Mail-Versand ist pro User erst nach Admin-Freischaltung erlaubt (siehe migrations/0037).
+ * Betrifft nur den tatsächlichen Mailversand rund um Turniere; Push/Postfach bleiben unberührt,
+ * und die auslösende Aktion (Anmeldung, Stornierung, Broadcast) läuft in jedem Fall normal durch.
+ */
+async function canSendTournamentMail(db, tournament) {
+  const owner = await db.prepare('SELECT role, mail_enabled FROM users WHERE id = ?').bind(tournament.created_by).first();
+  if (!owner) return true;
+  return owner.role === 'admin' || Boolean(Number(owner.mail_enabled));
+}
+
 function buildTeamRecipients(registration) {
   const entries = [
     { email: registration.email, firstName: registration.first_name },
@@ -381,6 +392,7 @@ export function buildCancelLink(appOrigin, token) {
 }
 
 async function sendRegistrationConfirmationEmail(env, tournament, registration, appOrigin) {
+  if (!(await canSendTournamentMail(env.DB, tournament))) return;
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_CONFIRMATION_EMAILS[language] || REGISTRATION_CONFIRMATION_EMAILS.de;
   const dateTimeLabel = formatTournamentDateTime(tournament, language);
@@ -403,6 +415,7 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
 }
 
 async function sendDisplacementEmail(env, tournament, registration, wasCancelled, appOrigin) {
+  if (!(await canSendTournamentMail(env.DB, tournament))) return;
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_DISPLACED_EMAILS[language] || REGISTRATION_DISPLACED_EMAILS.de;
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
@@ -424,6 +437,7 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
 }
 
 async function sendCancellationEmail(env, tournament, registration, appOrigin) {
+  if (!(await canSendTournamentMail(env.DB, tournament))) return;
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_CANCELLED_EMAILS[language] || REGISTRATION_CANCELLED_EMAILS.de;
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
@@ -452,6 +466,7 @@ async function sendTournamentReminders(env) {
   const tournaments = await env.DB.prepare("SELECT * FROM tournaments WHERE date = ? AND status != 'draft'").bind(targetDate).all();
 
   for (const tournament of tournaments.results || []) {
+    const mailAllowed = await canSendTournamentMail(env.DB, tournament);
     const registrations = await env.DB
       .prepare(
         `SELECT * FROM registrations
@@ -471,7 +486,7 @@ async function sendTournamentReminders(env) {
       const allRecipients = buildTeamRecipients(registration);
       const recipients = allRecipients.filter((recipient) => !notifiedEmails.has(recipient.email.toLowerCase()));
 
-      if (recipients.length > 0) {
+      if (recipients.length > 0 && mailAllowed) {
         const language = await resolveEmailLanguage(env.DB, tournament, registration);
         const templates = TOURNAMENT_REMINDER_EMAILS[language] || TOURNAMENT_REMINDER_EMAILS.de;
         const dateTimeLabel = formatTournamentDateTime(tournament, language);
@@ -1273,8 +1288,8 @@ async function registerUser(request, env, url) {
   try {
     await db
       .prepare(
-        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, language, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'user', ?, ?, NULL, ?, ?, ?)`,
+        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, language, mail_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'user', ?, ?, NULL, ?, 0, ?, ?)`,
       )
       .bind(id, user.firstName, user.lastName, user.email, password.salt, password.hash, language, now, now)
       .run();
@@ -1527,7 +1542,7 @@ async function resetPassword(request, db) {
 async function listUsers(db) {
   const result = await db
     .prepare(
-      'SELECT id, first_name, last_name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
+      'SELECT id, first_name, last_name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
     )
     .all();
   return json({ users: result.results.map(toPublicUser) });
@@ -1681,7 +1696,8 @@ async function createBroadcastPostboxMessage(env, { sender, tournament, body }) 
     ),
   ));
 
-  for (const recipient of uniqueRecipients.values()) {
+  const mailAllowed = await canSendTournamentMail(env.DB, tournament);
+  for (const recipient of mailAllowed ? uniqueRecipients.values() : []) {
     const templates = TOURNAMENT_BROADCAST_EMAILS[recipient.language] || TOURNAMENT_BROADCAST_EMAILS.de;
     try {
       await sendTransactionalEmail(env, {
@@ -1811,6 +1827,7 @@ async function updateUser(request, env, id, currentUserId) {
   const emailVerifiedAt = resolveAdminEmailVerifiedAt(body, existing, user, now);
   const passwordChangeRequired = body.passwordChangeRequired === true ? 1 : 0;
   const tournamentLimit = resolveTournamentLimit(body, existing.tournament_limit ?? DEFAULT_TOURNAMENT_LIMIT);
+  const mailEnabled = body.mailEnabled === undefined ? Number(existing.mail_enabled) : (body.mailEnabled ? 1 : 0);
 
   if (id === currentUserId && user.role !== 'admin') {
     throw new HttpError(400, 'Du kannst deine eigene Admin-Rolle nicht entfernen');
@@ -1822,17 +1839,17 @@ async function updateUser(request, env, id, currentUserId) {
       await db
         .prepare(
           `UPDATE users
-           SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, updated_at = ?
+           SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, mail_enabled = ?, updated_at = ?
            WHERE id = ?`,
         )
-        .bind(user.firstName, user.lastName, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, id)
+        .bind(user.firstName, user.lastName, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, id)
         .run();
     } else {
       await db
         .prepare(
-          'UPDATE users SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, role = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, updated_at = ? WHERE id = ?',
+          'UPDATE users SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, role = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, mail_enabled = ?, updated_at = ? WHERE id = ?',
         )
-        .bind(user.firstName, user.lastName, user.email, user.role, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, id)
+        .bind(user.firstName, user.lastName, user.email, user.role, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, id)
         .run();
     }
   } catch (error) {
@@ -1844,7 +1861,7 @@ async function updateUser(request, env, id, currentUserId) {
 
   const updated = await db
     .prepare(
-      'SELECT id, first_name, last_name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users WHERE id = ?',
     )
     .bind(id)
     .first();
@@ -3242,7 +3259,7 @@ async function requireSession(request, db) {
   const row = await db
     .prepare(
       `SELECT users.id, users.first_name, users.last_name, users.email, users.pending_email, users.role, users.club, users.license_nr, users.email_verified_at, users.password_change_required,
-              users.tournament_limit, users.created_at, users.updated_at, sessions.expires_at
+              users.tournament_limit, users.mail_enabled, users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
        WHERE sessions.id = ?`,
@@ -3721,6 +3738,7 @@ function toPublicUser(row) {
     emailVerifiedAt: row.email_verified_at || null,
     passwordChangeRequired: Boolean(Number(row.password_change_required || 0)),
     tournamentLimit: row.tournament_limit === undefined || row.tournament_limit === null ? DEFAULT_TOURNAMENT_LIMIT : Number(row.tournament_limit),
+    mailEnabled: row.mail_enabled === undefined || row.mail_enabled === null ? true : Boolean(Number(row.mail_enabled)),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

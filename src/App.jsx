@@ -100,6 +100,7 @@ export const EMPTY_USER_FORM = {
   emailVerified: true,
   passwordChangeRequired: false,
   tournamentLimit: DEFAULT_TOURNAMENT_LIMIT,
+  mailEnabled: true,
 };
 
 const EMPTY_PROFILE_FORM = {
@@ -997,6 +998,7 @@ export default function App() {
       emailVerified: Boolean(user.emailVerifiedAt),
       passwordChangeRequired: Boolean(user.passwordChangeRequired),
       tournamentLimit: user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT,
+      mailEnabled: user.mailEnabled ?? true,
     });
     clearFeedback();
     setUserDialogOpen(true);
@@ -1825,6 +1827,7 @@ export default function App() {
                 isAdmin={isAdmin}
                 users={users}
                 language={language}
+                currentUser={currentUser}
               />
             </EditDialog>
           )}
@@ -3471,15 +3474,19 @@ function FormationHelpDialog({ onClose }) {
   );
 }
 
-export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, users, language }) {
+export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, users, language, currentUser }) {
   const [showFormationHelp, setShowFormationHelp] = useState(false);
   const managerOptions = [
     { value: '', label: '(ich selbst)' },
     ...users.map((user) => ({ value: user.id, label: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email })),
   ];
+  const showMailNotEnabledHint = !isAdmin && currentUser && currentUser.mailEnabled === false;
 
   return (
     <form className="form dense" onSubmit={onSubmit}>
+      {showMailNotEnabledHint && (
+        <p className="feedback offline">{MAIL_NOT_ENABLED_HINT_TEMPLATES[language] || MAIL_NOT_ENABLED_HINT_TEMPLATES.de}</p>
+      )}
       <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
       {isAdmin && (
         <SelectField
@@ -4159,6 +4166,11 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
         </span>
         {user.passwordChangeRequired && <span className="status registration-pending">Passwortwechsel nötig</span>}
         {user.role !== 'admin' && <span className="status">Turnier-Limit: {user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT}</span>}
+        {user.role !== 'admin' && (
+          <span className={user.mailEnabled ? 'status registration-confirmed' : 'status registration-pending'}>
+            {user.mailEnabled ? 'E-Mail-Versand freigeschaltet' : 'E-Mail-Versand gesperrt'}
+          </span>
+        )}
       </div>
       <div className="row-actions">
         <Button variant="secondary" onClick={() => onEdit(user)}>
@@ -4203,6 +4215,15 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwo
         onChange={(value) => setForm({ ...form, tournamentLimit: value === '' ? '' : Number(value) })}
       />
       <p className="hint">Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).</p>
+      <label className="checkbox-row">
+        <input
+          type="checkbox"
+          checked={form.mailEnabled}
+          onChange={(event) => setForm({ ...form, mailEnabled: event.target.checked })}
+        />
+        <span>E-Mail-Versand für Turniere dieses Nutzers freigeschaltet</span>
+      </label>
+      <p className="hint">Solange nicht freigeschaltet, werden für Turniere dieses Nutzers keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt (Push/Postfach bleiben unberührt).</p>
       <TextField
         label={passwordLabel}
         type="password"
@@ -4901,6 +4922,14 @@ const TIMEZONE_HINT_TEMPLATES = {
   en: (timeZone) => `Note: this tournament's date, start time and registration times are in the tournament location's time zone: ${timeZone}. Your time zone differs.`,
   es: (timeZone) => `Aviso: la fecha, hora de inicio y horarios de inscripción de este torneo son en la zona horaria de la sede: ${timeZone}. Tu zona horaria es diferente.`,
   fr: (timeZone) => `Remarque : la date, l'heure de début et les horaires d'inscription de ce tournoi sont dans le fuseau horaire du lieu : ${timeZone}. Votre fuseau horaire est différent.`,
+};
+
+const MAIL_NOT_ENABLED_HINT_TEMPLATES = {
+  de: 'Hinweis: Der E-Mail-Versand für deine Turniere ist noch nicht von einem Admin freigeschaltet. Anmeldungen und Stornierungen funktionieren normal, es werden aber keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt, bis die Freischaltung erfolgt ist.',
+  nl: "Let op: het versturen van e-mails voor jouw toernooien is nog niet door een beheerder vrijgegeven. Aanmelden en afmelden werken normaal, maar er worden geen bevestigings-, herinnerings- of broadcastmails verstuurd totdat dit is vrijgegeven.",
+  en: 'Note: email sending for your tournaments has not yet been approved by an admin. Registrations and cancellations work normally, but no confirmation, reminder or broadcast emails will be sent until this is approved.',
+  es: 'Aviso: el envío de correos para tus torneos aún no ha sido aprobado por un administrador. Las inscripciones y cancelaciones funcionan con normalidad, pero no se enviará ningún correo de confirmación, recordatorio o difusión hasta que se apruebe.',
+  fr: "Remarque : l'envoi d'e-mails pour vos tournois n'a pas encore été validé par un administrateur. Les inscriptions et annulations fonctionnent normalement, mais aucun e-mail de confirmation, de rappel ou de diffusion ne sera envoyé tant que la validation n'a pas eu lieu.",
 };
 
 const REGISTRATION_OPENS_TEMPLATES = {
