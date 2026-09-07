@@ -6,7 +6,9 @@ describe('Postbox-Grundlogik', () => {
     'https://fcm.googleapis.com/fcm/send/token',
     'https://updates.push.services.mozilla.com/wpush/v2/token',
     'https://updates-autopush.mozilla.org/wpush/v2/token',
+    'https://push.services.mozilla.com/wpush/v2/token',
     'https://web.push.apple.com/QH/token',
+    'https://web.push-1.push.apple.com/QH/token',
   ])('akzeptiert bekannte Web-Push-Endpunkte', (endpoint) => expect(isAllowedPushEndpoint(endpoint)).toBe(true));
 
   it.each(['http://fcm.googleapis.com/x', 'https://example.org/push', 'https://fcm.googleapis.com.evil.example/x', 'not-a-url'])('lehnt unsichere Push-Endpunkte ab', (endpoint) => expect(isAllowedPushEndpoint(endpoint)).toBe(false));

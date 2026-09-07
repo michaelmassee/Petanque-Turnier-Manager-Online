@@ -2104,21 +2104,23 @@ function sameBytes(left, right) {
 
 function PushMigrationNotice({ language, onDismiss, onEnabled }) {
   const [state, setState] = useState('');
+  const [errorDetail, setErrorDetail] = useState('');
   const text = (key) => postboxText(language, key);
   async function enable() {
     try {
       const result = await subscribeToPush();
       setState(result);
       if (result === 'enabled') onEnabled();
-    } catch {
+    } catch (error) {
       setState('setupError');
+      setErrorDetail(error.message || '');
     }
   }
   return (
     <section className="panel push-migration-notice" aria-label={text('migrationTitle')}>
       <h2>{text('migrationTitle')}</h2>
       <p>{state === 'blocked' ? text('blocked') : text('migrationText')}</p>
-      {state && state !== 'enabled' && <p className="hint">{text(state)}</p>}
+      {state && state !== 'enabled' && <p className="hint">{text(state)}{errorDetail ? ` (${errorDetail})` : ''}</p>}
       <div className="dialog-actions"><Button onClick={enable}>{text('enable')}</Button><Button variant="secondary" onClick={onDismiss}>{text('later')}</Button></div>
     </section>
   );
@@ -2126,10 +2128,17 @@ function PushMigrationNotice({ language, onDismiss, onEnabled }) {
 
 function PostboxControl({ language, open, unreadCount, messages, todos, recipients, recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit }) {
   const [pushState, setPushState] = useState('');
+  const [pushErrorDetail, setPushErrorDetail] = useState('');
   const text = (key) => postboxText(language, key);
 
   async function enablePush() {
-    try { setPushState(await subscribeToPush()); } catch { setPushState('setupError'); }
+    try {
+      setPushErrorDetail('');
+      setPushState(await subscribeToPush());
+    } catch (error) {
+      setPushState('setupError');
+      setPushErrorDetail(error.message || '');
+    }
   }
 
   return (
@@ -2145,7 +2154,7 @@ function PostboxControl({ language, open, unreadCount, messages, todos, recipien
           <div className="search-menu-backdrop" onClick={onClose} />
           <section className="postbox-panel" aria-label={text('inbox')}>
             <div className="section-title"><h2>{text('inbox')}</h2><button className="link-button" type="button" onClick={onClose}>{text('close')}</button></div>
-            <div><Button variant="secondary" onClick={enablePush}>{text('enable')}</Button>{pushState && <p className="hint">{text(pushState)}</p>}</div>
+            <div><Button variant="secondary" onClick={enablePush}>{text('enable')}</Button>{pushState && <p className="hint">{text(pushState)}{pushErrorDetail ? ` (${pushErrorDetail})` : ''}</p>}</div>
             <form className="form postbox-compose" onSubmit={onSubmit}>
               <SelectField label={text('recipient')} value={recipientId} onChange={setRecipientId} options={[{ value: '', label: text('chooseRecipient') }, ...recipients.map((recipient) => ({ value: recipient.id, label: `${recipient.firstName} ${recipient.lastName} (${roleName(recipient.role)})` }))]} />
               <TextArea label={text('message')} value={body} onChange={setBody} />
