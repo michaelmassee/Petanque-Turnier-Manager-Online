@@ -420,27 +420,43 @@ export default function App() {
   const authModalOpen = authView !== 'home' && authView !== 'cancelRegistration';
   const anyDialogOpen =
     menuOpen || searchMenuOpen || homeFilterOpen || postboxOpen || userDialogOpen || tournamentDialogOpen || registrationDialogOpen || authModalOpen;
-  const dialogHistoryDepthRef = useRef(0);
-  const suppressDialogPopRef = useRef(false);
+  const awayFromHome = activeTab !== 'home';
+  const desiredNavDepth = (awayFromHome ? 1 : 0) + (anyDialogOpen ? 1 : 0);
+  const navDepthRef = useRef(0);
+  const suppressNavPopCountRef = useRef(0);
 
+  // Zurück (Handy-Geste/Hardware-Button, Browser) soll offene Dialoge schließen bzw. von einem
+  // anderen Tab auf den Hauptbildschirm (Home) zurückkehren, statt die App zu verlassen. Dafür
+  // bekommt jede aktive "Ebene" (weg von Home, Dialog offen) genau einen History-Eintrag; wird
+  // eine Ebene stattdessen über die UI geschlossen (X, Speichern, Tab-Wechsel), wird der
+  // zugehörige Eintrag hier konsumiert, damit Zurück nicht ins Leere läuft. Welche Ebene ein
+  // echter Zurück-Druck schließt, wird bewusst erst im Popstate-Handler anhand des aktuellen
+  // Zustands entschieden (Dialog vor Tab) statt anhand gemerkter Labels, weil einzelne UI-
+  // Aktionen (z. B. Menüpunkt anklicken) Dialog- und Tab-Zustand gleichzeitig ändern können.
   useEffect(() => {
-    if (anyDialogOpen && dialogHistoryDepthRef.current === 0) {
-      dialogHistoryDepthRef.current = 1;
-      window.history.pushState({ ...window.history.state, ptmDialog: true }, '');
-    } else if (!anyDialogOpen && dialogHistoryDepthRef.current === 1) {
-      dialogHistoryDepthRef.current = 0;
-      if (suppressDialogPopRef.current) {
-        suppressDialogPopRef.current = false;
-      } else {
-        window.history.back();
+    const current = navDepthRef.current;
+    if (desiredNavDepth > current) {
+      for (let index = current; index < desiredNavDepth; index += 1) {
+        window.history.pushState({ ...window.history.state, ptmNav: true }, '');
       }
+      navDepthRef.current = desiredNavDepth;
+    } else if (desiredNavDepth < current) {
+      const removeCount = current - desiredNavDepth;
+      navDepthRef.current = desiredNavDepth;
+      suppressNavPopCountRef.current += removeCount;
+      window.history.go(-removeCount);
     }
-  }, [anyDialogOpen]);
+  }, [desiredNavDepth]);
 
   useEffect(() => {
     function onPopState() {
-      if (dialogHistoryDepthRef.current > 0) {
-        suppressDialogPopRef.current = true;
+      if (suppressNavPopCountRef.current > 0) {
+        suppressNavPopCountRef.current -= 1;
+        return;
+      }
+      if (navDepthRef.current <= 0) return;
+      navDepthRef.current -= 1;
+      if (anyDialogOpen) {
         setMenuOpen(false);
         setSearchMenuOpen(false);
         setHomeFilterOpen(false);
@@ -452,11 +468,13 @@ export default function App() {
           setAuthView('home');
           clearFeedback();
         }
+      } else if (awayFromHome) {
+        setActiveTab('home');
       }
     }
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [authModalOpen]);
+  }, [anyDialogOpen, awayFromHome, authModalOpen]);
 
   useEffect(() => {
     if (currentUser) {
