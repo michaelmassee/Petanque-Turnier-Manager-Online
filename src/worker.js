@@ -231,6 +231,34 @@ const REGISTRATION_CANCELLED_EMAILS = {
   },
 };
 
+const TOURNAMENT_BROADCAST_EMAILS = {
+  de: {
+    subject: (name) => `Nachricht an alle Teilnehmer: ${name}`,
+    text: (firstName, name, senderName, message) =>
+      `Hallo ${firstName},\n\n${senderName} hat allen Teilnehmern von "${name}" folgende Nachricht geschickt:\n\n${message}`,
+  },
+  nl: {
+    subject: (name) => `Bericht aan alle deelnemers: ${name}`,
+    text: (firstName, name, senderName, message) =>
+      `Hallo ${firstName},\n\n${senderName} heeft alle deelnemers van "${name}" het volgende bericht gestuurd:\n\n${message}`,
+  },
+  en: {
+    subject: (name) => `Message to all participants: ${name}`,
+    text: (firstName, name, senderName, message) =>
+      `Hi ${firstName},\n\n${senderName} sent the following message to all participants of "${name}":\n\n${message}`,
+  },
+  es: {
+    subject: (name) => `Mensaje a todos los participantes: ${name}`,
+    text: (firstName, name, senderName, message) =>
+      `Hola ${firstName},\n\n${senderName} envió el siguiente mensaje a todos los participantes de "${name}":\n\n${message}`,
+  },
+  fr: {
+    subject: (name) => `Message à tous les participants : ${name}`,
+    text: (firstName, name, senderName, message) =>
+      `Bonjour ${firstName},\n\n${senderName} a envoyé le message suivant à tous les participants de « ${name} » :\n\n${message}`,
+  },
+};
+
 const DESKTOP_APP_URL = 'https://michaelmassee.github.io/Petanque-Turnier-Manager/';
 
 const EMAIL_FOOTERS = {
@@ -1509,35 +1537,72 @@ async function listPostboxRecipients(db, userId) {
   const result = await db.prepare(
     'SELECT id, first_name, last_name, role FROM users WHERE id != ? ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
   ).bind(userId).all();
-  return json({ recipients: result.results.map((user) => ({ id: user.id, firstName: user.first_name, lastName: user.last_name, role: user.role })) });
+  const tournaments = await db.prepare(
+    'SELECT id, name FROM tournaments WHERE created_by = ? ORDER BY name COLLATE NOCASE',
+  ).bind(userId).all();
+  return json({
+    recipients: result.results.map((user) => ({ id: user.id, firstName: user.first_name, lastName: user.last_name, role: user.role })),
+    tournaments: tournaments.results.map((tournament) => ({ id: tournament.id, name: tournament.name })),
+  });
 }
+
+const PARTICIPANT_TOURNAMENTS_SUBQUERY = `SELECT DISTINCT reg.tournament_id FROM registrations reg
+  JOIN users u2 ON lower(u2.email) = lower(reg.email)
+  WHERE u2.id = ? AND reg.status IN ('pending', 'confirmed')`;
 
 async function getPostbox(db, user) {
   const result = await db.prepare(
-    `SELECT m.*, s.first_name AS sender_first_name, s.last_name AS sender_last_name
-     FROM postbox_messages m LEFT JOIN users s ON s.id = m.sender_id
-     WHERE m.recipient_id = ? OR m.sender_id = ? ORDER BY m.created_at DESC LIMIT 250`,
-  ).bind(user.id, user.id).all();
+    `SELECT m.*, s.first_name AS sender_first_name, s.last_name AS sender_last_name, r.first_name AS recipient_first_name, r.last_name AS recipient_last_name, t.name AS broadcast_tournament_name
+     FROM postbox_messages m
+     LEFT JOIN users s ON s.id = m.sender_id
+     LEFT JOIN users r ON r.id = m.recipient_id
+     LEFT JOIN tournaments t ON t.id = m.broadcast_tournament_id
+     WHERE m.recipient_id = ? OR m.sender_id = ?
+        OR (m.broadcast_tournament_id IS NOT NULL AND m.broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
+     ORDER BY m.created_at DESC LIMIT 25`,
+  ).bind(user.id, user.id, user.id).all();
   const messages = result.results.map((row) => toPostboxMessage(row, user.id));
-  const unread = await db.prepare('SELECT COUNT(*) AS count FROM postbox_messages WHERE recipient_id = ? AND read_at IS NULL').bind(user.id).first();
+  const unread = await db.prepare(
+    `SELECT COUNT(*) AS count FROM postbox_messages m
+     WHERE m.read_at IS NULL AND (
+       m.recipient_id = ?
+       OR (m.broadcast_tournament_id IS NOT NULL AND m.broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
+     )`,
+  ).bind(user.id, user.id).first();
   return json({ messages, unreadCount: unreadPostboxCount(unread), todos: await listPostboxTodos(db, user) });
 }
 
 async function sendPostboxMessage(request, env, sender) {
   const body = await readJson(request);
-  const recipientId = String(body.recipientId || '').trim();
+  const recipientRaw = String(body.recipientId || '').trim();
   const text = String(body.body || '').trim();
-  if (!recipientId || recipientId === sender.id) throw new HttpError(400, 'Bitte wähle einen anderen Empfänger');
-  if (!text || text.length > 2000) throw new HttpError(400, 'Die Nachricht muss zwischen 1 und 2000 Zeichen lang sein');
-  const recipient = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(recipientId).first();
+  if (!recipientRaw) throw new HttpError(400, 'Bitte wähle einen Empfänger');
+  if (!text || text.length > 250) throw new HttpError(400, 'Die Nachricht muss zwischen 1 und 250 Zeichen lang sein');
+
+  if (recipientRaw.startsWith('tournament:')) {
+    const tournamentId = recipientRaw.slice('tournament:'.length);
+    const tournament = await env.DB.prepare('SELECT * FROM tournaments WHERE id = ?').bind(tournamentId).first();
+    if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+    if (tournament.created_by !== sender.id) throw new HttpError(403, 'Nur der Organisator kann an alle Teilnehmer senden');
+    const message = await createBroadcastPostboxMessage(env, { sender, tournament, body: text });
+    return json({ message }, 201);
+  }
+
+  if (recipientRaw === sender.id) throw new HttpError(400, 'Bitte wähle einen anderen Empfänger');
+  const recipient = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(recipientRaw).first();
   if (!recipient) throw new HttpError(404, 'Empfänger nicht gefunden');
-  const message = await createPostboxMessage(env, { senderId: sender.id, recipientId, kind: 'direct', body: text, pushTitle: 'Neue Nachricht', pushActor: `${sender.firstName} ${sender.lastName}` });
+  const message = await createPostboxMessage(env, { senderId: sender.id, recipientId: recipientRaw, kind: 'direct', body: text, pushTitle: 'Neue Nachricht', pushActor: `${sender.firstName} ${sender.lastName}` });
   return json({ message }, 201);
 }
 
 async function markPostboxMessageRead(db, id, userId) {
   const now = new Date().toISOString();
-  const result = await db.prepare('UPDATE postbox_messages SET read_at = COALESCE(read_at, ?) WHERE id = ? AND recipient_id = ?').bind(now, id, userId).run();
+  const result = await db.prepare(
+    `UPDATE postbox_messages SET read_at = COALESCE(read_at, ?) WHERE id = ? AND (
+       recipient_id = ?
+       OR (broadcast_tournament_id IS NOT NULL AND broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
+     )`,
+  ).bind(now, id, userId, userId).run();
   if (!result.meta.changes) throw new HttpError(404, 'Nachricht nicht gefunden');
   return json({ ok: true });
 }
@@ -1562,6 +1627,11 @@ async function createPostboxMessage(env, { senderId = null, recipientId, kind, b
   const createdAt = new Date().toISOString();
   await env.DB.prepare('INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, event_type, event_data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(id, senderId, recipientId, kind, body, eventType, eventData ? JSON.stringify(eventData) : null, createdAt).run();
+  await env.DB.prepare(
+    `DELETE FROM postbox_messages WHERE recipient_id = ? AND id NOT IN (
+       SELECT id FROM postbox_messages WHERE recipient_id = ? ORDER BY created_at DESC LIMIT 25
+     )`,
+  ).bind(recipientId, recipientId).run();
   const row = await env.DB.prepare('SELECT * FROM postbox_messages WHERE id = ?').bind(id).first();
   const message = toPostboxMessage(row, recipientId);
   try {
@@ -1572,15 +1642,74 @@ async function createPostboxMessage(env, { senderId = null, recipientId, kind, b
   return message;
 }
 
+async function createBroadcastPostboxMessage(env, { sender, tournament, body }) {
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  await env.DB.prepare(
+    'INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, created_at, broadcast_tournament_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).bind(id, sender.id, sender.id, 'direct', body, createdAt, tournament.id).run();
+  await env.DB.prepare(
+    `DELETE FROM postbox_messages WHERE recipient_id = ? AND id NOT IN (
+       SELECT id FROM postbox_messages WHERE recipient_id = ? ORDER BY created_at DESC LIMIT 25
+     )`,
+  ).bind(sender.id, sender.id).run();
+  const row = await env.DB.prepare(
+    `SELECT m.*, t.name AS broadcast_tournament_name FROM postbox_messages m LEFT JOIN tournaments t ON t.id = m.broadcast_tournament_id WHERE m.id = ?`,
+  ).bind(id).first();
+  const message = toPostboxMessage(row, sender.id);
+
+  const registrations = await env.DB.prepare(
+    "SELECT * FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')",
+  ).bind(tournament.id).all();
+
+  const uniqueRecipients = new Map();
+  for (const registration of registrations.results || []) {
+    for (const recipient of buildTeamRecipients(registration)) {
+      const email = String(recipient.email || '').trim().toLowerCase();
+      if (!email || email === sender.email.toLowerCase() || uniqueRecipients.has(email)) continue;
+      uniqueRecipients.set(email, { email: recipient.email, firstName: recipient.firstName, language: registration.language });
+    }
+  }
+
+  const accountUsers = await env.DB.prepare(
+    `SELECT DISTINCT u.id FROM registrations reg JOIN users u ON lower(u.email) = lower(reg.email)
+     WHERE reg.tournament_id = ? AND reg.status IN ('pending', 'confirmed') AND u.id != ?`,
+  ).bind(tournament.id, sender.id).all();
+  await Promise.all((accountUsers.results || []).map((accountUser) =>
+    sendPushNotifications(env, accountUser.id, { title: 'Neue Nachricht', actor: `${sender.firstName} ${sender.lastName}`, messageId: id }).catch((error) =>
+      console.error('Postbox broadcast push dispatch failed', error),
+    ),
+  ));
+
+  for (const recipient of uniqueRecipients.values()) {
+    const templates = TOURNAMENT_BROADCAST_EMAILS[recipient.language] || TOURNAMENT_BROADCAST_EMAILS.de;
+    try {
+      await sendTransactionalEmail(env, {
+        to: recipient.email,
+        subject: templates.subject(tournament.name),
+        text: templates.text(recipient.firstName, tournament.name, `${sender.firstName} ${sender.lastName}`, body),
+        language: recipient.language,
+        logFallback: `Tournament broadcast email for ${recipient.email} (tournament ${tournament.id})`,
+        failureContext: `tournament broadcast for tournament ${tournament.id}`,
+        allowLogFallback: true,
+      });
+    } catch (error) {
+      console.error('Postbox broadcast email dispatch failed', error);
+    }
+  }
+
+  return message;
+}
+
 async function createSystemNotification(env, recipientId, eventType, eventData, pushTitle = 'Neue Statusmeldung') {
   if (!recipientId) return;
   await createPostboxMessage(env, { recipientId, kind: 'system', eventType, eventData, pushTitle });
 }
 
-async function notifyUserByEmail(env, email, eventType, eventData, pushTitle) {
+async function notifyUserByEmail(env, email, eventType, eventData, pushTitle, excludeUserId = null) {
   if (!email) return;
   const user = await env.DB.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').bind(email).first();
-  if (user) await createSystemNotification(env, user.id, eventType, eventData, pushTitle);
+  if (user && user.id !== excludeUserId) await createSystemNotification(env, user.id, eventType, eventData, pushTitle);
 }
 
 async function savePushSubscription(request, db, userId) {
@@ -2438,7 +2567,7 @@ async function createRegistration(request, env, tournament) {
 
   const created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
   await createSystemNotification(env, tournament.created_by, 'registration_status_changed', { tournamentName: tournament.name, status: created.status, participant: `${created.first_name} ${created.last_name}` });
-  await notifyUserByEmail(env, created.email, 'registration_status_changed', { tournamentName: tournament.name, status: created.status });
+  await notifyUserByEmail(env, created.email, 'registration_status_changed', { tournamentName: tournament.name, status: created.status }, undefined, tournament.created_by);
 
   if (displace) {
     await displaceRegistration(env, tournament, displace, appOrigin);
@@ -2502,7 +2631,7 @@ async function updateRegistration(request, env, existing) {
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
   if (updated.status !== existing.status) {
     await createSystemNotification(env, existing.created_by, 'registration_status_changed', { tournamentName: existing.name, status: updated.status, participant: `${updated.first_name} ${updated.last_name}` });
-    await notifyUserByEmail(env, updated.email, 'registration_status_changed', { tournamentName: existing.name, status: updated.status });
+    await notifyUserByEmail(env, updated.email, 'registration_status_changed', { tournamentName: existing.name, status: updated.status }, undefined, existing.created_by);
   }
   return json({ registration: toPublicRegistration(updated) });
 }
@@ -2770,7 +2899,7 @@ async function syncPostResults(request, env, tournamentId) {
     const previous = previousById.get(entry.id);
     if (previous && previous.status !== entry.status && changes) {
       await createSystemNotification(env, previous.created_by, 'registration_status_changed', { tournamentName: previous.name, status: entry.status, participant: `${previous.first_name} ${previous.last_name}` });
-      await notifyUserByEmail(env, previous.email, 'registration_status_changed', { tournamentName: previous.name, status: entry.status });
+      await notifyUserByEmail(env, previous.email, 'registration_status_changed', { tournamentName: previous.name, status: entry.status }, undefined, previous.created_by);
     }
   }
 
@@ -3553,6 +3682,9 @@ function toPostboxMessage(row, currentUserId) {
     senderId: row.sender_id || null,
     senderName: row.sender_id ? `${row.sender_first_name || ''} ${row.sender_last_name || ''}`.trim() : null,
     recipientId: row.recipient_id,
+    recipientName: row.recipient_first_name != null ? `${row.recipient_first_name || ''} ${row.recipient_last_name || ''}`.trim() : null,
+    broadcastTournamentId: row.broadcast_tournament_id || null,
+    broadcastTournamentName: row.broadcast_tournament_name || null,
     kind: row.kind,
     body: row.body || null,
     eventType: row.event_type || null,

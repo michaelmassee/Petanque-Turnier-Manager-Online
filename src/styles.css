@@ -466,7 +466,8 @@ textarea:focus {
 .postbox-panel h2, .postbox-panel h3 { margin: 0; }
 .postbox-compose { gap: 8px; }
 .postbox-section { display: grid; gap: 8px; }
-.postbox-todo { margin: 0; padding: 9px; border-radius: 6px; background: #fff8e8; }
+.postbox-todo { display: block; width: 100%; margin: 0; padding: 9px; border: none; border-radius: 6px; background: #fff8e8; color: inherit; text-align: left; cursor: pointer; }
+.postbox-todo:hover { background: #ffefc4; }
 .postbox-message { display: grid; gap: 3px; width: 100%; padding: 10px; border: 1px solid #d7deea; border-radius: 6px; background: #fff; color: inherit; text-align: left; }
 .postbox-message.unread { border-color: #1677ff; background: #f3f8ff; }
 .postbox-panel .hint { margin: 4px 0 0; font-size: 0.85rem; color: #53627a; }

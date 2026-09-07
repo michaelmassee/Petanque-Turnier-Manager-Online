@@ -8,11 +8,11 @@ const ROLES = [
 ];
 
 const POSTBOX_TEXT = {
-  de: { inbox: 'Postbox', close: 'Schließen', enable: 'Push-Benachrichtigungen aktivieren', recipient: 'Empfänger', chooseRecipient: 'Empfänger auswählen', message: 'Nachricht', send: 'Senden', todos: 'Aufgaben', messages: 'Nachrichten', none: 'Keine Nachrichten vorhanden.', status: 'Statusmeldung', you: 'Du', unsupported: 'Push-Benachrichtigungen werden von diesem Browser nicht unterstützt.', denied: 'Push-Benachrichtigungen wurden nicht erlaubt.', setupError: 'Push konnte trotz erteilter Berechtigung nicht eingerichtet werden. Bitte versuche es erneut.', enabled: 'Push-Benachrichtigungen sind aktiviert.', migrationTitle: 'Push-Benachrichtigungen', migrationText: 'Aktiviere Push, damit neue Nachrichten auch bei geschlossener App angezeigt werden.', later: 'Nicht aktivieren', blocked: 'Push ist in den Browser-Einstellungen blockiert. Du kannst die Berechtigung dort wieder erlauben.', todo_unverified_users: 'E-Mail-Bestätigungen prüfen', todo_api_key_requests: 'API-Schlüssel-Anträge prüfen', todo_pending_registrations: 'Ausstehende Anmeldungen bearbeiten', todo_waitlist: 'Wartelisten prüfen' },
-  nl: { inbox: 'Postvak', close: 'Sluiten', enable: 'Pushmeldingen inschakelen', recipient: 'Ontvanger', chooseRecipient: 'Ontvanger kiezen', message: 'Bericht', send: 'Versturen', todos: 'Taken', messages: 'Berichten', none: 'Geen berichten aanwezig.', status: 'Statusmelding', you: 'Jij', unsupported: 'Pushmeldingen worden niet ondersteund door deze browser.', denied: 'Pushmeldingen zijn niet toegestaan.', setupError: 'Push kon ondanks de toestemming niet worden ingesteld. Probeer het opnieuw.', enabled: 'Pushmeldingen zijn ingeschakeld.', migrationTitle: 'Pushmeldingen', migrationText: 'Schakel push in zodat nieuwe berichten ook worden getoond wanneer de app gesloten is.', later: 'Niet inschakelen', blocked: 'Push is geblokkeerd in de browserinstellingen. Je kunt de toestemming daar weer toestaan.', todo_unverified_users: 'E-mailbevestigingen controleren', todo_api_key_requests: 'API-sleutelaanvragen controleren', todo_pending_registrations: 'Openstaande inschrijvingen behandelen', todo_waitlist: 'Wachtlijsten controleren' },
-  en: { inbox: 'Inbox', close: 'Close', enable: 'Enable push notifications', recipient: 'Recipient', chooseRecipient: 'Choose recipient', message: 'Message', send: 'Send', todos: 'Tasks', messages: 'Messages', none: 'No messages yet.', status: 'Status notification', you: 'You', unsupported: 'Push notifications are not supported by this browser.', denied: 'Push notifications were not allowed.', setupError: 'Push could not be set up despite permission being granted. Please try again.', enabled: 'Push notifications are enabled.', migrationTitle: 'Push notifications', migrationText: 'Enable push so new messages are shown even when the app is closed.', later: 'Do not enable', blocked: 'Push is blocked in the browser settings. You can allow it there again.', todo_unverified_users: 'Review email confirmations', todo_api_key_requests: 'Review API key requests', todo_pending_registrations: 'Process pending registrations', todo_waitlist: 'Review waitlists' },
-  es: { inbox: 'Buzón', close: 'Cerrar', enable: 'Activar notificaciones push', recipient: 'Destinatario', chooseRecipient: 'Elegir destinatario', message: 'Mensaje', send: 'Enviar', todos: 'Tareas', messages: 'Mensajes', none: 'No hay mensajes.', status: 'Notificación de estado', you: 'Tú', unsupported: 'Este navegador no admite notificaciones push.', denied: 'Las notificaciones push no fueron permitidas.', setupError: 'No se pudo configurar push a pesar de tener permiso. Inténtalo de nuevo.', enabled: 'Las notificaciones push están activadas.', migrationTitle: 'Notificaciones push', migrationText: 'Activa push para ver mensajes nuevos incluso cuando la aplicación está cerrada.', later: 'No activar', blocked: 'Push está bloqueado en la configuración del navegador. Puedes permitirlo allí de nuevo.', todo_unverified_users: 'Revisar confirmaciones de correo', todo_api_key_requests: 'Revisar solicitudes de clave API', todo_pending_registrations: 'Gestionar inscripciones pendientes', todo_waitlist: 'Revisar listas de espera' },
-  fr: { inbox: 'Boîte de réception', close: 'Fermer', enable: 'Activer les notifications push', recipient: 'Destinataire', chooseRecipient: 'Choisir un destinataire', message: 'Message', send: 'Envoyer', todos: 'Tâches', messages: 'Messages', none: 'Aucun message.', status: 'Notification de statut', you: 'Vous', unsupported: 'Les notifications push ne sont pas prises en charge par ce navigateur.', denied: 'Les notifications push ne sont pas autorisées.', setupError: 'Les notifications push n’ont pas pu être configurées malgré l’autorisation. Réessaie.', enabled: 'Les notifications push sont activées.', migrationTitle: 'Notifications push', migrationText: 'Active les notifications pour voir les nouveaux messages même quand l’application est fermée.', later: 'Ne pas activer', blocked: 'Les notifications push sont bloquées dans les réglages du navigateur. Tu peux les y autoriser de nouveau.', todo_unverified_users: 'Vérifier les confirmations d’e-mail', todo_api_key_requests: 'Vérifier les demandes de clé API', todo_pending_registrations: 'Traiter les inscriptions en attente', todo_waitlist: 'Vérifier les listes d’attente' },
+  de: { inbox: 'Postbox', close: 'Schließen', enable: 'Push-Benachrichtigungen aktivieren', recipient: 'Empfänger', chooseRecipient: 'Empfänger auswählen', message: 'Nachricht', send: 'Senden', todos: 'Aufgaben', messages: 'Nachrichten', none: 'Keine Nachrichten vorhanden.', status: 'Statusmeldung', you: 'Du', unsupported: 'Push-Benachrichtigungen werden von diesem Browser nicht unterstützt.', denied: 'Push-Benachrichtigungen wurden nicht erlaubt.', setupError: 'Push konnte trotz erteilter Berechtigung nicht eingerichtet werden. Bitte versuche es erneut.', enabled: 'Push-Benachrichtigungen sind aktiviert.', migrationTitle: 'Push-Benachrichtigungen', migrationText: 'Aktiviere Push, damit neue Nachrichten auch bei geschlossener App angezeigt werden.', later: 'Nicht aktivieren', blocked: 'Push ist in den Browser-Einstellungen blockiert. Du kannst die Berechtigung dort wieder erlauben.', todo_unverified_users: 'E-Mail-Bestätigungen prüfen', todo_api_key_requests: 'API-Schlüssel-Anträge prüfen', todo_pending_registrations: 'Ausstehende Anmeldungen bearbeiten', todo_waitlist: 'Wartelisten prüfen', allParticipantsOf: 'Alle Teilnehmer von {name}' },
+  nl: { inbox: 'Postvak', close: 'Sluiten', enable: 'Pushmeldingen inschakelen', recipient: 'Ontvanger', chooseRecipient: 'Ontvanger kiezen', message: 'Bericht', send: 'Versturen', todos: 'Taken', messages: 'Berichten', none: 'Geen berichten aanwezig.', status: 'Statusmelding', you: 'Jij', unsupported: 'Pushmeldingen worden niet ondersteund door deze browser.', denied: 'Pushmeldingen zijn niet toegestaan.', setupError: 'Push kon ondanks de toestemming niet worden ingesteld. Probeer het opnieuw.', enabled: 'Pushmeldingen zijn ingeschakeld.', migrationTitle: 'Pushmeldingen', migrationText: 'Schakel push in zodat nieuwe berichten ook worden getoond wanneer de app gesloten is.', later: 'Niet inschakelen', blocked: 'Push is geblokkeerd in de browserinstellingen. Je kunt de toestemming daar weer toestaan.', todo_unverified_users: 'E-mailbevestigingen controleren', todo_api_key_requests: 'API-sleutelaanvragen controleren', todo_pending_registrations: 'Openstaande inschrijvingen behandelen', todo_waitlist: 'Wachtlijsten controleren', allParticipantsOf: 'Alle deelnemers van {name}' },
+  en: { inbox: 'Inbox', close: 'Close', enable: 'Enable push notifications', recipient: 'Recipient', chooseRecipient: 'Choose recipient', message: 'Message', send: 'Send', todos: 'Tasks', messages: 'Messages', none: 'No messages yet.', status: 'Status notification', you: 'You', unsupported: 'Push notifications are not supported by this browser.', denied: 'Push notifications were not allowed.', setupError: 'Push could not be set up despite permission being granted. Please try again.', enabled: 'Push notifications are enabled.', migrationTitle: 'Push notifications', migrationText: 'Enable push so new messages are shown even when the app is closed.', later: 'Do not enable', blocked: 'Push is blocked in the browser settings. You can allow it there again.', todo_unverified_users: 'Review email confirmations', todo_api_key_requests: 'Review API key requests', todo_pending_registrations: 'Process pending registrations', todo_waitlist: 'Review waitlists', allParticipantsOf: 'All participants of {name}' },
+  es: { inbox: 'Buzón', close: 'Cerrar', enable: 'Activar notificaciones push', recipient: 'Destinatario', chooseRecipient: 'Elegir destinatario', message: 'Mensaje', send: 'Enviar', todos: 'Tareas', messages: 'Mensajes', none: 'No hay mensajes.', status: 'Notificación de estado', you: 'Tú', unsupported: 'Este navegador no admite notificaciones push.', denied: 'Las notificaciones push no fueron permitidas.', setupError: 'No se pudo configurar push a pesar de tener permiso. Inténtalo de nuevo.', enabled: 'Las notificaciones push están activadas.', migrationTitle: 'Notificaciones push', migrationText: 'Activa push para ver mensajes nuevos incluso cuando la aplicación está cerrada.', later: 'No activar', blocked: 'Push está bloqueado en la configuración del navegador. Puedes permitirlo allí de nuevo.', todo_unverified_users: 'Revisar confirmaciones de correo', todo_api_key_requests: 'Revisar solicitudes de clave API', todo_pending_registrations: 'Gestionar inscripciones pendientes', todo_waitlist: 'Revisar listas de espera', allParticipantsOf: 'Todos los participantes de {name}' },
+  fr: { inbox: 'Boîte de réception', close: 'Fermer', enable: 'Activer les notifications push', recipient: 'Destinataire', chooseRecipient: 'Choisir un destinataire', message: 'Message', send: 'Envoyer', todos: 'Tâches', messages: 'Messages', none: 'Aucun message.', status: 'Notification de statut', you: 'Vous', unsupported: 'Les notifications push ne sont pas prises en charge par ce navigateur.', denied: 'Les notifications push ne sont pas autorisées.', setupError: 'Les notifications push n’ont pas pu être configurées malgré l’autorisation. Réessaie.', enabled: 'Les notifications push sont activées.', migrationTitle: 'Notifications push', migrationText: 'Active les notifications pour voir les nouveaux messages même quand l’application est fermée.', later: 'Ne pas activer', blocked: 'Les notifications push sont bloquées dans les réglages du navigateur. Tu peux les y autoriser de nouveau.', todo_unverified_users: 'Vérifier les confirmations d’e-mail', todo_api_key_requests: 'Vérifier les demandes de clé API', todo_pending_registrations: 'Traiter les inscriptions en attente', todo_waitlist: 'Vérifier les listes d’attente', allParticipantsOf: 'Tous les participants de {name}' },
 };
 
 function postboxText(language, key) {
@@ -227,6 +227,7 @@ export default function App() {
   const [postboxOpen, setPostboxOpen] = useState(false);
   const [postbox, setPostbox] = useState({ messages: [], unreadCount: 0, todos: [] });
   const [postboxRecipients, setPostboxRecipients] = useState([]);
+  const [postboxRecipientTournaments, setPostboxRecipientTournaments] = useState([]);
   const [postboxRecipientId, setPostboxRecipientId] = useState('');
   const [postboxBody, setPostboxBody] = useState('');
   const [pushMigrationDismissed, setPushMigrationDismissed] = useState(() => localStorage.getItem('ptm_push_migration') === 'dismissed');
@@ -511,6 +512,7 @@ export default function App() {
       const [data, recipients] = await Promise.all([api('/api/postbox'), api('/api/postbox/recipients')]);
       setPostbox(data);
       setPostboxRecipients(recipients.recipients);
+      setPostboxRecipientTournaments(recipients.tournaments || []);
     } catch (requestError) {
       setError(translateText(requestError.message, language));
     }
@@ -1589,6 +1591,7 @@ export default function App() {
             messages={postbox.messages}
             todos={postbox.todos}
             recipients={postboxRecipients}
+            recipientTournaments={postboxRecipientTournaments}
             recipientId={postboxRecipientId}
             setRecipientId={setPostboxRecipientId}
             body={postboxBody}
@@ -1601,6 +1604,18 @@ export default function App() {
             onClose={() => setPostboxOpen(false)}
             onRead={handleReadPostboxMessage}
             onSubmit={handleSendPostboxMessage}
+            onTodoClick={(type) => {
+              setPostboxOpen(false);
+              if (type === 'unverified_users') setActiveTab('users');
+              else if (type === 'api_key_requests') setActiveTab('apikeys');
+              else if (type === 'pending_registrations') {
+                setRegistrationStatusFilter('pending');
+                setActiveTab('registrations');
+              } else if (type === 'waitlist') {
+                setRegistrationStatusFilter('waitlist');
+                setActiveTab('registrations');
+              }
+            }}
           />
         }
       >
@@ -2145,7 +2160,7 @@ function PushMigrationNotice({ language, onDismiss, onEnabled }) {
   );
 }
 
-function PostboxControl({ language, open, unreadCount, messages, todos = [], recipients, recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit }) {
+function PostboxControl({ language, open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick }) {
   const [pushState, setPushState] = useState('');
   const [pushErrorDetail, setPushErrorDetail] = useState('');
   const [pushActive, setPushActive] = useState(false);
@@ -2190,15 +2205,23 @@ function PostboxControl({ language, open, unreadCount, messages, todos = [], rec
               {pushState && !pushActive && <p className="hint">{text(pushState)}{pushErrorDetail ? ` (${pushErrorDetail})` : ''}</p>}
             </div>
             <form className="form postbox-compose" onSubmit={onSubmit}>
-              <SelectField label={text('recipient')} value={recipientId} onChange={setRecipientId} options={[{ value: '', label: text('chooseRecipient') }, ...recipients.map((recipient) => ({ value: recipient.id, label: `${recipient.firstName} ${recipient.lastName} (${roleName(recipient.role)})` }))]} />
-              <TextArea label={text('message')} value={body} onChange={setBody} />
+              <SelectField label={text('recipient')} value={recipientId} onChange={setRecipientId} options={[
+                { value: '', label: text('chooseRecipient') },
+                ...recipientTournaments.map((tournament) => ({ value: `tournament:${tournament.id}`, label: text('allParticipantsOf').replace('{name}', tournament.name) })),
+                ...recipients.map((recipient) => ({ value: recipient.id, label: `${recipient.firstName} ${recipient.lastName} (${roleName(recipient.role)})` })),
+              ]} />
+              <TextArea label={text('message')} value={body} onChange={setBody} maxLength={250} />
               <Button type="submit" disabled={!recipientId || !body.trim()}>{text('send')}</Button>
             </form>
-            {todos.length > 0 && <div className="postbox-section"><h3>{text('todos')}</h3>{todos.map((todo) => <p key={todo.type} className="postbox-todo"><strong>{todo.count}</strong> {postboxTodoText(todo.type, language)}</p>)}</div>}
+            {todos.length > 0 && <div className="postbox-section"><h3>{text('todos')}</h3>{todos.map((todo) => (
+              <button className="postbox-todo" key={todo.type} type="button" onClick={() => onTodoClick?.(todo.type)}>
+                <strong>{todo.count}</strong> {postboxTodoText(todo.type, language)}
+              </button>
+            ))}</div>}
             <div className="postbox-section"><h3>{text('messages')}</h3>
               {messages.map((message) => (
                 <button className={`postbox-message ${!message.readAt && !message.mine ? 'unread' : ''}`} key={message.id} type="button" onClick={() => onRead(message)}>
-                  <strong>{message.kind === 'system' ? text('status') : message.mine ? text('you') : message.senderName}</strong>
+                  <strong>{message.kind === 'system' ? text('status') : message.broadcastTournamentName ? (message.mine ? `${text('you')} → ` : `${message.senderName} → `) + text('allParticipantsOf').replace('{name}', message.broadcastTournamentName) : message.mine ? `${text('you')} → ${message.recipientName || ''}` : message.senderName}</strong>
                   <span>{postboxMessageText(message, language)}</span>
                   <small>{new Date(message.createdAt).toLocaleString()}</small>
                 </button>
@@ -4233,11 +4256,11 @@ function TextField({ label, value, onChange, type = 'text', ...props }) {
   );
 }
 
-function TextArea({ label, value, onChange }) {
+function TextArea({ label, value, onChange, maxLength }) {
   return (
     <label>
-      {label}
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={4} />
+      {label}{maxLength ? ` (${value.length}/${maxLength})` : ''}
+      <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={4} maxLength={maxLength} />
     </label>
   );
 }
