@@ -81,13 +81,17 @@ npm run deploy
 
 ## Password reset emails
 
-Password reset tokens are stored in D1. For production email delivery, configure
-these Worker secrets or variables:
+Password reset tokens are stored in D1. Email delivery tries Strato SMTP first
+and automatically falls back to Resend if Strato fails or is not configured.
+For production email delivery, configure these Worker secrets or variables:
 
-- `RESEND_API_KEY`
+- `STRATO_SMTP_USER` (secret)
+- `STRATO_SMTP_PASSWORD` (secret)
+- `STRATO_MAIL_FROM` (optional, falls back to `MAIL_FROM`)
+- `RESEND_API_KEY` (fallback provider)
 - `MAIL_FROM`
 
-Without those values, reset links are logged by the Worker. During local
+Without any of those values, reset links are logged by the Worker. During local
 development on `localhost` or `127.0.0.1`, the reset URL is also returned in the
 API response for testing.
 

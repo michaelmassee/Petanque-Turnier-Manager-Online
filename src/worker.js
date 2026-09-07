@@ -2906,15 +2906,7 @@ async function syncPostResults(request, env, tournamentId) {
   return json({ updatedCount });
 }
 
-async function sendTransactionalEmail(env, { to, subject, text, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
-  if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
-    console.log(logFallback);
-    if (allowLogFallback) {
-      return;
-    }
-    throw new HttpError(503, 'E-Mail-Versand ist nicht konfiguriert.');
-  }
-
+async function sendViaResend(env, { to, subject, body, attachments, failureContext }) {
   let response;
   try {
     response = await fetch('https://api.resend.com/emails', {
@@ -2927,7 +2919,7 @@ async function sendTransactionalEmail(env, { to, subject, text, language = 'de',
         from: env.MAIL_FROM,
         to,
         subject,
-        text: appendEmailFooter(text, language),
+        text: body,
         ...(attachments ? { attachments } : {}),
       }),
     });
@@ -2941,6 +2933,65 @@ async function sendTransactionalEmail(env, { to, subject, text, language = 'de',
     console.error(`Resend failed to send ${failureContext}: ${response.status} ${errorText}`);
     throw new HttpError(503, 'E-Mail konnte nicht versendet werden.');
   }
+}
+
+async function sendViaStrato(env, { to, subject, body, attachments }) {
+  const { WorkerMailer } = await import('worker-mailer');
+  const mailer = await WorkerMailer.connect({
+    credentials: {
+      username: env.STRATO_SMTP_USER,
+      password: env.STRATO_SMTP_PASSWORD,
+    },
+    authType: 'plain',
+    host: env.STRATO_SMTP_HOST || 'smtp.strato.de',
+    port: Number(env.STRATO_SMTP_PORT) || 587,
+    secure: true,
+  });
+
+  try {
+    await mailer.send({
+      from: env.STRATO_MAIL_FROM || env.MAIL_FROM,
+      to,
+      subject,
+      text: body,
+      ...(attachments ? { attachments } : {}),
+    });
+  } finally {
+    await mailer.close?.();
+  }
+}
+
+function stratoConfigured(env) {
+  return Boolean(env.STRATO_SMTP_USER && env.STRATO_SMTP_PASSWORD);
+}
+
+async function sendTransactionalEmail(env, { to, subject, text, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
+  const stratoAvailable = stratoConfigured(env);
+  const resendAvailable = Boolean(env.RESEND_API_KEY && env.MAIL_FROM);
+
+  if (!stratoAvailable && !resendAvailable) {
+    console.log(logFallback);
+    if (allowLogFallback) {
+      return;
+    }
+    throw new HttpError(503, 'E-Mail-Versand ist nicht konfiguriert.');
+  }
+
+  const body = appendEmailFooter(text, language);
+
+  if (stratoAvailable) {
+    try {
+      await sendViaStrato(env, { to, subject, body, attachments });
+      return;
+    } catch (error) {
+      console.error(`Strato SMTP failed to send ${failureContext}, falling back to Resend`, error);
+      if (!resendAvailable) {
+        throw new HttpError(503, 'E-Mail konnte nicht versendet werden.');
+      }
+    }
+  }
+
+  await sendViaResend(env, { to, subject, body, attachments, failureContext });
 }
 
 async function geocodeLocation(query) {

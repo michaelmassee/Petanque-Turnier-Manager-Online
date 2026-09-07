@@ -59,9 +59,14 @@ Commits must follow these rules:
 Use Cloudflare secrets for production:
 
 ```bash
+wrangler secret put STRATO_SMTP_USER
+wrangler secret put STRATO_SMTP_PASSWORD
 wrangler secret put RESEND_API_KEY
 wrangler secret put MAIL_FROM
 ```
+
+Email delivery tries Strato SMTP first and falls back to Resend automatically
+if Strato is unreachable, misconfigured, or rejects the send.
 
 Local development may use an ignored `.env` file. Do not copy real production
 secrets into examples, screenshots, issues or test fixtures.
