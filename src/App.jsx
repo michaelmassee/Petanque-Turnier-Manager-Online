@@ -2126,7 +2126,7 @@ function PushMigrationNotice({ language, onDismiss, onEnabled }) {
   );
 }
 
-function PostboxControl({ language, open, unreadCount, messages, todos, recipients, recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit }) {
+function PostboxControl({ language, open, unreadCount, messages, todos = [], recipients, recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit }) {
   const [pushState, setPushState] = useState('');
   const [pushErrorDetail, setPushErrorDetail] = useState('');
   const text = (key) => postboxText(language, key);
@@ -2141,13 +2141,14 @@ function PostboxControl({ language, open, unreadCount, messages, todos, recipien
     }
   }
 
+  const badgeCount = unreadCount + todos.reduce((sum, todo) => sum + todo.count, 0);
   return (
     <div className="postbox-menu">
       <button className="postbox-btn" type="button" aria-label={text('inbox')} aria-expanded={open} onClick={onToggle}>
         <svg className="postbox-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M3.5 5.5h17v13h-17zM4.5 6.5 12 13l7.5-6.5M4.5 17.5l5.7-5M19.5 17.5l-5.7-5" />
         </svg>
-        {unreadCount > 0 && <span className="postbox-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+        {badgeCount > 0 && <span className="postbox-badge">{badgeCount > 99 ? '99+' : badgeCount}</span>}
       </button>
       {open && (
         <>
