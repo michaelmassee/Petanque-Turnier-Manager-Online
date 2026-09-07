@@ -1,4 +1,5 @@
-import { zonedDateTimeToUtcIso, registrationOpenStatus } from '../src/worker.js';
+import { zonedDateTimeToUtcIso } from '../src/worker.js';
+import { registrationOpenStatus } from '../src/worker-core.js';
 
 let failures = 0;
 

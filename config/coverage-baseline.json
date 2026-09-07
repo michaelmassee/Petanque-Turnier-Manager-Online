@@ -1,0 +1,14 @@
+{
+  "Frontend": {
+    "lines": 100,
+    "statements": 100,
+    "functions": 100,
+    "branches": 97.05
+  },
+  "Worker": {
+    "lines": 100,
+    "statements": 92.55,
+    "functions": 100,
+    "branches": 92.59
+  }
+}

@@ -5,7 +5,7 @@
 //   incompatible with systems that require permanently fixed teams).
 // - Partner fields are only expected for registrationType "forme" (drawn team types
 //   never take partner input, regardless of formation).
-import { normalizeTournamentInput, assertPartnerCountMatchesFormation } from '../src/worker.js';
+import { normalizeTournamentInput, assertPartnerCountMatchesFormation } from '../src/worker-core.js';
 
 const BASE_BODY = {
   name: 'Testturnier',

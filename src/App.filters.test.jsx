@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { filterRegistrations, filterTournaments, filterUsers } from './App.jsx';
+import { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
+import { currencyDecimals } from './currencies.js';
 
 const tournaments = [
   { id: 't1', name: 'Sommerturnier', location: 'Musterstadt', status: 'registration' },
@@ -66,5 +67,13 @@ describe('filterUsers', () => {
 
   it('filtert nach erzwungenem Passwortwechsel', () => {
     expect(filterUsers(users, '', '', 'password_change_required')).toEqual([users[1]]);
+  });
+});
+
+describe('currencyDecimals', () => {
+  it('unterscheidet Null-, Drei- und Standard-Nachkommastellen', () => {
+    expect(currencyDecimals('JPY')).toBe(0);
+    expect(currencyDecimals('KWD')).toBe(3);
+    expect(currencyDecimals('EUR')).toBe(2);
   });
 });

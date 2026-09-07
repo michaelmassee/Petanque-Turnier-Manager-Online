@@ -1,5 +1,11 @@
 import tzlookup from 'tz-lookup';
 import { CURRENCY_CODES } from './currencies.js';
+import { HttpError } from './errors.js';
+import {
+  assertPartnerCountMatchesFormation as assertCorePartnerCountMatchesFormation,
+  normalizeTournamentInput as normalizeCoreTournamentInput,
+  registrationOpenStatus as coreRegistrationOpenStatus,
+} from './worker-core.js';
 
 const ROLES = ['admin', 'user'];
 const DEFAULT_TOURNAMENT_LIMIT = 5;
@@ -1794,7 +1800,7 @@ async function createTournament(request, db, user) {
   }
 
   const body = await readJson(request);
-  const tournament = normalizeTournamentInput(body);
+  const tournament = normalizeCoreTournamentInput(body);
   const presentation = {
     websiteUrl: normalizePresentationUrl(body.websiteUrl),
     logoUrl: normalizePresentationUrl(body.logoUrl),
@@ -1864,7 +1870,7 @@ async function updateTournament(request, db, existing, user) {
     throw new HttpError(409, 'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.');
   }
   const body = await readJson(request);
-  const tournament = normalizeTournamentInput(body);
+  const tournament = normalizeCoreTournamentInput(body);
   const now = new Date().toISOString();
   const managerId = user.role === 'admin' ? tournament.managerId || existing.manager_id || user.id : existing.manager_id || user.id;
   const geo = await resolveTournamentGeolocation(tournament, existing, now);
@@ -2064,7 +2070,7 @@ async function updateTournamentPresentation(request, db, existing, user) {
 async function syncPutTournamentMetadata(request, db, existing, user) {
   const body = await readJson(request);
   const legacyRegistrationTimes = body.registrationTimeSemantics !== 'tournament-local-v1';
-  const tournament = normalizeTournamentInput(body, {
+  const tournament = normalizeCoreTournamentInput(body, {
     legacyRegistrationTimes,
     registrationTypeDefault: existing.registration_type || 'forme',
   });
@@ -2203,7 +2209,7 @@ const REGISTRATION_CLOSED_MESSAGES = {
 async function createRegistration(request, env, tournament) {
   const db = env.DB;
 
-  const openStatus = registrationOpenStatus(tournament);
+  const openStatus = coreRegistrationOpenStatus(tournament);
   if (openStatus !== 'open') {
     throw new HttpError(403, REGISTRATION_CLOSED_MESSAGES[openStatus]);
   }
@@ -2215,7 +2221,7 @@ async function createRegistration(request, env, tournament) {
 
   const registration = normalizeRegistrationInput(body, { requireStatus: false });
   const language = normalizeLanguage(body.language);
-  assertPartnerCountMatchesFormation(tournament, registration);
+  assertCorePartnerCountMatchesFormation(tournament, registration);
   assertLicenseMatchesTournament(tournament, registration);
   const { status, displace } = await initialRegistrationStatus(db, tournament, registration.isVip);
   const now = new Date().toISOString();
@@ -2280,7 +2286,7 @@ async function updateRegistration(request, env, existing) {
   const db = env.DB;
   const body = await readJson(request);
   const registration = normalizeRegistrationInput(body, { requireStatus: true });
-  assertPartnerCountMatchesFormation(existing, registration);
+  assertCorePartnerCountMatchesFormation(existing, registration);
   assertLicenseMatchesTournament(existing, registration);
   const now = new Date().toISOString();
   const confirmedAt = registration.status === 'confirmed' ? existing.confirmed_at || now : null;
@@ -3529,11 +3535,4 @@ function assertSameOriginForUnsafeMethods(request, url) {
 
 function isLocalhost(url) {
   return ['localhost', '127.0.0.1'].includes(url.hostname);
-}
-
-class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
 }

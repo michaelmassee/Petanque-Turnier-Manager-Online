@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { CURRENCY_CODES, currencyDecimals } from './currencies.js';
+import { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 
 const ROLES = [
   { value: 'admin', label: 'Admin' },
@@ -175,55 +176,7 @@ const PROFILE_UPDATE_SUCCESS = 'Deine Daten wurden gespeichert.';
 const PROFILE_EMAIL_CHANGE_PENDING =
   'Deine Daten wurden gespeichert. Bitte bestätige deine neue E-Mail-Adresse über den Link, den wir dir zugeschickt haben.';
 
-export function filterTournaments(tournaments, query, statusFilter) {
-  const normalizedQuery = (query || '').trim().toLowerCase();
-  return tournaments.filter((tournament) => {
-    if (statusFilter && tournament.status !== statusFilter) {
-      return false;
-    }
-    if (!normalizedQuery) {
-      return true;
-    }
-    return [tournament.name, tournament.location].some((value) => (value || '').toLowerCase().includes(normalizedQuery));
-  });
-}
-
-export function filterRegistrations(registrations, query, statusFilter) {
-  const normalizedQuery = (query || '').trim().toLowerCase();
-  return registrations.filter((registration) => {
-    if (statusFilter && registration.status !== statusFilter) {
-      return false;
-    }
-    if (!normalizedQuery) {
-      return true;
-    }
-    return [registration.firstName, registration.lastName, registration.teamName].some((value) =>
-      (value || '').toLowerCase().includes(normalizedQuery),
-    );
-  });
-}
-
-export function filterUsers(users, query, roleFilter, statusFilter) {
-  const normalizedQuery = (query || '').trim().toLowerCase();
-  return users.filter((user) => {
-    if (normalizedQuery && ![user.firstName, user.lastName, user.email].some((value) => (value || '').toLowerCase().includes(normalizedQuery))) {
-      return false;
-    }
-    if (roleFilter && user.role !== roleFilter) {
-      return false;
-    }
-    if (statusFilter === 'verified' && !user.emailVerifiedAt) {
-      return false;
-    }
-    if (statusFilter === 'unverified' && user.emailVerifiedAt) {
-      return false;
-    }
-    if (statusFilter === 'password_change_required' && !user.passwordChangeRequired) {
-      return false;
-    }
-    return true;
-  });
-}
+export { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -501,7 +454,13 @@ export default function App() {
     try {
       const data = await api('/api/tournaments');
       setTournaments(data.tournaments);
-      setSelectedTournamentId((previous) => previous || data.tournaments[0]?.id || '');
+      setSelectedTournamentId((previous) => {
+        if (previous && data.tournaments.some((tournament) => tournament.id === previous)) {
+          return previous;
+        }
+        const manageable = data.tournaments.find((tournament) => tournament.canManage);
+        return manageable?.id || data.tournaments[0]?.id || '';
+      });
     } catch (requestError) {
       setError(translateText(requestError.message, language));
     }
