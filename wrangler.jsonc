@@ -22,7 +22,8 @@
     }
   ],
   "vars": {
-    "MAIL_FROM": "noreply@ptmonline.org"
+    "MAIL_FROM": "noreply@ptmonline.org",
+    "STRATO_MAIL_FROM": "ptmonline@bclinden.de"
   },
   "triggers": {
     "crons": ["0 6 * * *"]

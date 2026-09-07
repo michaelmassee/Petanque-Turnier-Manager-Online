@@ -2944,8 +2944,9 @@ async function sendViaStrato(env, { to, subject, body, attachments }) {
     },
     authType: 'plain',
     host: env.STRATO_SMTP_HOST || 'smtp.strato.de',
-    port: Number(env.STRATO_SMTP_PORT) || 587,
+    port: Number(env.STRATO_SMTP_PORT) || 465,
     secure: true,
+    startTls: false,
   });
 
   try {
