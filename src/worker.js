@@ -1,5 +1,6 @@
 import tzlookup from 'tz-lookup';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
+import { isAllowedPushEndpoint, unreadPostboxCount } from './postbox-core.js';
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
 import {
@@ -1518,8 +1519,8 @@ async function getPostbox(db, user) {
      WHERE m.recipient_id = ? OR m.sender_id = ? ORDER BY m.created_at DESC LIMIT 250`,
   ).bind(user.id, user.id).all();
   const messages = result.results.map((row) => toPostboxMessage(row, user.id));
-  const unread = messages.filter((message) => message.recipientId === user.id && !message.readAt).length;
-  return json({ messages, unreadCount: unread, todos: await listPostboxTodos(db, user) });
+  const unread = await db.prepare('SELECT COUNT(*) AS count FROM postbox_messages WHERE recipient_id = ? AND read_at IS NULL').bind(user.id).first();
+  return json({ messages, unreadCount: unreadPostboxCount(unread), todos: await listPostboxTodos(db, user) });
 }
 
 async function sendPostboxMessage(request, env, sender) {
@@ -1546,13 +1547,13 @@ async function listPostboxTodos(db, user) {
   if (user.role === 'admin') {
     const unverified = await db.prepare('SELECT COUNT(*) AS count FROM users WHERE email_verified_at IS NULL').first();
     const keys = await db.prepare("SELECT COUNT(*) AS count FROM api_keys WHERE status = 'pending'").first();
-    if (Number(unverified?.count)) todos.push({ type: 'unverified_users', count: Number(unverified.count), label: 'E-Mail-Bestätigungen prüfen' });
-    if (Number(keys?.count)) todos.push({ type: 'api_key_requests', count: Number(keys.count), label: 'API-Schlüssel-Anträge prüfen' });
+    if (Number(unverified?.count)) todos.push({ type: 'unverified_users', count: Number(unverified.count) });
+    if (Number(keys?.count)) todos.push({ type: 'api_key_requests', count: Number(keys.count) });
   }
   const pending = await db.prepare("SELECT COUNT(*) AS count FROM registrations r JOIN tournaments t ON t.id = r.tournament_id WHERE t.created_by = ? AND r.status = 'pending'").bind(user.id).first();
   const waitlist = await db.prepare("SELECT COUNT(*) AS count FROM registrations r JOIN tournaments t ON t.id = r.tournament_id WHERE t.created_by = ? AND r.status = 'waitlist'").bind(user.id).first();
-  if (Number(pending?.count)) todos.push({ type: 'pending_registrations', count: Number(pending.count), label: 'Ausstehende Anmeldungen bearbeiten' });
-  if (Number(waitlist?.count)) todos.push({ type: 'waitlist', count: Number(waitlist.count), label: 'Wartelisten prüfen' });
+  if (Number(pending?.count)) todos.push({ type: 'pending_registrations', count: Number(pending.count) });
+  if (Number(waitlist?.count)) todos.push({ type: 'waitlist', count: Number(waitlist.count) });
   return todos;
 }
 
@@ -1587,7 +1588,7 @@ async function savePushSubscription(request, db, userId) {
   const endpoint = String(subscription.endpoint || '');
   const p256dh = String(subscription.keys?.p256dh || '');
   const auth = String(subscription.keys?.auth || '');
-  if (!endpoint.startsWith('https://') || !p256dh || !auth) throw new HttpError(400, 'Ungültiges Push-Abonnement');
+  if (!isAllowedPushEndpoint(endpoint) || !p256dh || !auth) throw new HttpError(400, 'Ungültiges Push-Abonnement');
   const now = new Date().toISOString();
   await db.prepare(`INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, expiration_time, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth, expiration_time = excluded.expiration_time, updated_at = excluded.updated_at`)

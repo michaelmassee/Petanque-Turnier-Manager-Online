@@ -7,6 +7,18 @@ const ROLES = [
   { value: 'user', label: 'User' },
 ];
 
+const POSTBOX_TEXT = {
+  de: { inbox: 'Postbox', close: 'Schließen', enable: 'Push-Benachrichtigungen aktivieren', recipient: 'Empfänger', chooseRecipient: 'Empfänger auswählen', message: 'Nachricht', send: 'Senden', todos: 'Aufgaben', messages: 'Nachrichten', none: 'Keine Nachrichten vorhanden.', status: 'Statusmeldung', you: 'Du', unsupported: 'Push-Benachrichtigungen werden von diesem Browser nicht unterstützt.', denied: 'Push-Benachrichtigungen wurden nicht erlaubt.', enabled: 'Push-Benachrichtigungen sind aktiviert.', migrationTitle: 'Push-Benachrichtigungen', migrationText: 'Aktiviere Push, damit neue Nachrichten auch bei geschlossener App angezeigt werden.', later: 'Nicht aktivieren', blocked: 'Push ist in den Browser-Einstellungen blockiert. Du kannst die Berechtigung dort wieder erlauben.', todo_unverified_users: 'E-Mail-Bestätigungen prüfen', todo_api_key_requests: 'API-Schlüssel-Anträge prüfen', todo_pending_registrations: 'Ausstehende Anmeldungen bearbeiten', todo_waitlist: 'Wartelisten prüfen' },
+  nl: { inbox: 'Postvak', close: 'Sluiten', enable: 'Pushmeldingen inschakelen', recipient: 'Ontvanger', chooseRecipient: 'Ontvanger kiezen', message: 'Bericht', send: 'Versturen', todos: 'Taken', messages: 'Berichten', none: 'Geen berichten aanwezig.', status: 'Statusmelding', you: 'Jij', unsupported: 'Pushmeldingen worden niet ondersteund door deze browser.', denied: 'Pushmeldingen zijn niet toegestaan.', enabled: 'Pushmeldingen zijn ingeschakeld.', migrationTitle: 'Pushmeldingen', migrationText: 'Schakel push in zodat nieuwe berichten ook worden getoond wanneer de app gesloten is.', later: 'Niet inschakelen', blocked: 'Push is geblokkeerd in de browserinstellingen. Je kunt de toestemming daar weer toestaan.', todo_unverified_users: 'E-mailbevestigingen controleren', todo_api_key_requests: 'API-sleutelaanvragen controleren', todo_pending_registrations: 'Openstaande inschrijvingen behandelen', todo_waitlist: 'Wachtlijsten controleren' },
+  en: { inbox: 'Inbox', close: 'Close', enable: 'Enable push notifications', recipient: 'Recipient', chooseRecipient: 'Choose recipient', message: 'Message', send: 'Send', todos: 'Tasks', messages: 'Messages', none: 'No messages yet.', status: 'Status notification', you: 'You', unsupported: 'Push notifications are not supported by this browser.', denied: 'Push notifications were not allowed.', enabled: 'Push notifications are enabled.', migrationTitle: 'Push notifications', migrationText: 'Enable push so new messages are shown even when the app is closed.', later: 'Do not enable', blocked: 'Push is blocked in the browser settings. You can allow it there again.', todo_unverified_users: 'Review email confirmations', todo_api_key_requests: 'Review API key requests', todo_pending_registrations: 'Process pending registrations', todo_waitlist: 'Review waitlists' },
+  es: { inbox: 'Buzón', close: 'Cerrar', enable: 'Activar notificaciones push', recipient: 'Destinatario', chooseRecipient: 'Elegir destinatario', message: 'Mensaje', send: 'Enviar', todos: 'Tareas', messages: 'Mensajes', none: 'No hay mensajes.', status: 'Notificación de estado', you: 'Tú', unsupported: 'Este navegador no admite notificaciones push.', denied: 'Las notificaciones push no fueron permitidas.', enabled: 'Las notificaciones push están activadas.', migrationTitle: 'Notificaciones push', migrationText: 'Activa push para ver mensajes nuevos incluso cuando la aplicación está cerrada.', later: 'No activar', blocked: 'Push está bloqueado en la configuración del navegador. Puedes permitirlo allí de nuevo.', todo_unverified_users: 'Revisar confirmaciones de correo', todo_api_key_requests: 'Revisar solicitudes de clave API', todo_pending_registrations: 'Gestionar inscripciones pendientes', todo_waitlist: 'Revisar listas de espera' },
+  fr: { inbox: 'Boîte de réception', close: 'Fermer', enable: 'Activer les notifications push', recipient: 'Destinataire', chooseRecipient: 'Choisir un destinataire', message: 'Message', send: 'Envoyer', todos: 'Tâches', messages: 'Messages', none: 'Aucun message.', status: 'Notification de statut', you: 'Vous', unsupported: 'Les notifications push ne sont pas prises en charge par ce navigateur.', denied: 'Les notifications push ne sont pas autorisées.', enabled: 'Les notifications push sont activées.', migrationTitle: 'Notifications push', migrationText: 'Active les notifications pour voir les nouveaux messages même quand l’application est fermée.', later: 'Ne pas activer', blocked: 'Les notifications push sont bloquées dans les réglages du navigateur. Tu peux les y autoriser de nouveau.', todo_unverified_users: 'Vérifier les confirmations d’e-mail', todo_api_key_requests: 'Vérifier les demandes de clé API', todo_pending_registrations: 'Traiter les inscriptions en attente', todo_waitlist: 'Vérifier les listes d’attente' },
+};
+
+function postboxText(language, key) {
+  return POSTBOX_TEXT[language]?.[key] || POSTBOX_TEXT.de[key];
+}
+
 const TOURNAMENT_TYPES = [
   { value: 'formule_x', label: 'Formule X' },
   { value: 'jeder_gegen_jeden', label: 'Jeder gegen Jeden' },
@@ -217,6 +229,7 @@ export default function App() {
   const [postboxRecipients, setPostboxRecipients] = useState([]);
   const [postboxRecipientId, setPostboxRecipientId] = useState('');
   const [postboxBody, setPostboxBody] = useState('');
+  const [pushMigrationDismissed, setPushMigrationDismissed] = useState(() => localStorage.getItem('ptm_push_migration') === 'dismissed');
   const [users, setUsers] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [registrations, setRegistrations] = useState([]);
@@ -1568,8 +1581,9 @@ export default function App() {
             />
           ) : null
         }
-          postboxControl={
+        postboxControl={
           <PostboxControl
+            language={language}
             open={postboxOpen}
             unreadCount={postbox.unreadCount}
             messages={postbox.messages}
@@ -1683,6 +1697,20 @@ export default function App() {
       </AppHeader>
 
       <Feedback message={message} error={error} />
+
+      {currentUser && !pushMigrationDismissed && (
+        <PushMigrationNotice
+          language={language}
+          onDismiss={() => {
+            localStorage.setItem('ptm_push_migration', 'dismissed');
+            setPushMigrationDismissed(true);
+          }}
+          onEnabled={() => {
+            localStorage.setItem('ptm_push_migration', 'enabled');
+            setPushMigrationDismissed(true);
+          }}
+        />
+      )}
 
       {activeTab === 'home' && (
         <HomeTournaments
@@ -2051,53 +2079,78 @@ function CancelRegistrationForm({ onSubmit, onBack }) {
   );
 }
 
-function PostboxControl({ open, unreadCount, messages, todos, recipients, recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit }) {
+async function subscribeToPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return 'unsupported';
+  if (Notification.permission === 'denied') return 'blocked';
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') return 'denied';
+  const { publicKey } = await api('/api/push/public-key');
+  const registration = await navigator.serviceWorker.ready;
+  const existing = await registration.pushManager.getSubscription();
+  const subscription = existing || await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64urlToUint8Array(publicKey) });
+  await api('/api/push/subscriptions', { method: 'POST', body: JSON.stringify(subscription.toJSON()) });
+  return 'enabled';
+}
+
+function PushMigrationNotice({ language, onDismiss, onEnabled }) {
+  const [state, setState] = useState('');
+  const text = (key) => postboxText(language, key);
+  async function enable() {
+    try {
+      const result = await subscribeToPush();
+      setState(result);
+      if (result === 'enabled') onEnabled();
+    } catch {
+      setState('denied');
+    }
+  }
+  return (
+    <section className="panel push-migration-notice" aria-label={text('migrationTitle')}>
+      <h2>{text('migrationTitle')}</h2>
+      <p>{state === 'blocked' ? text('blocked') : text('migrationText')}</p>
+      {state && state !== 'enabled' && <p className="hint">{text(state)}</p>}
+      <div className="dialog-actions"><Button onClick={enable}>{text('enable')}</Button><Button variant="secondary" onClick={onDismiss}>{text('later')}</Button></div>
+    </section>
+  );
+}
+
+function PostboxControl({ language, open, unreadCount, messages, todos, recipients, recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit }) {
   const [pushState, setPushState] = useState('');
+  const text = (key) => postboxText(language, key);
 
   async function enablePush() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-      setPushState('Push-Benachrichtigungen werden von diesem Browser nicht unterstützt.');
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      setPushState('Push-Benachrichtigungen wurden nicht erlaubt.');
-      return;
-    }
-    const { publicKey } = await api('/api/push/public-key');
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64urlToUint8Array(publicKey) });
-    await api('/api/push/subscriptions', { method: 'POST', body: JSON.stringify(subscription.toJSON()) });
-    setPushState('Push-Benachrichtigungen sind aktiviert.');
+    try { setPushState(await subscribeToPush()); } catch { setPushState('denied'); }
   }
 
   return (
     <div className="postbox-menu">
-      <button className="postbox-btn" type="button" aria-label="Postbox öffnen" aria-expanded={open} onClick={onToggle}>
-        <span aria-hidden="true">✉</span>
+      <button className="postbox-btn" type="button" aria-label={text('inbox')} aria-expanded={open} onClick={onToggle}>
+        <svg className="postbox-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3.5 5.5h17v13h-17zM4.5 6.5 12 13l7.5-6.5M4.5 17.5l5.7-5M19.5 17.5l-5.7-5" />
+        </svg>
         {unreadCount > 0 && <span className="postbox-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
       </button>
       {open && (
         <>
           <div className="search-menu-backdrop" onClick={onClose} />
-          <section className="postbox-panel" aria-label="Postbox">
-            <div className="section-title"><h2>Postbox</h2><button className="link-button" type="button" onClick={onClose}>Schließen</button></div>
-            <div><Button variant="secondary" onClick={enablePush}>Push-Benachrichtigungen aktivieren</Button>{pushState && <p className="hint">{pushState}</p>}</div>
+          <section className="postbox-panel" aria-label={text('inbox')}>
+            <div className="section-title"><h2>{text('inbox')}</h2><button className="link-button" type="button" onClick={onClose}>{text('close')}</button></div>
+            <div><Button variant="secondary" onClick={enablePush}>{text('enable')}</Button>{pushState && <p className="hint">{text(pushState)}</p>}</div>
             <form className="form postbox-compose" onSubmit={onSubmit}>
-              <SelectField label="Empfänger" value={recipientId} onChange={setRecipientId} options={[{ value: '', label: 'Empfänger auswählen' }, ...recipients.map((recipient) => ({ value: recipient.id, label: `${recipient.firstName} ${recipient.lastName} (${roleName(recipient.role)})` }))]} />
-              <TextArea label="Nachricht" value={body} onChange={setBody} />
-              <Button type="submit" disabled={!recipientId || !body.trim()}>Senden</Button>
+              <SelectField label={text('recipient')} value={recipientId} onChange={setRecipientId} options={[{ value: '', label: text('chooseRecipient') }, ...recipients.map((recipient) => ({ value: recipient.id, label: `${recipient.firstName} ${recipient.lastName} (${roleName(recipient.role)})` }))]} />
+              <TextArea label={text('message')} value={body} onChange={setBody} />
+              <Button type="submit" disabled={!recipientId || !body.trim()}>{text('send')}</Button>
             </form>
-            {todos.length > 0 && <div className="postbox-section"><h3>Aufgaben</h3>{todos.map((todo) => <p key={todo.type} className="postbox-todo"><strong>{todo.count}</strong> {todo.label}</p>)}</div>}
-            <div className="postbox-section"><h3>Nachrichten</h3>
+            {todos.length > 0 && <div className="postbox-section"><h3>{text('todos')}</h3>{todos.map((todo) => <p key={todo.type} className="postbox-todo"><strong>{todo.count}</strong> {postboxTodoText(todo.type, language)}</p>)}</div>}
+            <div className="postbox-section"><h3>{text('messages')}</h3>
               {messages.map((message) => (
                 <button className={`postbox-message ${!message.readAt && !message.mine ? 'unread' : ''}`} key={message.id} type="button" onClick={() => onRead(message)}>
-                  <strong>{message.kind === 'system' ? 'Statusmeldung' : message.mine ? 'Du' : message.senderName}</strong>
-                  <span>{postboxMessageText(message)}</span>
+                  <strong>{message.kind === 'system' ? text('status') : message.mine ? text('you') : message.senderName}</strong>
+                  <span>{postboxMessageText(message, language)}</span>
                   <small>{new Date(message.createdAt).toLocaleString()}</small>
                 </button>
               ))}
-              {messages.length === 0 && <p className="muted">Keine Nachrichten vorhanden.</p>}
+              {messages.length === 0 && <p className="muted">{text('none')}</p>}
             </div>
           </section>
         </>
@@ -2112,12 +2165,16 @@ function base64urlToUint8Array(value) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-function postboxMessageText(message) {
+function postboxMessageText(message, language) {
   if (message.kind === 'direct') return message.body;
   const data = message.eventData || {};
   if (message.eventType === 'tournament_status_changed') return `${data.tournamentName}: Status ${labelFor(TOURNAMENT_STATUSES, data.status)}`;
   if (message.eventType === 'registration_status_changed') return `${data.tournamentName}: Anmeldung ${labelFor(REGISTRATION_STATUSES, data.status)}`;
-  return 'Es gibt eine neue Verwaltungsstatusmeldung.';
+  return postboxText(language, 'status');
+}
+
+function postboxTodoText(type, language) {
+  return postboxText(language, `todo_${type}`);
 }
 
 function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, children }) {

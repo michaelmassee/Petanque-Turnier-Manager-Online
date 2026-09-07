@@ -458,7 +458,8 @@ textarea:focus {
 }
 
 .postbox-menu { position: static; }
-.postbox-btn { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #bcc8d9; border-radius: 6px; background: #fff; color: #172033; font-size: 1.15rem; }
+.postbox-btn { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #bcc8d9; border-radius: 6px; background: #fff; color: #172033; }
+.postbox-icon { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .postbox-btn:hover, .postbox-btn[aria-expanded="true"] { border-color: #1677ff; background: #ecf4ff; }
 .postbox-badge { position: absolute; top: -7px; right: -7px; min-width: 19px; padding: 2px 5px; border-radius: 999px; background: #c21d32; color: #fff; font-size: .68rem; font-weight: 800; }
 .postbox-panel { position: absolute; z-index: 12; top: calc(100% + 8px); right: 0; display: grid; gap: 14px; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 110px); overflow: auto; padding: 18px; border: 1px solid #d7deea; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgb(23 32 51 / 16%); }
@@ -470,6 +471,8 @@ textarea:focus {
 .postbox-message.unread { border-color: #1677ff; background: #f3f8ff; }
 .postbox-panel .hint { margin: 4px 0 0; font-size: 0.85rem; color: #53627a; }
 .postbox-message small { color: #66758c; }
+.push-migration-notice { max-width: 680px; margin: 0 auto 18px; }
+.push-migration-notice h2 { margin-top: 0; }
 
 .search-menu-btn:hover {
   border-color: #1677ff;

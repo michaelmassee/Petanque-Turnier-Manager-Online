@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ptm-online-v4';
+const CACHE_NAME = 'ptm-online-v5';
 const API_CACHE_NAME = 'ptm-online-api-v1';
 const APP_SHELL = [
   '/',
