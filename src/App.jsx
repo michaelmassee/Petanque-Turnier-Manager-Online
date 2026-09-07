@@ -212,6 +212,11 @@ export default function App() {
   const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
   const [path, navigate] = usePath();
   const [currentUser, setCurrentUser] = useState(null);
+  const [postboxOpen, setPostboxOpen] = useState(false);
+  const [postbox, setPostbox] = useState({ messages: [], unreadCount: 0, todos: [] });
+  const [postboxRecipients, setPostboxRecipients] = useState([]);
+  const [postboxRecipientId, setPostboxRecipientId] = useState('');
+  const [postboxBody, setPostboxBody] = useState('');
   const [users, setUsers] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [registrations, setRegistrations] = useState([]);
@@ -400,7 +405,14 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       loadTournaments();
+      loadPostbox();
     }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    const timer = window.setInterval(loadPostbox, 60000);
+    return () => window.clearInterval(timer);
   }, [currentUser]);
 
   useEffect(() => {
@@ -478,6 +490,38 @@ export default function App() {
       setRegistrations(data.registrations);
     } catch (requestError) {
       setError(translateText(requestError.message, language));
+    }
+  }
+
+  async function loadPostbox() {
+    try {
+      const [data, recipients] = await Promise.all([api('/api/postbox'), api('/api/postbox/recipients')]);
+      setPostbox(data);
+      setPostboxRecipients(recipients.recipients);
+    } catch (requestError) {
+      setError(translateText(requestError.message, language));
+    }
+  }
+
+  async function handleSendPostboxMessage(event) {
+    event.preventDefault();
+    try {
+      await api('/api/postbox/messages', { method: 'POST', body: JSON.stringify({ recipientId: postboxRecipientId, body: postboxBody }) });
+      setPostboxBody('');
+      setPostboxRecipientId('');
+      await loadPostbox();
+    } catch (requestError) {
+      setError(translateText(requestError.message, language));
+    }
+  }
+
+  async function handleReadPostboxMessage(message) {
+    if (message.kind === 'direct' && !message.mine && message.senderId) {
+      setPostboxRecipientId(message.senderId);
+    }
+    if (message.recipientId === currentUser?.id && !message.readAt) {
+      await api(`/api/postbox/messages/${message.id}/read`, { method: 'POST' });
+      await loadPostbox();
     }
   }
 
@@ -1524,6 +1568,27 @@ export default function App() {
             />
           ) : null
         }
+          postboxControl={
+          <PostboxControl
+            open={postboxOpen}
+            unreadCount={postbox.unreadCount}
+            messages={postbox.messages}
+            todos={postbox.todos}
+            recipients={postboxRecipients}
+            recipientId={postboxRecipientId}
+            setRecipientId={setPostboxRecipientId}
+            body={postboxBody}
+            setBody={setPostboxBody}
+            onToggle={() => {
+              setMenuOpen(false);
+              setSearchMenuOpen(false);
+              setPostboxOpen((open) => !open);
+            }}
+            onClose={() => setPostboxOpen(false)}
+            onRead={handleReadPostboxMessage}
+            onSubmit={handleSendPostboxMessage}
+          />
+        }
       >
         <div className="drawer-user">
           <span>{currentUser.firstName} {currentUser.lastName}</span>
@@ -1986,7 +2051,76 @@ function CancelRegistrationForm({ onSubmit, onBack }) {
   );
 }
 
-function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, children }) {
+function PostboxControl({ open, unreadCount, messages, todos, recipients, recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit }) {
+  const [pushState, setPushState] = useState('');
+
+  async function enablePush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      setPushState('Push-Benachrichtigungen werden von diesem Browser nicht unterstützt.');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      setPushState('Push-Benachrichtigungen wurden nicht erlaubt.');
+      return;
+    }
+    const { publicKey } = await api('/api/push/public-key');
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64urlToUint8Array(publicKey) });
+    await api('/api/push/subscriptions', { method: 'POST', body: JSON.stringify(subscription.toJSON()) });
+    setPushState('Push-Benachrichtigungen sind aktiviert.');
+  }
+
+  return (
+    <div className="postbox-menu">
+      <button className="postbox-btn" type="button" aria-label="Postbox öffnen" aria-expanded={open} onClick={onToggle}>
+        <span aria-hidden="true">✉</span>
+        {unreadCount > 0 && <span className="postbox-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+      </button>
+      {open && (
+        <>
+          <div className="search-menu-backdrop" onClick={onClose} />
+          <section className="postbox-panel" aria-label="Postbox">
+            <div className="section-title"><h2>Postbox</h2><button className="link-button" type="button" onClick={onClose}>Schließen</button></div>
+            <div><Button variant="secondary" onClick={enablePush}>Push-Benachrichtigungen aktivieren</Button>{pushState && <p className="hint">{pushState}</p>}</div>
+            <form className="form postbox-compose" onSubmit={onSubmit}>
+              <SelectField label="Empfänger" value={recipientId} onChange={setRecipientId} options={[{ value: '', label: 'Empfänger auswählen' }, ...recipients.map((recipient) => ({ value: recipient.id, label: `${recipient.firstName} ${recipient.lastName} (${roleName(recipient.role)})` }))]} />
+              <TextArea label="Nachricht" value={body} onChange={setBody} />
+              <Button type="submit" disabled={!recipientId || !body.trim()}>Senden</Button>
+            </form>
+            {todos.length > 0 && <div className="postbox-section"><h3>Aufgaben</h3>{todos.map((todo) => <p key={todo.type} className="postbox-todo"><strong>{todo.count}</strong> {todo.label}</p>)}</div>}
+            <div className="postbox-section"><h3>Nachrichten</h3>
+              {messages.map((message) => (
+                <button className={`postbox-message ${!message.readAt && !message.mine ? 'unread' : ''}`} key={message.id} type="button" onClick={() => onRead(message)}>
+                  <strong>{message.kind === 'system' ? 'Statusmeldung' : message.mine ? 'Du' : message.senderName}</strong>
+                  <span>{postboxMessageText(message)}</span>
+                  <small>{new Date(message.createdAt).toLocaleString()}</small>
+                </button>
+              ))}
+              {messages.length === 0 && <p className="muted">Keine Nachrichten vorhanden.</p>}
+            </div>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+function base64urlToUint8Array(value) {
+  const padded = value + '='.repeat((4 - (value.length % 4)) % 4);
+  const binary = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function postboxMessageText(message) {
+  if (message.kind === 'direct') return message.body;
+  const data = message.eventData || {};
+  if (message.eventType === 'tournament_status_changed') return `${data.tournamentName}: Status ${labelFor(TOURNAMENT_STATUSES, data.status)}`;
+  if (message.eventType === 'registration_status_changed') return `${data.tournamentName}: Anmeldung ${labelFor(REGISTRATION_STATUSES, data.status)}`;
+  return 'Es gibt eine neue Verwaltungsstatusmeldung.';
+}
+
+function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, children }) {
   return (
     <header className="topbar">
       <button
@@ -2009,6 +2143,7 @@ function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onC
       </button>
       <div className="topbar-actions">
         {searchControl}
+        {postboxControl}
         <button
           className="hamburger-btn"
           type="button"

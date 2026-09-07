@@ -1,4 +1,5 @@
 import tzlookup from 'tz-lookup';
+import { buildPushPayload } from '@block65/webcrypto-web-push';
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
 import {
@@ -570,6 +571,43 @@ export default {
         return await updateOwnProfile(request, env, url, session.user.id);
       }
 
+      if (request.method === 'GET' && url.pathname === '/api/postbox') {
+        const session = await requireSession(request, env.DB);
+        return await getPostbox(env.DB, session.user);
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/postbox/recipients') {
+        const session = await requireSession(request, env.DB);
+        return await listPostboxRecipients(env.DB, session.user.id);
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/postbox/messages') {
+        const session = await requireSession(request, env.DB);
+        return await sendPostboxMessage(request, env, session.user);
+      }
+
+      const postboxReadMatch = url.pathname.match(/^\/api\/postbox\/messages\/([^/]+)\/read$/);
+      if (postboxReadMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        return await markPostboxMessageRead(env.DB, postboxReadMatch[1], session.user.id);
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/push/public-key') {
+        await requireSession(request, env.DB);
+        if (!env.VAPID_PUBLIC_KEY) throw new HttpError(503, 'Push-Benachrichtigungen sind nicht konfiguriert');
+        return json({ publicKey: env.VAPID_PUBLIC_KEY });
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/push/subscriptions') {
+        const session = await requireSession(request, env.DB);
+        return await savePushSubscription(request, env.DB, session.user.id);
+      }
+
+      if (request.method === 'DELETE' && url.pathname === '/api/push/subscriptions') {
+        const session = await requireSession(request, env.DB);
+        return await removePushSubscription(request, env.DB, session.user.id);
+      }
+
       if (url.pathname === '/api/users') {
         const session = await requireAdmin(request, env.DB);
 
@@ -587,7 +625,7 @@ export default {
         const session = await requireAdmin(request, env.DB);
 
         if (request.method === 'PUT') {
-          return await updateUser(request, env.DB, userMatch[1], session.user.id);
+          return await updateUser(request, env, userMatch[1], session.user.id);
         }
 
         if (request.method === 'DELETE') {
@@ -623,13 +661,13 @@ export default {
       const adminApiKeyApproveMatch = url.pathname.match(/^\/api\/admin\/api-keys\/([^/]+)\/approve$/);
       if (adminApiKeyApproveMatch && request.method === 'POST') {
         const session = await requireAdmin(request, env.DB);
-        return await approveApiKey(env.DB, adminApiKeyApproveMatch[1], session.user.id);
+        return await approveApiKey(env, adminApiKeyApproveMatch[1], session.user.id);
       }
 
       const adminApiKeyRevokeMatch = url.pathname.match(/^\/api\/admin\/api-keys\/([^/]+)\/revoke$/);
       if (adminApiKeyRevokeMatch && request.method === 'POST') {
         await requireAdmin(request, env.DB);
-        return await revokeApiKey(env.DB, adminApiKeyRevokeMatch[1]);
+        return await revokeApiKey(env, adminApiKeyRevokeMatch[1]);
       }
 
       if (url.pathname === '/api/tournaments') {
@@ -729,7 +767,7 @@ export default {
         assertCanManageTournament(tournament, session.user);
 
         if (request.method === 'PUT') {
-          return await updateTournament(request, env.DB, tournament, session.user);
+          return await updateTournament(request, env, tournament, session.user);
         }
 
         if (request.method === 'DELETE') {
@@ -802,7 +840,7 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
-        return await syncPostResults(request, env.DB, tournament.id);
+        return await syncPostResults(request, env, tournament.id);
       }
 
       const syncMetadataMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/metadata$/);
@@ -1466,6 +1504,126 @@ async function listUsers(db) {
   return json({ users: result.results.map(toPublicUser) });
 }
 
+async function listPostboxRecipients(db, userId) {
+  const result = await db.prepare(
+    'SELECT id, first_name, last_name, role FROM users WHERE id != ? ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
+  ).bind(userId).all();
+  return json({ recipients: result.results.map((user) => ({ id: user.id, firstName: user.first_name, lastName: user.last_name, role: user.role })) });
+}
+
+async function getPostbox(db, user) {
+  const result = await db.prepare(
+    `SELECT m.*, s.first_name AS sender_first_name, s.last_name AS sender_last_name
+     FROM postbox_messages m LEFT JOIN users s ON s.id = m.sender_id
+     WHERE m.recipient_id = ? OR m.sender_id = ? ORDER BY m.created_at DESC LIMIT 250`,
+  ).bind(user.id, user.id).all();
+  const messages = result.results.map((row) => toPostboxMessage(row, user.id));
+  const unread = messages.filter((message) => message.recipientId === user.id && !message.readAt).length;
+  return json({ messages, unreadCount: unread, todos: await listPostboxTodos(db, user) });
+}
+
+async function sendPostboxMessage(request, env, sender) {
+  const body = await readJson(request);
+  const recipientId = String(body.recipientId || '').trim();
+  const text = String(body.body || '').trim();
+  if (!recipientId || recipientId === sender.id) throw new HttpError(400, 'Bitte wähle einen anderen Empfänger');
+  if (!text || text.length > 2000) throw new HttpError(400, 'Die Nachricht muss zwischen 1 und 2000 Zeichen lang sein');
+  const recipient = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(recipientId).first();
+  if (!recipient) throw new HttpError(404, 'Empfänger nicht gefunden');
+  const message = await createPostboxMessage(env, { senderId: sender.id, recipientId, kind: 'direct', body: text, pushTitle: 'Neue Nachricht', pushActor: `${sender.firstName} ${sender.lastName}` });
+  return json({ message }, 201);
+}
+
+async function markPostboxMessageRead(db, id, userId) {
+  const now = new Date().toISOString();
+  const result = await db.prepare('UPDATE postbox_messages SET read_at = COALESCE(read_at, ?) WHERE id = ? AND recipient_id = ?').bind(now, id, userId).run();
+  if (!result.meta.changes) throw new HttpError(404, 'Nachricht nicht gefunden');
+  return json({ ok: true });
+}
+
+async function listPostboxTodos(db, user) {
+  const todos = [];
+  if (user.role === 'admin') {
+    const unverified = await db.prepare('SELECT COUNT(*) AS count FROM users WHERE email_verified_at IS NULL').first();
+    const keys = await db.prepare("SELECT COUNT(*) AS count FROM api_keys WHERE status = 'pending'").first();
+    if (Number(unverified?.count)) todos.push({ type: 'unverified_users', count: Number(unverified.count), label: 'E-Mail-Bestätigungen prüfen' });
+    if (Number(keys?.count)) todos.push({ type: 'api_key_requests', count: Number(keys.count), label: 'API-Schlüssel-Anträge prüfen' });
+  }
+  const pending = await db.prepare("SELECT COUNT(*) AS count FROM registrations r JOIN tournaments t ON t.id = r.tournament_id WHERE t.created_by = ? AND r.status = 'pending'").bind(user.id).first();
+  const waitlist = await db.prepare("SELECT COUNT(*) AS count FROM registrations r JOIN tournaments t ON t.id = r.tournament_id WHERE t.created_by = ? AND r.status = 'waitlist'").bind(user.id).first();
+  if (Number(pending?.count)) todos.push({ type: 'pending_registrations', count: Number(pending.count), label: 'Ausstehende Anmeldungen bearbeiten' });
+  if (Number(waitlist?.count)) todos.push({ type: 'waitlist', count: Number(waitlist.count), label: 'Wartelisten prüfen' });
+  return todos;
+}
+
+async function createPostboxMessage(env, { senderId = null, recipientId, kind, body = null, eventType = null, eventData = null, pushTitle = 'Neue Nachricht', pushActor = '' }) {
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  await env.DB.prepare('INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, event_type, event_data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, senderId, recipientId, kind, body, eventType, eventData ? JSON.stringify(eventData) : null, createdAt).run();
+  const row = await env.DB.prepare('SELECT * FROM postbox_messages WHERE id = ?').bind(id).first();
+  const message = toPostboxMessage(row, recipientId);
+  try {
+    await sendPushNotifications(env, recipientId, { title: pushTitle, actor: pushActor, messageId: id });
+  } catch (error) {
+    console.error('Postbox push dispatch failed', error);
+  }
+  return message;
+}
+
+async function createSystemNotification(env, recipientId, eventType, eventData, pushTitle = 'Neue Statusmeldung') {
+  if (!recipientId) return;
+  await createPostboxMessage(env, { recipientId, kind: 'system', eventType, eventData, pushTitle });
+}
+
+async function notifyUserByEmail(env, email, eventType, eventData, pushTitle) {
+  if (!email) return;
+  const user = await env.DB.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').bind(email).first();
+  if (user) await createSystemNotification(env, user.id, eventType, eventData, pushTitle);
+}
+
+async function savePushSubscription(request, db, userId) {
+  const subscription = await readJson(request);
+  const endpoint = String(subscription.endpoint || '');
+  const p256dh = String(subscription.keys?.p256dh || '');
+  const auth = String(subscription.keys?.auth || '');
+  if (!endpoint.startsWith('https://') || !p256dh || !auth) throw new HttpError(400, 'Ungültiges Push-Abonnement');
+  const now = new Date().toISOString();
+  await db.prepare(`INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, expiration_time, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth, expiration_time = excluded.expiration_time, updated_at = excluded.updated_at`)
+    .bind(endpoint, userId, p256dh, auth, subscription.expirationTime || null, now, now).run();
+  return json({ ok: true }, 201);
+}
+
+async function removePushSubscription(request, db, userId) {
+  const body = await readJson(request);
+  await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?').bind(String(body.endpoint || ''), userId).run();
+  return json({ ok: true });
+}
+
+async function sendPushNotifications(env, userId, payload) {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) return;
+  const subscriptions = await env.DB.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').bind(userId).all();
+  const vapid = { subject: env.VAPID_SUBJECT, publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY };
+  await Promise.all((subscriptions.results || []).map(async (subscription) => {
+    try {
+      const pushPayload = await buildPushPayload(
+        { data: payload },
+        { endpoint: subscription.endpoint, expirationTime: null, keys: { p256dh: subscription.p256dh, auth: subscription.auth } },
+        vapid,
+      );
+      const response = await fetch(subscription.endpoint, pushPayload);
+      if (response.status === 404 || response.status === 410) {
+        await env.DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(subscription.endpoint).run();
+      } else if (!response.ok) {
+        console.error('Postbox push failed', response.status, await response.text());
+      }
+    } catch (error) {
+      console.error('Postbox push failed', error);
+    }
+  }));
+}
+
 async function createUser(request, db) {
   const body = await readJson(request);
   const user = normalizeUserInput(body, { requirePassword: true });
@@ -1510,7 +1668,8 @@ async function createUser(request, db) {
   );
 }
 
-async function updateUser(request, db, id, currentUserId) {
+async function updateUser(request, env, id, currentUserId) {
+  const db = env.DB;
   const existing = await db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
   if (!existing) {
     throw new HttpError(404, 'Benutzer nicht gefunden');
@@ -1559,6 +1718,9 @@ async function updateUser(request, db, id, currentUserId) {
     )
     .bind(id)
     .first();
+  if (updated.role !== existing.role || updated.email_verified_at !== existing.email_verified_at || Number(updated.password_change_required) !== Number(existing.password_change_required)) {
+    await createSystemNotification(env, id, 'account_status_changed', { role: updated.role, emailVerified: Boolean(updated.email_verified_at), passwordChangeRequired: Boolean(Number(updated.password_change_required)) });
+  }
   return json({ user: toPublicUser(updated) });
 }
 
@@ -1865,7 +2027,8 @@ async function createTournament(request, db, user) {
   return json({ tournament: toPublicTournament(created, user) }, 201);
 }
 
-async function updateTournament(request, db, existing, user) {
+async function updateTournament(request, env, existing, user) {
+  const db = env.DB;
   if (Number(existing.document_managed || 0) === 1) {
     throw new HttpError(409, 'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.');
   }
@@ -1921,6 +2084,11 @@ async function updateTournament(request, db, existing, user) {
     .run();
 
   const updated = await getTournamentById(db, existing.id);
+  if (updated.status !== existing.status) {
+    await createSystemNotification(env, existing.created_by, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
+    const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.created_by).all();
+    await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
+  }
   return json({ tournament: toPublicTournament(updated, user) });
 }
 
@@ -2268,6 +2436,8 @@ async function createRegistration(request, env, tournament) {
     .run();
 
   const created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
+  await createSystemNotification(env, tournament.created_by, 'registration_status_changed', { tournamentName: tournament.name, status: created.status, participant: `${created.first_name} ${created.last_name}` });
+  await notifyUserByEmail(env, created.email, 'registration_status_changed', { tournamentName: tournament.name, status: created.status });
 
   if (displace) {
     await displaceRegistration(env, tournament, displace, appOrigin);
@@ -2329,6 +2499,10 @@ async function updateRegistration(request, env, existing) {
   }
 
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
+  if (updated.status !== existing.status) {
+    await createSystemNotification(env, existing.created_by, 'registration_status_changed', { tournamentName: existing.name, status: updated.status, participant: `${updated.first_name} ${updated.last_name}` });
+    await notifyUserByEmail(env, updated.email, 'registration_status_changed', { tournamentName: existing.name, status: updated.status });
+  }
   return json({ registration: toPublicRegistration(updated) });
 }
 
@@ -2451,7 +2625,8 @@ async function listAllApiKeys(db, url) {
   });
 }
 
-async function approveApiKey(db, id, adminUserId) {
+async function approveApiKey(env, id, adminUserId) {
+  const db = env.DB;
   const existing = await db.prepare('SELECT * FROM api_keys WHERE id = ?').bind(id).first();
   if (!existing) {
     throw new HttpError(404, 'API-Schlüssel nicht gefunden');
@@ -2474,10 +2649,13 @@ async function approveApiKey(db, id, adminUserId) {
     .run();
 
   const updated = await db.prepare('SELECT * FROM api_keys WHERE id = ?').bind(id).first();
+  await createSystemNotification(env, updated.user_id, 'api_key_status_changed', { status: 'approved', label: updated.label });
   return json({ apiKey: toPublicApiKey(updated) });
 }
 
-async function revokeApiKey(db, id) {
+async function revokeApiKey(env, id) {
+  const db = env.DB;
+  const existing = await db.prepare('SELECT * FROM api_keys WHERE id = ?').bind(id).first();
   const now = new Date().toISOString();
   const result = await db
     .prepare(
@@ -2491,6 +2669,7 @@ async function revokeApiKey(db, id) {
   if (result.meta.changes === 0) {
     throw new HttpError(404, 'API-Schlüssel nicht gefunden oder bereits widerrufen');
   }
+  await createSystemNotification(env, existing.user_id, 'api_key_status_changed', { status: 'revoked', label: existing.label });
   return json({ ok: true });
 }
 
@@ -2526,7 +2705,8 @@ async function syncGetRegistrations(db, tournamentId, url) {
   return json({ registrations, cursor });
 }
 
-async function syncPostResults(request, db, tournamentId) {
+async function syncPostResults(request, env, tournamentId) {
+  const db = env.DB;
   const body = await readJson(request);
   const entries = Array.isArray(body.registrations) ? body.registrations : [];
   if (entries.length === 0) {
@@ -2534,8 +2714,7 @@ async function syncPostResults(request, db, tournamentId) {
   }
 
   const now = new Date().toISOString();
-  let updatedCount = 0;
-
+  const parsed = [];
   for (const entry of entries) {
     const id = String(entry.id || '');
     if (!id) {
@@ -2552,16 +2731,46 @@ async function syncPostResults(request, db, tournamentId) {
         ? null
         : Number.parseInt(entry.seedingPosition, 10);
 
-    const result = await db
-      .prepare(
-        `UPDATE registrations
-         SET status = COALESCE(?, status), seeding_position = ?, updated_at = ?
-         WHERE id = ? AND tournament_id = ?`,
-      )
-      .bind(status, seedingPosition, now, id, tournamentId)
-      .run();
+    parsed.push({ id, status, seedingPosition });
+  }
 
-    updatedCount += result.meta.changes;
+  const statusChangeIds = parsed.filter((entry) => entry.status !== null).map((entry) => entry.id);
+  const previousById = new Map();
+  if (statusChangeIds.length > 0) {
+    const placeholders = statusChangeIds.map(() => '?').join(', ');
+    const previousRows = await db
+      .prepare(
+        `SELECT r.*, t.name, t.created_by FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
+         WHERE r.tournament_id = ? AND r.id IN (${placeholders})`,
+      )
+      .bind(tournamentId, ...statusChangeIds)
+      .all();
+    for (const row of previousRows.results || []) {
+      previousById.set(row.id, row);
+    }
+  }
+
+  const updateStatement = db.prepare(
+    `UPDATE registrations
+     SET status = COALESCE(?, status), seeding_position = ?, updated_at = ?
+     WHERE id = ? AND tournament_id = ?`,
+  );
+  const updateResults =
+    parsed.length > 0
+      ? await db.batch(parsed.map((entry) => updateStatement.bind(entry.status, entry.seedingPosition, now, entry.id, tournamentId)))
+      : [];
+
+  let updatedCount = 0;
+  for (let index = 0; index < parsed.length; index += 1) {
+    const entry = parsed[index];
+    const changes = updateResults[index]?.meta?.changes || 0;
+    updatedCount += changes;
+
+    const previous = previousById.get(entry.id);
+    if (previous && previous.status !== entry.status && changes) {
+      await createSystemNotification(env, previous.created_by, 'registration_status_changed', { tournamentName: previous.name, status: entry.status, participant: `${previous.first_name} ${previous.last_name}` });
+      await notifyUserByEmail(env, previous.email, 'registration_status_changed', { tournamentName: previous.name, status: entry.status });
+    }
   }
 
   return json({ updatedCount });
@@ -3332,6 +3541,24 @@ function toPublicUser(row) {
     tournamentLimit: row.tournament_limit === undefined || row.tournament_limit === null ? DEFAULT_TOURNAMENT_LIMIT : Number(row.tournament_limit),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function toPostboxMessage(row, currentUserId) {
+  let eventData = null;
+  try { eventData = row.event_data ? JSON.parse(row.event_data) : null; } catch { eventData = null; }
+  return {
+    id: row.id,
+    senderId: row.sender_id || null,
+    senderName: row.sender_id ? `${row.sender_first_name || ''} ${row.sender_last_name || ''}`.trim() : null,
+    recipientId: row.recipient_id,
+    kind: row.kind,
+    body: row.body || null,
+    eventType: row.event_type || null,
+    eventData,
+    createdAt: row.created_at,
+    readAt: row.read_at || null,
+    mine: row.sender_id === currentUserId,
   };
 }
 

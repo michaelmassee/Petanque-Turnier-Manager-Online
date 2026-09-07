@@ -457,6 +457,20 @@ textarea:focus {
     box-shadow 140ms ease;
 }
 
+.postbox-menu { position: static; }
+.postbox-btn { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #bcc8d9; border-radius: 6px; background: #fff; color: #172033; font-size: 1.15rem; }
+.postbox-btn:hover, .postbox-btn[aria-expanded="true"] { border-color: #1677ff; background: #ecf4ff; }
+.postbox-badge { position: absolute; top: -7px; right: -7px; min-width: 19px; padding: 2px 5px; border-radius: 999px; background: #c21d32; color: #fff; font-size: .68rem; font-weight: 800; }
+.postbox-panel { position: absolute; z-index: 12; top: calc(100% + 8px); right: 0; display: grid; gap: 14px; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 110px); overflow: auto; padding: 18px; border: 1px solid #d7deea; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgb(23 32 51 / 16%); }
+.postbox-panel h2, .postbox-panel h3 { margin: 0; }
+.postbox-compose { gap: 8px; }
+.postbox-section { display: grid; gap: 8px; }
+.postbox-todo { margin: 0; padding: 9px; border-radius: 6px; background: #fff8e8; }
+.postbox-message { display: grid; gap: 3px; width: 100%; padding: 10px; border: 1px solid #d7deea; border-radius: 6px; background: #fff; color: inherit; text-align: left; }
+.postbox-message.unread { border-color: #1677ff; background: #f3f8ff; }
+.postbox-panel .hint { margin: 4px 0 0; font-size: 0.85rem; color: #53627a; }
+.postbox-message small { color: #66758c; }
+
 .search-menu-btn:hover {
   border-color: #1677ff;
   background: #f7fbff;
