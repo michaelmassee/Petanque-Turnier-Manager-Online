@@ -1247,8 +1247,8 @@ async function findOrCreateOAuthUser(db, provider, profile) {
   await db.batch([
     db
       .prepare(
-        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'user', ?, ?, ?, 0, ?, ?, ?)`,
+        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'user', ?, ?, ?, 0, ?, 0, ?, ?)`,
       )
       .bind(userId, userFirstName, userLastName, profile.email, password.salt, password.hash, now, DEFAULT_TOURNAMENT_LIMIT, now, now),
     oauthAccountInsert(db, userId, provider, profile, now),
@@ -1779,14 +1779,15 @@ async function createUser(request, db) {
   const emailVerifiedAt = body.emailVerified === false ? null : now;
   const passwordChangeRequired = body.passwordChangeRequired === true ? 1 : 0;
   const tournamentLimit = resolveTournamentLimit(body, DEFAULT_TOURNAMENT_LIMIT);
+  const mailEnabled = body.mailEnabled === true ? 1 : 0;
 
   try {
     await db
       .prepare(
-        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, user.firstName, user.lastName, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, now, now)
+      .bind(id, user.firstName, user.lastName, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, now)
       .run();
   } catch (error) {
     if (String(error.message || '').includes('UNIQUE')) {
@@ -1806,6 +1807,7 @@ async function createUser(request, db) {
         email_verified_at: emailVerifiedAt,
         password_change_required: passwordChangeRequired,
         tournament_limit: tournamentLimit,
+        mail_enabled: mailEnabled,
         created_at: now,
         updated_at: now,
       }),

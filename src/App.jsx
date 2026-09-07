@@ -100,7 +100,7 @@ export const EMPTY_USER_FORM = {
   emailVerified: true,
   passwordChangeRequired: false,
   tournamentLimit: DEFAULT_TOURNAMENT_LIMIT,
-  mailEnabled: true,
+  mailEnabled: false,
 };
 
 const EMPTY_PROFILE_FORM = {
@@ -416,6 +416,47 @@ export default function App() {
     document.documentElement.lang = language;
     translateDom(language);
   });
+
+  const authModalOpen = authView !== 'home' && authView !== 'cancelRegistration';
+  const anyDialogOpen =
+    menuOpen || searchMenuOpen || homeFilterOpen || postboxOpen || userDialogOpen || tournamentDialogOpen || registrationDialogOpen || authModalOpen;
+  const dialogHistoryDepthRef = useRef(0);
+  const suppressDialogPopRef = useRef(false);
+
+  useEffect(() => {
+    if (anyDialogOpen && dialogHistoryDepthRef.current === 0) {
+      dialogHistoryDepthRef.current = 1;
+      window.history.pushState({ ...window.history.state, ptmDialog: true }, '');
+    } else if (!anyDialogOpen && dialogHistoryDepthRef.current === 1) {
+      dialogHistoryDepthRef.current = 0;
+      if (suppressDialogPopRef.current) {
+        suppressDialogPopRef.current = false;
+      } else {
+        window.history.back();
+      }
+    }
+  }, [anyDialogOpen]);
+
+  useEffect(() => {
+    function onPopState() {
+      if (dialogHistoryDepthRef.current > 0) {
+        suppressDialogPopRef.current = true;
+        setMenuOpen(false);
+        setSearchMenuOpen(false);
+        setHomeFilterOpen(false);
+        setPostboxOpen(false);
+        setUserDialogOpen(false);
+        setTournamentDialogOpen(false);
+        setRegistrationDialogOpen(false);
+        if (authModalOpen) {
+          setAuthView('home');
+          clearFeedback();
+        }
+      }
+    }
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [authModalOpen]);
 
   useEffect(() => {
     if (currentUser) {
