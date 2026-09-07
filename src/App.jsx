@@ -2102,10 +2102,28 @@ function sameBytes(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+async function hasActivePushSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return false;
+  if (Notification.permission !== 'granted') return false;
+  const registration = await navigator.serviceWorker.getRegistration();
+  if (!registration) return false;
+  return Boolean(await registration.pushManager.getSubscription());
+}
+
 function PushMigrationNotice({ language, onDismiss, onEnabled }) {
   const [state, setState] = useState('');
   const [errorDetail, setErrorDetail] = useState('');
+  const [checking, setChecking] = useState(true);
   const text = (key) => postboxText(language, key);
+  useEffect(() => {
+    let cancelled = false;
+    hasActivePushSubscription().then((active) => {
+      if (cancelled) return;
+      if (active) onEnabled();
+      else setChecking(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
   async function enable() {
     try {
       const result = await subscribeToPush();
@@ -2116,6 +2134,7 @@ function PushMigrationNotice({ language, onDismiss, onEnabled }) {
       setErrorDetail(error.message || '');
     }
   }
+  if (checking) return null;
   return (
     <section className="panel push-migration-notice" aria-label={text('migrationTitle')}>
       <h2>{text('migrationTitle')}</h2>
@@ -2129,12 +2148,21 @@ function PushMigrationNotice({ language, onDismiss, onEnabled }) {
 function PostboxControl({ language, open, unreadCount, messages, todos = [], recipients, recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit }) {
   const [pushState, setPushState] = useState('');
   const [pushErrorDetail, setPushErrorDetail] = useState('');
+  const [pushActive, setPushActive] = useState(false);
   const text = (key) => postboxText(language, key);
+
+  useEffect(() => {
+    let cancelled = false;
+    hasActivePushSubscription().then((active) => { if (!cancelled) setPushActive(active); });
+    return () => { cancelled = true; };
+  }, []);
 
   async function enablePush() {
     try {
       setPushErrorDetail('');
-      setPushState(await subscribeToPush());
+      const result = await subscribeToPush();
+      setPushState(result);
+      if (result === 'enabled') setPushActive(true);
     } catch (error) {
       setPushState('setupError');
       setPushErrorDetail(error.message || '');
@@ -2155,7 +2183,12 @@ function PostboxControl({ language, open, unreadCount, messages, todos = [], rec
           <div className="search-menu-backdrop" onClick={onClose} />
           <section className="postbox-panel" aria-label={text('inbox')}>
             <div className="section-title"><h2>{text('inbox')}</h2><button className="link-button" type="button" onClick={onClose}>{text('close')}</button></div>
-            <div><Button variant="secondary" onClick={enablePush}>{text('enable')}</Button>{pushState && <p className="hint">{text(pushState)}{pushErrorDetail ? ` (${pushErrorDetail})` : ''}</p>}</div>
+            <div>
+              {pushActive
+                ? <p className="hint">{text('enabled')}</p>
+                : <Button variant="secondary" onClick={enablePush}>{text('enable')}</Button>}
+              {pushState && !pushActive && <p className="hint">{text(pushState)}{pushErrorDetail ? ` (${pushErrorDetail})` : ''}</p>}
+            </div>
             <form className="form postbox-compose" onSubmit={onSubmit}>
               <SelectField label={text('recipient')} value={recipientId} onChange={setRecipientId} options={[{ value: '', label: text('chooseRecipient') }, ...recipients.map((recipient) => ({ value: recipient.id, label: `${recipient.firstName} ${recipient.lastName} (${roleName(recipient.role)})` }))]} />
               <TextArea label={text('message')} value={body} onChange={setBody} />
