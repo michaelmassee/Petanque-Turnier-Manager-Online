@@ -421,10 +421,14 @@ export default function App() {
     setLoading(true);
     setError('');
 
+    // Turniere zuerst laden: der Service Worker kann /api/tournaments aus dem
+    // Cache bedienen, auch wenn /api/bootstrap offline fehlschlägt - das darf
+    // die öffentliche Turnier-Detailseite offline nicht blockieren.
+    await loadTournaments();
+
     try {
       const bootstrap = await api('/api/bootstrap');
       setNeedsSetup(bootstrap.needsSetup);
-      await loadTournaments();
 
       if (!bootstrap.needsSetup) {
         try {
@@ -435,7 +439,9 @@ export default function App() {
         }
       }
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      if (navigator.onLine) {
+        setError(translateText(requestError.message, language));
+      }
     } finally {
       setLoading(false);
     }
@@ -2403,6 +2409,7 @@ function TournamentDetailPage({
         onLogout={onLogout}
       />
 
+      <OfflineNotice language={language} />
       <Feedback message={message} error={error} />
 
       <section className="tournament-detail-page">
@@ -4133,6 +4140,35 @@ function Feedback({ message, error }) {
   return <p className={error ? 'feedback error' : 'feedback success'}>{error || message}</p>;
 }
 
+function useOnlineStatus() {
+  const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+
+  useEffect(() => {
+    function goOnline() {
+      setOnline(true);
+    }
+    function goOffline() {
+      setOnline(false);
+    }
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
+
+  return online;
+}
+
+function OfflineNotice({ language }) {
+  const online = useOnlineStatus();
+  if (online) {
+    return null;
+  }
+  return <p className="feedback offline">{translateText('Du bist offline – angezeigte Daten können veraltet sein.', language)}</p>;
+}
+
 function authTitle(needsSetup, authView) {
   if (needsSetup) {
     return 'Ersten Admin anlegen';
@@ -4763,6 +4799,7 @@ const TRANSLATIONS = {
     'Bild konnte nicht geladen werden': 'Afbeelding kon niet worden geladen',
     'Bild zu groß': 'Afbeelding te groot',
     'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.': 'Het toernooi is volgeboekt. Er is geen wachtlijst geactiveerd voor dit toernooi.',
+    'Du bist offline – angezeigte Daten können veraltet sein.': 'Je bent offline – de getoonde gegevens kunnen verouderd zijn.',
     'Du kannst deine eigene Admin-Rolle nicht entfernen': 'Je kunt je eigen beheerdersrol niet verwijderen',
     'Du kannst deinen eigenen Benutzer nicht löschen': 'Je kunt je eigen account niet verwijderen',
     'E-Mail ist erforderlich': 'E-mail is vereist',
@@ -5235,6 +5272,7 @@ const TRANSLATIONS = {
     'Bild konnte nicht geladen werden': 'Image could not be loaded',
     'Bild zu groß': 'Image too large',
     'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.': 'The tournament is fully booked. A waiting list is not enabled for this tournament.',
+    'Du bist offline – angezeigte Daten können veraltet sein.': "You're offline – the information shown may be outdated.",
     'Du kannst deine eigene Admin-Rolle nicht entfernen': 'You cannot remove your own admin role',
     'Du kannst deinen eigenen Benutzer nicht löschen': 'You cannot delete your own user',
     'E-Mail ist erforderlich': 'Email is required',
@@ -5707,6 +5745,7 @@ const TRANSLATIONS = {
     'Bild konnte nicht geladen werden': 'No se pudo cargar la imagen',
     'Bild zu groß': 'Imagen demasiado grande',
     'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.': 'El torneo está completo. No hay lista de espera activada para este torneo.',
+    'Du bist offline – angezeigte Daten können veraltet sein.': 'Estás sin conexión: la información mostrada puede estar desactualizada.',
     'Du kannst deine eigene Admin-Rolle nicht entfernen': 'No puedes eliminar tu propio rol de administrador',
     'Du kannst deinen eigenen Benutzer nicht löschen': 'No puedes eliminar tu propio usuario',
     'E-Mail ist erforderlich': 'Se requiere el correo electrónico',
@@ -6179,6 +6218,7 @@ const TRANSLATIONS = {
     'Bild konnte nicht geladen werden': 'L\'image n\'a pas pu être chargée',
     'Bild zu groß': 'Image trop volumineuse',
     'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.': 'Le tournoi est complet. Aucune liste d\'attente n\'est activée pour ce tournoi.',
+    'Du bist offline – angezeigte Daten können veraltet sein.': 'Vous êtes hors ligne : les informations affichées peuvent être obsolètes.',
     'Du kannst deine eigene Admin-Rolle nicht entfernen': 'Vous ne pouvez pas retirer votre propre rôle d\'administrateur',
     'Du kannst deinen eigenen Benutzer nicht löschen': 'Vous ne pouvez pas supprimer votre propre utilisateur',
     'E-Mail ist erforderlich': 'L\'e-mail est requis',

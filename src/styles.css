@@ -357,6 +357,11 @@ textarea:focus {
   color: #206f3b;
 }
 
+.feedback.offline {
+  background: #fff4e0;
+  color: #8a5a00;
+}
+
 .app-shell {
   min-height: 100vh;
   padding: 28px;
