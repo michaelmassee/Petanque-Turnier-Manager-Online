@@ -163,7 +163,6 @@ export const EMPTY_TOURNAMENT_FORM = {
 
 export const EMPTY_CALENDAR_ENTRY_FORM = {
   id: '',
-  managerId: '',
   name: '',
   date: '',
   startTime: '',
@@ -1159,7 +1158,6 @@ export default function App() {
 
   function calendarEntryPayload(form) {
     return {
-      managerId: form.managerId || null,
       name: form.name,
       date: form.date,
       startTime: form.startTime || null,
@@ -1964,8 +1962,6 @@ export default function App() {
                 setForm={setCalendarEntryForm}
                 onSubmit={handleCalendarEntrySubmit}
                 onCancel={closeCalendarEntryDialog}
-                isAdmin={isAdmin}
-                users={users}
               />
             </EditDialog>
           )}
@@ -3776,23 +3772,10 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
   );
 }
 
-export function CalendarEntryForm({ form, setForm, onSubmit, onCancel, isAdmin, users }) {
-  const managerOptions = [
-    { value: '', label: '(ich selbst)' },
-    ...users.map((user) => ({ value: user.id, label: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email })),
-  ];
-
+export function CalendarEntryForm({ form, setForm, onSubmit, onCancel }) {
   return (
     <form className="form dense" onSubmit={onSubmit}>
       <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
-      {isAdmin && (
-        <SelectField
-          label="Turnierleiter"
-          value={form.managerId}
-          onChange={(managerId) => setForm({ ...form, managerId })}
-          options={managerOptions}
-        />
-      )}
       <div className="form-grid">
         <TextField label="Datum" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
         <TextField label="Startzeit" type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
