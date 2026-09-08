@@ -89,6 +89,7 @@ const RADIUS_OPTIONS = [
 ];
 
 const DEFAULT_TOURNAMENT_LIMIT = 5;
+const DEFAULT_CALENDAR_ENTRY_LIMIT = 30;
 
 export const EMPTY_USER_FORM = {
   id: '',
@@ -100,6 +101,7 @@ export const EMPTY_USER_FORM = {
   emailVerified: true,
   passwordChangeRequired: false,
   tournamentLimit: DEFAULT_TOURNAMENT_LIMIT,
+  calendarEntryLimit: DEFAULT_CALENDAR_ENTRY_LIMIT,
   mailEnabled: false,
 };
 
@@ -153,9 +155,21 @@ export const EMPTY_TOURNAMENT_FORM = {
   licenseRequired: false,
   teamNameEnabled: false,
   waitlistEnabled: true,
+  registrationEnabled: true,
   websiteUrl: '',
   logoUrl: '',
   flyerUrl: '',
+};
+
+export const EMPTY_CALENDAR_ENTRY_FORM = {
+  id: '',
+  managerId: '',
+  name: '',
+  date: '',
+  startTime: '',
+  location: '',
+  description: '',
+  visible: true,
 };
 
 export const EMPTY_REGISTRATION_FORM = {
@@ -240,6 +254,9 @@ export default function App() {
   const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
   const [authForm, setAuthForm] = useState(EMPTY_AUTH_FORM);
   const [tournamentForm, setTournamentForm] = useState(EMPTY_TOURNAMENT_FORM);
+  const [calendarEntryForm, setCalendarEntryForm] = useState(EMPTY_CALENDAR_ENTRY_FORM);
+  const [calendarEntryDialogOpen, setCalendarEntryDialogOpen] = useState(false);
+  const [calendarEntryMode, setCalendarEntryMode] = useState('create');
   const [registrationForm, setRegistrationForm] = useState(EMPTY_REGISTRATION_FORM);
   const [userMode, setUserMode] = useState('create');
   const [tournamentMode, setTournamentMode] = useState('create');
@@ -1057,6 +1074,7 @@ export default function App() {
       emailVerified: Boolean(user.emailVerifiedAt),
       passwordChangeRequired: Boolean(user.passwordChangeRequired),
       tournamentLimit: user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT,
+      calendarEntryLimit: user.calendarEntryLimit ?? DEFAULT_CALENDAR_ENTRY_LIMIT,
       mailEnabled: user.mailEnabled ?? true,
     });
     clearFeedback();
@@ -1109,6 +1127,7 @@ export default function App() {
       licenseRequired: Boolean(tournament.licenseRequired),
       teamNameEnabled: Boolean(tournament.teamNameEnabled),
       waitlistEnabled: tournament.waitlistEnabled === undefined ? true : Boolean(tournament.waitlistEnabled),
+      registrationEnabled: tournament.registrationEnabled === undefined ? true : Boolean(tournament.registrationEnabled),
       websiteUrl: tournament.websiteUrl || '',
       logoUrl: tournament.logoUrl || '',
       flyerUrl: tournament.flyerUrl || '',
@@ -1122,6 +1141,48 @@ export default function App() {
     setTournamentDialogOpen(false);
     setTournamentMode('create');
     setTournamentForm(EMPTY_TOURNAMENT_FORM);
+  }
+
+  function newCalendarEntry() {
+    setCalendarEntryMode('create');
+    setCalendarEntryForm(EMPTY_CALENDAR_ENTRY_FORM);
+    setActiveTab('tournaments');
+    clearFeedback();
+    setCalendarEntryDialogOpen(true);
+  }
+
+  function closeCalendarEntryDialog() {
+    setCalendarEntryDialogOpen(false);
+    setCalendarEntryMode('create');
+    setCalendarEntryForm(EMPTY_CALENDAR_ENTRY_FORM);
+  }
+
+  function calendarEntryPayload(form) {
+    return {
+      managerId: form.managerId || null,
+      name: form.name,
+      date: form.date,
+      startTime: form.startTime || null,
+      location: form.location,
+      description: form.description || null,
+      visibility: 'public',
+      status: form.visible ? 'running' : 'draft',
+      registrationEnabled: false,
+    };
+  }
+
+  async function handleCalendarEntrySubmit(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    try {
+      await api('/api/tournaments', { method: 'POST', body: JSON.stringify(calendarEntryPayload(calendarEntryForm)) });
+      setMessage('Kalendereintrag wurde angelegt.');
+      closeCalendarEntryDialog();
+      await loadTournaments();
+    } catch (requestError) {
+      setError(translateText(requestError.message, language));
+    }
   }
 
   function newRegistration() {
@@ -1860,6 +1921,7 @@ export default function App() {
             isAdmin={isAdmin}
             language={language}
             onCreate={newTournament}
+            onCreateCalendarEntry={newCalendarEntry}
             query={tournamentQuery}
             onQueryChange={setTournamentQuery}
             statusFilter={tournamentStatusFilter}
@@ -1890,6 +1952,23 @@ export default function App() {
               />
             </EditDialog>
           )}
+
+          {canManageTournaments && (
+            <EditDialog
+              open={calendarEntryDialogOpen}
+              title="Kalendereintrag erstellen"
+              onClose={closeCalendarEntryDialog}
+            >
+              <CalendarEntryForm
+                form={calendarEntryForm}
+                setForm={setCalendarEntryForm}
+                onSubmit={handleCalendarEntrySubmit}
+                onCancel={closeCalendarEntryDialog}
+                isAdmin={isAdmin}
+                users={users}
+              />
+            </EditDialog>
+          )}
         </section>
       )}
 
@@ -1900,7 +1979,7 @@ export default function App() {
             registrations={registrations}
             filteredRegistrations={filteredRegistrations}
             onTournamentChange={setSelectedTournamentId}
-            tournaments={manageableTournaments}
+            tournaments={manageableTournaments.filter((tournament) => tournament.registrationEnabled !== false)}
             onCreate={newRegistration}
             query={registrationQuery}
             onQueryChange={setRegistrationQuery}
@@ -2703,8 +2782,8 @@ function TournamentDetailPage({
     );
   }
 
-  const canRegister = tournament.status === 'registration' && tournament.visibility === 'public';
-  const canShowParticipants = tournament.participantsPublic || tournament.canManage;
+  const canRegister = tournament.status === 'registration' && tournament.visibility === 'public' && tournament.registrationEnabled !== false;
+  const canShowParticipants = (tournament.participantsPublic || tournament.canManage) && tournament.registrationEnabled !== false;
 
   async function handleShare() {
     const shareUrl = window.location.href;
@@ -3225,7 +3304,9 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
           </strong>
           <span>{tournament.location}</span>
           <small>
-            {labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}
+            {tournament.registrationEnabled !== false && (
+              <>{labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</>
+            )}
             {typeof tournament.distanceKm === 'number' && (
               <>
                 {' · '}
@@ -3238,13 +3319,15 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
       </button>
       <div className="tournament-card-meta">
         <span className={`status status-${tournament.status}`}>{registrationStatusLabel(tournament, language)}</span>
-        <Button
-          variant="secondary"
-          onClick={() => onRegister(tournament)}
-          disabled={tournament.status !== 'registration' || tournament.visibility !== 'public' || registrationNotYetOpen(tournament)}
-        >
-          Anmelden
-        </Button>
+        {tournament.registrationEnabled !== false && (
+          <Button
+            variant="secondary"
+            onClick={() => onRegister(tournament)}
+            disabled={tournament.status !== 'registration' || tournament.visibility !== 'public' || registrationNotYetOpen(tournament)}
+          >
+            Anmelden
+          </Button>
+        )}
       </div>
     </article>
   );
@@ -3693,6 +3776,45 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
   );
 }
 
+export function CalendarEntryForm({ form, setForm, onSubmit, onCancel, isAdmin, users }) {
+  const managerOptions = [
+    { value: '', label: '(ich selbst)' },
+    ...users.map((user) => ({ value: user.id, label: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email })),
+  ];
+
+  return (
+    <form className="form dense" onSubmit={onSubmit}>
+      <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+      {isAdmin && (
+        <SelectField
+          label="Turnierleiter"
+          value={form.managerId}
+          onChange={(managerId) => setForm({ ...form, managerId })}
+          options={managerOptions}
+        />
+      )}
+      <div className="form-grid">
+        <TextField label="Datum" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
+        <TextField label="Startzeit" type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
+      </div>
+      <TextField label="Ort" value={form.location} onChange={(location) => setForm({ ...form, location })} required minLength={2} />
+      <TextArea label="Beschreibung" value={form.description} onChange={(description) => setForm({ ...form, description })} />
+      <label className="checkbox-field">
+        <input
+          type="checkbox"
+          checked={form.visible}
+          onChange={(event) => setForm({ ...form, visible: event.target.checked })}
+        />
+        Sichtbar
+      </label>
+      <div className="dialog-actions">
+        <Button variant="secondary" type="button" onClick={onCancel}>Abbrechen</Button>
+        <Button type="submit">Kalendereintrag anlegen</Button>
+      </div>
+    </form>
+  );
+}
+
 export function TournamentList({
   tournaments,
   totalTournaments,
@@ -3703,6 +3825,7 @@ export function TournamentList({
   isAdmin,
   language,
   onCreate,
+  onCreateCalendarEntry,
   query,
   onQueryChange,
   statusFilter,
@@ -3717,6 +3840,7 @@ export function TournamentList({
         <h2>Turniere</h2>
         <span className="counter">{filtered ? `${tournaments.length}/${totalTournaments}` : totalTournaments}</span>
         <Button onClick={onCreate}>Neues Turnier</Button>
+        <Button variant="secondary" onClick={onCreateCalendarEntry}>Kalendereintrag erstellen</Button>
       </div>
       <ListToolbar
         query={query}
@@ -3733,14 +3857,25 @@ export function TournamentList({
           <article className={`data-row tournament-row ${selectedId === tournament.id ? 'selected' : ''}`} key={tournament.id}>
             <button className="row-main" type="button" onClick={() => onSelect(tournament.id)}>
               <strong>{tournament.name}</strong>
+              {tournament.registrationEnabled === false && <span className="role">{translateText('Kalendereintrag', language)}</span>}
               <span>{formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)} · {tournament.location}</span>
-              <small>{labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</small>
+              {tournament.registrationEnabled !== false && (
+                <small>{labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</small>
+              )}
               {isAdmin && tournament.managerName && <small>Turnierleiter: {tournament.managerName}</small>}
             </button>
             <div className="badges">
-              <span className={`status status-${tournament.status}`}>{labelFor(TOURNAMENT_STATUSES, tournament.status)}</span>
-              <span className="role">{tournament.activeRegistrations}/{tournament.maxRegistrations || '∞'}</span>
-              {tournament.waitlistRegistrations > 0 && <span className="role role-user">{tournament.waitlistRegistrations} Warteliste</span>}
+              {tournament.registrationEnabled === false ? (
+                <span className={`status status-${tournament.status}`}>
+                  {translateText(tournament.status === 'draft' ? 'Unsichtbar' : 'Sichtbar', language)}
+                </span>
+              ) : (
+                <>
+                  <span className={`status status-${tournament.status}`}>{labelFor(TOURNAMENT_STATUSES, tournament.status)}</span>
+                  <span className="role">{tournament.activeRegistrations}/{tournament.maxRegistrations || '∞'}</span>
+                  {tournament.waitlistRegistrations > 0 && <span className="role role-user">{tournament.waitlistRegistrations} Warteliste</span>}
+                </>
+              )}
             </div>
             {tournament.canManage && (
               <div className="row-actions">
@@ -4225,6 +4360,7 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
         </span>
         {user.passwordChangeRequired && <span className="status registration-pending">Passwortwechsel nötig</span>}
         {user.role !== 'admin' && <span className="status">Turnier-Limit: {user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT}</span>}
+        {user.role !== 'admin' && <span className="status">Kalendereintrag-Limit: {user.calendarEntryLimit ?? DEFAULT_CALENDAR_ENTRY_LIMIT}</span>}
         {user.role !== 'admin' && (
           <span className={user.mailEnabled ? 'status registration-confirmed' : 'status registration-pending'}>
             {user.mailEnabled ? 'E-Mail-Versand freigeschaltet' : 'E-Mail-Versand gesperrt'}
@@ -4274,6 +4410,14 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwo
         onChange={(value) => setForm({ ...form, tournamentLimit: value === '' ? '' : Number(value) })}
       />
       <p className="hint">Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).</p>
+      <TextField
+        label="Kalendereintrag-Limit"
+        type="number"
+        min={0}
+        value={form.calendarEntryLimit}
+        onChange={(value) => setForm({ ...form, calendarEntryLimit: value === '' ? '' : Number(value) })}
+      />
+      <p className="hint">Maximale Anzahl eigener Kalendereinträge, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).</p>
       <label className="checkbox-row">
         <input
           type="checkbox"
@@ -4627,6 +4771,7 @@ function tournamentPayload(form) {
     licenseRequired: Boolean(form.licenseRequired),
     teamNameEnabled: Boolean(form.teamNameEnabled),
     waitlistEnabled: Boolean(form.waitlistEnabled),
+    registrationEnabled: form.registrationEnabled === undefined ? true : Boolean(form.registrationEnabled),
     websiteUrl: form.websiteUrl || null,
     logoUrl: form.logoUrl || null,
     flyerUrl: form.flyerUrl || null,
@@ -4724,6 +4869,10 @@ const REGISTERED_COUNT_TEMPLATES = {
 };
 
 function registrationStatusLabel(tournament, language) {
+  if (tournament.registrationEnabled === false) {
+    return translateText('Kein Anmeldeverfahren', language);
+  }
+
   if (tournament.status === 'registration' && registrationNotYetOpen(tournament)) {
     return `${translateText('Anmeldung ab', language)} ${formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}`;
   }
@@ -5182,6 +5331,7 @@ const TRANSLATIONS = {
     'Ungültiger Bildtyp': 'Ongeldig afbeeldingstype',
     'Ungültiger oder abgelaufener Reset-Token': 'Ongeldig of verlopen reset-token',
     'Ungültiges Turnier-Limit': 'Ongeldige toernooilimiet',
+    'Ungültiges Kalendereintrag-Limit': 'Ongeldige agenda-itemlimiet',
     'Vorname und Nachname müssen mindestens 2 Zeichen enthalten': 'Voor- en achternaam moeten minimaal 2 tekens bevatten',
     'Vorname und Nachname sind erforderlich': 'Voor- en achternaam zijn vereist',
     'Ziel-URL nicht erlaubt': 'Doel-URL niet toegestaan',
@@ -5205,6 +5355,7 @@ const TRANSLATIONS = {
     'Die eingegebene Ortszeit existiert wegen der Sommerzeitumstellung nicht.': 'De opgegeven lokale tijd bestaat niet vanwege de omschakeling naar zomertijd.',
     'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.': 'De basisgegevens van dit toernooi worden beheerd in het toernooidocument.',
     'Turnier-Limit erreicht. Bitte bei einem Admin um mehr Turniere bitten.': 'Toernooilimiet bereikt. Vraag een beheerder om meer toernooien.',
+    'Kalendereintrag-Limit erreicht. Bitte bei einem Admin um mehr Kalendereinträge bitten.': 'Agenda-itemlimiet bereikt. Vraag een beheerder om meer agenda-items.',
     'Die Anmeldung ist geschlossen': 'De inschrijving is gesloten',
     'Anmeldung ab': 'Inschrijving vanaf',
     'Anmeldung möglich ab': 'Inschrijving mogelijk vanaf',
@@ -5324,6 +5475,13 @@ const TRANSLATIONS = {
     'Keine Benutzer gefunden.': 'Geen gebruikers gevonden.',
     'Neuer Benutzer': 'Nieuwe gebruiker',
     'Neues Turnier': 'Nieuw toernooi',
+    'Kalendereintrag erstellen': 'Agenda-item aanmaken',
+    'Kalendereintrag anlegen': 'Agenda-item opslaan',
+    'Kalendereintrag wurde angelegt.': 'Agenda-item werd aangemaakt.',
+    'Sichtbar': 'Zichtbaar',
+    'Unsichtbar': 'Onzichtbaar',
+    'Kalendereintrag': 'Agenda-item',
+    'Kein Anmeldeverfahren': 'Geen inschrijfprocedure',
     'Neue Anmeldung': 'Nieuwe inschrijving',
     'Keine Anmeldungen gefunden.': 'Geen inschrijvingen gevonden.',
     'Name oder Ort suchen': 'Naam of locatie zoeken',
@@ -5655,6 +5813,7 @@ const TRANSLATIONS = {
     'Ungültiger Bildtyp': 'Invalid image type',
     'Ungültiger oder abgelaufener Reset-Token': 'Invalid or expired reset token',
     'Ungültiges Turnier-Limit': 'Invalid tournament limit',
+    'Ungültiges Kalendereintrag-Limit': 'Invalid calendar entry limit',
     'Vorname und Nachname müssen mindestens 2 Zeichen enthalten': 'First name and last name must contain at least 2 characters',
     'Vorname und Nachname sind erforderlich': 'First name and last name are required',
     'Ziel-URL nicht erlaubt': 'Target URL not allowed',
@@ -5678,6 +5837,7 @@ const TRANSLATIONS = {
     'Die eingegebene Ortszeit existiert wegen der Sommerzeitumstellung nicht.': 'The entered local time does not exist due to the daylight saving time change.',
     'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.': "This tournament's core data is managed in the tournament document.",
     'Turnier-Limit erreicht. Bitte bei einem Admin um mehr Turniere bitten.': 'Tournament limit reached. Please ask an admin for more tournaments.',
+    'Kalendereintrag-Limit erreicht. Bitte bei einem Admin um mehr Kalendereinträge bitten.': 'Calendar entry limit reached. Please ask an admin for more calendar entries.',
     'Die Anmeldung ist geschlossen': 'Registration is closed',
     'Anmeldung ab': 'Registration from',
     'Anmeldung möglich ab': 'Registration opens at',
@@ -5797,6 +5957,13 @@ const TRANSLATIONS = {
     'Keine Benutzer gefunden.': 'No users found.',
     'Neuer Benutzer': 'New user',
     'Neues Turnier': 'New tournament',
+    'Kalendereintrag erstellen': 'Create calendar entry',
+    'Kalendereintrag anlegen': 'Save calendar entry',
+    'Kalendereintrag wurde angelegt.': 'Calendar entry was created.',
+    'Sichtbar': 'Visible',
+    'Unsichtbar': 'Hidden',
+    'Kalendereintrag': 'Calendar entry',
+    'Kein Anmeldeverfahren': 'No registration process',
     'Neue Anmeldung': 'New registration',
     'Keine Anmeldungen gefunden.': 'No registrations found.',
     'Name oder Ort suchen': 'Search name or location',
@@ -6128,6 +6295,7 @@ const TRANSLATIONS = {
     'Ungültiger Bildtyp': 'Tipo de imagen no válido',
     'Ungültiger oder abgelaufener Reset-Token': 'Token de restablecimiento no válido o caducado',
     'Ungültiges Turnier-Limit': 'Límite de torneos no válido',
+    'Ungültiges Kalendereintrag-Limit': 'Límite de entradas de calendario no válido',
     'Vorname und Nachname müssen mindestens 2 Zeichen enthalten': 'El nombre y el apellido deben contener al menos 2 caracteres',
     'Vorname und Nachname sind erforderlich': 'Se requieren el nombre y el apellido',
     'Ziel-URL nicht erlaubt': 'URL de destino no permitida',
@@ -6151,6 +6319,7 @@ const TRANSLATIONS = {
     'Die eingegebene Ortszeit existiert wegen der Sommerzeitumstellung nicht.': 'La hora local introducida no existe debido al cambio de horario de verano.',
     'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.': 'Los datos básicos de este torneo se gestionan en el documento del torneo.',
     'Turnier-Limit erreicht. Bitte bei einem Admin um mehr Turniere bitten.': 'Límite de torneos alcanzado. Por favor, pide a un administrador más torneos.',
+    'Kalendereintrag-Limit erreicht. Bitte bei einem Admin um mehr Kalendereinträge bitten.': 'Límite de entradas de calendario alcanzado. Por favor, pide a un administrador más entradas de calendario.',
     'Die Anmeldung ist geschlossen': 'La inscripción está cerrada',
     'Anmeldung ab': 'Inscripción desde',
     'Anmeldung möglich ab': 'Inscripción posible desde',
@@ -6270,6 +6439,13 @@ const TRANSLATIONS = {
     'Keine Benutzer gefunden.': 'No se encontraron usuarios.',
     'Neuer Benutzer': 'Nuevo usuario',
     'Neues Turnier': 'Nuevo torneo',
+    'Kalendereintrag erstellen': 'Crear entrada de calendario',
+    'Kalendereintrag anlegen': 'Guardar entrada de calendario',
+    'Kalendereintrag wurde angelegt.': 'La entrada de calendario fue creada.',
+    'Sichtbar': 'Visible',
+    'Unsichtbar': 'Oculto',
+    'Kalendereintrag': 'Entrada de calendario',
+    'Kein Anmeldeverfahren': 'Sin proceso de inscripción',
     'Neue Anmeldung': 'Nueva inscripción',
     'Keine Anmeldungen gefunden.': 'No se encontraron inscripciones.',
     'Name oder Ort suchen': 'Buscar nombre o ubicación',
@@ -6601,6 +6777,7 @@ const TRANSLATIONS = {
     'Ungültiger Bildtyp': 'Type d\'image invalide',
     'Ungültiger oder abgelaufener Reset-Token': 'Jeton de réinitialisation invalide ou expiré',
     'Ungültiges Turnier-Limit': 'Limite de tournois invalide',
+    'Ungültiges Kalendereintrag-Limit': "Limite d'entrées d'agenda invalide",
     'Vorname und Nachname müssen mindestens 2 Zeichen enthalten': 'Le prénom et le nom doivent contenir au moins 2 caractères',
     'Vorname und Nachname sind erforderlich': 'Le prénom et le nom sont requis',
     'Ziel-URL nicht erlaubt': 'URL de destination non autorisée',
@@ -6624,6 +6801,7 @@ const TRANSLATIONS = {
     'Die eingegebene Ortszeit existiert wegen der Sommerzeitumstellung nicht.': "L'heure locale saisie n'existe pas en raison du changement d'heure d'été.",
     'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.': 'Les données de base de ce tournoi sont gérées dans le document du tournoi.',
     'Turnier-Limit erreicht. Bitte bei einem Admin um mehr Turniere bitten.': 'Limite de tournois atteinte. Merci de demander plus de tournois à un administrateur.',
+    'Kalendereintrag-Limit erreicht. Bitte bei einem Admin um mehr Kalendereinträge bitten.': "Limite d'entrées d'agenda atteinte. Merci de demander plus d'entrées d'agenda à un administrateur.",
     'Die Anmeldung ist geschlossen': "L'inscription est fermée",
     'Anmeldung ab': 'Inscriptions à partir du',
     'Anmeldung möglich ab': 'Inscriptions possibles à partir du',
@@ -6743,6 +6921,13 @@ const TRANSLATIONS = {
     'Keine Benutzer gefunden.': 'Aucun utilisateur trouvé.',
     'Neuer Benutzer': 'Nouvel utilisateur',
     'Neues Turnier': 'Nouveau tournoi',
+    'Kalendereintrag erstellen': "Créer une entrée d'agenda",
+    'Kalendereintrag anlegen': "Enregistrer l'entrée d'agenda",
+    'Kalendereintrag wurde angelegt.': "L'entrée d'agenda a été créée.",
+    'Sichtbar': 'Visible',
+    'Unsichtbar': 'Masqué',
+    'Kalendereintrag': "Entrée d'agenda",
+    'Kein Anmeldeverfahren': "Pas de procédure d'inscription",
     'Neue Anmeldung': 'Nouvelle inscription',
     'Keine Anmeldungen gefunden.': 'Aucune inscription trouvée.',
     'Name oder Ort suchen': 'Rechercher nom ou lieu',

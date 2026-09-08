@@ -1,0 +1,2 @@
+ALTER TABLE tournaments ADD COLUMN registration_enabled INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE users ADD COLUMN calendar_entry_limit INTEGER NOT NULL DEFAULT 30;

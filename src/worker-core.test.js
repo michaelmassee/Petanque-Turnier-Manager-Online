@@ -5,7 +5,12 @@ const base = { name: 'Testturnier', date: '2026-06-01', location: 'Musterstadt' 
 
 describe('Worker-Fachlogik', () => {
   it('normalisiert ein vollständiges Turnier', () => {
-    expect(normalizeTournamentInput({ ...base, formation: 'triplette', registrationType: 'supermelee', type: 'rangliste', visibility: 'public', latitude: '50', longitude: '8', contactEmail: 'a@b.de' })).toMatchObject({ currency: 'EUR', waitlistEnabled: true, latitude: 50, longitude: 8 });
+    expect(normalizeTournamentInput({ ...base, formation: 'triplette', registrationType: 'supermelee', type: 'rangliste', visibility: 'public', latitude: '50', longitude: '8', contactEmail: 'a@b.de' })).toMatchObject({ currency: 'EUR', waitlistEnabled: true, registrationEnabled: true, latitude: 50, longitude: 8 });
+  });
+
+  it('respektiert registrationEnabled für Kalendereinträge', () => {
+    expect(normalizeTournamentInput({ ...base, registrationEnabled: false })).toMatchObject({ registrationEnabled: false });
+    expect(registrationOpenStatus({ visibility: 'public', status: 'registration', registration_enabled: 0 })).toBe('closed');
   });
 
   it.each([
