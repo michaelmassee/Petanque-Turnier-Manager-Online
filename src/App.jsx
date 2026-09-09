@@ -2117,6 +2117,16 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             licenseRequired={tournament.licenseRequired}
             teamNameEnabled={tournament.teamNameEnabled}
           />
+          <label className="honeypot-field" aria-hidden="true">
+            Webseite (bitte leer lassen)
+            <input
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              value={form.honeypot}
+              onChange={(event) => setForm({ ...form, honeypot: event.target.value })}
+            />
+          </label>
           <label className="checkbox-field">
             <input
               type="checkbox"
@@ -2136,7 +2146,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
 
 
 

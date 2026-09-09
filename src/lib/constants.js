@@ -108,6 +108,7 @@ export const EMPTY_AUTH_FORM = {
   password: '',
   passwordConfirm: '',
   token: '',
+  honeypot: '',
 };
 
 export const EMPTY_TOURNAMENT_FORM = {
@@ -182,6 +183,7 @@ export const EMPTY_REGISTRATION_FORM = {
   status: 'pending',
   isVip: false,
   publicationNoticeAccepted: false,
+  honeypot: '',
 };
 
 export const REGISTER_SUCCESS = 'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.';

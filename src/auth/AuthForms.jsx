@@ -94,6 +94,16 @@ export function RegisterForm({ form, setForm, onSubmit, onBack, navigate }) {
       <p className="hint">
         Mit der Registrierung stimmst du der Verarbeitung deiner Daten gemäß unserer Datenschutzerklärung zu.
       </p>
+      <label className="honeypot-field" aria-hidden="true">
+        Webseite (bitte leer lassen)
+        <input
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={form.honeypot}
+          onChange={(event) => setForm({ ...form, honeypot: event.target.value })}
+        />
+      </label>
       <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
         Datenschutzerklärung lesen
       </button>

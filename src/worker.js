@@ -1318,6 +1318,11 @@ function oauthAccountInsert(db, userId, provider, profile, now) {
 async function registerUser(request, env, url) {
   const db = env.DB;
   const body = await readJson(request);
+  // Honeypot: bots that fill the invisible field receive the normal success response,
+  // but no account or verification email is created.
+  if (nullableText(body.honeypot)) {
+    return json({ message: 'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.' }, 201);
+  }
   const user = normalizeUserInput({ ...body, role: 'user' }, { requirePassword: true });
   const language = normalizeLanguage(body.language);
   const password = await hashPassword(user.password);
@@ -2792,6 +2797,11 @@ async function createRegistration(request, env, tournament) {
   }
 
   const body = await readJson(request);
+  // Honeypot: public registrations are a spam target. Do not create registrations
+  // or trigger notifications when a bot fills this field.
+  if (nullableText(body.honeypot)) {
+    return json({ ok: true }, 201);
+  }
   if (body.publicationNoticeAccepted !== true) {
     throw new HttpError(400, 'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden');
   }
