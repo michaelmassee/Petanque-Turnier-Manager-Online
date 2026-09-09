@@ -266,6 +266,7 @@ export default function App() {
   const awayFromHome = activeTab !== 'home';
   const desiredNavDepth = (awayFromHome ? 1 : 0) + (anyDialogOpen ? 1 : 0);
   const navDepthRef = useRef(0);
+  const navPathRef = useRef(path);
   const suppressNavPopCountRef = useRef(0);
 
   // Zurück (Handy-Geste/Hardware-Button, Browser) soll offene Dialoge schließen bzw. von einem
@@ -277,6 +278,16 @@ export default function App() {
   // Zustands entschieden (Dialog vor Tab) statt anhand gemerkter Labels, weil einzelne UI-
   // Aktionen (z. B. Menüpunkt anklicken) Dialog- und Tab-Zustand gleichzeitig ändern können.
   useEffect(() => {
+    const pathChanged = navPathRef.current !== path;
+    navPathRef.current = path;
+    if (pathChanged) {
+      // Ein echter Routenwechsel legt bereits einen neuen History-Eintrag an. Offene
+      // App-Ebenen liegen darunter und dürfen diesen Eintrag nicht mit history.go()
+      // wieder zurücknehmen (z. B. "Turnier melden" aus dem geöffneten Admin-Menü).
+      navDepthRef.current = desiredNavDepth;
+      return;
+    }
+
     const current = navDepthRef.current;
     if (desiredNavDepth > current) {
       for (let index = current; index < desiredNavDepth; index += 1) {
@@ -289,7 +300,7 @@ export default function App() {
       suppressNavPopCountRef.current += removeCount;
       window.history.go(-removeCount);
     }
-  }, [desiredNavDepth]);
+  }, [desiredNavDepth, path]);
 
   useEffect(() => {
     function onPopState() {
@@ -2125,7 +2136,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
 
 
 

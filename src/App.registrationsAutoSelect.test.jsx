@@ -50,10 +50,13 @@ function installFetchMock(calls) {
       return Promise.resolve(jsonResponse({ needsSetup: false }));
     }
     if (path === '/api/session') {
-      return Promise.resolve(jsonResponse({ user: { id: 'u1', firstName: 'Test', lastName: 'User', role: 'organizer' } }));
+      return Promise.resolve(jsonResponse({ user: { id: 'u1', firstName: 'Test', lastName: 'User', role: 'admin' } }));
     }
     if (path === '/api/tournaments') {
       return Promise.resolve(jsonResponse({ tournaments: TOURNAMENTS }));
+    }
+    if (path === '/api/users') {
+      return Promise.resolve(jsonResponse({ users: [] }));
     }
     if (path === '/api/tournaments/t2/registrations') {
       return Promise.resolve(jsonResponse({ registrations: REGISTRATIONS }));
@@ -85,5 +88,17 @@ describe('Anmeldungen: automatische Turnierauswahl beim ersten Öffnen', () => {
 
     await waitFor(() => expect(calls).toContain('/api/tournaments/t2/registrations'));
     expect(calls).not.toContain('/api/tournaments/t1/registrations');
+  });
+
+  it('öffnet Turnier melden aus dem geöffneten Menü, ohne den neuen Routen-Eintrag zurückzunehmen', async () => {
+    const historyGo = vi.spyOn(window.history, 'go');
+    render(<App />);
+
+    fireEvent.click(await screen.findByLabelText('Menü öffnen'));
+    fireEvent.click(screen.getByRole('button', { name: 'Turnier melden' }));
+
+    expect(await screen.findByText(/Melde ein Petanque-Turnier/)).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/turnier-melden');
+    expect(historyGo).not.toHaveBeenCalled();
   });
 });
