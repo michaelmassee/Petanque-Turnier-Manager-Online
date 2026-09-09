@@ -34,7 +34,7 @@ export function TextField({ label, value, onChange, type = 'text', required, inv
   }
 
   return (
-    <label>
+    <label className={invalid ? 'field-invalid-label' : undefined}>
       {label}
       {required ? <RequiredMark /> : null}
       <input

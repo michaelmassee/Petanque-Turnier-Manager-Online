@@ -872,7 +872,9 @@ export default function App() {
         await loadRegistrations(selectedTournament.id);
       }
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      const baseMessage = translateText(requestError.message, language);
+      const conflictName = requestError.payload?.details?.name;
+      setError(conflictName ? `${baseMessage} ("${conflictName}")` : baseMessage);
       setRegistrationInvalidField(requestError.payload?.details?.field || null);
     }
   }

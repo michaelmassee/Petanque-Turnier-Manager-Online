@@ -374,12 +374,18 @@ textarea:focus {
 }
 
 .field-invalid {
-  border-color: #9d2424 !important;
-  background: #ffecec;
+  border: 2px solid #c62828 !important;
+  background: #fff0f0;
+  box-shadow: 0 0 0 1px #c62828;
 }
 
 .field-invalid:focus {
-  outline-color: #9d2424;
+  outline-color: #c62828;
+}
+
+.field-invalid-label {
+  color: #c62828;
+  font-weight: 700;
 }
 
 .app-shell {

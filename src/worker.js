@@ -3943,7 +3943,7 @@ async function assertNoDuplicateTeamName(db, tournamentId, teamName, excludeId) 
     .bind(...(excludeId ? [tournamentId, teamName, excludeId] : [tournamentId, teamName]))
     .first();
   if (existing) {
-    throw new HttpError(409, 'Ein Team mit diesem Namen ist für dieses Turnier bereits angemeldet', { field: 'teamName' });
+    throw new HttpError(409, 'Ein Team mit diesem Namen ist für dieses Turnier bereits angemeldet', { field: 'teamName', name: teamName });
   }
 }
 
@@ -3974,12 +3974,24 @@ function registrationPlayerNames(row) {
 }
 
 async function assertNoDuplicatePlayer(db, tournamentId, registration, excludeId) {
-  const incoming = [{ field: 'firstName', name: normalizePlayerName(registration.firstName, registration.lastName) }];
+  const incoming = [{
+    field: 'firstName',
+    name: normalizePlayerName(registration.firstName, registration.lastName),
+    displayName: `${registration.firstName} ${registration.lastName}`.trim(),
+  }];
   if (registration.partnerFirstName && registration.partnerLastName) {
-    incoming.push({ field: 'partnerFirstName', name: normalizePlayerName(registration.partnerFirstName, registration.partnerLastName) });
+    incoming.push({
+      field: 'partnerFirstName',
+      name: normalizePlayerName(registration.partnerFirstName, registration.partnerLastName),
+      displayName: `${registration.partnerFirstName} ${registration.partnerLastName}`.trim(),
+    });
   }
   if (registration.partner2FirstName && registration.partner2LastName) {
-    incoming.push({ field: 'partner2FirstName', name: normalizePlayerName(registration.partner2FirstName, registration.partner2LastName) });
+    incoming.push({
+      field: 'partner2FirstName',
+      name: normalizePlayerName(registration.partner2FirstName, registration.partner2LastName),
+      displayName: `${registration.partner2FirstName} ${registration.partner2LastName}`.trim(),
+    });
   }
 
   const result = await db
@@ -3999,7 +4011,7 @@ async function assertNoDuplicatePlayer(db, tournamentId, registration, excludeId
         throw new HttpError(
           409,
           'Dieser Spieler ist mit Vor- und Nachname bereits für dieses Turnier angemeldet (auch als Partner einer anderen Anmeldung)',
-          { field: entry.field },
+          { field: entry.field, name: entry.displayName },
         );
       }
     }
