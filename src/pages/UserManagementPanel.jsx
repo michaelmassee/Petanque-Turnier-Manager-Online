@@ -1,4 +1,4 @@
-import { DEFAULT_TOURNAMENT_LIMIT, DEFAULT_CALENDAR_ENTRY_LIMIT, ROLES, EMPTY_USER_FORM } from '../lib/constants.js';
+import { DEFAULT_TOURNAMENT_LIMIT, ROLES, EMPTY_USER_FORM } from '../lib/constants.js';
 import { PASSWORD_STRENGTH_HINT } from '../lib/format.js';
 import { roleName } from '../lib/domain.js';
 import { SelectField, TextField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
@@ -131,7 +131,6 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
         </span>
         {user.passwordChangeRequired && <span className="status registration-pending">Passwortwechsel nötig</span>}
         {user.role !== 'admin' && <span className="status">Turnier-Limit: {user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT}</span>}
-        {user.role !== 'admin' && <span className="status">Kalendereintrag-Limit: {user.calendarEntryLimit ?? DEFAULT_CALENDAR_ENTRY_LIMIT}</span>}
         {user.role !== 'admin' && (
           <span className={user.mailEnabled ? 'status registration-confirmed' : 'status registration-pending'}>
             {user.mailEnabled ? 'E-Mail-Versand freigeschaltet' : 'E-Mail-Versand gesperrt'}
@@ -181,14 +180,6 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwo
         onChange={(value) => setForm({ ...form, tournamentLimit: value === '' ? '' : Number(value) })}
       />
       <p className="hint">Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).</p>
-      <TextField
-        label="Kalendereintrag-Limit"
-        type="number"
-        min={0}
-        value={form.calendarEntryLimit}
-        onChange={(value) => setForm({ ...form, calendarEntryLimit: value === '' ? '' : Number(value) })}
-      />
-      <p className="hint">Maximale Anzahl eigener Kalendereinträge, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).</p>
       <label className="checkbox-row">
         <input
           type="checkbox"

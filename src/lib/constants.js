@@ -74,7 +74,6 @@ export const RADIUS_OPTIONS = [
 ];
 
 export const DEFAULT_TOURNAMENT_LIMIT = 5;
-export const DEFAULT_CALENDAR_ENTRY_LIMIT = 30;
 
 export const EMPTY_USER_FORM = {
   id: '',
@@ -86,7 +85,6 @@ export const EMPTY_USER_FORM = {
   emailVerified: true,
   passwordChangeRequired: false,
   tournamentLimit: DEFAULT_TOURNAMENT_LIMIT,
-  calendarEntryLimit: DEFAULT_CALENDAR_ENTRY_LIMIT,
   mailEnabled: false,
 };
 
