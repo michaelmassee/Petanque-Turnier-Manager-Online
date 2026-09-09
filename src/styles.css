@@ -188,6 +188,10 @@ label {
   font-weight: 700;
 }
 
+.required-mark {
+  color: #d1453b;
+}
+
 input,
 select,
 textarea {

@@ -91,8 +91,8 @@ describe('Benutzer-Seite: Liste + Dialog', () => {
     fireEvent.click(screen.getByText('Bearbeiten'));
 
     expect(screen.getByText('Benutzer bearbeiten')).toBeInTheDocument();
-    expect(screen.getByLabelText('Vorname')).toHaveValue('Anna');
-    expect(screen.getByLabelText('Nachname')).toHaveValue('Admin');
+    expect(screen.getByLabelText(/^Vorname\b/)).toHaveValue('Anna');
+    expect(screen.getByLabelText(/^Nachname\b/)).toHaveValue('Admin');
 
     fireEvent.click(screen.getByText('Abbrechen'));
     expect(screen.queryByText('Benutzer bearbeiten')).not.toBeInTheDocument();
@@ -181,7 +181,7 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     fireEvent.click(screen.getByText('Bearbeiten'));
 
     expect(screen.getByText('Turnier bearbeiten')).toBeInTheDocument();
-    expect(screen.getByLabelText('Name')).toHaveValue('Sommerturnier');
+    expect(screen.getByLabelText(/^Name\b/)).toHaveValue('Sommerturnier');
 
     fireEvent.click(screen.getByText('Abbrechen'));
     expect(screen.queryByText('Turnier bearbeiten')).not.toBeInTheDocument();
@@ -270,7 +270,7 @@ describe('Anmeldungen-Seite: Liste + Dialog', () => {
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Anmeldung bearbeiten')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Vorname')).toHaveValue('Anna');
+    expect(within(dialog).getByLabelText(/^Vorname\b/)).toHaveValue('Anna');
 
     fireEvent.click(within(dialog).getByText('Abbrechen'));
     expect(screen.queryByText('Anmeldung bearbeiten')).not.toBeInTheDocument();

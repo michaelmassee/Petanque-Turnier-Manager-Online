@@ -3526,6 +3526,7 @@ function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel
               required
             />
             Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.
+            <RequiredMark />
           </label>
           <div className="row-actions stretch">
             <Button type="submit">Anmeldung senden</Button>
@@ -4428,18 +4429,24 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwo
   );
 }
 
-function TextField({ label, value, onChange, type = 'text', ...props }) {
+function RequiredMark() {
+  return <span className="required-mark" aria-hidden="true"> *</span>;
+}
+
+function TextField({ label, value, onChange, type = 'text', required, ...props }) {
   const [passwordVisible, setPasswordVisible] = useState(false);
 
   if (type === 'password') {
     return (
       <label>
         {label}
+        {required ? <RequiredMark /> : null}
         <div className="password-field">
           <input
             type={passwordVisible ? 'text' : 'password'}
             value={value}
             onChange={(event) => onChange(event.target.value)}
+            required={required}
             {...props}
           />
           <button
@@ -4458,25 +4465,34 @@ function TextField({ label, value, onChange, type = 'text', ...props }) {
   return (
     <label>
       {label}
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} {...props} />
+      {required ? <RequiredMark /> : null}
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        required={required}
+        {...props}
+      />
     </label>
   );
 }
 
-function TextArea({ label, value, onChange, maxLength }) {
+function TextArea({ label, value, onChange, maxLength, required }) {
   return (
     <label>
       {label}{maxLength ? ` (${value.length}/${maxLength})` : ''}
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={4} maxLength={maxLength} />
+      {required ? <RequiredMark /> : null}
+      <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={4} maxLength={maxLength} required={required} />
     </label>
   );
 }
 
-function SelectField({ label, value, onChange, options, disabled }) {
+function SelectField({ label, value, onChange, options, disabled, required }) {
   return (
     <label>
       {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+      {required ? <RequiredMark /> : null}
+      <select value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} required={required}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
