@@ -3484,19 +3484,24 @@ async function sendTransactionalEmail(env, { to, subject, text, language = 'de',
   const body = appendEmailFooter(text, language);
   const html = renderTransactionalEmailHtml(subject, text, language);
 
-  if (stratoAvailable) {
+  // Resend zuerst: die Domain ptmonline.org ist dort mit SPF/DKIM verifiziert.
+  // Strato (Absender ptmonline@bclinden.de) hat kein passendes SPF/DKIM-Alignment
+  // für sein DMARC(p=reject)-Setup - Strato selbst nimmt die Mail zwar an, sie wird
+  // von strikten Empfängern wie Gmail aber danach still verworfen. Strato dient
+  // deshalb nur noch als Fallback, falls Resend ausfällt.
+  if (resendAvailable) {
     try {
-      await sendViaStrato(env, { to, subject, body, html, attachments });
+      await sendViaResend(env, { to, subject, body, html, attachments, failureContext });
       return;
     } catch (error) {
-      console.error(`Strato SMTP failed to send ${failureContext}, falling back to Resend`, error);
-      if (!resendAvailable) {
-        throw new HttpError(503, 'E-Mail konnte nicht versendet werden.');
+      console.error(`Resend failed to send ${failureContext}, falling back to Strato`, error);
+      if (!stratoAvailable) {
+        throw error;
       }
     }
   }
 
-  await sendViaResend(env, { to, subject, body, html, attachments, failureContext });
+  await sendViaStrato(env, { to, subject, body, html, attachments });
 }
 
 async function geocodeLocation(query) {
