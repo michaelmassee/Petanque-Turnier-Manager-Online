@@ -1005,6 +1005,7 @@ export default function App() {
       visibility: tournament.visibility || 'private',
       internalNotes: tournament.internalNotes || '',
       participantsPublic: Boolean(tournament.participantsPublic),
+      approvalRequired: Boolean(tournament.approvalRequired),
       licenseRequired: Boolean(tournament.licenseRequired),
       teamNameEnabled: Boolean(tournament.teamNameEnabled),
       waitlistEnabled: tournament.waitlistEnabled === undefined ? true : Boolean(tournament.waitlistEnabled),

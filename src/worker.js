@@ -2413,7 +2413,7 @@ async function updateTournament(request, env, existing, user) {
        SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
-           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, updated_at = ?
+           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -2443,6 +2443,7 @@ async function updateTournament(request, env, existing, user) {
       tournament.teamNameEnabled ? 1 : 0,
       tournament.waitlistEnabled ? 1 : 0,
       tournament.registrationEnabled ? 1 : 0,
+      tournament.approvalRequired ? 1 : 0,
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
