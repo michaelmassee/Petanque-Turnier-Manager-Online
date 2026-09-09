@@ -116,6 +116,8 @@ function UserStat({ label, value }) {
 }
 
 function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
+  const systemUser = user.id === 'system-tournament-reports';
+
   return (
     <article className={`data-row user-row ${selected ? 'selected' : ''}`}>
       <div>
@@ -137,10 +139,10 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
         )}
       </div>
       <div className="row-actions">
-        <Button variant="secondary" onClick={() => onEdit(user)}>
+        <Button variant="secondary" onClick={() => onEdit(user)} disabled={systemUser}>
           Bearbeiten
         </Button>
-        <Button variant="danger" onClick={() => onDelete(user)} disabled={user.id === currentUser.id}>
+        <Button variant="danger" onClick={() => onDelete(user)} disabled={systemUser || user.id === currentUser.id}>
           Löschen
         </Button>
       </div>

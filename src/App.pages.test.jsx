@@ -140,6 +140,35 @@ describe('Benutzer-Seite: Liste + Dialog', () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Benutzer bearbeiten')).not.toBeInTheDocument();
   });
+
+  it('sperrt Bearbeiten und Löschen für den technischen Turniermelde-Account', () => {
+    render(
+      <UserManagementPanel
+        users={[{ id: 'system-tournament-reports', firstName: 'Turnier', lastName: 'Meldungen (System)', email: 'system-tournament-reports@ptmonline.internal', role: 'user', emailVerifiedAt: '2026-01-01', passwordChangeRequired: false, mailEnabled: false }]}
+        stats={{ total: 1, admins: 0, unverified: 0, passwordChangeRequired: 0 }}
+        totalUsers={1}
+        userMode="create"
+        currentUser={{ id: 'admin' }}
+        userForm={EMPTY_USER_FORM}
+        setUserForm={() => {}}
+        userQuery=""
+        setUserQuery={() => {}}
+        userRoleFilter=""
+        setUserRoleFilter={() => {}}
+        userStatusFilter=""
+        setUserStatusFilter={() => {}}
+        dialogOpen={false}
+        onCloseDialog={() => {}}
+        onCreateUser={() => {}}
+        onSubmitUser={() => {}}
+        onEditUser={() => {}}
+        onDeleteUser={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Löschen' })).toBeDisabled();
+  });
 });
 
 function TournamentPageHarness({ onSubmit }) {

@@ -1863,6 +1863,9 @@ async function createUser(request, db) {
 }
 
 async function updateUser(request, env, id, currentUserId) {
+  if (id === TOURNAMENT_REPORT_SYSTEM_USER_ID) {
+    throw new HttpError(403, 'Zugriff verweigert');
+  }
   const db = env.DB;
   const existing = await db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
   if (!existing) {
@@ -2015,6 +2018,9 @@ async function updateOwnProfile(request, env, url, userId) {
 }
 
 async function deleteUser(db, id, currentUserId, deleteTournaments) {
+  if (id === TOURNAMENT_REPORT_SYSTEM_USER_ID) {
+    throw new HttpError(403, 'Zugriff verweigert');
+  }
   if (id === currentUserId) {
     throw new HttpError(400, 'Du kannst deinen eigenen Benutzer nicht löschen');
   }
