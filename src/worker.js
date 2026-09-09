@@ -3469,6 +3469,13 @@ function stratoConfigured(env) {
   return Boolean(env.STRATO_SMTP_USER && env.STRATO_SMTP_PASSWORD);
 }
 
+const GOOGLE_MAIL_DOMAINS = new Set(['gmail.com', 'googlemail.com']);
+
+function isGoogleMailRecipient(to) {
+  const domain = String(to || '').split('@')[1]?.toLowerCase();
+  return Boolean(domain && GOOGLE_MAIL_DOMAINS.has(domain));
+}
+
 async function sendTransactionalEmail(env, { to, subject, text, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
   const stratoAvailable = stratoConfigured(env);
   const resendAvailable = Boolean(env.RESEND_API_KEY && env.MAIL_FROM);
@@ -3484,24 +3491,34 @@ async function sendTransactionalEmail(env, { to, subject, text, language = 'de',
   const body = appendEmailFooter(text, language);
   const html = renderTransactionalEmailHtml(subject, text, language);
 
-  // Resend zuerst: die Domain ptmonline.org ist dort mit SPF/DKIM verifiziert.
-  // Strato (Absender ptmonline@bclinden.de) hat kein passendes SPF/DKIM-Alignment
-  // für sein DMARC(p=reject)-Setup - Strato selbst nimmt die Mail zwar an, sie wird
-  // von strikten Empfängern wie Gmail aber danach still verworfen. Strato dient
-  // deshalb nur noch als Fallback, falls Resend ausfällt.
-  if (resendAvailable) {
+  // Strato (Absender ptmonline@bclinden.de) hat kein SPF/DKIM-Alignment für sein
+  // DMARC(p=reject)-Setup - Strato nimmt die Mail zwar an, Google verwirft sie
+  // danach aber still. Für Gmail/Googlemail-Empfänger deshalb Resend zuerst
+  // (ptmonline.org ist dort sauber mit SPF/DKIM verifiziert), für alle anderen
+  // Empfänger bleibt Strato primär. Jeweils mit Fallback auf den anderen Anbieter.
+  const preferResend = isGoogleMailRecipient(to);
+  const primaryAvailable = preferResend ? resendAvailable : stratoAvailable;
+  const fallbackAvailable = preferResend ? stratoAvailable : resendAvailable;
+  const sendPrimary = () => (preferResend
+    ? sendViaResend(env, { to, subject, body, html, attachments, failureContext })
+    : sendViaStrato(env, { to, subject, body, html, attachments }));
+  const sendFallback = () => (preferResend
+    ? sendViaStrato(env, { to, subject, body, html, attachments })
+    : sendViaResend(env, { to, subject, body, html, attachments, failureContext }));
+
+  if (primaryAvailable) {
     try {
-      await sendViaResend(env, { to, subject, body, html, attachments, failureContext });
+      await sendPrimary();
       return;
     } catch (error) {
-      console.error(`Resend failed to send ${failureContext}, falling back to Strato`, error);
-      if (!stratoAvailable) {
-        throw error;
+      console.error(`${preferResend ? 'Resend' : 'Strato'} failed to send ${failureContext}, falling back to ${preferResend ? 'Strato' : 'Resend'}`, error);
+      if (!fallbackAvailable) {
+        throw error instanceof HttpError ? error : new HttpError(503, 'E-Mail konnte nicht versendet werden.');
       }
     }
   }
 
-  await sendViaStrato(env, { to, subject, body, html, attachments });
+  await sendFallback();
 }
 
 async function geocodeLocation(query) {
