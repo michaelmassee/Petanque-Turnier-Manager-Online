@@ -4,7 +4,7 @@ export function RequiredMark() {
   return <span className="required-mark" aria-hidden="true"> *</span>;
 }
 
-export function TextField({ label, value, onChange, type = 'text', required, ...props }) {
+export function TextField({ label, value, onChange, type = 'text', required, invalid, className, ...props }) {
   const [passwordVisible, setPasswordVisible] = useState(false);
 
   if (type === 'password') {
@@ -42,6 +42,7 @@ export function TextField({ label, value, onChange, type = 'text', required, ...
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required={required}
+        className={[className, invalid ? 'field-invalid' : ''].filter(Boolean).join(' ') || undefined}
         {...props}
       />
     </label>

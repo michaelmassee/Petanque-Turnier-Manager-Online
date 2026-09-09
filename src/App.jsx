@@ -77,6 +77,7 @@ export default function App() {
   const [authForm, setAuthForm] = useState(EMPTY_AUTH_FORM);
   const [tournamentForm, setTournamentForm] = useState(EMPTY_TOURNAMENT_FORM);
   const [registrationForm, setRegistrationForm] = useState(EMPTY_REGISTRATION_FORM);
+  const [registrationInvalidField, setRegistrationInvalidField] = useState(null);
   const [userMode, setUserMode] = useState('create');
   const [tournamentMode, setTournamentMode] = useState('create');
   const [registrationMode, setRegistrationMode] = useState('create');
@@ -848,6 +849,7 @@ export default function App() {
     event.preventDefault();
     setError('');
     setMessage('');
+    setRegistrationInvalidField(null);
 
     const tournamentId = registrationForm.tournamentId || selectedTournamentId;
     const payload = registrationPayload({ ...registrationForm, tournamentId }, language);
@@ -871,6 +873,7 @@ export default function App() {
       }
     } catch (requestError) {
       setError(translateText(requestError.message, language));
+      setRegistrationInvalidField(requestError.payload?.details?.field || null);
     }
   }
 
@@ -1026,6 +1029,7 @@ export default function App() {
   function clearFeedback() {
     setError('');
     setMessage('');
+    setRegistrationInvalidField(null);
   }
 
   function resetHomeFilters() {
@@ -1458,6 +1462,7 @@ export default function App() {
                 navigate={navigate}
                 language={language}
                 currentUser={currentUser}
+                invalidField={registrationInvalidField}
                 embedded
               />
             )}
@@ -1744,6 +1749,7 @@ export default function App() {
             navigate={navigate}
             language={language}
             currentUser={currentUser}
+            invalidField={registrationInvalidField}
             embedded
           />
         </AuthModal>
@@ -1813,6 +1819,7 @@ export default function App() {
               manageableTournaments={manageableTournaments}
               selectedTournamentId={selectedTournamentId}
               manageMode={Boolean(selectedTournament?.canManage)}
+              invalidField={registrationInvalidField}
             />
           </section>
         </Suspense>
@@ -2103,7 +2110,7 @@ function HomeTournaments({
   );
 }
 
-export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, language, embedded = false, currentUser = null }) {
+export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, language, embedded = false, currentUser = null, invalidField = null }) {
   useEffect(() => {
     if (!form.id && form.tournamentId !== tournament.id) {
       setForm({ ...EMPTY_REGISTRATION_FORM, tournamentId: tournament.id });
@@ -2162,6 +2169,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             registrationType={tournament.registrationType}
             licenseRequired={tournament.licenseRequired}
             teamNameEnabled={tournament.teamNameEnabled}
+            invalidField={invalidField}
           />
           <label className="website-field" aria-hidden="true">
             Website

@@ -4,7 +4,7 @@ import { labelFor } from '../lib/domain.js';
 import { SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
 
-export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode }) {
+export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField }) {
   const selectedValue = form.tournamentId || selectedTournamentId;
   const options = tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }));
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedValue);
@@ -20,6 +20,7 @@ export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournament
         registrationType={selectedTournament?.registrationType}
         licenseRequired={selectedTournament?.licenseRequired}
         teamNameEnabled={selectedTournament?.teamNameEnabled}
+        invalidField={invalidField}
       />
       <div className="dialog-actions">
         {onCancel && <Button variant="secondary" type="button" onClick={onCancel}>Abbrechen</Button>}
@@ -191,6 +192,7 @@ export function RegistrationsManagementPage({
   manageableTournaments,
   selectedTournamentId,
   manageMode,
+  invalidField,
 }) {
   return (
     <>
@@ -224,6 +226,7 @@ export function RegistrationsManagementPage({
           tournaments={manageableTournaments}
           selectedTournamentId={selectedTournamentId}
           manageMode={manageMode}
+          invalidField={invalidField}
         />
       </EditDialog>
     </>

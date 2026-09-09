@@ -1,13 +1,8 @@
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import {
-  EditDialog,
-  EMPTY_REGISTRATION_FORM,
-  EMPTY_TOURNAMENT_FORM,
-  EMPTY_USER_FORM,
-  ProfilePanel,
-} from './App.jsx';
+import { EditDialog, ProfilePanel } from './App.jsx';
+import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_USER_FORM } from './lib/constants.js';
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
 import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
 import { UserManagementPanel } from './pages/UserManagementPanel.jsx';
@@ -364,5 +359,54 @@ describe('Anmeldungen-Seite: Liste + Dialog', () => {
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Anmeldung bearbeiten')).not.toBeInTheDocument();
+  });
+
+  it('markiert das betroffene Feld rot, wenn der Server eine Mehrfachanmeldung meldet', () => {
+    const tournament = { id: 'tour1', name: 'Sommerturnier', formation: 'doublette', registrationType: 'forme', teamNameEnabled: true, canManage: true };
+
+    const { rerender } = render(
+      <RegistrationForm
+        form={EMPTY_REGISTRATION_FORM}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        tournaments={[tournament]}
+        selectedTournamentId={tournament.id}
+        manageMode
+      />,
+    );
+
+    expect(screen.getByLabelText(/^Vorname\b/)).not.toHaveClass('field-invalid');
+    expect(screen.getByLabelText(/^Teamname\b/)).not.toHaveClass('field-invalid');
+
+    rerender(
+      <RegistrationForm
+        form={EMPTY_REGISTRATION_FORM}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        tournaments={[tournament]}
+        selectedTournamentId={tournament.id}
+        manageMode
+        invalidField="firstName"
+      />,
+    );
+
+    expect(screen.getByLabelText(/^Vorname\b/)).toHaveClass('field-invalid');
+    expect(screen.getByLabelText(/^Nachname\b/)).toHaveClass('field-invalid');
+    expect(screen.getByLabelText(/^Teamname\b/)).not.toHaveClass('field-invalid');
+
+    rerender(
+      <RegistrationForm
+        form={EMPTY_REGISTRATION_FORM}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        tournaments={[tournament]}
+        selectedTournamentId={tournament.id}
+        manageMode
+        invalidField="teamName"
+      />,
+    );
+
+    expect(screen.getByLabelText(/^Vorname\b/)).not.toHaveClass('field-invalid');
+    expect(screen.getByLabelText(/^Teamname\b/)).toHaveClass('field-invalid');
   });
 });

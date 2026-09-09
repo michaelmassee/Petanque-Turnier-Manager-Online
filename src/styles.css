@@ -373,6 +373,15 @@ textarea:focus {
   color: #8a5a00;
 }
 
+.field-invalid {
+  border-color: #9d2424 !important;
+  background: #ffecec;
+}
+
+.field-invalid:focus {
+  outline-color: #9d2424;
+}
+
 .app-shell {
   min-height: 100vh;
   padding: 28px;

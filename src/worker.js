@@ -939,7 +939,7 @@ export default {
       return json({ error: 'Not found' }, 404);
     } catch (error) {
       if (error instanceof HttpError) {
-        return json({ error: error.message }, error.status);
+        return json({ error: error.message, ...(error.details ? { details: error.details } : {}) }, error.status);
       }
 
       console.error(error);
@@ -3933,7 +3933,7 @@ async function assertNoDuplicateTeamName(db, tournamentId, teamName, excludeId) 
     .bind(...(excludeId ? [tournamentId, teamName, excludeId] : [tournamentId, teamName]))
     .first();
   if (existing) {
-    throw new HttpError(409, 'Ein Team mit diesem Namen ist für dieses Turnier bereits angemeldet');
+    throw new HttpError(409, 'Ein Team mit diesem Namen ist für dieses Turnier bereits angemeldet', { field: 'teamName' });
   }
 }
 
@@ -3964,10 +3964,14 @@ function registrationPlayerNames(row) {
 }
 
 async function assertNoDuplicatePlayer(db, tournamentId, registration, excludeId) {
-  const incomingNames = new Set(registrationPlayerNames(registration));
-  if (incomingNames.size === 0) {
-    return;
+  const incoming = [{ field: 'firstName', name: normalizePlayerName(registration.firstName, registration.lastName) }];
+  if (registration.partnerFirstName && registration.partnerLastName) {
+    incoming.push({ field: 'partnerFirstName', name: normalizePlayerName(registration.partnerFirstName, registration.partnerLastName) });
   }
+  if (registration.partner2FirstName && registration.partner2LastName) {
+    incoming.push({ field: 'partner2FirstName', name: normalizePlayerName(registration.partner2FirstName, registration.partner2LastName) });
+  }
+
   const result = await db
     .prepare(
       `SELECT first_name, last_name, partner_first_name, partner_last_name, partner2_first_name, partner2_last_name
@@ -3979,9 +3983,14 @@ async function assertNoDuplicatePlayer(db, tournamentId, registration, excludeId
     .all();
 
   for (const row of result.results) {
-    for (const name of registrationPlayerNames(row)) {
-      if (incomingNames.has(name)) {
-        throw new HttpError(409, 'Ein Spieler mit diesem Namen ist für dieses Turnier bereits angemeldet');
+    const existingNames = new Set(registrationPlayerNames(row));
+    for (const entry of incoming) {
+      if (entry.name && existingNames.has(entry.name)) {
+        throw new HttpError(
+          409,
+          'Dieser Spieler ist mit Vor- und Nachname bereits für dieses Turnier angemeldet (auch als Partner einer anderen Anmeldung)',
+          { field: entry.field },
+        );
       }
     }
   }
