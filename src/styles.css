@@ -181,11 +181,18 @@ small {
 }
 
 label {
-  display: grid;
-  gap: 7px;
+  display: block;
   color: #364258;
   font-size: 0.92rem;
   font-weight: 700;
+}
+
+label > input:not([type="checkbox"]):not([type="radio"]),
+label > select,
+label > textarea,
+label > .password-field {
+  display: block;
+  margin-top: 7px;
 }
 
 .required-mark {
