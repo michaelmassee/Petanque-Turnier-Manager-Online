@@ -140,6 +140,7 @@ export const EMPTY_TOURNAMENT_FORM = {
   teamNameEnabled: false,
   waitlistEnabled: true,
   registrationEnabled: true,
+  approvalRequired: false,
   websiteUrl: '',
   logoUrl: '',
   flyerUrl: '',

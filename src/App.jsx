@@ -861,9 +861,11 @@ export default function App() {
       } else {
         const result = await api(`/api/tournaments/${tournamentId}/registrations`, { method: 'POST', body: JSON.stringify(payload) });
         setMessage(
-          result.mailEnabled
-            ? 'Du hast dich erfolgreich angemeldet. Du erhältst in Kürze eine Bestätigung per E-Mail.'
-            : 'Du hast dich erfolgreich angemeldet.',
+          result.registration.status === 'pending'
+            ? translateText('Deine Anmeldung ist eingegangen und wird vom Turnierleiter geprüft.', language)
+            : result.mailEnabled
+              ? translateText('Du hast dich erfolgreich angemeldet. Deine Teilnahme wurde per E-Mail bestätigt.', language)
+              : translateText('Du hast dich erfolgreich angemeldet. Deine Teilnahme ist bestätigt.', language),
         );
       }
 
@@ -896,6 +898,34 @@ export default function App() {
       await api(`/api/registrations/${registration.id}`, { method: 'DELETE' });
       setMessage('Anmeldung wurde gelöscht.');
       await loadRegistrations(registration.tournamentId);
+      await loadTournaments();
+    } catch (requestError) {
+      setError(translateText(requestError.message, language));
+    }
+  }
+
+  async function handleConfirmRegistration(registration) {
+    setError('');
+    setMessage('');
+    try {
+      const payload = registrationPayload({ ...registration, seedingPosition: registration.seedingPosition ?? '', status: 'confirmed' }, language);
+      await api(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      setMessage(translateText('Anmeldung wurde bestätigt.', language));
+      await loadRegistrations(registration.tournamentId);
+      await loadTournaments();
+    } catch (requestError) {
+      setError(translateText(requestError.message, language));
+    }
+  }
+
+  async function handleConfirmAllRegistrations() {
+    if (!selectedTournament) return;
+    setError('');
+    setMessage('');
+    try {
+      const result = await api(`/api/tournaments/${selectedTournament.id}/registrations/confirm-pending`, { method: 'POST' });
+      setMessage(`${result.confirmedCount} ${translateText('offene Anmeldung(en) wurden bestätigt.', language)}`);
+      await loadRegistrations(selectedTournament.id);
       await loadTournaments();
     } catch (requestError) {
       setError(translateText(requestError.message, language));
@@ -1824,7 +1854,10 @@ export default function App() {
                 setRegistrationStatusFilter('');
               }}
               onEdit={editRegistration}
+              onConfirm={handleConfirmRegistration}
+              onConfirmAll={handleConfirmAllRegistrations}
               onDelete={handleDeleteRegistration}
+              language={language}
               registrationDialogOpen={registrationDialogOpen}
               registrationMode={registrationMode}
               registrationForm={registrationForm}
@@ -2218,11 +2251,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
-
-
-
-
 
 
 

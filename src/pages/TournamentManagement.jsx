@@ -221,6 +221,16 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         />
         Warteliste ermöglichen
       </label>
+      {mode === 'create' && (
+        <label className="checkbox-field">
+          <input
+            type="checkbox"
+            checked={form.approvalRequired}
+            onChange={(event) => setForm({ ...form, approvalRequired: event.target.checked })}
+          />
+          {translateText('Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen', language)}
+        </label>
+      )}
       <label className="checkbox-field">
         <input
           type="checkbox"

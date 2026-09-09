@@ -110,9 +110,35 @@ export function RegistrationsPanel({
   onStatusFilterChange,
   onResetFilters,
   onEdit,
+  onConfirm,
+  onConfirmAll,
   onDelete,
+  language = 'de',
 }) {
   const filtered = filteredRegistrations.length !== registrations.length;
+  const pendingRegistrations = filteredRegistrations.filter((registration) => registration.status === 'pending');
+  const otherRegistrations = filteredRegistrations.filter((registration) => registration.status !== 'pending');
+
+  function RegistrationRow({ registration, showConfirm = false }) {
+    return (
+      <article className="data-row" key={registration.id}>
+        <div>
+          <strong>
+            {registration.isVip && <span className="vip-badge" title="VIP">★</span>}
+            {registration.firstName} {registration.lastName}
+          </strong>
+          <span>{registration.email}</span>
+          {registration.teamName && <small>{registration.teamName}</small>}
+        </div>
+        <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
+        <div className="row-actions">
+          {showConfirm && <Button onClick={() => onConfirm(registration)}>{translateText('Bestätigen', language)}</Button>}
+          <Button variant="secondary" onClick={() => onEdit(registration)}>Bearbeiten</Button>
+          <Button variant="danger" onClick={() => onDelete(registration)}>Löschen</Button>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <div className="panel">
@@ -145,26 +171,19 @@ export function RegistrationsPanel({
         onReset={onResetFilters}
         resetDisabled={!filtered}
       />
-      <div className="user-list">
-        {filteredRegistrations.map((registration) => (
-          <article className="data-row" key={registration.id}>
-            <div>
-              <strong>
-                {registration.isVip && <span className="vip-badge" title="VIP">★</span>}
-                {registration.firstName} {registration.lastName}
-              </strong>
-              <span>{registration.email}</span>
-              {registration.teamName && <small>{registration.teamName}</small>}
-            </div>
-            <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
-            <div className="row-actions">
-              <Button variant="secondary" onClick={() => onEdit(registration)}>Bearbeiten</Button>
-              <Button variant="danger" onClick={() => onDelete(registration)}>Löschen</Button>
-            </div>
-          </article>
-        ))}
-        {filteredRegistrations.length === 0 && <p className="muted">Keine Anmeldungen gefunden.</p>}
-      </div>
+      {pendingRegistrations.length > 0 && (
+        <section className="user-list" aria-label={translateText('Offene Anmeldungen', language)}>
+          <div className="section-title"><h3>{translateText('Offene Anmeldungen', language)}</h3><span className="counter">{pendingRegistrations.length}</span><Button onClick={onConfirmAll}>{translateText('Alle bestätigen', language)}</Button></div>
+          {pendingRegistrations.map((registration) => <RegistrationRow key={registration.id} registration={registration} showConfirm />)}
+        </section>
+      )}
+      {(otherRegistrations.length > 0 || (filteredRegistrations.length === 0 && pendingRegistrations.length === 0)) && (
+        <section className="user-list" aria-label={translateText('Weitere Anmeldungen', language)}>
+          {pendingRegistrations.length > 0 && <div className="section-title"><h3>{translateText('Weitere Anmeldungen', language)}</h3><span className="counter">{otherRegistrations.length}</span></div>}
+          {otherRegistrations.map((registration) => <RegistrationRow key={registration.id} registration={registration} />)}
+          {filteredRegistrations.length === 0 && <p className="muted">Keine Anmeldungen gefunden.</p>}
+        </section>
+      )}
     </div>
   );
 }
@@ -182,7 +201,10 @@ export function RegistrationsManagementPage({
   onStatusFilterChange,
   onResetFilters,
   onEdit,
+  onConfirm,
+  onConfirmAll,
   onDelete,
+  language,
   registrationDialogOpen,
   registrationMode,
   registrationForm,
@@ -209,7 +231,10 @@ export function RegistrationsManagementPage({
         onStatusFilterChange={onStatusFilterChange}
         onResetFilters={onResetFilters}
         onEdit={onEdit}
+        onConfirm={onConfirm}
+        onConfirmAll={onConfirmAll}
         onDelete={onDelete}
+        language={language}
       />
 
       <EditDialog

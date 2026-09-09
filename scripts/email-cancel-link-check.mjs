@@ -5,6 +5,7 @@
 // through (happened once for REGISTRATION_DISPLACED_EMAILS.textWaitlisted).
 import {
   REGISTRATION_CONFIRMATION_EMAILS,
+  REGISTRATION_RECEIVED_EMAILS,
   REGISTRATION_DISPLACED_EMAILS,
   TOURNAMENT_REMINDER_EMAILS,
   buildCancelLink,
@@ -26,6 +27,11 @@ const cancelLink = buildCancelLink('https://ptmonline.org', 'test-token-123');
 const link = 'https://ptmonline.org/turniere/1/info';
 
 for (const language of LANGUAGES) {
+  expectContainsCancelLink(
+    `Eingangsbestätigung enthält Abmelde-Link (${language})`,
+    REGISTRATION_RECEIVED_EMAILS[language].text('Vorname', 'Turnier', link, cancelLink),
+    cancelLink,
+  );
   expectContainsCancelLink(
     `Anmeldebestätigung enthält Abmelde-Link (${language})`,
     REGISTRATION_CONFIRMATION_EMAILS[language].text('Vorname', 'Turnier', 'Termin', 'Ort', link, cancelLink),

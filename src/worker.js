@@ -171,31 +171,59 @@ function buildRegistrationParticipantsBlock(registration, language) {
   return `\n\n${teamLine}${labels.participants}:\n${lines.join('\n')}`;
 }
 
-export const REGISTRATION_CONFIRMATION_EMAILS = {
+export const REGISTRATION_RECEIVED_EMAILS = {
   de: {
-    subject: (name) => `Anmeldebestätigung: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
-      `Hallo ${firstName},\n\nDeine Anmeldung für "${name}" ist eingegangen.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}${participantsBlock}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
+    subject: (name) => `Anmeldung eingegangen: ${name}`,
+    text: (firstName, name, link, cancelLink, participantsBlock = '') =>
+      `Hallo ${firstName},\n\ndeine Anmeldung für "${name}" ist eingegangen.${participantsBlock}\n\nDer Turnierersteller prüft deine Anmeldung noch. Du erhältst eine weitere E-Mail, sobald deine Teilnahme bestätigt wurde.\n\nAlle Infos zum Turnier:\n${link}\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
   },
   nl: {
-    subject: (name) => `Inschrijvingsbevestiging: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
-      `Hallo ${firstName},\n\nJe inschrijving voor "${name}" is ontvangen.\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}${participantsBlock}\n\nAlle informatie over het toernooi:\n${link}\n\nEen agenda-afspraak vind je als bijlage bij deze e-mail.\n\nWil je je weer afmelden? Gebruik deze link:\n${cancelLink}`,
+    subject: (name) => `Inschrijving ontvangen: ${name}`,
+    text: (firstName, name, link, cancelLink, participantsBlock = '') =>
+      `Hallo ${firstName},\n\nje inschrijving voor "${name}" is ontvangen.${participantsBlock}\n\nDe toernooiorganisator moet je inschrijving nog bevestigen. Je ontvangt een nieuwe e-mail zodra je deelname is bevestigd.\n\nAlle informatie over het toernooi:\n${link}\n\nWil je je weer afmelden? Gebruik deze link:\n${cancelLink}`,
   },
   en: {
-    subject: (name) => `Registration confirmation: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
-      `Hi ${firstName},\n\nYour registration for "${name}" has been received.\n\nDate: ${dateTimeLabel}\nLocation: ${location}${participantsBlock}\n\nAll tournament details:\n${link}\n\nA calendar event is attached to this email.\n\nWant to withdraw again? Use this link:\n${cancelLink}`,
+    subject: (name) => `Registration received: ${name}`,
+    text: (firstName, name, link, cancelLink, participantsBlock = '') =>
+      `Hi ${firstName},\n\nyour registration for "${name}" has been received.${participantsBlock}\n\nThe tournament organizer still needs to confirm your registration. You will receive another email once your participation has been confirmed.\n\nAll tournament details:\n${link}\n\nWant to withdraw again? Use this link:\n${cancelLink}`,
   },
   es: {
-    subject: (name) => `Confirmación de inscripción: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
-      `Hola ${firstName},\n\nTu inscripción para "${name}" se ha recibido.\n\nFecha: ${dateTimeLabel}\nLugar: ${location}${participantsBlock}\n\nToda la información del torneo:\n${link}\n\nEncontrarás una cita de calendario adjunta a este correo.\n\n¿Quieres darte de baja de nuevo? Usa este enlace:\n${cancelLink}`,
+    subject: (name) => `Inscripción recibida: ${name}`,
+    text: (firstName, name, link, cancelLink, participantsBlock = '') =>
+      `Hola ${firstName},\n\ntu inscripción para "${name}" se ha recibido.${participantsBlock}\n\nEl organizador del torneo aún debe confirmar tu inscripción. Recibirás otro correo cuando tu participación esté confirmada.\n\nToda la información del torneo:\n${link}\n\n¿Quieres darte de baja de nuevo? Usa este enlace:\n${cancelLink}`,
   },
   fr: {
-    subject: (name) => `Confirmation d'inscription : ${name}`,
+    subject: (name) => `Inscription reçue : ${name}`,
+    text: (firstName, name, link, cancelLink, participantsBlock = '') =>
+      `Bonjour ${firstName},\n\nton inscription pour « ${name} » a bien été reçue.${participantsBlock}\n\nL’organisateur du tournoi doit encore confirmer ton inscription. Tu recevras un autre e-mail dès que ta participation sera confirmée.\n\nToutes les informations sur le tournoi :\n${link}\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
+  },
+};
+
+export const REGISTRATION_CONFIRMATION_EMAILS = {
+  de: {
+    subject: (name) => `Teilnahme bestätigt: ${name}`,
     text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
-      `Bonjour ${firstName},\n\nTon inscription pour « ${name} » a bien été reçue.\n\nDate : ${dateTimeLabel}\nLieu : ${location}${participantsBlock}\n\nToutes les informations sur le tournoi :\n${link}\n\nUn rendez-vous de calendrier est joint à cet e-mail.\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
+      `Hallo ${firstName},\n\ndeine Teilnahme an "${name}" wurde bestätigt.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}${participantsBlock}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
+  },
+  nl: {
+    subject: (name) => `Deelname bevestigd: ${name}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
+      `Hallo ${firstName},\n\nJe deelname aan "${name}" is bevestigd.\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}${participantsBlock}\n\nAlle informatie over het toernooi:\n${link}\n\nEen agenda-afspraak vind je als bijlage bij deze e-mail.\n\nWil je je weer afmelden? Gebruik deze link:\n${cancelLink}`,
+  },
+  en: {
+    subject: (name) => `Participation confirmed: ${name}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
+      `Hi ${firstName},\n\nYour participation in "${name}" has been confirmed.\n\nDate: ${dateTimeLabel}\nLocation: ${location}${participantsBlock}\n\nAll tournament details:\n${link}\n\nA calendar event is attached to this email.\n\nWant to withdraw again? Use this link:\n${cancelLink}`,
+  },
+  es: {
+    subject: (name) => `Participación confirmada: ${name}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
+      `Hola ${firstName},\n\nTu participación en "${name}" ha sido confirmada.\n\nFecha: ${dateTimeLabel}\nLugar: ${location}${participantsBlock}\n\nToda la información del torneo:\n${link}\n\nEncontrarás una cita de calendario adjunta a este correo.\n\n¿Quieres darte de baja de nuevo? Usa este enlace:\n${cancelLink}`,
+  },
+  fr: {
+    subject: (name) => `Participation confirmée : ${name}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
+      `Bonjour ${firstName},\n\nTa participation à « ${name} » est confirmée.\n\nDate : ${dateTimeLabel}\nLieu : ${location}${participantsBlock}\n\nToutes les informations sur le tournoi :\n${link}\n\nUn rendez-vous de calendrier est joint à cet e-mail.\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
   },
 };
 
@@ -549,6 +577,27 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
   }
 }
 
+async function sendRegistrationReceivedEmail(env, tournament, registration, appOrigin) {
+  if (!(await canSendTournamentMail(env.DB, tournament))) return;
+  const language = await resolveEmailLanguage(env.DB, tournament, registration);
+  const templates = REGISTRATION_RECEIVED_EMAILS[language] || REGISTRATION_RECEIVED_EMAILS.de;
+  const link = `${appOrigin}/turniere/${tournament.id}/info`;
+  const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
+  const participantsBlock = buildRegistrationParticipantsBlock(registration, language);
+
+  for (const recipient of buildTeamRecipients(registration)) {
+    await sendTransactionalEmail(env, {
+      to: recipient.email,
+      subject: templates.subject(tournament.name),
+      text: templates.text(recipient.firstName, tournament.name, link, cancelLink, participantsBlock),
+      language,
+      logFallback: `Registration received email for ${recipient.email} (tournament ${tournament.id})`,
+      failureContext: `registration receipt for registration ${registration.id}`,
+      allowLogFallback: true,
+    });
+  }
+}
+
 async function sendDisplacementEmail(env, tournament, registration, wasCancelled, appOrigin) {
   if (!(await canSendTournamentMail(env.DB, tournament))) return;
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
@@ -897,6 +946,17 @@ export default {
         if (request.method === 'POST') {
           return await createRegistration(request, env, tournament);
         }
+      }
+
+      const confirmPendingRegistrationsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registrations\/confirm-pending$/);
+      if (confirmPendingRegistrationsMatch && request.method === 'POST') {
+        const session = await requireManagerAuth(request, env.DB);
+        const tournament = await getTournamentById(env.DB, confirmPendingRegistrationsMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        assertCanManageTournament(tournament, session.user);
+        return await confirmPendingRegistrations(env, tournament, new URL(request.url).origin);
       }
 
       const tournamentParticipantsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/participants$/);
@@ -2284,9 +2344,9 @@ async function createTournament(request, db, user) {
       `INSERT INTO tournaments (
         id, created_by, manager_id, name, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, website_url, logo_url, flyer_url,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
         latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -2317,6 +2377,7 @@ async function createTournament(request, db, user) {
       tournament.teamNameEnabled ? 1 : 0,
       tournament.waitlistEnabled ? 1 : 0,
       tournament.registrationEnabled ? 1 : 0,
+      tournament.approvalRequired ? 1 : 0,
       presentation.websiteUrl,
       presentation.logoUrl,
       presentation.flyerUrl,
@@ -2798,6 +2859,30 @@ async function listRegistrations(db, tournamentId) {
   return json({ registrations: result.results.map(toPublicRegistration) });
 }
 
+async function confirmPendingRegistrations(env, tournament, appOrigin) {
+  const pending = await env.DB.prepare("SELECT * FROM registrations WHERE tournament_id = ? AND status = 'pending' ORDER BY registered_at ASC").bind(tournament.id).all();
+  const registrations = pending.results || [];
+  if (registrations.length === 0) return json({ confirmedCount: 0 });
+
+  const now = new Date().toISOString();
+  const updateResults = await env.DB.batch(registrations.map((registration) =>
+    env.DB.prepare("UPDATE registrations SET status = 'confirmed', confirmed_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'")
+      .bind(now, now, registration.id),
+  ));
+  const confirmedRegistrations = registrations.filter((registration, index) => Number(updateResults[index]?.meta?.changes || 0) > 0);
+
+  for (const registration of confirmedRegistrations) {
+    await createSystemNotification(env, tournament.created_by, 'registration_status_changed', { tournamentName: tournament.name, status: 'confirmed', participant: `${registration.first_name} ${registration.last_name}` });
+    await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentName: tournament.name, status: 'confirmed' }, undefined, tournament.created_by);
+    try {
+      await sendRegistrationConfirmationEmail(env, tournament, registration, appOrigin);
+    } catch (error) {
+      console.error(`Failed to send bulk registration confirmation email for registration ${registration.id}`, error);
+    }
+  }
+  return json({ confirmedCount: confirmedRegistrations.length });
+}
+
 async function listPublicParticipants(db, tournamentId, currentUserEmail) {
   const result = await db
     .prepare(
@@ -2966,7 +3051,11 @@ async function createRegistration(request, env, tournament) {
   const mailEnabled = await canSendTournamentMail(db, tournament);
   if (mailEnabled) {
     try {
-      await sendRegistrationConfirmationEmail(env, tournament, created, appOrigin);
+      if (created.status === 'pending') {
+        await sendRegistrationReceivedEmail(env, tournament, created, appOrigin);
+      } else if (created.status === 'confirmed') {
+        await sendRegistrationConfirmationEmail(env, tournament, created, appOrigin);
+      }
     } catch (error) {
       console.error(`Failed to send registration confirmation email for registration ${id}`, error);
     }
@@ -3027,6 +3116,13 @@ async function updateRegistration(request, env, existing) {
   if (updated.status !== existing.status) {
     await createSystemNotification(env, existing.created_by, 'registration_status_changed', { tournamentName: existing.name, status: updated.status, participant: `${updated.first_name} ${updated.last_name}` });
     await notifyUserByEmail(env, updated.email, 'registration_status_changed', { tournamentName: existing.name, status: updated.status }, undefined, existing.created_by);
+    if (existing.status !== 'confirmed' && updated.status === 'confirmed') {
+      try {
+        await sendRegistrationConfirmationEmail(env, { ...existing, id: existing.tournament_id }, updated, new URL(request.url).origin);
+      } catch (error) {
+        console.error(`Failed to send registration confirmation email for registration ${updated.id}`, error);
+      }
+    }
   }
   return json({ registration: toPublicRegistration(updated) });
 }
@@ -3265,7 +3361,7 @@ async function syncPostResults(request, env, tournamentId) {
     const placeholders = statusChangeIds.map(() => '?').join(', ');
     const previousRows = await db
       .prepare(
-        `SELECT r.*, t.name, t.created_by FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
+        `SELECT r.*, t.name, t.created_by, t.date, t.start_time, t.location, t.waitlist_enabled FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
          WHERE r.tournament_id = ? AND r.id IN (${placeholders})`,
       )
       .bind(tournamentId, ...statusChangeIds)
@@ -3277,12 +3373,14 @@ async function syncPostResults(request, env, tournamentId) {
 
   const updateStatement = db.prepare(
     `UPDATE registrations
-     SET status = COALESCE(?, status), seeding_position = ?, updated_at = ?
+     SET status = COALESCE(?, status),
+         confirmed_at = CASE WHEN ? = 'confirmed' THEN COALESCE(confirmed_at, ?) WHEN ? IS NOT NULL THEN NULL ELSE confirmed_at END,
+         seeding_position = ?, updated_at = ?
      WHERE id = ? AND tournament_id = ?`,
   );
   const updateResults =
     parsed.length > 0
-      ? await db.batch(parsed.map((entry) => updateStatement.bind(entry.status, entry.seedingPosition, now, entry.id, tournamentId)))
+      ? await db.batch(parsed.map((entry) => updateStatement.bind(entry.status, entry.status, now, entry.status, entry.seedingPosition, now, entry.id, tournamentId)))
       : [];
 
   let updatedCount = 0;
@@ -3295,6 +3393,13 @@ async function syncPostResults(request, env, tournamentId) {
     if (previous && previous.status !== entry.status && changes) {
       await createSystemNotification(env, previous.created_by, 'registration_status_changed', { tournamentName: previous.name, status: entry.status, participant: `${previous.first_name} ${previous.last_name}` });
       await notifyUserByEmail(env, previous.email, 'registration_status_changed', { tournamentName: previous.name, status: entry.status }, undefined, previous.created_by);
+      if (previous.status !== 'confirmed' && entry.status === 'confirmed') {
+        try {
+          await sendRegistrationConfirmationEmail(env, { ...previous, id: tournamentId }, previous, APP_ORIGIN);
+        } catch (error) {
+          console.error(`Failed to send synced registration confirmation email for registration ${previous.id}`, error);
+        }
+      }
     }
   }
 
@@ -3462,8 +3567,9 @@ async function displaceRegistration(env, tournament, registrationToDisplace, app
 }
 
 async function initialRegistrationStatus(db, tournament, isVip) {
+  const initialStatus = Number(tournament.approval_required || 0) ? 'pending' : 'confirmed';
   if (!Number(tournament.max_registrations)) {
-    return { status: 'pending', displace: null };
+    return { status: initialStatus, displace: null };
   }
 
   const row = await db
@@ -3477,12 +3583,12 @@ async function initialRegistrationStatus(db, tournament, isVip) {
 
   const isFull = Number(row?.count || 0) >= Number(tournament.max_registrations);
   if (!isFull) {
-    return { status: 'pending', displace: null };
+    return { status: initialStatus, displace: null };
   }
   if (isVip) {
     const displace = await findDisplaceableNonVip(db, tournament.id, null);
     if (displace) {
-      return { status: 'pending', displace };
+      return { status: initialStatus, displace };
     }
   }
   if (!Number(tournament.waitlist_enabled ?? 1)) {
@@ -4298,6 +4404,7 @@ function toPublicTournament(row, user) {
     teamNameEnabled: Boolean(Number(row.team_name_enabled || 0)),
     waitlistEnabled: Boolean(Number(row.waitlist_enabled ?? 1)),
     registrationEnabled: Boolean(Number(row.registration_enabled ?? 1)),
+    approvalRequired: Boolean(Number(row.approval_required || 0)),
     documentManaged: Boolean(Number(row.document_managed || 0)),
     websiteUrl: row.website_url || null,
     logoUrl: row.logo_url || null,
