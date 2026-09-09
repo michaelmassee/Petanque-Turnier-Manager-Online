@@ -12,6 +12,10 @@ export function postboxText(language, key) {
 
 export const TRANSLATIONS = {
   nl: {
+    'Orte werden gesucht…': 'Plaatsen worden gezocht…',
+    'Ausgewählt:': 'Geselecteerd:',
+    'Kein Ort gefunden. Bitte Eingabe prüfen.': 'Geen plaats gevonden. Controleer je invoer.',
+    'Bitte Ort aus der Liste auswählen, um Mehrdeutigkeiten zu vermeiden.': 'Kies een plaats uit de lijst om verwarring te voorkomen.',
     'Wird geladen…': 'Wordt geladen…',
     'Währung': 'Valuta',
     'API-Schlüssel nicht gefunden': 'API-sleutel niet gevonden',
@@ -534,6 +538,10 @@ export const TRANSLATIONS = {
     'Andere (siehe Beschreibung)': 'Anders (zie beschrijving)',
   },
   en: {
+    'Orte werden gesucht…': 'Searching places…',
+    'Ausgewählt:': 'Selected:',
+    'Kein Ort gefunden. Bitte Eingabe prüfen.': 'No place found. Please check your input.',
+    'Bitte Ort aus der Liste auswählen, um Mehrdeutigkeiten zu vermeiden.': 'Please pick a place from the list to avoid ambiguity.',
     'Wird geladen…': 'Loading…',
     'Währung': 'Currency',
     'API-Schlüssel nicht gefunden': 'API key not found',
@@ -1056,6 +1064,10 @@ export const TRANSLATIONS = {
     'Andere (siehe Beschreibung)': 'Other (see description)',
   },
   es: {
+    'Orte werden gesucht…': 'Buscando lugares…',
+    'Ausgewählt:': 'Seleccionado:',
+    'Kein Ort gefunden. Bitte Eingabe prüfen.': 'No se encontró ningún lugar. Por favor revisa tu entrada.',
+    'Bitte Ort aus der Liste auswählen, um Mehrdeutigkeiten zu vermeiden.': 'Elige un lugar de la lista para evitar ambigüedades.',
     'Wird geladen…': 'Cargando…',
     'Währung': 'Moneda',
     'API-Schlüssel nicht gefunden': 'Clave de API no encontrada',
@@ -1578,6 +1590,10 @@ export const TRANSLATIONS = {
     'Andere (siehe Beschreibung)': 'Otra (ver descripción)',
   },
   fr: {
+    'Orte werden gesucht…': 'Recherche de lieux…',
+    'Ausgewählt:': 'Sélectionné :',
+    'Kein Ort gefunden. Bitte Eingabe prüfen.': 'Aucun lieu trouvé. Merci de vérifier ta saisie.',
+    'Bitte Ort aus der Liste auswählen, um Mehrdeutigkeiten zu vermeiden.': 'Choisis un lieu dans la liste pour éviter toute ambiguïté.',
     'Wird geladen…': 'Chargement…',
     'Währung': 'Devise',
     'API-Schlüssel nicht gefunden': 'Clé API introuvable',

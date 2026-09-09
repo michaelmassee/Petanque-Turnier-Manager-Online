@@ -4,6 +4,7 @@ import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate } from '..
 import { translateText } from '../lib/i18n.js';
 import { labelFor, formationLabel, formatTournamentStartTime } from '../lib/domain.js';
 import { TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
+import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 
 function FormationHelpDialog({ onClose }) {
   return (
@@ -113,7 +114,22 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         <TextField label="Datum" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
         <TextField label="Startzeit" type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
       </div>
-      <TextField label="Ort" value={form.location} onChange={(location) => setForm({ ...form, location })} required minLength={2} />
+      <LocationAutocomplete
+        label="Ort"
+        value={form.location}
+        onChange={(location) => setForm({ ...form, location, locationConfirmed: false })}
+        onSelect={(candidate) => setForm({
+          ...form,
+          location: candidate.displayName,
+          latitude: candidate.lat,
+          longitude: candidate.lng,
+          locationConfirmed: true,
+        })}
+        confirmed={form.locationConfirmed}
+        required
+        minLength={2}
+        language={language}
+      />
       <label className="checkbox-field">
         <input
           type="checkbox"

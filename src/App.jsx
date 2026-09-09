@@ -988,6 +988,7 @@ export default function App() {
       latitude: tournament.latitude ?? '',
       longitude: tournament.longitude ?? '',
       overrideCoordinates: false,
+      locationConfirmed: false,
       description: tournament.description || '',
       type: tournament.type || 'formule_x',
       formation: tournament.formationOther ? 'andere' : (tournament.formation || 'doublette'),
@@ -1130,6 +1131,12 @@ export default function App() {
     } finally {
       setGeoLoading(false);
     }
+  }
+
+  function handleSearchOriginSelect(candidate) {
+    setSearchOrigin({ lat: candidate.lat, lng: candidate.lng, label: candidate.displayName });
+    setSearchOriginQuery('');
+    setGeoError('');
   }
 
   function handleClearSearchOrigin() {
@@ -1313,6 +1320,7 @@ export default function App() {
               searchOriginQuery={searchOriginQuery}
               setSearchOriginQuery={setSearchOriginQuery}
               onSearchOriginSubmit={handleSearchOriginSubmit}
+              onSearchOriginSelect={handleSearchOriginSelect}
               onUseMyLocation={handleUseMyLocation}
               onClearSearchOrigin={handleClearSearchOrigin}
               searchRadiusKm={searchRadiusKm}
@@ -1577,6 +1585,7 @@ export default function App() {
               searchOriginQuery={searchOriginQuery}
               setSearchOriginQuery={setSearchOriginQuery}
               onSearchOriginSubmit={handleSearchOriginSubmit}
+              onSearchOriginSelect={handleSearchOriginSelect}
               onUseMyLocation={handleUseMyLocation}
               onClearSearchOrigin={handleClearSearchOrigin}
               searchRadiusKm={searchRadiusKm}

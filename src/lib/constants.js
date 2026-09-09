@@ -120,6 +120,7 @@ export const EMPTY_TOURNAMENT_FORM = {
   latitude: '',
   longitude: '',
   overrideCoordinates: false,
+  locationConfirmed: false,
   description: '',
   type: 'formule_x',
   formation: 'doublette',

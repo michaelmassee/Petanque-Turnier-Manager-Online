@@ -5,6 +5,7 @@ import { useInstallPrompt, isIosSafari, useOnlineStatus } from '../lib/hooks.js'
 import { ROLES, MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTIONS, TOURNAMENT_STATUSES, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor, roleName } from '../lib/domain.js';
 import { EditDialog, SelectField, TextArea, Button } from './ui.jsx';
+import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 
 async function subscribeToPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return 'unsupported';
@@ -301,6 +302,7 @@ export function SearchMenuControl({
   searchOriginQuery,
   setSearchOriginQuery,
   onSearchOriginSubmit,
+  onSearchOriginSelect,
   onUseMyLocation,
   onClearSearchOrigin,
   searchRadiusKm,
@@ -345,15 +347,14 @@ export function SearchMenuControl({
             </div>
 
             <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
-              <label className="home-search-field">
-                Umkreissuche: Von diesem Ort aus suchen
-                <input
-                  type="search"
-                  placeholder="Ort oder PLZ eingeben"
-                  value={searchOriginQuery}
-                  onChange={(event) => setSearchOriginQuery(event.target.value)}
-                />
-              </label>
+              <LocationAutocomplete
+                label="Umkreissuche: Von diesem Ort aus suchen"
+                value={searchOriginQuery}
+                onChange={setSearchOriginQuery}
+                onSelect={onSearchOriginSelect}
+                language={language}
+                disabled={geoLoading}
+              />
               <Button type="submit" variant="secondary" disabled={geoLoading}>
                 Suchen
               </Button>

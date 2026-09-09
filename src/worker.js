@@ -922,11 +922,14 @@ export default {
         const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
         await enforceGeocodeRateLimit(env.DB, ip);
         const body = await readJson(request);
-        const result = await geocodeLocation(body.query);
+        const countryCode = request.headers.get('CF-IPCountry');
+        const results = await geocodeLocation(body.query, { countryCode, limit: 5 });
+        const [best] = results;
         return json({
-          lat: result?.lat ?? null,
-          lng: result?.lng ?? null,
-          displayName: result?.displayName ?? null,
+          results: results.map(({ lat, lng, displayName }) => ({ lat, lng, displayName })),
+          lat: best?.lat ?? null,
+          lng: best?.lng ?? null,
+          displayName: best?.displayName ?? null,
         });
       }
 
@@ -2243,7 +2246,7 @@ async function listTournaments(db, user) {
   return json({ tournaments: rows.results.map((row) => toPublicTournament(row, user)) });
 }
 
-async function resolveTournamentGeolocation(tournament, existing, now) {
+async function resolveTournamentGeolocation(tournament, existing, now, countryCode) {
   if (tournament.latitude !== null && tournament.longitude !== null) {
     return { latitude: tournament.latitude, longitude: tournament.longitude, geocodedAt: null };
   }
@@ -2251,7 +2254,7 @@ async function resolveTournamentGeolocation(tournament, existing, now) {
     return { latitude: existing.latitude, longitude: existing.longitude, geocodedAt: existing.geocoded_at };
   }
 
-  const result = await geocodeLocation(tournament.location);
+  const [result] = await geocodeLocation(tournament.location, { countryCode, limit: 1 });
   if (!result) {
     return { latitude: null, longitude: null, geocodedAt: null };
   }
@@ -2335,7 +2338,7 @@ async function createTournament(request, db, user) {
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   const managerId = user.role === 'admin' ? tournament.managerId || user.id : user.id;
-  const geo = await resolveTournamentGeolocation(tournament, null, now);
+  const geo = await resolveTournamentGeolocation(tournament, null, now, request.headers.get('CF-IPCountry'));
   const timezone = resolveTournamentTimezone(geo);
   const registrationTimes = resolveRegistrationTimes(tournament, timezone);
 
@@ -2403,7 +2406,7 @@ async function updateTournament(request, env, existing, user) {
   const tournament = normalizeCoreTournamentInput(body);
   const now = new Date().toISOString();
   const managerId = user.role === 'admin' ? tournament.managerId || existing.manager_id || user.id : existing.manager_id || user.id;
-  const geo = await resolveTournamentGeolocation(tournament, existing, now);
+  const geo = await resolveTournamentGeolocation(tournament, existing, now, request.headers.get('CF-IPCountry'));
   const timezone = resolveTournamentTimezone(geo, existing.timezone || 'Europe/Berlin');
   const registrationTimes = resolveRegistrationTimes(tournament, timezone);
 
@@ -2586,7 +2589,7 @@ async function createTournamentReport(request, env, url) {
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   const tournamentForGeo = { location, latitude: null, longitude: null };
-  const geo = await resolveTournamentGeolocation(tournamentForGeo, null, now);
+  const geo = await resolveTournamentGeolocation(tournamentForGeo, null, now, request.headers.get('CF-IPCountry'));
   const timezone = resolveTournamentTimezone(geo);
 
   await db
@@ -2819,7 +2822,7 @@ async function syncPutTournamentMetadata(request, db, existing, user) {
     registrationTypeDefault: existing.registration_type || 'forme',
   });
   const now = new Date().toISOString();
-  const geo = await resolveTournamentGeolocation(tournament, existing, now);
+  const geo = await resolveTournamentGeolocation(tournament, existing, now, request.headers.get('CF-IPCountry'));
   const timezone = resolveTournamentTimezone(geo, existing.timezone || 'Europe/Berlin');
   const registrationTimes = resolveRegistrationTimes(tournament, timezone, { legacyUtc: legacyRegistrationTimes });
 
@@ -3522,16 +3525,16 @@ async function sendTransactionalEmail(env, { to, subject, text, language = 'de',
   await sendFallback();
 }
 
-async function geocodeLocation(query) {
+async function geocodeLocation(query, { limit = 5, countryCode } = {}) {
   const trimmed = String(query || '').trim();
   if (!trimmed) {
-    return null;
+    return [];
   }
 
   let response;
   try {
     response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(trimmed)}`,
+      `https://nominatim.openstreetmap.org/search?format=json&limit=${limit}&addressdetails=1&q=${encodeURIComponent(trimmed)}`,
       {
         headers: {
           'User-Agent': 'Petanque-Turnier-Manager-Online (https://github.com/massee/Petanque-Turnier-Manager-Online)',
@@ -3541,27 +3544,32 @@ async function geocodeLocation(query) {
     );
   } catch (error) {
     console.error(`Geocoding request failed for "${trimmed}"`, error);
-    return null;
+    return [];
   }
 
   if (!response.ok) {
     console.error(`Geocoding failed for "${trimmed}": ${response.status}`);
-    return null;
+    return [];
   }
 
-  const results = await response.json().catch(() => []);
-  const match = Array.isArray(results) ? results[0] : null;
-  if (!match) {
-    return null;
+  const rawResults = await response.json().catch(() => []);
+  const matches = Array.isArray(rawResults) ? rawResults : [];
+
+  const results = matches
+    .map((match) => ({
+      lat: Number(match.lat),
+      lng: Number(match.lon),
+      displayName: match.display_name || trimmed,
+      countryCode: (match.address?.country_code || '').toUpperCase(),
+    }))
+    .filter((match) => Number.isFinite(match.lat) && Number.isFinite(match.lng));
+
+  const hint = String(countryCode || '').toUpperCase();
+  if (hint) {
+    results.sort((a, b) => (b.countryCode === hint) - (a.countryCode === hint));
   }
 
-  const lat = Number(match.lat);
-  const lng = Number(match.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return null;
-  }
-
-  return { lat, lng, displayName: match.display_name || trimmed };
+  return results;
 }
 
 async function findDisplaceableNonVip(db, tournamentId, excludeId) {

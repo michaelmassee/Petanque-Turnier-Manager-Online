@@ -674,6 +674,62 @@ textarea:focus {
   color: #53627a;
 }
 
+.location-autocomplete {
+  position: relative;
+}
+
+.location-autocomplete-results {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: #ffffff;
+  border: 1px solid #c7d0df;
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(23, 32, 51, 0.15);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.location-autocomplete-results li {
+  margin: 0;
+}
+
+.location-autocomplete-results button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #172033;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.location-autocomplete-results button:hover,
+.location-autocomplete-results button.active {
+  background: #eef1f8;
+}
+
+.location-autocomplete-status {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+}
+
+.location-autocomplete-status.success {
+  color: #1f7a4d;
+}
+
+.location-autocomplete-status.hint {
+  color: #a15c00;
+}
+
 .checkbox-field {
   display: flex;
   flex-direction: row;
