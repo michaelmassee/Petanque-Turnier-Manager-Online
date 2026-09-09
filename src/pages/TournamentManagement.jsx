@@ -87,14 +87,21 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
     ...users.map((user) => ({ value: user.id, label: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email })),
   ];
   const showMailNotEnabledHint = !isAdmin && currentUser && currentUser.mailEnabled === false;
+  // Kalendereintrag = per "Turnier melden" eingereicht (registrationEnabled=false), nur die
+  // damals abgefragten Felder sind hier sinnvoll editierbar - alles rund um Anmeldung,
+  // Turniersystem, Gebühren etc. ist für so einen Eintrag ohne Bedeutung.
+  const isCalendarEntry = mode === 'edit' && form.registrationEnabled === false;
 
   return (
     <form className="form dense" onSubmit={onSubmit}>
       {showMailNotEnabledHint && (
         <p className="feedback offline">{MAIL_NOT_ENABLED_HINT_TEMPLATES[language] || MAIL_NOT_ENABLED_HINT_TEMPLATES.de}</p>
       )}
+      {isCalendarEntry && (
+        <TextField label="Verein" value={form.club} onChange={(club) => setForm({ ...form, club })} required minLength={2} />
+      )}
       <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
-      {isAdmin && (
+      {isAdmin && !isCalendarEntry && (
         <SelectField
           label="Turnierleiter"
           value={form.managerId}
@@ -133,113 +140,140 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           />
         </div>
       )}
-      <div className="form-section-header">
-        <span>Formation, Anmeldetyp &amp; Turniersystem</span>
-        <button type="button" className="help-btn" onClick={() => setShowFormationHelp(true)} aria-label="Hilfe zu Formation, Anmeldetyp und Turniersystem">
-          ? Hilfe
-        </button>
-      </div>
-      <div className="form-grid-3">
+      {isCalendarEntry ? (
         <SelectField
           label="Formation"
           value={form.formation}
-          onChange={(formation) => setForm({
-            ...form,
-            formation,
-            registrationType: (formation === 'tete' || formation === 'andere') ? 'forme' : form.registrationType,
-          })}
-          options={form.registrationType === 'supermelee' ? FORMATIONS.filter((option) => option.value !== 'tete' && option.value !== 'andere') : FORMATIONS}
+          onChange={(formation) => setForm({ ...form, formation })}
+          options={FORMATIONS}
         />
-        <SelectField
-          label="Anmeldetyp"
-          value={form.registrationType}
-          onChange={(registrationType) => setForm({
-            ...form,
-            registrationType,
-            type: registrationType === 'supermelee' ? 'rangliste' : form.type,
-            formation: registrationType === 'supermelee' && (form.formation === 'tete' || form.formation === 'andere') ? 'doublette' : form.formation,
-          })}
-          options={(form.formation === 'tete' || form.formation === 'andere') ? REGISTRATION_TYPES.filter((option) => option.value === 'forme') : REGISTRATION_TYPES}
-          disabled={form.formation === 'tete' || form.formation === 'andere'}
-        />
-        <SelectField
-          label="Turniersystem"
-          value={form.registrationType === 'supermelee' ? 'rangliste' : form.type}
-          onChange={(type) => setForm({ ...form, type })}
-          options={TOURNAMENT_TYPES}
-          disabled={form.registrationType === 'supermelee'}
-        />
-      </div>
-      {showFormationHelp && (
-        <FormationHelpDialog onClose={() => setShowFormationHelp(false)} />
+      ) : (
+        <>
+          <div className="form-section-header">
+            <span>Formation, Anmeldetyp &amp; Turniersystem</span>
+            <button type="button" className="help-btn" onClick={() => setShowFormationHelp(true)} aria-label="Hilfe zu Formation, Anmeldetyp und Turniersystem">
+              ? Hilfe
+            </button>
+          </div>
+          <div className="form-grid-3">
+            <SelectField
+              label="Formation"
+              value={form.formation}
+              onChange={(formation) => setForm({
+                ...form,
+                formation,
+                registrationType: (formation === 'tete' || formation === 'andere') ? 'forme' : form.registrationType,
+              })}
+              options={form.registrationType === 'supermelee' ? FORMATIONS.filter((option) => option.value !== 'tete' && option.value !== 'andere') : FORMATIONS}
+            />
+            <SelectField
+              label="Anmeldetyp"
+              value={form.registrationType}
+              onChange={(registrationType) => setForm({
+                ...form,
+                registrationType,
+                type: registrationType === 'supermelee' ? 'rangliste' : form.type,
+                formation: registrationType === 'supermelee' && (form.formation === 'tete' || form.formation === 'andere') ? 'doublette' : form.formation,
+              })}
+              options={(form.formation === 'tete' || form.formation === 'andere') ? REGISTRATION_TYPES.filter((option) => option.value === 'forme') : REGISTRATION_TYPES}
+              disabled={form.formation === 'tete' || form.formation === 'andere'}
+            />
+            <SelectField
+              label="Turniersystem"
+              value={form.registrationType === 'supermelee' ? 'rangliste' : form.type}
+              onChange={(type) => setForm({ ...form, type })}
+              options={TOURNAMENT_TYPES}
+              disabled={form.registrationType === 'supermelee'}
+            />
+          </div>
+          {showFormationHelp && (
+            <FormationHelpDialog onClose={() => setShowFormationHelp(false)} />
+          )}
+        </>
       )}
       <div className="form-grid">
         <SelectField label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={TOURNAMENT_STATUSES} />
-        <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(visibility) => setForm({ ...form, visibility })} options={VISIBILITIES} />
+        {!isCalendarEntry && (
+          <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(visibility) => setForm({ ...form, visibility })} options={VISIBILITIES} />
+        )}
       </div>
-      <div className="form-grid">
-        <TextField label="Max. Meldungen" type="number" min="0" value={form.maxRegistrations} onChange={(maxRegistrations) => setForm({ ...form, maxRegistrations })} />
-      </div>
-      <div className="form-grid">
-        <TextField label={translateText('Startgeld', language)} inputMode="decimal" value={form.entryFeeAmount} onChange={(entryFeeAmount) => setForm({ ...form, entryFeeAmount })} />
-        <SelectField label={translateText('Währung', language)} value={form.currency} onChange={(currency) => setForm({ ...form, currency })} options={currencyOptions(language)} />
-      </div>
-      <div className="form-grid">
-        <TextField label={translateText('Anmeldung möglich ab', language)} type="datetime-local" value={form.registrationOpensAt} onChange={(registrationOpensAt) => setForm({ ...form, registrationOpensAt })} />
-        <TextField label={translateText('Meldefrist', language)} type="datetime-local" value={form.registrationDeadline} onChange={(registrationDeadline) => setForm({ ...form, registrationDeadline })} />
-      </div>
-      <p className="hint">{translateText('Die Uhrzeiten gelten als Ortszeit am Turnierstandort und werden automatisch der passenden Zeitzone zugeordnet.', language)}</p>
+      {!isCalendarEntry && (
+        <>
+          <div className="form-grid">
+            <TextField label="Max. Meldungen" type="number" min="0" value={form.maxRegistrations} onChange={(maxRegistrations) => setForm({ ...form, maxRegistrations })} />
+          </div>
+          <div className="form-grid">
+            <TextField label={translateText('Startgeld', language)} inputMode="decimal" value={form.entryFeeAmount} onChange={(entryFeeAmount) => setForm({ ...form, entryFeeAmount })} />
+            <SelectField label={translateText('Währung', language)} value={form.currency} onChange={(currency) => setForm({ ...form, currency })} options={currencyOptions(language)} />
+          </div>
+          <div className="form-grid">
+            <TextField label={translateText('Anmeldung möglich ab', language)} type="datetime-local" value={form.registrationOpensAt} onChange={(registrationOpensAt) => setForm({ ...form, registrationOpensAt })} />
+            <TextField label={translateText('Meldefrist', language)} type="datetime-local" value={form.registrationDeadline} onChange={(registrationDeadline) => setForm({ ...form, registrationDeadline })} />
+          </div>
+          <p className="hint">{translateText('Die Uhrzeiten gelten als Ortszeit am Turnierstandort und werden automatisch der passenden Zeitzone zugeordnet.', language)}</p>
+        </>
+      )}
       {mode === 'edit' && form.timezone && <p className="hint">{translateText('Erkannte Zeitzone:', language)} {form.timezone}</p>}
       <div className="form-grid">
         <TextField label="Kontaktname" value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} />
         <TextField label="Kontakt-E-Mail" type="email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} />
       </div>
-      <TextField label="Kontakt-Telefon" value={form.contactPhone} onChange={(contactPhone) => setForm({ ...form, contactPhone })} />
+      {!isCalendarEntry && (
+        <TextField label="Kontakt-Telefon" value={form.contactPhone} onChange={(contactPhone) => setForm({ ...form, contactPhone })} />
+      )}
       <TextArea label="Beschreibung" value={form.description} onChange={(description) => setForm({ ...form, description })} />
       <TextArea label="Interne Notizen" value={form.internalNotes} onChange={(internalNotes) => setForm({ ...form, internalNotes })} />
-      <label className="checkbox-field">
-        <input
-          type="checkbox"
-          checked={form.licenseRequired}
-          onChange={(event) => setForm({ ...form, licenseRequired: event.target.checked })}
-        />
-        Lizenznummer erforderlich
-      </label>
-      <label className="checkbox-field">
-        <input
-          type="checkbox"
-          checked={form.teamNameEnabled}
-          onChange={(event) => setForm({ ...form, teamNameEnabled: event.target.checked })}
-        />
-        Teamname abfragen
-      </label>
-      <label className="checkbox-field">
-        <input
-          type="checkbox"
-          checked={form.waitlistEnabled}
-          onChange={(event) => setForm({ ...form, waitlistEnabled: event.target.checked })}
-        />
-        Warteliste ermöglichen
-      </label>
-      <label className="checkbox-field">
-        <input
-          type="checkbox"
-          checked={form.approvalRequired}
-          onChange={(event) => setForm({ ...form, approvalRequired: event.target.checked })}
-        />
-        {translateText('Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen', language)}
-      </label>
-      <label className="checkbox-field">
-        <input
-          type="checkbox"
-          checked={form.participantsPublic}
-          onChange={(event) => setForm({ ...form, participantsPublic: event.target.checked })}
-        />
-        Teilnehmerliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.
-      </label>
+      {!isCalendarEntry && (
+        <>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={form.licenseRequired}
+              onChange={(event) => setForm({ ...form, licenseRequired: event.target.checked })}
+            />
+            Lizenznummer erforderlich
+          </label>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={form.teamNameEnabled}
+              onChange={(event) => setForm({ ...form, teamNameEnabled: event.target.checked })}
+            />
+            Teamname abfragen
+          </label>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={form.waitlistEnabled}
+              onChange={(event) => setForm({ ...form, waitlistEnabled: event.target.checked })}
+            />
+            Warteliste ermöglichen
+          </label>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={form.approvalRequired}
+              onChange={(event) => setForm({ ...form, approvalRequired: event.target.checked })}
+            />
+            {translateText('Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen', language)}
+          </label>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={form.participantsPublic}
+              onChange={(event) => setForm({ ...form, participantsPublic: event.target.checked })}
+            />
+            Teilnehmerliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.
+          </label>
+        </>
+      )}
       <TextField label="Website" type="url" placeholder="https://…" value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} />
-      <TextField label="Logo-Bildlink" type="url" placeholder="https://…" value={form.logoUrl} onChange={(logoUrl) => setForm({ ...form, logoUrl })} />
-      <TextField label="Flyer-Bildlink" type="url" placeholder="https://…" value={form.flyerUrl} onChange={(flyerUrl) => setForm({ ...form, flyerUrl })} />
+      {!isCalendarEntry && (
+        <>
+          <TextField label="Logo-Bildlink" type="url" placeholder="https://…" value={form.logoUrl} onChange={(logoUrl) => setForm({ ...form, logoUrl })} />
+          <TextField label="Flyer-Bildlink" type="url" placeholder="https://…" value={form.flyerUrl} onChange={(flyerUrl) => setForm({ ...form, flyerUrl })} />
+        </>
+      )}
       <div className="dialog-actions">
         <Button variant="secondary" type="button" onClick={onCancel}>Abbrechen</Button>
         <Button type="submit">{mode === 'edit' ? 'Turnier speichern' : 'Turnier anlegen'}</Button>

@@ -1004,6 +1004,7 @@ export default function App() {
       contactPhone: tournament.contactPhone || '',
       visibility: tournament.visibility || 'private',
       internalNotes: tournament.internalNotes || '',
+      club: tournament.club || '',
       participantsPublic: Boolean(tournament.participantsPublic),
       approvalRequired: Boolean(tournament.approvalRequired),
       licenseRequired: Boolean(tournament.licenseRequired),

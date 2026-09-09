@@ -112,6 +112,7 @@ export const EMPTY_AUTH_FORM = {
 export const EMPTY_TOURNAMENT_FORM = {
   id: '',
   managerId: '',
+  club: '',
   name: '',
   date: '',
   startTime: '',

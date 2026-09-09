@@ -2410,7 +2410,7 @@ async function updateTournament(request, env, existing, user) {
   await db
     .prepare(
       `UPDATE tournaments
-       SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
+       SET manager_id = ?, name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
            participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, updated_at = ?
@@ -2419,6 +2419,7 @@ async function updateTournament(request, env, existing, user) {
     .bind(
       managerId,
       tournament.name,
+      tournament.club,
       tournament.date,
       tournament.startTime,
       tournament.location,
