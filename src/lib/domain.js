@@ -84,6 +84,10 @@ export function googleMapsUrl(tournament) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tournament.location || '')}`;
 }
 
+export function tournamentImageUrl(tournamentId, field) {
+  return `/api/tournaments/${tournamentId}/image?field=${field}`;
+}
+
 export function tournamentPayload(form) {
   return {
     managerId: form.managerId || null,

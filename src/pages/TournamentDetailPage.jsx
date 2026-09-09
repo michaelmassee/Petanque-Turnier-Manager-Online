@@ -4,14 +4,10 @@ import { translateText } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney } from '../lib/format.js';
-import { labelFor, formationLabel, registrationNotYetOpen, formatTournamentStartTime, googleMapsUrl } from '../lib/domain.js';
+import { labelFor, formationLabel, registrationNotYetOpen, formatTournamentStartTime, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { Button, Feedback, RequiredMark } from '../components/ui.jsx';
 import { StandalonePageHeader, OfflineNotice } from '../components/layout.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
-
-function tournamentImageUrl(tournamentId, field) {
-  return `/api/tournaments/${tournamentId}/image?field=${field}`;
-}
 
 function ShareIcon() {
   return (
