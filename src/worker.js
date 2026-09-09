@@ -138,31 +138,64 @@ const EMAIL_CHANGE_EMAILS = {
   },
 };
 
+const PARTICIPANTS_EMAIL_LABELS = {
+  de: { team: 'Team', participants: 'Teilnehmer', license: 'Lizenznummer' },
+  nl: { team: 'Team', participants: 'Deelnemers', license: 'Licentienummer' },
+  en: { team: 'Team', participants: 'Participants', license: 'License number' },
+  es: { team: 'Equipo', participants: 'Participantes', license: 'Número de licencia' },
+  fr: { team: 'Équipe', participants: 'Participants', license: 'Numéro de licence' },
+};
+
+// Listet alle an einer Anmeldung beteiligten Personen (Hauptmelder + ggf. Partner) mit
+// ihren Anmeldedaten auf, damit z. B. bei Doublette/Triplette auch die Partner sehen,
+// mit welchen Daten sie gemeldet wurden.
+function buildRegistrationParticipantsBlock(registration, language) {
+  const labels = PARTICIPANTS_EMAIL_LABELS[language] || PARTICIPANTS_EMAIL_LABELS.de;
+  const people = [
+    { firstName: registration.first_name, lastName: registration.last_name, email: registration.email, club: registration.club, licenseNr: registration.license_nr },
+  ];
+  if (registration.partner_first_name && registration.partner_last_name) {
+    people.push({ firstName: registration.partner_first_name, lastName: registration.partner_last_name, email: registration.partner_email, club: null, licenseNr: registration.partner_license_nr });
+  }
+  if (registration.partner2_first_name && registration.partner2_last_name) {
+    people.push({ firstName: registration.partner2_first_name, lastName: registration.partner2_last_name, email: registration.partner2_email, club: null, licenseNr: registration.partner2_license_nr });
+  }
+
+  const lines = people.map((person) => {
+    const details = [person.email, person.club, person.licenseNr ? `${labels.license}: ${person.licenseNr}` : null].filter(Boolean);
+    const detailsText = details.length ? ` (${details.join(', ')})` : '';
+    return `- ${person.firstName} ${person.lastName}${detailsText}`;
+  });
+
+  const teamLine = registration.team_name ? `${labels.team}: ${registration.team_name}\n` : '';
+  return `\n\n${teamLine}${labels.participants}:\n${lines.join('\n')}`;
+}
+
 export const REGISTRATION_CONFIRMATION_EMAILS = {
   de: {
     subject: (name) => `Anmeldebestätigung: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
-      `Hallo ${firstName},\n\nDeine Anmeldung für "${name}" ist eingegangen.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
+      `Hallo ${firstName},\n\nDeine Anmeldung für "${name}" ist eingegangen.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}${participantsBlock}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
   },
   nl: {
     subject: (name) => `Inschrijvingsbevestiging: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
-      `Hallo ${firstName},\n\nJe inschrijving voor "${name}" is ontvangen.\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}\n\nAlle informatie over het toernooi:\n${link}\n\nEen agenda-afspraak vind je als bijlage bij deze e-mail.\n\nWil je je weer afmelden? Gebruik deze link:\n${cancelLink}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
+      `Hallo ${firstName},\n\nJe inschrijving voor "${name}" is ontvangen.\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}${participantsBlock}\n\nAlle informatie over het toernooi:\n${link}\n\nEen agenda-afspraak vind je als bijlage bij deze e-mail.\n\nWil je je weer afmelden? Gebruik deze link:\n${cancelLink}`,
   },
   en: {
     subject: (name) => `Registration confirmation: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
-      `Hi ${firstName},\n\nYour registration for "${name}" has been received.\n\nDate: ${dateTimeLabel}\nLocation: ${location}\n\nAll tournament details:\n${link}\n\nA calendar event is attached to this email.\n\nWant to withdraw again? Use this link:\n${cancelLink}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
+      `Hi ${firstName},\n\nYour registration for "${name}" has been received.\n\nDate: ${dateTimeLabel}\nLocation: ${location}${participantsBlock}\n\nAll tournament details:\n${link}\n\nA calendar event is attached to this email.\n\nWant to withdraw again? Use this link:\n${cancelLink}`,
   },
   es: {
     subject: (name) => `Confirmación de inscripción: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
-      `Hola ${firstName},\n\nTu inscripción para "${name}" se ha recibido.\n\nFecha: ${dateTimeLabel}\nLugar: ${location}\n\nToda la información del torneo:\n${link}\n\nEncontrarás una cita de calendario adjunta a este correo.\n\n¿Quieres darte de baja de nuevo? Usa este enlace:\n${cancelLink}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
+      `Hola ${firstName},\n\nTu inscripción para "${name}" se ha recibido.\n\nFecha: ${dateTimeLabel}\nLugar: ${location}${participantsBlock}\n\nToda la información del torneo:\n${link}\n\nEncontrarás una cita de calendario adjunta a este correo.\n\n¿Quieres darte de baja de nuevo? Usa este enlace:\n${cancelLink}`,
   },
   fr: {
     subject: (name) => `Confirmation d'inscription : ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
-      `Bonjour ${firstName},\n\nTon inscription pour « ${name} » a bien été reçue.\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nUn rendez-vous de calendrier est joint à cet e-mail.\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
+      `Bonjour ${firstName},\n\nTon inscription pour « ${name} » a bien été reçue.\n\nDate : ${dateTimeLabel}\nLieu : ${location}${participantsBlock}\n\nToutes les informations sur le tournoi :\n${link}\n\nUn rendez-vous de calendrier est joint à cet e-mail.\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
   },
 };
 
@@ -428,12 +461,13 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
   const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
   const ics = buildTournamentIcs(tournament, appOrigin);
+  const participantsBlock = buildRegistrationParticipantsBlock(registration, language);
 
   for (const recipient of buildTeamRecipients(registration)) {
     await sendTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link, cancelLink),
+      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link, cancelLink, participantsBlock),
       language,
       attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
       logFallback: `Registration confirmation email for ${recipient.email} (tournament ${tournament.id})`,
