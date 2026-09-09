@@ -679,11 +679,8 @@ textarea:focus {
 }
 
 .location-autocomplete-results {
-  position: absolute;
-  z-index: 20;
-  left: 0;
-  right: 0;
-  margin: 4px 0 0;
+  z-index: 1000;
+  margin: 0;
   padding: 4px;
   list-style: none;
   background: #ffffff;

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../lib/api.js';
 import { translateText } from '../lib/i18n.js';
 import { RequiredMark } from './ui.jsx';
@@ -9,10 +10,29 @@ export function LocationAutocomplete({ label, value, onChange, onSelect, confirm
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [searched, setSearched] = useState(false);
+  const [menuRect, setMenuRect] = useState(null);
   const requestIdRef = useRef(0);
   const containerRef = useRef(null);
+  const menuRef = useRef(null);
+  const inputRef = useRef(null);
   const lastSelectedValueRef = useRef(null);
   const userEditedRef = useRef(false);
+
+  useEffect(() => {
+    if (!open) return;
+    function updateRect() {
+      if (!inputRef.current) return;
+      const rect = inputRef.current.getBoundingClientRect();
+      setMenuRect({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+    updateRect();
+    window.addEventListener('resize', updateRect);
+    window.addEventListener('scroll', updateRect, true);
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      window.removeEventListener('scroll', updateRect, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     const query = value.trim();
@@ -50,7 +70,9 @@ export function LocationAutocomplete({ label, value, onChange, onSelect, confirm
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      const insideContainer = containerRef.current && containerRef.current.contains(event.target);
+      const insideMenu = menuRef.current && menuRef.current.contains(event.target);
+      if (!insideContainer && !insideMenu) {
         setOpen(false);
       }
     }
@@ -89,6 +111,7 @@ export function LocationAutocomplete({ label, value, onChange, onSelect, confirm
         {label}
         {required ? <RequiredMark /> : null}
         <input
+          ref={inputRef}
           type="text"
           value={value}
           onChange={(event) => {
@@ -106,8 +129,12 @@ export function LocationAutocomplete({ label, value, onChange, onSelect, confirm
           aria-autocomplete="list"
         />
       </label>
-      {open && suggestions.length > 0 && (
-        <ul className="location-autocomplete-results">
+      {open && suggestions.length > 0 && menuRect && createPortal(
+        <ul
+          ref={menuRef}
+          className="location-autocomplete-results"
+          style={{ position: 'fixed', top: menuRect.top, left: menuRect.left, width: menuRect.width }}
+        >
           {suggestions.map((candidate, index) => (
             <li key={`${candidate.lat}-${candidate.lng}-${index}`}>
               <button
@@ -120,7 +147,8 @@ export function LocationAutocomplete({ label, value, onChange, onSelect, confirm
               </button>
             </li>
           ))}
-        </ul>
+        </ul>,
+        document.body,
       )}
       {loading && (
         <p className="location-autocomplete-status muted">{translateText('Orte werden gesucht…', language)}</p>
