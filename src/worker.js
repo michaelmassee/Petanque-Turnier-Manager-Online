@@ -2816,6 +2816,8 @@ async function createRegistration(request, env, tournament) {
   const language = normalizeLanguage(body.language);
   assertCorePartnerCountMatchesFormation(tournament, registration);
   assertLicenseMatchesTournament(tournament, registration);
+  await assertNoDuplicateTeamName(db, tournament.id, registration.teamName);
+  await assertNoDuplicatePlayer(db, tournament.id, registration);
   const { status, displace } = await initialRegistrationStatus(db, tournament, registration.isVip);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -2883,6 +2885,8 @@ async function updateRegistration(request, env, existing) {
   const registration = normalizeRegistrationInput(body, { requireStatus: true });
   assertCorePartnerCountMatchesFormation(existing, registration);
   assertLicenseMatchesTournament(existing, registration);
+  await assertNoDuplicateTeamName(db, existing.tournament_id, registration.teamName, existing.id);
+  await assertNoDuplicatePlayer(db, existing.tournament_id, registration, existing.id);
   const now = new Date().toISOString();
   const confirmedAt = registration.status === 'confirmed' ? existing.confirmed_at || now : null;
 
@@ -3912,6 +3916,74 @@ function assertLicenseMatchesTournament(tournament, registration) {
   }
   if (registration.partner2FirstName && !registration.partner2LicenseNr) {
     throw new HttpError(400, 'Lizenznummer für Partner 2 ist erforderlich');
+  }
+}
+
+async function assertNoDuplicateTeamName(db, tournamentId, teamName, excludeId) {
+  if (!teamName) {
+    return;
+  }
+  const existing = await db
+    .prepare(
+      `SELECT id FROM registrations
+       WHERE tournament_id = ? AND status != 'cancelled' AND LOWER(TRIM(team_name)) = LOWER(TRIM(?))
+       ${excludeId ? 'AND id != ?' : ''}
+       LIMIT 1`,
+    )
+    .bind(...(excludeId ? [tournamentId, teamName, excludeId] : [tournamentId, teamName]))
+    .first();
+  if (existing) {
+    throw new HttpError(409, 'Ein Team mit diesem Namen ist für dieses Turnier bereits angemeldet');
+  }
+}
+
+// Vergleicht Namen unabhängig von Groß-/Kleinschreibung, Leerzeichen und Sonderzeichen
+// (z. B. "Jean-Paul Müller" === "jean paul muller"), damit ein Spieler sich nicht mit
+// leicht abgewandelter Schreibweise mehrfach für dasselbe Turnier anmelden kann.
+function normalizePlayerName(firstName, lastName) {
+  return `${firstName || ''}${lastName || ''}`
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function registrationPlayerNames(row) {
+  const names = [normalizePlayerName(row.first_name ?? row.firstName, row.last_name ?? row.lastName)];
+  const partnerFirst = row.partner_first_name ?? row.partnerFirstName;
+  const partnerLast = row.partner_last_name ?? row.partnerLastName;
+  if (partnerFirst && partnerLast) {
+    names.push(normalizePlayerName(partnerFirst, partnerLast));
+  }
+  const partner2First = row.partner2_first_name ?? row.partner2FirstName;
+  const partner2Last = row.partner2_last_name ?? row.partner2LastName;
+  if (partner2First && partner2Last) {
+    names.push(normalizePlayerName(partner2First, partner2Last));
+  }
+  return names.filter(Boolean);
+}
+
+async function assertNoDuplicatePlayer(db, tournamentId, registration, excludeId) {
+  const incomingNames = new Set(registrationPlayerNames(registration));
+  if (incomingNames.size === 0) {
+    return;
+  }
+  const result = await db
+    .prepare(
+      `SELECT first_name, last_name, partner_first_name, partner_last_name, partner2_first_name, partner2_last_name
+       FROM registrations
+       WHERE tournament_id = ? AND status != 'cancelled'
+       ${excludeId ? 'AND id != ?' : ''}`,
+    )
+    .bind(...(excludeId ? [tournamentId, excludeId] : [tournamentId]))
+    .all();
+
+  for (const row of result.results) {
+    for (const name of registrationPlayerNames(row)) {
+      if (incomingNames.has(name)) {
+        throw new HttpError(409, 'Ein Spieler mit diesem Namen ist für dieses Turnier bereits angemeldet');
+      }
+    }
   }
 }
 
