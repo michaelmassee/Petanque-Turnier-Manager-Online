@@ -368,7 +368,11 @@ export default function App() {
     await loadTournaments();
 
     try {
-      const bootstrap = await api('/api/bootstrap');
+      // /api/bootstrap wird (anders als /api/tournaments) nicht vom Service
+      // Worker gecacht, daher auf Mobilfunk anfällig für kurze Netzwerkaussetzer -
+      // ein stiller Retry vermeidet unnötige Fehlermeldungen bei bereits
+      // erfolgreich geladener Turnierliste.
+      const bootstrap = await api('/api/bootstrap').catch(() => api('/api/bootstrap'));
       setNeedsSetup(bootstrap.needsSetup);
       setTurnstileSiteKey(bootstrap.turnstileSiteKey || null);
 
@@ -381,9 +385,10 @@ export default function App() {
         }
       }
     } catch (requestError) {
-      if (navigator.onLine) {
-        setError(translateText(requestError.message, language));
-      }
+      // Turnierliste ist bereits geladen und nutzbar; ein fehlgeschlagenes
+      // /api/bootstrap blockiert die Finder-Seite nicht und verdient keinen
+      // alarmierenden globalen Fehlerbanner.
+      console.warn('Bootstrap-Request fehlgeschlagen:', requestError);
     } finally {
       setLoading(false);
     }
