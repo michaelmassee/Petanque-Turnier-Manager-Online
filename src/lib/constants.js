@@ -20,6 +20,7 @@ export const FORMATIONS = [
   { value: 'tete', label: 'Tête' },
   { value: 'doublette', label: 'Doublette' },
   { value: 'triplette', label: 'Triplette' },
+  { value: 'andere', label: 'Andere (siehe Beschreibung)' },
 ];
 
 export const REGISTRATION_TYPES = [
@@ -145,14 +146,19 @@ export const EMPTY_TOURNAMENT_FORM = {
   flyerUrl: '',
 };
 
-export const EMPTY_CALENDAR_ENTRY_FORM = {
-  id: '',
+export const EMPTY_TOURNAMENT_REPORT_FORM = {
+  club: '',
   name: '',
+  location: '',
   date: '',
   startTime: '',
-  location: '',
+  formation: 'doublette',
   description: '',
-  visible: true,
+  websiteUrl: '',
+  contactName: '',
+  contactEmail: '',
+  consentAccepted: false,
+  honeypot: '',
 };
 
 export const EMPTY_REGISTRATION_FORM = {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate } from '../lib/format.js';
 import { translateText } from '../lib/i18n.js';
-import { labelFor, formatTournamentStartTime } from '../lib/domain.js';
+import { labelFor, formationLabel, formatTournamentStartTime } from '../lib/domain.js';
 import { TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 
 function FormationHelpDialog({ onClose }) {
@@ -146,9 +146,9 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           onChange={(formation) => setForm({
             ...form,
             formation,
-            registrationType: formation === 'tete' ? 'forme' : form.registrationType,
+            registrationType: (formation === 'tete' || formation === 'andere') ? 'forme' : form.registrationType,
           })}
-          options={form.registrationType === 'supermelee' ? FORMATIONS.filter((option) => option.value !== 'tete') : FORMATIONS}
+          options={form.registrationType === 'supermelee' ? FORMATIONS.filter((option) => option.value !== 'tete' && option.value !== 'andere') : FORMATIONS}
         />
         <SelectField
           label="Anmeldetyp"
@@ -157,10 +157,10 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             ...form,
             registrationType,
             type: registrationType === 'supermelee' ? 'rangliste' : form.type,
-            formation: registrationType === 'supermelee' && form.formation === 'tete' ? 'doublette' : form.formation,
+            formation: registrationType === 'supermelee' && (form.formation === 'tete' || form.formation === 'andere') ? 'doublette' : form.formation,
           })}
-          options={form.formation === 'tete' ? REGISTRATION_TYPES.filter((option) => option.value === 'forme') : REGISTRATION_TYPES}
-          disabled={form.formation === 'tete'}
+          options={(form.formation === 'tete' || form.formation === 'andere') ? REGISTRATION_TYPES.filter((option) => option.value === 'forme') : REGISTRATION_TYPES}
+          disabled={form.formation === 'tete' || form.formation === 'andere'}
         />
         <SelectField
           label="Turniersystem"
@@ -240,32 +240,6 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
   );
 }
 
-export function CalendarEntryForm({ form, setForm, onSubmit, onCancel }) {
-  return (
-    <form className="form dense" onSubmit={onSubmit}>
-      <TextField label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
-      <div className="form-grid">
-        <TextField label="Datum" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
-        <TextField label="Startzeit" type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
-      </div>
-      <TextField label="Ort" value={form.location} onChange={(location) => setForm({ ...form, location })} required minLength={2} />
-      <TextArea label="Beschreibung" value={form.description} onChange={(description) => setForm({ ...form, description })} />
-      <label className="checkbox-field">
-        <input
-          type="checkbox"
-          checked={form.visible}
-          onChange={(event) => setForm({ ...form, visible: event.target.checked })}
-        />
-        Sichtbar
-      </label>
-      <div className="dialog-actions">
-        <Button variant="secondary" type="button" onClick={onCancel}>Abbrechen</Button>
-        <Button type="submit">Kalendereintrag anlegen</Button>
-      </div>
-    </form>
-  );
-}
-
 export function TournamentList({
   tournaments,
   totalTournaments,
@@ -276,7 +250,6 @@ export function TournamentList({
   isAdmin,
   language,
   onCreate,
-  onCreateCalendarEntry,
   query,
   onQueryChange,
   statusFilter,
@@ -291,7 +264,6 @@ export function TournamentList({
         <h2>Turniere</h2>
         <span className="counter">{filtered ? `${tournaments.length}/${totalTournaments}` : totalTournaments}</span>
         <Button onClick={onCreate}>Neues Turnier</Button>
-        <Button variant="secondary" onClick={onCreateCalendarEntry}>Kalendereintrag erstellen</Button>
       </div>
       <ListToolbar
         query={query}
@@ -311,7 +283,7 @@ export function TournamentList({
               {tournament.registrationEnabled === false && <span className="role">{translateText('Kalendereintrag', language)}</span>}
               <span>{formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)} · {tournament.location}</span>
               {tournament.registrationEnabled !== false && (
-                <small>{labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</small>
+                <small>{formationLabel(tournament)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</small>
               )}
               {isAdmin && tournament.managerName && <small>Turnierleiter: {tournament.managerName}</small>}
             </button>
@@ -356,7 +328,6 @@ export function TournamentManagementPage({
   isAdmin,
   language,
   onCreate,
-  onCreateCalendarEntry,
   query,
   onQueryChange,
   statusFilter,
@@ -371,11 +342,6 @@ export function TournamentManagementPage({
   onCloseTournamentDialog,
   users,
   currentUser,
-  calendarEntryDialogOpen,
-  calendarEntryForm,
-  setCalendarEntryForm,
-  onCalendarEntrySubmit,
-  onCloseCalendarEntryDialog,
 }) {
   return (
     <>
@@ -389,7 +355,6 @@ export function TournamentManagementPage({
         isAdmin={isAdmin}
         language={language}
         onCreate={onCreate}
-        onCreateCalendarEntry={onCreateCalendarEntry}
         query={query}
         onQueryChange={onQueryChange}
         statusFilter={statusFilter}
@@ -414,21 +379,6 @@ export function TournamentManagementPage({
             users={users}
             language={language}
             currentUser={currentUser}
-          />
-        </EditDialog>
-      )}
-
-      {canManageTournaments && (
-        <EditDialog
-          open={calendarEntryDialogOpen}
-          title="Kalendereintrag erstellen"
-          onClose={onCloseCalendarEntryDialog}
-        >
-          <CalendarEntryForm
-            form={calendarEntryForm}
-            setForm={setCalendarEntryForm}
-            onSubmit={onCalendarEntrySubmit}
-            onCancel={onCloseCalendarEntryDialog}
           />
         </EditDialog>
       )}

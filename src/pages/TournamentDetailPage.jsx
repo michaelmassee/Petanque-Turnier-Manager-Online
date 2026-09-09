@@ -4,7 +4,7 @@ import { translateText } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney } from '../lib/format.js';
-import { labelFor, registrationNotYetOpen, formatTournamentStartTime, googleMapsUrl } from '../lib/domain.js';
+import { labelFor, formationLabel, registrationNotYetOpen, formatTournamentStartTime, googleMapsUrl } from '../lib/domain.js';
 import { Button, Feedback, RequiredMark } from '../components/ui.jsx';
 import { StandalonePageHeader, OfflineNotice } from '../components/layout.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
@@ -21,7 +21,8 @@ function ShareIcon() {
   );
 }
 
-function TournamentInfo({ tournament, language, onShare }) {
+export function TournamentInfo({ tournament, language, onShare }) {
+  const isCalendarEntry = tournament.registrationEnabled === false;
   const mapsUrl = googleMapsUrl(tournament);
   const viewerTimeZone = detectViewerTimeZone();
   const tournamentTimeZone = tournament.timezone || 'UTC';
@@ -84,53 +85,61 @@ function TournamentInfo({ tournament, language, onShare }) {
       <p>
         <strong>Ort</strong>: {tournament.location}
       </p>
-      <p>
-        <strong>Formation</strong>: {labelFor(FORMATIONS, tournament.formation)}
-      </p>
-      <p>
-        <strong>Anmeldetyp</strong>: {labelFor(REGISTRATION_TYPES, tournament.registrationType)}
-      </p>
-      <p>
-        <strong>Turniersystem</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
-      </p>
-      <p>
-        <strong>{translateText('Lizenz', language)}</strong>: {translateText(tournament.licenseRequired ? 'Ja' : 'Nein', language)}
-      </p>
+      {!isCalendarEntry && (
+        <>
+          <p>
+            <strong>Formation</strong>: {formationLabel(tournament)}
+          </p>
+          <p>
+            <strong>Anmeldetyp</strong>: {labelFor(REGISTRATION_TYPES, tournament.registrationType)}
+          </p>
+          <p>
+            <strong>Turniersystem</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
+          </p>
+          <p>
+            <strong>{translateText('Lizenz', language)}</strong>: {translateText(tournament.licenseRequired ? 'Ja' : 'Nein', language)}
+          </p>
+        </>
+      )}
       {tournament.description && <p>{tournament.description}</p>}
-      {Boolean(tournament.entryFeeCents) && (
-        <p>
-          <strong>{translateText('Startgeld', language)}</strong>: {formatMoney(tournament.entryFeeCents, tournament.currency, language)}
-        </p>
-      )}
-      {tournament.registrationOpensAt && (
-        <p>
-          <strong>{translateText('Anmeldung möglich ab', language)}</strong>: {formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}
-        </p>
-      )}
-      {tournament.registrationDeadline && (
-        <p>
-          <strong>{translateText('Meldefrist', language)}</strong>: {formatTournamentDateTime(tournament.registrationDeadline, language, tournament.timezone)}
-        </p>
-      )}
-      <p>
-        <strong>{translateText('Max. Meldungen', language)}</strong>: {tournament.maxRegistrations || '∞'}
-      </p>
-      {freeSlots === null ? (
-        <p>
-          <strong>{translateText('Angemeldet', language)}</strong>: {tournament.activeRegistrations || 0}
-        </p>
-      ) : (
-        <p>
-          <strong>{translateText('Noch frei', language)}</strong>: {freeSlots}
-        </p>
-      )}
-      <p>
-        <strong>{translateText('Warteliste', language)}</strong>: {tournament.waitlistRegistrations || 0}
-      </p>
-      {(tournament.contactName || tournament.contactEmail || tournament.contactPhone) && (
-        <p>
-          <strong>Kontakt</strong>: {[tournament.contactName, tournament.contactEmail, tournament.contactPhone].filter(Boolean).join(' · ')}
-        </p>
+      {!isCalendarEntry && (
+        <>
+          {Boolean(tournament.entryFeeCents) && (
+            <p>
+              <strong>{translateText('Startgeld', language)}</strong>: {formatMoney(tournament.entryFeeCents, tournament.currency, language)}
+            </p>
+          )}
+          {tournament.registrationOpensAt && (
+            <p>
+              <strong>{translateText('Anmeldung möglich ab', language)}</strong>: {formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}
+            </p>
+          )}
+          {tournament.registrationDeadline && (
+            <p>
+              <strong>{translateText('Meldefrist', language)}</strong>: {formatTournamentDateTime(tournament.registrationDeadline, language, tournament.timezone)}
+            </p>
+          )}
+          <p>
+            <strong>{translateText('Max. Meldungen', language)}</strong>: {tournament.maxRegistrations || '∞'}
+          </p>
+          {freeSlots === null ? (
+            <p>
+              <strong>{translateText('Angemeldet', language)}</strong>: {tournament.activeRegistrations || 0}
+            </p>
+          ) : (
+            <p>
+              <strong>{translateText('Noch frei', language)}</strong>: {freeSlots}
+            </p>
+          )}
+          <p>
+            <strong>{translateText('Warteliste', language)}</strong>: {tournament.waitlistRegistrations || 0}
+          </p>
+          {(tournament.contactName || tournament.contactEmail || tournament.contactPhone) && (
+            <p>
+              <strong>Kontakt</strong>: {[tournament.contactName, tournament.contactEmail, tournament.contactPhone].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </>
       )}
     </div>
   );

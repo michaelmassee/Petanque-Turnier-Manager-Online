@@ -10,6 +10,44 @@ import {
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
 import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
 import { UserManagementPanel } from './pages/UserManagementPanel.jsx';
+import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
+
+describe('Öffentliche Turnierdetailseite', () => {
+  it('zeigt für Kalendereinträge keine turnier- oder anmeldespezifischen Daten', () => {
+    render(
+      <TournamentInfo
+        language="de"
+        onShare={() => {}}
+        tournament={{
+          id: 'calendar-1',
+          name: 'Vereinsabend',
+          date: '2026-09-10',
+          location: 'Bouleplatz',
+          description: 'Gemeinsames Spielen.',
+          registrationEnabled: false,
+          formation: 'triplette',
+          registrationType: 'supermelee',
+          type: 'rangliste',
+          licenseRequired: true,
+          entryFeeCents: 500,
+          currency: 'EUR',
+          maxRegistrations: 32,
+          activeRegistrations: 8,
+          waitlistRegistrations: 2,
+          contactEmail: 'kontakt@example.test',
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Gemeinsames Spielen.')).toBeInTheDocument();
+    expect(screen.queryByText('Formation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Anmeldetyp')).not.toBeInTheDocument();
+    expect(screen.queryByText('Turniersystem')).not.toBeInTheDocument();
+    expect(screen.queryByText('Max. Meldungen')).not.toBeInTheDocument();
+    expect(screen.queryByText('Warteliste')).not.toBeInTheDocument();
+    expect(screen.queryByText('Kontakt')).not.toBeInTheDocument();
+  });
+});
 
 function UserManagementHarness({ onSubmit }) {
   const [userMode, setUserMode] = useState('create');

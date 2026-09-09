@@ -3,6 +3,12 @@ import { HttpError } from './errors.js';
 
 const TOURNAMENT_TYPES = ['formule_x', 'jeder_gegen_jeden', 'ko', 'kaskaden', 'liga', 'maastrichter', 'poule_ab', 'rangliste', 'schweizer', 'trip_tete'];
 const FORMATIONS = ['tete', 'doublette', 'triplette'];
+// 'andere' is an input-only pseudo-formation: the DB column keeps its existing CHECK
+// (tete/doublette/triplette) to avoid a table rebuild (see migrations/0006, and
+// feedback-d1-migration-no-table-rebuild memory - a rebuild once cascade-deleted all
+// tournaments via registrations.tournament_id ON DELETE CASCADE). 'andere' is stored as
+// formation='tete' (identical partner/registration-type rules) plus formation_other=1.
+const FORMATION_INPUT_VALUES = [...FORMATIONS, 'andere'];
 const REGISTRATION_TYPES = ['supermelee', 'melee', 'forme'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
@@ -31,13 +37,15 @@ export function registrationOpenStatus(tournament, now = new Date()) {
 }
 
 export function normalizeTournamentInput(body, { legacyRegistrationTimes = false, registrationTypeDefault = 'forme' } = {}) {
-  const tournament = { name: text(body.name), date: text(body.date), startTime: nullableText(body.startTime), location: text(body.location), description: nullableText(body.description), type: text(body.type || 'formule_x'), formation: text(body.formation || 'doublette'), registrationType: text(body.registrationType || registrationTypeDefault), status: text(body.status || 'draft'), maxRegistrations: nonNegativeInteger(body.maxRegistrations), registrationDeadline: normalizeRegistrationDateTime(body.registrationDeadline, { legacyUtc: legacyRegistrationTimes }), registrationOpensAt: normalizeRegistrationDateTime(body.registrationOpensAt, { legacyUtc: legacyRegistrationTimes }), entryFeeCents: nonNegativeInteger(body.entryFeeCents), currency: text(body.currency || 'EUR').toUpperCase(), contactName: nullableText(body.contactName), contactEmail: nullableText(body.contactEmail), contactPhone: nullableText(body.contactPhone), visibility: text(body.visibility || 'private'), internalNotes: nullableText(body.internalNotes), managerId: nullableText(body.managerId), participantsPublic: Boolean(body.participantsPublic), licenseRequired: Boolean(body.licenseRequired), teamNameEnabled: Boolean(body.teamNameEnabled), waitlistEnabled: body.waitlistEnabled === undefined ? true : Boolean(body.waitlistEnabled), registrationEnabled: body.registrationEnabled === undefined ? true : Boolean(body.registrationEnabled), latitude: nullableCoordinate(body.latitude, -90, 90), longitude: nullableCoordinate(body.longitude, -180, 180) };
+  const rawFormation = text(body.formation || 'doublette');
+  const formationOther = rawFormation === 'andere';
+  const tournament = { name: text(body.name), date: text(body.date), startTime: nullableText(body.startTime), location: text(body.location), description: nullableText(body.description), type: text(body.type || 'formule_x'), formation: formationOther ? 'tete' : rawFormation, formationOther, registrationType: text(body.registrationType || registrationTypeDefault), status: text(body.status || 'draft'), maxRegistrations: nonNegativeInteger(body.maxRegistrations), registrationDeadline: normalizeRegistrationDateTime(body.registrationDeadline, { legacyUtc: legacyRegistrationTimes }), registrationOpensAt: normalizeRegistrationDateTime(body.registrationOpensAt, { legacyUtc: legacyRegistrationTimes }), entryFeeCents: nonNegativeInteger(body.entryFeeCents), currency: text(body.currency || 'EUR').toUpperCase(), contactName: nullableText(body.contactName), contactEmail: nullableText(body.contactEmail), contactPhone: nullableText(body.contactPhone), visibility: text(body.visibility || 'private'), internalNotes: nullableText(body.internalNotes), managerId: nullableText(body.managerId), participantsPublic: Boolean(body.participantsPublic), licenseRequired: Boolean(body.licenseRequired), teamNameEnabled: Boolean(body.teamNameEnabled), waitlistEnabled: body.waitlistEnabled === undefined ? true : Boolean(body.waitlistEnabled), registrationEnabled: body.registrationEnabled === undefined ? true : Boolean(body.registrationEnabled), latitude: nullableCoordinate(body.latitude, -90, 90), longitude: nullableCoordinate(body.longitude, -180, 180) };
   if (tournament.name.length < 2) throw new HttpError(400, 'Der Turniername muss mindestens 2 Zeichen enthalten');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(tournament.date)) throw new HttpError(400, 'Ein gültiges Turnierdatum ist erforderlich');
   if (tournament.startTime && !/^\d{2}:\d{2}$/.test(tournament.startTime)) throw new HttpError(400, 'Eine gültige Startzeit ist erforderlich');
   if (tournament.location.length < 2) throw new HttpError(400, 'Der Ort muss mindestens 2 Zeichen enthalten');
   if (!TOURNAMENT_TYPES.includes(tournament.type)) throw new HttpError(400, 'Ungültiges Turniersystem');
-  if (!FORMATIONS.includes(tournament.formation)) throw new HttpError(400, 'Ungültige Formation');
+  if (!FORMATION_INPUT_VALUES.includes(rawFormation)) throw new HttpError(400, 'Ungültige Formation');
   if (!REGISTRATION_TYPES.includes(tournament.registrationType)) throw new HttpError(400, 'Ungültiger Anmeldetyp');
   if (tournament.formation === 'tete' && tournament.registrationType !== 'forme') throw new HttpError(400, 'Formation Tête ist nur mit dem Anmeldetyp Formée möglich');
   if (tournament.registrationType === 'supermelee' && tournament.formation === 'tete') throw new HttpError(400, 'Supermêlée ist nur mit Doublette oder Triplette möglich');

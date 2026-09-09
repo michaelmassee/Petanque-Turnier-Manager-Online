@@ -660,6 +660,15 @@ textarea:focus {
   min-height: 44px;
 }
 
+.honeypot-field {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .checkbox-field input {
   width: auto;
   min-height: 0;

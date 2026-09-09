@@ -1,12 +1,12 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
-import { ROLES, TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_STATUSES, VISIBILITIES, REGISTRATION_STATUSES, RADIUS_OPTIONS, DEFAULT_TOURNAMENT_LIMIT, DEFAULT_CALENDAR_ENTRY_LIMIT, EMPTY_USER_FORM, EMPTY_PROFILE_FORM, EMPTY_AUTH_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_CALENDAR_ENTRY_FORM, EMPTY_REGISTRATION_FORM, REGISTER_SUCCESS, VERIFY_SUCCESS, CANCEL_REGISTRATION_EXPLANATION, CANCEL_REGISTRATION_SUCCESS, PROFILE_UPDATE_SUCCESS, PROFILE_EMAIL_CHANGE_PENDING } from './lib/constants.js';
+import { ROLES, TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_STATUSES, VISIBILITIES, REGISTRATION_STATUSES, RADIUS_OPTIONS, DEFAULT_TOURNAMENT_LIMIT, DEFAULT_CALENDAR_ENTRY_LIMIT, EMPTY_USER_FORM, EMPTY_PROFILE_FORM, EMPTY_AUTH_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_TOURNAMENT_REPORT_FORM, EMPTY_REGISTRATION_FORM, REGISTER_SUCCESS, VERIFY_SUCCESS, CANCEL_REGISTRATION_EXPLANATION, CANCEL_REGISTRATION_SUCCESS, PROFILE_UPDATE_SUCCESS, PROFILE_EMAIL_CHANGE_PENDING } from './lib/constants.js';
 import { POSTBOX_TEXT, postboxText, TRANSLATIONS, translateDom, translateText } from './lib/i18n.js';
 import { api } from './lib/api.js';
 import { usePath, matchTournamentRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, timezoneAbbrev, formatTournamentDateTime, minorUnitsToAmount, amountToMinorUnits, currencyOptions, formatMoney, utcIsoToZonedDateTimeInput, formatDateTime, isPasswordStrong } from './lib/format.js';
-import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentPayload, registrationPayload, roleName, labelFor, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime } from './lib/domain.js';
+import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentPayload, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime } from './lib/domain.js';
 import { RequiredMark, TextField, SelectField, Button, Feedback } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
@@ -15,6 +15,7 @@ import { AuthShell, LanguageSelect, SetupForm, LoginForm, RegisterForm, Register
 
 const ImpressumPage = lazy(() => import('./pages/ImpressumPage.jsx'));
 const DatenschutzPage = lazy(() => import('./pages/DatenschutzPage.jsx'));
+const TournamentReportPage = lazy(() => import('./pages/TournamentReportPage.jsx'));
 const TournamentDetailPage = lazy(() => import('./pages/TournamentDetailPage.jsx'));
 const TournamentManagement = lazy(() => import('./pages/TournamentManagement.jsx'));
 const RegistrationsManagement = lazy(() => import('./pages/RegistrationsManagement.jsx'));
@@ -28,6 +29,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState(() => localStorage.getItem('ptm_language') || 'de');
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState(null);
+  const [reportVerifyStatus, setReportVerifyStatus] = useState(null);
   const [authView, setAuthView] = useState('home');
   const [activeTab, setActiveTab] = useState('home');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -73,9 +76,6 @@ export default function App() {
   const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
   const [authForm, setAuthForm] = useState(EMPTY_AUTH_FORM);
   const [tournamentForm, setTournamentForm] = useState(EMPTY_TOURNAMENT_FORM);
-  const [calendarEntryForm, setCalendarEntryForm] = useState(EMPTY_CALENDAR_ENTRY_FORM);
-  const [calendarEntryDialogOpen, setCalendarEntryDialogOpen] = useState(false);
-  const [calendarEntryMode, setCalendarEntryMode] = useState('create');
   const [registrationForm, setRegistrationForm] = useState(EMPTY_REGISTRATION_FORM);
   const [userMode, setUserMode] = useState('create');
   const [tournamentMode, setTournamentMode] = useState('create');
@@ -115,7 +115,7 @@ export default function App() {
       if (homeFilterMonth && tournament.date.slice(5, 7) !== homeFilterMonth) {
         return false;
       }
-      if (homeFilterFormation && tournament.formation !== homeFilterFormation) {
+      if (homeFilterFormation === 'andere' ? !tournament.formationOther : (homeFilterFormation && (tournament.formation !== homeFilterFormation || tournament.formationOther))) {
         return false;
       }
       if (homeFilterRegistrationType && tournament.registrationType !== homeFilterRegistrationType) {
@@ -213,10 +213,17 @@ export default function App() {
     const resetToken = params.get('reset_token');
     const verifyToken = params.get('verify_token');
     const cancelToken = params.get('cancel_token');
+    const reportVerifyToken = params.get('report_verify_token');
     const authResult = params.get('auth');
     const authError = params.get('auth_error');
     let pendingAuthMessage = '';
     let pendingAuthError = '';
+    if (reportVerifyToken) {
+      navigate('/turnier-melden');
+      api('/api/tournament-reports/verify', { method: 'POST', body: JSON.stringify({ token: reportVerifyToken }) })
+        .then(() => setReportVerifyStatus('success'))
+        .catch(() => setReportVerifyStatus('error'));
+    }
     if (resetToken) {
       setAuthView('reset');
       setAuthForm((previous) => ({ ...previous, token: resetToken }));
@@ -351,6 +358,7 @@ export default function App() {
     try {
       const bootstrap = await api('/api/bootstrap');
       setNeedsSetup(bootstrap.needsSetup);
+      setTurnstileSiteKey(bootstrap.turnstileSiteKey || null);
 
       if (!bootstrap.needsSetup) {
         try {
@@ -928,7 +936,7 @@ export default function App() {
       overrideCoordinates: false,
       description: tournament.description || '',
       type: tournament.type || 'formule_x',
-      formation: tournament.formation || 'doublette',
+      formation: tournament.formationOther ? 'andere' : (tournament.formation || 'doublette'),
       registrationType: tournament.registrationType || 'forme',
       status: tournament.status || 'draft',
       maxRegistrations: tournament.maxRegistrations || 0,
@@ -960,47 +968,6 @@ export default function App() {
     setTournamentDialogOpen(false);
     setTournamentMode('create');
     setTournamentForm(EMPTY_TOURNAMENT_FORM);
-  }
-
-  function newCalendarEntry() {
-    setCalendarEntryMode('create');
-    setCalendarEntryForm(EMPTY_CALENDAR_ENTRY_FORM);
-    setActiveTab('tournaments');
-    clearFeedback();
-    setCalendarEntryDialogOpen(true);
-  }
-
-  function closeCalendarEntryDialog() {
-    setCalendarEntryDialogOpen(false);
-    setCalendarEntryMode('create');
-    setCalendarEntryForm(EMPTY_CALENDAR_ENTRY_FORM);
-  }
-
-  function calendarEntryPayload(form) {
-    return {
-      name: form.name,
-      date: form.date,
-      startTime: form.startTime || null,
-      location: form.location,
-      description: form.description || null,
-      visibility: 'public',
-      status: form.visible ? 'running' : 'draft',
-      registrationEnabled: false,
-    };
-  }
-
-  async function handleCalendarEntrySubmit(event) {
-    event.preventDefault();
-    setError('');
-    setMessage('');
-    try {
-      await api('/api/tournaments', { method: 'POST', body: JSON.stringify(calendarEntryPayload(calendarEntryForm)) });
-      setMessage('Kalendereintrag wurde angelegt.');
-      closeCalendarEntryDialog();
-      await loadTournaments();
-    } catch (requestError) {
-      setError(translateText(requestError.message, language));
-    }
   }
 
   function newRegistration() {
@@ -1179,6 +1146,24 @@ export default function App() {
     );
   }
 
+  if (!needsSetup && path === '/turnier-melden') {
+    return (
+      <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
+        <TournamentReportPage
+          language={language}
+          setLanguage={setLanguage}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          navigate={navigate}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          turnstileSiteKey={turnstileSiteKey}
+          verifyStatus={reportVerifyStatus}
+        />
+      </Suspense>
+    );
+  }
+
   if (currentUser && authView === 'cancelRegistration') {
     return (
       <main className="app-shell">
@@ -1289,6 +1274,16 @@ export default function App() {
             }}
           >
             Anmelden
+          </button>
+          <button
+            className="drawer-link"
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              navigate('/turnier-melden');
+            }}
+          >
+            Turnier melden
           </button>
           <a
             className="drawer-link"
@@ -1601,6 +1596,16 @@ export default function App() {
         >
           Anmeldungen
         </button>
+        <button
+          className="drawer-link"
+          type="button"
+          onClick={() => {
+            setMenuOpen(false);
+            navigate('/turnier-melden');
+          }}
+        >
+          Turnier melden
+        </button>
         {isAdmin && (
           <button
             className={`drawer-link ${activeTab === 'users' ? 'active' : ''}`}
@@ -1746,7 +1751,6 @@ export default function App() {
               isAdmin={isAdmin}
               language={language}
               onCreate={newTournament}
-              onCreateCalendarEntry={newCalendarEntry}
               query={tournamentQuery}
               onQueryChange={setTournamentQuery}
               statusFilter={tournamentStatusFilter}
@@ -1764,11 +1768,6 @@ export default function App() {
               onCloseTournamentDialog={closeTournamentDialog}
               users={users}
               currentUser={currentUser}
-              calendarEntryDialogOpen={calendarEntryDialogOpen}
-              calendarEntryForm={calendarEntryForm}
-              setCalendarEntryForm={setCalendarEntryForm}
-              onCalendarEntrySubmit={handleCalendarEntrySubmit}
-              onCloseCalendarEntryDialog={closeCalendarEntryDialog}
             />
           </section>
         </Suspense>
@@ -1890,7 +1889,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
           <span>{tournament.location}</span>
           <small>
             {tournament.registrationEnabled !== false && (
-              <>{labelFor(FORMATIONS, tournament.formation)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</>
+              <>{formationLabel(tournament)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</>
             )}
             {typeof tournament.distanceKm === 'number' && (
               <>

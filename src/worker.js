@@ -25,6 +25,7 @@ const TOURNAMENT_TYPES = [
   'trip_tete',
 ];
 const FORMATIONS = ['tete', 'doublette', 'triplette'];
+const FORMATION_REPORT_VALUES = [...FORMATIONS, 'andere'];
 const REGISTRATION_TYPES = ['supermelee', 'melee', 'forme'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
@@ -45,6 +46,11 @@ const GEOCODE_RATE_LIMIT_WINDOW_SECONDS = 60 * 15;
 const GEOCODE_RATE_LIMIT_MAX_PER_IP = 30;
 const EMAIL_VERIFICATION_TTL_SECONDS = 60 * 60 * 24;
 const EMAIL_RESEND_COOLDOWN_SECONDS = 60;
+const TOURNAMENT_REPORT_TOKEN_TTL_SECONDS = 60 * 60 * 24;
+const TOURNAMENT_REPORT_SYSTEM_USER_ID = 'system-tournament-reports';
+const TOURNAMENT_REPORT_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const TOURNAMENT_REPORT_RATE_LIMIT_MAX_PER_IP = 5;
+const TOURNAMENT_REPORT_MAX_DAYS_AHEAD = 365 * 2;
 // Changing this invalidates every stored password_hash (verifyPassword re-derives with the
 // current value). Any seeded/test users must be re-hashed and re-seeded after a change.
 const PASSWORD_ITERATIONS = 100000;
@@ -56,7 +62,7 @@ const DUMMY_PASSWORD_HASH = '000000000000000000000000000000000000000000000000000
 const UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 const SECURITY_HEADERS = {
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests",
+    "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; frame-src https://challenges.cloudflare.com; form-action 'self'; upgrade-insecure-requests",
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(self), payment=(), usb=()',
@@ -84,6 +90,29 @@ const EMAIL_VERIFICATION_EMAILS = {
   fr: {
     subject: 'Confirmer l’adresse e-mail',
     text: (verificationUrl) => `Confirme ton adresse e-mail avec ce lien:\n\n${verificationUrl}\n\nLe lien est valable 24 heures.`,
+  },
+};
+
+const TOURNAMENT_REPORT_VERIFICATION_EMAILS = {
+  de: {
+    subject: 'Turniermeldung bestätigen',
+    text: (verificationUrl) => `Bitte bestätige deine gemeldete Turnier-/Kalenderveranstaltung über diesen Link:\n\n${verificationUrl}\n\nErst nach der Bestätigung wird der Eintrag öffentlich sichtbar. Der Link ist 24 Stunden gültig.`,
+  },
+  nl: {
+    subject: 'Toernooimelding bevestigen',
+    text: (verificationUrl) => `Bevestig je gemelde toernooi via deze link:\n\n${verificationUrl}\n\nPas na bevestiging wordt de melding openbaar zichtbaar. De link is 24 uur geldig.`,
+  },
+  en: {
+    subject: 'Confirm your tournament report',
+    text: (verificationUrl) => `Please confirm your reported tournament via this link:\n\n${verificationUrl}\n\nThe entry only becomes publicly visible after confirmation. The link is valid for 24 hours.`,
+  },
+  es: {
+    subject: 'Confirmar torneo notificado',
+    text: (verificationUrl) => `Confirma el torneo notificado con este enlace:\n\n${verificationUrl}\n\nLa entrada solo sera visible publicamente tras la confirmacion. El enlace es valido durante 24 horas.`,
+  },
+  fr: {
+    subject: 'Confirmer le tournoi signalé',
+    text: (verificationUrl) => `Confirme le tournoi signalé via ce lien :\n\n${verificationUrl}\n\nL’entrée ne devient publique qu’après confirmation. Le lien est valable 24 heures.`,
   },
 };
 
@@ -555,7 +584,7 @@ export default {
       await cleanupExpiredSessions(env.DB);
 
       if (request.method === 'GET' && url.pathname === '/api/bootstrap') {
-        return json({ needsSetup: await needsSetup(env.DB) });
+        return json({ needsSetup: await needsSetup(env.DB), turnstileSiteKey: env.TURNSTILE_SITE_KEY || null });
       }
 
       if (request.method === 'POST' && url.pathname === '/api/setup') {
@@ -725,6 +754,14 @@ export default {
           const auth = await requireManagerAuth(request, env.DB);
           return await createTournament(request, env.DB, auth.user);
         }
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/tournament-reports') {
+        return await createTournamentReport(request, env, url);
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/tournament-reports/verify') {
+        return await verifyTournamentReport(request, env.DB);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/geocode') {
@@ -2141,11 +2178,11 @@ async function createTournament(request, db, user) {
   await db
     .prepare(
       `INSERT INTO tournaments (
-        id, created_by, manager_id, name, date, start_time, location, description, type, formation, registration_type, status,
+        id, created_by, manager_id, name, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, website_url, logo_url, flyer_url,
         latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -2158,6 +2195,7 @@ async function createTournament(request, db, user) {
       tournament.description,
       tournament.type,
       tournament.formation,
+      tournament.formationOther ? 1 : 0,
       tournament.registrationType,
       tournament.status,
       tournament.maxRegistrations,
@@ -2208,7 +2246,7 @@ async function updateTournament(request, env, existing, user) {
     .prepare(
       `UPDATE tournaments
        SET manager_id = ?, name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
-           formation = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?,
+           formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
            participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, updated_at = ?
        WHERE id = ?`,
@@ -2222,6 +2260,7 @@ async function updateTournament(request, env, existing, user) {
       tournament.description,
       tournament.type,
       tournament.formation,
+      tournament.formationOther ? 1 : 0,
       tournament.registrationType,
       tournament.status,
       tournament.maxRegistrations,
@@ -2266,6 +2305,211 @@ function normalizePresentationUrl(value) {
     throw new HttpError(400, 'Eine gültige URL (http:// oder https://) ist erforderlich');
   }
   return trimmed;
+}
+
+function assertTournamentReportDateWithinRange(dateStr) {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const minDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  const maxDate = new Date(today.getTime() + TOURNAMENT_REPORT_MAX_DAYS_AHEAD * 24 * 60 * 60 * 1000);
+  const value = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(value.getTime()) || value.getTime() < minDate.getTime()) {
+    throw new HttpError(400, 'Das Turnierdatum muss in der Zukunft liegen');
+  }
+  if (value.getTime() > maxDate.getTime()) {
+    throw new HttpError(400, 'Das Turnierdatum darf höchstens 2 Jahre in der Zukunft liegen');
+  }
+}
+
+async function enforceTournamentReportRateLimit(db, ip) {
+  const windowStart = new Date(Date.now() - TOURNAMENT_REPORT_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
+
+  const ipCount = await db
+    .prepare('SELECT COUNT(*) AS count FROM tournament_report_attempts WHERE ip = ? AND created_at > ?')
+    .bind(ip, windowStart)
+    .first();
+
+  if (Number(ipCount?.count || 0) >= TOURNAMENT_REPORT_RATE_LIMIT_MAX_PER_IP) {
+    throw new HttpError(429, 'Zu viele Turniermeldungen. Bitte versuche es später erneut.');
+  }
+
+  await db
+    .prepare('INSERT INTO tournament_report_attempts (id, ip, created_at) VALUES (?, ?, ?)')
+    .bind(crypto.randomUUID(), ip, new Date().toISOString())
+    .run();
+}
+
+async function verifyTurnstileToken(env, token, ip) {
+  if (!env.TURNSTILE_SECRET_KEY) {
+    // Not configured on this environment (e.g. local dev) - skip verification rather than
+    // hard-blocking the whole feature.
+    return;
+  }
+  if (!token) {
+    throw new HttpError(400, 'Sicherheitsprüfung fehlgeschlagen. Bitte erneut versuchen.');
+  }
+  const params = new URLSearchParams({ secret: env.TURNSTILE_SECRET_KEY, response: token });
+  if (ip && ip !== 'unknown') {
+    params.set('remoteip', ip);
+  }
+  let result;
+  try {
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params,
+    });
+    result = await response.json();
+  } catch (error) {
+    console.error('Turnstile verification request failed', error);
+    throw new HttpError(400, 'Sicherheitsprüfung fehlgeschlagen. Bitte erneut versuchen.');
+  }
+  if (!result?.success) {
+    throw new HttpError(400, 'Sicherheitsprüfung fehlgeschlagen. Bitte erneut versuchen.');
+  }
+}
+
+/**
+ * Public, unauthenticated "Turnier melden" submission. Replaces the old logged-in-only
+ * calendar-entry form: anyone can report a tournament, but the entry stays hidden
+ * (status='draft') until the contact email is confirmed via createTournamentReportToken,
+ * and is auto-deleted if unconfirmed within 24h or once its date is in the past
+ * (see cleanupExpiredSessions).
+ */
+async function createTournamentReport(request, env, url) {
+  const db = env.DB;
+  const body = await readJson(request);
+
+  // Honeypot: real users never see/fill this field. Silently no-op for bots without
+  // revealing the detection.
+  if (nullableText(body.honeypot)) {
+    return json({ ok: true }, 201);
+  }
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  await enforceTournamentReportRateLimit(db, ip);
+  await verifyTurnstileToken(env, body.turnstileToken, ip);
+
+  const club = text(body.club);
+  const name = text(body.name);
+  const location = text(body.location);
+  const date = text(body.date);
+  const startTime = nullableText(body.startTime);
+  const rawFormation = text(body.formation || 'doublette');
+  const formationOther = rawFormation === 'andere';
+  const formation = formationOther ? 'tete' : rawFormation;
+  const description = nullableText(body.description);
+  const websiteUrl = normalizePresentationUrl(body.websiteUrl);
+  const contactName = text(body.contactName);
+  const contactEmail = text(body.contactEmail).toLowerCase();
+  const language = normalizeLanguage(body.language);
+
+  if (club.length < 2) throw new HttpError(400, 'Der Verein muss mindestens 2 Zeichen enthalten');
+  if (name.length < 2) throw new HttpError(400, 'Die Turnier-Informationen müssen mindestens 2 Zeichen enthalten');
+  if (location.length < 2) throw new HttpError(400, 'Der Ort muss mindestens 2 Zeichen enthalten');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new HttpError(400, 'Ein gültiges Turnierdatum ist erforderlich');
+  assertTournamentReportDateWithinRange(date);
+  if (startTime && !/^\d{2}:\d{2}$/.test(startTime)) throw new HttpError(400, 'Eine gültige Startzeit ist erforderlich');
+  if (!FORMATION_REPORT_VALUES.includes(rawFormation)) throw new HttpError(400, 'Ungültige Formation');
+  if (!websiteUrl) throw new HttpError(400, 'Eine Quelle/Webseite ist erforderlich');
+  if (contactName.length < 2) throw new HttpError(400, 'Der Kontaktname muss mindestens 2 Zeichen enthalten');
+  if (!isEmail(contactEmail)) throw new HttpError(400, 'Eine gültige Kontakt-E-Mail ist erforderlich');
+  if (!body.consentAccepted) throw new HttpError(400, 'Zustimmung zur Datenschutzerklärung ist erforderlich');
+
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  const tournamentForGeo = { location, latitude: null, longitude: null };
+  const geo = await resolveTournamentGeolocation(tournamentForGeo, null, now);
+  const timezone = resolveTournamentTimezone(geo);
+
+  await db
+    .prepare(
+      `INSERT INTO tournaments (
+        id, created_by, manager_id, name, date, start_time, location, description, type, formation, formation_other,
+        registration_type, status, visibility, registration_enabled, club, website_url, contact_name, contact_email,
+        latitude, longitude, geocoded_at, timezone, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      id,
+      TOURNAMENT_REPORT_SYSTEM_USER_ID,
+      null,
+      name,
+      date,
+      startTime,
+      location,
+      description,
+      'formule_x',
+      formation,
+      formationOther ? 1 : 0,
+      'forme',
+      'draft',
+      'public',
+      0,
+      club,
+      websiteUrl,
+      contactName,
+      contactEmail,
+      geo.latitude,
+      geo.longitude,
+      geo.geocodedAt,
+      timezone,
+      now,
+      now,
+    )
+    .run();
+
+  const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+  const tokenHash = await sha256Hex(token);
+  const expiresAt = new Date(Date.now() + TOURNAMENT_REPORT_TOKEN_TTL_SECONDS * 1000);
+  await db
+    .prepare('INSERT INTO tournament_report_tokens (token_hash, tournament_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
+    .bind(tokenHash, id, expiresAt.toISOString(), now)
+    .run();
+
+  const verificationUrl = `${url.origin}/?report_verify_token=${encodeURIComponent(token)}`;
+  const emailText = TOURNAMENT_REPORT_VERIFICATION_EMAILS[language] || TOURNAMENT_REPORT_VERIFICATION_EMAILS.de;
+  await sendTransactionalEmail(env, {
+    to: contactEmail,
+    subject: emailText.subject,
+    text: emailText.text(verificationUrl),
+    language,
+    logFallback: `Tournament report verification link for ${contactEmail}: ${verificationUrl}`,
+    failureContext: `tournament report verification email for ${contactEmail}`,
+    allowLogFallback: isLocalhost(url),
+  });
+
+  const response = { ok: true };
+  if (isLocalhost(url)) {
+    response.verificationUrl = verificationUrl;
+  }
+  return json(response, 201);
+}
+
+async function verifyTournamentReport(request, db) {
+  const body = await readJson(request);
+  const token = String(body.token || '').trim();
+  if (!token) {
+    throw new HttpError(400, 'Bestätigungs-Token ist erforderlich');
+  }
+
+  const tokenHash = await sha256Hex(token);
+  const verification = await db
+    .prepare('SELECT token_hash, tournament_id, expires_at, used_at FROM tournament_report_tokens WHERE token_hash = ?')
+    .bind(tokenHash)
+    .first();
+
+  if (!verification || verification.used_at || new Date(verification.expires_at).getTime() <= Date.now()) {
+    throw new HttpError(400, 'Bestätigungs-Link ist ungültig oder abgelaufen');
+  }
+
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare("UPDATE tournaments SET status = 'running', updated_at = ? WHERE id = ?").bind(now, verification.tournament_id),
+    db.prepare('UPDATE tournament_report_tokens SET used_at = ? WHERE token_hash = ?').bind(now, tokenHash),
+  ]);
+
+  return json({ ok: true, tournamentId: verification.tournament_id });
 }
 
 const PROXY_IMAGE_FIELDS = { logo: 'logo_url', website: 'website_url', flyer: 'flyer_url' };
@@ -3315,9 +3559,37 @@ async function cleanupExpiredSessions(db) {
   await db.prepare('DELETE FROM geocode_attempts WHERE created_at <= ?').bind(geocodeAttemptsCutoff).run();
   const unverifiedAccountCutoff = new Date(Date.now() - EMAIL_VERIFICATION_TTL_SECONDS * 1000).toISOString();
   await db
-    .prepare('DELETE FROM users WHERE email_verified_at IS NULL AND created_at <= ?')
-    .bind(unverifiedAccountCutoff)
+    .prepare('DELETE FROM users WHERE email_verified_at IS NULL AND created_at <= ? AND id != ?')
+    .bind(unverifiedAccountCutoff, TOURNAMENT_REPORT_SYSTEM_USER_ID)
     .run();
+
+  // "Turnier melden": delete unconfirmed reports whose 24h confirmation window has
+  // expired (cascades to their tournament_report_tokens row), plus already-confirmed
+  // reports whose event date is in the past. Only tournaments that originated from
+  // "Turnier melden" (i.e. have a tournament_report_tokens row, confirmed or not) are
+  // touched - regular manager-created tournaments/calendar entries are unaffected.
+  const reportTokenCutoff = new Date(Date.now() - TOURNAMENT_REPORT_TOKEN_TTL_SECONDS * 1000).toISOString();
+  await db
+    .prepare(
+      `DELETE FROM tournaments WHERE id IN (
+        SELECT tournament_id FROM tournament_report_tokens WHERE used_at IS NULL AND created_at <= ?
+      )`,
+    )
+    .bind(reportTokenCutoff)
+    .run();
+  const today = new Date().toISOString().slice(0, 10);
+  await db
+    .prepare(
+      `DELETE FROM tournaments WHERE date < ? AND id IN (SELECT tournament_id FROM tournament_report_tokens)`,
+    )
+    .bind(today)
+    .run();
+  // Note: verified (used_at IS NOT NULL) tokens are intentionally kept, not cleaned up here -
+  // they remain the marker that identifies a tournament as originating from "Turnier melden"
+  // for the past-date cleanup above, and cascade-delete automatically once their tournament
+  // row is removed (ON DELETE CASCADE).
+  const reportAttemptsCutoff = new Date(Date.now() - TOURNAMENT_REPORT_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
+  await db.prepare('DELETE FROM tournament_report_attempts WHERE created_at <= ?').bind(reportAttemptsCutoff).run();
 }
 
 async function enforceLoginRateLimit(db, email, ip) {
@@ -3810,6 +4082,8 @@ function toPublicTournament(row, user) {
     description: row.description,
     type: row.type,
     formation: row.formation,
+    formationOther: Boolean(Number(row.formation_other || 0)),
+    club: row.club || null,
     registrationType: row.registration_type || 'forme',
     status: row.status,
     maxRegistrations: Number(row.max_registrations || 0),

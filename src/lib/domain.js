@@ -1,4 +1,4 @@
-import { ROLES } from './constants.js';
+import { ROLES, FORMATIONS } from './constants.js';
 import { formatTournamentDateTime, timezoneAbbrev, detectViewerTimeZone, amountToMinorUnits, DISPLAY_LOCALES } from './format.js';
 import { translateText } from './i18n.js';
 
@@ -149,6 +149,13 @@ export function roleName(value) {
 
 export function labelFor(options, value) {
   return options.find((option) => option.value === value)?.label || value;
+}
+
+export function formationLabel(tournament) {
+  if (tournament.formationOther) {
+    return labelFor(FORMATIONS, 'andere');
+  }
+  return labelFor(FORMATIONS, tournament.formation);
 }
 
 export function isOwnTournament(tournament, user) {

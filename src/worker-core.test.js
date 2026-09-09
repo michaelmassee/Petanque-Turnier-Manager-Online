@@ -13,6 +13,12 @@ describe('Worker-Fachlogik', () => {
     expect(registrationOpenStatus({ visibility: 'public', status: 'registration', registration_enabled: 0 })).toBe('closed');
   });
 
+  it('mappt Formation "andere" auf tete + formationOther, ohne den DB-CHECK zu verletzen', () => {
+    expect(normalizeTournamentInput({ ...base, formation: 'andere' })).toMatchObject({ formation: 'tete', formationOther: true, registrationType: 'forme' });
+    expect(normalizeTournamentInput({ ...base, formation: 'doublette' })).toMatchObject({ formation: 'doublette', formationOther: false });
+    expect(() => normalizeTournamentInput({ ...base, formation: 'andere', registrationType: 'supermelee' })).toThrow('Formée');
+  });
+
   it.each([
     [{ ...base, name: 'x' }, 'Turniername'], [{ ...base, date: 'x' }, 'Turnierdatum'], [{ ...base, startTime: '2:00' }, 'Startzeit'], [{ ...base, location: 'x' }, 'Ort'],
     [{ ...base, type: 'x' }, 'Turniersystem'], [{ ...base, formation: 'x' }, 'Formation'], [{ ...base, registrationType: 'x' }, 'Anmeldetyp'],
