@@ -6,6 +6,7 @@ import {
   EMPTY_REGISTRATION_FORM,
   EMPTY_TOURNAMENT_FORM,
   EMPTY_USER_FORM,
+  ProfilePanel,
 } from './App.jsx';
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
 import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
@@ -46,6 +47,23 @@ describe('Öffentliche Turnierdetailseite', () => {
     expect(screen.queryByText('Max. Meldungen')).not.toBeInTheDocument();
     expect(screen.queryByText('Warteliste')).not.toBeInTheDocument();
     expect(screen.queryByText('Kontakt')).not.toBeInTheDocument();
+  });
+});
+
+describe('Mein Profil', () => {
+  it('rendert das Profilformular für einen angemeldeten Benutzer', () => {
+    render(
+      <ProfilePanel
+        currentUser={{ pendingEmail: null }}
+        form={{ firstName: 'Anna', lastName: 'Muster', email: 'anna@example.com', club: '', licenseNr: '', currentPassword: '', newPassword: '', newPasswordConfirm: '' }}
+        setForm={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Mein Profil' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('anna@example.com')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
   });
 });
 

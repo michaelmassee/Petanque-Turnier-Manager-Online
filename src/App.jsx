@@ -1861,6 +1861,52 @@ export default function App() {
   );
 }
 
+export function ProfilePanel({ currentUser, form, setForm, onSubmit }) {
+  return (
+    <div className="panel">
+      <div className="section-title">
+        <h2>Mein Profil</h2>
+      </div>
+      <p className="muted">Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.</p>
+      {currentUser.pendingEmail && (
+        <p className="hint">
+          {`Bestätigung ausstehend für ${currentUser.pendingEmail}. Bitte prüfe dein Postfach, um die Änderung abzuschließen.`}
+        </p>
+      )}
+      <form className="form" onSubmit={onSubmit}>
+        <TextField label="Vorname" value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
+        <TextField label="Nachname" value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
+        <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+        <TextField label="Verein" value={form.club} onChange={(club) => setForm({ ...form, club })} />
+        <TextField label="Lizenznummer" value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
+        <TextField
+          label="Aktuelles Passwort"
+          type="password"
+          value={form.currentPassword}
+          onChange={(currentPassword) => setForm({ ...form, currentPassword })}
+        />
+        <p className="hint">Nur erforderlich, wenn du deine E-Mail-Adresse oder dein Passwort änderst.</p>
+        <TextField
+          label="Neues Passwort"
+          type="password"
+          value={form.newPassword}
+          onChange={(newPassword) => setForm({ ...form, newPassword })}
+          minLength={8}
+        />
+        <p className="hint">{PASSWORD_STRENGTH_HINT}</p>
+        <TextField
+          label="Passwort bestätigen"
+          type="password"
+          value={form.newPasswordConfirm}
+          onChange={(newPasswordConfirm) => setForm({ ...form, newPasswordConfirm })}
+          minLength={8}
+        />
+        <Button type="submit">Speichern</Button>
+      </form>
+    </div>
+  );
+}
+
 
 function TournamentCard({ tournament, onOpenTournament, onRegister, language }) {
   const [logoBroken, setLogoBroken] = useState(false);
@@ -2147,7 +2193,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
 
 
 
