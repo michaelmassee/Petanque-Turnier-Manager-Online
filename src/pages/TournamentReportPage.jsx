@@ -59,12 +59,14 @@ function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSite
           onChange={(event) => setForm({ ...form, consentAccepted: event.target.checked })}
           required
         />
-        Ich habe die{' '}
-        <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
-          Datenschutzerklärung
-        </button>{' '}
-        gelesen und stimme der Verarbeitung meiner Daten zu.
-        <RequiredMark />
+        <span>
+          Ich habe die{' '}
+          <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
+            Datenschutzerklärung
+          </button>{' '}
+          gelesen und stimme der Verarbeitung meiner Daten zu.
+          <RequiredMark />
+        </span>
       </label>
       {turnstileSiteKey && <div className="cf-turnstile" data-sitekey={turnstileSiteKey} />}
       <div className="dialog-actions">

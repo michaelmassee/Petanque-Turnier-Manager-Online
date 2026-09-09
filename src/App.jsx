@@ -2204,8 +2204,10 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
               onChange={(event) => setForm({ ...form, publicationNoticeAccepted: event.target.checked })}
               required
             />
-            Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.
-            <RequiredMark />
+            <span>
+              Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.
+              <RequiredMark />
+            </span>
           </label>
           <div className="row-actions stretch">
             <Button type="submit">Anmeldung senden</Button>

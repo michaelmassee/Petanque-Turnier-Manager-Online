@@ -677,7 +677,7 @@ textarea:focus {
 .checkbox-field {
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-height: 44px;
 }
@@ -692,8 +692,11 @@ textarea:focus {
 }
 
 .checkbox-field input {
-  width: auto;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
   min-height: 0;
+  margin-top: 2px;
 }
 
 .checkbox-row {
