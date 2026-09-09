@@ -2891,13 +2891,16 @@ async function createRegistration(request, env, tournament) {
     await displaceRegistration(env, tournament, displace, appOrigin);
   }
 
-  try {
-    await sendRegistrationConfirmationEmail(env, tournament, created, appOrigin);
-  } catch (error) {
-    console.error(`Failed to send registration confirmation email for registration ${id}`, error);
+  const mailEnabled = await canSendTournamentMail(db, tournament);
+  if (mailEnabled) {
+    try {
+      await sendRegistrationConfirmationEmail(env, tournament, created, appOrigin);
+    } catch (error) {
+      console.error(`Failed to send registration confirmation email for registration ${id}`, error);
+    }
   }
 
-  return json({ registration: toPublicRegistration(created) }, 201);
+  return json({ registration: toPublicRegistration(created), mailEnabled }, 201);
 }
 
 async function updateRegistration(request, env, existing) {

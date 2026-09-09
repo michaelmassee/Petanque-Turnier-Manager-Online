@@ -263,6 +263,7 @@ export function TournamentDetailPage({
   onSubmitRegistration,
   message,
   error,
+  registrationInvalidField,
   setMessage,
   setError,
   onLogout,
@@ -390,6 +391,7 @@ export function TournamentDetailPage({
               navigate={navigate}
               language={language}
               currentUser={currentUser}
+              invalidField={registrationInvalidField}
             />
           )}
 

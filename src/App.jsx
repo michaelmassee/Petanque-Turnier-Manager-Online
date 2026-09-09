@@ -859,8 +859,12 @@ export default function App() {
         await api(`/api/registrations/${registrationForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
         setMessage('Anmeldung wurde aktualisiert.');
       } else {
-        await api(`/api/tournaments/${tournamentId}/registrations`, { method: 'POST', body: JSON.stringify(payload) });
-        setMessage('Anmeldung wurde gespeichert.');
+        const result = await api(`/api/tournaments/${tournamentId}/registrations`, { method: 'POST', body: JSON.stringify(payload) });
+        setMessage(
+          result.mailEnabled
+            ? 'Du hast dich erfolgreich angemeldet. Du erhältst in Kürze eine Bestätigung per E-Mail.'
+            : 'Du hast dich erfolgreich angemeldet.',
+        );
       }
 
       setRegistrationForm(EMPTY_REGISTRATION_FORM);
@@ -1122,6 +1126,7 @@ export default function App() {
           onSubmitRegistration={handleRegistrationSubmit}
           message={message}
           error={error}
+          registrationInvalidField={registrationInvalidField}
           setMessage={setMessage}
           setError={setError}
           onLogout={handleLogout}
@@ -1499,7 +1504,10 @@ export default function App() {
         }}
         onCloseMenu={() => setMenuOpen(false)}
         navigate={navigate}
-        onLogoClick={() => setActiveTab('home')}
+        onLogoClick={() => {
+          setActiveTab('home');
+          clearFeedback();
+        }}
         searchControl={
           activeTab === 'home' ? (
             <SearchMenuControl
@@ -1587,6 +1595,7 @@ export default function App() {
           onClick={() => {
             setActiveTab('home');
             setMenuOpen(false);
+            clearFeedback();
           }}
         >
           Startseite
@@ -1598,6 +1607,7 @@ export default function App() {
             onClick={() => {
               setActiveTab('tournaments');
               setMenuOpen(false);
+              clearFeedback();
             }}
           >
             Turnierverwaltung
@@ -1609,6 +1619,7 @@ export default function App() {
           onClick={() => {
             setActiveTab('registrations');
             setMenuOpen(false);
+            clearFeedback();
           }}
         >
           Anmeldungen
@@ -1618,6 +1629,7 @@ export default function App() {
           type="button"
           onClick={() => {
             setMenuOpen(false);
+            clearFeedback();
             navigate('/turnier-melden');
           }}
         >
@@ -1630,6 +1642,7 @@ export default function App() {
             onClick={() => {
               setActiveTab('users');
               setMenuOpen(false);
+              clearFeedback();
             }}
           >
             Benutzer
@@ -1642,6 +1655,7 @@ export default function App() {
             onClick={() => {
               setActiveTab('apikeys');
               setMenuOpen(false);
+              clearFeedback();
             }}
           >
             API-Zugänge
