@@ -1,7 +1,7 @@
 // Every transactional email must end with the marketing footer (app description +
 // desktop app link), regardless of language. sendTransactionalEmail appends it via
 // appendEmailFooter - this guards that wiring against regressions.
-import { appendEmailFooter } from '../src/worker.js';
+import { appendEmailFooter, renderTransactionalEmailHtml } from '../src/worker.js';
 
 let failures = 0;
 
@@ -26,6 +26,24 @@ for (const language of LANGUAGES) {
 
 // Unknown/missing language falls back to German rather than dropping the footer.
 expectContains('Footer-Fallback auf Deutsch bei unbekannter Sprache', appendEmailFooter('x', 'xx'), 'Finde dein nächstes Turnier');
+
+for (const language of LANGUAGES) {
+  const html = renderTransactionalEmailHtml('Betreff', 'Hallo!\n\nhttps://ptmonline.org/test', language);
+  expectContains(`HTML-Mail enthält Marken-Kopf (${language})`, html, 'Pétanque Turnier Manager Online');
+  expectContains(`HTML-Mail enthält Link (${language})`, html, 'href="https://ptmonline.org/test"');
+  expectContains(`HTML-Mail enthält Klartext-Fallback-Inhalt (${language})`, html, 'Hallo!');
+}
+
+const escapedHtml = renderTransactionalEmailHtml('<script>alert(1)</script>', '<img src=x onerror=alert(1)>', 'de');
+if (!escapedHtml.includes('&lt;script&gt;alert(1)&lt;/script&gt;') || escapedHtml.includes('<script>alert(1)</script>') || escapedHtml.includes('<img src=x onerror=alert(1)>')) {
+  failures += 1;
+  console.error('FAIL HTML-Mail escaped dynamic content unsafely');
+} else {
+  console.log('ok   HTML-Mail escaped dynamic content');
+}
+
+const queryLinkHtml = renderTransactionalEmailHtml('Betreff', 'https://ptmonline.org/?token=a&next=b', 'de');
+expectContains('HTML-Mail erhält URL-Parameter', queryLinkHtml, 'href="https://ptmonline.org/?token=a&amp;next=b"');
 
 if (failures > 0) process.exit(1);
 console.log('\nemail footer check passed.');

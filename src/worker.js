@@ -336,6 +336,78 @@ export function appendEmailFooter(text, language) {
   return `${text}\n\n----------\n\n${footer}`;
 }
 
+const EMAIL_BRAND = 'Pétanque Turnier Manager Online';
+const EMAIL_LAYOUT_LABELS = {
+  de: { openLink: 'Link öffnen', automated: `Diese E-Mail wurde automatisch von ${EMAIL_BRAND} versendet.` },
+  nl: { openLink: 'Link openen', automated: `Deze e-mail is automatisch verzonden door ${EMAIL_BRAND}.` },
+  en: { openLink: 'Open link', automated: `This email was sent automatically by ${EMAIL_BRAND}.` },
+  es: { openLink: 'Abrir enlace', automated: `Este correo se ha enviado automáticamente desde ${EMAIL_BRAND}.` },
+  fr: { openLink: 'Ouvrir le lien', automated: `Cet e-mail a été envoyé automatiquement par ${EMAIL_BRAND}.` },
+};
+
+function escapeEmailHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function linkifyEmailHtml(value) {
+  const urlPattern = /(https?:\/\/[^\s<]+)/g;
+  return String(value || '')
+    .split(urlPattern)
+    .map((part) => {
+      const escaped = escapeEmailHtml(part);
+      return /^https?:\/\/[^\s<]+$/.test(part)
+        ? `<a href="${escaped}" style="color:#086f61;text-decoration:underline;word-break:break-all;">${escaped}</a>`
+        : escaped;
+    })
+    .join('');
+}
+
+function renderEmailSection(text, labels) {
+  return text
+    .split(/\n{2,}/)
+    .filter(Boolean)
+    .map((paragraph) => {
+      const trimmed = paragraph.trim();
+      if (/^https?:\/\/[^\s<]+$/.test(trimmed)) {
+        const href = escapeEmailHtml(trimmed);
+        return `<p style="margin:24px 0;"><a href="${href}" style="display:inline-block;background:#087f6f;border-radius:8px;color:#ffffff;font-weight:700;padding:13px 20px;text-decoration:none;">${labels.openLink}</a></p><p style="margin:0;color:#5e6d69;font-size:13px;line-height:20px;word-break:break-all;">${href}</p>`;
+      }
+      return `<p style="margin:0 0 18px;color:#25332f;font-size:16px;line-height:25px;">${linkifyEmailHtml(paragraph).replace(/\n/g, '<br>')}</p>`;
+    })
+    .join('');
+}
+
+/**
+ * Builds an email-client-safe HTML alternative for every transactional message. The plain text
+ * body remains the canonical fallback, while this layout gives modern clients a readable card,
+ * clear action links and a separate product footer. All dynamic content is escaped before use.
+ */
+export function renderTransactionalEmailHtml(subject, text, language) {
+  const labels = EMAIL_LAYOUT_LABELS[language] || EMAIL_LAYOUT_LABELS.de;
+  const [content, footer = ''] = appendEmailFooter(text, language).split('\n\n----------\n\n');
+  const footerHtml = renderEmailSection(footer, labels);
+  return `<!doctype html>
+<html lang="${escapeEmailHtml(language || 'de')}">
+  <body style="margin:0;padding:0;background:#eef3f1;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#eef3f1;">
+      <tr><td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border-radius:14px;overflow:hidden;">
+          <tr><td style="background:#07594f;padding:24px 32px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:.1px;">${EMAIL_BRAND}</td></tr>
+          <tr><td style="padding:34px 32px 24px;"><h1 style="margin:0 0 24px;color:#173b34;font-size:24px;line-height:31px;">${escapeEmailHtml(subject)}</h1>${renderEmailSection(content, labels)}</td></tr>
+          <tr><td style="border-top:1px solid #dce6e2;padding:24px 32px 28px;background:#f8fbfa;">${footerHtml}</td></tr>
+        </table>
+        <p style="margin:16px 0 0;color:#71807b;font-size:12px;line-height:18px;">${labels.automated}</p>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
+}
+
 const EMAIL_LOCALES = { de: 'de-DE', nl: 'nl-NL', en: 'en-GB', es: 'es-ES', fr: 'fr-FR' };
 
 function formatTournamentDateTime(tournament, language) {
@@ -3229,7 +3301,7 @@ async function syncPostResults(request, env, tournamentId) {
   return json({ updatedCount });
 }
 
-async function sendViaResend(env, { to, subject, body, attachments, failureContext }) {
+async function sendViaResend(env, { to, subject, body, html, attachments, failureContext }) {
   let response;
   try {
     response = await fetch('https://api.resend.com/emails', {
@@ -3243,6 +3315,7 @@ async function sendViaResend(env, { to, subject, body, attachments, failureConte
         to,
         subject,
         text: body,
+        html,
         ...(attachments ? { attachments } : {}),
       }),
     });
@@ -3258,7 +3331,7 @@ async function sendViaResend(env, { to, subject, body, attachments, failureConte
   }
 }
 
-async function sendViaStrato(env, { to, subject, body, attachments }) {
+async function sendViaStrato(env, { to, subject, body, html, attachments }) {
   const { WorkerMailer } = await import('worker-mailer');
   const mailer = await WorkerMailer.connect({
     credentials: {
@@ -3278,6 +3351,7 @@ async function sendViaStrato(env, { to, subject, body, attachments }) {
       to,
       subject,
       text: body,
+      html,
       ...(attachments ? { attachments } : {}),
     });
   } finally {
@@ -3302,10 +3376,11 @@ async function sendTransactionalEmail(env, { to, subject, text, language = 'de',
   }
 
   const body = appendEmailFooter(text, language);
+  const html = renderTransactionalEmailHtml(subject, text, language);
 
   if (stratoAvailable) {
     try {
-      await sendViaStrato(env, { to, subject, body, attachments });
+      await sendViaStrato(env, { to, subject, body, html, attachments });
       return;
     } catch (error) {
       console.error(`Strato SMTP failed to send ${failureContext}, falling back to Resend`, error);
@@ -3315,7 +3390,7 @@ async function sendTransactionalEmail(env, { to, subject, text, language = 'de',
     }
   }
 
-  await sendViaResend(env, { to, subject, body, attachments, failureContext });
+  await sendViaResend(env, { to, subject, body, html, attachments, failureContext });
 }
 
 async function geocodeLocation(query) {
