@@ -143,7 +143,7 @@ export function registrationPayload(form, language) {
     status: form.status,
     isVip: Boolean(form.isVip),
     publicationNoticeAccepted: Boolean(form.publicationNoticeAccepted),
-    honeypot: form.honeypot || '',
+    website: form.website || '',
     language,
   };
 }

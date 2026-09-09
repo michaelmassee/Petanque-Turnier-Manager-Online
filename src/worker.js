@@ -1318,9 +1318,9 @@ function oauthAccountInsert(db, userId, provider, profile, now) {
 async function registerUser(request, env, url) {
   const db = env.DB;
   const body = await readJson(request);
-  // Honeypot: bots that fill the invisible field receive the normal success response,
-  // but no account or verification email is created.
-  if (nullableText(body.honeypot)) {
+  // Automated submissions that populate the hidden website field receive the normal
+  // success response, but no account or verification email is created.
+  if (nullableText(body.website)) {
     return json({ message: 'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.' }, 201);
   }
   const user = normalizeUserInput({ ...body, role: 'user' }, { requirePassword: true });
@@ -2385,9 +2385,9 @@ async function createTournamentReport(request, env, url) {
   const db = env.DB;
   const body = await readJson(request);
 
-  // Honeypot: real users never see/fill this field. Silently no-op for bots without
+  // Ignore automated submissions that populate the hidden website field without
   // revealing the detection.
-  if (nullableText(body.honeypot)) {
+  if (nullableText(body.website)) {
     return json({ ok: true }, 201);
   }
 
@@ -2797,9 +2797,9 @@ async function createRegistration(request, env, tournament) {
   }
 
   const body = await readJson(request);
-  // Honeypot: public registrations are a spam target. Do not create registrations
-  // or trigger notifications when a bot fills this field.
-  if (nullableText(body.honeypot)) {
+  // Do not create registrations or trigger notifications when automated submissions
+  // populate the hidden website field.
+  if (nullableText(body.website)) {
     return json({ ok: true }, 201);
   }
   if (body.publicationNoticeAccepted !== true) {

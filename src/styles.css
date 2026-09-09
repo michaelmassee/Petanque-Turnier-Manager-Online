@@ -667,7 +667,7 @@ textarea:focus {
   min-height: 44px;
 }
 
-.honeypot-field {
+.website-field {
   position: absolute;
   width: 1px;
   height: 1px;

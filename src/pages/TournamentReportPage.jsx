@@ -41,14 +41,15 @@ function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSite
         <TextField label="Name (Kontakt)" value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} required minLength={2} />
         <TextField label="E-Mail (Kontakt)" type="email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} required />
       </div>
-      <label className="honeypot-field" aria-hidden="true">
-        Webseite (bitte leer lassen)
+      <label className="website-field" aria-hidden="true">
+        Website
         <input
           type="text"
+          name="website"
           tabIndex={-1}
           autoComplete="off"
-          value={form.honeypot}
-          onChange={(event) => setForm({ ...form, honeypot: event.target.value })}
+          value={form.website}
+          onChange={(event) => setForm({ ...form, website: event.target.value })}
         />
       </label>
       <label className="checkbox-field">
