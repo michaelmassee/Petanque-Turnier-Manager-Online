@@ -6,12 +6,10 @@ import {
   EMPTY_REGISTRATION_FORM,
   EMPTY_TOURNAMENT_FORM,
   EMPTY_USER_FORM,
-  RegistrationForm,
-  RegistrationsPanel,
-  TournamentForm,
-  TournamentList,
-  UserManagementPanel,
 } from './App.jsx';
+import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
+import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
+import { UserManagementPanel } from './pages/UserManagementPanel.jsx';
 
 function UserManagementHarness({ onSubmit }) {
   const [userMode, setUserMode] = useState('create');

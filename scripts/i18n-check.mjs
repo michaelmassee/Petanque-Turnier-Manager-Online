@@ -5,14 +5,14 @@
 // JSX text) and is not itself a TRANSLATIONS entry.
 import { readFileSync } from 'node:fs';
 
-const APP_FILE = new URL('../src/App.jsx', import.meta.url);
+const APP_FILE = new URL('../src/lib/i18n.js', import.meta.url);
 const LANGUAGES = ['nl', 'en', 'es', 'fr'];
 
 function extractTranslationsSource(source) {
-  const startMarker = 'const TRANSLATIONS = {';
+  const startMarker = 'export const TRANSLATIONS = {';
   const start = source.indexOf(startMarker);
   if (start === -1) {
-    throw new Error('Could not locate "const TRANSLATIONS = {" in src/App.jsx');
+    throw new Error('Could not locate "export const TRANSLATIONS = {" in src/lib/i18n.js');
   }
 
   let depth = 0;
@@ -30,10 +30,10 @@ function extractTranslationsSource(source) {
   }
 
   if (end === -1) {
-    throw new Error('Could not find the end of the TRANSLATIONS object in src/App.jsx');
+    throw new Error('Could not find the end of the TRANSLATIONS object in src/lib/i18n.js');
   }
 
-  return source.slice(start + 'const TRANSLATIONS = '.length, end);
+  return source.slice(start + 'export const TRANSLATIONS = '.length, end);
 }
 
 function loadTranslations() {
@@ -83,7 +83,7 @@ function main() {
       console.error(`  - ${message}`);
     }
     console.error(
-      '\nEvery UI string must be translatable: add the missing key(s) to TRANSLATIONS in src/App.jsx for every language (nl/en/es/fr).',
+      '\nEvery UI string must be translatable: add the missing key(s) to TRANSLATIONS in src/lib/i18n.js for every language (nl/en/es/fr).',
     );
     process.exit(1);
   }
