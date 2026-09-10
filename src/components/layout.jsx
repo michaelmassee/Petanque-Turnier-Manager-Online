@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { postboxText, translateText } from '../lib/i18n.js';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus } from '../lib/hooks.js';
 import { MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTIONS, TOURNAMENT_STATUSES, REGISTRATION_STATUSES } from '../lib/constants.js';
@@ -38,11 +38,11 @@ async function hasActivePushSubscription() {
   return Boolean(await registration.pushManager.getSubscription());
 }
 
-export function PushMigrationNotice({ language, onDismiss, onEnabled }) {
+export function PushMigrationNotice({ onDismiss, onEnabled }) {
   const [state, setState] = useState('');
   const [errorDetail, setErrorDetail] = useState('');
   const [checking, setChecking] = useState(true);
-  const text = (key) => postboxText(language, key);
+  const { t: text } = useTranslation();
   useEffect(() => {
     let cancelled = false;
     hasActivePushSubscription().then((active) => {
@@ -73,11 +73,11 @@ export function PushMigrationNotice({ language, onDismiss, onEnabled }) {
   );
 }
 
-export function PostboxControl({ language, open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick }) {
+export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick }) {
   const [pushState, setPushState] = useState('');
   const [pushErrorDetail, setPushErrorDetail] = useState('');
   const [pushActive, setPushActive] = useState(false);
-  const text = (key) => postboxText(language, key);
+  const { t: text } = useTranslation();
 
   useEffect(() => {
     let cancelled = false;
@@ -128,14 +128,14 @@ export function PostboxControl({ language, open, unreadCount, messages, todos = 
             </form>
             {todos.length > 0 && <div className="postbox-section"><h3>{text('todos')}</h3>{todos.map((todo) => (
               <button className="postbox-todo" key={todo.type} type="button" onClick={() => onTodoClick?.(todo.type)}>
-                <strong>{todo.count}</strong> {postboxTodoText(todo.type, language)}
+                <strong>{todo.count}</strong> {postboxTodoText(todo.type, text)}
               </button>
             ))}</div>}
             <div className="postbox-section"><h3>{text('messages')}</h3>
               {messages.map((message) => (
                 <button className={`postbox-message ${!message.readAt && !message.mine ? 'unread' : ''}`} key={message.id} type="button" onClick={() => onRead(message)}>
                   <strong>{message.kind === 'system' ? text('status') : message.broadcastTournamentName ? (message.mine ? `${text('you')} → ` : `${message.senderName} → `) + text('allParticipantsOf').replace('{name}', message.broadcastTournamentName) : message.mine ? `${text('you')} → ${message.recipientName || ''}` : message.senderName}</strong>
-                  <span>{postboxMessageText(message, language)}</span>
+                  <span>{postboxMessageText(message, text)}</span>
                   <small>{new Date(message.createdAt).toLocaleString()}</small>
                 </button>
               ))}
@@ -154,19 +154,20 @@ function base64urlToUint8Array(value) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-function postboxMessageText(message, language) {
+function postboxMessageText(message, t) {
   if (message.kind === 'direct') return message.body;
   const data = message.eventData || {};
   if (message.eventType === 'tournament_status_changed') return `${data.tournamentName}: Status ${labelFor(TOURNAMENT_STATUSES, data.status)}`;
   if (message.eventType === 'registration_status_changed') return `${data.tournamentName}: Anmeldung ${labelFor(REGISTRATION_STATUSES, data.status)}`;
-  return postboxText(language, 'status');
+  return t('status');
 }
 
-function postboxTodoText(type, language) {
-  return postboxText(language, `todo_${type}`);
+function postboxTodoText(type, t) {
+  return t(`todo_${type}`);
 }
 
 export function InstallAppButton() {
+  const { t } = useTranslation();
   const { canInstall, installed, promptInstall } = useInstallPrompt();
   const [showIosHint, setShowIosHint] = useState(false);
 
@@ -177,7 +178,7 @@ export function InstallAppButton() {
   if (canInstall) {
     return (
       <button className="drawer-link install-link" type="button" onClick={promptInstall}>
-        App installieren
+        {t('App installieren')}
       </button>
     );
   }
@@ -186,7 +187,7 @@ export function InstallAppButton() {
     return (
       <div className="install-hint">
         <button className="drawer-link install-link" type="button" onClick={() => setShowIosHint((prev) => !prev)}>
-          App installieren
+          {t('App installieren')}
         </button>
         {showIosHint && (
           <p className="install-hint-text">
@@ -200,7 +201,8 @@ export function InstallAppButton() {
   return null;
 }
 
-export function AppHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, children }) {
+export function AppHeader({ heading, headingNoTranslate, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, children }) {
+  const { t } = useTranslation();
   return (
     <header className="topbar">
       <button
@@ -227,7 +229,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
         <button
           className="hamburger-btn"
           type="button"
-          aria-label="Menü öffnen"
+          aria-label={t('Menü öffnen')}
           aria-expanded={menuOpen}
           onClick={onToggleMenu}
         >
@@ -241,7 +243,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
       {menuOpen && (
         <>
           <div className="nav-drawer-backdrop" onClick={onCloseMenu} />
-          <nav className="nav-drawer" aria-label="Hauptmenü">
+          <nav className="nav-drawer" aria-label={t('Hauptmenü')}>
             {children}
             <InstallAppButton />
             {navigate && (
@@ -254,7 +256,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
                     navigate('/impressum');
                   }}
                 >
-                  Impressum
+                  {t('Impressum')}
                 </button>
                 <button
                   className="link-button"
@@ -264,7 +266,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
                     navigate('/datenschutz');
                   }}
                 >
-                  Datenschutz
+                  {t('Datenschutz')}
                 </button>
               </div>
             )}
@@ -276,7 +278,6 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
 }
 
 export function SearchMenuControl({
-  language,
   open,
   onToggle,
   onClose,
@@ -310,12 +311,13 @@ export function SearchMenuControl({
   geoLoading,
   geoError,
 }) {
+  const { t } = useTranslation();
   return (
     <div className="search-menu">
       <button
         className="search-menu-btn"
         type="button"
-        aria-label={translateText(open ? 'Suche schließen' : 'Suche öffnen', language)}
+        aria-label={open ? t('Suche schließen') : t('Suche öffnen')}
         aria-expanded={open}
         onClick={onToggle}
       >
@@ -326,10 +328,10 @@ export function SearchMenuControl({
           <div className="search-menu-backdrop" onClick={onClose} />
           <div className="search-menu-panel" role="search">
             <label className="home-search-field">
-              Turnier suchen
+              {t('Turnier suchen')}
               <input
                 type="search"
-                placeholder="Name, Ort oder Turniersystem"
+                placeholder={t('Name, Ort oder Turniersystem')}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -338,37 +340,36 @@ export function SearchMenuControl({
               {showMineFilter && (
                 <label className="checkbox-field">
                   <input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} />
-                  Nur meine Turniere
+                  {t('Nur meine Turniere')}
                 </label>
               )}
               <Button variant="secondary" onClick={() => setFilterOpen((active) => !active)}>
-                {filterOpen ? 'Filter ausblenden' : 'Filter anzeigen'}
+                {filterOpen ? t('Filter ausblenden') : t('Filter anzeigen')}
               </Button>
             </div>
 
             <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
               <LocationAutocomplete
-                label="Umkreissuche: Von diesem Ort aus suchen"
+                label={t('Umkreissuche: Von diesem Ort aus suchen')}
                 value={searchOriginQuery}
                 onChange={setSearchOriginQuery}
                 onSelect={onSearchOriginSelect}
-                language={language}
                 disabled={geoLoading}
               />
               <Button type="submit" variant="secondary" disabled={geoLoading}>
-                Suchen
+                {t('Suchen')}
               </Button>
               <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading}>
-                Meinen Standort verwenden
+                {t('Meinen Standort verwenden')}
               </Button>
               {searchOrigin && (
                 <>
-                  <SelectField label="Umkreis" value={searchRadiusKm} onChange={setSearchRadiusKm} options={RADIUS_OPTIONS} />
+                  <SelectField label={t('Umkreis')} value={searchRadiusKm} onChange={setSearchRadiusKm} options={RADIUS_OPTIONS} />
                   <span className="search-origin-label">
-                    {translateText('Ausgangspunkt:', language)} {searchOrigin.label}
+                    {t('Ausgangspunkt:')} {searchOrigin.label}
                   </span>
                   <button className="link-button" type="button" onClick={onClearSearchOrigin}>
-                    Umkreissuche beenden
+                    {t('Umkreissuche beenden')}
                   </button>
                 </>
               )}
@@ -379,37 +380,37 @@ export function SearchMenuControl({
               <div className="filter-panel">
                 <div className="filter-grid">
                   <SelectField
-                    label="Monat"
+                    label={t('Monat')}
                     value={filterMonth}
                     onChange={setFilterMonth}
-                    options={[{ value: '', label: 'Alle Monate' }, ...MONTHS]}
+                    options={[{ value: '', label: t('Alle Monate') }, ...MONTHS]}
                   />
                   <SelectField
-                    label="Formation"
+                    label={t('Formation')}
                     value={filterFormation}
                     onChange={setFilterFormation}
-                    options={[{ value: '', label: 'Alle Formationen' }, ...FORMATIONS]}
+                    options={[{ value: '', label: t('Alle Formationen') }, ...FORMATIONS]}
                   />
                   <SelectField
-                    label="Anmeldetyp"
+                    label={t('Anmeldetyp')}
                     value={filterRegistrationType}
                     onChange={setFilterRegistrationType}
-                    options={[{ value: '', label: 'Alle Anmeldetypen' }, ...REGISTRATION_TYPES]}
+                    options={[{ value: '', label: t('Alle Anmeldetypen') }, ...REGISTRATION_TYPES]}
                   />
                   <SelectField
-                    label="Turniersystem"
+                    label={t('Turniersystem')}
                     value={filterType}
                     onChange={setFilterType}
-                    options={[{ value: '', label: 'Alle Turniersysteme' }, ...TOURNAMENT_TYPES]}
+                    options={[{ value: '', label: t('Alle Turniersysteme') }, ...TOURNAMENT_TYPES]}
                   />
                 </div>
                 <label className="checkbox-field">
                   <input type="checkbox" checked={filterOpenOnly} onChange={(event) => setFilterOpenOnly(event.target.checked)} />
-                  Anmeldung möglich
+                  {t('Anmeldung möglich')}
                 </label>
                 <div className="filter-actions">
                   <button className="link-button" type="button" onClick={onResetFilters}>
-                    Zurücksetzen
+                    {t('Zurücksetzen')}
                   </button>
                 </div>
               </div>
@@ -429,13 +430,12 @@ export function AuthModal({ title, subtitle, message, error, onClose, children }
   );
 }
 
-export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
+export function StandalonePageHeader({ heading, headingNoTranslate, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
+  const { t } = useTranslation();
   return (
     <AppHeader
       heading={heading}
       headingNoTranslate={headingNoTranslate}
-      language={language}
-      setLanguage={setLanguage}
       menuOpen={menuOpen}
       onToggleMenu={() => setMenuOpen((open) => !open)}
       onCloseMenu={() => setMenuOpen(false)}
@@ -449,7 +449,7 @@ export function StandalonePageHeader({ heading, headingNoTranslate, language, se
           navigate('/');
         }}
       >
-        Zur Startseite
+        {t('Zur Startseite')}
       </button>
       {currentUser && (
         <Button
@@ -459,17 +459,18 @@ export function StandalonePageHeader({ heading, headingNoTranslate, language, se
             onLogout();
           }}
         >
-          Abmelden
+          {t('Abmelden')}
         </Button>
       )}
     </AppHeader>
   );
 }
 
-export function OfflineNotice({ language }) {
+export function OfflineNotice() {
+  const { t } = useTranslation();
   const online = useOnlineStatus();
   if (online) {
     return null;
   }
-  return <p className="feedback offline">{translateText('Du bist offline – angezeigte Daten können veraltet sein.', language)}</p>;
+  return <p className="feedback offline">{t('Du bist offline – angezeigte Daten können veraltet sein.')}</p>;
 }
