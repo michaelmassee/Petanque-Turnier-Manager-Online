@@ -337,13 +337,13 @@ export function TournamentList({
         {tournaments.map((tournament) => (
           <article className={`data-row tournament-row ${selectedId === tournament.id ? 'selected' : ''}`} key={tournament.id}>
             <button className="row-main" type="button" onClick={() => onSelect(tournament.id)}>
-              <strong>{tournament.name}</strong>
+              <strong data-i18n-skip>{tournament.name}</strong>
               {tournament.registrationEnabled === false && <span className="role">{translateText('Kalendereintrag', language)}</span>}
-              <span>{formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)} · {tournament.location}</span>
+              <span>{formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)} · <span data-i18n-skip>{tournament.location}</span></span>
               {tournament.registrationEnabled !== false && (
                 <small>{formationLabel(tournament)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</small>
               )}
-              {isAdmin && tournament.managerName && <small>Turnierleiter: {tournament.managerName}</small>}
+              {isAdmin && tournament.managerName && <small>{translateText('Turnierleiter:', language)} <span data-i18n-skip>{tournament.managerName}</span></small>}
             </button>
             <div className="badges">
               {tournament.registrationEnabled === false ? (

@@ -69,9 +69,9 @@ function MatchRow({ match, onSave, busy, language }) {
   return (
     <article className="supermelee-match">
       <div className="supermelee-match-teams">
-        <div className="supermelee-team">{teamLabel(match.teamA)}</div>
+        <div className="supermelee-team" data-i18n-skip>{teamLabel(match.teamA)}</div>
         <div className="supermelee-vs">{translateText('gegen', language)}</div>
-        <div className="supermelee-team is-second">{teamLabel(match.teamB)}</div>
+        <div className="supermelee-team is-second" data-i18n-skip>{teamLabel(match.teamB)}</div>
       </div>
 
       <div className="supermelee-result-row">
@@ -299,7 +299,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
             </p>
             {confirmedRegistrations.map((registration) => (
               <div className="round-participant-row" key={registration.id}>
-                <span className={registration.active ? '' : 'muted'}>{playerLabel(registration)}</span>
+                <span className={registration.active ? '' : 'muted'} data-i18n-skip>{playerLabel(registration)}</span>
                 <Button
                   variant="secondary"
                   disabled={busy}
@@ -360,7 +360,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
                 {ranking.map((entry) => (
                   <tr key={entry.playerId}>
                     <td>{entry.rank}</td>
-                    <td>{playerLabel(entry)}</td>
+                    <td data-i18n-skip>{playerLabel(entry)}</td>
                     <td>{entry.wins}</td>
                     <td>{entry.gameDiff}</td>
                     <td>{entry.pointsFor}:{entry.pointsAgainst}</td>

@@ -200,7 +200,7 @@ export function InstallAppButton() {
   return null;
 }
 
-export function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, children }) {
+export function AppHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, children }) {
   return (
     <header className="topbar">
       <button
@@ -218,7 +218,7 @@ export function AppHeader({ heading, language, setLanguage, menuOpen, onToggleMe
         <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="brand-logo" />
         <div className="brand-text">
           <p className="eyebrow">Pétanque Turnier Manager Online</p>
-          <h1>{heading}</h1>
+          <h1 {...(headingNoTranslate ? { 'data-i18n-skip': true } : {})}>{heading}</h1>
         </div>
       </button>
       <div className="topbar-actions">
@@ -429,10 +429,11 @@ export function AuthModal({ title, subtitle, message, error, onClose, children }
   );
 }
 
-export function StandalonePageHeader({ heading, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
+export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
   return (
     <AppHeader
       heading={heading}
+      headingNoTranslate={headingNoTranslate}
       language={language}
       setLanguage={setLanguage}
       menuOpen={menuOpen}

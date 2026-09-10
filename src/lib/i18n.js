@@ -530,6 +530,8 @@ export const TRANSLATIONS = {
     'Meinen Standort verwenden': 'Mijn locatie gebruiken',
     Umkreis: 'Straal',
     'Ausgangspunkt:': 'Startpunt:',
+    'Anmeldung:': 'Registratie:',
+    'Turnierleiter:': 'Toernooileider:',
     'Umkreissuche beenden': 'Straal zoeken beëindigen',
     'Mein Standort': 'Mijn locatie',
     'km entfernt': 'km verwijderd',
@@ -1096,6 +1098,8 @@ export const TRANSLATIONS = {
     'Meinen Standort verwenden': 'Use my location',
     Umkreis: 'Radius',
     'Ausgangspunkt:': 'Starting point:',
+    'Anmeldung:': 'Registration:',
+    'Turnierleiter:': 'Tournament director:',
     'Umkreissuche beenden': 'Stop radius search',
     'Mein Standort': 'My location',
     'km entfernt': 'km away',
@@ -1662,6 +1666,8 @@ export const TRANSLATIONS = {
     'Meinen Standort verwenden': 'Usar mi ubicación',
     Umkreis: 'Radio',
     'Ausgangspunkt:': 'Punto de partida:',
+    'Anmeldung:': 'Inscripción:',
+    'Turnierleiter:': 'Director del torneo:',
     'Umkreissuche beenden': 'Finalizar búsqueda por radio',
     'Mein Standort': 'Mi ubicación',
     'km entfernt': 'km de distancia',
@@ -2228,6 +2234,8 @@ export const TRANSLATIONS = {
     'Meinen Standort verwenden': 'Utiliser ma position',
     Umkreis: 'Rayon',
     'Ausgangspunkt:': 'Point de départ :',
+    'Anmeldung:': 'Inscription :',
+    'Turnierleiter:': 'Directeur du tournoi :',
     'Umkreissuche beenden': 'Terminer la recherche par rayon',
     'Mein Standort': 'Ma position',
     'km entfernt': 'km',
@@ -2279,6 +2287,13 @@ export const TRANSLATIONS = {
 
 const ORIGINAL_TEXT = new WeakMap();
 
+// Attribut, mit dem einzelne Elemente vom DOM-weiten Übersetzen ausgenommen werden -
+// für Text, der aus Nutzerdaten stammt (Namen, Vereine, Teamnamen, Turniernamen, Orte, ...)
+// statt aus festem UI-Text. translateDom() matcht sonst blind per exaktem Text auf das
+// Wörterbuch; ein Vorname wie "Neu" oder ein Verein wie "Verein" würde sonst genauso
+// übersetzt wie das gleichlautende UI-Wort.
+export const NO_TRANSLATE_ATTR = 'data-i18n-skip';
+
 export function translateDom(language) {
   const root = document.getElementById('root');
   if (!root) {
@@ -2288,6 +2303,9 @@ export function translateDom(language) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) {
+    if (walker.currentNode.parentElement?.closest(`[${NO_TRANSLATE_ATTR}]`)) {
+      continue;
+    }
     nodes.push(walker.currentNode);
   }
 

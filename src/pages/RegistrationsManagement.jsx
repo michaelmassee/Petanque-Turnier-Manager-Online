@@ -123,12 +123,12 @@ export function RegistrationsPanel({
     return (
       <article className="data-row" key={registration.id}>
         <div>
-          <strong>
+          <strong data-i18n-skip>
             {registration.isVip && <span className="vip-badge" title="VIP">★</span>}
             {registration.firstName} {registration.lastName}
           </strong>
           <span>{registration.noEmail ? translateText('ohne E-Mail-Adresse', language) : registration.email}</span>
-          {registration.teamName && <small>{registration.teamName}</small>}
+          {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
         </div>
         <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
         <div className="row-actions">

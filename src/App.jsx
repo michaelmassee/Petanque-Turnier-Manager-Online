@@ -1655,7 +1655,7 @@ export default function App() {
         }
       >
         <div className="drawer-user">
-          <span>{currentUser.firstName} {currentUser.lastName}</span>
+          <span data-i18n-skip>{currentUser.firstName} {currentUser.lastName}</span>
           <strong>{roleLabel}</strong>
         </div>
         <button
@@ -2056,9 +2056,9 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
             {tournament.visibility === 'private' && (
               <span className="license-badge" title="Nur für Admins sichtbar (Privat)">🔒</span>
             )}
-            {tournament.name}
+            <span data-i18n-skip>{tournament.name}</span>
           </strong>
-          <span>{tournament.location}</span>
+          <span data-i18n-skip>{tournament.location}</span>
           <small>
             {tournament.registrationEnabled !== false && (
               <>{formationLabel(tournament)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</>
@@ -2254,7 +2254,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
 
   return (
     <form className={embedded ? 'public-registration public-registration--embedded' : 'public-registration'} onSubmit={onSubmit}>
-      <h2>Anmeldung: {tournament.name}</h2>
+      <h2>{translateText('Anmeldung:', language)} <span data-i18n-skip>{tournament.name}</span></h2>
       {notYetOpen ? (
         <>
           <p className="hint">

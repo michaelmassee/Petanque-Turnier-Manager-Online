@@ -121,7 +121,7 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
   return (
     <article className={`data-row user-row ${selected ? 'selected' : ''}`}>
       <div>
-        <strong>{user.firstName} {user.lastName}</strong>
+        <strong data-i18n-skip>{user.firstName} {user.lastName}</strong>
         <span>{user.email}</span>
       </div>
       <div className="badges">

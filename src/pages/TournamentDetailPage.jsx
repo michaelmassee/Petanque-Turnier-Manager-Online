@@ -80,7 +80,7 @@ export function TournamentInfo({ tournament, language, onShare }) {
         <strong>{translateText('Datum', language)}</strong>: {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
       </p>
       <p>
-        <strong>Ort</strong>: {tournament.location}
+        <strong>Ort</strong>: <span data-i18n-skip>{tournament.location}</span>
       </p>
       {!isCalendarEntry && (
         <>
@@ -225,7 +225,7 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError, lan
       {logo}
       {participants.map((participant, index) => (
         <article className="data-row participants-row" key={`${participant.firstName}-${participant.lastName}-${index}`}>
-          <div>
+          <div data-i18n-skip>
             <strong>
               {participant.isVip && <span className="vip-badge" title="VIP">★</span>}
               {participant.firstName} {participant.lastName}
@@ -233,7 +233,7 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError, lan
             <span>{participant.club}</span>
           </div>
           {(participant.partnerFirstName || participant.partnerLastName) && (
-            <div>
+            <div data-i18n-skip>
               <strong>
                 {participant.partnerFirstName} {participant.partnerLastName}
               </strong>
@@ -320,7 +320,7 @@ export function TournamentSchedule({ tournamentId, language }) {
               {ranking.map((entry) => (
                 <tr key={entry.playerId}>
                   <td>{entry.rank}</td>
-                  <td>{playerLabel(entry)}</td>
+                  <td data-i18n-skip>{playerLabel(entry)}</td>
                   <td>{entry.wins}</td>
                   <td>{entry.gameDiff}</td>
                   <td>{entry.pointsFor}:{entry.pointsAgainst}</td>
@@ -423,6 +423,7 @@ export function TournamentDetailPage({
     <main className="app-shell">
       <StandalonePageHeader
         heading={tournament.name}
+        headingNoTranslate
         language={language}
         setLanguage={setLanguage}
         menuOpen={menuOpen}
