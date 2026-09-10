@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { translateText } from '../lib/i18n.js';
 import { SelectField, Button, Feedback } from '../components/ui.jsx';
-import { PAIRING_STRATEGIES } from '../lib/pairing/index.js';
+import { PAIRING_STRATEGIES, checkRoundRequirements } from '../lib/pairing/index.js';
 import { REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
 
 const DESKTOP_APP_URL = 'https://michaelmassee.github.io/Petanque-Turnier-Manager/';
@@ -26,6 +26,18 @@ function OnlineSystemsHint({ language }) {
       </a>
     </p>
   );
+}
+
+// Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
+// Systemwissen: 'minPlayers' trägt die Mindestanzahl als Zahl statt fest im Satz
+// eingebacken zu sein (verschiedene Systeme/Formationen können unterschiedliche
+// Mindestanzahlen haben), 'message' ist ein fertiger, übersetzbarer Freitext für
+// alles, was sich nicht in ein generisches Muster fassen lässt.
+function requirementText(requirement, language) {
+  if (requirement.type === 'minPlayers') {
+    return `${translateText('Es werden mindestens', language)} ${requirement.min} ${translateText('bestätigte Meldungen benötigt.', language)}`;
+  }
+  return translateText(requirement.text, language);
 }
 
 function playerLabel(player) {
@@ -110,6 +122,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
   const [selectedTournamentId, setSelectedTournamentId] = useState(tournaments[0]?.id || '');
   const [rounds, setRounds] = useState([]);
   const [ranking, setRanking] = useState([]);
+  const [confirmedCount, setConfirmedCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -127,15 +140,18 @@ export default function TournamentPlayManagement({ tournaments, language }) {
     if (!tournamentId) {
       setRounds([]);
       setRanking([]);
+      setConfirmedCount(0);
       return;
     }
     try {
-      const [roundsData, rankingData] = await Promise.all([
+      const [roundsData, rankingData, registrationsData] = await Promise.all([
         api(`/api/tournaments/${tournamentId}/rounds`),
         api(`/api/tournaments/${tournamentId}/ranking`),
+        api(`/api/tournaments/${tournamentId}/registrations`),
       ]);
       setRounds(roundsData.rounds);
       setRanking(rankingData.ranking);
+      setConfirmedCount(registrationsData.registrations.filter((registration) => registration.status === 'confirmed').length);
     } catch (err) {
       setError(translateText(err.message, language));
     }
@@ -207,7 +223,24 @@ export default function TournamentPlayManagement({ tournaments, language }) {
 
   const currentRound = rounds[rounds.length - 1] || null;
   const currentRoundOpen = currentRound ? !isRoundComplete(currentRound) : false;
-  const canGenerateRound = selectedTournamentStatus === 'running' && !currentRoundOpen;
+
+  // Voraussetzungen für "Neue Runde starten" proaktiv prüfen, damit der Turniersteller
+  // sofort sieht, was fehlt, statt es erst nach einem Fehlschlag zu erfahren. Die
+  // eigentlichen Regeln (Mindestspielerzahl, gültige Teamaufteilung, ...) stammen aus
+  // checkRoundRequirements() - system-spezifisch je nach PAIRING_STRATEGIES-Eintrag,
+  // hier bleibt der Check bewusst generisch, damit künftige Online-Turniersysteme
+  // keine Anpassung an dieser Stelle brauchen.
+  const strategyRequirementGaps = selectedTournament && selectedTournamentStatus === 'running'
+    ? checkRoundRequirements(selectedTournament, confirmedCount)
+    : [];
+  const missingRequirements = [
+    ...strategyRequirementGaps.map((requirement) => requirementText(requirement, language)),
+    ...(selectedTournamentStatus === 'running' && currentRoundOpen
+      ? [translateText('Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen.', language)]
+      : []),
+  ];
+
+  const canGenerateRound = selectedTournamentStatus === 'running' && !currentRoundOpen && strategyRequirementGaps.length === 0;
   const roundsNewestFirst = [...rounds].reverse();
 
   return (
@@ -232,6 +265,19 @@ export default function TournamentPlayManagement({ tournaments, language }) {
             </Button>
           )}
         </div>
+
+        {selectedTournamentStatus === 'running' && (
+          <div className="round-requirements">
+            <p className="hint">
+              {translateText('Bestätigte Meldungen', language)}: {confirmedCount}
+            </p>
+            {missingRequirements.map((requirement) => (
+              <p className="hint" key={requirement}>
+                {requirement}
+              </p>
+            ))}
+          </div>
+        )}
       </div>
 
       <Feedback message={message} error={error} />

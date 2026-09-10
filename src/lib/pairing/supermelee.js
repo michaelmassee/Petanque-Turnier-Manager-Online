@@ -130,6 +130,28 @@ function countConflicts(matches, teammatePairs, opponentPairs) {
   return conflicts;
 }
 
+export const MIN_PLAYERS = 4;
+
+// Prüft, ob genug bestätigte Meldungen für eine gültige Rundenaufteilung vorliegen,
+// ohne (wie generateRound) tatsächlich eine Runde auszulosen. Gibt eine Liste
+// generischer, UI-seitig renderbarer Anforderungs-Objekte zurück (leer = alle
+// Voraussetzungen erfüllt) - damit proaktiv angezeigt werden kann, was fehlt,
+// statt es erst nach einem Fehlschlag von generateRound zu erfahren.
+//
+// { type: 'minPlayers', min } statt eines fertigen Satzes mit eingebackener Zahl,
+// damit die Mindestanzahl je System/Formation unterschiedlich sein kann, ohne dass
+// UI oder i18n-Wörterbuch etwas Systemspezifisches wissen müssen (siehe
+// lib/pairing/index.js#checkRoundRequirements).
+export function checkRequirements(confirmedCount, { formation } = {}) {
+  if (confirmedCount < MIN_PLAYERS) {
+    return [{ type: 'minPlayers', min: MIN_PLAYERS }];
+  }
+  if (!computeGameSizes(confirmedCount, formation)) {
+    return [{ type: 'message', text: 'Für diese Anzahl bestätigter Meldungen ist keine gültige Rundenaufteilung möglich.' }];
+  }
+  return [];
+}
+
 export function generateRound(players, history, { formation, attempts = 20 } = {}) {
   const playerIds = players.map((player) => player.id ?? player);
   if (playerIds.length < 4) {

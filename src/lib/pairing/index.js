@@ -1,7 +1,7 @@
-import { generateRound as generateSupermeleeRound } from './supermelee.js';
+import { generateRound as generateSupermeleeRound, checkRequirements as checkSupermeleeRequirements } from './supermelee.js';
 
 export const PAIRING_STRATEGIES = {
-  supermelee: { generateRound: generateSupermeleeRound },
+  supermelee: { generateRound: generateSupermeleeRound, checkRequirements: checkSupermeleeRequirements },
 };
 
 // Supermêlée ist über registrationType codiert, alle anderen Systeme über type
@@ -21,4 +21,16 @@ export function isOnlinePlayable(tournament) {
 
 export function getPairingStrategy(tournament) {
   return PAIRING_STRATEGIES[getPlaySystemKey(tournament)] || null;
+}
+
+// Fragt die Mindestvoraussetzungen für eine Runde generisch beim jeweiligen
+// System ab (checkRequirements ist Teil des PAIRING_STRATEGIES-Vertrags, siehe
+// supermelee.js) - UI-Code muss dadurch nicht wissen, welches System aktuell
+// online spielbar ist bzw. welche Regeln dafür gelten.
+export function checkRoundRequirements(tournament, confirmedCount) {
+  const strategy = getPairingStrategy(tournament);
+  if (!strategy?.checkRequirements) {
+    return [];
+  }
+  return strategy.checkRequirements(confirmedCount, { formation: tournament.formation });
 }

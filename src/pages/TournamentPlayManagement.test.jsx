@@ -30,7 +30,9 @@ function jsonResponse(payload) {
   return { ok: true, json: () => Promise.resolve(payload) };
 }
 
-function installFetchMock(calls, { rounds = [ROUND_1], ranking = [] } = {}) {
+const CONFIRMED_REGISTRATIONS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id) => ({ id, status: 'confirmed' }));
+
+function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registrations = CONFIRMED_REGISTRATIONS } = {}) {
   global.fetch = vi.fn((path, options = {}) => {
     calls.push(path);
     if (path === '/api/tournaments/t1/rounds' && (!options.method || options.method === 'GET')) {
@@ -38,6 +40,9 @@ function installFetchMock(calls, { rounds = [ROUND_1], ranking = [] } = {}) {
     }
     if (path === '/api/tournaments/t1/ranking') {
       return Promise.resolve(jsonResponse({ ranking }));
+    }
+    if (path === '/api/tournaments/t1/registrations') {
+      return Promise.resolve(jsonResponse({ registrations }));
     }
     if (path === '/api/tournaments/t1/rounds' && options.method === 'POST') {
       return Promise.resolve(jsonResponse({ rounds: [...rounds, { id: 'r2', roundNumber: 2, matches: [] }] }));
@@ -86,6 +91,17 @@ describe('TournamentPlayManagement', () => {
 
     await screen.findByText('Neue Runde wurde erstellt.');
     expect(calls.filter((path) => path === '/api/tournaments/t1/rounds').length).toBeGreaterThan(1);
+  });
+
+  it('zeigt fehlende Voraussetzungen und deaktiviert den Button bei zu wenigen bestätigten Meldungen', async () => {
+    const calls = [];
+    installFetchMock(calls, { rounds: [], registrations: [{ id: 'p1', status: 'confirmed' }, { id: 'p2', status: 'pending' }] });
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+
+    expect(await screen.findByText('Bestätigte Meldungen: 1')).toBeInTheDocument();
+    expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Neue Runde starten' })).toBeDisabled();
   });
 
   it('speichert ein Ergebnis über die Eingabefelder', async () => {
