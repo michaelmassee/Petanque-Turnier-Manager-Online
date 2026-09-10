@@ -12,6 +12,7 @@ import { LazyFallback } from './components/LazyFallback.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
 import { AppHeader, PostboxControl, PushMigrationNotice, SearchMenuControl, AuthModal, StandalonePageHeader, InstallAppButton, OfflineNotice } from './components/layout.jsx';
 import { AuthShell, LanguageSelect, SetupForm, LoginForm, RegisterForm, RegisterSuccessNotice, ForgotPasswordForm, ResendVerificationForm, ResetPasswordForm, VerifyEmailForm, CancelRegistrationForm } from './auth/AuthForms.jsx';
+import { isOnlinePlayable } from './lib/pairing/index.js';
 
 const ImpressumPage = lazy(() => import('./pages/ImpressumPage.jsx'));
 const DatenschutzPage = lazy(() => import('./pages/DatenschutzPage.jsx'));
@@ -21,6 +22,7 @@ const TournamentManagement = lazy(() => import('./pages/TournamentManagement.jsx
 const RegistrationsManagement = lazy(() => import('./pages/RegistrationsManagement.jsx'));
 const UserManagementPanel = lazy(() => import('./pages/UserManagementPanel.jsx'));
 const ApiKeysPanel = lazy(() => import('./pages/ApiKeysPanel.jsx'));
+const TournamentPlayManagement = lazy(() => import('./pages/TournamentPlayManagement.jsx'));
 
 export { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 export { EditDialog, ListToolbar } from './components/ui.jsx';
@@ -1544,11 +1546,13 @@ export default function App() {
       ? 'Benutzerverwaltung'
       : activeTab === 'apikeys'
         ? 'API-Zugänge'
-        : activeTab === 'registrations'
-          ? 'Anmeldungen'
-          : activeTab === 'tournaments'
-            ? 'Turnierverwaltung'
-            : homeHeading;
+        : activeTab === 'play'
+          ? 'Turnier durchführen'
+          : activeTab === 'registrations'
+            ? 'Anmeldungen'
+            : activeTab === 'tournaments'
+              ? 'Turnierverwaltung'
+              : homeHeading;
 
   return (
     <main className="app-shell">
@@ -1680,6 +1684,19 @@ export default function App() {
         >
           Anmeldungen
         </button>
+        {canManageTournaments && (
+          <button
+            className={`drawer-link ${activeTab === 'play' ? 'active' : ''}`}
+            type="button"
+            onClick={() => {
+              setActiveTab('play');
+              setMenuOpen(false);
+              clearFeedback();
+            }}
+          >
+            Turnier durchführen
+          </button>
+        )}
         <button
           className="drawer-link"
           type="button"
@@ -1929,6 +1946,14 @@ export default function App() {
         <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
           <section className="single-column">
             <ApiKeysPanel isAdmin={isAdmin} language={language} />
+          </section>
+        </Suspense>
+      )}
+
+      {activeTab === 'play' && canManageTournaments && (
+        <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
+          <section className="single-column">
+            <TournamentPlayManagement tournaments={manageableTournaments.filter(isOnlinePlayable)} language={language} />
           </section>
         </Suspense>
       )}

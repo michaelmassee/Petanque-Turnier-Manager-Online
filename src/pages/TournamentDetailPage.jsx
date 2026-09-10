@@ -3,6 +3,7 @@ import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FO
 import { translateText } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
+import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney } from '../lib/format.js';
 import { labelFor, formationLabel, registrationNotYetOpen, formatTournamentStartTime, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { Button, Feedback, RequiredMark } from '../components/ui.jsx';
@@ -249,6 +250,90 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError, lan
   );
 }
 
+function playerLabel(player) {
+  return [player.firstName, player.lastName].filter(Boolean).join(' ') || player.id;
+}
+
+export function TournamentSchedule({ tournamentId, language }) {
+  const [rounds, setRounds] = useState(null);
+  const [ranking, setRanking] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([api(`/api/tournaments/${tournamentId}/rounds`), api(`/api/tournaments/${tournamentId}/ranking`)])
+      .then(([roundsData, rankingData]) => {
+        if (!cancelled) {
+          setRounds(roundsData.rounds);
+          setRanking(rankingData.ranking);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRounds([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId]);
+
+  if (!rounds) {
+    return <p className="muted">{translateText('Wird geladen…', language)}</p>;
+  }
+
+  if (!rounds.length) {
+    return <p className="muted">{translateText('Noch keine Runde gestartet.', language)}</p>;
+  }
+
+  const currentRound = rounds[rounds.length - 1];
+
+  return (
+    <div className="supermelee-schedule">
+      <h3>
+        {translateText('Runde', language)} {currentRound.roundNumber}
+      </h3>
+      {currentRound.matches.map((match) => (
+        <article className="data-row" key={match.id}>
+          <div>
+            <strong>{match.teamA.map(playerLabel).join(' + ')}</strong>
+            <span>{translateText('gegen', language)}</span>
+            <strong>{match.teamB.map(playerLabel).join(' + ')}</strong>
+          </div>
+          <div>{match.noShow ? translateText('Nicht angetreten', language) : match.scoreA != null ? `${match.scoreA}:${match.scoreB}` : translateText('Offen', language)}</div>
+        </article>
+      ))}
+
+      {Boolean(ranking.length) && (
+        <>
+          <h3>{translateText('Rangliste', language)}</h3>
+          <table className="ranking-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{translateText('Spieler', language)}</th>
+                <th>{translateText('Siege', language)}</th>
+                <th>+/-</th>
+                <th>{translateText('Punkte', language)}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ranking.map((entry) => (
+                <tr key={entry.playerId}>
+                  <td>{entry.rank}</td>
+                  <td>{playerLabel(entry)}</td>
+                  <td>{entry.wins}</td>
+                  <td>{entry.gameDiff}</td>
+                  <td>{entry.pointsFor}:{entry.pointsAgainst}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function TournamentDetailPage({
   route,
   tournaments,
@@ -312,6 +397,7 @@ export function TournamentDetailPage({
 
   const canRegister = tournament.status === 'registration' && tournament.visibility === 'public' && tournament.registrationEnabled !== false;
   const canShowParticipants = (tournament.participantsPublic || tournament.canManage) && tournament.registrationEnabled !== false;
+  const canShowSchedule = canShowParticipants && isOnlinePlayable(tournament);
 
   async function handleShare() {
     const shareUrl = window.location.href;
@@ -376,6 +462,15 @@ export function TournamentDetailPage({
               Teilnehmer
             </button>
           )}
+          {canShowSchedule && (
+            <button
+              className={`tournament-detail-tab ${route.view === 'spielplan' ? 'active' : ''}`}
+              type="button"
+              onClick={() => navigate(`/turniere/${tournament.id}/spielplan`)}
+            >
+              {translateText('Spielplan', language)}
+            </button>
+          )}
         </nav>
 
         <div className="tournament-detail-content">
@@ -403,6 +498,8 @@ export function TournamentDetailPage({
               <TournamentParticipants tournamentId={tournament.id} logoUrl={tournament.logoUrl} onMessage={setMessage} onError={setError} language={language} />
             </>
           )}
+
+          {route.view === 'spielplan' && canShowSchedule && <TournamentSchedule tournamentId={tournament.id} language={language} />}
         </div>
       </section>
     </main>

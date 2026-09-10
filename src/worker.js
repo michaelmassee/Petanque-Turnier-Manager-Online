@@ -8,6 +8,8 @@ import {
   normalizeTournamentInput as normalizeCoreTournamentInput,
   registrationOpenStatus as coreRegistrationOpenStatus,
 } from './worker-core.js';
+import { getPairingStrategy, isOnlinePlayable } from './lib/pairing/index.js';
+import { computeRanking } from './lib/pairing/ranking.js';
 
 const ROLES = ['admin', 'user'];
 const DEFAULT_TOURNAMENT_LIMIT = 5;
@@ -981,6 +983,52 @@ export default {
           }
           return await listPublicParticipants(env.DB, tournament.id, session?.user?.email || null);
         }
+      }
+
+      const tournamentRoundsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/rounds$/);
+      if (tournamentRoundsMatch) {
+        const tournament = await getTournamentById(env.DB, tournamentRoundsMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+
+        if (request.method === 'GET') {
+          const session = await optionalSession(request, env.DB);
+          if (!canViewParticipants(tournament, session?.user || null)) {
+            throw new HttpError(403, 'Zugriff verweigert');
+          }
+          return await listTournamentRounds(env.DB, tournament.id);
+        }
+
+        if (request.method === 'POST') {
+          const session = await requireSession(request, env.DB);
+          assertCanManageTournament(tournament, session.user);
+          return await generateTournamentRound(env.DB, tournament);
+        }
+      }
+
+      const tournamentMatchResultMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/matches\/([^/]+)\/result$/);
+      if (tournamentMatchResultMatch && request.method === 'PUT') {
+        const tournament = await getTournamentById(env.DB, tournamentMatchResultMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        const session = await requireSession(request, env.DB);
+        assertCanManageTournament(tournament, session.user);
+        return await setTournamentMatchResult(request, env.DB, tournament, tournamentMatchResultMatch[2]);
+      }
+
+      const tournamentRankingMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/ranking$/);
+      if (tournamentRankingMatch && request.method === 'GET') {
+        const tournament = await getTournamentById(env.DB, tournamentRankingMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        const session = await optionalSession(request, env.DB);
+        if (!canViewParticipants(tournament, session?.user || null)) {
+          throw new HttpError(403, 'Zugriff verweigert');
+        }
+        return await getTournamentRanking(env.DB, tournament);
       }
 
       const registrationCancelMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/cancel$/);
@@ -2942,6 +2990,150 @@ async function listPublicParticipants(db, tournamentId, currentUserEmail) {
         isVip: Boolean(row.is_vip),
       };
     }),
+  });
+}
+
+function toPublicMatch(row, playersById) {
+  const resolvePlayers = (idsJson) =>
+    JSON.parse(idsJson).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' });
+  return {
+    id: row.id,
+    teamA: resolvePlayers(row.team_a_registration_ids),
+    teamB: resolvePlayers(row.team_b_registration_ids),
+    scoreA: row.score_a,
+    scoreB: row.score_b,
+    noShow: row.no_show,
+  };
+}
+
+async function getPlayersById(db, tournamentId) {
+  const result = await db.prepare('SELECT id, first_name, last_name FROM registrations WHERE tournament_id = ?').bind(tournamentId).all();
+  return new Map(result.results.map((row) => [row.id, { id: row.id, firstName: row.first_name, lastName: row.last_name }]));
+}
+
+async function listTournamentRounds(db, tournamentId) {
+  const roundsResult = await db.prepare('SELECT * FROM tournament_rounds WHERE tournament_id = ? ORDER BY round_number ASC').bind(tournamentId).all();
+  const matchesResult = await db.prepare('SELECT * FROM tournament_matches WHERE tournament_id = ? ORDER BY created_at ASC').bind(tournamentId).all();
+  const playersById = await getPlayersById(db, tournamentId);
+
+  const matchesByRound = new Map();
+  for (const row of matchesResult.results) {
+    const list = matchesByRound.get(row.round_id) || [];
+    list.push(toPublicMatch(row, playersById));
+    matchesByRound.set(row.round_id, list);
+  }
+
+  return json({
+    rounds: roundsResult.results.map((round) => ({
+      id: round.id,
+      roundNumber: round.round_number,
+      matches: matchesByRound.get(round.id) || [],
+    })),
+  });
+}
+
+async function generateTournamentRound(db, tournament) {
+  if (!isOnlinePlayable(tournament)) {
+    throw new HttpError(400, 'Für dieses Turniersystem ist keine Online-Durchführung verfügbar');
+  }
+  if (tournament.status !== 'running') {
+    throw new HttpError(400, 'Das Turnier muss den Status "Läuft" haben, um Runden zu generieren');
+  }
+
+  const lastRound = await db
+    .prepare('SELECT * FROM tournament_rounds WHERE tournament_id = ? ORDER BY round_number DESC LIMIT 1')
+    .bind(tournament.id)
+    .first();
+  if (lastRound) {
+    const openMatches = await db
+      .prepare('SELECT COUNT(*) AS count FROM tournament_matches WHERE round_id = ? AND score_a IS NULL AND score_b IS NULL AND no_show IS NULL')
+      .bind(lastRound.id)
+      .first();
+    if (Number(openMatches.count) > 0) {
+      throw new HttpError(400, 'Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen');
+    }
+  }
+
+  const registrationsResult = await db.prepare("SELECT id FROM registrations WHERE tournament_id = ? AND status = 'confirmed'").bind(tournament.id).all();
+  const players = registrationsResult.results.map((row) => ({ id: row.id }));
+
+  const historyResult = await db
+    .prepare('SELECT team_a_registration_ids, team_b_registration_ids FROM tournament_matches WHERE tournament_id = ?')
+    .bind(tournament.id)
+    .all();
+  const history = historyResult.results.map((row) => ({
+    teamA: JSON.parse(row.team_a_registration_ids),
+    teamB: JSON.parse(row.team_b_registration_ids),
+  }));
+
+  const strategy = getPairingStrategy(tournament);
+  const { matches } = strategy.generateRound(players, history, { formation: tournament.formation });
+
+  const roundId = crypto.randomUUID();
+  const roundNumber = (lastRound?.round_number || 0) + 1;
+  const now = new Date().toISOString();
+
+  const statements = [
+    db.prepare('INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES (?, ?, ?, ?)').bind(roundId, tournament.id, roundNumber, now),
+  ];
+  for (const match of matches) {
+    statements.push(
+      db
+        .prepare(
+          'INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        )
+        .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(match.teamA), JSON.stringify(match.teamB), now, now),
+    );
+  }
+  await db.batch(statements);
+
+  return listTournamentRounds(db, tournament.id);
+}
+
+async function setTournamentMatchResult(request, db, tournament, matchId) {
+  const match = await db.prepare('SELECT * FROM tournament_matches WHERE id = ? AND tournament_id = ?').bind(matchId, tournament.id).first();
+  if (!match) {
+    throw new HttpError(404, 'Spiel nicht gefunden');
+  }
+
+  const body = await readJson(request);
+  const now = new Date().toISOString();
+
+  if (body.noShow === 'a' || body.noShow === 'b') {
+    await db.prepare('UPDATE tournament_matches SET no_show = ?, score_a = NULL, score_b = NULL, updated_at = ? WHERE id = ?').bind(body.noShow, now, matchId).run();
+  } else {
+    const scoreA = Number(body.scoreA);
+    const scoreB = Number(body.scoreB);
+    if (!Number.isInteger(scoreA) || !Number.isInteger(scoreB) || scoreA < 0 || scoreB < 0 || scoreA === scoreB) {
+      throw new HttpError(400, 'Ungültiges Ergebnis');
+    }
+    await db.prepare('UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, updated_at = ? WHERE id = ?').bind(scoreA, scoreB, now, matchId).run();
+  }
+
+  return listTournamentRounds(db, tournament.id);
+}
+
+async function getTournamentRanking(db, tournament) {
+  const matchesResult = await db
+    .prepare('SELECT team_a_registration_ids, team_b_registration_ids, score_a, score_b, no_show FROM tournament_matches WHERE tournament_id = ?')
+    .bind(tournament.id)
+    .all();
+  const matches = matchesResult.results.map((row) => ({
+    teamA: JSON.parse(row.team_a_registration_ids),
+    teamB: JSON.parse(row.team_b_registration_ids),
+    scoreA: row.score_a,
+    scoreB: row.score_b,
+    noShow: row.no_show,
+  }));
+  const ranking = computeRanking(matches);
+  const playersById = await getPlayersById(db, tournament.id);
+
+  return json({
+    ranking: ranking.map((entry, index) => ({
+      rank: index + 1,
+      ...entry,
+      ...(playersById.get(entry.playerId) || {}),
+    })),
   });
 }
 

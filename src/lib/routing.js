@@ -31,7 +31,7 @@ export function matchTournamentRoute(path) {
 
   const id = decodeURIComponent(segments[1]);
   const sub = segments[2] || 'info';
-  if (!['info', 'anmelden', 'teilnehmer'].includes(sub)) {
+  if (!['info', 'anmelden', 'teilnehmer', 'spielplan'].includes(sub)) {
     return null;
   }
 
