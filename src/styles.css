@@ -1701,6 +1701,33 @@ textarea:focus {
   margin: 0;
 }
 
+.round-requirements {
+  display: grid;
+  gap: 4px;
+}
+
+.round-requirements .hint {
+  margin: 0;
+}
+
+.round-participants {
+  display: grid;
+  gap: 8px;
+}
+
+.round-participant-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #e5e9f0;
+}
+
+.round-participant-row:last-child {
+  border-bottom: none;
+}
+
 .supermelee-rounds {
   display: grid;
   gap: 12px;

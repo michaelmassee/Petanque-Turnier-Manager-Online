@@ -1145,6 +1145,18 @@ export default {
         }
       }
 
+      const registrationActiveMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/active$/);
+      if (registrationActiveMatch && request.method === 'PUT') {
+        const auth = await requireManagerAuth(request, env.DB);
+        const registration = await getRegistrationWithTournament(env.DB, registrationActiveMatch[1]);
+        if (!registration) {
+          throw new HttpError(404, 'Anmeldung nicht gefunden');
+        }
+        assertCanManageTournament(registration, auth.user);
+        const body = await readJson(request);
+        return await setRegistrationActive(env.DB, registration, Boolean(body.active));
+      }
+
       const syncRegistrationsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registrations$/);
       if (syncRegistrationsMatch && request.method === 'GET') {
         const auth = await requireApiKey(request, env.DB);
@@ -3090,7 +3102,7 @@ async function generateTournamentRound(db, tournament) {
     }
   }
 
-  const registrationsResult = await db.prepare("SELECT id FROM registrations WHERE tournament_id = ? AND status = 'confirmed'").bind(tournament.id).all();
+  const registrationsResult = await db.prepare("SELECT id FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1").bind(tournament.id).all();
   const players = registrationsResult.results.map((row) => ({ id: row.id }));
 
   const historyResult = await db
@@ -3401,6 +3413,20 @@ async function updateRegistration(request, env, existing) {
       }
     }
   }
+  return json({ registration: toPublicRegistration(updated) });
+}
+
+/**
+ * Aktiv/Inaktiv-Status während der Turnierdurchführung (siehe migrations/0046):
+ * ersetzt den match-bezogenen "nicht angetreten"-Button. Wer inaktiv gesetzt wird,
+ * geht bei der nächsten Rundenauslosung nicht mehr in den Spielerpool ein
+ * (generateTournamentRound filtert auf active = 1) - analog zum Hauptprojekt, wo nur
+ * Meldungen mit Spieltag-Status "JA" in die Paarungsbildung einfließen.
+ */
+async function setRegistrationActive(db, existing, active) {
+  const now = new Date().toISOString();
+  await db.prepare('UPDATE registrations SET active = ?, updated_at = ? WHERE id = ?').bind(active ? 1 : 0, now, existing.id).run();
+  const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
   return json({ registration: toPublicRegistration(updated) });
 }
 
@@ -4744,6 +4770,7 @@ function toPublicRegistration(row) {
     seedingPosition: row.seeding_position,
     status: row.status,
     isVip: Boolean(row.is_vip),
+    active: Boolean(Number(row.active ?? 1)),
     registeredAt: row.registered_at,
     confirmedAt: row.confirmed_at,
     createdAt: row.created_at,

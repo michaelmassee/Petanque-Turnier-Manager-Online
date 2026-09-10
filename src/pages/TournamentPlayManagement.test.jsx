@@ -30,7 +30,14 @@ function jsonResponse(payload) {
   return { ok: true, json: () => Promise.resolve(payload) };
 }
 
-const CONFIRMED_REGISTRATIONS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id) => ({ id, status: 'confirmed' }));
+const CONFIRMED_REGISTRATIONS = [
+  { id: 'p1', firstName: 'Anna', lastName: 'Muster' },
+  { id: 'p2', firstName: 'Bert', lastName: 'Beispiel' },
+  { id: 'p3', firstName: 'Clara', lastName: 'Test' },
+  { id: 'p4', firstName: 'Dirk', lastName: 'Demo' },
+  { id: 'p5', firstName: 'Eva', lastName: 'Muster' },
+  { id: 'p6', firstName: 'Finn', lastName: 'Test' },
+].map((registration) => ({ ...registration, status: 'confirmed', active: true }));
 
 function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registrations = CONFIRMED_REGISTRATIONS } = {}) {
   global.fetch = vi.fn((path, options = {}) => {
@@ -50,6 +57,9 @@ function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registratio
     if (path === '/api/tournaments/t1/matches/m1/result' && options.method === 'PUT') {
       const updated = { ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 7 }] };
       return Promise.resolve(jsonResponse({ rounds: [updated] }));
+    }
+    if (/^\/api\/registrations\/.+\/active$/.test(path) && options.method === 'PUT') {
+      return Promise.resolve(jsonResponse({ registration: {} }));
     }
     return Promise.resolve(jsonResponse({}));
   });
@@ -95,13 +105,41 @@ describe('TournamentPlayManagement', () => {
 
   it('zeigt fehlende Voraussetzungen und deaktiviert den Button bei zu wenigen bestätigten Meldungen', async () => {
     const calls = [];
-    installFetchMock(calls, { rounds: [], registrations: [{ id: 'p1', status: 'confirmed' }, { id: 'p2', status: 'pending' }] });
+    installFetchMock(calls, {
+      rounds: [],
+      registrations: [
+        { id: 'p1', status: 'confirmed', active: true },
+        { id: 'p2', status: 'pending', active: true },
+      ],
+    });
 
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
 
-    expect(await screen.findByText('Bestätigte Meldungen: 1')).toBeInTheDocument();
+    expect(await screen.findByText('Bestätigte Meldungen: 1 (1 aktiv)')).toBeInTheDocument();
     expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Neue Runde starten' })).toBeDisabled();
+  });
+
+  it('schließt inaktive Teilnehmer von der Mindestanzahl-Prüfung aus und erlaubt das Reaktivieren', async () => {
+    const calls = [];
+    const registrations = [
+      { id: 'p1', firstName: 'Anna', lastName: 'Muster', status: 'confirmed', active: true },
+      { id: 'p2', firstName: 'Bert', lastName: 'Beispiel', status: 'confirmed', active: true },
+      { id: 'p3', firstName: 'Clara', lastName: 'Test', status: 'confirmed', active: true },
+      { id: 'p4', firstName: 'Dirk', lastName: 'Demo', status: 'confirmed', active: false },
+    ];
+    installFetchMock(calls, { rounds: [], registrations });
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+
+    expect(await screen.findByText('Bestätigte Meldungen: 4 (3 aktiv)')).toBeInTheDocument();
+    expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Auf aktiv setzen' }));
+
+    await waitFor(() => expect(calls).toContain('/api/registrations/p4/active'));
+    expect(await screen.findByText('Bestätigte Meldungen: 4 (4 aktiv)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Neue Runde starten' })).not.toBeDisabled();
   });
 
   it('speichert ein Ergebnis über die Eingabefelder', async () => {

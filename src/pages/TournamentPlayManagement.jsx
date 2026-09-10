@@ -113,7 +113,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
   const [selectedTournamentId, setSelectedTournamentId] = useState(tournaments[0]?.id || '');
   const [rounds, setRounds] = useState([]);
   const [ranking, setRanking] = useState([]);
-  const [confirmedCount, setConfirmedCount] = useState(0);
+  const [confirmedRegistrations, setConfirmedRegistrations] = useState([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -131,7 +131,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
     if (!tournamentId) {
       setRounds([]);
       setRanking([]);
-      setConfirmedCount(0);
+      setConfirmedRegistrations([]);
       return;
     }
     try {
@@ -142,7 +142,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
       ]);
       setRounds(roundsData.rounds);
       setRanking(rankingData.ranking);
-      setConfirmedCount(registrationsData.registrations.filter((registration) => registration.status === 'confirmed').length);
+      setConfirmedRegistrations(registrationsData.registrations.filter((registration) => registration.status === 'confirmed'));
     } catch (err) {
       setError(translateText(err.message, language));
     }
@@ -163,6 +163,24 @@ export default function TournamentPlayManagement({ tournaments, language }) {
       await api(`/api/tournaments/${selectedTournamentId}/start`, { method: 'POST' });
       setStartedTournamentIds((current) => new Set(current).add(selectedTournamentId));
       setMessage(translateText('Turnier wurde gestartet.', language));
+    } catch (err) {
+      setError(translateText(err.message, language));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleToggleActive(registrationId, nextActive) {
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/api/registrations/${registrationId}/active`, {
+        method: 'PUT',
+        body: JSON.stringify({ active: nextActive }),
+      });
+      setConfirmedRegistrations((current) =>
+        current.map((registration) => (registration.id === registrationId ? { ...registration, active: nextActive } : registration)),
+      );
     } catch (err) {
       setError(translateText(err.message, language));
     } finally {
@@ -214,15 +232,17 @@ export default function TournamentPlayManagement({ tournaments, language }) {
 
   const currentRound = rounds[rounds.length - 1] || null;
   const currentRoundOpen = currentRound ? !isRoundComplete(currentRound) : false;
+  const activeConfirmedCount = confirmedRegistrations.filter((registration) => registration.active).length;
 
   // Voraussetzungen für "Neue Runde starten" proaktiv prüfen, damit der Turniersteller
   // sofort sieht, was fehlt, statt es erst nach einem Fehlschlag zu erfahren. Die
   // eigentlichen Regeln (Mindestspielerzahl, gültige Teamaufteilung, ...) stammen aus
   // checkRoundRequirements() - system-spezifisch je nach PAIRING_STRATEGIES-Eintrag,
   // hier bleibt der Check bewusst generisch, damit künftige Online-Turniersysteme
-  // keine Anpassung an dieser Stelle brauchen.
+  // keine Anpassung an dieser Stelle brauchen. Nur aktive Meldungen zählen, analog zum
+  // Hauptprojekt (nur Meldungen mit Spieltag-Status "JA" gehen in die Rundenauslosung ein).
   const strategyRequirementGaps = selectedTournament && selectedTournamentStatus === 'running'
-    ? checkRoundRequirements(selectedTournament, confirmedCount)
+    ? checkRoundRequirements(selectedTournament, activeConfirmedCount)
     : [];
   const missingRequirements = [
     ...strategyRequirementGaps.map((requirement) => requirementText(requirement, language)),
@@ -260,12 +280,36 @@ export default function TournamentPlayManagement({ tournaments, language }) {
         {selectedTournamentStatus === 'running' && (
           <div className="round-requirements">
             <p className="hint">
-              {translateText('Bestätigte Meldungen', language)}: {confirmedCount}
+              {translateText('Bestätigte Meldungen', language)}: {confirmedRegistrations.length} ({activeConfirmedCount}{' '}
+              {translateText('aktiv', language)})
             </p>
             {missingRequirements.map((requirement) => (
               <p className="hint" key={requirement}>
                 {requirement}
               </p>
+            ))}
+          </div>
+        )}
+
+        {selectedTournamentStatus === 'running' && confirmedRegistrations.length > 0 && (
+          <div className="round-participants">
+            <h3>{translateText('Teilnehmer', language)}</h3>
+            <p className="hint">
+              {translateText('Inaktive Teilnehmer werden bei der nächsten Runde nicht mehr eingeteilt.', language)}
+            </p>
+            {confirmedRegistrations.map((registration) => (
+              <div className="round-participant-row" key={registration.id}>
+                <span className={registration.active ? '' : 'muted'}>{playerLabel(registration)}</span>
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => handleToggleActive(registration.id, !registration.active)}
+                >
+                  {registration.active
+                    ? translateText('Auf inaktiv setzen', language)
+                    : translateText('Auf aktiv setzen', language)}
+                </Button>
+              </div>
             ))}
           </div>
         )}
