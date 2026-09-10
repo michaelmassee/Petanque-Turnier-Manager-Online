@@ -11,10 +11,19 @@ function teamLabel(team) {
   return team.map(playerLabel).join(' + ');
 }
 
+function sanitizeScore(value) {
+  const digitsOnly = value.replace(/\D/g, '').slice(0, 2);
+  if (digitsOnly === '') {
+    return '';
+  }
+  return String(Math.min(Number(digitsOnly), 13));
+}
+
 function MatchRow({ match, onSave, busy, language }) {
   const [scoreA, setScoreA] = useState(match.scoreA ?? '');
   const [scoreB, setScoreB] = useState(match.scoreB ?? '');
   const decided = match.scoreA != null || match.scoreB != null || match.noShow;
+  const isDraw = scoreA !== '' && scoreB !== '' && scoreA === scoreB;
 
   return (
     <article className="data-row supermelee-match-row">
@@ -25,23 +34,30 @@ function MatchRow({ match, onSave, busy, language }) {
       </div>
       <div className="supermelee-match-result">
         <input
-          type="number"
-          min="0"
+          className="score-input"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]{0,2}"
+          maxLength={2}
           value={scoreA}
-          onChange={(event) => setScoreA(event.target.value)}
+          onChange={(event) => setScoreA(sanitizeScore(event.target.value))}
           aria-label={translateText('Punkte Team A', language)}
         />
         <span>:</span>
         <input
-          type="number"
-          min="0"
+          className="score-input"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]{0,2}"
+          maxLength={2}
           value={scoreB}
-          onChange={(event) => setScoreB(event.target.value)}
+          onChange={(event) => setScoreB(sanitizeScore(event.target.value))}
           aria-label={translateText('Punkte Team B', language)}
         />
+        {isDraw && <span className="feedback error">{translateText('Unentschieden ist nicht möglich', language)}</span>}
         <Button
           variant="secondary"
-          disabled={busy || scoreA === '' || scoreB === ''}
+          disabled={busy || scoreA === '' || scoreB === '' || isDraw}
           onClick={() => onSave(match.id, { scoreA: Number(scoreA), scoreB: Number(scoreB) })}
         >
           {decided ? translateText('Ergebnis ändern', language) : translateText('Ergebnis speichern', language)}

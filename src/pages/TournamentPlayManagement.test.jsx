@@ -101,4 +101,30 @@ describe('TournamentPlayManagement', () => {
 
     await waitFor(() => expect(calls).toContain('/api/tournaments/t1/matches/m1/result'));
   });
+
+  it('erlaubt in den Ergebnisfeldern nur Ziffern, begrenzt auf maximal 13', async () => {
+    const calls = [];
+    installFetchMock(calls);
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    await screen.findByText('Anna Muster + Bert Beispiel + Clara Test');
+
+    const inputA = screen.getByLabelText('Punkte Team A');
+    fireEvent.change(inputA, { target: { value: 'ab99' } });
+    expect(inputA.value).toBe('13');
+  });
+
+  it('verhindert das Speichern eines Unentschiedens', async () => {
+    const calls = [];
+    installFetchMock(calls);
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    await screen.findByText('Anna Muster + Bert Beispiel + Clara Test');
+
+    fireEvent.change(screen.getByLabelText('Punkte Team A'), { target: { value: '7' } });
+    fireEvent.change(screen.getByLabelText('Punkte Team B'), { target: { value: '7' } });
+
+    expect(screen.getByText('Unentschieden ist nicht möglich')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ergebnis speichern' })).toBeDisabled();
+  });
 });

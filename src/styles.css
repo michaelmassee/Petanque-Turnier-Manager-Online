@@ -1652,3 +1652,16 @@ textarea:focus {
     font-size: 1.8rem;
   }
 }
+
+.supermelee-match-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.score-input {
+  width: 3em;
+  text-align: center;
+  padding: 6px 4px;
+}
