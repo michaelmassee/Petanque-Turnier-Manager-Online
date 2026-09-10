@@ -3103,7 +3103,16 @@ async function generateTournamentRound(db, tournament) {
   }));
 
   const strategy = getPairingStrategy(tournament);
-  const { matches } = strategy.generateRound(players, history, { formation: tournament.formation });
+  let matches;
+  try {
+    ({ matches } = strategy.generateRound(players, history, { formation: tournament.formation }));
+  } catch (error) {
+    // generateRound prüft die Mindestvoraussetzungen (u.a. mind. 4 bestätigte
+    // Meldungen, siehe lib/pairing/supermelee.js) und wirft dafür ein einfaches
+    // Error - ohne diese Umwandlung landet das als 500 "Internal server error"
+    // statt als verständliche Meldung beim Turniersteller.
+    throw new HttpError(400, error.message);
+  }
 
   const roundId = crypto.randomUUID();
   const roundNumber = (lastRound?.round_number || 0) + 1;
