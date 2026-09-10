@@ -30,7 +30,19 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
         <TextField label="Vorname" value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />
         <TextField label="Nachname" value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} invalid={invalidField === 'firstName'} />
       </div>
-      <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+      {showStatus && (
+        <label className="checkbox-field">
+          <input
+            type="checkbox"
+            checked={Boolean(form.noEmail)}
+            onChange={(event) => setForm({ ...form, noEmail: event.target.checked })}
+          />
+          Keine E-Mail-Adresse vorhanden
+        </label>
+      )}
+      {!(showStatus && form.noEmail) && (
+        <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+      )}
       <div className="form-grid">
         <TextField label="Verein" value={form.club} onChange={(club) => setForm({ ...form, club })} />
         {licenseRequired && (

@@ -130,6 +130,7 @@ export function registrationPayload(form, language) {
     firstName: form.firstName,
     lastName: form.lastName,
     email: form.email,
+    noEmail: Boolean(form.noEmail),
     club: form.club || null,
     licenseNr: form.licenseNr || null,
     partnerFirstName: form.partnerFirstName || null,

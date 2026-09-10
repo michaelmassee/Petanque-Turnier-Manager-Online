@@ -127,7 +127,7 @@ export function RegistrationsPanel({
             {registration.isVip && <span className="vip-badge" title="VIP">★</span>}
             {registration.firstName} {registration.lastName}
           </strong>
-          <span>{registration.email}</span>
+          <span>{registration.noEmail ? translateText('ohne E-Mail-Adresse', language) : registration.email}</span>
           {registration.teamName && <small>{registration.teamName}</small>}
         </div>
         <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>

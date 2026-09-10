@@ -169,6 +169,7 @@ export const EMPTY_REGISTRATION_FORM = {
   firstName: '',
   lastName: '',
   email: '',
+  noEmail: false,
   club: '',
   licenseNr: '',
   partnerFirstName: '',

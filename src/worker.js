@@ -11,6 +11,7 @@ import {
 } from './worker-core.js';
 import { getPairingStrategy, isOnlinePlayable } from './lib/pairing/index.js';
 import { computeRanking } from './lib/pairing/ranking.js';
+import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
 
 const ROLES = ['admin', 'user'];
 const DEFAULT_TOURNAMENT_LIMIT = 5;
@@ -543,7 +544,7 @@ function buildTeamRecipients(registration) {
   const seen = new Set();
   const recipients = [];
   for (const entry of entries) {
-    if (!entry.email) continue;
+    if (!entry.email || isPlaceholderEmail(entry.email)) continue;
     const key = entry.email.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -1045,7 +1046,7 @@ export default {
         }
         const result = await cancelRegistration(env.DB, registration.id);
         try {
-          await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name }, registration, APP_ORIGIN);
+          await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, created_by: registration.created_by }, registration, APP_ORIGIN);
         } catch (error) {
           console.error(`Failed to send cancellation email for registration ${registration.id}`, error);
         }
@@ -1123,7 +1124,7 @@ export default {
         if (request.method === 'DELETE') {
           if (registration.status !== 'cancelled') {
             try {
-              await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name }, registration, APP_ORIGIN);
+              await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, created_by: registration.created_by }, registration, APP_ORIGIN);
             } catch (error) {
               console.error(`Failed to send deletion notice email for registration ${registration.id}`, error);
             }
@@ -3166,7 +3167,7 @@ async function cancelRegistrationByToken(request, env) {
 
   const result = await cancelRegistration(env.DB, registration.id);
   try {
-    await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name }, registration, APP_ORIGIN);
+    await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, created_by: registration.created_by }, registration, APP_ORIGIN);
   } catch (error) {
     console.error(`Failed to send cancellation email for registration ${registration.id}`, error);
   }
@@ -3211,8 +3212,13 @@ async function createRegistration(request, env, tournament) {
   if (nullableText(body.website)) {
     return json({ ok: true }, 201);
   }
-  if (body.publicationNoticeAccepted !== true) {
+  const session = await optionalSession(request, env.DB);
+  const isManager = canManageTournament(tournament, session?.user || null);
+  if (!isManager && body.publicationNoticeAccepted !== true) {
     throw new HttpError(400, 'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden');
+  }
+  if (isManager && body.noEmail === true) {
+    body.email = createPlaceholderEmail();
   }
 
   const registration = normalizeRegistrationInput(body, { requireStatus: false });
@@ -3292,6 +3298,9 @@ async function createRegistration(request, env, tournament) {
 async function updateRegistration(request, env, existing) {
   const db = env.DB;
   const body = await readJson(request);
+  if (body.noEmail === true) {
+    body.email = isPlaceholderEmail(existing.email) ? existing.email : createPlaceholderEmail();
+  }
   const registration = normalizeRegistrationInput(body, { requireStatus: true });
   assertCorePartnerCountMatchesFormation(existing, registration);
   assertLicenseMatchesTournament(existing, registration);
@@ -3890,7 +3899,7 @@ async function getRegistrationWithTournament(db, id) {
 async function getRegistrationByCancelToken(db, token) {
   return db
     .prepare(
-      `SELECT registrations.*, tournaments.name, tournaments.date, tournaments.start_time, tournaments.location
+      `SELECT registrations.*, tournaments.created_by, tournaments.name, tournaments.date, tournaments.start_time, tournaments.location
        FROM registrations
        JOIN tournaments ON tournaments.id = registrations.tournament_id
        WHERE registrations.cancel_token = ?`,
@@ -4670,12 +4679,14 @@ function toPublicTournament(row, user) {
 }
 
 function toPublicRegistration(row) {
+  const noEmail = isPlaceholderEmail(row.email);
   return {
     id: row.id,
     tournamentId: row.tournament_id,
     firstName: row.first_name,
     lastName: row.last_name,
-    email: row.email,
+    email: noEmail ? '' : row.email,
+    noEmail,
     club: row.club,
     licenseNr: row.license_nr,
     partnerFirstName: row.partner_first_name,

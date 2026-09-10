@@ -1059,6 +1059,7 @@ export default function App() {
       firstName: registration.firstName || '',
       lastName: registration.lastName || '',
       email: registration.email || '',
+      noEmail: Boolean(registration.noEmail),
       club: registration.club || '',
       licenseNr: registration.licenseNr || '',
       partnerFirstName: registration.partnerFirstName || '',
