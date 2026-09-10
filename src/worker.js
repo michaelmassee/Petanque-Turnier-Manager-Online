@@ -820,6 +820,11 @@ export default {
         return await markPostboxMessageRead(env.DB, postboxReadMatch[1], session.user.id);
       }
 
+      if (request.method === 'POST' && url.pathname === '/api/postbox/read-all') {
+        const session = await requireSession(request, env.DB);
+        return await markAllPostboxMessagesRead(env.DB, session.user.id);
+      }
+
       if (request.method === 'GET' && url.pathname === '/api/push/public-key') {
         await requireSession(request, env.DB);
         if (!env.VAPID_PUBLIC_KEY) throw new HttpError(503, 'Push-Benachrichtigungen sind nicht konfiguriert');
@@ -1838,6 +1843,17 @@ async function markPostboxMessageRead(db, id, userId) {
      )`,
   ).bind(now, id, userId, userId).run();
   if (!result.meta.changes) throw new HttpError(404, 'Nachricht nicht gefunden');
+  return json({ ok: true });
+}
+
+async function markAllPostboxMessagesRead(db, userId) {
+  const now = new Date().toISOString();
+  await db.prepare(
+    `UPDATE postbox_messages SET read_at = COALESCE(read_at, ?) WHERE read_at IS NULL AND (
+       recipient_id = ?
+       OR (broadcast_tournament_id IS NOT NULL AND broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
+     )`,
+  ).bind(now, userId, userId).run();
   return json({ ok: true });
 }
 

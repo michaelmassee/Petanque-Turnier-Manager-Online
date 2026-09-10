@@ -451,6 +451,20 @@ export default function App() {
     }
   }
 
+  async function handleOpenPostbox() {
+    setMenuOpen(false);
+    setSearchMenuOpen(false);
+    setPostboxOpen((open) => {
+      const willOpen = !open;
+      if (willOpen && postbox.unreadCount > 0) {
+        api('/api/postbox/read-all', { method: 'POST' })
+          .then(loadPostbox)
+          .catch((requestError) => setError(translateText(requestError.message, language)));
+      }
+      return willOpen;
+    });
+  }
+
   async function handleReadPostboxMessage(message) {
     if (message.kind === 'direct' && !message.mine && message.senderId) {
       setPostboxRecipientId(message.senderId);
@@ -1608,11 +1622,7 @@ export default function App() {
             setRecipientId={setPostboxRecipientId}
             body={postboxBody}
             setBody={setPostboxBody}
-            onToggle={() => {
-              setMenuOpen(false);
-              setSearchMenuOpen(false);
-              setPostboxOpen((open) => !open);
-            }}
+            onToggle={handleOpenPostbox}
             onClose={() => setPostboxOpen(false)}
             onRead={handleReadPostboxMessage}
             onSubmit={handleSendPostboxMessage}
