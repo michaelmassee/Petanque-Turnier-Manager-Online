@@ -3256,11 +3256,6 @@ const REGISTRATION_CLOSED_MESSAGES = {
 async function createRegistration(request, env, tournament) {
   const db = env.DB;
 
-  const openStatus = coreRegistrationOpenStatus(tournament);
-  if (openStatus !== 'open') {
-    throw new HttpError(403, REGISTRATION_CLOSED_MESSAGES[openStatus]);
-  }
-
   const body = await readJson(request);
   // Do not create registrations or trigger notifications when automated submissions
   // populate the hidden website field.
@@ -3269,6 +3264,16 @@ async function createRegistration(request, env, tournament) {
   }
   const session = await optionalSession(request, env.DB);
   const isManager = canManageTournament(tournament, session?.user || null);
+  // Der reguläre Anmeldezeitraum (Status/Sichtbarkeit/Fristen) gilt nur für die
+  // öffentliche Selbstanmeldung. Der Turniersteller erfasst hier bewusst manuell
+  // Meldungen - auch bei laufendem Turnier (z.B. neu hinzugekommene Spieler
+  // zwischen zwei Runden), daher gilt für ihn keine dieser automatischen Sperren.
+  if (!isManager) {
+    const openStatus = coreRegistrationOpenStatus(tournament);
+    if (openStatus !== 'open') {
+      throw new HttpError(403, REGISTRATION_CLOSED_MESSAGES[openStatus]);
+    }
+  }
   if (!isManager && body.publicationNoticeAccepted !== true) {
     throw new HttpError(400, 'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden');
   }
