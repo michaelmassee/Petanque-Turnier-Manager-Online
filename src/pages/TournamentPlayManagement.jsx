@@ -19,6 +19,10 @@ function sanitizeScore(value) {
   return String(Math.min(Number(digitsOnly), 13));
 }
 
+function isRoundComplete(round) {
+  return round.matches.every((match) => match.scoreA != null || match.scoreB != null || match.noShow);
+}
+
 function MatchRow({ match, onSave, busy, language }) {
   const [scoreA, setScoreA] = useState(match.scoreA ?? '');
   const [scoreB, setScoreB] = useState(match.scoreB ?? '');
@@ -26,13 +30,14 @@ function MatchRow({ match, onSave, busy, language }) {
   const isDraw = scoreA !== '' && scoreB !== '' && scoreA === scoreB;
 
   return (
-    <article className="data-row supermelee-match-row">
-      <div>
-        <strong>{teamLabel(match.teamA)}</strong>
-        <span>{translateText('gegen', language)}</span>
-        <strong>{teamLabel(match.teamB)}</strong>
+    <article className="supermelee-match">
+      <div className="supermelee-match-teams">
+        <div className="supermelee-team">{teamLabel(match.teamA)}</div>
+        <div className="supermelee-vs">{translateText('gegen', language)}</div>
+        <div className="supermelee-team is-second">{teamLabel(match.teamB)}</div>
       </div>
-      <div className="supermelee-match-result">
+
+      <div className="supermelee-result-row">
         <input
           className="score-input"
           type="text"
@@ -43,7 +48,7 @@ function MatchRow({ match, onSave, busy, language }) {
           onChange={(event) => setScoreA(sanitizeScore(event.target.value))}
           aria-label={translateText('Punkte Team A', language)}
         />
-        <span>:</span>
+        <span className="supermelee-score-sep">:</span>
         <input
           className="score-input"
           type="text"
@@ -54,20 +59,23 @@ function MatchRow({ match, onSave, busy, language }) {
           onChange={(event) => setScoreB(sanitizeScore(event.target.value))}
           aria-label={translateText('Punkte Team B', language)}
         />
-        {isDraw && <span className="feedback error">{translateText('Unentschieden ist nicht möglich', language)}</span>}
         <Button
-          variant="secondary"
           disabled={busy || scoreA === '' || scoreB === '' || isDraw}
           onClick={() => onSave(match.id, { scoreA: Number(scoreA), scoreB: Number(scoreB) })}
         >
           {decided ? translateText('Ergebnis ändern', language) : translateText('Ergebnis speichern', language)}
         </Button>
-        <Button variant="secondary" disabled={busy} onClick={() => onSave(match.id, { noShow: 'a' })}>
+      </div>
+
+      {isDraw && <p className="feedback error">{translateText('Unentschieden ist nicht möglich', language)}</p>}
+
+      <div className="supermelee-noshow-row">
+        <button className="link-button" type="button" disabled={busy} onClick={() => onSave(match.id, { noShow: 'a' })}>
           {translateText('Team A nicht angetreten', language)}
-        </Button>
-        <Button variant="secondary" disabled={busy} onClick={() => onSave(match.id, { noShow: 'b' })}>
+        </button>
+        <button className="link-button" type="button" disabled={busy} onClick={() => onSave(match.id, { noShow: 'b' })}>
           {translateText('Team B nicht angetreten', language)}
-        </Button>
+        </button>
       </div>
     </article>
   );
@@ -151,64 +159,84 @@ export default function TournamentPlayManagement({ tournaments, language }) {
   }
 
   const currentRound = rounds[rounds.length - 1] || null;
-  const currentRoundOpen = currentRound ? currentRound.matches.some((match) => match.scoreA == null && match.scoreB == null && !match.noShow) : false;
+  const currentRoundOpen = currentRound ? !isRoundComplete(currentRound) : false;
   const canGenerateRound = selectedTournament?.status === 'running' && !currentRoundOpen;
+  const roundsNewestFirst = [...rounds].reverse();
 
   return (
-    <div className="panel">
-      <SelectField
-        label="Turnier"
-        value={selectedTournamentId}
-        onChange={setSelectedTournamentId}
-        options={tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }))}
-      />
+    <div className="supermelee-manage">
+      <div className="panel supermelee-toolbar">
+        <SelectField
+          label="Turnier"
+          value={selectedTournamentId}
+          onChange={setSelectedTournamentId}
+          options={tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }))}
+        />
+
+        <div className="supermelee-toolbar-actions">
+          <Button disabled={busy || !selectedTournamentId || !canGenerateRound} onClick={handleNewRound}>
+            {translateText('Neue Runde starten', language)}
+          </Button>
+          {selectedTournament && selectedTournament.status !== 'running' && (
+            <p className="hint">{translateText('Setze den Turnierstatus auf "Läuft", um Runden zu starten.', language)}</p>
+          )}
+        </div>
+      </div>
 
       <Feedback message={message} error={error} />
 
-      {selectedTournament && selectedTournament.status !== 'running' && (
-        <p className="hint">{translateText('Setze den Turnierstatus auf "Läuft", um Runden zu starten.', language)}</p>
+      {Boolean(roundsNewestFirst.length) && (
+        <div className="supermelee-rounds">
+          {roundsNewestFirst.map((round, index) => {
+            const complete = isRoundComplete(round);
+            return (
+              <details key={round.id} className="panel supermelee-round" open={index === 0}>
+                <summary className="supermelee-round-summary">
+                  <span>
+                    {translateText('Runde', language)} {round.roundNumber}
+                  </span>
+                  <span className={`status ${complete ? 'registration-confirmed' : 'status-running'}`}>
+                    {complete ? translateText('Abgeschlossen', language) : translateText('Offen', language)}
+                  </span>
+                </summary>
+                <div className="supermelee-match-list">
+                  {round.matches.map((match) => (
+                    <MatchRow key={match.id} match={match} onSave={handleSaveResult} busy={busy} language={language} />
+                  ))}
+                </div>
+              </details>
+            );
+          })}
+        </div>
       )}
 
-      <Button disabled={busy || !selectedTournamentId || !canGenerateRound} onClick={handleNewRound}>
-        {translateText('Neue Runde starten', language)}
-      </Button>
-
-      {rounds.map((round) => (
-        <section key={round.id}>
-          <h3>
-            {translateText('Runde', language)} {round.roundNumber}
-          </h3>
-          {round.matches.map((match) => (
-            <MatchRow key={match.id} match={match} onSave={handleSaveResult} busy={busy} language={language} />
-          ))}
-        </section>
-      ))}
-
       {Boolean(ranking.length) && (
-        <section>
+        <section className="panel">
           <h3>{translateText('Rangliste', language)}</h3>
-          <table className="ranking-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>{translateText('Spieler', language)}</th>
-                <th>{translateText('Siege', language)}</th>
-                <th>+/-</th>
-                <th>{translateText('Punkte', language)}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ranking.map((entry) => (
-                <tr key={entry.playerId}>
-                  <td>{entry.rank}</td>
-                  <td>{playerLabel(entry)}</td>
-                  <td>{entry.wins}</td>
-                  <td>{entry.gameDiff}</td>
-                  <td>{entry.pointsFor}:{entry.pointsAgainst}</td>
+          <div className="table-scroll">
+            <table className="ranking-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>{translateText('Spieler', language)}</th>
+                  <th>{translateText('Siege', language)}</th>
+                  <th>+/-</th>
+                  <th>{translateText('Punkte', language)}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {ranking.map((entry) => (
+                  <tr key={entry.playerId}>
+                    <td>{entry.rank}</td>
+                    <td>{playerLabel(entry)}</td>
+                    <td>{entry.wins}</td>
+                    <td>{entry.gameDiff}</td>
+                    <td>{entry.pointsFor}:{entry.pointsAgainst}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </div>

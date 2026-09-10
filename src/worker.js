@@ -7,6 +7,7 @@ import {
   assertPartnerCountMatchesFormation as assertCorePartnerCountMatchesFormation,
   normalizeTournamentInput as normalizeCoreTournamentInput,
   registrationOpenStatus as coreRegistrationOpenStatus,
+  validateMatchScore,
 } from './worker-core.js';
 import { getPairingStrategy, isOnlinePlayable } from './lib/pairing/index.js';
 import { computeRanking } from './lib/pairing/ranking.js';
@@ -3102,9 +3103,9 @@ async function setTournamentMatchResult(request, db, tournament, matchId) {
   if (body.noShow === 'a' || body.noShow === 'b') {
     await db.prepare('UPDATE tournament_matches SET no_show = ?, score_a = NULL, score_b = NULL, updated_at = ? WHERE id = ?').bind(body.noShow, now, matchId).run();
   } else {
-    const scoreA = Number(body.scoreA);
-    const scoreB = Number(body.scoreB);
-    if (!Number.isInteger(scoreA) || !Number.isInteger(scoreB) || scoreA < 0 || scoreB < 0 || scoreA === scoreB) {
+    const scoreA = validateMatchScore(body.scoreA);
+    const scoreB = validateMatchScore(body.scoreB);
+    if (scoreA === scoreB) {
       throw new HttpError(400, 'Ungültiges Ergebnis');
     }
     await db.prepare('UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, updated_at = ? WHERE id = ?').bind(scoreA, scoreB, now, matchId).run();

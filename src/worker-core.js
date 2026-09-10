@@ -36,6 +36,17 @@ export function registrationOpenStatus(tournament, now = new Date()) {
   return 'open';
 }
 
+export function validateMatchScore(value) {
+  if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') {
+    throw new HttpError(400, 'Ungültiges Ergebnis');
+  }
+  const score = Number(value);
+  if (!Number.isInteger(score) || score < 0 || score > 13) {
+    throw new HttpError(400, 'Ungültiges Ergebnis');
+  }
+  return score;
+}
+
 export function normalizeTournamentInput(body, { legacyRegistrationTimes = false, registrationTypeDefault = 'forme' } = {}) {
   const rawFormation = text(body.formation || 'doublette');
   const formationOther = rawFormation === 'andere';

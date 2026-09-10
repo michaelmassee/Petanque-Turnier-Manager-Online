@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertPartnerCountMatchesFormation, normalizeTournamentInput, registrationOpenStatus } from './worker-core.js';
+import { assertPartnerCountMatchesFormation, normalizeTournamentInput, registrationOpenStatus, validateMatchScore } from './worker-core.js';
 
 const base = { name: 'Testturnier', date: '2026-06-01', location: 'Musterstadt' };
 
@@ -47,5 +47,13 @@ describe('Worker-Fachlogik', () => {
     expect(registrationOpenStatus(tournament, new Date('2026-06-02T09:00:00Z'))).toBe('not_yet_open');
     expect(registrationOpenStatus(tournament, new Date('2026-06-02T12:00:00Z'))).toBe('open');
     expect(registrationOpenStatus(tournament, new Date('2026-06-04T12:00:00Z'))).toBe('deadline_passed');
+  });
+
+  it('akzeptiert nur Ergebniswerte von 0 bis 13', () => {
+    expect(validateMatchScore(13)).toBe(13);
+    expect(validateMatchScore('0')).toBe(0);
+    for (const value of [-1, 14, 99, '', null, '13.5']) {
+      expect(() => validateMatchScore(value)).toThrow('Ungültiges Ergebnis');
+    }
   });
 });
