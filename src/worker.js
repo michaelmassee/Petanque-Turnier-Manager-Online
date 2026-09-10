@@ -175,7 +175,7 @@ export const REGISTRATION_RECEIVED_EMAILS = {
   de: {
     subject: (name) => `Anmeldung eingegangen: ${name}`,
     text: (firstName, name, link, cancelLink, participantsBlock = '') =>
-      `Hallo ${firstName},\n\ndeine Anmeldung für "${name}" ist eingegangen.${participantsBlock}\n\nDer Turnierersteller prüft deine Anmeldung noch. Du erhältst eine weitere E-Mail, sobald deine Teilnahme bestätigt wurde.\n\nAlle Infos zum Turnier:\n${link}\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
+      `Hallo ${firstName},\n\ndeine Anmeldung für "${name}" ist eingegangen.${participantsBlock}\n\nDer Turnierersteller prüft deine Anmeldung noch. Du erhältst eine weitere E-Mail, sobald deine Anmeldung bestätigt wurde.\n\nAlle Infos zum Turnier:\n${link}\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
   },
   nl: {
     subject: (name) => `Inschrijving ontvangen: ${name}`,
@@ -201,9 +201,9 @@ export const REGISTRATION_RECEIVED_EMAILS = {
 
 export const REGISTRATION_CONFIRMATION_EMAILS = {
   de: {
-    subject: (name) => `Teilnahme bestätigt: ${name}`,
+    subject: (name) => `Anmeldung bestätigt: ${name}`,
     text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
-      `Hallo ${firstName},\n\ndeine Teilnahme an "${name}" wurde bestätigt.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}${participantsBlock}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
+      `Hallo ${firstName},\n\ndeine Anmeldung für "${name}" wurde bestätigt.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}${participantsBlock}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
   },
   nl: {
     subject: (name) => `Deelname bevestigd: ${name}`,
@@ -1067,6 +1067,14 @@ export default {
         }
 
         if (request.method === 'DELETE') {
+          if (registration.status !== 'cancelled') {
+            try {
+              await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name }, registration, APP_ORIGIN);
+            } catch (error) {
+              console.error(`Failed to send deletion notice email for registration ${registration.id}`, error);
+            }
+            await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentName: registration.name, status: 'cancelled' }, undefined, registration.created_by);
+          }
           return await deleteRegistration(env.DB, registration.id);
         }
       }
