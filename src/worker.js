@@ -1774,8 +1774,8 @@ async function listUsers(db) {
 
 async function listPostboxRecipients(db, userId) {
   const result = await db.prepare(
-    'SELECT id, first_name, last_name, role FROM users WHERE id != ? ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
-  ).bind(userId).all();
+    "SELECT id, first_name, last_name, role FROM users WHERE id != ? AND id != ? AND role = 'user' ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE",
+  ).bind(userId, TOURNAMENT_REPORT_SYSTEM_USER_ID).all();
   const tournaments = await db.prepare(
     'SELECT id, name FROM tournaments WHERE created_by = ? ORDER BY name COLLATE NOCASE',
   ).bind(userId).all();
@@ -1828,8 +1828,11 @@ async function sendPostboxMessage(request, env, sender) {
   }
 
   if (recipientRaw === sender.id) throw new HttpError(400, 'Bitte wähle einen anderen Empfänger');
-  const recipient = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(recipientRaw).first();
+  const recipient = await env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(recipientRaw).first();
   if (!recipient) throw new HttpError(404, 'Empfänger nicht gefunden');
+  if (recipient.role !== 'user' || recipient.id === TOURNAMENT_REPORT_SYSTEM_USER_ID) {
+    throw new HttpError(403, 'An diesen Empfänger kann keine Nachricht gesendet werden');
+  }
   const message = await createPostboxMessage(env, { senderId: sender.id, recipientId: recipientRaw, kind: 'direct', body: text, pushTitle: 'Neue Nachricht', pushActor: `${sender.firstName} ${sender.lastName}` });
   return json({ message }, 201);
 }

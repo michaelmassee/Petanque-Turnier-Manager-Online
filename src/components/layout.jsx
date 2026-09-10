@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { postboxText, translateText } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus } from '../lib/hooks.js';
-import { ROLES, MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTIONS, TOURNAMENT_STATUSES, REGISTRATION_STATUSES } from '../lib/constants.js';
+import { MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTIONS, TOURNAMENT_STATUSES, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor, roleName } from '../lib/domain.js';
 import { EditDialog, SelectField, TextArea, Button } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
@@ -121,7 +121,7 @@ export function PostboxControl({ language, open, unreadCount, messages, todos = 
               <SelectField label={text('recipient')} value={recipientId} onChange={setRecipientId} options={[
                 { value: '', label: text('chooseRecipient') },
                 ...recipientTournaments.map((tournament) => ({ value: `tournament:${tournament.id}`, label: text('allParticipantsOf').replace('{name}', tournament.name) })),
-                ...recipients.map((recipient) => ({ value: recipient.id, label: `${recipient.firstName} ${recipient.lastName} (${labelFor(ROLES, recipient.role)})` })),
+                ...recipients.map((recipient) => ({ value: recipient.id, label: `${recipient.firstName} ${recipient.lastName}` })),
               ]} />
               <TextArea label={text('message')} value={body} onChange={setBody} maxLength={250} />
               <Button type="submit" disabled={!recipientId || !body.trim()}>{text('send')}</Button>
