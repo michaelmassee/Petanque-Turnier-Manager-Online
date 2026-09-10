@@ -256,6 +256,9 @@ export const TRANSLATIONS = {
     Supermêlée: 'Supermêlée',
     Mêlée: 'Mêlée',
     Formée: 'Formée',
+    'Online durchführbar sind aktuell:': 'Online speelbaar zijn momenteel:',
+    'Alle anderen Turniersysteme können mit der Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
+      'Alle andere toernooisystemen kunnen worden gespeeld met de desktopversie van de Pétanque Turnier Manager:',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       'Dit toernooi wordt als mêlée gespeeld – partners worden ter plaatse geloot.',
     'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':
@@ -808,6 +811,9 @@ export const TRANSLATIONS = {
     Supermêlée: 'Supermêlée',
     Mêlée: 'Mêlée',
     Formée: 'Formée',
+    'Online durchführbar sind aktuell:': 'Currently playable online:',
+    'Alle anderen Turniersysteme können mit der Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
+      'All other tournament systems can be run with the desktop version of the Pétanque Turnier Manager:',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       'This tournament is played as mêlée – partners will be drawn on site.',
     'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':
@@ -1360,6 +1366,9 @@ export const TRANSLATIONS = {
     Supermêlée: 'Supermêlée',
     Mêlée: 'Mêlée',
     Formée: 'Formée',
+    'Online durchführbar sind aktuell:': 'Actualmente se pueden jugar online:',
+    'Alle anderen Turniersysteme können mit der Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
+      'Todos los demás sistemas de torneo se pueden gestionar con la versión de escritorio del Pétanque Turnier Manager:',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       'Este torneo se juega como mêlée – los compañeros se sortean in situ.',
     'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':
@@ -1912,6 +1921,9 @@ export const TRANSLATIONS = {
     Supermêlée: 'Supermêlée',
     Mêlée: 'Mêlée',
     Formée: 'Formée',
+    'Online durchführbar sind aktuell:': 'Actuellement jouables en ligne :',
+    'Alle anderen Turniersysteme können mit der Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
+      'Tous les autres systèmes de tournoi peuvent être gérés avec la version bureau du Pétanque Turnier Manager :',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       "Ce tournoi se joue en mêlée – les partenaires seront tirés au sort sur place.",
     'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':

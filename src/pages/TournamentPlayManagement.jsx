@@ -2,6 +2,31 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { translateText } from '../lib/i18n.js';
 import { SelectField, Button, Feedback } from '../components/ui.jsx';
+import { PAIRING_STRATEGIES } from '../lib/pairing/index.js';
+import { REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
+
+const DESKTOP_APP_URL = 'https://michaelmassee.github.io/Petanque-Turnier-Manager/';
+
+// Welche Turniersysteme online durchführbar sind, ergibt sich allein aus
+// PAIRING_STRATEGIES (siehe lib/pairing/index.js) - kommen dort weitere Systeme
+// dazu, taucht ihr Label hier automatisch auf, ohne dass diese Liste angepasst
+// werden muss.
+const ONLINE_SYSTEM_LABELS = [...REGISTRATION_TYPES, ...TOURNAMENT_TYPES]
+  .filter((entry) => PAIRING_STRATEGIES[entry.value])
+  .map((entry) => entry.label);
+
+function OnlineSystemsHint({ language }) {
+  return (
+    <p className="hint">
+      {translateText('Online durchführbar sind aktuell:', language)}{' '}
+      {ONLINE_SYSTEM_LABELS.map((label) => translateText(label, language)).join(', ')}.{' '}
+      {translateText('Alle anderen Turniersysteme können mit der Desktop-Version des Pétanque Turnier Managers durchgeführt werden:', language)}{' '}
+      <a href={DESKTOP_APP_URL} target="_blank" rel="noreferrer">
+        {translateText('Turniersoftware', language)}
+      </a>
+    </p>
+  );
+}
 
 function playerLabel(player) {
   return [player.firstName, player.lastName].filter(Boolean).join(' ') || player.id;
@@ -154,6 +179,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
     return (
       <div className="panel">
         <p className="muted">{translateText('Keine Turniere mit Online-Durchführung verfügbar.', language)}</p>
+        <OnlineSystemsHint language={language} />
       </div>
     );
   }
@@ -165,6 +191,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
 
   return (
     <div className="supermelee-manage">
+      <OnlineSystemsHint language={language} />
       <div className="panel supermelee-toolbar">
         <SelectField
           label="Turnier"
