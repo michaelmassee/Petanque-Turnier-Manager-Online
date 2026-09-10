@@ -7,6 +7,37 @@ import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx
 import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
 import { UserManagementPanel } from './pages/UserManagementPanel.jsx';
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
+import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
+import { tournamentPayload } from './lib/domain.js';
+
+describe('Turnier-Payload', () => {
+  it('behält den Verein eines bearbeiteten Kalendereintrags bei', () => {
+    expect(tournamentPayload({ ...EMPTY_TOURNAMENT_FORM, club: 'BC Linden' }).club).toBe('BC Linden');
+  });
+});
+
+describe('Turnier melden', () => {
+  it('rendert die öffentliche Meldeseite in der ausgewählten Sprache', () => {
+    render(
+      <TournamentReportPage
+        language="en"
+        setLanguage={() => {}}
+        menuOpen={false}
+        setMenuOpen={() => {}}
+        navigate={() => {}}
+        currentUser={null}
+        onLogout={() => {}}
+        turnstileSiteKey={null}
+        verifyStatus=""
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Report tournament' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Tournament information/)).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Other (see description)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Report tournament' })).toBeInTheDocument();
+  });
+});
 
 describe('Öffentliche Turnierdetailseite', () => {
   it('zeigt für Kalendereinträge keine turnier- oder anmeldespezifischen Daten', () => {

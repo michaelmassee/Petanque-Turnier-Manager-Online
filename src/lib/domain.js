@@ -91,6 +91,7 @@ export function tournamentImageUrl(tournamentId, field) {
 export function tournamentPayload(form) {
   return {
     managerId: form.managerId || null,
+    club: form.club || null,
     name: form.name,
     date: form.date,
     startTime: form.startTime || null,
