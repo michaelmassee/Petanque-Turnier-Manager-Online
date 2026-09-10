@@ -875,6 +875,12 @@ export default function App() {
     const tournamentId = registrationForm.tournamentId || selectedTournamentId;
     const payload = registrationPayload({ ...registrationForm, tournamentId }, language);
 
+    // Dieselbe Funktion bedient sowohl die öffentliche Selbstanmeldung (PublicRegistrationPanel)
+    // als auch den Erfassungsdialog des Turniererstellers (RegistrationsManagementPage) - nur
+    // Letzterer öffnet über registrationDialogOpen. Die Erfolgsmeldung muss sich unterscheiden:
+    // "Du hast dich angemeldet" ergibt keinen Sinn, wenn der Veranstalter eine fremde Meldung erfasst.
+    const isManagerEntry = registrationDialogOpen;
+
     try {
       if (registrationMode === 'edit') {
         await api(`/api/registrations/${registrationForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -882,11 +888,13 @@ export default function App() {
       } else {
         const result = await api(`/api/tournaments/${tournamentId}/registrations`, { method: 'POST', body: JSON.stringify(payload) });
         setMessage(
-          result.registration.status === 'pending'
-            ? translateText('Deine Anmeldung ist eingegangen und wird vom Turnierleiter geprüft.', language)
-            : result.mailEnabled
-              ? translateText('Du hast dich erfolgreich angemeldet. Deine Teilnahme wurde per E-Mail bestätigt.', language)
-              : translateText('Du hast dich erfolgreich angemeldet. Deine Teilnahme ist bestätigt.', language),
+          isManagerEntry
+            ? `${translateText('Neue Meldung hinzugefügt:', language)} ${result.registration.firstName} ${result.registration.lastName}`
+            : result.registration.status === 'pending'
+              ? translateText('Deine Anmeldung ist eingegangen und wird vom Turnierleiter geprüft.', language)
+              : result.mailEnabled && !result.registration.noEmail
+                ? translateText('Du hast dich erfolgreich angemeldet. Deine Teilnahme wurde per E-Mail bestätigt.', language)
+                : translateText('Du hast dich erfolgreich angemeldet. Deine Teilnahme ist bestätigt.', language),
         );
       }
 
