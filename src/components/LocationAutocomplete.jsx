@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
-import { translateText } from '../lib/i18n.js';
 import { RequiredMark } from './ui.jsx';
 
-export function LocationAutocomplete({ label, value, onChange, onSelect, confirmed, required, minLength, disabled, language }) {
+export function LocationAutocomplete({ label, value, onChange, onSelect, confirmed, required, minLength, disabled }) {
+  const { t } = useTranslation();
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -151,18 +152,18 @@ export function LocationAutocomplete({ label, value, onChange, onSelect, confirm
         document.body,
       )}
       {loading && (
-        <p className="location-autocomplete-status muted">{translateText('Orte werden gesucht…', language)}</p>
+        <p className="location-autocomplete-status muted">{t('Orte werden gesucht…')}</p>
       )}
       {confirmed && !loading && (
         <p className="location-autocomplete-status success">
-          ✓ {translateText('Ausgewählt:', language)} {value}
+          ✓ {t('Ausgewählt:')} {value}
         </p>
       )}
       {showHint && (
         <p className="location-autocomplete-status hint">
           {suggestions.length === 0
-            ? translateText('Kein Ort gefunden. Bitte Eingabe prüfen.', language)
-            : translateText('Bitte Ort aus der Liste auswählen, um Mehrdeutigkeiten zu vermeiden.', language)}
+            ? t('Kein Ort gefunden. Bitte Eingabe prüfen.')
+            : t('Bitte Ort aus der Liste auswählen, um Mehrdeutigkeiten zu vermeiden.')}
         </p>
       )}
     </div>

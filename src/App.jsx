@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 import { ROLES, TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_STATUSES, VISIBILITIES, REGISTRATION_STATUSES, RADIUS_OPTIONS, DEFAULT_TOURNAMENT_LIMIT, EMPTY_USER_FORM, EMPTY_PROFILE_FORM, EMPTY_AUTH_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_TOURNAMENT_REPORT_FORM, EMPTY_REGISTRATION_FORM, REGISTER_SUCCESS, VERIFY_SUCCESS, CANCEL_REGISTRATION_EXPLANATION, CANCEL_REGISTRATION_SUCCESS, PROFILE_UPDATE_SUCCESS, PROFILE_EMAIL_CHANGE_PENDING } from './lib/constants.js';
 import { POSTBOX_TEXT, postboxText, TRANSLATIONS, translateDom, translateText } from './lib/i18n.js';
+import i18next from './lib/i18next-config.js';
 import { api } from './lib/api.js';
 import { usePath, matchTournamentRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
@@ -260,6 +261,9 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('ptm_language', language);
     document.documentElement.lang = language;
+    if (i18next.language !== language) {
+      i18next.changeLanguage(language);
+    }
     translateDom(language);
   });
 
