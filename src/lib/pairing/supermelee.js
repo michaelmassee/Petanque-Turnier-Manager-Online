@@ -33,9 +33,13 @@ export function computeGameSizes(playerCount, formation) {
   if (!combos.length) {
     return null;
   }
+  // Ausnahme-Spiele weichen von der Basisgröße des Hauptmodus ab (siehe Hauptprojekt,
+  // turniersysteme/07_Supermelee.md, Abschnitt 3): bei Triplette (Basis 6) sind 4er/5er
+  // die Ausnahme, bei Doublette (Basis 4) sind 5er/6er die Ausnahme. Wer welches Muster
+  // bevorzugt, entscheidet preferSix - nicht pauschal fours+fives.
   combos.sort((a, b) => {
-    const exceptionsA = a.fours + a.fives;
-    const exceptionsB = b.fours + b.fives;
+    const exceptionsA = preferSix ? a.fours + a.fives : a.fives + a.sixes;
+    const exceptionsB = preferSix ? b.fours + b.fives : b.fives + b.sixes;
     if (exceptionsA !== exceptionsB) {
       return exceptionsA - exceptionsB;
     }

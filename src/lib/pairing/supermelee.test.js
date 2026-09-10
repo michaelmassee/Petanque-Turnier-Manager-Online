@@ -15,6 +15,17 @@ describe('computeGameSizes', () => {
     expect(computeGameSizes(8, 'doublette')).toEqual([4, 4]);
   });
 
+  // Bei 12 Spielern gehen sowohl "alles 4er" (3x4) als auch "alles 6er" (2x6) exakt
+  // auf - hier muss der Hauptmodus (Doublette vs. Triplette) die Basisgröße
+  // bestimmen, nicht eine pauschale Minimierung von "fours + fives".
+  it('bevorzugt bei Doublette 4er auch dann, wenn 6er ohne Rest aufgehen', () => {
+    expect(computeGameSizes(12, 'doublette')).toEqual([4, 4, 4]);
+  });
+
+  it('bevorzugt bei Triplette 6er auch dann, wenn 4er ohne Rest aufgehen', () => {
+    expect(computeGameSizes(12, 'triplette')).toEqual([6, 6]);
+  });
+
   it('liefert null für zu wenige Spieler', () => {
     expect(computeGameSizes(3, 'triplette')).toBeNull();
   });
