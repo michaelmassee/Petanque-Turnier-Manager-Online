@@ -179,7 +179,6 @@ export default function TournamentPlayManagement({ tournaments, language }) {
     return (
       <div className="panel">
         <p className="muted">{translateText('Keine Turniere mit Online-Durchführung verfügbar.', language)}</p>
-        <OnlineSystemsHint language={language} />
       </div>
     );
   }
@@ -191,7 +190,6 @@ export default function TournamentPlayManagement({ tournaments, language }) {
 
   return (
     <div className="supermelee-manage">
-      <OnlineSystemsHint language={language} />
       <div className="panel supermelee-toolbar">
         <SelectField
           label="Turnier"
@@ -199,6 +197,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
           onChange={setSelectedTournamentId}
           options={tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }))}
         />
+        <OnlineSystemsHint language={language} />
 
         <div className="supermelee-toolbar-actions">
           <Button disabled={busy || !selectedTournamentId || !canGenerateRound} onClick={handleNewRound}>
