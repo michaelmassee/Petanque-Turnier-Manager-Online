@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 import { ROLES, TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_STATUSES, VISIBILITIES, REGISTRATION_STATUSES, RADIUS_OPTIONS, DEFAULT_TOURNAMENT_LIMIT, EMPTY_USER_FORM, EMPTY_PROFILE_FORM, EMPTY_AUTH_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_TOURNAMENT_REPORT_FORM, EMPTY_REGISTRATION_FORM, REGISTER_SUCCESS, VERIFY_SUCCESS, CANCEL_REGISTRATION_EXPLANATION, CANCEL_REGISTRATION_SUCCESS, PROFILE_UPDATE_SUCCESS, PROFILE_EMAIL_CHANGE_PENDING } from './lib/constants.js';
-import { POSTBOX_TEXT, postboxText, TRANSLATIONS, translateDom, translateText } from './lib/i18n.js';
+import { translateDom } from './lib/i18n.js';
 import i18next from './lib/i18next-config.js';
+import { useTranslation } from 'react-i18next';
 import { api } from './lib/api.js';
 import { usePath, matchTournamentRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
@@ -29,6 +30,7 @@ export { filterRegistrations, filterTournaments, filterUsers } from './frontend-
 export { EditDialog, ListToolbar } from './components/ui.jsx';
 
 export default function App() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState(() => localStorage.getItem('ptm_language') || 'de');
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -105,7 +107,7 @@ export default function App() {
   const canManageTournaments = Boolean(currentUser);
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
 
-  const homeHeading = 'Öffentliche Turniere';
+  const homeHeading = t('Öffentliche Turniere');
 
   const filteredHomeTournaments = useMemo(() => {
     const query = homeQuery.trim().toLowerCase();
@@ -238,14 +240,14 @@ export default function App() {
       setAuthView('cancelRegistration');
       setAuthForm((previous) => ({ ...previous, token: cancelToken }));
     } else if (authResult === 'google_success') {
-      pendingAuthMessage = translateText('Mit Google angemeldet.', language);
+      pendingAuthMessage = t('Mit Google angemeldet.');
       window.history.replaceState({}, '', window.location.pathname);
     } else if (authResult === 'facebook_success') {
-      pendingAuthMessage = translateText('Mit Facebook angemeldet.', language);
+      pendingAuthMessage = t('Mit Facebook angemeldet.');
       window.history.replaceState({}, '', window.location.pathname);
     } else if (authError) {
       setAuthView('login');
-      pendingAuthError = translateText(authErrorMessage(authError), language);
+      pendingAuthError = t(authErrorMessage(authError));
       window.history.replaceState({}, '', window.location.pathname);
     }
     initialize().then(() => {
@@ -405,7 +407,7 @@ export default function App() {
       const data = await api('/api/users');
       setUsers(data.users);
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -421,7 +423,7 @@ export default function App() {
         return manageable?.id || data.tournaments[0]?.id || '';
       });
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -430,7 +432,7 @@ export default function App() {
       const data = await api(`/api/tournaments/${tournamentId}/registrations`);
       setRegistrations(data.registrations);
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -441,7 +443,7 @@ export default function App() {
       setPostboxRecipients(recipients.recipients);
       setPostboxRecipientTournaments(recipients.tournaments || []);
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -453,7 +455,7 @@ export default function App() {
       setPostboxRecipientId('');
       await loadPostbox();
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -465,7 +467,7 @@ export default function App() {
       if (willOpen && postbox.unreadCount > 0) {
         api('/api/postbox/read-all', { method: 'POST' })
           .then(loadPostbox)
-          .catch((requestError) => setError(translateText(requestError.message, language)));
+          .catch((requestError) => setError(t(requestError.message)));
       }
       return willOpen;
     });
@@ -487,12 +489,12 @@ export default function App() {
     setMessage('');
 
     if (authForm.password !== authForm.passwordConfirm) {
-      setError('Die Passwörter stimmen nicht überein.');
+      setError(t('Die Passwörter stimmen nicht überein.'));
       return;
     }
 
     if (!isPasswordStrong(authForm.password)) {
-      setError(PASSWORD_STRENGTH_ERROR);
+      setError(t(PASSWORD_STRENGTH_ERROR));
       return;
     }
 
@@ -504,10 +506,10 @@ export default function App() {
       setCurrentUser(data.user);
       setNeedsSetup(false);
       setAuthForm(EMPTY_AUTH_FORM);
-      setMessage('Admin wurde angelegt.');
+      setMessage(t('Admin wurde angelegt.'));
       await loadTournaments();
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -523,16 +525,16 @@ export default function App() {
       });
       setCurrentUser(data.user);
       setAuthForm(EMPTY_AUTH_FORM);
-      setMessage('Angemeldet.');
+      setMessage(t('Angemeldet.'));
       await loadTournaments();
     } catch (requestError) {
       if (requestError.payload?.passwordChangeRequired && requestError.payload.resetToken) {
         setAuthForm({ ...EMPTY_AUTH_FORM, token: requestError.payload.resetToken });
         setAuthView('reset');
-        setMessage(translateText(requestError.message, language));
+        setMessage(t(requestError.message));
         return;
       }
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -542,12 +544,12 @@ export default function App() {
     setMessage('');
 
     if (authForm.password !== authForm.passwordConfirm) {
-      setError('Die Passwörter stimmen nicht überein.');
+      setError(t('Die Passwörter stimmen nicht überein.'));
       return;
     }
 
     if (!isPasswordStrong(authForm.password)) {
-      setError(PASSWORD_STRENGTH_ERROR);
+      setError(t(PASSWORD_STRENGTH_ERROR));
       return;
     }
 
@@ -558,9 +560,9 @@ export default function App() {
       });
       setAuthForm(EMPTY_AUTH_FORM);
       setAuthView('registerSuccess');
-      setMessage(data.verificationUrl ? `${translateText(REGISTER_SUCCESS, language)} ${data.verificationUrl}` : translateText(REGISTER_SUCCESS, language));
+      setMessage(data.verificationUrl ? `${t(REGISTER_SUCCESS)} ${data.verificationUrl}` : t(REGISTER_SUCCESS));
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -577,15 +579,15 @@ export default function App() {
       window.history.replaceState({}, '', window.location.pathname);
       setAuthForm(EMPTY_AUTH_FORM);
       setAuthView('login');
-      setMessage(translateText(VERIFY_SUCCESS, language));
+      setMessage(t(VERIFY_SUCCESS));
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
   async function handleCancelRegistration(event) {
     event.preventDefault();
-    if (!window.confirm(translateText(CANCEL_REGISTRATION_EXPLANATION, language))) {
+    if (!window.confirm(t(CANCEL_REGISTRATION_EXPLANATION))) {
       return;
     }
     setError('');
@@ -599,9 +601,9 @@ export default function App() {
       window.history.replaceState({}, '', window.location.pathname);
       setAuthForm(EMPTY_AUTH_FORM);
       setAuthView('login');
-      setMessage(translateText(CANCEL_REGISTRATION_SUCCESS, language));
+      setMessage(t(CANCEL_REGISTRATION_SUCCESS));
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -611,17 +613,17 @@ export default function App() {
     setMessage('');
 
     if (profileForm.newPassword && profileForm.newPassword !== profileForm.newPasswordConfirm) {
-      setError(translateText('Die Passwörter stimmen nicht überein.', language));
+      setError(t('Die Passwörter stimmen nicht überein.'));
       return;
     }
 
     if (profileForm.newPassword && !isPasswordStrong(profileForm.newPassword)) {
-      setError(translateText(PASSWORD_STRENGTH_ERROR, language));
+      setError(t(PASSWORD_STRENGTH_ERROR));
       return;
     }
 
     if (profileForm.newPassword && profileForm.newPassword === profileForm.currentPassword) {
-      setError(translateText('Neues Passwort darf nicht mit dem aktuellen Passwort übereinstimmen', language));
+      setError(t('Neues Passwort darf nicht mit dem aktuellen Passwort übereinstimmen'));
       return;
     }
 
@@ -652,11 +654,11 @@ export default function App() {
       });
       setMessage(
         data.user.pendingEmail
-          ? translateText(PROFILE_EMAIL_CHANGE_PENDING, language) + (data.verificationUrl ? ` ${data.verificationUrl}` : '')
-          : translateText(PROFILE_UPDATE_SUCCESS, language),
+          ? t(PROFILE_EMAIL_CHANGE_PENDING) + (data.verificationUrl ? ` ${data.verificationUrl}` : '')
+          : t(PROFILE_UPDATE_SUCCESS),
       );
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -673,7 +675,7 @@ export default function App() {
       setMessage(data.resetUrl ? `${data.message} ${data.resetUrl}` : data.message);
       setAuthForm(EMPTY_AUTH_FORM);
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -690,7 +692,7 @@ export default function App() {
       setMessage(data.verificationUrl ? `${data.message} ${data.verificationUrl}` : data.message);
       setAuthForm(EMPTY_AUTH_FORM);
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -700,12 +702,12 @@ export default function App() {
     setMessage('');
 
     if (authForm.password !== authForm.passwordConfirm) {
-      setError('Die Passwörter stimmen nicht überein.');
+      setError(t('Die Passwörter stimmen nicht überein.'));
       return;
     }
 
     if (!isPasswordStrong(authForm.password)) {
-      setError(PASSWORD_STRENGTH_ERROR);
+      setError(t(PASSWORD_STRENGTH_ERROR));
       return;
     }
 
@@ -720,9 +722,9 @@ export default function App() {
       window.history.replaceState({}, '', window.location.pathname);
       setAuthForm(EMPTY_AUTH_FORM);
       setAuthView('login');
-      setMessage('Passwort wurde geändert. Du kannst dich jetzt anmelden.');
+      setMessage(t('Passwort wurde geändert. Du kannst dich jetzt anmelden.'));
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -759,7 +761,7 @@ export default function App() {
     }
 
     if (payload.password && !isPasswordStrong(payload.password)) {
-      setError(PASSWORD_STRENGTH_ERROR);
+      setError(t(PASSWORD_STRENGTH_ERROR));
       return;
     }
 
@@ -769,13 +771,13 @@ export default function App() {
           method: 'PUT',
           body: JSON.stringify(payload),
         });
-        setMessage('Benutzer wurde aktualisiert.');
+        setMessage(t('Benutzer wurde aktualisiert.'));
       } else {
         await api('/api/users', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
-        setMessage('Benutzer wurde angelegt.');
+        setMessage(t('Benutzer wurde angelegt.'));
       }
 
       setUserForm(EMPTY_USER_FORM);
@@ -783,7 +785,7 @@ export default function App() {
       setUserDialogOpen(false);
       await loadUsers();
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -805,11 +807,11 @@ export default function App() {
 
     try {
       await api(`/api/users/${user.id}${deleteTournaments ? '?deleteTournaments=true' : ''}`, { method: 'DELETE' });
-      setMessage('Benutzer wurde gelöscht.');
+      setMessage(t('Benutzer wurde gelöscht.'));
       await loadUsers();
       await loadTournaments();
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -836,14 +838,14 @@ export default function App() {
         data = await api('/api/tournaments', { method: 'POST', body: JSON.stringify(payload) });
       }
 
-      setMessage(tournamentMode === 'edit' ? 'Turnier wurde aktualisiert.' : 'Turnier wurde angelegt.');
+      setMessage(tournamentMode === 'edit' ? t('Turnier wurde aktualisiert.') : t('Turnier wurde angelegt.'));
       setTournamentForm(EMPTY_TOURNAMENT_FORM);
       setTournamentMode('create');
       setTournamentDialogOpen(false);
       await loadTournaments();
       setSelectedTournamentId(data.tournament.id);
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -861,12 +863,12 @@ export default function App() {
 
     try {
       await api(`/api/tournaments/${tournament.id}`, { method: 'DELETE' });
-      setMessage('Turnier wurde gelöscht.');
+      setMessage(t('Turnier wurde gelöscht.'));
       setSelectedTournamentId('');
       setRegistrations([]);
       await loadTournaments();
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -888,17 +890,17 @@ export default function App() {
     try {
       if (registrationMode === 'edit') {
         await api(`/api/registrations/${registrationForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
-        setMessage('Anmeldung wurde aktualisiert.');
+        setMessage(t('Anmeldung wurde aktualisiert.'));
       } else {
         const result = await api(`/api/tournaments/${tournamentId}/registrations`, { method: 'POST', body: JSON.stringify(payload) });
         setMessage(
           isManagerEntry
-            ? `${translateText('Neue Meldung hinzugefügt:', language)} ${result.registration.firstName} ${result.registration.lastName}`
+            ? `${t('Neue Meldung hinzugefügt:')} ${result.registration.firstName} ${result.registration.lastName}`
             : result.registration.status === 'pending'
-              ? translateText('Deine Anmeldung ist eingegangen und wird vom Turnierleiter geprüft.', language)
+              ? t('Deine Anmeldung ist eingegangen und wird vom Turnierleiter geprüft.')
               : result.mailEnabled && !result.registration.noEmail
-                ? translateText('Du hast dich erfolgreich angemeldet. Deine Teilnahme wurde per E-Mail bestätigt.', language)
-                : translateText('Du hast dich erfolgreich angemeldet. Deine Teilnahme ist bestätigt.', language),
+                ? t('Du hast dich erfolgreich angemeldet. Deine Teilnahme wurde per E-Mail bestätigt.')
+                : t('Du hast dich erfolgreich angemeldet. Deine Teilnahme ist bestätigt.'),
         );
       }
 
@@ -911,7 +913,7 @@ export default function App() {
         await loadRegistrations(selectedTournament.id);
       }
     } catch (requestError) {
-      const baseMessage = translateText(requestError.message, language);
+      const baseMessage = t(requestError.message);
       const conflictName = requestError.payload?.details?.name;
       setError(conflictName ? `${baseMessage} ("${conflictName}")` : baseMessage);
       setRegistrationInvalidField(requestError.payload?.details?.field || null);
@@ -929,11 +931,11 @@ export default function App() {
 
     try {
       await api(`/api/registrations/${registration.id}`, { method: 'DELETE' });
-      setMessage('Anmeldung wurde gelöscht.');
+      setMessage(t('Anmeldung wurde gelöscht.'));
       await loadRegistrations(registration.tournamentId);
       await loadTournaments();
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -943,11 +945,11 @@ export default function App() {
     try {
       const payload = registrationPayload({ ...registration, seedingPosition: registration.seedingPosition ?? '', status: 'confirmed' }, language);
       await api(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
-      setMessage(translateText('Anmeldung wurde bestätigt.', language));
+      setMessage(t('Anmeldung wurde bestätigt.'));
       await loadRegistrations(registration.tournamentId);
       await loadTournaments();
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -957,11 +959,11 @@ export default function App() {
     setMessage('');
     try {
       const result = await api(`/api/tournaments/${selectedTournament.id}/registrations/confirm-pending`, { method: 'POST' });
-      setMessage(`${result.confirmedCount} ${translateText('offene Anmeldung(en) wurden bestätigt.', language)}`);
+      setMessage(`${result.confirmedCount} ${t('offene Anmeldung(en) wurden bestätigt.')}`);
       await loadRegistrations(selectedTournament.id);
       await loadTournaments();
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(t(requestError.message));
     }
   }
 
@@ -1115,21 +1117,21 @@ export default function App() {
   function handleUseMyLocation() {
     setGeoError('');
     if (!navigator.geolocation) {
-      setGeoError('Geolocation wird von diesem Browser nicht unterstützt.');
+      setGeoError(t('Geolocation wird von diesem Browser nicht unterstützt.'));
       return;
     }
     setGeoLoading(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setSearchOrigin({ lat: position.coords.latitude, lng: position.coords.longitude, label: 'Mein Standort' });
+        setSearchOrigin({ lat: position.coords.latitude, lng: position.coords.longitude, label: t('Mein Standort') });
         setSearchOriginQuery('');
         setGeoLoading(false);
       },
       (error) => {
         setGeoError(
           error.code === error.PERMISSION_DENIED
-            ? 'Standort-Zugriff wurde verweigert. Bitte erlaube den Zugriff in den Einstellungen deines Geräts unter Datenschutz > Ortungsdienste.'
-            : 'Standort konnte nicht ermittelt werden.',
+            ? t('Standort-Zugriff wurde verweigert. Bitte erlaube den Zugriff in den Einstellungen deines Geräts unter Datenschutz > Ortungsdienste.')
+            : t('Standort konnte nicht ermittelt werden.'),
         );
         setGeoLoading(false);
       },
@@ -1151,12 +1153,12 @@ export default function App() {
       const data = await api('/api/geocode', { method: 'POST', body: JSON.stringify({ query }) });
       if (data.lat === null || data.lng === null) {
         setSearchOrigin(null);
-        setGeoError('Kein Ort gefunden.');
+        setGeoError(t('Kein Ort gefunden.'));
       } else {
         setSearchOrigin({ lat: data.lat, lng: data.lng, label: data.displayName || query });
       }
     } catch (requestError) {
-      setGeoError(translateText(requestError.message, language));
+      setGeoError(t(requestError.message));
     } finally {
       setGeoLoading(false);
     }
@@ -1177,14 +1179,14 @@ export default function App() {
   const roleLabel = useMemo(() => roleName(currentUser?.role), [currentUser]);
 
   if (loading) {
-    return <AuthShell title="Pétanque Turnier Manager Online" subtitle="App wird geladen." language={language} setLanguage={setLanguage} />;
+    return <AuthShell title="Pétanque Turnier Manager Online" subtitle={t('App wird geladen.')} language={language} setLanguage={setLanguage} />;
   }
 
   const tournamentRoute = matchTournamentRoute(path);
 
   if (!needsSetup && tournamentRoute) {
     return (
-      <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
+      <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
         <TournamentDetailPage
           route={tournamentRoute}
           tournaments={tournaments}
@@ -1210,7 +1212,7 @@ export default function App() {
 
   if (!needsSetup && path === '/impressum') {
     return (
-      <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
+      <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
         <ImpressumPage
           language={language}
           setLanguage={setLanguage}
@@ -1226,7 +1228,7 @@ export default function App() {
 
   if (!needsSetup && path === '/datenschutz') {
     return (
-      <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
+      <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
         <DatenschutzPage
           language={language}
           setLanguage={setLanguage}
@@ -1242,7 +1244,7 @@ export default function App() {
 
   if (!needsSetup && path === '/turnier-melden') {
     return (
-      <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
+      <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
         <TournamentReportPage
           language={language}
           setLanguage={setLanguage}
@@ -1368,7 +1370,7 @@ export default function App() {
               clearFeedback();
             }}
           >
-            Anmelden
+            {t('Anmelden')}
           </button>
           <button
             className="drawer-link"
@@ -1378,7 +1380,7 @@ export default function App() {
               navigate('/turnier-melden');
             }}
           >
-            Turnier melden
+            {t('Turnier melden')}
           </button>
           <a
             className="drawer-link"
@@ -1386,7 +1388,7 @@ export default function App() {
             target="_blank"
             rel="noreferrer"
           >
-            Turniersoftware
+            {t('Turniersoftware')}
           </a>
         </AppHeader>
 
@@ -1554,17 +1556,17 @@ export default function App() {
 
   const activeTabHeading =
     activeTab === 'profile'
-      ? 'Mein Profil'
+      ? t('Mein Profil')
       : activeTab === 'users'
-      ? 'Benutzerverwaltung'
+      ? t('Benutzerverwaltung')
       : activeTab === 'apikeys'
-        ? 'API-Zugänge'
+        ? t('API-Zugänge')
         : activeTab === 'play'
-          ? 'Turnier durchführen'
+          ? t('Turnier durchführen')
           : activeTab === 'registrations'
-            ? 'Anmeldungen'
+            ? t('Anmeldungen')
             : activeTab === 'tournaments'
-              ? 'Turnierverwaltung'
+              ? t('Turnierverwaltung')
               : homeHeading;
 
   return (
@@ -1671,7 +1673,7 @@ export default function App() {
             clearFeedback();
           }}
         >
-          Startseite
+          {t('Startseite')}
         </button>
         {canManageTournaments && (
           <button
@@ -1683,7 +1685,7 @@ export default function App() {
               clearFeedback();
             }}
           >
-            Turnierverwaltung
+            {t('Turnierverwaltung')}
           </button>
         )}
         <button
@@ -1695,7 +1697,7 @@ export default function App() {
             clearFeedback();
           }}
         >
-          Anmeldungen
+          {t('Anmeldungen')}
         </button>
         {canManageTournaments && (
           <button
@@ -1707,7 +1709,7 @@ export default function App() {
               clearFeedback();
             }}
           >
-            Turnier durchführen
+            {t('Turnier durchführen')}
           </button>
         )}
         <button
@@ -1719,7 +1721,7 @@ export default function App() {
             navigate('/turnier-melden');
           }}
         >
-          Turnier melden
+          {t('Turnier melden')}
         </button>
         {isAdmin && (
           <button
@@ -1731,7 +1733,7 @@ export default function App() {
               clearFeedback();
             }}
           >
-            Benutzer
+            {t('Benutzer')}
           </button>
         )}
         {canManageTournaments && (
@@ -1744,7 +1746,7 @@ export default function App() {
               clearFeedback();
             }}
           >
-            API-Zugänge
+            {t('API-Zugänge')}
           </button>
         )}
         <button
@@ -1766,7 +1768,7 @@ export default function App() {
             clearFeedback();
           }}
         >
-          Mein Profil
+          {t('Mein Profil')}
         </button>
         <Button
           variant="secondary"
@@ -1775,7 +1777,7 @@ export default function App() {
             handleLogout();
           }}
         >
-          Abmelden
+          {t('Abmelden')}
         </Button>
       </AppHeader>
 
@@ -1857,7 +1859,7 @@ export default function App() {
       )}
 
       {activeTab === 'tournaments' && (
-        <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
+        <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
             <TournamentManagement
               tournaments={filteredTournaments}
@@ -1892,7 +1894,7 @@ export default function App() {
       )}
 
       {activeTab === 'registrations' && (
-        <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
+        <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
             <RegistrationsManagement
               tournament={selectedTournament}
@@ -1930,7 +1932,7 @@ export default function App() {
       )}
 
       {activeTab === 'users' && isAdmin && (
-        <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
+        <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <UserManagementPanel
             users={filteredUsers}
             stats={userStats}
@@ -1956,7 +1958,7 @@ export default function App() {
       )}
 
       {activeTab === 'apikeys' && canManageTournaments && (
-        <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
+        <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
             <ApiKeysPanel isAdmin={isAdmin} language={language} />
           </section>
@@ -1964,7 +1966,7 @@ export default function App() {
       )}
 
       {activeTab === 'play' && canManageTournaments && (
-        <Suspense fallback={<LazyFallback label={translateText('Wird geladen…', language)} />}>
+        <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
             <TournamentPlayManagement tournaments={manageableTournaments.filter(isOnlinePlayable)} language={language} />
           </section>
@@ -1981,46 +1983,47 @@ export default function App() {
 }
 
 export function ProfilePanel({ currentUser, form, setForm, onSubmit }) {
+  const { t } = useTranslation();
   return (
     <div className="panel">
       <div className="section-title">
-        <h2>Mein Profil</h2>
+        <h2>{t('Mein Profil')}</h2>
       </div>
-      <p className="muted">Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.</p>
+      <p className="muted">{t('Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.')}</p>
       {currentUser.pendingEmail && (
         <p className="hint">
-          {`Bestätigung ausstehend für ${currentUser.pendingEmail}. Bitte prüfe dein Postfach, um die Änderung abzuschließen.`}
+          {`${t('Bestätigung ausstehend für')} ${currentUser.pendingEmail}. ${t('Bitte prüfe dein Postfach, um die Änderung abzuschließen.')}`}
         </p>
       )}
       <form className="form" onSubmit={onSubmit}>
-        <TextField label="Vorname" value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
-        <TextField label="Nachname" value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
-        <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
-        <TextField label="Verein" value={form.club} onChange={(club) => setForm({ ...form, club })} />
-        <TextField label="Lizenznummer" value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
+        <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
+        <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
+        <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+        <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
+        <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
         <TextField
-          label="Aktuelles Passwort"
+          label={t('Aktuelles Passwort')}
           type="password"
           value={form.currentPassword}
           onChange={(currentPassword) => setForm({ ...form, currentPassword })}
         />
-        <p className="hint">Nur erforderlich, wenn du deine E-Mail-Adresse oder dein Passwort änderst.</p>
+        <p className="hint">{t('Nur erforderlich, wenn du deine E-Mail-Adresse oder dein Passwort änderst.')}</p>
         <TextField
-          label="Neues Passwort"
+          label={t('Neues Passwort')}
           type="password"
           value={form.newPassword}
           onChange={(newPassword) => setForm({ ...form, newPassword })}
           minLength={8}
         />
-        <p className="hint">{PASSWORD_STRENGTH_HINT}</p>
+        <p className="hint">{t(PASSWORD_STRENGTH_HINT)}</p>
         <TextField
-          label="Passwort bestätigen"
+          label={t('Passwort bestätigen')}
           type="password"
           value={form.newPasswordConfirm}
           onChange={(newPasswordConfirm) => setForm({ ...form, newPasswordConfirm })}
           minLength={8}
         />
-        <Button type="submit">Speichern</Button>
+        <Button type="submit">{t('Speichern')}</Button>
       </form>
     </div>
   );
@@ -2028,6 +2031,7 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit }) {
 
 
 function TournamentCard({ tournament, onOpenTournament, onRegister, language }) {
+  const { t } = useTranslation();
   const [logoBroken, setLogoBroken] = useState(false);
   const hasLogo = Boolean(tournament.logoUrl) && !logoBroken;
 
@@ -2055,10 +2059,10 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
         <span className="tournament-card-copy">
           <strong>
             {tournament.licenseRequired && (
-              <span className="license-badge" title={translateText('Lizenznummer erforderlich', language)}>🪪</span>
+              <span className="license-badge" title={t('Lizenznummer erforderlich')}>🪪</span>
             )}
             {tournament.visibility === 'private' && (
-              <span className="license-badge" title="Nur für Admins sichtbar (Privat)">🔒</span>
+              <span className="license-badge" title={t('Nur für Admins sichtbar (Privat)')}>🔒</span>
             )}
             <span data-i18n-skip>{tournament.name}</span>
           </strong>
@@ -2071,7 +2075,8 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
               <>
                 {' · '}
                 {Math.round(tournament.distanceKm)}
-                {' km entfernt'}
+                {' '}
+                {t('km entfernt')}
               </>
             )}
           </small>
@@ -2085,7 +2090,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
             onClick={() => onRegister(tournament)}
             disabled={tournament.status !== 'registration' || tournament.visibility !== 'public' || registrationNotYetOpen(tournament)}
           >
-            Anmelden
+            {t('Anmelden')}
           </Button>
         )}
       </div>
@@ -2113,6 +2118,7 @@ function HomeTournaments({
   onOpenFilters,
   onOpenRadiusSearch,
 }) {
+  const { t } = useTranslation();
   const activeFilterCount = [
     showMineFilter && onlyMine,
     filterMonth,
@@ -2130,17 +2136,17 @@ function HomeTournaments({
       <div className="home-finder">
         <div className="home-finder-copy">
           <p className="eyebrow">Pétanque Turnier Manager Online</p>
-          <h2>Finde dein nächstes Pétanque-Turnier</h2>
-          <p className="subtitle">Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.</p>
+          <h2>{t('Finde dein nächstes Pétanque-Turnier')}</h2>
+          <p className="subtitle">{t('Suche nach Ort, Verein oder Turniersystem und melde dich direkt online an.')}</p>
         </div>
-        <div className="home-finder-stats" aria-label="Turniersuche Übersicht">
+        <div className="home-finder-stats" aria-label={t('Turniersuche Übersicht')}>
           <button
             type="button"
             onClick={() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            aria-label={`${total} gefundene Turniere – zur Liste springen`}
+            aria-label={`${total} ${t('gefundene Turniere – zur Liste springen')}`}
           >
             <strong>{total}</strong>
-            <span>Gefundene Turniere</span>
+            <span>{t('Gefundene Turniere')}</span>
           </button>
           <button
             type="button"
@@ -2148,38 +2154,38 @@ function HomeTournaments({
             disabled={!nextTournament}
             aria-label={
               nextTournament
-                ? `Nächster Termin ${formatDate(nextTournament.date, language)} – Turnier öffnen`
-                : 'Kein nächster Termin'
+                ? `${t('Nächster Termin')} ${formatDate(nextTournament.date, language)} ${t('– Turnier öffnen')}`
+                : t('Kein nächster Termin')
             }
           >
-            <strong>{nextTournament ? formatDate(nextTournament.date, language) : 'keiner'}</strong>
-            <span>Nächster Termin</span>
+            <strong>{nextTournament ? formatDate(nextTournament.date, language) : t('keiner')}</strong>
+            <span>{t('Nächster Termin')}</span>
           </button>
           <button
             type="button"
             onClick={onOpenFilters}
-            aria-label={`${activeFilterCount > 0 ? 'Filter aktiv' : 'Keine Filter aktiv'} – Filter öffnen`}
+            aria-label={`${activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')} ${t('– Filter öffnen')}`}
           >
-            <strong>{activeFilterCount > 0 ? 'Filter aktiv' : 'Keine Filter aktiv'}</strong>
-            <span>Finder</span>
+            <strong>{activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')}</strong>
+            <span>{t('Finder')}</span>
           </button>
-          <button type="button" onClick={onOpenRadiusSearch} aria-label="Umkreissuche öffnen">
+          <button type="button" onClick={onOpenRadiusSearch} aria-label={t('Umkreissuche öffnen')}>
             <strong>
               {searchOrigin ? (
                 <>
-                  {radiusLabel} {translateText('Umkreis', language)}
+                  {radiusLabel} {t('Umkreis')}
                 </>
               ) : (
-                'Umkreissuche aus'
+                t('Umkreissuche aus')
               )}
             </strong>
             <span>
               {searchOrigin ? (
                 <>
-                  {translateText('Ausgangspunkt:', language)} {searchOrigin.label}
+                  {t('Ausgangspunkt:')} {searchOrigin.label}
                 </>
               ) : (
-                'Umkreis'
+                t('Umkreis')
               )}
             </span>
           </button>
@@ -2187,14 +2193,14 @@ function HomeTournaments({
       </div>
 
       <div className="section-title home-results-title" ref={resultsRef}>
-        <p className="eyebrow">Alle passenden Turniere</p>
+        <p className="eyebrow">{t('Alle passenden Turniere')}</p>
         <span className="counter">{total}</span>
       </div>
 
       {!tournaments.length && (
         <div className="empty-state">
-          <strong>Keine Turniere gefunden.</strong>
-          <p className="muted">Passe die Suche an.</p>
+          <strong>{t('Keine Turniere gefunden.')}</strong>
+          <p className="muted">{t('Passe die Suche an.')}</p>
         </div>
       )}
 
@@ -2213,7 +2219,7 @@ function HomeTournaments({
       {hasMore && (
         <div className="load-more-wrap">
           <Button variant="secondary" onClick={onLoadMore}>
-            Weitere Turniere laden
+            {t('Weitere Turniere laden')}
           </Button>
         </div>
       )}
@@ -2223,6 +2229,7 @@ function HomeTournaments({
 }
 
 export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, language, embedded = false, currentUser = null, invalidField = null }) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!form.id && form.tournamentId !== tournament.id) {
       setForm({ ...EMPTY_REGISTRATION_FORM, tournamentId: tournament.id });
@@ -2258,20 +2265,20 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
 
   return (
     <form className={embedded ? 'public-registration public-registration--embedded' : 'public-registration'} onSubmit={onSubmit}>
-      <h2>{translateText('Anmeldung:', language)} <span data-i18n-skip>{tournament.name}</span></h2>
+      <h2>{t('Anmeldung:')} <span data-i18n-skip>{tournament.name}</span></h2>
       {notYetOpen ? (
         <>
           <p className="hint">
             {(REGISTRATION_OPENS_TEMPLATES[language] || REGISTRATION_OPENS_TEMPLATES.de)(formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone))}
           </p>
           <div className="row-actions stretch">
-            <Button variant="secondary" onClick={onCancel}>Abbrechen</Button>
+            <Button variant="secondary" onClick={onCancel}>{t('Abbrechen')}</Button>
           </div>
         </>
       ) : (
         <>
           <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
-            Datenschutzerklärung lesen
+            {t('Datenschutzerklärung lesen')}
           </button>
           <RegistrationFields
             form={form}
@@ -2284,7 +2291,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             invalidField={invalidField}
           />
           <label className="website-field" aria-hidden="true">
-            Website
+            {t('Website')}
             <input
               type="text"
               name="website"
@@ -2302,13 +2309,13 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
               required
             />
             <span>
-              Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.
+              {t('Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.')}
               <RequiredMark />
             </span>
           </label>
           <div className="row-actions stretch">
-            <Button type="submit">Anmeldung senden</Button>
-            <Button variant="secondary" onClick={onCancel}>Abbrechen</Button>
+            <Button type="submit">{t('Anmeldung senden')}</Button>
+            <Button variant="secondary" onClick={onCancel}>{t('Abbrechen')}</Button>
           </div>
         </>
       )}

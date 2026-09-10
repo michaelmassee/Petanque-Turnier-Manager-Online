@@ -21,6 +21,11 @@ i18next.use(initReactI18next).init({
   fallbackLng: 'de',
   interpolation: { escapeValue: false },
   returnEmptyString: false,
+  // Keys sind ganze deutsche Sätze (siehe Migrationsentscheidung: deutscher Text bleibt Key)
+  // und enthalten oft ":" oder ".". i18next würde das sonst als Namespace- bzw.
+  // Pfad-Trenner interpretieren und Lookups falsch auflösen.
+  keySeparator: false,
+  nsSeparator: false,
 });
 
 export default i18next;
