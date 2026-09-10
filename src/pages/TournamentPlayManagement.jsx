@@ -20,7 +20,7 @@ function OnlineSystemsHint({ language }) {
     <p className="hint">
       {translateText('Online durchführbar sind aktuell:', language)}{' '}
       {ONLINE_SYSTEM_LABELS.map((label) => translateText(label, language)).join(', ')}.{' '}
-      {translateText('Alle anderen Turniersysteme können mit der Desktop-Version des Pétanque Turnier Managers durchgeführt werden:', language)}{' '}
+      {translateText('Alle Turniersysteme können mit der professionellen, kostenfreien Desktop-Version des Pétanque Turnier Managers durchgeführt werden:', language)}{' '}
       <a href={DESKTOP_APP_URL} target="_blank" rel="noreferrer">
         {translateText('Turniersoftware', language)}
       </a>
@@ -113,8 +113,15 @@ export default function TournamentPlayManagement({ tournaments, language }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  // Der `tournaments`-Prop kommt vom Elternteil und wird nicht sofort neu geladen,
+  // nachdem hier der Status auf "Läuft" gesetzt wurde - deshalb lokal vormerken,
+  // welche Turniere in dieser Sitzung bereits gestartet wurden.
+  const [startedTournamentIds, setStartedTournamentIds] = useState(() => new Set());
 
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
+  const selectedTournamentStatus = selectedTournament
+    ? (startedTournamentIds.has(selectedTournament.id) ? 'running' : selectedTournament.status)
+    : null;
 
   async function loadData(tournamentId) {
     if (!tournamentId) {
@@ -140,6 +147,21 @@ export default function TournamentPlayManagement({ tournaments, language }) {
     loadData(selectedTournamentId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTournamentId]);
+
+  async function handleStartTournament() {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      await api(`/api/tournaments/${selectedTournamentId}/start`, { method: 'POST' });
+      setStartedTournamentIds((current) => new Set(current).add(selectedTournamentId));
+      setMessage(translateText('Turnier wurde gestartet.', language));
+    } catch (err) {
+      setError(translateText(err.message, language));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleNewRound() {
     setBusy(true);
@@ -185,7 +207,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
 
   const currentRound = rounds[rounds.length - 1] || null;
   const currentRoundOpen = currentRound ? !isRoundComplete(currentRound) : false;
-  const canGenerateRound = selectedTournament?.status === 'running' && !currentRoundOpen;
+  const canGenerateRound = selectedTournamentStatus === 'running' && !currentRoundOpen;
   const roundsNewestFirst = [...rounds].reverse();
 
   return (
@@ -200,11 +222,14 @@ export default function TournamentPlayManagement({ tournaments, language }) {
         <OnlineSystemsHint language={language} />
 
         <div className="supermelee-toolbar-actions">
-          <Button disabled={busy || !selectedTournamentId || !canGenerateRound} onClick={handleNewRound}>
-            {translateText('Neue Runde starten', language)}
-          </Button>
-          {selectedTournament && selectedTournament.status !== 'running' && (
-            <p className="hint">{translateText('Setze den Turnierstatus auf "Läuft", um Runden zu starten.', language)}</p>
+          {selectedTournament && selectedTournamentStatus !== 'running' ? (
+            <Button disabled={busy || !selectedTournamentId} onClick={handleStartTournament}>
+              {translateText('Turnier starten', language)}
+            </Button>
+          ) : (
+            <Button disabled={busy || !selectedTournamentId || !canGenerateRound} onClick={handleNewRound}>
+              {translateText('Neue Runde starten', language)}
+            </Button>
           )}
         </div>
       </div>

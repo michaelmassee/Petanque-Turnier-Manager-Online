@@ -1080,6 +1080,17 @@ export default {
         }
       }
 
+      const tournamentStartMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/start$/);
+      if (tournamentStartMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, tournamentStartMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        assertCanManageTournament(tournament, session.user);
+        return await startTournament(env, tournament, session.user);
+      }
+
       const presentationMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/presentation$/);
       if (presentationMatch && request.method === 'PUT') {
         const session = await requireSession(request, env.DB);
@@ -2540,6 +2551,29 @@ async function updateTournament(request, env, existing, user) {
     const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.created_by).all();
     await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
   }
+  return json({ tournament: toPublicTournament(updated, user) });
+}
+
+/**
+ * Leichtgewichtiger Statuswechsel für "Turnier durchführen": setzt nur status auf 'running',
+ * ohne die vollständige Turnier-Eingabemaske (normalizeCoreTournamentInput mit allen Pflicht-
+ * feldern) zu durchlaufen - sonst müsste die Durchführungs-Seite das komplette Turnierformular
+ * mitschleppen, nur um den Status umzuschalten.
+ */
+async function startTournament(env, existing, user) {
+  const db = env.DB;
+  if (Number(existing.document_managed || 0) === 1) {
+    throw new HttpError(409, 'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.');
+  }
+  if (existing.status === 'running') {
+    return json({ tournament: toPublicTournament(existing, user) });
+  }
+  const now = new Date().toISOString();
+  await db.prepare("UPDATE tournaments SET status = 'running', updated_at = ? WHERE id = ?").bind(now, existing.id).run();
+  const updated = await getTournamentById(db, existing.id);
+  await createSystemNotification(env, existing.created_by, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
+  const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.created_by).all();
+  await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
   return json({ tournament: toPublicTournament(updated, user) });
 }
 

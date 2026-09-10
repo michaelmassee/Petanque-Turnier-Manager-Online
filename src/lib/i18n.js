@@ -27,7 +27,8 @@ export const TRANSLATIONS = {
     'Team B nicht angetreten': 'Team B niet aangetreden',
     'Unentschieden ist nicht möglich': 'Gelijkspel is niet mogelijk',
     'Keine Turniere mit Online-Durchführung verfügbar.': 'Geen toernooien met online uitvoering beschikbaar.',
-    'Setze den Turnierstatus auf "Läuft", um Runden zu starten.': 'Zet de toernooistatus op "Loopt" om rondes te starten.',
+    'Turnier starten': 'Toernooi starten',
+    'Turnier wurde gestartet.': 'Toernooi is gestart.',
     'Neue Runde starten': 'Nieuwe ronde starten',
     'Neue Runde wurde erstellt.': 'Nieuwe ronde is aangemaakt.',
     'Runde': 'Ronde',
@@ -257,8 +258,8 @@ export const TRANSLATIONS = {
     Mêlée: 'Mêlée',
     Formée: 'Formée',
     'Online durchführbar sind aktuell:': 'Online speelbaar zijn momenteel:',
-    'Alle anderen Turniersysteme können mit der Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
-      'Alle andere toernooisystemen kunnen worden gespeeld met de desktopversie van de Pétanque Turnier Manager:',
+    'Alle Turniersysteme können mit der professionellen, kostenfreien Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
+      'Alle toernooisystemen kunnen worden gespeeld met de professionele, gratis desktopversie van de Pétanque Turnier Manager:',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       'Dit toernooi wordt als mêlée gespeeld – partners worden ter plaatse geloot.',
     'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':
@@ -582,7 +583,8 @@ export const TRANSLATIONS = {
     'Team B nicht angetreten': 'Team B did not show up',
     'Unentschieden ist nicht möglich': 'A draw is not possible',
     'Keine Turniere mit Online-Durchführung verfügbar.': 'No tournaments with online play available.',
-    'Setze den Turnierstatus auf "Läuft", um Runden zu starten.': 'Set the tournament status to "Running" to start rounds.',
+    'Turnier starten': 'Start tournament',
+    'Turnier wurde gestartet.': 'Tournament has been started.',
     'Neue Runde starten': 'Start new round',
     'Neue Runde wurde erstellt.': 'New round was created.',
     'Runde': 'Round',
@@ -812,8 +814,8 @@ export const TRANSLATIONS = {
     Mêlée: 'Mêlée',
     Formée: 'Formée',
     'Online durchführbar sind aktuell:': 'Currently playable online:',
-    'Alle anderen Turniersysteme können mit der Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
-      'All other tournament systems can be run with the desktop version of the Pétanque Turnier Manager:',
+    'Alle Turniersysteme können mit der professionellen, kostenfreien Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
+      'All tournament systems can be run with the professional, free desktop version of the Pétanque Turnier Manager:',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       'This tournament is played as mêlée – partners will be drawn on site.',
     'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':
@@ -1137,7 +1139,8 @@ export const TRANSLATIONS = {
     'Team B nicht angetreten': 'Equipo B no se presentó',
     'Unentschieden ist nicht möglich': 'No se permite un empate',
     'Keine Turniere mit Online-Durchführung verfügbar.': 'No hay torneos con desarrollo en línea disponibles.',
-    'Setze den Turnierstatus auf "Läuft", um Runden zu starten.': 'Pon el estado del torneo en "En curso" para iniciar rondas.',
+    'Turnier starten': 'Iniciar torneo',
+    'Turnier wurde gestartet.': 'El torneo ha comenzado.',
     'Neue Runde starten': 'Iniciar nueva ronda',
     'Neue Runde wurde erstellt.': 'Se creó una nueva ronda.',
     'Runde': 'Ronda',
@@ -1367,8 +1370,8 @@ export const TRANSLATIONS = {
     Mêlée: 'Mêlée',
     Formée: 'Formée',
     'Online durchführbar sind aktuell:': 'Actualmente se pueden jugar online:',
-    'Alle anderen Turniersysteme können mit der Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
-      'Todos los demás sistemas de torneo se pueden gestionar con la versión de escritorio del Pétanque Turnier Manager:',
+    'Alle Turniersysteme können mit der professionellen, kostenfreien Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
+      'Todos los sistemas de torneo se pueden gestionar con la versión de escritorio profesional y gratuita del Pétanque Turnier Manager:',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       'Este torneo se juega como mêlée – los compañeros se sortean in situ.',
     'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':
@@ -1692,7 +1695,8 @@ export const TRANSLATIONS = {
     'Team B nicht angetreten': 'Équipe B absente',
     'Unentschieden ist nicht möglich': 'Un match nul n’est pas possible',
     'Keine Turniere mit Online-Durchführung verfügbar.': 'Aucun tournoi avec déroulement en ligne disponible.',
-    'Setze den Turnierstatus auf "Läuft", um Runden zu starten.': 'Passe le statut du tournoi à « En cours » pour démarrer des tours.',
+    'Turnier starten': 'Démarrer le tournoi',
+    'Turnier wurde gestartet.': 'Le tournoi a été démarré.',
     'Neue Runde starten': 'Démarrer un nouveau tour',
     'Neue Runde wurde erstellt.': 'Un nouveau tour a été créé.',
     'Runde': 'Tour',
@@ -1922,8 +1926,8 @@ export const TRANSLATIONS = {
     Mêlée: 'Mêlée',
     Formée: 'Formée',
     'Online durchführbar sind aktuell:': 'Actuellement jouables en ligne :',
-    'Alle anderen Turniersysteme können mit der Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
-      'Tous les autres systèmes de tournoi peuvent être gérés avec la version bureau du Pétanque Turnier Manager :',
+    'Alle Turniersysteme können mit der professionellen, kostenfreien Desktop-Version des Pétanque Turnier Managers durchgeführt werden:':
+      'Tous les systèmes de tournoi peuvent être gérés avec la version bureau professionnelle et gratuite du Pétanque Turnier Manager :',
     'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.':
       "Ce tournoi se joue en mêlée – les partenaires seront tirés au sort sur place.",
     'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.':
