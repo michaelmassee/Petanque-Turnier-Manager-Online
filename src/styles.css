@@ -1797,16 +1797,3 @@ textarea:focus {
   font-weight: 800;
   color: #53627a;
 }
-
-.supermelee-noshow-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px 16px;
-}
-
-.supermelee-noshow-row .link-button {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #a92d2d;
-}

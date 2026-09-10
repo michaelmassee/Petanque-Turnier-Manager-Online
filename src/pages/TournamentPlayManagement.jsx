@@ -105,15 +105,6 @@ function MatchRow({ match, onSave, busy, language }) {
       </div>
 
       {isDraw && <p className="feedback error">{translateText('Unentschieden ist nicht möglich', language)}</p>}
-
-      <div className="supermelee-noshow-row">
-        <button className="link-button" type="button" disabled={busy} onClick={() => onSave(match.id, { noShow: 'a' })}>
-          {translateText('Team A nicht angetreten', language)}
-        </button>
-        <button className="link-button" type="button" disabled={busy} onClick={() => onSave(match.id, { noShow: 'b' })}>
-          {translateText('Team B nicht angetreten', language)}
-        </button>
-      </div>
     </article>
   );
 }
