@@ -5,6 +5,7 @@ import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
 import {
   assertPartnerCountMatchesFormation as assertCorePartnerCountMatchesFormation,
+  isTournamentRoundNumberConflict,
   normalizeTournamentInput as normalizeCoreTournamentInput,
   registrationOpenStatus as coreRegistrationOpenStatus,
   validateMatchScore,
@@ -3142,7 +3143,17 @@ async function generateTournamentRound(db, tournament) {
         .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(match.teamA), JSON.stringify(match.teamB), now, now),
     );
   }
-  await db.batch(statements);
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    // Mehrere berechtigte Turnierleiter können die letzte abgeschlossene Runde
+    // gleichzeitig sehen. Der eindeutige Zähler entscheidet atomar, welche
+    // Anfrage gewinnt; die andere ist ein erwartbarer Konflikt, kein 500er.
+    if (isTournamentRoundNumberConflict(error)) {
+      throw new HttpError(409, 'Eine neue Runde wurde bereits zeitgleich erstellt. Bitte aktualisieren.');
+    }
+    throw error;
+  }
 
   return listTournamentRounds(db, tournament.id);
 }

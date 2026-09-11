@@ -47,6 +47,15 @@ export function validateMatchScore(value) {
   return score;
 }
 
+// D1 gibt bei einem parallelen INSERT in den eindeutigen Rundenzähler einen
+// SQLite-Fehler zurück. Die Zuordnung bleibt hier testbar und ist bewusst eng
+// auf genau diesen Constraint beschränkt, damit andere Datenbankfehler nicht
+// als harmloser Bedienkonflikt maskiert werden.
+export function isTournamentRoundNumberConflict(error) {
+  const message = String(error?.message || error || '');
+  return /UNIQUE constraint failed:\s*tournament_rounds\.tournament_id,\s*tournament_rounds\.round_number/i.test(message);
+}
+
 export function normalizeTournamentInput(body, { legacyRegistrationTimes = false, registrationTypeDefault = 'forme' } = {}) {
   const rawFormation = text(body.formation || 'doublette');
   const formationOther = rawFormation === 'andere';

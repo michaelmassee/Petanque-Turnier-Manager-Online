@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertPartnerCountMatchesFormation, normalizeTournamentInput, registrationOpenStatus, validateMatchScore } from './worker-core.js';
+import { assertPartnerCountMatchesFormation, isTournamentRoundNumberConflict, normalizeTournamentInput, registrationOpenStatus, validateMatchScore } from './worker-core.js';
 
 const base = { name: 'Testturnier', date: '2026-06-01', location: 'Musterstadt' };
 
@@ -55,5 +55,12 @@ describe('Worker-Fachlogik', () => {
     for (const value of [-1, 14, 99, '', null, '13.5']) {
       expect(() => validateMatchScore(value)).toThrow('Ungültiges Ergebnis');
     }
+  });
+
+  it('erkennt ausschließlich den parallelen Rundenzähler-Konflikt als Bedienkonflikt', () => {
+    expect(isTournamentRoundNumberConflict(new Error('D1_ERROR: UNIQUE constraint failed: tournament_rounds.tournament_id, tournament_rounds.round_number: SQLITE_CONSTRAINT'))).toBe(true);
+    expect(isTournamentRoundNumberConflict('UNIQUE constraint failed: tournament_rounds.tournament_id, tournament_rounds.round_number')).toBe(true);
+    expect(isTournamentRoundNumberConflict()).toBe(false);
+    expect(isTournamentRoundNumberConflict(new Error('UNIQUE constraint failed: registrations.tournament_id, registrations.email'))).toBe(false);
   });
 });

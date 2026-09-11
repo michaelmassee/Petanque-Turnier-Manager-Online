@@ -189,6 +189,7 @@
   "Ein gültiger lokaler Anmeldezeitpunkt ist erforderlich": "A valid local registration date-time is required",
   "Ein gültiges Turnierdatum ist erforderlich": "A valid tournament date is required",
   "Ein Team mit diesem Namen ist für dieses Turnier bereits angemeldet": "A team with this name is already registered for this tournament",
+  "Eine neue Runde wurde bereits zeitgleich erstellt. Bitte aktualisieren.": "A new round was created at the same time. Please refresh.",
   "Eine gültige E-Mail ist erforderlich": "A valid email is required",
   "Eine gültige Kontakt-E-Mail ist erforderlich": "A valid contact email is required",
   "Eine gültige Partner-E-Mail ist erforderlich": "A valid partner email is required",
