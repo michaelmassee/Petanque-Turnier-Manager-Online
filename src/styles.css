@@ -451,6 +451,14 @@ textarea:focus {
   flex-shrink: 0;
 }
 
+.topbar .language-select > .language-flag-button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
 .hamburger-btn {
   display: grid;
   place-items: center;
@@ -1594,11 +1602,6 @@ textarea:focus {
 
   .topbar .language-select {
     gap: 2px;
-  }
-
-  .topbar .language-flag-button {
-    padding: 1px 2px;
-    font-size: 1rem;
   }
 
   .search-menu-panel {
