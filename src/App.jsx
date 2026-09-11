@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 import { ROLES, TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_STATUSES, VISIBILITIES, REGISTRATION_STATUSES, RADIUS_OPTIONS, DEFAULT_TOURNAMENT_LIMIT, EMPTY_USER_FORM, EMPTY_PROFILE_FORM, EMPTY_AUTH_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_TOURNAMENT_REPORT_FORM, EMPTY_REGISTRATION_FORM, REGISTER_SUCCESS, VERIFY_SUCCESS, CANCEL_REGISTRATION_EXPLANATION, CANCEL_REGISTRATION_SUCCESS, PROFILE_UPDATE_SUCCESS, PROFILE_EMAIL_CHANGE_PENDING } from './lib/constants.js';
-import { translateDom } from './lib/i18n.js';
 import i18next from './lib/i18next-config.js';
 import { useTranslation } from 'react-i18next';
 import { api } from './lib/api.js';
@@ -266,8 +265,7 @@ export default function App() {
     if (i18next.language !== language) {
       i18next.changeLanguage(language);
     }
-    translateDom(language);
-  });
+  }, [language]);
 
   const authModalOpen = authView !== 'home' && authView !== 'cancelRegistration';
   const anyDialogOpen =
@@ -407,7 +405,7 @@ export default function App() {
       const data = await api('/api/users');
       setUsers(data.users);
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -423,7 +421,7 @@ export default function App() {
         return manageable?.id || data.tournaments[0]?.id || '';
       });
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -432,7 +430,7 @@ export default function App() {
       const data = await api(`/api/tournaments/${tournamentId}/registrations`);
       setRegistrations(data.registrations);
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -443,7 +441,7 @@ export default function App() {
       setPostboxRecipients(recipients.recipients);
       setPostboxRecipientTournaments(recipients.tournaments || []);
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -455,7 +453,7 @@ export default function App() {
       setPostboxRecipientId('');
       await loadPostbox();
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -467,7 +465,7 @@ export default function App() {
       if (willOpen && postbox.unreadCount > 0) {
         api('/api/postbox/read-all', { method: 'POST' })
           .then(loadPostbox)
-          .catch((requestError) => setError(t(requestError.message)));
+          .catch((requestError) => setError(requestError.message));
       }
       return willOpen;
     });
@@ -509,7 +507,7 @@ export default function App() {
       setMessage(t('Admin wurde angelegt.'));
       await loadTournaments();
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -531,10 +529,10 @@ export default function App() {
       if (requestError.payload?.passwordChangeRequired && requestError.payload.resetToken) {
         setAuthForm({ ...EMPTY_AUTH_FORM, token: requestError.payload.resetToken });
         setAuthView('reset');
-        setMessage(t(requestError.message));
+        setMessage(requestError.message);
         return;
       }
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -562,7 +560,7 @@ export default function App() {
       setAuthView('registerSuccess');
       setMessage(data.verificationUrl ? `${t(REGISTER_SUCCESS)} ${data.verificationUrl}` : t(REGISTER_SUCCESS));
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -581,7 +579,7 @@ export default function App() {
       setAuthView('login');
       setMessage(t(VERIFY_SUCCESS));
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -603,7 +601,7 @@ export default function App() {
       setAuthView('login');
       setMessage(t(CANCEL_REGISTRATION_SUCCESS));
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -658,7 +656,7 @@ export default function App() {
           : t(PROFILE_UPDATE_SUCCESS),
       );
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -675,7 +673,7 @@ export default function App() {
       setMessage(data.resetUrl ? `${data.message} ${data.resetUrl}` : data.message);
       setAuthForm(EMPTY_AUTH_FORM);
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -692,7 +690,7 @@ export default function App() {
       setMessage(data.verificationUrl ? `${data.message} ${data.verificationUrl}` : data.message);
       setAuthForm(EMPTY_AUTH_FORM);
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -724,7 +722,7 @@ export default function App() {
       setAuthView('login');
       setMessage(t('Passwort wurde geändert. Du kannst dich jetzt anmelden.'));
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -785,7 +783,7 @@ export default function App() {
       setUserDialogOpen(false);
       await loadUsers();
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -811,7 +809,7 @@ export default function App() {
       await loadUsers();
       await loadTournaments();
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -845,7 +843,7 @@ export default function App() {
       await loadTournaments();
       setSelectedTournamentId(data.tournament.id);
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -868,7 +866,7 @@ export default function App() {
       setRegistrations([]);
       await loadTournaments();
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -913,7 +911,7 @@ export default function App() {
         await loadRegistrations(selectedTournament.id);
       }
     } catch (requestError) {
-      const baseMessage = t(requestError.message);
+      const baseMessage = requestError.message;
       const conflictName = requestError.payload?.details?.name;
       setError(conflictName ? `${baseMessage} ("${conflictName}")` : baseMessage);
       setRegistrationInvalidField(requestError.payload?.details?.field || null);
@@ -935,7 +933,7 @@ export default function App() {
       await loadRegistrations(registration.tournamentId);
       await loadTournaments();
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -949,7 +947,7 @@ export default function App() {
       await loadRegistrations(registration.tournamentId);
       await loadTournaments();
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -963,7 +961,7 @@ export default function App() {
       await loadRegistrations(selectedTournament.id);
       await loadTournaments();
     } catch (requestError) {
-      setError(t(requestError.message));
+      setError(requestError.message);
     }
   }
 
@@ -1158,7 +1156,7 @@ export default function App() {
         setSearchOrigin({ lat: data.lat, lng: data.lng, label: data.displayName || query });
       }
     } catch (requestError) {
-      setGeoError(t(requestError.message));
+      setGeoError(requestError.message);
     } finally {
       setGeoLoading(false);
     }

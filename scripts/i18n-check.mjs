@@ -1,77 +1,66 @@
-// i18n quality gate, mirrors the intent of the main project's
-// I18nVollstaendigkeitTest (completeness) / I18nReferenzdateiTest (reference
-// consistency): every translation key must exist, non-empty, in every
-// supported language. German is the implicit source language (the literal
-// JSX text) and is not itself a TRANSLATIONS entry.
-import { readFileSync } from 'node:fs';
+// i18n quality gate for the react-i18next setup: every literal string passed
+// to t('...') in the source must have a translation for every supported
+// language in src/locales/*.json. German is the implicit source language
+// (the literal key itself) and does not need its own locales/de.json entry
+// unless the German text differs from the key (rare, legacy postbox strings).
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const APP_FILE = new URL('../src/lib/i18n.js', import.meta.url);
+const ROOT = dirname(fileURLToPath(import.meta.url));
+const SRC_DIR = join(ROOT, '..', 'src');
+const LOCALES_DIR = join(SRC_DIR, 'locales');
 const LANGUAGES = ['nl', 'en', 'es', 'fr'];
 
-function extractTranslationsSource(source) {
-  const startMarker = 'export const TRANSLATIONS = {';
-  const start = source.indexOf(startMarker);
-  if (start === -1) {
-    throw new Error('Could not locate "export const TRANSLATIONS = {" in src/lib/i18n.js');
-  }
-
-  let depth = 0;
-  let end = -1;
-  for (let i = start + startMarker.length - 1; i < source.length; i += 1) {
-    const char = source[i];
-    if (char === '{') depth += 1;
-    if (char === '}') {
-      depth -= 1;
-      if (depth === 0) {
-        end = i + 1;
-        break;
-      }
+function walk(dir, files = []) {
+  for (const entry of readdirSync(dir)) {
+    if (entry === 'locales' || entry === 'node_modules') continue;
+    const full = join(dir, entry);
+    const stat = statSync(full);
+    if (stat.isDirectory()) {
+      walk(full, files);
+    } else if (/\.jsx?$/.test(entry) && !/\.test\.jsx?$/.test(entry)) {
+      files.push(full);
     }
   }
-
-  if (end === -1) {
-    throw new Error('Could not find the end of the TRANSLATIONS object in src/lib/i18n.js');
-  }
-
-  return source.slice(start + 'export const TRANSLATIONS = '.length, end);
+  return files;
 }
 
-function loadTranslations() {
-  const source = readFileSync(APP_FILE, 'utf8');
-  const objectSource = extractTranslationsSource(source);
-  // eslint-disable-next-line no-new-func
-  return new Function(`return (${objectSource});`)();
+function extractKeys(source) {
+  const keys = new Set();
+  // Only matches literal single-quoted t('...') calls; dynamic keys like
+  // t(option.label) or t(requirement.text) can't be checked statically and
+  // are intentionally skipped here.
+  const regex = /\bt\(\s*'((?:[^'\\]|\\.)*)'\s*\)/g;
+  let match;
+  while ((match = regex.exec(source))) {
+    keys.add(match[1].replace(/\\'/g, "'"));
+  }
+  return keys;
 }
 
 function main() {
-  const translations = loadTranslations();
-  const errors = [];
-
-  for (const language of LANGUAGES) {
-    if (!translations[language]) {
-      errors.push(`Missing language block: ${language}`);
-    }
-  }
-
-  const keysByLanguage = Object.fromEntries(
-    LANGUAGES.map((language) => [language, new Set(Object.keys(translations[language] || {}))]),
-  );
-
+  const files = walk(SRC_DIR);
   const allKeys = new Set();
-  for (const keys of Object.values(keysByLanguage)) {
-    for (const key of keys) allKeys.add(key);
-  }
-
-  for (const key of allKeys) {
-    const missingIn = LANGUAGES.filter((language) => !keysByLanguage[language].has(key));
-    if (missingIn.length > 0) {
-      errors.push(`Key missing in [${missingIn.join(', ')}]: ${JSON.stringify(key)}`);
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
+    for (const key of extractKeys(source)) {
+      allKeys.add(key);
     }
   }
 
+  const locales = {};
   for (const language of LANGUAGES) {
-    for (const [key, value] of Object.entries(translations[language] || {})) {
-      if (typeof value !== 'string' || value.trim() === '') {
+    locales[language] = JSON.parse(readFileSync(join(LOCALES_DIR, `${language}.json`), 'utf8'));
+  }
+
+  const errors = [];
+  for (const key of allKeys) {
+    for (const language of LANGUAGES) {
+      const value = locales[language][key];
+      if (value === undefined) {
+        errors.push(`Key missing in ${language}.json: ${JSON.stringify(key)}`);
+      } else if (typeof value !== 'string' || value.trim() === '') {
         errors.push(`Empty translation for "${language}" -> ${JSON.stringify(key)}`);
       }
     }
@@ -83,12 +72,12 @@ function main() {
       console.error(`  - ${message}`);
     }
     console.error(
-      '\nEvery UI string must be translatable: add the missing key(s) to TRANSLATIONS in src/lib/i18n.js for every language (nl/en/es/fr).',
+      "\nEvery literal t('...') string needs a translation for every language: add the missing key(s) to src/locales/{nl,en,es,fr}.json.",
     );
     process.exit(1);
   }
 
-  console.log(`i18n check passed: ${allKeys.size} keys, all present and translated in [${LANGUAGES.join(', ')}].`);
+  console.log(`i18n check passed: ${allKeys.size} literal t() keys, all present and translated in [${LANGUAGES.join(', ')}].`);
 }
 
 main();

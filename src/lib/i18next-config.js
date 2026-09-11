@@ -6,9 +6,6 @@ import en from '../locales/en.json';
 import es from '../locales/es.json';
 import fr from '../locales/fr.json';
 
-// Übergangsphase: TRANSLATIONS/translateDom in lib/i18n.js bleiben aktiv, bis alle
-// Komponenten auf useTranslation()/t() umgestellt sind. Beide Systeme laufen parallel
-// auf derselben Sprache (siehe App.jsx: language-State ruft i18next.changeLanguage()).
 i18next.use(initReactI18next).init({
   resources: {
     de: { translation: de },
