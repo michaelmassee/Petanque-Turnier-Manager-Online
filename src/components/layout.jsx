@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus } from '../lib/hooks.js';
 import { MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTIONS, TOURNAMENT_STATUSES, REGISTRATION_STATUSES } from '../lib/constants.js';
-import { labelFor, roleName } from '../lib/domain.js';
+import { labelFor, roleName, translatedOptions } from '../lib/domain.js';
 import { EditDialog, SelectField, TextArea, Button } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 
@@ -364,7 +364,7 @@ export function SearchMenuControl({
               </Button>
               {searchOrigin && (
                 <>
-                  <SelectField label={t('Umkreis')} value={searchRadiusKm} onChange={setSearchRadiusKm} options={RADIUS_OPTIONS} />
+                  <SelectField label={t('Umkreis')} value={searchRadiusKm} onChange={setSearchRadiusKm} options={translatedOptions(RADIUS_OPTIONS)} />
                   <span className="search-origin-label">
                     {t('Ausgangspunkt:')} {searchOrigin.label}
                   </span>
@@ -383,25 +383,25 @@ export function SearchMenuControl({
                     label={t('Monat')}
                     value={filterMonth}
                     onChange={setFilterMonth}
-                    options={[{ value: '', label: t('Alle Monate') }, ...MONTHS]}
+                    options={[{ value: '', label: t('Alle Monate') }, ...translatedOptions(MONTHS)]}
                   />
                   <SelectField
                     label={t('Formation')}
                     value={filterFormation}
                     onChange={setFilterFormation}
-                    options={[{ value: '', label: t('Alle Formationen') }, ...FORMATIONS]}
+                    options={[{ value: '', label: t('Alle Formationen') }, ...translatedOptions(FORMATIONS)]}
                   />
                   <SelectField
                     label={t('Anmeldetyp')}
                     value={filterRegistrationType}
                     onChange={setFilterRegistrationType}
-                    options={[{ value: '', label: t('Alle Anmeldetypen') }, ...REGISTRATION_TYPES]}
+                    options={[{ value: '', label: t('Alle Anmeldetypen') }, ...translatedOptions(REGISTRATION_TYPES)]}
                   />
                   <SelectField
                     label={t('Turniersystem')}
                     value={filterType}
                     onChange={setFilterType}
-                    options={[{ value: '', label: t('Alle Turniersysteme') }, ...TOURNAMENT_TYPES]}
+                    options={[{ value: '', label: t('Alle Turniersysteme') }, ...translatedOptions(TOURNAMENT_TYPES)]}
                   />
                 </div>
                 <label className="checkbox-field">

@@ -4,77 +4,77 @@ import i18next from './i18next-config.js';
 
 export function authTitle(needsSetup, authView) {
   if (needsSetup) {
-    return 'Ersten Admin anlegen';
+    return i18next.t('Ersten Admin anlegen');
   }
   if (authView === 'forgot') {
-    return 'Passwort vergessen';
+    return i18next.t('Passwort vergessen');
   }
   if (authView === 'register') {
-    return 'Neu registrieren';
+    return i18next.t('Neu registrieren');
   }
   if (authView === 'registerSuccess') {
-    return 'Registrierung gespeichert';
+    return i18next.t('Registrierung gespeichert');
   }
   if (authView === 'reset') {
-    return 'Passwort ändern';
+    return i18next.t('Passwort ändern');
   }
   if (authView === 'verify') {
-    return 'E-Mail bestätigen';
+    return i18next.t('E-Mail bestätigen');
   }
   if (authView === 'resendVerification') {
-    return 'Bestätigungslink erneut anfordern';
+    return i18next.t('Bestätigungslink erneut anfordern');
   }
   if (authView === 'publicRegistration') {
-    return 'Turnieranmeldung';
+    return i18next.t('Turnieranmeldung');
   }
   if (authView === 'cancelRegistration') {
-    return 'Anmeldung stornieren';
+    return i18next.t('Anmeldung stornieren');
   }
-  return 'Anmelden';
+  return i18next.t('Anmelden');
 }
 
 export function authSubtitle(needsSetup, authView) {
   if (needsSetup) {
-    return 'Lege den ersten Admin-Benutzer für dieses neue Projekt an.';
+    return i18next.t('Lege den ersten Admin-Benutzer für dieses neue Projekt an.');
   }
   if (authView === 'forgot') {
-    return 'Fordere einen Link zum Zurücksetzen deines Passworts an.';
+    return i18next.t('Fordere einen Link zum Zurücksetzen deines Passworts an.');
   }
   if (authView === 'register') {
-    return 'Registriere dein Benutzerkonto. Nach der E-Mail-Bestätigung kannst du dich anmelden.';
+    return i18next.t('Registriere dein Benutzerkonto. Nach der E-Mail-Bestätigung kannst du dich anmelden.');
   }
   if (authView === 'registerSuccess') {
-    return 'Bitte bestätige deine E-Mail-Adresse.';
+    return i18next.t('Bitte bestätige deine E-Mail-Adresse.');
   }
   if (authView === 'reset') {
-    return 'Setze mit deinem Reset-Token ein neues Passwort.';
+    return i18next.t('Setze mit deinem Reset-Token ein neues Passwort.');
   }
   if (authView === 'verify') {
-    return 'Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.';
+    return i18next.t('Bestätige deine E-Mail-Adresse, um dein Benutzerkonto freizuschalten.');
   }
   if (authView === 'resendVerification') {
-    return 'Fordere einen neuen Bestätigungslink für dein Benutzerkonto an.';
+    return i18next.t('Fordere einen neuen Bestätigungslink für dein Benutzerkonto an.');
   }
   if (authView === 'publicRegistration') {
-    return 'Melde dich für ein öffentliches Turnier an.';
+    return i18next.t('Melde dich für ein öffentliches Turnier an.');
   }
   if (authView === 'cancelRegistration') {
-    return 'Storniere deine Turnieranmeldung über den Link aus deiner E-Mail.';
+    return i18next.t('Storniere deine Turnieranmeldung über den Link aus deiner E-Mail.');
   }
-  return 'Melde dich mit deinem Benutzerkonto an.';
+  return i18next.t('Melde dich mit deinem Benutzerkonto an.');
 }
 
 export function authErrorMessage(code) {
   if (code === 'google_not_configured') {
-    return 'Google Anmeldung ist nicht konfiguriert.';
+    return i18next.t('Google Anmeldung ist nicht konfiguriert.');
   }
   if (code === 'facebook_not_configured') {
-    return 'Facebook Anmeldung ist nicht konfiguriert.';
+    return i18next.t('Facebook Anmeldung ist nicht konfiguriert.');
   }
   if (code === 'facebook_login_failed') {
-    return 'Facebook Anmeldung fehlgeschlagen.';
+    return i18next.t('Facebook Anmeldung fehlgeschlagen.');
   }
-  return 'Google Anmeldung fehlgeschlagen.';
+  return i18next.t('Google Anmeldung fehlgeschlagen.');
 }
 
 export function googleMapsUrl(tournament) {
@@ -152,11 +152,22 @@ export function registrationPayload(form, language) {
 }
 
 export function roleName(value) {
-  return ROLES.find((role) => role.value === value)?.label || value;
+  const label = ROLES.find((role) => role.value === value)?.label;
+  return label ? i18next.t(label) : value;
 }
 
 export function labelFor(options, value) {
-  return options.find((option) => option.value === value)?.label || value;
+  const label = options.find((option) => option.value === value)?.label;
+  return label ? i18next.t(label) : value;
+}
+
+// Für <select>-Optionslisten aus einer Konstanten (TOURNAMENT_STATUSES,
+// REGISTRATION_TYPES, ...): übersetzt jedes option.label. NUR für Listen mit
+// festen, übersetzbaren Labels verwenden - niemals für Optionen mit
+// Nutzerdaten (Turnier-/Personennamen), da diese sonst fälschlich als
+// i18next-Key nachgeschlagen würden.
+export function translatedOptions(options) {
+  return options.map((option) => ({ ...option, label: i18next.t(option.label) }));
 }
 
 export function formationLabel(tournament) {

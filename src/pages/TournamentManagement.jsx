@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate } from '../lib/format.js';
-import { labelFor, formationLabel, formatTournamentStartTime } from '../lib/domain.js';
+import { labelFor, formationLabel, formatTournamentStartTime, translatedOptions } from '../lib/domain.js';
 import { TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 
@@ -158,7 +158,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           label={t('Formation')}
           value={form.formation}
           onChange={(formation) => setForm({ ...form, formation })}
-          options={FORMATIONS}
+          options={translatedOptions(FORMATIONS)}
         />
       ) : (
         <>
@@ -177,7 +177,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
                 formation,
                 registrationType: (formation === 'tete' || formation === 'andere') ? 'forme' : form.registrationType,
               })}
-              options={form.registrationType === 'supermelee' ? FORMATIONS.filter((option) => option.value !== 'tete' && option.value !== 'andere') : FORMATIONS}
+              options={translatedOptions(form.registrationType === 'supermelee' ? FORMATIONS.filter((option) => option.value !== 'tete' && option.value !== 'andere') : FORMATIONS)}
             />
             <SelectField
               label={t('Anmeldetyp')}
@@ -188,14 +188,14 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
                 type: registrationType === 'supermelee' ? 'rangliste' : form.type,
                 formation: registrationType === 'supermelee' && (form.formation === 'tete' || form.formation === 'andere') ? 'doublette' : form.formation,
               })}
-              options={(form.formation === 'tete' || form.formation === 'andere') ? REGISTRATION_TYPES.filter((option) => option.value === 'forme') : REGISTRATION_TYPES}
+              options={translatedOptions((form.formation === 'tete' || form.formation === 'andere') ? REGISTRATION_TYPES.filter((option) => option.value === 'forme') : REGISTRATION_TYPES)}
               disabled={form.formation === 'tete' || form.formation === 'andere'}
             />
             <SelectField
               label={t('Turniersystem')}
               value={form.registrationType === 'supermelee' ? 'rangliste' : form.type}
               onChange={(type) => setForm({ ...form, type })}
-              options={TOURNAMENT_TYPES}
+              options={translatedOptions(TOURNAMENT_TYPES)}
               disabled={form.registrationType === 'supermelee'}
             />
           </div>
@@ -205,9 +205,9 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         </>
       )}
       <div className="form-grid">
-        <SelectField label={t('Status')} value={form.status} onChange={(status) => setForm({ ...form, status })} options={TOURNAMENT_STATUSES} />
+        <SelectField label={t('Status')} value={form.status} onChange={(status) => setForm({ ...form, status })} options={translatedOptions(TOURNAMENT_STATUSES)} />
         {!isCalendarEntry && (
-          <SelectField label={t('Sichtbarkeit')} value={form.visibility} onChange={(visibility) => setForm({ ...form, visibility })} options={VISIBILITIES} />
+          <SelectField label={t('Sichtbarkeit')} value={form.visibility} onChange={(visibility) => setForm({ ...form, visibility })} options={translatedOptions(VISIBILITIES)} />
         )}
       </div>
       {!isCalendarEntry && (
@@ -326,7 +326,7 @@ export function TournamentList({
         onQueryChange={onQueryChange}
         searchPlaceholder={t('Name oder Ort suchen')}
         filters={[
-          { label: t('Status filtern'), value: statusFilter, onChange: onStatusFilterChange, options: [{ value: '', label: t('Alle Status') }, ...TOURNAMENT_STATUSES] },
+          { label: t('Status filtern'), value: statusFilter, onChange: onStatusFilterChange, options: [{ value: '', label: t('Alle Status') }, ...translatedOptions(TOURNAMENT_STATUSES)] },
         ]}
         onReset={onResetFilters}
         resetDisabled={!filtered}

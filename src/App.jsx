@@ -246,7 +246,7 @@ export default function App() {
       window.history.replaceState({}, '', window.location.pathname);
     } else if (authError) {
       setAuthView('login');
-      pendingAuthError = t(authErrorMessage(authError));
+      pendingAuthError = authErrorMessage(authError);
       window.history.replaceState({}, '', window.location.pathname);
     }
     initialize().then(() => {

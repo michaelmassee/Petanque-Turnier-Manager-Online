@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { REGISTRATION_STATUSES } from '../lib/constants.js';
-import { labelFor } from '../lib/domain.js';
+import { labelFor, translatedOptions } from '../lib/domain.js';
 import { SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
 
@@ -167,7 +167,7 @@ export function RegistrationsPanel({
         onQueryChange={onQueryChange}
         searchPlaceholder={t('Name oder Team suchen')}
         filters={[
-          { label: t('Status filtern'), value: statusFilter, onChange: onStatusFilterChange, options: [{ value: '', label: t('Alle Status') }, ...REGISTRATION_STATUSES] },
+          { label: t('Status filtern'), value: statusFilter, onChange: onStatusFilterChange, options: [{ value: '', label: t('Alle Status') }, ...translatedOptions(REGISTRATION_STATUSES)] },
         ]}
         onReset={onResetFilters}
         resetDisabled={!filtered}

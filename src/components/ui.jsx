@@ -1,10 +1,12 @@
 import { useState, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function RequiredMark() {
   return <span className="required-mark" aria-hidden="true"> *</span>;
 }
 
 export function TextField({ label, value, onChange, type = 'text', required, invalid, className, ...props }) {
+  const { t } = useTranslation();
   const [passwordVisible, setPasswordVisible] = useState(false);
 
   if (type === 'password') {
@@ -24,9 +26,9 @@ export function TextField({ label, value, onChange, type = 'text', required, inv
             className="password-toggle"
             type="button"
             onClick={() => setPasswordVisible((visible) => !visible)}
-            aria-label={passwordVisible ? 'Passwort verbergen' : 'Passwort anzeigen'}
+            aria-label={passwordVisible ? t('Passwort verbergen') : t('Passwort anzeigen')}
           >
-            {passwordVisible ? 'Verbergen' : 'Anzeigen'}
+            {passwordVisible ? t('Verbergen') : t('Anzeigen')}
           </button>
         </div>
       </label>
@@ -92,6 +94,7 @@ export function Feedback({ message, error }) {
 }
 
 export function ListToolbar({ query, onQueryChange, searchPlaceholder, filters = [], onReset, resetDisabled }) {
+  const { t } = useTranslation();
   return (
     <div className="user-toolbar">
       <input
@@ -104,13 +107,14 @@ export function ListToolbar({ query, onQueryChange, searchPlaceholder, filters =
         <SelectField key={filter.label} label={filter.label} value={filter.value} onChange={filter.onChange} options={filter.options} />
       ))}
       <Button variant="secondary" onClick={onReset} disabled={resetDisabled}>
-        Filter zurücksetzen
+        {t('Filter zurücksetzen')}
       </Button>
     </div>
   );
 }
 
 export function EditDialog({ open = true, title, subtitle, message, error, onClose, wide, nested, children }) {
+  const { t } = useTranslation();
   const titleId = useId();
 
   if (!open) {
@@ -126,7 +130,7 @@ export function EditDialog({ open = true, title, subtitle, message, error, onClo
         aria-labelledby={titleId}
         onClick={(event) => event.stopPropagation()}
       >
-        <button className="modal-close" type="button" onClick={onClose} aria-label="Schließen">
+        <button className="modal-close" type="button" onClick={onClose} aria-label={t('Schließen')}>
           ×
         </button>
         <h2 id={titleId}>{title}</h2>
