@@ -613,5 +613,13 @@
   "Trip-Tête": "Trip-Tête",
   "Schließen": "Close",
   "Bitte bestätige deine E-Mail-Adresse.": "Please confirm your email address.",
-  "Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse über den Link in der Bestätigungs-E-Mail. Danach kannst du dich anmelden und eigene Turniere erstellen.": "Your user account has been created. Please confirm your email address via the link in the confirmation email first. After that you can sign in and create your own tournaments."
+  "Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse über den Link in der Bestätigungs-E-Mail. Danach kannst du dich anmelden und eigene Turniere erstellen.": "Your user account has been created. Please confirm your email address via the link in the confirmation email first. After that you can sign in and create your own tournaments.",
+  "Konten und Rollen zentral bearbeiten.": "Manage accounts and roles centrally.",
+  "Turnier-Limit:": "Tournament limit:",
+  "Turnier-Limit": "Tournament limit",
+  "E-Mail-Versand freigeschaltet": "Email sending enabled",
+  "E-Mail-Versand gesperrt": "Email sending blocked",
+  "Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).": "Maximum number of own tournaments this user may create (admins are unlimited).",
+  "E-Mail-Versand für Turniere dieses Nutzers freigeschaltet": "Email sending enabled for this user's tournaments",
+  "Solange nicht freigeschaltet, werden für Turniere dieses Nutzers keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt (Push/Postfach bleiben unberührt).": "As long as this is not enabled, no confirmation, reminder, or broadcast emails will be sent for this user's tournaments (push/inbox remain unaffected)."
 }

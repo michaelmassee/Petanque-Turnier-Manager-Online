@@ -613,5 +613,13 @@
   "Trip-Tête": "Trip-Tête",
   "Schließen": "Cerrar",
   "Bitte bestätige deine E-Mail-Adresse.": "Por favor, confirma tu dirección de correo electrónico.",
-  "Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse über den Link in der Bestätigungs-E-Mail. Danach kannst du dich anmelden und eigene Turniere erstellen.": "Tu cuenta de usuario ha sido creada. Primero confirma tu dirección de correo electrónico a través del enlace del correo de confirmación. Después podrás iniciar sesión y crear tus propios torneos."
+  "Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse über den Link in der Bestätigungs-E-Mail. Danach kannst du dich anmelden und eigene Turniere erstellen.": "Tu cuenta de usuario ha sido creada. Primero confirma tu dirección de correo electrónico a través del enlace del correo de confirmación. Después podrás iniciar sesión y crear tus propios torneos.",
+  "Konten und Rollen zentral bearbeiten.": "Gestiona cuentas y roles de forma centralizada.",
+  "Turnier-Limit:": "Límite de torneos:",
+  "Turnier-Limit": "Límite de torneos",
+  "E-Mail-Versand freigeschaltet": "Envío de correo habilitado",
+  "E-Mail-Versand gesperrt": "Envío de correo bloqueado",
+  "Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).": "Número máximo de torneos propios que este usuario puede crear (los administradores no tienen límite).",
+  "E-Mail-Versand für Turniere dieses Nutzers freigeschaltet": "Envío de correo habilitado para los torneos de este usuario",
+  "Solange nicht freigeschaltet, werden für Turniere dieses Nutzers keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt (Push/Postfach bleiben unberührt).": "Mientras esto no esté habilitado, no se enviarán correos de confirmación, recordatorio ni difusión para los torneos de este usuario (push/bandeja de entrada no se ven afectados)."
 }

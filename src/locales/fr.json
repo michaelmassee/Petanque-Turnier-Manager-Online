@@ -613,5 +613,13 @@
   "Trip-Tête": "Trip-Tête",
   "Schließen": "Fermer",
   "Bitte bestätige deine E-Mail-Adresse.": "Merci de confirmer ton adresse e-mail.",
-  "Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse über den Link in der Bestätigungs-E-Mail. Danach kannst du dich anmelden und eigene Turniere erstellen.": "Ton compte utilisateur a été créé. Merci de confirmer d'abord ton adresse e-mail via le lien dans l'e-mail de confirmation. Tu pourras ensuite te connecter et créer tes propres tournois."
+  "Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse über den Link in der Bestätigungs-E-Mail. Danach kannst du dich anmelden und eigene Turniere erstellen.": "Ton compte utilisateur a été créé. Merci de confirmer d'abord ton adresse e-mail via le lien dans l'e-mail de confirmation. Tu pourras ensuite te connecter et créer tes propres tournois.",
+  "Konten und Rollen zentral bearbeiten.": "Gère les comptes et les rôles de façon centralisée.",
+  "Turnier-Limit:": "Limite de tournois :",
+  "Turnier-Limit": "Limite de tournois",
+  "E-Mail-Versand freigeschaltet": "Envoi d'e-mails activé",
+  "E-Mail-Versand gesperrt": "Envoi d'e-mails bloqué",
+  "Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).": "Nombre maximal de tournois propres que cet utilisateur peut créer (illimité pour les administrateurs).",
+  "E-Mail-Versand für Turniere dieses Nutzers freigeschaltet": "Envoi d'e-mails activé pour les tournois de cet utilisateur",
+  "Solange nicht freigeschaltet, werden für Turniere dieses Nutzers keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt (Push/Postfach bleiben unberührt).": "Tant que cela n'est pas activé, aucun e-mail de confirmation, de rappel ou de diffusion ne sera envoyé pour les tournois de cet utilisateur (push/boîte de réception non concernés)."
 }

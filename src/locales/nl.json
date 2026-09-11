@@ -613,5 +613,13 @@
   "Trip-Tête": "Trip-Tête",
   "Schließen": "Sluiten",
   "Bitte bestätige deine E-Mail-Adresse.": "Bevestig je e-mailadres.",
-  "Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse über den Link in der Bestätigungs-E-Mail. Danach kannst du dich anmelden und eigene Turniere erstellen.": "Je gebruikersaccount is aangemaakt. Bevestig eerst je e-mailadres via de link in de bevestigingsmail. Daarna kun je je aanmelden en eigen toernooien aanmaken."
+  "Dein Benutzerkonto wurde angelegt. Bitte bestätige zuerst deine E-Mail-Adresse über den Link in der Bestätigungs-E-Mail. Danach kannst du dich anmelden und eigene Turniere erstellen.": "Je gebruikersaccount is aangemaakt. Bevestig eerst je e-mailadres via de link in de bevestigingsmail. Daarna kun je je aanmelden en eigen toernooien aanmaken.",
+  "Konten und Rollen zentral bearbeiten.": "Accounts en rollen centraal beheren.",
+  "Turnier-Limit:": "Toernooilimiet:",
+  "Turnier-Limit": "Toernooilimiet",
+  "E-Mail-Versand freigeschaltet": "E-mailverzending vrijgegeven",
+  "E-Mail-Versand gesperrt": "E-mailverzending geblokkeerd",
+  "Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).": "Maximaal aantal eigen toernooien dat deze gebruiker mag aanmaken (beheerders onbeperkt).",
+  "E-Mail-Versand für Turniere dieses Nutzers freigeschaltet": "E-mailverzending voor toernooien van deze gebruiker vrijgegeven",
+  "Solange nicht freigeschaltet, werden für Turniere dieses Nutzers keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt (Push/Postfach bleiben unberührt).": "Zolang dit niet is vrijgegeven, worden voor toernooien van deze gebruiker geen bevestigings-, herinnerings- of broadcast-e-mails verstuurd (push/postvak blijven onaangetast)."
 }

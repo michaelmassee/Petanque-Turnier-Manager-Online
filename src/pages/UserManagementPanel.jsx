@@ -1,6 +1,7 @@
+import { useTranslation } from 'react-i18next';
 import { DEFAULT_TOURNAMENT_LIMIT, ROLES, EMPTY_USER_FORM } from '../lib/constants.js';
 import { PASSWORD_STRENGTH_HINT } from '../lib/format.js';
-import { roleName } from '../lib/domain.js';
+import { roleName, translatedOptions } from '../lib/domain.js';
 import { SelectField, TextField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 
 const USER_STATUS_FILTERS = [
@@ -31,8 +32,9 @@ export function UserManagementPanel({
   onEditUser,
   onDeleteUser,
 }) {
+  const { t } = useTranslation();
   const filtered = users.length !== totalUsers;
-  const roleOptions = [{ value: '', label: 'Alle Rollen' }, ...ROLES];
+  const roleOptions = [{ value: '', label: t('Alle Rollen') }, ...translatedOptions(ROLES)];
 
   function resetUserFilters() {
     setUserQuery('');
@@ -44,30 +46,30 @@ export function UserManagementPanel({
     <section className="user-management">
       <div className="user-management-header">
         <div>
-          <h2>Benutzerverwaltung</h2>
-          <p className="muted">Konten und Rollen zentral bearbeiten.</p>
+          <h2>{t('Benutzerverwaltung')}</h2>
+          <p className="muted">{t('Konten und Rollen zentral bearbeiten.')}</p>
         </div>
         <div className="user-stat-grid">
-          <UserStat label="Benutzer" value={stats.total} />
-          <UserStat label="Admins" value={stats.admins} />
-          <UserStat label="E-Mail offen" value={stats.unverified} />
-          <UserStat label="Passwortwechsel" value={stats.passwordChangeRequired} />
+          <UserStat label={t('Benutzer')} value={stats.total} />
+          <UserStat label={t('Admins')} value={stats.admins} />
+          <UserStat label={t('E-Mail offen')} value={stats.unverified} />
+          <UserStat label={t('Passwortwechsel')} value={stats.passwordChangeRequired} />
         </div>
       </div>
 
       <div className="panel user-list-panel">
         <div className="section-title">
-          <h2>Benutzer</h2>
+          <h2>{t('Benutzer')}</h2>
           <span className="counter">{filtered ? `${users.length}/${totalUsers}` : totalUsers}</span>
-          <Button onClick={onCreateUser}>Neuer Benutzer</Button>
+          <Button onClick={onCreateUser}>{t('Neuer Benutzer')}</Button>
         </div>
         <ListToolbar
           query={userQuery}
           onQueryChange={setUserQuery}
-          searchPlaceholder="Name oder E-Mail suchen"
+          searchPlaceholder={t('Name oder E-Mail suchen')}
           filters={[
-            { label: 'Rolle filtern', value: userRoleFilter, onChange: setUserRoleFilter, options: roleOptions },
-            { label: 'Status filtern', value: userStatusFilter, onChange: setUserStatusFilter, options: USER_STATUS_FILTERS },
+            { label: t('Rolle filtern'), value: userRoleFilter, onChange: setUserRoleFilter, options: roleOptions },
+            { label: t('Status filtern'), value: userStatusFilter, onChange: setUserStatusFilter, options: translatedOptions(USER_STATUS_FILTERS) },
           ]}
           onReset={resetUserFilters}
           resetDisabled={!filtered}
@@ -83,22 +85,22 @@ export function UserManagementPanel({
               onDelete={onDeleteUser}
             />
           ))}
-          {users.length === 0 && <p className="muted">Keine Benutzer gefunden.</p>}
+          {users.length === 0 && <p className="muted">{t('Keine Benutzer gefunden.')}</p>}
         </div>
       </div>
 
       <EditDialog
         open={dialogOpen}
-        title={userMode === 'edit' ? 'Benutzer bearbeiten' : 'Benutzer anlegen'}
+        title={userMode === 'edit' ? t('Benutzer bearbeiten') : t('Benutzer anlegen')}
         onClose={onCloseDialog}
       >
         <UserEditorForm
           form={userForm}
           setForm={setUserForm}
-          submitLabel={userMode === 'edit' ? 'Speichern' : 'Anlegen'}
+          submitLabel={userMode === 'edit' ? t('Speichern') : t('Anlegen')}
           onSubmit={onSubmitUser}
           onCancel={onCloseDialog}
-          passwordLabel={userMode === 'edit' ? 'Neues Passwort' : 'Passwort'}
+          passwordLabel={userMode === 'edit' ? t('Neues Passwort') : t('Passwort')}
           passwordRequired={userMode === 'create'}
         />
       </EditDialog>
@@ -116,6 +118,7 @@ function UserStat({ label, value }) {
 }
 
 function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
+  const { t } = useTranslation();
   const systemUser = user.id === 'system-tournament-reports';
 
   return (
@@ -127,22 +130,22 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
       <div className="badges">
         <span className={`role role-${user.role}`}>{roleName(user.role)}</span>
         <span className={user.emailVerifiedAt ? 'status registration-confirmed' : 'status registration-pending'}>
-          {user.emailVerifiedAt ? 'E-Mail bestätigt' : 'E-Mail offen'}
+          {user.emailVerifiedAt ? t('E-Mail bestätigt') : t('E-Mail offen')}
         </span>
-        {user.passwordChangeRequired && <span className="status registration-pending">Passwortwechsel nötig</span>}
-        {user.role !== 'admin' && <span className="status">Turnier-Limit: {user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT}</span>}
+        {user.passwordChangeRequired && <span className="status registration-pending">{t('Passwortwechsel nötig')}</span>}
+        {user.role !== 'admin' && <span className="status">{t('Turnier-Limit:')} {user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT}</span>}
         {user.role !== 'admin' && (
           <span className={user.mailEnabled ? 'status registration-confirmed' : 'status registration-pending'}>
-            {user.mailEnabled ? 'E-Mail-Versand freigeschaltet' : 'E-Mail-Versand gesperrt'}
+            {user.mailEnabled ? t('E-Mail-Versand freigeschaltet') : t('E-Mail-Versand gesperrt')}
           </span>
         )}
       </div>
       <div className="row-actions">
         <Button variant="secondary" onClick={() => onEdit(user)} disabled={systemUser}>
-          Bearbeiten
+          {t('Bearbeiten')}
         </Button>
         <Button variant="danger" onClick={() => onDelete(user)} disabled={systemUser || user.id === currentUser.id}>
-          Löschen
+          {t('Löschen')}
         </Button>
       </div>
     </article>
@@ -150,19 +153,20 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
 }
 
 function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwordLabel, passwordRequired }) {
+  const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
-      <TextField label="Vorname" value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
-      <TextField label="Nachname" value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
-      <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
-      <SelectField label="Rolle" value={form.role} onChange={(role) => setForm({ ...form, role })} options={ROLES} />
+      <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
+      <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
+      <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+      <SelectField label={t('Rolle')} value={form.role} onChange={(role) => setForm({ ...form, role })} options={translatedOptions(ROLES)} />
       <label className="checkbox-row">
         <input
           type="checkbox"
           checked={form.emailVerified}
           onChange={(event) => setForm({ ...form, emailVerified: event.target.checked })}
         />
-        <span>E-Mail bestätigt setzen</span>
+        <span>{t('E-Mail bestätigt setzen')}</span>
       </label>
       <label className="checkbox-row">
         <input
@@ -170,25 +174,25 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwo
           checked={form.passwordChangeRequired}
           onChange={(event) => setForm({ ...form, passwordChangeRequired: event.target.checked })}
         />
-        <span>Passwortänderung beim nächsten Login erzwingen</span>
+        <span>{t('Passwortänderung beim nächsten Login erzwingen')}</span>
       </label>
       <TextField
-        label="Turnier-Limit"
+        label={t('Turnier-Limit')}
         type="number"
         min={0}
         value={form.tournamentLimit}
         onChange={(value) => setForm({ ...form, tournamentLimit: value === '' ? '' : Number(value) })}
       />
-      <p className="hint">Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).</p>
+      <p className="hint">{t('Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).')}</p>
       <label className="checkbox-row">
         <input
           type="checkbox"
           checked={form.mailEnabled}
           onChange={(event) => setForm({ ...form, mailEnabled: event.target.checked })}
         />
-        <span>E-Mail-Versand für Turniere dieses Nutzers freigeschaltet</span>
+        <span>{t('E-Mail-Versand für Turniere dieses Nutzers freigeschaltet')}</span>
       </label>
-      <p className="hint">Solange nicht freigeschaltet, werden für Turniere dieses Nutzers keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt (Push/Postfach bleiben unberührt).</p>
+      <p className="hint">{t('Solange nicht freigeschaltet, werden für Turniere dieses Nutzers keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt (Push/Postfach bleiben unberührt).')}</p>
       <TextField
         label={passwordLabel}
         type="password"
@@ -196,11 +200,11 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwo
         onChange={(password) => setForm({ ...form, password })}
         required={passwordRequired}
         minLength={passwordRequired ? 8 : undefined}
-        placeholder={passwordRequired ? '' : 'Leer lassen, wenn unverändert'}
+        placeholder={passwordRequired ? '' : t('Leer lassen, wenn unverändert')}
       />
-      <p className="hint">{PASSWORD_STRENGTH_HINT}</p>
+      <p className="hint">{t(PASSWORD_STRENGTH_HINT)}</p>
       <div className="dialog-actions">
-        <Button variant="secondary" type="button" onClick={onCancel}>Abbrechen</Button>
+        <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>
         <Button type="submit">{submitLabel}</Button>
       </div>
     </form>
