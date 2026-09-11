@@ -622,5 +622,6 @@
   "Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).": "Maximum number of own tournaments this user may create (admins are unlimited).",
   "E-Mail-Versand für Turniere dieses Nutzers freigeschaltet": "Email sending enabled for this user's tournaments",
   "Solange nicht freigeschaltet, werden für Turniere dieses Nutzers keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt (Push/Postfach bleiben unberührt).": "As long as this is not enabled, no confirmation, reminder, or broadcast emails will be sent for this user's tournaments (push/inbox remain unaffected).",
-  "Tippe unten auf „Teilen\" und dann auf „Zum Home-Bildschirm\".": "Tap \"Share\" at the bottom and then \"Add to Home Screen\"."
+  "Tippe unten auf „Teilen\" und dann auf „Zum Home-Bildschirm\".": "Tap \"Share\" at the bottom and then \"Add to Home Screen\".",
+  "Anmeldung": "Registration"
 }

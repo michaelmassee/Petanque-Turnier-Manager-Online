@@ -157,8 +157,8 @@ function base64urlToUint8Array(value) {
 function postboxMessageText(message, t) {
   if (message.kind === 'direct') return message.body;
   const data = message.eventData || {};
-  if (message.eventType === 'tournament_status_changed') return `${data.tournamentName}: Status ${labelFor(TOURNAMENT_STATUSES, data.status)}`;
-  if (message.eventType === 'registration_status_changed') return `${data.tournamentName}: Anmeldung ${labelFor(REGISTRATION_STATUSES, data.status)}`;
+  if (message.eventType === 'tournament_status_changed') return `${data.tournamentName}: ${t('Status')} ${labelFor(TOURNAMENT_STATUSES, data.status)}`;
+  if (message.eventType === 'registration_status_changed') return `${data.tournamentName}: ${t('Anmeldung')} ${labelFor(REGISTRATION_STATUSES, data.status)}`;
   return t('status');
 }
 
