@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PASSWORD_STRENGTH_HINT } from '../lib/format.js';
 import { TextField, Button } from '../components/ui.jsx';
@@ -29,21 +30,53 @@ const LANGUAGE_FLAGS = [
 
 export function LanguageSelect({ language, setLanguage }) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const selectRef = useRef(null);
+  const activeLanguage = LANGUAGE_FLAGS.find((option) => option.value === language) || LANGUAGE_FLAGS[0];
+
+  useEffect(() => {
+    function closeOnOutsidePointer(event) {
+      if (!selectRef.current?.contains(event.target)) setOpen(false);
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer);
+  }, []);
+
   return (
-    <div className="language-select" role="group" aria-label={t('Sprache')}>
-      {LANGUAGE_FLAGS.map((option) => (
+    <div className="language-select" ref={selectRef} role="group" aria-label={t('Sprache')}>
+      <button
+        type="button"
+        className="language-flag-button active"
+        title={activeLanguage.label}
+        aria-label={`${t('Sprache')}: ${activeLanguage.label}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((visible) => !visible)}
+        onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false); }}
+      >
+        {activeLanguage.flag}
+      </button>
+      {open && (
+        <div className="language-menu" role="menu" aria-label={t('Sprache')}>
+          {LANGUAGE_FLAGS.map((option) => (
         <button
           key={option.value}
           type="button"
           className={`language-flag-button${option.value === language ? ' active' : ''}`}
           title={option.label}
           aria-label={option.label}
-          aria-pressed={option.value === language}
-          onClick={() => setLanguage(option.value)}
+          role="menuitemradio"
+          aria-checked={option.value === language}
+          onClick={() => {
+            setLanguage(option.value);
+            setOpen(false);
+          }}
         >
           {option.flag}
         </button>
-      ))}
+          ))}
+        </div>
+      )}
     </div>
   );
 }

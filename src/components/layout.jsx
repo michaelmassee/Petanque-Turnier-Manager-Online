@@ -6,6 +6,7 @@ import { MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTION
 import { labelFor, roleName, translatedOptions } from '../lib/domain.js';
 import { EditDialog, SelectField, TextArea, Button } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
+import { LanguageSelect } from '../auth/AuthForms.jsx';
 
 async function subscribeToPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return 'unsupported';
@@ -201,7 +202,7 @@ export function InstallAppButton() {
   return null;
 }
 
-export function AppHeader({ heading, headingNoTranslate, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, children }) {
+export function AppHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, children }) {
   const { t } = useTranslation();
   return (
     <header className="topbar">
@@ -226,6 +227,7 @@ export function AppHeader({ heading, headingNoTranslate, menuOpen, onToggleMenu,
       <div className="topbar-actions">
         {searchControl}
         {postboxControl}
+        <LanguageSelect language={language} setLanguage={setLanguage} />
         <button
           className="hamburger-btn"
           type="button"
@@ -430,12 +432,14 @@ export function AuthModal({ title, subtitle, message, error, onClose, children }
   );
 }
 
-export function StandalonePageHeader({ heading, headingNoTranslate, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
+export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
   const { t } = useTranslation();
   return (
     <AppHeader
       heading={heading}
       headingNoTranslate={headingNoTranslate}
+      language={language}
+      setLanguage={setLanguage}
       menuOpen={menuOpen}
       onToggleMenu={() => setMenuOpen((open) => !open)}
       onCloseMenu={() => setMenuOpen(false)}

@@ -3,6 +3,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import i18next from './lib/i18next-config.js';
 import { EditDialog, ProfilePanel } from './App.jsx';
+import { AppHeader } from './components/layout.jsx';
 import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_USER_FORM } from './lib/constants.js';
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
 import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
@@ -14,6 +15,29 @@ import { tournamentPayload } from './lib/domain.js';
 describe('Turnier-Payload', () => {
   it('behält den Verein eines bearbeiteten Kalendereintrags bei', () => {
     expect(tournamentPayload({ ...EMPTY_TOURNAMENT_FORM, club: 'BC Linden' }).club).toBe('BC Linden');
+  });
+});
+
+describe('Kopfzeile', () => {
+  it('zeigt die Sprachumschaltung dauerhaft in der oberen Leiste', () => {
+    const setLanguage = vi.fn();
+    render(
+      <AppHeader
+        heading="Turniere"
+        language="de"
+        setLanguage={setLanguage}
+        menuOpen={false}
+        onToggleMenu={() => {}}
+        onCloseMenu={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('group', { name: 'Sprache' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'English' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sprache: Deutsch' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'English' }));
+    expect(setLanguage).toHaveBeenCalledWith('en');
+    expect(screen.queryByRole('menu', { name: 'Sprache' })).not.toBeInTheDocument();
   });
 });
 
