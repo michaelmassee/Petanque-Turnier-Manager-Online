@@ -569,7 +569,7 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
   const participantsBlock = buildRegistrationParticipantsBlock(registration, language);
 
   for (const recipient of buildTeamRecipients(registration)) {
-    await sendTransactionalEmail(env, {
+    await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
       text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link, cancelLink, participantsBlock),
@@ -591,7 +591,7 @@ async function sendRegistrationReceivedEmail(env, tournament, registration, appO
   const participantsBlock = buildRegistrationParticipantsBlock(registration, language);
 
   for (const recipient of buildTeamRecipients(registration)) {
-    await sendTransactionalEmail(env, {
+    await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
       text: templates.text(recipient.firstName, tournament.name, link, cancelLink, participantsBlock),
@@ -611,7 +611,7 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
   const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
 
   for (const recipient of buildTeamRecipients(registration)) {
-    await sendTransactionalEmail(env, {
+    await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
       text: wasCancelled
@@ -632,7 +632,7 @@ async function sendCancellationEmail(env, tournament, registration, appOrigin) {
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
 
   for (const recipient of buildTeamRecipients(registration)) {
-    await sendTransactionalEmail(env, {
+    await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
       text: templates.text(recipient.firstName, tournament.name, link),
@@ -685,7 +685,7 @@ async function sendTournamentReminders(env) {
 
         try {
           for (const recipient of recipients) {
-            await sendTransactionalEmail(env, {
+            await enqueueTransactionalEmail(env, {
               to: recipient.email,
               subject: templates.subject(tournament.name),
               text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link, cancelLink),
@@ -715,6 +715,10 @@ const PWA_INSTALL_PATHS = ['/manifest.webmanifest', '/service-worker.js'];
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sendTournamentReminders(env));
+  },
+
+  async queue(batch, env) {
+    await processMailQueueBatch(batch, env);
   },
 
   async fetch(request, env) {
@@ -2044,7 +2048,7 @@ async function createBroadcastPostboxMessage(env, { sender, tournament, body }) 
   for (const recipient of mailAllowed ? uniqueRecipients.values() : []) {
     const templates = TOURNAMENT_BROADCAST_EMAILS[recipient.language] || TOURNAMENT_BROADCAST_EMAILS.de;
     try {
-      await sendTransactionalEmail(env, {
+      await enqueueTransactionalEmail(env, {
         to: recipient.email,
         subject: templates.subject(tournament.name),
         text: templates.text(recipient.firstName, tournament.name, `${sender.firstName} ${sender.lastName}`, body),
@@ -3866,6 +3870,33 @@ async function sendTransactionalEmail(env, { to, subject, text, language = 'de',
   }
 
   await sendFallback();
+}
+
+// Wird von Mengen-Versandstellen (Reminder-Cron, Broadcast, Bulk-Status-Update) genutzt,
+// damit der eigentliche Versand gedrosselt über den Queue-Consumer (queue()) läuft statt
+// den Mailserver mit vielen Sends ohne Pause zu belasten. Einzelne, latenzkritische Flows
+// (Passwort-Reset, E-Mail-/Report-Verifizierung) rufen weiterhin sendTransactionalEmail direkt.
+async function enqueueTransactionalEmail(env, payload) {
+  await env.MAIL_QUEUE.send(payload);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const MAIL_QUEUE_SEND_DELAY_MS = 2000;
+
+async function processMailQueueBatch(batch, env) {
+  for (const message of batch.messages) {
+    try {
+      await sendTransactionalEmail(env, message.body);
+      message.ack();
+    } catch (error) {
+      console.error(`Queued email delivery failed for ${message.body?.failureContext || message.body?.to}`, error);
+      message.retry({ delaySeconds: 10 });
+    }
+    await sleep(MAIL_QUEUE_SEND_DELAY_MS);
+  }
 }
 
 async function geocodeLocation(query, { limit = 5, countryCode } = {}) {

@@ -28,5 +28,19 @@
   },
   "triggers": {
     "crons": ["0 6 * * *"]
+  },
+  "queues": {
+    "producers": [
+      { "binding": "MAIL_QUEUE", "queue": "ptm-mail-queue" }
+    ],
+    "consumers": [
+      {
+        "queue": "ptm-mail-queue",
+        "max_batch_size": 3,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "ptm-mail-dlq"
+      }
+    ]
   }
 }
