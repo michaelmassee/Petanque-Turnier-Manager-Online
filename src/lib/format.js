@@ -61,10 +61,10 @@ export function formatTournamentDateTime(value, language, timeZone) {
   if (Number.isNaN(date.getTime())) return '';
   const zone = timeZone || 'UTC';
   const viewerZone = detectViewerTimeZone();
-  return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, {
-    dateStyle: 'medium', timeStyle: 'short', timeZone: zone,
-    ...(viewerZone && viewerZone !== zone ? { timeZoneName: 'short' } : {}),
-  }).format(date);
+  const locale = DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de;
+  const formatted = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: zone }).format(date);
+  if (!viewerZone || viewerZone === zone) return formatted;
+  return `${formatted} ${timezoneAbbrev(date, zone, locale)}`;
 }
 
 export function minorUnitsToAmount(units, currency) {
