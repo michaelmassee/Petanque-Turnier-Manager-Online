@@ -11,6 +11,14 @@ function shuffle(list) {
   return result;
 }
 
+// Basis-Teamgröße der Formation: 2 bei Doublette (Basisspiel 2v2 = 4), sonst 3
+// (Basisspiel 3v3 = 6). "Ausnahme-Spiele"/"Ausnahme-Teams" sind alle, die von
+// dieser Basisgröße abweichen (siehe computeGameSizes, buildHistoryIndex,
+// generateRound - alle drei müssen dieselbe Basisgröße verwenden).
+function baseTeamSize(formation) {
+  return formation === 'doublette' ? 2 : 3;
+}
+
 // Ein "Spiel" besteht aus zwei Teams (Größe 2 oder 3). Gültige Spielgrößen sind
 // 4 (2v2), 5 (3v2) und 6 (3v3). Wir suchen die Kombination von Spielgrößen, die
 // alle n Spieler verbraucht, mit möglichst wenigen "Ausnahme-Spielen" (4er/5er
@@ -19,7 +27,7 @@ export function computeGameSizes(playerCount, formation) {
   if (playerCount < 4) {
     return null;
   }
-  const preferSix = formation !== 'doublette';
+  const preferSix = baseTeamSize(formation) === 3;
   const combos = [];
   for (let sixes = 0; sixes * 6 <= playerCount; sixes++) {
     const afterSixes = playerCount - sixes * 6;
@@ -60,16 +68,17 @@ function splitGameSize(gameSize) {
 }
 
 // history: flaches Array bisheriger Matches dieses Turniers, je { teamA: [ids], teamB: [ids] }
-export function buildHistoryIndex(history) {
+export function buildHistoryIndex(history, formation) {
   const teammatePairs = new Set();
   const opponentPairs = new Set();
   const exceptionCounts = {};
+  const base = baseTeamSize(formation);
 
   for (const match of history || []) {
     const teamA = match.teamA || [];
     const teamB = match.teamB || [];
     for (const team of [teamA, teamB]) {
-      if (team.length !== 3) {
+      if (team.length !== base) {
         for (const playerId of team) {
           exceptionCounts[playerId] = (exceptionCounts[playerId] || 0) + 1;
         }
@@ -163,10 +172,11 @@ export function generateRound(players, history, { formation, attempts = 20 } = {
     throw new Error('Für diese Spieleranzahl ist keine gültige Rundenaufteilung möglich.');
   }
 
-  const { teammatePairs, opponentPairs, exceptionCounts } = buildHistoryIndex(history || []);
+  const { teammatePairs, opponentPairs, exceptionCounts } = buildHistoryIndex(history || [], formation);
 
   const gamesBySize = gameSizes.map((size) => ({ size, teamSizes: splitGameSize(size) }));
   gamesBySize.sort((a, b) => a.size - b.size);
+  const baseGameSize = baseTeamSize(formation) * 2;
 
   let best = null;
   let bestConflicts = Infinity;
@@ -178,7 +188,7 @@ export function generateRound(players, history, { formation, attempts = 20 } = {
     const matches = [];
 
     for (const game of gamesBySize) {
-      const isExceptionGame = game.size !== 6;
+      const isExceptionGame = game.size !== baseGameSize;
       const pool = isExceptionGame ? fairnessOrder : randomOrder;
       const teamA = pickTeam(pool, assigned, game.teamSizes[0], teammatePairs);
       const teamB = pickTeam(pool, assigned, game.teamSizes[1], teammatePairs);

@@ -69,4 +69,19 @@ describe('generateRound', () => {
       }
     }
   });
+
+  it('bevorzugt bei Doublette für das Ausnahme-Spiel (3er-Team) Spieler, die noch nicht in einem 3er-Team waren', () => {
+    const players = makePlayers(9);
+    // p1-p3 waren bereits im 3er-Team (Ausnahme bei Doublette, Basis ist 2er) -
+    // bei der nächsten Runde sollen bevorzugt p4-p9 (noch keine Ausnahme) das
+    // neue 3er-Team stellen, nicht wieder p1-p3.
+    const history = [{ teamA: ['p1', 'p2', 'p3'], teamB: ['p4', 'p5'] }];
+    const { matches } = generateRound(players, history, { formation: 'doublette', attempts: 50 });
+    const exceptionMatch = matches.find((match) => match.teamA.length === 3 || match.teamB.length === 3);
+    expect(exceptionMatch).toBeDefined();
+    const exceptionTeam = exceptionMatch.teamA.length === 3 ? exceptionMatch.teamA : exceptionMatch.teamB;
+    expect(exceptionTeam).not.toContain('p1');
+    expect(exceptionTeam).not.toContain('p2');
+    expect(exceptionTeam).not.toContain('p3');
+  });
 });
