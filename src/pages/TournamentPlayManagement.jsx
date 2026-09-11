@@ -298,8 +298,8 @@ export default function TournamentPlayManagement({ tournaments }) {
       <Feedback message={message} error={error} />
 
       {selectedTournamentStatus === 'running' && (
-        <section className="panel round-participants">
-          <div className="section-title"><h2>{t('Teilnehmer')}</h2><span className="counter">{activeConfirmedCount}</span></div>
+        <details className="panel round-participants">
+          <summary className="supermelee-round-summary"><span>{t('Teilnehmer')}</span><span className="counter">{activeConfirmedCount}</span></summary>
           <form className="quick-player-form" onSubmit={handleQuickPlayerSubmit}>
             <TextField label={t('Vorname')} value={quickPlayer.firstName} onChange={(firstName) => setQuickPlayer({ ...quickPlayer, firstName })} required minLength={2} />
             <TextField label={t('Nachname')} value={quickPlayer.lastName} onChange={(lastName) => setQuickPlayer({ ...quickPlayer, lastName })} required minLength={2} />
@@ -310,12 +310,12 @@ export default function TournamentPlayManagement({ tournaments }) {
           <div className="round-participant-list">
             {confirmedRegistrations.map((registration) => (
               <label className="round-participant-row" key={registration.id}>
-                <input type="checkbox" checked={registration.active} disabled={busy} onChange={(event) => handleToggleActive(registration.id, event.target.checked)} />
                 <span className={registration.active ? '' : 'muted'} data-i18n-skip>{playerLabel(registration)}</span>
+                <input type="checkbox" checked={registration.active} disabled={busy} onChange={(event) => handleToggleActive(registration.id, event.target.checked)} />
               </label>
             ))}
           </div>
-        </section>
+        </details>
       )}
 
       {currentRound && (

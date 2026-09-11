@@ -95,6 +95,16 @@ describe('TournamentPlayManagement', () => {
     await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
   });
 
+  it('klappt die Teilnehmerverwaltung standardmäßig ein', async () => {
+    const calls = [];
+    installFetchMock(calls);
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    await screen.findByText('Anna Muster + Bert Beispiel + Clara Test');
+
+    expect(screen.getByText('Teilnehmer').closest('details')).not.toHaveAttribute('open');
+  });
+
   it('erstellt über den Button eine neue Runde, sobald alle Ergebnisse der aktuellen Runde feststehen', async () => {
     const calls = [];
     const decidedRound = { ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 7 }] };
@@ -141,6 +151,7 @@ describe('TournamentPlayManagement', () => {
     expect(await screen.findByText('Bestätigte Meldungen: 4 (3 aktiv)')).toBeInTheDocument();
     expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
 
+    fireEvent.click(screen.getByText('Teilnehmer'));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Dirk Demo' }));
 
     await waitFor(() => expect(calls).toContain('/api/registrations/p4/active'));
@@ -195,6 +206,7 @@ describe('TournamentPlayManagement', () => {
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
     await screen.findByText('Anna Muster + Bert Beispiel + Clara Test');
 
+    fireEvent.click(screen.getByText('Teilnehmer'));
     const [firstName, lastName] = screen.getAllByRole('textbox');
     fireEvent.change(firstName, { target: { value: 'Gina' } });
     fireEvent.change(lastName, { target: { value: 'Neu' } });
