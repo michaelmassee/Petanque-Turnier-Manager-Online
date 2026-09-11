@@ -84,4 +84,18 @@ describe('generateRound', () => {
     expect(exceptionTeam).not.toContain('p2');
     expect(exceptionTeam).not.toContain('p3');
   });
+
+  it('bevorzugt bei Triplette für das Ausnahme-Spiel (2er-Team) Spieler, die noch nicht in einem 2er-Team waren', () => {
+    const players = makePlayers(11);
+    // p4/p5 waren bereits im 2er-Team (Ausnahme bei Triplette, Basis ist 3er) -
+    // bei der nächsten Runde sollen bevorzugt die übrigen Spieler (noch keine
+    // Ausnahme) das neue 2er-Team stellen, nicht wieder p4/p5.
+    const history = [{ teamA: ['p1', 'p2', 'p3'], teamB: ['p4', 'p5'] }];
+    const { matches } = generateRound(players, history, { formation: 'triplette', attempts: 50 });
+    const exceptionMatch = matches.find((match) => match.teamA.length === 2 || match.teamB.length === 2);
+    expect(exceptionMatch).toBeDefined();
+    const exceptionTeam = exceptionMatch.teamA.length === 2 ? exceptionMatch.teamA : exceptionMatch.teamB;
+    expect(exceptionTeam).not.toContain('p4');
+    expect(exceptionTeam).not.toContain('p5');
+  });
 });
