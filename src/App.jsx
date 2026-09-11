@@ -1915,7 +1915,6 @@ export default function App() {
               onConfirm={handleConfirmRegistration}
               onConfirmAll={handleConfirmAllRegistrations}
               onDelete={handleDeleteRegistration}
-              language={language}
               registrationDialogOpen={registrationDialogOpen}
               registrationMode={registrationMode}
               registrationForm={registrationForm}

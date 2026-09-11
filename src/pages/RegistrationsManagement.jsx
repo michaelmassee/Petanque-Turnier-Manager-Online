@@ -1,17 +1,18 @@
+import { useTranslation } from 'react-i18next';
 import { REGISTRATION_STATUSES } from '../lib/constants.js';
-import { translateText } from '../lib/i18n.js';
 import { labelFor } from '../lib/domain.js';
 import { SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
 
 export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField }) {
+  const { t } = useTranslation();
   const selectedValue = form.tournamentId || selectedTournamentId;
   const options = tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }));
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedValue);
 
   return (
     <form className="form dense" onSubmit={onSubmit}>
-      <SelectField label="Turnier" value={selectedValue} onChange={(tournamentId) => setForm({ ...form, tournamentId })} options={options} />
+      <SelectField label={t('Turnier')} value={selectedValue} onChange={(tournamentId) => setForm({ ...form, tournamentId })} options={options} />
       <RegistrationFields
         form={form}
         setForm={setForm}
@@ -23,8 +24,8 @@ export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournament
         invalidField={invalidField}
       />
       <div className="dialog-actions">
-        {onCancel && <Button variant="secondary" type="button" onClick={onCancel}>Abbrechen</Button>}
-        <Button type="submit">{form.id ? 'Anmeldung speichern' : 'Anmeldung erfassen'}</Button>
+        {onCancel && <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>}
+        <Button type="submit">{form.id ? t('Anmeldung speichern') : t('Anmeldung erfassen')}</Button>
       </div>
     </form>
   );
@@ -113,8 +114,8 @@ export function RegistrationsPanel({
   onConfirm,
   onConfirmAll,
   onDelete,
-  language = 'de',
 }) {
+  const { t } = useTranslation();
   const filtered = filteredRegistrations.length !== registrations.length;
   const pendingRegistrations = filteredRegistrations.filter((registration) => registration.status === 'pending');
   const otherRegistrations = filteredRegistrations.filter((registration) => registration.status !== 'pending');
@@ -127,14 +128,14 @@ export function RegistrationsPanel({
             {registration.isVip && <span className="vip-badge" title="VIP">★</span>}
             {registration.firstName} {registration.lastName}
           </strong>
-          <span>{registration.noEmail ? translateText('ohne E-Mail-Adresse', language) : registration.email}</span>
+          <span>{registration.noEmail ? t('ohne E-Mail-Adresse') : registration.email}</span>
           {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
         </div>
         <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
         <div className="row-actions">
-          {showConfirm && <Button onClick={() => onConfirm(registration)}>{translateText('Bestätigen', language)}</Button>}
-          <Button variant="secondary" onClick={() => onEdit(registration)}>Bearbeiten</Button>
-          <Button variant="danger" onClick={() => onDelete(registration)}>Löschen</Button>
+          {showConfirm && <Button onClick={() => onConfirm(registration)}>{t('Bestätigen')}</Button>}
+          <Button variant="secondary" onClick={() => onEdit(registration)}>{t('Bearbeiten')}</Button>
+          <Button variant="danger" onClick={() => onDelete(registration)}>{t('Löschen')}</Button>
         </div>
       </article>
     );
@@ -143,45 +144,45 @@ export function RegistrationsPanel({
   return (
     <div className="panel">
       <div className="section-title">
-        <h2>Anmeldungen</h2>
+        <h2>{t('Anmeldungen')}</h2>
         <span className="counter">{filtered ? `${filteredRegistrations.length}/${registrations.length}` : registrations.length}</span>
         <Button
           variant="secondary"
           disabled={registrations.length === 0}
           onClick={() => downloadRegistrationsCsv(tournament, registrations)}
         >
-          CSV exportieren
+          {t('CSV exportieren')}
         </Button>
-        <Button onClick={onCreate}>Neue Anmeldung</Button>
+        <Button onClick={onCreate}>{t('Neue Anmeldung')}</Button>
       </div>
       <SelectField
-        label="Turnier anzeigen"
+        label={t('Turnier anzeigen')}
         value={tournament?.id || ''}
         onChange={onTournamentChange}
         options={tournaments.map((item) => ({ value: item.id, label: item.name }))}
       />
-      {!tournament?.canManage && <p className="muted">Für dieses Turnier sind Anmeldungen nur für Admins und zuständige Turnierleiter sichtbar.</p>}
+      {!tournament?.canManage && <p className="muted">{t('Für dieses Turnier sind Anmeldungen nur für Admins und zuständige Turnierleiter sichtbar.')}</p>}
       <ListToolbar
         query={query}
         onQueryChange={onQueryChange}
-        searchPlaceholder="Name oder Team suchen"
+        searchPlaceholder={t('Name oder Team suchen')}
         filters={[
-          { label: 'Status filtern', value: statusFilter, onChange: onStatusFilterChange, options: [{ value: '', label: 'Alle Status' }, ...REGISTRATION_STATUSES] },
+          { label: t('Status filtern'), value: statusFilter, onChange: onStatusFilterChange, options: [{ value: '', label: t('Alle Status') }, ...REGISTRATION_STATUSES] },
         ]}
         onReset={onResetFilters}
         resetDisabled={!filtered}
       />
       {pendingRegistrations.length > 0 && (
-        <section className="user-list" aria-label={translateText('Offene Anmeldungen', language)}>
-          <div className="section-title"><h3>{translateText('Offene Anmeldungen', language)}</h3><span className="counter">{pendingRegistrations.length}</span><Button onClick={onConfirmAll}>{translateText('Alle bestätigen', language)}</Button></div>
+        <section className="user-list" aria-label={t('Offene Anmeldungen')}>
+          <div className="section-title"><h3>{t('Offene Anmeldungen')}</h3><span className="counter">{pendingRegistrations.length}</span><Button onClick={onConfirmAll}>{t('Alle bestätigen')}</Button></div>
           {pendingRegistrations.map((registration) => <RegistrationRow key={registration.id} registration={registration} showConfirm />)}
         </section>
       )}
       {(otherRegistrations.length > 0 || (filteredRegistrations.length === 0 && pendingRegistrations.length === 0)) && (
-        <section className="user-list" aria-label={translateText('Weitere Anmeldungen', language)}>
-          {pendingRegistrations.length > 0 && <div className="section-title"><h3>{translateText('Weitere Anmeldungen', language)}</h3><span className="counter">{otherRegistrations.length}</span></div>}
+        <section className="user-list" aria-label={t('Weitere Anmeldungen')}>
+          {pendingRegistrations.length > 0 && <div className="section-title"><h3>{t('Weitere Anmeldungen')}</h3><span className="counter">{otherRegistrations.length}</span></div>}
           {otherRegistrations.map((registration) => <RegistrationRow key={registration.id} registration={registration} />)}
-          {filteredRegistrations.length === 0 && <p className="muted">Keine Anmeldungen gefunden.</p>}
+          {filteredRegistrations.length === 0 && <p className="muted">{t('Keine Anmeldungen gefunden.')}</p>}
         </section>
       )}
     </div>
@@ -204,7 +205,6 @@ export function RegistrationsManagementPage({
   onConfirm,
   onConfirmAll,
   onDelete,
-  language,
   registrationDialogOpen,
   registrationMode,
   registrationForm,
@@ -216,6 +216,7 @@ export function RegistrationsManagementPage({
   manageMode,
   invalidField,
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <RegistrationsPanel
@@ -234,13 +235,12 @@ export function RegistrationsManagementPage({
         onConfirm={onConfirm}
         onConfirmAll={onConfirmAll}
         onDelete={onDelete}
-        language={language}
       />
 
       <EditDialog
         open={registrationDialogOpen}
         wide
-        title={registrationMode === 'edit' ? 'Anmeldung bearbeiten' : 'Anmeldung erfassen'}
+        title={registrationMode === 'edit' ? t('Anmeldung bearbeiten') : t('Anmeldung erfassen')}
         onClose={onCloseRegistrationDialog}
       >
         <RegistrationForm
