@@ -621,5 +621,6 @@
   "E-Mail-Versand gesperrt": "Envoi d'e-mails bloqué",
   "Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).": "Nombre maximal de tournois propres que cet utilisateur peut créer (illimité pour les administrateurs).",
   "E-Mail-Versand für Turniere dieses Nutzers freigeschaltet": "Envoi d'e-mails activé pour les tournois de cet utilisateur",
-  "Solange nicht freigeschaltet, werden für Turniere dieses Nutzers keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt (Push/Postfach bleiben unberührt).": "Tant que cela n'est pas activé, aucun e-mail de confirmation, de rappel ou de diffusion ne sera envoyé pour les tournois de cet utilisateur (push/boîte de réception non concernés)."
+  "Solange nicht freigeschaltet, werden für Turniere dieses Nutzers keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt (Push/Postfach bleiben unberührt).": "Tant que cela n'est pas activé, aucun e-mail de confirmation, de rappel ou de diffusion ne sera envoyé pour les tournois de cet utilisateur (push/boîte de réception non concernés).",
+  "Tippe unten auf „Teilen\" und dann auf „Zum Home-Bildschirm\".": "Appuie sur « Partager » en bas puis sur « Sur l’écran d’accueil »."
 }

@@ -1308,7 +1308,7 @@ export default function App() {
     return (
       <main className="app-shell">
         <AppHeader
-          heading="Turniere"
+          heading={t('Turniere')}
           language={language}
           setLanguage={setLanguage}
           menuOpen={menuOpen}

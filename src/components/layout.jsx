@@ -191,7 +191,7 @@ export function InstallAppButton() {
         </button>
         {showIosHint && (
           <p className="install-hint-text">
-            Tippe unten auf <strong>Teilen</strong> und dann auf <strong>„Zum Home-Bildschirm"</strong>.
+            {t('Tippe unten auf „Teilen" und dann auf „Zum Home-Bildschirm".')}
           </p>
         )}
       </div>
