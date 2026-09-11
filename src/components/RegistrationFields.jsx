@@ -1,8 +1,11 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { REGISTRATION_STATUSES } from '../lib/constants.js';
+import { translatedOptions } from '../lib/domain.js';
 import { SelectField, TextField } from './ui.jsx';
 
 export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled, invalidField }) {
+  const { t } = useTranslation();
   const isDrawnTeam = registrationType === 'melee' || registrationType === 'supermelee';
   const allowsPartner = isDrawnTeam ? false : (formation ? formation !== 'tete' : true);
   const allowsPartner2 = isDrawnTeam ? false : formation === 'triplette';
@@ -27,8 +30,8 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
   return (
     <>
       <div className="form-grid">
-        <TextField label="Vorname" value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />
-        <TextField label="Nachname" value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} invalid={invalidField === 'firstName'} />
+        <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />
+        <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} invalid={invalidField === 'firstName'} />
       </div>
       {showStatus && (
         <label className="checkbox-field">
@@ -37,42 +40,42 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
             checked={Boolean(form.noEmail)}
             onChange={(event) => setForm({ ...form, noEmail: event.target.checked })}
           />
-          Keine E-Mail-Adresse vorhanden
+          {t('Keine E-Mail-Adresse vorhanden')}
         </label>
       )}
       {!(showStatus && form.noEmail) && (
-        <TextField label="E-Mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+        <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       )}
       <div className="form-grid">
-        <TextField label="Verein" value={form.club} onChange={(club) => setForm({ ...form, club })} />
+        <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
         {licenseRequired && (
           <TextField
-            label="Lizenznummer"
+            label={t('Lizenznummer')}
             value={form.licenseNr}
             onChange={(licenseNr) => setForm({ ...form, licenseNr })}
             required
           />
         )}
       </div>
-      {teamNameEnabled && <TextField label="Teamname" value={form.teamName} onChange={(teamName) => setForm({ ...form, teamName })} invalid={invalidField === 'teamName'} />}
+      {teamNameEnabled && <TextField label={t('Teamname')} value={form.teamName} onChange={(teamName) => setForm({ ...form, teamName })} invalid={invalidField === 'teamName'} />}
       {showMeleeNotice && (
         <p className="muted">
           {registrationType === 'supermelee'
-            ? 'Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.'
-            : 'Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.'}
+            ? t('Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.')
+            : t('Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.')}
         </p>
       )}
       {allowsPartner && (
         <>
           <div className="form-grid">
-            <TextField label="Partner Vorname" value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
-            <TextField label="Partner Nachname" value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
+            <TextField label={t('Partner Vorname')} value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
+            <TextField label={t('Partner Nachname')} value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
           </div>
           <div className="form-grid">
-            <TextField label="Partner E-Mail" type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
+            <TextField label={t('Partner E-Mail')} type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
             {licenseRequired && (
               <TextField
-                label="Partner Lizenznummer"
+                label={t('Partner Lizenznummer')}
                 value={form.partnerLicenseNr}
                 onChange={(partnerLicenseNr) => setForm({ ...form, partnerLicenseNr })}
                 required
@@ -84,14 +87,14 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
       {allowsPartner2 && (
         <>
           <div className="form-grid">
-            <TextField label="Partner 2 Vorname" value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required minLength={2} invalid={invalidField === 'partner2FirstName'} />
-            <TextField label="Partner 2 Nachname" value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} required minLength={2} invalid={invalidField === 'partner2FirstName'} />
+            <TextField label={t('Partner 2 Vorname')} value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required minLength={2} invalid={invalidField === 'partner2FirstName'} />
+            <TextField label={t('Partner 2 Nachname')} value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} required minLength={2} invalid={invalidField === 'partner2FirstName'} />
           </div>
           <div className="form-grid">
-            <TextField label="Partner 2 E-Mail" type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
+            <TextField label={t('Partner 2 E-Mail')} type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
             {licenseRequired && (
               <TextField
-                label="Partner 2 Lizenznummer"
+                label={t('Partner 2 Lizenznummer')}
                 value={form.partner2LicenseNr}
                 onChange={(partner2LicenseNr) => setForm({ ...form, partner2LicenseNr })}
                 required
@@ -103,8 +106,8 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
       {showStatus && (
         <>
           <div className="form-grid">
-            <TextField label="Setzposition" type="number" min="0" value={form.seedingPosition} onChange={(seedingPosition) => setForm({ ...form, seedingPosition })} />
-            <SelectField label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={REGISTRATION_STATUSES} />
+            <TextField label={t('Setzposition')} type="number" min="0" value={form.seedingPosition} onChange={(seedingPosition) => setForm({ ...form, seedingPosition })} />
+            <SelectField label={t('Status')} value={form.status} onChange={(status) => setForm({ ...form, status })} options={translatedOptions(REGISTRATION_STATUSES)} />
           </div>
           <label className="checkbox-field">
             <input
