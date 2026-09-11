@@ -26,11 +26,9 @@ function walk(dir, files = []) {
   return files;
 }
 
-function extractKeys(source) {
+function extractLiteralKeys(source) {
   const keys = new Set();
-  // Only matches literal single-quoted t('...') calls; dynamic keys like
-  // t(option.label) or t(requirement.text) can't be checked statically and
-  // are intentionally skipped here.
+  // Matches literal single-quoted t('...') calls.
   const regex = /\bt\(\s*'((?:[^'\\]|\\.)*)'\s*\)/g;
   let match;
   while ((match = regex.exec(source))) {
@@ -39,13 +37,55 @@ function extractKeys(source) {
   return keys;
 }
 
+function extractConstDeclarations(source, constants) {
+  // export const SOME_CONST = 'literal text';
+  const regex = /export const ([A-Za-z_][A-Za-z0-9_]*)\s*=\s*'((?:[^'\\]|\\.)*)'\s*;/g;
+  let match;
+  while ((match = regex.exec(source))) {
+    constants.set(match[1], match[2].replace(/\\'/g, "'"));
+  }
+}
+
+function extractConstReferences(source) {
+  // t(SOME_CONST) - references a module-level string constant by name,
+  // resolved against extractConstDeclarations() below. Covers the common
+  // "translated message constant" pattern (see lib/constants.js,
+  // lib/format.js) without needing to check the identifier at every call
+  // site by hand. Object/array field access (t(option.label),
+  // t(requirement.text)) and anything else non-trivial is NOT resolved -
+  // those stay a manual-audit responsibility, see i18next-migration memory.
+  const keys = new Set();
+  const regex = /\bt\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)/g;
+  let match;
+  while ((match = regex.exec(source))) {
+    keys.add(match[1]);
+  }
+  return keys;
+}
+
 function main() {
   const files = walk(SRC_DIR);
   const allKeys = new Set();
+  const constants = new Map();
+  const constRefsByFile = new Map();
+
   for (const file of files) {
     const source = readFileSync(file, 'utf8');
-    for (const key of extractKeys(source)) {
+    for (const key of extractLiteralKeys(source)) {
       allKeys.add(key);
+    }
+    extractConstDeclarations(source, constants);
+    constRefsByFile.set(file, extractConstReferences(source));
+  }
+
+  const unresolvedConstRefs = new Set();
+  for (const refs of constRefsByFile.values()) {
+    for (const name of refs) {
+      if (constants.has(name)) {
+        allKeys.add(constants.get(name));
+      } else {
+        unresolvedConstRefs.add(name);
+      }
     }
   }
 
@@ -72,12 +112,19 @@ function main() {
       console.error(`  - ${message}`);
     }
     console.error(
-      "\nEvery literal t('...') string needs a translation for every language: add the missing key(s) to src/locales/{nl,en,es,fr}.json.",
+      "\nEvery literal t('...') string, and every t(SOME_CONST) referencing an 'export const SOME_CONST = \\'...\\'' string, needs a translation for every language: add the missing key(s) to src/locales/{nl,en,es,fr}.json.",
     );
     process.exit(1);
   }
 
-  console.log(`i18n check passed: ${allKeys.size} literal t() keys, all present and translated in [${LANGUAGES.join(', ')}].`);
+  console.log(`i18n check passed: ${allKeys.size} t() keys (literal + resolved const references), all present and translated in [${LANGUAGES.join(', ')}].`);
+  if (unresolvedConstRefs.size > 0) {
+    console.log(
+      `Note: ${unresolvedConstRefs.size} t(...) call(s) use a non-literal argument this check cannot resolve statically ` +
+        `(e.g. t(option.label), t(requirement.text)) and were skipped: ${[...unresolvedConstRefs].sort().join(', ')}. ` +
+        'Verify these by hand whenever the underlying data (constants arrays, API-provided text) changes.',
+    );
+  }
 }
 
 main();
