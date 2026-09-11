@@ -131,7 +131,7 @@ describe('TournamentPlayManagement', () => {
 
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
 
-    expect(await screen.findByText('Bestätigte Meldungen: 1 (1 aktiv)')).toBeInTheDocument();
+    expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 1 (1 aktiv)')).toBeInTheDocument();
     expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erste Runde starten' })).toBeDisabled();
   });
@@ -148,14 +148,14 @@ describe('TournamentPlayManagement', () => {
 
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
 
-    expect(await screen.findByText('Bestätigte Meldungen: 4 (3 aktiv)')).toBeInTheDocument();
+    expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 4 (3 aktiv)')).toBeInTheDocument();
     expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Teilnehmer'));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Dirk Demo' }));
 
     await waitFor(() => expect(calls).toContain('/api/registrations/p4/active'));
-    expect(await screen.findByText('Bestätigte Meldungen: 4 (4 aktiv)')).toBeInTheDocument();
+    expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 4 (4 aktiv)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erste Runde starten' })).not.toBeDisabled();
   });
 

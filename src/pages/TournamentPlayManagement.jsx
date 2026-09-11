@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
 import { SelectField, TextField, Button, Feedback } from '../components/ui.jsx';
 import { checkRoundRequirements } from '../lib/pairing/index.js';
+import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
+import { labelFor } from '../lib/domain.js';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
 // Systemwissen: 'minPlayers' trägt die Mindestanzahl als Zahl statt fest im Satz
@@ -292,7 +294,11 @@ export default function TournamentPlayManagement({ tournaments }) {
             <Button disabled={busy || !selectedTournamentId} onClick={handleStartTournament}>{t('Turnier starten')}</Button>
           </div>
         )}
-        {selectedTournamentStatus === 'running' && <p className="hint">{t('Bestätigte Meldungen')}: {confirmedRegistrations.length} ({activeConfirmedCount} {t('aktiv')})</p>}
+        {selectedTournamentStatus === 'running' && (
+          <p className="hint">
+            {t('Bestätigte Meldungen')} · {labelFor(REGISTRATION_TYPES, selectedTournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, selectedTournament.type)} · {labelFor(FORMATIONS, selectedTournament.formation)}: {confirmedRegistrations.length} ({activeConfirmedCount} {t('aktiv')})
+          </p>
+        )}
       </div>
 
       <Feedback message={message} error={error} />
