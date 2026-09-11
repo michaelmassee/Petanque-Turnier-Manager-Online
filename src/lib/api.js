@@ -1,4 +1,4 @@
-import { translateText } from './i18n.js';
+import i18next from './i18next-config.js';
 
 export async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -11,7 +11,7 @@ export async function api(path, options = {}) {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(translateText(payload.error || 'Request failed', localStorage.getItem('ptm_language') || 'de'));
+    const error = new Error(i18next.t(payload.error || 'Request failed'));
     error.payload = payload;
     throw error;
   }
