@@ -1,4 +1,8 @@
 {
+  "Keine Verbindung zum Server. Bitte versuche es erneut.": "No hay conexión con el servidor. Inténtalo de nuevo.",
+  "Die Anfrage hat zu lange gedauert. Bitte versuche es erneut.": "La solicitud tardó demasiado. Inténtalo de nuevo.",
+  "Die Anfrage wurde abgebrochen.": "La solicitud se canceló.",
+  "Die Serverantwort konnte nicht verarbeitet werden.": "No se pudo procesar la respuesta del servidor.",
   "1. Verantwortlicher": "1. Responsable del tratamiento",
   "10 km": "10 km",
   "10. Deine Rechte": "10. Tus derechos",

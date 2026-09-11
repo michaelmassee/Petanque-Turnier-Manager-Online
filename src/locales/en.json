@@ -1,4 +1,8 @@
 {
+  "Keine Verbindung zum Server. Bitte versuche es erneut.": "No connection to the server. Please try again.",
+  "Die Anfrage hat zu lange gedauert. Bitte versuche es erneut.": "The request took too long. Please try again.",
+  "Die Anfrage wurde abgebrochen.": "The request was cancelled.",
+  "Die Serverantwort konnte nicht verarbeitet werden.": "The server response could not be processed.",
   "1. Verantwortlicher": "1. Controller",
   "10 km": "10 km",
   "10. Deine Rechte": "10. Your rights",

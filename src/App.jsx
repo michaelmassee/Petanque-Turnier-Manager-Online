@@ -3,7 +3,9 @@ import { filterRegistrations, filterTournaments, filterUsers } from './frontend-
 import { ROLES, TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_STATUSES, VISIBILITIES, REGISTRATION_STATUSES, RADIUS_OPTIONS, DEFAULT_TOURNAMENT_LIMIT, EMPTY_USER_FORM, EMPTY_PROFILE_FORM, EMPTY_AUTH_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_TOURNAMENT_REPORT_FORM, EMPTY_REGISTRATION_FORM, REGISTER_SUCCESS, VERIFY_SUCCESS, CANCEL_REGISTRATION_EXPLANATION, CANCEL_REGISTRATION_SUCCESS, PROFILE_UPDATE_SUCCESS, PROFILE_EMAIL_CHANGE_PENDING } from './lib/constants.js';
 import i18next from './lib/i18next-config.js';
 import { useTranslation } from 'react-i18next';
+import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './lib/api.js';
+import { queryClient } from './lib/query-client.js';
 import { usePath, matchTournamentRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, timezoneAbbrev, formatTournamentDateTime, minorUnitsToAmount, amountToMinorUnits, currencyOptions, formatMoney, utcIsoToZonedDateTimeInput, formatDateTime, isPasswordStrong } from './lib/format.js';
@@ -29,7 +31,16 @@ export { filterRegistrations, filterTournaments, filterUsers } from './frontend-
 export { EditDialog, ListToolbar } from './components/ui.jsx';
 
 export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
+    </QueryClientProvider>
+  );
+}
+
+function AppContent() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState(() => localStorage.getItem('ptm_language') || 'de');
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -105,6 +116,25 @@ export default function App() {
   const isAdmin = currentUser?.role === 'admin';
   const canManageTournaments = Boolean(currentUser);
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
+
+  const tournamentsQuery = useQuery({ queryKey: ['tournaments'], queryFn: () => api('/api/tournaments') });
+  const postboxQuery = useQuery({
+    queryKey: ['postbox', currentUser?.id],
+    queryFn: async () => {
+      const [postbox, recipients] = await Promise.all([api('/api/postbox'), api('/api/postbox/recipients')]);
+      return { postbox, recipients };
+    },
+    enabled: Boolean(currentUser),
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+  });
+  const usersQuery = useQuery({ queryKey: ['users'], queryFn: () => api('/api/users'), enabled: isAdmin });
+  const manageableTournamentId = selectedTournament?.canManage ? selectedTournament.id : null;
+  const registrationsQuery = useQuery({
+    queryKey: ['registrations', manageableTournamentId],
+    queryFn: () => api(`/api/tournaments/${manageableTournamentId}/registrations`),
+    enabled: Boolean(manageableTournamentId),
+  });
 
   const homeHeading = t('Öffentliche Turniere');
 
@@ -338,31 +368,34 @@ export default function App() {
   }, [anyDialogOpen, awayFromHome, authModalOpen]);
 
   useEffect(() => {
-    if (currentUser) {
-      loadTournaments();
-      loadPostbox();
-    }
-  }, [currentUser]);
+    if (!tournamentsQuery.data) return;
+    const data = tournamentsQuery.data;
+    setTournaments(data.tournaments);
+    setSelectedTournamentId((previous) => {
+      if (previous && data.tournaments.some((tournament) => tournament.id === previous)) return previous;
+      const manageable = data.tournaments.find((tournament) => tournament.canManage);
+      return manageable?.id || data.tournaments[0]?.id || '';
+    });
+  }, [tournamentsQuery.data]);
 
   useEffect(() => {
-    if (!currentUser) return undefined;
-    const timer = window.setInterval(loadPostbox, 60000);
-    return () => window.clearInterval(timer);
-  }, [currentUser]);
+    if (!postboxQuery.data) return;
+    setPostbox(postboxQuery.data.postbox);
+    setPostboxRecipients(postboxQuery.data.recipients.recipients);
+    setPostboxRecipientTournaments(postboxQuery.data.recipients.tournaments || []);
+  }, [postboxQuery.data]);
 
   useEffect(() => {
-    if (isAdmin) {
-      loadUsers();
-    }
-  }, [isAdmin]);
+    if (usersQuery.data) setUsers(usersQuery.data.users);
+  }, [usersQuery.data]);
 
   useEffect(() => {
-    if (selectedTournament?.canManage) {
-      loadRegistrations(selectedTournament.id);
-    } else {
+    if (registrationsQuery.data) {
+      setRegistrations(registrationsQuery.data.registrations);
+    } else if (!selectedTournament?.canManage) {
       setRegistrations([]);
     }
-  }, [selectedTournamentId, selectedTournament?.canManage]);
+  }, [registrationsQuery.data, selectedTournament?.canManage]);
 
   async function initialize() {
     setLoading(true);
@@ -400,18 +433,18 @@ export default function App() {
     }
   }
 
-  async function loadUsers() {
+  async function loadUsers(silent = false) {
     try {
-      const data = await api('/api/users');
+      const data = await queryClient.fetchQuery({ queryKey: ['users'], queryFn: () => api('/api/users'), staleTime: 0 });
       setUsers(data.users);
     } catch (requestError) {
-      setError(requestError.message);
+      if (!silent) setError(requestError.message);
     }
   }
 
-  async function loadTournaments() {
+  async function loadTournaments(silent = false) {
     try {
-      const data = await api('/api/tournaments');
+      const data = await queryClient.fetchQuery({ queryKey: ['tournaments'], queryFn: () => api('/api/tournaments'), staleTime: 0 });
       setTournaments(data.tournaments);
       setSelectedTournamentId((previous) => {
         if (previous && data.tournaments.some((tournament) => tournament.id === previous)) {
@@ -421,27 +454,38 @@ export default function App() {
         return manageable?.id || data.tournaments[0]?.id || '';
       });
     } catch (requestError) {
-      setError(requestError.message);
+      if (!silent) setError(requestError.message);
     }
   }
 
-  async function loadRegistrations(tournamentId) {
+  async function loadRegistrations(tournamentId, silent = false) {
     try {
-      const data = await api(`/api/tournaments/${tournamentId}/registrations`);
+      const data = await queryClient.fetchQuery({
+        queryKey: ['registrations', tournamentId],
+        queryFn: () => api(`/api/tournaments/${tournamentId}/registrations`),
+        staleTime: 0,
+      });
       setRegistrations(data.registrations);
     } catch (requestError) {
-      setError(requestError.message);
+      if (!silent) setError(requestError.message);
     }
   }
 
-  async function loadPostbox() {
+  async function loadPostbox(silent = false) {
     try {
-      const [data, recipients] = await Promise.all([api('/api/postbox'), api('/api/postbox/recipients')]);
-      setPostbox(data);
-      setPostboxRecipients(recipients.recipients);
-      setPostboxRecipientTournaments(recipients.tournaments || []);
+      const data = await queryClient.fetchQuery({
+        queryKey: ['postbox', currentUser?.id],
+        queryFn: async () => {
+          const [postbox, recipients] = await Promise.all([api('/api/postbox'), api('/api/postbox/recipients')]);
+          return { postbox, recipients };
+        },
+        staleTime: 0,
+      });
+      setPostbox(data.postbox);
+      setPostboxRecipients(data.recipients.recipients);
+      setPostboxRecipientTournaments(data.recipients.tournaments || []);
     } catch (requestError) {
-      setError(requestError.message);
+      if (!silent) setError(requestError.message);
     }
   }
 
@@ -501,6 +545,7 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify(authForm),
       });
+      queryClient.clear();
       setCurrentUser(data.user);
       setNeedsSetup(false);
       setAuthForm(EMPTY_AUTH_FORM);
@@ -521,6 +566,7 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify(authForm),
       });
+      queryClient.clear();
       setCurrentUser(data.user);
       setAuthForm(EMPTY_AUTH_FORM);
       setMessage(t('Angemeldet.'));
@@ -728,6 +774,7 @@ export default function App() {
 
   async function handleLogout() {
     await api('/api/logout', { method: 'POST' });
+    queryClient.clear();
     setCurrentUser(null);
     setUsers([]);
     setRegistrations([]);
@@ -2319,13 +2366,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
-
-
-
-
-
-
 
 
 

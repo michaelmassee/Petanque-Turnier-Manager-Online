@@ -1,4 +1,8 @@
 {
+  "Keine Verbindung zum Server. Bitte versuche es erneut.": "Keine Verbindung zum Server. Bitte versuche es erneut.",
+  "Die Anfrage hat zu lange gedauert. Bitte versuche es erneut.": "Die Anfrage hat zu lange gedauert. Bitte versuche es erneut.",
+  "Die Anfrage wurde abgebrochen.": "Die Anfrage wurde abgebrochen.",
+  "Die Serverantwort konnte nicht verarbeitet werden.": "Die Serverantwort konnte nicht verarbeitet werden.",
   "inbox": "Postbox",
   "close": "Schließen",
   "enable": "Push-Benachrichtigungen aktivieren",

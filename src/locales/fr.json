@@ -1,4 +1,8 @@
 {
+  "Keine Verbindung zum Server. Bitte versuche es erneut.": "Aucune connexion au serveur. Réessaie.",
+  "Die Anfrage hat zu lange gedauert. Bitte versuche es erneut.": "La demande a pris trop de temps. Réessaie.",
+  "Die Anfrage wurde abgebrochen.": "La demande a été annulée.",
+  "Die Serverantwort konnte nicht verarbeitet werden.": "La réponse du serveur n'a pas pu être traitée.",
   "1. Verantwortlicher": "1. Responsable du traitement",
   "10 km": "10 km",
   "10. Deine Rechte": "10. Tes droits",

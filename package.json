@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@block65/webcrypto-web-push": "^2.0.0",
+    "@tanstack/react-query": "^5.102.8",
     "i18next": "^26.4.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
