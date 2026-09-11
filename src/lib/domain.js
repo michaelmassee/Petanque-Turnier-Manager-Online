@@ -1,6 +1,6 @@
 import { ROLES, FORMATIONS } from './constants.js';
 import { formatTournamentDateTime, timezoneAbbrev, detectViewerTimeZone, amountToMinorUnits, DISPLAY_LOCALES } from './format.js';
-import { translateText } from './i18n.js';
+import i18next from './i18next-config.js';
 
 export function authTitle(needsSetup, authView) {
   if (needsSetup) {
@@ -226,11 +226,11 @@ export const REGISTERED_COUNT_TEMPLATES = {
 
 export function registrationStatusLabel(tournament, language) {
   if (tournament.registrationEnabled === false) {
-    return translateText('Kein Anmeldeverfahren', language);
+    return i18next.t('Kein Anmeldeverfahren', { lng: language });
   }
 
   if (tournament.status === 'registration' && registrationNotYetOpen(tournament)) {
-    return `${translateText('Anmeldung ab', language)} ${formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}`;
+    return `${i18next.t('Anmeldung ab', { lng: language })} ${formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}`;
   }
 
   const deadlinePassed = tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now();
@@ -239,9 +239,9 @@ export function registrationStatusLabel(tournament, language) {
 
   if (!registrationOpen || isFull) {
     if (isFull && tournament.waitlistRegistrations > 0) {
-      return translateText('Anmeldung Warteliste möglich', language);
+      return i18next.t('Anmeldung Warteliste möglich', { lng: language });
     }
-    return translateText('Anmeldung nicht mehr möglich', language);
+    return i18next.t('Anmeldung nicht mehr möglich', { lng: language });
   }
 
   if (!tournament.maxRegistrations) {
@@ -259,7 +259,7 @@ export const API_KEY_STATUS_LABELS = {
 };
 
 export function formatTournamentStartTime(tournament, language) {
-  if (!tournament.startTime) return translateText('Ganztägig', language);
+  if (!tournament.startTime) return i18next.t('Ganztägig', { lng: language });
   const zone = tournament.timezone || 'UTC';
   const viewerZone = detectViewerTimeZone();
   if (!viewerZone || viewerZone === zone) return tournament.startTime;
