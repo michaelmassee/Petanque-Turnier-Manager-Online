@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
-import { translateText } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
@@ -19,6 +19,7 @@ function ShareIcon() {
 }
 
 export function TournamentInfo({ tournament, language, onShare }) {
+  const { t } = useTranslation();
   const isCalendarEntry = tournament.registrationEnabled === false;
   const mapsUrl = googleMapsUrl(tournament);
   const viewerTimeZone = detectViewerTimeZone();
@@ -34,8 +35,8 @@ export function TournamentInfo({ tournament, language, onShare }) {
         <button
           type="button"
           className="icon-bar-button"
-          title={translateText('Turnier teilen', language)}
-          aria-label={translateText('Turnier teilen', language)}
+          title={t('Turnier teilen')}
+          aria-label={t('Turnier teilen')}
           onClick={onShare}
         >
           <ShareIcon />
@@ -45,8 +46,8 @@ export function TournamentInfo({ tournament, language, onShare }) {
           href={mapsUrl}
           target="_blank"
           rel="noreferrer"
-          title={translateText('Spielort in Google Maps öffnen', language)}
-          aria-label={translateText('Spielort in Google Maps öffnen', language)}
+          title={t('Spielort in Google Maps öffnen')}
+          aria-label={t('Spielort in Google Maps öffnen')}
         >
           📍
         </a>
@@ -56,8 +57,8 @@ export function TournamentInfo({ tournament, language, onShare }) {
             href={tournament.websiteUrl}
             target="_blank"
             rel="noreferrer"
-            title={translateText('Website öffnen', language)}
-            aria-label={translateText('Website öffnen', language)}
+            title={t('Website öffnen')}
+            aria-label={t('Website öffnen')}
           >
             🌐
           </a>
@@ -68,8 +69,8 @@ export function TournamentInfo({ tournament, language, onShare }) {
             href={tournament.flyerUrl}
             target="_blank"
             rel="noreferrer"
-            title={translateText('Flyer öffnen', language)}
-            aria-label={translateText('Flyer öffnen', language)}
+            title={t('Flyer öffnen')}
+            aria-label={t('Flyer öffnen')}
           >
             📄
           </a>
@@ -77,24 +78,24 @@ export function TournamentInfo({ tournament, language, onShare }) {
       </div>
       {showTimezoneHint && <p className="hint">{(TIMEZONE_HINT_TEMPLATES[language] || TIMEZONE_HINT_TEMPLATES.de)(tournamentTimeZone)}</p>}
       <p>
-        <strong>{translateText('Datum', language)}</strong>: {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
+        <strong>{t('Datum')}</strong>: {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
       </p>
       <p>
-        <strong>Ort</strong>: <span data-i18n-skip>{tournament.location}</span>
+        <strong>{t('Ort')}</strong>: <span data-i18n-skip>{tournament.location}</span>
       </p>
       {!isCalendarEntry && (
         <>
           <p>
-            <strong>Formation</strong>: {formationLabel(tournament)}
+            <strong>{t('Formation')}</strong>: {formationLabel(tournament)}
           </p>
           <p>
-            <strong>Anmeldetyp</strong>: {labelFor(REGISTRATION_TYPES, tournament.registrationType)}
+            <strong>{t('Anmeldetyp')}</strong>: {labelFor(REGISTRATION_TYPES, tournament.registrationType)}
           </p>
           <p>
-            <strong>Turniersystem</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
+            <strong>{t('Turniersystem')}</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
           </p>
           <p>
-            <strong>{translateText('Lizenz', language)}</strong>: {translateText(tournament.licenseRequired ? 'Ja' : 'Nein', language)}
+            <strong>{t('Lizenz')}</strong>: {t(tournament.licenseRequired ? 'Ja' : 'Nein')}
           </p>
         </>
       )}
@@ -103,37 +104,37 @@ export function TournamentInfo({ tournament, language, onShare }) {
         <>
           {Boolean(tournament.entryFeeCents) && (
             <p>
-              <strong>{translateText('Startgeld', language)}</strong>: {formatMoney(tournament.entryFeeCents, tournament.currency, language)}
+              <strong>{t('Startgeld')}</strong>: {formatMoney(tournament.entryFeeCents, tournament.currency, language)}
             </p>
           )}
           {tournament.registrationOpensAt && (
             <p>
-              <strong>{translateText('Anmeldung möglich ab', language)}</strong>: {formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}
+              <strong>{t('Anmeldung möglich ab')}</strong>: {formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}
             </p>
           )}
           {tournament.registrationDeadline && (
             <p>
-              <strong>{translateText('Meldefrist', language)}</strong>: {formatTournamentDateTime(tournament.registrationDeadline, language, tournament.timezone)}
+              <strong>{t('Meldefrist')}</strong>: {formatTournamentDateTime(tournament.registrationDeadline, language, tournament.timezone)}
             </p>
           )}
           <p>
-            <strong>{translateText('Max. Meldungen', language)}</strong>: {tournament.maxRegistrations || '∞'}
+            <strong>{t('Max. Meldungen')}</strong>: {tournament.maxRegistrations || '∞'}
           </p>
           {freeSlots === null ? (
             <p>
-              <strong>{translateText('Angemeldet', language)}</strong>: {tournament.activeRegistrations || 0}
+              <strong>{t('Angemeldet')}</strong>: {tournament.activeRegistrations || 0}
             </p>
           ) : (
             <p>
-              <strong>{translateText('Noch frei', language)}</strong>: {freeSlots}
+              <strong>{t('Noch frei')}</strong>: {freeSlots}
             </p>
           )}
           <p>
-            <strong>{translateText('Warteliste', language)}</strong>: {tournament.waitlistRegistrations || 0}
+            <strong>{t('Warteliste')}</strong>: {tournament.waitlistRegistrations || 0}
           </p>
           {(tournament.contactName || tournament.contactEmail || tournament.contactPhone) && (
             <p>
-              <strong>Kontakt</strong>: {[tournament.contactName, tournament.contactEmail, tournament.contactPhone].filter(Boolean).join(' · ')}
+              <strong>{t('Kontakt')}</strong>: {[tournament.contactName, tournament.contactEmail, tournament.contactPhone].filter(Boolean).join(' · ')}
             </p>
           )}
         </>
@@ -142,7 +143,8 @@ export function TournamentInfo({ tournament, language, onShare }) {
   );
 }
 
-function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError, language }) {
+function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
+  const { t } = useTranslation();
   const [participants, setParticipants] = useState(null);
   const [forbidden, setForbidden] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -175,10 +177,10 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError, lan
     onMessage?.('');
     try {
       await api(`/api/registrations/${participant.registrationId}/cancel`, { method: 'POST' });
-      onMessage?.('Anmeldung wurde abgesagt.');
+      onMessage?.(t('Anmeldung wurde abgesagt.'));
       setReloadKey((key) => key + 1);
     } catch (requestError) {
-      onError?.(translateText(requestError.message, language));
+      onError?.(requestError.message);
     }
   }
 
@@ -197,7 +199,7 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError, lan
     return (
       <>
         {logo}
-        <p className="muted">Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.</p>
+        <p className="muted">{t('Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.')}</p>
       </>
     );
   }
@@ -206,7 +208,7 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError, lan
     return (
       <>
         {logo}
-        <p className="muted">Teilnehmerliste wird geladen…</p>
+        <p className="muted">{t('Teilnehmerliste wird geladen…')}</p>
       </>
     );
   }
@@ -215,7 +217,7 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError, lan
     return (
       <>
         {logo}
-        <p className="muted">Noch keine Anmeldungen.</p>
+        <p className="muted">{t('Noch keine Anmeldungen.')}</p>
       </>
     );
   }
@@ -241,7 +243,7 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError, lan
           )}
           {participant.registrationId && (
             <Button variant="secondary" onClick={() => handleCancelOwnRegistration(participant)}>
-              Absagen
+              {t('Absagen')}
             </Button>
           )}
         </article>
@@ -254,7 +256,8 @@ function playerLabel(player) {
   return [player.firstName, player.lastName].filter(Boolean).join(' ') || player.id;
 }
 
-export function TournamentSchedule({ tournamentId, language }) {
+export function TournamentSchedule({ tournamentId }) {
+  const { t } = useTranslation();
   const [rounds, setRounds] = useState(null);
   const [ranking, setRanking] = useState([]);
 
@@ -278,11 +281,11 @@ export function TournamentSchedule({ tournamentId, language }) {
   }, [tournamentId]);
 
   if (!rounds) {
-    return <p className="muted">{translateText('Wird geladen…', language)}</p>;
+    return <p className="muted">{t('Wird geladen…')}</p>;
   }
 
   if (!rounds.length) {
-    return <p className="muted">{translateText('Noch keine Runde gestartet.', language)}</p>;
+    return <p className="muted">{t('Noch keine Runde gestartet.')}</p>;
   }
 
   const currentRound = rounds[rounds.length - 1];
@@ -290,30 +293,30 @@ export function TournamentSchedule({ tournamentId, language }) {
   return (
     <div className="supermelee-schedule">
       <h3>
-        {translateText('Runde', language)} {currentRound.roundNumber}
+        {t('Runde')} {currentRound.roundNumber}
       </h3>
       {currentRound.matches.map((match) => (
         <article className="data-row" key={match.id}>
           <div>
             <strong>{match.teamA.map(playerLabel).join(' + ')}</strong>
-            <span>{translateText('gegen', language)}</span>
+            <span>{t('gegen')}</span>
             <strong>{match.teamB.map(playerLabel).join(' + ')}</strong>
           </div>
-          <div>{match.noShow ? translateText('Nicht angetreten', language) : match.scoreA != null ? `${match.scoreA}:${match.scoreB}` : translateText('Offen', language)}</div>
+          <div>{match.noShow ? t('Nicht angetreten') : match.scoreA != null ? `${match.scoreA}:${match.scoreB}` : t('Offen')}</div>
         </article>
       ))}
 
       {Boolean(ranking.length) && (
         <>
-          <h3>{translateText('Rangliste', language)}</h3>
+          <h3>{t('Rangliste')}</h3>
           <table className="ranking-table">
             <thead>
               <tr>
                 <th>#</th>
-                <th>{translateText('Spieler', language)}</th>
-                <th>{translateText('Siege', language)}</th>
+                <th>{t('Spieler')}</th>
+                <th>{t('Siege')}</th>
                 <th>+/-</th>
-                <th>{translateText('Punkte', language)}</th>
+                <th>{t('Punkte')}</th>
               </tr>
             </thead>
             <tbody>
@@ -353,13 +356,14 @@ export function TournamentDetailPage({
   setError,
   onLogout,
 }) {
+  const { t } = useTranslation();
   const { tournament, notFound } = useRoutedTournament(route.id, tournaments);
 
   if (notFound) {
     return (
       <main className="app-shell">
         <StandalonePageHeader
-          heading="Turnier nicht gefunden"
+          heading={t('Turnier nicht gefunden')}
           language={language}
           setLanguage={setLanguage}
           menuOpen={menuOpen}
@@ -369,9 +373,9 @@ export function TournamentDetailPage({
           onLogout={onLogout}
         />
         <section className="home-tournaments">
-          <p className="muted">Dieses Turnier existiert nicht oder ist nicht öffentlich sichtbar.</p>
+          <p className="muted">{t('Dieses Turnier existiert nicht oder ist nicht öffentlich sichtbar.')}</p>
           <button className="link-button" type="button" onClick={() => navigate('/')}>
-            Zur Startseite
+            {t('Zur Startseite')}
           </button>
         </section>
       </main>
@@ -382,7 +386,7 @@ export function TournamentDetailPage({
     return (
       <main className="app-shell">
         <StandalonePageHeader
-          heading="Turnier wird geladen…"
+          heading={t('Turnier wird geladen…')}
           language={language}
           setLanguage={setLanguage}
           menuOpen={menuOpen}
@@ -413,9 +417,9 @@ export function TournamentDetailPage({
     }
     try {
       await navigator.clipboard.writeText(shareUrl);
-      setMessage(translateText('Link kopiert', language));
+      setMessage(t('Link kopiert'));
     } catch {
-      setError(translateText('Teilen wird von diesem Gerät nicht unterstützt', language));
+      setError(t('Teilen wird von diesem Gerät nicht unterstützt'));
     }
   }
 
@@ -437,13 +441,13 @@ export function TournamentDetailPage({
       <Feedback message={message} error={error} />
 
       <section className="tournament-detail-page">
-        <nav className="tournament-detail-tabs" aria-label="Turnierdetails">
+        <nav className="tournament-detail-tabs" aria-label={t('Turnierdetails')}>
           <button
             className={`tournament-detail-tab ${route.view === 'info' ? 'active' : ''}`}
             type="button"
             onClick={() => navigate(`/turniere/${tournament.id}/info`)}
           >
-            Info
+            {t('Info')}
           </button>
           {canRegister && (
             <button
@@ -451,7 +455,7 @@ export function TournamentDetailPage({
               type="button"
               onClick={() => navigate(`/turniere/${tournament.id}/anmelden`)}
             >
-              Anmelden
+              {t('Anmelden')}
             </button>
           )}
           {canShowParticipants && (
@@ -460,7 +464,7 @@ export function TournamentDetailPage({
               type="button"
               onClick={() => navigate(`/turniere/${tournament.id}/teilnehmer`)}
             >
-              Teilnehmer
+              {t('Teilnehmer')}
             </button>
           )}
           {canShowSchedule && (
@@ -469,7 +473,7 @@ export function TournamentDetailPage({
               type="button"
               onClick={() => navigate(`/turniere/${tournament.id}/spielplan`)}
             >
-              {translateText('Spielplan', language)}
+              {t('Spielplan')}
             </button>
           )}
         </nav>
@@ -494,13 +498,13 @@ export function TournamentDetailPage({
           {route.view === 'teilnehmer' && canShowParticipants && (
             <>
               <p className="hint">
-                Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.
+                {t('Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.')}
               </p>
-              <TournamentParticipants tournamentId={tournament.id} logoUrl={tournament.logoUrl} onMessage={setMessage} onError={setError} language={language} />
+              <TournamentParticipants tournamentId={tournament.id} logoUrl={tournament.logoUrl} onMessage={setMessage} onError={setError} />
             </>
           )}
 
-          {route.view === 'spielplan' && canShowSchedule && <TournamentSchedule tournamentId={tournament.id} language={language} />}
+          {route.view === 'spielplan' && canShowSchedule && <TournamentSchedule tournamentId={tournament.id} />}
         </div>
       </section>
     </main>
