@@ -52,6 +52,8 @@ async function readJsonResponse(response) {
 }
 
 async function requestOnce(path, options, timeoutMs) {
+  if (options.signal?.aborted) throw new AbortedError();
+
   const controller = new AbortController();
   let timedOut = false;
   const timeout = window.setTimeout(() => {

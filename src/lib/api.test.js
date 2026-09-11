@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, ApiError, InvalidResponseError, NetworkError } from './api.js';
+import { api, AbortedError, ApiError, InvalidResponseError, NetworkError } from './api.js';
 
 describe('api', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -27,6 +27,16 @@ describe('api', () => {
     const error = new NetworkError();
     expect(error).toBeInstanceOf(ApiError);
     expect(error.status).toBeUndefined();
+  });
+
+  it('startet keine Anfrage mit einem bereits abgebrochenen Signal', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(api('/api/tournaments', { signal: controller.signal })).rejects.toBeInstanceOf(AbortedError);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('weist ungültige Erfolgsantworten zurück, statt sie als leeres Objekt zu behandeln', async () => {

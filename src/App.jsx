@@ -776,6 +776,12 @@ function AppContent() {
     await api('/api/logout', { method: 'POST' });
     queryClient.clear();
     setCurrentUser(null);
+    setPostboxOpen(false);
+    setPostbox({ messages: [], unreadCount: 0, todos: [] });
+    setPostboxRecipients([]);
+    setPostboxRecipientTournaments([]);
+    setPostboxRecipientId('');
+    setPostboxBody('');
     setUsers([]);
     setRegistrations([]);
     setUserForm(EMPTY_USER_FORM);
@@ -2366,7 +2372,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
 
 
 
