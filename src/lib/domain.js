@@ -177,7 +177,7 @@ export function formationLabel(tournament) {
 }
 
 export function isOwnTournament(tournament, user) {
-  return Boolean(user) && (tournament.createdBy === user.id || (tournament.editors || []).some((editor) => editor.id === user.id));
+  return Boolean(user) && (tournament.ownerId === user.id || (tournament.editors || []).some((editor) => editor.id === user.id));
 }
 
 export function isUpcoming(tournament) {

@@ -1,8 +1,11 @@
 // i18n quality gate for the react-i18next setup: every literal string passed
-// to t('...') in the source must have a translation for every supported
-// language in src/locales/*.json. German is the implicit source language
-// (the literal key itself) and does not need its own locales/de.json entry
-// unless the German text differs from the key (rare, legacy postbox strings).
+// to t('...') in the source, and every literal message thrown via
+// new HttpError(<status>, '...') in worker.js (translated client-side at
+// runtime through i18next.t(payload.error), see src/lib/api.js), must have a
+// translation for every supported language in src/locales/*.json. German is
+// the implicit source language (the literal key itself) and does not need
+// its own locales/de.json entry unless the German text differs from the key
+// (rare, legacy postbox strings).
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +49,20 @@ function extractConstDeclarations(source, constants) {
   }
 }
 
+function extractHttpErrorMessages(source) {
+  // throw new HttpError(<status>, '...') - backend error messages that reach
+  // the client as payload.error and get translated at runtime via
+  // i18next.t(payload.error) in src/lib/api.js. Not a t('...') call, so it
+  // needs its own extraction or these strings silently stay untranslated.
+  const keys = new Set();
+  const regex = /new HttpError\(\s*\d+\s*,\s*'((?:[^'\\]|\\.)*)'\s*\)/g;
+  let match;
+  while ((match = regex.exec(source))) {
+    keys.add(match[1].replace(/\\'/g, "'"));
+  }
+  return keys;
+}
+
 function extractConstReferences(source) {
   // t(SOME_CONST) - references a module-level string constant by name,
   // resolved against extractConstDeclarations() below. Covers the common
@@ -72,6 +89,9 @@ function main() {
   for (const file of files) {
     const source = readFileSync(file, 'utf8');
     for (const key of extractLiteralKeys(source)) {
+      allKeys.add(key);
+    }
+    for (const key of extractHttpErrorMessages(source)) {
       allKeys.add(key);
     }
     extractConstDeclarations(source, constants);
@@ -112,12 +132,12 @@ function main() {
       console.error(`  - ${message}`);
     }
     console.error(
-      "\nEvery literal t('...') string, and every t(SOME_CONST) referencing an 'export const SOME_CONST = \\'...\\'' string, needs a translation for every language: add the missing key(s) to src/locales/{nl,en,es,fr}.json.",
+      "\nEvery literal t('...') string, every t(SOME_CONST) referencing an 'export const SOME_CONST = \\'...\\'' string, and every literal throw new HttpError(<status>, '...') message needs a translation for every language: add the missing key(s) to src/locales/{nl,en,es,fr}.json.",
     );
     process.exit(1);
   }
 
-  console.log(`i18n check passed: ${allKeys.size} t() keys (literal + resolved const references), all present and translated in [${LANGUAGES.join(', ')}].`);
+  console.log(`i18n check passed: ${allKeys.size} keys (t() calls, resolved const references, HttpError messages), all present and translated in [${LANGUAGES.join(', ')}].`);
   if (unresolvedConstRefs.size > 0) {
     console.log(
       `Note: ${unresolvedConstRefs.size} t(...) call(s) use a non-literal argument this check cannot resolve statically ` +

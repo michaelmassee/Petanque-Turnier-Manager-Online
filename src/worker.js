@@ -521,8 +521,8 @@ async function resolveEmailLanguage(db, tournament, registration) {
   if (matchingUser) {
     return matchingUser.language || registration.language || 'de';
   }
-  const creator = await db.prepare('SELECT language FROM users WHERE id = ?').bind(tournament.created_by).first();
-  return creator?.language || registration.language || 'de';
+  const owner = await db.prepare('SELECT language FROM users WHERE id = ?').bind(tournament.owner_id).first();
+  return owner?.language || registration.language || 'de';
 }
 
 /**
@@ -531,7 +531,7 @@ async function resolveEmailLanguage(db, tournament, registration) {
  * und die auslösende Aktion (Anmeldung, Stornierung, Broadcast) läuft in jedem Fall normal durch.
  */
 async function canSendTournamentMail(db, tournament) {
-  const owner = await db.prepare('SELECT role, mail_enabled FROM users WHERE id = ?').bind(tournament.created_by).first();
+  const owner = await db.prepare('SELECT role, mail_enabled FROM users WHERE id = ?').bind(tournament.owner_id).first();
   if (!owner) return true;
   return owner.role === 'admin' || Boolean(Number(owner.mail_enabled));
 }
@@ -992,9 +992,23 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageEditors(tournament, session.user);
+        if (tournamentEditorMatch[2] === tournament.owner_id && session.user.role !== 'admin') {
+          throw new HttpError(403, 'Der Owner kann nur von einem Admin entfernt werden');
+        }
         await env.DB.prepare('DELETE FROM tournament_editors WHERE tournament_id = ? AND user_id = ?').bind(tournament.id, tournamentEditorMatch[2]).run();
         const updated = await getTournamentById(env.DB, tournament.id);
         return json({ editors: tournamentEditors(updated) });
+      }
+
+      const tournamentOwnerMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/owner$/);
+      if (tournamentOwnerMatch && request.method === 'PUT') {
+        const session = await requireAdmin(request, env.DB);
+        const tournament = await getTournamentById(env.DB, tournamentOwnerMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        const updated = await updateTournamentOwner(request, env.DB, tournament);
+        return json({ tournament: toPublicTournament(updated, session.user) });
       }
 
       const confirmPendingRegistrationsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registrations\/confirm-pending$/);
@@ -1083,7 +1097,7 @@ export default {
         }
         const result = await cancelRegistration(env.DB, registration.id);
         try {
-          await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, created_by: registration.created_by }, registration, APP_ORIGIN);
+          await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, owner_id: registration.owner_id }, registration, APP_ORIGIN);
         } catch (error) {
           console.error(`Failed to send cancellation email for registration ${registration.id}`, error);
         }
@@ -1172,11 +1186,11 @@ export default {
         if (request.method === 'DELETE') {
           if (registration.status !== 'cancelled') {
             try {
-              await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, created_by: registration.created_by }, registration, APP_ORIGIN);
+              await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, owner_id: registration.owner_id }, registration, APP_ORIGIN);
             } catch (error) {
               console.error(`Failed to send deletion notice email for registration ${registration.id}`, error);
             }
-            await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentName: registration.name, status: 'cancelled' }, undefined, registration.created_by);
+            await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentName: registration.name, status: 'cancelled' }, undefined, registration.owner_id);
           }
           return await deleteRegistration(env.DB, registration.id);
         }
@@ -1887,7 +1901,7 @@ async function listPostboxRecipients(db, userId) {
     "SELECT id, first_name, last_name, role FROM users WHERE id != ? AND id != ? AND role = 'user' ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE",
   ).bind(userId, TOURNAMENT_REPORT_SYSTEM_USER_ID).all();
   const tournaments = await db.prepare(
-    'SELECT id, name FROM tournaments WHERE created_by = ? ORDER BY name COLLATE NOCASE',
+    'SELECT id, name FROM tournaments WHERE owner_id = ? ORDER BY name COLLATE NOCASE',
   ).bind(userId).all();
   return json({
     recipients: result.results.map((user) => ({ id: user.id, firstName: user.first_name, lastName: user.last_name, role: user.role })),
@@ -1932,7 +1946,7 @@ async function sendPostboxMessage(request, env, sender) {
     const tournamentId = recipientRaw.slice('tournament:'.length);
     const tournament = await env.DB.prepare('SELECT * FROM tournaments WHERE id = ?').bind(tournamentId).first();
     if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
-    if (tournament.created_by !== sender.id) throw new HttpError(403, 'Nur der Organisator kann an alle Teilnehmer senden');
+    if (tournament.owner_id !== sender.id) throw new HttpError(403, 'Nur der Organisator kann an alle Teilnehmer senden');
     const message = await createBroadcastPostboxMessage(env, { sender, tournament, body: text });
     return json({ message }, 201);
   }
@@ -1978,8 +1992,8 @@ async function listPostboxTodos(db, user) {
     if (Number(unverified?.count)) todos.push({ type: 'unverified_users', count: Number(unverified.count) });
     if (Number(keys?.count)) todos.push({ type: 'api_key_requests', count: Number(keys.count) });
   }
-  const pending = await db.prepare("SELECT COUNT(*) AS count FROM registrations r JOIN tournaments t ON t.id = r.tournament_id WHERE t.created_by = ? AND r.status = 'pending'").bind(user.id).first();
-  const waitlist = await db.prepare("SELECT COUNT(*) AS count FROM registrations r JOIN tournaments t ON t.id = r.tournament_id WHERE t.created_by = ? AND r.status = 'waitlist'").bind(user.id).first();
+  const pending = await db.prepare("SELECT COUNT(*) AS count FROM registrations r JOIN tournaments t ON t.id = r.tournament_id WHERE t.owner_id = ? AND r.status = 'pending'").bind(user.id).first();
+  const waitlist = await db.prepare("SELECT COUNT(*) AS count FROM registrations r JOIN tournaments t ON t.id = r.tournament_id WHERE t.owner_id = ? AND r.status = 'waitlist'").bind(user.id).first();
   if (Number(pending?.count)) todos.push({ type: 'pending_registrations', count: Number(pending.count) });
   if (Number(waitlist?.count)) todos.push({ type: 'waitlist', count: Number(waitlist.count) });
   return todos;
@@ -2329,21 +2343,23 @@ async function deleteUser(db, id, currentUserId, deleteTournaments) {
   const now = new Date().toISOString();
 
   if (deleteTournaments) {
-    // Nur selbst erstellte Turniere löschen - Turniere, bei denen dieser User
-    // lediglich als Editor eingetragen war, gehören anderen Erstellern und dürfen
+    // Nur selbst besessene Turniere löschen - Turniere, bei denen dieser User
+    // lediglich als Editor eingetragen war, gehören anderen Ownern und dürfen
     // nicht mitgerissen werden. Der zugehörige tournament_editors-Eintrag entfällt
     // ohnehin automatisch über ON DELETE CASCADE auf user_id.
     await db.batch([
       db
-        .prepare('DELETE FROM registrations WHERE tournament_id IN (SELECT id FROM tournaments WHERE created_by = ?)')
+        .prepare('DELETE FROM registrations WHERE tournament_id IN (SELECT id FROM tournaments WHERE owner_id = ?)')
         .bind(id),
-      db.prepare('DELETE FROM tournaments WHERE created_by = ?').bind(id),
+      db.prepare('DELETE FROM tournaments WHERE owner_id = ?').bind(id),
     ]);
   } else {
-    // Reassign to the admin performing the deletion instead of leaving created_by
-    // pointing at a user row that no longer exists. Editor-Zuweisungen dieses Users
-    // entfallen automatisch über ON DELETE CASCADE.
-    await db.prepare('UPDATE tournaments SET created_by = ?, updated_at = ? WHERE created_by = ?').bind(currentUserId, now, id).run();
+    // Reassign to the admin performing the deletion instead of leaving owner_id
+    // pointing at a user row that no longer exists (owner_id ist NOT NULL mit
+    // FK ON DELETE CASCADE - ohne Reassignment würde das Turnier sonst kaskadierend
+    // mitgelöscht). creator_id (rein informativ) bleibt bewusst unangetastet.
+    // Editor-Zuweisungen dieses Users entfallen automatisch über ON DELETE CASCADE.
+    await db.prepare('UPDATE tournaments SET owner_id = ?, updated_at = ? WHERE owner_id = ?').bind(currentUserId, now, id).run();
   }
 
   const result = await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
@@ -2373,7 +2389,7 @@ async function listTournaments(db, user) {
         ) AS waitlist_registrations
        FROM tournaments
        WHERE (?1 IS NOT NULL AND ?1 = 'admin')
-          OR (?2 IS NOT NULL AND (tournaments.created_by = ?2 OR EXISTS (
+          OR (?2 IS NOT NULL AND (tournaments.owner_id = ?2 OR EXISTS (
                SELECT 1 FROM tournament_editors WHERE tournament_editors.tournament_id = tournaments.id AND tournament_editors.user_id = ?2
              )))
           OR (tournaments.visibility = 'public' AND tournaments.status != 'draft')
@@ -2463,7 +2479,7 @@ async function createTournament(request, db, user) {
 
   if (user.role !== 'admin' && tournament.registrationEnabled !== false) {
     const limit = user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT;
-    const { count } = await db.prepare('SELECT COUNT(*) AS count FROM tournaments WHERE created_by = ? AND registration_enabled = 1').bind(user.id).first();
+    const { count } = await db.prepare('SELECT COUNT(*) AS count FROM tournaments WHERE owner_id = ? AND registration_enabled = 1').bind(user.id).first();
     if (count >= limit) {
       throw new HttpError(403, 'Turnier-Limit erreicht. Bitte bei einem Admin um mehr Turniere bitten.');
     }
@@ -2483,14 +2499,15 @@ async function createTournament(request, db, user) {
   await db
     .prepare(
       `INSERT INTO tournaments (
-        id, created_by, name, date, start_time, location, description, type, formation, formation_other, registration_type, status,
+        id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
         latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
+      user.id,
       user.id,
       tournament.name,
       tournament.date,
@@ -2594,8 +2611,8 @@ async function updateTournament(request, env, existing, user) {
 
   const updated = await getTournamentById(db, existing.id);
   if (updated.status !== existing.status) {
-    await createSystemNotification(env, existing.created_by, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
-    const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.created_by).all();
+    await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
+    const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.owner_id).all();
     await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
   }
   return json({ tournament: toPublicTournament(updated, user) });
@@ -2618,8 +2635,8 @@ async function startTournament(env, existing, user) {
   const now = new Date().toISOString();
   await db.prepare("UPDATE tournaments SET status = 'running', updated_at = ? WHERE id = ?").bind(now, existing.id).run();
   const updated = await getTournamentById(db, existing.id);
-  await createSystemNotification(env, existing.created_by, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
-  const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.created_by).all();
+  await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
+  const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.owner_id).all();
   await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
   return json({ tournament: toPublicTournament(updated, user) });
 }
@@ -2698,6 +2715,16 @@ async function verifyTurnstileToken(env, token, ip) {
 }
 
 /**
+ * Kein eingeloggter User beteiligt, aber owner_id ist NOT NULL - der aelteste Admin-Account
+ * uebernimmt die Ownership fuer anonym gemeldete Turniere/Kalendereintraege.
+ */
+async function resolveDefaultReportOwnerId(db) {
+  const admin = await db.prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1").first();
+  if (!admin) throw new HttpError(500, 'Kein Admin-Konto vorhanden');
+  return admin.id;
+}
+
+/**
  * Public, unauthenticated "Turnier melden" submission. Replaces the old logged-in-only
  * calendar-entry form: anyone can report a tournament, but the entry stays hidden
  * (status='draft') until the contact email is confirmed via createTournamentReportToken,
@@ -2749,17 +2776,19 @@ async function createTournamentReport(request, env, url) {
   const tournamentForGeo = { location, latitude: null, longitude: null };
   const geo = await resolveTournamentGeolocation(tournamentForGeo, null, now, request.headers.get('CF-IPCountry'));
   const timezone = resolveTournamentTimezone(geo);
+  const ownerId = await resolveDefaultReportOwnerId(db);
 
   await db
     .prepare(
       `INSERT INTO tournaments (
-        id, created_by, name, date, start_time, location, description, type, formation, formation_other,
+        id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other,
         registration_type, status, visibility, registration_enabled, club, website_url, contact_name, contact_email,
         latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
+      ownerId,
       TOURNAMENT_REPORT_SYSTEM_USER_ID,
       name,
       date,
@@ -3034,8 +3063,8 @@ async function confirmPendingRegistrations(env, tournament, appOrigin) {
   const confirmedRegistrations = registrations.filter((registration, index) => Number(updateResults[index]?.meta?.changes || 0) > 0);
 
   for (const registration of confirmedRegistrations) {
-    await createSystemNotification(env, tournament.created_by, 'registration_status_changed', { tournamentName: tournament.name, status: 'confirmed', participant: `${registration.first_name} ${registration.last_name}` });
-    await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentName: tournament.name, status: 'confirmed' }, undefined, tournament.created_by);
+    await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', { tournamentName: tournament.name, status: 'confirmed', participant: `${registration.first_name} ${registration.last_name}` });
+    await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentName: tournament.name, status: 'confirmed' }, undefined, tournament.owner_id);
     try {
       await sendRegistrationConfirmationEmail(env, tournament, registration, appOrigin);
     } catch (error) {
@@ -3266,7 +3295,7 @@ async function cancelRegistrationByToken(request, env) {
 
   const result = await cancelRegistration(env.DB, registration.id);
   try {
-    await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, created_by: registration.created_by }, registration, APP_ORIGIN);
+    await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, owner_id: registration.owner_id }, registration, APP_ORIGIN);
   } catch (error) {
     console.error(`Failed to send cancellation email for registration ${registration.id}`, error);
   }
@@ -3376,8 +3405,8 @@ async function createRegistration(request, env, tournament) {
     .run();
 
   const created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
-  await createSystemNotification(env, tournament.created_by, 'registration_status_changed', { tournamentName: tournament.name, status: created.status, participant: `${created.first_name} ${created.last_name}` });
-  await notifyUserByEmail(env, created.email, 'registration_status_changed', { tournamentName: tournament.name, status: created.status }, undefined, tournament.created_by);
+  await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', { tournamentName: tournament.name, status: created.status, participant: `${created.first_name} ${created.last_name}` });
+  await notifyUserByEmail(env, created.email, 'registration_status_changed', { tournamentName: tournament.name, status: created.status }, undefined, tournament.owner_id);
 
   if (displace) {
     await displaceRegistration(env, tournament, displace, appOrigin);
@@ -3452,8 +3481,8 @@ async function updateRegistration(request, env, existing) {
 
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
   if (updated.status !== existing.status) {
-    await createSystemNotification(env, existing.created_by, 'registration_status_changed', { tournamentName: existing.name, status: updated.status, participant: `${updated.first_name} ${updated.last_name}` });
-    await notifyUserByEmail(env, updated.email, 'registration_status_changed', { tournamentName: existing.name, status: updated.status }, undefined, existing.created_by);
+    await createSystemNotification(env, existing.owner_id, 'registration_status_changed', { tournamentName: existing.name, status: updated.status, participant: `${updated.first_name} ${updated.last_name}` });
+    await notifyUserByEmail(env, updated.email, 'registration_status_changed', { tournamentName: existing.name, status: updated.status }, undefined, existing.owner_id);
     if (existing.status !== 'confirmed' && updated.status === 'confirmed') {
       try {
         await sendRegistrationConfirmationEmail(env, { ...existing, id: existing.tournament_id }, updated, new URL(request.url).origin);
@@ -3488,7 +3517,7 @@ async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
 
   const tournament = {
     id: existing.tournament_id,
-    created_by: existing.created_by,
+    owner_id: existing.owner_id,
     waitlist_enabled: existing.waitlist_enabled,
     name: existing.name,
     date: existing.date,
@@ -3713,7 +3742,7 @@ async function syncPostResults(request, env, tournamentId) {
     const placeholders = statusChangeIds.map(() => '?').join(', ');
     const previousRows = await db
       .prepare(
-        `SELECT r.*, t.name, t.created_by, t.date, t.start_time, t.location, t.waitlist_enabled FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
+        `SELECT r.*, t.name, t.owner_id, t.date, t.start_time, t.location, t.waitlist_enabled FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
          WHERE r.tournament_id = ? AND r.id IN (${placeholders})`,
       )
       .bind(tournamentId, ...statusChangeIds)
@@ -3743,8 +3772,8 @@ async function syncPostResults(request, env, tournamentId) {
 
     const previous = previousById.get(entry.id);
     if (previous && previous.status !== entry.status && changes) {
-      await createSystemNotification(env, previous.created_by, 'registration_status_changed', { tournamentName: previous.name, status: entry.status, participant: `${previous.first_name} ${previous.last_name}` });
-      await notifyUserByEmail(env, previous.email, 'registration_status_changed', { tournamentName: previous.name, status: entry.status }, undefined, previous.created_by);
+      await createSystemNotification(env, previous.owner_id, 'registration_status_changed', { tournamentName: previous.name, status: entry.status, participant: `${previous.first_name} ${previous.last_name}` });
+      await notifyUserByEmail(env, previous.email, 'registration_status_changed', { tournamentName: previous.name, status: entry.status }, undefined, previous.owner_id);
       if (previous.status !== 'confirmed' && entry.status === 'confirmed') {
         try {
           await sendRegistrationConfirmationEmail(env, { ...previous, id: tournamentId }, previous, APP_ORIGIN);
@@ -4013,8 +4042,8 @@ async function addTournamentEditor(request, db, tournament, actingUser) {
   if (!userId) {
     throw new HttpError(400, 'Bitte wähle einen Benutzer aus');
   }
-  if (userId === tournament.created_by) {
-    throw new HttpError(400, 'Der Ersteller hat bereits Zugriff auf dieses Turnier');
+  if (userId === tournament.owner_id) {
+    throw new HttpError(400, 'Der Owner hat bereits Zugriff auf dieses Turnier');
   }
   const targetUser = await db.prepare('SELECT id, role FROM users WHERE id = ?').bind(userId).first();
   if (!targetUser || targetUser.role !== 'user') {
@@ -4029,6 +4058,27 @@ async function addTournamentEditor(request, db, tournament, actingUser) {
     .run();
   const updated = await getTournamentById(db, tournament.id);
   return json({ editors: tournamentEditors(updated) }, 201);
+}
+
+/**
+ * Admin-only Ownership-Wechsel: setzt owner_id auf einen beliebigen bestehenden User.
+ * creator_id (rein informativ, wer urspruenglich erstellt hat) bleibt unangetastet.
+ */
+async function updateTournamentOwner(request, db, tournament) {
+  const body = await readJson(request);
+  const userId = String(body.userId || '').trim();
+  if (!userId) {
+    throw new HttpError(400, 'Bitte wähle einen Benutzer aus');
+  }
+  const targetUser = await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+  if (!targetUser) {
+    throw new HttpError(404, 'Benutzer nicht gefunden');
+  }
+  const now = new Date().toISOString();
+  await db.prepare('UPDATE tournaments SET owner_id = ?, updated_at = ? WHERE id = ?').bind(userId, now, tournament.id).run();
+  // Der neue Owner hat ohnehin volle Rechte - ein doppelter Editor-Eintrag ist redundant.
+  await db.prepare('DELETE FROM tournament_editors WHERE tournament_id = ? AND user_id = ?').bind(tournament.id, userId).run();
+  return await getTournamentById(db, tournament.id);
 }
 
 async function getTournamentById(db, id) {
@@ -4058,7 +4108,7 @@ async function getTournamentById(db, id) {
 async function getRegistrationWithTournament(db, id) {
   return db
     .prepare(
-      `SELECT registrations.*, tournaments.created_by, tournaments.visibility, tournaments.formation,
+      `SELECT registrations.*, tournaments.owner_id, tournaments.visibility, tournaments.formation,
               tournaments.registration_type, tournaments.license_required, tournaments.max_registrations, tournaments.waitlist_enabled,
               tournaments.name, tournaments.date, tournaments.start_time, tournaments.location,
               ${TOURNAMENT_EDITORS_JSON_SUBQUERY}
@@ -4073,7 +4123,7 @@ async function getRegistrationWithTournament(db, id) {
 async function getRegistrationByCancelToken(db, token) {
   return db
     .prepare(
-      `SELECT registrations.*, tournaments.created_by, tournaments.name, tournaments.date, tournaments.start_time, tournaments.location
+      `SELECT registrations.*, tournaments.owner_id, tournaments.name, tournaments.date, tournaments.start_time, tournaments.location
        FROM registrations
        JOIN tournaments ON tournaments.id = registrations.tournament_id
        WHERE registrations.cancel_token = ?`,
@@ -4122,7 +4172,7 @@ function canManageTournament(tournament, user) {
   if (!user) {
     return false;
   }
-  return user.role === 'admin' || tournament.created_by === user.id || tournamentEditorIds(tournament).includes(user.id);
+  return user.role === 'admin' || tournament.owner_id === user.id || tournamentEditorIds(tournament).includes(user.id);
 }
 
 function assertCanManageTournament(tournament, user) {
@@ -4132,7 +4182,7 @@ function assertCanManageTournament(tournament, user) {
 }
 
 function canManageEditors(tournament, user) {
-  return Boolean(user) && (user.role === 'admin' || tournament.created_by === user.id);
+  return Boolean(user) && (user.role === 'admin' || tournament.owner_id === user.id);
 }
 
 function assertCanManageEditors(tournament, user) {
@@ -4837,7 +4887,8 @@ function toPostboxMessage(row, currentUserId) {
 function toPublicTournament(row, user) {
   return {
     id: row.id,
-    createdBy: row.created_by,
+    ownerId: row.owner_id,
+    creatorId: row.creator_id,
     editors: tournamentEditors(row),
     name: row.name,
     date: row.date,

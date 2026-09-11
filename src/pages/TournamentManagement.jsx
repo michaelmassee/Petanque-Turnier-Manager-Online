@@ -7,7 +7,7 @@ import { TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } fro
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { api } from '../lib/api.js';
 
-function TournamentEditorsPanel({ tournamentId, candidates = [] }) {
+function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmin }) {
   const { t } = useTranslation();
   const [editors, setEditors] = useState(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState('');
@@ -67,12 +67,17 @@ function TournamentEditorsPanel({ tournamentId, candidates = [] }) {
           {editors.length === 0 && <p className="muted">{t('Noch keine weiteren Bearbeiter für dieses Turnier.')}</p>}
           {editors.length > 0 && (
             <ul className="editor-list">
-              {editors.map((editor) => (
-                <li key={editor.id}>
-                  <span data-i18n-skip>{`${editor.firstName || ''} ${editor.lastName || ''}`.trim()}</span>
-                  <Button variant="secondary" type="button" disabled={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
-                </li>
-              ))}
+              {editors.map((editor) => {
+                const isOwner = editor.id === ownerId;
+                return (
+                  <li key={editor.id}>
+                    <span data-i18n-skip>{`${editor.firstName || ''} ${editor.lastName || ''}`.trim()}</span>
+                    {(!isOwner || isAdmin) && (
+                      <Button variant="secondary" type="button" disabled={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
           {availableCandidates.length > 0 && (
@@ -90,6 +95,58 @@ function TournamentEditorsPanel({ tournamentId, candidates = [] }) {
             </div>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], onOwnerChanged }) {
+  const { t } = useTranslation();
+  const [selectedOwnerId, setSelectedOwnerId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [panelError, setPanelError] = useState('');
+
+  const owner = candidates.find((candidate) => candidate.id === ownerId);
+  const otherCandidates = candidates.filter((candidate) => candidate.id !== ownerId);
+
+  async function handleChangeOwner(event) {
+    event.preventDefault();
+    if (!selectedOwnerId) return;
+    setBusy(true);
+    setPanelError('');
+    try {
+      const data = await api(`/api/tournaments/${tournamentId}/owner`, { method: 'PUT', body: JSON.stringify({ userId: selectedOwnerId }) });
+      onOwnerChanged(data.tournament);
+      setSelectedOwnerId('');
+    } catch (err) {
+      setPanelError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="form-section">
+      <div className="form-section-header">
+        <span>{t('Owner verwalten')}</span>
+      </div>
+      {panelError && <p className="feedback error">{panelError}</p>}
+      <p className="muted">
+        {t('Aktueller Owner:')} <span data-i18n-skip>{owner ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim() : ownerId}</span>
+      </p>
+      {otherCandidates.length > 0 && (
+        <div className="inline-form">
+          <SelectField
+            label={t('Owner wechseln')}
+            value={selectedOwnerId}
+            onChange={setSelectedOwnerId}
+            options={[
+              { value: '', label: t('Bitte wählen') },
+              ...otherCandidates.map((candidate) => ({ value: candidate.id, label: `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() })),
+            ]}
+          />
+          <Button type="button" disabled={busy || !selectedOwnerId} onClick={handleChangeOwner}>{t('Übernehmen')}</Button>
+        </div>
       )}
     </div>
   );
@@ -166,11 +223,12 @@ function FormationHelpDialog({ onClose }) {
   );
 }
 
-export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, language, currentUser }) {
+export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser }) {
   const { t } = useTranslation();
   const [showFormationHelp, setShowFormationHelp] = useState(false);
   const showMailNotEnabledHint = !isAdmin && currentUser && currentUser.mailEnabled === false;
-  const canManageEditors = mode === 'edit' && form.id && Boolean(currentUser) && (isAdmin || form.createdBy === currentUser.id);
+  const canManageEditors = mode === 'edit' && form.id && Boolean(currentUser) && (isAdmin || form.ownerId === currentUser.id);
+  const canManageOwner = mode === 'edit' && form.id && isAdmin;
   // Kalendereintrag = per "Turnier melden" eingereicht (registrationEnabled=false), nur die
   // damals abgefragten Felder sind hier sinnvoll editierbar - alles rund um Anmeldung,
   // Turniersystem, Gebühren etc. ist für so einen Eintrag ohne Bedeutung.
@@ -365,7 +423,10 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           <TextField label={t('Flyer-Bildlink')} type="url" placeholder="https://…" value={form.flyerUrl} onChange={(flyerUrl) => setForm({ ...form, flyerUrl })} />
         </>
       )}
-      {canManageEditors && <TournamentEditorsPanel tournamentId={form.id} candidates={editorCandidates} />}
+      {canManageOwner && (
+        <TournamentOwnerPanel tournamentId={form.id} ownerId={form.ownerId} candidates={ownerCandidates} onOwnerChanged={(tournament) => { onOwnerChanged(tournament); setForm({ ...form, ownerId: tournament.ownerId }); }} />
+      )}
+      {canManageEditors && <TournamentEditorsPanel tournamentId={form.id} candidates={editorCandidates} ownerId={form.ownerId} isAdmin={isAdmin} />}
       <div className="dialog-actions">
         <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>
         <Button type="submit">{mode === 'edit' ? t('Turnier speichern') : t('Turnier anlegen')}</Button>
@@ -478,6 +539,8 @@ export function TournamentManagementPage({
   onTournamentSubmit,
   onCloseTournamentDialog,
   editorCandidates,
+  ownerCandidates,
+  onOwnerChanged,
   currentUser,
 }) {
   const { t } = useTranslation();
@@ -515,6 +578,8 @@ export function TournamentManagementPage({
             mode={tournamentMode}
             isAdmin={isAdmin}
             editorCandidates={editorCandidates}
+            ownerCandidates={ownerCandidates}
+            onOwnerChanged={onOwnerChanged}
             language={language}
             currentUser={currentUser}
           />

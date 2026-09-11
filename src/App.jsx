@@ -845,7 +845,7 @@ function AppContent() {
       return;
     }
 
-    const ownedTournaments = tournaments.filter((tournament) => tournament.createdBy === user.id);
+    const ownedTournaments = tournaments.filter((tournament) => tournament.ownerId === user.id);
     let deleteTournaments = false;
     if (ownedTournaments.length > 0) {
       deleteTournaments = window.confirm(
@@ -898,6 +898,10 @@ function AppContent() {
     } catch (requestError) {
       setError(requestError.message);
     }
+  }
+
+  async function handleOwnerChanged() {
+    await loadTournaments(true);
   }
 
   async function handleDeleteTournament(tournament) {
@@ -1061,7 +1065,8 @@ function AppContent() {
     setTournamentMode('edit');
     setTournamentForm({
       id: tournament.id,
-      createdBy: tournament.createdBy || '',
+      ownerId: tournament.ownerId || '',
+      creatorId: tournament.creatorId || '',
       name: tournament.name || '',
       date: tournament.date || '',
       startTime: tournament.startTime || '',
@@ -1937,7 +1942,9 @@ function AppContent() {
               setTournamentForm={setTournamentForm}
               onTournamentSubmit={handleTournamentSubmit}
               onCloseTournamentDialog={closeTournamentDialog}
-              editorCandidates={postboxRecipients.filter((recipient) => recipient.id !== tournamentForm.createdBy)}
+              editorCandidates={postboxRecipients.filter((recipient) => recipient.id !== tournamentForm.ownerId)}
+              ownerCandidates={postboxRecipients}
+              onOwnerChanged={handleOwnerChanged}
               currentUser={currentUser}
             />
           </section>
