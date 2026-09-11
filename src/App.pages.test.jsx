@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
+import i18next from './lib/i18next-config.js';
 import { EditDialog, ProfilePanel } from './App.jsx';
 import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_USER_FORM } from './lib/constants.js';
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
@@ -17,7 +18,12 @@ describe('Turnier-Payload', () => {
 });
 
 describe('Turnier melden', () => {
+  afterEach(() => {
+    i18next.changeLanguage('de');
+  });
+
   it('rendert die öffentliche Meldeseite in der ausgewählten Sprache', () => {
+    i18next.changeLanguage('en');
     render(
       <TournamentReportPage
         language="en"

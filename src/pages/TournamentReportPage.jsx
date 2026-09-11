@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { EMPTY_TOURNAMENT_REPORT_FORM, FORMATIONS } from '../lib/constants.js';
-import { translateText } from '../lib/i18n.js';
 import { api } from '../lib/api.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 
-function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSiteKey, language }) {
+function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSiteKey }) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!turnstileSiteKey || document.querySelector('script[data-turnstile]')) {
       return;
@@ -20,23 +21,23 @@ function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSite
 
   return (
     <form className="form dense" onSubmit={onSubmit}>
-      <TextField label={translateText('Verein', language)} value={form.club} onChange={(club) => setForm({ ...form, club })} required minLength={2} />
-      <TextField label={translateText('Turnier-Informationen', language)} value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
-      <TextField label={translateText('Ort', language)} value={form.location} onChange={(location) => setForm({ ...form, location })} required minLength={2} />
+      <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} required minLength={2} />
+      <TextField label={t('Turnier-Informationen')} value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+      <TextField label={t('Ort')} value={form.location} onChange={(location) => setForm({ ...form, location })} required minLength={2} />
       <div className="form-grid">
-        <TextField label={translateText('Datum', language)} type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
-        <TextField label={translateText('Startzeit', language)} type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
+        <TextField label={t('Datum')} type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
+        <TextField label={t('Startzeit')} type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
       </div>
       <SelectField
-        label={translateText('Formation', language)}
+        label={t('Formation')}
         value={form.formation}
         onChange={(formation) => setForm({ ...form, formation })}
-        options={FORMATIONS.map((option) => ({ ...option, label: translateText(option.label, language) }))}
+        options={FORMATIONS.map((option) => ({ ...option, label: t(option.label) }))}
         required
       />
-      <TextArea label={translateText('Weitere Infos', language)} value={form.description} onChange={(description) => setForm({ ...form, description })} />
+      <TextArea label={t('Weitere Infos')} value={form.description} onChange={(description) => setForm({ ...form, description })} />
       <TextField
-        label={translateText('Quelle / Webseite', language)}
+        label={t('Quelle / Webseite')}
         type="url"
         placeholder="https://…"
         value={form.websiteUrl}
@@ -44,8 +45,8 @@ function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSite
         required
       />
       <div className="form-grid">
-        <TextField label={translateText('Name (Kontakt)', language)} value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} required minLength={2} />
-        <TextField label={translateText('E-Mail (Kontakt)', language)} type="email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} required />
+        <TextField label={t('Name (Kontakt)')} value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} required minLength={2} />
+        <TextField label={t('E-Mail (Kontakt)')} type="email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} required />
       </div>
       <label className="website-field" aria-hidden="true">
         Website
@@ -66,17 +67,17 @@ function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSite
           required
         />
         <span>
-          {translateText('Ich habe die', language)}{' '}
+          {t('Ich habe die')}{' '}
           <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
-            {translateText('Datenschutzerklärung', language)}
+            {t('Datenschutzerklärung')}
           </button>{' '}
-          {translateText('gelesen und stimme der Verarbeitung meiner Daten zu.', language)}
+          {t('gelesen und stimme der Verarbeitung meiner Daten zu.')}
           <RequiredMark />
         </span>
       </label>
       {turnstileSiteKey && <div className="cf-turnstile" data-sitekey={turnstileSiteKey} />}
       <div className="dialog-actions">
-        <Button type="submit">{translateText('Turnier melden', language)}</Button>
+        <Button type="submit">{t('Turnier melden')}</Button>
       </div>
     </form>
   );
@@ -93,6 +94,7 @@ export function TournamentReportPage({
   turnstileSiteKey,
   verifyStatus,
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState(() => ({
     ...EMPTY_TOURNAMENT_REPORT_FORM,
     contactName: currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '',
@@ -115,14 +117,14 @@ export function TournamentReportPage({
       });
       setSubmitted(true);
     } catch (requestError) {
-      setError(translateText(requestError.message, language));
+      setError(requestError.message);
     }
   }
 
   return (
     <main className="app-shell">
       <StandalonePageHeader
-        heading={translateText('Turnier melden', language)}
+        heading={t('Turnier melden')}
         language={language}
         setLanguage={setLanguage}
         menuOpen={menuOpen}
@@ -135,16 +137,16 @@ export function TournamentReportPage({
       <section className="single-column">
         <div className="panel">
           {verifyStatus === 'success' && (
-            <Feedback message={translateText('Deine Turniermeldung wurde bestätigt und ist jetzt im öffentlichen Kalender sichtbar.', language)} />
+            <Feedback message={t('Deine Turniermeldung wurde bestätigt und ist jetzt im öffentlichen Kalender sichtbar.')} />
           )}
-          {verifyStatus === 'error' && <Feedback error={translateText('Der Bestätigungslink ist ungültig oder abgelaufen.', language)} />}
+          {verifyStatus === 'error' && <Feedback error={t('Der Bestätigungslink ist ungültig oder abgelaufen.')} />}
 
           {submitted ? (
-            <Feedback message={translateText('Danke für deine Meldung! Bitte bestätige sie über den Link, den wir dir per E-Mail geschickt haben. Erst danach erscheint sie im öffentlichen Kalender.', language)} />
+            <Feedback message={t('Danke für deine Meldung! Bitte bestätige sie über den Link, den wir dir per E-Mail geschickt haben. Erst danach erscheint sie im öffentlichen Kalender.')} />
           ) : (
             <>
               <p className="subtitle">
-                {translateText('Melde ein Petanque-Turnier oder eine Veranstaltung für den öffentlichen Kalender. Der Eintrag wird sichtbar, sobald du die Bestätigungs-E-Mail bestätigt hast.', language)}
+                {t('Melde ein Petanque-Turnier oder eine Veranstaltung für den öffentlichen Kalender. Der Eintrag wird sichtbar, sobald du die Bestätigungs-E-Mail bestätigt hast.')}
               </p>
               <TournamentReportForm
                 form={form}
@@ -152,7 +154,6 @@ export function TournamentReportPage({
                 onSubmit={handleSubmit}
                 navigate={navigate}
                 turnstileSiteKey={turnstileSiteKey}
-                language={language}
               />
               <Feedback message={message} error={error} />
             </>
