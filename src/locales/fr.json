@@ -624,5 +624,11 @@
   "E-Mail-Versand für Turniere dieses Nutzers freigeschaltet": "Envoi d'e-mails activé pour les tournois de cet utilisateur",
   "Solange nicht freigeschaltet, werden für Turniere dieses Nutzers keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt (Push/Postfach bleiben unberührt).": "Tant que cela n'est pas activé, aucun e-mail de confirmation, de rappel ou de diffusion ne sera envoyé pour les tournois de cet utilisateur (push/boîte de réception non concernés).",
   "Tippe unten auf „Teilen\" und dann auf „Zum Home-Bildschirm\".": "Appuie sur « Partager » en bas puis sur « Sur l’écran d’accueil ».",
-  "Anmeldung": "Inscription"
+  "Anmeldung": "Inscription",
+  "Erste Runde starten": "Démarrer la première ronde",
+  "Nächste Runde starten": "Démarrer la ronde suivante",
+  "Neue Spieler sind sofort für die nächste Runde aktiv.": "Les nouveaux joueurs sont immédiatement actifs pour la prochaine ronde.",
+  "Spieler hinzufügen": "Ajouter un joueur",
+  "Spieler hinzugefügt:": "Joueur ajouté :",
+  "Vergangene Runden": "Rondes précédentes"
 }

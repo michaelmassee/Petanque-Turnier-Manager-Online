@@ -48,11 +48,17 @@ function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registratio
     if (path === '/api/tournaments/t1/ranking') {
       return Promise.resolve(jsonResponse({ ranking }));
     }
-    if (path === '/api/tournaments/t1/registrations') {
+    if (path === '/api/tournaments/t1/registrations' && (!options.method || options.method === 'GET')) {
       return Promise.resolve(jsonResponse({ registrations }));
     }
+    if (path === '/api/tournaments/t1/registrations' && options.method === 'POST') {
+      return Promise.resolve(jsonResponse({ registration: { firstName: 'Gina', lastName: 'Neu' } }));
+    }
     if (path === '/api/tournaments/t1/rounds' && options.method === 'POST') {
-      return Promise.resolve(jsonResponse({ rounds: [...rounds, { id: 'r2', roundNumber: 2, matches: [] }] }));
+      return Promise.resolve(jsonResponse({
+        rounds: [...rounds, { id: 'r2', roundNumber: 2, matches: [] }],
+        registration: { firstName: 'Gina', lastName: 'Neu' },
+      }));
     }
     if (path === '/api/tournaments/t1/matches/m1/result' && options.method === 'PUT') {
       const updated = { ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 7 }] };
@@ -83,7 +89,7 @@ describe('TournamentPlayManagement', () => {
 
     expect(await screen.findByText('Anna Muster + Bert Beispiel + Clara Test')).toBeInTheDocument();
     expect(screen.getByText('Dirk Demo + Eva Muster + Finn Test')).toBeInTheDocument();
-    expect(await screen.findByRole('cell', { name: 'Anna Muster' })).toBeInTheDocument();
+    expect((await screen.findAllByText('Anna Muster')).length).toBeGreaterThan(0);
 
     await waitFor(() => expect(calls).toContain('/api/tournaments/t1/rounds'));
     await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
@@ -97,7 +103,7 @@ describe('TournamentPlayManagement', () => {
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
     await screen.findByText('Anna Muster + Bert Beispiel + Clara Test');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Neue Runde starten' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Nächste Runde starten' }));
 
     await screen.findByText('Neue Runde wurde erstellt.');
     expect(calls.filter((path) => path === '/api/tournaments/t1/rounds').length).toBeGreaterThan(1);
@@ -117,7 +123,7 @@ describe('TournamentPlayManagement', () => {
 
     expect(await screen.findByText('Bestätigte Meldungen: 1 (1 aktiv)')).toBeInTheDocument();
     expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Neue Runde starten' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Erste Runde starten' })).toBeDisabled();
   });
 
   it('schließt inaktive Teilnehmer von der Mindestanzahl-Prüfung aus und erlaubt das Reaktivieren', async () => {
@@ -135,11 +141,11 @@ describe('TournamentPlayManagement', () => {
     expect(await screen.findByText('Bestätigte Meldungen: 4 (3 aktiv)')).toBeInTheDocument();
     expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Auf aktiv setzen' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Dirk Demo' }));
 
     await waitFor(() => expect(calls).toContain('/api/registrations/p4/active'));
     expect(await screen.findByText('Bestätigte Meldungen: 4 (4 aktiv)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Neue Runde starten' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Erste Runde starten' })).not.toBeDisabled();
   });
 
   it('speichert ein Ergebnis über die Eingabefelder', async () => {
@@ -180,5 +186,22 @@ describe('TournamentPlayManagement', () => {
 
     expect(screen.getByText('Unentschieden ist nicht möglich')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ergebnis speichern' })).toBeDisabled();
+  });
+
+  it('fügt einen Spieler direkt für die nächste Runde hinzu', async () => {
+    const calls = [];
+    installFetchMock(calls);
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    await screen.findByText('Anna Muster + Bert Beispiel + Clara Test');
+
+    const [firstName, lastName] = screen.getAllByRole('textbox');
+    fireEvent.change(firstName, { target: { value: 'Gina' } });
+    fireEvent.change(lastName, { target: { value: 'Neu' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Spieler hinzufügen' }));
+
+    await screen.findByText('Spieler hinzugefügt: Gina Neu');
+    const addCall = global.fetch.mock.calls.find(([path, options]) => path === '/api/tournaments/t1/registrations' && options.method === 'POST');
+    expect(JSON.parse(addCall[1].body)).toMatchObject({ firstName: 'Gina', lastName: 'Neu', noEmail: true, confirmImmediately: true });
   });
 });

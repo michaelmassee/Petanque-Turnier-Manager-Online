@@ -3298,7 +3298,7 @@ async function createRegistration(request, env, tournament) {
   assertLicenseMatchesTournament(tournament, registration);
   await assertNoDuplicateTeamName(db, tournament.id, registration.teamName);
   await assertNoDuplicatePlayer(db, tournament.id, registration);
-  const { status, displace } = await initialRegistrationStatus(db, tournament, registration.isVip);
+  const { status, displace } = await initialRegistrationStatus(db, tournament, registration.isVip, isManager && body.confirmImmediately === true);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   const cancelToken = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
@@ -3912,8 +3912,12 @@ async function displaceRegistration(env, tournament, registrationToDisplace, app
   }
 }
 
-async function initialRegistrationStatus(db, tournament, isVip) {
-  const initialStatus = Number(tournament.approval_required || 0) ? 'pending' : 'confirmed';
+async function initialRegistrationStatus(db, tournament, isVip, confirmImmediately = false) {
+  // Die Schnellaufnahme in der Turnierdurchführung ist ausschließlich für
+  // berechtigte Turnierleiter erreichbar. Sie darf einen Spieler unmittelbar
+  // in die nächste Auslosung übernehmen, ohne die öffentliche Freigabe-Regel
+  // für Selbstanmeldungen zu verändern.
+  const initialStatus = confirmImmediately || !Number(tournament.approval_required || 0) ? 'confirmed' : 'pending';
   if (!Number(tournament.max_registrations)) {
     return { status: initialStatus, displace: null };
   }

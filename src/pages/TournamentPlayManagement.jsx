@@ -1,33 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
-import { SelectField, Button, Feedback } from '../components/ui.jsx';
-import { PAIRING_STRATEGIES, checkRoundRequirements } from '../lib/pairing/index.js';
-import { REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
-
-const DESKTOP_APP_URL = 'https://michaelmassee.github.io/Petanque-Turnier-Manager/';
-
-// Welche Turniersysteme online durchführbar sind, ergibt sich allein aus
-// PAIRING_STRATEGIES (siehe lib/pairing/index.js) - kommen dort weitere Systeme
-// dazu, taucht ihr Label hier automatisch auf, ohne dass diese Liste angepasst
-// werden muss.
-const ONLINE_SYSTEM_LABELS = [...REGISTRATION_TYPES, ...TOURNAMENT_TYPES]
-  .filter((entry) => PAIRING_STRATEGIES[entry.value])
-  .map((entry) => entry.label);
-
-function OnlineSystemsHint() {
-  const { t } = useTranslation();
-  return (
-    <p className="hint">
-      {t('Online durchführbar sind aktuell:')}{' '}
-      {ONLINE_SYSTEM_LABELS.map((label) => t(label)).join(', ')}.{' '}
-      {t('Alle Turniersysteme können mit der professionellen, kostenfreien Desktop-Version des Pétanque Turnier Managers durchgeführt werden:')}{' '}
-      <a href={DESKTOP_APP_URL} target="_blank" rel="noreferrer">
-        {t('Turniersoftware')}
-      </a>
-    </p>
-  );
-}
+import { SelectField, TextField, Button, Feedback } from '../components/ui.jsx';
+import { checkRoundRequirements } from '../lib/pairing/index.js';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
 // Systemwissen: 'minPlayers' trägt die Mindestanzahl als Zahl statt fest im Satz
@@ -112,7 +87,7 @@ function MatchRow({ match, onSave, busy }) {
 }
 
 export default function TournamentPlayManagement({ tournaments }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [selectedTournamentId, setSelectedTournamentId] = useState(tournaments[0]?.id || '');
   const [rounds, setRounds] = useState([]);
   const [ranking, setRanking] = useState([]);
@@ -120,6 +95,7 @@ export default function TournamentPlayManagement({ tournaments }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [quickPlayer, setQuickPlayer] = useState({ firstName: '', lastName: '', licenseNr: '' });
   // Der `tournaments`-Prop kommt vom Elternteil und wird nicht sofort neu geladen,
   // nachdem hier der Status auf "Läuft" gesetzt wurde - deshalb lokal vormerken,
   // welche Turniere in dieser Sitzung bereits gestartet wurden.
@@ -191,6 +167,34 @@ export default function TournamentPlayManagement({ tournaments }) {
     }
   }
 
+  async function handleQuickPlayerSubmit(event) {
+    event.preventDefault();
+    if (!selectedTournamentId) return;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await api(`/api/tournaments/${selectedTournamentId}/registrations`, {
+        method: 'POST',
+        body: JSON.stringify({
+          firstName: quickPlayer.firstName,
+          lastName: quickPlayer.lastName,
+          licenseNr: quickPlayer.licenseNr || null,
+          noEmail: true,
+          confirmImmediately: true,
+          language: i18n.language,
+        }),
+      });
+      setQuickPlayer({ firstName: '', lastName: '', licenseNr: '' });
+      setMessage(`${t('Spieler hinzugefügt:')} ${result.registration.firstName} ${result.registration.lastName}`);
+      await loadData(selectedTournamentId);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleNewRound() {
     setBusy(true);
     setError('');
@@ -255,7 +259,24 @@ export default function TournamentPlayManagement({ tournaments }) {
   ];
 
   const canGenerateRound = selectedTournamentStatus === 'running' && !currentRoundOpen && strategyRequirementGaps.length === 0;
-  const roundsNewestFirst = [...rounds].reverse();
+  const olderRoundsNewestFirst = rounds.slice(0, -1).reverse();
+  const showRoundAction = selectedTournamentStatus === 'running';
+
+  function RoundAction() {
+    if (!showRoundAction) return null;
+    return (
+      <div className="supermelee-round-action">
+        {missingRequirements.length > 0 && (
+          <div className="round-requirements">
+            {missingRequirements.map((requirement) => <p className="hint" key={requirement}>{requirement}</p>)}
+          </div>
+        )}
+        <Button disabled={busy || !selectedTournamentId || !canGenerateRound} onClick={handleNewRound}>
+          {currentRound ? t('Nächste Runde starten') : t('Erste Runde starten')}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="supermelee-manage">
@@ -266,88 +287,64 @@ export default function TournamentPlayManagement({ tournaments }) {
           onChange={setSelectedTournamentId}
           options={tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }))}
         />
-        <OnlineSystemsHint />
-
-        <div className="supermelee-toolbar-actions">
-          {selectedTournament && selectedTournamentStatus !== 'running' ? (
-            <Button disabled={busy || !selectedTournamentId} onClick={handleStartTournament}>
-              {t('Turnier starten')}
-            </Button>
-          ) : (
-            <Button disabled={busy || !selectedTournamentId || !canGenerateRound} onClick={handleNewRound}>
-              {t('Neue Runde starten')}
-            </Button>
-          )}
-        </div>
-
-        {selectedTournamentStatus === 'running' && (
-          <div className="round-requirements">
-            <p className="hint">
-              {t('Bestätigte Meldungen')}: {confirmedRegistrations.length} ({activeConfirmedCount}{' '}
-              {t('aktiv')})
-            </p>
-            {missingRequirements.map((requirement) => (
-              <p className="hint" key={requirement}>
-                {requirement}
-              </p>
-            ))}
+        {selectedTournament && selectedTournamentStatus !== 'running' && (
+          <div className="supermelee-toolbar-actions">
+            <Button disabled={busy || !selectedTournamentId} onClick={handleStartTournament}>{t('Turnier starten')}</Button>
           </div>
         )}
-
-        {selectedTournamentStatus === 'running' && confirmedRegistrations.length > 0 && (
-          <div className="round-participants">
-            <h3>{t('Teilnehmer')}</h3>
-            <p className="hint">
-              {t('Inaktive Teilnehmer werden bei der nächsten Runde nicht mehr eingeteilt.')}
-            </p>
-            {confirmedRegistrations.map((registration) => (
-              <div className="round-participant-row" key={registration.id}>
-                <span className={registration.active ? '' : 'muted'} data-i18n-skip>{playerLabel(registration)}</span>
-                <Button
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => handleToggleActive(registration.id, !registration.active)}
-                >
-                  {registration.active
-                    ? t('Auf inaktiv setzen')
-                    : t('Auf aktiv setzen')}
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+        {selectedTournamentStatus === 'running' && <p className="hint">{t('Bestätigte Meldungen')}: {confirmedRegistrations.length} ({activeConfirmedCount} {t('aktiv')})</p>}
       </div>
 
       <Feedback message={message} error={error} />
 
-      {Boolean(roundsNewestFirst.length) && (
-        <div className="supermelee-rounds">
-          {roundsNewestFirst.map((round, index) => {
-            const complete = isRoundComplete(round);
-            return (
-              <details key={round.id} className="panel supermelee-round" open={index === 0}>
-                <summary className="supermelee-round-summary">
-                  <span>
-                    {t('Runde')} {round.roundNumber}
-                  </span>
-                  <span className={`status ${complete ? 'registration-confirmed' : 'status-running'}`}>
-                    {complete ? t('Abgeschlossen') : t('Offen')}
-                  </span>
-                </summary>
-                <div className="supermelee-match-list">
-                  {round.matches.map((match) => (
-                    <MatchRow key={match.id} match={match} onSave={handleSaveResult} busy={busy} />
-                  ))}
-                </div>
-              </details>
-            );
-          })}
-        </div>
+      {selectedTournamentStatus === 'running' && (
+        <section className="panel round-participants">
+          <div className="section-title"><h2>{t('Teilnehmer')}</h2><span className="counter">{activeConfirmedCount}</span></div>
+          <form className="quick-player-form" onSubmit={handleQuickPlayerSubmit}>
+            <TextField label={t('Vorname')} value={quickPlayer.firstName} onChange={(firstName) => setQuickPlayer({ ...quickPlayer, firstName })} required minLength={2} />
+            <TextField label={t('Nachname')} value={quickPlayer.lastName} onChange={(lastName) => setQuickPlayer({ ...quickPlayer, lastName })} required minLength={2} />
+            {selectedTournament?.licenseRequired && <TextField label={t('Lizenznummer')} value={quickPlayer.licenseNr} onChange={(licenseNr) => setQuickPlayer({ ...quickPlayer, licenseNr })} required />}
+            <Button type="submit" disabled={busy}>{t('Spieler hinzufügen')}</Button>
+          </form>
+          <p className="hint">{t('Neue Spieler sind sofort für die nächste Runde aktiv.')}</p>
+          <div className="round-participant-list">
+            {confirmedRegistrations.map((registration) => (
+              <label className="round-participant-row" key={registration.id}>
+                <input type="checkbox" checked={registration.active} disabled={busy} onChange={(event) => handleToggleActive(registration.id, event.target.checked)} />
+                <span className={registration.active ? '' : 'muted'} data-i18n-skip>{playerLabel(registration)}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {currentRound && (
+        <section className="panel supermelee-current-round">
+          <div className="section-title"><h2>{t('Runde')} {currentRound.roundNumber}</h2><span className={`status ${currentRoundOpen ? 'status-running' : 'registration-confirmed'}`}>{currentRoundOpen ? t('Offen') : t('Abgeschlossen')}</span></div>
+          <div className="supermelee-match-list">
+            {currentRound.matches.map((match) => <MatchRow key={match.id} match={match} onSave={handleSaveResult} busy={busy} />)}
+          </div>
+          <RoundAction />
+        </section>
+      )}
+
+      {!currentRound && <RoundAction />}
+
+      {Boolean(olderRoundsNewestFirst.length) && (
+        <section className="supermelee-rounds">
+          <h2>{t('Vergangene Runden')}</h2>
+          {olderRoundsNewestFirst.map((round) => (
+            <details key={round.id} className="panel supermelee-round">
+              <summary className="supermelee-round-summary"><span>{t('Runde')} {round.roundNumber}</span><span className="status registration-confirmed">{t('Abgeschlossen')}</span></summary>
+              <div className="supermelee-match-list">{round.matches.map((match) => <MatchRow key={match.id} match={match} onSave={handleSaveResult} busy={busy} />)}</div>
+            </details>
+          ))}
+        </section>
       )}
 
       {Boolean(ranking.length) && (
-        <section className="panel">
-          <h3>{t('Rangliste')}</h3>
+        <details className="panel ranking-panel">
+          <summary className="supermelee-round-summary"><span>{t('Rangliste')}</span></summary>
           <div className="table-scroll">
             <table className="ranking-table">
               <thead>
@@ -372,7 +369,7 @@ export default function TournamentPlayManagement({ tournaments }) {
               </tbody>
             </table>
           </div>
-        </section>
+        </details>
       )}
     </div>
   );

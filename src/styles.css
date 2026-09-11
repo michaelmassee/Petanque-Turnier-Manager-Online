@@ -1715,13 +1715,33 @@ textarea:focus {
   gap: 8px;
 }
 
+.quick-player-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.quick-player-form label {
+  margin: 0;
+}
+
+.quick-player-form input {
+  min-width: 0;
+}
+
+.round-participant-list {
+  display: grid;
+  gap: 0;
+}
+
 .round-participant-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 6px 0;
   border-bottom: 1px solid #e5e9f0;
+  cursor: pointer;
 }
 
 .round-participant-row:last-child {
@@ -1731,6 +1751,35 @@ textarea:focus {
 .supermelee-rounds {
   display: grid;
   gap: 12px;
+}
+
+.supermelee-round-action {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.supermelee-current-round .supermelee-round-action {
+  padding-top: 16px;
+  border-top: 1px solid #e5e9f0;
+}
+
+.ranking-panel tbody tr:nth-child(even) {
+  background: #f3f6fa;
+}
+
+.ranking-panel tbody tr:nth-child(odd) {
+  background: #fff;
+}
+
+@media (max-width: 560px) {
+  .quick-player-form {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-player-form .button {
+    width: 100%;
+  }
 }
 
 .supermelee-round {
