@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
-import { translateText } from '../lib/i18n.js';
 import { SelectField, Button, Feedback } from '../components/ui.jsx';
 import { PAIRING_STRATEGIES, checkRoundRequirements } from '../lib/pairing/index.js';
 import { REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
@@ -15,14 +15,15 @@ const ONLINE_SYSTEM_LABELS = [...REGISTRATION_TYPES, ...TOURNAMENT_TYPES]
   .filter((entry) => PAIRING_STRATEGIES[entry.value])
   .map((entry) => entry.label);
 
-function OnlineSystemsHint({ language }) {
+function OnlineSystemsHint() {
+  const { t } = useTranslation();
   return (
     <p className="hint">
-      {translateText('Online durchführbar sind aktuell:', language)}{' '}
-      {ONLINE_SYSTEM_LABELS.map((label) => translateText(label, language)).join(', ')}.{' '}
-      {translateText('Alle Turniersysteme können mit der professionellen, kostenfreien Desktop-Version des Pétanque Turnier Managers durchgeführt werden:', language)}{' '}
+      {t('Online durchführbar sind aktuell:')}{' '}
+      {ONLINE_SYSTEM_LABELS.map((label) => t(label)).join(', ')}.{' '}
+      {t('Alle Turniersysteme können mit der professionellen, kostenfreien Desktop-Version des Pétanque Turnier Managers durchgeführt werden:')}{' '}
       <a href={DESKTOP_APP_URL} target="_blank" rel="noreferrer">
-        {translateText('Turniersoftware', language)}
+        {t('Turniersoftware')}
       </a>
     </p>
   );
@@ -33,11 +34,11 @@ function OnlineSystemsHint({ language }) {
 // eingebacken zu sein (verschiedene Systeme/Formationen können unterschiedliche
 // Mindestanzahlen haben), 'message' ist ein fertiger, übersetzbarer Freitext für
 // alles, was sich nicht in ein generisches Muster fassen lässt.
-function requirementText(requirement, language) {
+function requirementText(requirement, t) {
   if (requirement.type === 'minPlayers') {
-    return `${translateText('Es werden mindestens', language)} ${requirement.min} ${translateText('bestätigte Meldungen benötigt.', language)}`;
+    return `${t('Es werden mindestens')} ${requirement.min} ${t('bestätigte Meldungen benötigt.')}`;
   }
-  return translateText(requirement.text, language);
+  return t(requirement.text);
 }
 
 function playerLabel(player) {
@@ -60,7 +61,8 @@ function isRoundComplete(round) {
   return round.matches.every((match) => match.scoreA != null || match.scoreB != null || match.noShow);
 }
 
-function MatchRow({ match, onSave, busy, language }) {
+function MatchRow({ match, onSave, busy }) {
+  const { t } = useTranslation();
   const [scoreA, setScoreA] = useState(match.scoreA ?? '');
   const [scoreB, setScoreB] = useState(match.scoreB ?? '');
   const decided = match.scoreA != null || match.scoreB != null || match.noShow;
@@ -70,7 +72,7 @@ function MatchRow({ match, onSave, busy, language }) {
     <article className="supermelee-match">
       <div className="supermelee-match-teams">
         <div className="supermelee-team" data-i18n-skip>{teamLabel(match.teamA)}</div>
-        <div className="supermelee-vs">{translateText('gegen', language)}</div>
+        <div className="supermelee-vs">{t('gegen')}</div>
         <div className="supermelee-team is-second" data-i18n-skip>{teamLabel(match.teamB)}</div>
       </div>
 
@@ -83,7 +85,7 @@ function MatchRow({ match, onSave, busy, language }) {
           maxLength={2}
           value={scoreA}
           onChange={(event) => setScoreA(sanitizeScore(event.target.value))}
-          aria-label={translateText('Punkte Team A', language)}
+          aria-label={t('Punkte Team A')}
         />
         <span className="supermelee-score-sep">:</span>
         <input
@@ -94,22 +96,23 @@ function MatchRow({ match, onSave, busy, language }) {
           maxLength={2}
           value={scoreB}
           onChange={(event) => setScoreB(sanitizeScore(event.target.value))}
-          aria-label={translateText('Punkte Team B', language)}
+          aria-label={t('Punkte Team B')}
         />
         <Button
           disabled={busy || scoreA === '' || scoreB === '' || isDraw}
           onClick={() => onSave(match.id, { scoreA: Number(scoreA), scoreB: Number(scoreB) })}
         >
-          {decided ? translateText('Ergebnis ändern', language) : translateText('Ergebnis speichern', language)}
+          {decided ? t('Ergebnis ändern') : t('Ergebnis speichern')}
         </Button>
       </div>
 
-      {isDraw && <p className="feedback error">{translateText('Unentschieden ist nicht möglich', language)}</p>}
+      {isDraw && <p className="feedback error">{t('Unentschieden ist nicht möglich')}</p>}
     </article>
   );
 }
 
-export default function TournamentPlayManagement({ tournaments, language }) {
+export default function TournamentPlayManagement({ tournaments }) {
+  const { t } = useTranslation();
   const [selectedTournamentId, setSelectedTournamentId] = useState(tournaments[0]?.id || '');
   const [rounds, setRounds] = useState([]);
   const [ranking, setRanking] = useState([]);
@@ -144,7 +147,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
       setRanking(rankingData.ranking);
       setConfirmedRegistrations(registrationsData.registrations.filter((registration) => registration.status === 'confirmed'));
     } catch (err) {
-      setError(translateText(err.message, language));
+      setError(err.message);
     }
   }
 
@@ -162,9 +165,9 @@ export default function TournamentPlayManagement({ tournaments, language }) {
     try {
       await api(`/api/tournaments/${selectedTournamentId}/start`, { method: 'POST' });
       setStartedTournamentIds((current) => new Set(current).add(selectedTournamentId));
-      setMessage(translateText('Turnier wurde gestartet.', language));
+      setMessage(t('Turnier wurde gestartet.'));
     } catch (err) {
-      setError(translateText(err.message, language));
+      setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -182,7 +185,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
         current.map((registration) => (registration.id === registrationId ? { ...registration, active: nextActive } : registration)),
       );
     } catch (err) {
-      setError(translateText(err.message, language));
+      setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -195,9 +198,9 @@ export default function TournamentPlayManagement({ tournaments, language }) {
     try {
       const data = await api(`/api/tournaments/${selectedTournamentId}/rounds`, { method: 'POST' });
       setRounds(data.rounds);
-      setMessage(translateText('Neue Runde wurde erstellt.', language));
+      setMessage(t('Neue Runde wurde erstellt.'));
     } catch (err) {
-      setError(translateText(err.message, language));
+      setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -216,7 +219,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
       const rankingData = await api(`/api/tournaments/${selectedTournamentId}/ranking`);
       setRanking(rankingData.ranking);
     } catch (err) {
-      setError(translateText(err.message, language));
+      setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -225,7 +228,7 @@ export default function TournamentPlayManagement({ tournaments, language }) {
   if (!tournaments.length) {
     return (
       <div className="panel">
-        <p className="muted">{translateText('Keine Turniere mit Online-Durchführung verfügbar.', language)}</p>
+        <p className="muted">{t('Keine Turniere mit Online-Durchführung verfügbar.')}</p>
       </div>
     );
   }
@@ -245,9 +248,9 @@ export default function TournamentPlayManagement({ tournaments, language }) {
     ? checkRoundRequirements(selectedTournament, activeConfirmedCount)
     : [];
   const missingRequirements = [
-    ...strategyRequirementGaps.map((requirement) => requirementText(requirement, language)),
+    ...strategyRequirementGaps.map((requirement) => requirementText(requirement, t)),
     ...(selectedTournamentStatus === 'running' && currentRoundOpen
-      ? [translateText('Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen.', language)]
+      ? [t('Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen.')]
       : []),
   ];
 
@@ -258,21 +261,21 @@ export default function TournamentPlayManagement({ tournaments, language }) {
     <div className="supermelee-manage">
       <div className="panel supermelee-toolbar">
         <SelectField
-          label="Turnier"
+          label={t('Turnier')}
           value={selectedTournamentId}
           onChange={setSelectedTournamentId}
           options={tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }))}
         />
-        <OnlineSystemsHint language={language} />
+        <OnlineSystemsHint />
 
         <div className="supermelee-toolbar-actions">
           {selectedTournament && selectedTournamentStatus !== 'running' ? (
             <Button disabled={busy || !selectedTournamentId} onClick={handleStartTournament}>
-              {translateText('Turnier starten', language)}
+              {t('Turnier starten')}
             </Button>
           ) : (
             <Button disabled={busy || !selectedTournamentId || !canGenerateRound} onClick={handleNewRound}>
-              {translateText('Neue Runde starten', language)}
+              {t('Neue Runde starten')}
             </Button>
           )}
         </div>
@@ -280,8 +283,8 @@ export default function TournamentPlayManagement({ tournaments, language }) {
         {selectedTournamentStatus === 'running' && (
           <div className="round-requirements">
             <p className="hint">
-              {translateText('Bestätigte Meldungen', language)}: {confirmedRegistrations.length} ({activeConfirmedCount}{' '}
-              {translateText('aktiv', language)})
+              {t('Bestätigte Meldungen')}: {confirmedRegistrations.length} ({activeConfirmedCount}{' '}
+              {t('aktiv')})
             </p>
             {missingRequirements.map((requirement) => (
               <p className="hint" key={requirement}>
@@ -293,9 +296,9 @@ export default function TournamentPlayManagement({ tournaments, language }) {
 
         {selectedTournamentStatus === 'running' && confirmedRegistrations.length > 0 && (
           <div className="round-participants">
-            <h3>{translateText('Teilnehmer', language)}</h3>
+            <h3>{t('Teilnehmer')}</h3>
             <p className="hint">
-              {translateText('Inaktive Teilnehmer werden bei der nächsten Runde nicht mehr eingeteilt.', language)}
+              {t('Inaktive Teilnehmer werden bei der nächsten Runde nicht mehr eingeteilt.')}
             </p>
             {confirmedRegistrations.map((registration) => (
               <div className="round-participant-row" key={registration.id}>
@@ -306,8 +309,8 @@ export default function TournamentPlayManagement({ tournaments, language }) {
                   onClick={() => handleToggleActive(registration.id, !registration.active)}
                 >
                   {registration.active
-                    ? translateText('Auf inaktiv setzen', language)
-                    : translateText('Auf aktiv setzen', language)}
+                    ? t('Auf inaktiv setzen')
+                    : t('Auf aktiv setzen')}
                 </Button>
               </div>
             ))}
@@ -325,15 +328,15 @@ export default function TournamentPlayManagement({ tournaments, language }) {
               <details key={round.id} className="panel supermelee-round" open={index === 0}>
                 <summary className="supermelee-round-summary">
                   <span>
-                    {translateText('Runde', language)} {round.roundNumber}
+                    {t('Runde')} {round.roundNumber}
                   </span>
                   <span className={`status ${complete ? 'registration-confirmed' : 'status-running'}`}>
-                    {complete ? translateText('Abgeschlossen', language) : translateText('Offen', language)}
+                    {complete ? t('Abgeschlossen') : t('Offen')}
                   </span>
                 </summary>
                 <div className="supermelee-match-list">
                   {round.matches.map((match) => (
-                    <MatchRow key={match.id} match={match} onSave={handleSaveResult} busy={busy} language={language} />
+                    <MatchRow key={match.id} match={match} onSave={handleSaveResult} busy={busy} />
                   ))}
                 </div>
               </details>
@@ -344,16 +347,16 @@ export default function TournamentPlayManagement({ tournaments, language }) {
 
       {Boolean(ranking.length) && (
         <section className="panel">
-          <h3>{translateText('Rangliste', language)}</h3>
+          <h3>{t('Rangliste')}</h3>
           <div className="table-scroll">
             <table className="ranking-table">
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>{translateText('Spieler', language)}</th>
-                  <th>{translateText('Siege', language)}</th>
+                  <th>{t('Spieler')}</th>
+                  <th>{t('Siege')}</th>
                   <th>+/-</th>
-                  <th>{translateText('Punkte', language)}</th>
+                  <th>{t('Punkte')}</th>
                 </tr>
               </thead>
               <tbody>

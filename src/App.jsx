@@ -1967,7 +1967,7 @@ export default function App() {
       {activeTab === 'play' && canManageTournaments && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
-            <TournamentPlayManagement tournaments={manageableTournaments.filter(isOnlinePlayable)} language={language} />
+            <TournamentPlayManagement tournaments={manageableTournaments.filter(isOnlinePlayable)} />
           </section>
         </Suspense>
       )}
