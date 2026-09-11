@@ -845,7 +845,7 @@ function AppContent() {
       return;
     }
 
-    const ownedTournaments = tournaments.filter((tournament) => tournament.createdBy === user.id || tournament.managerId === user.id);
+    const ownedTournaments = tournaments.filter((tournament) => tournament.createdBy === user.id);
     let deleteTournaments = false;
     if (ownedTournaments.length > 0) {
       deleteTournaments = window.confirm(
@@ -1061,7 +1061,7 @@ function AppContent() {
     setTournamentMode('edit');
     setTournamentForm({
       id: tournament.id,
-      managerId: tournament.managerId || '',
+      createdBy: tournament.createdBy || '',
       name: tournament.name || '',
       date: tournament.date || '',
       startTime: tournament.startTime || '',
@@ -1937,7 +1937,7 @@ function AppContent() {
               setTournamentForm={setTournamentForm}
               onTournamentSubmit={handleTournamentSubmit}
               onCloseTournamentDialog={closeTournamentDialog}
-              users={users}
+              editorCandidates={postboxRecipients.filter((recipient) => recipient.id !== tournamentForm.createdBy)}
               currentUser={currentUser}
             />
           </section>

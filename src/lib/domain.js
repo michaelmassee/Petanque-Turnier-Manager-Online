@@ -90,7 +90,6 @@ export function tournamentImageUrl(tournamentId, field) {
 
 export function tournamentPayload(form) {
   return {
-    managerId: form.managerId || null,
     club: form.club || null,
     name: form.name,
     date: form.date,
@@ -178,7 +177,7 @@ export function formationLabel(tournament) {
 }
 
 export function isOwnTournament(tournament, user) {
-  return Boolean(user) && (tournament.createdBy === user.id || tournament.managerId === user.id);
+  return Boolean(user) && (tournament.createdBy === user.id || (tournament.editors || []).some((editor) => editor.id === user.id));
 }
 
 export function isUpcoming(tournament) {

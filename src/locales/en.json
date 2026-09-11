@@ -634,5 +634,16 @@
   "Neue Spieler sind sofort für die nächste Runde aktiv.": "New players are immediately active for the next round.",
   "Spieler hinzufügen": "Add player",
   "Spieler hinzugefügt:": "Player added:",
-  "Vergangene Runden": "Previous rounds"
+  "Vergangene Runden": "Previous rounds",
+  "Bearbeitungsrechte verwalten": "Manage editing rights",
+  "Lädt …": "Loading …",
+  "Noch keine weiteren Bearbeiter für dieses Turnier.": "No additional editors for this tournament yet.",
+  "Entfernen": "Remove",
+  "Bitte wählen": "Please select",
+  "Hinzufügen": "Add",
+  "Bearbeiter:": "Editors:",
+  "Benutzer hinzufügen": "Add user",
+  "Bitte wähle einen Benutzer aus": "Please select a user",
+  "Der Ersteller hat bereits Zugriff auf dieses Turnier": "The creator already has access to this tournament",
+  "Dieser Benutzer hat bereits Bearbeitungsrechte für dieses Turnier": "This user already has editing rights for this tournament"
 }

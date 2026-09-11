@@ -961,6 +961,38 @@ export default {
         }
       }
 
+      const tournamentEditorsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/editors$/);
+      if (tournamentEditorsMatch) {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, tournamentEditorsMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+
+        if (request.method === 'GET') {
+          assertCanManageTournament(tournament, session.user);
+          return json({ editors: tournamentEditors(tournament) });
+        }
+
+        if (request.method === 'POST') {
+          assertCanManageEditors(tournament, session.user);
+          return await addTournamentEditor(request, env.DB, tournament, session.user);
+        }
+      }
+
+      const tournamentEditorMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/editors\/([^/]+)$/);
+      if (tournamentEditorMatch && request.method === 'DELETE') {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, tournamentEditorMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        assertCanManageEditors(tournament, session.user);
+        await env.DB.prepare('DELETE FROM tournament_editors WHERE tournament_id = ? AND user_id = ?').bind(tournament.id, tournamentEditorMatch[2]).run();
+        const updated = await getTournamentById(env.DB, tournament.id);
+        return json({ editors: tournamentEditors(updated) });
+      }
+
       const confirmPendingRegistrationsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registrations\/confirm-pending$/);
       if (confirmPendingRegistrationsMatch && request.method === 'POST') {
         const session = await requireManagerAuth(request, env.DB);
@@ -2293,21 +2325,21 @@ async function deleteUser(db, id, currentUserId, deleteTournaments) {
   const now = new Date().toISOString();
 
   if (deleteTournaments) {
+    // Nur selbst erstellte Turniere löschen - Turniere, bei denen dieser User
+    // lediglich als Editor eingetragen war, gehören anderen Erstellern und dürfen
+    // nicht mitgerissen werden. Der zugehörige tournament_editors-Eintrag entfällt
+    // ohnehin automatisch über ON DELETE CASCADE auf user_id.
     await db.batch([
       db
-        .prepare(
-          `DELETE FROM registrations WHERE tournament_id IN (
-            SELECT id FROM tournaments WHERE created_by = ? OR manager_id = ?
-          )`,
-        )
-        .bind(id, id),
-      db.prepare('DELETE FROM tournaments WHERE created_by = ? OR manager_id = ?').bind(id, id),
+        .prepare('DELETE FROM registrations WHERE tournament_id IN (SELECT id FROM tournaments WHERE created_by = ?)')
+        .bind(id),
+      db.prepare('DELETE FROM tournaments WHERE created_by = ?').bind(id),
     ]);
   } else {
-    // Reassign to the admin performing the deletion instead of leaving created_by/manager_id
-    // pointing at a user row that no longer exists.
+    // Reassign to the admin performing the deletion instead of leaving created_by
+    // pointing at a user row that no longer exists. Editor-Zuweisungen dieses Users
+    // entfallen automatisch über ON DELETE CASCADE.
     await db.prepare('UPDATE tournaments SET created_by = ?, updated_at = ? WHERE created_by = ?').bind(currentUserId, now, id).run();
-    await db.prepare('UPDATE tournaments SET manager_id = ?, updated_at = ? WHERE manager_id = ?').bind(currentUserId, now, id).run();
   }
 
   const result = await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
@@ -2321,7 +2353,8 @@ async function deleteUser(db, id, currentUserId, deleteTournaments) {
 async function listTournaments(db, user) {
   const rows = await db
     .prepare(
-      `SELECT tournaments.*, (users.first_name || ' ' || users.last_name) AS manager_name,
+      `SELECT tournaments.*,
+        ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
         (
           SELECT COUNT(*)
           FROM registrations
@@ -2335,9 +2368,10 @@ async function listTournaments(db, user) {
             AND registrations.status = 'waitlist'
         ) AS waitlist_registrations
        FROM tournaments
-       LEFT JOIN users ON users.id = tournaments.manager_id
        WHERE (?1 IS NOT NULL AND ?1 = 'admin')
-          OR (?2 IS NOT NULL AND (tournaments.created_by = ?2 OR tournaments.manager_id = ?2))
+          OR (?2 IS NOT NULL AND (tournaments.created_by = ?2 OR EXISTS (
+               SELECT 1 FROM tournament_editors WHERE tournament_editors.tournament_id = tournaments.id AND tournament_editors.user_id = ?2
+             )))
           OR (tournaments.visibility = 'public' AND tournaments.status != 'draft')
        ORDER BY tournaments.date ASC, tournaments.start_time ASC, tournaments.name COLLATE NOCASE`,
     )
@@ -2438,7 +2472,6 @@ async function createTournament(request, db, user) {
   };
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
-  const managerId = user.role === 'admin' ? tournament.managerId || user.id : user.id;
   const geo = await resolveTournamentGeolocation(tournament, null, now, request.headers.get('CF-IPCountry'));
   const timezone = resolveTournamentTimezone(geo);
   const registrationTimes = resolveRegistrationTimes(tournament, timezone);
@@ -2446,16 +2479,15 @@ async function createTournament(request, db, user) {
   await db
     .prepare(
       `INSERT INTO tournaments (
-        id, created_by, manager_id, name, date, start_time, location, description, type, formation, formation_other, registration_type, status,
+        id, created_by, name, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
         latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       user.id,
-      managerId,
       tournament.name,
       tournament.date,
       tournament.startTime,
@@ -2506,7 +2538,6 @@ async function updateTournament(request, env, existing, user) {
   const body = await readJson(request);
   const tournament = normalizeCoreTournamentInput(body);
   const now = new Date().toISOString();
-  const managerId = user.role === 'admin' ? tournament.managerId || existing.manager_id || user.id : existing.manager_id || user.id;
   const geo = await resolveTournamentGeolocation(tournament, existing, now, request.headers.get('CF-IPCountry'));
   const timezone = resolveTournamentTimezone(geo, existing.timezone || 'Europe/Berlin');
   const registrationTimes = resolveRegistrationTimes(tournament, timezone);
@@ -2514,14 +2545,13 @@ async function updateTournament(request, env, existing, user) {
   await db
     .prepare(
       `UPDATE tournaments
-       SET manager_id = ?, name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
+       SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
            participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
-      managerId,
       tournament.name,
       tournament.club,
       tournament.date,
@@ -2719,15 +2749,14 @@ async function createTournamentReport(request, env, url) {
   await db
     .prepare(
       `INSERT INTO tournaments (
-        id, created_by, manager_id, name, date, start_time, location, description, type, formation, formation_other,
+        id, created_by, name, date, start_time, location, description, type, formation, formation_other,
         registration_type, status, visibility, registration_enabled, club, website_url, contact_name, contact_email,
         latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       TOURNAMENT_REPORT_SYSTEM_USER_ID,
-      null,
       name,
       date,
       startTime,
@@ -3947,10 +3976,35 @@ async function initialRegistrationStatus(db, tournament, isVip, confirmImmediate
   return { status: 'waitlist', displace: null };
 }
 
+async function addTournamentEditor(request, db, tournament, actingUser) {
+  const body = await readJson(request);
+  const userId = String(body.userId || '').trim();
+  if (!userId) {
+    throw new HttpError(400, 'Bitte wähle einen Benutzer aus');
+  }
+  if (userId === tournament.created_by) {
+    throw new HttpError(400, 'Der Ersteller hat bereits Zugriff auf dieses Turnier');
+  }
+  const targetUser = await db.prepare('SELECT id, role FROM users WHERE id = ?').bind(userId).first();
+  if (!targetUser || targetUser.role !== 'user') {
+    throw new HttpError(404, 'Benutzer nicht gefunden');
+  }
+  if (tournamentEditorIds(tournament).includes(userId)) {
+    throw new HttpError(409, 'Dieser Benutzer hat bereits Bearbeitungsrechte für dieses Turnier');
+  }
+  await db
+    .prepare('INSERT INTO tournament_editors (id, tournament_id, user_id, granted_by, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(crypto.randomUUID(), tournament.id, userId, actingUser.id, new Date().toISOString())
+    .run();
+  const updated = await getTournamentById(db, tournament.id);
+  return json({ editors: tournamentEditors(updated) }, 201);
+}
+
 async function getTournamentById(db, id) {
   return db
     .prepare(
-      `SELECT tournaments.*, (users.first_name || ' ' || users.last_name) AS manager_name,
+      `SELECT tournaments.*,
+        ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
         (
           SELECT COUNT(*)
           FROM registrations
@@ -3964,7 +4018,6 @@ async function getTournamentById(db, id) {
             AND registrations.status = 'waitlist'
         ) AS waitlist_registrations
        FROM tournaments
-       LEFT JOIN users ON users.id = tournaments.manager_id
        WHERE tournaments.id = ?`,
     )
     .bind(id)
@@ -3974,9 +4027,10 @@ async function getTournamentById(db, id) {
 async function getRegistrationWithTournament(db, id) {
   return db
     .prepare(
-      `SELECT registrations.*, tournaments.created_by, tournaments.manager_id, tournaments.visibility, tournaments.formation,
+      `SELECT registrations.*, tournaments.created_by, tournaments.visibility, tournaments.formation,
               tournaments.registration_type, tournaments.license_required, tournaments.max_registrations, tournaments.waitlist_enabled,
-              tournaments.name, tournaments.date, tournaments.start_time, tournaments.location
+              tournaments.name, tournaments.date, tournaments.start_time, tournaments.location,
+              ${TOURNAMENT_EDITORS_JSON_SUBQUERY}
        FROM registrations
        JOIN tournaments ON tournaments.id = registrations.tournament_id
        WHERE registrations.id = ?`,
@@ -4012,15 +4066,46 @@ function canViewParticipants(tournament, user) {
   return canManageTournament(tournament, user);
 }
 
+function tournamentEditors(tournament) {
+  if (Array.isArray(tournament.editors)) return tournament.editors;
+  if (!tournament.editors_json) return [];
+  try {
+    return JSON.parse(tournament.editors_json);
+  } catch {
+    return [];
+  }
+}
+
+function tournamentEditorIds(tournament) {
+  return tournamentEditors(tournament).map((editor) => editor.id);
+}
+
+const TOURNAMENT_EDITORS_JSON_SUBQUERY = `(
+          SELECT COALESCE(json_group_array(json_object('id', te.user_id, 'firstName', u.first_name, 'lastName', u.last_name)), '[]')
+          FROM tournament_editors te
+          JOIN users u ON u.id = te.user_id
+          WHERE te.tournament_id = tournaments.id
+        ) AS editors_json`;
+
 function canManageTournament(tournament, user) {
   if (!user) {
     return false;
   }
-  return user.role === 'admin' || tournament.created_by === user.id || tournament.manager_id === user.id;
+  return user.role === 'admin' || tournament.created_by === user.id || tournamentEditorIds(tournament).includes(user.id);
 }
 
 function assertCanManageTournament(tournament, user) {
   if (!canManageTournament(tournament, user)) {
+    throw new HttpError(403, 'Zugriff verweigert');
+  }
+}
+
+function canManageEditors(tournament, user) {
+  return Boolean(user) && (user.role === 'admin' || tournament.created_by === user.id);
+}
+
+function assertCanManageEditors(tournament, user) {
+  if (!canManageEditors(tournament, user)) {
     throw new HttpError(403, 'Zugriff verweigert');
   }
 }
@@ -4295,7 +4380,6 @@ export function normalizeTournamentInput(body, { legacyRegistrationTimes = false
     contactPhone: nullableText(body.contactPhone),
     visibility: text(body.visibility || 'private'),
     internalNotes: nullableText(body.internalNotes),
-    managerId: nullableText(body.managerId),
     participantsPublic: Boolean(body.participantsPublic),
     licenseRequired: Boolean(body.licenseRequired),
     teamNameEnabled: Boolean(body.teamNameEnabled),
@@ -4723,8 +4807,7 @@ function toPublicTournament(row, user) {
   return {
     id: row.id,
     createdBy: row.created_by,
-    managerId: row.manager_id,
-    managerName: row.manager_name,
+    editors: tournamentEditors(row),
     name: row.name,
     date: row.date,
     startTime: row.start_time,

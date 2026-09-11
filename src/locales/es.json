@@ -634,5 +634,16 @@
   "Neue Spieler sind sofort für die nächste Runde aktiv.": "Los nuevos jugadores están activos de inmediato para la siguiente ronda.",
   "Spieler hinzufügen": "Añadir jugador",
   "Spieler hinzugefügt:": "Jugador añadido:",
-  "Vergangene Runden": "Rondas anteriores"
+  "Vergangene Runden": "Rondas anteriores",
+  "Bearbeitungsrechte verwalten": "Gestionar permisos de edición",
+  "Lädt …": "Cargando …",
+  "Noch keine weiteren Bearbeiter für dieses Turnier.": "Todavía no hay más editores para este torneo.",
+  "Entfernen": "Quitar",
+  "Bitte wählen": "Selecciona",
+  "Hinzufügen": "Añadir",
+  "Bearbeiter:": "Editores:",
+  "Benutzer hinzufügen": "Añadir usuario",
+  "Bitte wähle einen Benutzer aus": "Selecciona un usuario",
+  "Der Ersteller hat bereits Zugriff auf dieses Turnier": "El organizador ya tiene acceso a este torneo",
+  "Dieser Benutzer hat bereits Bearbeitungsrechte für dieses Turnier": "Este usuario ya tiene permisos de edición para este torneo"
 }

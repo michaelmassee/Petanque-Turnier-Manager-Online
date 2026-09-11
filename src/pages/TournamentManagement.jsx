@@ -1,10 +1,99 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate } from '../lib/format.js';
 import { labelFor, formationLabel, formatTournamentStartTime, translatedOptions } from '../lib/domain.js';
 import { TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
+import { api } from '../lib/api.js';
+
+function TournamentEditorsPanel({ tournamentId, candidates = [] }) {
+  const { t } = useTranslation();
+  const [editors, setEditors] = useState(null);
+  const [selectedCandidateId, setSelectedCandidateId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [panelError, setPanelError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setEditors(null);
+    api(`/api/tournaments/${tournamentId}/editors`)
+      .then((data) => { if (!cancelled) setEditors(data.editors); })
+      .catch((err) => { if (!cancelled) setPanelError(err.message); });
+    return () => { cancelled = true; };
+  }, [tournamentId]);
+
+  const availableCandidates = candidates.filter((candidate) => !(editors || []).some((editor) => editor.id === candidate.id));
+
+  async function handleAdd(event) {
+    event.preventDefault();
+    if (!selectedCandidateId) return;
+    setBusy(true);
+    setPanelError('');
+    try {
+      const data = await api(`/api/tournaments/${tournamentId}/editors`, { method: 'POST', body: JSON.stringify({ userId: selectedCandidateId }) });
+      setEditors(data.editors);
+      setSelectedCandidateId('');
+    } catch (err) {
+      setPanelError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemove(editorId) {
+    setBusy(true);
+    setPanelError('');
+    try {
+      const data = await api(`/api/tournaments/${tournamentId}/editors/${editorId}`, { method: 'DELETE' });
+      setEditors(data.editors);
+    } catch (err) {
+      setPanelError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="form-section">
+      <div className="form-section-header">
+        <span>{t('Bearbeitungsrechte verwalten')}</span>
+      </div>
+      {panelError && <p className="feedback error">{panelError}</p>}
+      {editors === null ? (
+        <p className="muted">{t('Lädt …')}</p>
+      ) : (
+        <>
+          {editors.length === 0 && <p className="muted">{t('Noch keine weiteren Bearbeiter für dieses Turnier.')}</p>}
+          {editors.length > 0 && (
+            <ul className="editor-list">
+              {editors.map((editor) => (
+                <li key={editor.id}>
+                  <span data-i18n-skip>{`${editor.firstName || ''} ${editor.lastName || ''}`.trim()}</span>
+                  <Button variant="secondary" type="button" disabled={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {availableCandidates.length > 0 && (
+            <div className="inline-form">
+              <SelectField
+                label={t('Benutzer hinzufügen')}
+                value={selectedCandidateId}
+                onChange={setSelectedCandidateId}
+                options={[
+                  { value: '', label: t('Bitte wählen') },
+                  ...availableCandidates.map((candidate) => ({ value: candidate.id, label: `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() })),
+                ]}
+              />
+              <Button type="button" disabled={busy || !selectedCandidateId} onClick={handleAdd}>{t('Hinzufügen')}</Button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 function FormationHelpDialog({ onClose }) {
   const { t } = useTranslation();
@@ -77,14 +166,11 @@ function FormationHelpDialog({ onClose }) {
   );
 }
 
-export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, users, language, currentUser }) {
+export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, language, currentUser }) {
   const { t } = useTranslation();
   const [showFormationHelp, setShowFormationHelp] = useState(false);
-  const managerOptions = [
-    { value: '', label: t('(ich selbst)') },
-    ...users.map((user) => ({ value: user.id, label: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email })),
-  ];
   const showMailNotEnabledHint = !isAdmin && currentUser && currentUser.mailEnabled === false;
+  const canManageEditors = mode === 'edit' && form.id && Boolean(currentUser) && (isAdmin || form.createdBy === currentUser.id);
   // Kalendereintrag = per "Turnier melden" eingereicht (registrationEnabled=false), nur die
   // damals abgefragten Felder sind hier sinnvoll editierbar - alles rund um Anmeldung,
   // Turniersystem, Gebühren etc. ist für so einen Eintrag ohne Bedeutung.
@@ -99,14 +185,6 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} required minLength={2} />
       )}
       <TextField label={t('Name')} value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
-      {isAdmin && !isCalendarEntry && (
-        <SelectField
-          label={t('Turnierleiter')}
-          value={form.managerId}
-          onChange={(managerId) => setForm({ ...form, managerId })}
-          options={managerOptions}
-        />
-      )}
       <div className="form-grid">
         <TextField label={t('Datum')} type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
         <TextField label={t('Startzeit')} type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
@@ -287,6 +365,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           <TextField label={t('Flyer-Bildlink')} type="url" placeholder="https://…" value={form.flyerUrl} onChange={(flyerUrl) => setForm({ ...form, flyerUrl })} />
         </>
       )}
+      {canManageEditors && <TournamentEditorsPanel tournamentId={form.id} candidates={editorCandidates} />}
       <div className="dialog-actions">
         <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>
         <Button type="submit">{mode === 'edit' ? t('Turnier speichern') : t('Turnier anlegen')}</Button>
@@ -341,7 +420,9 @@ export function TournamentList({
               {tournament.registrationEnabled !== false && (
                 <small>{formationLabel(tournament)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</small>
               )}
-              {isAdmin && tournament.managerName && <small>{t('Turnierleiter:')} <span data-i18n-skip>{tournament.managerName}</span></small>}
+              {isAdmin && tournament.editors?.length > 0 && (
+                <small>{t('Bearbeiter:')} <span data-i18n-skip>{tournament.editors.map((editor) => `${editor.firstName || ''} ${editor.lastName || ''}`.trim()).join(', ')}</span></small>
+              )}
             </button>
             <div className="badges">
               {tournament.registrationEnabled === false ? (
@@ -396,7 +477,7 @@ export function TournamentManagementPage({
   setTournamentForm,
   onTournamentSubmit,
   onCloseTournamentDialog,
-  users,
+  editorCandidates,
   currentUser,
 }) {
   const { t } = useTranslation();
@@ -433,7 +514,7 @@ export function TournamentManagementPage({
             onCancel={onCloseTournamentDialog}
             mode={tournamentMode}
             isAdmin={isAdmin}
-            users={users}
+            editorCandidates={editorCandidates}
             language={language}
             currentUser={currentUser}
           />

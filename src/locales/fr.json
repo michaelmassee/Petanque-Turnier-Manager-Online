@@ -634,5 +634,16 @@
   "Neue Spieler sind sofort für die nächste Runde aktiv.": "Les nouveaux joueurs sont immédiatement actifs pour la prochaine ronde.",
   "Spieler hinzufügen": "Ajouter un joueur",
   "Spieler hinzugefügt:": "Joueur ajouté :",
-  "Vergangene Runden": "Rondes précédentes"
+  "Vergangene Runden": "Rondes précédentes",
+  "Bearbeitungsrechte verwalten": "Gérer les droits de modification",
+  "Lädt …": "Chargement …",
+  "Noch keine weiteren Bearbeiter für dieses Turnier.": "Pas encore d’autres éditeurs pour ce tournoi.",
+  "Entfernen": "Retirer",
+  "Bitte wählen": "Veuillez choisir",
+  "Hinzufügen": "Ajouter",
+  "Bearbeiter:": "Éditeurs :",
+  "Benutzer hinzufügen": "Ajouter un utilisateur",
+  "Bitte wähle einen Benutzer aus": "Veuillez sélectionner un utilisateur",
+  "Der Ersteller hat bereits Zugriff auf dieses Turnier": "L’organisateur a déjà accès à ce tournoi",
+  "Dieser Benutzer hat bereits Bearbeitungsrechte für dieses Turnier": "Cet utilisateur dispose déjà des droits de modification pour ce tournoi"
 }

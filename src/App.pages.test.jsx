@@ -302,7 +302,6 @@ function TournamentPageHarness({ onSubmit }) {
           onCancel={closeDialog}
           mode={tournamentMode}
           isAdmin={false}
-          users={[]}
           language="de"
         />
       </EditDialog>
