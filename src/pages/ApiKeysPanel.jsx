@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
-import { translateText } from '../lib/i18n.js';
 import { formatDateTime } from '../lib/format.js';
 import { API_KEY_STATUS_LABELS } from '../lib/domain.js';
 import { Button } from '../components/ui.jsx';
 
-function ApiKeysPanel({ isAdmin, language }) {
+function ApiKeysPanel({ isAdmin }) {
+  const { t } = useTranslation();
   const [apiKeys, setApiKeys] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [label, setLabel] = useState('');
@@ -18,7 +19,7 @@ function ApiKeysPanel({ isAdmin, language }) {
       const data = await api('/api/api-keys');
       setApiKeys(data.apiKeys);
     } catch (err) {
-      setPanelError(translateText(err.message, language));
+      setPanelError(err.message);
     }
   }
 
@@ -30,7 +31,7 @@ function ApiKeysPanel({ isAdmin, language }) {
       const data = await api('/api/admin/api-keys?status=pending');
       setPendingRequests(data.apiKeys);
     } catch (err) {
-      setPanelError(translateText(err.message, language));
+      setPanelError(err.message);
     }
   }
 
@@ -52,7 +53,7 @@ function ApiKeysPanel({ isAdmin, language }) {
       setLabel('');
       await loadOwnKeys();
     } catch (err) {
-      setPanelError(translateText(err.message, language));
+      setPanelError(err.message);
     } finally {
       setBusy(false);
     }
@@ -65,7 +66,7 @@ function ApiKeysPanel({ isAdmin, language }) {
       setRevealedSecret({ id, secret: data.secret });
       await loadOwnKeys();
     } catch (err) {
-      setPanelError(translateText(err.message, language));
+      setPanelError(err.message);
     }
   }
 
@@ -78,7 +79,7 @@ function ApiKeysPanel({ isAdmin, language }) {
       await api(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
       await loadOwnKeys();
     } catch (err) {
-      setPanelError(translateText(err.message, language));
+      setPanelError(err.message);
     }
   }
 
@@ -88,7 +89,7 @@ function ApiKeysPanel({ isAdmin, language }) {
       await api(`/api/admin/api-keys/${id}/approve`, { method: 'POST' });
       await Promise.all([loadPendingRequests(), loadOwnKeys()]);
     } catch (err) {
-      setPanelError(translateText(err.message, language));
+      setPanelError(err.message);
     }
   }
 
@@ -98,7 +99,7 @@ function ApiKeysPanel({ isAdmin, language }) {
       await api(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
       await loadPendingRequests();
     } catch (err) {
-      setPanelError(translateText(err.message, language));
+      setPanelError(err.message);
     }
   }
 
@@ -106,23 +107,21 @@ function ApiKeysPanel({ isAdmin, language }) {
     <>
       <div className="panel">
         <div className="section-title">
-          <h2>API-Zugänge</h2>
+          <h2>{t('API-Zugänge')}</h2>
         </div>
         <p className="hint">
-          Externe Turnierleitungs-Software (z.B. das PTM-Hauptprogramm auf deinem Rechner) braucht einen
-          freigeschalteten API-Schlüssel, um Turniere anzulegen und Anmeldungen abzugleichen. Ein Administrator muss
-          jede Installation einzeln genehmigen.
+          {t('Externe Turnierleitungs-Software (z.B. das PTM-Hauptprogramm auf deinem Rechner) braucht einen freigeschalteten API-Schlüssel, um Turniere anzulegen und Anmeldungen abzugleichen. Ein Administrator muss jede Installation einzeln genehmigen.')}
         </p>
 
         <form className="form" onSubmit={handleRequest}>
           <input
             type="text"
-            placeholder="Bezeichnung der Installation, z.B. Bürorechner"
+            placeholder={t('Bezeichnung der Installation, z.B. Bürorechner')}
             value={label}
             onChange={(event) => setLabel(event.target.value)}
           />
           <Button type="submit" disabled={busy || !label.trim()}>
-            Schlüssel beantragen
+            {t('Schlüssel beantragen')}
           </Button>
         </form>
 
@@ -130,7 +129,7 @@ function ApiKeysPanel({ isAdmin, language }) {
 
         {revealedSecret && (
           <div className="api-key-secret-box">
-            <p>Speichere diesen Schlüssel jetzt sicher ab. Er wird nicht erneut angezeigt.</p>
+            <p>{t('Speichere diesen Schlüssel jetzt sicher ab. Er wird nicht erneut angezeigt.')}</p>
             <code>{revealedSecret.secret}</code>
           </div>
         )}
@@ -138,10 +137,10 @@ function ApiKeysPanel({ isAdmin, language }) {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Bezeichnung</th>
-              <th>Status</th>
-              <th>Beantragt am</th>
-              <th>Zuletzt genutzt</th>
+              <th>{t('Bezeichnung')}</th>
+              <th>{t('Status')}</th>
+              <th>{t('Beantragt am')}</th>
+              <th>{t('Zuletzt genutzt')}</th>
               <th />
             </tr>
           </thead>
@@ -155,12 +154,12 @@ function ApiKeysPanel({ isAdmin, language }) {
                 <td>
                   {key.status === 'approved' && key.secretAvailable && (
                     <Button variant="secondary" onClick={() => handleRevealSecret(key.id)}>
-                      Schlüssel abholen
+                      {t('Schlüssel abholen')}
                     </Button>
                   )}
                   {key.status === 'approved' && (
                     <Button variant="secondary" onClick={() => handleRevoke(key.id)}>
-                      Widerrufen
+                      {t('Widerrufen')}
                     </Button>
                   )}
                 </td>
@@ -168,7 +167,7 @@ function ApiKeysPanel({ isAdmin, language }) {
             ))}
             {apiKeys.length === 0 && (
               <tr>
-                <td colSpan={5}>Noch keine API-Schlüssel beantragt.</td>
+                <td colSpan={5}>{t('Noch keine API-Schlüssel beantragt.')}</td>
               </tr>
             )}
           </tbody>
@@ -178,14 +177,14 @@ function ApiKeysPanel({ isAdmin, language }) {
       {isAdmin && (
         <div className="panel">
           <div className="section-title">
-            <h2>Offene Freischaltungsanfragen</h2>
+            <h2>{t('Offene Freischaltungsanfragen')}</h2>
           </div>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Turnierleiter</th>
-                <th>Bezeichnung</th>
-                <th>Beantragt am</th>
+                <th>{t('Turnierleiter')}</th>
+                <th>{t('Bezeichnung')}</th>
+                <th>{t('Beantragt am')}</th>
                 <th />
               </tr>
             </thead>
@@ -198,16 +197,16 @@ function ApiKeysPanel({ isAdmin, language }) {
                   <td>{key.label}</td>
                   <td>{formatDateTime(key.requestedAt)}</td>
                   <td>
-                    <Button onClick={() => handleApprove(key.id)}>Genehmigen</Button>
+                    <Button onClick={() => handleApprove(key.id)}>{t('Genehmigen')}</Button>
                     <Button variant="secondary" onClick={() => handleReject(key.id)}>
-                      Ablehnen
+                      {t('Ablehnen')}
                     </Button>
                   </td>
                 </tr>
               ))}
               {pendingRequests.length === 0 && (
                 <tr>
-                  <td colSpan={4}>Keine offenen Anfragen.</td>
+                  <td colSpan={4}>{t('Keine offenen Anfragen.')}</td>
                 </tr>
               )}
             </tbody>

@@ -1959,7 +1959,7 @@ export default function App() {
       {activeTab === 'apikeys' && canManageTournaments && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
-            <ApiKeysPanel isAdmin={isAdmin} language={language} />
+            <ApiKeysPanel isAdmin={isAdmin} />
           </section>
         </Suspense>
       )}
