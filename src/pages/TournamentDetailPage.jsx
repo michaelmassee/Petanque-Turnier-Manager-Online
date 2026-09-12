@@ -256,10 +256,12 @@ function playerLabel(player) {
   return [player.firstName, player.lastName].filter(Boolean).join(' ') || player.id;
 }
 
-export function TournamentSchedule({ tournamentId }) {
+export function TournamentSchedule({ tournamentId, tournament }) {
   const { t } = useTranslation();
   const [rounds, setRounds] = useState(null);
   const [ranking, setRanking] = useState([]);
+  const isSchweizer = tournament?.type === 'schweizer';
+  const isSchweizerWithBuchholz = isSchweizer && tournament?.schweizerRankingMode !== 'ohne_buchholz';
 
   useEffect(() => {
     let cancelled = false;
@@ -309,28 +311,71 @@ export function TournamentSchedule({ tournamentId }) {
       {Boolean(ranking.length) && (
         <>
           <h3>{t('Rangliste')}</h3>
-          <table className="ranking-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>{t('Spieler')}</th>
-                <th>{t('Siege')}</th>
-                <th>+/-</th>
-                <th>{t('Punkte')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ranking.map((entry) => (
-                <tr key={entry.playerId}>
-                  <td>{entry.rank}</td>
-                  <td data-i18n-skip>{playerLabel(entry)}</td>
-                  <td>{entry.wins}</td>
-                  <td>{entry.gameDiff}</td>
-                  <td>{entry.pointsFor}:{entry.pointsAgainst}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="ranking-table">
+              <thead>
+                {isSchweizer ? (
+                  <>
+                    <tr>
+                      <th rowSpan={2}>{t('Platz')}</th>
+                      <th rowSpan={2}>{t('Team')}</th>
+                      <th rowSpan={2}>{t('Siege')}</th>
+                      {isSchweizerWithBuchholz && <><th rowSpan={2}>{t('BHZ')}</th><th rowSpan={2}>{t('FBHZ')}</th></>}
+                      <th colSpan={3}>{t('Punkte')}</th>
+                    </tr>
+                    <tr>
+                      <th>+</th>
+                      <th>-</th>
+                      <th>{t('Δ')}</th>
+                    </tr>
+                  </>
+                ) : (
+                  <>
+                    <tr>
+                      <th rowSpan={2}>{t('Platz')}</th>
+                      <th rowSpan={2}>{t('Spieler')}</th>
+                      <th colSpan={3}>{t('Spiele')}</th>
+                      <th colSpan={3}>{t('Punkte')}</th>
+                    </tr>
+                    <tr>
+                      <th>+</th>
+                      <th>-</th>
+                      <th>{t('Δ')}</th>
+                      <th>+</th>
+                      <th>-</th>
+                      <th>{t('Δ')}</th>
+                    </tr>
+                  </>
+                )}
+              </thead>
+              <tbody>
+                {ranking.map((entry) => (
+                  <tr key={entry.teamId || entry.playerId}>
+                    <td>{entry.rank}</td>
+                    <td data-i18n-skip>{entry.members ? entry.members.map(playerLabel).join(' + ') : playerLabel(entry)}</td>
+                    {isSchweizer ? (
+                      <>
+                        <td>{entry.wins}</td>
+                        {isSchweizerWithBuchholz && <><td>{entry.bhz}</td><td>{entry.fbhz}</td></>}
+                        <td>{entry.pointsFor}</td>
+                        <td>{entry.pointsAgainst}</td>
+                        <td>{entry.pointsDiff}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td>{entry.wins}</td>
+                        <td>{entry.wins - entry.gameDiff}</td>
+                        <td>{entry.gameDiff}</td>
+                        <td>{entry.pointsFor}</td>
+                        <td>{entry.pointsAgainst}</td>
+                        <td>{entry.pointsDiff}</td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>
@@ -504,7 +549,7 @@ export function TournamentDetailPage({
             </>
           )}
 
-          {route.view === 'spielplan' && canShowSchedule && <TournamentSchedule tournamentId={tournament.id} />}
+          {route.view === 'spielplan' && canShowSchedule && <TournamentSchedule tournamentId={tournament.id} tournament={tournament} />}
         </div>
       </section>
     </main>

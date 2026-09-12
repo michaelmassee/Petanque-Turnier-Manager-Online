@@ -55,8 +55,10 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
 
     render(<TournamentSchedule tournamentId="t1" language="de" />);
 
-    expect((await screen.findAllByText('13:7')).length).toBe(2);
-    expect(screen.getByRole('cell', { name: 'Anna Muster' })).toBeInTheDocument();
+    expect(await screen.findByText('13:7')).toBeInTheDocument();
+    const ranglisteRow = (await screen.findAllByRole('cell', { name: 'Anna Muster' })).at(-1).closest('tr');
+    expect(ranglisteRow).toHaveTextContent('13');
+    expect(ranglisteRow).toHaveTextContent('7');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

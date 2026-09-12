@@ -1817,15 +1817,16 @@ textarea:focus {
   border-top: 1px solid #e5e9f0;
 }
 
-.ranking-panel tbody tr:nth-child(even) {
+.ranking-table tbody tr:nth-child(even) {
   background: #f3f6fa;
 }
 
-.ranking-panel tbody tr:nth-child(odd) {
+.ranking-table tbody tr:nth-child(odd) {
   background: #fff;
 }
 
-.ranking-panel .table-scroll {
+.ranking-panel .table-scroll,
+.supermelee-schedule .table-scroll {
   max-height: 60vh;
   overflow-y: auto;
 }
