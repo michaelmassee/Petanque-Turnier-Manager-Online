@@ -14,6 +14,7 @@ import { getPairingStrategy, isOnlinePlayable } from './lib/pairing/index.js';
 import { computeRanking } from './lib/pairing/ranking.js';
 import { sortSwiss, swissStats } from './lib/pairing/schweizer.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
+import { isFuturePetanqueOnlineTournament, mapPetanqueOnlineTournament, petanqueOnlineKey } from './petanque-online-core.js';
 
 const ROLES = ['admin', 'user'];
 const DEFAULT_TOURNAMENT_LIMIT = 5;
@@ -56,6 +57,8 @@ const TOURNAMENT_REPORT_SYSTEM_USER_ID = 'system-tournament-reports';
 const TOURNAMENT_REPORT_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
 const TOURNAMENT_REPORT_RATE_LIMIT_MAX_PER_IP = 5;
 const TOURNAMENT_REPORT_MAX_DAYS_AHEAD = 365 * 2;
+const PETANQUE_ONLINE_CALENDAR_URL = 'https://petanque-online.de/api/v1/calendar/public';
+const PETANQUE_ONLINE_PAGE_SIZE = 100;
 // Changing this invalidates every stored password_hash (verifyPassword re-derives with the
 // current value). Any seeded/test users must be re-hashed and re-seeded after a change.
 const PASSWORD_ITERATIONS = 100000;
@@ -788,7 +791,12 @@ const PWA_INSTALL_PATHS = ['/manifest.webmanifest', '/service-worker.js'];
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(sendTournamentReminders(env));
+    ctx.waitUntil(
+      Promise.all([
+        sendTournamentReminders(env).catch((error) => console.error('Tournament reminder cron failed', error)),
+        syncPetanqueOnlineImports(env.DB).catch((error) => console.error('Petanque-Online sync cron failed', error)),
+      ]),
+    );
   },
 
   async queue(batch, env) {
@@ -1004,6 +1012,16 @@ export default {
 
       if (request.method === 'POST' && url.pathname === '/api/tournament-reports/verify') {
         return await verifyTournamentReport(request, env.DB);
+      }
+
+      if (url.pathname === '/api/admin/petanque-online/tournaments' && request.method === 'GET') {
+        await requireAdmin(request, env.DB);
+        return json({ tournaments: await listPetanqueOnlineCandidates(env.DB) });
+      }
+
+      if (url.pathname === '/api/admin/petanque-online/import' && request.method === 'POST') {
+        const session = await requireAdmin(request, env.DB);
+        return await importPetanqueOnlineTournaments(request, env.DB, session.user);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/geocode') {
@@ -2639,6 +2657,126 @@ async function createTournament(request, db, user) {
 
   const created = await getTournamentById(db, id);
   return json({ tournament: toPublicTournament(created, user) }, 201);
+}
+
+async function fetchPetanqueOnlineCalendar() {
+  const entries = [];
+  let skip = 0;
+  let total = null;
+
+  do {
+    let response;
+    try {
+      response = await fetch(`${PETANQUE_ONLINE_CALENDAR_URL}?skip=${skip}&limit=${PETANQUE_ONLINE_PAGE_SIZE}`, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (error) {
+      console.error('Petanque-Online calendar request failed', error);
+      throw new HttpError(502, 'Petanque-Online-Kalender ist derzeit nicht erreichbar.');
+    }
+    if (!response.ok) {
+      console.error('Petanque-Online calendar returned', response.status);
+      throw new HttpError(502, 'Petanque-Online-Kalender ist derzeit nicht erreichbar.');
+    }
+    const page = await response.json().catch(() => null);
+    if (!page || !Array.isArray(page.items) || !Number.isInteger(page.total) || page.total < 0 || page.total > 1_000) {
+      throw new HttpError(502, 'Petanque-Online-Kalender lieferte ungültige Daten.');
+    }
+    entries.push(...page.items);
+    total = page.total;
+    skip += page.items.length;
+    if (page.items.length === 0 && skip < total) {
+      throw new HttpError(502, 'Petanque-Online-Kalender lieferte unvollständige Daten.');
+    }
+  } while (skip < total);
+
+  return entries;
+}
+
+async function listPetanqueOnlineCandidates(db) {
+  const [entries, imports] = await Promise.all([
+    fetchPetanqueOnlineCalendar(),
+    db.prepare("SELECT external_key FROM petanque_online_imports WHERE source = 'petanque-online'").all(),
+  ]);
+  const importedKeys = new Set(imports.results.map((entry) => entry.external_key));
+  return entries
+    .filter(isFuturePetanqueOnlineTournament)
+    .map((entry) => ({ ...mapPetanqueOnlineTournament(entry), type: entry.type, sourceFormation: entry.formation, imported: importedKeys.has(petanqueOnlineKey(entry)) }))
+    .filter((entry) => entry.name.length >= 2 && entry.location.length >= 2)
+    .sort((left, right) => left.date.localeCompare(right.date) || (left.startTime || '').localeCompare(right.startTime || '') || left.name.localeCompare(right.name));
+}
+
+async function upsertPetanqueOnlineTournament(db, entry, ownerId, now) {
+  const mapped = mapPetanqueOnlineTournament(entry);
+  if (mapped.name.length < 2 || !/^\d{4}-\d{2}-\d{2}$/.test(mapped.date) || mapped.location.length < 2) {
+    throw new HttpError(400, 'Der ausgewählte Petanque-Online-Termin ist unvollständig.');
+  }
+  const existing = await db.prepare("SELECT tournament_id FROM petanque_online_imports WHERE source = 'petanque-online' AND external_key = ?").bind(mapped.externalKey).first();
+
+  if (existing) {
+    await db.prepare(
+      `UPDATE tournaments SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, formation = ?, formation_other = ?,
+       website_url = ?, flyer_url = ?, status = 'registration', visibility = 'public', registration_enabled = 0, updated_at = ? WHERE id = ?`,
+    ).bind(mapped.name, mapped.club, mapped.date, mapped.startTime, mapped.location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.websiteUrl, mapped.flyerUrl, now, existing.tournament_id).run();
+    await db.prepare("UPDATE petanque_online_imports SET synced_at = ? WHERE source = 'petanque-online' AND external_key = ?").bind(now, mapped.externalKey).run();
+    return 'updated';
+  }
+
+  const id = crypto.randomUUID();
+  await db.batch([
+    db.prepare(
+      `INSERT INTO tournaments (id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, registration_type,
+       status, visibility, registration_enabled, club, website_url, flyer_url, timezone, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'formule_x', ?, ?, 'forme', 'registration', 'public', 0, ?, ?, ?, 'Europe/Berlin', ?, ?)`,
+    ).bind(id, ownerId, ownerId, mapped.name, mapped.date, mapped.startTime, mapped.location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.club, mapped.websiteUrl, mapped.flyerUrl, now, now),
+    db.prepare("INSERT INTO petanque_online_imports (source, external_key, tournament_id, imported_at, synced_at) VALUES ('petanque-online', ?, ?, ?, ?)").bind(mapped.externalKey, id, now, now),
+  ]);
+  return 'created';
+}
+
+async function importPetanqueOnlineTournaments(request, db, user) {
+  const body = await readJson(request);
+  const externalKeys = Array.isArray(body.externalKeys) ? [...new Set(body.externalKeys.map((key) => String(key || '').trim()).filter(Boolean))] : [];
+  if (externalKeys.length === 0 || externalKeys.length > 200) throw new HttpError(400, 'Bitte wähle mindestens einen und höchstens 200 Termine aus.');
+  const entries = await fetchPetanqueOnlineCalendar();
+  const selected = new Map(entries.map((entry) => [petanqueOnlineKey(entry), entry]));
+  if (externalKeys.some((key) => !selected.has(key))) throw new HttpError(400, 'Ein ausgewählter Petanque-Online-Termin ist nicht mehr verfügbar.');
+
+  const now = new Date().toISOString();
+  const result = { created: 0, updated: 0, failed: 0 };
+  for (const key of externalKeys) {
+    try {
+      const action = await upsertPetanqueOnlineTournament(db, selected.get(key), user.id, now);
+      result[action] += 1;
+    } catch (error) {
+      console.error(`Petanque-Online import failed for ${key}`, error);
+      result.failed += 1;
+    }
+  }
+  return json(result, 201);
+}
+
+async function syncPetanqueOnlineImports(db) {
+  const imports = await db.prepare("SELECT external_key, tournament_id FROM petanque_online_imports WHERE source = 'petanque-online'").all();
+  if (imports.results.length === 0) return { created: 0, updated: 0, deleted: 0 };
+
+  const entries = await fetchPetanqueOnlineCalendar();
+  const byKey = new Map(entries.map((entry) => [petanqueOnlineKey(entry), entry]));
+  const now = new Date().toISOString();
+  let updated = 0;
+  let deleted = 0;
+  for (const imported of imports.results) {
+    const entry = byKey.get(imported.external_key);
+    if (!entry) {
+      await db.prepare('DELETE FROM tournaments WHERE id = ?').bind(imported.tournament_id).run();
+      deleted += 1;
+      continue;
+    }
+    await upsertPetanqueOnlineTournament(db, entry, null, now);
+    updated += 1;
+  }
+  return { created: 0, updated, deleted };
 }
 
 async function updateTournament(request, env, existing, user) {

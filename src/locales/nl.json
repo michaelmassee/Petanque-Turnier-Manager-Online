@@ -708,6 +708,7 @@
   "Bereits importiert": "Al geïmporteerd",
   "Keine künftigen Termine gefunden.": "Geen toekomstige evenementen gevonden.",
   "Petanque-Online-Termine importiert: {created} neu, {updated} aktualisiert.": "Petanque-Online-evenementen geïmporteerd: {created} nieuw, {updated} bijgewerkt.",
+  "{failed} Termine fehlgeschlagen.": "{failed} evenementen mislukt.",
   "Petanque-Online-Kalender ist derzeit nicht erreichbar.": "De Petanque-Online-kalender is momenteel niet bereikbaar.",
   "Petanque-Online-Kalender lieferte ungültige Daten.": "De Petanque-Online-kalender leverde ongeldige gegevens.",
   "Petanque-Online-Kalender lieferte unvollständige Daten.": "De Petanque-Online-kalender leverde onvolledige gegevens.",

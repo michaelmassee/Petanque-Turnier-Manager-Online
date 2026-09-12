@@ -26,6 +26,7 @@ const RegistrationsManagement = lazy(() => import('./pages/RegistrationsManageme
 const UserManagementPanel = lazy(() => import('./pages/UserManagementPanel.jsx'));
 const ApiKeysPanel = lazy(() => import('./pages/ApiKeysPanel.jsx'));
 const TournamentPlayManagement = lazy(() => import('./pages/TournamentPlayManagement.jsx'));
+const PetanqueOnlineImportPanel = lazy(() => import('./pages/PetanqueOnlineImportPanel.jsx'));
 
 export { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 export { EditDialog, ListToolbar } from './components/ui.jsx';
@@ -1618,6 +1619,8 @@ function AppContent() {
       ? t('Benutzerverwaltung')
       : activeTab === 'apikeys'
         ? t('API-Zugänge')
+        : activeTab === 'petanque-online-import'
+          ? t('Petanque-Online importieren')
         : activeTab === 'play'
           ? t('Turnier durchführen')
           : activeTab === 'registrations'
@@ -1780,6 +1783,19 @@ function AppContent() {
         >
           {t('Turnier melden')}
         </button>
+        {isAdmin && (
+          <button
+            className={`drawer-link ${activeTab === 'petanque-online-import' ? 'active' : ''}`}
+            type="button"
+            onClick={() => {
+              setActiveTab('petanque-online-import');
+              setMenuOpen(false);
+              clearFeedback();
+            }}
+          >
+            {t('Petanque-Online importieren')}
+          </button>
+        )}
         {isAdmin && (
           <button
             className={`drawer-link ${activeTab === 'users' ? 'active' : ''}`}
@@ -2020,6 +2036,12 @@ function AppContent() {
           <section className="single-column">
             <ApiKeysPanel isAdmin={isAdmin} />
           </section>
+        </Suspense>
+      )}
+
+      {activeTab === 'petanque-online-import' && isAdmin && (
+        <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
+          <PetanqueOnlineImportPanel />
         </Suspense>
       )}
 
@@ -2380,7 +2402,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
 
 
 

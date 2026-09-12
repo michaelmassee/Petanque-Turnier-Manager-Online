@@ -708,6 +708,7 @@
   "Bereits importiert": "Ya importado",
   "Keine künftigen Termine gefunden.": "No se encontraron eventos futuros.",
   "Petanque-Online-Termine importiert: {created} neu, {updated} aktualisiert.": "Eventos de Petanque-Online importados: {created} nuevos, {updated} actualizados.",
+  "{failed} Termine fehlgeschlagen.": "{failed} eventos fallidos.",
   "Petanque-Online-Kalender ist derzeit nicht erreichbar.": "El calendario de Petanque-Online no está disponible actualmente.",
   "Petanque-Online-Kalender lieferte ungültige Daten.": "El calendario de Petanque-Online devolvió datos no válidos.",
   "Petanque-Online-Kalender lieferte unvollständige Daten.": "El calendario de Petanque-Online devolvió datos incompletos.",
