@@ -19,6 +19,7 @@ function requirementText(requirement, t) {
 }
 
 function playerLabel(player) {
+  if (player.teamLabel) return player.teamLabel;
   return [player.firstName, player.lastName].filter(Boolean).join(' ') || player.id;
 }
 
@@ -92,6 +93,7 @@ export default function TournamentPlayManagement({ tournaments }) {
   const { t, i18n } = useTranslation();
   const [selectedTournamentId, setSelectedTournamentId] = useState(tournaments[0]?.id || '');
   const [rounds, setRounds] = useState([]);
+  const [swissTeams, setSwissTeams] = useState([]);
   const [ranking, setRanking] = useState([]);
   const [confirmedRegistrations, setConfirmedRegistrations] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -111,6 +113,7 @@ export default function TournamentPlayManagement({ tournaments }) {
   async function loadData(tournamentId) {
     if (!tournamentId) {
       setRounds([]);
+      setSwissTeams([]);
       setRanking([]);
       setConfirmedRegistrations([]);
       return;
@@ -122,6 +125,7 @@ export default function TournamentPlayManagement({ tournaments }) {
         api(`/api/tournaments/${tournamentId}/registrations`),
       ]);
       setRounds(roundsData.rounds);
+      setSwissTeams(roundsData.teams || []);
       setRanking(rankingData.ranking);
       setConfirmedRegistrations(registrationsData.registrations.filter((registration) => registration.status === 'confirmed'));
     } catch (err) {
@@ -212,6 +216,15 @@ export default function TournamentPlayManagement({ tournaments }) {
     }
   }
 
+  async function handleDrawMeleeTeams() {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      const data = await api(`/api/tournaments/${selectedTournamentId}/teams/draw`, { method: 'POST' });
+      setSwissTeams(data.teams || []);
+      setMessage(`${t('Mêlée-Teams wurden ausgelost:')} ${data.teams.length}`);
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+
   async function handleSaveResult(matchId, result) {
     setBusy(true);
     setError('');
@@ -242,6 +255,11 @@ export default function TournamentPlayManagement({ tournaments }) {
   const currentRound = rounds[rounds.length - 1] || null;
   const currentRoundOpen = currentRound ? !isRoundComplete(currentRound) : false;
   const activeConfirmedCount = confirmedRegistrations.filter((registration) => registration.active).length;
+  const isSchweizerMelee = selectedTournament?.type === 'schweizer' && selectedTournament?.registrationType === 'melee';
+  const isSchweizerWithBuchholz = selectedTournament?.type === 'schweizer' && selectedTournament?.schweizerRankingMode !== 'ohne_buchholz';
+  const requiredMeleePlayers = selectedTournament?.formation === 'triplette' ? 18 : 12;
+  const canDrawMeleeTeams = isSchweizerMelee && !rounds.length && activeConfirmedCount >= requiredMeleePlayers;
+  const missingMeleeDraw = isSchweizerMelee && swissTeams.length < 6;
 
   // Voraussetzungen für "Neue Runde starten" proaktiv prüfen, damit der Turniersteller
   // sofort sieht, was fehlt, statt es erst nach einem Fehlschlag zu erfahren. Die
@@ -258,9 +276,10 @@ export default function TournamentPlayManagement({ tournaments }) {
     ...(selectedTournamentStatus === 'running' && currentRoundOpen
       ? [t('Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen.')]
       : []),
+    ...(missingMeleeDraw ? [t('Bitte zuerst Mêlée-Teams auslosen')] : []),
   ];
 
-  const canGenerateRound = selectedTournamentStatus === 'running' && !currentRoundOpen && strategyRequirementGaps.length === 0;
+  const canGenerateRound = selectedTournamentStatus === 'running' && !currentRoundOpen && strategyRequirementGaps.length === 0 && !missingMeleeDraw;
   const olderRoundsNewestFirst = rounds.slice(0, -1).reverse();
   const showRoundAction = selectedTournamentStatus === 'running';
 
@@ -291,17 +310,30 @@ export default function TournamentPlayManagement({ tournaments }) {
         />
         {selectedTournament && selectedTournamentStatus !== 'running' && (
           <div className="supermelee-toolbar-actions">
+            {isSchweizerMelee && !rounds.length && (
+              <Button variant="secondary" disabled={busy || !selectedTournamentId || !canDrawMeleeTeams} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>
+            )}
             <Button disabled={busy || !selectedTournamentId} onClick={handleStartTournament}>{t('Turnier starten')}</Button>
           </div>
         )}
         {selectedTournamentStatus === 'running' && (
-          <p className="hint">
-            {t('Bestätigte Meldungen')} · {labelFor(REGISTRATION_TYPES, selectedTournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, selectedTournament.type)} · {labelFor(FORMATIONS, selectedTournament.formation)}: {confirmedRegistrations.length} ({activeConfirmedCount} {t('aktiv')})
-          </p>
+          <div className="supermelee-toolbar-actions">
+            <p className="hint">
+              {t('Bestätigte Meldungen')} · {labelFor(REGISTRATION_TYPES, selectedTournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, selectedTournament.type)} · {labelFor(FORMATIONS, selectedTournament.formation)}: {confirmedRegistrations.length} ({activeConfirmedCount} {t('aktiv')})
+              {selectedTournament.type === 'schweizer' && ` · ${t(selectedTournament.schweizerRankingMode === 'ohne_buchholz' ? 'Ohne Buchholz' : 'Mit Buchholz')}`}
+            </p>
+            {isSchweizerMelee && !rounds.length && (
+              <Button variant="secondary" disabled={busy || !canDrawMeleeTeams} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>
+            )}
+          </div>
         )}
       </div>
 
       <Feedback message={message} error={error} />
+
+      {isSchweizerMelee && !rounds.length && activeConfirmedCount < requiredMeleePlayers && (
+        <p className="hint">{t('Für die Mêlée-Auslosung werden mindestens')} {requiredMeleePlayers} {t('aktive bestätigte Meldungen benötigt.')}</p>
+      )}
 
       {selectedTournamentStatus === 'running' && (
         <details className="panel round-participants">
@@ -356,20 +388,22 @@ export default function TournamentPlayManagement({ tournaments }) {
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>{t('Spieler')}</th>
+                  <th>{selectedTournament?.type === 'schweizer' ? t('Team') : t('Spieler')}</th>
                   <th>{t('Siege')}</th>
+                  {isSchweizerWithBuchholz && <><th>{t('BHZ')}</th><th>{t('FBHZ')}</th></>}
                   <th>+/-</th>
-                  <th>{t('Punkte')}</th>
+                  <th>{selectedTournament?.type === 'schweizer' ? t('Punkte+') : t('Punkte')}</th>
                 </tr>
               </thead>
               <tbody>
                 {ranking.map((entry) => (
-                  <tr key={entry.playerId}>
+                  <tr key={entry.teamId || entry.playerId}>
                     <td>{entry.rank}</td>
-                    <td data-i18n-skip>{playerLabel(entry)}</td>
+                    <td data-i18n-skip>{entry.members ? entry.members.map(playerLabel).join(' + ') : playerLabel(entry)}</td>
                     <td>{entry.wins}</td>
-                    <td>{entry.gameDiff}</td>
-                    <td>{entry.pointsFor}:{entry.pointsAgainst}</td>
+                    {isSchweizerWithBuchholz && <><td>{entry.bhz}</td><td>{entry.fbhz}</td></>}
+                    <td>{selectedTournament?.type === 'schweizer' ? entry.pointsDiff : entry.gameDiff}</td>
+                    <td>{selectedTournament?.type === 'schweizer' ? entry.pointsFor : `${entry.pointsFor}:${entry.pointsAgainst}`}</td>
                   </tr>
                 ))}
               </tbody>

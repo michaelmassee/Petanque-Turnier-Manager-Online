@@ -1,7 +1,9 @@
 import { generateRound as generateSupermeleeRound, checkRequirements as checkSupermeleeRequirements } from './supermelee.js';
+import { generateRound as generateSchweizerRound, checkRequirements as checkSchweizerRequirements } from './schweizer.js';
 
 export const PAIRING_STRATEGIES = {
   supermelee: { generateRound: generateSupermeleeRound, checkRequirements: checkSupermeleeRequirements },
+  schweizer: { generateRound: generateSchweizerRound, checkRequirements: checkSchweizerRequirements },
 };
 
 // Supermêlée ist über registrationType codiert, alle anderen Systeme über type

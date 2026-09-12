@@ -142,6 +142,7 @@ export const EMPTY_TOURNAMENT_FORM = {
   waitlistEnabled: true,
   registrationEnabled: true,
   approvalRequired: false,
+  schweizerRankingMode: 'mit_buchholz',
   websiteUrl: '',
   logoUrl: '',
   flyerUrl: '',

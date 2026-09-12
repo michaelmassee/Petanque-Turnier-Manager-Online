@@ -335,6 +335,18 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               disabled={form.registrationType === 'supermelee'}
             />
           </div>
+          {form.type === 'schweizer' && (
+            <SelectField
+              label={t('Schweizer Ranglistenmodus')}
+              value={form.schweizerRankingMode || 'mit_buchholz'}
+              onChange={(schweizerRankingMode) => setForm({ ...form, schweizerRankingMode })}
+              options={[
+                { value: 'mit_buchholz', label: t('Mit Buchholz') },
+                { value: 'ohne_buchholz', label: t('Ohne Buchholz') },
+              ]}
+              disabled={form.status === 'running' || form.status === 'finished'}
+            />
+          )}
           {showFormationHelp && (
             <FormationHelpDialog onClose={() => setShowFormationHelp(false)} />
           )}

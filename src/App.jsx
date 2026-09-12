@@ -1079,6 +1079,7 @@ function AppContent() {
       type: tournament.type || 'formule_x',
       formation: tournament.formationOther ? 'andere' : (tournament.formation || 'doublette'),
       registrationType: tournament.registrationType || 'forme',
+      schweizerRankingMode: tournament.schweizerRankingMode || 'mit_buchholz',
       status: tournament.status || 'draft',
       maxRegistrations: tournament.maxRegistrations || 0,
       registrationDeadline: utcIsoToZonedDateTimeInput(tournament.registrationDeadline, tournament.timezone),
@@ -2379,7 +2380,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
 
 
 

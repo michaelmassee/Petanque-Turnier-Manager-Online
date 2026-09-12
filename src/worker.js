@@ -12,6 +12,7 @@ import {
 } from './worker-core.js';
 import { getPairingStrategy, isOnlinePlayable } from './lib/pairing/index.js';
 import { computeRanking } from './lib/pairing/ranking.js';
+import { sortSwiss, swissStats } from './lib/pairing/schweizer.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
 
 const ROLES = ['admin', 'user'];
@@ -1058,6 +1059,15 @@ export default {
           assertCanManageTournament(tournament, session.user);
           return await generateTournamentRound(env.DB, tournament);
         }
+      }
+
+      const tournamentTeamDrawMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/teams\/draw$/);
+      if (tournamentTeamDrawMatch && request.method === 'POST') {
+        const tournament = await getTournamentById(env.DB, tournamentTeamDrawMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await requireSession(request, env.DB);
+        assertCanManageTournament(tournament, session.user);
+        return await drawSchweizerMeleeTeams(env.DB, tournament);
       }
 
       const tournamentMatchResultMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/matches\/([^/]+)\/result$/);
@@ -2500,10 +2510,10 @@ async function createTournament(request, db, user) {
     .prepare(
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, registration_type, status,
-        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, contact_name, contact_email, contact_phone,
+        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
         latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -2524,6 +2534,7 @@ async function createTournament(request, db, user) {
       registrationTimes.registrationOpensAt,
       tournament.entryFeeCents,
       tournament.currency,
+      tournament.schweizerRankingMode,
       tournament.contactName,
       tournament.contactEmail,
       tournament.contactPhone,
@@ -2558,6 +2569,10 @@ async function updateTournament(request, env, existing, user) {
   }
   const body = await readJson(request);
   const tournament = normalizeCoreTournamentInput(body);
+  if (existing.type === 'schweizer' && existing.status === 'running'
+    && tournament.schweizerRankingMode !== (existing.schweizer_ranking_mode || 'mit_buchholz')) {
+    throw new HttpError(409, 'Der Schweizer Ranglistenmodus kann nach Turnierstart nicht geändert werden');
+  }
   const now = new Date().toISOString();
   const geo = await resolveTournamentGeolocation(tournament, existing, now, request.headers.get('CF-IPCountry'));
   const timezone = resolveTournamentTimezone(geo, existing.timezone || 'Europe/Berlin');
@@ -2567,7 +2582,7 @@ async function updateTournament(request, env, existing, user) {
     .prepare(
       `UPDATE tournaments
        SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
-           formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?,
+           formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, schweizer_ranking_mode = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
            participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, updated_at = ?
        WHERE id = ?`,
@@ -2589,6 +2604,7 @@ async function updateTournament(request, env, existing, user) {
       registrationTimes.registrationOpensAt,
       tournament.entryFeeCents,
       tournament.currency,
+      tournament.schweizerRankingMode,
       tournament.contactName,
       tournament.contactEmail,
       tournament.contactPhone,
@@ -3118,13 +3134,52 @@ function toPublicMatch(row, playersById) {
 }
 
 async function getPlayersById(db, tournamentId) {
-  const result = await db.prepare('SELECT id, first_name, last_name FROM registrations WHERE tournament_id = ?').bind(tournamentId).all();
-  return new Map(result.results.map((row) => [row.id, { id: row.id, firstName: row.first_name, lastName: row.last_name }]));
+  const result = await db.prepare('SELECT id, first_name, last_name, partner_first_name, partner_last_name, partner2_first_name, partner2_last_name, team_name FROM registrations WHERE tournament_id = ?').bind(tournamentId).all();
+  return new Map(result.results.map((row) => [row.id, {
+    id: row.id, firstName: row.first_name, lastName: row.last_name,
+    teamLabel: row.team_name || [row.first_name, row.last_name, row.partner_first_name, row.partner_last_name, row.partner2_first_name, row.partner2_last_name].filter(Boolean).join(' '),
+  }]));
+}
+
+async function getSchweizerTeams(db, tournament) {
+  const result = await db.prepare('SELECT * FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id').bind(tournament.id).all();
+  return result.results.map((row) => ({ id: row.id, members: JSON.parse(row.member_registration_ids), seedPosition: Number(row.seed_position || 0) }));
+}
+
+async function createFormeSchweizerTeams(db, tournament) {
+  const current = await getSchweizerTeams(db, tournament);
+  if (current.length) return current;
+  const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1 ORDER BY registered_at").bind(tournament.id).all();
+  const now = new Date().toISOString();
+  await db.batch(registrations.results.map((row) => db.prepare('INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), tournament.id, JSON.stringify([row.id]), Number(row.seeding_position || 0), now)));
+  return getSchweizerTeams(db, tournament);
+}
+
+async function drawSchweizerMeleeTeams(db, tournament) {
+  if (tournament.type !== 'schweizer' || tournament.registration_type !== 'melee') throw new HttpError(400, 'Die Team-Auslosung ist nur für Schweizer Mêlée verfügbar');
+  if (tournament.status === 'finished') throw new HttpError(409, 'Nach Turnierende können Teams nicht mehr ausgelost werden');
+  const rounds = await db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?').bind(tournament.id).first();
+  if (Number(rounds.count)) throw new HttpError(409, 'Nach der ersten Runde können Teams nicht mehr ausgelost werden');
+  const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1 ORDER BY registered_at").bind(tournament.id).all();
+  const size = tournament.formation === 'triplette' ? 3 : 2;
+  if (registrations.results.length < size * 6) throw new HttpError(400, 'Für eine Runde werden mindestens 6 Teams benötigt.');
+  const shuffled = [...registrations.results].sort(() => Math.random() - 0.5);
+  const teamCount = Math.floor(shuffled.length / size); const now = new Date().toISOString();
+  const statements = [db.prepare('DELETE FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id)];
+  for (let index = 0; index < teamCount; index++) {
+    const members = shuffled.slice(index * size, (index + 1) * size);
+    const seededPositions = members.map((member) => Number(member.seeding_position || 0)).filter(Boolean);
+    const seedPosition = seededPositions.length ? Math.min(...seededPositions) : 0;
+    statements.push(db.prepare('INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), tournament.id, JSON.stringify(members.map((member) => member.id)), seedPosition, now));
+  }
+  await db.batch(statements);
+  return json({ teams: await getSchweizerTeams(db, tournament), unassignedCount: shuffled.length - teamCount * size });
 }
 
 async function listTournamentRounds(db, tournamentId) {
   const roundsResult = await db.prepare('SELECT * FROM tournament_rounds WHERE tournament_id = ? ORDER BY round_number ASC').bind(tournamentId).all();
   const matchesResult = await db.prepare('SELECT * FROM tournament_matches WHERE tournament_id = ? ORDER BY created_at ASC').bind(tournamentId).all();
+  const teamsResult = await db.prepare('SELECT id, member_registration_ids, seed_position FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id').bind(tournamentId).all();
   const playersById = await getPlayersById(db, tournamentId);
 
   const matchesByRound = new Map();
@@ -3135,6 +3190,7 @@ async function listTournamentRounds(db, tournamentId) {
   }
 
   return json({
+    teams: teamsResult.results.map((team) => ({ id: team.id, members: JSON.parse(team.member_registration_ids), seedPosition: Number(team.seed_position || 0) })),
     rounds: roundsResult.results.map((round) => ({
       id: round.id,
       roundNumber: round.round_number,
@@ -3165,22 +3221,35 @@ async function generateTournamentRound(db, tournament) {
     }
   }
 
-  const registrationsResult = await db.prepare("SELECT id FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1").bind(tournament.id).all();
-  const players = registrationsResult.results.map((row) => ({ id: row.id }));
+  const isSchweizer = tournament.type === 'schweizer' && tournament.registration_type !== 'supermelee';
+  let players;
+  let teamsById = new Map();
+  if (isSchweizer) {
+    const teams = tournament.registration_type === 'forme'
+      ? await createFormeSchweizerTeams(db, tournament)
+      : await getSchweizerTeams(db, tournament);
+    if (!teams.length) throw new HttpError(400, 'Bitte zuerst Mêlée-Teams auslosen');
+    players = teams;
+    teamsById = new Map(teams.map((team) => [team.id, team]));
+  } else {
+    const registrationsResult = await db.prepare("SELECT id FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1").bind(tournament.id).all();
+    players = registrationsResult.results.map((row) => ({ id: row.id }));
+  }
 
   const historyResult = await db
-    .prepare('SELECT team_a_registration_ids, team_b_registration_ids FROM tournament_matches WHERE tournament_id = ?')
+    .prepare('SELECT team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, no_show FROM tournament_matches WHERE tournament_id = ?')
     .bind(tournament.id)
     .all();
   const history = historyResult.results.map((row) => ({
-    teamA: JSON.parse(row.team_a_registration_ids),
-    teamB: JSON.parse(row.team_b_registration_ids),
+    teamA: isSchweizer && row.team_a_id ? [row.team_a_id] : JSON.parse(row.team_a_registration_ids),
+    teamB: isSchweizer && row.team_b_id ? [row.team_b_id] : JSON.parse(row.team_b_registration_ids),
+    scoreA: row.score_a, scoreB: row.score_b, noShow: row.no_show,
   }));
 
   const strategy = getPairingStrategy(tournament);
   let matches;
   try {
-    ({ matches } = strategy.generateRound(players, history, { formation: tournament.formation }));
+    ({ matches } = strategy.generateRound(players, history, isSchweizer ? { mode: tournament.schweizer_ranking_mode } : { formation: tournament.formation }));
   } catch (error) {
     // generateRound prüft die Mindestvoraussetzungen (u.a. mind. 4 bestätigte
     // Meldungen, siehe lib/pairing/supermelee.js) und wirft dafür ein einfaches
@@ -3197,12 +3266,16 @@ async function generateTournamentRound(db, tournament) {
     db.prepare('INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES (?, ?, ?, ?)').bind(roundId, tournament.id, roundNumber, now),
   ];
   for (const match of matches) {
+    const teamA = isSchweizer ? teamsById.get(match.teamA[0]) : null;
+    const teamB = isSchweizer && match.teamB.length ? teamsById.get(match.teamB[0]) : null;
     statements.push(
       db
         .prepare(
-          'INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         )
-        .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(match.teamA), JSON.stringify(match.teamB), now, now),
+        // Freilos-Anzeigewert 13:7 statt 13:0, konsistent mit den Hauptprojekt-Default-
+        // Freispielpunkten (Diff 6), die swissStats() in schweizer.js verbucht.
+        .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(teamA?.members || match.teamA), JSON.stringify(teamB?.members || match.teamB), teamA?.id || null, teamB?.id || null, isSchweizer && !teamB ? 13 : null, isSchweizer && !teamB ? 7 : null, now, now),
     );
   }
   try {
@@ -3245,7 +3318,7 @@ async function setTournamentMatchResult(request, db, tournament, matchId) {
 
 async function getTournamentRanking(db, tournament) {
   const matchesResult = await db
-    .prepare('SELECT team_a_registration_ids, team_b_registration_ids, score_a, score_b, no_show FROM tournament_matches WHERE tournament_id = ?')
+    .prepare('SELECT team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, no_show FROM tournament_matches WHERE tournament_id = ?')
     .bind(tournament.id)
     .all();
   const matches = matchesResult.results.map((row) => ({
@@ -3255,6 +3328,19 @@ async function getTournamentRanking(db, tournament) {
     scoreB: row.score_b,
     noShow: row.no_show,
   }));
+  if (tournament.type === 'schweizer' && tournament.registration_type !== 'supermelee') {
+    const teams = await getSchweizerTeams(db, tournament);
+    const teamsById = new Map(teams.map((team) => [team.id, team]));
+    const swissMatches = matchesResult.results.map((row) => ({
+      teamA: row.team_a_id ? [row.team_a_id] : [], teamB: row.team_b_id ? [row.team_b_id] : [], scoreA: row.score_a, scoreB: row.score_b, noShow: row.no_show,
+    }));
+    const playersById = await getPlayersById(db, tournament.id);
+    const ranking = sortSwiss(swissStats(teams, swissMatches, tournament.schweizer_ranking_mode), tournament.schweizer_ranking_mode);
+    return json({ ranking: ranking.map((entry, index) => ({
+      rank: index + 1, ...entry, teamId: entry.teamId,
+      members: (teamsById.get(entry.teamId)?.members || []).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
+    })) });
+  }
   const ranking = computeRanking(matches);
   const playersById = await getPlayersById(db, tournament.id);
 
@@ -4902,6 +4988,7 @@ function toPublicTournament(row, user) {
     formationOther: Boolean(Number(row.formation_other || 0)),
     club: row.club || null,
     registrationType: row.registration_type || 'forme',
+    schweizerRankingMode: row.schweizer_ranking_mode || 'mit_buchholz',
     status: row.status,
     maxRegistrations: Number(row.max_registrations || 0),
     registrationDeadline: row.registration_deadline,
