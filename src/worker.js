@@ -2062,11 +2062,12 @@ async function createBroadcastPostboxMessage(env, { sender, tournament, body }) 
     `SELECT DISTINCT u.id FROM registrations reg JOIN users u ON lower(u.email) = lower(reg.email)
      WHERE reg.tournament_id = ? AND reg.status IN ('pending', 'confirmed') AND u.id != ?`,
   ).bind(tournament.id, sender.id).all();
-  await Promise.all((accountUsers.results || []).map((accountUser) =>
-    sendPushNotifications(env, accountUser.id, { title: 'Neue Nachricht', actor: `${sender.firstName} ${sender.lastName}`, messageId: id }).catch((error) =>
-      console.error('Postbox broadcast push dispatch failed', error),
-    ),
-  ));
+  for (const accountUser of accountUsers.results || []) {
+    await enqueuePushNotification(env, {
+      userId: accountUser.id,
+      payload: { title: 'Neue Nachricht', actor: `${sender.firstName} ${sender.lastName}`, messageId: id },
+    });
+  }
 
   const mailAllowed = await canSendTournamentMail(env.DB, tournament);
   for (const recipient of mailAllowed ? uniqueRecipients.values() : []) {
@@ -3995,6 +3996,13 @@ async function enqueueTransactionalEmail(env, payload) {
   await env.MAIL_QUEUE.send(payload);
 }
 
+// Nutzt dieselbe Queue/denselben Consumer wie enqueueTransactionalEmail, damit auch
+// Push-Fan-out bei Broadcasts (z. B. an alle Teilnehmer eines Turniers) gedrosselt statt
+// unbegrenzt parallel läuft, ohne eine eigene Queue-Infrastruktur anzulegen.
+async function enqueuePushNotification(env, { userId, payload }) {
+  await env.MAIL_QUEUE.send({ kind: 'push', userId, payload });
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -4004,10 +4012,14 @@ const MAIL_QUEUE_SEND_DELAY_MS = 2000;
 async function processMailQueueBatch(batch, env) {
   for (const message of batch.messages) {
     try {
-      await sendTransactionalEmail(env, message.body);
+      if (message.body?.kind === 'push') {
+        await sendPushNotifications(env, message.body.userId, message.body.payload);
+      } else {
+        await sendTransactionalEmail(env, message.body);
+      }
       message.ack();
     } catch (error) {
-      console.error(`Queued email delivery failed for ${message.body?.failureContext || message.body?.to}`, error);
+      console.error(`Queued ${message.body?.kind === 'push' ? 'push' : 'email'} delivery failed for ${message.body?.kind === 'push' ? message.body?.userId : (message.body?.failureContext || message.body?.to)}`, error);
       message.retry({ delaySeconds: 10 });
     }
     await sleep(MAIL_QUEUE_SEND_DELAY_MS);
