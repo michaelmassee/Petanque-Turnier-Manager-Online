@@ -72,7 +72,7 @@ self.addEventListener('push', (event) => {
   let payload = { title: 'Neue Nachricht', actor: '' };
   try { payload = event.data?.json() || payload; } catch { /* use safe fallback */ }
   event.waitUntil(self.registration.showNotification(payload.title || 'Neue Nachricht', {
-    body: payload.actor ? `Von ${payload.actor}` : 'In deiner Postbox wartet ein neuer Eintrag.',
+    body: payload.body || (payload.actor ? `Von ${payload.actor}` : 'In deiner Postbox wartet ein neuer Eintrag.'),
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     tag: `postbox-${payload.messageId || 'new'}`,

@@ -159,7 +159,18 @@ function postboxMessageText(message, t) {
   if (message.kind === 'direct') return message.body;
   const data = message.eventData || {};
   if (message.eventType === 'tournament_status_changed') return `${data.tournamentName}: ${t('Status')} ${labelFor(TOURNAMENT_STATUSES, data.status)}`;
-  if (message.eventType === 'registration_status_changed') return `${data.tournamentName}: ${t('Anmeldung')} ${labelFor(REGISTRATION_STATUSES, data.status)}`;
+  if (message.eventType === 'registration_status_changed') {
+    return `${data.tournamentName}: ${t('registrationFor').replace('{participant}', data.participant || '')} ${labelFor(REGISTRATION_STATUSES, data.status)}`;
+  }
+  if (message.eventType === 'account_status_changed') {
+    const parts = [t('accountRoleUpdated').replace('{role}', roleName(data.role))];
+    if (!data.emailVerified) parts.push(t('accountEmailUnverified'));
+    if (data.passwordChangeRequired) parts.push(t('accountPasswordChangeRequired'));
+    return parts.join(', ');
+  }
+  if (message.eventType === 'api_key_status_changed') {
+    return t(data.status === 'approved' ? 'apiKeyApproved' : 'apiKeyRevoked').replace('{label}', data.label || '');
+  }
   return t('status');
 }
 
