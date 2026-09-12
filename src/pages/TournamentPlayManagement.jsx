@@ -384,26 +384,69 @@ export default function TournamentPlayManagement({ tournaments }) {
         <details className="panel ranking-panel">
           <summary className="supermelee-round-summary"><span>{t('Rangliste')}</span></summary>
           <div className="table-scroll">
+            {// Spalten/Überschriften wie im Hauptprojekt: Schweizer-Rangliste (Platz, Team, Siege,
+            // BHZ/FBHZ, Punkte +/-/Delta) bzw. JGJ-/Supermêlée-Rangliste (Platz, Spieler, Spiele
+            // +/-/Delta, Punkte +/-/Delta), siehe SchweizerRanglisteSheet/JGJRanglisteSheet im Hauptprojekt.
+            null}
             <table className="ranking-table">
               <thead>
-                <tr>
-                  <th>#</th>
-                  <th>{selectedTournament?.type === 'schweizer' ? t('Team') : t('Spieler')}</th>
-                  <th>{t('Siege')}</th>
-                  {isSchweizerWithBuchholz && <><th>{t('BHZ')}</th><th>{t('FBHZ')}</th></>}
-                  <th>+/-</th>
-                  <th>{selectedTournament?.type === 'schweizer' ? t('Punkte+') : t('Punkte')}</th>
-                </tr>
+                {selectedTournament?.type === 'schweizer' ? (
+                  <>
+                    <tr>
+                      <th rowSpan={2}>{t('Platz')}</th>
+                      <th rowSpan={2}>{t('Team')}</th>
+                      <th rowSpan={2}>{t('Siege')}</th>
+                      {isSchweizerWithBuchholz && <><th rowSpan={2}>{t('BHZ')}</th><th rowSpan={2}>{t('FBHZ')}</th></>}
+                      <th colSpan={3}>{t('Punkte')}</th>
+                    </tr>
+                    <tr>
+                      <th>+</th>
+                      <th>-</th>
+                      <th>{t('Δ')}</th>
+                    </tr>
+                  </>
+                ) : (
+                  <>
+                    <tr>
+                      <th rowSpan={2}>{t('Platz')}</th>
+                      <th rowSpan={2}>{t('Spieler')}</th>
+                      <th colSpan={3}>{t('Spiele')}</th>
+                      <th colSpan={3}>{t('Punkte')}</th>
+                    </tr>
+                    <tr>
+                      <th>+</th>
+                      <th>-</th>
+                      <th>{t('Δ')}</th>
+                      <th>+</th>
+                      <th>-</th>
+                      <th>{t('Δ')}</th>
+                    </tr>
+                  </>
+                )}
               </thead>
               <tbody>
                 {ranking.map((entry) => (
                   <tr key={entry.teamId || entry.playerId}>
                     <td>{entry.rank}</td>
                     <td data-i18n-skip>{entry.members ? entry.members.map(playerLabel).join(' + ') : playerLabel(entry)}</td>
-                    <td>{entry.wins}</td>
-                    {isSchweizerWithBuchholz && <><td>{entry.bhz}</td><td>{entry.fbhz}</td></>}
-                    <td>{selectedTournament?.type === 'schweizer' ? entry.pointsDiff : entry.gameDiff}</td>
-                    <td>{selectedTournament?.type === 'schweizer' ? entry.pointsFor : `${entry.pointsFor}:${entry.pointsAgainst}`}</td>
+                    {selectedTournament?.type === 'schweizer' ? (
+                      <>
+                        <td>{entry.wins}</td>
+                        {isSchweizerWithBuchholz && <><td>{entry.bhz}</td><td>{entry.fbhz}</td></>}
+                        <td>{entry.pointsFor}</td>
+                        <td>{entry.pointsAgainst}</td>
+                        <td>{entry.pointsDiff}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td>{entry.wins}</td>
+                        <td>{entry.wins - entry.gameDiff}</td>
+                        <td>{entry.gameDiff}</td>
+                        <td>{entry.pointsFor}</td>
+                        <td>{entry.pointsAgainst}</td>
+                        <td>{entry.pointsDiff}</td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

@@ -1825,6 +1825,31 @@ textarea:focus {
   background: #fff;
 }
 
+.ranking-panel .table-scroll {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.ranking-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.ranking-table th,
+.ranking-table td {
+  padding: 6px 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ranking-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f4f6fa;
+  border-bottom: 1px solid #d7deea;
+  z-index: 1;
+}
+
 @media (max-width: 560px) {
   .quick-player-form {
     grid-template-columns: 1fr;
