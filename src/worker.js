@@ -2701,7 +2701,7 @@ async function listPetanqueOnlineCandidates(db) {
   ]);
   const importedKeys = new Set(imports.results.map((entry) => entry.external_key));
   return entries
-    .filter(isFuturePetanqueOnlineTournament)
+    .filter((entry) => isFuturePetanqueOnlineTournament(entry))
     .map((entry) => ({ ...mapPetanqueOnlineTournament(entry), type: entry.type, sourceFormation: entry.formation, imported: importedKeys.has(petanqueOnlineKey(entry)) }))
     .filter((entry) => entry.name.length >= 2 && entry.location.length >= 2)
     .sort((left, right) => left.date.localeCompare(right.date) || (left.startTime || '').localeCompare(right.startTime || '') || left.name.localeCompare(right.name));

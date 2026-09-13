@@ -23,4 +23,10 @@ describe('Petanque-Online-Import', () => {
     expect(isFuturePetanqueOnlineTournament({ date: '2026-09-13' }, '2026-09-12')).toBe(true);
     expect(isFuturePetanqueOnlineTournament({ date: '2026-09-12' }, '2026-09-12')).toBe(false);
   });
+
+  it('funktioniert als Array.filter-Callback, ohne dass der Index den Default-today-Wert überschreibt', () => {
+    const entries = [{ date: '2999-01-01' }, { date: '2999-01-02' }, { date: '2999-01-03' }];
+    expect(entries.filter(isFuturePetanqueOnlineTournament)).toHaveLength(0);
+    expect(entries.filter((entry) => isFuturePetanqueOnlineTournament(entry))).toHaveLength(3);
+  });
 });
