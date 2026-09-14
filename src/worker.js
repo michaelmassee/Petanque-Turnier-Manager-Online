@@ -3142,8 +3142,13 @@ async function startTournament(env, existing, user) {
     return json({ tournament: toPublicTournament(existing, user) });
   }
   const now = new Date().toISOString();
-  await db.prepare("UPDATE tournaments SET status = 'running', updated_at = ? WHERE id = ?").bind(now, existing.id).run();
+  const result = await db.prepare("UPDATE tournaments SET status = 'running', updated_at = ? WHERE id = ? AND status != 'running'").bind(now, existing.id).run();
   const updated = await getTournamentById(db, existing.id);
+  if (result.meta.changes === 0) {
+    // Ein gleichzeitiger Request hat den Statuswechsel bereits durchgeführt -
+    // Benachrichtigungen wurden bereits von diesem verschickt, nicht erneut auslösen.
+    return json({ tournament: toPublicTournament(updated, user) });
+  }
   if (isNewlyPublicTournament(existing, updated)) {
     await notifySavedSearchesForPublishedTournament(env, updated);
   }
