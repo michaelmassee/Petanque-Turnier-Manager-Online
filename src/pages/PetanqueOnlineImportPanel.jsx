@@ -49,8 +49,8 @@ export function PetanqueOnlineImportPanel() {
     setError('');
     try {
       const result = await api('/api/admin/petanque-online/import', { method: 'POST', body: JSON.stringify({ externalKeys: [...selected] }) });
-      const parts = [t('Petanque-Online-Termine importiert: {created} neu, {updated} aktualisiert.', { created: result.created, updated: result.updated })];
-      if (result.failed > 0) parts.push(t('{failed} Termine fehlgeschlagen.', { failed: result.failed }));
+      const parts = [t('Petanque-Online-Termine importiert: {created} neu, {updated} aktualisiert.').replace('{created}', result.created).replace('{updated}', result.updated)];
+      if (result.failed > 0) parts.push(t('{failed} Termine fehlgeschlagen.').replace('{failed}', result.failed));
       setMessage(parts.join(' '));
       await load();
     } catch (requestError) {
