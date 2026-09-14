@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isFuturePetanqueOnlineTournament, mapPetanqueOnlineFormation, mapPetanqueOnlineTournament, petanqueOnlineKey } from './petanque-online-core.js';
+import { formatPetanqueOnlineAddress, isFuturePetanqueOnlineTournament, mapPetanqueOnlineFormation, mapPetanqueOnlineTournament, petanqueOnlineKey } from './petanque-online-core.js';
 
 describe('Petanque-Online-Import', () => {
   it('bildet Quell-IDs und Formationen stabil ab', () => {
@@ -28,5 +28,26 @@ describe('Petanque-Online-Import', () => {
     const entries = [{ date: '2999-01-01' }, { date: '2999-01-02' }, { date: '2999-01-03' }];
     expect(entries.filter(isFuturePetanqueOnlineTournament)).toHaveLength(0);
     expect(entries.filter((entry) => isFuturePetanqueOnlineTournament(entry))).toHaveLength(3);
+  });
+
+  it('baut aus der gescrapten PostalAddress die vollständige Adresse inkl. Straße', () => {
+    expect(formatPetanqueOnlineAddress({ streetAddress: 'Pariser Str. 45', postalCode: '40549', addressLocality: 'Düsseldorf' }, 'Düsseldorf'))
+      .toBe('Pariser Str. 45, 40549 Düsseldorf');
+  });
+
+  it('lässt die PLZ weg, wenn sie fehlt', () => {
+    expect(formatPetanqueOnlineAddress({ streetAddress: 'Pariser Str. 45', addressLocality: 'Düsseldorf' }, 'Düsseldorf'))
+      .toBe('Pariser Str. 45, Düsseldorf');
+  });
+
+  it('fällt ohne Straße auf null zurück (Ort bleibt wie bisher unverändert)', () => {
+    expect(formatPetanqueOnlineAddress({ postalCode: '40549', addressLocality: 'Düsseldorf' }, 'Düsseldorf')).toBeNull();
+    expect(formatPetanqueOnlineAddress(null, 'Düsseldorf')).toBeNull();
+    expect(formatPetanqueOnlineAddress(undefined, 'Düsseldorf')).toBeNull();
+  });
+
+  it('nutzt den Fallback-Ort, wenn addressLocality fehlt', () => {
+    expect(formatPetanqueOnlineAddress({ streetAddress: 'Pariser Str. 45', postalCode: '40549' }, 'Düsseldorf'))
+      .toBe('Pariser Str. 45, 40549 Düsseldorf');
   });
 });

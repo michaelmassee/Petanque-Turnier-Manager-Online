@@ -14,7 +14,7 @@ import { getPairingStrategy, isOnlinePlayable } from './lib/pairing/index.js';
 import { computeRanking } from './lib/pairing/ranking.js';
 import { sortSwiss, swissStats } from './lib/pairing/schweizer.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
-import { isFuturePetanqueOnlineTournament, mapPetanqueOnlineTournament, petanqueOnlineKey } from './petanque-online-core.js';
+import { formatPetanqueOnlineAddress, isFuturePetanqueOnlineTournament, mapPetanqueOnlineTournament, petanqueOnlineKey } from './petanque-online-core.js';
 
 const ROLES = ['admin', 'user'];
 const DEFAULT_TOURNAMENT_LIMIT = 5;
@@ -2508,7 +2508,10 @@ async function listTournaments(db, user) {
           FROM registrations
           WHERE registrations.tournament_id = tournaments.id
             AND registrations.status = 'waitlist'
-        ) AS waitlist_registrations
+        ) AS waitlist_registrations,
+        (
+          SELECT 1 FROM petanque_online_imports WHERE petanque_online_imports.tournament_id = tournaments.id
+        ) AS imported_from_petanque_online
        FROM tournaments
        WHERE (?1 IS NOT NULL AND ?1 = 'admin')
           OR (?2 IS NOT NULL AND (tournaments.owner_id = ?2 OR EXISTS (
@@ -2722,27 +2725,33 @@ async function listPetanqueOnlineCandidates(db) {
     .sort((left, right) => left.date.localeCompare(right.date) || (left.startTime || '').localeCompare(right.startTime || '') || left.name.localeCompare(right.name));
 }
 
-// Turnier-Detailseite scrapen, um die tatsächliche Vereinswebseite (organizer.url im
-// eingebetteten JSON-LD) statt des petanque-online.de-Links als Quelle zu verwenden.
-// Nur beim Import ausgeführt, nicht beim täglichen Sync (undokumentierte HTML-Struktur,
-// soll den Cron-Lauf nicht verlangsamen oder anfällig für Änderungen an der Fremdseite machen).
-async function fetchPetanqueOnlineClubWebsite(slug) {
-  if (!slug) return null;
+// Turnier-Detailseite scrapen, um die tatsächliche Vereinswebseite (organizer.url) und die
+// vollständige Adresse (location.address im eingebetteten JSON-LD) statt nur des Orts aus der
+// Kalender-Liste zu verwenden. Nur beim Import ausgeführt, nicht beim täglichen Sync
+// (undokumentierte HTML-Struktur, soll den Cron-Lauf nicht verlangsamen oder anfällig für
+// Änderungen an der Fremdseite machen).
+async function fetchPetanqueOnlineTournamentDetails(slug, fallbackLocation) {
+  if (!slug) return { websiteUrl: null, address: null };
   try {
     const response = await fetch(`https://petanque-online.de/turniere/${encodeURIComponent(slug)}`, {
       headers: { Accept: 'text/html' },
       signal: AbortSignal.timeout(8_000),
     });
-    if (!response.ok) return null;
+    if (!response.ok) return { websiteUrl: null, address: null };
     const html = await response.text();
-    const match = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
-    if (!match) return null;
-    const data = JSON.parse(match[1]);
+    // Die Seite bettet mehrere ld+json-Blöcke ein (u.a. einen generischen Organization-Block
+    // für die Seite selbst); wir brauchen gezielt den SportsEvent-Block mit organizer/location.
+    const data = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+      .map((entry) => { try { return JSON.parse(entry[1]); } catch { return null; } })
+      .find((entry) => entry?.['@type'] === 'SportsEvent');
+    if (!data) return { websiteUrl: null, address: null };
     const url = data?.organizer?.url;
-    return typeof url === 'string' && isHttpUrl(url) ? url : null;
+    const websiteUrl = typeof url === 'string' && isHttpUrl(url) ? url : null;
+    const address = formatPetanqueOnlineAddress(data?.location?.address, fallbackLocation);
+    return { websiteUrl, address };
   } catch (error) {
-    console.error(`Petanque-Online club website scrape failed for slug ${slug}`, error);
-    return null;
+    console.error(`Petanque-Online tournament detail scrape failed for slug ${slug}`, error);
+    return { websiteUrl: null, address: null };
   }
 }
 
@@ -2754,18 +2763,23 @@ async function upsertPetanqueOnlineTournament(db, entry, ownerId, now, { scrapeC
   const existing = await db.prepare("SELECT tournament_id FROM petanque_online_imports WHERE source = 'petanque-online' AND external_key = ?").bind(mapped.externalKey).first();
 
   if (existing) {
+    // location wird bewusst nicht mitaktualisiert: Die vollständige Adresse (inkl. Straße) wird
+    // nur beim Import gescrapt (s.u.), ein Sync mit dem reinen Ort aus der Kalender-Liste würde
+    // sie sonst wieder auf den Ort zurücksetzen.
     await db.prepare(
-      `UPDATE tournaments SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, formation = ?, formation_other = ?,
+      `UPDATE tournaments SET name = ?, club = ?, date = ?, start_time = ?, description = ?, formation = ?, formation_other = ?,
        flyer_url = ?, status = 'registration', visibility = 'public', registration_enabled = 0, updated_at = ? WHERE id = ?`,
-    ).bind(mapped.name, mapped.club, mapped.date, mapped.startTime, mapped.location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.flyerUrl, now, existing.tournament_id).run();
+    ).bind(mapped.name, mapped.club, mapped.date, mapped.startTime, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.flyerUrl, now, existing.tournament_id).run();
     await db.prepare("UPDATE petanque_online_imports SET synced_at = ? WHERE source = 'petanque-online' AND external_key = ?").bind(now, mapped.externalKey).run();
     return 'updated';
   }
 
   let websiteUrl = mapped.websiteUrl;
-  if (scrapeClubWebsite && !entry.source_url) {
-    const clubWebsite = await fetchPetanqueOnlineClubWebsite(entry.slug);
-    if (clubWebsite) websiteUrl = clubWebsite;
+  let location = mapped.location;
+  if (scrapeClubWebsite) {
+    const details = await fetchPetanqueOnlineTournamentDetails(entry.slug, mapped.location);
+    if (details.websiteUrl && !entry.source_url) websiteUrl = details.websiteUrl;
+    if (details.address) location = details.address;
   }
 
   const id = crypto.randomUUID();
@@ -2774,7 +2788,7 @@ async function upsertPetanqueOnlineTournament(db, entry, ownerId, now, { scrapeC
       `INSERT INTO tournaments (id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, registration_type,
        status, visibility, registration_enabled, club, website_url, flyer_url, timezone, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'formule_x', ?, ?, 'forme', 'registration', 'public', 0, ?, ?, ?, 'Europe/Berlin', ?, ?)`,
-    ).bind(id, ownerId, ownerId, mapped.name, mapped.date, mapped.startTime, mapped.location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.club, websiteUrl, mapped.flyerUrl, now, now),
+    ).bind(id, ownerId, ownerId, mapped.name, mapped.date, mapped.startTime, location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.club, websiteUrl, mapped.flyerUrl, now, now),
     db.prepare("INSERT INTO petanque_online_imports (source, external_key, tournament_id, imported_at, synced_at) VALUES ('petanque-online', ?, ?, ?, ?)").bind(mapped.externalKey, id, now, now),
   ]);
   return 'created';
@@ -4514,7 +4528,10 @@ async function getTournamentById(db, id) {
           FROM registrations
           WHERE registrations.tournament_id = tournaments.id
             AND registrations.status = 'waitlist'
-        ) AS waitlist_registrations
+        ) AS waitlist_registrations,
+        (
+          SELECT 1 FROM petanque_online_imports WHERE petanque_online_imports.tournament_id = tournaments.id
+        ) AS imported_from_petanque_online
        FROM tournaments
        WHERE tournaments.id = ?`,
     )
@@ -5340,6 +5357,7 @@ function toPublicTournament(row, user) {
     approvalRequired: Boolean(Number(row.approval_required || 0)),
     documentManaged: Boolean(Number(row.document_managed || 0)),
     websiteUrl: row.website_url || null,
+    websiteIsOriginalClubSite: Boolean(row.imported_from_petanque_online),
     logoUrl: row.logo_url || null,
     flyerUrl: row.flyer_url || null,
     activeRegistrations: Number(row.active_registrations || 0),

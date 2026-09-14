@@ -18,6 +18,18 @@ export function sourceUrlForPetanqueOnline(entry) {
   return entry.slug ? `https://petanque-online.de/turniere/${encodeURIComponent(entry.slug)}` : 'https://petanque-online.de/';
 }
 
+// Baut aus der schema.org-PostalAddress der gescrapten Turnier-Detailseite eine
+// vollständige Adresse (Straße + PLZ/Ort) statt nur des Orts aus der Kalender-Liste.
+// Fehlt die Straße, bleibt es beim reinen Ort.
+export function formatPetanqueOnlineAddress(address, fallbackLocation) {
+  const street = String(address?.streetAddress || '').trim();
+  const postalCode = String(address?.postalCode || '').trim();
+  const city = String(address?.addressLocality || fallbackLocation || '').trim();
+  if (!street) return null;
+  const cityPart = [postalCode, city].filter(Boolean).join(' ');
+  return [street, cityPart].filter(Boolean).join(', ');
+}
+
 export function mapPetanqueOnlineTournament(entry) {
   const formation = mapPetanqueOnlineFormation(entry.formation);
   const location = String(entry.location || entry.club_city || entry.club_name || '').trim();

@@ -57,8 +57,8 @@ export function TournamentInfo({ tournament, language, onShare }) {
             href={tournament.websiteUrl}
             target="_blank"
             rel="noreferrer"
-            title={t('Website öffnen')}
-            aria-label={t('Website öffnen')}
+            title={tournament.websiteIsOriginalClubSite ? t('Original-Vereinswebseite öffnen') : t('Website öffnen')}
+            aria-label={tournament.websiteIsOriginalClubSite ? t('Original-Vereinswebseite öffnen') : t('Website öffnen')}
           >
             🌐
           </a>
