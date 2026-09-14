@@ -88,6 +88,7 @@
   "Anmeldung:": "Registratie:",
   "Anmeldungen": "Inschrijvingen",
   "Anmeldungen müssen als nicht-leeres Array übergeben werden": "Inschrijvingen moeten als niet-lege array worden opgegeven",
+  "Anmeldungen müssen vom Turnierersteller bestätigt werden.": "Inschrijvingen moeten door de toernooimaker worden goedgekeurd.",
   "Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen": "Inschrijvingen laten beoordelen door de toernooileider voordat ze worden bevestigd",
   "Anzeigen": "Tonen",
   "API-Schlüssel nicht gefunden": "API-sleutel niet gevonden",

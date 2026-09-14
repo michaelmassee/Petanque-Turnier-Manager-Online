@@ -88,6 +88,7 @@
   "Anmeldung:": "Registration:",
   "Anmeldungen": "Registrations",
   "Anmeldungen müssen als nicht-leeres Array übergeben werden": "Registrations must be provided as a non-empty array",
+  "Anmeldungen müssen vom Turnierersteller bestätigt werden.": "Registrations must be approved by the tournament creator.",
   "Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen": "Review registrations before the tournament organizer confirms them",
   "Anzeigen": "Show",
   "API-Schlüssel nicht gefunden": "API key not found",

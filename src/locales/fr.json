@@ -88,6 +88,7 @@
   "Anmeldung:": "Inscription :",
   "Anmeldungen": "Inscriptions",
   "Anmeldungen müssen als nicht-leeres Array übergeben werden": "Les inscriptions doivent être fournies sous forme de tableau non vide",
+  "Anmeldungen müssen vom Turnierersteller bestätigt werden.": "Les inscriptions doivent être approuvées par le créateur du tournoi.",
   "Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen": "Vérifier les inscriptions avant que l’organisateur du tournoi ne les confirme",
   "Anzeigen": "Afficher",
   "API-Schlüssel nicht gefunden": "Clé API introuvable",

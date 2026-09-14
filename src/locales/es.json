@@ -88,6 +88,7 @@
   "Anmeldung:": "Inscripción:",
   "Anmeldungen": "Inscripciones",
   "Anmeldungen müssen als nicht-leeres Array übergeben werden": "Las inscripciones deben enviarse como una matriz no vacía",
+  "Anmeldungen müssen vom Turnierersteller bestätigt werden.": "Las inscripciones deben ser aprobadas por el creador del torneo.",
   "Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen": "Revisar las inscripciones antes de que el organizador del torneo las confirme",
   "Anzeigen": "Mostrar",
   "API-Schlüssel nicht gefunden": "Clave de API no encontrada",

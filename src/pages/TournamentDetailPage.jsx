@@ -77,6 +77,7 @@ export function TournamentInfo({ tournament, language, onShare }) {
         )}
       </div>
       {showTimezoneHint && <p className="hint">{(TIMEZONE_HINT_TEMPLATES[language] || TIMEZONE_HINT_TEMPLATES.de)(tournamentTimeZone)}</p>}
+      <h2 data-i18n-skip>{tournament.name}</h2>
       <p>
         <strong>{t('Datum')}</strong>: {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
       </p>
@@ -85,6 +86,7 @@ export function TournamentInfo({ tournament, language, onShare }) {
       </p>
       {!isCalendarEntry && (
         <>
+          {tournament.approvalRequired && <p className="hint">{t('Anmeldungen müssen vom Turnierersteller bestätigt werden.')}</p>}
           <p>
             <strong>{t('Formation')}</strong>: {formationLabel(tournament)}
           </p>
@@ -455,9 +457,10 @@ export function TournamentDetailPage({
 
   async function handleShare() {
     const shareUrl = window.location.href;
+    const shareText = `${tournament.name}\n${shareUrl}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: tournament.name, url: shareUrl });
+        await navigator.share({ title: tournament.name, text: shareText });
       } catch (shareError) {
         if (shareError.name !== 'AbortError') {
           setError(shareError.message);
@@ -466,7 +469,7 @@ export function TournamentDetailPage({
       return;
     }
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(shareText);
       setMessage(t('Link kopiert'));
     } catch {
       setError(t('Teilen wird von diesem Gerät nicht unterstützt'));

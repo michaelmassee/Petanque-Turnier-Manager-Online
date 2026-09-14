@@ -118,6 +118,7 @@ describe('Öffentliche Turnierdetailseite', () => {
       />,
     );
 
+    expect(screen.getByRole('heading', { name: 'Vereinsabend' })).toBeInTheDocument();
     expect(screen.getByText('Gemeinsames Spielen.')).toBeInTheDocument();
     expect(screen.queryByText('Formation')).not.toBeInTheDocument();
     expect(screen.queryByText('Anmeldetyp')).not.toBeInTheDocument();
@@ -125,6 +126,28 @@ describe('Öffentliche Turnierdetailseite', () => {
     expect(screen.queryByText('Max. Meldungen')).not.toBeInTheDocument();
     expect(screen.queryByText('Warteliste')).not.toBeInTheDocument();
     expect(screen.queryByText('Kontakt')).not.toBeInTheDocument();
+  });
+
+  it('weist auf die notwendige Freigabe durch den Turnierersteller hin', () => {
+    render(
+      <TournamentInfo
+        language="de"
+        onShare={() => {}}
+        tournament={{
+          id: 'approval-1',
+          name: 'Herbstturnier',
+          date: '2026-10-10',
+          location: 'Bouleplatz',
+          registrationEnabled: true,
+          approvalRequired: true,
+          formation: 'doublette',
+          registrationType: 'forme',
+          type: 'formule_x',
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Anmeldungen müssen vom Turnierersteller bestätigt werden.')).toBeInTheDocument();
   });
 });
 
