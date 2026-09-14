@@ -1170,7 +1170,7 @@ function AppContent() {
     }
   }
 
-  async function handleRegistrationSubmit(event) {
+  async function handleRegistrationSubmit(event, shareToken = '') {
     event.preventDefault();
     setError('');
     setMessage('');
@@ -1191,7 +1191,8 @@ function AppContent() {
         await authenticatedApi(`/api/registrations/${registrationForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
         setMessage(t('Anmeldung wurde aktualisiert.'));
       } else {
-        const result = await api(`/api/tournaments/${tournamentId}/registrations`, { method: 'POST', body: JSON.stringify(payload) });
+        const shareQuery = shareToken ? `?share=${encodeURIComponent(shareToken)}` : '';
+        const result = await api(`/api/tournaments/${tournamentId}/registrations${shareQuery}`, { method: 'POST', body: JSON.stringify(payload) });
         setMessage(
           isManagerEntry
             ? `${t('Neue Meldung hinzugefügt:')} ${result.registration.firstName} ${result.registration.lastName}`
@@ -2480,7 +2481,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
           <Button
             variant="secondary"
             onClick={() => onRegister(tournament)}
-            disabled={tournament.status !== 'registration' || tournament.visibility !== 'public' || registrationNotYetOpen(tournament)}
+            disabled={tournament.visibility !== 'public' || !hasOpenRegistration(tournament)}
           >
             {t('Anmelden')}
           </Button>
@@ -2654,15 +2655,18 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
   }, [tournament.id, currentUser]);
 
   const notYetOpen = registrationNotYetOpen(tournament);
+  const registrationOpen = hasOpenRegistration(tournament);
 
   return (
     <form className={embedded ? 'public-registration public-registration--embedded' : 'public-registration'} onSubmit={onSubmit}>
       <h2>{t('Anmeldung:')} <span data-i18n-skip>{tournament.name}</span></h2>
-      {notYetOpen ? (
+      {!registrationOpen ? (
         <>
-          <p className="hint">
-            {(REGISTRATION_OPENS_TEMPLATES[language] || REGISTRATION_OPENS_TEMPLATES.de)(formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone))}
-          </p>
+          {notYetOpen ? (
+            <p className="hint">
+              {(REGISTRATION_OPENS_TEMPLATES[language] || REGISTRATION_OPENS_TEMPLATES.de)(formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone))}
+            </p>
+          ) : <p className="hint">{registrationStatusLabel(tournament, language)}</p>}
           <div className="row-actions stretch">
             <Button variant="secondary" onClick={onCancel}>{t('Abbrechen')}</Button>
           </div>

@@ -465,6 +465,37 @@ export function TournamentList({
 }) {
   const { t } = useTranslation();
   const filtered = tournaments.length !== totalTournaments;
+  const [shareBusyId, setShareBusyId] = useState('');
+  const [shareError, setShareError] = useState('');
+
+  async function shareTournament(tournament) {
+    setShareBusyId(tournament.id);
+    setShareError('');
+    try {
+      const shareUrl = tournament.visibility === 'private'
+        ? (await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' })).shareUrl
+        : `${window.location.origin}/turniere/${tournament.id}/info`;
+      const shareData = { title: tournament.name, text: `${tournament.name}\n${shareUrl}`, url: shareUrl };
+      if (navigator.share) await navigator.share(shareData);
+      else await navigator.clipboard.writeText(shareUrl);
+    } catch (error) {
+      if (error.name !== 'AbortError') setShareError(error.message || t('Teilen wird von diesem Gerät nicht unterstützt'));
+    } finally {
+      setShareBusyId('');
+    }
+  }
+
+  async function disableShareLink(tournament) {
+    setShareBusyId(tournament.id);
+    setShareError('');
+    try {
+      await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'DELETE' });
+    } catch (error) {
+      setShareError(error.message);
+    } finally {
+      setShareBusyId('');
+    }
+  }
 
   return (
     <div className="panel">
@@ -483,6 +514,7 @@ export function TournamentList({
         onReset={onResetFilters}
         resetDisabled={!filtered}
       />
+      {shareError && <p className="feedback error">{shareError}</p>}
       <div className="user-list">
         {tournaments.map((tournament) => (
           <article className={`data-row tournament-row ${selectedId === tournament.id ? 'selected' : ''}`} key={tournament.id}>
@@ -516,6 +548,12 @@ export function TournamentList({
                   <span className="muted">{t('Eckdaten im Turnierdokument')}</span>
                 ) : (
                   <Button variant="secondary" onClick={() => onEdit(tournament)}>{t('Bearbeiten')}</Button>
+                )}
+                {tournament.status !== 'draft' && (
+                  <Button variant="secondary" disabled={shareBusyId === tournament.id} loading={shareBusyId === tournament.id} onClick={() => shareTournament(tournament)}>{t('Turnier teilen')}</Button>
+                )}
+                {tournament.visibility === 'private' && tournament.status !== 'draft' && (
+                  <Button variant="secondary" disabled={shareBusyId === tournament.id} onClick={() => disableShareLink(tournament)}>{t('Freigabe-Link deaktivieren')}</Button>
                 )}
                 <Button variant="danger" onClick={() => onDelete(tournament)}>{t('Löschen')}</Button>
               </div>

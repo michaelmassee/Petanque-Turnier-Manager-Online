@@ -62,7 +62,7 @@ export function useOnlineStatus() {
   return online;
 }
 
-export function useRoutedTournament(id, tournaments) {
+export function useRoutedTournament(id, tournaments, shareToken = '') {
   const [fetched, setFetched] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const existing = tournaments.find((tournament) => tournament.id === id) || null;
@@ -76,7 +76,7 @@ export function useRoutedTournament(id, tournaments) {
 
     let cancelled = false;
     setNotFound(false);
-    api(`/api/tournaments/${id}`)
+    api(`/api/tournaments/${id}${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`)
       .then((data) => {
         if (!cancelled) {
           setFetched(data.tournament);
@@ -91,7 +91,7 @@ export function useRoutedTournament(id, tournaments) {
     return () => {
       cancelled = true;
     };
-  }, [id, existing]);
+  }, [id, existing, shareToken]);
 
   return { tournament: existing || fetched, notFound: notFound && !existing };
 }

@@ -62,13 +62,10 @@ button:disabled {
 
 .tournament-logo {
   display: block;
-  max-width: 160px;
-  max-height: 160px;
   width: auto;
   height: auto;
   object-fit: contain;
   border-radius: 8px;
-  margin-bottom: 12px;
 }
 
 .language-bar {
@@ -1301,6 +1298,28 @@ textarea:focus {
   margin: 0 auto;
 }
 
+.tournament-detail-heading {
+  padding: 4px 4px 0;
+}
+
+.tournament-detail-heading .eyebrow {
+  margin-bottom: 4px;
+}
+
+.tournament-detail-heading h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.tournament-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: #53627a;
+  font-weight: 700;
+}
+
 .tournament-detail-tabs {
   display: flex;
   gap: 8px;
@@ -1323,6 +1342,25 @@ textarea:focus {
 .tournament-detail-tab.active {
   background: #1677ff;
   color: #ffffff;
+}
+
+.tournament-info-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.tournament-info-top .tournament-icon-bar {
+  justify-content: flex-start;
+  margin: 0;
+}
+
+.tournament-info-logo {
+  max-width: 160px;
+  max-height: 160px;
+  flex: 0 1 160px;
 }
 
 .participants-list {

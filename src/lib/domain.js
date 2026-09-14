@@ -84,8 +84,10 @@ export function googleMapsUrl(tournament) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tournament.location || '')}`;
 }
 
-export function tournamentImageUrl(tournamentId, field) {
-  return `/api/tournaments/${tournamentId}/image?field=${field}`;
+export function tournamentImageUrl(tournamentId, field, shareToken = '') {
+  const params = new URLSearchParams({ field });
+  if (shareToken) params.set('share', shareToken);
+  return `/api/tournaments/${tournamentId}/image?${params}`;
 }
 
 export function tournamentPayload(form) {
@@ -238,6 +240,10 @@ export const REGISTERED_COUNT_TEMPLATES = {
 export function registrationStatusLabel(tournament, language) {
   if (tournament.registrationEnabled === false) {
     return i18next.t('Kein Anmeldeverfahren', { lng: language });
+  }
+
+  if (tournament.status === 'running') {
+    return i18next.t('Läuft', { lng: language });
   }
 
   if (tournament.status === 'registration' && registrationNotYetOpen(tournament)) {

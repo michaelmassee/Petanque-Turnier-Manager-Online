@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeRanking } from './ranking.js';
+import { competitionRanks, computeRanking, sameStandardRankingPlace } from './ranking.js';
 
 describe('computeRanking', () => {
   it('sortiert nach Siegen, Spieldifferenz, Punktedifferenz, erzielten Punkten', () => {
@@ -25,5 +25,18 @@ describe('computeRanking', () => {
   it('ignoriert Matches ohne Ergebnis', () => {
     const matches = [{ teamA: ['p1'], teamB: ['p2'], scoreA: null, scoreB: null }];
     expect(computeRanking(matches)).toEqual([]);
+  });
+
+  it('vergibt bei vollständig gleichem Ergebnis denselben Platz wie das Hauptprojekt', () => {
+    const ranking = competitionRanks([
+      { playerId: 'p1', wins: 1, gameDiff: 1, pointsDiff: 12, pointsFor: 13 },
+      { playerId: 'p2', wins: 1, gameDiff: 1, pointsDiff: 12, pointsFor: 13 },
+      { playerId: 'p3', wins: 1, gameDiff: 1, pointsDiff: 12, pointsFor: 13 },
+      { playerId: 'p4', wins: 1, gameDiff: 1, pointsDiff: 5, pointsFor: 9 },
+      { playerId: 'p5', wins: 1, gameDiff: 1, pointsDiff: 5, pointsFor: 9 },
+      { playerId: 'p6', wins: 1, gameDiff: 1, pointsDiff: 4, pointsFor: 13 },
+    ], sameStandardRankingPlace);
+
+    expect(ranking.map((entry) => entry.rank)).toEqual([1, 1, 1, 4, 4, 6]);
   });
 });

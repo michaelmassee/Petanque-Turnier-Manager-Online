@@ -13,8 +13,8 @@ import {
   validateMatchScore,
 } from './worker-core.js';
 import { getPairingStrategy, isOnlinePlayable } from './lib/pairing/index.js';
-import { computeRanking } from './lib/pairing/ranking.js';
-import { sortSwiss, swissStats } from './lib/pairing/schweizer.js';
+import { competitionRanks, computeRanking, sameStandardRankingPlace } from './lib/pairing/ranking.js';
+import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schweizer.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
 import { formatPetanqueOnlineAddress, isExternalPetanqueOnlineWebsite, isFuturePetanqueOnlineTournament, mapPetanqueOnlineTournament, petanqueOnlineKey } from './petanque-online-core.js';
 
@@ -1100,7 +1100,9 @@ export default {
         }
 
         if (request.method === 'POST') {
-          return await createRegistration(request, env, tournament);
+          const session = await optionalSession(request, env.DB);
+          const shareAccess = await hasTournamentShareAccess(env.DB, tournament, url.searchParams.get('share'));
+          return await createRegistration(request, env, tournament, { session, shareAccess });
         }
       }
 
@@ -1261,7 +1263,8 @@ export default {
 
         if (request.method === 'GET') {
           const session = await optionalSession(request, env.DB);
-          if (!canViewTournament(tournament, session?.user || null)) {
+          const shareAccess = await hasTournamentShareAccess(env.DB, tournament, url.searchParams.get('share'));
+          if (!canViewTournament(tournament, session?.user || null) && !shareAccess) {
             throw new HttpError(403, 'Zugriff verweigert');
           }
           return json({ tournament: toPublicTournament(tournament, session?.user || null) });
@@ -1301,6 +1304,20 @@ export default {
         return await updateTournamentPresentation(request, env, tournament, session.user);
       }
 
+      const shareLinkMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/share-link$/);
+      if (shareLinkMatch) {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, shareLinkMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        assertCanManageTournament(tournament, session.user);
+        if (tournament.status === 'draft') throw new HttpError(400, 'Entwürfe können nicht geteilt werden');
+        if (tournament.visibility !== 'private' && request.method === 'POST') {
+          return json({ shareUrl: `${url.origin}/turniere/${tournament.id}/info` });
+        }
+        if (request.method === 'POST') return await createTournamentShareLink(env.DB, tournament.id, url.origin);
+        if (request.method === 'DELETE') return await deleteTournamentShareLink(env.DB, tournament.id);
+      }
+
       const imageProxyMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/image$/);
       if (imageProxyMatch && request.method === 'GET') {
         const tournament = await getTournamentById(env.DB, imageProxyMatch[1]);
@@ -1308,7 +1325,8 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         const session = await optionalSession(request, env.DB);
-        if (!canViewTournament(tournament, session?.user || null)) {
+        const shareAccess = await hasTournamentShareAccess(env.DB, tournament, url.searchParams.get('share'));
+        if (!canViewTournament(tournament, session?.user || null) && !shareAccess) {
           throw new HttpError(403, 'Zugriff verweigert');
         }
         return await proxyTournamentImage(tournament, url.searchParams.get('field'));
@@ -3852,18 +3870,20 @@ async function getTournamentRanking(db, tournament) {
       teamA: row.team_a_id ? [row.team_a_id] : [], teamB: row.team_b_id ? [row.team_b_id] : [], scoreA: row.score_a, scoreB: row.score_b, noShow: row.no_show,
     }));
     const playersById = await getPlayersById(db, tournament.id);
-    const ranking = sortSwiss(swissStats(teams, swissMatches, tournament.schweizer_ranking_mode), tournament.schweizer_ranking_mode);
-    return json({ ranking: ranking.map((entry, index) => ({
-      rank: index + 1, ...entry, teamId: entry.teamId,
+    const ranking = competitionRanks(
+      sortSwiss(swissStats(teams, swissMatches, tournament.schweizer_ranking_mode), tournament.schweizer_ranking_mode),
+      (previous, entry) => sameSwissRankingPlace(previous, entry, tournament.schweizer_ranking_mode),
+    );
+    return json({ ranking: ranking.map((entry) => ({
+      ...entry, teamId: entry.teamId,
       members: (teamsById.get(entry.teamId)?.members || []).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
     })) });
   }
-  const ranking = computeRanking(matches);
+  const ranking = competitionRanks(computeRanking(matches), sameStandardRankingPlace);
   const playersById = await getPlayersById(db, tournament.id);
 
   return json({
-    ranking: ranking.map((entry, index) => ({
-      rank: index + 1,
+    ranking: ranking.map((entry) => ({
       ...entry,
       ...(playersById.get(entry.playerId) || {}),
     })),
@@ -3929,7 +3949,7 @@ const REGISTRATION_CLOSED_MESSAGES = {
   not_yet_open: 'Die Anmeldung ist noch nicht geöffnet',
 };
 
-async function createRegistration(request, env, tournament) {
+async function createRegistration(request, env, tournament, { session = null, shareAccess = false } = {}) {
   const db = env.DB;
 
   const body = await readJson(request);
@@ -3938,14 +3958,13 @@ async function createRegistration(request, env, tournament) {
   if (nullableText(body.website)) {
     return json({ ok: true }, 201);
   }
-  const session = await optionalSession(request, env.DB);
   const isManager = canManageTournament(tournament, session?.user || null);
   // Der reguläre Anmeldezeitraum (Status/Sichtbarkeit/Fristen) gilt nur für die
   // öffentliche Selbstanmeldung. Der Turniersteller erfasst hier bewusst manuell
   // Meldungen - auch bei laufendem Turnier (z.B. neu hinzugekommene Spieler
   // zwischen zwei Runden), daher gilt für ihn keine dieser automatischen Sperren.
   if (!isManager) {
-    const openStatus = coreRegistrationOpenStatus(tournament);
+    const openStatus = coreRegistrationOpenStatus({ ...tournament, visibility: shareAccess ? 'public' : tournament.visibility });
     if (openStatus !== 'open') {
       throw new HttpError(403, REGISTRATION_CLOSED_MESSAGES[openStatus]);
     }
@@ -4813,6 +4832,30 @@ function isPubliclyVisible(tournament) {
 
 function canViewTournament(tournament, user) {
   return isPubliclyVisible(tournament) || canManageTournament(tournament, user);
+}
+
+async function hasTournamentShareAccess(db, tournament, token) {
+  if (!token || tournament.visibility !== 'private' || tournament.status === 'draft') return false;
+  const tokenHash = await sha256Hex(token);
+  const link = await db.prepare('SELECT token_hash FROM tournament_share_links WHERE tournament_id = ? AND token_hash = ?').bind(tournament.id, tokenHash).first();
+  return Boolean(link);
+}
+
+async function createTournamentShareLink(db, tournamentId, origin) {
+  const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+  const tokenHash = await sha256Hex(token);
+  const now = new Date().toISOString();
+  await db.prepare(
+    `INSERT INTO tournament_share_links (tournament_id, token_hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(tournament_id) DO UPDATE SET token_hash = excluded.token_hash, updated_at = excluded.updated_at`,
+  ).bind(tournamentId, tokenHash, now, now).run();
+  return json({ shareUrl: `${origin}/turniere/${tournamentId}/info?share=${encodeURIComponent(token)}` });
+}
+
+async function deleteTournamentShareLink(db, tournamentId) {
+  await db.prepare('DELETE FROM tournament_share_links WHERE tournament_id = ?').bind(tournamentId).run();
+  return json({ ok: true });
 }
 
 function canViewParticipants(tournament, user) {

@@ -5,7 +5,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney } from '../lib/format.js';
-import { labelFor, formationLabel, registrationNotYetOpen, formatTournamentStartTime, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
+import { labelFor, formationLabel, hasOpenRegistration, formatTournamentStartTime, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { Button, Feedback, RequiredMark } from '../components/ui.jsx';
 import { StandalonePageHeader, OfflineNotice } from '../components/layout.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
@@ -18,7 +18,7 @@ function ShareIcon() {
   );
 }
 
-export function TournamentInfo({ tournament, language, onShare }) {
+export function TournamentInfo({ tournament, language, onShare, showTitle = true, shareToken = '' }) {
   const { t } = useTranslation();
   const isCalendarEntry = tournament.registrationEnabled === false;
   const mapsUrl = googleMapsUrl(tournament);
@@ -30,54 +30,66 @@ export function TournamentInfo({ tournament, language, onShare }) {
     : null;
 
   return (
-    <div className="panel">
-      <div className="tournament-icon-bar">
-        <button
-          type="button"
-          className="icon-bar-button"
-          title={t('Turnier teilen')}
-          aria-label={t('Turnier teilen')}
-          onClick={onShare}
-        >
-          <ShareIcon />
-        </button>
-        <a
-          className="icon-bar-button"
-          href={mapsUrl}
-          target="_blank"
-          rel="noreferrer"
-          title={t('Spielort in Google Maps öffnen')}
-          aria-label={t('Spielort in Google Maps öffnen')}
-        >
-          📍
-        </a>
-        {tournament.websiteUrl && (
+    <div className="panel tournament-info-panel">
+      <div className="tournament-info-top">
+        <div className="tournament-icon-bar">
+          <button
+            type="button"
+            className="icon-bar-button"
+            title={t('Turnier teilen')}
+            aria-label={t('Turnier teilen')}
+            onClick={onShare}
+          >
+            <ShareIcon />
+          </button>
           <a
             className="icon-bar-button"
-            href={tournament.websiteUrl}
+            href={mapsUrl}
             target="_blank"
             rel="noreferrer"
-            title={tournament.websiteIsOriginalClubSite ? t('Original-Vereinswebseite öffnen') : t('Website öffnen')}
-            aria-label={tournament.websiteIsOriginalClubSite ? t('Original-Vereinswebseite öffnen') : t('Website öffnen')}
+            title={t('Spielort in Google Maps öffnen')}
+            aria-label={t('Spielort in Google Maps öffnen')}
           >
-            🌐
+            📍
           </a>
-        )}
-        {tournament.flyerUrl && (
-          <a
-            className="icon-bar-button"
-            href={tournament.flyerUrl}
-            target="_blank"
-            rel="noreferrer"
-            title={t('Flyer öffnen')}
-            aria-label={t('Flyer öffnen')}
-          >
-            📄
-          </a>
+          {tournament.websiteUrl && (
+            <a
+              className="icon-bar-button"
+              href={tournament.websiteUrl}
+              target="_blank"
+              rel="noreferrer"
+              title={tournament.websiteIsOriginalClubSite ? t('Original-Vereinswebseite öffnen') : t('Website öffnen')}
+              aria-label={tournament.websiteIsOriginalClubSite ? t('Original-Vereinswebseite öffnen') : t('Website öffnen')}
+            >
+              🌐
+            </a>
+          )}
+          {tournament.flyerUrl && (
+            <a
+              className="icon-bar-button"
+              href={tournament.flyerUrl}
+              target="_blank"
+              rel="noreferrer"
+              title={t('Flyer öffnen')}
+              aria-label={t('Flyer öffnen')}
+            >
+              📄
+            </a>
+          )}
+        </div>
+        {tournament.logoUrl && (
+          <img
+            className="tournament-logo tournament-info-logo"
+            src={tournamentImageUrl(tournament.id, 'logo', shareToken)}
+            alt=""
+            onError={(event) => {
+              event.target.style.display = 'none';
+            }}
+          />
         )}
       </div>
       {showTimezoneHint && <p className="hint">{(TIMEZONE_HINT_TEMPLATES[language] || TIMEZONE_HINT_TEMPLATES.de)(tournamentTimeZone)}</p>}
-      <h2 data-i18n-skip>{tournament.name}</h2>
+      {showTitle && <h2 data-i18n-skip>{tournament.name}</h2>}
       <p>
         <strong>{t('Datum')}</strong>: {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
       </p>
@@ -145,7 +157,7 @@ export function TournamentInfo({ tournament, language, onShare }) {
   );
 }
 
-function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
+function TournamentParticipants({ tournamentId, onMessage, onError }) {
   const { t } = useTranslation();
   const [participants, setParticipants] = useState(null);
   const [forbidden, setForbidden] = useState(false);
@@ -190,21 +202,9 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
     }
   }
 
-  const logo = logoUrl && (
-    <img
-      className="tournament-logo"
-      src={tournamentImageUrl(tournamentId, 'logo')}
-      alt=""
-      onError={(event) => {
-        event.target.style.display = 'none';
-      }}
-    />
-  );
-
   if (forbidden) {
     return (
       <>
-        {logo}
         <p className="muted">{t('Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.')}</p>
       </>
     );
@@ -213,7 +213,6 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
   if (!participants) {
     return (
       <>
-        {logo}
         <p className="muted">{t('Teilnehmerliste wird geladen…')}</p>
       </>
     );
@@ -222,7 +221,6 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
   if (!participants.length) {
     return (
       <>
-        {logo}
         <p className="muted">{t('Noch keine Anmeldungen.')}</p>
       </>
     );
@@ -230,7 +228,6 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
 
   return (
     <div className="participants-list">
-      {logo}
       {participants.map((participant, index) => (
         <article className="data-row participants-row" key={`${participant.firstName}-${participant.lastName}-${index}`}>
           <div data-i18n-skip>
@@ -409,7 +406,10 @@ export function TournamentDetailPage({
   onLogout,
 }) {
   const { t } = useTranslation();
-  const { tournament, notFound } = useRoutedTournament(route.id, tournaments);
+  const shareToken = new URLSearchParams(window.location.search).get('share') || '';
+  const shareSuffix = shareToken ? `?share=${encodeURIComponent(shareToken)}` : '';
+  const detailPath = (view) => `/turniere/${route.id}/${view}${shareSuffix}`;
+  const { tournament, notFound } = useRoutedTournament(route.id, tournaments, shareToken);
 
   if (notFound) {
     return (
@@ -451,7 +451,7 @@ export function TournamentDetailPage({
     );
   }
 
-  const canRegister = tournament.status === 'registration' && tournament.visibility === 'public' && tournament.registrationEnabled !== false;
+  const canRegister = (tournament.visibility === 'public' || Boolean(shareToken)) && tournament.registrationEnabled !== false && hasOpenRegistration(tournament);
   const canShowParticipants = (tournament.participantsPublic || tournament.canManage) && tournament.registrationEnabled !== false;
   const canShowSchedule = canShowParticipants && isOnlinePlayable(tournament);
 
@@ -479,8 +479,7 @@ export function TournamentDetailPage({
   return (
     <main className="app-shell">
       <StandalonePageHeader
-        heading={tournament.name}
-        headingNoTranslate
+        heading={t('Turnierdetails')}
         language={language}
         setLanguage={setLanguage}
         menuOpen={menuOpen}
@@ -494,11 +493,20 @@ export function TournamentDetailPage({
       <Feedback message={message} error={error} />
 
       <section className="tournament-detail-page">
+        <header className="tournament-detail-heading">
+          <p className="eyebrow">{t('Turnierdetails')}</p>
+          <h1 data-i18n-skip>{tournament.name}</h1>
+          <p className="tournament-detail-meta" data-i18n-skip>
+            {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
+            <span aria-hidden="true">·</span>
+            {tournament.location}
+          </p>
+        </header>
         <nav className="tournament-detail-tabs" aria-label={t('Turnierdetails')}>
           <button
             className={`tournament-detail-tab ${route.view === 'info' ? 'active' : ''}`}
             type="button"
-            onClick={() => navigate(`/turniere/${tournament.id}/info`)}
+            onClick={() => navigate(detailPath('info'))}
           >
             {t('Info')}
           </button>
@@ -506,7 +514,7 @@ export function TournamentDetailPage({
             <button
               className={`tournament-detail-tab ${route.view === 'anmelden' ? 'active' : ''}`}
               type="button"
-              onClick={() => navigate(`/turniere/${tournament.id}/anmelden`)}
+              onClick={() => navigate(detailPath('anmelden'))}
             >
               {t('Anmelden')}
             </button>
@@ -515,7 +523,7 @@ export function TournamentDetailPage({
             <button
               className={`tournament-detail-tab ${route.view === 'teilnehmer' ? 'active' : ''}`}
               type="button"
-              onClick={() => navigate(`/turniere/${tournament.id}/teilnehmer`)}
+              onClick={() => navigate(detailPath('teilnehmer'))}
             >
               {t('Teilnehmer')}
             </button>
@@ -524,7 +532,7 @@ export function TournamentDetailPage({
             <button
               className={`tournament-detail-tab ${route.view === 'spielplan' ? 'active' : ''}`}
               type="button"
-              onClick={() => navigate(`/turniere/${tournament.id}/spielplan`)}
+              onClick={() => navigate(detailPath('spielplan'))}
             >
               {t('Spielplan')}
             </button>
@@ -532,16 +540,16 @@ export function TournamentDetailPage({
         </nav>
 
         <div className="tournament-detail-content">
-          {route.view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} />}
+          {route.view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} showTitle={false} shareToken={shareToken} />}
 
           {route.view === 'anmelden' && canRegister && (
             <PublicRegistrationPanel
               tournament={tournament}
               form={registrationForm}
               setForm={setRegistrationForm}
-              onSubmit={onSubmitRegistration}
+              onSubmit={(event) => onSubmitRegistration(event, shareToken)}
               saving={registrationSaving}
-              onCancel={() => navigate(`/turniere/${tournament.id}/info`)}
+              onCancel={() => navigate(detailPath('info'))}
               navigate={navigate}
               language={language}
               currentUser={currentUser}
@@ -554,7 +562,7 @@ export function TournamentDetailPage({
               <p className="hint">
                 {t('Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.')}
               </p>
-              <TournamentParticipants tournamentId={tournament.id} logoUrl={tournament.logoUrl} onMessage={setMessage} onError={setError} />
+              <TournamentParticipants tournamentId={tournament.id} onMessage={setMessage} onError={setError} />
             </>
           )}
 

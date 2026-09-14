@@ -9,6 +9,26 @@ function applyResult(stats, playerId, won, pointsFor, pointsAgainst) {
   stats.set(playerId, entry);
 }
 
+// Gleich bewertete Einträge teilen sich den Platz; der nächste Platz entspricht
+// weiterhin der Zeilennummer (1, 1, 3 statt 1, 1, 2). Das entspricht der
+// Platz-Formel im Hauptprojekt.
+export function competitionRanks(entries, samePlace) {
+  let previous = null;
+  return entries.map((entry, index) => {
+    const rank = previous && samePlace(previous, entry) ? previous.rank : index + 1;
+    const ranked = { ...entry, rank };
+    previous = ranked;
+    return ranked;
+  });
+}
+
+export function sameStandardRankingPlace(a, b) {
+  return a.wins === b.wins
+    && a.gameDiff === b.gameDiff
+    && a.pointsDiff === b.pointsDiff
+    && a.pointsFor === b.pointsFor;
+}
+
 // matches: [{ teamA: [ids], teamB: [ids], scoreA, scoreB, noShow: 'a' | 'b' | null }]
 // Sortierkriterien wie im Hauptprojekt (SpielerSpieltagErgebnis/SpielerEndranglisteErgebnis):
 // Siege absteigend, dann Spieldifferenz, dann Punktedifferenz, dann erzielte Punkte.

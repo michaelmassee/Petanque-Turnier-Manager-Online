@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import i18next from './lib/i18next-config.js';
-import { EditDialog, ProfilePanel } from './App.jsx';
+import { EditDialog, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
 import { AppHeader } from './components/layout.jsx';
 import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_USER_FORM } from './lib/constants.js';
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
@@ -10,11 +10,16 @@ import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManag
 import { UserManagementPanel } from './pages/UserManagementPanel.jsx';
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
 import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
-import { tournamentPayload } from './lib/domain.js';
+import { registrationStatusLabel, tournamentPayload } from './lib/domain.js';
 
 describe('Turnier-Payload', () => {
   it('behält den Verein eines bearbeiteten Kalendereintrags bei', () => {
     expect(tournamentPayload({ ...EMPTY_TOURNAMENT_FORM, club: 'BC Linden' }).club).toBe('BC Linden');
+  });
+
+  it('zeigt in der Übersicht den laufenden Turnierstatus statt einer Anmelde-Meldung', () => {
+    expect(registrationStatusLabel({ status: 'running', registrationEnabled: true }, 'de')).toBe('Läuft');
+    expect(registrationStatusLabel({ status: 'running', registrationEnabled: true }, 'en')).toBe('Running');
   });
 });
 
@@ -92,8 +97,33 @@ describe('Turnier melden', () => {
 });
 
 describe('Öffentliche Turnierdetailseite', () => {
-  it('zeigt für Kalendereinträge keine turnier- oder anmeldespezifischen Daten', () => {
+  it('bietet nur bei einer möglichen Anmeldung Eingabefelder an', () => {
     render(
+      <PublicRegistrationPanel
+        language="de"
+        tournament={{
+          id: 'full-1',
+          name: 'Ausgebuchtes Turnier',
+          status: 'registration',
+          visibility: 'public',
+          maxRegistrations: 16,
+          activeRegistrations: 16,
+          waitlistEnabled: false,
+        }}
+        form={{ ...EMPTY_REGISTRATION_FORM, tournamentId: 'full-1' }}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        onCancel={() => {}}
+        navigate={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Anmeldung nicht mehr möglich')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anmeldung senden' })).not.toBeInTheDocument();
+  });
+
+  it('zeigt für Kalendereinträge keine turnier- oder anmeldespezifischen Daten', () => {
+    const { container } = render(
       <TournamentInfo
         language="de"
         onShare={() => {}}
@@ -102,6 +132,7 @@ describe('Öffentliche Turnierdetailseite', () => {
           name: 'Vereinsabend',
           date: '2026-09-10',
           location: 'Bouleplatz',
+          logoUrl: 'https://example.test/logo.png',
           description: 'Gemeinsames Spielen.',
           registrationEnabled: false,
           formation: 'triplette',
@@ -119,6 +150,7 @@ describe('Öffentliche Turnierdetailseite', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Vereinsabend' })).toBeInTheDocument();
+    expect(container.querySelector('.tournament-info-logo')).toHaveAttribute('src', '/api/tournaments/calendar-1/image?field=logo');
     expect(screen.getByText('Gemeinsames Spielen.')).toBeInTheDocument();
     expect(screen.queryByText('Formation')).not.toBeInTheDocument();
     expect(screen.queryByText('Anmeldetyp')).not.toBeInTheDocument();
@@ -297,7 +329,7 @@ function TournamentPageHarness({ onSubmit }) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const tournaments = [
-    { id: 't1', name: 'Sommerturnier', location: 'Musterstadt', date: '2026-06-01', formation: 'doublette', registrationType: 'forme', type: 'ko', status: 'registration', activeRegistrations: 0, maxRegistrations: 16, waitlistRegistrations: 0, canManage: true },
+    { id: 't1', name: 'Sommerturnier', location: 'Musterstadt', date: '2026-06-01', formation: 'doublette', registrationType: 'forme', type: 'ko', status: 'registration', visibility: 'private', activeRegistrations: 0, maxRegistrations: 16, waitlistRegistrations: 0, canManage: true },
   ];
 
   function editTournament(tournament) {
@@ -360,6 +392,8 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     render(<TournamentPageHarness onSubmit={onSubmit} />);
 
     expect(screen.queryByText('Turnier bearbeiten')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Turnier teilen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Freigabe-Link deaktivieren' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Bearbeiten'));
 

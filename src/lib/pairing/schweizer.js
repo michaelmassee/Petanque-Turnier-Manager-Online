@@ -50,6 +50,13 @@ export function sortSwiss(stats, mode = 'mit_buchholz') {
     || b.pointsDiff - a.pointsDiff || b.pointsFor - a.pointsFor || a.teamId.localeCompare(b.teamId));
 }
 
+export function sameSwissRankingPlace(a, b, mode = 'mit_buchholz') {
+  return a.wins === b.wins
+    && (mode !== 'mit_buchholz' || (a.bhz === b.bhz && a.fbhz === b.fbhz))
+    && a.pointsDiff === b.pointsDiff
+    && a.pointsFor === b.pointsFor;
+}
+
 function pairOrdered(ordered, played) {
   const result = [];
   for (let index = 0; index < ordered.length; index += 2) {

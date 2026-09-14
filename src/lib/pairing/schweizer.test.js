@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateRound, sortSwiss, swissStats } from './schweizer.js';
+import { sameSwissRankingPlace, sortSwiss, swissStats, generateRound } from './schweizer.js';
 
 const teams = Array.from({ length: 6 }, (_, index) => ({ id: `t${index + 1}`, seedPosition: index + 1 }));
 
@@ -39,5 +39,12 @@ describe('Schweizer Pairing', () => {
   it('verbucht bei Freilos die Hauptprojekt-Default-Freispielpunkte 13:7 (Diff 6)', () => {
     const stats = swissStats(teams, [{ teamA: ['t1'], teamB: [] }]);
     expect(stats.find((entry) => entry.teamId === 't1')).toMatchObject({ wins: 1, pointsFor: 13, pointsAgainst: 7, pointsDiff: 6 });
+  });
+
+  it('berücksichtigt Buchholz und Feinbuchholz beim geteilten Platz', () => {
+    const base = { wins: 2, pointsDiff: 12, pointsFor: 26 };
+    expect(sameSwissRankingPlace({ ...base, bhz: 3, fbhz: 4 }, { ...base, bhz: 3, fbhz: 4 })).toBe(true);
+    expect(sameSwissRankingPlace({ ...base, bhz: 3, fbhz: 4 }, { ...base, bhz: 4, fbhz: 4 })).toBe(false);
+    expect(sameSwissRankingPlace({ ...base, bhz: 3, fbhz: 4 }, { ...base, bhz: 4, fbhz: 4 }, 'ohne_buchholz')).toBe(true);
   });
 });
