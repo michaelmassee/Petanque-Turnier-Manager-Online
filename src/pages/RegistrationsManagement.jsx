@@ -4,7 +4,7 @@ import { labelFor, translatedOptions } from '../lib/domain.js';
 import { SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
 
-export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField }) {
+export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false }) {
   const { t } = useTranslation();
   const selectedValue = form.tournamentId || selectedTournamentId;
   const options = tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }));
@@ -25,7 +25,7 @@ export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournament
       />
       <div className="dialog-actions">
         {onCancel && <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>}
-        <Button type="submit">{form.id ? t('Anmeldung speichern') : t('Anmeldung erfassen')}</Button>
+        <Button type="submit" loading={saving}>{form.id ? t('Anmeldung speichern') : t('Anmeldung erfassen')}</Button>
       </div>
     </form>
   );
@@ -217,6 +217,7 @@ export function RegistrationsManagementPage({
   invalidField,
   message,
   error,
+  registrationSaving,
 }) {
   const { t } = useTranslation();
   return (
@@ -256,6 +257,7 @@ export function RegistrationsManagementPage({
           selectedTournamentId={selectedTournamentId}
           manageMode={manageMode}
           invalidField={invalidField}
+          saving={registrationSaving}
         />
       </EditDialog>
     </>

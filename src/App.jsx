@@ -105,6 +105,11 @@ function AppContent() {
   const [userMode, setUserMode] = useState('create');
   const [tournamentMode, setTournamentMode] = useState('create');
   const [registrationMode, setRegistrationMode] = useState('create');
+  const [tournamentSaving, setTournamentSaving] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [userSaving, setUserSaving] = useState(false);
+  const [registrationSaving, setRegistrationSaving] = useState(false);
+  const [authSaving, setAuthSaving] = useState(false);
   const [message, setMessageState] = useState('');
   const [error, setErrorState] = useState('');
 
@@ -709,6 +714,7 @@ function AppContent() {
       return;
     }
 
+    setAuthSaving(true);
     try {
       const data = await api('/api/setup', {
         method: 'POST',
@@ -722,6 +728,8 @@ function AppContent() {
       await loadTournaments();
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setAuthSaving(false);
     }
   }
 
@@ -730,6 +738,7 @@ function AppContent() {
     setError('');
     setMessage('');
 
+    setAuthSaving(true);
     try {
       const data = await api('/api/login', {
         method: 'POST',
@@ -748,6 +757,8 @@ function AppContent() {
         return;
       }
       setError(requestError.message);
+    } finally {
+      setAuthSaving(false);
     }
   }
 
@@ -766,6 +777,7 @@ function AppContent() {
       return;
     }
 
+    setAuthSaving(true);
     try {
       const data = await api('/api/register', {
         method: 'POST',
@@ -776,6 +788,8 @@ function AppContent() {
       setMessage(data.verificationUrl ? `${t(REGISTER_SUCCESS)} ${data.verificationUrl}` : t(REGISTER_SUCCESS));
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setAuthSaving(false);
     }
   }
 
@@ -784,6 +798,7 @@ function AppContent() {
     setError('');
     setMessage('');
 
+    setAuthSaving(true);
     try {
       await api('/api/email/verify', {
         method: 'POST',
@@ -795,6 +810,8 @@ function AppContent() {
       setMessage(t(VERIFY_SUCCESS));
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setAuthSaving(false);
     }
   }
 
@@ -806,6 +823,7 @@ function AppContent() {
     setError('');
     setMessage('');
 
+    setAuthSaving(true);
     try {
       await api('/api/registrations/cancel-by-token', {
         method: 'POST',
@@ -817,6 +835,8 @@ function AppContent() {
       setMessage(t(CANCEL_REGISTRATION_SUCCESS));
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setAuthSaving(false);
     }
   }
 
@@ -840,6 +860,7 @@ function AppContent() {
       return;
     }
 
+    setProfileSaving(true);
     try {
       const data = await api('/api/me', {
         method: 'PUT',
@@ -872,6 +893,8 @@ function AppContent() {
       );
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setProfileSaving(false);
     }
   }
 
@@ -880,6 +903,7 @@ function AppContent() {
     setError('');
     setMessage('');
 
+    setAuthSaving(true);
     try {
       const data = await api('/api/password/forgot', {
         method: 'POST',
@@ -889,6 +913,8 @@ function AppContent() {
       setAuthForm(EMPTY_AUTH_FORM);
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setAuthSaving(false);
     }
   }
 
@@ -897,6 +923,7 @@ function AppContent() {
     setError('');
     setMessage('');
 
+    setAuthSaving(true);
     try {
       const data = await api('/api/email/resend', {
         method: 'POST',
@@ -906,6 +933,8 @@ function AppContent() {
       setAuthForm(EMPTY_AUTH_FORM);
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setAuthSaving(false);
     }
   }
 
@@ -924,6 +953,7 @@ function AppContent() {
       return;
     }
 
+    setAuthSaving(true);
     try {
       await api('/api/password/reset', {
         method: 'POST',
@@ -938,6 +968,8 @@ function AppContent() {
       setMessage(t('Passwort wurde geändert. Du kannst dich jetzt anmelden.'));
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setAuthSaving(false);
     }
   }
 
@@ -985,6 +1017,7 @@ function AppContent() {
       return;
     }
 
+    setUserSaving(true);
     try {
       if (userMode === 'edit') {
         await api(`/api/users/${userForm.id}`, {
@@ -1006,6 +1039,8 @@ function AppContent() {
       await loadUsers();
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setUserSaving(false);
     }
   }
 
@@ -1042,6 +1077,7 @@ function AppContent() {
 
     const payload = tournamentPayload(tournamentForm);
 
+    setTournamentSaving(true);
     try {
       let data;
       if (tournamentMode === 'edit') {
@@ -1073,6 +1109,8 @@ function AppContent() {
         return;
       }
       setError(requestError.message);
+    } finally {
+      setTournamentSaving(false);
     }
   }
 
@@ -1118,6 +1156,7 @@ function AppContent() {
     // "Du hast dich angemeldet" ergibt keinen Sinn, wenn der Veranstalter eine fremde Meldung erfasst.
     const isManagerEntry = registrationDialogOpen;
 
+    setRegistrationSaving(true);
     try {
       if (registrationMode === 'edit') {
         await api(`/api/registrations/${registrationForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -1148,6 +1187,8 @@ function AppContent() {
       const conflictName = requestError.payload?.details?.name;
       setError(conflictName ? `${baseMessage} ("${conflictName}")` : baseMessage);
       setRegistrationInvalidField(requestError.payload?.details?.field || null);
+    } finally {
+      setRegistrationSaving(false);
     }
   }
 
@@ -1432,6 +1473,7 @@ function AppContent() {
           registrationForm={registrationForm}
           setRegistrationForm={setRegistrationForm}
           onSubmitRegistration={handleRegistrationSubmit}
+          registrationSaving={registrationSaving}
           message={message}
           error={error}
           registrationInvalidField={registrationInvalidField}
@@ -1511,6 +1553,7 @@ function AppContent() {
             <p className="subtitle">{authSubtitle(needsSetup, authView)}</p>
             <CancelRegistrationForm
               onSubmit={handleCancelRegistration}
+              saving={authSaving}
               onBack={() => {
                 window.history.replaceState({}, '', window.location.pathname);
                 setAuthForm(EMPTY_AUTH_FORM);
@@ -1529,7 +1572,7 @@ function AppContent() {
     if (needsSetup) {
       return (
         <AuthShell title={authTitle(needsSetup, authView)} subtitle={authSubtitle(needsSetup, authView)} language={language} setLanguage={setLanguage}>
-          <SetupForm form={authForm} setForm={setAuthForm} onSubmit={handleSetup} />
+          <SetupForm form={authForm} setForm={setAuthForm} onSubmit={handleSetup} saving={authSaving} />
           <Feedback message={message} error={error} />
         </AuthShell>
       );
@@ -1664,6 +1707,7 @@ function AppContent() {
                 form={authForm}
                 setForm={setAuthForm}
                 onSubmit={handleLogin}
+                saving={authSaving}
                 onGoogleLogin={() => {
                   window.location.href = '/api/auth/google/start';
                 }}
@@ -1687,6 +1731,7 @@ function AppContent() {
                 form={authForm}
                 setForm={setAuthForm}
                 onSubmit={handleRegister}
+                saving={authSaving}
                 navigate={navigate}
                 onBack={() => {
                   setAuthView('login');
@@ -1713,6 +1758,7 @@ function AppContent() {
                 form={authForm}
                 setForm={setAuthForm}
                 onSubmit={handleForgotPassword}
+                saving={authSaving}
                 onBack={() => {
                   setAuthView('login');
                   clearFeedback();
@@ -1725,6 +1771,7 @@ function AppContent() {
                 form={authForm}
                 setForm={setAuthForm}
                 onSubmit={handleResendVerification}
+                saving={authSaving}
                 onBack={() => {
                   setAuthView('login');
                   clearFeedback();
@@ -1737,6 +1784,7 @@ function AppContent() {
                 form={authForm}
                 setForm={setAuthForm}
                 onSubmit={handleResetPassword}
+                saving={authSaving}
                 onBack={() => {
                   setAuthView('login');
                   clearFeedback();
@@ -1749,6 +1797,7 @@ function AppContent() {
                 form={authForm}
                 setForm={setAuthForm}
                 onSubmit={handleVerifyEmail}
+                saving={authSaving}
                 onBack={() => {
                   setAuthView('login');
                   clearFeedback();
@@ -1759,6 +1808,7 @@ function AppContent() {
             {authView === 'cancelRegistration' && (
               <CancelRegistrationForm
                 onSubmit={handleCancelRegistration}
+                saving={authSaving}
                 onBack={() => {
                   setAuthView('login');
                   clearFeedback();
@@ -1773,6 +1823,7 @@ function AppContent() {
                 form={registrationForm}
                 setForm={setRegistrationForm}
                 onSubmit={handleRegistrationSubmit}
+                saving={registrationSaving}
                 onCancel={closeAuthModal}
                 navigate={navigate}
                 language={language}
@@ -2140,6 +2191,7 @@ function AppContent() {
             form={registrationForm}
             setForm={setRegistrationForm}
             onSubmit={handleRegistrationSubmit}
+            saving={registrationSaving}
             onCancel={() => {
               setAuthView('home');
               clearFeedback();
@@ -2180,6 +2232,7 @@ function AppContent() {
               tournamentForm={tournamentForm}
               setTournamentForm={setTournamentForm}
               onTournamentSubmit={handleTournamentSubmit}
+              tournamentSaving={tournamentSaving}
               onCloseTournamentDialog={closeTournamentDialog}
               editorCandidates={postboxRecipients.filter((recipient) => recipient.id !== tournamentForm.ownerId)}
               ownerCandidates={postboxRecipients}
@@ -2219,6 +2272,7 @@ function AppContent() {
               registrationForm={registrationForm}
               setRegistrationForm={setRegistrationForm}
               onRegistrationSubmit={handleRegistrationSubmit}
+              registrationSaving={registrationSaving}
               onCloseRegistrationDialog={closeRegistrationDialog}
               manageableTournaments={manageableTournaments}
               selectedTournamentId={selectedTournamentId}
@@ -2251,6 +2305,7 @@ function AppContent() {
             onCloseDialog={closeUserDialog}
             onCreateUser={newUser}
             onSubmitUser={handleUserSubmit}
+            saving={userSaving}
             onEditUser={editUser}
             onDeleteUser={handleDeleteUser}
             message={message}
@@ -2283,14 +2338,14 @@ function AppContent() {
 
       {activeTab === 'profile' && (
         <section className="single-column">
-          <ProfilePanel currentUser={currentUser} form={profileForm} setForm={setProfileForm} onSubmit={handleUpdateProfile} />
+          <ProfilePanel currentUser={currentUser} form={profileForm} setForm={setProfileForm} onSubmit={handleUpdateProfile} saving={profileSaving} />
         </section>
       )}
     </main>
   );
 }
 
-export function ProfilePanel({ currentUser, form, setForm, onSubmit }) {
+export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = false }) {
   const { t } = useTranslation();
   return (
     <div className="panel">
@@ -2331,7 +2386,7 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit }) {
           onChange={(newPasswordConfirm) => setForm({ ...form, newPasswordConfirm })}
           minLength={8}
         />
-        <Button type="submit">{t('Speichern')}</Button>
+        <Button type="submit" loading={saving}>{t('Speichern')}</Button>
       </form>
     </div>
   );
@@ -2536,7 +2591,7 @@ function HomeTournaments({
   );
 }
 
-export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, language, embedded = false, currentUser = null, invalidField = null }) {
+export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, language, embedded = false, currentUser = null, invalidField = null, saving = false }) {
   const { t } = useTranslation();
   useEffect(() => {
     if (!form.id && form.tournamentId !== tournament.id) {
@@ -2622,7 +2677,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             </span>
           </label>
           <div className="row-actions stretch">
-            <Button type="submit">{t('Anmeldung senden')}</Button>
+            <Button type="submit" loading={saving}>{t('Anmeldung senden')}</Button>
             <Button variant="secondary" onClick={onCancel}>{t('Abbrechen')}</Button>
           </div>
         </>
@@ -2630,8 +2685,3 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
-
-
-
-

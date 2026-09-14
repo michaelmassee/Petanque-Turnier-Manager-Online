@@ -31,6 +31,8 @@ function ApiKeysPanel({ isAdmin }) {
   const [mode, setMode] = useState('create');
   const [form, setForm] = useState(EMPTY_ADMIN_KEY_FORM);
   const [adminError, setAdminError] = useState('');
+  const [adminSaving, setAdminSaving] = useState(false);
+  const [adminActionId, setAdminActionId] = useState('');
 
   async function loadOwnKeys() {
     try {
@@ -100,12 +102,15 @@ function ApiKeysPanel({ isAdmin }) {
 
   async function handleRevealSecret(id) {
     setPanelError('');
+    setAdminActionId(`reveal-${id}`);
     try {
       const data = await api(`/api/api-keys/${id}/secret`);
       setRevealedSecret({ id, secret: data.secret });
       await loadOwnKeys();
     } catch (err) {
       setPanelError(err.message);
+    } finally {
+      setAdminActionId('');
     }
   }
 
@@ -114,21 +119,27 @@ function ApiKeysPanel({ isAdmin }) {
       return;
     }
     setPanelError('');
+    setAdminActionId(`revoke-${id}`);
     try {
       await api(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
       await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
       setPanelError(err.message);
+    } finally {
+      setAdminActionId('');
     }
   }
 
   async function handleApprove(id) {
     setPanelError('');
+    setAdminActionId(`approve-${id}`);
     try {
       await api(`/api/admin/api-keys/${id}/approve`, { method: 'POST' });
       await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
       setPanelError(err.message);
+    } finally {
+      setAdminActionId('');
     }
   }
 
@@ -137,11 +148,14 @@ function ApiKeysPanel({ isAdmin }) {
       return;
     }
     setPanelError('');
+    setAdminActionId(`delete-${key.id}`);
     try {
       await api(`/api/admin/api-keys/${key.id}`, { method: 'DELETE' });
       await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
       setPanelError(err.message);
+    } finally {
+      setAdminActionId('');
     }
   }
 
@@ -166,6 +180,7 @@ function ApiKeysPanel({ isAdmin }) {
   async function handleDialogSubmit(event) {
     event.preventDefault();
     setAdminError('');
+    setAdminSaving(true);
     try {
       if (mode === 'edit') {
         await api(`/api/admin/api-keys/${form.id}`, { method: 'PUT', body: JSON.stringify({ label: form.label.trim() }) });
@@ -176,6 +191,8 @@ function ApiKeysPanel({ isAdmin }) {
       await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
       setAdminError(err.message);
+    } finally {
+      setAdminSaving(false);
     }
   }
 
@@ -231,7 +248,7 @@ function ApiKeysPanel({ isAdmin }) {
                 <td>{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : '–'}</td>
                 <td>
                   {key.status === 'approved' && key.secretAvailable && (
-                    <Button variant="secondary" onClick={() => handleRevealSecret(key.id)}>
+                    <Button variant="secondary" disabled={Boolean(adminActionId)} loading={adminActionId === `reveal-${key.id}`} onClick={() => handleRevealSecret(key.id)}>
                       {t('Schlüssel abholen')}
                     </Button>
                   )}
@@ -294,17 +311,17 @@ function ApiKeysPanel({ isAdmin }) {
                   <td>{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : '–'}</td>
                   <td className="row-actions">
                     {key.status === 'pending' && (
-                      <Button onClick={() => handleApprove(key.id)}>{t('Freischalten')}</Button>
+                      <Button disabled={Boolean(adminActionId)} loading={adminActionId === `approve-${key.id}`} onClick={() => handleApprove(key.id)}>{t('Freischalten')}</Button>
                     )}
                     {key.status === 'approved' && (
-                      <Button variant="secondary" onClick={() => handleRevoke(key.id)}>
+                      <Button variant="secondary" disabled={Boolean(adminActionId)} loading={adminActionId === `revoke-${key.id}`} onClick={() => handleRevoke(key.id)}>
                         {t('Sperren')}
                       </Button>
                     )}
-                    <Button variant="secondary" onClick={() => openEditDialog(key)}>
+                    <Button variant="secondary" onClick={() => openEditDialog(key)} disabled={Boolean(adminActionId)}>
                       {t('Bearbeiten')}
                     </Button>
-                    <Button variant="danger" onClick={() => handleDelete(key)}>
+                    <Button variant="danger" disabled={Boolean(adminActionId)} loading={adminActionId === `delete-${key.id}`} onClick={() => handleDelete(key)}>
                       {t('Löschen')}
                     </Button>
                   </td>
@@ -348,7 +365,7 @@ function ApiKeysPanel({ isAdmin }) {
             <Button variant="secondary" type="button" onClick={closeDialog}>
               {t('Abbrechen')}
             </Button>
-            <Button type="submit">{mode === 'edit' ? t('Speichern') : t('Anlegen')}</Button>
+            <Button type="submit" loading={adminSaving}>{mode === 'edit' ? t('Speichern') : t('Anlegen')}</Button>
           </div>
         </form>
       </EditDialog>

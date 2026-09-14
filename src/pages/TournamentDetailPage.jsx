@@ -148,6 +148,7 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
   const [participants, setParticipants] = useState(null);
   const [forbidden, setForbidden] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [cancellingRegistrationId, setCancellingRegistrationId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -175,12 +176,15 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
     }
     onError?.('');
     onMessage?.('');
+    setCancellingRegistrationId(participant.registrationId);
     try {
       await api(`/api/registrations/${participant.registrationId}/cancel`, { method: 'POST' });
       onMessage?.(t('Anmeldung wurde abgesagt.'));
       setReloadKey((key) => key + 1);
     } catch (requestError) {
       onError?.(requestError.message);
+    } finally {
+      setCancellingRegistrationId('');
     }
   }
 
@@ -242,7 +246,7 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
             </div>
           )}
           {participant.registrationId && (
-            <Button variant="secondary" onClick={() => handleCancelOwnRegistration(participant)}>
+            <Button variant="secondary" loading={cancellingRegistrationId === participant.registrationId} onClick={() => handleCancelOwnRegistration(participant)}>
               {t('Absagen')}
             </Button>
           )}
@@ -394,6 +398,7 @@ export function TournamentDetailPage({
   registrationForm,
   setRegistrationForm,
   onSubmitRegistration,
+  registrationSaving,
   message,
   error,
   registrationInvalidField,
@@ -532,6 +537,7 @@ export function TournamentDetailPage({
               form={registrationForm}
               setForm={setRegistrationForm}
               onSubmit={onSubmitRegistration}
+              saving={registrationSaving}
               onCancel={() => navigate(`/turniere/${tournament.id}/info`)}
               navigate={navigate}
               language={language}

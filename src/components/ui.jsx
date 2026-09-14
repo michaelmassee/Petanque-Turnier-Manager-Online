@@ -77,16 +77,31 @@ export function SelectField({ label, value, onChange, options, disabled, require
   );
 }
 
-export function Button({ children, type = 'button', variant = 'primary', loading = false, disabled, ...props }) {
+export function Button({ children, type = 'button', variant = 'primary', loading = false, disabled, onClick, ...props }) {
+  const [clickPending, setClickPending] = useState(false);
+  const pending = loading || clickPending;
+
+  function handleClick(event) {
+    const result = onClick?.(event);
+    if (!result || typeof result.then !== 'function') return result;
+    setClickPending(true);
+    Promise.resolve(result).then(
+      () => setClickPending(false),
+      () => setClickPending(false),
+    );
+    return result;
+  }
+
   return (
     <button
       type={type}
       className={`button button-${variant}`}
-      disabled={disabled || loading}
-      aria-busy={loading || undefined}
+      disabled={disabled || pending}
+      aria-busy={pending || undefined}
+      onClick={onClick ? handleClick : undefined}
       {...props}
     >
-      {loading && <span className="button-spinner" aria-hidden="true" />}
+      {pending && <span className="button-spinner" aria-hidden="true" />}
       {children}
     </button>
   );

@@ -33,6 +33,7 @@ export function UserManagementPanel({
   onDeleteUser,
   message,
   error,
+  saving,
 }) {
   const { t } = useTranslation();
   const filtered = users.length !== totalUsers;
@@ -106,6 +107,7 @@ export function UserManagementPanel({
           onCancel={onCloseDialog}
           passwordLabel={userMode === 'edit' ? t('Neues Passwort') : t('Passwort')}
           passwordRequired={userMode === 'create'}
+          saving={saving}
         />
       </EditDialog>
     </section>
@@ -156,7 +158,7 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
   );
 }
 
-function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwordLabel, passwordRequired }) {
+function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwordLabel, passwordRequired, saving = false }) {
   const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
@@ -209,7 +211,7 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwo
       <p className="hint">{t(PASSWORD_STRENGTH_HINT)}</p>
       <div className="dialog-actions">
         <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>
-        <Button type="submit">{submitLabel}</Button>
+        <Button type="submit" loading={saving}>{submitLabel}</Button>
       </div>
     </form>
   );

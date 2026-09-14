@@ -5,7 +5,7 @@ import { api } from '../lib/api.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 
-function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSiteKey }) {
+function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSiteKey, saving }) {
   const { t } = useTranslation();
   useEffect(() => {
     if (!turnstileSiteKey || document.querySelector('script[data-turnstile]')) {
@@ -77,7 +77,7 @@ function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSite
       </label>
       {turnstileSiteKey && <div className="cf-turnstile" data-sitekey={turnstileSiteKey} />}
       <div className="dialog-actions">
-        <Button type="submit">{t('Turnier melden')}</Button>
+        <Button type="submit" loading={saving}>{t('Turnier melden')}</Button>
       </div>
     </form>
   );
@@ -103,11 +103,13 @@ export function TournamentReportPage({
   const [submitted, setSubmitted] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setMessage('');
     setError('');
+    setSaving(true);
     try {
       const turnstileToken =
         turnstileSiteKey && typeof window !== 'undefined' && window.turnstile ? window.turnstile.getResponse() : undefined;
@@ -118,6 +120,8 @@ export function TournamentReportPage({
       setSubmitted(true);
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -154,6 +158,7 @@ export function TournamentReportPage({
                 onSubmit={handleSubmit}
                 navigate={navigate}
                 turnstileSiteKey={turnstileSiteKey}
+                saving={saving}
               />
               <Feedback message={message} error={error} />
             </>

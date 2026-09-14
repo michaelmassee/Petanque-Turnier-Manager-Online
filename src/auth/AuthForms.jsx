@@ -81,7 +81,7 @@ export function LanguageSelect({ language, setLanguage }) {
   );
 }
 
-export function SetupForm({ form, setForm, onSubmit }) {
+export function SetupForm({ form, setForm, onSubmit, saving = false }) {
   const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
@@ -90,18 +90,18 @@ export function SetupForm({ form, setForm, onSubmit }) {
       <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <TextField label={t('Passwort')} type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required minLength={8} />
       <TextField label={t('Passwort bestätigen')} type="password" value={form.passwordConfirm} onChange={(passwordConfirm) => setForm({ ...form, passwordConfirm })} required minLength={8} />
-      <Button type="submit">{t('Admin anlegen')}</Button>
+      <Button type="submit" loading={saving}>{t('Admin anlegen')}</Button>
     </form>
   );
 }
 
-export function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, onRegister, onResendVerification }) {
+export function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, onRegister, onResendVerification, saving = false }) {
   const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
       <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <TextField label={t('Passwort')} type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required />
-      <Button type="submit">{t('Anmelden')}</Button>
+      <Button type="submit" loading={saving}>{t('Anmelden')}</Button>
       <button className="google-login-button" type="button" onClick={onGoogleLogin}>
         <span aria-hidden="true">G</span>
         {t('Mit Google anmelden')}
@@ -119,7 +119,7 @@ export function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, on
   );
 }
 
-export function RegisterForm({ form, setForm, onSubmit, onBack, navigate }) {
+export function RegisterForm({ form, setForm, onSubmit, onBack, navigate, saving = false }) {
   const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
@@ -146,7 +146,7 @@ export function RegisterForm({ form, setForm, onSubmit, onBack, navigate }) {
       <button className="link-button" type="button" onClick={() => navigate('/datenschutz')}>
         {t('Datenschutzerklärung lesen')}
       </button>
-      <Button type="submit">{t('Registrieren')}</Button>
+      <Button type="submit" loading={saving}>{t('Registrieren')}</Button>
       <button className="link-button" type="button" onClick={onBack}>
         {t('Zurück zur Anmeldung')}
       </button>
@@ -171,12 +171,12 @@ export function RegisterSuccessNotice({ onBack, onResendVerification }) {
   );
 }
 
-export function ForgotPasswordForm({ form, setForm, onSubmit, onBack }) {
+export function ForgotPasswordForm({ form, setForm, onSubmit, onBack, saving = false }) {
   const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
       <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
-      <Button type="submit">{t('Reset-Link anfordern')}</Button>
+      <Button type="submit" loading={saving}>{t('Reset-Link anfordern')}</Button>
       <button className="link-button" type="button" onClick={onBack}>
         {t('Zurück zur Anmeldung')}
       </button>
@@ -184,12 +184,12 @@ export function ForgotPasswordForm({ form, setForm, onSubmit, onBack }) {
   );
 }
 
-export function ResendVerificationForm({ form, setForm, onSubmit, onBack }) {
+export function ResendVerificationForm({ form, setForm, onSubmit, onBack, saving = false }) {
   const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
       <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
-      <Button type="submit">{t('Bestätigungslink erneut senden')}</Button>
+      <Button type="submit" loading={saving}>{t('Bestätigungslink erneut senden')}</Button>
       <button className="link-button" type="button" onClick={onBack}>
         {t('Zurück zur Anmeldung')}
       </button>
@@ -197,7 +197,7 @@ export function ResendVerificationForm({ form, setForm, onSubmit, onBack }) {
   );
 }
 
-export function ResetPasswordForm({ form, setForm, onSubmit, onBack }) {
+export function ResetPasswordForm({ form, setForm, onSubmit, onBack, saving = false }) {
   const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
@@ -205,7 +205,7 @@ export function ResetPasswordForm({ form, setForm, onSubmit, onBack }) {
       <TextField label={t('Neues Passwort')} type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required minLength={8} />
       <p className="hint">{t(PASSWORD_STRENGTH_HINT)}</p>
       <TextField label={t('Passwort bestätigen')} type="password" value={form.passwordConfirm} onChange={(passwordConfirm) => setForm({ ...form, passwordConfirm })} required minLength={8} />
-      <Button type="submit">{t('Passwort ändern')}</Button>
+      <Button type="submit" loading={saving}>{t('Passwort ändern')}</Button>
       <button className="link-button" type="button" onClick={onBack}>
         {t('Zurück zur Anmeldung')}
       </button>
@@ -213,12 +213,12 @@ export function ResetPasswordForm({ form, setForm, onSubmit, onBack }) {
   );
 }
 
-export function VerifyEmailForm({ form, setForm, onSubmit, onBack }) {
+export function VerifyEmailForm({ form, setForm, onSubmit, onBack, saving = false }) {
   const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
       <TextField label={t('Bestätigungs-Token')} value={form.token} onChange={(token) => setForm({ ...form, token })} required />
-      <Button type="submit">{t('E-Mail bestätigen')}</Button>
+      <Button type="submit" loading={saving}>{t('E-Mail bestätigen')}</Button>
       <button className="link-button" type="button" onClick={onBack}>
         {t('Zurück zur Anmeldung')}
       </button>
@@ -226,11 +226,11 @@ export function VerifyEmailForm({ form, setForm, onSubmit, onBack }) {
   );
 }
 
-export function CancelRegistrationForm({ onSubmit, onBack }) {
+export function CancelRegistrationForm({ onSubmit, onBack, saving = false }) {
   const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
-      <Button type="submit" variant="danger">
+      <Button type="submit" variant="danger" loading={saving}>
         {t('Anmeldung stornieren')}
       </Button>
       <button className="link-button" type="button" onClick={onBack}>

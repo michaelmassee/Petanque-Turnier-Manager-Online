@@ -223,7 +223,7 @@ function FormationHelpDialog({ onClose }) {
   );
 }
 
-export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser }) {
+export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, saving = false }) {
   const { t } = useTranslation();
   const [showFormationHelp, setShowFormationHelp] = useState(false);
   const showMailNotEnabledHint = !isAdmin && currentUser && currentUser.mailEnabled === false;
@@ -441,7 +441,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
       {canManageEditors && <TournamentEditorsPanel tournamentId={form.id} candidates={editorCandidates} ownerId={form.ownerId} isAdmin={isAdmin} />}
       <div className="dialog-actions">
         <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>
-        <Button type="submit">{mode === 'edit' ? t('Turnier speichern') : t('Turnier anlegen')}</Button>
+        <Button type="submit" loading={saving}>{mode === 'edit' ? t('Turnier speichern') : t('Turnier anlegen')}</Button>
       </div>
     </form>
   );
@@ -556,6 +556,7 @@ export function TournamentManagementPage({
   currentUser,
   message,
   error,
+  tournamentSaving,
 }) {
   const { t } = useTranslation();
   return (
@@ -598,6 +599,7 @@ export function TournamentManagementPage({
             onOwnerChanged={onOwnerChanged}
             language={language}
             currentUser={currentUser}
+            saving={tournamentSaving}
           />
         </EditDialog>
       )}
