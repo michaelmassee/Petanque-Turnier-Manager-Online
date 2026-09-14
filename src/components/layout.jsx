@@ -194,7 +194,7 @@ function savedSearchSummary(search, t) {
   if (search.filterRegistrationType) parts.push(labelFor(REGISTRATION_TYPES, search.filterRegistrationType));
   if (search.filterType) parts.push(labelFor(TOURNAMENT_TYPES, search.filterType));
   if (search.filterOpenOnly) parts.push(t('Anmeldung möglich'));
-  if (search.searchOrigin) parts.push(`${labelFor(RADIUS_OPTIONS, search.radiusKm)} ${t('Umkreis')} · ${search.searchOrigin.label}`);
+  if (search.searchOrigin) parts.push(`${t('Umkreis')}: ${labelFor(RADIUS_OPTIONS, search.radiusKm)} · ${search.searchOrigin.label}`);
   return parts.length ? parts.join(' · ') : t('Alle Turniere');
 }
 
