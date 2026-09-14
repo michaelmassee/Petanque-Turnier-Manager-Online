@@ -286,40 +286,38 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
   };
   return (
     <header className="topbar">
-      <div className="topbar-start">
-        <button
-          className="left-menu-btn"
-          type="button"
-          aria-label={t('Bereiche öffnen')}
-          aria-expanded={leftPanelOpen}
-          onClick={() => {
-            onCloseMenu();
-            setLeftPanelOpen((open) => !open);
-          }}
-        >
-          <svg className="left-menu-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2" />
-            <rect x="13" y="3.5" width="7.5" height="7.5" rx="2" />
-            <rect x="3.5" y="13" width="7.5" height="7.5" rx="2" />
-            <rect x="13" y="13" width="7.5" height="7.5" rx="2" />
-          </svg>
-        </button>
-        <button
-          className="brand brand-link"
-          type="button"
-          onClick={() => {
-            onCloseMenu();
-            closeLeftPanel();
-            goToTournaments();
-          }}
-        >
-          <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="brand-logo" />
-          <div className="brand-text">
-            <p className="eyebrow">Pétanque Turnier Manager Online</p>
-            <h1 {...(headingNoTranslate ? { 'data-i18n-skip': true } : {})}>{heading}</h1>
-          </div>
-        </button>
-      </div>
+      <button
+        className="left-menu-btn"
+        type="button"
+        aria-label={t('Bereiche öffnen')}
+        aria-expanded={leftPanelOpen}
+        onClick={() => {
+          onCloseMenu();
+          setLeftPanelOpen((open) => !open);
+        }}
+      >
+        <svg className="left-menu-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2" />
+          <rect x="13" y="3.5" width="7.5" height="7.5" rx="2" />
+          <rect x="3.5" y="13" width="7.5" height="7.5" rx="2" />
+          <rect x="13" y="13" width="7.5" height="7.5" rx="2" />
+        </svg>
+      </button>
+      <button
+        className="brand brand-link"
+        type="button"
+        onClick={() => {
+          onCloseMenu();
+          closeLeftPanel();
+          goToTournaments();
+        }}
+      >
+        <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="brand-logo" />
+        <div className="brand-text">
+          <p className="eyebrow">Pétanque Turnier Manager Online</p>
+          <h1 {...(headingNoTranslate ? { 'data-i18n-skip': true } : {})}>{heading}</h1>
+        </div>
+      </button>
       <div className="topbar-actions-scroll">
         <div className="topbar-actions">
           {searchControl}

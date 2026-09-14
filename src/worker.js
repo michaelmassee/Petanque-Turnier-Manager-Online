@@ -4619,6 +4619,21 @@ async function processMailQueueBatch(batch, env) {
   }
 }
 
+function reorderHouseNumberInDisplayName(displayName, address) {
+  const houseNumber = address?.house_number;
+  const road = address?.road;
+  if (!houseNumber || !road) {
+    return displayName;
+  }
+  const parts = String(displayName).split(', ');
+  if (parts[0] === houseNumber && parts[1] === road) {
+    parts[0] = road;
+    parts[1] = houseNumber;
+    return parts.join(', ');
+  }
+  return displayName;
+}
+
 async function geocodeLocation(query, { limit = 5, countryCode } = {}) {
   const trimmed = String(query || '').trim();
   if (!trimmed) {
@@ -4653,7 +4668,7 @@ async function geocodeLocation(query, { limit = 5, countryCode } = {}) {
     .map((match) => ({
       lat: Number(match.lat),
       lng: Number(match.lon),
-      displayName: match.display_name || trimmed,
+      displayName: reorderHouseNumberInDisplayName(match.display_name || trimmed, match.address),
       countryCode: (match.address?.country_code || '').toUpperCase(),
     }))
     .filter((match) => Number.isFinite(match.lat) && Number.isFinite(match.lng));
