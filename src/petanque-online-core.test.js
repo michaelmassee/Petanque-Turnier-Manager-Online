@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPetanqueOnlineAddress, isFuturePetanqueOnlineTournament, mapPetanqueOnlineFormation, mapPetanqueOnlineTournament, petanqueOnlineKey } from './petanque-online-core.js';
+import { formatPetanqueOnlineAddress, isExternalPetanqueOnlineWebsite, isFuturePetanqueOnlineTournament, mapPetanqueOnlineFormation, mapPetanqueOnlineTournament, petanqueOnlineKey } from './petanque-online-core.js';
 
 describe('Petanque-Online-Import', () => {
   it('bildet Quell-IDs und Formationen stabil ab', () => {
@@ -49,5 +49,21 @@ describe('Petanque-Online-Import', () => {
   it('nutzt den Fallback-Ort, wenn addressLocality fehlt', () => {
     expect(formatPetanqueOnlineAddress({ streetAddress: 'Pariser Str. 45', postalCode: '40549' }, 'Düsseldorf'))
       .toBe('Pariser Str. 45, 40549 Düsseldorf');
+  });
+
+  it('erkennt eine echte Vereinswebseite als extern', () => {
+    expect(isExternalPetanqueOnlineWebsite('https://www.boule-aachen.de/')).toBe(true);
+    expect(isExternalPetanqueOnlineWebsite('http://www.turn-club-bissendorf.de/pages/sportarten/petanque.php')).toBe(true);
+  });
+
+  it('erkennt den petanque-online.de-Fallback-Link nicht als Vereinswebseite', () => {
+    expect(isExternalPetanqueOnlineWebsite('https://petanque-online.de/turniere/dusseldorf-sur-place-6407')).toBe(false);
+  });
+
+  it('behandelt fehlende oder ungültige URLs als "keine Vereinswebseite"', () => {
+    expect(isExternalPetanqueOnlineWebsite(null)).toBe(false);
+    expect(isExternalPetanqueOnlineWebsite(undefined)).toBe(false);
+    expect(isExternalPetanqueOnlineWebsite('')).toBe(false);
+    expect(isExternalPetanqueOnlineWebsite('nicht-valide')).toBe(false);
   });
 });

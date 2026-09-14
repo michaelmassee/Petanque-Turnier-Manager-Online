@@ -60,3 +60,14 @@ export function mapPetanqueOnlineTournament(entry) {
 export function isFuturePetanqueOnlineTournament(entry, today = new Date().toISOString().slice(0, 10)) {
   return typeof entry?.date === 'string' && entry.date > today;
 }
+
+// true, wenn die URL auf eine externe Domain zeigt statt auf petanque-online.de selbst
+// (Fallback-Link, wenn der Verein keine eigene Webseite hinterlegt hat).
+export function isExternalPetanqueOnlineWebsite(url) {
+  if (!url) return false;
+  try {
+    return new URL(url).hostname !== 'petanque-online.de';
+  } catch {
+    return false;
+  }
+}

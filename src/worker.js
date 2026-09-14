@@ -14,7 +14,7 @@ import { getPairingStrategy, isOnlinePlayable } from './lib/pairing/index.js';
 import { computeRanking } from './lib/pairing/ranking.js';
 import { sortSwiss, swissStats } from './lib/pairing/schweizer.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
-import { formatPetanqueOnlineAddress, isFuturePetanqueOnlineTournament, mapPetanqueOnlineTournament, petanqueOnlineKey } from './petanque-online-core.js';
+import { formatPetanqueOnlineAddress, isExternalPetanqueOnlineWebsite, isFuturePetanqueOnlineTournament, mapPetanqueOnlineTournament, petanqueOnlineKey } from './petanque-online-core.js';
 
 const ROLES = ['admin', 'user'];
 const DEFAULT_TOURNAMENT_LIMIT = 5;
@@ -2715,12 +2715,22 @@ async function fetchPetanqueOnlineCalendar() {
 async function listPetanqueOnlineCandidates(db) {
   const [entries, imports] = await Promise.all([
     fetchPetanqueOnlineCalendar(),
-    db.prepare("SELECT external_key FROM petanque_online_imports WHERE source = 'petanque-online'").all(),
+    db.prepare(
+      `SELECT poi.external_key, t.website_url
+       FROM petanque_online_imports poi
+       JOIN tournaments t ON t.id = poi.tournament_id
+       WHERE poi.source = 'petanque-online'`,
+    ).all(),
   ]);
-  const importedKeys = new Set(imports.results.map((entry) => entry.external_key));
+  const importedWebsiteByKey = new Map(imports.results.map((row) => [row.external_key, row.website_url]));
   return entries
     .filter((entry) => isFuturePetanqueOnlineTournament(entry))
-    .map((entry) => ({ ...mapPetanqueOnlineTournament(entry), type: entry.type, sourceFormation: entry.formation, imported: importedKeys.has(petanqueOnlineKey(entry)) }))
+    .map((entry) => {
+      const key = petanqueOnlineKey(entry);
+      const imported = importedWebsiteByKey.has(key);
+      const websiteUrl = imported ? importedWebsiteByKey.get(key) : mapPetanqueOnlineTournament(entry).websiteUrl;
+      return { ...mapPetanqueOnlineTournament(entry), type: entry.type, sourceFormation: entry.formation, imported, websiteUrl, hasClubWebsite: imported && isExternalPetanqueOnlineWebsite(websiteUrl) };
+    })
     .filter((entry) => entry.name.length >= 2 && entry.location.length >= 2)
     .sort((left, right) => left.date.localeCompare(right.date) || (left.startTime || '').localeCompare(right.startTime || '') || left.name.localeCompare(right.name));
 }

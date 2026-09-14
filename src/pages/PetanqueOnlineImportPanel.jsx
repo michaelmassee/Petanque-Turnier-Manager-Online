@@ -11,6 +11,7 @@ export function PetanqueOnlineImportPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [onlyWithClubWebsite, setOnlyWithClubWebsite] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -29,6 +30,10 @@ export function PetanqueOnlineImportPanel() {
   useEffect(() => { load(); }, []);
 
   const selectable = useMemo(() => tournaments.filter((tournament) => !tournament.imported), [tournaments]);
+  const visibleTournaments = useMemo(
+    () => (onlyWithClubWebsite ? tournaments.filter((tournament) => tournament.hasClubWebsite) : tournaments),
+    [tournaments, onlyWithClubWebsite],
+  );
 
   function toggle(key) {
     setSelected((current) => {
@@ -78,10 +83,14 @@ export function PetanqueOnlineImportPanel() {
                 <input type="checkbox" checked={selectable.length > 0 && selected.size === selectable.length} onChange={toggleAll} disabled={selectable.length === 0 || busy} />
                 <span>{t('Alle neuen Termine auswählen')}</span>
               </label>
+              <label className="checkbox-field">
+                <input type="checkbox" checked={onlyWithClubWebsite} onChange={(event) => setOnlyWithClubWebsite(event.target.checked)} />
+                <span>{t('Nur mit Vereinswebseite')}</span>
+              </label>
               <Button disabled={selected.size === 0 || busy} onClick={handleImport}>{t('Ausgewählte Termine importieren')}</Button>
             </div>
             <div className="user-list import-list">
-              {tournaments.map((tournament) => (
+              {visibleTournaments.map((tournament) => (
                 <label className="data-row" key={tournament.externalKey}>
                   <input type="checkbox" checked={selected.has(tournament.externalKey)} onChange={() => toggle(tournament.externalKey)} disabled={tournament.imported || busy} />
                   <span>
@@ -90,9 +99,14 @@ export function PetanqueOnlineImportPanel() {
                     <small data-i18n-skip>{tournament.sourceFormation}</small>
                   </span>
                   {tournament.imported && <span className="role">{t('Bereits importiert')}</span>}
+                  {tournament.hasClubWebsite && (
+                    <a className="role" href={tournament.websiteUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+                      {t('Vereinswebseite')}
+                    </a>
+                  )}
                 </label>
               ))}
-              {tournaments.length === 0 && <p className="muted">{t('Keine künftigen Termine gefunden.')}</p>}
+              {visibleTournaments.length === 0 && <p className="muted">{t('Keine künftigen Termine gefunden.')}</p>}
             </div>
           </>
         )}

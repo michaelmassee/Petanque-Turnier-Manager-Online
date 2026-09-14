@@ -715,6 +715,8 @@
   "Alle neuen Termine auswählen": "Seleccionar todos los eventos nuevos",
   "Ausgewählte Termine importieren": "Importar eventos seleccionados",
   "Bereits importiert": "Ya importado",
+  "Nur mit Vereinswebseite": "Solo con sitio web del club",
+  "Vereinswebseite": "Sitio web del club",
   "Keine künftigen Termine gefunden.": "No se encontraron eventos futuros.",
   "Petanque-Online-Termine importiert: {created} neu, {updated} aktualisiert.": "Eventos de Petanque-Online importados: {created} nuevos, {updated} actualizados.",
   "{failed} Termine fehlgeschlagen.": "{failed} eventos fallidos.",
