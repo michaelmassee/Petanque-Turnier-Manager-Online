@@ -1628,7 +1628,7 @@ function AppContent() {
         : activeTab === 'petanque-online-import'
           ? t('Petanque-Online importieren')
         : activeTab === 'play'
-          ? t('Turnier durchführen')
+          ? t('Turnier starten')
           : activeTab === 'registrations'
             ? t('Anmeldungen')
             : activeTab === 'tournaments'
@@ -1777,7 +1777,7 @@ function AppContent() {
               clearFeedback();
             }}
           >
-            {t('Turnier durchführen')}
+            {t('Turnier starten')}
           </button>
         )}
         <button
@@ -2416,7 +2416,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
 
 
 

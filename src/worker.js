@@ -2921,7 +2921,7 @@ async function updateTournament(request, env, existing, user) {
 }
 
 /**
- * Leichtgewichtiger Statuswechsel für "Turnier durchführen": setzt nur status auf 'running',
+ * Leichtgewichtiger Statuswechsel für "Turnier starten": setzt nur status auf 'running',
  * ohne die vollständige Turnier-Eingabemaske (normalizeCoreTournamentInput mit allen Pflicht-
  * feldern) zu durchlaufen - sonst müsste die Durchführungs-Seite das komplette Turnierformular
  * mitschleppen, nur um den Status umzuschalten.
