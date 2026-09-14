@@ -28,7 +28,7 @@ export function mapPetanqueOnlineTournament(entry) {
     entry.entry_fee ? `Startgeld: ${entry.entry_fee} €` : null,
     entry.max_teams !== null && entry.max_teams !== undefined && entry.max_teams !== '' && Number.isFinite(Number(entry.max_teams)) ? `Max. Teams: ${entry.max_teams}` : null,
     entry.registration_deadline ? `Meldefrist: ${entry.registration_deadline}${entry.registration_deadline_time ? ` ${String(entry.registration_deadline_time).slice(0, 5)}` : ''}` : null,
-    `Quelle: ${sourceUrlForPetanqueOnline(entry)}`,
+    'Hinweis: Dieser Termin wurde automatisch übernommen. Weitere Informationen findest du auf der verlinkten Vereinswebseite (🌐-Symbol oben).',
   ].filter(Boolean);
 
   return {
