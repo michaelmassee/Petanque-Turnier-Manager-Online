@@ -40,6 +40,7 @@ const VISIBILITIES = ['public', 'private'];
 const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
 const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
 const SESSION_COOKIE = 'ptm_session';
+const sessionRefreshes = new WeakMap();
 const GOOGLE_OAUTH_STATE_COOKIE = 'ptm_google_oauth_state';
 const FACEBOOK_OAUTH_STATE_COOKIE = 'ptm_facebook_oauth_state';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
@@ -834,8 +835,9 @@ export default {
       return withSecurityHeaders(await env.ASSETS.fetch(request), url);
     }
 
-    try {
-      assertSameOriginForUnsafeMethods(request, url);
+    const response = await (async () => {
+      try {
+        assertSameOriginForUnsafeMethods(request, url);
       await cleanupExpiredSessions(env.DB);
 
       if (request.method === 'GET' && url.pathname === '/api/bootstrap') {
@@ -1388,14 +1390,16 @@ export default {
       }
 
       return json({ error: 'Not found' }, 404);
-    } catch (error) {
-      if (error instanceof HttpError) {
-        return json({ error: error.message, ...(error.details ? { details: error.details } : {}) }, error.status);
-      }
+      } catch (error) {
+        if (error instanceof HttpError) {
+          return json({ error: error.message, ...(error.details ? { details: error.details } : {}) }, error.status);
+        }
 
-      console.error(error);
-      return json({ error: 'Internal server error' }, 500);
-    }
+        console.error(error);
+        return json({ error: 'Internal server error' }, 500);
+      }
+    })();
+    return withRefreshedSessionCookie(request, response, url);
   },
 };
 
@@ -2581,7 +2585,8 @@ async function updateOwnProfile(request, env, url, userId) {
 
   if (emailChanged || passwordChanged) {
     if (!currentPassword || !(await verifyPassword(currentPassword, existing.password_salt, existing.password_hash))) {
-      throw new HttpError(401, 'Aktuelles Passwort ist erforderlich oder falsch');
+      // The session is still valid; this is form validation, not a session failure.
+      throw new HttpError(400, 'Aktuelles Passwort ist erforderlich oder falsch');
     }
   }
 
@@ -4944,6 +4949,12 @@ async function requireSession(request, db) {
     throw new HttpError(401, 'Anmeldung erforderlich');
   }
 
+  // Every successful use extends the server-side session. The response wrapper
+  // below refreshes the HttpOnly cookie with the same expiry.
+  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
+  await db.prepare('UPDATE sessions SET expires_at = ? WHERE id = ?').bind(expiresAt.toISOString(), sessionId).run();
+  sessionRefreshes.set(request, { id: sessionId, expiresAt });
+
   return { user: toPublicUser(row) };
 }
 
@@ -5664,6 +5675,14 @@ function getCookie(request, name) {
 function sessionCookie(value, expiresAt, url) {
   const secure = !url || url.protocol === 'https:' ? '; Secure' : '';
   return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax${secure}; Expires=${expiresAt.toUTCString()}`;
+}
+
+function withRefreshedSessionCookie(request, response, url) {
+  const session = sessionRefreshes.get(request);
+  if (!session) return response;
+  const headers = new Headers(response.headers);
+  headers.append('Set-Cookie', sessionCookie(session.id, session.expiresAt, url));
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 function googleOAuthStateCookie(value, url) {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../lib/api.js';
+import { authenticatedApi } from '../lib/api.js';
 import { Button, Feedback } from '../components/ui.jsx';
 
 export function PetanqueOnlineImportPanel() {
@@ -17,7 +17,7 @@ export function PetanqueOnlineImportPanel() {
     setLoading(true);
     setError('');
     try {
-      const result = await api('/api/admin/petanque-online/tournaments');
+      const result = await authenticatedApi('/api/admin/petanque-online/tournaments');
       setTournaments(result.tournaments || []);
       setSelected(new Set());
     } catch (requestError) {
@@ -53,7 +53,7 @@ export function PetanqueOnlineImportPanel() {
     setMessage('');
     setError('');
     try {
-      const result = await api('/api/admin/petanque-online/import', { method: 'POST', body: JSON.stringify({ externalKeys: [...selected] }) });
+      const result = await authenticatedApi('/api/admin/petanque-online/import', { method: 'POST', body: JSON.stringify({ externalKeys: [...selected] }) });
       const parts = [t('Petanque-Online-Termine importiert: {created} neu, {updated} aktualisiert.').replace('{created}', result.created).replace('{updated}', result.updated)];
       if (result.failed > 0) parts.push(t('{failed} Termine fehlgeschlagen.').replace('{failed}', result.failed));
       setMessage(parts.join(' '));

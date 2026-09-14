@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../lib/api.js';
+import { api, authenticatedApi } from '../lib/api.js';
 import { SelectField, TextField, Button, Feedback } from '../components/ui.jsx';
 import { checkRoundRequirements } from '../lib/pairing/index.js';
 import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
@@ -123,7 +123,7 @@ export default function TournamentPlayManagement({ tournaments }) {
       const [roundsData, rankingData, registrationsData] = await Promise.all([
         api(`/api/tournaments/${tournamentId}/rounds`),
         api(`/api/tournaments/${tournamentId}/ranking`),
-        api(`/api/tournaments/${tournamentId}/registrations`),
+        authenticatedApi(`/api/tournaments/${tournamentId}/registrations`),
       ]);
       setRounds(roundsData.rounds);
       setSwissTeams(roundsData.teams || []);
@@ -146,7 +146,7 @@ export default function TournamentPlayManagement({ tournaments }) {
     setError('');
     setMessage('');
     try {
-      await api(`/api/tournaments/${selectedTournamentId}/start`, { method: 'POST' });
+      await authenticatedApi(`/api/tournaments/${selectedTournamentId}/start`, { method: 'POST' });
       setStartedTournamentIds((current) => new Set(current).add(selectedTournamentId));
       setMessage(t('Turnier wurde gestartet.'));
     } catch (err) {
@@ -160,7 +160,7 @@ export default function TournamentPlayManagement({ tournaments }) {
     setBusy(true);
     setError('');
     try {
-      await api(`/api/registrations/${registrationId}/active`, {
+      await authenticatedApi(`/api/registrations/${registrationId}/active`, {
         method: 'PUT',
         body: JSON.stringify({ active: nextActive }),
       });
@@ -207,7 +207,7 @@ export default function TournamentPlayManagement({ tournaments }) {
     setError('');
     setMessage('');
     try {
-      const data = await api(`/api/tournaments/${selectedTournamentId}/rounds`, { method: 'POST' });
+      const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/rounds`, { method: 'POST' });
       setRounds(data.rounds);
       setMessage(t('Neue Runde wurde erstellt.'));
     } catch (err) {
@@ -220,7 +220,7 @@ export default function TournamentPlayManagement({ tournaments }) {
   async function handleDrawMeleeTeams() {
     setBusy(true); setError(''); setMessage('');
     try {
-      const data = await api(`/api/tournaments/${selectedTournamentId}/teams/draw`, { method: 'POST' });
+      const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/teams/draw`, { method: 'POST' });
       setSwissTeams(data.teams || []);
       setMessage(`${t('Mêlée-Teams wurden ausgelost:')} ${data.teams.length}`);
     } catch (err) { setError(err.message); } finally { setBusy(false); }
@@ -231,7 +231,7 @@ export default function TournamentPlayManagement({ tournaments }) {
     setError('');
     setMessage('');
     try {
-      const data = await api(`/api/tournaments/${selectedTournamentId}/matches/${matchId}/result`, {
+      const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/matches/${matchId}/result`, {
         method: 'PUT',
         body: JSON.stringify(result),
       });

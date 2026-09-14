@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../lib/api.js';
+import { authenticatedApi } from '../lib/api.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus } from '../lib/hooks.js';
 import { MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTIONS, TOURNAMENT_STATUSES, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor, roleName, translatedOptions } from '../lib/domain.js';
@@ -14,7 +14,7 @@ async function subscribeToPush() {
   if (Notification.permission === 'denied') return 'blocked';
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return 'denied';
-  const { publicKey } = await api('/api/push/public-key');
+  const { publicKey } = await authenticatedApi('/api/push/public-key');
   const registration = await navigator.serviceWorker.ready;
   const applicationServerKey = base64urlToUint8Array(publicKey);
   const existing = await registration.pushManager.getSubscription();
@@ -24,7 +24,7 @@ async function subscribeToPush() {
   const subscription = existing && !keyChanged
     ? existing
     : await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
-  await api('/api/push/subscriptions', { method: 'POST', body: JSON.stringify(subscription.toJSON()) });
+  await authenticatedApi('/api/push/subscriptions', { method: 'POST', body: JSON.stringify(subscription.toJSON()) });
   return 'enabled';
 }
 

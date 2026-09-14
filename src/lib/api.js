@@ -29,6 +29,26 @@ export class InvalidResponseError extends ApiError {
   constructor() { super(i18next.t('Die Serverantwort konnte nicht verarbeitet werden.')); }
 }
 
+export class SessionExpiredError extends ApiError {
+  constructor(cause) {
+    super(i18next.t('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.'), {
+      status: 401,
+      payload: cause.payload,
+    });
+    this.cause = cause;
+  }
+}
+
+let sessionExpiredHandler = null;
+
+/** Registers the single app-wide reaction to a rejected authenticated request. */
+export function setSessionExpiredHandler(handler) {
+  sessionExpiredHandler = handler;
+  return () => {
+    if (sessionExpiredHandler === handler) sessionExpiredHandler = null;
+  };
+}
+
 async function readJsonResponse(response) {
   const contentLength = Number(response.headers?.get?.('Content-Length'));
   if (Number.isFinite(contentLength) && contentLength > MAX_JSON_BYTES) throw new InvalidResponseError();
@@ -97,4 +117,20 @@ async function requestOnce(path, options, timeoutMs) {
 /** Mutations are deliberately attempted once; query lifecycle belongs to TanStack Query. */
 export function api(path, options = {}) {
   return requestOnce(path, options, options.timeoutMs || DEFAULT_TIMEOUT_MS);
+}
+
+/**
+ * Use only for endpoints that require the browser session. Public endpoints keep
+ * using api(), so their own 401 responses remain domain errors.
+ */
+export async function authenticatedApi(path, options = {}) {
+  try {
+    return await api(path, options);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      sessionExpiredHandler?.();
+      throw new SessionExpiredError(error);
+    }
+    throw error;
+  }
 }

@@ -4,7 +4,7 @@ import { ROLES, TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNA
 import i18next from './lib/i18next-config.js';
 import { useTranslation } from 'react-i18next';
 import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from './lib/api.js';
+import { api, authenticatedApi, setSessionExpiredHandler } from './lib/api.js';
 import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { usePath, matchTournamentRoute } from './lib/routing.js';
@@ -112,6 +112,7 @@ function AppContent() {
   const [authSaving, setAuthSaving] = useState(false);
   const [message, setMessageState] = useState('');
   const [error, setErrorState] = useState('');
+  const sessionExpiryHandled = useRef(false);
 
   function setMessage(text) {
     setMessageState(text);
@@ -127,6 +128,41 @@ function AppContent() {
     }
   }
 
+  useEffect(() => {
+    if (currentUser) sessionExpiryHandled.current = false;
+  }, [currentUser]);
+
+  useEffect(() => setSessionExpiredHandler(() => {
+    if (sessionExpiryHandled.current) return;
+    sessionExpiryHandled.current = true;
+    queryClient.clear();
+    setCurrentUser(null);
+    setPostboxOpen(false);
+    setPostbox({ messages: [], unreadCount: 0, todos: [] });
+    setPostboxRecipients([]);
+    setPostboxRecipientTournaments([]);
+    setPostboxRecipientId('');
+    setPostboxBody('');
+    setSavedSearches([]);
+    setUsers([]);
+    setRegistrations([]);
+    setUserForm(EMPTY_USER_FORM);
+    setTournamentForm(EMPTY_TOURNAMENT_FORM);
+    setRegistrationForm(EMPTY_REGISTRATION_FORM);
+    setUserMode('create');
+    setTournamentMode('create');
+    setRegistrationMode('create');
+    setUserDialogOpen(false);
+    setTournamentDialogOpen(false);
+    setRegistrationDialogOpen(false);
+    setActiveTab('home');
+    setHomeOnlyMine(false);
+    setMessage('');
+    setError(t('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.'));
+    navigate('/');
+    setAuthView('login');
+  }), [navigate, queryClient, t]);
+
   const isAdmin = currentUser?.role === 'admin';
   const canManageTournaments = Boolean(currentUser);
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
@@ -135,18 +171,18 @@ function AppContent() {
   const postboxQuery = useQuery({
     queryKey: ['postbox', currentUser?.id],
     queryFn: async () => {
-      const [postbox, recipients] = await Promise.all([api('/api/postbox'), api('/api/postbox/recipients')]);
+      const [postbox, recipients] = await Promise.all([authenticatedApi('/api/postbox'), authenticatedApi('/api/postbox/recipients')]);
       return { postbox, recipients };
     },
     enabled: Boolean(currentUser),
     refetchInterval: 60_000,
     refetchIntervalInBackground: false,
   });
-  const usersQuery = useQuery({ queryKey: ['users'], queryFn: () => api('/api/users'), enabled: isAdmin });
+  const usersQuery = useQuery({ queryKey: ['users'], queryFn: () => authenticatedApi('/api/users'), enabled: isAdmin });
   const manageableTournamentId = selectedTournament?.canManage ? selectedTournament.id : null;
   const registrationsQuery = useQuery({
     queryKey: ['registrations', manageableTournamentId],
-    queryFn: () => api(`/api/tournaments/${manageableTournamentId}/registrations`),
+    queryFn: () => authenticatedApi(`/api/tournaments/${manageableTournamentId}/registrations`),
     enabled: Boolean(manageableTournamentId),
   });
 
@@ -459,7 +495,7 @@ function AppContent() {
 
   async function loadUsers(silent = false) {
     try {
-      const data = await queryClient.fetchQuery({ queryKey: ['users'], queryFn: () => api('/api/users'), staleTime: 0 });
+      const data = await queryClient.fetchQuery({ queryKey: ['users'], queryFn: () => authenticatedApi('/api/users'), staleTime: 0 });
       setUsers(data.users);
     } catch (requestError) {
       if (!silent) setError(requestError.message);
@@ -486,7 +522,7 @@ function AppContent() {
     try {
       const data = await queryClient.fetchQuery({
         queryKey: ['registrations', tournamentId],
-        queryFn: () => api(`/api/tournaments/${tournamentId}/registrations`),
+        queryFn: () => authenticatedApi(`/api/tournaments/${tournamentId}/registrations`),
         staleTime: 0,
       });
       setRegistrations(data.registrations);
@@ -500,7 +536,7 @@ function AppContent() {
       const data = await queryClient.fetchQuery({
         queryKey: ['postbox', currentUser?.id],
         queryFn: async () => {
-          const [postbox, recipients] = await Promise.all([api('/api/postbox'), api('/api/postbox/recipients')]);
+          const [postbox, recipients] = await Promise.all([authenticatedApi('/api/postbox'), authenticatedApi('/api/postbox/recipients')]);
           return { postbox, recipients };
         },
         staleTime: 0,
@@ -517,7 +553,7 @@ function AppContent() {
     try {
       const data = await queryClient.fetchQuery({
         queryKey: ['savedSearches', currentUser?.id],
-        queryFn: () => api('/api/saved-searches'),
+        queryFn: () => authenticatedApi('/api/saved-searches'),
         staleTime: 0,
       });
       setSavedSearches(data.savedSearches);
@@ -540,10 +576,10 @@ function AppContent() {
     setHomeFilterRegistrationType(search.filterRegistrationType || '');
     setHomeFilterType(search.filterType || '');
     setHomeFilterOpenOnly(Boolean(search.filterOpenOnly));
+    setSearchRadiusKm(search.radiusKm || '25');
     if (search.searchOrigin) {
       setSearchOrigin({ lat: search.searchOrigin.lat, lng: search.searchOrigin.lng, label: search.searchOrigin.label });
       setSearchOriginQuery(search.searchOrigin.label || '');
-      setSearchRadiusKm(search.radiusKm || '25');
     } else {
       setSearchOrigin(null);
       setSearchOriginQuery('');
@@ -606,11 +642,11 @@ function AppContent() {
           radiusKm: source.radiusKm,
           notifyEnabled: savedSearchForm.notifyEnabled,
         };
-        await api(`/api/saved-searches/${savedSearchForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        await authenticatedApi(`/api/saved-searches/${savedSearchForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
         setMessage(t('Gespeicherte Suche wurde aktualisiert.'));
       } else {
         const payload = buildSavedSearchPayload(savedSearchForm.name, savedSearchForm.notifyEnabled);
-        await api('/api/saved-searches', { method: 'POST', body: JSON.stringify(payload) });
+        await authenticatedApi('/api/saved-searches', { method: 'POST', body: JSON.stringify(payload) });
         setMessage(t('Suche wurde gespeichert.'));
       }
       setSavedSearchDialogOpen(false);
@@ -637,7 +673,7 @@ function AppContent() {
         radiusKm: search.radiusKm,
         notifyEnabled: !search.notifyEnabled,
       };
-      await api(`/api/saved-searches/${search.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      await authenticatedApi(`/api/saved-searches/${search.id}`, { method: 'PUT', body: JSON.stringify(payload) });
       await loadSavedSearches();
     } catch (requestError) {
       setError(requestError.message);
@@ -651,7 +687,7 @@ function AppContent() {
     setError('');
     setMessage('');
     try {
-      await api(`/api/saved-searches/${search.id}`, { method: 'DELETE' });
+      await authenticatedApi(`/api/saved-searches/${search.id}`, { method: 'DELETE' });
       setMessage(t('Gespeicherte Suche wurde gelöscht.'));
       await loadSavedSearches();
     } catch (requestError) {
@@ -663,7 +699,7 @@ function AppContent() {
     event.preventDefault();
     setPostboxSending(true);
     try {
-      await api('/api/postbox/messages', { method: 'POST', body: JSON.stringify({ recipientId: postboxRecipientId, body: postboxBody }) });
+      await authenticatedApi('/api/postbox/messages', { method: 'POST', body: JSON.stringify({ recipientId: postboxRecipientId, body: postboxBody }) });
       pushRecentRecipientValue(currentUser?.id, postboxRecipientId);
       setPostboxBody('');
       setPostboxRecipientId('');
@@ -681,7 +717,7 @@ function AppContent() {
     setPostboxOpen((open) => {
       const willOpen = !open;
       if (willOpen && postbox.unreadCount > 0) {
-        api('/api/postbox/read-all', { method: 'POST' })
+        authenticatedApi('/api/postbox/read-all', { method: 'POST' })
           .then(loadPostbox)
           .catch((requestError) => setError(requestError.message));
       }
@@ -694,7 +730,7 @@ function AppContent() {
       setPostboxRecipientId(message.senderId);
     }
     if (message.recipientId === currentUser?.id && !message.readAt) {
-      await api(`/api/postbox/messages/${message.id}/read`, { method: 'POST' });
+      await authenticatedApi(`/api/postbox/messages/${message.id}/read`, { method: 'POST' });
       await loadPostbox();
     }
   }
@@ -862,7 +898,7 @@ function AppContent() {
 
     setProfileSaving(true);
     try {
-      const data = await api('/api/me', {
+      const data = await authenticatedApi('/api/me', {
         method: 'PUT',
         body: JSON.stringify({
           firstName: profileForm.firstName,
@@ -1020,13 +1056,13 @@ function AppContent() {
     setUserSaving(true);
     try {
       if (userMode === 'edit') {
-        await api(`/api/users/${userForm.id}`, {
+        await authenticatedApi(`/api/users/${userForm.id}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
         });
         setMessage(t('Benutzer wurde aktualisiert.'));
       } else {
-        await api('/api/users', {
+        await authenticatedApi('/api/users', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
@@ -1061,7 +1097,7 @@ function AppContent() {
     setMessage('');
 
     try {
-      await api(`/api/users/${user.id}${deleteTournaments ? '?deleteTournaments=true' : ''}`, { method: 'DELETE' });
+      await authenticatedApi(`/api/users/${user.id}${deleteTournaments ? '?deleteTournaments=true' : ''}`, { method: 'DELETE' });
       setMessage(t('Benutzer wurde gelöscht.'));
       await loadUsers();
       await loadTournaments();
@@ -1081,8 +1117,8 @@ function AppContent() {
     try {
       let data;
       if (tournamentMode === 'edit') {
-        data = await api(`/api/tournaments/${tournamentForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
-        await api(`/api/tournaments/${data.tournament.id}/presentation`, {
+        data = await authenticatedApi(`/api/tournaments/${tournamentForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        await authenticatedApi(`/api/tournaments/${data.tournament.id}/presentation`, {
           method: 'PUT',
           body: JSON.stringify({
             websiteUrl: tournamentForm.websiteUrl,
@@ -1091,7 +1127,7 @@ function AppContent() {
           }),
         });
       } else {
-        data = await api('/api/tournaments', { method: 'POST', body: JSON.stringify(payload) });
+        data = await authenticatedApi('/api/tournaments', { method: 'POST', body: JSON.stringify(payload) });
       }
 
       setMessage(tournamentMode === 'edit' ? t('Turnier wurde aktualisiert.') : t('Turnier wurde angelegt.'));
@@ -1101,13 +1137,6 @@ function AppContent() {
       await loadTournaments();
       setSelectedTournamentId(data.tournament.id);
     } catch (requestError) {
-      if (requestError.status === 401) {
-        queryClient.clear();
-        setCurrentUser(null);
-        setAuthView('login');
-        setError(t('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.'));
-        return;
-      }
       setError(requestError.message);
     } finally {
       setTournamentSaving(false);
@@ -1131,7 +1160,7 @@ function AppContent() {
     setMessage('');
 
     try {
-      await api(`/api/tournaments/${tournament.id}`, { method: 'DELETE' });
+      await authenticatedApi(`/api/tournaments/${tournament.id}`, { method: 'DELETE' });
       setMessage(t('Turnier wurde gelöscht.'));
       setSelectedTournamentId('');
       setRegistrations([]);
@@ -1159,7 +1188,7 @@ function AppContent() {
     setRegistrationSaving(true);
     try {
       if (registrationMode === 'edit') {
-        await api(`/api/registrations/${registrationForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        await authenticatedApi(`/api/registrations/${registrationForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
         setMessage(t('Anmeldung wurde aktualisiert.'));
       } else {
         const result = await api(`/api/tournaments/${tournamentId}/registrations`, { method: 'POST', body: JSON.stringify(payload) });
@@ -1202,7 +1231,7 @@ function AppContent() {
     setMessage('');
 
     try {
-      await api(`/api/registrations/${registration.id}`, { method: 'DELETE' });
+      await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'DELETE' });
       setMessage(t('Anmeldung wurde gelöscht.'));
       await loadRegistrations(registration.tournamentId);
       await loadTournaments();
@@ -1216,7 +1245,7 @@ function AppContent() {
     setMessage('');
     try {
       const payload = registrationPayload({ ...registration, seedingPosition: registration.seedingPosition ?? '', status: 'confirmed' }, language);
-      await api(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
       setMessage(t('Anmeldung wurde bestätigt.'));
       await loadRegistrations(registration.tournamentId);
       await loadTournaments();
@@ -1230,7 +1259,7 @@ function AppContent() {
     setError('');
     setMessage('');
     try {
-      const result = await api(`/api/tournaments/${selectedTournament.id}/registrations/confirm-pending`, { method: 'POST' });
+      const result = await authenticatedApi(`/api/tournaments/${selectedTournament.id}/registrations/confirm-pending`, { method: 'POST' });
       setMessage(`${result.confirmedCount} ${t('offene Anmeldung(en) wurden bestätigt.')}`);
       await loadRegistrations(selectedTournament.id);
       await loadTournaments();

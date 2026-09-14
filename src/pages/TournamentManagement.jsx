@@ -5,7 +5,7 @@ import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate } from '..
 import { labelFor, formationLabel, formatTournamentStartTime, translatedOptions } from '../lib/domain.js';
 import { TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
-import { api } from '../lib/api.js';
+import { authenticatedApi } from '../lib/api.js';
 
 function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmin }) {
   const { t } = useTranslation();
@@ -17,7 +17,7 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmi
   useEffect(() => {
     let cancelled = false;
     setEditors(null);
-    api(`/api/tournaments/${tournamentId}/editors`)
+    authenticatedApi(`/api/tournaments/${tournamentId}/editors`)
       .then((data) => { if (!cancelled) setEditors(data.editors); })
       .catch((err) => { if (!cancelled) setPanelError(err.message); });
     return () => { cancelled = true; };
@@ -31,7 +31,7 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmi
     setBusy(true);
     setPanelError('');
     try {
-      const data = await api(`/api/tournaments/${tournamentId}/editors`, { method: 'POST', body: JSON.stringify({ userId: selectedCandidateId }) });
+      const data = await authenticatedApi(`/api/tournaments/${tournamentId}/editors`, { method: 'POST', body: JSON.stringify({ userId: selectedCandidateId }) });
       setEditors(data.editors);
       setSelectedCandidateId('');
     } catch (err) {
@@ -45,7 +45,7 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmi
     setBusy(true);
     setPanelError('');
     try {
-      const data = await api(`/api/tournaments/${tournamentId}/editors/${editorId}`, { method: 'DELETE' });
+      const data = await authenticatedApi(`/api/tournaments/${tournamentId}/editors/${editorId}`, { method: 'DELETE' });
       setEditors(data.editors);
     } catch (err) {
       setPanelError(err.message);
@@ -115,7 +115,7 @@ function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], onOwnerC
     setBusy(true);
     setPanelError('');
     try {
-      const data = await api(`/api/tournaments/${tournamentId}/owner`, { method: 'PUT', body: JSON.stringify({ userId: selectedOwnerId }) });
+      const data = await authenticatedApi(`/api/tournaments/${tournamentId}/owner`, { method: 'PUT', body: JSON.stringify({ userId: selectedOwnerId }) });
       onOwnerChanged(data.tournament);
       setSelectedOwnerId('');
     } catch (err) {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
-import { api } from '../lib/api.js';
+import { api, authenticatedApi } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney } from '../lib/format.js';
@@ -180,7 +180,7 @@ function TournamentParticipants({ tournamentId, logoUrl, onMessage, onError }) {
     onMessage?.('');
     setCancellingRegistrationId(participant.registrationId);
     try {
-      await api(`/api/registrations/${participant.registrationId}/cancel`, { method: 'POST' });
+      await authenticatedApi(`/api/registrations/${participant.registrationId}/cancel`, { method: 'POST' });
       onMessage?.(t('Anmeldung wurde abgesagt.'));
       setReloadKey((key) => key + 1);
     } catch (requestError) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../lib/api.js';
+import { authenticatedApi } from '../lib/api.js';
 import { formatDateTime } from '../lib/format.js';
 import { API_KEY_STATUS_LABELS } from '../lib/domain.js';
 import { filterApiKeys } from '../frontend-core.js';
@@ -36,7 +36,7 @@ function ApiKeysPanel({ isAdmin }) {
 
   async function loadOwnKeys() {
     try {
-      const data = await api('/api/api-keys');
+      const data = await authenticatedApi('/api/api-keys');
       setApiKeys(data.apiKeys);
     } catch (err) {
       setPanelError(err.message);
@@ -48,7 +48,7 @@ function ApiKeysPanel({ isAdmin }) {
       return;
     }
     try {
-      const data = await api('/api/admin/api-keys');
+      const data = await authenticatedApi('/api/admin/api-keys');
       setAllApiKeys(data.apiKeys);
     } catch (err) {
       setPanelError(err.message);
@@ -60,7 +60,7 @@ function ApiKeysPanel({ isAdmin }) {
       return;
     }
     try {
-      const data = await api('/api/users');
+      const data = await authenticatedApi('/api/users');
       setUsers(data.users);
     } catch (err) {
       setPanelError(err.message);
@@ -90,7 +90,7 @@ function ApiKeysPanel({ isAdmin }) {
     setBusy(true);
     setPanelError('');
     try {
-      await api('/api/api-keys/request', { method: 'POST', body: JSON.stringify({ label: label.trim() }) });
+      await authenticatedApi('/api/api-keys/request', { method: 'POST', body: JSON.stringify({ label: label.trim() }) });
       setLabel('');
       await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
@@ -104,7 +104,7 @@ function ApiKeysPanel({ isAdmin }) {
     setPanelError('');
     setAdminActionId(`reveal-${id}`);
     try {
-      const data = await api(`/api/api-keys/${id}/secret`);
+      const data = await authenticatedApi(`/api/api-keys/${id}/secret`);
       setRevealedSecret({ id, secret: data.secret });
       await loadOwnKeys();
     } catch (err) {
@@ -121,7 +121,7 @@ function ApiKeysPanel({ isAdmin }) {
     setPanelError('');
     setAdminActionId(`revoke-${id}`);
     try {
-      await api(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
+      await authenticatedApi(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
       await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
       setPanelError(err.message);
@@ -134,7 +134,7 @@ function ApiKeysPanel({ isAdmin }) {
     setPanelError('');
     setAdminActionId(`approve-${id}`);
     try {
-      await api(`/api/admin/api-keys/${id}/approve`, { method: 'POST' });
+      await authenticatedApi(`/api/admin/api-keys/${id}/approve`, { method: 'POST' });
       await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
       setPanelError(err.message);
@@ -150,7 +150,7 @@ function ApiKeysPanel({ isAdmin }) {
     setPanelError('');
     setAdminActionId(`delete-${key.id}`);
     try {
-      await api(`/api/admin/api-keys/${key.id}`, { method: 'DELETE' });
+      await authenticatedApi(`/api/admin/api-keys/${key.id}`, { method: 'DELETE' });
       await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
       setPanelError(err.message);
@@ -183,9 +183,9 @@ function ApiKeysPanel({ isAdmin }) {
     setAdminSaving(true);
     try {
       if (mode === 'edit') {
-        await api(`/api/admin/api-keys/${form.id}`, { method: 'PUT', body: JSON.stringify({ label: form.label.trim() }) });
+        await authenticatedApi(`/api/admin/api-keys/${form.id}`, { method: 'PUT', body: JSON.stringify({ label: form.label.trim() }) });
       } else {
-        await api('/api/admin/api-keys', { method: 'POST', body: JSON.stringify({ userId: form.userId, label: form.label.trim() }) });
+        await authenticatedApi('/api/admin/api-keys', { method: 'POST', body: JSON.stringify({ userId: form.userId, label: form.label.trim() }) });
       }
       setDialogOpen(false);
       await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
