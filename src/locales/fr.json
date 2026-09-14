@@ -714,5 +714,15 @@
   "Petanque-Online-Kalender lieferte unvollständige Daten.": "Le calendrier Petanque-Online a renvoyé des données incomplètes.",
   "Der ausgewählte Petanque-Online-Termin ist unvollständig.": "L’événement Petanque-Online sélectionné est incomplet.",
   "Bitte wähle mindestens einen und höchstens 200 Termine aus.": "Sélectionne au moins un et au plus 200 événements.",
-  "Ein ausgewählter Petanque-Online-Termin ist nicht mehr verfügbar.": "Un événement Petanque-Online sélectionné n’est plus disponible."
+  "Ein ausgewählter Petanque-Online-Termin ist nicht mehr verfügbar.": "Un événement Petanque-Online sélectionné n’est plus disponible.",
+  "Freischalten": "Approuver",
+  "Sperren": "Bloquer",
+  "Alle API-Schlüssel": "Toutes les clés API",
+  "Neuer API-Schlüssel": "Nouvelle clé API",
+  "Bezeichnung, Name oder E-Mail suchen": "Rechercher par libellé, nom ou e-mail",
+  "Keine API-Schlüssel gefunden.": "Aucune clé API trouvée.",
+  "API-Schlüssel bearbeiten": "Modifier la clé API",
+  "API-Schlüssel anlegen": "Créer une clé API",
+  "Nutzer erforderlich": "Utilisateur requis",
+  "Nutzer nicht gefunden": "Utilisateur introuvable"
 }

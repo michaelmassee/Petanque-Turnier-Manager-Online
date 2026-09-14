@@ -714,5 +714,15 @@
   "Petanque-Online-Kalender lieferte unvollständige Daten.": "De Petanque-Online-kalender leverde onvolledige gegevens.",
   "Der ausgewählte Petanque-Online-Termin ist unvollständig.": "Het geselecteerde Petanque-Online-evenement is onvolledig.",
   "Bitte wähle mindestens einen und höchstens 200 Termine aus.": "Selecteer minstens één en hoogstens 200 evenementen.",
-  "Ein ausgewählter Petanque-Online-Termin ist nicht mehr verfügbar.": "Een geselecteerd Petanque-Online-evenement is niet langer beschikbaar."
+  "Ein ausgewählter Petanque-Online-Termin ist nicht mehr verfügbar.": "Een geselecteerd Petanque-Online-evenement is niet langer beschikbaar.",
+  "Freischalten": "Goedkeuren",
+  "Sperren": "Blokkeren",
+  "Alle API-Schlüssel": "Alle API-sleutels",
+  "Neuer API-Schlüssel": "Nieuwe API-sleutel",
+  "Bezeichnung, Name oder E-Mail suchen": "Zoeken op label, naam of e-mail",
+  "Keine API-Schlüssel gefunden.": "Geen API-sleutels gevonden.",
+  "API-Schlüssel bearbeiten": "API-sleutel bewerken",
+  "API-Schlüssel anlegen": "API-sleutel aanmaken",
+  "Nutzer erforderlich": "Gebruiker vereist",
+  "Nutzer nicht gefunden": "Gebruiker niet gevonden"
 }

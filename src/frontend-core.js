@@ -20,3 +20,12 @@ export function filterUsers(users, query, roleFilter, statusFilter) {
     return matchesQuery && matchesRole && matchesStatus;
   });
 }
+
+export function filterApiKeys(apiKeys, query, statusFilter) {
+  const normalizedQuery = (query || '').trim().toLowerCase();
+  return apiKeys.filter((key) => {
+    const matchesQuery = !normalizedQuery || [key.label, key.userName, key.userEmail].some((value) => (value || '').toLowerCase().includes(normalizedQuery));
+    const matchesStatus = !statusFilter || key.status === statusFilter;
+    return matchesQuery && matchesStatus;
+  });
+}

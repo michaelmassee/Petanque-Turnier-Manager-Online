@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
+import { filterApiKeys, filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 import { currencyDecimals } from './currencies.js';
 
 const tournaments = [
@@ -67,6 +67,31 @@ describe('filterUsers', () => {
 
   it('filtert nach erzwungenem Passwortwechsel', () => {
     expect(filterUsers(users, '', '', 'password_change_required')).toEqual([users[1]]);
+  });
+});
+
+const apiKeys = [
+  { id: 'k1', label: 'Bürorechner', status: 'pending', userName: 'Anna Admin', userEmail: 'anna@example.com' },
+  { id: 'k2', label: 'Laptop Turnierleitung', status: 'approved', userName: 'Bea User', userEmail: 'bea@example.com' },
+  { id: 'k3', label: null, status: 'revoked', userName: 'Carl User', userEmail: 'carl@example.com' },
+];
+
+describe('filterApiKeys', () => {
+  it('liefert alle Schlüssel bei leerer Suche und ohne Filter', () => {
+    expect(filterApiKeys(apiKeys, '', '')).toEqual(apiKeys);
+  });
+
+  it('filtert per Teilstring über Bezeichnung/Name/E-Mail', () => {
+    expect(filterApiKeys(apiKeys, 'bürorechner', '')).toEqual([apiKeys[0]]);
+    expect(filterApiKeys(apiKeys, 'bea@example.com', '')).toEqual([apiKeys[1]]);
+  });
+
+  it('behandelt fehlende Bezeichnung als leeren String', () => {
+    expect(filterApiKeys(apiKeys, 'carl@example.com', '')).toEqual([apiKeys[2]]);
+  });
+
+  it('filtert nach Status', () => {
+    expect(filterApiKeys(apiKeys, '', 'approved')).toEqual([apiKeys[1]]);
   });
 });
 

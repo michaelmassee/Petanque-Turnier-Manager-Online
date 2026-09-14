@@ -1,18 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
 import { formatDateTime } from '../lib/format.js';
 import { API_KEY_STATUS_LABELS } from '../lib/domain.js';
-import { Button } from '../components/ui.jsx';
+import { filterApiKeys } from '../frontend-core.js';
+import { Button, ListToolbar, EditDialog, SelectField, TextField } from '../components/ui.jsx';
+
+const API_KEY_STATUS_FILTERS = [
+  { value: '', label: 'Alle Status' },
+  { value: 'pending', label: 'Ausstehend' },
+  { value: 'approved', label: 'Freigeschaltet' },
+  { value: 'revoked', label: 'Widerrufen' },
+];
+
+const EMPTY_ADMIN_KEY_FORM = { id: '', userId: '', label: '' };
 
 function ApiKeysPanel({ isAdmin }) {
   const { t } = useTranslation();
   const [apiKeys, setApiKeys] = useState([]);
-  const [pendingRequests, setPendingRequests] = useState([]);
   const [label, setLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [panelError, setPanelError] = useState('');
   const [revealedSecret, setRevealedSecret] = useState(null);
+
+  const [allApiKeys, setAllApiKeys] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [mode, setMode] = useState('create');
+  const [form, setForm] = useState(EMPTY_ADMIN_KEY_FORM);
+  const [adminError, setAdminError] = useState('');
 
   async function loadOwnKeys() {
     try {
@@ -23,13 +41,25 @@ function ApiKeysPanel({ isAdmin }) {
     }
   }
 
-  async function loadPendingRequests() {
+  async function loadAllApiKeys() {
     if (!isAdmin) {
       return;
     }
     try {
-      const data = await api('/api/admin/api-keys?status=pending');
-      setPendingRequests(data.apiKeys);
+      const data = await api('/api/admin/api-keys');
+      setAllApiKeys(data.apiKeys);
+    } catch (err) {
+      setPanelError(err.message);
+    }
+  }
+
+  async function loadUsers() {
+    if (!isAdmin) {
+      return;
+    }
+    try {
+      const data = await api('/api/users');
+      setUsers(data.users);
     } catch (err) {
       setPanelError(err.message);
     }
@@ -37,9 +67,18 @@ function ApiKeysPanel({ isAdmin }) {
 
   useEffect(() => {
     loadOwnKeys();
-    loadPendingRequests();
+    loadAllApiKeys();
+    loadUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
+
+  const filteredApiKeys = useMemo(() => filterApiKeys(allApiKeys, query, statusFilter), [allApiKeys, query, statusFilter]);
+  const filtered = filteredApiKeys.length !== allApiKeys.length;
+
+  function resetFilters() {
+    setQuery('');
+    setStatusFilter('');
+  }
 
   async function handleRequest(event) {
     event.preventDefault();
@@ -51,7 +90,7 @@ function ApiKeysPanel({ isAdmin }) {
     try {
       await api('/api/api-keys/request', { method: 'POST', body: JSON.stringify({ label: label.trim() }) });
       setLabel('');
-      await loadOwnKeys();
+      await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
       setPanelError(err.message);
     } finally {
@@ -71,13 +110,13 @@ function ApiKeysPanel({ isAdmin }) {
   }
 
   async function handleRevoke(id) {
-    if (!window.confirm('API-Schlüssel wirklich widerrufen?')) {
+    if (!window.confirm('API-Schlüssel wirklich sperren?')) {
       return;
     }
     setPanelError('');
     try {
       await api(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
-      await loadOwnKeys();
+      await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
       setPanelError(err.message);
     }
@@ -87,21 +126,60 @@ function ApiKeysPanel({ isAdmin }) {
     setPanelError('');
     try {
       await api(`/api/admin/api-keys/${id}/approve`, { method: 'POST' });
-      await Promise.all([loadPendingRequests(), loadOwnKeys()]);
+      await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
       setPanelError(err.message);
     }
   }
 
-  async function handleReject(id) {
+  async function handleDelete(key) {
+    if (!window.confirm(`API-Schlüssel "${key.label}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) {
+      return;
+    }
     setPanelError('');
     try {
-      await api(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
-      await loadPendingRequests();
+      await api(`/api/admin/api-keys/${key.id}`, { method: 'DELETE' });
+      await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
     } catch (err) {
       setPanelError(err.message);
     }
   }
+
+  function openCreateDialog() {
+    setForm({ ...EMPTY_ADMIN_KEY_FORM, userId: users[0]?.id || '' });
+    setMode('create');
+    setAdminError('');
+    setDialogOpen(true);
+  }
+
+  function openEditDialog(key) {
+    setForm({ id: key.id, userId: key.userId, label: key.label });
+    setMode('edit');
+    setAdminError('');
+    setDialogOpen(true);
+  }
+
+  function closeDialog() {
+    setDialogOpen(false);
+  }
+
+  async function handleDialogSubmit(event) {
+    event.preventDefault();
+    setAdminError('');
+    try {
+      if (mode === 'edit') {
+        await api(`/api/admin/api-keys/${form.id}`, { method: 'PUT', body: JSON.stringify({ label: form.label.trim() }) });
+      } else {
+        await api('/api/admin/api-keys', { method: 'POST', body: JSON.stringify({ userId: form.userId, label: form.label.trim() }) });
+      }
+      setDialogOpen(false);
+      await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
+    } catch (err) {
+      setAdminError(err.message);
+    }
+  }
+
+  const userOptions = users.map((user) => ({ value: user.id, label: `${user.firstName} ${user.lastName} (${user.email})` }));
 
   return (
     <>
@@ -157,11 +235,6 @@ function ApiKeysPanel({ isAdmin }) {
                       {t('Schlüssel abholen')}
                     </Button>
                   )}
-                  {key.status === 'approved' && (
-                    <Button variant="secondary" onClick={() => handleRevoke(key.id)}>
-                      {t('Widerrufen')}
-                    </Button>
-                  )}
                 </td>
               </tr>
             ))}
@@ -177,42 +250,108 @@ function ApiKeysPanel({ isAdmin }) {
       {isAdmin && (
         <div className="panel">
           <div className="section-title">
-            <h2>{t('Offene Freischaltungsanfragen')}</h2>
+            <h2>{t('Alle API-Schlüssel')}</h2>
+            <span className="counter">{filtered ? `${filteredApiKeys.length}/${allApiKeys.length}` : allApiKeys.length}</span>
+            <Button onClick={openCreateDialog} disabled={users.length === 0}>
+              {t('Neuer API-Schlüssel')}
+            </Button>
           </div>
+          <ListToolbar
+            query={query}
+            onQueryChange={setQuery}
+            searchPlaceholder={t('Bezeichnung, Name oder E-Mail suchen')}
+            filters={[
+              {
+                label: t('Status filtern'),
+                value: statusFilter,
+                onChange: setStatusFilter,
+                options: API_KEY_STATUS_FILTERS.map((option) => ({ ...option, label: t(option.label) })),
+              },
+            ]}
+            onReset={resetFilters}
+            resetDisabled={!filtered}
+          />
           <table className="data-table">
             <thead>
               <tr>
                 <th>{t('Turnierleiter')}</th>
                 <th>{t('Bezeichnung')}</th>
+                <th>{t('Status')}</th>
                 <th>{t('Beantragt am')}</th>
+                <th>{t('Zuletzt genutzt')}</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {pendingRequests.map((key) => (
+              {filteredApiKeys.map((key) => (
                 <tr key={key.id}>
                   <td>
                     {key.userName} ({key.userEmail})
                   </td>
                   <td>{key.label}</td>
+                  <td>{API_KEY_STATUS_LABELS[key.status] || key.status}</td>
                   <td>{formatDateTime(key.requestedAt)}</td>
-                  <td>
-                    <Button onClick={() => handleApprove(key.id)}>{t('Genehmigen')}</Button>
-                    <Button variant="secondary" onClick={() => handleReject(key.id)}>
-                      {t('Ablehnen')}
+                  <td>{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : '–'}</td>
+                  <td className="row-actions">
+                    {key.status === 'pending' && (
+                      <Button onClick={() => handleApprove(key.id)}>{t('Freischalten')}</Button>
+                    )}
+                    {key.status === 'approved' && (
+                      <Button variant="secondary" onClick={() => handleRevoke(key.id)}>
+                        {t('Sperren')}
+                      </Button>
+                    )}
+                    <Button variant="secondary" onClick={() => openEditDialog(key)}>
+                      {t('Bearbeiten')}
+                    </Button>
+                    <Button variant="danger" onClick={() => handleDelete(key)}>
+                      {t('Löschen')}
                     </Button>
                   </td>
                 </tr>
               ))}
-              {pendingRequests.length === 0 && (
+              {filteredApiKeys.length === 0 && (
                 <tr>
-                  <td colSpan={4}>{t('Keine offenen Anfragen.')}</td>
+                  <td colSpan={6}>{t('Keine API-Schlüssel gefunden.')}</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       )}
+
+      <EditDialog
+        open={dialogOpen}
+        title={mode === 'edit' ? t('API-Schlüssel bearbeiten') : t('API-Schlüssel anlegen')}
+        error={adminError}
+        onClose={closeDialog}
+      >
+        <form className="form" onSubmit={handleDialogSubmit}>
+          {mode === 'create' && (
+            <SelectField
+              label={t('Turnierleiter')}
+              value={form.userId}
+              onChange={(userId) => setForm({ ...form, userId })}
+              options={userOptions}
+              required
+            />
+          )}
+          <TextField
+            label={t('Bezeichnung')}
+            value={form.label}
+            onChange={(value) => setForm({ ...form, label: value })}
+            required
+            minLength={2}
+            maxLength={120}
+          />
+          <div className="dialog-actions">
+            <Button variant="secondary" type="button" onClick={closeDialog}>
+              {t('Abbrechen')}
+            </Button>
+            <Button type="submit">{mode === 'edit' ? t('Speichern') : t('Anlegen')}</Button>
+          </div>
+        </form>
+      </EditDialog>
     </>
   );
 }

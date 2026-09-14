@@ -714,5 +714,15 @@
   "Petanque-Online-Kalender lieferte unvollständige Daten.": "The Petanque-Online calendar returned incomplete data.",
   "Der ausgewählte Petanque-Online-Termin ist unvollständig.": "The selected Petanque-Online event is incomplete.",
   "Bitte wähle mindestens einen und höchstens 200 Termine aus.": "Select at least one and at most 200 events.",
-  "Ein ausgewählter Petanque-Online-Termin ist nicht mehr verfügbar.": "A selected Petanque-Online event is no longer available."
+  "Ein ausgewählter Petanque-Online-Termin ist nicht mehr verfügbar.": "A selected Petanque-Online event is no longer available.",
+  "Freischalten": "Approve",
+  "Sperren": "Suspend",
+  "Alle API-Schlüssel": "All API keys",
+  "Neuer API-Schlüssel": "New API key",
+  "Bezeichnung, Name oder E-Mail suchen": "Search by label, name or email",
+  "Keine API-Schlüssel gefunden.": "No API keys found.",
+  "API-Schlüssel bearbeiten": "Edit API key",
+  "API-Schlüssel anlegen": "Create API key",
+  "Nutzer erforderlich": "User required",
+  "Nutzer nicht gefunden": "User not found"
 }

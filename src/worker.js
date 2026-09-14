@@ -994,6 +994,21 @@ export default {
         return await revokeApiKey(env, adminApiKeyRevokeMatch[1]);
       }
 
+      if (request.method === 'POST' && url.pathname === '/api/admin/api-keys') {
+        await requireAdmin(request, env.DB);
+        return await adminCreateApiKey(env.DB, request);
+      }
+
+      const adminApiKeyMatch = url.pathname.match(/^\/api\/admin\/api-keys\/([^/]+)$/);
+      if (adminApiKeyMatch && request.method === 'PUT') {
+        await requireAdmin(request, env.DB);
+        return await updateApiKeyLabel(env.DB, adminApiKeyMatch[1], request);
+      }
+      if (adminApiKeyMatch && request.method === 'DELETE') {
+        await requireAdmin(request, env.DB);
+        return await deleteApiKey(env.DB, adminApiKeyMatch[1]);
+      }
+
       if (url.pathname === '/api/tournaments') {
         if (request.method === 'GET') {
           const session = await optionalSession(request, env.DB);
@@ -2707,7 +2722,31 @@ async function listPetanqueOnlineCandidates(db) {
     .sort((left, right) => left.date.localeCompare(right.date) || (left.startTime || '').localeCompare(right.startTime || '') || left.name.localeCompare(right.name));
 }
 
-async function upsertPetanqueOnlineTournament(db, entry, ownerId, now) {
+// Turnier-Detailseite scrapen, um die tatsächliche Vereinswebseite (organizer.url im
+// eingebetteten JSON-LD) statt des petanque-online.de-Links als Quelle zu verwenden.
+// Nur beim Import ausgeführt, nicht beim täglichen Sync (undokumentierte HTML-Struktur,
+// soll den Cron-Lauf nicht verlangsamen oder anfällig für Änderungen an der Fremdseite machen).
+async function fetchPetanqueOnlineClubWebsite(slug) {
+  if (!slug) return null;
+  try {
+    const response = await fetch(`https://petanque-online.de/turniere/${encodeURIComponent(slug)}`, {
+      headers: { Accept: 'text/html' },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) return null;
+    const html = await response.text();
+    const match = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+    if (!match) return null;
+    const data = JSON.parse(match[1]);
+    const url = data?.organizer?.url;
+    return typeof url === 'string' && isHttpUrl(url) ? url : null;
+  } catch (error) {
+    console.error(`Petanque-Online club website scrape failed for slug ${slug}`, error);
+    return null;
+  }
+}
+
+async function upsertPetanqueOnlineTournament(db, entry, ownerId, now, { scrapeClubWebsite = false } = {}) {
   const mapped = mapPetanqueOnlineTournament(entry);
   if (mapped.name.length < 2 || !/^\d{4}-\d{2}-\d{2}$/.test(mapped.date) || mapped.location.length < 2) {
     throw new HttpError(400, 'Der ausgewählte Petanque-Online-Termin ist unvollständig.');
@@ -2717,10 +2756,16 @@ async function upsertPetanqueOnlineTournament(db, entry, ownerId, now) {
   if (existing) {
     await db.prepare(
       `UPDATE tournaments SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, formation = ?, formation_other = ?,
-       website_url = ?, flyer_url = ?, status = 'registration', visibility = 'public', registration_enabled = 0, updated_at = ? WHERE id = ?`,
-    ).bind(mapped.name, mapped.club, mapped.date, mapped.startTime, mapped.location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.websiteUrl, mapped.flyerUrl, now, existing.tournament_id).run();
+       flyer_url = ?, status = 'registration', visibility = 'public', registration_enabled = 0, updated_at = ? WHERE id = ?`,
+    ).bind(mapped.name, mapped.club, mapped.date, mapped.startTime, mapped.location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.flyerUrl, now, existing.tournament_id).run();
     await db.prepare("UPDATE petanque_online_imports SET synced_at = ? WHERE source = 'petanque-online' AND external_key = ?").bind(now, mapped.externalKey).run();
     return 'updated';
+  }
+
+  let websiteUrl = mapped.websiteUrl;
+  if (scrapeClubWebsite && !entry.source_url) {
+    const clubWebsite = await fetchPetanqueOnlineClubWebsite(entry.slug);
+    if (clubWebsite) websiteUrl = clubWebsite;
   }
 
   const id = crypto.randomUUID();
@@ -2729,7 +2774,7 @@ async function upsertPetanqueOnlineTournament(db, entry, ownerId, now) {
       `INSERT INTO tournaments (id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, registration_type,
        status, visibility, registration_enabled, club, website_url, flyer_url, timezone, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'formule_x', ?, ?, 'forme', 'registration', 'public', 0, ?, ?, ?, 'Europe/Berlin', ?, ?)`,
-    ).bind(id, ownerId, ownerId, mapped.name, mapped.date, mapped.startTime, mapped.location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.club, mapped.websiteUrl, mapped.flyerUrl, now, now),
+    ).bind(id, ownerId, ownerId, mapped.name, mapped.date, mapped.startTime, mapped.location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.club, websiteUrl, mapped.flyerUrl, now, now),
     db.prepare("INSERT INTO petanque_online_imports (source, external_key, tournament_id, imported_at, synced_at) VALUES ('petanque-online', ?, ?, ?, ?)").bind(mapped.externalKey, id, now, now),
   ]);
   return 'created';
@@ -2747,7 +2792,7 @@ async function importPetanqueOnlineTournaments(request, db, user) {
   const result = { created: 0, updated: 0, failed: 0 };
   for (const key of externalKeys) {
     try {
-      const action = await upsertPetanqueOnlineTournament(db, selected.get(key), user.id, now);
+      const action = await upsertPetanqueOnlineTournament(db, selected.get(key), user.id, now, { scrapeClubWebsite: true });
       result[action] += 1;
     } catch (error) {
       console.error(`Petanque-Online import failed for ${key}`, error);
@@ -3975,6 +4020,64 @@ async function revokeApiKey(env, id) {
     throw new HttpError(404, 'API-Schlüssel nicht gefunden oder bereits widerrufen');
   }
   await createSystemNotification(env, existing.user_id, 'api_key_status_changed', { status: 'revoked', label: existing.label });
+  return json({ ok: true });
+}
+
+async function adminCreateApiKey(db, request) {
+  const body = await readJson(request);
+  const label = String(body.label || '').trim();
+  const userId = String(body.userId || '').trim();
+
+  if (!userId) {
+    throw new HttpError(400, 'Nutzer erforderlich');
+  }
+  if (label.length < 2 || label.length > 120) {
+    throw new HttpError(400, 'Label muss zwischen 2 und 120 Zeichen enthalten');
+  }
+
+  const user = await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+  if (!user) {
+    throw new HttpError(404, 'Nutzer nicht gefunden');
+  }
+
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  await db
+    .prepare(
+      `INSERT INTO api_keys (id, user_id, key_hash, label, status, requested_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
+    )
+    .bind(id, userId, `pending:${id}`, label, now, now, now)
+    .run();
+
+  const created = await db.prepare('SELECT * FROM api_keys WHERE id = ?').bind(id).first();
+  return json({ apiKey: toPublicApiKey(created) }, 201);
+}
+
+async function updateApiKeyLabel(db, id, request) {
+  const body = await readJson(request);
+  const label = String(body.label || '').trim();
+
+  if (label.length < 2 || label.length > 120) {
+    throw new HttpError(400, 'Label muss zwischen 2 und 120 Zeichen enthalten');
+  }
+
+  const now = new Date().toISOString();
+  const result = await db.prepare('UPDATE api_keys SET label = ?, updated_at = ? WHERE id = ?').bind(label, now, id).run();
+  if (result.meta.changes === 0) {
+    throw new HttpError(404, 'API-Schlüssel nicht gefunden');
+  }
+
+  const updated = await db.prepare('SELECT * FROM api_keys WHERE id = ?').bind(id).first();
+  return json({ apiKey: toPublicApiKey(updated) });
+}
+
+async function deleteApiKey(db, id) {
+  const result = await db.prepare('DELETE FROM api_keys WHERE id = ?').bind(id).run();
+  if (result.meta.changes === 0) {
+    throw new HttpError(404, 'API-Schlüssel nicht gefunden');
+  }
   return json({ ok: true });
 }
 
