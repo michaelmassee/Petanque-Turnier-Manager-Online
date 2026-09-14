@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './lib/api.js';
 import { queryClient } from './lib/query-client.js';
+import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { usePath, matchTournamentRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, timezoneAbbrev, formatTournamentDateTime, minorUnitsToAmount, amountToMinorUnits, currencyOptions, formatMoney, utcIsoToZonedDateTimeInput, formatDateTime, isPasswordStrong } from './lib/format.js';
@@ -494,6 +495,7 @@ function AppContent() {
     event.preventDefault();
     try {
       await api('/api/postbox/messages', { method: 'POST', body: JSON.stringify({ recipientId: postboxRecipientId, body: postboxBody }) });
+      pushRecentRecipientValue(currentUser?.id, postboxRecipientId);
       setPostboxBody('');
       setPostboxRecipientId('');
       await loadPostbox();
@@ -1699,6 +1701,7 @@ function AppContent() {
             recipientTournaments={postboxRecipientTournaments}
             recipientId={postboxRecipientId}
             setRecipientId={setPostboxRecipientId}
+            currentUserId={currentUser?.id}
             body={postboxBody}
             setBody={setPostboxBody}
             onToggle={handleOpenPostbox}

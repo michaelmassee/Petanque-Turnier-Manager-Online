@@ -6,6 +6,7 @@ import { MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTION
 import { labelFor, roleName, translatedOptions } from '../lib/domain.js';
 import { EditDialog, SelectField, TextArea, Button } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
+import { RecipientPicker } from './RecipientPicker.jsx';
 import { LanguageSelect } from '../auth/AuthForms.jsx';
 
 async function subscribeToPush() {
@@ -74,7 +75,7 @@ export function PushMigrationNotice({ onDismiss, onEnabled }) {
   );
 }
 
-export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick }) {
+export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick, currentUserId }) {
   const [pushState, setPushState] = useState('');
   const [pushErrorDetail, setPushErrorDetail] = useState('');
   const [pushActive, setPushActive] = useState(false);
@@ -119,11 +120,15 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
               {pushState && !pushActive && <p className="hint">{text(pushState)}{pushErrorDetail ? ` (${pushErrorDetail})` : ''}</p>}
             </div>
             <form className="form postbox-compose" onSubmit={onSubmit}>
-              <SelectField label={text('recipient')} value={recipientId} onChange={setRecipientId} options={[
-                { value: '', label: text('chooseRecipient') },
-                ...recipientTournaments.map((tournament) => ({ value: `tournament:${tournament.id}`, label: text('allParticipantsOf').replace('{name}', tournament.name) })),
-                ...recipients.map((recipient) => ({ value: recipient.id, label: `${recipient.firstName} ${recipient.lastName}` })),
-              ]} />
+              <RecipientPicker
+                label={text('recipient')}
+                recipients={recipients}
+                recipientTournaments={recipientTournaments}
+                value={recipientId}
+                onChange={setRecipientId}
+                currentUserId={currentUserId}
+                required
+              />
               <TextArea label={text('message')} value={body} onChange={setBody} maxLength={250} />
               <Button type="submit" disabled={!recipientId || !body.trim()}>{text('send')}</Button>
             </form>
