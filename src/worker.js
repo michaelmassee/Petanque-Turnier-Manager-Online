@@ -8,6 +8,7 @@ import {
   isTournamentRoundNumberConflict,
   normalizeTournamentInput as normalizeCoreTournamentInput,
   registrationOpenStatus as coreRegistrationOpenStatus,
+  tournamentMatchesSavedSearch,
   validateMatchScore,
 } from './worker-core.js';
 import { getPairingStrategy, isOnlinePlayable } from './lib/pairing/index.js';
@@ -371,6 +372,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     accountPasswordChangeRequired: 'Passwortänderung erforderlich',
     apiKeyApproved: (label) => `API-Schlüssel „${label}“ wurde freigegeben`,
     apiKeyRevoked: (label) => `API-Schlüssel „${label}“ wurde gesperrt`,
+    savedSearchMatches: (name, count) => `${count} neue${count === 1 ? 's' : ''} Turnier${count === 1 ? '' : 'e'} für „${name}“`,
   },
   nl: {
     tournamentStatus: { draft: 'Concept', registration: 'Inschrijving open', running: 'Bezig', finished: 'Afgerond' },
@@ -380,6 +382,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     accountPasswordChangeRequired: 'wachtwoordwijziging vereist',
     apiKeyApproved: (label) => `API-sleutel „${label}” is goedgekeurd`,
     apiKeyRevoked: (label) => `API-sleutel „${label}” is ingetrokken`,
+    savedSearchMatches: (name, count) => `${count} nieuw(e) toernooi(en) voor „${name}”`,
   },
   en: {
     tournamentStatus: { draft: 'Draft', registration: 'Registration open', running: 'Running', finished: 'Finished' },
@@ -389,6 +392,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     accountPasswordChangeRequired: 'password change required',
     apiKeyApproved: (label) => `API key "${label}" was approved`,
     apiKeyRevoked: (label) => `API key "${label}" was revoked`,
+    savedSearchMatches: (name, count) => `${count} new tournament${count === 1 ? '' : 's'} for "${name}"`,
   },
   es: {
     tournamentStatus: { draft: 'Borrador', registration: 'Inscripción abierta', running: 'En curso', finished: 'Finalizado' },
@@ -398,6 +402,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     accountPasswordChangeRequired: 'cambio de contraseña requerido',
     apiKeyApproved: (label) => `La clave API «${label}» fue aprobada`,
     apiKeyRevoked: (label) => `La clave API «${label}» fue revocada`,
+    savedSearchMatches: (name, count) => `${count} torneo${count === 1 ? '' : 's'} nuevo${count === 1 ? '' : 's'} para «${name}»`,
   },
   fr: {
     tournamentStatus: { draft: 'Brouillon', registration: 'Inscriptions ouvertes', running: 'En cours', finished: 'Terminé' },
@@ -407,6 +412,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     accountPasswordChangeRequired: 'changement de mot de passe requis',
     apiKeyApproved: (label) => `La clé API « ${label} » a été approuvée`,
     apiKeyRevoked: (label) => `La clé API « ${label} » a été révoquée`,
+    savedSearchMatches: (name, count) => `${count} nouveau${count === 1 ? '' : 'x'} tournoi${count === 1 ? '' : 's'} pour « ${name} »`,
   },
 };
 
@@ -427,6 +433,9 @@ function buildSystemNotificationPushBody(eventType, eventData, language) {
   }
   if (eventType === 'api_key_status_changed') {
     return data.status === 'approved' ? texts.apiKeyApproved(data.label || '') : texts.apiKeyRevoked(data.label || '');
+  }
+  if (eventType === 'saved_search_new_matches') {
+    return texts.savedSearchMatches(data.savedSearchName || '', data.count || 0);
   }
   return null;
 }
@@ -795,6 +804,7 @@ export default {
       Promise.all([
         sendTournamentReminders(env).catch((error) => console.error('Tournament reminder cron failed', error)),
         syncPetanqueOnlineImports(env.DB).catch((error) => console.error('Petanque-Online sync cron failed', error)),
+        checkSavedSearchMatches(env).catch((error) => console.error('Saved-search matching cron failed', error)),
       ]),
     );
   },
@@ -930,6 +940,26 @@ export default {
       if (request.method === 'DELETE' && url.pathname === '/api/push/subscriptions') {
         const session = await requireSession(request, env.DB);
         return await removePushSubscription(request, env.DB, session.user.id);
+      }
+
+      if (url.pathname === '/api/saved-searches') {
+        const session = await requireSession(request, env.DB);
+        if (request.method === 'GET') {
+          return await listSavedSearches(env.DB, session.user.id);
+        }
+        if (request.method === 'POST') {
+          return await createSavedSearch(request, env.DB, session.user.id);
+        }
+      }
+
+      const savedSearchMatch = url.pathname.match(/^\/api\/saved-searches\/([^/]+)$/);
+      if (savedSearchMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        return await updateSavedSearch(request, env.DB, savedSearchMatch[1], session.user.id);
+      }
+      if (savedSearchMatch && request.method === 'DELETE') {
+        const session = await requireSession(request, env.DB);
+        return await deleteSavedSearch(env.DB, savedSearchMatch[1], session.user.id);
       }
 
       if (url.pathname === '/api/users') {
@@ -2229,6 +2259,138 @@ async function removePushSubscription(request, db, userId) {
   const body = await readJson(request);
   await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?').bind(String(body.endpoint || ''), userId).run();
   return json({ ok: true });
+}
+
+const SAVED_SEARCH_LIMIT = 25;
+
+function toPublicSavedSearch(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    query: row.query || '',
+    onlyMine: Boolean(Number(row.only_mine)),
+    filterMonth: row.filter_month || '',
+    filterFormation: row.filter_formation || '',
+    filterRegistrationType: row.filter_registration_type || '',
+    filterType: row.filter_type || '',
+    filterOpenOnly: Boolean(Number(row.filter_open_only)),
+    searchOrigin: row.origin_lat === null || row.origin_lat === undefined
+      ? null
+      : { lat: Number(row.origin_lat), lng: Number(row.origin_lng), label: row.origin_label || '' },
+    radiusKm: row.radius_km || '',
+    notifyEnabled: Boolean(Number(row.notify_enabled)),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function normalizeSavedSearchInput(body) {
+  const name = String(body.name || '').trim();
+  if (!name) throw new HttpError(400, 'Bitte gib der gespeicherten Suche einen Namen.');
+  if (name.length > 80) throw new HttpError(400, 'Der Name darf höchstens 80 Zeichen lang sein.');
+  const originInput = body.searchOrigin;
+  const origin = originInput && Number.isFinite(Number(originInput.lat)) && Number.isFinite(Number(originInput.lng))
+    ? { lat: Number(originInput.lat), lng: Number(originInput.lng), label: String(originInput.label || '') }
+    : null;
+  return {
+    name,
+    query: String(body.query || '').trim().slice(0, 200),
+    onlyMine: Boolean(body.onlyMine),
+    filterMonth: String(body.filterMonth || ''),
+    filterFormation: String(body.filterFormation || ''),
+    filterRegistrationType: String(body.filterRegistrationType || ''),
+    filterType: String(body.filterType || ''),
+    filterOpenOnly: Boolean(body.filterOpenOnly),
+    origin,
+    radiusKm: origin ? String(body.radiusKm || '25') : null,
+    notifyEnabled: Boolean(body.notifyEnabled),
+  };
+}
+
+async function listSavedSearches(db, userId) {
+  const result = await db.prepare('SELECT * FROM saved_searches WHERE user_id = ? ORDER BY created_at DESC').bind(userId).all();
+  return json({ savedSearches: (result.results || []).map(toPublicSavedSearch) });
+}
+
+async function createSavedSearch(request, db, userId) {
+  const body = await readJson(request);
+  const input = normalizeSavedSearchInput(body);
+
+  const { count } = await db.prepare('SELECT COUNT(*) AS count FROM saved_searches WHERE user_id = ?').bind(userId).first();
+  if (count >= SAVED_SEARCH_LIMIT) {
+    throw new HttpError(403, 'Maximal 25 gespeicherte Suchen erlaubt.');
+  }
+
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  await db.prepare(
+    `INSERT INTO saved_searches (
+      id, user_id, name, query, only_mine, filter_month, filter_formation, filter_registration_type, filter_type, filter_open_only,
+      origin_lat, origin_lng, origin_label, radius_km, notify_enabled, last_checked_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+  ).bind(
+    id, userId, input.name, input.query, input.onlyMine ? 1 : 0, input.filterMonth, input.filterFormation,
+    input.filterRegistrationType, input.filterType, input.filterOpenOnly ? 1 : 0,
+    input.origin?.lat ?? null, input.origin?.lng ?? null, input.origin?.label ?? null, input.radiusKm,
+    input.notifyEnabled ? 1 : 0, now, now,
+  ).run();
+
+  const row = await db.prepare('SELECT * FROM saved_searches WHERE id = ?').bind(id).first();
+  return json({ savedSearch: toPublicSavedSearch(row) }, 201);
+}
+
+async function updateSavedSearch(request, db, id, userId) {
+  const existing = await db.prepare('SELECT id, notify_enabled FROM saved_searches WHERE id = ? AND user_id = ?').bind(id, userId).first();
+  if (!existing) throw new HttpError(404, 'Gespeicherte Suche nicht gefunden.');
+  const body = await readJson(request);
+  const input = normalizeSavedSearchInput(body);
+  const now = new Date().toISOString();
+  await db.prepare(
+    `UPDATE saved_searches SET name = ?, query = ?, only_mine = ?, filter_month = ?, filter_formation = ?, filter_registration_type = ?,
+     filter_type = ?, filter_open_only = ?, origin_lat = ?, origin_lng = ?, origin_label = ?, radius_km = ?, notify_enabled = ?,
+     last_checked_at = CASE WHEN ? = 1 AND ? = 0 THEN NULL ELSE last_checked_at END, updated_at = ?
+     WHERE id = ?`,
+  ).bind(
+    input.name, input.query, input.onlyMine ? 1 : 0, input.filterMonth, input.filterFormation, input.filterRegistrationType,
+    input.filterType, input.filterOpenOnly ? 1 : 0, input.origin?.lat ?? null, input.origin?.lng ?? null, input.origin?.label ?? null,
+    input.radiusKm, input.notifyEnabled ? 1 : 0, input.notifyEnabled ? 1 : 0, Number(existing.notify_enabled), now, id,
+  ).run();
+  const row = await db.prepare('SELECT * FROM saved_searches WHERE id = ?').bind(id).first();
+  return json({ savedSearch: toPublicSavedSearch(row) });
+}
+
+async function deleteSavedSearch(db, id, userId) {
+  const result = await db.prepare('DELETE FROM saved_searches WHERE id = ? AND user_id = ?').bind(id, userId).run();
+  if (!result.meta.changes) throw new HttpError(404, 'Gespeicherte Suche nicht gefunden.');
+  return json({ ok: true });
+}
+
+async function checkSavedSearchMatches(env) {
+  const db = env.DB;
+  const searches = await db.prepare('SELECT * FROM saved_searches WHERE notify_enabled = 1').all();
+  const now = new Date().toISOString();
+
+  for (const search of searches.results || []) {
+    const isFirstRun = !search.last_checked_at;
+    const since = search.last_checked_at || now;
+    const candidates = await db.prepare(
+      "SELECT * FROM tournaments WHERE created_at > ? AND visibility = 'public' AND status != 'draft'",
+    ).bind(since).all();
+
+    const matches = (candidates.results || []).filter((tournament) => tournamentMatchesSavedSearch(tournament, search));
+
+    if (matches.length > 0 && !isFirstRun) {
+      await createSystemNotification(
+        env,
+        search.user_id,
+        'saved_search_new_matches',
+        { savedSearchName: search.name, count: matches.length, tournamentNames: matches.slice(0, 3).map((tournament) => tournament.name) },
+        'Neue Turniere gefunden',
+      );
+    }
+
+    await db.prepare('UPDATE saved_searches SET last_checked_at = ? WHERE id = ?').bind(now, search.id).run();
+  }
 }
 
 async function sendPushNotifications(env, userId, payload) {

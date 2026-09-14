@@ -176,11 +176,65 @@ function postboxMessageText(message, t) {
   if (message.eventType === 'api_key_status_changed') {
     return t(data.status === 'approved' ? 'apiKeyApproved' : 'apiKeyRevoked').replace('{label}', data.label || '');
   }
+  if (message.eventType === 'saved_search_new_matches') {
+    return t('savedSearchMatchesText').replace('{name}', data.savedSearchName || '').replace('{count}', data.count ?? 0);
+  }
   return t('status');
 }
 
 function postboxTodoText(type, t) {
   return t(`todo_${type}`);
+}
+
+function savedSearchSummary(search, t) {
+  const parts = [];
+  if (search.query) parts.push(`„${search.query}“`);
+  if (search.filterMonth) parts.push(labelFor(MONTHS, search.filterMonth));
+  if (search.filterFormation) parts.push(labelFor(FORMATIONS, search.filterFormation));
+  if (search.filterRegistrationType) parts.push(labelFor(REGISTRATION_TYPES, search.filterRegistrationType));
+  if (search.filterType) parts.push(labelFor(TOURNAMENT_TYPES, search.filterType));
+  if (search.filterOpenOnly) parts.push(t('Anmeldung möglich'));
+  if (search.searchOrigin) parts.push(`${labelFor(RADIUS_OPTIONS, search.radiusKm)} ${t('Umkreis')} · ${search.searchOrigin.label}`);
+  return parts.length ? parts.join(' · ') : t('Alle Turniere');
+}
+
+export function SavedSearchesControl({ open, savedSearches = [], onToggle, onClose, onApply, onToggleNotify, onEdit, onDelete }) {
+  const { t } = useTranslation();
+  return (
+    <div className="postbox-menu">
+      <button className="postbox-btn" type="button" aria-label={t('savedSearches')} aria-expanded={open} onClick={onToggle}>
+        <svg className="postbox-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M6 3.5h12v17l-6-4-6 4z" />
+        </svg>
+      </button>
+      {open && (
+        <>
+          <div className="search-menu-backdrop" onClick={onClose} />
+          <section className="postbox-panel" aria-label={t('savedSearches')}>
+            <div className="section-title"><h2>{t('savedSearches')}</h2><button className="link-button" type="button" onClick={onClose}>{t('close')}</button></div>
+            <div className="postbox-section">
+              {savedSearches.map((search) => (
+                <div className="postbox-message" key={search.id}>
+                  <strong data-i18n-skip>{search.name}</strong>
+                  <span data-i18n-skip>{savedSearchSummary(search, t)}</span>
+                  <div className="dialog-actions">
+                    <Button variant="secondary" onClick={() => onApply(search)}>{t('applySavedSearch')}</Button>
+                    <label className="checkbox-field">
+                      <input type="checkbox" checked={search.notifyEnabled} onChange={() => onToggleNotify(search)} />
+                      {t('notifyOnNewMatches')}
+                    </label>
+                    <button className="link-button" type="button" onClick={() => onEdit(search)}>{t('Bearbeiten')}</button>
+                    <button className="link-button" type="button" onClick={() => onDelete(search)}>{t('Löschen')}</button>
+                  </div>
+                </div>
+              ))}
+              {savedSearches.length === 0 && <p className="muted">{t('noSavedSearches')}</p>}
+            </div>
+          </section>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function InstallAppButton() {
@@ -218,7 +272,7 @@ export function InstallAppButton() {
   return null;
 }
 
-export function AppHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, children }) {
+export function AppHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, savedSearchesControl, children }) {
   const { t } = useTranslation();
   return (
     <header className="topbar">
@@ -242,6 +296,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
       </button>
       <div className="topbar-actions">
         {searchControl}
+        {savedSearchesControl}
         {postboxControl}
         <LanguageSelect language={language} setLanguage={setLanguage} />
         <button
@@ -328,6 +383,8 @@ export function SearchMenuControl({
   setSearchRadiusKm,
   geoLoading,
   geoError,
+  canSaveSearch,
+  onSaveSearch,
 }) {
   const { t } = useTranslation();
   return (
@@ -430,6 +487,11 @@ export function SearchMenuControl({
                   <button className="link-button" type="button" onClick={onResetFilters}>
                     {t('Zurücksetzen')}
                   </button>
+                  {canSaveSearch && (
+                    <button className="link-button" type="button" onClick={onSaveSearch}>
+                      {t('saveThisSearch')}
+                    </button>
+                  )}
                 </div>
               </div>
             )}

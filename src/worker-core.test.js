@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertPartnerCountMatchesFormation, isTournamentRoundNumberConflict, normalizeTournamentInput, registrationOpenStatus, validateMatchScore } from './worker-core.js';
+import { assertPartnerCountMatchesFormation, isTournamentRoundNumberConflict, normalizeTournamentInput, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
 
 const base = { name: 'Testturnier', date: '2026-06-01', location: 'Musterstadt' };
 
@@ -62,5 +62,32 @@ describe('Worker-Fachlogik', () => {
     expect(isTournamentRoundNumberConflict('UNIQUE constraint failed: tournament_rounds.tournament_id, tournament_rounds.round_number')).toBe(true);
     expect(isTournamentRoundNumberConflict()).toBe(false);
     expect(isTournamentRoundNumberConflict(new Error('UNIQUE constraint failed: registrations.tournament_id, registrations.email'))).toBe(false);
+  });
+
+  it('gleicht gespeicherte Suchen mit öffentlichen Turnieren und dem Umkreis ab', () => {
+    const tournament = {
+      name: 'Herbstpokal', location: 'Linden', type: 'rangliste', date: '2026-09-20', visibility: 'public', status: 'registration',
+      formation: 'doublette', formation_other: 0, registration_type: 'forme', latitude: 50.52, longitude: 8.58,
+    };
+    const matchingSearch = { query: 'herbst', filter_month: '09', filter_formation: 'doublette', filter_registration_type: 'forme', filter_type: 'rangliste', filter_open_only: 0, origin_lat: 50.51, origin_lng: 8.57, radius_km: '25' };
+
+    expect(workerDistanceKm(50.51, 8.57, 50.52, 8.58)).toBeLessThan(2);
+    expect(tournamentMatchesSavedSearch(tournament, matchingSearch)).toBe(true);
+    expect(tournamentMatchesSavedSearch({ ...tournament, visibility: 'private' }, matchingSearch)).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, status: 'draft' }, matchingSearch)).toBe(false);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_month: '10' })).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, formation_other: 1 }, matchingSearch)).toBe(false);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_formation: 'andere' })).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, formation_other: 1 }, { ...matchingSearch, filter_formation: 'andere' })).toBe(true);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_registration_type: 'melee' })).toBe(false);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_type: 'ko' })).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, status: 'running' }, { ...matchingSearch, filter_open_only: 1 })).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, registration_opens_at: '2099-01-01T00:00:00.000Z' }, { ...matchingSearch, filter_open_only: 1 })).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, registration_deadline: '2000-01-01T00:00:00.000Z' }, { ...matchingSearch, filter_open_only: 1 })).toBe(false);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_open_only: 1 })).toBe(true);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, query: 'unbekannt' })).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, latitude: null }, matchingSearch)).toBe(false);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, origin_lat: null, origin_lng: null })).toBe(true);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, radius_km: '0.1' })).toBe(false);
   });
 });

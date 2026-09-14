@@ -11,10 +11,10 @@ import { usePath, matchTournamentRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, timezoneAbbrev, formatTournamentDateTime, minorUnitsToAmount, amountToMinorUnits, currencyOptions, formatMoney, utcIsoToZonedDateTimeInput, formatDateTime, isPasswordStrong } from './lib/format.js';
 import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, tournamentPayload, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, distanceKm } from './lib/domain.js';
-import { RequiredMark, TextField, SelectField, Button, Feedback } from './components/ui.jsx';
+import { RequiredMark, TextField, SelectField, Button, Feedback, EditDialog } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
-import { AppHeader, PostboxControl, PushMigrationNotice, SearchMenuControl, AuthModal, StandalonePageHeader, InstallAppButton, OfflineNotice } from './components/layout.jsx';
+import { AppHeader, PostboxControl, PushMigrationNotice, SearchMenuControl, SavedSearchesControl, AuthModal, StandalonePageHeader, InstallAppButton, OfflineNotice } from './components/layout.jsx';
 import { AuthShell, LanguageSelect, SetupForm, LoginForm, RegisterForm, RegisterSuccessNotice, ForgotPasswordForm, ResendVerificationForm, ResetPasswordForm, VerifyEmailForm, CancelRegistrationForm } from './auth/AuthForms.jsx';
 import { isOnlinePlayable } from './lib/pairing/index.js';
 
@@ -85,6 +85,12 @@ function AppContent() {
   const [postboxRecipientId, setPostboxRecipientId] = useState('');
   const [postboxBody, setPostboxBody] = useState('');
   const [postboxSending, setPostboxSending] = useState(false);
+  const [savedSearches, setSavedSearches] = useState([]);
+  const [savedSearchesOpen, setSavedSearchesOpen] = useState(false);
+  const [savedSearchDialogOpen, setSavedSearchDialogOpen] = useState(false);
+  const [savedSearchMode, setSavedSearchMode] = useState('create');
+  const [savedSearchForm, setSavedSearchForm] = useState({ id: '', name: '', notifyEnabled: false });
+  const [savedSearchSaving, setSavedSearchSaving] = useState(false);
   const [pushMigrationDismissed, setPushMigrationDismissed] = useState(() => localStorage.getItem('ptm_push_migration') === 'dismissed');
   const [users, setUsers] = useState([]);
   const [tournaments, setTournaments] = useState([]);
@@ -302,7 +308,7 @@ function AppContent() {
 
   const authModalOpen = authView !== 'home' && authView !== 'cancelRegistration';
   const anyDialogOpen =
-    menuOpen || searchMenuOpen || homeFilterOpen || postboxOpen || userDialogOpen || tournamentDialogOpen || registrationDialogOpen || authModalOpen;
+    menuOpen || searchMenuOpen || homeFilterOpen || postboxOpen || savedSearchesOpen || savedSearchDialogOpen || userDialogOpen || tournamentDialogOpen || registrationDialogOpen || authModalOpen;
   const awayFromHome = activeTab !== 'home';
   const desiredNavDepth = (awayFromHome ? 1 : 0) + (anyDialogOpen ? 1 : 0);
   const navDepthRef = useRef(0);
@@ -355,6 +361,8 @@ function AppContent() {
         setSearchMenuOpen(false);
         setHomeFilterOpen(false);
         setPostboxOpen(false);
+        setSavedSearchesOpen(false);
+        setSavedSearchDialogOpen(false);
         setUserDialogOpen(false);
         setTournamentDialogOpen(false);
         setRegistrationDialogOpen(false);
@@ -391,6 +399,14 @@ function AppContent() {
   useEffect(() => {
     if (usersQuery.data) setUsers(usersQuery.data.users);
   }, [usersQuery.data]);
+
+  useEffect(() => {
+    if (currentUser) {
+      loadSavedSearches(true);
+    } else {
+      setSavedSearches([]);
+    }
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (registrationsQuery.data) {
@@ -489,6 +505,152 @@ function AppContent() {
       setPostboxRecipientTournaments(data.recipients.tournaments || []);
     } catch (requestError) {
       if (!silent) setError(requestError.message);
+    }
+  }
+
+  async function loadSavedSearches(silent = false) {
+    try {
+      const data = await queryClient.fetchQuery({
+        queryKey: ['savedSearches', currentUser?.id],
+        queryFn: () => api('/api/saved-searches'),
+        staleTime: 0,
+      });
+      setSavedSearches(data.savedSearches);
+    } catch (requestError) {
+      if (!silent) setError(requestError.message);
+    }
+  }
+
+  function handleOpenSavedSearches() {
+    setMenuOpen(false);
+    setSearchMenuOpen(false);
+    setSavedSearchesOpen((open) => !open);
+  }
+
+  function handleApplySavedSearch(search) {
+    setHomeQuery(search.query || '');
+    setHomeOnlyMine(Boolean(search.onlyMine));
+    setHomeFilterMonth(search.filterMonth || '');
+    setHomeFilterFormation(search.filterFormation || '');
+    setHomeFilterRegistrationType(search.filterRegistrationType || '');
+    setHomeFilterType(search.filterType || '');
+    setHomeFilterOpenOnly(Boolean(search.filterOpenOnly));
+    if (search.searchOrigin) {
+      setSearchOrigin({ lat: search.searchOrigin.lat, lng: search.searchOrigin.lng, label: search.searchOrigin.label });
+      setSearchOriginQuery(search.searchOrigin.label || '');
+      setSearchRadiusKm(search.radiusKm || '25');
+    } else {
+      setSearchOrigin(null);
+      setSearchOriginQuery('');
+    }
+    setSavedSearchesOpen(false);
+    setActiveTab('home');
+  }
+
+  function handleOpenSaveSearchDialog() {
+    setMenuOpen(false);
+    setSearchMenuOpen(false);
+    setSavedSearchMode('create');
+    setSavedSearchForm({ id: '', name: '', notifyEnabled: false });
+    clearFeedback();
+    setSavedSearchDialogOpen(true);
+  }
+
+  function handleEditSavedSearch(search) {
+    setSavedSearchesOpen(false);
+    setSavedSearchMode('edit');
+    setSavedSearchForm({ id: search.id, name: search.name, notifyEnabled: search.notifyEnabled, sourceSearch: search });
+    clearFeedback();
+    setSavedSearchDialogOpen(true);
+  }
+
+  function buildSavedSearchPayload(name, notifyEnabled) {
+    return {
+      name,
+      query: homeQuery,
+      onlyMine: homeOnlyMine,
+      filterMonth: homeFilterMonth,
+      filterFormation: homeFilterFormation,
+      filterRegistrationType: homeFilterRegistrationType,
+      filterType: homeFilterType,
+      filterOpenOnly: homeFilterOpenOnly,
+      searchOrigin: searchOrigin ? { lat: searchOrigin.lat, lng: searchOrigin.lng, label: searchOrigin.label } : null,
+      radiusKm: searchRadiusKm,
+      notifyEnabled,
+    };
+  }
+
+  async function handleSaveCurrentSearch(event) {
+    event.preventDefault();
+    setSavedSearchSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      if (savedSearchMode === 'edit') {
+        const source = savedSearchForm.sourceSearch;
+        const payload = {
+          name: savedSearchForm.name,
+          query: source.query,
+          onlyMine: source.onlyMine,
+          filterMonth: source.filterMonth,
+          filterFormation: source.filterFormation,
+          filterRegistrationType: source.filterRegistrationType,
+          filterType: source.filterType,
+          filterOpenOnly: source.filterOpenOnly,
+          searchOrigin: source.searchOrigin,
+          radiusKm: source.radiusKm,
+          notifyEnabled: savedSearchForm.notifyEnabled,
+        };
+        await api(`/api/saved-searches/${savedSearchForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        setMessage(t('Gespeicherte Suche wurde aktualisiert.'));
+      } else {
+        const payload = buildSavedSearchPayload(savedSearchForm.name, savedSearchForm.notifyEnabled);
+        await api('/api/saved-searches', { method: 'POST', body: JSON.stringify(payload) });
+        setMessage(t('Suche wurde gespeichert.'));
+      }
+      setSavedSearchDialogOpen(false);
+      await loadSavedSearches();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSavedSearchSaving(false);
+    }
+  }
+
+  async function handleToggleSavedSearchNotify(search) {
+    try {
+      const payload = {
+        name: search.name,
+        query: search.query,
+        onlyMine: search.onlyMine,
+        filterMonth: search.filterMonth,
+        filterFormation: search.filterFormation,
+        filterRegistrationType: search.filterRegistrationType,
+        filterType: search.filterType,
+        filterOpenOnly: search.filterOpenOnly,
+        searchOrigin: search.searchOrigin,
+        radiusKm: search.radiusKm,
+        notifyEnabled: !search.notifyEnabled,
+      };
+      await api(`/api/saved-searches/${search.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      await loadSavedSearches();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function handleDeleteSavedSearch(search) {
+    if (!window.confirm(t('Gespeicherte Suche "{name}" wirklich löschen?').replace('{name}', search.name))) {
+      return;
+    }
+    setError('');
+    setMessage('');
+    try {
+      await api(`/api/saved-searches/${search.id}`, { method: 'DELETE' });
+      setMessage(t('Gespeicherte Suche wurde gelöscht.'));
+      await loadSavedSearches();
+    } catch (requestError) {
+      setError(requestError.message);
     }
   }
 
@@ -1691,9 +1853,23 @@ function AppContent() {
               setSearchRadiusKm={setSearchRadiusKm}
               geoLoading={geoLoading}
               geoError={geoError}
+              canSaveSearch={Boolean(currentUser)}
+              onSaveSearch={handleOpenSaveSearchDialog}
             />
           ) : null
         }
+        savedSearchesControl={currentUser ? (
+          <SavedSearchesControl
+            open={savedSearchesOpen}
+            savedSearches={savedSearches}
+            onToggle={handleOpenSavedSearches}
+            onClose={() => setSavedSearchesOpen(false)}
+            onApply={handleApplySavedSearch}
+            onToggleNotify={handleToggleSavedSearchNotify}
+            onEdit={handleEditSavedSearch}
+            onDelete={handleDeleteSavedSearch}
+          />
+        ) : null}
         postboxControl={
           <PostboxControl
             language={language}
@@ -1863,6 +2039,37 @@ function AppContent() {
       </AppHeader>
 
       <Feedback message={message} error={error} />
+
+      <EditDialog
+        open={savedSearchDialogOpen}
+        title={savedSearchMode === 'edit' ? t('Gespeicherte Suche bearbeiten') : t('Suche speichern')}
+        message={message}
+        error={error}
+        onClose={() => setSavedSearchDialogOpen(false)}
+      >
+        <form onSubmit={handleSaveCurrentSearch}>
+          <TextField
+            label={t('Name')}
+            value={savedSearchForm.name}
+            onChange={(name) => setSavedSearchForm((form) => ({ ...form, name }))}
+            required
+          />
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={savedSearchForm.notifyEnabled}
+              onChange={(event) => setSavedSearchForm((form) => ({ ...form, notifyEnabled: event.target.checked }))}
+            />
+            {t('notifyOnNewMatches')}
+          </label>
+          <div className="dialog-actions">
+            <Button variant="secondary" type="button" onClick={() => setSavedSearchDialogOpen(false)}>{t('Abbrechen')}</Button>
+            <Button type="submit" disabled={savedSearchSaving} loading={savedSearchSaving}>
+              {savedSearchMode === 'edit' ? t('Speichern') : t('Anlegen')}
+            </Button>
+          </div>
+        </form>
+      </EditDialog>
 
       {currentUser && !pushMigrationDismissed && (
         <PushMigrationNotice
@@ -2416,7 +2623,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
 
 
 

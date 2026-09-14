@@ -87,3 +87,49 @@ export function assertPartnerCountMatchesFormation(tournament, registration) {
   if (formation === 'doublette') { if (!hasPartner) throw new HttpError(400, 'Formation Doublette erfordert genau einen Partner'); if (hasPartner2) throw new HttpError(400, 'Formation Doublette erlaubt nur einen Partner'); return; }
   if (formation === 'triplette' && (!hasPartner || !hasPartner2)) throw new HttpError(400, 'Formation Triplette erfordert genau zwei Partner');
 }
+
+// Duplikat von distanceKm (src/lib/domain.js) - worker.js kann domain.js nicht
+// importieren, da diese Datei i18next/localStorage-Bootstrapping mitzieht, das im
+// Worker-Runtime fehlt.
+export function workerDistanceKm(lat1, lng1, lat2, lng2) {
+  const earthRadiusKm = 6371;
+  const toRad = (degrees) => (degrees * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Spiegelt bewusst die Client-Filterlogik aus filteredHomeTournaments (App.jsx) für
+// den Cron-Abgleich "neue Treffer" - bei Änderungen dort auch hier nachziehen.
+// "Nur meine Turniere" wird absichtlich NICHT nachgebildet: das ist ein
+// sitzungsbezogener, subjektiver Filter ohne sinnvollen Cron-Kontext.
+export function tournamentMatchesSavedSearch(tournament, search) {
+  if (tournament.visibility !== 'public' || tournament.status === 'draft') return false;
+  if (search.filter_month && tournament.date.slice(5, 7) !== search.filter_month) return false;
+  if (search.filter_formation) {
+    if (search.filter_formation === 'andere') {
+      if (!Number(tournament.formation_other)) return false;
+    } else if (tournament.formation !== search.filter_formation || Number(tournament.formation_other)) {
+      return false;
+    }
+  }
+  if (search.filter_registration_type && tournament.registration_type !== search.filter_registration_type) return false;
+  if (search.filter_type && tournament.type !== search.filter_type) return false;
+  if (search.filter_open_only) {
+    if (tournament.status !== 'registration') return false;
+    if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > Date.now()) return false;
+    if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < Date.now()) return false;
+  }
+  const query = String(search.query || '').trim().toLowerCase();
+  if (query) {
+    const haystack = [tournament.name, tournament.location, tournament.type].join(' ').toLowerCase();
+    if (!haystack.includes(query)) return false;
+  }
+  if (search.origin_lat !== null && search.origin_lat !== undefined) {
+    if (tournament.latitude === null || tournament.longitude === null) return false;
+    const distance = workerDistanceKm(search.origin_lat, search.origin_lng, tournament.latitude, tournament.longitude);
+    if (distance > Number(search.radius_km || 25)) return false;
+  }
+  return true;
+}
