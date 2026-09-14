@@ -39,6 +39,28 @@ describe('Kopfzeile', () => {
     expect(setLanguage).toHaveBeenCalledWith('en');
     expect(screen.queryByRole('menu', { name: 'Sprache' })).not.toBeInTheDocument();
   });
+
+  it('gruppiert optionale Controls in einer mobilen scrollbaren Icon-Leiste', () => {
+    const { container } = render(
+      <AppHeader
+        heading="Turniere"
+        language="de"
+        setLanguage={() => {}}
+        menuOpen={false}
+        onToggleMenu={() => {}}
+        onCloseMenu={() => {}}
+        searchControl={<button type="button">Suche</button>}
+        savedSearchesControl={<button type="button">Gespeicherte Suchen</button>}
+        postboxControl={<button type="button">Postfach</button>}
+      />,
+    );
+
+    const scrollArea = container.querySelector('.topbar-actions-scroll');
+    expect(scrollArea).toContainElement(screen.getByRole('button', { name: 'Suche' }));
+    expect(scrollArea).toContainElement(screen.getByRole('button', { name: 'Gespeicherte Suchen' }));
+    expect(scrollArea).toContainElement(screen.getByRole('button', { name: 'Postfach' }));
+    expect(scrollArea).toContainElement(screen.getByRole('button', { name: 'Menü öffnen' }));
+  });
 });
 
 describe('Turnier melden', () => {

@@ -274,45 +274,121 @@ export function InstallAppButton() {
 
 export function AppHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, savedSearchesControl, children }) {
   const { t } = useTranslation();
+  const [leftPanelOpen, setLeftPanelOpen] = useState(false);
+  const [placesInfoOpen, setPlacesInfoOpen] = useState(false);
+  const closeLeftPanel = () => setLeftPanelOpen(false);
+  const goToTournaments = () => {
+    if (onLogoClick) {
+      onLogoClick();
+    } else if (navigate) {
+      navigate('/');
+    }
+  };
   return (
     <header className="topbar">
-      <button
-        className="brand brand-link"
-        type="button"
-        onClick={() => {
-          onCloseMenu();
-          if (onLogoClick) {
-            onLogoClick();
-          } else if (navigate) {
-            navigate('/');
-          }
-        }}
-      >
-        <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="brand-logo" />
-        <div className="brand-text">
-          <p className="eyebrow">Pétanque Turnier Manager Online</p>
-          <h1 {...(headingNoTranslate ? { 'data-i18n-skip': true } : {})}>{heading}</h1>
-        </div>
-      </button>
-      <div className="topbar-actions">
-        {searchControl}
-        {savedSearchesControl}
-        {postboxControl}
-        <LanguageSelect language={language} setLanguage={setLanguage} />
+      <div className="topbar-start">
         <button
-          className="hamburger-btn"
+          className="left-menu-btn"
           type="button"
-          aria-label={t('Menü öffnen')}
-          aria-expanded={menuOpen}
-          onClick={onToggleMenu}
+          aria-label={t('Bereiche öffnen')}
+          aria-expanded={leftPanelOpen}
+          onClick={() => {
+            onCloseMenu();
+            setLeftPanelOpen((open) => !open);
+          }}
         >
-          <span className="hamburger-icon" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </span>
+          <svg className="left-menu-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2" />
+            <rect x="13" y="3.5" width="7.5" height="7.5" rx="2" />
+            <rect x="3.5" y="13" width="7.5" height="7.5" rx="2" />
+            <rect x="13" y="13" width="7.5" height="7.5" rx="2" />
+          </svg>
+        </button>
+        <button
+          className="brand brand-link"
+          type="button"
+          onClick={() => {
+            onCloseMenu();
+            closeLeftPanel();
+            goToTournaments();
+          }}
+        >
+          <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="brand-logo" />
+          <div className="brand-text">
+            <p className="eyebrow">Pétanque Turnier Manager Online</p>
+            <h1 {...(headingNoTranslate ? { 'data-i18n-skip': true } : {})}>{heading}</h1>
+          </div>
         </button>
       </div>
+      <div className="topbar-actions-scroll">
+        <div className="topbar-actions">
+          {searchControl}
+          {savedSearchesControl}
+          {postboxControl}
+          <LanguageSelect language={language} setLanguage={setLanguage} />
+          <button
+            className="hamburger-btn"
+            type="button"
+            aria-label={t('Menü öffnen')}
+            aria-expanded={menuOpen}
+            onClick={() => {
+              closeLeftPanel();
+              onToggleMenu();
+            }}
+          >
+            <span className="hamburger-icon" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </button>
+        </div>
+      </div>
+      <div
+        className={`left-panel-backdrop${leftPanelOpen ? ' open' : ''}`}
+        onClick={closeLeftPanel}
+        aria-hidden="true"
+      />
+      <nav
+        className={`left-panel${leftPanelOpen ? ' open' : ''}`}
+        aria-label={t('Bereiche')}
+        inert={!leftPanelOpen}
+      >
+        <button
+          className="left-panel-link"
+          type="button"
+          onClick={() => {
+            closeLeftPanel();
+            goToTournaments();
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 3 3 9l9 6 9-6z" />
+            <path d="M3 9v6l9 6 9-6V9" />
+          </svg>
+          {t('Turniere')}
+        </button>
+        <button
+          className="left-panel-link"
+          type="button"
+          onClick={() => {
+            closeLeftPanel();
+            setPlacesInfoOpen(true);
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="9" r="7" />
+            <path d="M12 21c3-3.6 4.5-6.4 4.5-9" />
+            <path d="M12 21c-3-3.6-4.5-6.4-4.5-9" />
+          </svg>
+          {t('Boule-Plätze / Vereine')}
+        </button>
+      </nav>
+      {placesInfoOpen && (
+        <AuthModal title={t('Boule-Plätze / Vereine')} onClose={() => setPlacesInfoOpen(false)}>
+          <p>{t('Bald verfügbar')}</p>
+        </AuthModal>
+      )}
       {menuOpen && (
         <>
           <div className="nav-drawer-backdrop" onClick={onCloseMenu} />
