@@ -215,6 +215,8 @@ export function RegistrationsManagementPage({
   selectedTournamentId,
   manageMode,
   invalidField,
+  message,
+  error,
 }) {
   const { t } = useTranslation();
   return (
@@ -241,6 +243,8 @@ export function RegistrationsManagementPage({
         open={registrationDialogOpen}
         wide
         title={registrationMode === 'edit' ? t('Anmeldung bearbeiten') : t('Anmeldung erfassen')}
+        message={message}
+        error={error}
         onClose={onCloseRegistrationDialog}
       >
         <RegistrationForm

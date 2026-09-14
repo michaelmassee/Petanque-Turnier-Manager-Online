@@ -31,6 +31,8 @@ export function UserManagementPanel({
   onSubmitUser,
   onEditUser,
   onDeleteUser,
+  message,
+  error,
 }) {
   const { t } = useTranslation();
   const filtered = users.length !== totalUsers;
@@ -92,6 +94,8 @@ export function UserManagementPanel({
       <EditDialog
         open={dialogOpen}
         title={userMode === 'edit' ? t('Benutzer bearbeiten') : t('Benutzer anlegen')}
+        message={message}
+        error={error}
         onClose={onCloseDialog}
       >
         <UserEditorForm

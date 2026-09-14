@@ -554,6 +554,8 @@ export function TournamentManagementPage({
   ownerCandidates,
   onOwnerChanged,
   currentUser,
+  message,
+  error,
 }) {
   const { t } = useTranslation();
   return (
@@ -580,6 +582,8 @@ export function TournamentManagementPage({
           open={tournamentDialogOpen}
           wide
           title={tournamentMode === 'edit' ? t('Turnier bearbeiten') : t('Turnier anlegen')}
+          message={message}
+          error={error}
           onClose={onCloseTournamentDialog}
         >
           <TournamentForm

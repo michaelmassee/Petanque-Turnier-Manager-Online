@@ -1971,6 +1971,8 @@ function AppContent() {
               ownerCandidates={postboxRecipients}
               onOwnerChanged={handleOwnerChanged}
               currentUser={currentUser}
+              message={message}
+              error={error}
             />
           </section>
         </Suspense>
@@ -2008,6 +2010,8 @@ function AppContent() {
               selectedTournamentId={selectedTournamentId}
               manageMode={Boolean(selectedTournament?.canManage)}
               invalidField={registrationInvalidField}
+              message={message}
+              error={error}
             />
           </section>
         </Suspense>
@@ -2035,6 +2039,8 @@ function AppContent() {
             onSubmitUser={handleUserSubmit}
             onEditUser={editUser}
             onDeleteUser={handleDeleteUser}
+            message={message}
+            error={error}
           />
         </Suspense>
       )}
