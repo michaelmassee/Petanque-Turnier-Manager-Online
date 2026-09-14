@@ -84,6 +84,7 @@ function AppContent() {
   const [postboxRecipientTournaments, setPostboxRecipientTournaments] = useState([]);
   const [postboxRecipientId, setPostboxRecipientId] = useState('');
   const [postboxBody, setPostboxBody] = useState('');
+  const [postboxSending, setPostboxSending] = useState(false);
   const [pushMigrationDismissed, setPushMigrationDismissed] = useState(() => localStorage.getItem('ptm_push_migration') === 'dismissed');
   const [users, setUsers] = useState([]);
   const [tournaments, setTournaments] = useState([]);
@@ -493,6 +494,7 @@ function AppContent() {
 
   async function handleSendPostboxMessage(event) {
     event.preventDefault();
+    setPostboxSending(true);
     try {
       await api('/api/postbox/messages', { method: 'POST', body: JSON.stringify({ recipientId: postboxRecipientId, body: postboxBody }) });
       pushRecentRecipientValue(currentUser?.id, postboxRecipientId);
@@ -501,6 +503,8 @@ function AppContent() {
       await loadPostbox();
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setPostboxSending(false);
     }
   }
 
@@ -1704,6 +1708,7 @@ function AppContent() {
             currentUserId={currentUser?.id}
             body={postboxBody}
             setBody={setPostboxBody}
+            sending={postboxSending}
             onToggle={handleOpenPostbox}
             onClose={() => setPostboxOpen(false)}
             onRead={handleReadPostboxMessage}

@@ -73,7 +73,7 @@ export function PetanqueOnlineImportPanel() {
             <h2>{t('Petanque-Online importieren')}</h2>
             <p className="muted">{t('Wähle künftige Termine aus. Bereits importierte Termine werden täglich mit der Quelle abgeglichen.')}</p>
           </div>
-          <Button variant="secondary" disabled={loading || busy} onClick={load}>{t('Aktualisieren')}</Button>
+          <Button variant="secondary" disabled={loading || busy} loading={loading || busy} onClick={load}>{t('Aktualisieren')}</Button>
         </div>
         <Feedback message={message} error={error} />
         {loading ? <p className="muted">{t('Wird geladen…')}</p> : (
@@ -87,7 +87,7 @@ export function PetanqueOnlineImportPanel() {
                 <input type="checkbox" checked={onlyWithClubWebsite} onChange={(event) => setOnlyWithClubWebsite(event.target.checked)} />
                 <span>{t('Nur mit Vereinswebseite')}</span>
               </label>
-              <Button disabled={selected.size === 0 || busy} onClick={handleImport}>{t('Ausgewählte Termine importieren')}</Button>
+              <Button disabled={selected.size === 0 || busy} loading={busy} onClick={handleImport}>{t('Ausgewählte Termine importieren')}</Button>
             </div>
             <div className="user-list import-list">
               {visibleTournaments.map((tournament) => (

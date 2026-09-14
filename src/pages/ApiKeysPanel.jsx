@@ -198,7 +198,7 @@ function ApiKeysPanel({ isAdmin }) {
             value={label}
             onChange={(event) => setLabel(event.target.value)}
           />
-          <Button type="submit" disabled={busy || !label.trim()}>
+          <Button type="submit" disabled={busy || !label.trim()} loading={busy}>
             {t('Schlüssel beantragen')}
           </Button>
         </form>

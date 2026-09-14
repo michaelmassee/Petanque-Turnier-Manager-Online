@@ -75,7 +75,7 @@ export function PushMigrationNotice({ onDismiss, onEnabled }) {
   );
 }
 
-export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick, currentUserId }) {
+export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick, currentUserId, sending = false }) {
   const [pushState, setPushState] = useState('');
   const [pushErrorDetail, setPushErrorDetail] = useState('');
   const [pushActive, setPushActive] = useState(false);
@@ -130,7 +130,7 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
                 required
               />
               <TextArea label={text('message')} value={body} onChange={setBody} maxLength={250} />
-              <Button type="submit" disabled={!recipientId || !body.trim()}>{text('send')}</Button>
+              <Button type="submit" disabled={!recipientId || !body.trim()} loading={sending}>{text('send')}</Button>
             </form>
             {todos.length > 0 && <div className="postbox-section"><h3>{text('todos')}</h3>{todos.map((todo) => (
               <button className="postbox-todo" key={todo.type} type="button" onClick={() => onTodoClick?.(todo.type)}>

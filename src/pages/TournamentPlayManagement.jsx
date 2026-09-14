@@ -78,6 +78,7 @@ function MatchRow({ match, onSave, busy }) {
         />
         <Button
           disabled={busy || scoreA === '' || scoreB === '' || isDraw}
+          loading={busy}
           onClick={() => onSave(match.id, { scoreA: Number(scoreA), scoreB: Number(scoreB) })}
         >
           {decided ? t('Ergebnis ändern') : t('Ergebnis speichern')}
@@ -292,7 +293,7 @@ export default function TournamentPlayManagement({ tournaments }) {
             {missingRequirements.map((requirement) => <p className="hint" key={requirement}>{requirement}</p>)}
           </div>
         )}
-        <Button disabled={busy || !selectedTournamentId || !canGenerateRound} onClick={handleNewRound}>
+        <Button disabled={busy || !selectedTournamentId || !canGenerateRound} loading={busy} onClick={handleNewRound}>
           {currentRound ? t('Nächste Runde starten') : t('Erste Runde starten')}
         </Button>
       </div>
@@ -311,9 +312,9 @@ export default function TournamentPlayManagement({ tournaments }) {
         {selectedTournament && selectedTournamentStatus !== 'running' && (
           <div className="supermelee-toolbar-actions">
             {isSchweizerMelee && !rounds.length && (
-              <Button variant="secondary" disabled={busy || !selectedTournamentId || !canDrawMeleeTeams} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>
+              <Button variant="secondary" disabled={busy || !selectedTournamentId || !canDrawMeleeTeams} loading={busy} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>
             )}
-            <Button disabled={busy || !selectedTournamentId} onClick={handleStartTournament}>{t('Turnier starten')}</Button>
+            <Button disabled={busy || !selectedTournamentId} loading={busy} onClick={handleStartTournament}>{t('Turnier starten')}</Button>
           </div>
         )}
         {selectedTournamentStatus === 'running' && (
@@ -323,7 +324,7 @@ export default function TournamentPlayManagement({ tournaments }) {
               {selectedTournament.type === 'schweizer' && ` · ${t(selectedTournament.schweizerRankingMode === 'ohne_buchholz' ? 'Ohne Buchholz' : 'Mit Buchholz')}`}
             </p>
             {isSchweizerMelee && !rounds.length && (
-              <Button variant="secondary" disabled={busy || !canDrawMeleeTeams} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>
+              <Button variant="secondary" disabled={busy || !canDrawMeleeTeams} loading={busy} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>
             )}
           </div>
         )}
@@ -342,7 +343,7 @@ export default function TournamentPlayManagement({ tournaments }) {
             <TextField label={t('Vorname')} value={quickPlayer.firstName} onChange={(firstName) => setQuickPlayer({ ...quickPlayer, firstName })} required minLength={2} />
             <TextField label={t('Nachname')} value={quickPlayer.lastName} onChange={(lastName) => setQuickPlayer({ ...quickPlayer, lastName })} required minLength={2} />
             {selectedTournament?.licenseRequired && <TextField label={t('Lizenznummer')} value={quickPlayer.licenseNr} onChange={(licenseNr) => setQuickPlayer({ ...quickPlayer, licenseNr })} required />}
-            <Button type="submit" disabled={busy}>{t('Spieler hinzufügen')}</Button>
+            <Button type="submit" disabled={busy} loading={busy}>{t('Spieler hinzufügen')}</Button>
           </form>
           <p className="hint">{t('Neue Spieler sind sofort für die nächste Runde aktiv.')}</p>
           <div className="round-participant-list">

@@ -77,9 +77,16 @@ export function SelectField({ label, value, onChange, options, disabled, require
   );
 }
 
-export function Button({ children, type = 'button', variant = 'primary', ...props }) {
+export function Button({ children, type = 'button', variant = 'primary', loading = false, disabled, ...props }) {
   return (
-    <button type={type} className={`button button-${variant}`} {...props}>
+    <button
+      type={type}
+      className={`button button-${variant}`}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    >
+      {loading && <span className="button-spinner" aria-hidden="true" />}
       {children}
     </button>
   );

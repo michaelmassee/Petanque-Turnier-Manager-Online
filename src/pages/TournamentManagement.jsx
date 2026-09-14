@@ -73,7 +73,7 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmi
                   <li key={editor.id}>
                     <span data-i18n-skip>{`${editor.firstName || ''} ${editor.lastName || ''}`.trim()}</span>
                     {(!isOwner || isAdmin) && (
-                      <Button variant="secondary" type="button" disabled={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
+                      <Button variant="secondary" type="button" disabled={busy} loading={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
                     )}
                   </li>
                 );
@@ -91,7 +91,7 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmi
                   ...availableCandidates.map((candidate) => ({ value: candidate.id, label: `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() })),
                 ]}
               />
-              <Button type="button" disabled={busy || !selectedCandidateId} onClick={handleAdd}>{t('Hinzufügen')}</Button>
+              <Button type="button" disabled={busy || !selectedCandidateId} loading={busy} onClick={handleAdd}>{t('Hinzufügen')}</Button>
             </div>
           )}
         </>
@@ -145,7 +145,7 @@ function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], onOwnerC
               ...otherCandidates.map((candidate) => ({ value: candidate.id, label: `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() })),
             ]}
           />
-          <Button type="button" disabled={busy || !selectedOwnerId} onClick={handleChangeOwner}>{t('Übernehmen')}</Button>
+          <Button type="button" disabled={busy || !selectedOwnerId} loading={busy} onClick={handleChangeOwner}>{t('Übernehmen')}</Button>
         </div>
       )}
     </div>
