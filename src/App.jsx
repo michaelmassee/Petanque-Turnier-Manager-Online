@@ -1065,6 +1065,13 @@ function AppContent() {
       await loadTournaments();
       setSelectedTournamentId(data.tournament.id);
     } catch (requestError) {
+      if (requestError.status === 401) {
+        queryClient.clear();
+        setCurrentUser(null);
+        setAuthView('login');
+        setError(t('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.'));
+        return;
+      }
       setError(requestError.message);
     }
   }
@@ -2623,7 +2630,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     </form>
   );
 }
-
 
 
 
