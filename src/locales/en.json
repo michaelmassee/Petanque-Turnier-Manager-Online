@@ -744,7 +744,7 @@
   "Nutzer erforderlich": "User required",
   "Nutzer nicht gefunden": "User not found",
   "Gespeicherte Suche \"{name}\" wirklich löschen?": "Really delete saved search \"{name}\"?",
-  "Maximal 25 gespeicherte Suchen erlaubt.": "A maximum of 25 saved searches is allowed.",
+  "Maximal 3 gespeicherte Suchen erlaubt.": "A maximum of 3 saved searches is allowed.",
   "Gespeicherte Suche wurde aktualisiert.": "Saved search was updated.",
   "Suche wurde gespeichert.": "Search was saved.",
   "Gespeicherte Suche wurde gelöscht.": "Saved search was deleted.",

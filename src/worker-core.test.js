@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertPartnerCountMatchesFormation, isTournamentRoundNumberConflict, normalizeTournamentInput, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
+import { assertPartnerCountMatchesFormation, isNewlyPublicTournament, isTournamentRoundNumberConflict, normalizeTournamentInput, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
 
 const base = { name: 'Testturnier', date: '2026-06-01', location: 'Musterstadt' };
 
@@ -62,6 +62,14 @@ describe('Worker-Fachlogik', () => {
     expect(isTournamentRoundNumberConflict('UNIQUE constraint failed: tournament_rounds.tournament_id, tournament_rounds.round_number')).toBe(true);
     expect(isTournamentRoundNumberConflict()).toBe(false);
     expect(isTournamentRoundNumberConflict(new Error('UNIQUE constraint failed: registrations.tournament_id, registrations.email'))).toBe(false);
+  });
+
+  it('erkennt die erste und erneute Veröffentlichung eines Turniers', () => {
+    const published = { visibility: 'public', status: 'registration' };
+    expect(isNewlyPublicTournament({ visibility: 'private', status: 'registration' }, published)).toBe(true);
+    expect(isNewlyPublicTournament({ visibility: 'public', status: 'draft' }, published)).toBe(true);
+    expect(isNewlyPublicTournament(published, { ...published, name: 'Nur bearbeitet' })).toBe(false);
+    expect(isNewlyPublicTournament(published, { visibility: 'private', status: 'registration' })).toBe(false);
   });
 
   it('gleicht gespeicherte Suchen mit öffentlichen Turnieren und dem Umkreis ab', () => {

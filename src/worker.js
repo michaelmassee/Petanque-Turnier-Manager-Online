@@ -5,6 +5,7 @@ import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
 import {
   assertPartnerCountMatchesFormation as assertCorePartnerCountMatchesFormation,
+  isNewlyPublicTournament,
   isTournamentRoundNumberConflict,
   normalizeTournamentInput as normalizeCoreTournamentInput,
   registrationOpenStatus as coreRegistrationOpenStatus,
@@ -803,8 +804,7 @@ export default {
     ctx.waitUntil(
       Promise.all([
         sendTournamentReminders(env).catch((error) => console.error('Tournament reminder cron failed', error)),
-        syncPetanqueOnlineImports(env.DB).catch((error) => console.error('Petanque-Online sync cron failed', error)),
-        checkSavedSearchMatches(env).catch((error) => console.error('Saved-search matching cron failed', error)),
+        syncPetanqueOnlineImports(env).catch((error) => console.error('Petanque-Online sync cron failed', error)),
       ]),
     );
   },
@@ -1047,7 +1047,7 @@ export default {
 
         if (request.method === 'POST') {
           const auth = await requireManagerAuth(request, env.DB);
-          return await createTournament(request, env.DB, auth.user);
+          return await createTournament(request, env, auth.user);
         }
       }
 
@@ -1056,7 +1056,7 @@ export default {
       }
 
       if (request.method === 'POST' && url.pathname === '/api/tournament-reports/verify') {
-        return await verifyTournamentReport(request, env.DB);
+        return await verifyTournamentReport(request, env);
       }
 
       if (url.pathname === '/api/admin/petanque-online/tournaments' && request.method === 'GET') {
@@ -1066,7 +1066,7 @@ export default {
 
       if (url.pathname === '/api/admin/petanque-online/import' && request.method === 'POST') {
         const session = await requireAdmin(request, env.DB);
-        return await importPetanqueOnlineTournaments(request, env.DB, session.user);
+        return await importPetanqueOnlineTournaments(request, env, session.user);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/geocode') {
@@ -1296,7 +1296,7 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, session.user);
-        return await updateTournamentPresentation(request, env.DB, tournament, session.user);
+        return await updateTournamentPresentation(request, env, tournament, session.user);
       }
 
       const imageProxyMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/image$/);
@@ -1384,7 +1384,7 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
-        return await syncPutTournamentMetadata(request, env.DB, tournament, auth.user);
+        return await syncPutTournamentMetadata(request, env, tournament, auth.user);
       }
 
       return json({ error: 'Not found' }, 404);
@@ -2261,7 +2261,7 @@ async function removePushSubscription(request, db, userId) {
   return json({ ok: true });
 }
 
-const SAVED_SEARCH_LIMIT = 25;
+const SAVED_SEARCH_LIMIT = 3;
 
 function toPublicSavedSearch(row) {
   return {
@@ -2318,7 +2318,7 @@ async function createSavedSearch(request, db, userId) {
 
   const { count } = await db.prepare('SELECT COUNT(*) AS count FROM saved_searches WHERE user_id = ?').bind(userId).first();
   if (count >= SAVED_SEARCH_LIMIT) {
-    throw new HttpError(403, 'Maximal 25 gespeicherte Suchen erlaubt.');
+    throw new HttpError(403, 'Maximal 3 gespeicherte Suchen erlaubt.');
   }
 
   const now = new Date().toISOString();
@@ -2365,32 +2365,61 @@ async function deleteSavedSearch(db, id, userId) {
   return json({ ok: true });
 }
 
-async function checkSavedSearchMatches(env) {
-  const db = env.DB;
-  const searches = await db.prepare('SELECT * FROM saved_searches WHERE notify_enabled = 1').all();
-  const now = new Date().toISOString();
+const D1_BATCH_SIZE = 100;
 
-  for (const search of searches.results || []) {
-    const isFirstRun = !search.last_checked_at;
-    const since = search.last_checked_at || now;
-    const candidates = await db.prepare(
-      "SELECT * FROM tournaments WHERE created_at > ? AND visibility = 'public' AND status != 'draft'",
-    ).bind(since).all();
+function batches(values, size = D1_BATCH_SIZE) {
+  return Array.from({ length: Math.ceil(values.length / size) }, (_, index) => values.slice(index * size, (index + 1) * size));
+}
 
-    const matches = (candidates.results || []).filter((tournament) => tournamentMatchesSavedSearch(tournament, search));
+// Ein Suchauftrag speichert keine Treffer. Deshalb reicht es, genau beim Übergang
+// zu einem öffentlich sichtbaren Turnier abzugleichen; Entwürfe, private und
+// gelöschte Turniere sind automatisch nicht mehr Bestandteil der Live-Suche.
+async function notifySavedSearchesForPublishedTournament(env, tournament, searches = null) {
+  const activeSearches = searches || (await env.DB.prepare('SELECT * FROM saved_searches WHERE notify_enabled = 1').all()).results || [];
+  const matches = activeSearches.filter((search) => tournamentMatchesSavedSearch(tournament, search));
+  if (matches.length === 0) return 0;
 
-    if (matches.length > 0 && !isFirstRun) {
-      await createSystemNotification(
-        env,
-        search.user_id,
-        'saved_search_new_matches',
-        { savedSearchName: search.name, count: matches.length, tournamentNames: matches.slice(0, 3).map((tournament) => tournament.name) },
-        'Neue Turniere gefunden',
-      );
-    }
+  const createdAt = new Date().toISOString();
+  const notifications = matches.map((search) => ({
+    id: crypto.randomUUID(),
+    recipientId: search.user_id,
+    eventData: { savedSearchName: search.name, count: 1, tournamentNames: [tournament.name] },
+  }));
 
-    await db.prepare('UPDATE saved_searches SET last_checked_at = ? WHERE id = ?').bind(now, search.id).run();
+  for (const batch of batches(notifications)) {
+    await env.DB.batch(batch.map((notification) => env.DB.prepare(
+      'INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, event_type, event_data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    ).bind(notification.id, null, notification.recipientId, 'system', null, 'saved_search_new_matches', JSON.stringify(notification.eventData), createdAt)));
   }
+
+  const recipientIds = [...new Set(notifications.map((notification) => notification.recipientId))];
+  for (const batch of batches(recipientIds)) {
+    await env.DB.batch(batch.map((recipientId) => env.DB.prepare(
+      `DELETE FROM postbox_messages WHERE recipient_id = ? AND id NOT IN (
+         SELECT id FROM postbox_messages WHERE recipient_id = ? ORDER BY created_at DESC LIMIT 25
+       )`,
+    ).bind(recipientId, recipientId)));
+  }
+
+  const languages = new Map();
+  for (const batch of batches(recipientIds)) {
+    const users = await env.DB.prepare(`SELECT id, language FROM users WHERE id IN (${batch.map(() => '?').join(', ')})`).bind(...batch).all();
+    for (const user of users.results || []) languages.set(user.id, user.language || 'de');
+  }
+  for (const batch of batches(notifications)) {
+    await env.MAIL_QUEUE.sendBatch(batch.map((notification) => ({
+      body: {
+        kind: 'push',
+        userId: notification.recipientId,
+        payload: {
+          title: 'Neue Turniere gefunden',
+          body: buildSystemNotificationPushBody('saved_search_new_matches', notification.eventData, languages.get(notification.recipientId) || 'de'),
+          messageId: notification.id,
+        },
+      },
+    })));
+  }
+  return notifications.length;
 }
 
 async function sendPushNotifications(env, userId, payload) {
@@ -2760,7 +2789,8 @@ function resolveRegistrationTimes(tournament, timezone, { legacyUtc = false } = 
   };
 }
 
-async function createTournament(request, db, user) {
+async function createTournament(request, env, user) {
+  const db = env.DB;
   const body = await readJson(request);
   const tournament = normalizeCoreTournamentInput(body);
 
@@ -2836,6 +2866,9 @@ async function createTournament(request, db, user) {
     .run();
 
   const created = await getTournamentById(db, id);
+  if (isPubliclyVisible(created)) {
+    await notifySavedSearchesForPublishedTournament(env, created);
+  }
   return json({ tournament: toPublicTournament(created, user) }, 201);
 }
 
@@ -2927,7 +2960,8 @@ async function fetchPetanqueOnlineTournamentDetails(slug, fallbackLocation) {
   }
 }
 
-async function upsertPetanqueOnlineTournament(db, entry, ownerId, now, { scrapeClubWebsite = false } = {}) {
+async function upsertPetanqueOnlineTournament(env, entry, ownerId, now, { scrapeClubWebsite = false, searches = null } = {}) {
+  const db = env.DB;
   const mapped = mapPetanqueOnlineTournament(entry);
   if (mapped.name.length < 2 || !/^\d{4}-\d{2}-\d{2}$/.test(mapped.date) || mapped.location.length < 2) {
     throw new HttpError(400, 'Der ausgewählte Petanque-Online-Termin ist unvollständig.');
@@ -2938,11 +2972,14 @@ async function upsertPetanqueOnlineTournament(db, entry, ownerId, now, { scrapeC
     // location wird bewusst nicht mitaktualisiert: Die vollständige Adresse (inkl. Straße) wird
     // nur beim Import gescrapt (s.u.), ein Sync mit dem reinen Ort aus der Kalender-Liste würde
     // sie sonst wieder auf den Ort zurücksetzen.
+    const previous = await getTournamentById(db, existing.tournament_id);
     await db.prepare(
       `UPDATE tournaments SET name = ?, club = ?, date = ?, start_time = ?, description = ?, formation = ?, formation_other = ?,
        flyer_url = ?, status = 'registration', visibility = 'public', registration_enabled = 0, updated_at = ? WHERE id = ?`,
     ).bind(mapped.name, mapped.club, mapped.date, mapped.startTime, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.flyerUrl, now, existing.tournament_id).run();
     await db.prepare("UPDATE petanque_online_imports SET synced_at = ? WHERE source = 'petanque-online' AND external_key = ?").bind(now, mapped.externalKey).run();
+    const updated = await getTournamentById(db, existing.tournament_id);
+    if (isNewlyPublicTournament(previous, updated)) await notifySavedSearchesForPublishedTournament(env, updated, searches);
     return 'updated';
   }
 
@@ -2963,10 +3000,12 @@ async function upsertPetanqueOnlineTournament(db, entry, ownerId, now, { scrapeC
     ).bind(id, ownerId, ownerId, mapped.name, mapped.date, mapped.startTime, location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.club, websiteUrl, mapped.flyerUrl, now, now),
     db.prepare("INSERT INTO petanque_online_imports (source, external_key, tournament_id, imported_at, synced_at) VALUES ('petanque-online', ?, ?, ?, ?)").bind(mapped.externalKey, id, now, now),
   ]);
+  await notifySavedSearchesForPublishedTournament(env, await getTournamentById(db, id), searches);
   return 'created';
 }
 
-async function importPetanqueOnlineTournaments(request, db, user) {
+async function importPetanqueOnlineTournaments(request, env, user) {
+  const db = env.DB;
   const body = await readJson(request);
   const externalKeys = Array.isArray(body.externalKeys) ? [...new Set(body.externalKeys.map((key) => String(key || '').trim()).filter(Boolean))] : [];
   if (externalKeys.length === 0 || externalKeys.length > 200) throw new HttpError(400, 'Bitte wähle mindestens einen und höchstens 200 Termine aus.');
@@ -2975,10 +3014,11 @@ async function importPetanqueOnlineTournaments(request, db, user) {
   if (externalKeys.some((key) => !selected.has(key))) throw new HttpError(400, 'Ein ausgewählter Petanque-Online-Termin ist nicht mehr verfügbar.');
 
   const now = new Date().toISOString();
+  const searches = (await db.prepare('SELECT * FROM saved_searches WHERE notify_enabled = 1').all()).results || [];
   const result = { created: 0, updated: 0, failed: 0 };
   for (const key of externalKeys) {
     try {
-      const action = await upsertPetanqueOnlineTournament(db, selected.get(key), user.id, now, { scrapeClubWebsite: true });
+      const action = await upsertPetanqueOnlineTournament(env, selected.get(key), user.id, now, { scrapeClubWebsite: true, searches });
       result[action] += 1;
     } catch (error) {
       console.error(`Petanque-Online import failed for ${key}`, error);
@@ -2988,13 +3028,15 @@ async function importPetanqueOnlineTournaments(request, db, user) {
   return json(result, 201);
 }
 
-async function syncPetanqueOnlineImports(db) {
+async function syncPetanqueOnlineImports(env) {
+  const db = env.DB;
   const imports = await db.prepare("SELECT external_key, tournament_id FROM petanque_online_imports WHERE source = 'petanque-online'").all();
   if (imports.results.length === 0) return { created: 0, updated: 0, deleted: 0 };
 
   const entries = await fetchPetanqueOnlineCalendar();
   const byKey = new Map(entries.map((entry) => [petanqueOnlineKey(entry), entry]));
   const now = new Date().toISOString();
+  const searches = (await db.prepare('SELECT * FROM saved_searches WHERE notify_enabled = 1').all()).results || [];
   let updated = 0;
   let deleted = 0;
   for (const imported of imports.results) {
@@ -3004,7 +3046,7 @@ async function syncPetanqueOnlineImports(db) {
       deleted += 1;
       continue;
     }
-    await upsertPetanqueOnlineTournament(db, entry, null, now);
+    await upsertPetanqueOnlineTournament(env, entry, null, now, { searches });
     updated += 1;
   }
   return { created: 0, updated, deleted };
@@ -3074,6 +3116,9 @@ async function updateTournament(request, env, existing, user) {
     .run();
 
   const updated = await getTournamentById(db, existing.id);
+  if (isNewlyPublicTournament(existing, updated)) {
+    await notifySavedSearchesForPublishedTournament(env, updated);
+  }
   if (updated.status !== existing.status) {
     await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
     const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.owner_id).all();
@@ -3099,6 +3144,9 @@ async function startTournament(env, existing, user) {
   const now = new Date().toISOString();
   await db.prepare("UPDATE tournaments SET status = 'running', updated_at = ? WHERE id = ?").bind(now, existing.id).run();
   const updated = await getTournamentById(db, existing.id);
+  if (isNewlyPublicTournament(existing, updated)) {
+    await notifySavedSearchesForPublishedTournament(env, updated);
+  }
   await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
   const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.owner_id).all();
   await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
@@ -3306,7 +3354,8 @@ async function createTournamentReport(request, env, url) {
   return json(response, 201);
 }
 
-async function verifyTournamentReport(request, db) {
+async function verifyTournamentReport(request, env) {
+  const db = env.DB;
   const body = await readJson(request);
   const token = String(body.token || '').trim();
   if (!token) {
@@ -3323,11 +3372,16 @@ async function verifyTournamentReport(request, db) {
     throw new HttpError(400, 'Bestätigungs-Link ist ungültig oder abgelaufen');
   }
 
+  const previous = await getTournamentById(db, verification.tournament_id);
   const now = new Date().toISOString();
   await db.batch([
     db.prepare("UPDATE tournaments SET status = 'running', updated_at = ? WHERE id = ?").bind(now, verification.tournament_id),
     db.prepare('UPDATE tournament_report_tokens SET used_at = ? WHERE token_hash = ?').bind(now, tokenHash),
   ]);
+  const updated = await getTournamentById(db, verification.tournament_id);
+  if (isNewlyPublicTournament(previous, updated)) {
+    await notifySavedSearchesForPublishedTournament(env, updated);
+  }
 
   return json({ ok: true, tournamentId: verification.tournament_id });
 }
@@ -3447,7 +3501,8 @@ function isPrivateIpLiteral(hostname) {
  * Website/Logo/Flyer are presentation-only extras, not part of the tournament document's core
  * data, so this bypasses the document_managed lock enforced by updateTournament.
  */
-async function updateTournamentPresentation(request, db, existing, user) {
+async function updateTournamentPresentation(request, env, existing, user) {
+  const db = env.DB;
   const body = await readJson(request);
   const websiteUrl = normalizePresentationUrl(body.websiteUrl);
   const logoUrl = normalizePresentationUrl(body.logoUrl);
@@ -3464,7 +3519,8 @@ async function updateTournamentPresentation(request, db, existing, user) {
 }
 
 /** PTM Calc is the exclusive writer for the metadata of a linked tournament. */
-async function syncPutTournamentMetadata(request, db, existing, user) {
+async function syncPutTournamentMetadata(request, env, existing, user) {
+  const db = env.DB;
   const body = await readJson(request);
   const legacyRegistrationTimes = body.registrationTimeSemantics !== 'tournament-local-v1';
   const tournament = normalizeCoreTournamentInput(body, {
@@ -3492,6 +3548,9 @@ async function syncPutTournamentMetadata(request, db, existing, user) {
   ).run();
 
   const updated = await getTournamentById(db, existing.id);
+  if (isNewlyPublicTournament(existing, updated)) {
+    await notifySavedSearchesForPublishedTournament(env, updated);
+  }
   return json({ tournament: toPublicTournament(updated, user) });
 }
 

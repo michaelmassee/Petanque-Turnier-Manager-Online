@@ -100,8 +100,13 @@ export function workerDistanceKm(lat1, lng1, lat2, lng2) {
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+export function isNewlyPublicTournament(previous, next) {
+  const isPublic = (tournament) => tournament.visibility === 'public' && tournament.status !== 'draft';
+  return !isPublic(previous) && isPublic(next);
+}
+
 // Spiegelt bewusst die Client-Filterlogik aus filteredHomeTournaments (App.jsx) für
-// den Cron-Abgleich "neue Treffer" - bei Änderungen dort auch hier nachziehen.
+// den Veröffentlichungsabgleich "neue Treffer" - bei Änderungen dort auch hier nachziehen.
 // "Nur meine Turniere" wird absichtlich NICHT nachgebildet: das ist ein
 // sitzungsbezogener, subjektiver Filter ohne sinnvollen Cron-Kontext.
 export function tournamentMatchesSavedSearch(tournament, search) {
