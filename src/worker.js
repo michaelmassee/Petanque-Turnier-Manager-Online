@@ -3371,6 +3371,7 @@ async function createTournamentReport(request, env, url) {
   const rawFormation = text(body.formation || 'doublette');
   const formationOther = rawFormation === 'andere';
   const formation = formationOther ? 'tete' : rawFormation;
+  const licenseRequired = Boolean(body.licenseRequired);
   const description = nullableText(body.description);
   const websiteUrl = normalizePresentationUrl(body.websiteUrl);
   const contactName = text(body.contactName);
@@ -3399,10 +3400,10 @@ async function createTournamentReport(request, env, url) {
   await db
     .prepare(
       `INSERT INTO tournaments (
-        id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other,
+        id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, license_required,
         registration_type, status, visibility, registration_enabled, club, website_url, contact_name, contact_email,
         latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -3416,6 +3417,7 @@ async function createTournamentReport(request, env, url) {
       'formule_x',
       formation,
       formationOther ? 1 : 0,
+      licenseRequired ? 1 : 0,
       'forme',
       'draft',
       'public',

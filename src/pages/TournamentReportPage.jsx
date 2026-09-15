@@ -35,6 +35,10 @@ function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSite
         options={FORMATIONS.map((option) => ({ ...option, label: t(option.label) }))}
         required
       />
+      <label className="checkbox-field">
+        <input type="checkbox" checked={form.licenseRequired} onChange={(event) => setForm({ ...form, licenseRequired: event.target.checked })} />
+        {t('Lizenz erforderlich')}
+      </label>
       <TextArea label={t('Weitere Infos')} value={form.description} onChange={(description) => setForm({ ...form, description })} />
       <TextField
         label={t('Quelle / Webseite')}

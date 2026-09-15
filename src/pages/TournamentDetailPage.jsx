@@ -101,6 +101,9 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
           <strong>{t('Bouleplatz')}</strong>: <a href={`/plaetze#${encodeURIComponent(tournament.boulePlaceId)}`}>{t('Öffentlichen Bouleplatz ansehen')}</a>
         </p>
       )}
+      <p>
+        <strong>{t('Lizenz')}</strong>: {t(tournament.licenseRequired ? 'Ja' : 'Nein')}
+      </p>
       {!isCalendarEntry && (
         <>
           {tournament.approvalRequired && <p className="hint">{t('Anmeldungen müssen vom Turnierersteller bestätigt werden.')}</p>}
@@ -112,9 +115,6 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
           </p>
           <p>
             <strong>{t('Turniersystem')}</strong>: {labelFor(TOURNAMENT_TYPES, tournament.type)}
-          </p>
-          <p>
-            <strong>{t('Lizenz')}</strong>: {t(tournament.licenseRequired ? 'Ja' : 'Nein')}
           </p>
         </>
       )}

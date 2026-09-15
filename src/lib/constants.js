@@ -157,6 +157,7 @@ export const EMPTY_TOURNAMENT_REPORT_FORM = {
   date: '',
   startTime: '',
   formation: 'doublette',
+  licenseRequired: false,
   description: '',
   websiteUrl: '',
   contactName: '',
