@@ -31,7 +31,7 @@ function FitToMarkers({ places }) {
 const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
 const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '' };
 
-export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
+export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [places, setPlaces] = useState([]);
@@ -216,14 +216,14 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       </div>
 
       {error && <p className="feedback error">{error}</p>}
-      {mapped.length > 0 && (
+      {mapped.length > 0 && maptilerApiKey && (
         <div className="panel">
           <div className="places-map">
             <MapContainer center={center} zoom={7} scrollWheelZoom={false}>
               <TileLayer
-                attribution={'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>'}
-                url="https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png"
-                maxZoom={19}
+                attribution={'&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>'}
+                url={`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}{r}.png?key=${maptilerApiKey}`}
+                maxZoom={20}
               />
               <FitToMarkers places={mapped} />
               {mapped.map((place) => (

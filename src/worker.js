@@ -75,7 +75,7 @@ const DUMMY_PASSWORD_HASH = '000000000000000000000000000000000000000000000000000
 const UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 const SECURITY_HEADERS = {
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data: https://maps.wikimedia.org; connect-src 'self' https://challenges.cloudflare.com; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; frame-src https://challenges.cloudflare.com; form-action 'self'; upgrade-insecure-requests",
+    "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data: https://api.maptiler.com; connect-src 'self' https://challenges.cloudflare.com; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; frame-src https://challenges.cloudflare.com; form-action 'self'; upgrade-insecure-requests",
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(self), payment=(), usb=()',
@@ -866,7 +866,7 @@ export default {
       await cleanupExpiredSessions(env.DB);
 
       if (request.method === 'GET' && url.pathname === '/api/bootstrap') {
-        return json({ needsSetup: await needsSetup(env.DB), turnstileSiteKey: env.TURNSTILE_SITE_KEY || null });
+        return json({ needsSetup: await needsSetup(env.DB), turnstileSiteKey: env.TURNSTILE_SITE_KEY || null, maptilerApiKey: env.MAPTILER_API_KEY || null });
       }
 
       if (request.method === 'POST' && url.pathname === '/api/setup') {

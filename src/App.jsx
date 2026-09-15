@@ -50,6 +50,7 @@ function AppContent() {
   const [language, setLanguage] = useState(() => localStorage.getItem('ptm_language') || 'de');
   const [needsSetup, setNeedsSetup] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState(null);
+  const [maptilerApiKey, setMaptilerApiKey] = useState(null);
   const [reportVerifyStatus, setReportVerifyStatus] = useState(null);
   const [placeReportVerifyStatus, setPlaceReportVerifyStatus] = useState(null);
   const [authView, setAuthView] = useState('home');
@@ -486,6 +487,7 @@ function AppContent() {
       const bootstrap = await api('/api/bootstrap').catch(() => api('/api/bootstrap'));
       setNeedsSetup(bootstrap.needsSetup);
       setTurnstileSiteKey(bootstrap.turnstileSiteKey || null);
+      setMaptilerApiKey(bootstrap.maptilerApiKey || null);
 
       if (!bootstrap.needsSetup) {
         try {
@@ -1597,7 +1599,7 @@ function AppContent() {
   }
 
   if (!needsSetup && path === '/plaetze') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlacesPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlacesPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} /></Suspense>;
   }
 
   if (currentUser && authView === 'cancelRegistration') {
