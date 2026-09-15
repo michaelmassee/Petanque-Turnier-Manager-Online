@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { Button, Feedback } from '../components/ui.jsx';
 
-export function PetanqueOnlineImportPanel() {
+export function PetanqueAktuellImportPanel() {
   const { t } = useTranslation();
   const [tournaments, setTournaments] = useState([]);
   const [selected, setSelected] = useState(new Set());
@@ -11,13 +11,12 @@ export function PetanqueOnlineImportPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [onlyWithClubWebsite, setOnlyWithClubWebsite] = useState(false);
 
   async function load() {
     setLoading(true);
     setError('');
     try {
-      const result = await authenticatedApi('/api/admin/petanque-online/tournaments');
+      const result = await authenticatedApi('/api/admin/petanque-aktuell/tournaments');
       setTournaments(result.tournaments || []);
       setSelected(new Set());
     } catch (requestError) {
@@ -28,12 +27,7 @@ export function PetanqueOnlineImportPanel() {
   }
 
   useEffect(() => { load(); }, []);
-
   const selectable = useMemo(() => tournaments.filter((tournament) => !tournament.imported), [tournaments]);
-  const visibleTournaments = useMemo(
-    () => (onlyWithClubWebsite ? tournaments.filter((tournament) => tournament.hasClubWebsite) : tournaments),
-    [tournaments, onlyWithClubWebsite],
-  );
 
   function toggle(key) {
     setSelected((current) => {
@@ -53,8 +47,8 @@ export function PetanqueOnlineImportPanel() {
     setMessage('');
     setError('');
     try {
-      const result = await authenticatedApi('/api/admin/petanque-online/import', { method: 'POST', body: JSON.stringify({ externalKeys: [...selected] }) });
-      const parts = [t('Petanque-Online-Termine importiert: {created} neu, {updated} aktualisiert.').replace('{created}', result.created).replace('{updated}', result.updated)];
+      const result = await authenticatedApi('/api/admin/petanque-aktuell/import', { method: 'POST', body: JSON.stringify({ externalKeys: [...selected] }) });
+      const parts = [t('Pétanque-Aktuell-Termine importiert: {created} neu, {updated} aktualisiert.').replace('{created}', result.created).replace('{updated}', result.updated)];
       if (result.failed > 0) parts.push(t('{failed} Termine fehlgeschlagen.').replace('{failed}', result.failed));
       setMessage(parts.join(' '));
       await load();
@@ -70,8 +64,8 @@ export function PetanqueOnlineImportPanel() {
       <div className="panel">
         <div className="section-title">
           <div>
-            <h2>{t('Petanque-Online importieren')}</h2>
-            <p className="muted">{t('Wähle künftige Termine aus. Bereits importierte Termine werden täglich mit der Quelle abgeglichen.')}</p>
+            <h2>{t('Pétanque Aktuell importieren')}</h2>
+            <p className="muted">{t('Wähle künftige Termine aus. Bereits importierte Termine werden täglich vollständig mit der Quelle abgeglichen.')}</p>
           </div>
           <Button variant="secondary" disabled={loading || busy} loading={loading || busy} onClick={load}>{t('Aktualisieren')}</Button>
         </div>
@@ -83,30 +77,22 @@ export function PetanqueOnlineImportPanel() {
                 <input type="checkbox" checked={selectable.length > 0 && selected.size === selectable.length} onChange={toggleAll} disabled={selectable.length === 0 || busy} />
                 <span>{t('Alle neuen Termine auswählen')}</span>
               </label>
-              <label className="checkbox-field">
-                <input type="checkbox" checked={onlyWithClubWebsite} onChange={(event) => setOnlyWithClubWebsite(event.target.checked)} />
-                <span>{t('Nur mit Vereinswebseite')}</span>
-              </label>
               <Button disabled={selected.size === 0 || busy} loading={busy} onClick={handleImport}>{t('Ausgewählte Termine importieren')}</Button>
             </div>
             <div className="user-list import-list">
-              {visibleTournaments.map((tournament) => (
+              {tournaments.map((tournament) => (
                 <label className="data-row" key={tournament.externalKey}>
                   <input type="checkbox" checked={selected.has(tournament.externalKey)} onChange={() => toggle(tournament.externalKey)} disabled={tournament.imported || busy} />
                   <span>
                     <strong data-i18n-skip>{tournament.name}</strong>
-                    <small data-i18n-skip>{tournament.date}{tournament.startTime ? ` · ${tournament.startTime}` : ''} · {tournament.location} · {tournament.club || 'Petanque-Online'}</small>
-                    <small data-i18n-skip>{tournament.sourceFormation}</small>
+                    <small data-i18n-skip>{tournament.date}{tournament.startTime ? ` · ${tournament.startTime}` : ''} · {tournament.location}</small>
+                    <small data-i18n-skip>{[tournament.sourceFormation, tournament.association, tournament.licenseRequired].filter(Boolean).join(' · ')}</small>
                   </span>
                   {tournament.imported && <span className="role">{t('Bereits importiert')}</span>}
-                  {tournament.hasClubWebsite && (
-                    <a className="role" href={tournament.websiteUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
-                      {t('Vereinswebseite')}
-                    </a>
-                  )}
+                  <a className="role" href={tournament.websiteUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>{t('Quelle')}</a>
                 </label>
               ))}
-              {visibleTournaments.length === 0 && <p className="muted">{t('Keine künftigen Termine gefunden.')}</p>}
+              {tournaments.length === 0 && <p className="muted">{t('Keine künftigen Termine gefunden.')}</p>}
             </div>
           </>
         )}
@@ -115,4 +101,4 @@ export function PetanqueOnlineImportPanel() {
   );
 }
 
-export default PetanqueOnlineImportPanel;
+export default PetanqueAktuellImportPanel;

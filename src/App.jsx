@@ -27,7 +27,7 @@ const RegistrationsManagement = lazy(() => import('./pages/RegistrationsManageme
 const UserManagementPanel = lazy(() => import('./pages/UserManagementPanel.jsx'));
 const ApiKeysPanel = lazy(() => import('./pages/ApiKeysPanel.jsx'));
 const TournamentPlayManagement = lazy(() => import('./pages/TournamentPlayManagement.jsx'));
-const PetanqueOnlineImportPanel = lazy(() => import('./pages/PetanqueOnlineImportPanel.jsx'));
+const PetanqueAktuellImportPanel = lazy(() => import('./pages/PetanqueAktuellImportPanel.jsx'));
 const PlacesPage = lazy(() => import('./pages/PlacesPage.jsx'));
 const PlaceReportPage = lazy(() => import('./pages/PlaceReportPage.jsx'));
 const ClubModerationPanel = lazy(() => import('./pages/ClubModerationPanel.jsx'));
@@ -1922,8 +1922,8 @@ function AppContent() {
       ? t('Vereine & Bouleplätze')
       : activeTab === 'apikeys'
         ? t('API-Zugänge')
-        : activeTab === 'petanque-online-import'
-          ? t('Petanque-Online importieren')
+        : activeTab === 'petanque-aktuell-import'
+          ? t('Pétanque Aktuell importieren')
         : activeTab === 'play'
           ? t('Turnier starten')
           : activeTab === 'registrations'
@@ -2115,15 +2115,15 @@ function AppContent() {
         </button>
         {isAdmin && (
           <button
-            className={`drawer-link ${activeTab === 'petanque-online-import' ? 'active' : ''}`}
+            className={`drawer-link ${activeTab === 'petanque-aktuell-import' ? 'active' : ''}`}
             type="button"
             onClick={() => {
-              setActiveTab('petanque-online-import');
+              setActiveTab('petanque-aktuell-import');
               setMenuOpen(false);
               clearFeedback();
             }}
           >
-            {t('Petanque-Online importieren')}
+            {t('Pétanque Aktuell importieren')}
           </button>
         )}
         {isAdmin && (
@@ -2430,9 +2430,9 @@ function AppContent() {
         </Suspense>
       )}
 
-      {activeTab === 'petanque-online-import' && isAdmin && (
+      {activeTab === 'petanque-aktuell-import' && isAdmin && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
-          <PetanqueOnlineImportPanel />
+          <PetanqueAktuellImportPanel />
         </Suspense>
       )}
 
