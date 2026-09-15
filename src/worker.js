@@ -2818,7 +2818,7 @@ async function listTournaments(db, user) {
           FROM registrations
           WHERE registrations.tournament_id = tournaments.id
             AND registrations.status = 'waitlist'
-        ) AS waitlist_registrations,
+        ) AS waitlist_registrations
        FROM tournaments
        WHERE (?1 IS NOT NULL AND ?1 = 'admin')
           OR (?2 IS NOT NULL AND (tournaments.owner_id = ?2 OR EXISTS (
@@ -4828,7 +4828,7 @@ async function getTournamentById(db, id) {
           FROM registrations
           WHERE registrations.tournament_id = tournaments.id
             AND registrations.status = 'waitlist'
-        ) AS waitlist_registrations,
+        ) AS waitlist_registrations
        FROM tournaments
        WHERE tournaments.id = ?`,
     )
