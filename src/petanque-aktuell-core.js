@@ -113,6 +113,10 @@ export function parsePetanqueAktuellCalendar(html) {
   return entries;
 }
 
+export function mapPetanqueAktuellLicenseRequired(value) {
+  return /^ja/i.test(String(value || '').trim());
+}
+
 export function mapPetanqueAktuellTournament(entry) {
   const formation = mapPetanqueAktuellFormation(entry.formation);
   const details = [
@@ -129,6 +133,7 @@ export function mapPetanqueAktuellTournament(entry) {
     startTime: entry.startTime,
     location: String(entry.location || '').trim(),
     formation,
+    licenseRequired: mapPetanqueAktuellLicenseRequired(entry.licenseRequired),
     description: details.join('\n'),
     websiteUrl: entry.detailUrl,
     flyerUrl: entry.flyerUrl,
@@ -137,4 +142,23 @@ export function mapPetanqueAktuellTournament(entry) {
 
 export function isFuturePetanqueAktuellTournament(entry, today = new Date().toISOString().slice(0, 10)) {
   return typeof entry?.date === 'string' && entry.date > today;
+}
+
+function valueForDetailLabel(html, label) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = String(html || '').match(new RegExp(`<div\\b[^>]*class=["']kalTbSp1["'][^>]*>\\s*${escaped}\\s*<\\/div>\\s*<div\\b[^>]*class=["']kalTbSp2["'][^>]*>([\\s\\S]*?)<\\/div>`, 'i'));
+  return decodeHtml(match?.[1]);
+}
+
+// Turnier-Detailseite (kal_Aktion=detail) trägt optional PLZ, Ort und Straße+Nr. als
+// vom Veranstalter gepflegte, freiwillige Einzelfelder - die Kalender-Liste liefert
+// dagegen nur den bloßen Ortsnamen. Ergibt sich daraus eine vollständigere Adresse als
+// die Liste, wird sie zurückgegeben; sonst null (Aufrufer behält den Listen-Ort bei).
+export function parsePetanqueAktuellDetailAddress(html) {
+  const plz = valueForDetailLabel(html, 'PLZ');
+  const ort = valueForDetailLabel(html, 'Ort');
+  const strasse = valueForDetailLabel(html, 'Straße, Nr.');
+  if (!strasse && !plz) return null;
+  const line2 = [plz, ort].filter(Boolean).join(' ');
+  return [strasse, line2].filter(Boolean).join(', ') || null;
 }

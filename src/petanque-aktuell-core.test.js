@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellFormation, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
+import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellFormation, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
 
 const CALENDAR = `
   <table>
@@ -51,6 +51,30 @@ describe('Pétanque-Aktuell-Import', () => {
     expect(parsePetanqueAktuellCalendar(LIVE_SHAPE)).toEqual([expect.objectContaining({
       externalKey: 'kalender:2443', date: '2026-09-19', name: 'Chateau Benrath Zock', location: 'Düsseldorf', startTime: '10:20', formation: '2:2', association: 'NRW', licenseRequired: 'nein',
     })]);
+  });
+
+  it('liest PLZ/Straße von der Detailseite, wenn der Veranstalter sie gepflegt hat', () => {
+    const detail = `
+      <div class="kalTbZl1"><div class="kalTbSp1">Nummer</div><div class="kalTbSp2">2544</div></div>
+      <div class="kalTbZl2"><div class="kalTbSp1">PLZ</div><div class="kalTbSp2">69121</div></div>
+      <div class="kalTbZl1"><div class="kalTbSp1">Ort</div><div class="kalTbSp2">Heidelberg</div></div>
+      <div class="kalTbZl2"><div class="kalTbSp1">Straße, Nr.</div><div class="kalTbSp2">Im Weiher 18</div></div>`;
+    expect(parsePetanqueAktuellDetailAddress(detail)).toBe('Im Weiher 18, 69121 Heidelberg');
+  });
+
+  it('liefert null, wenn die Detailseite keine PLZ/Straße enthält', () => {
+    const detail = `
+      <div class="kalTbZl1"><div class="kalTbSp1">Nummer</div><div class="kalTbSp2">2626</div></div>
+      <div class="kalTbZl2"><div class="kalTbSp1">Ort</div><div class="kalTbSp2">Khon Kaen (Thailand)</div></div>`;
+    expect(parsePetanqueAktuellDetailAddress(detail)).toBeNull();
+  });
+
+  it('übernimmt die Lizenzpflicht strukturiert vom Kalender', () => {
+    const entries = parsePetanqueAktuellCalendar(CALENDAR);
+    expect(entries[0].licenseRequired).toBe('nein');
+    expect(entries[1].licenseRequired).toBe('ja');
+    expect(mapPetanqueAktuellTournament(entries[0]).licenseRequired).toBe(false);
+    expect(mapPetanqueAktuellTournament(entries[1]).licenseRequired).toBe(true);
   });
 
   it('ordnet bekannte Formationen zu und bewahrt andere als Originalinformation', () => {
