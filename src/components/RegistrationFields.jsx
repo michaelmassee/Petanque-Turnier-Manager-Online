@@ -11,6 +11,13 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
   const allowsPartner = isDrawnTeam ? false : (formation ? formation !== 'tete' : true);
   const allowsPartner2 = isDrawnTeam ? false : formation === 'triplette';
   const showMeleeNotice = isDrawnTeam && formation && formation !== 'tete';
+  // Ohne Ermäßigung (nur ein wählbarer Tarif) gibt es nichts auszuwählen - die Auswahl
+  // entfällt und der einzige aktive Tarif wird automatisch zugeordnet, damit das Startgeld
+  // trotzdem erfasst wird. Deaktivierte Tarife zählen nicht mit (für neue Meldungen ohnehin
+  // nicht wählbar).
+  const activeFeeTiers = feeTiers.filter((tier) => tier.active !== false);
+  const soleTierId = activeFeeTiers.length === 1 ? activeFeeTiers[0].id : null;
+  const showFeeSelect = activeFeeTiers.length > 1;
   const selectedFee = (participant) => (form.feeSelections || []).find((selection) => selection.participant === participant)?.tariffId || '';
   const setSelectedFee = (participant, tariffId) => setForm({
     ...form,
@@ -53,13 +60,25 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [licenseRequired]);
 
+  useEffect(() => {
+    if (!soleTierId) return;
+    const wanted = ['primary', ...(allowsPartner ? ['partner'] : []), ...(allowsPartner2 ? ['partner2'] : [])];
+    setForm((current) => {
+      const existing = current.feeSelections || [];
+      const missing = wanted.filter((participant) => !existing.some((selection) => selection.participant === participant));
+      if (missing.length === 0) return current;
+      return { ...current, feeSelections: [...existing, ...missing.map((participant) => ({ participant, tariffId: soleTierId }))] };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [soleTierId, allowsPartner, allowsPartner2]);
+
   return (
     <>
       <div className="form-grid">
         <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />
         <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} invalid={invalidField === 'firstName'} />
       </div>
-      {feeTiers.length > 0 && <SelectField label={t('Startgeld')} value={selectedFee('primary')} onChange={(tariffId) => setSelectedFee('primary', tariffId)} options={feeOptions('primary')} />}
+      {showFeeSelect && <SelectField label={t('Startgeld')} value={selectedFee('primary')} onChange={(tariffId) => setSelectedFee('primary', tariffId)} options={feeOptions('primary')} />}
       {showStatus && (
         <label className="checkbox-field">
           <input
@@ -98,7 +117,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
             <TextField label={t('Partner Vorname')} value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
             <TextField label={t('Partner Nachname')} value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
           </div>
-          {feeTiers.length > 0 && <SelectField label={t('Startgeld Partner')} value={selectedFee('partner')} onChange={(tariffId) => setSelectedFee('partner', tariffId)} options={feeOptions('partner')} />}
+          {showFeeSelect && <SelectField label={t('Startgeld Partner')} value={selectedFee('partner')} onChange={(tariffId) => setSelectedFee('partner', tariffId)} options={feeOptions('partner')} />}
           <div className="form-grid">
             <TextField label={t('Partner E-Mail')} type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
             {licenseRequired && (
@@ -129,7 +148,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
               />
             )}
           </div>
-          {feeTiers.length > 0 && <SelectField label={t('Startgeld Partner 2')} value={selectedFee('partner2')} onChange={(tariffId) => setSelectedFee('partner2', tariffId)} options={feeOptions('partner2')} />}
+          {showFeeSelect && <SelectField label={t('Startgeld Partner 2')} value={selectedFee('partner2')} onChange={(tariffId) => setSelectedFee('partner2', tariffId)} options={feeOptions('partner2')} />}
         </>
       )}
       {showStatus && (
