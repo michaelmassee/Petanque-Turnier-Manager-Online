@@ -412,6 +412,7 @@ export function TournamentDetailPage({
   setMessage,
   setError,
   onLogout,
+  drawerContent,
 }) {
   const { t } = useTranslation();
   const shareToken = new URLSearchParams(window.location.search).get('share') || '';
@@ -431,6 +432,7 @@ export function TournamentDetailPage({
           navigate={navigate}
           currentUser={currentUser}
           onLogout={onLogout}
+          drawerContent={drawerContent}
         />
         <section className="home-tournaments">
           <p className="muted">{t('Dieses Turnier existiert nicht oder ist nicht öffentlich sichtbar.')}</p>
@@ -454,6 +456,7 @@ export function TournamentDetailPage({
           navigate={navigate}
           currentUser={currentUser}
           onLogout={onLogout}
+          drawerContent={drawerContent}
         />
       </main>
     );
@@ -495,6 +498,7 @@ export function TournamentDetailPage({
         navigate={navigate}
         currentUser={currentUser}
         onLogout={onLogout}
+        drawerContent={drawerContent}
       />
 
       <OfflineNotice language={language} />

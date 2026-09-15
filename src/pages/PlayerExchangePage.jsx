@@ -246,7 +246,7 @@ function PlayerExchangeSearchMenu({
   );
 }
 
-export default function PlayerExchangePage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey, createRequest = 0 }) {
+export default function PlayerExchangePage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey, createRequest = 0, drawerContent }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -358,6 +358,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
         navigate={navigate}
         currentUser={currentUser}
         onLogout={onLogout}
+        drawerContent={drawerContent}
         searchControl={
           <PlayerExchangeSearchMenu
             open={searchMenuOpen}

@@ -120,7 +120,7 @@ function PlacesMap({ places, center, maptilerApiKey }) {
   );
 }
 
-export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey }) {
+export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey, drawerContent }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [places, setPlaces] = useState([]);
@@ -241,32 +241,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       navigate={navigate}
       currentUser={currentUser}
       onLogout={onLogout}
-      menuExtra={
-        <>
-          <button
-            className="drawer-link"
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              navigate('/platz-melden');
-            }}
-          >
-            {t('Bouleplatz melden')}
-          </button>
-          {currentUser && (
-            <button
-              className="drawer-link"
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
-                navigate('/vereine');
-              }}
-            >
-              {t('Meine Vereine')}
-            </button>
-          )}
-        </>
-      }
+      drawerContent={drawerContent}
       searchControl={
         <PlacesSearchMenu
           open={searchMenuOpen}

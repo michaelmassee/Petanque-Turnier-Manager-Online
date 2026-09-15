@@ -7,7 +7,7 @@ import { StandalonePageHeader } from '../components/layout.jsx';
 
 const EMPTY_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '' };
 
-export function PlaceEditByTokenPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
+export function PlaceEditByTokenPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, drawerContent }) {
   const { t } = useTranslation();
   const [token] = useState(() => new URLSearchParams(window.location.search).get('edit_token') || '');
   const [form, setForm] = useState(EMPTY_FORM);
@@ -62,6 +62,7 @@ export function PlaceEditByTokenPage({ language, setLanguage, menuOpen, setMenuO
         navigate={navigate}
         currentUser={currentUser}
         onLogout={onLogout}
+        drawerContent={drawerContent}
       />
       <section className="single-column">
         <div className="panel">

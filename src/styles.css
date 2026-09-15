@@ -817,6 +817,26 @@ textarea:focus {
   color: #ffffff;
 }
 
+.drawer-menu-section {
+  display: grid;
+  gap: 10px;
+}
+
+.drawer-menu-section-admin,
+.drawer-menu-section-account {
+  padding-top: 10px;
+  border-top: 1px solid #e2e7f0;
+}
+
+.drawer-section-title {
+  margin: 0;
+  color: #53627a;
+  font-size: .8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
 .drawer-legal-links {
   display: flex;
   gap: 14px;

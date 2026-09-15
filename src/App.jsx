@@ -46,6 +46,40 @@ export default function App() {
   );
 }
 
+function ContextualDrawerContent({ area, currentUser, canManageTournaments, isAdmin, activeTab, onSelectTab, onNavigate, onCreateListing, onOpenProfile, onLogout }) {
+  const { t } = useTranslation();
+  const closeThen = (action) => () => action();
+  const navigate = (path) => closeThen(() => onNavigate(path));
+  const selectTab = (tab) => closeThen(() => onSelectTab(tab));
+
+  return <>
+    <div className="drawer-menu-section" aria-label={t(area === 'turniere' ? 'Turniere' : area === 'bouleplaetze' ? 'Boule-Plätze / Vereine' : 'Spielerbörse')}>
+      {area === 'turniere' && <>
+        {canManageTournaments && <button className={`drawer-link ${activeTab === 'tournaments' ? 'active' : ''}`} type="button" onClick={selectTab('tournaments')}>{t('Turnierverwaltung')}</button>}
+        {currentUser && <button className={`drawer-link ${activeTab === 'registrations' ? 'active' : ''}`} type="button" onClick={selectTab('registrations')}>{t('Anmeldungen')}</button>}
+        {canManageTournaments && <button className={`drawer-link ${activeTab === 'play' ? 'active' : ''}`} type="button" onClick={selectTab('play')}>{t('Turnier starten')}</button>}
+        <button className="drawer-link" type="button" onClick={navigate('/turnier-melden')}>{t('Turnier melden')}</button>
+        {isAdmin && <button className={`drawer-link ${activeTab === 'petanque-aktuell-import' ? 'active' : ''}`} type="button" onClick={selectTab('petanque-aktuell-import')}>{t('Pétanque Aktuell importieren')}</button>}
+      </>}
+      {area === 'bouleplaetze' && <>
+        <button className="drawer-link" type="button" onClick={navigate('/platz-melden')}>{t('Bouleplatz melden')}</button>
+        {currentUser && <button className="drawer-link" type="button" onClick={navigate('/vereine')}>{t('Meine Vereine')}</button>}
+        {isAdmin && <button className={`drawer-link ${activeTab === 'clubs' ? 'active' : ''}`} type="button" onClick={selectTab('clubs')}>{t('Vereine & Bouleplätze')}</button>}
+      </>}
+      {area === 'spielerboerse' && currentUser && <button className="drawer-link" type="button" onClick={closeThen(onCreateListing)}>{t('Anzeige erstellen')}</button>}
+    </div>
+    {(isAdmin || canManageTournaments) && <div className="drawer-menu-section drawer-menu-section-admin" aria-label={t('Administration')}>
+      <p className="drawer-section-title">{t('Administration')}</p>
+      {isAdmin && <button className={`drawer-link ${activeTab === 'users' ? 'active' : ''}`} type="button" onClick={selectTab('users')}>{t('Benutzer')}</button>}
+      {canManageTournaments && <button className={`drawer-link ${activeTab === 'apikeys' ? 'active' : ''}`} type="button" onClick={selectTab('apikeys')}>{t('API-Zugänge')}</button>}
+    </div>}
+    {currentUser && <div className="drawer-menu-section drawer-menu-section-account">
+      <button className={`drawer-link ${activeTab === 'profile' ? 'active' : ''}`} type="button" onClick={closeThen(onOpenProfile)}>{t('Mein Profil')}</button>
+      <button className="drawer-link" type="button" onClick={closeThen(onLogout)}>{t('Abmelden')}</button>
+    </div>}
+  </>;
+}
+
 function AppContent() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -1503,6 +1537,58 @@ function AppContent() {
 
   const roleLabel = useMemo(() => roleName(currentUser?.role), [currentUser]);
 
+  function selectDrawerTab(tab) {
+    setActiveTab(tab);
+    setMenuOpen(false);
+    clearFeedback();
+    if (path !== '/') navigate('/');
+  }
+
+  function navigateFromDrawer(nextPath) {
+    setMenuOpen(false);
+    clearFeedback();
+    navigate(nextPath);
+  }
+
+  function openPlayerListingFromDrawer() {
+    setMenuOpen(false);
+    clearFeedback();
+    setPlayerListingCreateRequest((current) => current + 1);
+    navigate('/spielerboerse');
+  }
+
+  function openProfileFromDrawer() {
+    setProfileForm({
+      firstName: currentUser.firstName,
+      lastName: currentUser.lastName,
+      email: currentUser.pendingEmail || currentUser.email,
+      club: currentUser.club || '',
+      licenseNr: currentUser.licenseNr || '',
+      currentPassword: '',
+      newPassword: '',
+      newPasswordConfirm: '',
+    });
+    selectDrawerTab('profile');
+  }
+
+  function drawerContent(area) {
+    return <ContextualDrawerContent
+      area={area}
+      currentUser={currentUser}
+      canManageTournaments={canManageTournaments}
+      isAdmin={isAdmin}
+      activeTab={activeTab}
+      onSelectTab={selectDrawerTab}
+      onNavigate={navigateFromDrawer}
+      onCreateListing={openPlayerListingFromDrawer}
+      onOpenProfile={openProfileFromDrawer}
+      onLogout={() => {
+        setMenuOpen(false);
+        handleLogout();
+      }}
+    />;
+  }
+
   if (loading) {
     return <AuthShell title="Pétanque Turnier Manager Online" subtitle={t('App wird geladen.')} language={language} setLanguage={setLanguage} />;
   }
@@ -1531,6 +1617,7 @@ function AppContent() {
           setMessage={setMessage}
           setError={setError}
           onLogout={handleLogout}
+          drawerContent={drawerContent('turniere')}
         />
       </Suspense>
     );
@@ -1581,6 +1668,7 @@ function AppContent() {
           onLogout={handleLogout}
           turnstileSiteKey={turnstileSiteKey}
           verifyStatus={reportVerifyStatus}
+          drawerContent={drawerContent('turniere')}
         />
       </Suspense>
     );
@@ -1599,6 +1687,7 @@ function AppContent() {
           onLogout={handleLogout}
           turnstileSiteKey={turnstileSiteKey}
           verifyStatus={placeReportVerifyStatus}
+          drawerContent={drawerContent('bouleplaetze')}
         />
       </Suspense>
     );
@@ -1615,21 +1704,22 @@ function AppContent() {
           navigate={navigate}
           currentUser={currentUser}
           onLogout={handleLogout}
+          drawerContent={drawerContent('bouleplaetze')}
         />
       </Suspense>
     );
   }
 
   if (!needsSetup && path === '/plaetze') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlacesPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlacesPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} drawerContent={drawerContent('bouleplaetze')} /></Suspense>;
   }
 
   if (!needsSetup && currentUser && path === '/vereine') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyClubsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyClubsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} drawerContent={drawerContent('bouleplaetze')} /></Suspense>;
   }
 
   if (!needsSetup && currentUser && path === '/spielerboerse') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerExchangePage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} createRequest={playerListingCreateRequest} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerExchangePage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} createRequest={playerListingCreateRequest} drawerContent={drawerContent('spielerboerse')} /></Suspense>;
   }
 
   if (currentUser && authView === 'cancelRegistration') {
@@ -2076,181 +2166,7 @@ function AppContent() {
           <span data-i18n-skip>{currentUser.firstName} {currentUser.lastName}</span>
           <strong>{roleLabel}</strong>
         </div>
-        <button
-          className={`drawer-link ${activeTab === 'home' ? 'active' : ''}`}
-          type="button"
-          onClick={() => {
-            setActiveTab('home');
-            setMenuOpen(false);
-            clearFeedback();
-          }}
-        >
-          {t('Startseite')}
-        </button>
-        {canManageTournaments && (
-          <button
-            className={`drawer-link ${activeTab === 'tournaments' ? 'active' : ''}`}
-            type="button"
-            onClick={() => {
-              setActiveTab('tournaments');
-              setMenuOpen(false);
-              clearFeedback();
-            }}
-          >
-            {t('Turnierverwaltung')}
-          </button>
-        )}
-        <button
-          className={`drawer-link ${activeTab === 'registrations' ? 'active' : ''}`}
-          type="button"
-          onClick={() => {
-            setActiveTab('registrations');
-            setMenuOpen(false);
-            clearFeedback();
-          }}
-        >
-          {t('Anmeldungen')}
-        </button>
-        {canManageTournaments && (
-          <button
-            className={`drawer-link ${activeTab === 'play' ? 'active' : ''}`}
-            type="button"
-            onClick={() => {
-              setActiveTab('play');
-              setMenuOpen(false);
-              clearFeedback();
-            }}
-          >
-            {t('Turnier starten')}
-          </button>
-        )}
-        <button
-          className="drawer-link"
-          type="button"
-          onClick={() => {
-            setMenuOpen(false);
-            clearFeedback();
-            navigate('/turnier-melden');
-          }}
-        >
-          {t('Turnier melden')}
-        </button>
-        <button
-          className="drawer-link"
-          type="button"
-          onClick={() => {
-            setMenuOpen(false);
-            clearFeedback();
-            navigate('/platz-melden');
-          }}
-        >
-          {t('Bouleplatz melden')}
-        </button>
-        <button
-          className="drawer-link"
-          type="button"
-          onClick={() => {
-            setMenuOpen(false);
-            clearFeedback();
-            setPlayerListingCreateRequest((current) => current + 1);
-            navigate('/spielerboerse');
-          }}
-        >
-          {t('Anzeige erstellen')}
-        </button>
-        <button
-          className="drawer-link"
-          type="button"
-          onClick={() => {
-            setMenuOpen(false);
-            clearFeedback();
-            navigate('/vereine');
-          }}
-        >
-          {t('Meine Vereine')}
-        </button>
-        {isAdmin && (
-          <button
-            className={`drawer-link ${activeTab === 'petanque-aktuell-import' ? 'active' : ''}`}
-            type="button"
-            onClick={() => {
-              setActiveTab('petanque-aktuell-import');
-              setMenuOpen(false);
-              clearFeedback();
-            }}
-          >
-            {t('Pétanque Aktuell importieren')}
-          </button>
-        )}
-        {isAdmin && (
-          <button
-            className={`drawer-link ${activeTab === 'users' ? 'active' : ''}`}
-            type="button"
-            onClick={() => {
-              setActiveTab('users');
-              setMenuOpen(false);
-              clearFeedback();
-            }}
-          >
-            {t('Benutzer')}
-          </button>
-        )}
-        {isAdmin && (
-          <button
-            className={`drawer-link ${activeTab === 'clubs' ? 'active' : ''}`}
-            type="button"
-            onClick={() => {
-              setActiveTab('clubs');
-              setMenuOpen(false);
-              clearFeedback();
-            }}
-          >
-            {t('Vereine & Bouleplätze')}
-          </button>
-        )}
-        {canManageTournaments && (
-          <button
-            className={`drawer-link ${activeTab === 'apikeys' ? 'active' : ''}`}
-            type="button"
-            onClick={() => {
-              setActiveTab('apikeys');
-              setMenuOpen(false);
-              clearFeedback();
-            }}
-          >
-            {t('API-Zugänge')}
-          </button>
-        )}
-        <button
-          className={`drawer-link ${activeTab === 'profile' ? 'active' : ''}`}
-          type="button"
-          onClick={() => {
-            setProfileForm({
-              firstName: currentUser.firstName,
-              lastName: currentUser.lastName,
-              email: currentUser.pendingEmail || currentUser.email,
-              club: currentUser.club || '',
-              licenseNr: currentUser.licenseNr || '',
-              currentPassword: '',
-              newPassword: '',
-              newPasswordConfirm: '',
-            });
-            setActiveTab('profile');
-            setMenuOpen(false);
-            clearFeedback();
-          }}
-        >
-          {t('Mein Profil')}
-        </button>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setMenuOpen(false);
-            handleLogout();
-          }}
-        >
-          {t('Abmelden')}
-        </Button>
+        {drawerContent(activeTab === 'clubs' ? 'bouleplaetze' : 'turniere')}
       </AppHeader>
 
       <Feedback message={message} error={error} />

@@ -596,7 +596,7 @@ export function AuthModal({ title, subtitle, message, error, onClose, children }
   );
 }
 
-export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, searchControl, menuExtra }) {
+export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, searchControl, menuExtra, drawerContent }) {
   const { t } = useTranslation();
   return (
     <AppHeader
@@ -611,7 +611,8 @@ export function StandalonePageHeader({ heading, headingNoTranslate, language, se
       currentUser={currentUser}
       searchControl={searchControl}
     >
-      <button
+      {drawerContent || <>
+        <button
         className="drawer-link"
         type="button"
         onClick={() => {
@@ -620,9 +621,9 @@ export function StandalonePageHeader({ heading, headingNoTranslate, language, se
         }}
       >
         {t('Zur Startseite')}
-      </button>
-      {menuExtra}
-      {currentUser && (
+        </button>
+        {menuExtra}
+        {currentUser && (
         <Button
           variant="secondary"
           onClick={() => {
@@ -632,7 +633,8 @@ export function StandalonePageHeader({ heading, headingNoTranslate, language, se
         >
           {t('Abmelden')}
         </Button>
-      )}
+        )}
+      </>}
     </AppHeader>
   );
 }
