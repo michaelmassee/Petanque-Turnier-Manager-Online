@@ -1174,6 +1174,27 @@ export default {
         const session = await requireSession(request, env.DB);
         return await toggleBoulePlaceFavorite(env.DB, placeFavoriteMatch[1], session.user.id);
       }
+      if (request.method === 'GET' && url.pathname === '/api/player-listings') {
+        const session = await requireSession(request, env.DB);
+        return await listPlayerListings(env.DB, session.user, url.searchParams);
+      }
+      if (request.method === 'GET' && url.pathname === '/api/player-listings/mine') {
+        const session = await requireSession(request, env.DB);
+        return await listMyPlayerListings(env.DB, session.user.id);
+      }
+      if (request.method === 'POST' && url.pathname === '/api/player-listings') {
+        const session = await requireSession(request, env.DB);
+        return await createPlayerListing(request, env.DB, session.user, request.headers.get('CF-IPCountry'));
+      }
+      const playerListingMatch = url.pathname.match(/^\/api\/player-listings\/([^/]+)$/);
+      if (playerListingMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        return await updatePlayerListing(request, env.DB, playerListingMatch[1], session.user, request.headers.get('CF-IPCountry'));
+      }
+      if (playerListingMatch && request.method === 'DELETE') {
+        const session = await requireSession(request, env.DB);
+        return await deletePlayerListing(env.DB, playerListingMatch[1], session.user);
+      }
       if (request.method === 'GET' && url.pathname === '/api/admin/club-editor-requests') {
         await requireAdmin(request, env.DB);
         return await listClubEditorRequests(env.DB);
@@ -5052,6 +5073,81 @@ async function toggleBoulePlaceLike(db, placeId, userId) {
   const liked = await db.prepare('SELECT 1 FROM boule_place_likes WHERE place_id = ? AND user_id = ?').bind(placeId, userId).first();
   if (liked) await db.prepare('DELETE FROM boule_place_likes WHERE place_id = ? AND user_id = ?').bind(placeId, userId).run(); else await db.prepare('INSERT INTO boule_place_likes (place_id, user_id, created_at) VALUES (?, ?, ?)').bind(placeId, userId, new Date().toISOString()).run();
   const count = await db.prepare('SELECT COUNT(*) AS count FROM boule_place_likes WHERE place_id = ?').bind(placeId).first(); return json({ liked: !liked, likeCount: Number(count.count) });
+}
+
+const PLAYER_LISTING_LIMIT = 5;
+
+function toPublicPlayerListing(row) {
+  return {
+    id: row.id, userId: row.user_id, type: row.type, title: row.title, description: row.description || null,
+    locationName: row.location_name, latitude: Number(row.latitude), longitude: Number(row.longitude),
+    eventDate: row.event_date || null, ownerName: row.owner_first_name ? `${row.owner_first_name} ${row.owner_last_name}` : null,
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+async function playerListingInput(body, countryCode) {
+  const type = text(body.type);
+  if (type !== 'tournament' && type !== 'training') throw new HttpError(400, 'Bitte wähle einen Typ');
+  const title = text(body.title); if (title.length < 2) throw new HttpError(400, 'Bitte gib einen Titel ein');
+  const locationName = text(body.locationName); if (locationName.length < 2) throw new HttpError(400, 'Bitte gib einen Ort ein');
+  const eventDate = type === 'tournament' ? text(body.eventDate) : '';
+  if (type === 'tournament' && !eventDate) throw new HttpError(400, 'Bitte gib ein Datum an');
+  const [geo] = await geocodeLocation(locationName, { countryCode, limit: 1 });
+  if (!geo) throw new HttpError(400, 'Kein Ort gefunden.');
+  return { type, title, description: nullableText(body.description), locationName, latitude: geo.lat, longitude: geo.lng, eventDate: eventDate || null };
+}
+
+async function listPlayerListings(db, user, searchParams) {
+  const term = String(searchParams.get('q') || '').trim();
+  const typeFilter = String(searchParams.get('type') || '').trim();
+  const rows = await db.prepare(
+    `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name
+     FROM player_listings l JOIN users u ON u.id = l.user_id
+     WHERE (l.type = 'training' OR (l.type = 'tournament' AND l.event_date >= date('now')))
+       AND (?1 = '' OR l.type = ?1)
+       AND (?2 = '' OR l.title LIKE '%' || ?2 || '%' COLLATE NOCASE OR l.description LIKE '%' || ?2 || '%' COLLATE NOCASE OR l.location_name LIKE '%' || ?2 || '%' COLLATE NOCASE)
+     ORDER BY l.created_at DESC`).bind(typeFilter, term).all();
+  return json({ listings: (rows.results || []).map(toPublicPlayerListing) });
+}
+
+async function listMyPlayerListings(db, userId) {
+  const rows = await db.prepare(
+    `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name
+     FROM player_listings l JOIN users u ON u.id = l.user_id
+     WHERE l.user_id = ? ORDER BY l.created_at DESC`).bind(userId).all();
+  return json({ listings: (rows.results || []).map(toPublicPlayerListing) });
+}
+
+async function createPlayerListing(request, db, user, countryCode) {
+  const count = await db.prepare('SELECT COUNT(*) AS count FROM player_listings WHERE user_id = ?').bind(user.id).first();
+  if (Number(count.count) >= PLAYER_LISTING_LIMIT) throw new HttpError(400, 'Du hast bereits die maximale Anzahl an Anzeigen erreicht');
+  const input = await playerListingInput(await readJson(request), countryCode);
+  const id = crypto.randomUUID(); const now = new Date().toISOString();
+  await db.prepare('INSERT INTO player_listings (id, user_id, type, title, description, location_name, latitude, longitude, event_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, user.id, input.type, input.title, input.description, input.locationName, input.latitude, input.longitude, input.eventDate, now, now).run();
+  return json({ id }, 201);
+}
+
+async function assertPlayerListingOwner(db, id, user) {
+  const listing = await db.prepare('SELECT * FROM player_listings WHERE id = ?').bind(id).first();
+  if (!listing) throw new HttpError(404, 'Anzeige nicht gefunden');
+  if (!(user.role === 'admin' || listing.user_id === user.id)) throw new HttpError(403, 'Keine Bearbeitungsrechte für diese Anzeige');
+  return listing;
+}
+
+async function updatePlayerListing(request, db, id, user, countryCode) {
+  await assertPlayerListingOwner(db, id, user);
+  const input = await playerListingInput(await readJson(request), countryCode);
+  await db.prepare('UPDATE player_listings SET type = ?, title = ?, description = ?, location_name = ?, latitude = ?, longitude = ?, event_date = ?, updated_at = ? WHERE id = ?')
+    .bind(input.type, input.title, input.description, input.locationName, input.latitude, input.longitude, input.eventDate, new Date().toISOString(), id).run();
+  return json({ ok: true });
+}
+
+async function deletePlayerListing(db, id, user) {
+  await assertPlayerListingOwner(db, id, user);
+  await db.prepare('DELETE FROM player_listings WHERE id = ?').bind(id).run();
+  return json({ ok: true });
 }
 
 async function toggleBoulePlaceFavorite(db, placeId, userId) {

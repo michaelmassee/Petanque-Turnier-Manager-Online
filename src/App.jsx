@@ -30,6 +30,7 @@ const TournamentPlayManagement = lazy(() => import('./pages/TournamentPlayManage
 const PetanqueAktuellImportPanel = lazy(() => import('./pages/PetanqueAktuellImportPanel.jsx'));
 const PlacesPage = lazy(() => import('./pages/PlacesPage.jsx'));
 const MyClubsPage = lazy(() => import('./pages/MyClubsPage.jsx'));
+const PlayerExchangePage = lazy(() => import('./pages/PlayerExchangePage.jsx'));
 const PlaceReportPage = lazy(() => import('./pages/PlaceReportPage.jsx'));
 const PlaceEditByTokenPage = lazy(() => import('./pages/PlaceEditByTokenPage.jsx'));
 const ClubModerationPanel = lazy(() => import('./pages/ClubModerationPanel.jsx'));
@@ -1626,6 +1627,10 @@ function AppContent() {
     return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyClubsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} /></Suspense>;
   }
 
+  if (!needsSetup && currentUser && path === '/spielerboerse') {
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerExchangePage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} /></Suspense>;
+  }
+
   if (currentUser && authView === 'cancelRegistration') {
     return (
       <main className="app-shell">
@@ -2149,6 +2154,17 @@ function AppContent() {
           }}
         >
           {t('Meine Vereine')}
+        </button>
+        <button
+          className="drawer-link"
+          type="button"
+          onClick={() => {
+            setMenuOpen(false);
+            clearFeedback();
+            navigate('/spielerboerse');
+          }}
+        >
+          {t('Spielerbörse')}
         </button>
         {isAdmin && (
           <button
