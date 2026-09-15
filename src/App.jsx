@@ -1976,6 +1976,7 @@ function AppContent() {
         }}
         onCloseMenu={() => setMenuOpen(false)}
         navigate={navigate}
+        currentUser={currentUser}
         onLogoClick={() => {
           setActiveTab('home');
           clearFeedback();
