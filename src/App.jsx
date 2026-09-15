@@ -1350,6 +1350,7 @@ function AppContent() {
       registrationOpensAt: utcIsoToZonedDateTimeInput(tournament.registrationOpensAt, tournament.timezone),
       timezone: tournament.timezone || '',
       entryFeeAmount: minorUnitsToAmount(tournament.entryFeeCents, tournament.currency || 'EUR'),
+      feeTiers: (tournament.feeTiers || []).filter((tier) => tier.id !== 'legacy-standard').map((tier) => ({ ...tier, amount: minorUnitsToAmount(tier.amountCents, tournament.currency || 'EUR') })),
       currency: tournament.currency || 'EUR',
       contactName: tournament.contactName || '',
       contactEmail: tournament.contactEmail || '',
@@ -1405,6 +1406,7 @@ function AppContent() {
       partner2LastName: registration.partner2LastName || '',
       partner2Email: registration.partner2Email || '',
       partner2LicenseNr: registration.partner2LicenseNr || '',
+      feeSelections: registration.feeSelections || [],
       teamName: registration.teamName || '',
       seedingPosition: registration.seedingPosition || '',
       status: registration.status || 'pending',
@@ -2797,6 +2799,8 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             registrationType={tournament.registrationType}
             licenseRequired={tournament.licenseRequired}
             teamNameEnabled={tournament.teamNameEnabled}
+            feeTiers={tournament.feeTiers}
+            currency={tournament.currency}
             invalidField={invalidField}
           />
           <label className="website-field" aria-hidden="true">

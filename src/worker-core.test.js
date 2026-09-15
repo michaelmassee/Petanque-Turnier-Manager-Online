@@ -12,6 +12,14 @@ describe('Worker-Fachlogik', () => {
     expect(normalizeTournamentInput({ ...base, approvalRequired: true })).toMatchObject({ approvalRequired: true });
   });
 
+  it('normalisiert ermäßigte Startgeld-Tarife und weist ungültige Tarife ab', () => {
+    expect(normalizeTournamentInput({ ...base, feeTiers: [{ id: 'youth', name: 'Jugend', amountCents: 300 }] }).feeTiers).toEqual([
+      { id: 'youth', name: 'Jugend', amountCents: 300, active: true },
+    ]);
+    expect(() => normalizeTournamentInput({ ...base, feeTiers: [{ id: 'x', name: 'x', amountCents: 1 }] })).toThrow('Startgeld-Tarife');
+    expect(() => normalizeTournamentInput({ ...base, feeTiers: [{ id: 'legacy-standard', name: 'Normal', amountCents: 1 }] })).toThrow('Startgeld-Tarife');
+  });
+
   it('respektiert registrationEnabled für Kalendereinträge', () => {
     expect(normalizeTournamentInput({ ...base, registrationEnabled: false })).toMatchObject({ registrationEnabled: false });
     expect(registrationOpenStatus({ visibility: 'public', status: 'registration', registration_enabled: 0 })).toBe('closed');

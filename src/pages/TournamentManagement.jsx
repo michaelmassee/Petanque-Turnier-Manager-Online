@@ -388,6 +388,28 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             <TextField label={t('Startgeld')} inputMode="decimal" value={form.entryFeeAmount} onChange={(entryFeeAmount) => setForm({ ...form, entryFeeAmount })} />
             <SelectField label={t('Währung')} value={form.currency} onChange={(currency) => setForm({ ...form, currency })} options={currencyOptions(language)} />
           </div>
+          <div className="form">
+            <div className="section-title">
+              <h3>{t('Ermäßigte Startgelder')}</h3>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setForm({ ...form, feeTiers: [...(form.feeTiers || []), { id: crypto.randomUUID(), name: '', amount: '', active: true }] })}
+              >
+                {t('Tarif hinzufügen')}
+              </Button>
+            </div>
+            {(form.feeTiers || []).map((tier, index) => (
+              <div className="form-grid" key={tier.id}>
+                <TextField label={t('Tarifname')} value={tier.name} onChange={(name) => setForm({ ...form, feeTiers: form.feeTiers.map((item, itemIndex) => itemIndex === index ? { ...item, name } : item) })} />
+                <TextField label={t('Startgeld')} inputMode="decimal" value={tier.amount} onChange={(amount) => setForm({ ...form, feeTiers: form.feeTiers.map((item, itemIndex) => itemIndex === index ? { ...item, amount } : item) })} />
+                <label className="checkbox-field">
+                  <input type="checkbox" checked={tier.active !== false} onChange={(event) => setForm({ ...form, feeTiers: form.feeTiers.map((item, itemIndex) => itemIndex === index ? { ...item, active: event.target.checked } : item) })} />
+                  {t('Für neue Meldungen verfügbar')}
+                </label>
+              </div>
+            ))}
+          </div>
           <div className="form-grid">
             <TextField label={t('Anmeldung möglich ab')} type="datetime-local" value={form.registrationOpensAt} onChange={(registrationOpensAt) => setForm({ ...form, registrationOpensAt })} />
             <TextField label={t('Meldefrist')} type="datetime-local" value={form.registrationDeadline} onChange={(registrationDeadline) => setForm({ ...form, registrationDeadline })} />

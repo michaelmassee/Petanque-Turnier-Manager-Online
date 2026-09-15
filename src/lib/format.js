@@ -99,7 +99,7 @@ export function currencyOptions(language) {
 }
 
 export function formatMoney(units, currency, language) {
-  if (!units) {
+  if (units === null || units === undefined || units === '') {
     return '';
   }
   const decimals = currencyDecimals(currency);

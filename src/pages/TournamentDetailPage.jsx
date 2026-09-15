@@ -121,10 +121,13 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
       {tournament.description && <p>{tournament.description}</p>}
       {!isCalendarEntry && (
         <>
-          {Boolean(tournament.entryFeeCents) && (
-            <p>
-              <strong>{t('Startgeld')}</strong>: {formatMoney(tournament.entryFeeCents, tournament.currency, language)}
+          {(tournament.feeTiers || []).map((tier) => tier.active !== false && (
+            <p key={tier.id}>
+              <strong>{tier.id === 'legacy-standard' ? t('Startgeld') : `${t('Startgeld')} ${tier.name}`}</strong>: {formatMoney(tier.amountCents, tournament.currency, language)}
             </p>
+          ))}
+          {!(tournament.feeTiers || []).length && Boolean(tournament.entryFeeCents) && (
+            <p><strong>{t('Startgeld')}</strong>: {formatMoney(tournament.entryFeeCents, tournament.currency, language)}</p>
           )}
           {tournament.registrationOpensAt && (
             <p>

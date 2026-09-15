@@ -3,6 +3,7 @@ import { REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor, translatedOptions } from '../lib/domain.js';
 import { SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
+import { formatMoney } from '../lib/format.js';
 
 export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false }) {
   const { t } = useTranslation();
@@ -21,6 +22,8 @@ export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournament
         registrationType={selectedTournament?.registrationType}
         licenseRequired={selectedTournament?.licenseRequired}
         teamNameEnabled={selectedTournament?.teamNameEnabled}
+        feeTiers={selectedTournament?.feeTiers}
+        currency={selectedTournament?.currency}
         invalidField={invalidField}
       />
       <div className="dialog-actions">
@@ -50,6 +53,8 @@ const REGISTRATION_CSV_COLUMNS = [
   'seedingPosition',
   'status',
   'isVip',
+  'feeSelections',
+  'feeTotalCents',
   'registeredAt',
   'confirmedAt',
   'createdAt',
@@ -57,6 +62,9 @@ const REGISTRATION_CSV_COLUMNS = [
 ];
 
 function csvField(value) {
+  if (Array.isArray(value)) {
+    value = value.map((selection) => `${selection.name} (${selection.amountCents})`).join('; ');
+  }
   let text = value === null || value === undefined ? '' : String(value);
   // Spreadsheet applications evaluate cells beginning with these characters as formulas,
   // even when the CSV field is quoted. Preserve participant input as literal text instead.
@@ -69,10 +77,14 @@ function csvField(value) {
   return text;
 }
 
-function registrationsToCsv(registrations) {
+function registrationsToCsv(registrations, currency) {
   const lines = [REGISTRATION_CSV_COLUMNS.map(csvField).join(',')];
   for (const registration of registrations) {
-    lines.push(REGISTRATION_CSV_COLUMNS.map((column) => csvField(registration[column])).join(','));
+    lines.push(REGISTRATION_CSV_COLUMNS.map((column) => {
+      if (column === 'feeSelections') return csvField((registration.feeSelections || []).map((selection) => `${selection.name} (${formatMoney(selection.amountCents, currency, 'de')})`).join('; '));
+      if (column === 'feeTotalCents') return csvField(registration.feeSelections?.length ? formatMoney(registration.feeTotalCents, currency, 'de') : '');
+      return csvField(registration[column]);
+    }).join(','));
   }
   return `﻿${lines.join('\r\n')}\r\n`;
 }
@@ -85,7 +97,7 @@ function tournamentFileSlug(name) {
 }
 
 function downloadRegistrationsCsv(tournament, registrations) {
-  const csv = registrationsToCsv(registrations);
+  const csv = registrationsToCsv(registrations, tournament?.currency);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -130,6 +142,7 @@ export function RegistrationsPanel({
           </strong>
           <span>{registration.noEmail ? t('ohne E-Mail-Adresse') : registration.email}</span>
           {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
+          {registration.feeSelections?.length > 0 && <small data-i18n-skip>{registration.feeSelections.map((selection) => `${selection.name}: ${formatMoney(selection.amountCents, tournament?.currency, 'de')}`).join(' · ')}{registration.feeTotalCents ? ` = ${formatMoney(registration.feeTotalCents, tournament?.currency, 'de')}` : ''}</small>}
         </div>
         <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
         <div className="row-actions">

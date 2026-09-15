@@ -3007,6 +3007,8 @@ async function createTournament(request, env, user) {
     )
     .run();
 
+  await db.prepare('UPDATE tournaments SET fee_tiers = ? WHERE id = ?').bind(JSON.stringify(tournament.feeTiers), id).run();
+
   const created = await getTournamentById(db, id);
   if (isPubliclyVisible(created)) {
     await notifySavedSearchesForPublishedTournament(env, created);
@@ -3177,6 +3179,9 @@ async function updateTournament(request, env, existing, user) {
       existing.id,
     )
     .run();
+
+  const feeTiers = tournament.feeTiersProvided ? tournament.feeTiers : jsonArray(existing.fee_tiers).filter((tier) => tier?.id !== 'legacy-standard');
+  await db.prepare('UPDATE tournaments SET fee_tiers = ? WHERE id = ?').bind(JSON.stringify(feeTiers), existing.id).run();
 
   const updated = await getTournamentById(db, existing.id);
   if (isNewlyPublicTournament(existing, updated)) {
@@ -4019,6 +4024,7 @@ async function createRegistration(request, env, tournament, { session = null, sh
   const registration = normalizeRegistrationInput(body, { requireStatus: false });
   const language = normalizeLanguage(body.language);
   assertCorePartnerCountMatchesFormation(tournament, registration);
+  const feeSelections = resolveFeeSelections(tournament, body.feeSelections, registration);
   assertLicenseMatchesTournament(tournament, registration);
   await assertNoDuplicateTeamName(db, tournament.id, registration.teamName);
   await assertNoDuplicatePlayer(db, tournament.id, registration);
@@ -4034,8 +4040,8 @@ async function createRegistration(request, env, tournament, { session = null, sh
         id, tournament_id, first_name, last_name, email, club, license_nr,
         partner_first_name, partner_last_name, partner_email, partner_license_nr,
         partner2_first_name, partner2_last_name, partner2_email, partner2_license_nr,
-        team_name, seeding_position, status, is_vip, language, registered_at, confirmed_at, created_at, updated_at, cancel_token
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        team_name, seeding_position, status, is_vip, fee_selections, language, registered_at, confirmed_at, created_at, updated_at, cancel_token
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -4057,6 +4063,7 @@ async function createRegistration(request, env, tournament, { session = null, sh
       registration.seedingPosition,
       status,
       registration.isVip ? 1 : 0,
+      JSON.stringify(feeSelections),
       language,
       now,
       status === 'confirmed' ? now : null,
@@ -4098,6 +4105,7 @@ async function updateRegistration(request, env, existing) {
   }
   const registration = normalizeRegistrationInput(body, { requireStatus: true });
   assertCorePartnerCountMatchesFormation(existing, registration);
+  const feeSelections = resolveFeeSelections(existing, body.feeSelections, registration, existing);
   assertLicenseMatchesTournament(existing, registration);
   await assertNoDuplicateTeamName(db, existing.tournament_id, registration.teamName, existing.id);
   await assertNoDuplicatePlayer(db, existing.tournament_id, registration, existing.id);
@@ -4110,7 +4118,7 @@ async function updateRegistration(request, env, existing) {
        SET first_name = ?, last_name = ?, email = ?, club = ?, license_nr = ?,
            partner_first_name = ?, partner_last_name = ?, partner_email = ?, partner_license_nr = ?,
            partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?, partner2_license_nr = ?,
-           team_name = ?, seeding_position = ?, status = ?, is_vip = ?, confirmed_at = ?, updated_at = ?
+           team_name = ?, seeding_position = ?, status = ?, is_vip = ?, fee_selections = ?, confirmed_at = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -4131,6 +4139,7 @@ async function updateRegistration(request, env, existing) {
       registration.seedingPosition,
       registration.status,
       registration.isVip ? 1 : 0,
+      JSON.stringify(feeSelections),
       confirmedAt,
       now,
       existing.id,
@@ -5154,7 +5163,7 @@ async function getRegistrationWithTournament(db, id) {
   return db
     .prepare(
       `SELECT registrations.*, tournaments.owner_id, tournaments.visibility, tournaments.formation,
-              tournaments.registration_type, tournaments.license_required, tournaments.max_registrations, tournaments.waitlist_enabled,
+              tournaments.registration_type, tournaments.license_required, tournaments.max_registrations, tournaments.waitlist_enabled, tournaments.entry_fee_cents, tournaments.fee_tiers,
               tournaments.name, tournaments.date, tournaments.start_time, tournaments.location,
               ${TOURNAMENT_EDITORS_JSON_SUBQUERY}
        FROM registrations
@@ -5973,6 +5982,51 @@ function toPostboxMessage(row, currentUserId) {
   };
 }
 
+function jsonArray(value) {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function feeTiersFromRow(row) {
+  const custom = jsonArray(row.fee_tiers).filter((tier) => tier && tier.id !== 'legacy-standard');
+  const standard = Number(row.entry_fee_cents || 0) > 0
+    ? [{ id: 'legacy-standard', name: 'Startgeld', amountCents: Number(row.entry_fee_cents), active: true }]
+    : [];
+  return [...standard, ...custom];
+}
+
+function registrationFeeSelections(row) {
+  return jsonArray(row.fee_selections).filter((selection) => selection && typeof selection.name === 'string' && Number.isInteger(selection.amountCents));
+}
+
+function resolveFeeSelections(tournament, input, registration, existing = null) {
+  if (input === undefined && existing) return registrationFeeSelections(existing);
+  if (!Array.isArray(input)) throw new HttpError(400, 'Ungültige Startgeld-Auswahl');
+  const allowed = new Set(['primary']);
+  if (registration.partnerFirstName) allowed.add('partner');
+  if (registration.partner2FirstName) allowed.add('partner2');
+  const prior = new Map(registrationFeeSelections(existing || {}).map((selection) => [selection.participant, selection]));
+  const tiers = new Map(feeTiersFromRow(tournament).map((tier) => [tier.id, tier]));
+  const participants = new Set();
+  return input.map((selection) => {
+    const participant = text(selection?.participant);
+    const tariffId = text(selection?.tariffId);
+    if (!allowed.has(participant) || !tariffId || participants.has(participant)) throw new HttpError(400, 'Ungültige Startgeld-Auswahl');
+    participants.add(participant);
+    const tier = tiers.get(tariffId);
+    const priorSelection = prior.get(participant);
+    // Ein bereits gewählter Tarif ist ein Preis-Snapshot. Er bleibt beim Bearbeiten
+    // der Anmeldung erhalten, selbst wenn der Tarif danach geändert/deaktiviert wurde.
+    if (priorSelection?.tariffId === tariffId) return priorSelection;
+    if (!tier || tier.active === false) throw new HttpError(400, 'Ungültige Startgeld-Auswahl');
+    return { participant, tariffId: tier.id, name: tier.name, amountCents: Number(tier.amountCents) };
+  });
+}
+
 function toPublicTournament(row, user) {
   return {
     id: row.id,
@@ -5999,6 +6053,7 @@ function toPublicTournament(row, user) {
     registrationOpensAt: row.registration_opens_at,
     timezone: row.timezone || 'Europe/Berlin',
     entryFeeCents: Number(row.entry_fee_cents || 0),
+    feeTiers: feeTiersFromRow(row),
     currency: row.currency || 'EUR',
     contactName: row.contact_name,
     contactEmail: row.contact_email,
@@ -6026,6 +6081,7 @@ function toPublicTournament(row, user) {
 
 function toPublicRegistration(row) {
   const noEmail = isPlaceholderEmail(row.email);
+  const feeSelections = registrationFeeSelections(row);
   return {
     id: row.id,
     tournamentId: row.tournament_id,
@@ -6047,6 +6103,8 @@ function toPublicRegistration(row) {
     seedingPosition: row.seeding_position,
     status: row.status,
     isVip: Boolean(row.is_vip),
+    feeSelections,
+    feeTotalCents: feeSelections.reduce((total, selection) => total + Number(selection.amountCents || 0), 0),
     active: Boolean(Number(row.active ?? 1)),
     registeredAt: row.registered_at,
     confirmedAt: row.confirmed_at,
