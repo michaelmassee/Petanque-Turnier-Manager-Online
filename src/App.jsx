@@ -1010,6 +1010,7 @@ function AppContent() {
   }
 
   async function handleLogout() {
+    sessionExpiryHandled.current = true;
     await api('/api/logout', { method: 'POST' });
     queryClient.clear();
     setCurrentUser(null);
