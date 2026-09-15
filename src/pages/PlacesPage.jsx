@@ -220,7 +220,12 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         <div className="panel">
           <div className="places-map">
             <MapContainer center={center} zoom={7} scrollWheelZoom={false}>
-              <TileLayer attribution="&copy; OpenStreetMap-Mitwirkende" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <TileLayer
+                attribution={'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'}
+                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                subdomains="abcd"
+                maxZoom={20}
+              />
               <FitToMarkers places={mapped} />
               {mapped.map((place) => (
                 <Marker key={place.id} icon={marker} position={[place.latitude, place.longitude]}>
