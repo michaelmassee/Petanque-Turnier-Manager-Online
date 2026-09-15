@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Button, SelectField } from '../components/ui.jsx';
+import { Button, DistanceBadge, SelectField } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 
@@ -262,7 +262,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
             <article className="panel place-card" id={place.id} key={place.id}>
               <div><h2 data-i18n-skip>{place.name}</h2><p className="muted" data-i18n-skip>{place.clubName ? `${place.clubName} · ` : ''}{place.address}</p></div>
               {place.description && <p data-i18n-skip>{place.description}</p>}
-              <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${place.facilities}` : ''}{typeof place.distanceKm === 'number' ? ` · ${place.distanceKm.toFixed(1)} km` : ''}</p>
+              <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${place.facilities}` : ''}</p>
+              <DistanceBadge distanceKm={place.distanceKm} />
               <div className="place-actions">
                 <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
                 <Button variant={place.liked ? 'primary' : 'secondary'} onClick={() => toggleLike(place)}>{place.liked ? '♥' : '♡'} {place.likeCount}</Button>
@@ -351,4 +352,3 @@ function PlacesSearchMenu({
     </div>
   );
 }
-

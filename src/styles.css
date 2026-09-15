@@ -1267,6 +1267,25 @@ textarea:focus {
   overflow-wrap: anywhere;
 }
 
+.distance-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  gap: 6px;
+  margin-top: 2px;
+  border: 1px solid #94bce8;
+  border-radius: 999px;
+  background: #eaf4ff;
+  color: #0c4f8a;
+  padding: 4px 9px;
+  font-size: .85rem;
+  line-height: 1.2;
+}
+
+.distance-badge strong {
+  font-weight: 700;
+}
+
 .tournament-card-meta {
   display: flex;
   flex-wrap: wrap;
@@ -2276,4 +2295,5 @@ textarea:focus {
  .places-map .leaflet-container { height: 100%; width: 100%; }
  .places-list { display: grid; gap: 1rem; margin-top: 1rem; }
  .place-card h2 { margin: 0; }
+ .place-card .distance-badge { margin-top: -.25rem; }
  .place-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }

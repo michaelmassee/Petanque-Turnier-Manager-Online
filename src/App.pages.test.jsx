@@ -3,6 +3,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import i18next from './lib/i18next-config.js';
 import { EditDialog, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
+import { DistanceBadge } from './components/ui.jsx';
 import { AppHeader } from './components/layout.jsx';
 import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_USER_FORM } from './lib/constants.js';
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
@@ -20,6 +21,21 @@ describe('Turnier-Payload', () => {
   it('zeigt in der Übersicht den laufenden Turnierstatus statt einer Anmelde-Meldung', () => {
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: true }, 'de')).toBe('Läuft');
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: true }, 'en')).toBe('Running');
+  });
+});
+
+describe('Entfernungs-Badge', () => {
+  it('zeigt bei berechneter Entfernung eine hervorgehobene, gerundete Angabe', () => {
+    render(<DistanceBadge distanceKm={12.6} />);
+
+    expect(screen.getByText('13 km entfernt')).toBeInTheDocument();
+    expect(document.querySelector('.distance-badge')).toBeInTheDocument();
+  });
+
+  it('bleibt ohne aktive Umkreissuche unsichtbar', () => {
+    const { container } = render(<DistanceBadge distanceKm={undefined} />);
+
+    expect(container).toBeEmptyDOMElement();
   });
 });
 

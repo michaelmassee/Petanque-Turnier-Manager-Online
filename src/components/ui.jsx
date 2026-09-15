@@ -115,6 +115,21 @@ export function Feedback({ message, error }) {
   return <p className={error ? 'feedback error' : 'feedback success'}>{error || message}</p>;
 }
 
+export function DistanceBadge({ distanceKm }) {
+  const { t } = useTranslation();
+
+  if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm)) {
+    return null;
+  }
+
+  return (
+    <span className="distance-badge">
+      <span aria-hidden="true">📍</span>
+      <strong>{Math.round(distanceKm)} {t('km entfernt')}</strong>
+    </span>
+  );
+}
+
 export function ListToolbar({ query, onQueryChange, searchPlaceholder, filters = [], onReset, resetDisabled }) {
   const { t } = useTranslation();
   return (
