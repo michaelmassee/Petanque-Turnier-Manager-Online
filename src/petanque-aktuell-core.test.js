@@ -35,6 +35,18 @@ describe('Pétanque-Aktuell-Import', () => {
     ]));
   });
 
+  it('ignoriert Turnier-Detaillinks, die kal_Start nur als Kontext mitführen', () => {
+    // Auf petanque-aktuell.de trägt jeder Detaillink ab Seite 2 kal_Start als
+    // zusätzlichen Query-Parameter (z.B. ?kal_Aktion=detail&kal_Nummer=2626&kal_Start=51).
+    // Ohne den kal_Aktion-Ausschluss würde jeder dieser Links als eigene "Seite" gezählt
+    // und das Seiten-Limit sofort erschöpfen.
+    const html = `${CALENDAR}<a href="kalender.php?kal_Aktion=detail&amp;kal_Nummer=2626&amp;kal_Start=51">Detail</a>`;
+    expect(petanqueAktuellPageUrls(html)).toEqual([
+      'https://petanque-aktuell.de/kialender_1/kalender.php',
+      'https://petanque-aktuell.de/kialender_1/kalender.php?kal_Start=51',
+    ]);
+  });
+
   it('liest die tatsächliche div-basierte Kalenderstruktur', () => {
     expect(parsePetanqueAktuellCalendar(LIVE_SHAPE)).toEqual([expect.objectContaining({
       externalKey: 'kalender:2443', date: '2026-09-19', name: 'Chateau Benrath Zock', location: 'Düsseldorf', startTime: '10:20', formation: '2:2', association: 'NRW', licenseRequired: 'nein',

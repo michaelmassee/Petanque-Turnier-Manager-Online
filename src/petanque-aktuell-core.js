@@ -32,7 +32,12 @@ export function petanqueAktuellCalendarUrl(start = null) {
 
 export function petanqueAktuellPageUrls(html) {
   const urls = new Set([petanqueAktuellCalendarUrl()]);
+  // Nur echte Paginierungslinks (reines "?kal_Start=N") sammeln. Turnier-Detaillinks
+  // (kal_Aktion=detail&...&kal_Start=N) tragen kal_Start ebenfalls in der Query mit,
+  // zeigen aber auf eine einzelne Turnierseite statt der Kalenderliste - würden sie
+  // mitgezählt, verbraucht jeder Detaillink einen Slot des Seiten-Limits.
   for (const match of String(html || '').matchAll(/href\s*=\s*["']?([^\s"'>]+kal_Start=\d+[^\s"'>]*)/gi)) {
+    if (/kal_Aktion=/i.test(match[1])) continue;
     const url = absoluteSourceUrl(match[1]);
     if (url && new URL(url).pathname === PETANQUE_AKTUELL_CALENDAR_PATH) urls.add(url);
   }
