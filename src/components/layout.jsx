@@ -578,7 +578,7 @@ export function AuthModal({ title, subtitle, message, error, onClose, children }
   );
 }
 
-export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, searchControl }) {
+export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, searchControl, menuExtra }) {
   const { t } = useTranslation();
   return (
     <AppHeader
@@ -602,6 +602,7 @@ export function StandalonePageHeader({ heading, headingNoTranslate, language, se
       >
         {t('Zur Startseite')}
       </button>
+      {menuExtra}
       {currentUser && (
         <Button
           variant="secondary"

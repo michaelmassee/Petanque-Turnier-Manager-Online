@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -14,6 +14,19 @@ import { StandalonePageHeader } from '../components/layout.jsx';
 
 const FALLBACK_CENTER = [51.1, 10.4];
 const marker = new L.Icon({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow, iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] });
+
+function FitToMarkers({ places }) {
+  const map = useMap();
+  useEffect(() => {
+    if (places.length === 0) return;
+    if (places.length === 1) {
+      map.setView([places[0].latitude, places[0].longitude], 13);
+      return;
+    }
+    map.fitBounds(L.latLngBounds(places.map((place) => [place.latitude, place.longitude])), { padding: [32, 32], maxZoom: 13 });
+  }, [map, places]);
+  return null;
+}
 
 const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
 const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '' };
@@ -139,6 +152,18 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       navigate={navigate}
       currentUser={currentUser}
       onLogout={onLogout}
+      menuExtra={
+        <button
+          className="drawer-link"
+          type="button"
+          onClick={() => {
+            setMenuOpen(false);
+            navigate('/platz-melden');
+          }}
+        >
+          {t('Bouleplatz melden')}
+        </button>
+      }
       searchControl={
         <PlacesSearchMenu
           open={searchMenuOpen}
@@ -169,9 +194,6 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
           <p className="eyebrow">Pétanque Turnier Manager Online</p>
           <h2>{t('Boule-Plätze / Vereine')}</h2>
           <p className="subtitle">{t('Finde Bouleplätze und Vereine in deiner Nähe.')}</p>
-          <div className="dialog-actions">
-            <Button variant="secondary" onClick={() => navigate('/platz-melden')}>{t('Bouleplatz melden')}</Button>
-          </div>
         </div>
         <div className="home-finder-stats" aria-label={t('Bouleplatzsuche Übersicht')}>
           <button
@@ -199,6 +221,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
           <div className="places-map">
             <MapContainer center={center} zoom={7} scrollWheelZoom={false}>
               <TileLayer attribution="&copy; OpenStreetMap-Mitwirkende" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <FitToMarkers places={mapped} />
               {mapped.map((place) => (
                 <Marker key={place.id} icon={marker} position={[place.latitude, place.longitude]}>
                   <Popup><strong>{place.name}</strong>{place.clubName && <><br />{place.clubName}</>}<br /><a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a></Popup>
