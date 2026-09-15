@@ -28,6 +28,98 @@ function FitToMarkers({ places }) {
   return null;
 }
 
+function KeepMapSized() {
+  const map = useMap();
+
+  useEffect(() => {
+    const resize = () => map.invalidateSize({ pan: false, debounceMoveend: true });
+    const firstFrame = requestAnimationFrame(resize);
+    const secondFrame = requestAnimationFrame(() => requestAnimationFrame(resize));
+    const timer = window.setTimeout(resize, 250);
+    window.addEventListener('resize', resize);
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+      window.clearTimeout(timer);
+      window.removeEventListener('resize', resize);
+    };
+  }, [map]);
+
+  return null;
+}
+
+function PlacesMap({ places, center, maptilerApiKey }) {
+  const { t } = useTranslation();
+  const [provider, setProvider] = useState(maptilerApiKey ? 'maptiler' : 'openstreetmap');
+  const [loadingTiles, setLoadingTiles] = useState(true);
+  const [tileError, setTileError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    setProvider(maptilerApiKey ? 'maptiler' : 'openstreetmap');
+    setLoadingTiles(true);
+    setTileError(false);
+  }, [maptilerApiKey, reloadKey]);
+
+  useEffect(() => {
+    if (!loadingTiles) return undefined;
+    const timeout = window.setTimeout(() => {
+      if (provider === 'maptiler') {
+        setProvider('openstreetmap');
+      } else {
+        setLoadingTiles(false);
+        setTileError(true);
+      }
+    }, 12000);
+    return () => window.clearTimeout(timeout);
+  }, [loadingTiles, provider]);
+
+  const usingFallback = provider === 'openstreetmap' && Boolean(maptilerApiKey);
+  const tileUrl = provider === 'maptiler'
+    ? `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}{r}.png?key=${maptilerApiKey}`
+    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+  function handleTileError() {
+    if (provider === 'maptiler') {
+      setProvider('openstreetmap');
+      setLoadingTiles(true);
+      return;
+    }
+    setLoadingTiles(false);
+    setTileError(true);
+  }
+
+  function retry() {
+    setReloadKey((current) => current + 1);
+  }
+
+  return (
+    <div className="places-map" aria-busy={loadingTiles}>
+      <MapContainer key={reloadKey} center={center} zoom={7} scrollWheelZoom={false}>
+        <TileLayer
+          key={provider}
+          attribution={provider === 'maptiler'
+            ? '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>'
+            : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>'}
+          url={tileUrl}
+          maxZoom={20}
+          eventHandlers={{ load: () => setLoadingTiles(false), tileerror: handleTileError }}
+        />
+        <KeepMapSized />
+        <FitToMarkers places={places} />
+        {places.map((place) => (
+          <Marker key={place.id} icon={marker} position={[place.latitude, place.longitude]}>
+            <Popup><strong>{place.name}</strong>{place.clubName && <><br />{place.clubName}</>}<br /><a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a></Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+      {loadingTiles && <p className="places-map-status" role="status">{usingFallback ? t('Ersatzkarte wird geladen …') : t('Karte wird geladen …')}</p>}
+      {usingFallback && !loadingTiles && !tileError && <p className="places-map-status places-map-notice" role="status">{t('Ersatzkarte aktiv, weil der primäre Kartenanbieter nicht erreichbar ist.')}</p>}
+      {tileError && <div className="places-map-status places-map-error" role="alert"><span>{t('Karte konnte nicht geladen werden.')}</span><button type="button" onClick={retry}>{t('Karte erneut laden')}</button></div>}
+    </div>
+  );
+}
+
 export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -227,23 +319,9 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       </div>
 
       {error && <p className="feedback error">{error}</p>}
-      {mapped.length > 0 && maptilerApiKey && (
+      {mapped.length > 0 && (
         <div className="panel">
-          <div className="places-map">
-            <MapContainer center={center} zoom={7} scrollWheelZoom={false}>
-              <TileLayer
-                attribution={'&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>'}
-                url={`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}{r}.png?key=${maptilerApiKey}`}
-                maxZoom={20}
-              />
-              <FitToMarkers places={mapped} />
-              {mapped.map((place) => (
-                <Marker key={place.id} icon={marker} position={[place.latitude, place.longitude]}>
-                  <Popup><strong>{place.name}</strong>{place.clubName && <><br />{place.clubName}</>}<br /><a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a></Popup>
-                </Marker>
-              ))}
-            </MapContainer>
-          </div>
+          <PlacesMap places={mapped} center={center} maptilerApiKey={maptilerApiKey} />
         </div>
       )}
 

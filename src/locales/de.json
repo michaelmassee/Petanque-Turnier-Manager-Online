@@ -81,5 +81,10 @@
   "Keine Bearbeitungsrechte für diesen Verein": "Keine Bearbeitungsrechte für diesen Verein",
   "Bouleplatz": "Bouleplatz",
   "Individuellen Ort verwenden": "Individuellen Ort verwenden",
-  "Öffentlichen Bouleplatz ansehen": "Öffentlichen Bouleplatz ansehen"
+  "Öffentlichen Bouleplatz ansehen": "Öffentlichen Bouleplatz ansehen",
+  "Karte wird geladen …": "Karte wird geladen …",
+  "Ersatzkarte wird geladen …": "Ersatzkarte wird geladen …",
+  "Ersatzkarte aktiv, weil der primäre Kartenanbieter nicht erreichbar ist.": "Ersatzkarte aktiv, weil der primäre Kartenanbieter nicht erreichbar ist.",
+  "Karte konnte nicht geladen werden.": "Karte konnte nicht geladen werden.",
+  "Karte erneut laden": "Karte erneut laden"
 }

@@ -2291,8 +2291,12 @@ textarea:focus {
   font-weight: 800;
   color: #53627a;
 }
- .places-map { height: min(48vh, 420px); border-radius: 10px; overflow: hidden; }
+ .places-map { position: relative; height: min(48vh, 420px); border-radius: 10px; overflow: hidden; background: #e8edf1; }
  .places-map .leaflet-container { height: 100%; width: 100%; }
+ .places-map-status { position: absolute; z-index: 500; right: .75rem; bottom: .75rem; margin: 0; padding: .45rem .65rem; border-radius: 6px; background: rgb(255 255 255 / 94%); color: #263648; box-shadow: 0 1px 4px rgb(0 0 0 / 18%); font-size: .875rem; }
+ .places-map-notice { max-width: min(90%, 34rem); }
+ .places-map-error { display: flex; align-items: center; gap: .5rem; }
+ .places-map-error button { border: 0; border-radius: 4px; background: #263648; color: white; padding: .3rem .5rem; font: inherit; cursor: pointer; }
  .places-list { display: grid; gap: 1rem; margin-top: 1rem; }
  .place-card h2 { margin: 0; }
  .place-card .distance-badge { margin-top: -.25rem; }
