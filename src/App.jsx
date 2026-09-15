@@ -54,6 +54,7 @@ function AppContent() {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState(null);
   const [maptilerApiKey, setMaptilerApiKey] = useState(null);
+  const [playerListingCreateRequest, setPlayerListingCreateRequest] = useState(0);
   const [reportVerifyStatus, setReportVerifyStatus] = useState(null);
   const [placeReportVerifyStatus, setPlaceReportVerifyStatus] = useState(null);
   const [authView, setAuthView] = useState('home');
@@ -1628,7 +1629,7 @@ function AppContent() {
   }
 
   if (!needsSetup && currentUser && path === '/spielerboerse') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerExchangePage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerExchangePage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} createRequest={playerListingCreateRequest} /></Suspense>;
   }
 
   if (currentUser && authView === 'cancelRegistration') {
@@ -2151,10 +2152,11 @@ function AppContent() {
           onClick={() => {
             setMenuOpen(false);
             clearFeedback();
-            navigate('/vereine');
+            setPlayerListingCreateRequest((current) => current + 1);
+            navigate('/spielerboerse');
           }}
         >
-          {t('Meine Vereine')}
+          {t('Anzeige erstellen')}
         </button>
         <button
           className="drawer-link"
@@ -2162,10 +2164,10 @@ function AppContent() {
           onClick={() => {
             setMenuOpen(false);
             clearFeedback();
-            navigate('/spielerboerse');
+            navigate('/vereine');
           }}
         >
-          {t('Spielerbörse')}
+          {t('Meine Vereine')}
         </button>
         {isAdmin && (
           <button

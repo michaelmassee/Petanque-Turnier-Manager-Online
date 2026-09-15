@@ -39,7 +39,7 @@ function FitToMarkers({ listings }) {
   return null;
 }
 
-function MyListingsPanel({ language, onChanged }) {
+function MyListingsPanel({ language, onChanged, createRequest }) {
   const { t } = useTranslation();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +64,10 @@ function MyListingsPanel({ language, onChanged }) {
     setForm(EMPTY_LISTING_FORM);
     setDialogOpen(true);
   }
+
+  useEffect(() => {
+    if (createRequest > 0) openCreate();
+  }, [createRequest]);
 
   function openEdit(listing) {
     setEditId(listing.id);
@@ -242,7 +246,7 @@ function PlayerExchangeSearchMenu({
   );
 }
 
-export default function PlayerExchangePage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey }) {
+export default function PlayerExchangePage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey, createRequest = 0 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -450,7 +454,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
           </div>
         )}
 
-        <MyListingsPanel language={language} onChanged={load} />
+        <MyListingsPanel language={language} onChanged={load} createRequest={createRequest} />
       </section>
 
       {contactListing && <ContactDialog listing={contactListing} onClose={() => setContactListing(null)} />}
