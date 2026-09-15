@@ -808,5 +808,15 @@
   "Deine Bouleplatz-Meldung wurde bestätigt und ist jetzt öffentlich sichtbar.": "Je baanmelding is bevestigd en nu openbaar zichtbaar.",
   "Danke für deine Meldung! Bitte bestätige sie über den Link, den wir dir per E-Mail geschickt haben. Erst danach erscheint sie öffentlich.": "Bedankt voor je melding! Bevestig deze via de link die we je per e-mail hebben gestuurd. Pas daarna wordt hij openbaar zichtbaar.",
   "Melde einen Bouleplatz, auch ohne eigenen Verein. Der Eintrag wird sichtbar, sobald du die Bestätigungs-E-Mail bestätigt hast.": "Meld een jeu-de-boulesbaan, ook zonder eigen vereniging. De melding wordt zichtbaar zodra je de bevestigingsmail bevestigt.",
-  "Zu viele Bouleplatz-Meldungen. Bitte versuche es später erneut.": "Te veel baanmeldingen. Probeer het later opnieuw."
+  "Zu viele Bouleplatz-Meldungen. Bitte versuche es später erneut.": "Te veel baanmeldingen. Probeer het later opnieuw.",
+  "Meine gemeldeten Bouleplätze": "Mijn gemelde jeu-de-boulesbanen",
+  "Bouleplatz bearbeiten": "Jeu-de-boulesbaan bewerken",
+  "Bouleplatz aktualisiert. Ein Admin prüft die Änderung.": "Jeu-de-boulesbaan bijgewerkt. Een beheerder controleert de wijziging.",
+  "Bouleplatz aktualisiert.": "Jeu-de-boulesbaan bijgewerkt.",
+  "Gemeldete Bouleplätze (ohne Verein)": "Gemelde jeu-de-boulesbanen (zonder club)",
+  "Keine gemeldeten Bouleplätze.": "Geen gemelde jeu-de-boulesbanen.",
+  "Dieser Bearbeitungslink ist ungültig.": "Deze bewerkingslink is ongeldig.",
+  "Deine Änderungen wurden gespeichert. Ein Admin prüft sie kurz, bevor sie sichtbar werden.": "Je wijzigingen zijn opgeslagen. Een beheerder controleert ze kort voordat ze zichtbaar worden.",
+  "Hier kannst du die Angaben zu deinem gemeldeten Bouleplatz jederzeit aktualisieren.": "Hier kun je de gegevens van je gemelde jeu-de-boulesbaan op elk moment bijwerken.",
+  "Keine Bearbeitungsrechte für diesen Bouleplatz": "Geen bewerkingsrechten voor deze jeu-de-boulesbaan"
 }

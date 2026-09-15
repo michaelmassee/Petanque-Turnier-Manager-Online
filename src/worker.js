@@ -132,23 +132,23 @@ const TOURNAMENT_REPORT_VERIFICATION_EMAILS = {
 const PLACE_REPORT_VERIFICATION_EMAILS = {
   de: {
     subject: 'Bouleplatz-Meldung bestätigen',
-    text: (verificationUrl) => `Bitte bestätige deinen gemeldeten Bouleplatz über diesen Link:\n\n${verificationUrl}\n\nErst nach der Bestätigung wird der Platz öffentlich sichtbar. Der Link ist 24 Stunden gültig.`,
+    text: (verificationUrl, editUrl) => `Bitte bestätige deinen gemeldeten Bouleplatz über diesen Link:\n\n${verificationUrl}\n\nErst nach der Bestätigung wird der Platz öffentlich sichtbar. Der Link ist 24 Stunden gültig.\n\nSpäter Angaben ändern kannst du jederzeit über diesen Link (unbegrenzt gültig, bitte aufbewahren):\n\n${editUrl}`,
   },
   nl: {
     subject: 'Baanmelding bevestigen',
-    text: (verificationUrl) => `Bevestig je gemelde jeu-de-boulesbaan via deze link:\n\n${verificationUrl}\n\nPas na bevestiging wordt de baan openbaar zichtbaar. De link is 24 uur geldig.`,
+    text: (verificationUrl, editUrl) => `Bevestig je gemelde jeu-de-boulesbaan via deze link:\n\n${verificationUrl}\n\nPas na bevestiging wordt de baan openbaar zichtbaar. De link is 24 uur geldig.\n\nJe kunt de gegevens later altijd wijzigen via deze link (onbeperkt geldig, bewaar hem goed):\n\n${editUrl}`,
   },
   en: {
     subject: 'Confirm your boules court report',
-    text: (verificationUrl) => `Please confirm your reported boules court via this link:\n\n${verificationUrl}\n\nThe court only becomes publicly visible after confirmation. The link is valid for 24 hours.`,
+    text: (verificationUrl, editUrl) => `Please confirm your reported boules court via this link:\n\n${verificationUrl}\n\nThe court only becomes publicly visible after confirmation. The link is valid for 24 hours.\n\nYou can update the details later at any time via this link (valid indefinitely, please keep it):\n\n${editUrl}`,
   },
   es: {
     subject: 'Confirmar pista notificada',
-    text: (verificationUrl) => `Confirma la pista notificada con este enlace:\n\n${verificationUrl}\n\nLa pista solo sera visible publicamente tras la confirmacion. El enlace es valido durante 24 horas.`,
+    text: (verificationUrl, editUrl) => `Confirma la pista notificada con este enlace:\n\n${verificationUrl}\n\nLa pista solo sera visible publicamente tras la confirmacion. El enlace es valido durante 24 horas.\n\nMas adelante puedes editar los datos en cualquier momento con este enlace (valido sin limite, guardalo):\n\n${editUrl}`,
   },
   fr: {
     subject: 'Confirmer le terrain signalé',
-    text: (verificationUrl) => `Confirme le terrain signalé via ce lien :\n\n${verificationUrl}\n\nLe terrain ne devient public qu’après confirmation. Le lien est valable 24 heures.`,
+    text: (verificationUrl, editUrl) => `Confirme le terrain signalé via ce lien :\n\n${verificationUrl}\n\nLe terrain ne devient public qu’après confirmation. Le lien est valable 24 heures.\n\nTu peux modifier les informations plus tard à tout moment via ce lien (valable sans limite, à conserver) :\n\n${editUrl}`,
   },
 };
 
@@ -1121,6 +1121,17 @@ export default {
       if (request.method === 'POST' && url.pathname === '/api/place-reports/verify') {
         return await verifyPlaceReport(request, env.DB);
       }
+      const placeReportTokenMatch = url.pathname.match(/^\/api\/place-reports\/by-token\/([^/]+)$/);
+      if (placeReportTokenMatch && request.method === 'GET') {
+        return await getPlaceReportByToken(env.DB, placeReportTokenMatch[1]);
+      }
+      if (placeReportTokenMatch && request.method === 'PUT') {
+        return await updatePlaceReportByToken(request, env.DB, placeReportTokenMatch[1], request.headers.get('CF-IPCountry'));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/places/mine') {
+        const session = await requireSession(request, env.DB);
+        return await listMyPlaceReports(env.DB, session.user.id);
+      }
       if (request.method === 'POST' && url.pathname === '/api/clubs') {
         const session = await requireSession(request, env.DB);
         return await createClub(request, env.DB, session.user);
@@ -1175,6 +1186,10 @@ export default {
       if (request.method === 'GET' && url.pathname === '/api/admin/pending-places') {
         await requireAdmin(request, env.DB);
         return await listPendingBoulePlaces(env.DB);
+      }
+      if (request.method === 'GET' && url.pathname === '/api/admin/place-reports') {
+        await requireAdmin(request, env.DB);
+        return await listPlaceReportsForAdmin(env.DB);
       }
       const publishPlaceMatch = url.pathname.match(/^\/api\/admin\/places\/([^/]+)\/publish$/);
       if (publishPlaceMatch && request.method === 'POST') {
@@ -4841,13 +4856,14 @@ function clubCanEdit(club, user) {
 }
 
 function toPublicBoulePlace(row, user) {
+  const canEdit = row.club_id ? clubCanEdit(row, user) : Boolean(user?.role === 'admin' || (row.reported_by_user_id && row.reported_by_user_id === user?.id));
   return {
     id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubLogoUrl: row.club_logo_url || null, name: row.name, address: row.address,
     latitude: row.latitude === null ? null : Number(row.latitude), longitude: row.longitude === null ? null : Number(row.longitude),
     courtCount: Number(row.court_count || 0), description: row.description || null, accessible: Boolean(Number(row.accessible)),
     facilities: row.facilities || null, status: row.status, likeCount: Number(row.like_count || 0), liked: Boolean(Number(row.liked || 0)),
     favorited: Boolean(Number(row.favorited || 0)),
-    canEdit: clubCanEdit(row, user),
+    canEdit,
   };
 }
 
@@ -4941,8 +4957,50 @@ async function createBoulePlace(request, db, clubId, user, countryCode) {
 }
 
 async function updateBoulePlace(request, db, id, user, countryCode) {
-  const place = await db.prepare('SELECT club_id FROM boule_places WHERE id = ?').bind(id).first(); if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden'); await assertClubEditor(db, place.club_id, user); const input = await placeInput(await readJson(request), countryCode);
+  const place = await db.prepare('SELECT club_id, reported_by_user_id FROM boule_places WHERE id = ?').bind(id).first();
+  if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
+  if (place.club_id) {
+    await assertClubEditor(db, place.club_id, user);
+  } else if (!(user?.role === 'admin' || (place.reported_by_user_id && place.reported_by_user_id === user.id))) {
+    throw new HttpError(403, 'Keine Bearbeitungsrechte für diesen Bouleplatz');
+  }
+  const input = await placeInput(await readJson(request), countryCode);
   await db.prepare("UPDATE boule_places SET name = ?, address = ?, latitude = ?, longitude = ?, court_count = ?, description = ?, accessible = ?, facilities = ?, status = 'pending', updated_at = ? WHERE id = ?").bind(input.name, input.address, input.latitude, input.longitude, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, new Date().toISOString(), id).run(); return json({ ok: true });
+}
+
+async function getPlaceReportByToken(db, token) {
+  const place = await db.prepare('SELECT id, name, address, court_count, description, accessible, facilities FROM boule_places WHERE edit_token = ?').bind(token).first();
+  if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
+  return json({
+    id: place.id,
+    name: place.name,
+    address: place.address,
+    courtCount: place.court_count,
+    description: place.description || '',
+    accessible: Boolean(place.accessible),
+    facilities: place.facilities || '',
+  });
+}
+
+async function updatePlaceReportByToken(request, db, token, countryCode) {
+  const place = await db.prepare('SELECT id FROM boule_places WHERE edit_token = ?').bind(token).first();
+  if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
+  const input = await placeInput(await readJson(request), countryCode);
+  await db.prepare("UPDATE boule_places SET name = ?, address = ?, latitude = ?, longitude = ?, court_count = ?, description = ?, accessible = ?, facilities = ?, status = 'pending', updated_at = ? WHERE id = ?").bind(input.name, input.address, input.latitude, input.longitude, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, new Date().toISOString(), place.id).run();
+  return json({ ok: true });
+}
+
+async function listMyPlaceReports(db, userId) {
+  const rows = await db.prepare('SELECT * FROM boule_places WHERE reported_by_user_id = ? ORDER BY created_at DESC').bind(userId).all();
+  return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, { id: userId })) });
+}
+
+// Alle über "Bouleplatz melden" ohne Verein eingereichten Plätze, jeder Status - im
+// Unterschied zu listPendingBoulePlaces auch bereits veröffentlichte, da diese ohne
+// Admin-Schritt live gehen (s. createPlaceReport) und trotzdem korrigierbar bleiben müssen.
+async function listPlaceReportsForAdmin(db) {
+  const rows = await db.prepare("SELECT * FROM boule_places WHERE club_id IS NULL ORDER BY created_at DESC").all();
+  return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, null)) });
 }
 
 async function toggleBoulePlaceLike(db, placeId, userId) {
@@ -4979,6 +5037,7 @@ async function createPlaceReport(request, env, url) {
     return json({ ok: true }, 201);
   }
 
+  const session = await optionalSession(request, db);
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   await enforcePlaceReportRateLimit(db, ip);
   await verifyTurnstileToken(env, body.turnstileToken, ip);
@@ -5005,12 +5064,13 @@ async function createPlaceReport(request, env, url) {
 
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
+  const editToken = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
   await db
     .prepare(
-      `INSERT INTO boule_places (id, club_id, club_name, name, address, latitude, longitude, court_count, description, accessible, facilities, status, contact_name, contact_email, created_at, updated_at)
-       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+      `INSERT INTO boule_places (id, club_id, club_name, name, address, latitude, longitude, court_count, description, accessible, facilities, status, contact_name, contact_email, reported_by_user_id, edit_token, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, clubName, name, address, latitude, longitude, courtCount, description, accessible ? 1 : 0, facilities, contactName, contactEmail, now, now)
+    .bind(id, clubName, name, address, latitude, longitude, courtCount, description, accessible ? 1 : 0, facilities, contactName, contactEmail, session?.user?.id || null, editToken, now, now)
     .run();
 
   const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
@@ -5022,13 +5082,14 @@ async function createPlaceReport(request, env, url) {
     .run();
 
   const verificationUrl = `${url.origin}/?place_report_verify_token=${encodeURIComponent(token)}`;
+  const editUrl = `${url.origin}/platz-bearbeiten?edit_token=${encodeURIComponent(editToken)}`;
   const emailText = PLACE_REPORT_VERIFICATION_EMAILS[language] || PLACE_REPORT_VERIFICATION_EMAILS.de;
   await sendTransactionalEmail(env, {
     to: contactEmail,
     subject: emailText.subject,
-    text: emailText.text(verificationUrl),
+    text: emailText.text(verificationUrl, editUrl),
     language,
-    logFallback: `Boule place report verification link for ${contactEmail}: ${verificationUrl}`,
+    logFallback: `Boule place report verification link for ${contactEmail}: ${verificationUrl} (edit: ${editUrl})`,
     failureContext: `boule place report verification email for ${contactEmail}`,
     allowLogFallback: isLocalhost(url),
   });
@@ -5036,6 +5097,7 @@ async function createPlaceReport(request, env, url) {
   const response = { ok: true };
   if (isLocalhost(url)) {
     response.verificationUrl = verificationUrl;
+    response.editUrl = editUrl;
   }
   return json(response, 201);
 }

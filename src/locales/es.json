@@ -808,5 +808,15 @@
   "Deine Bouleplatz-Meldung wurde bestätigt und ist jetzt öffentlich sichtbar.": "Tu notificacion de pista ha sido confirmada y ahora es visible publicamente.",
   "Danke für deine Meldung! Bitte bestätige sie über den Link, den wir dir per E-Mail geschickt haben. Erst danach erscheint sie öffentlich.": "Gracias por tu notificacion. Confirmala con el enlace que te enviamos por correo electronico. Solo aparecera publicamente tras la confirmacion.",
   "Melde einen Bouleplatz, auch ohne eigenen Verein. Der Eintrag wird sichtbar, sobald du die Bestätigungs-E-Mail bestätigt hast.": "Notifica una pista de petanca, incluso sin club propio. La entrada sera visible en cuanto confirmes el correo de confirmacion.",
-  "Zu viele Bouleplatz-Meldungen. Bitte versuche es später erneut.": "Demasiadas notificaciones de pistas. Intentalo de nuevo mas tarde."
+  "Zu viele Bouleplatz-Meldungen. Bitte versuche es später erneut.": "Demasiadas notificaciones de pistas. Intentalo de nuevo mas tarde.",
+  "Meine gemeldeten Bouleplätze": "Mis pistas notificadas",
+  "Bouleplatz bearbeiten": "Editar pista",
+  "Bouleplatz aktualisiert. Ein Admin prüft die Änderung.": "Pista actualizada. Un administrador revisara el cambio.",
+  "Bouleplatz aktualisiert.": "Pista actualizada.",
+  "Gemeldete Bouleplätze (ohne Verein)": "Pistas notificadas (sin club)",
+  "Keine gemeldeten Bouleplätze.": "No hay pistas notificadas.",
+  "Dieser Bearbeitungslink ist ungültig.": "Este enlace de edicion no es valido.",
+  "Deine Änderungen wurden gespeichert. Ein Admin prüft sie kurz, bevor sie sichtbar werden.": "Tus cambios se han guardado. Un administrador los revisara brevemente antes de que sean visibles.",
+  "Hier kannst du die Angaben zu deinem gemeldeten Bouleplatz jederzeit aktualisieren.": "Aqui puedes actualizar los datos de tu pista notificada en cualquier momento.",
+  "Keine Bearbeitungsrechte für diesen Bouleplatz": "Sin permisos de edicion para esta pista"
 }

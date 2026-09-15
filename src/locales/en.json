@@ -808,5 +808,15 @@
   "Deine Bouleplatz-Meldung wurde bestätigt und ist jetzt öffentlich sichtbar.": "Your boules court report has been confirmed and is now publicly visible.",
   "Danke für deine Meldung! Bitte bestätige sie über den Link, den wir dir per E-Mail geschickt haben. Erst danach erscheint sie öffentlich.": "Thanks for your report! Please confirm it via the link we sent you by email. It will only appear publicly after confirmation.",
   "Melde einen Bouleplatz, auch ohne eigenen Verein. Der Eintrag wird sichtbar, sobald du die Bestätigungs-E-Mail bestätigt hast.": "Report a boules court, even without your own club. The entry becomes visible once you confirm the confirmation email.",
-  "Zu viele Bouleplatz-Meldungen. Bitte versuche es später erneut.": "Too many boules court reports. Please try again later."
+  "Zu viele Bouleplatz-Meldungen. Bitte versuche es später erneut.": "Too many boules court reports. Please try again later.",
+  "Meine gemeldeten Bouleplätze": "My reported boules courts",
+  "Bouleplatz bearbeiten": "Edit boules court",
+  "Bouleplatz aktualisiert. Ein Admin prüft die Änderung.": "Boules court updated. An admin will review the change.",
+  "Bouleplatz aktualisiert.": "Boules court updated.",
+  "Gemeldete Bouleplätze (ohne Verein)": "Reported boules courts (without a club)",
+  "Keine gemeldeten Bouleplätze.": "No reported boules courts.",
+  "Dieser Bearbeitungslink ist ungültig.": "This edit link is invalid.",
+  "Deine Änderungen wurden gespeichert. Ein Admin prüft sie kurz, bevor sie sichtbar werden.": "Your changes have been saved. An admin will briefly review them before they become visible.",
+  "Hier kannst du die Angaben zu deinem gemeldeten Bouleplatz jederzeit aktualisieren.": "Here you can update the details of your reported boules court at any time.",
+  "Keine Bearbeitungsrechte für diesen Bouleplatz": "No editing rights for this boules court"
 }

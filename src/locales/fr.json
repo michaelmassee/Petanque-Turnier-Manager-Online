@@ -808,5 +808,15 @@
   "Deine Bouleplatz-Meldung wurde bestätigt und ist jetzt öffentlich sichtbar.": "Ton signalement de terrain a été confirmé et est maintenant visible publiquement.",
   "Danke für deine Meldung! Bitte bestätige sie über den Link, den wir dir per E-Mail geschickt haben. Erst danach erscheint sie öffentlich.": "Merci pour ton signalement ! Confirme-le via le lien que nous t'avons envoyé par e-mail. Il n'apparaîtra publiquement qu'après confirmation.",
   "Melde einen Bouleplatz, auch ohne eigenen Verein. Der Eintrag wird sichtbar, sobald du die Bestätigungs-E-Mail bestätigt hast.": "Signale un terrain de pétanque, même sans club. L'entrée devient visible dès que tu confirmes l'e-mail de confirmation.",
-  "Zu viele Bouleplatz-Meldungen. Bitte versuche es später erneut.": "Trop de signalements de terrains. Réessaie plus tard."
+  "Zu viele Bouleplatz-Meldungen. Bitte versuche es später erneut.": "Trop de signalements de terrains. Réessaie plus tard.",
+  "Meine gemeldeten Bouleplätze": "Mes terrains signalés",
+  "Bouleplatz bearbeiten": "Modifier le terrain",
+  "Bouleplatz aktualisiert. Ein Admin prüft die Änderung.": "Terrain mis à jour. Un administrateur va vérifier la modification.",
+  "Bouleplatz aktualisiert.": "Terrain mis à jour.",
+  "Gemeldete Bouleplätze (ohne Verein)": "Terrains signalés (sans club)",
+  "Keine gemeldeten Bouleplätze.": "Aucun terrain signalé.",
+  "Dieser Bearbeitungslink ist ungültig.": "Ce lien de modification n'est pas valide.",
+  "Deine Änderungen wurden gespeichert. Ein Admin prüft sie kurz, bevor sie sichtbar werden.": "Tes modifications ont été enregistrées. Un administrateur les vérifiera brièvement avant qu'elles soient visibles.",
+  "Hier kannst du die Angaben zu deinem gemeldeten Bouleplatz jederzeit aktualisieren.": "Tu peux mettre à jour les informations de ton terrain signalé à tout moment ici.",
+  "Keine Bearbeitungsrechte für diesen Bouleplatz": "Aucun droit de modification pour ce terrain"
 }

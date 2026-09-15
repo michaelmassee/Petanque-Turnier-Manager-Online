@@ -31,6 +31,7 @@ const PetanqueAktuellImportPanel = lazy(() => import('./pages/PetanqueAktuellImp
 const PlacesPage = lazy(() => import('./pages/PlacesPage.jsx'));
 const MyClubsPage = lazy(() => import('./pages/MyClubsPage.jsx'));
 const PlaceReportPage = lazy(() => import('./pages/PlaceReportPage.jsx'));
+const PlaceEditByTokenPage = lazy(() => import('./pages/PlaceEditByTokenPage.jsx'));
 const ClubModerationPanel = lazy(() => import('./pages/ClubModerationPanel.jsx'));
 
 export { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
@@ -1599,6 +1600,22 @@ function AppContent() {
     );
   }
 
+  if (!needsSetup && path === '/platz-bearbeiten') {
+    return (
+      <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
+        <PlaceEditByTokenPage
+          language={language}
+          setLanguage={setLanguage}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          navigate={navigate}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+        />
+      </Suspense>
+    );
+  }
+
   if (!needsSetup && path === '/plaetze') {
     return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlacesPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} /></Suspense>;
   }
@@ -2436,7 +2453,7 @@ function AppContent() {
 
       {activeTab === 'clubs' && isAdmin && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
-          <ClubModerationPanel />
+          <ClubModerationPanel language={language} />
         </Suspense>
       )}
 

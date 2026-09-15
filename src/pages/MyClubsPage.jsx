@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { Button, TextField, TextArea, EditDialog } from '../components/ui.jsx';
-import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
+import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 
 const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
@@ -14,9 +14,17 @@ function statusLabel(status, t) {
   return t('In Prüfung');
 }
 
+function placeToForm(place) {
+  return {
+    name: place.name, address: place.address, latitude: place.latitude, longitude: place.longitude, locationConfirmed: true,
+    courtCount: String(place.courtCount ?? ''), description: place.description || '', accessible: Boolean(place.accessible), facilities: place.facilities || '',
+  };
+}
+
 function MyClubsPanel({ language }) {
   const { t } = useTranslation();
   const [clubs, setClubs] = useState([]);
+  const [myPlaces, setMyPlaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -26,13 +34,22 @@ function MyClubsPanel({ language }) {
   const [placeDialogClubId, setPlaceDialogClubId] = useState(null);
   const [placeForm, setPlaceForm] = useState(EMPTY_PLACE_FORM);
   const [placeSaving, setPlaceSaving] = useState(false);
+  const [editPlaceId, setEditPlaceId] = useState(null);
+  const [editPlaceForm, setEditPlaceForm] = useState(EMPTY_PLACE_FORM);
+  const [editPlaceSaving, setEditPlaceSaving] = useState(false);
 
-  async function loadClubs() {
+  async function load() {
     setLoading(true);
-    try { const data = await authenticatedApi('/api/clubs/mine'); setClubs(data.clubs || []); }
-    catch (err) { setError(err.message); } finally { setLoading(false); }
+    try {
+      const [clubsData, placesData] = await Promise.all([
+        authenticatedApi('/api/clubs/mine'),
+        authenticatedApi('/api/places/mine'),
+      ]);
+      setClubs(clubsData.clubs || []);
+      setMyPlaces(placesData.places || []);
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
   }
-  useEffect(() => { loadClubs(); }, []);
+  useEffect(() => { load(); }, []);
 
   async function submitClub(event) {
     event.preventDefault();
@@ -42,7 +59,7 @@ function MyClubsPanel({ language }) {
       setClubDialogOpen(false);
       setClubForm(EMPTY_CLUB_FORM);
       setMessage(t('Verein eingereicht. Ein Admin muss ihn noch freigeben.'));
-      await loadClubs();
+      await load();
     } catch (err) { setError(err.message); } finally { setClubSaving(false); }
   }
 
@@ -60,33 +77,74 @@ function MyClubsPanel({ language }) {
     } catch (err) { setError(err.message); } finally { setPlaceSaving(false); }
   }
 
+  async function submitEditPlace(event) {
+    event.preventDefault();
+    setError(''); setMessage(''); setEditPlaceSaving(true);
+    try {
+      await authenticatedApi(`/api/places/${editPlaceId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...editPlaceForm, courtCount: editPlaceForm.courtCount === '' ? 0 : Number(editPlaceForm.courtCount) }),
+      });
+      setEditPlaceId(null);
+      setMessage(t('Bouleplatz aktualisiert. Ein Admin prüft die Änderung.'));
+      await load();
+    } catch (err) { setError(err.message); } finally { setEditPlaceSaving(false); }
+  }
+
   return (
-    <div className="panel">
-      <div className="section-title">
-        <h2>{t('Meine Vereine')}</h2>
-        <Button onClick={() => setClubDialogOpen(true)}>{t('Verein anlegen')}</Button>
+    <>
+      <div className="panel">
+        <div className="section-title">
+          <h2>{t('Meine Vereine')}</h2>
+          <Button onClick={() => setClubDialogOpen(true)}>{t('Verein anlegen')}</Button>
+        </div>
+        {message && <p className="feedback success">{message}</p>}
+        {error && <p className="feedback error">{error}</p>}
+        {loading ? <p className="muted">{t('Lädt …')}</p> : clubs.length === 0 ? (
+          <p className="muted">{t('Du verwaltest noch keinen Verein.')}</p>
+        ) : (
+          <div className="user-list">
+            {clubs.map((club) => (
+              <article className="data-row" key={club.id}>
+                <div>
+                  <strong data-i18n-skip>{club.name}</strong>
+                  <span className={club.status === 'published' ? 'status registration-confirmed' : 'status registration-pending'}>
+                    {statusLabel(club.status, t)}
+                  </span>
+                </div>
+                <div className="row-actions">
+                  <Button variant="secondary" onClick={() => { setPlaceDialogClubId(club.id); setPlaceForm(EMPTY_PLACE_FORM); }}>
+                    {t('Bouleplatz hinzufügen')}
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
-      {message && <p className="feedback success">{message}</p>}
-      {error && <p className="feedback error">{error}</p>}
-      {loading ? <p className="muted">{t('Lädt …')}</p> : clubs.length === 0 ? (
-        <p className="muted">{t('Du verwaltest noch keinen Verein.')}</p>
-      ) : (
-        <div className="user-list">
-          {clubs.map((club) => (
-            <article className="data-row" key={club.id}>
-              <div>
-                <strong data-i18n-skip>{club.name}</strong>
-                <span className={club.status === 'published' ? 'status registration-confirmed' : 'status registration-pending'}>
-                  {statusLabel(club.status, t)}
-                </span>
-              </div>
-              <div className="row-actions">
-                <Button variant="secondary" onClick={() => { setPlaceDialogClubId(club.id); setPlaceForm(EMPTY_PLACE_FORM); }}>
-                  {t('Bouleplatz hinzufügen')}
-                </Button>
-              </div>
-            </article>
-          ))}
+
+      {!loading && myPlaces.length > 0 && (
+        <div className="panel">
+          <div className="section-title">
+            <h2>{t('Meine gemeldeten Bouleplätze')}</h2>
+          </div>
+          <div className="user-list">
+            {myPlaces.map((place) => (
+              <article className="data-row" key={place.id}>
+                <div>
+                  <strong data-i18n-skip>{place.name}</strong>
+                  <span data-i18n-skip className={place.status === 'published' ? 'status registration-confirmed' : 'status registration-pending'}>
+                    {statusLabel(place.status, t)} · {place.address}
+                  </span>
+                </div>
+                <div className="row-actions">
+                  <Button variant="secondary" onClick={() => { setEditPlaceId(place.id); setEditPlaceForm(placeToForm(place)); }}>
+                    {t('Bearbeiten')}
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       )}
 
@@ -107,37 +165,24 @@ function MyClubsPanel({ language }) {
 
       <EditDialog open={Boolean(placeDialogClubId)} title={t('Bouleplatz hinzufügen')} onClose={() => setPlaceDialogClubId(null)}>
         <form className="form" onSubmit={submitPlace}>
-          <TextField label={t('Name')} value={placeForm.name} onChange={(name) => setPlaceForm({ ...placeForm, name })} required minLength={2} />
-          <LocationAutocomplete
-            label={t('Adresse')}
-            value={placeForm.address}
-            onChange={(address) => setPlaceForm({ ...placeForm, address, locationConfirmed: false })}
-            onSelect={(candidate) => setPlaceForm({
-              ...placeForm,
-              address: candidate.displayName,
-              latitude: candidate.lat,
-              longitude: candidate.lng,
-              locationConfirmed: true,
-            })}
-            confirmed={placeForm.locationConfirmed}
-            required
-            minLength={5}
-            language={language}
-          />
-          <TextField label={t('Platzanzahl')} type="number" min={0} value={placeForm.courtCount} onChange={(courtCount) => setPlaceForm({ ...placeForm, courtCount })} />
-          <TextArea label={t('Beschreibung')} value={placeForm.description} onChange={(description) => setPlaceForm({ ...placeForm, description })} />
-          <TextField label={t('Ausstattung')} value={placeForm.facilities} onChange={(facilities) => setPlaceForm({ ...placeForm, facilities })} />
-          <label className="checkbox-row">
-            <input type="checkbox" checked={placeForm.accessible} onChange={(event) => setPlaceForm({ ...placeForm, accessible: event.target.checked })} />
-            <span>{t('Barrierefrei')}</span>
-          </label>
+          <BoulePlaceFields form={placeForm} setForm={setPlaceForm} language={language} />
           <div className="dialog-actions">
             <Button variant="secondary" type="button" onClick={() => setPlaceDialogClubId(null)}>{t('Abbrechen')}</Button>
             <Button type="submit" loading={placeSaving}>{t('Anlegen')}</Button>
           </div>
         </form>
       </EditDialog>
-    </div>
+
+      <EditDialog open={Boolean(editPlaceId)} title={t('Bouleplatz bearbeiten')} onClose={() => setEditPlaceId(null)}>
+        <form className="form" onSubmit={submitEditPlace}>
+          <BoulePlaceFields form={editPlaceForm} setForm={setEditPlaceForm} language={language} />
+          <div className="dialog-actions">
+            <Button variant="secondary" type="button" onClick={() => setEditPlaceId(null)}>{t('Abbrechen')}</Button>
+            <Button type="submit" loading={editPlaceSaving}>{t('Speichern')}</Button>
+          </div>
+        </form>
+      </EditDialog>
+    </>
   );
 }
 
