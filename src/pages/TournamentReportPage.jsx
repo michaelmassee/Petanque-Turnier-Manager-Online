@@ -98,6 +98,7 @@ export function TournamentReportPage({
   turnstileSiteKey,
   verifyStatus,
   drawerContent,
+  postboxControl,
 }) {
   const { t } = useTranslation();
   const [form, setForm] = useState(() => ({
@@ -142,6 +143,7 @@ export function TournamentReportPage({
         currentUser={currentUser}
         onLogout={onLogout}
         drawerContent={drawerContent}
+        postboxControl={postboxControl}
       />
 
       <section className="single-column">

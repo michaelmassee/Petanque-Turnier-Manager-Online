@@ -106,7 +106,6 @@ function MyListingsPanel({ language, onChanged, createRequest }) {
     <div className="panel">
       <div className="section-title">
         <h2>{t('Meine Anzeigen')}</h2>
-        <Button onClick={openCreate}>{t('Anzeige erstellen')}</Button>
       </div>
       {message && <p className="feedback success">{message}</p>}
       {error && <p className="feedback error">{error}</p>}
@@ -246,7 +245,7 @@ function PlayerExchangeSearchMenu({
   );
 }
 
-export default function PlayerExchangePage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey, createRequest = 0, drawerContent }) {
+export default function PlayerExchangePage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey, createRequest = 0, drawerContent, postboxControl }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -267,7 +266,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
     setLoading(true); setError('');
     try {
       const params = new URLSearchParams({ q: query, type: typeFilter });
-      const data = await authenticatedApi(`/api/player-listings?${params.toString()}`);
+      const data = await api(`/api/player-listings?${params.toString()}`);
       setListings(data.listings || []);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }
@@ -341,8 +340,6 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
     setGeoError('');
   }
 
-  if (!currentUser) return null;
-
   const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);
   const typeFilterLabel = typeFilter ? t(labelFor(TYPE_FILTER_OPTIONS, typeFilter)) : null;
   const activeFilterCount = [query, typeFilter].filter(Boolean).length;
@@ -359,6 +356,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
         currentUser={currentUser}
         onLogout={onLogout}
         drawerContent={drawerContent}
+        postboxControl={postboxControl}
         searchControl={
           <PlayerExchangeSearchMenu
             open={searchMenuOpen}
@@ -445,17 +443,19 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
               <article className="panel place-card" key={listing.id}>
                 <div><h2 data-i18n-skip>{listing.title}</h2><p className="muted" data-i18n-skip>{listing.type === 'tournament' ? t('Turnier') : t('Training')} · {listing.locationName}{listing.eventDate ? ` · ${listing.eventDate}` : ''}</p></div>
                 {listing.description && <p data-i18n-skip>{listing.description}</p>}
-                <p className="muted">{t('Von')} {listing.ownerName}</p>
+                {listing.ownerName && <p className="muted">{t('Von')} {listing.ownerName}</p>}
                 <DistanceBadge distanceKm={listing.distanceKm} />
-                <div className="place-actions">
-                  <Button onClick={() => setContactListing(listing)} disabled={listing.userId === currentUser.id}>{t('Nachricht senden')}</Button>
-                </div>
+                {currentUser && (
+                  <div className="place-actions">
+                    <Button onClick={() => setContactListing(listing)} disabled={listing.userId === currentUser.id}>{t('Nachricht senden')}</Button>
+                  </div>
+                )}
               </article>
             ))}
           </div>
         )}
 
-        <MyListingsPanel language={language} onChanged={load} createRequest={createRequest} />
+        {currentUser && <MyListingsPanel language={language} onChanged={load} createRequest={createRequest} />}
       </section>
 
       {contactListing && <ContactDialog listing={contactListing} onClose={() => setContactListing(null)} />}

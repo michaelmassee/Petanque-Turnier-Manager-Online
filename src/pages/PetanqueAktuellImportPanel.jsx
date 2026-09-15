@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
-import { Button, Feedback } from '../components/ui.jsx';
+import { Button, Feedback, SelectField } from '../components/ui.jsx';
+
+const IMPORT_STATUS_OPTIONS = [
+  { value: 'all', label: 'Alle Termine' },
+  { value: 'new', label: 'Noch nicht importiert' },
+  { value: 'imported', label: 'Bereits importiert' },
+];
 
 export function PetanqueAktuellImportPanel() {
   const { t } = useTranslation();
   const [tournaments, setTournaments] = useState([]);
   const [selected, setSelected] = useState(new Set());
+  const [importStatus, setImportStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -28,6 +35,9 @@ export function PetanqueAktuellImportPanel() {
 
   useEffect(() => { load(); }, []);
   const selectable = useMemo(() => tournaments.filter((tournament) => !tournament.imported), [tournaments]);
+  const visibleTournaments = useMemo(() => tournaments.filter((tournament) => (
+    importStatus === 'all' || (importStatus === 'imported' ? tournament.imported : !tournament.imported)
+  )), [tournaments, importStatus]);
 
   function toggle(key) {
     setSelected((current) => {
@@ -73,6 +83,13 @@ export function PetanqueAktuellImportPanel() {
         {loading ? <p className="muted">{t('Wird geladen…')}</p> : (
           <>
             <div className="section-title">
+              <SelectField
+                label={t('Importstatus')}
+                value={importStatus}
+                onChange={setImportStatus}
+                disabled={busy}
+                options={IMPORT_STATUS_OPTIONS.map((option) => ({ ...option, label: t(option.label) }))}
+              />
               <label className="checkbox-field">
                 <input type="checkbox" checked={selectable.length > 0 && selected.size === selectable.length} onChange={toggleAll} disabled={selectable.length === 0 || busy} />
                 <span>{t('Alle neuen Termine auswählen')}</span>
@@ -80,7 +97,7 @@ export function PetanqueAktuellImportPanel() {
               <Button disabled={selected.size === 0 || busy} loading={busy} onClick={handleImport}>{t('Ausgewählte Termine importieren')}</Button>
             </div>
             <div className="user-list import-list">
-              {tournaments.map((tournament) => (
+              {visibleTournaments.map((tournament) => (
                 <label className="data-row" key={tournament.externalKey}>
                   <input type="checkbox" checked={selected.has(tournament.externalKey)} onChange={() => toggle(tournament.externalKey)} disabled={tournament.imported || busy} />
                   <span>
@@ -92,7 +109,7 @@ export function PetanqueAktuellImportPanel() {
                   <a className="role" href={tournament.websiteUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>{t('Quelle')}</a>
                 </label>
               ))}
-              {tournaments.length === 0 && <p className="muted">{t('Keine künftigen Termine gefunden.')}</p>}
+              {visibleTournaments.length === 0 && <p className="muted">{t('Keine künftigen Termine gefunden.')}</p>}
             </div>
           </>
         )}

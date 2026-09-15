@@ -97,6 +97,7 @@ export function PlaceReportPage({
   turnstileSiteKey,
   verifyStatus,
   drawerContent,
+  postboxControl,
 }) {
   const { t } = useTranslation();
   const [form, setForm] = useState(() => ({
@@ -141,6 +142,7 @@ export function PlaceReportPage({
         currentUser={currentUser}
         onLogout={onLogout}
         drawerContent={drawerContent}
+        postboxControl={postboxControl}
       />
 
       <section className="single-column">

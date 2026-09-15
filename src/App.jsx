@@ -1571,6 +1571,44 @@ function AppContent() {
     selectDrawerTab('profile');
   }
 
+  function handlePostboxTodoClick(type) {
+    setPostboxOpen(false);
+    if (type === 'unverified_users') setActiveTab('users');
+    else if (type === 'api_key_requests') setActiveTab('apikeys');
+    else if (type === 'pending_registrations') {
+      setRegistrationStatusFilter('pending');
+      setActiveTab('registrations');
+    } else if (type === 'waitlist') {
+      setRegistrationStatusFilter('waitlist');
+      setActiveTab('registrations');
+    }
+    if (path !== '/') navigate('/');
+  }
+
+  function renderPostboxControl() {
+    if (!currentUser) return null;
+    return <PostboxControl
+      language={language}
+      open={postboxOpen}
+      unreadCount={postbox.unreadCount}
+      messages={postbox.messages}
+      todos={postbox.todos}
+      recipients={postboxRecipients}
+      recipientTournaments={postboxRecipientTournaments}
+      recipientId={postboxRecipientId}
+      setRecipientId={setPostboxRecipientId}
+      currentUserId={currentUser.id}
+      body={postboxBody}
+      setBody={setPostboxBody}
+      sending={postboxSending}
+      onToggle={handleOpenPostbox}
+      onClose={() => setPostboxOpen(false)}
+      onRead={handleReadPostboxMessage}
+      onSubmit={handleSendPostboxMessage}
+      onTodoClick={handlePostboxTodoClick}
+    />;
+  }
+
   function drawerContent(area) {
     return <ContextualDrawerContent
       area={area}
@@ -1618,6 +1656,7 @@ function AppContent() {
           setError={setError}
           onLogout={handleLogout}
           drawerContent={drawerContent('turniere')}
+          postboxControl={renderPostboxControl()}
         />
       </Suspense>
     );
@@ -1669,6 +1708,7 @@ function AppContent() {
           turnstileSiteKey={turnstileSiteKey}
           verifyStatus={reportVerifyStatus}
           drawerContent={drawerContent('turniere')}
+          postboxControl={renderPostboxControl()}
         />
       </Suspense>
     );
@@ -1688,6 +1728,7 @@ function AppContent() {
           turnstileSiteKey={turnstileSiteKey}
           verifyStatus={placeReportVerifyStatus}
           drawerContent={drawerContent('bouleplaetze')}
+          postboxControl={renderPostboxControl()}
         />
       </Suspense>
     );
@@ -1705,21 +1746,22 @@ function AppContent() {
           currentUser={currentUser}
           onLogout={handleLogout}
           drawerContent={drawerContent('bouleplaetze')}
+          postboxControl={renderPostboxControl()}
         />
       </Suspense>
     );
   }
 
   if (!needsSetup && path === '/plaetze') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlacesPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} drawerContent={drawerContent('bouleplaetze')} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlacesPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} drawerContent={drawerContent('bouleplaetze')} postboxControl={renderPostboxControl()} /></Suspense>;
   }
 
   if (!needsSetup && currentUser && path === '/vereine') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyClubsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} drawerContent={drawerContent('bouleplaetze')} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyClubsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} drawerContent={drawerContent('bouleplaetze')} postboxControl={renderPostboxControl()} /></Suspense>;
   }
 
-  if (!needsSetup && currentUser && path === '/spielerboerse') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerExchangePage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} createRequest={playerListingCreateRequest} drawerContent={drawerContent('spielerboerse')} /></Suspense>;
+  if (!needsSetup && path === '/spielerboerse') {
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerExchangePage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} createRequest={playerListingCreateRequest} drawerContent={drawerContent('spielerboerse')} postboxControl={renderPostboxControl()} /></Suspense>;
   }
 
   if (currentUser && authView === 'cancelRegistration') {
@@ -2128,39 +2170,7 @@ function AppContent() {
             onDelete={handleDeleteSavedSearch}
           />
         ) : null}
-        postboxControl={
-          <PostboxControl
-            language={language}
-            open={postboxOpen}
-            unreadCount={postbox.unreadCount}
-            messages={postbox.messages}
-            todos={postbox.todos}
-            recipients={postboxRecipients}
-            recipientTournaments={postboxRecipientTournaments}
-            recipientId={postboxRecipientId}
-            setRecipientId={setPostboxRecipientId}
-            currentUserId={currentUser?.id}
-            body={postboxBody}
-            setBody={setPostboxBody}
-            sending={postboxSending}
-            onToggle={handleOpenPostbox}
-            onClose={() => setPostboxOpen(false)}
-            onRead={handleReadPostboxMessage}
-            onSubmit={handleSendPostboxMessage}
-            onTodoClick={(type) => {
-              setPostboxOpen(false);
-              if (type === 'unverified_users') setActiveTab('users');
-              else if (type === 'api_key_requests') setActiveTab('apikeys');
-              else if (type === 'pending_registrations') {
-                setRegistrationStatusFilter('pending');
-                setActiveTab('registrations');
-              } else if (type === 'waitlist') {
-                setRegistrationStatusFilter('waitlist');
-                setActiveTab('registrations');
-              }
-            }}
-          />
-        }
+        postboxControl={renderPostboxControl()}
       >
         <div className="drawer-user">
           <span data-i18n-skip>{currentUser.firstName} {currentUser.lastName}</span>

@@ -186,7 +186,7 @@ function MyClubsPanel({ language }) {
   );
 }
 
-export function MyClubsPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, drawerContent }) {
+export function MyClubsPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, drawerContent, postboxControl }) {
   const { t } = useTranslation();
   return (
     <main className="app-shell">
@@ -200,6 +200,7 @@ export function MyClubsPage({ language, setLanguage, menuOpen, setMenuOpen, navi
         currentUser={currentUser}
         onLogout={onLogout}
         drawerContent={drawerContent}
+        postboxControl={postboxControl}
       />
       <section className="single-column">
         <MyClubsPanel language={language} />

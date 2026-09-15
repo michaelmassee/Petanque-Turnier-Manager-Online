@@ -1175,8 +1175,8 @@ export default {
         return await toggleBoulePlaceFavorite(env.DB, placeFavoriteMatch[1], session.user.id);
       }
       if (request.method === 'GET' && url.pathname === '/api/player-listings') {
-        const session = await requireSession(request, env.DB);
-        return await listPlayerListings(env.DB, session.user, url.searchParams);
+        const session = await optionalSession(request, env.DB);
+        return await listPlayerListings(env.DB, session?.user || null, url.searchParams);
       }
       if (request.method === 'GET' && url.pathname === '/api/player-listings/mine') {
         const session = await requireSession(request, env.DB);
@@ -5077,11 +5077,11 @@ async function toggleBoulePlaceLike(db, placeId, userId) {
 
 const PLAYER_LISTING_LIMIT = 5;
 
-function toPublicPlayerListing(row) {
+function toPublicPlayerListing(row, includeOwner = false) {
   return {
-    id: row.id, userId: row.user_id, type: row.type, title: row.title, description: row.description || null,
+    id: row.id, ...(includeOwner ? { userId: row.user_id } : {}), type: row.type, title: row.title, description: row.description || null,
     locationName: row.location_name, latitude: Number(row.latitude), longitude: Number(row.longitude),
-    eventDate: row.event_date || null, ownerName: row.owner_first_name ? `${row.owner_first_name} ${row.owner_last_name}` : null,
+    eventDate: row.event_date || null, ...(includeOwner && row.owner_first_name ? { ownerName: `${row.owner_first_name} ${row.owner_last_name}` } : {}),
     createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
@@ -5108,7 +5108,7 @@ async function listPlayerListings(db, user, searchParams) {
        AND (?1 = '' OR l.type = ?1)
        AND (?2 = '' OR l.title LIKE '%' || ?2 || '%' COLLATE NOCASE OR l.description LIKE '%' || ?2 || '%' COLLATE NOCASE OR l.location_name LIKE '%' || ?2 || '%' COLLATE NOCASE)
      ORDER BY l.created_at DESC`).bind(typeFilter, term).all();
-  return json({ listings: (rows.results || []).map(toPublicPlayerListing) });
+  return json({ listings: (rows.results || []).map((row) => toPublicPlayerListing(row, Boolean(user))) });
 }
 
 async function listMyPlayerListings(db, userId) {
@@ -5116,7 +5116,7 @@ async function listMyPlayerListings(db, userId) {
     `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name
      FROM player_listings l JOIN users u ON u.id = l.user_id
      WHERE l.user_id = ? ORDER BY l.created_at DESC`).bind(userId).all();
-  return json({ listings: (rows.results || []).map(toPublicPlayerListing) });
+  return json({ listings: (rows.results || []).map((row) => toPublicPlayerListing(row, true)) });
 }
 
 async function createPlayerListing(request, db, user, countryCode) {

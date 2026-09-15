@@ -380,24 +380,22 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
           </svg>
           {t('Boule-Plätze / Vereine')}
         </button>
-        {currentUser && (
-          <button
-            className="left-panel-link"
-            type="button"
-            onClick={() => {
-              closeLeftPanel();
-              navigate?.('/spielerboerse');
-            }}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <circle cx="8.5" cy="8" r="3" />
-              <circle cx="16" cy="9.5" r="2.5" />
-              <path d="M3 20c0-3 2.5-5.5 5.5-5.5S14 17 14 20" />
-              <path d="M14.5 20c0-2.4 1.8-4.4 4-4.7" />
-            </svg>
-            {t('Spielerbörse')}
-          </button>
-        )}
+        <button
+          className="left-panel-link"
+          type="button"
+          onClick={() => {
+            closeLeftPanel();
+            navigate?.('/spielerboerse');
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="8.5" cy="8" r="3" />
+            <circle cx="16" cy="9.5" r="2.5" />
+            <path d="M3 20c0-3 2.5-5.5 5.5-5.5S14 17 14 20" />
+            <path d="M14.5 20c0-2.4 1.8-4.4 4-4.7" />
+          </svg>
+          {t('Spielerbörse')}
+        </button>
       </nav>
       {menuOpen && (
         <>
@@ -596,7 +594,7 @@ export function AuthModal({ title, subtitle, message, error, onClose, children }
   );
 }
 
-export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, searchControl, menuExtra, drawerContent }) {
+export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, searchControl, postboxControl, menuExtra, drawerContent }) {
   const { t } = useTranslation();
   return (
     <AppHeader
@@ -610,6 +608,7 @@ export function StandalonePageHeader({ heading, headingNoTranslate, language, se
       navigate={navigate}
       currentUser={currentUser}
       searchControl={searchControl}
+      postboxControl={postboxControl}
     >
       {drawerContent || <>
         <button
