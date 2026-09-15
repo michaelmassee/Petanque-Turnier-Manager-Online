@@ -275,7 +275,6 @@ export function InstallAppButton() {
 export function AppHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, searchControl, postboxControl, savedSearchesControl, children }) {
   const { t } = useTranslation();
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
-  const [placesInfoOpen, setPlacesInfoOpen] = useState(false);
   const closeLeftPanel = () => setLeftPanelOpen(false);
   const goToTournaments = () => {
     if (onLogoClick) {
@@ -371,7 +370,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
           type="button"
           onClick={() => {
             closeLeftPanel();
-            setPlacesInfoOpen(true);
+            navigate?.('/plaetze');
           }}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -382,11 +381,6 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
           {t('Boule-Plätze / Vereine')}
         </button>
       </nav>
-      {placesInfoOpen && (
-        <AuthModal title={t('Boule-Plätze / Vereine')} onClose={() => setPlacesInfoOpen(false)}>
-          <p>{t('Bald verfügbar')}</p>
-        </AuthModal>
-      )}
       {menuOpen && (
         <>
           <div className="nav-drawer-backdrop" onClick={onCloseMenu} />
@@ -584,7 +578,7 @@ export function AuthModal({ title, subtitle, message, error, onClose, children }
   );
 }
 
-export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
+export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, searchControl }) {
   const { t } = useTranslation();
   return (
     <AppHeader
@@ -596,6 +590,7 @@ export function StandalonePageHeader({ heading, headingNoTranslate, language, se
       onToggleMenu={() => setMenuOpen((open) => !open)}
       onCloseMenu={() => setMenuOpen(false)}
       navigate={navigate}
+      searchControl={searchControl}
     >
       <button
         className="drawer-link"

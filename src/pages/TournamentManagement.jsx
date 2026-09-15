@@ -223,7 +223,7 @@ function FormationHelpDialog({ onClose }) {
   );
 }
 
-export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, saving = false }) {
+export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false }) {
   const { t } = useTranslation();
   const [showFormationHelp, setShowFormationHelp] = useState(false);
   const showMailNotEnabledHint = !isAdmin && currentUser && currentUser.mailEnabled === false;
@@ -247,6 +247,25 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         <TextField label={t('Datum')} type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
         <TextField label={t('Startzeit')} type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
       </div>
+      {boulePlaces.length > 0 && (
+        <SelectField
+          label={t('Bouleplatz')}
+          value={form.boulePlaceId || ''}
+          onChange={(boulePlaceId) => {
+            const place = boulePlaces.find((entry) => entry.id === boulePlaceId);
+            setForm({
+              ...form,
+              boulePlaceId,
+              logoUrl: place?.clubLogoUrl || form.logoUrl,
+              location: place ? place.address : form.location,
+              latitude: place ? place.latitude : form.latitude,
+              longitude: place ? place.longitude : form.longitude,
+              locationConfirmed: place ? true : form.locationConfirmed,
+            });
+          }}
+          options={[{ value: '', label: t('Individuellen Ort verwenden') }, ...boulePlaces.map((place) => ({ value: place.id, label: `${place.clubName}: ${place.name}` }))]}
+        />
+      )}
       <LocationAutocomplete
         label={t('Ort')}
         value={form.location}
@@ -262,7 +281,9 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         required
         minLength={2}
         language={language}
+        disabled={Boolean(form.boulePlaceId)}
       />
+      {form.boulePlaceId && <p className="hint">{t('Ort wird vom ausgewählten Bouleplatz übernommen.')}</p>}
       <label className="checkbox-field">
         <input
           type="checkbox"
@@ -591,7 +612,7 @@ export function TournamentManagementPage({
   editorCandidates,
   ownerCandidates,
   onOwnerChanged,
-  currentUser,
+  currentUser, boulePlaces,
   message,
   error,
   tournamentSaving,
@@ -637,6 +658,7 @@ export function TournamentManagementPage({
             onOwnerChanged={onOwnerChanged}
             language={language}
             currentUser={currentUser}
+            boulePlaces={boulePlaces}
             saving={tournamentSaving}
           />
         </EditDialog>

@@ -28,6 +28,9 @@ const UserManagementPanel = lazy(() => import('./pages/UserManagementPanel.jsx')
 const ApiKeysPanel = lazy(() => import('./pages/ApiKeysPanel.jsx'));
 const TournamentPlayManagement = lazy(() => import('./pages/TournamentPlayManagement.jsx'));
 const PetanqueOnlineImportPanel = lazy(() => import('./pages/PetanqueOnlineImportPanel.jsx'));
+const PlacesPage = lazy(() => import('./pages/PlacesPage.jsx'));
+const PlaceReportPage = lazy(() => import('./pages/PlaceReportPage.jsx'));
+const ClubModerationPanel = lazy(() => import('./pages/ClubModerationPanel.jsx'));
 
 export { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 export { EditDialog, ListToolbar } from './components/ui.jsx';
@@ -48,6 +51,7 @@ function AppContent() {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState(null);
   const [reportVerifyStatus, setReportVerifyStatus] = useState(null);
+  const [placeReportVerifyStatus, setPlaceReportVerifyStatus] = useState(null);
   const [authView, setAuthView] = useState('home');
   const [activeTab, setActiveTab] = useState('home');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -168,6 +172,7 @@ function AppContent() {
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
 
   const tournamentsQuery = useQuery({ queryKey: ['tournaments'], queryFn: () => api('/api/tournaments') });
+  const boulePlacesQuery = useQuery({ queryKey: ['boule-places-for-tournament'], queryFn: () => api('/api/places'), enabled: canManageTournaments });
   const postboxQuery = useQuery({
     queryKey: ['postbox', currentUser?.id],
     queryFn: async () => {
@@ -299,6 +304,7 @@ function AppContent() {
     const verifyToken = params.get('verify_token');
     const cancelToken = params.get('cancel_token');
     const reportVerifyToken = params.get('report_verify_token');
+    const placeReportVerifyToken = params.get('place_report_verify_token');
     const authResult = params.get('auth');
     const authError = params.get('auth_error');
     let pendingAuthMessage = '';
@@ -308,6 +314,12 @@ function AppContent() {
       api('/api/tournament-reports/verify', { method: 'POST', body: JSON.stringify({ token: reportVerifyToken }) })
         .then(() => setReportVerifyStatus('success'))
         .catch(() => setReportVerifyStatus('error'));
+    }
+    if (placeReportVerifyToken) {
+      navigate('/platz-melden');
+      api('/api/place-reports/verify', { method: 'POST', body: JSON.stringify({ token: placeReportVerifyToken }) })
+        .then(() => setPlaceReportVerifyStatus('success'))
+        .catch(() => setPlaceReportVerifyStatus('error'));
     }
     if (resetToken) {
       setAuthView('reset');
@@ -1566,6 +1578,28 @@ function AppContent() {
     );
   }
 
+  if (!needsSetup && path === '/platz-melden') {
+    return (
+      <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
+        <PlaceReportPage
+          language={language}
+          setLanguage={setLanguage}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          navigate={navigate}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          turnstileSiteKey={turnstileSiteKey}
+          verifyStatus={placeReportVerifyStatus}
+        />
+      </Suspense>
+    );
+  }
+
+  if (!needsSetup && path === '/plaetze') {
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlacesPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} /></Suspense>;
+  }
+
   if (currentUser && authView === 'cancelRegistration') {
     return (
       <main className="app-shell">
@@ -1688,6 +1722,16 @@ function AppContent() {
             }}
           >
             {t('Turnier melden')}
+          </button>
+          <button
+            className="drawer-link"
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              navigate('/platz-melden');
+            }}
+          >
+            {t('Bouleplatz melden')}
           </button>
           <a
             className="drawer-link"
@@ -1874,6 +1918,8 @@ function AppContent() {
       ? t('Mein Profil')
       : activeTab === 'users'
       ? t('Benutzerverwaltung')
+      : activeTab === 'clubs'
+      ? t('Vereine & Bouleplätze')
       : activeTab === 'apikeys'
         ? t('API-Zugänge')
         : activeTab === 'petanque-online-import'
@@ -2056,6 +2102,17 @@ function AppContent() {
         >
           {t('Turnier melden')}
         </button>
+        <button
+          className="drawer-link"
+          type="button"
+          onClick={() => {
+            setMenuOpen(false);
+            clearFeedback();
+            navigate('/platz-melden');
+          }}
+        >
+          {t('Bouleplatz melden')}
+        </button>
         {isAdmin && (
           <button
             className={`drawer-link ${activeTab === 'petanque-online-import' ? 'active' : ''}`}
@@ -2080,6 +2137,19 @@ function AppContent() {
             }}
           >
             {t('Benutzer')}
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            className={`drawer-link ${activeTab === 'clubs' ? 'active' : ''}`}
+            type="button"
+            onClick={() => {
+              setActiveTab('clubs');
+              setMenuOpen(false);
+              clearFeedback();
+            }}
+          >
+            {t('Vereine & Bouleplätze')}
           </button>
         )}
         {canManageTournaments && (
@@ -2271,6 +2341,7 @@ function AppContent() {
               currentUser={currentUser}
               message={message}
               error={error}
+              boulePlaces={boulePlacesQuery.data?.places || []}
             />
           </section>
         </Suspense>
@@ -2342,6 +2413,12 @@ function AppContent() {
             message={message}
             error={error}
           />
+        </Suspense>
+      )}
+
+      {activeTab === 'clubs' && isAdmin && (
+        <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
+          <ClubModerationPanel />
         </Suspense>
       )}
 

@@ -1862,6 +1862,15 @@ textarea:focus {
     justify-content: flex-end;
   }
 
+  /* Der Aktionsbereich ist horizontal scrollbar; außerhalb des Buttons liegende
+     Badges würden dort abgeschnitten. Daher auf Mobilgeräten nach innen setzen. */
+  .postbox-badge {
+    top: 2px;
+    right: 2px;
+    min-width: 17px;
+    padding: 1px 4px;
+  }
+
   .topbar-actions-scroll {
     display: block;
     min-width: 0;
@@ -2263,3 +2272,8 @@ textarea:focus {
   font-weight: 800;
   color: #53627a;
 }
+ .places-map { height: min(48vh, 420px); border-radius: 10px; overflow: hidden; }
+ .places-map .leaflet-container { height: 100%; width: 100%; }
+ .places-list { display: grid; gap: 1rem; margin-top: 1rem; }
+ .place-card h2 { margin: 0; }
+ .place-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }

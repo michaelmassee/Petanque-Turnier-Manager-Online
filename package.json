@@ -25,9 +25,11 @@
     "@block65/webcrypto-web-push": "^2.0.0",
     "@tanstack/react-query": "^5.102.8",
     "i18next": "^26.4.2",
+    "leaflet": "^1.9.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-i18next": "^17.0.13",
+    "react-leaflet": "^5.0.0",
     "tz-lookup": "^6.1.25",
     "worker-mailer": "^1.2.1"
   },

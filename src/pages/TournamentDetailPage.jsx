@@ -96,6 +96,11 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
       <p>
         <strong>{t('Ort')}</strong>: <span data-i18n-skip>{tournament.location}</span>
       </p>
+      {tournament.boulePlaceId && (
+        <p>
+          <strong>{t('Bouleplatz')}</strong>: <a href={`/plaetze#${encodeURIComponent(tournament.boulePlaceId)}`}>{t('Öffentlichen Bouleplatz ansehen')}</a>
+        </p>
+      )}
       {!isCalendarEntry && (
         <>
           {tournament.approvalRequired && <p className="hint">{t('Anmeldungen müssen vom Turnierersteller bestätigt werden.')}</p>}

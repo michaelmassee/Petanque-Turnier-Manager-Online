@@ -81,7 +81,7 @@ export function googleMapsUrl(tournament) {
   if (typeof tournament.latitude === 'number' && typeof tournament.longitude === 'number') {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${tournament.latitude},${tournament.longitude}`)}`;
   }
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tournament.location || '')}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tournament.location || tournament.address || '')}`;
 }
 
 export function tournamentImageUrl(tournamentId, field, shareToken = '') {
@@ -92,6 +92,7 @@ export function tournamentImageUrl(tournamentId, field, shareToken = '') {
 
 export function tournamentPayload(form) {
   return {
+    boulePlaceId: form.boulePlaceId || null,
     club: form.club || null,
     name: form.name,
     date: form.date,

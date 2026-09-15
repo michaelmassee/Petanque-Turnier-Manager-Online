@@ -60,6 +60,9 @@ const TOURNAMENT_REPORT_SYSTEM_USER_ID = 'system-tournament-reports';
 const TOURNAMENT_REPORT_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
 const TOURNAMENT_REPORT_RATE_LIMIT_MAX_PER_IP = 5;
 const TOURNAMENT_REPORT_MAX_DAYS_AHEAD = 365 * 2;
+const PLACE_REPORT_TOKEN_TTL_SECONDS = 60 * 60 * 24;
+const PLACE_REPORT_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const PLACE_REPORT_RATE_LIMIT_MAX_PER_IP = 5;
 const PETANQUE_ONLINE_CALENDAR_URL = 'https://petanque-online.de/api/v1/calendar/public';
 const PETANQUE_ONLINE_PAGE_SIZE = 100;
 // Changing this invalidates every stored password_hash (verifyPassword re-derives with the
@@ -124,6 +127,29 @@ const TOURNAMENT_REPORT_VERIFICATION_EMAILS = {
   fr: {
     subject: 'Confirmer le tournoi signalé',
     text: (verificationUrl) => `Confirme le tournoi signalé via ce lien :\n\n${verificationUrl}\n\nL’entrée ne devient publique qu’après confirmation. Le lien est valable 24 heures.`,
+  },
+};
+
+const PLACE_REPORT_VERIFICATION_EMAILS = {
+  de: {
+    subject: 'Bouleplatz-Meldung bestätigen',
+    text: (verificationUrl) => `Bitte bestätige deinen gemeldeten Bouleplatz über diesen Link:\n\n${verificationUrl}\n\nErst nach der Bestätigung wird der Platz öffentlich sichtbar. Der Link ist 24 Stunden gültig.`,
+  },
+  nl: {
+    subject: 'Baanmelding bevestigen',
+    text: (verificationUrl) => `Bevestig je gemelde jeu-de-boulesbaan via deze link:\n\n${verificationUrl}\n\nPas na bevestiging wordt de baan openbaar zichtbaar. De link is 24 uur geldig.`,
+  },
+  en: {
+    subject: 'Confirm your boules court report',
+    text: (verificationUrl) => `Please confirm your reported boules court via this link:\n\n${verificationUrl}\n\nThe court only becomes publicly visible after confirmation. The link is valid for 24 hours.`,
+  },
+  es: {
+    subject: 'Confirmar pista notificada',
+    text: (verificationUrl) => `Confirma la pista notificada con este enlace:\n\n${verificationUrl}\n\nLa pista solo sera visible publicamente tras la confirmacion. El enlace es valido durante 24 horas.`,
+  },
+  fr: {
+    subject: 'Confirmer le terrain signalé',
+    text: (verificationUrl) => `Confirme le terrain signalé via ce lien :\n\n${verificationUrl}\n\nLe terrain ne devient public qu’après confirmation. Le lien est valable 24 heures.`,
   },
 };
 
@@ -1084,6 +1110,77 @@ export default {
           lng: best?.lng ?? null,
           displayName: best?.displayName ?? null,
         });
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/places') {
+        const session = await optionalSession(request, env.DB);
+        return await listBoulePlaces(env.DB, session?.user || null, url.searchParams.get('q'));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/place-reports') {
+        return await createPlaceReport(request, env, url);
+      }
+      if (request.method === 'POST' && url.pathname === '/api/place-reports/verify') {
+        return await verifyPlaceReport(request, env.DB);
+      }
+      if (request.method === 'POST' && url.pathname === '/api/clubs') {
+        const session = await requireSession(request, env.DB);
+        return await createClub(request, env.DB, session.user);
+      }
+      if (request.method === 'GET' && url.pathname === '/api/clubs/mine') {
+        const session = await requireSession(request, env.DB);
+        return await listMyClubs(env.DB, session.user.id);
+      }
+      const clubMatch = url.pathname.match(/^\/api\/clubs\/([^/]+)$/);
+      if (clubMatch && request.method === 'GET') {
+        const session = await optionalSession(request, env.DB);
+        return await getClub(env.DB, clubMatch[1], session?.user || null);
+      }
+      if (clubMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        return await updateClub(request, env.DB, clubMatch[1], session.user);
+      }
+      const clubRequestMatch = url.pathname.match(/^\/api\/clubs\/([^/]+)\/editor-request$/);
+      if (clubRequestMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        return await requestClubEditor(env.DB, clubRequestMatch[1], session.user.id);
+      }
+      const clubPlaceMatch = url.pathname.match(/^\/api\/clubs\/([^/]+)\/places$/);
+      if (clubPlaceMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        return await createBoulePlace(request, env.DB, clubPlaceMatch[1], session.user, request.headers.get('CF-IPCountry'));
+      }
+      const placeMatch = url.pathname.match(/^\/api\/places\/([^/]+)$/);
+      if (placeMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        return await updateBoulePlace(request, env.DB, placeMatch[1], session.user, request.headers.get('CF-IPCountry'));
+      }
+      const placeLikeMatch = url.pathname.match(/^\/api\/places\/([^/]+)\/like$/);
+      if (placeLikeMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        return await toggleBoulePlaceLike(env.DB, placeLikeMatch[1], session.user.id);
+      }
+      const placeFavoriteMatch = url.pathname.match(/^\/api\/places\/([^/]+)\/favorite$/);
+      if (placeFavoriteMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        return await toggleBoulePlaceFavorite(env.DB, placeFavoriteMatch[1], session.user.id);
+      }
+      if (request.method === 'GET' && url.pathname === '/api/admin/club-editor-requests') {
+        await requireAdmin(request, env.DB);
+        return await listClubEditorRequests(env.DB);
+      }
+      const approveClubEditorMatch = url.pathname.match(/^\/api\/admin\/clubs\/([^/]+)\/editors\/([^/]+)$/);
+      if (approveClubEditorMatch && request.method === 'POST') {
+        const session = await requireAdmin(request, env.DB);
+        return await approveClubEditor(env.DB, approveClubEditorMatch[1], approveClubEditorMatch[2], session.user.id);
+      }
+      if (request.method === 'GET' && url.pathname === '/api/admin/pending-places') {
+        await requireAdmin(request, env.DB);
+        return await listPendingBoulePlaces(env.DB);
+      }
+      const publishPlaceMatch = url.pathname.match(/^\/api\/admin\/places\/([^/]+)\/publish$/);
+      if (publishPlaceMatch && request.method === 'POST') {
+        await requireAdmin(request, env.DB);
+        return await publishBoulePlace(env.DB, publishPlaceMatch[1]);
       }
 
       const tournamentRegistrationsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registrations$/);
@@ -2765,6 +2862,14 @@ function resolveTournamentTimezone(geo, fallback = 'Europe/Berlin') {
   }
 }
 
+async function resolveTournamentBoulePlace(db, placeId) {
+  const id = nullableText(placeId);
+  if (!id) return null;
+  const place = await db.prepare("SELECT p.id, p.address, p.latitude, p.longitude, c.logo_url AS club_logo_url FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id WHERE p.id = ? AND p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')").bind(id).first();
+  if (!place) throw new HttpError(400, 'Bouleplatz nicht gefunden');
+  return place;
+}
+
 function localDateTimeParts(date, timeZone) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone,
@@ -2814,7 +2919,9 @@ function resolveRegistrationTimes(tournament, timezone, { legacyUtc = false } = 
 
 async function createTournament(request, env, user) {
   const db = env.DB;
-  const body = await readJson(request);
+  let body = await readJson(request);
+  const selectedPlace = await resolveTournamentBoulePlace(db, body.boulePlaceId);
+  if (selectedPlace) body = { ...body, location: selectedPlace.address, latitude: selectedPlace.latitude, longitude: selectedPlace.longitude, logoUrl: nullableText(body.logoUrl) || selectedPlace.club_logo_url || null };
   const tournament = normalizeCoreTournamentInput(body);
 
   if (user.role !== 'admin' && tournament.registrationEnabled !== false) {
@@ -2842,8 +2949,8 @@ async function createTournament(request, env, user) {
         id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
-        latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        latitude, longitude, geocoded_at, timezone, boule_place_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -2883,6 +2990,7 @@ async function createTournament(request, env, user) {
       geo.longitude,
       geo.geocodedAt,
       timezone,
+      selectedPlace?.id || null,
       now,
       now,
     )
@@ -3080,7 +3188,9 @@ async function updateTournament(request, env, existing, user) {
   if (Number(existing.document_managed || 0) === 1) {
     throw new HttpError(409, 'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.');
   }
-  const body = await readJson(request);
+  let body = await readJson(request);
+  const selectedPlace = await resolveTournamentBoulePlace(db, body.boulePlaceId);
+  if (selectedPlace) body = { ...body, location: selectedPlace.address, latitude: selectedPlace.latitude, longitude: selectedPlace.longitude };
   const tournament = normalizeCoreTournamentInput(body);
   if (existing.type === 'schweizer' && existing.status === 'running'
     && tournament.schweizerRankingMode !== (existing.schweizer_ranking_mode || 'mit_buchholz')) {
@@ -3097,7 +3207,7 @@ async function updateTournament(request, env, existing, user) {
        SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, schweizer_ranking_mode = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
-           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, updated_at = ?
+           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, boule_place_id = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -3133,6 +3243,7 @@ async function updateTournament(request, env, existing, user) {
       geo.longitude,
       geo.geocodedAt,
       timezone,
+      selectedPlace?.id || null,
       now,
       existing.id,
     )
@@ -4814,6 +4925,258 @@ async function getTournamentById(db, id) {
     .first();
 }
 
+function clubCanEdit(club, user) {
+  return user?.role === 'admin' || club.created_by === user?.id || Boolean(club.editor_user_id);
+}
+
+function toPublicBoulePlace(row, user) {
+  return {
+    id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubLogoUrl: row.club_logo_url || null, name: row.name, address: row.address,
+    latitude: row.latitude === null ? null : Number(row.latitude), longitude: row.longitude === null ? null : Number(row.longitude),
+    courtCount: Number(row.court_count || 0), description: row.description || null, accessible: Boolean(Number(row.accessible)),
+    facilities: row.facilities || null, status: row.status, likeCount: Number(row.like_count || 0), liked: Boolean(Number(row.liked || 0)),
+    favorited: Boolean(Number(row.favorited || 0)),
+    canEdit: clubCanEdit(row, user),
+  };
+}
+
+function toPublicClub(row, user) {
+  return {
+    id: row.id, name: row.name, description: row.description || null, websiteUrl: row.website_url || null, logoUrl: row.logo_url || null,
+    contactName: row.contact_name || null, contactEmail: row.contact_email || null, contactPhone: row.contact_phone || null,
+    status: row.status, canEdit: clubCanEdit(row, user), createdBy: row.created_by,
+  };
+}
+
+async function listBoulePlaces(db, user, query) {
+  const term = String(query || '').trim();
+  const rows = await db.prepare(
+    `SELECT p.*, c.name AS club_display_name, c.logo_url AS club_logo_url, c.created_by,
+       EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?1) AS editor_user_id,
+       (SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id) AS like_count,
+       EXISTS(SELECT 1 FROM boule_place_likes l WHERE l.place_id = p.id AND l.user_id = ?1) AS liked,
+       EXISTS(SELECT 1 FROM boule_place_favorites f WHERE f.place_id = p.id AND f.user_id = ?1) AS favorited
+     FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
+     WHERE p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')
+       AND (?2 = '' OR p.name LIKE '%' || ?2 || '%' COLLATE NOCASE OR c.name LIKE '%' || ?2 || '%' COLLATE NOCASE OR p.club_name LIKE '%' || ?2 || '%' COLLATE NOCASE OR p.address LIKE '%' || ?2 || '%' COLLATE NOCASE)
+     ORDER BY COALESCE(c.name, p.club_name) COLLATE NOCASE, p.name COLLATE NOCASE`).bind(user?.id || '', term).all();
+  return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, user)) });
+}
+
+async function getClub(db, id, user) {
+  const club = await db.prepare(`SELECT c.*, EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?2) AS editor_user_id FROM clubs c WHERE c.id = ?1`).bind(id, user?.id || '').first();
+  if (!club || (club.status !== 'published' && !clubCanEdit(club, user))) throw new HttpError(404, 'Verein nicht gefunden');
+  const places = await db.prepare(
+    `SELECT p.*, c.name AS club_name, c.logo_url AS club_logo_url, c.created_by, EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?2) AS editor_user_id,
+      (SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id) AS like_count,
+      EXISTS(SELECT 1 FROM boule_place_likes l WHERE l.place_id = p.id AND l.user_id = ?2) AS liked,
+      EXISTS(SELECT 1 FROM boule_place_favorites f WHERE f.place_id = p.id AND f.user_id = ?2) AS favorited
+     FROM boule_places p JOIN clubs c ON c.id = p.club_id WHERE p.club_id = ?1 AND (p.status = 'published' OR ?3 = 1) ORDER BY p.name COLLATE NOCASE`).bind(id, user?.id || '', clubCanEdit(club, user) ? 1 : 0).all();
+  return json({ club: toPublicClub(club, user), places: (places.results || []).map((row) => toPublicBoulePlace(row, user)) });
+}
+
+function clubInput(body) {
+  const name = text(body.name);
+  if (name.length < 2) throw new HttpError(400, 'Der Vereinsname muss mindestens 2 Zeichen enthalten');
+  const contactName = text(body.contactName);
+  if (contactName.length < 2) throw new HttpError(400, 'Der Kontaktname muss mindestens 2 Zeichen enthalten');
+  const contactEmail = text(body.contactEmail);
+  if (!isEmail(contactEmail)) throw new HttpError(400, 'Eine gültige Kontakt-E-Mail ist erforderlich');
+  return { name, description: nullableText(body.description), websiteUrl: normalizePresentationUrl(body.websiteUrl), logoUrl: normalizePresentationUrl(body.logoUrl), contactName, contactEmail, contactPhone: nullableText(body.contactPhone) };
+}
+
+async function createClub(request, db, user) {
+  const input = clubInput(await readJson(request)); const now = new Date().toISOString(); const id = crypto.randomUUID();
+  await db.batch([
+    db.prepare('INSERT INTO clubs (id, name, description, website_url, logo_url, contact_name, contact_email, contact_phone, status, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, \'pending\', ?, ?, ?)').bind(id, input.name, input.description, input.websiteUrl, input.logoUrl, input.contactName, input.contactEmail, input.contactPhone, user.id, now, now),
+    db.prepare('INSERT INTO club_editor_requests (club_id, user_id, created_at) VALUES (?, ?, ?)').bind(id, user.id, now),
+  ]);
+  return json({ club: await db.prepare('SELECT * FROM clubs WHERE id = ?').bind(id).first() }, 201);
+}
+
+async function assertClubEditor(db, clubId, user) {
+  const club = await db.prepare('SELECT c.*, EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?2) AS editor_user_id FROM clubs c WHERE c.id = ?1').bind(clubId, user.id).first();
+  if (!club) throw new HttpError(404, 'Verein nicht gefunden');
+  if (!clubCanEdit(club, user)) throw new HttpError(403, 'Keine Bearbeitungsrechte für diesen Verein');
+  return club;
+}
+
+async function updateClub(request, db, id, user) {
+  await assertClubEditor(db, id, user); const input = clubInput(await readJson(request)); const now = new Date().toISOString();
+  await db.prepare("UPDATE clubs SET name = ?, description = ?, website_url = ?, logo_url = ?, contact_name = ?, contact_email = ?, contact_phone = ?, status = 'pending', updated_at = ? WHERE id = ?").bind(input.name, input.description, input.websiteUrl, input.logoUrl, input.contactName, input.contactEmail, input.contactPhone, now, id).run();
+  return await getClub(db, id, user);
+}
+
+async function requestClubEditor(db, clubId, userId) {
+  const club = await db.prepare('SELECT id FROM clubs WHERE id = ?').bind(clubId).first(); if (!club) throw new HttpError(404, 'Verein nicht gefunden');
+  await db.prepare('INSERT OR IGNORE INTO club_editor_requests (club_id, user_id, created_at) VALUES (?, ?, ?)').bind(clubId, userId, new Date().toISOString()).run();
+  return json({ ok: true });
+}
+
+async function placeInput(body, countryCode) {
+  const name = text(body.name); const address = text(body.address); if (name.length < 2 || address.length < 5) throw new HttpError(400, 'Name und vollständige Adresse des Platzes sind erforderlich');
+  // Die Adresse ist die Quelle der Wahrheit. Client-Koordinaten wären sonst auch
+  // außerhalb der LocationAutocomplete-Oberfläche frei fälschbar.
+  const [geo] = await geocodeLocation(address, { countryCode, limit: 1 });
+  if (!geo) throw new HttpError(400, 'Kein Ort gefunden.');
+  const { lat: latitude, lng: longitude } = geo;
+  return { name, address, latitude, longitude, courtCount: nonNegativeInteger(body.courtCount), description: nullableText(body.description), accessible: Boolean(body.accessible), facilities: nullableText(body.facilities) };
+}
+
+async function createBoulePlace(request, db, clubId, user, countryCode) {
+  await assertClubEditor(db, clubId, user); const input = await placeInput(await readJson(request), countryCode); const id = crypto.randomUUID(); const now = new Date().toISOString();
+  await db.prepare("INSERT INTO boule_places (id, club_id, name, address, latitude, longitude, court_count, description, accessible, facilities, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)").bind(id, clubId, input.name, input.address, input.latitude, input.longitude, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, now, now).run();
+  return json({ id }, 201);
+}
+
+async function updateBoulePlace(request, db, id, user, countryCode) {
+  const place = await db.prepare('SELECT club_id FROM boule_places WHERE id = ?').bind(id).first(); if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden'); await assertClubEditor(db, place.club_id, user); const input = await placeInput(await readJson(request), countryCode);
+  await db.prepare("UPDATE boule_places SET name = ?, address = ?, latitude = ?, longitude = ?, court_count = ?, description = ?, accessible = ?, facilities = ?, status = 'pending', updated_at = ? WHERE id = ?").bind(input.name, input.address, input.latitude, input.longitude, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, new Date().toISOString(), id).run(); return json({ ok: true });
+}
+
+async function toggleBoulePlaceLike(db, placeId, userId) {
+  const place = await db.prepare("SELECT p.id FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id WHERE p.id = ? AND p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')").bind(placeId).first(); if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
+  const liked = await db.prepare('SELECT 1 FROM boule_place_likes WHERE place_id = ? AND user_id = ?').bind(placeId, userId).first();
+  if (liked) await db.prepare('DELETE FROM boule_place_likes WHERE place_id = ? AND user_id = ?').bind(placeId, userId).run(); else await db.prepare('INSERT INTO boule_place_likes (place_id, user_id, created_at) VALUES (?, ?, ?)').bind(placeId, userId, new Date().toISOString()).run();
+  const count = await db.prepare('SELECT COUNT(*) AS count FROM boule_place_likes WHERE place_id = ?').bind(placeId).first(); return json({ liked: !liked, likeCount: Number(count.count) });
+}
+
+async function toggleBoulePlaceFavorite(db, placeId, userId) {
+  const place = await db.prepare("SELECT p.id FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id WHERE p.id = ? AND p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')").bind(placeId).first(); if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
+  const favorited = await db.prepare('SELECT 1 FROM boule_place_favorites WHERE place_id = ? AND user_id = ?').bind(placeId, userId).first();
+  if (favorited) await db.prepare('DELETE FROM boule_place_favorites WHERE place_id = ? AND user_id = ?').bind(placeId, userId).run(); else await db.prepare('INSERT INTO boule_place_favorites (place_id, user_id, created_at) VALUES (?, ?, ?)').bind(placeId, userId, new Date().toISOString()).run();
+  return json({ favorited: !favorited });
+}
+
+async function enforcePlaceReportRateLimit(db, ip) {
+  const windowStart = new Date(Date.now() - PLACE_REPORT_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
+  const ipCount = await db.prepare('SELECT COUNT(*) AS count FROM boule_place_report_attempts WHERE ip = ? AND created_at > ?').bind(ip, windowStart).first();
+  if (Number(ipCount?.count || 0) >= PLACE_REPORT_RATE_LIMIT_MAX_PER_IP) throw new HttpError(429, 'Zu viele Bouleplatz-Meldungen. Bitte versuche es später erneut.');
+  await db.prepare('INSERT INTO boule_place_report_attempts (id, ip, created_at) VALUES (?, ?, ?)').bind(crypto.randomUUID(), ip, new Date().toISOString()).run();
+}
+
+/**
+ * Public, unauthenticated "Bouleplatz melden" submission - analog zu createTournamentReport.
+ * Kein Verein nötig (club_id bleibt NULL); der Platz bleibt 'pending' und wird erst durch
+ * Bestätigung der Kontakt-E-Mail (verifyPlaceReport) veröffentlicht, ganz ohne Admin-Schritt.
+ */
+async function createPlaceReport(request, env, url) {
+  const db = env.DB;
+  const body = await readJson(request);
+
+  if (nullableText(body.website)) {
+    return json({ ok: true }, 201);
+  }
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  await enforcePlaceReportRateLimit(db, ip);
+  await verifyTurnstileToken(env, body.turnstileToken, ip);
+
+  const name = text(body.name);
+  const address = text(body.address);
+  if (name.length < 2 || address.length < 5) throw new HttpError(400, 'Name und vollständige Adresse des Platzes sind erforderlich');
+  // Die Adresse ist die Quelle der Wahrheit. Ein öffentlicher API-Aufruf darf
+  // keine beliebige Kartenposition neben einer anderen Adresse veröffentlichen.
+  const [geo] = await geocodeLocation(address, { countryCode: request.headers.get('CF-IPCountry'), limit: 1 });
+  if (!geo) throw new HttpError(400, 'Kein Ort gefunden.');
+  const { lat: latitude, lng: longitude } = geo;
+  const courtCount = nonNegativeInteger(body.courtCount);
+  const description = nullableText(body.description);
+  const accessible = Boolean(body.accessible);
+  const facilities = nullableText(body.facilities);
+  const clubName = nullableText(body.clubName);
+  const contactName = text(body.contactName);
+  const contactEmail = text(body.contactEmail).toLowerCase();
+  const language = normalizeLanguage(body.language);
+  if (contactName.length < 2) throw new HttpError(400, 'Der Kontaktname muss mindestens 2 Zeichen enthalten');
+  if (!isEmail(contactEmail)) throw new HttpError(400, 'Eine gültige Kontakt-E-Mail ist erforderlich');
+  if (!body.consentAccepted) throw new HttpError(400, 'Zustimmung zur Datenschutzerklärung ist erforderlich');
+
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  await db
+    .prepare(
+      `INSERT INTO boule_places (id, club_id, club_name, name, address, latitude, longitude, court_count, description, accessible, facilities, status, contact_name, contact_email, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+    )
+    .bind(id, clubName, name, address, latitude, longitude, courtCount, description, accessible ? 1 : 0, facilities, contactName, contactEmail, now, now)
+    .run();
+
+  const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+  const tokenHash = await sha256Hex(token);
+  const expiresAt = new Date(Date.now() + PLACE_REPORT_TOKEN_TTL_SECONDS * 1000);
+  await db
+    .prepare('INSERT INTO boule_place_report_tokens (token_hash, place_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
+    .bind(tokenHash, id, expiresAt.toISOString(), now)
+    .run();
+
+  const verificationUrl = `${url.origin}/?place_report_verify_token=${encodeURIComponent(token)}`;
+  const emailText = PLACE_REPORT_VERIFICATION_EMAILS[language] || PLACE_REPORT_VERIFICATION_EMAILS.de;
+  await sendTransactionalEmail(env, {
+    to: contactEmail,
+    subject: emailText.subject,
+    text: emailText.text(verificationUrl),
+    language,
+    logFallback: `Boule place report verification link for ${contactEmail}: ${verificationUrl}`,
+    failureContext: `boule place report verification email for ${contactEmail}`,
+    allowLogFallback: isLocalhost(url),
+  });
+
+  const response = { ok: true };
+  if (isLocalhost(url)) {
+    response.verificationUrl = verificationUrl;
+  }
+  return json(response, 201);
+}
+
+async function verifyPlaceReport(request, db) {
+  const body = await readJson(request);
+  const token = String(body.token || '').trim();
+  if (!token) throw new HttpError(400, 'Bestätigungs-Token ist erforderlich');
+
+  const tokenHash = await sha256Hex(token);
+  const verification = await db
+    .prepare('SELECT token_hash, place_id, expires_at, used_at FROM boule_place_report_tokens WHERE token_hash = ?')
+    .bind(tokenHash)
+    .first();
+  if (!verification || verification.used_at || new Date(verification.expires_at).getTime() <= Date.now()) {
+    throw new HttpError(400, 'Bestätigungs-Link ist ungültig oder abgelaufen');
+  }
+
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare("UPDATE boule_places SET status = 'published', updated_at = ? WHERE id = ?").bind(now, verification.place_id),
+    db.prepare('UPDATE boule_place_report_tokens SET used_at = ? WHERE token_hash = ?').bind(now, tokenHash),
+  ]);
+  return json({ ok: true, placeId: verification.place_id });
+}
+
+async function listClubEditorRequests(db) { const rows = await db.prepare('SELECT r.club_id, r.user_id, r.created_at, c.name AS club_name, u.first_name, u.last_name, u.email FROM club_editor_requests r JOIN clubs c ON c.id = r.club_id JOIN users u ON u.id = r.user_id ORDER BY r.created_at').all(); return json({ requests: rows.results || [] }); }
+async function approveClubEditor(db, clubId, userId, adminId) { const now = new Date().toISOString(); await db.batch([db.prepare('INSERT OR REPLACE INTO club_editors (club_id, user_id, approved_by, approved_at) VALUES (?, ?, ?, ?)').bind(clubId, userId, adminId, now), db.prepare("UPDATE clubs SET status = 'published', updated_at = ? WHERE id = ?").bind(now, clubId), db.prepare('DELETE FROM club_editor_requests WHERE club_id = ? AND user_id = ?').bind(clubId, userId)]); return json({ ok: true }); }
+
+async function listMyClubs(db, userId) {
+  const rows = await db.prepare(
+    `SELECT DISTINCT c.*, 1 AS editor_user_id FROM clubs c
+     LEFT JOIN club_editors ce ON ce.club_id = c.id AND ce.user_id = ?1
+     WHERE c.created_by = ?1 OR ce.user_id = ?1
+     ORDER BY c.name COLLATE NOCASE`).bind(userId).all();
+  return json({ clubs: (rows.results || []).map((row) => toPublicClub(row, { id: userId })) });
+}
+
+async function listPendingBoulePlaces(db) {
+  const rows = await db.prepare(
+    `SELECT p.*, c.name AS club_name, c.logo_url AS club_logo_url, c.created_by
+     FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
+     WHERE p.status = 'pending' ORDER BY p.created_at`).all();
+  return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, null)) });
+}
+
+async function publishBoulePlace(db, id) {
+  const result = await db.prepare("UPDATE boule_places SET status = 'published', updated_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+  if (!result.meta.changes) throw new HttpError(404, 'Bouleplatz nicht gefunden');
+  return json({ ok: true });
+}
+
 async function getRegistrationWithTournament(db, id) {
   return db
     .prepare(
@@ -5070,6 +5433,20 @@ async function cleanupExpiredSessions(db) {
   // row is removed (ON DELETE CASCADE).
   const reportAttemptsCutoff = new Date(Date.now() - TOURNAMENT_REPORT_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
   await db.prepare('DELETE FROM tournament_report_attempts WHERE created_at <= ?').bind(reportAttemptsCutoff).run();
+
+  // "Bouleplatz melden": analog zu Turniermeldungen - unbestätigte Platzmeldungen nach Ablauf
+  // des 24h-Fensters löschen (kaskadiert auf ihre boule_place_report_tokens-Zeile).
+  const placeReportTokenCutoff = new Date(Date.now() - PLACE_REPORT_TOKEN_TTL_SECONDS * 1000).toISOString();
+  await db
+    .prepare(
+      `DELETE FROM boule_places WHERE id IN (
+        SELECT place_id FROM boule_place_report_tokens WHERE used_at IS NULL AND created_at <= ?
+      )`,
+    )
+    .bind(placeReportTokenCutoff)
+    .run();
+  const placeReportAttemptsCutoff = new Date(Date.now() - PLACE_REPORT_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
+  await db.prepare('DELETE FROM boule_place_report_attempts WHERE created_at <= ?').bind(placeReportAttemptsCutoff).run();
 }
 
 async function enforceLoginRateLimit(db, email, ip) {
@@ -5633,6 +6010,7 @@ function toPublicTournament(row, user) {
     date: row.date,
     startTime: row.start_time,
     location: row.location,
+    boulePlaceId: row.boule_place_id || null,
     latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
     longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
     description: row.description,

@@ -111,6 +111,7 @@ export const EMPTY_AUTH_FORM = {
 
 export const EMPTY_TOURNAMENT_FORM = {
   id: '',
+  boulePlaceId: '',
   club: '',
   name: '',
   date: '',
@@ -157,6 +158,23 @@ export const EMPTY_TOURNAMENT_REPORT_FORM = {
   formation: 'doublette',
   description: '',
   websiteUrl: '',
+  contactName: '',
+  contactEmail: '',
+  consentAccepted: false,
+  website: '',
+};
+
+export const EMPTY_PLACE_REPORT_FORM = {
+  name: '',
+  address: '',
+  latitude: null,
+  longitude: null,
+  locationConfirmed: false,
+  courtCount: '',
+  description: '',
+  accessible: false,
+  facilities: '',
+  clubName: '',
   contactName: '',
   contactEmail: '',
   consentAccepted: false,
