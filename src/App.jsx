@@ -29,6 +29,7 @@ const ApiKeysPanel = lazy(() => import('./pages/ApiKeysPanel.jsx'));
 const TournamentPlayManagement = lazy(() => import('./pages/TournamentPlayManagement.jsx'));
 const PetanqueAktuellImportPanel = lazy(() => import('./pages/PetanqueAktuellImportPanel.jsx'));
 const PlacesPage = lazy(() => import('./pages/PlacesPage.jsx'));
+const MyClubsPage = lazy(() => import('./pages/MyClubsPage.jsx'));
 const PlaceReportPage = lazy(() => import('./pages/PlaceReportPage.jsx'));
 const ClubModerationPanel = lazy(() => import('./pages/ClubModerationPanel.jsx'));
 
@@ -1602,6 +1603,10 @@ function AppContent() {
     return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlacesPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} /></Suspense>;
   }
 
+  if (!needsSetup && currentUser && path === '/vereine') {
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyClubsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} /></Suspense>;
+  }
+
   if (currentUser && authView === 'cancelRegistration') {
     return (
       <main className="app-shell">
@@ -2114,6 +2119,17 @@ function AppContent() {
           }}
         >
           {t('Bouleplatz melden')}
+        </button>
+        <button
+          className="drawer-link"
+          type="button"
+          onClick={() => {
+            setMenuOpen(false);
+            clearFeedback();
+            navigate('/vereine');
+          }}
+        >
+          {t('Meine Vereine')}
         </button>
         {isAdmin && (
           <button
