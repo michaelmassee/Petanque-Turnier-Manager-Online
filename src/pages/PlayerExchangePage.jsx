@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -174,6 +174,74 @@ function ContactDialog({ listing, onClose }) {
   );
 }
 
+function PlayerExchangeSearchMenu({
+  open,
+  onToggle,
+  onClose,
+  query,
+  setQuery,
+  typeFilter,
+  setTypeFilter,
+  searchOrigin,
+  searchOriginQuery,
+  setSearchOriginQuery,
+  onSearchOriginSubmit,
+  onSearchOriginSelect,
+  onUseMyLocation,
+  onClearSearchOrigin,
+  searchRadiusKm,
+  setSearchRadiusKm,
+  geoLoading,
+  geoError,
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="search-menu">
+      <button
+        className="search-menu-btn"
+        type="button"
+        aria-label={open ? t('Suche schließen') : t('Suche öffnen')}
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <span className="search-icon" aria-hidden="true" />
+      </button>
+      {open && (
+        <>
+          <div className="search-menu-backdrop" onClick={onClose} />
+          <div className="search-menu-panel" role="search">
+            <label className="home-search-field">
+              {t('Nach Titel, Beschreibung oder Ort suchen')}
+              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Nach Titel, Beschreibung oder Ort suchen')} />
+            </label>
+            <SelectField label={t('Typ filtern')} value={typeFilter} onChange={setTypeFilter} options={TYPE_FILTER_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
+
+            <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
+              <LocationAutocomplete
+                label={t('Umkreissuche: Von diesem Ort aus suchen')}
+                value={searchOriginQuery}
+                onChange={setSearchOriginQuery}
+                onSelect={onSearchOriginSelect}
+                disabled={geoLoading}
+              />
+              <Button type="submit" variant="secondary" disabled={geoLoading}>{t('Suchen')}</Button>
+              <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading}>{t('Meinen Standort verwenden')}</Button>
+              {searchOrigin && (
+                <>
+                  <SelectField label={t('Umkreis')} value={searchRadiusKm} onChange={setSearchRadiusKm} options={translatedOptions(RADIUS_OPTIONS)} />
+                  <span className="search-origin-label">{t('Ausgangspunkt:')} {searchOrigin.label}</span>
+                  <button className="link-button" type="button" onClick={onClearSearchOrigin}>{t('Umkreissuche beenden')}</button>
+                </>
+              )}
+            </form>
+            {geoError && <p className="feedback error">{geoError}</p>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function PlayerExchangePage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -182,6 +250,8 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [contactListing, setContactListing] = useState(null);
+  const [searchMenuOpen, setSearchMenuOpen] = useState(false);
+  const resultsRef = useRef(null);
 
   const [searchOrigin, setSearchOrigin] = useState(null);
   const [searchOriginQuery, setSearchOriginQuery] = useState('');
@@ -211,7 +281,8 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
     return results;
   }, [listings, searchOrigin, searchRadiusKm]);
 
-  const center = visibleListings.length ? [visibleListings[0].latitude, visibleListings[0].longitude] : FALLBACK_CENTER;
+  const mapped = useMemo(() => visibleListings.filter((listing) => listing.latitude !== null && listing.longitude !== null), [visibleListings]);
+  const center = mapped.length ? [mapped[0].latitude, mapped[0].longitude] : FALLBACK_CENTER;
 
   function handleUseMyLocation() {
     setGeoError('');
@@ -268,6 +339,10 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
 
   if (!currentUser) return null;
 
+  const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);
+  const typeFilterLabel = typeFilter ? t(labelFor(TYPE_FILTER_OPTIONS, typeFilter)) : null;
+  const activeFilterCount = [query, typeFilter].filter(Boolean).length;
+
   return (
     <main className="app-shell">
       <StandalonePageHeader
@@ -279,43 +354,58 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
         navigate={navigate}
         currentUser={currentUser}
         onLogout={onLogout}
+        searchControl={
+          <PlayerExchangeSearchMenu
+            open={searchMenuOpen}
+            onToggle={() => setSearchMenuOpen((value) => !value)}
+            onClose={() => setSearchMenuOpen(false)}
+            query={query}
+            setQuery={setQuery}
+            typeFilter={typeFilter}
+            setTypeFilter={setTypeFilter}
+            searchOrigin={searchOrigin}
+            searchOriginQuery={searchOriginQuery}
+            setSearchOriginQuery={setSearchOriginQuery}
+            onSearchOriginSubmit={handleSearchOriginSubmit}
+            onSearchOriginSelect={handleSearchOriginSelect}
+            onUseMyLocation={handleUseMyLocation}
+            onClearSearchOrigin={handleClearSearchOrigin}
+            searchRadiusKm={searchRadiusKm}
+            setSearchRadiusKm={setSearchRadiusKm}
+            geoLoading={geoLoading}
+            geoError={geoError}
+          />
+        }
       />
-      <section className="single-column">
-        <div className="panel">
-          <div className="section-title">
+      <section className="home-tournaments">
+        <div className="home-finder">
+          <div className="home-finder-copy">
+            <p className="eyebrow">Pétanque Turnier Manager Online</p>
             <h2>{t('Spielerbörse')}</h2>
-            <span className="counter">{visibleListings.length}</span>
+            <p className="subtitle">{t('Finde Spieler für Turniere oder regelmäßiges Training.')}</p>
           </div>
-          <p className="muted">{t('Finde Spieler für Turniere oder regelmäßiges Training.')}</p>
-          <label className="home-search-field">
-            {t('Nach Titel, Beschreibung oder Ort suchen')}
-            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Nach Titel, Beschreibung oder Ort suchen')} />
-          </label>
-          <SelectField label={t('Typ filtern')} value={typeFilter} onChange={setTypeFilter} options={TYPE_FILTER_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
-          <form className="home-radius-search" onSubmit={handleSearchOriginSubmit}>
-            <LocationAutocomplete
-              label={t('Umkreissuche: Von diesem Ort aus suchen')}
-              value={searchOriginQuery}
-              onChange={setSearchOriginQuery}
-              onSelect={handleSearchOriginSelect}
-              disabled={geoLoading}
-            />
-            <Button type="submit" variant="secondary" disabled={geoLoading}>{t('Suchen')}</Button>
-            <Button type="button" variant="secondary" onClick={handleUseMyLocation} disabled={geoLoading}>{t('Meinen Standort verwenden')}</Button>
-            {searchOrigin && (
-              <>
-                <SelectField label={t('Umkreis')} value={searchRadiusKm} onChange={setSearchRadiusKm} options={translatedOptions(RADIUS_OPTIONS)} />
-                <span className="search-origin-label">{t('Ausgangspunkt:')} {searchOrigin.label}</span>
-                <button className="link-button" type="button" onClick={handleClearSearchOrigin}>{t('Umkreissuche beenden')}</button>
-              </>
-            )}
-          </form>
-          {geoError && <p className="feedback error">{geoError}</p>}
+          <div className="home-finder-stats" aria-label={t('Spielerbörse Übersicht')}>
+            <button
+              type="button"
+              onClick={() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              aria-label={`${visibleListings.length} ${t('gefundene Anzeigen – zur Liste springen')}`}
+            >
+              <strong>{visibleListings.length}</strong>
+              <span>{t('Gefundene Anzeigen')}</span>
+            </button>
+            <button type="button" onClick={() => setSearchMenuOpen(true)} aria-label={`${activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')} ${t('– Filter öffnen')}`}>
+              <strong>{activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')}</strong>
+              <span>{typeFilterLabel || t('Finder')}</span>
+            </button>
+            <button type="button" onClick={() => setSearchMenuOpen(true)} aria-label={t('Umkreissuche öffnen')}>
+              <strong>{searchOrigin ? <>{radiusLabel} {t('Umkreis')}</> : t('Umkreissuche aus')}</strong>
+              <span>{searchOrigin ? <>{t('Ausgangspunkt:')} {searchOrigin.label}</> : t('Umkreis')}</span>
+            </button>
+          </div>
         </div>
 
         {error && <p className="feedback error">{error}</p>}
-
-        {visibleListings.length > 0 && maptilerApiKey && (
+        {mapped.length > 0 && maptilerApiKey && (
           <div className="panel">
             <div className="places-map">
               <MapContainer center={center} zoom={7} scrollWheelZoom={false}>
@@ -324,8 +414,8 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
                   url={`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}{r}.png?key=${maptilerApiKey}`}
                   maxZoom={20}
                 />
-                <FitToMarkers listings={visibleListings} />
-                {visibleListings.map((listing) => (
+                <FitToMarkers listings={mapped} />
+                {mapped.map((listing) => (
                   <Marker key={listing.id} icon={marker} position={[listing.latitude, listing.longitude]}>
                     <Popup><strong>{listing.title}</strong><br />{listing.locationName}</Popup>
                   </Marker>
@@ -334,6 +424,11 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
             </div>
           </div>
         )}
+
+        <div className="section-title home-results-title" ref={resultsRef}>
+          <p className="eyebrow">{t('Alle passenden Anzeigen')}</p>
+          <span className="counter">{visibleListings.length}</span>
+        </div>
 
         {loading ? <p className="muted">{t('Lädt …')}</p> : visibleListings.length === 0 ? (
           <div className="empty-state">

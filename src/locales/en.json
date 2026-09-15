@@ -859,5 +859,9 @@
   "Du hast bereits die maximale Anzahl an Anzeigen erreicht": "You have already reached the maximum number of listings",
   "Anzeige nicht gefunden": "Listing not found",
   "Keine Bearbeitungsrechte für diese Anzeige": "No editing rights for this listing",
-  "Alle Typen": "All types"
+  "Alle Typen": "All types",
+  "Spielerbörse Übersicht": "Player exchange overview",
+  "gefundene Anzeigen – zur Liste springen": "listings found – jump to list",
+  "Gefundene Anzeigen": "Listings found",
+  "Alle passenden Anzeigen": "All matching listings"
 }

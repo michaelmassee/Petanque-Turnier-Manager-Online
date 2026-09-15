@@ -859,5 +859,9 @@
   "Du hast bereits die maximale Anzahl an Anzeigen erreicht": "Vous avez déjà atteint le nombre maximum d'annonces",
   "Anzeige nicht gefunden": "Annonce introuvable",
   "Keine Bearbeitungsrechte für diese Anzeige": "Aucun droit de modification pour cette annonce",
-  "Alle Typen": "Tous les types"
+  "Alle Typen": "Tous les types",
+  "Spielerbörse Übersicht": "Aperçu de la bourse aux joueurs",
+  "gefundene Anzeigen – zur Liste springen": "annonces trouvées – aller à la liste",
+  "Gefundene Anzeigen": "Annonces trouvées",
+  "Alle passenden Anzeigen": "Toutes les annonces correspondantes"
 }
