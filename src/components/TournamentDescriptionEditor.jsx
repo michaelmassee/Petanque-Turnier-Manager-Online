@@ -21,6 +21,8 @@ export function TournamentDescriptionEditor({ label, value, onChange, boldLabel,
   const editor = useEditor({
     extensions,
     content: tournamentDescriptionDocument(value),
+    immediatelyRender: true,
+    shouldRerenderOnTransaction: true,
     editorProps: { attributes: { id: editorId, 'aria-label': label } },
     onUpdate: ({ editor: currentEditor }) => onChange(serializeTournamentDescription(currentEditor.getJSON())),
   });
@@ -34,8 +36,6 @@ export function TournamentDescriptionEditor({ label, value, onChange, boldLabel,
     }
   }, [editor, value]);
 
-  if (!editor) return null;
-
   return (
     <div className="tournament-description-editor">
       <span className="tournament-description-editor-label">{label}</span>
@@ -44,9 +44,10 @@ export function TournamentDescriptionEditor({ label, value, onChange, boldLabel,
           type="button"
           className="tournament-description-editor-button"
           aria-label={boldLabel}
-          aria-pressed={editor.isActive('bold')}
+          aria-pressed={editor?.isActive('bold') || false}
           title={boldLabel}
-          onClick={() => editor.chain().focus().toggleBold().run()}
+          disabled={!editor}
+          onClick={() => editor?.chain().focus().toggleBold().run()}
         >
           <strong aria-hidden="true">B</strong>
         </button>
@@ -54,9 +55,10 @@ export function TournamentDescriptionEditor({ label, value, onChange, boldLabel,
           type="button"
           className="tournament-description-editor-button"
           aria-label={italicLabel}
-          aria-pressed={editor.isActive('italic')}
+          aria-pressed={editor?.isActive('italic') || false}
           title={italicLabel}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
+          disabled={!editor}
+          onClick={() => editor?.chain().focus().toggleItalic().run()}
         >
           <em aria-hidden="true">I</em>
         </button>

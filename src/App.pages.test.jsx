@@ -413,6 +413,24 @@ function TournamentPageHarness({ onSubmit }) {
 }
 
 describe('Turniere-Seite: Liste + Dialog', () => {
+  it('zeigt beim Bearbeiten die Formatierungs-Toolbar der Turnierbeschreibung', () => {
+    render(
+      <TournamentForm
+        form={{ ...EMPTY_TOURNAMENT_FORM, name: 'Sommerturnier', date: '2026-06-01', location: 'Musterstadt' }}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        onCancel={() => {}}
+        mode="edit"
+        isAdmin={false}
+        language="de"
+      />,
+    );
+
+    expect(screen.getByRole('toolbar', { name: 'Beschreibung' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fett' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kursiv' })).toBeInTheDocument();
+  });
+
   it('entfernt einen optionalen Startgeld-Tarif aus dem Turnierformular', () => {
     function FeeTierHarness() {
       const [form, setForm] = useState({
