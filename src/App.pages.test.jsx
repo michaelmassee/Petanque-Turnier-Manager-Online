@@ -366,6 +366,25 @@ function TournamentPageHarness({ onSubmit }) {
 }
 
 describe('Turniere-Seite: Liste + Dialog', () => {
+  it('entfernt einen optionalen Startgeld-Tarif aus dem Turnierformular', () => {
+    function FeeTierHarness() {
+      const [form, setForm] = useState({
+        ...EMPTY_TOURNAMENT_FORM,
+        name: 'Sommerturnier',
+        date: '2026-06-01',
+        location: 'Musterstadt',
+        feeTiers: [{ id: 'youth', name: 'Jugend', amount: '3,00', active: true }],
+      });
+      return <TournamentForm form={form} setForm={setForm} onSubmit={(event) => event.preventDefault()} onCancel={() => {}} mode="edit" isAdmin={false} language="de" />;
+    }
+
+    render(<FeeTierHarness />);
+
+    expect(screen.getByDisplayValue('Jugend')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Tarif entfernen' }));
+    expect(screen.queryByDisplayValue('Jugend')).not.toBeInTheDocument();
+  });
+
   it('öffnet den Dialog vorausgefüllt bei Bearbeiten, Abbrechen schließt ohne Submit, Speichern schließt mit Submit', () => {
     const onSubmit = vi.fn();
     render(<TournamentPageHarness onSubmit={onSubmit} />);

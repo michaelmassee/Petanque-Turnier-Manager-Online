@@ -409,6 +409,13 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
                   <input type="checkbox" checked={tier.active !== false} onChange={(event) => setForm({ ...form, feeTiers: form.feeTiers.map((item, itemIndex) => itemIndex === index ? { ...item, active: event.target.checked } : item) })} />
                   {t('Für neue Meldungen verfügbar')}
                 </label>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => setForm({ ...form, feeTiers: form.feeTiers.filter((_, itemIndex) => itemIndex !== index) })}
+                >
+                  {t('Tarif entfernen')}
+                </Button>
               </div>
             ))}
           </div>
@@ -435,13 +442,15 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
                   minLength={2}
                   maxLength={250}
                 />
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={() => setForm({ ...form, registrationQuestions: form.registrationQuestions.filter((_, itemIndex) => itemIndex !== index) })}
-                >
-                  {t('Frage entfernen')}
-                </Button>
+                <div className="tournament-question-remove">
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={() => setForm({ ...form, registrationQuestions: form.registrationQuestions.filter((_, itemIndex) => itemIndex !== index) })}
+                  >
+                    {t('Frage entfernen')}
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

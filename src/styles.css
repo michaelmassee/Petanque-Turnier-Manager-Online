@@ -309,6 +309,10 @@ textarea:focus {
   color: #a92d2d;
 }
 
+.tournament-question-remove {
+  justify-self: start;
+}
+
 .link-button {
   min-height: 32px;
   border: 0;
