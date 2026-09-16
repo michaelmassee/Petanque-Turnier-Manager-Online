@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ptm-online-v5';
+const CACHE_NAME = 'ptm-online-v6';
 const API_CACHE_NAME = 'ptm-online-api-v1';
 const APP_SHELL = [
   '/',
@@ -37,6 +37,13 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   if (request.method !== 'GET') {
+    return;
+  }
+
+  // Fremde Domains (z.B. Kartenkacheln von OpenStreetMap/MapTiler) nicht abfangen:
+  // das erneute Cachen der opaken no-cors-Antworten hat die Bilddaten beschädigt
+  // (Karten blieben grau, obwohl der Netzwerk-Request 200 lieferte).
+  if (url.origin !== self.location.origin) {
     return;
   }
 

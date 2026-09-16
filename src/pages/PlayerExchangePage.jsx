@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -12,6 +12,7 @@ import { Button, TextArea, SelectField, DistanceBadge, EditDialog } from '../com
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { PlayerListingFields } from '../components/PlayerListingFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
+import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx';
 
 const FALLBACK_CENTER = [51.1, 10.4];
 const marker = new L.Icon({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow, iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] });
@@ -24,19 +25,6 @@ function listingToForm(listing) {
     locationName: listing.locationName, latitude: listing.latitude, longitude: listing.longitude,
     locationConfirmed: true, eventDate: listing.eventDate || '',
   };
-}
-
-function FitToMarkers({ listings }) {
-  const map = useMap();
-  useEffect(() => {
-    if (listings.length === 0) return;
-    if (listings.length === 1) {
-      map.setView([listings[0].latitude, listings[0].longitude], 11);
-      return;
-    }
-    map.fitBounds(L.latLngBounds(listings.map((listing) => [listing.latitude, listing.longitude])), { padding: [32, 32], maxZoom: 12 });
-  }, [map, listings]);
-  return null;
 }
 
 function MyListingsPanel({ language, onChanged, createRequest }) {
@@ -408,23 +396,16 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
         </div>
 
         {error && <p className="feedback error">{error}</p>}
-        {mapped.length > 0 && maptilerApiKey && (
+        {mapped.length > 0 && (
           <div className="panel">
-            <div className="places-map">
-              <MapContainer center={center} zoom={7} scrollWheelZoom={false}>
-                <TileLayer
-                  attribution={'&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>'}
-                  url={`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}{r}.png?key=${maptilerApiKey}`}
-                  maxZoom={20}
-                />
-                <FitToMarkers listings={mapped} />
-                {mapped.map((listing) => (
-                  <Marker key={listing.id} icon={marker} position={[listing.latitude, listing.longitude]}>
-                    <Popup><strong>{listing.title}</strong><br />{listing.locationName}</Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
-            </div>
+            <TileFallbackMap center={center} maptilerApiKey={maptilerApiKey}>
+              <FitToBounds positions={mapped.map((listing) => [listing.latitude, listing.longitude])} maxZoom={12} singleZoom={11} />
+              {mapped.map((listing) => (
+                <Marker key={listing.id} icon={marker} position={[listing.latitude, listing.longitude]}>
+                  <Popup><strong>{listing.title}</strong><br />{listing.locationName}</Popup>
+                </Marker>
+              ))}
+            </TileFallbackMap>
           </div>
         )}
 

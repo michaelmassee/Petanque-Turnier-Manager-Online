@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -11,112 +11,22 @@ import { RADIUS_OPTIONS } from '../lib/constants.js';
 import { Button, DistanceBadge, SelectField } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
+import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx';
 
 const FALLBACK_CENTER = [51.1, 10.4];
 const marker = new L.Icon({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow, iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] });
 
-function FitToMarkers({ places }) {
-  const map = useMap();
-  useEffect(() => {
-    if (places.length === 0) return;
-    if (places.length === 1) {
-      map.setView([places[0].latitude, places[0].longitude], 13);
-      return;
-    }
-    map.fitBounds(L.latLngBounds(places.map((place) => [place.latitude, place.longitude])), { padding: [32, 32], maxZoom: 13 });
-  }, [map, places]);
-  return null;
-}
-
-function KeepMapSized() {
-  const map = useMap();
-
-  useEffect(() => {
-    const resize = () => map.invalidateSize({ pan: false, debounceMoveend: true });
-    const firstFrame = requestAnimationFrame(resize);
-    const secondFrame = requestAnimationFrame(() => requestAnimationFrame(resize));
-    const timer = window.setTimeout(resize, 250);
-    window.addEventListener('resize', resize);
-    return () => {
-      cancelAnimationFrame(firstFrame);
-      cancelAnimationFrame(secondFrame);
-      window.clearTimeout(timer);
-      window.removeEventListener('resize', resize);
-    };
-  }, [map]);
-
-  return null;
-}
-
 function PlacesMap({ places, center, maptilerApiKey }) {
   const { t } = useTranslation();
-  const [provider, setProvider] = useState(maptilerApiKey ? 'maptiler' : 'openstreetmap');
-  const [loadingTiles, setLoadingTiles] = useState(true);
-  const [tileError, setTileError] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  useEffect(() => {
-    setProvider(maptilerApiKey ? 'maptiler' : 'openstreetmap');
-    setLoadingTiles(true);
-    setTileError(false);
-  }, [maptilerApiKey, reloadKey]);
-
-  useEffect(() => {
-    if (!loadingTiles) return undefined;
-    const timeout = window.setTimeout(() => {
-      if (provider === 'maptiler') {
-        setProvider('openstreetmap');
-      } else {
-        setLoadingTiles(false);
-        setTileError(true);
-      }
-    }, 12000);
-    return () => window.clearTimeout(timeout);
-  }, [loadingTiles, provider]);
-
-  const usingFallback = provider === 'openstreetmap' && Boolean(maptilerApiKey);
-  const tileUrl = provider === 'maptiler'
-    ? `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}{r}.png?key=${maptilerApiKey}`
-    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-
-  function handleTileError() {
-    if (provider === 'maptiler') {
-      setProvider('openstreetmap');
-      setLoadingTiles(true);
-      return;
-    }
-    setLoadingTiles(false);
-    setTileError(true);
-  }
-
-  function retry() {
-    setReloadKey((current) => current + 1);
-  }
-
   return (
-    <div className="places-map" aria-busy={loadingTiles}>
-      <MapContainer key={reloadKey} center={center} zoom={7} scrollWheelZoom={false}>
-        <TileLayer
-          key={provider}
-          attribution={provider === 'maptiler'
-            ? '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>'
-            : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>'}
-          url={tileUrl}
-          maxZoom={20}
-          eventHandlers={{ load: () => setLoadingTiles(false), tileerror: handleTileError }}
-        />
-        <KeepMapSized />
-        <FitToMarkers places={places} />
-        {places.map((place) => (
-          <Marker key={place.id} icon={marker} position={[place.latitude, place.longitude]}>
-            <Popup><strong>{place.name}</strong>{place.clubName && <><br />{place.clubName}</>}<br /><a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a></Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-      {loadingTiles && <p className="places-map-status" role="status">{usingFallback ? t('Ersatzkarte wird geladen …') : t('Karte wird geladen …')}</p>}
-      {usingFallback && !loadingTiles && !tileError && <p className="places-map-status places-map-notice" role="status">{t('Ersatzkarte aktiv, weil der primäre Kartenanbieter nicht erreichbar ist.')}</p>}
-      {tileError && <div className="places-map-status places-map-error" role="alert"><span>{t('Karte konnte nicht geladen werden.')}</span><button type="button" onClick={retry}>{t('Karte erneut laden')}</button></div>}
-    </div>
+    <TileFallbackMap center={center} maptilerApiKey={maptilerApiKey}>
+      <FitToBounds positions={places.map((place) => [place.latitude, place.longitude])} />
+      {places.map((place) => (
+        <Marker key={place.id} icon={marker} position={[place.latitude, place.longitude]}>
+          <Popup><strong>{place.name}</strong>{place.clubName && <><br />{place.clubName}</>}<br /><a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a></Popup>
+        </Marker>
+      ))}
+    </TileFallbackMap>
   );
 }
 
