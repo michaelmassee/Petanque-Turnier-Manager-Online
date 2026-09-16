@@ -154,6 +154,7 @@ export function registrationPayload(form, language) {
     seedingPosition: form.seedingPosition === '' ? null : Number(form.seedingPosition),
     status: form.status,
     isVip: Boolean(form.isVip),
+    organizerMessage: form.organizerMessage || '',
     feeSelections: form.feeSelections || [],
     publicationNoticeAccepted: Boolean(form.publicationNoticeAccepted),
     website: form.website || '',

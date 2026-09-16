@@ -3703,7 +3703,7 @@ async function listRegistrations(db, tournamentId) {
     .prepare('SELECT * FROM registrations WHERE tournament_id = ? ORDER BY registered_at DESC')
     .bind(tournamentId)
     .all();
-  return json({ registrations: result.results.map(toPublicRegistration) });
+  return json({ registrations: result.results.map(toManagedRegistration) });
 }
 
 async function confirmPendingRegistrations(env, tournament, appOrigin) {
@@ -4082,6 +4082,7 @@ async function createRegistration(request, env, tournament, { session = null, sh
   }
 
   const registration = normalizeRegistrationInput(body, { requireStatus: false });
+  const organizerMessage = isManager ? null : registration.organizerMessage;
   const language = normalizeLanguage(body.language);
   assertCorePartnerCountMatchesFormation(tournament, registration);
   const feeSelections = resolveFeeSelections(tournament, body.feeSelections, registration);
@@ -4100,8 +4101,8 @@ async function createRegistration(request, env, tournament, { session = null, sh
         id, tournament_id, first_name, last_name, email, club, license_nr,
         partner_first_name, partner_last_name, partner_email, partner_license_nr,
         partner2_first_name, partner2_last_name, partner2_email, partner2_license_nr,
-        team_name, seeding_position, status, is_vip, fee_selections, language, registered_at, confirmed_at, created_at, updated_at, cancel_token
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        team_name, seeding_position, status, is_vip, organizer_message, fee_selections, language, registered_at, confirmed_at, created_at, updated_at, cancel_token
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -4123,6 +4124,7 @@ async function createRegistration(request, env, tournament, { session = null, sh
       registration.seedingPosition,
       status,
       registration.isVip ? 1 : 0,
+      organizerMessage,
       JSON.stringify(feeSelections),
       language,
       now,
@@ -4222,7 +4224,7 @@ async function updateRegistration(request, env, existing) {
       }
     }
   }
-  return json({ registration: toPublicRegistration(updated) });
+  return json({ registration: toManagedRegistration(updated) });
 }
 
 /**
@@ -4236,7 +4238,7 @@ async function setRegistrationActive(db, existing, active) {
   const now = new Date().toISOString();
   await db.prepare('UPDATE registrations SET active = ?, updated_at = ? WHERE id = ?').bind(active ? 1 : 0, now, existing.id).run();
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
-  return json({ registration: toPublicRegistration(updated) });
+  return json({ registration: toManagedRegistration(updated) });
 }
 
 async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
@@ -5804,6 +5806,7 @@ function normalizeRegistrationInput(body, { requireStatus }) {
     seedingPosition: body.seedingPosition === '' || body.seedingPosition === undefined ? null : nonNegativeInteger(body.seedingPosition),
     status: text(body.status || 'pending'),
     isVip: Boolean(body.isVip),
+    organizerMessage: nullableText(body.organizerMessage),
   };
 
   if (registration.firstName.length < 2 || registration.lastName.length < 2) {
@@ -5820,6 +5823,9 @@ function normalizeRegistrationInput(body, { requireStatus }) {
   }
   if (requireStatus && !REGISTRATION_STATUSES.includes(registration.status)) {
     throw new HttpError(400, 'Ungültiger Anmeldestatus');
+  }
+  if (registration.organizerMessage && registration.organizerMessage.length > 250) {
+    throw new HttpError(400, 'Die Nachricht an die Turnierleitung darf maximal 250 Zeichen enthalten.');
   }
 
   return registration;
@@ -6253,6 +6259,13 @@ function toPublicRegistration(row) {
     confirmedAt: row.confirmed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function toManagedRegistration(row) {
+  return {
+    ...toPublicRegistration(row),
+    organizerMessage: row.organizer_message || null,
   };
 }
 

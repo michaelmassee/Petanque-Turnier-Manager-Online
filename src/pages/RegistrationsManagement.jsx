@@ -144,6 +144,7 @@ export function RegistrationsPanel({
           </strong>
           <span>{registration.noEmail ? t('ohne E-Mail-Adresse') : registration.email}</span>
           {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
+          {registration.organizerMessage && <small data-i18n-skip>{registration.organizerMessage}</small>}
           {registration.feeSelections?.length > 0 && <small data-i18n-skip>{registration.feeSelections.map((selection) => `${selection.name}: ${formatMoney(selection.amountCents, tournament?.currency, 'de')}`).join(' · ')}{registration.feeTotalCents ? ` = ${formatMoney(registration.feeTotalCents, tournament?.currency, 'de')}` : ''}</small>}
         </div>
         <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>

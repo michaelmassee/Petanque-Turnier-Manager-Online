@@ -9,6 +9,8 @@
   "recipient": "Empfänger",
   "chooseRecipient": "Empfänger auswählen",
   "message": "Nachricht",
+  "Nachricht an die Turnierleitung": "Nachricht an die Turnierleitung",
+  "Die Nachricht an die Turnierleitung darf maximal 250 Zeichen enthalten.": "Die Nachricht an die Turnierleitung darf maximal 250 Zeichen enthalten.",
   "send": "Senden",
   "todos": "Aufgaben",
   "messages": "Nachrichten",

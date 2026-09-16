@@ -1,148 +1,92 @@
+<img align="right" src="public/icons/logo.png" alt="Logo des Pétanque-Turnier-Managers" height="120">
+
 # Pétanque Turnier Manager Online
 
-React app for Cloudflare Workers Static Assets with a Worker API, D1 database,
-login, password reset flow, role-based user management, tournament management,
-public registrations and installable PWA shell.
+[![Quality Gate](https://github.com/michaelmassee/Petanque-Turnier-Manager-Online/actions/workflows/quality-gate.yml/badge.svg)](https://github.com/michaelmassee/Petanque-Turnier-Manager-Online/actions/workflows/quality-gate.yml)
+[![Security](https://github.com/michaelmassee/Petanque-Turnier-Manager-Online/actions/workflows/security.yml/badge.svg)](https://github.com/michaelmassee/Petanque-Turnier-Manager-Online/actions/workflows/security.yml)
+[![Cloudflare Workers](https://img.shields.io/badge/Plattform-Cloudflare%20Workers-F38020.svg)](https://workers.cloudflare.com/)
+[![PWA](https://img.shields.io/badge/App-installierbare%20PWA-1677ff.svg)](https://ptmonline.org/)
+[![Spenden mit PayPal](https://img.shields.io/badge/Spenden-PayPal-blue.svg)](https://www.paypal.me/michaelmassee1)
 
-Roles:
+> *Gebaut mit der Präzision eines Informatikers und der Leidenschaft eines Boulers.*
 
-- Admin
-- User
-- Turnierleiter
+## 🎯 Pétanque-Turniere online organisieren
 
-Languages:
+Der **Pétanque Turnier Manager Online** ergänzt den
+[Pétanque-Turnier-Manager für LibreOffice Calc](https://github.com/michaelmassee/Petanque-Turnier-Manager)
+um eine moderne, browserbasierte Turnierplattform. Turnierleiter verwalten
+Turniere, Anmeldungen und Teilnehmer direkt im Browser; Spieler finden offene
+Turniere und melden sich unkompliziert über Handy, Tablet oder PC an.
 
-- DE
-- NL
-- EN
-- ES
-- FR
+Die Anwendung ist als installierbare Progressive Web App ausgelegt. Die
+konfigurierte Produktionsadresse ist [ptmonline.org](https://ptmonline.org/).
+Die Oberfläche ist verfügbar in Deutsch, Niederländisch, Englisch, Spanisch
+und Französisch.
 
-## Local development
+**Vorteile auf einen Blick:**
 
-```bash
-npm install
-npm run db:migrate:local
-npm run dev
-```
+* **Einfach anmelden:** Öffentliche Turniere finden, Details ansehen und direkt online melden.
+* **Für Turnierleiter gemacht:** Anmeldungen prüfen, bestätigen, Wartelisten verwalten und Teilnehmer exportieren.
+* **Mobil nutzbar:** Als PWA installierbar und für den Einsatz am Bouleplatz optimiert.
+* **Mehrsprachig:** DE, NL, EN, ES und FR sind direkt in der Anwendung umschaltbar.
+* **Sicher aufgebaut:** Sitzungen, Rollen, API-Schlüssel und Eingaben werden serverseitig abgesichert.
+* **Offen verbunden:** Autorisierte Turnierprogramme können Turniere, Meldungen und Ergebnisse über die API synchronisieren.
 
-## Build
+---
 
-```bash
-npm run security:check
-npm run build
-```
+## 🏆 Funktionen
 
-The production build is written to `dist/`.
+### 📅 Turniere entdecken und veröffentlichen
 
-## Security
+* Öffentliche Turnierübersicht mit Suche, Filtern und Umkreissuche
+* Turnierdetails mit Ort, Startzeit, Spielsystem, freien Plätzen und Kontakt
+* Öffentliche oder private Turniere mit teilbaren Anmeldelinks
+* Vereine und Bouleplätze auf einer Karte entdecken und Turnieren zuordnen
 
-This repository is public. Follow `SECURITY.md` and `CONTRIBUTING.md` before
-committing or pushing changes. At minimum:
+### 📝 Anmeldungen ohne Papierchaos
 
-```bash
-npm run security:check
-npm run build
-npm audit --audit-level=high
-```
+* Anmeldung für Tête-à-tête, Doublette und Triplette
+* Unterstützung für Forme, Mêlée und Supermêlée
+* Bestätigte Anmeldungen, Freigabe durch die Turnierleitung und Wartelisten
+* Startgeld-Tarife, Lizenzpflicht, Teamnamen und private Hinweise an die Turnierleitung
+* E-Mail-Bestätigungen, Erinnerungen und Stornierung über einen sicheren Link
 
-## Features
+### 🎯 Turnierverwaltung und Live-Spielbetrieb
 
-- User management with Admin, User and Turnierleiter roles
-- Tournament CRUD managed directly in PTM Online
-- Public tournament list and public registration form
-- Registration management with pending, confirmed, waitlist and cancelled states
-- Installable mobile PWA with manifest, app icon and service worker
-- Runtime language switcher for DE/NL/EN/ES/FR
-- REST API access for authorized external tournament-management software (API keys, admin-approved, `Authorization: Bearer ptm_...`) to create tournaments and sync registrations/results, see `SECURITY.md`
+* Turniere direkt online anlegen und bearbeiten
+* Teilnehmer verwalten, CSV exportieren und manuell ergänzen
+* Schweizer System und Mêlée/Supermêlée online durchführen
+* Runden auslosen, Ergebnisse eintragen und Ranglisten live anzeigen
+* Interne Postbox, Aufgabenhinweise und Push-Benachrichtigungen
 
-## Cloudflare
+### 🔗 Gemeinsam mit dem Desktop-Programm
 
-Connect this repository in the Cloudflare dashboard and use:
+Der Pétanque-Turnier-Manager Online kann eigenständig verwendet werden oder
+mit dem Desktop-Projekt verbunden werden. Über freigegebene API-Schlüssel
+können berechtigte Turnierleiter Turnierdaten übertragen sowie Anmeldungen und
+Ergebnisse synchronisieren.
 
-- Build command: `npm run build`
-- Deploy command: `npx wrangler deploy`
-- Output directory: `dist`
+---
 
-Apply the D1 migration before first production use:
+## 🚀 Direkt loslegen
 
-```bash
-npm run db:migrate:remote
-```
+1. Öffne [ptmonline.org](https://ptmonline.org/).
+2. Suche ein öffentliches Turnier oder erstelle ein Benutzerkonto.
+3. Melde dich an oder verwalte als Turnierleiter dein eigenes Turnier.
+4. Installiere die App bei Bedarf über das Browser-Menü auf deinem Gerät.
 
-When new migrations are added, run the same command again before using the new
-feature in production.
+> **💡 Für Veranstalter:** Ein Turnier kann mit wenigen Angaben angelegt werden.
+> Danach steuerst du Anmeldung, Teilnehmerliste und Kommunikation zentral an
+> einem Ort.
 
-For local CLI deploys:
+## 🤝 Mitwirken
 
-```bash
-npm run deploy
-```
+Fehlerberichte, Ideen und Pull Requests sind willkommen. Bitte beachte vor
+einem Beitrag die Hinweise in [CONTRIBUTING.md](CONTRIBUTING.md). Sicherheitslücken
+gehören nicht in öffentliche Issues; hierfür gilt der Meldeweg aus
+[SECURITY.md](SECURITY.md).
 
-## Password reset emails
+## ❤️ Unterstützung
 
-Password reset tokens are stored in D1. Email delivery tries Strato SMTP first
-and automatically falls back to Resend if Strato fails or is not configured.
-For production email delivery, configure these Worker secrets or variables:
-
-- `STRATO_SMTP_USER` (secret)
-- `STRATO_SMTP_PASSWORD` (secret)
-- `STRATO_MAIL_FROM` (optional, falls back to `MAIL_FROM`)
-- `RESEND_API_KEY` (fallback provider)
-- `MAIL_FROM`
-
-Without any of those values, reset links are logged by the Worker. During local
-development on `localhost` or `127.0.0.1`, the reset URL is also returned in the
-API response for testing.
-
-## Google login
-
-Google login uses the same `ptm_session` cookie as password login. Configure the
-OAuth client with this redirect URI:
-
-```text
-https://<your-domain>/api/auth/google/callback
-```
-
-For local Worker development, also allow:
-
-```text
-http://127.0.0.1:8787/api/auth/google/callback
-```
-
-If Wrangler starts on a different local port, add the same callback URL with
-that exact port.
-
-Configure these Worker values before using Google login:
-
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-
-Store `GOOGLE_CLIENT_SECRET` as a Worker secret or in ignored local development
-configuration, not in tracked files.
-
-## Facebook login
-
-Facebook login uses the same `ptm_session` cookie as password and Google login.
-Configure the Facebook app's OAuth redirect URI:
-
-```text
-https://<your-domain>/api/auth/facebook/callback
-```
-
-For local Worker development, also allow:
-
-```text
-http://127.0.0.1:8787/api/auth/facebook/callback
-```
-
-If Wrangler starts on a different local port, add the same callback URL with
-that exact port.
-
-Configure these Worker values before using Facebook login:
-
-- `FACEBOOK_APP_ID`
-- `FACEBOOK_APP_SECRET`
-
-Store `FACEBOOK_APP_SECRET` as a Worker secret or in ignored local development
-configuration, not in tracked files.
+Wenn dir der Pétanque-Turnier-Manager hilft, freue ich mich über eine
+[Unterstützung via PayPal](https://www.paypal.me/michaelmassee1).

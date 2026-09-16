@@ -205,6 +205,7 @@ export const EMPTY_REGISTRATION_FORM = {
   seedingPosition: '',
   status: 'pending',
   isVip: false,
+  organizerMessage: '',
   publicationNoticeAccepted: false,
   website: '',
 };

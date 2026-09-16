@@ -113,6 +113,31 @@ describe('Turnier melden', () => {
 });
 
 describe('Öffentliche Turnierdetailseite', () => {
+  it('bietet eine auf 250 Zeichen begrenzte private Nachricht an die Turnierleitung an', () => {
+    function RegistrationHarness() {
+      const [form, setForm] = useState({ ...EMPTY_REGISTRATION_FORM, tournamentId: 'open-1' });
+      return (
+        <PublicRegistrationPanel
+          language="de"
+          tournament={{ id: 'open-1', name: 'Offenes Turnier', status: 'registration', visibility: 'public', maxRegistrations: 0, activeRegistrations: 0 }}
+          form={form}
+          setForm={setForm}
+          onSubmit={(event) => event.preventDefault()}
+          onCancel={() => {}}
+          navigate={() => {}}
+        />
+      );
+    }
+
+    render(<RegistrationHarness />);
+
+    const message = screen.getByLabelText(/^Nachricht an die Turnierleitung/);
+    expect(message).toHaveAttribute('maxlength', '250');
+    fireEvent.change(message, { target: { value: 'Bitte ohne Mittagessen einplanen.' } });
+    expect(screen.getByLabelText(/^Nachricht an die Turnierleitung/)).toHaveValue('Bitte ohne Mittagessen einplanen.');
+    expect(screen.getByText('Nachricht an die Turnierleitung (33/250)')).toBeInTheDocument();
+  });
+
   it('bietet nur bei einer möglichen Anmeldung Eingabefelder an', () => {
     render(
       <PublicRegistrationPanel
@@ -436,7 +461,7 @@ function RegistrationsPageHarness({ onSubmit }) {
   const [statusFilter, setStatusFilter] = useState('');
   const tournament = { id: 'tour1', name: 'Sommerturnier', formation: 'tete', registrationType: 'forme', canManage: true };
   const registrations = [
-    { id: 'r1', firstName: 'Anna', lastName: 'Muster', email: 'anna@example.com', teamName: 'Team A', status: 'pending', isVip: false },
+    { id: 'r1', firstName: 'Anna', lastName: 'Muster', email: 'anna@example.com', teamName: 'Team A', organizerMessage: 'Bitte ohne Mittagessen einplanen.', status: 'pending', isVip: false },
   ];
 
   function editRegistration(registration) {
@@ -497,6 +522,7 @@ describe('Anmeldungen-Seite: Liste + Dialog', () => {
     const onSubmit = vi.fn();
     render(<RegistrationsPageHarness onSubmit={onSubmit} />);
 
+    expect(screen.getByText('Bitte ohne Mittagessen einplanen.')).toBeInTheDocument();
     expect(screen.queryByText('Anmeldung bearbeiten')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Bearbeiten'));
