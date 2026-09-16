@@ -11,8 +11,8 @@
   <body>
     <header class="site-header">
       <a class="brand" href="#start" aria-label="Pétanque Turnier Manager Online – Startseite">
-        <span class="brand-emblem" aria-hidden="true"><img src="assets/logo.png" width="256" height="249" alt=""></span>
-        <span class="brand-copy"><span>Pétanque Turnier Manager</span><strong>Online</strong></span>
+        <img class="brand-logo" src="assets/logo.png" width="256" height="249" alt="">
+        <span class="brand-online">Online</span>
       </a>
       <nav aria-label="Seitennavigation">
         <a href="#funktionen">Funktionen</a>
@@ -32,19 +32,15 @@
             <a class="button button-secondary" href="https://github.com/michaelmassee/Petanque-Turnier-Manager-Online/wiki">Anleitung lesen</a>
           </div>
           <p class="hint">Als Web-App installierbar. Keine App aus einem Store erforderlich.</p>
-          <p class="languages"><span aria-hidden="true">◎</span> International verwendbar: Deutsch (DE), Englisch (EN), Niederländisch (NL), Französisch (FR) und Spanisch (ES).</p>
+          <div class="languages" aria-label="International verfügbar in fünf Sprachen">
+            <span class="languages-title">International verfügbar:</span>
+            <span class="language-list"><span>🇩🇪 Deutsch</span><span>🇬🇧 Englisch</span><span>🇳🇱 Nederlands</span><span>🇫🇷 Français</span><span>🇪🇸 Español</span></span>
+          </div>
         </div>
-        <div class="hero-art" aria-hidden="true">
-          <div class="sun"></div>
-          <div class="cloud cloud-one"></div>
-          <div class="cloud cloud-two"></div>
-          <div class="ground"></div>
-          <div class="ball ball-blue"></div>
-          <div class="ball ball-red"></div>
-          <div class="ball ball-steel"></div>
-          <div class="cochonnet"></div>
-          <span class="hero-caption">Alles im Blick – vom ersten<br>Startplatz bis zur Rangliste.</span>
-        </div>
+        <figure class="hero-art">
+          <img src="assets/petanque-boule-hero.png" alt="Drei Pétanque-Kugeln und ein Cochonnet auf einem Bouleplatz">
+          <figcaption>Alles im Blick – vom ersten<br>Startplatz bis zur Rangliste.</figcaption>
+        </figure>
       </section>
 
       <section class="features" id="funktionen" aria-labelledby="features-title">
@@ -102,6 +98,7 @@
       <nav aria-label="Weiterführende Links">
         <a href="https://github.com/michaelmassee/Petanque-Turnier-Manager-Online">Quellcode</a>
         <a href="https://github.com/michaelmassee/Petanque-Turnier-Manager-Online/wiki">Wiki</a>
+        <a href="https://www.youtube.com/@petanque-turnier-manager2995">YouTube-Kanal</a>
         <a href="https://github.com/michaelmassee/Petanque-Turnier-Manager">Desktop-Version</a>
         <a href="https://ptmonline.org/">PTM Online</a>
       </nav>
