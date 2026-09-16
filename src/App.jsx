@@ -48,7 +48,7 @@ export default function App() {
   );
 }
 
-function ContextualDrawerContent({ area, currentUser, activeTab, onSelectTab, onNavigate, onOpenProfile, onLogout, onLogin }) {
+function ContextualDrawerContent({ area, currentUser, canManageTournaments, activeTab, onSelectTab, onNavigate, onOpenProfile, onLogout, onLogin }) {
   const { t } = useTranslation();
   const closeThen = (action) => () => action();
   const navigate = (path) => closeThen(() => onNavigate(path));
@@ -58,7 +58,9 @@ function ContextualDrawerContent({ area, currentUser, activeTab, onSelectTab, on
 
   return <>
     {(showAllAreas || area === 'turniere') && <div className="drawer-menu-section" aria-label={t('Turniere')}>
+      {canManageTournaments && <button className={`drawer-link ${activeTab === 'tournaments' ? 'active' : ''}`} type="button" onClick={selectTab('tournaments')}>{t('Turnierverwaltung')}</button>}
       {currentUser && <button className={`drawer-link ${activeTab === 'registrations' ? 'active' : ''}`} type="button" onClick={selectTab('registrations')}>{t('Anmeldungen')}</button>}
+      {canManageTournaments && <button className={`drawer-link ${activeTab === 'play' ? 'active' : ''}`} type="button" onClick={selectTab('play')}>{t('Turnier starten')}</button>}
       <button className="drawer-link" type="button" onClick={navigate('/turnier-melden')}>{t('Turnier melden')}</button>
     </div>}
     {(showAllAreas || area === 'bouleplaetze') && <div className="drawer-menu-section" aria-label={t('Boule-Plätze / Vereine')}>
@@ -1181,6 +1183,7 @@ function AppContent() {
     return <ContextualDrawerContent
       area={area}
       currentUser={currentUser}
+      canManageTournaments={canManageTournaments}
       activeTab={activeTab}
       onSelectTab={selectDrawerTab}
       onNavigate={navigateFromDrawer}
