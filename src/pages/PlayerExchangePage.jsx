@@ -10,127 +10,12 @@ import { distanceKm, labelFor, translatedOptions } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
 import { Button, TextArea, SelectField, DistanceBadge, EditDialog } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
-import { PlayerListingFields } from '../components/PlayerListingFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx';
 
 const FALLBACK_CENTER = [51.1, 10.4];
 const marker = new L.Icon({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow, iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] });
-const EMPTY_LISTING_FORM = { type: 'tournament', title: '', description: '', locationName: '', latitude: null, longitude: null, locationConfirmed: false, eventDate: '' };
 const TYPE_FILTER_OPTIONS = [{ value: '', label: 'Alle Typen' }, { value: 'tournament', label: 'Turnier' }, { value: 'training', label: 'Training' }];
-
-function listingToForm(listing) {
-  return {
-    type: listing.type, title: listing.title, description: listing.description || '',
-    locationName: listing.locationName, latitude: listing.latitude, longitude: listing.longitude,
-    locationConfirmed: true, eventDate: listing.eventDate || '',
-  };
-}
-
-function MyListingsPanel({ language, onChanged, createRequest }) {
-  const { t } = useTranslation();
-  const [listings, setListings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState(EMPTY_LISTING_FORM);
-  const [editId, setEditId] = useState(null);
-  const [saving, setSaving] = useState(false);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const data = await authenticatedApi('/api/player-listings/mine');
-      setListings(data.listings || []);
-    } catch (err) { setError(err.message); } finally { setLoading(false); }
-  }
-  useEffect(() => { load(); }, []);
-
-  function openCreate() {
-    setEditId(null);
-    setForm(EMPTY_LISTING_FORM);
-    setDialogOpen(true);
-  }
-
-  useEffect(() => {
-    if (createRequest > 0) openCreate();
-  }, [createRequest]);
-
-  function openEdit(listing) {
-    setEditId(listing.id);
-    setForm(listingToForm(listing));
-    setDialogOpen(true);
-  }
-
-  async function submit(event) {
-    event.preventDefault();
-    setError(''); setMessage(''); setSaving(true);
-    try {
-      if (editId) {
-        await authenticatedApi(`/api/player-listings/${editId}`, { method: 'PUT', body: JSON.stringify(form) });
-        setMessage(t('Anzeige aktualisiert.'));
-      } else {
-        await authenticatedApi('/api/player-listings', { method: 'POST', body: JSON.stringify(form) });
-        setMessage(t('Anzeige veröffentlicht.'));
-      }
-      setDialogOpen(false);
-      await load();
-      onChanged?.();
-    } catch (err) { setError(err.message); } finally { setSaving(false); }
-  }
-
-  async function remove(listing) {
-    if (!window.confirm(`${t('Anzeige')} "${listing.title}" ${t('wirklich löschen?')}`)) return;
-    setError('');
-    try {
-      await authenticatedApi(`/api/player-listings/${listing.id}`, { method: 'DELETE' });
-      await load();
-      onChanged?.();
-    } catch (err) { setError(err.message); }
-  }
-
-  return (
-    <div className="panel">
-      <div className="section-title">
-        <h2>{t('Meine Anzeigen')}</h2>
-      </div>
-      {message && <p className="feedback success">{message}</p>}
-      {error && <p className="feedback error">{error}</p>}
-      {loading ? <p className="muted">{t('Lädt …')}</p> : listings.length === 0 ? (
-        <p className="muted">{t('Du hast noch keine Anzeige veröffentlicht.')}</p>
-      ) : (
-        <div className="user-list">
-          {listings.map((listing) => (
-            <article className="data-row" key={listing.id}>
-              <div>
-                <strong data-i18n-skip>{listing.title}</strong>
-                <span data-i18n-skip>
-                  {listing.type === 'tournament' ? t('Turnier') : t('Training')} · {listing.locationName}
-                  {listing.eventDate ? ` · ${listing.eventDate}` : ''}
-                </span>
-              </div>
-              <div className="row-actions">
-                <Button variant="secondary" onClick={() => openEdit(listing)}>{t('Bearbeiten')}</Button>
-                <Button variant="danger" onClick={() => remove(listing)}>{t('Löschen')}</Button>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-
-      <EditDialog open={dialogOpen} title={editId ? t('Anzeige bearbeiten') : t('Anzeige erstellen')} onClose={() => setDialogOpen(false)}>
-        <form className="form" onSubmit={submit}>
-          <PlayerListingFields form={form} setForm={setForm} language={language} />
-          <div className="dialog-actions">
-            <Button variant="secondary" type="button" onClick={() => setDialogOpen(false)}>{t('Abbrechen')}</Button>
-            <Button type="submit" loading={saving}>{editId ? t('Speichern') : t('Veröffentlichen')}</Button>
-          </div>
-        </form>
-      </EditDialog>
-    </div>
-  );
-}
 
 function ContactDialog({ listing, onClose }) {
   const { t } = useTranslation();
@@ -233,7 +118,7 @@ function PlayerExchangeSearchMenu({
   );
 }
 
-export default function PlayerExchangePage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey, createRequest = 0, drawerContent, postboxControl }) {
+export default function PlayerExchangePage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey, drawerContent, postboxControl }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -436,7 +321,6 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
           </div>
         )}
 
-        {currentUser && <MyListingsPanel language={language} onChanged={load} createRequest={createRequest} />}
       </section>
 
       {contactListing && <ContactDialog listing={contactListing} onClose={() => setContactListing(null)} />}

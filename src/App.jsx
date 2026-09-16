@@ -11,7 +11,7 @@ import { usePath, matchTournamentRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, timezoneAbbrev, formatTournamentDateTime, minorUnitsToAmount, amountToMinorUnits, currencyOptions, formatMoney, utcIsoToZonedDateTimeInput, formatDateTime, isPasswordStrong } from './lib/format.js';
 import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, tournamentPayload, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, distanceKm } from './lib/domain.js';
-import { RequiredMark, TextField, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
+import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
 import { AppHeader, PostboxControl, PushMigrationNotice, SearchMenuControl, SavedSearchesControl, AuthModal, StandalonePageHeader, InstallAppButton, OfflineNotice } from './components/layout.jsx';
@@ -31,6 +31,7 @@ const PetanqueAktuellImportPanel = lazy(() => import('./pages/PetanqueAktuellImp
 const PlacesPage = lazy(() => import('./pages/PlacesPage.jsx'));
 const MyClubsPage = lazy(() => import('./pages/MyClubsPage.jsx'));
 const PlayerExchangePage = lazy(() => import('./pages/PlayerExchangePage.jsx'));
+const MyPlayerListingsPage = lazy(() => import('./pages/MyPlayerListingsPage.jsx'));
 const PlaceReportPage = lazy(() => import('./pages/PlaceReportPage.jsx'));
 const PlaceEditByTokenPage = lazy(() => import('./pages/PlaceEditByTokenPage.jsx'));
 const ClubModerationPanel = lazy(() => import('./pages/ClubModerationPanel.jsx'));
@@ -46,7 +47,7 @@ export default function App() {
   );
 }
 
-function ContextualDrawerContent({ area, currentUser, canManageTournaments, isAdmin, activeTab, onSelectTab, onNavigate, onCreateListing, onOpenProfile, onLogout }) {
+function ContextualDrawerContent({ area, currentUser, canManageTournaments, isAdmin, activeTab, onSelectTab, onNavigate, onOpenProfile, onLogout }) {
   const { t } = useTranslation();
   const closeThen = (action) => () => action();
   const navigate = (path) => closeThen(() => onNavigate(path));
@@ -66,7 +67,7 @@ function ContextualDrawerContent({ area, currentUser, canManageTournaments, isAd
         {currentUser && <button className="drawer-link" type="button" onClick={navigate('/vereine')}>{t('Meine Vereine')}</button>}
         {isAdmin && <button className={`drawer-link ${activeTab === 'clubs' ? 'active' : ''}`} type="button" onClick={selectTab('clubs')}>{t('Vereine & Bouleplätze')}</button>}
       </>}
-      {area === 'spielerboerse' && currentUser && <button className="drawer-link" type="button" onClick={closeThen(onCreateListing)}>{t('Anzeige erstellen')}</button>}
+      {area === 'spielerboerse' && currentUser && <button className="drawer-link" type="button" onClick={navigate('/meine-anzeigen')}>{t('Meine Anzeigen')}</button>}
     </div>
     {(isAdmin || canManageTournaments) && <div className="drawer-menu-section drawer-menu-section-admin" aria-label={t('Administration')}>
       <p className="drawer-section-title">{t('Administration')}</p>
@@ -88,7 +89,6 @@ function AppContent() {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState(null);
   const [maptilerApiKey, setMaptilerApiKey] = useState(null);
-  const [playerListingCreateRequest, setPlayerListingCreateRequest] = useState(0);
   const [reportVerifyStatus, setReportVerifyStatus] = useState(null);
   const [placeReportVerifyStatus, setPlaceReportVerifyStatus] = useState(null);
   const [authView, setAuthView] = useState('home');
@@ -1550,13 +1550,6 @@ function AppContent() {
     navigate(nextPath);
   }
 
-  function openPlayerListingFromDrawer() {
-    setMenuOpen(false);
-    clearFeedback();
-    setPlayerListingCreateRequest((current) => current + 1);
-    navigate('/spielerboerse');
-  }
-
   function openProfileFromDrawer() {
     setProfileForm({
       firstName: currentUser.firstName,
@@ -1618,7 +1611,6 @@ function AppContent() {
       activeTab={activeTab}
       onSelectTab={selectDrawerTab}
       onNavigate={navigateFromDrawer}
-      onCreateListing={openPlayerListingFromDrawer}
       onOpenProfile={openProfileFromDrawer}
       onLogout={() => {
         setMenuOpen(false);
@@ -1761,7 +1753,11 @@ function AppContent() {
   }
 
   if (!needsSetup && path === '/spielerboerse') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerExchangePage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} createRequest={playerListingCreateRequest} drawerContent={drawerContent('spielerboerse')} postboxControl={renderPostboxControl()} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerExchangePage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} drawerContent={drawerContent('spielerboerse')} postboxControl={renderPostboxControl()} /></Suspense>;
+  }
+
+  if (!needsSetup && currentUser && path === '/meine-anzeigen') {
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyPlayerListingsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} drawerContent={drawerContent('spielerboerse')} postboxControl={renderPostboxControl()} /></Suspense>;
   }
 
   if (currentUser && authView === 'cancelRegistration') {
@@ -2740,6 +2736,12 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             feeTiers={tournament.feeTiers}
             currency={tournament.currency}
             invalidField={invalidField}
+          />
+          <TextArea
+            label={t('Nachricht an die Turnierleitung')}
+            value={form.organizerMessage || ''}
+            onChange={(organizerMessage) => setForm({ ...form, organizerMessage })}
+            maxLength={250}
           />
           <label className="website-field" aria-hidden="true">
             {t('Website')}

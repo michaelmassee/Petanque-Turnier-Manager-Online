@@ -1195,6 +1195,10 @@ export default {
         const session = await requireSession(request, env.DB);
         return await deletePlayerListing(env.DB, playerListingMatch[1], session.user);
       }
+      if (request.method === 'GET' && url.pathname === '/api/admin/player-listings') {
+        await requireAdmin(request, env.DB);
+        return await listAllPlayerListings(env.DB);
+      }
       if (request.method === 'GET' && url.pathname === '/api/admin/club-editor-requests') {
         await requireAdmin(request, env.DB);
         return await listClubEditorRequests(env.DB);
@@ -5116,6 +5120,14 @@ async function listMyPlayerListings(db, userId) {
     `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name
      FROM player_listings l JOIN users u ON u.id = l.user_id
      WHERE l.user_id = ? ORDER BY l.created_at DESC`).bind(userId).all();
+  return json({ listings: (rows.results || []).map((row) => toPublicPlayerListing(row, true)) });
+}
+
+async function listAllPlayerListings(db) {
+  const rows = await db.prepare(
+    `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name
+     FROM player_listings l JOIN users u ON u.id = l.user_id
+     ORDER BY l.created_at DESC`).all();
   return json({ listings: (rows.results || []).map((row) => toPublicPlayerListing(row, true)) });
 }
 
