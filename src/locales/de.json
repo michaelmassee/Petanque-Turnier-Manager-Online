@@ -89,5 +89,15 @@
   "Ersatzkarte wird geladen …": "Ersatzkarte wird geladen …",
   "Ersatzkarte aktiv, weil der primäre Kartenanbieter nicht erreichbar ist.": "Ersatzkarte aktiv, weil der primäre Kartenanbieter nicht erreichbar ist.",
   "Karte konnte nicht geladen werden.": "Karte konnte nicht geladen werden.",
-  "Karte erneut laden": "Karte erneut laden"
+  "Karte erneut laden": "Karte erneut laden",
+  "Zusätzliche Teilnehmerfragen": "Zusätzliche Teilnehmerfragen",
+  "Frage hinzufügen": "Frage hinzufügen",
+  "Frage entfernen": "Frage entfernen",
+  "Frage": "Frage",
+  "Die Checkboxen werden für jeden Teilnehmer freiwillig abgefragt.": "Die Checkboxen werden für jeden Teilnehmer freiwillig abgefragt.",
+  "Hauptspieler": "Hauptspieler",
+  "Partner": "Partner",
+  "Partner 2": "Partner 2",
+  "Ungültige Teilnehmerfragen": "Ungültige Teilnehmerfragen",
+  "Ungültige Teilnehmerantworten": "Ungültige Teilnehmerantworten"
 }

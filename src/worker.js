@@ -7,6 +7,7 @@ import {
   assertPartnerCountMatchesFormation as assertCorePartnerCountMatchesFormation,
   isNewlyPublicTournament,
   isTournamentRoundNumberConflict,
+  normalizePlayerListingPosition,
   normalizeTournamentInput as normalizeCoreTournamentInput,
   registrationOpenStatus as coreRegistrationOpenStatus,
   tournamentMatchesSavedSearch,
@@ -1149,6 +1150,10 @@ export default {
         const session = await requireSession(request, env.DB);
         return await updateClub(request, env.DB, clubMatch[1], session.user);
       }
+      if (clubMatch && request.method === 'DELETE') {
+        const session = await requireSession(request, env.DB);
+        return await deleteClub(env.DB, clubMatch[1], session.user);
+      }
       const clubRequestMatch = url.pathname.match(/^\/api\/clubs\/([^/]+)\/editor-request$/);
       if (clubRequestMatch && request.method === 'POST') {
         const session = await requireSession(request, env.DB);
@@ -1163,6 +1168,10 @@ export default {
       if (placeMatch && request.method === 'PUT') {
         const session = await requireSession(request, env.DB);
         return await updateBoulePlace(request, env.DB, placeMatch[1], session.user, request.headers.get('CF-IPCountry'));
+      }
+      if (placeMatch && request.method === 'DELETE') {
+        const session = await requireSession(request, env.DB);
+        return await deleteBoulePlace(env.DB, placeMatch[1], session.user);
       }
       const placeLikeMatch = url.pathname.match(/^\/api\/places\/([^/]+)\/like$/);
       if (placeLikeMatch && request.method === 'POST') {
@@ -1220,6 +1229,31 @@ export default {
       if (publishPlaceMatch && request.method === 'POST') {
         await requireAdmin(request, env.DB);
         return await publishBoulePlace(env.DB, publishPlaceMatch[1]);
+      }
+      if (request.method === 'GET' && url.pathname === '/api/admin/dashboard-stats') {
+        await requireAdmin(request, env.DB);
+        return await getAdminDashboardStats(env.DB);
+      }
+      if (request.method === 'GET' && url.pathname === '/api/admin/clubs') {
+        await requireAdmin(request, env.DB);
+        return await listAllClubsForAdmin(env.DB);
+      }
+      const adminClubStatusMatch = url.pathname.match(/^\/api\/admin\/clubs\/([^/]+)\/status$/);
+      if (adminClubStatusMatch && request.method === 'PUT') {
+        await requireAdmin(request, env.DB);
+        const body = await readJson(request);
+        return await updateClubStatusAsAdmin(env.DB, adminClubStatusMatch[1], String(body.status || ''));
+      }
+      const adminClubOwnerMatch = url.pathname.match(/^\/api\/admin\/clubs\/([^/]+)\/owner$/);
+      if (adminClubOwnerMatch && request.method === 'PUT') {
+        await requireAdmin(request, env.DB);
+        const body = await readJson(request);
+        return await updateClubOwnerAsAdmin(env.DB, adminClubOwnerMatch[1], String(body.userId || ''));
+      }
+      const adminClubMatch = url.pathname.match(/^\/api\/admin\/clubs\/([^/]+)$/);
+      if (adminClubMatch && request.method === 'DELETE') {
+        await requireAdmin(request, env.DB);
+        return await deleteClubAsAdmin(env.DB, adminClubMatch[1]);
       }
 
       const tournamentRegistrationsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registrations$/);
@@ -3042,6 +3076,7 @@ async function createTournament(request, env, user) {
     .run();
 
   await db.prepare('UPDATE tournaments SET fee_tiers = ? WHERE id = ?').bind(JSON.stringify(tournament.feeTiers), id).run();
+  await db.prepare('UPDATE tournaments SET registration_questions = ? WHERE id = ?').bind(JSON.stringify(tournament.registrationQuestions), id).run();
 
   const created = await getTournamentById(db, id);
   if (isPubliclyVisible(created)) {
@@ -3249,6 +3284,9 @@ async function updateTournament(request, env, existing, user) {
 
   const feeTiers = tournament.feeTiersProvided ? tournament.feeTiers : jsonArray(existing.fee_tiers).filter((tier) => tier?.id !== 'legacy-standard');
   await db.prepare('UPDATE tournaments SET fee_tiers = ? WHERE id = ?').bind(JSON.stringify(feeTiers), existing.id).run();
+  const registrationQuestions = tournament.registrationQuestionsProvided ? tournament.registrationQuestions : registrationQuestionsFromRow(existing);
+  await db.prepare('UPDATE tournaments SET registration_questions = ? WHERE id = ?').bind(JSON.stringify(registrationQuestions), existing.id).run();
+  if (tournament.registrationQuestionsProvided) await pruneRegistrationAnswers(db, existing.id, registrationQuestions);
 
   const updated = await getTournamentById(db, existing.id);
   if (isNewlyPublicTournament(existing, updated)) {
@@ -4095,6 +4133,7 @@ async function createRegistration(request, env, tournament, { session = null, sh
   const language = normalizeLanguage(body.language);
   assertCorePartnerCountMatchesFormation(tournament, registration);
   const feeSelections = resolveFeeSelections(tournament, body.feeSelections, registration);
+  const registrationAnswers = resolveRegistrationAnswers(tournament, body.registrationAnswers, registration);
   assertLicenseMatchesTournament(tournament, registration);
   await assertNoDuplicateTeamName(db, tournament.id, registration.teamName);
   await assertNoDuplicatePlayer(db, tournament.id, registration);
@@ -4110,8 +4149,8 @@ async function createRegistration(request, env, tournament, { session = null, sh
         id, tournament_id, first_name, last_name, email, club, license_nr,
         partner_first_name, partner_last_name, partner_email, partner_license_nr,
         partner2_first_name, partner2_last_name, partner2_email, partner2_license_nr,
-        team_name, seeding_position, status, is_vip, organizer_message, fee_selections, language, registered_at, confirmed_at, created_at, updated_at, cancel_token
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        team_name, seeding_position, status, is_vip, organizer_message, fee_selections, registration_answers, language, registered_at, confirmed_at, created_at, updated_at, cancel_token
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -4135,6 +4174,7 @@ async function createRegistration(request, env, tournament, { session = null, sh
       registration.isVip ? 1 : 0,
       organizerMessage,
       JSON.stringify(feeSelections),
+      JSON.stringify(registrationAnswers),
       language,
       now,
       status === 'confirmed' ? now : null,
@@ -4177,6 +4217,7 @@ async function updateRegistration(request, env, existing) {
   const registration = normalizeRegistrationInput(body, { requireStatus: true });
   assertCorePartnerCountMatchesFormation(existing, registration);
   const feeSelections = resolveFeeSelections(existing, body.feeSelections, registration, existing);
+  const registrationAnswers = resolveRegistrationAnswers(existing, body.registrationAnswers, registration, existing);
   assertLicenseMatchesTournament(existing, registration);
   await assertNoDuplicateTeamName(db, existing.tournament_id, registration.teamName, existing.id);
   await assertNoDuplicatePlayer(db, existing.tournament_id, registration, existing.id);
@@ -4189,7 +4230,7 @@ async function updateRegistration(request, env, existing) {
        SET first_name = ?, last_name = ?, email = ?, club = ?, license_nr = ?,
            partner_first_name = ?, partner_last_name = ?, partner_email = ?, partner_license_nr = ?,
            partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?, partner2_license_nr = ?,
-           team_name = ?, seeding_position = ?, status = ?, is_vip = ?, fee_selections = ?, confirmed_at = ?, updated_at = ?
+           team_name = ?, seeding_position = ?, status = ?, is_vip = ?, fee_selections = ?, registration_answers = ?, confirmed_at = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -4211,6 +4252,7 @@ async function updateRegistration(request, env, existing) {
       registration.status,
       registration.isVip ? 1 : 0,
       JSON.stringify(feeSelections),
+      JSON.stringify(registrationAnswers),
       confirmedAt,
       now,
       existing.id,
@@ -4932,7 +4974,7 @@ async function getTournamentById(db, id) {
 }
 
 function clubCanEdit(club, user) {
-  return user?.role === 'admin' || club.created_by === user?.id || Boolean(club.editor_user_id);
+  return user?.role === 'admin' || club.owner_id === user?.id || Boolean(club.editor_user_id);
 }
 
 function toPublicBoulePlace(row, user) {
@@ -4951,14 +4993,14 @@ function toPublicClub(row, user) {
   return {
     id: row.id, name: row.name, description: row.description || null, websiteUrl: row.website_url || null, logoUrl: row.logo_url || null,
     contactName: row.contact_name || null, contactEmail: row.contact_email || null, contactPhone: row.contact_phone || null,
-    status: row.status, canEdit: clubCanEdit(row, user), createdBy: row.created_by,
+    status: row.status, canEdit: clubCanEdit(row, user), ownerId: row.owner_id,
   };
 }
 
 async function listBoulePlaces(db, user, query) {
   const term = String(query || '').trim();
   const rows = await db.prepare(
-    `SELECT p.*, c.name AS club_display_name, c.logo_url AS club_logo_url, c.created_by,
+    `SELECT p.*, c.name AS club_display_name, c.logo_url AS club_logo_url, c.owner_id,
        EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?1) AS editor_user_id,
        (SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id) AS like_count,
        EXISTS(SELECT 1 FROM boule_place_likes l WHERE l.place_id = p.id AND l.user_id = ?1) AS liked,
@@ -4974,7 +5016,7 @@ async function getClub(db, id, user) {
   const club = await db.prepare(`SELECT c.*, EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?2) AS editor_user_id FROM clubs c WHERE c.id = ?1`).bind(id, user?.id || '').first();
   if (!club || (club.status !== 'published' && !clubCanEdit(club, user))) throw new HttpError(404, 'Verein nicht gefunden');
   const places = await db.prepare(
-    `SELECT p.*, c.name AS club_name, c.logo_url AS club_logo_url, c.created_by, EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?2) AS editor_user_id,
+    `SELECT p.*, c.name AS club_name, c.logo_url AS club_logo_url, c.owner_id, EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?2) AS editor_user_id,
       (SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id) AS like_count,
       EXISTS(SELECT 1 FROM boule_place_likes l WHERE l.place_id = p.id AND l.user_id = ?2) AS liked,
       EXISTS(SELECT 1 FROM boule_place_favorites f WHERE f.place_id = p.id AND f.user_id = ?2) AS favorited
@@ -4995,7 +5037,7 @@ function clubInput(body) {
 async function createClub(request, db, user) {
   const input = clubInput(await readJson(request)); const now = new Date().toISOString(); const id = crypto.randomUUID();
   await db.batch([
-    db.prepare('INSERT INTO clubs (id, name, description, website_url, logo_url, contact_name, contact_email, contact_phone, status, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, \'pending\', ?, ?, ?)').bind(id, input.name, input.description, input.websiteUrl, input.logoUrl, input.contactName, input.contactEmail, input.contactPhone, user.id, now, now),
+    db.prepare('INSERT INTO clubs (id, name, description, website_url, logo_url, contact_name, contact_email, contact_phone, status, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, \'pending\', ?, ?, ?)').bind(id, input.name, input.description, input.websiteUrl, input.logoUrl, input.contactName, input.contactEmail, input.contactPhone, user.id, now, now),
     db.prepare('INSERT INTO club_editor_requests (club_id, user_id, created_at) VALUES (?, ?, ?)').bind(id, user.id, now),
   ]);
   return json({ club: await db.prepare('SELECT * FROM clubs WHERE id = ?').bind(id).first() }, 201);
@@ -5012,6 +5054,12 @@ async function updateClub(request, db, id, user) {
   await assertClubEditor(db, id, user); const input = clubInput(await readJson(request)); const now = new Date().toISOString();
   await db.prepare("UPDATE clubs SET name = ?, description = ?, website_url = ?, logo_url = ?, contact_name = ?, contact_email = ?, contact_phone = ?, status = 'pending', updated_at = ? WHERE id = ?").bind(input.name, input.description, input.websiteUrl, input.logoUrl, input.contactName, input.contactEmail, input.contactPhone, now, id).run();
   return await getClub(db, id, user);
+}
+
+async function deleteClub(db, id, user) {
+  await assertClubEditor(db, id, user);
+  await db.prepare('DELETE FROM clubs WHERE id = ?').bind(id).run();
+  return json({ ok: true });
 }
 
 async function requestClubEditor(db, clubId, userId) {
@@ -5036,7 +5084,7 @@ async function createBoulePlace(request, db, clubId, user, countryCode) {
   return json({ id }, 201);
 }
 
-async function updateBoulePlace(request, db, id, user, countryCode) {
+async function assertBoulePlaceEditor(db, id, user) {
   const place = await db.prepare('SELECT club_id, reported_by_user_id FROM boule_places WHERE id = ?').bind(id).first();
   if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
   if (place.club_id) {
@@ -5044,8 +5092,19 @@ async function updateBoulePlace(request, db, id, user, countryCode) {
   } else if (!(user?.role === 'admin' || (place.reported_by_user_id && place.reported_by_user_id === user.id))) {
     throw new HttpError(403, 'Keine Bearbeitungsrechte für diesen Bouleplatz');
   }
+  return place;
+}
+
+async function updateBoulePlace(request, db, id, user, countryCode) {
+  await assertBoulePlaceEditor(db, id, user);
   const input = await placeInput(await readJson(request), countryCode);
   await db.prepare("UPDATE boule_places SET name = ?, address = ?, latitude = ?, longitude = ?, court_count = ?, description = ?, accessible = ?, facilities = ?, status = 'pending', updated_at = ? WHERE id = ?").bind(input.name, input.address, input.latitude, input.longitude, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, new Date().toISOString(), id).run(); return json({ ok: true });
+}
+
+async function deleteBoulePlace(db, id, user) {
+  await assertBoulePlaceEditor(db, id, user);
+  await db.prepare('DELETE FROM boule_places WHERE id = ?').bind(id).run();
+  return json({ ok: true });
 }
 
 async function getPlaceReportByToken(db, token) {
@@ -5097,6 +5156,7 @@ function toPublicPlayerListing(row, includeOwner = false) {
     id: row.id, ...(includeOwner ? { userId: row.user_id } : {}), type: row.type, title: row.title, description: row.description || null,
     locationName: row.location_name, latitude: Number(row.latitude), longitude: Number(row.longitude),
     eventDate: row.event_date || null, ...(includeOwner && row.owner_first_name ? { ownerName: `${row.owner_first_name} ${row.owner_last_name}` } : {}),
+    playingPosition: row.playing_position,
     createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
@@ -5107,22 +5167,25 @@ async function playerListingInput(body, countryCode) {
   const title = text(body.title); if (title.length < 2) throw new HttpError(400, 'Bitte gib einen Titel ein');
   const locationName = text(body.locationName); if (locationName.length < 2) throw new HttpError(400, 'Bitte gib einen Ort ein');
   const eventDate = type === 'tournament' ? text(body.eventDate) : '';
+  const playingPosition = normalizePlayerListingPosition(body.playingPosition);
   if (type === 'tournament' && !eventDate) throw new HttpError(400, 'Bitte gib ein Datum an');
   const [geo] = await geocodeLocation(locationName, { countryCode, limit: 1 });
   if (!geo) throw new HttpError(400, 'Kein Ort gefunden.');
-  return { type, title, description: nullableText(body.description), locationName, latitude: geo.lat, longitude: geo.lng, eventDate: eventDate || null };
+  return { type, title, description: nullableText(body.description), locationName, latitude: geo.lat, longitude: geo.lng, eventDate: eventDate || null, playingPosition };
 }
 
 async function listPlayerListings(db, user, searchParams) {
   const term = String(searchParams.get('q') || '').trim();
   const typeFilter = String(searchParams.get('type') || '').trim();
+  const playingPositionFilter = String(searchParams.get('playingPosition') || '').trim();
   const rows = await db.prepare(
     `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name
      FROM player_listings l JOIN users u ON u.id = l.user_id
      WHERE (l.type = 'training' OR (l.type = 'tournament' AND l.event_date >= date('now')))
        AND (?1 = '' OR l.type = ?1)
        AND (?2 = '' OR l.title LIKE '%' || ?2 || '%' COLLATE NOCASE OR l.description LIKE '%' || ?2 || '%' COLLATE NOCASE OR l.location_name LIKE '%' || ?2 || '%' COLLATE NOCASE)
-     ORDER BY l.created_at DESC`).bind(typeFilter, term).all();
+       AND (?3 = '' OR l.playing_position = ?3 OR l.playing_position = 'egal')
+     ORDER BY l.created_at DESC`).bind(typeFilter, term, playingPositionFilter).all();
   return json({ listings: (rows.results || []).map((row) => toPublicPlayerListing(row, Boolean(user))) });
 }
 
@@ -5144,26 +5207,26 @@ async function listAllPlayerListings(db) {
 
 async function createPlayerListing(request, db, user, countryCode) {
   const count = await db.prepare('SELECT COUNT(*) AS count FROM player_listings WHERE user_id = ?').bind(user.id).first();
-  if (Number(count.count) >= PLAYER_LISTING_LIMIT) throw new HttpError(400, 'Du hast bereits die maximale Anzahl an Anzeigen erreicht');
+  if (Number(count.count) >= PLAYER_LISTING_LIMIT) throw new HttpError(400, 'Du hast bereits die maximale Anzahl an Mitspielgesuchen erreicht');
   const input = await playerListingInput(await readJson(request), countryCode);
   const id = crypto.randomUUID(); const now = new Date().toISOString();
-  await db.prepare('INSERT INTO player_listings (id, user_id, type, title, description, location_name, latitude, longitude, event_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(id, user.id, input.type, input.title, input.description, input.locationName, input.latitude, input.longitude, input.eventDate, now, now).run();
+  await db.prepare('INSERT INTO player_listings (id, user_id, type, title, description, location_name, latitude, longitude, event_date, playing_position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, user.id, input.type, input.title, input.description, input.locationName, input.latitude, input.longitude, input.eventDate, input.playingPosition, now, now).run();
   return json({ id }, 201);
 }
 
 async function assertPlayerListingOwner(db, id, user) {
   const listing = await db.prepare('SELECT * FROM player_listings WHERE id = ?').bind(id).first();
-  if (!listing) throw new HttpError(404, 'Anzeige nicht gefunden');
-  if (!(user.role === 'admin' || listing.user_id === user.id)) throw new HttpError(403, 'Keine Bearbeitungsrechte für diese Anzeige');
+  if (!listing) throw new HttpError(404, 'Mitspielgesuch nicht gefunden');
+  if (!(user.role === 'admin' || listing.user_id === user.id)) throw new HttpError(403, 'Keine Bearbeitungsrechte für dieses Mitspielgesuch');
   return listing;
 }
 
 async function updatePlayerListing(request, db, id, user, countryCode) {
   await assertPlayerListingOwner(db, id, user);
   const input = await playerListingInput(await readJson(request), countryCode);
-  await db.prepare('UPDATE player_listings SET type = ?, title = ?, description = ?, location_name = ?, latitude = ?, longitude = ?, event_date = ?, updated_at = ? WHERE id = ?')
-    .bind(input.type, input.title, input.description, input.locationName, input.latitude, input.longitude, input.eventDate, new Date().toISOString(), id).run();
+  await db.prepare('UPDATE player_listings SET type = ?, title = ?, description = ?, location_name = ?, latitude = ?, longitude = ?, event_date = ?, playing_position = ?, updated_at = ? WHERE id = ?')
+    .bind(input.type, input.title, input.description, input.locationName, input.latitude, input.longitude, input.eventDate, input.playingPosition, new Date().toISOString(), id).run();
   return json({ ok: true });
 }
 
@@ -5294,17 +5357,85 @@ async function listMyClubs(db, userId) {
   const rows = await db.prepare(
     `SELECT DISTINCT c.*, 1 AS editor_user_id FROM clubs c
      LEFT JOIN club_editors ce ON ce.club_id = c.id AND ce.user_id = ?1
-     WHERE c.created_by = ?1 OR ce.user_id = ?1
+     WHERE c.owner_id = ?1 OR ce.user_id = ?1
      ORDER BY c.name COLLATE NOCASE`).bind(userId).all();
   return json({ clubs: (rows.results || []).map((row) => toPublicClub(row, { id: userId })) });
 }
 
+async function listAllClubsForAdmin(db) {
+  const rows = await db.prepare(
+    `SELECT c.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name, u.email AS owner_email,
+       (SELECT COUNT(*) FROM boule_places p WHERE p.club_id = c.id) AS place_count,
+       (SELECT COUNT(*) FROM club_editors ce WHERE ce.club_id = c.id) AS editor_count
+     FROM clubs c JOIN users u ON u.id = c.owner_id
+     ORDER BY c.created_at DESC`).all();
+  return json({
+    clubs: (rows.results || []).map((row) => ({
+      ...toPublicClub(row, null),
+      ownerName: `${row.owner_first_name} ${row.owner_last_name}`,
+      ownerEmail: row.owner_email,
+      placeCount: Number(row.place_count),
+      editorCount: Number(row.editor_count),
+      createdAt: row.created_at,
+    })),
+  });
+}
+
+async function updateClubStatusAsAdmin(db, id, status) {
+  if (!['pending', 'published', 'rejected'].includes(status)) throw new HttpError(400, 'Ungültiger Status');
+  const club = await db.prepare('SELECT id FROM clubs WHERE id = ?').bind(id).first();
+  if (!club) throw new HttpError(404, 'Verein nicht gefunden');
+  await db.prepare('UPDATE clubs SET status = ?, updated_at = ? WHERE id = ?').bind(status, new Date().toISOString(), id).run();
+  return json({ ok: true });
+}
+
+async function updateClubOwnerAsAdmin(db, id, userId) {
+  const club = await db.prepare('SELECT id FROM clubs WHERE id = ?').bind(id).first();
+  if (!club) throw new HttpError(404, 'Verein nicht gefunden');
+  const trimmedUserId = String(userId || '').trim();
+  if (!trimmedUserId) throw new HttpError(400, 'Bitte wähle einen Benutzer aus');
+  const owner = await db.prepare('SELECT id FROM users WHERE id = ?').bind(trimmedUserId).first();
+  if (!owner) throw new HttpError(404, 'Benutzer nicht gefunden');
+  const now = new Date().toISOString();
+  await db.prepare('UPDATE clubs SET owner_id = ?, updated_at = ? WHERE id = ?').bind(owner.id, now, id).run();
+  // Der neue Owner hat ohnehin volle Rechte - ein doppelter Editor-/Anfrage-Eintrag ist redundant.
+  await db.prepare('DELETE FROM club_editors WHERE club_id = ? AND user_id = ?').bind(id, owner.id).run();
+  await db.prepare('DELETE FROM club_editor_requests WHERE club_id = ? AND user_id = ?').bind(id, owner.id).run();
+  return json({ ok: true });
+}
+
+async function deleteClubAsAdmin(db, id) {
+  const club = await db.prepare('SELECT id FROM clubs WHERE id = ?').bind(id).first();
+  if (!club) throw new HttpError(404, 'Verein nicht gefunden');
+  await db.prepare('DELETE FROM clubs WHERE id = ?').bind(id).run();
+  return json({ ok: true });
+}
+
 async function listPendingBoulePlaces(db) {
   const rows = await db.prepare(
-    `SELECT p.*, c.name AS club_name, c.logo_url AS club_logo_url, c.created_by
+    `SELECT p.*, c.name AS club_name, c.logo_url AS club_logo_url, c.owner_id
      FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
      WHERE p.status = 'pending' ORDER BY p.created_at`).all();
   return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, null)) });
+}
+
+async function getAdminDashboardStats(db) {
+  const [users, pendingApiKeys, pendingClubEditorRequests, pendingPlaces, pendingPlaceReports, playerListings] = await Promise.all([
+    db.prepare('SELECT COUNT(*) AS count FROM users').first(),
+    db.prepare("SELECT COUNT(*) AS count FROM api_keys WHERE status = 'pending'").first(),
+    db.prepare('SELECT COUNT(*) AS count FROM club_editor_requests').first(),
+    db.prepare("SELECT COUNT(*) AS count FROM boule_places WHERE club_id IS NOT NULL AND status = 'pending'").first(),
+    db.prepare("SELECT COUNT(*) AS count FROM boule_places WHERE club_id IS NULL AND status = 'pending'").first(),
+    db.prepare('SELECT COUNT(*) AS count FROM player_listings').first(),
+  ]);
+  return json({
+    users: Number(users.count),
+    pendingApiKeys: Number(pendingApiKeys.count),
+    pendingClubEditorRequests: Number(pendingClubEditorRequests.count),
+    pendingPlaces: Number(pendingPlaces.count),
+    pendingPlaceReports: Number(pendingPlaceReports.count),
+    playerListings: Number(playerListings.count),
+  });
 }
 
 async function publishBoulePlace(db, id) {
@@ -5317,7 +5448,7 @@ async function getRegistrationWithTournament(db, id) {
   return db
     .prepare(
       `SELECT registrations.*, tournaments.owner_id, tournaments.visibility, tournaments.formation,
-              tournaments.registration_type, tournaments.license_required, tournaments.max_registrations, tournaments.waitlist_enabled, tournaments.entry_fee_cents, tournaments.fee_tiers,
+              tournaments.registration_type, tournaments.license_required, tournaments.max_registrations, tournaments.waitlist_enabled, tournaments.entry_fee_cents, tournaments.fee_tiers, tournaments.registration_questions,
               tournaments.name, tournaments.date, tournaments.start_time, tournaments.location,
               ${TOURNAMENT_EDITORS_JSON_SUBQUERY}
        FROM registrations
@@ -6161,6 +6292,50 @@ function registrationFeeSelections(row) {
   return jsonArray(row.fee_selections).filter((selection) => selection && typeof selection.name === 'string' && Number.isInteger(selection.amountCents));
 }
 
+function registrationQuestionsFromRow(row) {
+  return jsonArray(row.registration_questions)
+    .filter((question) => question && typeof question.id === 'string' && typeof question.label === 'string')
+    .map((question) => ({ id: question.id, label: question.label }));
+}
+
+function registrationAnswersFromRow(row) {
+  return jsonArray(row.registration_answers)
+    .filter((answer) => answer && ['primary', 'partner', 'partner2'].includes(answer.participant) && typeof answer.questionId === 'string' && answer.checked === true);
+}
+
+function resolveRegistrationAnswers(tournament, input, registration, existing = null) {
+  if (input === undefined && existing) return registrationAnswersFromRow(existing);
+  if (!Array.isArray(input)) throw new HttpError(400, 'Ungültige Teilnehmerantworten');
+  const participants = new Set(['primary']);
+  if (registration.partnerFirstName) participants.add('partner');
+  if (registration.partner2FirstName) participants.add('partner2');
+  const questionIds = new Set(registrationQuestionsFromRow(tournament).map((question) => question.id));
+  const seen = new Set();
+  return input.reduce((answers, answer) => {
+    const participant = text(answer?.participant);
+    const questionId = text(answer?.questionId);
+    const key = `${participant}:${questionId}`;
+    if (!participants.has(participant) || !questionIds.has(questionId) || seen.has(key) || typeof answer?.checked !== 'boolean') {
+      throw new HttpError(400, 'Ungültige Teilnehmerantworten');
+    }
+    seen.add(key);
+    if (answer.checked) answers.push({ participant, questionId, checked: true });
+    return answers;
+  }, []);
+}
+
+async function pruneRegistrationAnswers(db, tournamentId, questions) {
+  const questionIds = new Set(questions.map((question) => question.id));
+  const result = await db.prepare('SELECT id, registration_answers FROM registrations WHERE tournament_id = ?').bind(tournamentId).all();
+  const updates = (result.results || []).flatMap((row) => {
+    const answers = registrationAnswersFromRow(row).filter((answer) => questionIds.has(answer.questionId));
+    return JSON.stringify(answers) === JSON.stringify(registrationAnswersFromRow(row))
+      ? []
+      : [db.prepare('UPDATE registrations SET registration_answers = ?, updated_at = ? WHERE id = ?').bind(JSON.stringify(answers), new Date().toISOString(), row.id)];
+  });
+  if (updates.length) await db.batch(updates);
+}
+
 function resolveFeeSelections(tournament, input, registration, existing = null) {
   if (input === undefined && existing) return registrationFeeSelections(existing);
   if (!Array.isArray(input)) throw new HttpError(400, 'Ungültige Startgeld-Auswahl');
@@ -6212,6 +6387,7 @@ function toPublicTournament(row, user) {
     timezone: row.timezone || 'Europe/Berlin',
     entryFeeCents: Number(row.entry_fee_cents || 0),
     feeTiers: feeTiersFromRow(row),
+    registrationQuestions: registrationQuestionsFromRow(row),
     currency: row.currency || 'EUR',
     contactName: row.contact_name,
     contactEmail: row.contact_email,
@@ -6275,6 +6451,7 @@ function toManagedRegistration(row) {
   return {
     ...toPublicRegistration(row),
     organizerMessage: row.organizer_message || null,
+    registrationAnswers: registrationAnswersFromRow(row),
   };
 }
 

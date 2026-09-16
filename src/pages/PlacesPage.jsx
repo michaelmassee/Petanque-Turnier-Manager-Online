@@ -30,7 +30,7 @@ function PlacesMap({ places, center, maptilerApiKey }) {
   );
 }
 
-export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey, drawerContent, postboxControl }) {
+export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, isAdmin, onSelectAdminDashboard, onLogout, maptilerApiKey, drawerContent, postboxControl }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [places, setPlaces] = useState([]);
@@ -150,6 +150,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       setMenuOpen={setMenuOpen}
       navigate={navigate}
       currentUser={currentUser}
+      isAdmin={isAdmin}
+      onSelectAdminDashboard={onSelectAdminDashboard}
       onLogout={onLogout}
       drawerContent={drawerContent}
       postboxControl={postboxControl}

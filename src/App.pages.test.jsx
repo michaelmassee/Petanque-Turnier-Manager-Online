@@ -397,9 +397,9 @@ function RegistrationsPageHarness({ onSubmit }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const tournament = { id: 'tour1', name: 'Sommerturnier', formation: 'tete', registrationType: 'forme', canManage: true };
+  const tournament = { id: 'tour1', name: 'Sommerturnier', formation: 'tete', registrationType: 'forme', registrationQuestions: [{ id: 'meal', label: 'Vegetarisches Essen?' }], canManage: true };
   const registrations = [
-    { id: 'r1', firstName: 'Anna', lastName: 'Muster', email: 'anna@example.com', teamName: 'Team A', organizerMessage: 'Bitte ohne Mittagessen einplanen.', status: 'pending', isVip: false },
+    { id: 'r1', firstName: 'Anna', lastName: 'Muster', email: 'anna@example.com', teamName: 'Team A', organizerMessage: 'Bitte ohne Mittagessen einplanen.', registrationAnswers: [{ participant: 'primary', questionId: 'meal', checked: true }], status: 'pending', isVip: false },
   ];
 
   function editRegistration(registration) {
@@ -461,6 +461,7 @@ describe('Anmeldungen-Seite: Liste + Dialog', () => {
     render(<RegistrationsPageHarness onSubmit={onSubmit} />);
 
     expect(screen.getByText('Bitte ohne Mittagessen einplanen.')).toBeInTheDocument();
+    expect(screen.getByText('Vegetarisches Essen?')).toBeInTheDocument();
     expect(screen.queryByText('Anmeldung bearbeiten')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Bearbeiten'));

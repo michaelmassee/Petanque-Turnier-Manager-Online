@@ -25,6 +25,7 @@ const TournamentManagement = lazy(() => import('./pages/TournamentManagement.jsx
 const RegistrationsManagement = lazy(() => import('./pages/RegistrationsManagement.jsx'));
 const UserManagementPanel = lazy(() => import('./pages/UserManagementPanel.jsx'));
 const ApiKeysPanel = lazy(() => import('./pages/ApiKeysPanel.jsx'));
+const OwnApiKeysPanel = lazy(() => import('./pages/ApiKeysPanel.jsx').then((module) => ({ default: module.OwnApiKeysPanel })));
 const TournamentPlayManagement = lazy(() => import('./pages/TournamentPlayManagement.jsx'));
 const PetanqueAktuellImportPanel = lazy(() => import('./pages/PetanqueAktuellImportPanel.jsx'));
 const PlacesPage = lazy(() => import('./pages/PlacesPage.jsx'));
@@ -34,6 +35,7 @@ const MyPlayerListingsPage = lazy(() => import('./pages/MyPlayerListingsPage.jsx
 const PlaceReportPage = lazy(() => import('./pages/PlaceReportPage.jsx'));
 const PlaceEditByTokenPage = lazy(() => import('./pages/PlaceEditByTokenPage.jsx'));
 const ClubModerationPanel = lazy(() => import('./pages/ClubModerationPanel.jsx'));
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'));
 
 export { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 export { EditDialog, ListToolbar } from './components/ui.jsx';
@@ -46,37 +48,36 @@ export default function App() {
   );
 }
 
-function ContextualDrawerContent({ area, currentUser, canManageTournaments, isAdmin, activeTab, onSelectTab, onNavigate, onOpenProfile, onLogout }) {
+function ContextualDrawerContent({ area, currentUser, activeTab, onSelectTab, onNavigate, onOpenProfile, onLogout, onLogin }) {
   const { t } = useTranslation();
   const closeThen = (action) => () => action();
   const navigate = (path) => closeThen(() => onNavigate(path));
   const selectTab = (tab) => closeThen(() => onSelectTab(tab));
 
+  const showAllAreas = area === 'all';
+
   return <>
-    <div className="drawer-menu-section" aria-label={t(area === 'turniere' ? 'Turniere' : area === 'bouleplaetze' ? 'Boule-Plätze / Vereine' : 'Boule-Treff')}>
-      {area === 'turniere' && <>
-        {canManageTournaments && <button className={`drawer-link ${activeTab === 'tournaments' ? 'active' : ''}`} type="button" onClick={selectTab('tournaments')}>{t('Turnierverwaltung')}</button>}
-        {currentUser && <button className={`drawer-link ${activeTab === 'registrations' ? 'active' : ''}`} type="button" onClick={selectTab('registrations')}>{t('Anmeldungen')}</button>}
-        {canManageTournaments && <button className={`drawer-link ${activeTab === 'play' ? 'active' : ''}`} type="button" onClick={selectTab('play')}>{t('Turnier starten')}</button>}
-        <button className="drawer-link" type="button" onClick={navigate('/turnier-melden')}>{t('Turnier melden')}</button>
-        {isAdmin && <button className={`drawer-link ${activeTab === 'petanque-aktuell-import' ? 'active' : ''}`} type="button" onClick={selectTab('petanque-aktuell-import')}>{t('Pétanque Aktuell importieren')}</button>}
-      </>}
-      {area === 'bouleplaetze' && <>
-        <button className="drawer-link" type="button" onClick={navigate('/platz-melden')}>{t('Bouleplatz melden')}</button>
-        {currentUser && <button className="drawer-link" type="button" onClick={navigate('/vereine')}>{t('Meine Vereine')}</button>}
-        {isAdmin && <button className={`drawer-link ${activeTab === 'clubs' ? 'active' : ''}`} type="button" onClick={selectTab('clubs')}>{t('Vereine & Bouleplätze')}</button>}
-      </>}
-      {area === 'spielerboerse' && currentUser && <button className="drawer-link" type="button" onClick={navigate('/meine-anzeigen')}>{t('Meine Anzeigen')}</button>}
+    {(showAllAreas || area === 'turniere') && <div className="drawer-menu-section" aria-label={t('Turniere')}>
+      {currentUser && <button className={`drawer-link ${activeTab === 'registrations' ? 'active' : ''}`} type="button" onClick={selectTab('registrations')}>{t('Anmeldungen')}</button>}
+      <button className="drawer-link" type="button" onClick={navigate('/turnier-melden')}>{t('Turnier melden')}</button>
+    </div>}
+    {(showAllAreas || area === 'bouleplaetze') && <div className="drawer-menu-section" aria-label={t('Boule-Plätze / Vereine')}>
+      <button className="drawer-link" type="button" onClick={navigate('/platz-melden')}>{t('Bouleplatz melden')}</button>
+      {currentUser && <button className="drawer-link" type="button" onClick={navigate('/vereine')}>{t('Meine Vereine')}</button>}
+    </div>}
+    {(showAllAreas || area === 'spielerboerse') && currentUser && <div className="drawer-menu-section" aria-label={t('Boule-Treff')}>
+      <button className="drawer-link" type="button" onClick={navigate('/meine-anzeigen')}>{t('Meine Mitspielgesuche')}</button>
+    </div>}
+    <div className="drawer-menu-section drawer-menu-section-account">
+      {currentUser ? (
+        <>
+          <button className={`drawer-link ${activeTab === 'profile' ? 'active' : ''}`} type="button" onClick={closeThen(onOpenProfile)}>{t('Mein Profil')}</button>
+          <button className="drawer-link" type="button" onClick={closeThen(onLogout)}>{t('Abmelden')}</button>
+        </>
+      ) : (
+        <button className="drawer-link" type="button" onClick={closeThen(onLogin)}>{t('Anmelden')}</button>
+      )}
     </div>
-    {(isAdmin || canManageTournaments) && <div className="drawer-menu-section drawer-menu-section-admin" aria-label={t('Administration')}>
-      <p className="drawer-section-title">{t('Administration')}</p>
-      {isAdmin && <button className={`drawer-link ${activeTab === 'users' ? 'active' : ''}`} type="button" onClick={selectTab('users')}>{t('Benutzer')}</button>}
-      {canManageTournaments && <button className={`drawer-link ${activeTab === 'apikeys' ? 'active' : ''}`} type="button" onClick={selectTab('apikeys')}>{t('API-Zugänge')}</button>}
-    </div>}
-    {currentUser && <div className="drawer-menu-section drawer-menu-section-account">
-      <button className={`drawer-link ${activeTab === 'profile' ? 'active' : ''}`} type="button" onClick={closeThen(onOpenProfile)}>{t('Mein Profil')}</button>
-      <button className="drawer-link" type="button" onClick={closeThen(onLogout)}>{t('Abmelden')}</button>
-    </div>}
   </>;
 }
 
@@ -1169,12 +1170,17 @@ function AppContent() {
     />;
   }
 
+  function loginFromDrawer() {
+    setMenuOpen(false);
+    clearFeedback();
+    if (path !== '/') navigate('/');
+    setAuthView('login');
+  }
+
   function drawerContent(area) {
     return <ContextualDrawerContent
       area={area}
       currentUser={currentUser}
-      canManageTournaments={canManageTournaments}
-      isAdmin={isAdmin}
       activeTab={activeTab}
       onSelectTab={selectDrawerTab}
       onNavigate={navigateFromDrawer}
@@ -1183,6 +1189,7 @@ function AppContent() {
         setMenuOpen(false);
         handleLogout();
       }}
+      onLogin={loginFromDrawer}
     />;
   }
 
@@ -1213,6 +1220,8 @@ function AppContent() {
           registrationInvalidField={registrationInvalidField}
           setMessage={setMessage}
           setError={setError}
+          isAdmin={isAdmin}
+          onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
           onLogout={handleLogout}
           drawerContent={drawerContent('turniere')}
           postboxControl={renderPostboxControl()}
@@ -1231,6 +1240,8 @@ function AppContent() {
           setMenuOpen={setMenuOpen}
           navigate={navigate}
           currentUser={currentUser}
+          isAdmin={isAdmin}
+          onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
           onLogout={handleLogout}
         />
       </Suspense>
@@ -1247,6 +1258,8 @@ function AppContent() {
           setMenuOpen={setMenuOpen}
           navigate={navigate}
           currentUser={currentUser}
+          isAdmin={isAdmin}
+          onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
           onLogout={handleLogout}
         />
       </Suspense>
@@ -1263,6 +1276,8 @@ function AppContent() {
           setMenuOpen={setMenuOpen}
           navigate={navigate}
           currentUser={currentUser}
+          isAdmin={isAdmin}
+          onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
           onLogout={handleLogout}
           turnstileSiteKey={turnstileSiteKey}
           verifyStatus={reportVerifyStatus}
@@ -1283,6 +1298,8 @@ function AppContent() {
           setMenuOpen={setMenuOpen}
           navigate={navigate}
           currentUser={currentUser}
+          isAdmin={isAdmin}
+          onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
           onLogout={handleLogout}
           turnstileSiteKey={turnstileSiteKey}
           verifyStatus={placeReportVerifyStatus}
@@ -1303,6 +1320,8 @@ function AppContent() {
           setMenuOpen={setMenuOpen}
           navigate={navigate}
           currentUser={currentUser}
+          isAdmin={isAdmin}
+          onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
           onLogout={handleLogout}
           drawerContent={drawerContent('bouleplaetze')}
           postboxControl={renderPostboxControl()}
@@ -1312,19 +1331,19 @@ function AppContent() {
   }
 
   if (!needsSetup && path === '/plaetze') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlacesPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} drawerContent={drawerContent('bouleplaetze')} postboxControl={renderPostboxControl()} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlacesPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} isAdmin={isAdmin} onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} drawerContent={drawerContent('bouleplaetze')} postboxControl={renderPostboxControl()} /></Suspense>;
   }
 
   if (!needsSetup && currentUser && path === '/vereine') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyClubsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} drawerContent={drawerContent('bouleplaetze')} postboxControl={renderPostboxControl()} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyClubsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} isAdmin={isAdmin} onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')} onLogout={handleLogout} drawerContent={drawerContent('bouleplaetze')} postboxControl={renderPostboxControl()} /></Suspense>;
   }
 
   if (!needsSetup && path === '/spielerboerse') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerExchangePage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} drawerContent={drawerContent('spielerboerse')} postboxControl={renderPostboxControl()} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerExchangePage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} isAdmin={isAdmin} onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')} onLogout={handleLogout} maptilerApiKey={maptilerApiKey} drawerContent={drawerContent('spielerboerse')} postboxControl={renderPostboxControl()} /></Suspense>;
   }
 
   if (!needsSetup && currentUser && path === '/meine-anzeigen') {
-    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyPlayerListingsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} onLogout={handleLogout} drawerContent={drawerContent('spielerboerse')} postboxControl={renderPostboxControl()} /></Suspense>;
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyPlayerListingsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} isAdmin={isAdmin} onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')} onLogout={handleLogout} drawerContent={drawerContent('spielerboerse')} postboxControl={renderPostboxControl()} /></Suspense>;
   }
 
   if (currentUser && authView === 'cancelRegistration') {
@@ -1338,6 +1357,8 @@ function AppContent() {
           setMenuOpen={setMenuOpen}
           navigate={navigate}
           currentUser={currentUser}
+          isAdmin={isAdmin}
+          onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
           onLogout={handleLogout}
         />
         <section className="single-column">
@@ -1442,26 +1463,18 @@ function AppContent() {
           >
             {t('Anmelden')}
           </button>
-          <button
-            className="drawer-link"
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              navigate('/turnier-melden');
-            }}
-          >
-            {t('Turnier melden')}
-          </button>
-          <button
-            className="drawer-link"
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              navigate('/platz-melden');
-            }}
-          >
-            {t('Bouleplatz melden')}
-          </button>
+          <div className="drawer-menu-section" aria-label={t('Turniere')}>
+            <button
+              className="drawer-link"
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                navigate('/turnier-melden');
+              }}
+            >
+              {t('Turnier melden')}
+            </button>
+          </div>
           <a
             className="drawer-link"
             href="https://michaelmassee.github.io/Petanque-Turnier-Manager/"
@@ -1646,12 +1659,14 @@ function AppContent() {
   const activeTabHeading =
     activeTab === 'profile'
       ? t('Mein Profil')
+      : activeTab === 'admin-dashboard'
+      ? t('Admin Dashboard')
       : activeTab === 'users'
       ? t('Benutzerverwaltung')
       : activeTab === 'clubs'
       ? t('Vereine & Bouleplätze')
       : activeTab === 'apikeys'
-        ? t('API-Zugänge')
+        ? t('Alle API-Schlüssel')
         : activeTab === 'petanque-aktuell-import'
           ? t('Pétanque Aktuell importieren')
         : activeTab === 'play'
@@ -1661,6 +1676,13 @@ function AppContent() {
             : activeTab === 'tournaments'
               ? t('Turnierverwaltung')
               : homeHeading;
+
+  const activeTabArea =
+    activeTab === 'clubs'
+      ? 'bouleplaetze'
+      : (activeTab === 'home' || activeTab === 'tournaments' || activeTab === 'registrations' || activeTab === 'play' || activeTab === 'petanque-aktuell-import')
+        ? 'turniere'
+        : null;
 
   return (
     <main className="app-shell">
@@ -1676,6 +1698,8 @@ function AppContent() {
         onCloseMenu={() => setMenuOpen(false)}
         navigate={navigate}
         currentUser={currentUser}
+        isAdmin={isAdmin}
+        onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
         onLogoClick={() => {
           setActiveTab('home');
           clearFeedback();
@@ -1744,7 +1768,7 @@ function AppContent() {
           <span data-i18n-skip>{currentUser.firstName} {currentUser.lastName}</span>
           <strong>{roleLabel}</strong>
         </div>
-        {drawerContent(activeTab === 'clubs' ? 'bouleplaetze' : 'turniere')}
+        {drawerContent(activeTabArea)}
       </AppHeader>
 
       <Feedback message={message} error={error} />
@@ -1891,6 +1915,17 @@ function AppContent() {
         </Suspense>
       )}
 
+      {activeTab === 'admin-dashboard' && isAdmin && (
+        <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
+          <AdminDashboardPage
+            onSelectTab={selectDrawerTab}
+            onNavigate={navigateFromDrawer}
+            tournamentsCount={tournaments.length}
+            registrationsCount={tournaments.reduce((sum, tournament) => sum + (tournament.activeRegistrations || 0), 0)}
+          />
+        </Suspense>
+      )}
+
       {activeTab === 'users' && isAdmin && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <UserManagementPanel
@@ -1907,7 +1942,7 @@ function AppContent() {
         </Suspense>
       )}
 
-      {activeTab === 'apikeys' && canManageTournaments && (
+      {activeTab === 'apikeys' && isAdmin && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
             <ApiKeysPanel isAdmin={isAdmin} />
@@ -1941,47 +1976,52 @@ function AppContent() {
 export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = false }) {
   const { t } = useTranslation();
   return (
-    <div className="panel">
-      <div className="section-title">
-        <h2>{t('Mein Profil')}</h2>
+    <>
+      <div className="panel">
+        <div className="section-title">
+          <h2>{t('Mein Profil')}</h2>
+        </div>
+        <p className="muted">{t('Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.')}</p>
+        {currentUser.pendingEmail && (
+          <p className="hint">
+            {`${t('Bestätigung ausstehend für')} ${currentUser.pendingEmail}. ${t('Bitte prüfe dein Postfach, um die Änderung abzuschließen.')}`}
+          </p>
+        )}
+        <form className="form" onSubmit={onSubmit}>
+          <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
+          <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
+          <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+          <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
+          <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
+          <TextField
+            label={t('Aktuelles Passwort')}
+            type="password"
+            value={form.currentPassword}
+            onChange={(currentPassword) => setForm({ ...form, currentPassword })}
+          />
+          <p className="hint">{t('Nur erforderlich, wenn du deine E-Mail-Adresse oder dein Passwort änderst.')}</p>
+          <TextField
+            label={t('Neues Passwort')}
+            type="password"
+            value={form.newPassword}
+            onChange={(newPassword) => setForm({ ...form, newPassword })}
+            minLength={8}
+          />
+          <p className="hint">{t(PASSWORD_STRENGTH_HINT)}</p>
+          <TextField
+            label={t('Passwort bestätigen')}
+            type="password"
+            value={form.newPasswordConfirm}
+            onChange={(newPasswordConfirm) => setForm({ ...form, newPasswordConfirm })}
+            minLength={8}
+          />
+          <Button type="submit" loading={saving}>{t('Speichern')}</Button>
+        </form>
       </div>
-      <p className="muted">{t('Bearbeite deinen Namen, deine E-Mail-Adresse und dein Passwort.')}</p>
-      {currentUser.pendingEmail && (
-        <p className="hint">
-          {`${t('Bestätigung ausstehend für')} ${currentUser.pendingEmail}. ${t('Bitte prüfe dein Postfach, um die Änderung abzuschließen.')}`}
-        </p>
-      )}
-      <form className="form" onSubmit={onSubmit}>
-        <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
-        <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
-        <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
-        <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
-        <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
-        <TextField
-          label={t('Aktuelles Passwort')}
-          type="password"
-          value={form.currentPassword}
-          onChange={(currentPassword) => setForm({ ...form, currentPassword })}
-        />
-        <p className="hint">{t('Nur erforderlich, wenn du deine E-Mail-Adresse oder dein Passwort änderst.')}</p>
-        <TextField
-          label={t('Neues Passwort')}
-          type="password"
-          value={form.newPassword}
-          onChange={(newPassword) => setForm({ ...form, newPassword })}
-          minLength={8}
-        />
-        <p className="hint">{t(PASSWORD_STRENGTH_HINT)}</p>
-        <TextField
-          label={t('Passwort bestätigen')}
-          type="password"
-          value={form.newPasswordConfirm}
-          onChange={(newPasswordConfirm) => setForm({ ...form, newPasswordConfirm })}
-          minLength={8}
-        />
-        <Button type="submit" loading={saving}>{t('Speichern')}</Button>
-      </form>
-    </div>
+      <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
+        <OwnApiKeysPanel />
+      </Suspense>
+    </>
   );
 }
 
@@ -2243,6 +2283,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             licenseRequired={tournament.licenseRequired}
             teamNameEnabled={tournament.teamNameEnabled}
             feeTiers={tournament.feeTiers}
+            registrationQuestions={tournament.registrationQuestions}
             currency={tournament.currency}
             invalidField={invalidField}
           />

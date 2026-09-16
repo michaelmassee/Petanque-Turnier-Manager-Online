@@ -132,6 +132,7 @@ export const EMPTY_TOURNAMENT_FORM = {
   timezone: '',
   entryFeeAmount: '',
   feeTiers: [],
+  registrationQuestions: [],
   currency: 'EUR',
   contactName: '',
   contactEmail: '',
@@ -186,6 +187,7 @@ export const EMPTY_PLACE_REPORT_FORM = {
 export const EMPTY_REGISTRATION_FORM = {
   id: '',
   tournamentId: '',
+  registrationAnswers: [],
   firstName: '',
   lastName: '',
   email: '',

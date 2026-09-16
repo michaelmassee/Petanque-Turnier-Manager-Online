@@ -93,6 +93,8 @@ export function PlaceReportPage({
   setMenuOpen,
   navigate,
   currentUser,
+  isAdmin,
+  onSelectAdminDashboard,
   onLogout,
   turnstileSiteKey,
   verifyStatus,
@@ -140,6 +142,8 @@ export function PlaceReportPage({
         setMenuOpen={setMenuOpen}
         navigate={navigate}
         currentUser={currentUser}
+        isAdmin={isAdmin}
+        onSelectAdminDashboard={onSelectAdminDashboard}
         onLogout={onLogout}
         drawerContent={drawerContent}
         postboxControl={postboxControl}

@@ -26,6 +26,7 @@ export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournament
         licenseRequired={selectedTournament?.licenseRequired}
         teamNameEnabled={selectedTournament?.teamNameEnabled}
         feeTiers={selectedTournament?.feeTiers}
+        registrationQuestions={selectedTournament?.registrationQuestions}
         currency={selectedTournament?.currency}
         invalidField={invalidField}
       />
@@ -82,14 +83,28 @@ function csvField(value) {
   return text;
 }
 
-function registrationsToCsv(registrations, currency) {
-  const lines = [REGISTRATION_CSV_COLUMNS.map(csvField).join(',')];
+function registrationQuestionColumns(tournament, t) {
+  const roles = ['primary', ...(tournament?.registrationType === 'forme' && tournament?.formation !== 'tete' ? ['partner'] : []), ...(tournament?.registrationType === 'forme' && tournament?.formation === 'triplette' ? ['partner2'] : [])];
+  const roleLabels = { primary: t('Hauptspieler'), partner: t('Partner'), partner2: t('Partner 2') };
+  return (tournament?.registrationQuestions || []).flatMap((question) => roles.map((participant) => ({
+    key: `${question.id}:${participant}`,
+    label: `${question.label} (${roleLabels[participant]})`,
+  })));
+}
+
+function registrationsToCsv(registrations, tournament, t) {
+  const questionColumns = registrationQuestionColumns(tournament, t);
+  const lines = [[...REGISTRATION_CSV_COLUMNS, ...questionColumns.map((column) => column.label)].map(csvField).join(',')];
   for (const registration of registrations) {
-    lines.push(REGISTRATION_CSV_COLUMNS.map((column) => {
+    const standardColumns = REGISTRATION_CSV_COLUMNS.map((column) => {
       if (column === 'feeSelections') return csvField((registration.feeSelections || []).map((selection) => `${selection.name} (${formatMoney(selection.amountCents, currency, 'de')})`).join('; '));
       if (column === 'feeTotalCents') return csvField(registration.feeSelections?.length ? formatMoney(registration.feeTotalCents, currency, 'de') : '');
       return csvField(registration[column]);
-    }).join(','));
+    });
+    const questionValues = questionColumns.map((column) => csvField(
+      (registration.registrationAnswers || []).some((answer) => `${answer.questionId}:${answer.participant}` === column.key) ? t('Ja') : t('Nein'),
+    ));
+    lines.push([...standardColumns, ...questionValues].join(','));
   }
   return `﻿${lines.join('\r\n')}\r\n`;
 }
@@ -101,8 +116,8 @@ function tournamentFileSlug(name) {
     .replace(/^-+|-+$/g, '') || 'turnier';
 }
 
-function downloadRegistrationsCsv(tournament, registrations) {
-  const csv = registrationsToCsv(registrations, tournament?.currency);
+function downloadRegistrationsCsv(tournament, registrations, t) {
+  const csv = registrationsToCsv(registrations, tournament, t);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -135,6 +150,7 @@ function registrationToForm(registration) {
     partner2Email: registration.partner2Email || '',
     partner2LicenseNr: registration.partner2LicenseNr || '',
     feeSelections: registration.feeSelections || [],
+    registrationAnswers: registration.registrationAnswers || [],
     teamName: registration.teamName || '',
     seedingPosition: registration.seedingPosition || '',
     status: registration.status || 'pending',
@@ -144,6 +160,7 @@ function registrationToForm(registration) {
 
 function RegistrationRow({ registration, tournament, showConfirm = false, busy, busyOther, onConfirm, onEdit, onDelete }) {
   const { t } = useTranslation();
+  const participantLabel = { primary: t('Hauptspieler'), partner: t('Partner'), partner2: t('Partner 2') };
   return (
     <article className="data-row">
       <div>
@@ -155,6 +172,10 @@ function RegistrationRow({ registration, tournament, showConfirm = false, busy, 
         {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
         {registration.organizerMessage && <small data-i18n-skip>{registration.organizerMessage}</small>}
         {registration.feeSelections?.length > 0 && <small data-i18n-skip>{registration.feeSelections.map((selection) => `${selection.name}: ${formatMoney(selection.amountCents, tournament?.currency, 'de')}`).join(' · ')}{registration.feeTotalCents ? ` = ${formatMoney(registration.feeTotalCents, tournament?.currency, 'de')}` : ''}</small>}
+        {(tournament?.registrationQuestions || []).map((question) => {
+          const answers = (registration.registrationAnswers || []).filter((answer) => answer.questionId === question.id);
+          return answers.length > 0 ? <small key={question.id}><span data-i18n-skip>{question.label}</span>: {answers.map((answer) => participantLabel[answer.participant]).join(', ')}</small> : null;
+        })}
       </div>
       <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
       <div className="row-actions">
@@ -208,7 +229,7 @@ export function RegistrationsPanel({
         <Button
           variant="secondary"
           disabled={registrations.length === 0}
-          onClick={() => downloadRegistrationsCsv(tournament, registrations)}
+          onClick={() => downloadRegistrationsCsv(tournament, registrations, t)}
         >
           {t('CSV exportieren')}
         </Button>

@@ -15,13 +15,130 @@ const API_KEY_STATUS_FILTERS = [
 
 const EMPTY_ADMIN_KEY_FORM = { id: '', userId: '', label: '' };
 
-function ApiKeysPanel({ isAdmin }) {
+export function OwnApiKeysPanel() {
   const { t } = useTranslation();
   const [apiKeys, setApiKeys] = useState([]);
   const [label, setLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [panelError, setPanelError] = useState('');
   const [revealedSecret, setRevealedSecret] = useState(null);
+  const [actionId, setActionId] = useState('');
+
+  async function loadOwnKeys() {
+    try {
+      const data = await authenticatedApi('/api/api-keys');
+      setApiKeys(data.apiKeys);
+    } catch (err) {
+      setPanelError(err.message);
+    }
+  }
+
+  useEffect(() => {
+    loadOwnKeys();
+  }, []);
+
+  async function handleRequest(event) {
+    event.preventDefault();
+    if (!label.trim()) {
+      return;
+    }
+    setBusy(true);
+    setPanelError('');
+    try {
+      await authenticatedApi('/api/api-keys/request', { method: 'POST', body: JSON.stringify({ label: label.trim() }) });
+      setLabel('');
+      await loadOwnKeys();
+    } catch (err) {
+      setPanelError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRevealSecret(id) {
+    setPanelError('');
+    setActionId(`reveal-${id}`);
+    try {
+      const data = await authenticatedApi(`/api/api-keys/${id}/secret`);
+      setRevealedSecret({ id, secret: data.secret });
+      await loadOwnKeys();
+    } catch (err) {
+      setPanelError(err.message);
+    } finally {
+      setActionId('');
+    }
+  }
+
+  return (
+    <div className="panel">
+      <div className="section-title">
+        <h2>{t('API-Zugänge')}</h2>
+      </div>
+      <p className="hint">
+        {t('Externe Turnierleitungs-Software (z.B. das PTM-Hauptprogramm auf deinem Rechner) braucht einen freigeschalteten API-Schlüssel, um Turniere anzulegen und Anmeldungen abzugleichen. Ein Administrator muss jede Installation einzeln genehmigen.')}
+      </p>
+
+      <form className="form" onSubmit={handleRequest}>
+        <input
+          type="text"
+          placeholder={t('Bezeichnung der Installation, z.B. Bürorechner')}
+          value={label}
+          onChange={(event) => setLabel(event.target.value)}
+        />
+        <Button type="submit" disabled={busy || !label.trim()} loading={busy}>
+          {t('Schlüssel beantragen')}
+        </Button>
+      </form>
+
+      {panelError && <p className="feedback error">{panelError}</p>}
+
+      {revealedSecret && (
+        <div className="api-key-secret-box">
+          <p>{t('Speichere diesen Schlüssel jetzt sicher ab. Er wird nicht erneut angezeigt.')}</p>
+          <code>{revealedSecret.secret}</code>
+        </div>
+      )}
+
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>{t('Bezeichnung')}</th>
+            <th>{t('Status')}</th>
+            <th>{t('Beantragt am')}</th>
+            <th>{t('Zuletzt genutzt')}</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {apiKeys.map((key) => (
+            <tr key={key.id}>
+              <td>{key.label}</td>
+              <td>{API_KEY_STATUS_LABELS[key.status] || key.status}</td>
+              <td>{formatDateTime(key.requestedAt)}</td>
+              <td>{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : '–'}</td>
+              <td>
+                {key.status === 'approved' && key.secretAvailable && (
+                  <Button variant="secondary" disabled={Boolean(actionId)} loading={actionId === `reveal-${key.id}`} onClick={() => handleRevealSecret(key.id)}>
+                    {t('Schlüssel abholen')}
+                  </Button>
+                )}
+              </td>
+            </tr>
+          ))}
+          {apiKeys.length === 0 && (
+            <tr>
+              <td colSpan={5}>{t('Noch keine API-Schlüssel beantragt.')}</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ApiKeysPanel({ isAdmin }) {
+  const { t } = useTranslation();
+  const [panelError, setPanelError] = useState('');
 
   const [allApiKeys, setAllApiKeys] = useState([]);
   const [users, setUsers] = useState([]);
@@ -33,15 +150,6 @@ function ApiKeysPanel({ isAdmin }) {
   const [adminError, setAdminError] = useState('');
   const [adminSaving, setAdminSaving] = useState(false);
   const [adminActionId, setAdminActionId] = useState('');
-
-  async function loadOwnKeys() {
-    try {
-      const data = await authenticatedApi('/api/api-keys');
-      setApiKeys(data.apiKeys);
-    } catch (err) {
-      setPanelError(err.message);
-    }
-  }
 
   async function loadAllApiKeys() {
     if (!isAdmin) {
@@ -68,7 +176,6 @@ function ApiKeysPanel({ isAdmin }) {
   }
 
   useEffect(() => {
-    loadOwnKeys();
     loadAllApiKeys();
     loadUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -82,38 +189,6 @@ function ApiKeysPanel({ isAdmin }) {
     setStatusFilter('');
   }
 
-  async function handleRequest(event) {
-    event.preventDefault();
-    if (!label.trim()) {
-      return;
-    }
-    setBusy(true);
-    setPanelError('');
-    try {
-      await authenticatedApi('/api/api-keys/request', { method: 'POST', body: JSON.stringify({ label: label.trim() }) });
-      setLabel('');
-      await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
-    } catch (err) {
-      setPanelError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleRevealSecret(id) {
-    setPanelError('');
-    setAdminActionId(`reveal-${id}`);
-    try {
-      const data = await authenticatedApi(`/api/api-keys/${id}/secret`);
-      setRevealedSecret({ id, secret: data.secret });
-      await loadOwnKeys();
-    } catch (err) {
-      setPanelError(err.message);
-    } finally {
-      setAdminActionId('');
-    }
-  }
-
   async function handleRevoke(id) {
     if (!window.confirm('API-Schlüssel wirklich sperren?')) {
       return;
@@ -122,7 +197,7 @@ function ApiKeysPanel({ isAdmin }) {
     setAdminActionId(`revoke-${id}`);
     try {
       await authenticatedApi(`/api/admin/api-keys/${id}/revoke`, { method: 'POST' });
-      await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
+      await loadAllApiKeys();
     } catch (err) {
       setPanelError(err.message);
     } finally {
@@ -135,7 +210,7 @@ function ApiKeysPanel({ isAdmin }) {
     setAdminActionId(`approve-${id}`);
     try {
       await authenticatedApi(`/api/admin/api-keys/${id}/approve`, { method: 'POST' });
-      await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
+      await loadAllApiKeys();
     } catch (err) {
       setPanelError(err.message);
     } finally {
@@ -151,7 +226,7 @@ function ApiKeysPanel({ isAdmin }) {
     setAdminActionId(`delete-${key.id}`);
     try {
       await authenticatedApi(`/api/admin/api-keys/${key.id}`, { method: 'DELETE' });
-      await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
+      await loadAllApiKeys();
     } catch (err) {
       setPanelError(err.message);
     } finally {
@@ -188,7 +263,7 @@ function ApiKeysPanel({ isAdmin }) {
         await authenticatedApi('/api/admin/api-keys', { method: 'POST', body: JSON.stringify({ userId: form.userId, label: form.label.trim() }) });
       }
       setDialogOpen(false);
-      await Promise.all([loadOwnKeys(), loadAllApiKeys()]);
+      await loadAllApiKeys();
     } catch (err) {
       setAdminError(err.message);
     } finally {
@@ -200,70 +275,6 @@ function ApiKeysPanel({ isAdmin }) {
 
   return (
     <>
-      <div className="panel">
-        <div className="section-title">
-          <h2>{t('API-Zugänge')}</h2>
-        </div>
-        <p className="hint">
-          {t('Externe Turnierleitungs-Software (z.B. das PTM-Hauptprogramm auf deinem Rechner) braucht einen freigeschalteten API-Schlüssel, um Turniere anzulegen und Anmeldungen abzugleichen. Ein Administrator muss jede Installation einzeln genehmigen.')}
-        </p>
-
-        <form className="form" onSubmit={handleRequest}>
-          <input
-            type="text"
-            placeholder={t('Bezeichnung der Installation, z.B. Bürorechner')}
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-          />
-          <Button type="submit" disabled={busy || !label.trim()} loading={busy}>
-            {t('Schlüssel beantragen')}
-          </Button>
-        </form>
-
-        {panelError && <p className="feedback error">{panelError}</p>}
-
-        {revealedSecret && (
-          <div className="api-key-secret-box">
-            <p>{t('Speichere diesen Schlüssel jetzt sicher ab. Er wird nicht erneut angezeigt.')}</p>
-            <code>{revealedSecret.secret}</code>
-          </div>
-        )}
-
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>{t('Bezeichnung')}</th>
-              <th>{t('Status')}</th>
-              <th>{t('Beantragt am')}</th>
-              <th>{t('Zuletzt genutzt')}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {apiKeys.map((key) => (
-              <tr key={key.id}>
-                <td>{key.label}</td>
-                <td>{API_KEY_STATUS_LABELS[key.status] || key.status}</td>
-                <td>{formatDateTime(key.requestedAt)}</td>
-                <td>{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : '–'}</td>
-                <td>
-                  {key.status === 'approved' && key.secretAvailable && (
-                    <Button variant="secondary" disabled={Boolean(adminActionId)} loading={adminActionId === `reveal-${key.id}`} onClick={() => handleRevealSecret(key.id)}>
-                      {t('Schlüssel abholen')}
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {apiKeys.length === 0 && (
-              <tr>
-                <td colSpan={5}>{t('Noch keine API-Schlüssel beantragt.')}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
       {isAdmin && (
         <div className="panel">
           <div className="section-title">
@@ -273,6 +284,7 @@ function ApiKeysPanel({ isAdmin }) {
               {t('Neuer API-Schlüssel')}
             </Button>
           </div>
+          {panelError && <p className="feedback error">{panelError}</p>}
           <ListToolbar
             query={query}
             onQueryChange={setQuery}

@@ -6,6 +6,12 @@ const TYPE_OPTIONS = [
   { value: 'tournament', label: 'Turnier' },
   { value: 'training', label: 'Training' },
 ];
+const PLAYING_POSITION_OPTIONS = [
+  { value: 'leger', label: 'Leger' },
+  { value: 'milieu', label: 'Milieu' },
+  { value: 'schiesser', label: 'Schießer' },
+  { value: 'egal', label: 'Egal' },
+];
 
 export function PlayerListingFields({ form, setForm, language }) {
   const { t } = useTranslation();
@@ -19,6 +25,12 @@ export function PlayerListingFields({ form, setForm, language }) {
       />
       <TextField label={t('Titel')} value={form.title} onChange={(title) => setForm({ ...form, title })} required minLength={2} />
       <TextArea label={t('Beschreibung')} value={form.description} onChange={(description) => setForm({ ...form, description })} />
+      <SelectField
+        label={t('Ich bin')}
+        value={form.playingPosition}
+        onChange={(playingPosition) => setForm({ ...form, playingPosition })}
+        options={PLAYING_POSITION_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
+      />
       <LocationAutocomplete
         label={t('Ort')}
         value={form.locationName}

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { StandalonePageHeader } from '../components/layout.jsx';
 
-export function ImpressumPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout }) {
+export function ImpressumPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, isAdmin, onSelectAdminDashboard, onLogout }) {
   const { t } = useTranslation();
   return (
     <main className="app-shell">
@@ -13,6 +13,8 @@ export function ImpressumPage({ language, setLanguage, menuOpen, setMenuOpen, na
         setMenuOpen={setMenuOpen}
         navigate={navigate}
         currentUser={currentUser}
+        isAdmin={isAdmin}
+        onSelectAdminDashboard={onSelectAdminDashboard}
         onLogout={onLogout}
       />
 

@@ -16,6 +16,7 @@ import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx'
 const FALLBACK_CENTER = [51.1, 10.4];
 const marker = new L.Icon({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow, iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] });
 const TYPE_FILTER_OPTIONS = [{ value: '', label: 'Alle Typen' }, { value: 'tournament', label: 'Turnier' }, { value: 'training', label: 'Training' }];
+const PLAYING_POSITION_FILTER_OPTIONS = [{ value: '', label: 'Alle Spielpositionen' }, { value: 'leger', label: 'Leger' }, { value: 'milieu', label: 'Milieu' }, { value: 'schiesser', label: 'Schießer' }, { value: 'egal', label: 'Egal' }];
 
 function ContactDialog({ listing, onClose }) {
   const { t } = useTranslation();
@@ -58,6 +59,8 @@ function PlayerExchangeSearchMenu({
   setQuery,
   typeFilter,
   setTypeFilter,
+  playingPositionFilter,
+  setPlayingPositionFilter,
   searchOrigin,
   searchOriginQuery,
   setSearchOriginQuery,
@@ -91,6 +94,7 @@ function PlayerExchangeSearchMenu({
               <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Nach Titel, Beschreibung oder Ort suchen')} />
             </label>
             <SelectField label={t('Typ filtern')} value={typeFilter} onChange={setTypeFilter} options={TYPE_FILTER_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
+            <SelectField label={t('Spielposition filtern')} value={playingPositionFilter} onChange={setPlayingPositionFilter} options={PLAYING_POSITION_FILTER_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
 
             <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
               <LocationAutocomplete
@@ -118,10 +122,11 @@ function PlayerExchangeSearchMenu({
   );
 }
 
-export default function PlayerExchangePage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, maptilerApiKey, drawerContent, postboxControl }) {
+export default function PlayerExchangePage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, isAdmin, onSelectAdminDashboard, onLogout, maptilerApiKey, drawerContent, postboxControl }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [playingPositionFilter, setPlayingPositionFilter] = useState('');
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -138,12 +143,12 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
   async function load() {
     setLoading(true); setError('');
     try {
-      const params = new URLSearchParams({ q: query, type: typeFilter });
+      const params = new URLSearchParams({ q: query, type: typeFilter, playingPosition: playingPositionFilter });
       const data = await api(`/api/player-listings?${params.toString()}`);
       setListings(data.listings || []);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }
-  useEffect(() => { const timer = setTimeout(load, 180); return () => clearTimeout(timer); }, [query, typeFilter]);
+  useEffect(() => { const timer = setTimeout(load, 180); return () => clearTimeout(timer); }, [query, typeFilter, playingPositionFilter]);
 
   const visibleListings = useMemo(() => {
     let results = listings;
@@ -215,7 +220,8 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
 
   const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);
   const typeFilterLabel = typeFilter ? t(labelFor(TYPE_FILTER_OPTIONS, typeFilter)) : null;
-  const activeFilterCount = [query, typeFilter].filter(Boolean).length;
+  const playingPositionFilterLabel = playingPositionFilter ? t(labelFor(PLAYING_POSITION_FILTER_OPTIONS, playingPositionFilter)) : null;
+  const activeFilterCount = [query, typeFilter, playingPositionFilter].filter(Boolean).length;
 
   return (
     <main className="app-shell">
@@ -227,6 +233,8 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
         setMenuOpen={setMenuOpen}
         navigate={navigate}
         currentUser={currentUser}
+        isAdmin={isAdmin}
+        onSelectAdminDashboard={onSelectAdminDashboard}
         onLogout={onLogout}
         drawerContent={drawerContent}
         postboxControl={postboxControl}
@@ -239,6 +247,8 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
             setQuery={setQuery}
             typeFilter={typeFilter}
             setTypeFilter={setTypeFilter}
+            playingPositionFilter={playingPositionFilter}
+            setPlayingPositionFilter={setPlayingPositionFilter}
             searchOrigin={searchOrigin}
             searchOriginQuery={searchOriginQuery}
             setSearchOriginQuery={setSearchOriginQuery}
@@ -264,14 +274,14 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
             <button
               type="button"
               onClick={() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              aria-label={`${visibleListings.length} ${t('gefundene Anzeigen – zur Liste springen')}`}
+              aria-label={`${visibleListings.length} ${t('gefundene Mitspielgesuche – zur Liste springen')}`}
             >
               <strong>{visibleListings.length}</strong>
-              <span>{t('Gefundene Anzeigen')}</span>
+              <span>{t('Gefundene Mitspielgesuche')}</span>
             </button>
             <button type="button" onClick={() => setSearchMenuOpen(true)} aria-label={`${activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')} ${t('– Filter öffnen')}`}>
               <strong>{activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')}</strong>
-              <span>{typeFilterLabel || t('Finder')}</span>
+              <span>{playingPositionFilterLabel || typeFilterLabel || t('Finder')}</span>
             </button>
             <button type="button" onClick={() => setSearchMenuOpen(true)} aria-label={t('Umkreissuche öffnen')}>
               <strong>{searchOrigin ? <>{radiusLabel} {t('Umkreis')}</> : t('Umkreissuche aus')}</strong>
@@ -295,19 +305,19 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
         )}
 
         <div className="section-title home-results-title" ref={resultsRef}>
-          <p className="eyebrow">{t('Alle passenden Anzeigen')}</p>
+          <p className="eyebrow">{t('Alle passenden Mitspielgesuche')}</p>
           <span className="counter">{visibleListings.length}</span>
         </div>
 
         {loading ? <p className="muted">{t('Lädt …')}</p> : visibleListings.length === 0 ? (
           <div className="empty-state">
-            <strong>{t('Keine Anzeigen gefunden.')}</strong>
+            <strong>{t('Keine Mitspielgesuche gefunden.')}</strong>
           </div>
         ) : (
           <div className="places-list">
             {visibleListings.map((listing) => (
               <article className="panel place-card" key={listing.id}>
-                <div><h2 data-i18n-skip>{listing.title}</h2><p className="muted" data-i18n-skip>{listing.type === 'tournament' ? t('Turnier') : t('Training')} · {listing.locationName}{listing.eventDate ? ` · ${listing.eventDate}` : ''}</p></div>
+                <div><h2 data-i18n-skip>{listing.title}</h2><p className="muted" data-i18n-skip>{listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {listing.locationName}{listing.eventDate ? ` · ${listing.eventDate}` : ''}</p></div>
                 {listing.description && <p data-i18n-skip>{listing.description}</p>}
                 {listing.ownerName && <p className="muted">{t('Von')} {listing.ownerName}</p>}
                 <DistanceBadge distanceKm={listing.distanceKm} />

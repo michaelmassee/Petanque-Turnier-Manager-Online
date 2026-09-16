@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
-import { Button, EditDialog, ListToolbar } from '../components/ui.jsx';
+import { Button, EditDialog, ListToolbar, SelectField } from '../components/ui.jsx';
 import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 
 const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '' };
@@ -24,29 +24,80 @@ export function ClubModerationPanel({ language }) {
   const [requests, setRequests] = useState([]);
   const [places, setPlaces] = useState([]);
   const [placeReports, setPlaceReports] = useState([]);
+  const [clubs, setClubs] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [editPlaceId, setEditPlaceId] = useState(null);
   const [editPlaceForm, setEditPlaceForm] = useState(EMPTY_PLACE_FORM);
   const [editPlaceSaving, setEditPlaceSaving] = useState(false);
+  const [ownerDialogClub, setOwnerDialogClub] = useState(null);
+  const [selectedOwnerId, setSelectedOwnerId] = useState('');
+  const [ownerSaving, setOwnerSaving] = useState(false);
+  const [ownerError, setOwnerError] = useState('');
   const [busyId, setBusyId] = useState('');
   const [query, setQuery] = useState('');
 
   async function load() {
     setLoading(true); setError('');
     try {
-      const [requestsData, placesData, placeReportsData] = await Promise.all([
+      const [requestsData, placesData, placeReportsData, clubsData, usersData] = await Promise.all([
         authenticatedApi('/api/admin/club-editor-requests'),
         authenticatedApi('/api/admin/pending-places'),
         authenticatedApi('/api/admin/place-reports'),
+        authenticatedApi('/api/admin/clubs'),
+        authenticatedApi('/api/users'),
       ]);
       setRequests(requestsData.requests || []);
       setPlaces(placesData.places || []);
       setPlaceReports(placeReportsData.places || []);
+      setClubs(clubsData.clubs || []);
+      setUsers(usersData.users || []);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  function openChangeOwner(club) {
+    setOwnerDialogClub(club);
+    setSelectedOwnerId('');
+    setOwnerError('');
+  }
+
+  async function submitChangeOwner(event) {
+    event.preventDefault();
+    if (!selectedOwnerId) return;
+    setOwnerSaving(true); setOwnerError('');
+    try {
+      await authenticatedApi(`/api/admin/clubs/${ownerDialogClub.id}/owner`, { method: 'PUT', body: JSON.stringify({ userId: selectedOwnerId }) });
+      setOwnerDialogClub(null);
+      setMessage(t('Owner geändert.'));
+      await load();
+    } catch (err) { setOwnerError(err.message); } finally { setOwnerSaving(false); }
+  }
+
+  async function setClubStatus(club, status) {
+    setError(''); setMessage('');
+    const id = `club-status-${club.id}`;
+    setBusyId(id);
+    try {
+      await authenticatedApi(`/api/admin/clubs/${club.id}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
+      setMessage(t('Vereinsstatus aktualisiert.'));
+      await load();
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+  }
+
+  async function deleteClub(club) {
+    if (!window.confirm(t('Verein „{name}“ wirklich löschen? Alle zugehörigen Bouleplätze werden mitgelöscht.').replace('{name}', club.name))) return;
+    setError(''); setMessage('');
+    const id = `club-delete-${club.id}`;
+    setBusyId(id);
+    try {
+      await authenticatedApi(`/api/admin/clubs/${club.id}`, { method: 'DELETE' });
+      setMessage(t('Verein gelöscht.'));
+      await load();
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+  }
 
   async function approveRequest(request) {
     setError(''); setMessage('');
@@ -80,6 +131,9 @@ export function ClubModerationPanel({ language }) {
   const filteredPlaceReports = term
     ? placeReports.filter((p) => `${p.name} ${p.address}`.toLowerCase().includes(term))
     : placeReports;
+  const filteredClubs = term
+    ? clubs.filter((c) => `${c.name} ${c.ownerName} ${c.ownerEmail}`.toLowerCase().includes(term))
+    : clubs;
 
   async function submitEditPlace(event) {
     event.preventDefault();
@@ -186,6 +240,37 @@ export function ClubModerationPanel({ language }) {
               ))}
             </div>
           </div>
+
+          <div className="panel user-list-panel">
+            <div className="section-title">
+              <h2>{t('Alle Vereine')}</h2>
+              <span className="counter">{filteredClubs.length}</span>
+            </div>
+            <div className="user-list">
+              {filteredClubs.length === 0 && <p className="muted">{t('Keine Vereine vorhanden.')}</p>}
+              {filteredClubs.map((club) => {
+                const statusId = `club-status-${club.id}`;
+                const deleteId = `club-delete-${club.id}`;
+                return (
+                  <article className="data-row" key={club.id}>
+                    <div>
+                      <strong data-i18n-skip>{club.name}</strong>
+                      <span data-i18n-skip className={club.status === 'published' ? 'status registration-confirmed' : club.status === 'rejected' ? 'status registration-cancelled' : 'status registration-pending'}>
+                        {statusLabel(club.status, t)} · {club.ownerName} ({club.ownerEmail})
+                      </span>
+                      <small data-i18n-skip>{t('{count} Bouleplätze').replace('{count}', club.placeCount)} · {t('{count} Bearbeiter').replace('{count}', club.editorCount)}</small>
+                    </div>
+                    <div className="row-actions">
+                      {club.status !== 'published' && <Button loading={busyId === statusId} disabled={Boolean(busyId)} onClick={() => setClubStatus(club, 'published')}>{t('Freigeben')}</Button>}
+                      {club.status !== 'rejected' && <Button variant="secondary" loading={busyId === statusId} disabled={Boolean(busyId)} onClick={() => setClubStatus(club, 'rejected')}>{t('Ablehnen')}</Button>}
+                      <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openChangeOwner(club)}>{t('Owner ändern')}</Button>
+                      <Button variant="danger" loading={busyId === deleteId} disabled={Boolean(busyId)} onClick={() => deleteClub(club)}>{t('Löschen')}</Button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
         </>
       )}
 
@@ -197,6 +282,30 @@ export function ClubModerationPanel({ language }) {
             <Button type="submit" loading={editPlaceSaving}>{t('Speichern')}</Button>
           </div>
         </form>
+      </EditDialog>
+
+      <EditDialog open={Boolean(ownerDialogClub)} title={ownerDialogClub ? t('Owner ändern für {name}').replace('{name}', ownerDialogClub.name) : ''} onClose={() => setOwnerDialogClub(null)}>
+        {ownerDialogClub && (
+          <form className="form" onSubmit={submitChangeOwner}>
+            {ownerError && <p className="feedback error">{ownerError}</p>}
+            <p className="muted">
+              {t('Aktueller Owner:')} <span data-i18n-skip>{ownerDialogClub.ownerName} ({ownerDialogClub.ownerEmail})</span>
+            </p>
+            <SelectField
+              label={t('Owner wechseln')}
+              value={selectedOwnerId}
+              onChange={setSelectedOwnerId}
+              options={[
+                { value: '', label: t('Bitte wählen') },
+                ...users.filter((u) => u.id !== ownerDialogClub.ownerId).map((u) => ({ value: u.id, label: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email })),
+              ]}
+            />
+            <div className="dialog-actions">
+              <Button variant="secondary" type="button" onClick={() => setOwnerDialogClub(null)}>{t('Abbrechen')}</Button>
+              <Button type="submit" disabled={!selectedOwnerId} loading={ownerSaving}>{t('Übernehmen')}</Button>
+            </div>
+          </form>
+        )}
       </EditDialog>
     </section>
   );

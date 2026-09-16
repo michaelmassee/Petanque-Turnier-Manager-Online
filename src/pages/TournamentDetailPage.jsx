@@ -411,6 +411,8 @@ export function TournamentDetailPage({
   registrationInvalidField,
   setMessage,
   setError,
+  isAdmin,
+  onSelectAdminDashboard,
   onLogout,
   drawerContent,
   postboxControl,
@@ -432,6 +434,8 @@ export function TournamentDetailPage({
           setMenuOpen={setMenuOpen}
           navigate={navigate}
           currentUser={currentUser}
+          isAdmin={isAdmin}
+          onSelectAdminDashboard={onSelectAdminDashboard}
           onLogout={onLogout}
           drawerContent={drawerContent}
           postboxControl={postboxControl}
@@ -457,6 +461,8 @@ export function TournamentDetailPage({
           setMenuOpen={setMenuOpen}
           navigate={navigate}
           currentUser={currentUser}
+          isAdmin={isAdmin}
+          onSelectAdminDashboard={onSelectAdminDashboard}
           onLogout={onLogout}
           drawerContent={drawerContent}
           postboxControl={postboxControl}
@@ -500,6 +506,8 @@ export function TournamentDetailPage({
         setMenuOpen={setMenuOpen}
         navigate={navigate}
         currentUser={currentUser}
+        isAdmin={isAdmin}
+        onSelectAdminDashboard={onSelectAdminDashboard}
         onLogout={onLogout}
         drawerContent={drawerContent}
         postboxControl={postboxControl}

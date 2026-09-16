@@ -12,6 +12,7 @@ const FORMATION_INPUT_VALUES = [...FORMATIONS, 'andere'];
 const REGISTRATION_TYPES = ['supermelee', 'melee', 'forme'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
+export const PLAYER_LISTING_POSITIONS = ['leger', 'milieu', 'schiesser', 'egal'];
 
 const text = (value) => String(value || '').trim();
 const nullableText = (value) => text(value) || null;
@@ -19,7 +20,7 @@ const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 function nonNegativeInteger(value) { const number = Number(value || 0); if (!Number.isInteger(number) || number < 0) throw new HttpError(400, 'Eine nicht-negative Ganzzahl ist erforderlich'); return number; }
 function normalizeFeeTiers(value) {
   if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > 20) throw new HttpError(400, 'Ungültige Startgeld-Tarife');
+  if (!Array.isArray(value) || value.length > 10) throw new HttpError(400, 'Ungültige Startgeld-Tarife');
   const ids = new Set();
   return value.map((tier) => {
     const id = text(tier?.id);
@@ -27,6 +28,18 @@ function normalizeFeeTiers(value) {
     if (!id || id === 'legacy-standard' || ids.has(id) || name.length < 2 || name.length > 80) throw new HttpError(400, 'Ungültige Startgeld-Tarife');
     ids.add(id);
     return { id, name, amountCents: nonNegativeInteger(tier?.amountCents), active: tier?.active !== false };
+  });
+}
+function normalizeRegistrationQuestions(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 10) throw new HttpError(400, 'Ungültige Teilnehmerfragen');
+  const ids = new Set();
+  return value.map((question) => {
+    const id = text(question?.id);
+    const label = text(question?.label);
+    if (!id || ids.has(id) || label.length < 2 || label.length > 250) throw new HttpError(400, 'Ungültige Teilnehmerfragen');
+    ids.add(id);
+    return { id, label };
   });
 }
 function nullableCoordinate(value, min, max) { if (value === undefined || value === null || value === '') return null; const number = Number(value); if (!Number.isFinite(number) || number < min || number > max) throw new HttpError(400, 'Ungültige Koordinate'); return number; }
@@ -59,6 +72,16 @@ export function validateMatchScore(value) {
   return score;
 }
 
+export function normalizePlayerListingPosition(value) {
+  const position = text(value || 'egal');
+  if (!PLAYER_LISTING_POSITIONS.includes(position)) throw new HttpError(400, 'Bitte wähle eine Spielposition');
+  return position;
+}
+
+export function playerListingMatchesPosition(listing, position) {
+  return !position || listing.playing_position === position || listing.playing_position === 'egal';
+}
+
 // D1 gibt bei einem parallelen INSERT in den eindeutigen Rundenzähler einen
 // SQLite-Fehler zurück. Die Zuordnung bleibt hier testbar und ist bewusst eng
 // auf genau diesen Constraint beschränkt, damit andere Datenbankfehler nicht
@@ -71,7 +94,7 @@ export function isTournamentRoundNumberConflict(error) {
 export function normalizeTournamentInput(body, { legacyRegistrationTimes = false, registrationTypeDefault = 'forme' } = {}) {
   const rawFormation = text(body.formation || 'doublette');
   const formationOther = rawFormation === 'andere';
-  const tournament = { name: text(body.name), club: nullableText(body.club), date: text(body.date), startTime: nullableText(body.startTime), location: text(body.location), description: nullableText(body.description), type: text(body.type || 'formule_x'), formation: formationOther ? 'tete' : rawFormation, formationOther, registrationType: text(body.registrationType || registrationTypeDefault), status: text(body.status || 'draft'), maxRegistrations: nonNegativeInteger(body.maxRegistrations), registrationDeadline: normalizeRegistrationDateTime(body.registrationDeadline, { legacyUtc: legacyRegistrationTimes }), registrationOpensAt: normalizeRegistrationDateTime(body.registrationOpensAt, { legacyUtc: legacyRegistrationTimes }), entryFeeCents: nonNegativeInteger(body.entryFeeCents), feeTiers: normalizeFeeTiers(body.feeTiers), feeTiersProvided: body.feeTiers !== undefined, currency: text(body.currency || 'EUR').toUpperCase(), contactName: nullableText(body.contactName), contactEmail: nullableText(body.contactEmail), contactPhone: nullableText(body.contactPhone), visibility: text(body.visibility || 'private'), internalNotes: nullableText(body.internalNotes), participantsPublic: Boolean(body.participantsPublic), licenseRequired: Boolean(body.licenseRequired), teamNameEnabled: Boolean(body.teamNameEnabled), waitlistEnabled: body.waitlistEnabled === undefined ? true : Boolean(body.waitlistEnabled), registrationEnabled: body.registrationEnabled === undefined ? true : Boolean(body.registrationEnabled), approvalRequired: Boolean(body.approvalRequired), schweizerRankingMode: text(body.schweizerRankingMode || 'mit_buchholz'), latitude: nullableCoordinate(body.latitude, -90, 90), longitude: nullableCoordinate(body.longitude, -180, 180) };
+  const tournament = { name: text(body.name), club: nullableText(body.club), date: text(body.date), startTime: nullableText(body.startTime), location: text(body.location), description: nullableText(body.description), type: text(body.type || 'formule_x'), formation: formationOther ? 'tete' : rawFormation, formationOther, registrationType: text(body.registrationType || registrationTypeDefault), status: text(body.status || 'draft'), maxRegistrations: nonNegativeInteger(body.maxRegistrations), registrationDeadline: normalizeRegistrationDateTime(body.registrationDeadline, { legacyUtc: legacyRegistrationTimes }), registrationOpensAt: normalizeRegistrationDateTime(body.registrationOpensAt, { legacyUtc: legacyRegistrationTimes }), entryFeeCents: nonNegativeInteger(body.entryFeeCents), feeTiers: normalizeFeeTiers(body.feeTiers), feeTiersProvided: body.feeTiers !== undefined, registrationQuestions: normalizeRegistrationQuestions(body.registrationQuestions), registrationQuestionsProvided: body.registrationQuestions !== undefined, currency: text(body.currency || 'EUR').toUpperCase(), contactName: nullableText(body.contactName), contactEmail: nullableText(body.contactEmail), contactPhone: nullableText(body.contactPhone), visibility: text(body.visibility || 'private'), internalNotes: nullableText(body.internalNotes), participantsPublic: Boolean(body.participantsPublic), licenseRequired: Boolean(body.licenseRequired), teamNameEnabled: Boolean(body.teamNameEnabled), waitlistEnabled: body.waitlistEnabled === undefined ? true : Boolean(body.waitlistEnabled), registrationEnabled: body.registrationEnabled === undefined ? true : Boolean(body.registrationEnabled), approvalRequired: Boolean(body.approvalRequired), schweizerRankingMode: text(body.schweizerRankingMode || 'mit_buchholz'), latitude: nullableCoordinate(body.latitude, -90, 90), longitude: nullableCoordinate(body.longitude, -180, 180) };
   if (tournament.name.length < 2) throw new HttpError(400, 'Der Turniername muss mindestens 2 Zeichen enthalten');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(tournament.date)) throw new HttpError(400, 'Ein gültiges Turnierdatum ist erforderlich');
   if (tournament.startTime && !/^\d{2}:\d{2}$/.test(tournament.startTime)) throw new HttpError(400, 'Eine gültige Startzeit ist erforderlich');

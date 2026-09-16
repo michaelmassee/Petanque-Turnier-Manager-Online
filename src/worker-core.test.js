@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { assertPartnerCountMatchesFormation, isNewlyPublicTournament, isTournamentRoundNumberConflict, normalizeTournamentInput, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
+import { assertPartnerCountMatchesFormation, isNewlyPublicTournament, isTournamentRoundNumberConflict, normalizePlayerListingPosition, normalizeTournamentInput, playerListingMatchesPosition, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
 
 const base = { name: 'Testturnier', date: '2026-06-01', location: 'Musterstadt' };
 
 describe('Worker-Fachlogik', () => {
+  it('normalisiert Spielpositionen und lässt flexible Gesuche bei jeder Positionssuche zu', () => {
+    expect(normalizePlayerListingPosition()).toBe('egal');
+    expect(normalizePlayerListingPosition('milieu')).toBe('milieu');
+    expect(() => normalizePlayerListingPosition('melee')).toThrow('Spielposition');
+    expect(playerListingMatchesPosition({ playing_position: 'egal' }, 'leger')).toBe(true);
+    expect(playerListingMatchesPosition({ playing_position: 'milieu' }, 'leger')).toBe(false);
+  });
+
   it('normalisiert ein vollständiges Turnier', () => {
     expect(normalizeTournamentInput({ ...base, formation: 'triplette', registrationType: 'supermelee', type: 'rangliste', visibility: 'public', latitude: '50', longitude: '8', contactEmail: 'a@b.de' })).toMatchObject({ currency: 'EUR', waitlistEnabled: true, registrationEnabled: true, approvalRequired: false, latitude: 50, longitude: 8 });
   });
@@ -18,6 +26,15 @@ describe('Worker-Fachlogik', () => {
     ]);
     expect(() => normalizeTournamentInput({ ...base, feeTiers: [{ id: 'x', name: 'x', amountCents: 1 }] })).toThrow('Startgeld-Tarife');
     expect(() => normalizeTournamentInput({ ...base, feeTiers: [{ id: 'legacy-standard', name: 'Normal', amountCents: 1 }] })).toThrow('Startgeld-Tarife');
+    expect(() => normalizeTournamentInput({ ...base, feeTiers: Array.from({ length: 11 }, (_, index) => ({ id: `tier${index}`, name: `Tarif ${index}`, amountCents: 100 })) })).toThrow('Startgeld-Tarife');
+  });
+
+  it('normalisiert bis zu zehn freiwillige Teilnehmerfragen', () => {
+    expect(normalizeTournamentInput({ ...base, registrationQuestions: [{ id: 'lunch', label: 'Vegetarisches Essen?' }] }).registrationQuestions).toEqual([
+      { id: 'lunch', label: 'Vegetarisches Essen?' },
+    ]);
+    expect(() => normalizeTournamentInput({ ...base, registrationQuestions: [{ id: 'x', label: 'x' }] })).toThrow('Teilnehmerfragen');
+    expect(() => normalizeTournamentInput({ ...base, registrationQuestions: Array.from({ length: 11 }, (_, index) => ({ id: `q${index}`, label: `Frage ${index}` })) })).toThrow('Teilnehmerfragen');
   });
 
   it('respektiert registrationEnabled für Kalendereinträge', () => {

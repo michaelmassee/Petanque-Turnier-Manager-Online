@@ -21,21 +21,32 @@ function placeToForm(place) {
   };
 }
 
+function clubToForm(club) {
+  return {
+    name: club.name, description: club.description || '', websiteUrl: club.websiteUrl || '',
+    contactName: club.contactName || '', contactEmail: club.contactEmail || '', contactPhone: club.contactPhone || '',
+  };
+}
+
 function MyClubsPanel({ language }) {
   const { t } = useTranslation();
   const [clubs, setClubs] = useState([]);
+  const [clubPlaces, setClubPlaces] = useState({});
   const [myPlaces, setMyPlaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [clubDialogOpen, setClubDialogOpen] = useState(false);
+  const [editClubId, setEditClubId] = useState(null);
   const [clubForm, setClubForm] = useState(EMPTY_CLUB_FORM);
   const [clubSaving, setClubSaving] = useState(false);
+  const [deletingClubId, setDeletingClubId] = useState(null);
   const [placeDialogOpen, setPlaceDialogOpen] = useState(false);
   const [placeClubId, setPlaceClubId] = useState(null);
   const [editPlaceId, setEditPlaceId] = useState(null);
   const [placeForm, setPlaceForm] = useState(EMPTY_PLACE_FORM);
   const [placeSaving, setPlaceSaving] = useState(false);
+  const [deletingPlaceId, setDeletingPlaceId] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -44,20 +55,62 @@ function MyClubsPanel({ language }) {
         authenticatedApi('/api/clubs/mine'),
         authenticatedApi('/api/places/mine'),
       ]);
-      setClubs(clubsData.clubs || []);
+      const clubList = clubsData.clubs || [];
+      setClubs(clubList);
       setMyPlaces(placesData.places || []);
+      const detailEntries = await Promise.all(
+        clubList.map((club) => authenticatedApi(`/api/clubs/${club.id}`).then((data) => [club.id, data.places || []])),
+      );
+      setClubPlaces(Object.fromEntries(detailEntries));
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  async function removeClub(club) {
+    if (!window.confirm(`${t('Verein')} "${club.name}" ${t('wirklich löschen?')}`)) return;
+    setError(''); setMessage('');
+    setDeletingClubId(club.id);
+    try {
+      await authenticatedApi(`/api/clubs/${club.id}`, { method: 'DELETE' });
+      await load();
+    } catch (err) { setError(err.message); } finally { setDeletingClubId(null); }
+  }
+
+  async function removePlace(place) {
+    if (!window.confirm(`${t('Bouleplatz')} "${place.name}" ${t('wirklich löschen?')}`)) return;
+    setError(''); setMessage('');
+    setDeletingPlaceId(place.id);
+    try {
+      await authenticatedApi(`/api/places/${place.id}`, { method: 'DELETE' });
+      await load();
+    } catch (err) { setError(err.message); } finally { setDeletingPlaceId(null); }
+  }
+
+  function openCreateClub() {
+    setEditClubId(null);
+    setClubForm(EMPTY_CLUB_FORM);
+    setClubDialogOpen(true);
+  }
+
+  function openEditClub(club) {
+    setEditClubId(club.id);
+    setClubForm(clubToForm(club));
+    setClubDialogOpen(true);
+  }
 
   async function submitClub(event) {
     event.preventDefault();
     setError(''); setMessage(''); setClubSaving(true);
     try {
-      await authenticatedApi('/api/clubs', { method: 'POST', body: JSON.stringify(clubForm) });
+      if (editClubId) {
+        await authenticatedApi(`/api/clubs/${editClubId}`, { method: 'PUT', body: JSON.stringify(clubForm) });
+        setMessage(t('Verein aktualisiert. Ein Admin prüft die Änderung.'));
+      } else {
+        await authenticatedApi('/api/clubs', { method: 'POST', body: JSON.stringify(clubForm) });
+        setMessage(t('Verein eingereicht. Ein Admin muss ihn noch freigeben.'));
+      }
       setClubDialogOpen(false);
       setClubForm(EMPTY_CLUB_FORM);
-      setMessage(t('Verein eingereicht. Ein Admin muss ihn noch freigeben.'));
       await load();
     } catch (err) { setError(err.message); } finally { setClubSaving(false); }
   }
@@ -97,7 +150,7 @@ function MyClubsPanel({ language }) {
       <div className="panel">
         <div className="section-title">
           <h2>{t('Meine Vereine')}</h2>
-          <Button onClick={() => setClubDialogOpen(true)}>{t('Verein anlegen')}</Button>
+          <Button onClick={openCreateClub}>{t('Verein anlegen')}</Button>
         </div>
         {message && <p className="feedback success">{message}</p>}
         {error && <p className="feedback error">{error}</p>}
@@ -106,19 +159,41 @@ function MyClubsPanel({ language }) {
         ) : (
           <div className="user-list">
             {clubs.map((club) => (
-              <article className="data-row" key={club.id}>
-                <div>
-                  <strong data-i18n-skip>{club.name}</strong>
-                  <span className={club.status === 'published' ? 'status registration-confirmed' : 'status registration-pending'}>
-                    {statusLabel(club.status, t)}
-                  </span>
-                </div>
-                <div className="row-actions">
-                  <Button variant="secondary" onClick={() => openCreatePlace(club)}>
-                    {t('Bouleplatz hinzufügen')}
-                  </Button>
-                </div>
-              </article>
+              <div key={club.id}>
+                <article className="data-row">
+                  <div>
+                    <strong data-i18n-skip>{club.name}</strong>
+                    <span className={club.status === 'published' ? 'status registration-confirmed' : 'status registration-pending'}>
+                      {statusLabel(club.status, t)}
+                    </span>
+                  </div>
+                  <div className="row-actions">
+                    <Button variant="secondary" onClick={() => openCreatePlace(club)}>
+                      {t('Bouleplatz hinzufügen')}
+                    </Button>
+                    {club.canEdit && <Button variant="secondary" disabled={Boolean(deletingClubId)} onClick={() => openEditClub(club)}>{t('Bearbeiten')}</Button>}
+                    {club.canEdit && <Button variant="danger" loading={deletingClubId === club.id} onClick={() => removeClub(club)}>{t('Löschen')}</Button>}
+                  </div>
+                </article>
+                {(clubPlaces[club.id] || []).length > 0 && (
+                  <div className="user-list club-places-list">
+                    {clubPlaces[club.id].map((place) => (
+                      <article className="data-row" key={place.id}>
+                        <div>
+                          <strong data-i18n-skip>{place.name}</strong>
+                          <span data-i18n-skip className={place.status === 'published' ? 'status registration-confirmed' : 'status registration-pending'}>
+                            {statusLabel(place.status, t)} · {place.address}
+                          </span>
+                        </div>
+                        <div className="row-actions">
+                          <Button variant="secondary" disabled={Boolean(deletingPlaceId)} onClick={() => openEditPlace(place)}>{t('Bearbeiten')}</Button>
+                          <Button variant="danger" loading={deletingPlaceId === place.id} onClick={() => removePlace(place)}>{t('Löschen')}</Button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -139,8 +214,11 @@ function MyClubsPanel({ language }) {
                   </span>
                 </div>
                 <div className="row-actions">
-                  <Button variant="secondary" onClick={() => openEditPlace(place)}>
+                  <Button variant="secondary" disabled={Boolean(deletingPlaceId)} onClick={() => openEditPlace(place)}>
                     {t('Bearbeiten')}
+                  </Button>
+                  <Button variant="danger" loading={deletingPlaceId === place.id} onClick={() => removePlace(place)}>
+                    {t('Löschen')}
                   </Button>
                 </div>
               </article>
@@ -149,7 +227,7 @@ function MyClubsPanel({ language }) {
         </div>
       )}
 
-      <EditDialog open={clubDialogOpen} title={t('Verein anlegen')} onClose={() => setClubDialogOpen(false)}>
+      <EditDialog open={clubDialogOpen} title={editClubId ? t('Verein bearbeiten') : t('Verein anlegen')} onClose={() => setClubDialogOpen(false)}>
         <form className="form" onSubmit={submitClub}>
           <TextField label={t('Name')} value={clubForm.name} onChange={(name) => setClubForm({ ...clubForm, name })} required minLength={2} />
           <TextArea label={t('Beschreibung')} value={clubForm.description} onChange={(description) => setClubForm({ ...clubForm, description })} />
@@ -159,7 +237,7 @@ function MyClubsPanel({ language }) {
           <TextField label={t('Kontakt-Telefon')} value={clubForm.contactPhone} onChange={(contactPhone) => setClubForm({ ...clubForm, contactPhone })} />
           <div className="dialog-actions">
             <Button variant="secondary" type="button" onClick={() => setClubDialogOpen(false)}>{t('Abbrechen')}</Button>
-            <Button type="submit" loading={clubSaving}>{t('Anlegen')}</Button>
+            <Button type="submit" loading={clubSaving}>{editClubId ? t('Speichern') : t('Anlegen')}</Button>
           </div>
         </form>
       </EditDialog>
@@ -177,7 +255,7 @@ function MyClubsPanel({ language }) {
   );
 }
 
-export function MyClubsPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, drawerContent, postboxControl }) {
+export function MyClubsPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, isAdmin, onSelectAdminDashboard, onLogout, drawerContent, postboxControl }) {
   const { t } = useTranslation();
   return (
     <main className="app-shell">
@@ -189,6 +267,8 @@ export function MyClubsPage({ language, setLanguage, menuOpen, setMenuOpen, navi
         setMenuOpen={setMenuOpen}
         navigate={navigate}
         currentUser={currentUser}
+        isAdmin={isAdmin}
+        onSelectAdminDashboard={onSelectAdminDashboard}
         onLogout={onLogout}
         drawerContent={drawerContent}
         postboxControl={postboxControl}

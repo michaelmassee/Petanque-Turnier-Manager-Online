@@ -5,7 +5,24 @@ import { translatedOptions } from '../lib/domain.js';
 import { formatMoney } from '../lib/format.js';
 import { SelectField, TextField } from './ui.jsx';
 
-export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled, feeTiers = [], currency = 'EUR', invalidField }) {
+function ParticipantQuestions({ participant, questions, answers, onChange }) {
+  if (questions.length === 0) return null;
+  return (
+    <div className="participant-questions">
+      {questions.map((question) => {
+        const checked = answers.some((answer) => answer.participant === participant && answer.questionId === question.id && answer.checked);
+        return (
+          <label className="checkbox-field" key={question.id} data-i18n-skip>
+            <input type="checkbox" checked={checked} onChange={(event) => onChange(question.id, event.target.checked)} />
+            {question.label}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled, feeTiers = [], registrationQuestions = [], currency = 'EUR', invalidField }) {
   const { t, i18n } = useTranslation();
   const isDrawnTeam = registrationType === 'melee' || registrationType === 'supermelee';
   const allowsPartner = isDrawnTeam ? false : (formation ? formation !== 'tete' : true);
@@ -22,6 +39,13 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
   const setSelectedFee = (participant, tariffId) => setForm({
     ...form,
     feeSelections: [...(form.feeSelections || []).filter((selection) => selection.participant !== participant), ...(tariffId ? [{ participant, tariffId }] : [])],
+  });
+  const setQuestionAnswer = (participant, questionId, checked) => setForm({
+    ...form,
+    registrationAnswers: [
+      ...(form.registrationAnswers || []).filter((answer) => answer.participant !== participant || answer.questionId !== questionId),
+      ...(checked ? [{ participant, questionId, checked: true }] : []),
+    ],
   });
   const feeOptions = (participant) => {
     const selected = selectedFee(participant);
@@ -42,12 +66,14 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
         partnerFirstName: '', partnerLastName: '', partnerEmail: '', partnerLicenseNr: '',
         partner2FirstName: '', partner2LastName: '', partner2Email: '', partner2LicenseNr: '',
         feeSelections: (current.feeSelections || []).filter((selection) => selection.participant !== 'partner' && selection.participant !== 'partner2'),
+        registrationAnswers: (current.registrationAnswers || []).filter((answer) => answer.participant !== 'partner' && answer.participant !== 'partner2'),
       }));
     } else if (allowsPartner && !allowsPartner2 && (form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2LicenseNr)) {
       setForm((current) => ({
         ...current,
         partner2FirstName: '', partner2LastName: '', partner2Email: '', partner2LicenseNr: '',
         feeSelections: (current.feeSelections || []).filter((selection) => selection.participant !== 'partner2'),
+        registrationAnswers: (current.registrationAnswers || []).filter((answer) => answer.participant !== 'partner2'),
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -78,6 +104,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
         <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />
         <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} invalid={invalidField === 'firstName'} />
       </div>
+      <ParticipantQuestions participant="primary" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('primary', questionId, checked)} />
       {showFeeSelect && <SelectField label={t('Startgeld')} value={selectedFee('primary')} onChange={(tariffId) => setSelectedFee('primary', tariffId)} options={feeOptions('primary')} />}
       {showStatus && (
         <label className="checkbox-field">
@@ -117,6 +144,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
             <TextField label={t('Partner Vorname')} value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
             <TextField label={t('Partner Nachname')} value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
           </div>
+          <ParticipantQuestions participant="partner" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner', questionId, checked)} />
           {showFeeSelect && <SelectField label={t('Startgeld Partner')} value={selectedFee('partner')} onChange={(tariffId) => setSelectedFee('partner', tariffId)} options={feeOptions('partner')} />}
           <div className="form-grid">
             <TextField label={t('Partner E-Mail')} type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
@@ -137,6 +165,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
             <TextField label={t('Partner 2 Vorname')} value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required minLength={2} invalid={invalidField === 'partner2FirstName'} />
             <TextField label={t('Partner 2 Nachname')} value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} required minLength={2} invalid={invalidField === 'partner2FirstName'} />
           </div>
+          <ParticipantQuestions participant="partner2" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner2', questionId, checked)} />
           <div className="form-grid">
             <TextField label={t('Partner 2 E-Mail')} type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
             {licenseRequired && (

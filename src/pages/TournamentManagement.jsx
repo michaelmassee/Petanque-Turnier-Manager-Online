@@ -395,6 +395,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               <Button
                 type="button"
                 variant="secondary"
+                disabled={(form.feeTiers || []).length >= 10}
                 onClick={() => setForm({ ...form, feeTiers: [...(form.feeTiers || []), { id: crypto.randomUUID(), name: '', amount: '', active: true }] })}
               >
                 {t('Tarif hinzufügen')}
@@ -408,6 +409,39 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
                   <input type="checkbox" checked={tier.active !== false} onChange={(event) => setForm({ ...form, feeTiers: form.feeTiers.map((item, itemIndex) => itemIndex === index ? { ...item, active: event.target.checked } : item) })} />
                   {t('Für neue Meldungen verfügbar')}
                 </label>
+              </div>
+            ))}
+          </div>
+          <div className="form">
+            <div className="section-title">
+              <h3>{t('Zusätzliche Teilnehmerfragen')}</h3>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={(form.registrationQuestions || []).length >= 10}
+                onClick={() => setForm({ ...form, registrationQuestions: [...(form.registrationQuestions || []), { id: crypto.randomUUID(), label: '' }] })}
+              >
+                {t('Frage hinzufügen')}
+              </Button>
+            </div>
+            <p className="hint">{t('Die Checkboxen werden für jeden Teilnehmer freiwillig abgefragt.')}</p>
+            {(form.registrationQuestions || []).map((question, index) => (
+              <div className="form-grid" key={question.id}>
+                <TextField
+                  label={`${t('Frage')} ${index + 1}`}
+                  value={question.label}
+                  onChange={(label) => setForm({ ...form, registrationQuestions: form.registrationQuestions.map((item, itemIndex) => itemIndex === index ? { ...item, label } : item) })}
+                  required
+                  minLength={2}
+                  maxLength={250}
+                />
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => setForm({ ...form, registrationQuestions: form.registrationQuestions.filter((_, itemIndex) => itemIndex !== index) })}
+                >
+                  {t('Frage entfernen')}
+                </Button>
               </div>
             ))}
           </div>
@@ -657,6 +691,7 @@ function tournamentToForm(tournament) {
     timezone: tournament.timezone || '',
     entryFeeAmount: minorUnitsToAmount(tournament.entryFeeCents, tournament.currency || 'EUR'),
     feeTiers: (tournament.feeTiers || []).filter((tier) => tier.id !== 'legacy-standard').map((tier) => ({ ...tier, amount: minorUnitsToAmount(tier.amountCents, tournament.currency || 'EUR') })),
+    registrationQuestions: tournament.registrationQuestions || [],
     currency: tournament.currency || 'EUR',
     contactName: tournament.contactName || '',
     contactEmail: tournament.contactEmail || '',

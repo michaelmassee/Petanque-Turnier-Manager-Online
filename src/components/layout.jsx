@@ -299,7 +299,7 @@ export function InstallAppButton() {
   return null;
 }
 
-export function AppHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, currentUser, searchControl, postboxControl, savedSearchesControl, children }) {
+export function AppHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, currentUser, isAdmin, onSelectAdminDashboard, searchControl, postboxControl, savedSearchesControl, children }) {
   const { t } = useTranslation();
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const closeLeftPanel = () => setLeftPanelOpen(false);
@@ -423,6 +423,24 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
           </svg>
           {t('Boule-Treff')}
         </button>
+        {isAdmin && onSelectAdminDashboard && (
+          <button
+            className="left-panel-link"
+            type="button"
+            onClick={() => {
+              closeLeftPanel();
+              onSelectAdminDashboard();
+            }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2" />
+              <rect x="13" y="3.5" width="7.5" height="7.5" rx="2" />
+              <rect x="3.5" y="13" width="7.5" height="7.5" rx="2" />
+              <rect x="13" y="13" width="7.5" height="7.5" rx="2" />
+            </svg>
+            {t('Admin Dashboard')}
+          </button>
+        )}
       </nav>
       {menuOpen && (
         <>
@@ -636,7 +654,7 @@ export function AuthModal({ title, subtitle, message, error, onClose, children }
   );
 }
 
-export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, onLogout, searchControl, postboxControl, menuExtra, drawerContent }) {
+export function StandalonePageHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, isAdmin, onSelectAdminDashboard, onLogout, searchControl, postboxControl, menuExtra, drawerContent }) {
   const { t } = useTranslation();
   return (
     <AppHeader
@@ -649,6 +667,8 @@ export function StandalonePageHeader({ heading, headingNoTranslate, language, se
       onCloseMenu={() => setMenuOpen(false)}
       navigate={navigate}
       currentUser={currentUser}
+      isAdmin={isAdmin}
+      onSelectAdminDashboard={onSelectAdminDashboard}
       searchControl={searchControl}
       postboxControl={postboxControl}
     >
