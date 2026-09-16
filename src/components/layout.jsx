@@ -201,6 +201,27 @@ function savedSearchSummary(search, t) {
 
 export function SavedSearchesControl({ open, savedSearches = [], onToggle, onClose, onApply, onToggleNotify, onEdit, onDelete }) {
   const { t } = useTranslation();
+  const [notifyBusyId, setNotifyBusyId] = useState(null);
+  const [deleteBusyId, setDeleteBusyId] = useState(null);
+
+  async function handleToggleNotify(search) {
+    setNotifyBusyId(search.id);
+    try {
+      await onToggleNotify(search);
+    } finally {
+      setNotifyBusyId(null);
+    }
+  }
+
+  async function handleDelete(search) {
+    setDeleteBusyId(search.id);
+    try {
+      await onDelete(search);
+    } finally {
+      setDeleteBusyId(null);
+    }
+  }
+
   return (
     <div className="postbox-menu">
       <button className="postbox-btn" type="button" aria-label={t('savedSearches')} aria-expanded={open} onClick={onToggle}>
@@ -221,11 +242,16 @@ export function SavedSearchesControl({ open, savedSearches = [], onToggle, onClo
                   <div className="dialog-actions">
                     <Button variant="secondary" onClick={() => onApply(search)}>{t('applySavedSearch')}</Button>
                     <label className="checkbox-field">
-                      <input type="checkbox" checked={search.notifyEnabled} onChange={() => onToggleNotify(search)} />
+                      <input
+                        type="checkbox"
+                        checked={search.notifyEnabled}
+                        disabled={notifyBusyId === search.id}
+                        onChange={() => handleToggleNotify(search)}
+                      />
                       {t('notifyOnNewMatches')}
                     </label>
-                    <button className="link-button" type="button" onClick={() => onEdit(search)}>{t('Bearbeiten')}</button>
-                    <button className="link-button" type="button" onClick={() => onDelete(search)}>{t('Löschen')}</button>
+                    <Button variant="secondary" disabled={deleteBusyId === search.id} onClick={() => onEdit(search)}>{t('Bearbeiten')}</Button>
+                    <Button variant="danger" loading={deleteBusyId === search.id} onClick={() => handleDelete(search)}>{t('Löschen')}</Button>
                   </div>
                 </div>
               ))}
@@ -527,10 +553,10 @@ export function SearchMenuControl({
                 onSelect={onSearchOriginSelect}
                 disabled={geoLoading}
               />
-              <Button type="submit" variant="secondary" disabled={geoLoading}>
+              <Button type="submit" variant="secondary" disabled={geoLoading} loading={geoLoading}>
                 {t('Suchen')}
               </Button>
-              <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading}>
+              <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading} loading={geoLoading}>
                 {t('Meinen Standort verwenden')}
               </Button>
               {searchOrigin && (

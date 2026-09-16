@@ -28,6 +28,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
   const [form, setForm] = useState(EMPTY_LISTING_FORM);
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const typeOptions = [
     { value: '', label: t('Alle Typen') },
@@ -89,10 +90,11 @@ function MyPlayerListingsPanel({ language, currentUser }) {
   async function remove(listing) {
     if (!window.confirm(`${t('Anzeige')} "${listing.title}" ${t('wirklich löschen?')}`)) return;
     setError('');
+    setDeletingId(listing.id);
     try {
       await authenticatedApi(`/api/player-listings/${listing.id}`, { method: 'DELETE' });
       await load();
-    } catch (err) { setError(err.message); }
+    } catch (err) { setError(err.message); } finally { setDeletingId(null); }
   }
 
   const filterActive = Boolean(query.trim()) || Boolean(typeFilter);
@@ -129,8 +131,8 @@ function MyPlayerListingsPanel({ language, currentUser }) {
                 </span>
               </div>
               <div className="row-actions">
-                <Button variant="secondary" onClick={() => openEdit(listing)}>{t('Bearbeiten')}</Button>
-                <Button variant="danger" onClick={() => remove(listing)}>{t('Löschen')}</Button>
+                <Button variant="secondary" disabled={deletingId === listing.id} onClick={() => openEdit(listing)}>{t('Bearbeiten')}</Button>
+                <Button variant="danger" loading={deletingId === listing.id} onClick={() => remove(listing)}>{t('Löschen')}</Button>
               </div>
             </article>
           ))}

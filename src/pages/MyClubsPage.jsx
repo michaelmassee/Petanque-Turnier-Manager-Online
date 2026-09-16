@@ -31,12 +31,11 @@ function MyClubsPanel({ language }) {
   const [clubDialogOpen, setClubDialogOpen] = useState(false);
   const [clubForm, setClubForm] = useState(EMPTY_CLUB_FORM);
   const [clubSaving, setClubSaving] = useState(false);
-  const [placeDialogClubId, setPlaceDialogClubId] = useState(null);
+  const [placeDialogOpen, setPlaceDialogOpen] = useState(false);
+  const [placeClubId, setPlaceClubId] = useState(null);
+  const [editPlaceId, setEditPlaceId] = useState(null);
   const [placeForm, setPlaceForm] = useState(EMPTY_PLACE_FORM);
   const [placeSaving, setPlaceSaving] = useState(false);
-  const [editPlaceId, setEditPlaceId] = useState(null);
-  const [editPlaceForm, setEditPlaceForm] = useState(EMPTY_PLACE_FORM);
-  const [editPlaceSaving, setEditPlaceSaving] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -63,32 +62,34 @@ function MyClubsPanel({ language }) {
     } catch (err) { setError(err.message); } finally { setClubSaving(false); }
   }
 
+  function openCreatePlace(club) {
+    setEditPlaceId(null);
+    setPlaceClubId(club.id);
+    setPlaceForm(EMPTY_PLACE_FORM);
+    setPlaceDialogOpen(true);
+  }
+
+  function openEditPlace(place) {
+    setEditPlaceId(place.id);
+    setPlaceForm(placeToForm(place));
+    setPlaceDialogOpen(true);
+  }
+
   async function submitPlace(event) {
     event.preventDefault();
     setError(''); setMessage(''); setPlaceSaving(true);
     try {
-      await authenticatedApi(`/api/clubs/${placeDialogClubId}/places`, {
-        method: 'POST',
-        body: JSON.stringify({ ...placeForm, courtCount: placeForm.courtCount === '' ? 0 : Number(placeForm.courtCount) }),
-      });
-      setPlaceDialogClubId(null);
-      setPlaceForm(EMPTY_PLACE_FORM);
-      setMessage(t('Bouleplatz eingereicht. Ein Admin muss ihn noch freigeben.'));
-    } catch (err) { setError(err.message); } finally { setPlaceSaving(false); }
-  }
-
-  async function submitEditPlace(event) {
-    event.preventDefault();
-    setError(''); setMessage(''); setEditPlaceSaving(true);
-    try {
-      await authenticatedApi(`/api/places/${editPlaceId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ ...editPlaceForm, courtCount: editPlaceForm.courtCount === '' ? 0 : Number(editPlaceForm.courtCount) }),
-      });
-      setEditPlaceId(null);
-      setMessage(t('Bouleplatz aktualisiert. Ein Admin prüft die Änderung.'));
+      const body = JSON.stringify({ ...placeForm, courtCount: placeForm.courtCount === '' ? 0 : Number(placeForm.courtCount) });
+      if (editPlaceId) {
+        await authenticatedApi(`/api/places/${editPlaceId}`, { method: 'PUT', body });
+        setMessage(t('Bouleplatz aktualisiert. Ein Admin prüft die Änderung.'));
+      } else {
+        await authenticatedApi(`/api/clubs/${placeClubId}/places`, { method: 'POST', body });
+        setMessage(t('Bouleplatz eingereicht. Ein Admin muss ihn noch freigeben.'));
+      }
+      setPlaceDialogOpen(false);
       await load();
-    } catch (err) { setError(err.message); } finally { setEditPlaceSaving(false); }
+    } catch (err) { setError(err.message); } finally { setPlaceSaving(false); }
   }
 
   return (
@@ -113,7 +114,7 @@ function MyClubsPanel({ language }) {
                   </span>
                 </div>
                 <div className="row-actions">
-                  <Button variant="secondary" onClick={() => { setPlaceDialogClubId(club.id); setPlaceForm(EMPTY_PLACE_FORM); }}>
+                  <Button variant="secondary" onClick={() => openCreatePlace(club)}>
                     {t('Bouleplatz hinzufügen')}
                   </Button>
                 </div>
@@ -138,7 +139,7 @@ function MyClubsPanel({ language }) {
                   </span>
                 </div>
                 <div className="row-actions">
-                  <Button variant="secondary" onClick={() => { setEditPlaceId(place.id); setEditPlaceForm(placeToForm(place)); }}>
+                  <Button variant="secondary" onClick={() => openEditPlace(place)}>
                     {t('Bearbeiten')}
                   </Button>
                 </div>
@@ -163,22 +164,12 @@ function MyClubsPanel({ language }) {
         </form>
       </EditDialog>
 
-      <EditDialog open={Boolean(placeDialogClubId)} title={t('Bouleplatz hinzufügen')} onClose={() => setPlaceDialogClubId(null)}>
+      <EditDialog open={placeDialogOpen} title={editPlaceId ? t('Bouleplatz bearbeiten') : t('Bouleplatz hinzufügen')} onClose={() => setPlaceDialogOpen(false)}>
         <form className="form" onSubmit={submitPlace}>
           <BoulePlaceFields form={placeForm} setForm={setPlaceForm} language={language} />
           <div className="dialog-actions">
-            <Button variant="secondary" type="button" onClick={() => setPlaceDialogClubId(null)}>{t('Abbrechen')}</Button>
-            <Button type="submit" loading={placeSaving}>{t('Anlegen')}</Button>
-          </div>
-        </form>
-      </EditDialog>
-
-      <EditDialog open={Boolean(editPlaceId)} title={t('Bouleplatz bearbeiten')} onClose={() => setEditPlaceId(null)}>
-        <form className="form" onSubmit={submitEditPlace}>
-          <BoulePlaceFields form={editPlaceForm} setForm={setEditPlaceForm} language={language} />
-          <div className="dialog-actions">
-            <Button variant="secondary" type="button" onClick={() => setEditPlaceId(null)}>{t('Abbrechen')}</Button>
-            <Button type="submit" loading={editPlaceSaving}>{t('Speichern')}</Button>
+            <Button variant="secondary" type="button" onClick={() => setPlaceDialogOpen(false)}>{t('Abbrechen')}</Button>
+            <Button type="submit" loading={placeSaving}>{editPlaceId ? t('Speichern') : t('Anlegen')}</Button>
           </div>
         </form>
       </EditDialog>

@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
-import { ROLES, TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_STATUSES, VISIBILITIES, REGISTRATION_STATUSES, RADIUS_OPTIONS, DEFAULT_TOURNAMENT_LIMIT, EMPTY_USER_FORM, EMPTY_PROFILE_FORM, EMPTY_AUTH_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_TOURNAMENT_REPORT_FORM, EMPTY_REGISTRATION_FORM, REGISTER_SUCCESS, VERIFY_SUCCESS, CANCEL_REGISTRATION_EXPLANATION, CANCEL_REGISTRATION_SUCCESS, PROFILE_UPDATE_SUCCESS, PROFILE_EMAIL_CHANGE_PENDING } from './lib/constants.js';
+import { TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_STATUSES, VISIBILITIES, RADIUS_OPTIONS, EMPTY_PROFILE_FORM, EMPTY_AUTH_FORM, EMPTY_TOURNAMENT_REPORT_FORM, EMPTY_REGISTRATION_FORM, REGISTER_SUCCESS, VERIFY_SUCCESS, CANCEL_REGISTRATION_EXPLANATION, CANCEL_REGISTRATION_SUCCESS, PROFILE_UPDATE_SUCCESS, PROFILE_EMAIL_CHANGE_PENDING } from './lib/constants.js';
 import i18next from './lib/i18next-config.js';
 import { useTranslation } from 'react-i18next';
 import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,8 +8,8 @@ import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { usePath, matchTournamentRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
-import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, timezoneAbbrev, formatTournamentDateTime, minorUnitsToAmount, amountToMinorUnits, currencyOptions, formatMoney, utcIsoToZonedDateTimeInput, formatDateTime, isPasswordStrong } from './lib/format.js';
-import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, tournamentPayload, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, distanceKm } from './lib/domain.js';
+import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
+import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, distanceKm } from './lib/domain.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
@@ -110,16 +109,6 @@ function AppContent() {
   const [searchRadiusKm, setSearchRadiusKm] = useState('25');
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState('');
-  const [userQuery, setUserQuery] = useState('');
-  const [userRoleFilter, setUserRoleFilter] = useState('');
-  const [userStatusFilter, setUserStatusFilter] = useState('');
-  const [tournamentQuery, setTournamentQuery] = useState('');
-  const [tournamentStatusFilter, setTournamentStatusFilter] = useState('');
-  const [registrationQuery, setRegistrationQuery] = useState('');
-  const [registrationStatusFilter, setRegistrationStatusFilter] = useState('');
-  const [userDialogOpen, setUserDialogOpen] = useState(false);
-  const [tournamentDialogOpen, setTournamentDialogOpen] = useState(false);
-  const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
   const [path, navigate] = usePath();
   const [currentUser, setCurrentUser] = useState(null);
   const [postboxOpen, setPostboxOpen] = useState(false);
@@ -136,22 +125,14 @@ function AppContent() {
   const [savedSearchForm, setSavedSearchForm] = useState({ id: '', name: '', notifyEnabled: false });
   const [savedSearchSaving, setSavedSearchSaving] = useState(false);
   const [pushMigrationDismissed, setPushMigrationDismissed] = useState(() => localStorage.getItem('ptm_push_migration') === 'dismissed');
-  const [users, setUsers] = useState([]);
   const [tournaments, setTournaments] = useState([]);
-  const [registrations, setRegistrations] = useState([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState('');
-  const [userForm, setUserForm] = useState(EMPTY_USER_FORM);
+  const [pendingRegistrationsFilter, setPendingRegistrationsFilter] = useState('');
   const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
   const [authForm, setAuthForm] = useState(EMPTY_AUTH_FORM);
-  const [tournamentForm, setTournamentForm] = useState(EMPTY_TOURNAMENT_FORM);
   const [registrationForm, setRegistrationForm] = useState(EMPTY_REGISTRATION_FORM);
   const [registrationInvalidField, setRegistrationInvalidField] = useState(null);
-  const [userMode, setUserMode] = useState('create');
-  const [tournamentMode, setTournamentMode] = useState('create');
-  const [registrationMode, setRegistrationMode] = useState('create');
-  const [tournamentSaving, setTournamentSaving] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
-  const [userSaving, setUserSaving] = useState(false);
   const [registrationSaving, setRegistrationSaving] = useState(false);
   const [authSaving, setAuthSaving] = useState(false);
   const [message, setMessageState] = useState('');
@@ -188,17 +169,7 @@ function AppContent() {
     setPostboxRecipientId('');
     setPostboxBody('');
     setSavedSearches([]);
-    setUsers([]);
-    setRegistrations([]);
-    setUserForm(EMPTY_USER_FORM);
-    setTournamentForm(EMPTY_TOURNAMENT_FORM);
     setRegistrationForm(EMPTY_REGISTRATION_FORM);
-    setUserMode('create');
-    setTournamentMode('create');
-    setRegistrationMode('create');
-    setUserDialogOpen(false);
-    setTournamentDialogOpen(false);
-    setRegistrationDialogOpen(false);
     setActiveTab('home');
     setHomeOnlyMine(false);
     setMessage('');
@@ -223,14 +194,6 @@ function AppContent() {
     refetchInterval: 60_000,
     refetchIntervalInBackground: false,
   });
-  const usersQuery = useQuery({ queryKey: ['users'], queryFn: () => authenticatedApi('/api/users'), enabled: isAdmin });
-  const manageableTournamentId = selectedTournament?.canManage ? selectedTournament.id : null;
-  const registrationsQuery = useQuery({
-    queryKey: ['registrations', manageableTournamentId],
-    queryFn: () => authenticatedApi(`/api/tournaments/${manageableTournamentId}/registrations`),
-    enabled: Boolean(manageableTournamentId),
-  });
-
   const homeHeading = t('Öffentliche Turniere');
 
   const filteredHomeTournaments = useMemo(() => {
@@ -303,31 +266,6 @@ function AppContent() {
   const manageableTournaments = useMemo(
     () => tournaments.filter((tournament) => tournament.canManage),
     [tournaments],
-  );
-
-  const filteredTournaments = useMemo(
-    () => filterTournaments(manageableTournaments, tournamentQuery, tournamentStatusFilter),
-    [manageableTournaments, tournamentQuery, tournamentStatusFilter],
-  );
-
-  const filteredRegistrations = useMemo(
-    () => filterRegistrations(registrations, registrationQuery, registrationStatusFilter),
-    [registrations, registrationQuery, registrationStatusFilter],
-  );
-
-  const filteredUsers = useMemo(
-    () => filterUsers(users, userQuery, userRoleFilter, userStatusFilter),
-    [users, userQuery, userRoleFilter, userStatusFilter],
-  );
-
-  const userStats = useMemo(
-    () => ({
-      total: users.length,
-      admins: users.filter((user) => user.role === 'admin').length,
-      unverified: users.filter((user) => !user.emailVerifiedAt).length,
-      passwordChangeRequired: users.filter((user) => user.passwordChangeRequired).length,
-    }),
-    [users],
   );
 
   useEffect(() => {
@@ -405,7 +343,7 @@ function AppContent() {
 
   const authModalOpen = authView !== 'home' && authView !== 'cancelRegistration';
   const anyDialogOpen =
-    menuOpen || searchMenuOpen || homeFilterOpen || postboxOpen || savedSearchesOpen || savedSearchDialogOpen || userDialogOpen || tournamentDialogOpen || registrationDialogOpen || authModalOpen;
+    menuOpen || searchMenuOpen || homeFilterOpen || postboxOpen || savedSearchesOpen || savedSearchDialogOpen || authModalOpen;
   const awayFromHome = activeTab !== 'home';
   const desiredNavDepth = (awayFromHome ? 1 : 0) + (anyDialogOpen ? 1 : 0);
   const navDepthRef = useRef(0);
@@ -460,9 +398,6 @@ function AppContent() {
         setPostboxOpen(false);
         setSavedSearchesOpen(false);
         setSavedSearchDialogOpen(false);
-        setUserDialogOpen(false);
-        setTournamentDialogOpen(false);
-        setRegistrationDialogOpen(false);
         if (authModalOpen) {
           setAuthView('home');
           clearFeedback();
@@ -494,24 +429,12 @@ function AppContent() {
   }, [postboxQuery.data]);
 
   useEffect(() => {
-    if (usersQuery.data) setUsers(usersQuery.data.users);
-  }, [usersQuery.data]);
-
-  useEffect(() => {
     if (currentUser) {
       loadSavedSearches(true);
     } else {
       setSavedSearches([]);
     }
   }, [currentUser?.id]);
-
-  useEffect(() => {
-    if (registrationsQuery.data) {
-      setRegistrations(registrationsQuery.data.registrations);
-    } else if (!selectedTournament?.canManage) {
-      setRegistrations([]);
-    }
-  }, [registrationsQuery.data, selectedTournament?.canManage]);
 
   async function initialize() {
     setLoading(true);
@@ -550,15 +473,6 @@ function AppContent() {
     }
   }
 
-  async function loadUsers(silent = false) {
-    try {
-      const data = await queryClient.fetchQuery({ queryKey: ['users'], queryFn: () => authenticatedApi('/api/users'), staleTime: 0 });
-      setUsers(data.users);
-    } catch (requestError) {
-      if (!silent) setError(requestError.message);
-    }
-  }
-
   async function loadTournaments(silent = false) {
     try {
       const data = await queryClient.fetchQuery({ queryKey: ['tournaments'], queryFn: () => api('/api/tournaments'), staleTime: 0 });
@@ -570,19 +484,6 @@ function AppContent() {
         const manageable = data.tournaments.find((tournament) => tournament.canManage);
         return manageable?.id || data.tournaments[0]?.id || '';
       });
-    } catch (requestError) {
-      if (!silent) setError(requestError.message);
-    }
-  }
-
-  async function loadRegistrations(tournamentId, silent = false) {
-    try {
-      const data = await queryClient.fetchQuery({
-        queryKey: ['registrations', tournamentId],
-        queryFn: () => authenticatedApi(`/api/tournaments/${tournamentId}/registrations`),
-        staleTime: 0,
-      });
-      setRegistrations(data.registrations);
     } catch (requestError) {
       if (!silent) setError(requestError.message);
     }
@@ -1081,155 +982,13 @@ function AppContent() {
     setPostboxRecipientTournaments([]);
     setPostboxRecipientId('');
     setPostboxBody('');
-    setUsers([]);
-    setRegistrations([]);
-    setUserForm(EMPTY_USER_FORM);
-    setTournamentForm(EMPTY_TOURNAMENT_FORM);
     setRegistrationForm(EMPTY_REGISTRATION_FORM);
-    setUserMode('create');
-    setTournamentMode('create');
-    setRegistrationMode('create');
-    setUserDialogOpen(false);
-    setTournamentDialogOpen(false);
-    setRegistrationDialogOpen(false);
     setAuthView('home');
     setActiveTab('home');
     setHomeOnlyMine(false);
     setMessage('');
     setError('');
     await loadTournaments();
-  }
-
-  async function handleUserSubmit(event) {
-    event.preventDefault();
-    setError('');
-    setMessage('');
-
-    const payload = { ...userForm };
-    if (userMode === 'edit' && !payload.password) {
-      delete payload.password;
-    }
-
-    if (payload.password && !isPasswordStrong(payload.password)) {
-      setError(t(PASSWORD_STRENGTH_ERROR));
-      return;
-    }
-
-    setUserSaving(true);
-    try {
-      if (userMode === 'edit') {
-        await authenticatedApi(`/api/users/${userForm.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload),
-        });
-        setMessage(t('Benutzer wurde aktualisiert.'));
-      } else {
-        await authenticatedApi('/api/users', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-        setMessage(t('Benutzer wurde angelegt.'));
-      }
-
-      setUserForm(EMPTY_USER_FORM);
-      setUserMode('create');
-      setUserDialogOpen(false);
-      await loadUsers();
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setUserSaving(false);
-    }
-  }
-
-  async function handleDeleteUser(user) {
-    if (!window.confirm(`Benutzer "${user.firstName} ${user.lastName}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) {
-      return;
-    }
-
-    const ownedTournaments = tournaments.filter((tournament) => tournament.ownerId === user.id);
-    let deleteTournaments = false;
-    if (ownedTournaments.length > 0) {
-      deleteTournaments = window.confirm(
-        `Dieser Benutzer besitzt ${ownedTournaments.length} Turnier(e). OK = diese Turniere ebenfalls löschen. Abbrechen = die Turniere werden dir als Admin zugewiesen und bleiben erhalten.`,
-      );
-    }
-
-    setError('');
-    setMessage('');
-
-    try {
-      await authenticatedApi(`/api/users/${user.id}${deleteTournaments ? '?deleteTournaments=true' : ''}`, { method: 'DELETE' });
-      setMessage(t('Benutzer wurde gelöscht.'));
-      await loadUsers();
-      await loadTournaments();
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function handleTournamentSubmit(event) {
-    event.preventDefault();
-    setError('');
-    setMessage('');
-
-    const payload = tournamentPayload(tournamentForm);
-
-    setTournamentSaving(true);
-    try {
-      let data;
-      if (tournamentMode === 'edit') {
-        data = await authenticatedApi(`/api/tournaments/${tournamentForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
-        await authenticatedApi(`/api/tournaments/${data.tournament.id}/presentation`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            websiteUrl: tournamentForm.websiteUrl,
-            logoUrl: tournamentForm.logoUrl,
-            flyerUrl: tournamentForm.flyerUrl,
-          }),
-        });
-      } else {
-        data = await authenticatedApi('/api/tournaments', { method: 'POST', body: JSON.stringify(payload) });
-      }
-
-      setMessage(tournamentMode === 'edit' ? t('Turnier wurde aktualisiert.') : t('Turnier wurde angelegt.'));
-      setTournamentForm(EMPTY_TOURNAMENT_FORM);
-      setTournamentMode('create');
-      setTournamentDialogOpen(false);
-      await loadTournaments();
-      setSelectedTournamentId(data.tournament.id);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setTournamentSaving(false);
-    }
-  }
-
-  async function handleOwnerChanged() {
-    await loadTournaments(true);
-  }
-
-  async function handleDeleteTournament(tournament) {
-    if (
-      !window.confirm(
-        `Turnier "${tournament.name}" wirklich löschen? Alle Anmeldungen dieses Turniers werden mitgelöscht und das kann nicht rückgängig gemacht werden.`,
-      )
-    ) {
-      return;
-    }
-
-    setError('');
-    setMessage('');
-
-    try {
-      await authenticatedApi(`/api/tournaments/${tournament.id}`, { method: 'DELETE' });
-      setMessage(t('Turnier wurde gelöscht.'));
-      setSelectedTournamentId('');
-      setRegistrations([]);
-      await loadTournaments();
-    } catch (requestError) {
-      setError(requestError.message);
-    }
   }
 
   async function handleRegistrationSubmit(event, shareToken = '') {
@@ -1241,39 +1000,21 @@ function AppContent() {
     const tournamentId = registrationForm.tournamentId || selectedTournamentId;
     const payload = registrationPayload({ ...registrationForm, tournamentId }, language);
 
-    // Dieselbe Funktion bedient sowohl die öffentliche Selbstanmeldung (PublicRegistrationPanel)
-    // als auch den Erfassungsdialog des Turniererstellers (RegistrationsManagementPage) - nur
-    // Letzterer öffnet über registrationDialogOpen. Die Erfolgsmeldung muss sich unterscheiden:
-    // "Du hast dich angemeldet" ergibt keinen Sinn, wenn der Veranstalter eine fremde Meldung erfasst.
-    const isManagerEntry = registrationDialogOpen;
-
     setRegistrationSaving(true);
     try {
-      if (registrationMode === 'edit') {
-        await authenticatedApi(`/api/registrations/${registrationForm.id}`, { method: 'PUT', body: JSON.stringify(payload) });
-        setMessage(t('Anmeldung wurde aktualisiert.'));
-      } else {
-        const shareQuery = shareToken ? `?share=${encodeURIComponent(shareToken)}` : '';
-        const result = await api(`/api/tournaments/${tournamentId}/registrations${shareQuery}`, { method: 'POST', body: JSON.stringify(payload) });
-        setMessage(
-          isManagerEntry
-            ? `${t('Neue Meldung hinzugefügt:')} ${result.registration.firstName} ${result.registration.lastName}`
-            : result.registration.status === 'pending'
-              ? t('Deine Anmeldung ist eingegangen und wird vom Turnierleiter geprüft.')
-              : result.mailEnabled && !result.registration.noEmail
-                ? t('Du hast dich erfolgreich angemeldet. Deine Teilnahme wurde per E-Mail bestätigt.')
-                : t('Du hast dich erfolgreich angemeldet. Deine Teilnahme ist bestätigt.'),
-        );
-      }
+      const shareQuery = shareToken ? `?share=${encodeURIComponent(shareToken)}` : '';
+      const result = await api(`/api/tournaments/${tournamentId}/registrations${shareQuery}`, { method: 'POST', body: JSON.stringify(payload) });
+      setMessage(
+        result.registration.status === 'pending'
+          ? t('Deine Anmeldung ist eingegangen und wird vom Turnierleiter geprüft.')
+          : result.mailEnabled && !result.registration.noEmail
+            ? t('Du hast dich erfolgreich angemeldet. Deine Teilnahme wurde per E-Mail bestätigt.')
+            : t('Du hast dich erfolgreich angemeldet. Deine Teilnahme ist bestätigt.'),
+      );
 
       setRegistrationForm(EMPTY_REGISTRATION_FORM);
-      setRegistrationMode('create');
-      setRegistrationDialogOpen(false);
       setAuthView('home');
       await loadTournaments();
-      if (selectedTournament?.canManage) {
-        await loadRegistrations(selectedTournament.id);
-      }
     } catch (requestError) {
       const baseMessage = requestError.message;
       const conflictName = requestError.payload?.details?.name;
@@ -1282,190 +1023,6 @@ function AppContent() {
     } finally {
       setRegistrationSaving(false);
     }
-  }
-
-  async function handleDeleteRegistration(registration) {
-    const registrationLabel = [registration.firstName, registration.lastName].filter(Boolean).join(' ') || registration.teamName;
-    if (!window.confirm(`Anmeldung "${registrationLabel}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) {
-      return;
-    }
-
-    setError('');
-    setMessage('');
-
-    try {
-      await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'DELETE' });
-      setMessage(t('Anmeldung wurde gelöscht.'));
-      await loadRegistrations(registration.tournamentId);
-      await loadTournaments();
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function handleConfirmRegistration(registration) {
-    setError('');
-    setMessage('');
-    try {
-      const payload = registrationPayload({ ...registration, seedingPosition: registration.seedingPosition ?? '', status: 'confirmed' }, language);
-      await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
-      setMessage(t('Anmeldung wurde bestätigt.'));
-      await loadRegistrations(registration.tournamentId);
-      await loadTournaments();
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  async function handleConfirmAllRegistrations() {
-    if (!selectedTournament) return;
-    setError('');
-    setMessage('');
-    try {
-      const result = await authenticatedApi(`/api/tournaments/${selectedTournament.id}/registrations/confirm-pending`, { method: 'POST' });
-      setMessage(`${result.confirmedCount} ${t('offene Anmeldung(en) wurden bestätigt.')}`);
-      await loadRegistrations(selectedTournament.id);
-      await loadTournaments();
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  }
-
-  function newUser() {
-    setUserMode('create');
-    setUserForm(EMPTY_USER_FORM);
-    clearFeedback();
-    setUserDialogOpen(true);
-  }
-
-  function editUser(user) {
-    setUserMode('edit');
-    setUserForm({
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.role,
-      password: '',
-      emailVerified: Boolean(user.emailVerifiedAt),
-      passwordChangeRequired: Boolean(user.passwordChangeRequired),
-      tournamentLimit: user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT,
-      mailEnabled: user.mailEnabled ?? true,
-    });
-    clearFeedback();
-    setUserDialogOpen(true);
-  }
-
-  function closeUserDialog() {
-    setUserDialogOpen(false);
-    setUserMode('create');
-    setUserForm(EMPTY_USER_FORM);
-  }
-
-  function newTournament() {
-    setTournamentMode('create');
-    setTournamentForm(EMPTY_TOURNAMENT_FORM);
-    setActiveTab('tournaments');
-    clearFeedback();
-    setTournamentDialogOpen(true);
-  }
-
-  function editTournament(tournament) {
-    setTournamentMode('edit');
-    setTournamentForm({
-      id: tournament.id,
-      ownerId: tournament.ownerId || '',
-      creatorId: tournament.creatorId || '',
-      name: tournament.name || '',
-      date: tournament.date || '',
-      startTime: tournament.startTime || '',
-      location: tournament.location || '',
-      latitude: tournament.latitude ?? '',
-      longitude: tournament.longitude ?? '',
-      overrideCoordinates: false,
-      locationConfirmed: false,
-      description: tournament.description || '',
-      type: tournament.type || 'formule_x',
-      formation: tournament.formationOther ? 'andere' : (tournament.formation || 'doublette'),
-      registrationType: tournament.registrationType || 'forme',
-      schweizerRankingMode: tournament.schweizerRankingMode || 'mit_buchholz',
-      status: tournament.status || 'draft',
-      maxRegistrations: tournament.maxRegistrations || 0,
-      registrationDeadline: utcIsoToZonedDateTimeInput(tournament.registrationDeadline, tournament.timezone),
-      registrationOpensAt: utcIsoToZonedDateTimeInput(tournament.registrationOpensAt, tournament.timezone),
-      timezone: tournament.timezone || '',
-      entryFeeAmount: minorUnitsToAmount(tournament.entryFeeCents, tournament.currency || 'EUR'),
-      feeTiers: (tournament.feeTiers || []).filter((tier) => tier.id !== 'legacy-standard').map((tier) => ({ ...tier, amount: minorUnitsToAmount(tier.amountCents, tournament.currency || 'EUR') })),
-      currency: tournament.currency || 'EUR',
-      contactName: tournament.contactName || '',
-      contactEmail: tournament.contactEmail || '',
-      contactPhone: tournament.contactPhone || '',
-      visibility: tournament.visibility || 'private',
-      internalNotes: tournament.internalNotes || '',
-      club: tournament.club || '',
-      participantsPublic: Boolean(tournament.participantsPublic),
-      approvalRequired: Boolean(tournament.approvalRequired),
-      licenseRequired: Boolean(tournament.licenseRequired),
-      teamNameEnabled: Boolean(tournament.teamNameEnabled),
-      waitlistEnabled: tournament.waitlistEnabled === undefined ? true : Boolean(tournament.waitlistEnabled),
-      registrationEnabled: tournament.registrationEnabled === undefined ? true : Boolean(tournament.registrationEnabled),
-      websiteUrl: tournament.websiteUrl || '',
-      logoUrl: tournament.logoUrl || '',
-      flyerUrl: tournament.flyerUrl || '',
-    });
-    setActiveTab('tournaments');
-    clearFeedback();
-    setTournamentDialogOpen(true);
-  }
-
-  function closeTournamentDialog() {
-    setTournamentDialogOpen(false);
-    setTournamentMode('create');
-    setTournamentForm(EMPTY_TOURNAMENT_FORM);
-  }
-
-  function newRegistration() {
-    setRegistrationMode('create');
-    setRegistrationForm({ ...EMPTY_REGISTRATION_FORM, tournamentId: selectedTournamentId });
-    setActiveTab('registrations');
-    clearFeedback();
-    setRegistrationDialogOpen(true);
-  }
-
-  function editRegistration(registration) {
-    setRegistrationMode('edit');
-    setRegistrationForm({
-      id: registration.id,
-      tournamentId: registration.tournamentId,
-      firstName: registration.firstName || '',
-      lastName: registration.lastName || '',
-      email: registration.email || '',
-      noEmail: Boolean(registration.noEmail),
-      club: registration.club || '',
-      licenseNr: registration.licenseNr || '',
-      partnerFirstName: registration.partnerFirstName || '',
-      partnerLastName: registration.partnerLastName || '',
-      partnerEmail: registration.partnerEmail || '',
-      partnerLicenseNr: registration.partnerLicenseNr || '',
-      partner2FirstName: registration.partner2FirstName || '',
-      partner2LastName: registration.partner2LastName || '',
-      partner2Email: registration.partner2Email || '',
-      partner2LicenseNr: registration.partner2LicenseNr || '',
-      feeSelections: registration.feeSelections || [],
-      teamName: registration.teamName || '',
-      seedingPosition: registration.seedingPosition || '',
-      status: registration.status || 'pending',
-      isVip: Boolean(registration.isVip),
-    });
-    setActiveTab('registrations');
-    clearFeedback();
-    setRegistrationDialogOpen(true);
-  }
-
-  function closeRegistrationDialog() {
-    setRegistrationDialogOpen(false);
-    setRegistrationMode('create');
-    setRegistrationForm(EMPTY_REGISTRATION_FORM);
   }
 
   function clearFeedback() {
@@ -1579,10 +1136,10 @@ function AppContent() {
     if (type === 'unverified_users') setActiveTab('users');
     else if (type === 'api_key_requests') setActiveTab('apikeys');
     else if (type === 'pending_registrations') {
-      setRegistrationStatusFilter('pending');
+      setPendingRegistrationsFilter('pending');
       setActiveTab('registrations');
     } else if (type === 'waitlist') {
-      setRegistrationStatusFilter('waitlist');
+      setPendingRegistrationsFilter('waitlist');
       setActiveTab('registrations');
     }
     if (path !== '/') navigate('/');
@@ -2304,38 +1861,15 @@ function AppContent() {
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
             <TournamentManagement
-              tournaments={filteredTournaments}
-              totalTournaments={manageableTournaments.length}
-              selectedId={selectedTournamentId}
-              onSelect={setSelectedTournamentId}
-              onEdit={editTournament}
-              onDelete={handleDeleteTournament}
+              tournaments={tournaments}
               isAdmin={isAdmin}
               language={language}
-              onCreate={newTournament}
-              query={tournamentQuery}
-              onQueryChange={setTournamentQuery}
-              statusFilter={tournamentStatusFilter}
-              onStatusFilterChange={setTournamentStatusFilter}
-              onResetFilters={() => {
-                setTournamentQuery('');
-                setTournamentStatusFilter('');
-              }}
-              canManageTournaments={canManageTournaments}
-              tournamentDialogOpen={tournamentDialogOpen}
-              tournamentMode={tournamentMode}
-              tournamentForm={tournamentForm}
-              setTournamentForm={setTournamentForm}
-              onTournamentSubmit={handleTournamentSubmit}
-              tournamentSaving={tournamentSaving}
-              onCloseTournamentDialog={closeTournamentDialog}
-              editorCandidates={postboxRecipients.filter((recipient) => recipient.id !== tournamentForm.ownerId)}
-              ownerCandidates={postboxRecipients}
-              onOwnerChanged={handleOwnerChanged}
               currentUser={currentUser}
-              message={message}
-              error={error}
               boulePlaces={boulePlacesQuery.data?.places || []}
+              postboxRecipients={postboxRecipients}
+              selectedTournamentId={selectedTournamentId}
+              setSelectedTournamentId={setSelectedTournamentId}
+              onTournamentsChanged={() => loadTournaments(true)}
             />
           </section>
         </Suspense>
@@ -2345,37 +1879,13 @@ function AppContent() {
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
             <RegistrationsManagement
-              tournament={selectedTournament}
-              registrations={registrations}
-              filteredRegistrations={filteredRegistrations}
-              onTournamentChange={setSelectedTournamentId}
-              tournaments={manageableTournaments.filter((tournament) => tournament.registrationEnabled !== false)}
-              onCreate={newRegistration}
-              query={registrationQuery}
-              onQueryChange={setRegistrationQuery}
-              statusFilter={registrationStatusFilter}
-              onStatusFilterChange={setRegistrationStatusFilter}
-              onResetFilters={() => {
-                setRegistrationQuery('');
-                setRegistrationStatusFilter('');
-              }}
-              onEdit={editRegistration}
-              onConfirm={handleConfirmRegistration}
-              onConfirmAll={handleConfirmAllRegistrations}
-              onDelete={handleDeleteRegistration}
-              registrationDialogOpen={registrationDialogOpen}
-              registrationMode={registrationMode}
-              registrationForm={registrationForm}
-              setRegistrationForm={setRegistrationForm}
-              onRegistrationSubmit={handleRegistrationSubmit}
-              registrationSaving={registrationSaving}
-              onCloseRegistrationDialog={closeRegistrationDialog}
-              manageableTournaments={manageableTournaments}
+              tournaments={tournaments}
               selectedTournamentId={selectedTournamentId}
-              manageMode={Boolean(selectedTournament?.canManage)}
-              invalidField={registrationInvalidField}
-              message={message}
-              error={error}
+              setSelectedTournamentId={setSelectedTournamentId}
+              onTournamentsChanged={() => loadTournaments(true)}
+              language={language}
+              initialStatusFilter={pendingRegistrationsFilter}
+              onInitialStatusFilterConsumed={() => setPendingRegistrationsFilter('')}
             />
           </section>
         </Suspense>
@@ -2384,28 +1894,9 @@ function AppContent() {
       {activeTab === 'users' && isAdmin && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <UserManagementPanel
-            users={filteredUsers}
-            stats={userStats}
-            totalUsers={users.length}
-            userMode={userMode}
             currentUser={currentUser}
-            userForm={userForm}
-            setUserForm={setUserForm}
-            userQuery={userQuery}
-            setUserQuery={setUserQuery}
-            userRoleFilter={userRoleFilter}
-            setUserRoleFilter={setUserRoleFilter}
-            userStatusFilter={userStatusFilter}
-            setUserStatusFilter={setUserStatusFilter}
-            dialogOpen={userDialogOpen}
-            onCloseDialog={closeUserDialog}
-            onCreateUser={newUser}
-            onSubmitUser={handleUserSubmit}
-            saving={userSaving}
-            onEditUser={editUser}
-            onDeleteUser={handleDeleteUser}
-            message={message}
-            error={error}
+            tournaments={tournaments}
+            onTournamentsChanged={() => loadTournaments(true)}
           />
         </Suspense>
       )}

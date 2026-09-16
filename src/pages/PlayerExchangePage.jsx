@@ -100,8 +100,8 @@ function PlayerExchangeSearchMenu({
                 onSelect={onSearchOriginSelect}
                 disabled={geoLoading}
               />
-              <Button type="submit" variant="secondary" disabled={geoLoading}>{t('Suchen')}</Button>
-              <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading}>{t('Meinen Standort verwenden')}</Button>
+              <Button type="submit" variant="secondary" disabled={geoLoading} loading={geoLoading}>{t('Suchen')}</Button>
+              <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading} loading={geoLoading}>{t('Meinen Standort verwenden')}</Button>
               {searchOrigin && (
                 <>
                   <SelectField label={t('Umkreis')} value={searchRadiusKm} onChange={setSearchRadiusKm} options={translatedOptions(RADIUS_OPTIONS)} />

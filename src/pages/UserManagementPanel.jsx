@@ -1,7 +1,10 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { authenticatedApi } from '../lib/api.js';
 import { DEFAULT_TOURNAMENT_LIMIT, ROLES, EMPTY_USER_FORM } from '../lib/constants.js';
-import { PASSWORD_STRENGTH_HINT } from '../lib/format.js';
+import { PASSWORD_STRENGTH_HINT, PASSWORD_STRENGTH_ERROR, isPasswordStrong } from '../lib/format.js';
 import { roleName, translatedOptions } from '../lib/domain.js';
+import { filterUsers } from '../frontend-core.js';
 import { SelectField, TextField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 
 const USER_STATUS_FILTERS = [
@@ -11,38 +14,129 @@ const USER_STATUS_FILTERS = [
   { value: 'password_change_required', label: 'Passwortwechsel nötig' },
 ];
 
-export function UserManagementPanel({
-  users,
-  stats,
-  totalUsers,
-  userMode,
-  currentUser,
-  userForm,
-  setUserForm,
-  userQuery,
-  setUserQuery,
-  userRoleFilter,
-  setUserRoleFilter,
-  userStatusFilter,
-  setUserStatusFilter,
-  dialogOpen,
-  onCloseDialog,
-  onCreateUser,
-  onSubmitUser,
-  onEditUser,
-  onDeleteUser,
-  message,
-  error,
-  saving,
-}) {
-  const { t } = useTranslation();
-  const filtered = users.length !== totalUsers;
-  const roleOptions = [{ value: '', label: t('Alle Rollen') }, ...translatedOptions(ROLES)];
+function userToForm(user) {
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    role: user.role,
+    password: '',
+    emailVerified: Boolean(user.emailVerifiedAt),
+    passwordChangeRequired: Boolean(user.passwordChangeRequired),
+    tournamentLimit: user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT,
+    mailEnabled: user.mailEnabled ?? true,
+  };
+}
 
-  function resetUserFilters() {
-    setUserQuery('');
-    setUserRoleFilter('');
-    setUserStatusFilter('');
+export function UserManagementPanel({ currentUser, tournaments = [], onTournamentsChanged }) {
+  const { t } = useTranslation();
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [query, setQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_USER_FORM);
+  const [mode, setMode] = useState('create');
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState('');
+
+  async function load() {
+    setLoading(true);
+    try {
+      const data = await authenticatedApi('/api/users');
+      setUsers(data.users);
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  const filtered = useMemo(() => filterUsers(users, query, roleFilter, statusFilter), [users, query, roleFilter, statusFilter]);
+  const stats = useMemo(() => ({
+    total: users.length,
+    admins: users.filter((user) => user.role === 'admin').length,
+    unverified: users.filter((user) => !user.emailVerifiedAt).length,
+    passwordChangeRequired: users.filter((user) => user.passwordChangeRequired).length,
+  }), [users]);
+
+  const roleOptions = [{ value: '', label: t('Alle Rollen') }, ...translatedOptions(ROLES)];
+  const isFiltered = filtered.length !== users.length;
+
+  function resetFilters() {
+    setQuery('');
+    setRoleFilter('');
+    setStatusFilter('');
+  }
+
+  function openCreate() {
+    setMode('create');
+    setForm(EMPTY_USER_FORM);
+    setError(''); setMessage('');
+    setDialogOpen(true);
+  }
+
+  function openEdit(user) {
+    setMode('edit');
+    setForm(userToForm(user));
+    setError(''); setMessage('');
+    setDialogOpen(true);
+  }
+
+  function closeDialog() {
+    setDialogOpen(false);
+    setMode('create');
+    setForm(EMPTY_USER_FORM);
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError(''); setMessage('');
+
+    const payload = { ...form };
+    if (mode === 'edit' && !payload.password) {
+      delete payload.password;
+    }
+    if (payload.password && !isPasswordStrong(payload.password)) {
+      setError(t(PASSWORD_STRENGTH_ERROR));
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (mode === 'edit') {
+        await authenticatedApi(`/api/users/${form.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        setMessage(t('Benutzer wurde aktualisiert.'));
+      } else {
+        await authenticatedApi('/api/users', { method: 'POST', body: JSON.stringify(payload) });
+        setMessage(t('Benutzer wurde angelegt.'));
+      }
+      closeDialog();
+      await load();
+    } catch (err) { setError(err.message); } finally { setSaving(false); }
+  }
+
+  async function handleDelete(user) {
+    if (!window.confirm(`Benutzer "${user.firstName} ${user.lastName}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) {
+      return;
+    }
+    const ownedTournaments = tournaments.filter((tournament) => tournament.ownerId === user.id);
+    let deleteTournaments = false;
+    if (ownedTournaments.length > 0) {
+      deleteTournaments = window.confirm(
+        `Dieser Benutzer besitzt ${ownedTournaments.length} Turnier(e). OK = diese Turniere ebenfalls löschen. Abbrechen = die Turniere werden dir als Admin zugewiesen und bleiben erhalten.`,
+      );
+    }
+
+    setError(''); setMessage('');
+    setBusyId(`delete-${user.id}`);
+    try {
+      await authenticatedApi(`/api/users/${user.id}${deleteTournaments ? '?deleteTournaments=true' : ''}`, { method: 'DELETE' });
+      setMessage(t('Benutzer wurde gelöscht.'));
+      await load();
+      onTournamentsChanged?.();
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
   }
 
   return (
@@ -63,50 +157,56 @@ export function UserManagementPanel({
       <div className="panel user-list-panel">
         <div className="section-title">
           <h2>{t('Benutzer')}</h2>
-          <span className="counter">{filtered ? `${users.length}/${totalUsers}` : totalUsers}</span>
-          <Button onClick={onCreateUser}>{t('Neuer Benutzer')}</Button>
+          <span className="counter">{isFiltered ? `${filtered.length}/${users.length}` : users.length}</span>
+          <Button onClick={openCreate}>{t('Neuer Benutzer')}</Button>
         </div>
+        {message && <p className="feedback success">{message}</p>}
+        {error && <p className="feedback error">{error}</p>}
         <ListToolbar
-          query={userQuery}
-          onQueryChange={setUserQuery}
+          query={query}
+          onQueryChange={setQuery}
           searchPlaceholder={t('Name oder E-Mail suchen')}
           filters={[
-            { label: t('Rolle filtern'), value: userRoleFilter, onChange: setUserRoleFilter, options: roleOptions },
-            { label: t('Status filtern'), value: userStatusFilter, onChange: setUserStatusFilter, options: translatedOptions(USER_STATUS_FILTERS) },
+            { label: t('Rolle filtern'), value: roleFilter, onChange: setRoleFilter, options: roleOptions },
+            { label: t('Status filtern'), value: statusFilter, onChange: setStatusFilter, options: translatedOptions(USER_STATUS_FILTERS) },
           ]}
-          onReset={resetUserFilters}
-          resetDisabled={!filtered}
+          onReset={resetFilters}
+          resetDisabled={!isFiltered}
         />
-        <div className="user-list">
-          {users.map((user) => (
-            <UserRow
-              key={user.id}
-              user={user}
-              currentUser={currentUser}
-              selected={userMode === 'edit' && user.id === userForm.id}
-              onEdit={onEditUser}
-              onDelete={onDeleteUser}
-            />
-          ))}
-          {users.length === 0 && <p className="muted">{t('Keine Benutzer gefunden.')}</p>}
-        </div>
+        {loading ? <p className="muted">{t('Lädt …')}</p> : (
+          <div className="user-list">
+            {filtered.map((user) => (
+              <UserRow
+                key={user.id}
+                user={user}
+                currentUser={currentUser}
+                selected={mode === 'edit' && user.id === form.id}
+                busy={busyId === `delete-${user.id}`}
+                busyOther={Boolean(busyId) && busyId !== `delete-${user.id}`}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+              />
+            ))}
+            {filtered.length === 0 && <p className="muted">{t('Keine Benutzer gefunden.')}</p>}
+          </div>
+        )}
       </div>
 
       <EditDialog
         open={dialogOpen}
-        title={userMode === 'edit' ? t('Benutzer bearbeiten') : t('Benutzer anlegen')}
+        title={mode === 'edit' ? t('Benutzer bearbeiten') : t('Benutzer anlegen')}
         message={message}
         error={error}
-        onClose={onCloseDialog}
+        onClose={closeDialog}
       >
         <UserEditorForm
-          form={userForm}
-          setForm={setUserForm}
-          submitLabel={userMode === 'edit' ? t('Speichern') : t('Anlegen')}
-          onSubmit={onSubmitUser}
-          onCancel={onCloseDialog}
-          passwordLabel={userMode === 'edit' ? t('Neues Passwort') : t('Passwort')}
-          passwordRequired={userMode === 'create'}
+          form={form}
+          setForm={setForm}
+          submitLabel={mode === 'edit' ? t('Speichern') : t('Anlegen')}
+          onSubmit={handleSubmit}
+          onCancel={closeDialog}
+          passwordLabel={mode === 'edit' ? t('Neues Passwort') : t('Passwort')}
+          passwordRequired={mode === 'create'}
           saving={saving}
         />
       </EditDialog>
@@ -123,7 +223,7 @@ function UserStat({ label, value }) {
   );
 }
 
-function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
+function UserRow({ user, currentUser, selected, busy, busyOther, onEdit, onDelete }) {
   const { t } = useTranslation();
   const systemUser = user.id === 'system-tournament-reports';
 
@@ -147,10 +247,10 @@ function UserRow({ user, currentUser, selected, onEdit, onDelete }) {
         )}
       </div>
       <div className="row-actions">
-        <Button variant="secondary" onClick={() => onEdit(user)} disabled={systemUser}>
+        <Button variant="secondary" onClick={() => onEdit(user)} disabled={systemUser || busy || busyOther}>
           {t('Bearbeiten')}
         </Button>
-        <Button variant="danger" onClick={() => onDelete(user)} disabled={systemUser || user.id === currentUser.id}>
+        <Button variant="danger" loading={busy} onClick={() => onDelete(user)} disabled={systemUser || user.id === currentUser.id || busyOther}>
           {t('Löschen')}
         </Button>
       </div>

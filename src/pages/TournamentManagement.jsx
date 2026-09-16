@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
-import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate } from '../lib/format.js';
-import { labelFor, formationLabel, formatTournamentStartTime, translatedOptions } from '../lib/domain.js';
+import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
+import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
+import { labelFor, formationLabel, formatTournamentStartTime, tournamentPayload, translatedOptions } from '../lib/domain.js';
+import { filterTournaments } from '../frontend-core.js';
 import { TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { authenticatedApi } from '../lib/api.js';
@@ -505,14 +506,15 @@ export function TournamentList({
   statusFilter,
   onStatusFilterChange,
   onResetFilters,
+  busyId = '',
+  setBusyId = () => {},
 }) {
   const { t } = useTranslation();
   const filtered = tournaments.length !== totalTournaments;
-  const [shareBusyId, setShareBusyId] = useState('');
   const [shareError, setShareError] = useState('');
 
   async function shareTournament(tournament) {
-    setShareBusyId(tournament.id);
+    setBusyId(`share-${tournament.id}`);
     setShareError('');
     try {
       const shareUrl = tournament.visibility === 'private'
@@ -524,19 +526,19 @@ export function TournamentList({
     } catch (error) {
       if (error.name !== 'AbortError') setShareError(error.message || t('Teilen wird von diesem Gerät nicht unterstützt'));
     } finally {
-      setShareBusyId('');
+      setBusyId('');
     }
   }
 
   async function disableShareLink(tournament) {
-    setShareBusyId(tournament.id);
+    setBusyId(`disable-${tournament.id}`);
     setShareError('');
     try {
       await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'DELETE' });
     } catch (error) {
       setShareError(error.message);
     } finally {
-      setShareBusyId('');
+      setBusyId('');
     }
   }
 
@@ -590,15 +592,36 @@ export function TournamentList({
                 {tournament.documentManaged ? (
                   <span className="muted">{t('Eckdaten im Turnierdokument')}</span>
                 ) : (
-                  <Button variant="secondary" onClick={() => onEdit(tournament)}>{t('Bearbeiten')}</Button>
+                  <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onEdit(tournament)}>{t('Bearbeiten')}</Button>
                 )}
                 {tournament.status !== 'draft' && (
-                  <Button variant="secondary" disabled={shareBusyId === tournament.id} loading={shareBusyId === tournament.id} onClick={() => shareTournament(tournament)}>{t('Turnier teilen')}</Button>
+                  <Button
+                    variant="secondary"
+                    loading={busyId === `share-${tournament.id}`}
+                    disabled={Boolean(busyId) && busyId !== `share-${tournament.id}`}
+                    onClick={() => shareTournament(tournament)}
+                  >
+                    {t('Turnier teilen')}
+                  </Button>
                 )}
                 {tournament.visibility === 'private' && tournament.status !== 'draft' && (
-                  <Button variant="secondary" disabled={shareBusyId === tournament.id} onClick={() => disableShareLink(tournament)}>{t('Freigabe-Link deaktivieren')}</Button>
+                  <Button
+                    variant="secondary"
+                    loading={busyId === `disable-${tournament.id}`}
+                    disabled={Boolean(busyId) && busyId !== `disable-${tournament.id}`}
+                    onClick={() => disableShareLink(tournament)}
+                  >
+                    {t('Freigabe-Link deaktivieren')}
+                  </Button>
                 )}
-                <Button variant="danger" onClick={() => onDelete(tournament)}>{t('Löschen')}</Button>
+                <Button
+                  variant="danger"
+                  loading={busyId === `delete-${tournament.id}`}
+                  disabled={Boolean(busyId) && busyId !== `delete-${tournament.id}`}
+                  onClick={() => onDelete(tournament)}
+                >
+                  {t('Löschen')}
+                </Button>
               </div>
             )}
           </article>
@@ -609,82 +632,211 @@ export function TournamentList({
   );
 }
 
+function tournamentToForm(tournament) {
+  return {
+    id: tournament.id,
+    ownerId: tournament.ownerId || '',
+    creatorId: tournament.creatorId || '',
+    name: tournament.name || '',
+    date: tournament.date || '',
+    startTime: tournament.startTime || '',
+    location: tournament.location || '',
+    latitude: tournament.latitude ?? '',
+    longitude: tournament.longitude ?? '',
+    overrideCoordinates: false,
+    locationConfirmed: false,
+    description: tournament.description || '',
+    type: tournament.type || 'formule_x',
+    formation: tournament.formationOther ? 'andere' : (tournament.formation || 'doublette'),
+    registrationType: tournament.registrationType || 'forme',
+    schweizerRankingMode: tournament.schweizerRankingMode || 'mit_buchholz',
+    status: tournament.status || 'draft',
+    maxRegistrations: tournament.maxRegistrations || 0,
+    registrationDeadline: utcIsoToZonedDateTimeInput(tournament.registrationDeadline, tournament.timezone),
+    registrationOpensAt: utcIsoToZonedDateTimeInput(tournament.registrationOpensAt, tournament.timezone),
+    timezone: tournament.timezone || '',
+    entryFeeAmount: minorUnitsToAmount(tournament.entryFeeCents, tournament.currency || 'EUR'),
+    feeTiers: (tournament.feeTiers || []).filter((tier) => tier.id !== 'legacy-standard').map((tier) => ({ ...tier, amount: minorUnitsToAmount(tier.amountCents, tournament.currency || 'EUR') })),
+    currency: tournament.currency || 'EUR',
+    contactName: tournament.contactName || '',
+    contactEmail: tournament.contactEmail || '',
+    contactPhone: tournament.contactPhone || '',
+    visibility: tournament.visibility || 'private',
+    internalNotes: tournament.internalNotes || '',
+    club: tournament.club || '',
+    participantsPublic: Boolean(tournament.participantsPublic),
+    approvalRequired: Boolean(tournament.approvalRequired),
+    licenseRequired: Boolean(tournament.licenseRequired),
+    teamNameEnabled: Boolean(tournament.teamNameEnabled),
+    waitlistEnabled: tournament.waitlistEnabled === undefined ? true : Boolean(tournament.waitlistEnabled),
+    registrationEnabled: tournament.registrationEnabled === undefined ? true : Boolean(tournament.registrationEnabled),
+    websiteUrl: tournament.websiteUrl || '',
+    logoUrl: tournament.logoUrl || '',
+    flyerUrl: tournament.flyerUrl || '',
+  };
+}
+
 export function TournamentManagementPage({
-  tournaments,
-  totalTournaments,
-  selectedId,
-  onSelect,
-  onEdit,
-  onDelete,
+  tournaments = [],
   isAdmin,
   language,
-  onCreate,
-  query,
-  onQueryChange,
-  statusFilter,
-  onStatusFilterChange,
-  onResetFilters,
-  canManageTournaments,
-  tournamentDialogOpen,
-  tournamentMode,
-  tournamentForm,
-  setTournamentForm,
-  onTournamentSubmit,
-  onCloseTournamentDialog,
-  editorCandidates,
-  ownerCandidates,
-  onOwnerChanged,
-  currentUser, boulePlaces,
-  message,
-  error,
-  tournamentSaving,
+  currentUser,
+  boulePlaces = [],
+  postboxRecipients = [],
+  selectedTournamentId,
+  setSelectedTournamentId,
+  onTournamentsChanged,
 }) {
   const { t } = useTranslation();
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_TOURNAMENT_FORM);
+  const [mode, setMode] = useState('create');
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState('');
+
+  const manageableTournaments = useMemo(() => tournaments.filter((tournament) => tournament.canManage), [tournaments]);
+  const filteredTournaments = useMemo(
+    () => filterTournaments(manageableTournaments, query, statusFilter),
+    [manageableTournaments, query, statusFilter],
+  );
+
+  function clearFeedback() {
+    setError('');
+    setMessage('');
+  }
+
+  function openCreate() {
+    setMode('create');
+    setForm(EMPTY_TOURNAMENT_FORM);
+    clearFeedback();
+    setDialogOpen(true);
+  }
+
+  function openEdit(tournament) {
+    setMode('edit');
+    setForm(tournamentToForm(tournament));
+    clearFeedback();
+    setDialogOpen(true);
+  }
+
+  function closeDialog() {
+    setDialogOpen(false);
+    setMode('create');
+    setForm(EMPTY_TOURNAMENT_FORM);
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+
+    const payload = tournamentPayload(form);
+
+    setSaving(true);
+    try {
+      let data;
+      if (mode === 'edit') {
+        data = await authenticatedApi(`/api/tournaments/${form.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        await authenticatedApi(`/api/tournaments/${data.tournament.id}/presentation`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            websiteUrl: form.websiteUrl,
+            logoUrl: form.logoUrl,
+            flyerUrl: form.flyerUrl,
+          }),
+        });
+      } else {
+        data = await authenticatedApi('/api/tournaments', { method: 'POST', body: JSON.stringify(payload) });
+      }
+
+      setMessage(mode === 'edit' ? t('Turnier wurde aktualisiert.') : t('Turnier wurde angelegt.'));
+      closeDialog();
+      await onTournamentsChanged?.();
+      setSelectedTournamentId(data.tournament.id);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleOwnerChanged() {
+    await onTournamentsChanged?.();
+  }
+
+  async function handleDelete(tournament) {
+    if (
+      !window.confirm(
+        `Turnier "${tournament.name}" wirklich löschen? Alle Anmeldungen dieses Turniers werden mitgelöscht und das kann nicht rückgängig gemacht werden.`,
+      )
+    ) {
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setBusyId(`delete-${tournament.id}`);
+    try {
+      await authenticatedApi(`/api/tournaments/${tournament.id}`, { method: 'DELETE' });
+      setMessage(t('Turnier wurde gelöscht.'));
+      setSelectedTournamentId('');
+      await onTournamentsChanged?.();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusyId('');
+    }
+  }
+
   return (
     <>
       <TournamentList
-        tournaments={tournaments}
-        totalTournaments={totalTournaments}
-        selectedId={selectedId}
-        onSelect={onSelect}
-        onEdit={onEdit}
-        onDelete={onDelete}
+        tournaments={filteredTournaments}
+        totalTournaments={manageableTournaments.length}
+        selectedId={selectedTournamentId}
+        onSelect={setSelectedTournamentId}
+        onEdit={openEdit}
+        onDelete={handleDelete}
         isAdmin={isAdmin}
         language={language}
-        onCreate={onCreate}
+        onCreate={openCreate}
         query={query}
-        onQueryChange={onQueryChange}
+        onQueryChange={setQuery}
         statusFilter={statusFilter}
-        onStatusFilterChange={onStatusFilterChange}
-        onResetFilters={onResetFilters}
+        onStatusFilterChange={setStatusFilter}
+        onResetFilters={() => { setQuery(''); setStatusFilter(''); }}
+        busyId={busyId}
+        setBusyId={setBusyId}
       />
 
-      {canManageTournaments && (
-        <EditDialog
-          open={tournamentDialogOpen}
-          wide
-          title={tournamentMode === 'edit' ? t('Turnier bearbeiten') : t('Turnier anlegen')}
-          message={message}
-          error={error}
-          onClose={onCloseTournamentDialog}
-        >
-          <TournamentForm
-            form={tournamentForm}
-            setForm={setTournamentForm}
-            onSubmit={onTournamentSubmit}
-            onCancel={onCloseTournamentDialog}
-            mode={tournamentMode}
-            isAdmin={isAdmin}
-            editorCandidates={editorCandidates}
-            ownerCandidates={ownerCandidates}
-            onOwnerChanged={onOwnerChanged}
-            language={language}
-            currentUser={currentUser}
-            boulePlaces={boulePlaces}
-            saving={tournamentSaving}
-          />
-        </EditDialog>
-      )}
+      <EditDialog
+        open={dialogOpen}
+        wide
+        title={mode === 'edit' ? t('Turnier bearbeiten') : t('Turnier anlegen')}
+        message={message}
+        error={error}
+        onClose={closeDialog}
+      >
+        <TournamentForm
+          form={form}
+          setForm={setForm}
+          onSubmit={handleSubmit}
+          onCancel={closeDialog}
+          mode={mode}
+          isAdmin={isAdmin}
+          editorCandidates={postboxRecipients.filter((recipient) => recipient.id !== form.ownerId)}
+          ownerCandidates={postboxRecipients}
+          onOwnerChanged={handleOwnerChanged}
+          language={language}
+          currentUser={currentUser}
+          boulePlaces={boulePlaces}
+          saving={saving}
+        />
+      </EditDialog>
     </>
   );
 }

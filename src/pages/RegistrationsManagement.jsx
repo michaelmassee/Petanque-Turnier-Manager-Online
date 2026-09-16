@@ -1,6 +1,9 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { REGISTRATION_STATUSES } from '../lib/constants.js';
-import { labelFor, translatedOptions } from '../lib/domain.js';
+import { authenticatedApi } from '../lib/api.js';
+import { EMPTY_REGISTRATION_FORM, REGISTRATION_STATUSES } from '../lib/constants.js';
+import { labelFor, registrationPayload, translatedOptions } from '../lib/domain.js';
+import { filterRegistrations } from '../frontend-core.js';
 import { SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
 import { formatMoney } from '../lib/format.js';
@@ -112,6 +115,61 @@ function downloadRegistrationsCsv(tournament, registrations) {
   URL.revokeObjectURL(url);
 }
 
+function registrationToForm(registration) {
+  return {
+    ...EMPTY_REGISTRATION_FORM,
+    id: registration.id,
+    tournamentId: registration.tournamentId,
+    firstName: registration.firstName || '',
+    lastName: registration.lastName || '',
+    email: registration.email || '',
+    noEmail: Boolean(registration.noEmail),
+    club: registration.club || '',
+    licenseNr: registration.licenseNr || '',
+    partnerFirstName: registration.partnerFirstName || '',
+    partnerLastName: registration.partnerLastName || '',
+    partnerEmail: registration.partnerEmail || '',
+    partnerLicenseNr: registration.partnerLicenseNr || '',
+    partner2FirstName: registration.partner2FirstName || '',
+    partner2LastName: registration.partner2LastName || '',
+    partner2Email: registration.partner2Email || '',
+    partner2LicenseNr: registration.partner2LicenseNr || '',
+    feeSelections: registration.feeSelections || [],
+    teamName: registration.teamName || '',
+    seedingPosition: registration.seedingPosition || '',
+    status: registration.status || 'pending',
+    isVip: Boolean(registration.isVip),
+  };
+}
+
+function RegistrationRow({ registration, tournament, showConfirm = false, busy, busyOther, onConfirm, onEdit, onDelete }) {
+  const { t } = useTranslation();
+  return (
+    <article className="data-row">
+      <div>
+        <strong data-i18n-skip>
+          {registration.isVip && <span className="vip-badge" title="VIP">★</span>}
+          {registration.firstName} {registration.lastName}
+        </strong>
+        <span>{registration.noEmail ? t('ohne E-Mail-Adresse') : registration.email}</span>
+        {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
+        {registration.organizerMessage && <small data-i18n-skip>{registration.organizerMessage}</small>}
+        {registration.feeSelections?.length > 0 && <small data-i18n-skip>{registration.feeSelections.map((selection) => `${selection.name}: ${formatMoney(selection.amountCents, tournament?.currency, 'de')}`).join(' · ')}{registration.feeTotalCents ? ` = ${formatMoney(registration.feeTotalCents, tournament?.currency, 'de')}` : ''}</small>}
+      </div>
+      <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
+      <div className="row-actions">
+        {showConfirm && (
+          <Button loading={busy === `confirm-${registration.id}`} disabled={Boolean(busyOther)} onClick={() => onConfirm(registration)}>
+            {t('Bestätigen')}
+          </Button>
+        )}
+        <Button variant="secondary" disabled={Boolean(busy)} onClick={() => onEdit(registration)}>{t('Bearbeiten')}</Button>
+        <Button variant="danger" loading={busy === `delete-${registration.id}`} disabled={Boolean(busyOther)} onClick={() => onDelete(registration)}>{t('Löschen')}</Button>
+      </div>
+    </article>
+  );
+}
+
 export function RegistrationsPanel({
   tournament,
   registrations,
@@ -128,33 +186,18 @@ export function RegistrationsPanel({
   onConfirm,
   onConfirmAll,
   onDelete,
+  busyId,
+  message,
+  error,
 }) {
   const { t } = useTranslation();
   const filtered = filteredRegistrations.length !== registrations.length;
   const pendingRegistrations = filteredRegistrations.filter((registration) => registration.status === 'pending');
   const otherRegistrations = filteredRegistrations.filter((registration) => registration.status !== 'pending');
 
-  function RegistrationRow({ registration, showConfirm = false }) {
-    return (
-      <article className="data-row" key={registration.id}>
-        <div>
-          <strong data-i18n-skip>
-            {registration.isVip && <span className="vip-badge" title="VIP">★</span>}
-            {registration.firstName} {registration.lastName}
-          </strong>
-          <span>{registration.noEmail ? t('ohne E-Mail-Adresse') : registration.email}</span>
-          {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
-          {registration.organizerMessage && <small data-i18n-skip>{registration.organizerMessage}</small>}
-          {registration.feeSelections?.length > 0 && <small data-i18n-skip>{registration.feeSelections.map((selection) => `${selection.name}: ${formatMoney(selection.amountCents, tournament?.currency, 'de')}`).join(' · ')}{registration.feeTotalCents ? ` = ${formatMoney(registration.feeTotalCents, tournament?.currency, 'de')}` : ''}</small>}
-        </div>
-        <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
-        <div className="row-actions">
-          {showConfirm && <Button onClick={() => onConfirm(registration)}>{t('Bestätigen')}</Button>}
-          <Button variant="secondary" onClick={() => onEdit(registration)}>{t('Bearbeiten')}</Button>
-          <Button variant="danger" onClick={() => onDelete(registration)}>{t('Löschen')}</Button>
-        </div>
-      </article>
-    );
+  function rowProps(registration) {
+    const busy = busyId === `confirm-${registration.id}` ? `confirm-${registration.id}` : busyId === `delete-${registration.id}` ? `delete-${registration.id}` : '';
+    return { busy, busyOther: Boolean(busyId) && !busy };
   }
 
   return (
@@ -171,6 +214,8 @@ export function RegistrationsPanel({
         </Button>
         <Button onClick={onCreate}>{t('Neue Anmeldung')}</Button>
       </div>
+      {message && <p className="feedback success">{message}</p>}
+      {error && <p className="feedback error">{error}</p>}
       <SelectField
         label={t('Turnier anzeigen')}
         value={tournament?.id || ''}
@@ -190,14 +235,22 @@ export function RegistrationsPanel({
       />
       {pendingRegistrations.length > 0 && (
         <section className="user-list" aria-label={t('Offene Anmeldungen')}>
-          <div className="section-title"><h3>{t('Offene Anmeldungen')}</h3><span className="counter">{pendingRegistrations.length}</span><Button onClick={onConfirmAll}>{t('Alle bestätigen')}</Button></div>
-          {pendingRegistrations.map((registration) => <RegistrationRow key={registration.id} registration={registration} showConfirm />)}
+          <div className="section-title">
+            <h3>{t('Offene Anmeldungen')}</h3>
+            <span className="counter">{pendingRegistrations.length}</span>
+            <Button loading={busyId === 'confirmAll'} disabled={Boolean(busyId) && busyId !== 'confirmAll'} onClick={onConfirmAll}>{t('Alle bestätigen')}</Button>
+          </div>
+          {pendingRegistrations.map((registration) => (
+            <RegistrationRow key={registration.id} registration={registration} tournament={tournament} showConfirm onConfirm={onConfirm} onEdit={onEdit} onDelete={onDelete} {...rowProps(registration)} />
+          ))}
         </section>
       )}
       {(otherRegistrations.length > 0 || (filteredRegistrations.length === 0 && pendingRegistrations.length === 0)) && (
         <section className="user-list" aria-label={t('Weitere Anmeldungen')}>
           {pendingRegistrations.length > 0 && <div className="section-title"><h3>{t('Weitere Anmeldungen')}</h3><span className="counter">{otherRegistrations.length}</span></div>}
-          {otherRegistrations.map((registration) => <RegistrationRow key={registration.id} registration={registration} />)}
+          {otherRegistrations.map((registration) => (
+            <RegistrationRow key={registration.id} registration={registration} tournament={tournament} onEdit={onEdit} onDelete={onDelete} {...rowProps(registration)} />
+          ))}
           {filteredRegistrations.length === 0 && <p className="muted">{t('Keine Anmeldungen gefunden.')}</p>}
         </section>
       )}
@@ -206,74 +259,196 @@ export function RegistrationsPanel({
 }
 
 export function RegistrationsManagementPage({
-  tournament,
-  registrations,
-  filteredRegistrations,
-  tournaments,
-  onTournamentChange,
-  onCreate,
-  query,
-  onQueryChange,
-  statusFilter,
-  onStatusFilterChange,
-  onResetFilters,
-  onEdit,
-  onConfirm,
-  onConfirmAll,
-  onDelete,
-  registrationDialogOpen,
-  registrationMode,
-  registrationForm,
-  setRegistrationForm,
-  onRegistrationSubmit,
-  onCloseRegistrationDialog,
-  manageableTournaments,
+  tournaments = [],
   selectedTournamentId,
-  manageMode,
-  invalidField,
-  message,
-  error,
-  registrationSaving,
+  setSelectedTournamentId,
+  onTournamentsChanged,
+  language,
+  initialStatusFilter = '',
+  onInitialStatusFilterConsumed,
 }) {
   const { t } = useTranslation();
+  const [registrations, setRegistrations] = useState([]);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_REGISTRATION_FORM);
+  const [invalidField, setInvalidField] = useState(null);
+  const [mode, setMode] = useState('create');
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState('');
+
+  const tournament = tournaments.find((item) => item.id === selectedTournamentId) || null;
+  const manageMode = Boolean(tournament?.canManage);
+  const manageableTournaments = useMemo(() => tournaments.filter((item) => item.canManage), [tournaments]);
+
+  async function load(tournamentId) {
+    if (!tournamentId) {
+      setRegistrations([]);
+      return;
+    }
+    try {
+      const data = await authenticatedApi(`/api/tournaments/${tournamentId}/registrations`);
+      setRegistrations(data.registrations);
+    } catch (err) { setError(err.message); }
+  }
+
+  useEffect(() => {
+    if (manageMode) {
+      load(tournament.id);
+    } else {
+      setRegistrations([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournament?.id, manageMode]);
+
+  const filteredRegistrations = useMemo(
+    () => filterRegistrations(registrations, query, statusFilter),
+    [registrations, query, statusFilter],
+  );
+
+  useEffect(() => {
+    if (initialStatusFilter) onInitialStatusFilterConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function clearFeedback() {
+    setError('');
+    setMessage('');
+    setInvalidField(null);
+  }
+
+  function openCreate() {
+    setMode('create');
+    setForm({ ...EMPTY_REGISTRATION_FORM, tournamentId: selectedTournamentId });
+    clearFeedback();
+    setDialogOpen(true);
+  }
+
+  function openEdit(registration) {
+    setMode('edit');
+    setForm(registrationToForm(registration));
+    clearFeedback();
+    setDialogOpen(true);
+  }
+
+  function closeDialog() {
+    setDialogOpen(false);
+    setMode('create');
+    setForm(EMPTY_REGISTRATION_FORM);
+  }
+
+  async function handleAdminSubmit(event) {
+    event.preventDefault();
+    setError(''); setMessage(''); setInvalidField(null);
+
+    const tournamentId = form.tournamentId || selectedTournamentId;
+    const payload = registrationPayload({ ...form, tournamentId }, language);
+
+    setSaving(true);
+    try {
+      if (mode === 'edit') {
+        await authenticatedApi(`/api/registrations/${form.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        setMessage(t('Anmeldung wurde aktualisiert.'));
+      } else {
+        const result = await authenticatedApi(`/api/tournaments/${tournamentId}/registrations`, { method: 'POST', body: JSON.stringify(payload) });
+        setMessage(`${t('Neue Meldung hinzugefügt:')} ${result.registration.firstName} ${result.registration.lastName}`);
+      }
+      closeDialog();
+      await load(tournamentId);
+      onTournamentsChanged?.();
+    } catch (err) {
+      const baseMessage = err.message;
+      const conflictName = err.payload?.details?.name;
+      setError(conflictName ? `${baseMessage} ("${conflictName}")` : baseMessage);
+      setInvalidField(err.payload?.details?.field || null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(registration) {
+    const registrationLabel = [registration.firstName, registration.lastName].filter(Boolean).join(' ') || registration.teamName;
+    if (!window.confirm(`Anmeldung "${registrationLabel}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) {
+      return;
+    }
+    setError(''); setMessage('');
+    setBusyId(`delete-${registration.id}`);
+    try {
+      await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'DELETE' });
+      setMessage(t('Anmeldung wurde gelöscht.'));
+      await load(registration.tournamentId);
+      onTournamentsChanged?.();
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+  }
+
+  async function handleConfirm(registration) {
+    setError(''); setMessage('');
+    setBusyId(`confirm-${registration.id}`);
+    try {
+      const payload = registrationPayload({ ...registration, seedingPosition: registration.seedingPosition ?? '', status: 'confirmed' }, language);
+      await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      setMessage(t('Anmeldung wurde bestätigt.'));
+      await load(registration.tournamentId);
+      onTournamentsChanged?.();
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+  }
+
+  async function handleConfirmAll() {
+    if (!tournament) return;
+    setError(''); setMessage('');
+    setBusyId('confirmAll');
+    try {
+      const result = await authenticatedApi(`/api/tournaments/${tournament.id}/registrations/confirm-pending`, { method: 'POST' });
+      setMessage(`${result.confirmedCount} ${t('offene Anmeldung(en) wurden bestätigt.')}`);
+      await load(tournament.id);
+      onTournamentsChanged?.();
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+  }
+
   return (
     <>
       <RegistrationsPanel
         tournament={tournament}
         registrations={registrations}
         filteredRegistrations={filteredRegistrations}
-        tournaments={tournaments}
-        onTournamentChange={onTournamentChange}
-        onCreate={onCreate}
+        tournaments={manageableTournaments}
+        onTournamentChange={setSelectedTournamentId}
+        onCreate={openCreate}
         query={query}
-        onQueryChange={onQueryChange}
+        onQueryChange={setQuery}
         statusFilter={statusFilter}
-        onStatusFilterChange={onStatusFilterChange}
-        onResetFilters={onResetFilters}
-        onEdit={onEdit}
-        onConfirm={onConfirm}
-        onConfirmAll={onConfirmAll}
-        onDelete={onDelete}
+        onStatusFilterChange={setStatusFilter}
+        onResetFilters={() => { setQuery(''); setStatusFilter(''); }}
+        onEdit={openEdit}
+        onConfirm={handleConfirm}
+        onConfirmAll={handleConfirmAll}
+        onDelete={handleDelete}
+        busyId={busyId}
+        message={message}
+        error={error}
       />
 
       <EditDialog
-        open={registrationDialogOpen}
+        open={dialogOpen}
         wide
-        title={registrationMode === 'edit' ? t('Anmeldung bearbeiten') : t('Anmeldung erfassen')}
+        title={mode === 'edit' ? t('Anmeldung bearbeiten') : t('Anmeldung erfassen')}
         message={message}
         error={error}
-        onClose={onCloseRegistrationDialog}
+        onClose={closeDialog}
       >
         <RegistrationForm
-          form={registrationForm}
-          setForm={setRegistrationForm}
-          onSubmit={onRegistrationSubmit}
-          onCancel={onCloseRegistrationDialog}
+          form={form}
+          setForm={setForm}
+          onSubmit={handleAdminSubmit}
+          onCancel={closeDialog}
           tournaments={manageableTournaments}
           selectedTournamentId={selectedTournamentId}
           manageMode={manageMode}
           invalidField={invalidField}
-          saving={registrationSaving}
+          saving={saving}
         />
       </EditDialog>
     </>

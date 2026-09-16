@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
-import { Button, EditDialog } from '../components/ui.jsx';
+import { Button, EditDialog, ListToolbar } from '../components/ui.jsx';
 import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 
 const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '' };
@@ -30,6 +30,8 @@ export function ClubModerationPanel({ language }) {
   const [editPlaceId, setEditPlaceId] = useState(null);
   const [editPlaceForm, setEditPlaceForm] = useState(EMPTY_PLACE_FORM);
   const [editPlaceSaving, setEditPlaceSaving] = useState(false);
+  const [busyId, setBusyId] = useState('');
+  const [query, setQuery] = useState('');
 
   async function load() {
     setLoading(true); setError('');
@@ -48,21 +50,36 @@ export function ClubModerationPanel({ language }) {
 
   async function approveRequest(request) {
     setError(''); setMessage('');
+    const id = `approve-${request.club_id}-${request.user_id}`;
+    setBusyId(id);
     try {
       await authenticatedApi(`/api/admin/clubs/${request.club_id}/editors/${request.user_id}`, { method: 'POST' });
       setMessage(t('Verein freigegeben.'));
       await load();
-    } catch (err) { setError(err.message); }
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
   }
 
   async function publishPlace(place) {
     setError(''); setMessage('');
+    const id = `publish-${place.id}`;
+    setBusyId(id);
     try {
       await authenticatedApi(`/api/admin/places/${place.id}/publish`, { method: 'POST' });
       setMessage(t('Bouleplatz freigegeben.'));
       await load();
-    } catch (err) { setError(err.message); }
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
   }
+
+  const term = query.trim().toLowerCase();
+  const filteredRequests = term
+    ? requests.filter((r) => `${r.club_name} ${r.first_name} ${r.last_name} ${r.email}`.toLowerCase().includes(term))
+    : requests;
+  const filteredPlaces = term
+    ? places.filter((p) => `${p.name} ${p.clubName} ${p.address}`.toLowerCase().includes(term))
+    : places;
+  const filteredPlaceReports = term
+    ? placeReports.filter((p) => `${p.name} ${p.address}`.toLowerCase().includes(term))
+    : placeReports;
 
   async function submitEditPlace(event) {
     event.preventDefault();
@@ -88,58 +105,71 @@ export function ClubModerationPanel({ language }) {
       </div>
       {message && <p className="feedback success">{message}</p>}
       {error && <p className="feedback error">{error}</p>}
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        searchPlaceholder={t('Nach Verein, Bouleplatz oder Person suchen')}
+        onReset={() => setQuery('')}
+        resetDisabled={!query.trim()}
+      />
       {loading ? <p className="muted">{t('Lädt …')}</p> : (
         <>
           <div className="panel user-list-panel">
             <div className="section-title">
               <h2>{t('Offene Vereinsanfragen')}</h2>
-              <span className="counter">{requests.length}</span>
+              <span className="counter">{filteredRequests.length}</span>
             </div>
             <div className="user-list">
-              {requests.length === 0 && <p className="muted">{t('Keine offenen Vereinsanfragen.')}</p>}
-              {requests.map((request) => (
-                <article className="data-row" key={`${request.club_id}-${request.user_id}`}>
-                  <div>
-                    <strong data-i18n-skip>{request.club_name}</strong>
-                    <span data-i18n-skip>{request.first_name} {request.last_name} ({request.email})</span>
-                  </div>
-                  <div className="row-actions">
-                    <Button onClick={() => approveRequest(request)}>{t('Freigeben')}</Button>
-                  </div>
-                </article>
-              ))}
+              {filteredRequests.length === 0 && <p className="muted">{t('Keine offenen Vereinsanfragen.')}</p>}
+              {filteredRequests.map((request) => {
+                const id = `approve-${request.club_id}-${request.user_id}`;
+                return (
+                  <article className="data-row" key={id}>
+                    <div>
+                      <strong data-i18n-skip>{request.club_name}</strong>
+                      <span data-i18n-skip>{request.first_name} {request.last_name} ({request.email})</span>
+                    </div>
+                    <div className="row-actions">
+                      <Button loading={busyId === id} onClick={() => approveRequest(request)}>{t('Freigeben')}</Button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </div>
 
           <div className="panel user-list-panel">
             <div className="section-title">
               <h2>{t('Offene Bouleplätze')}</h2>
-              <span className="counter">{places.length}</span>
+              <span className="counter">{filteredPlaces.length}</span>
             </div>
             <div className="user-list">
-              {places.length === 0 && <p className="muted">{t('Keine offenen Bouleplätze.')}</p>}
-              {places.map((place) => (
-                <article className="data-row" key={place.id}>
-                  <div>
-                    <strong data-i18n-skip>{place.name}</strong>
-                    <span data-i18n-skip>{place.clubName} · {place.address}</span>
-                  </div>
-                  <div className="row-actions">
-                    <Button onClick={() => publishPlace(place)}>{t('Freigeben')}</Button>
-                  </div>
-                </article>
-              ))}
+              {filteredPlaces.length === 0 && <p className="muted">{t('Keine offenen Bouleplätze.')}</p>}
+              {filteredPlaces.map((place) => {
+                const id = `publish-${place.id}`;
+                return (
+                  <article className="data-row" key={place.id}>
+                    <div>
+                      <strong data-i18n-skip>{place.name}</strong>
+                      <span data-i18n-skip>{place.clubName} · {place.address}</span>
+                    </div>
+                    <div className="row-actions">
+                      <Button loading={busyId === id} onClick={() => publishPlace(place)}>{t('Freigeben')}</Button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </div>
 
           <div className="panel user-list-panel">
             <div className="section-title">
               <h2>{t('Gemeldete Bouleplätze (ohne Verein)')}</h2>
-              <span className="counter">{placeReports.length}</span>
+              <span className="counter">{filteredPlaceReports.length}</span>
             </div>
             <div className="user-list">
-              {placeReports.length === 0 && <p className="muted">{t('Keine gemeldeten Bouleplätze.')}</p>}
-              {placeReports.map((place) => (
+              {filteredPlaceReports.length === 0 && <p className="muted">{t('Keine gemeldeten Bouleplätze.')}</p>}
+              {filteredPlaceReports.map((place) => (
                 <article className="data-row" key={place.id}>
                   <div>
                     <strong data-i18n-skip>{place.name}</strong>
@@ -148,7 +178,7 @@ export function ClubModerationPanel({ language }) {
                     </span>
                   </div>
                   <div className="row-actions">
-                    <Button variant="secondary" onClick={() => { setEditPlaceId(place.id); setEditPlaceForm(placeToForm(place)); }}>
+                    <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setEditPlaceId(place.id); setEditPlaceForm(placeToForm(place)); }}>
                       {t('Bearbeiten')}
                     </Button>
                   </div>

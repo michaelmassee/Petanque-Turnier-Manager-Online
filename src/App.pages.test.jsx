@@ -5,7 +5,7 @@ import i18next from './lib/i18next-config.js';
 import { EditDialog, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
 import { DistanceBadge } from './components/ui.jsx';
 import { AppHeader } from './components/layout.jsx';
-import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM, EMPTY_USER_FORM } from './lib/constants.js';
+import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM } from './lib/constants.js';
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
 import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
 import { UserManagementPanel } from './pages/UserManagementPanel.jsx';
@@ -250,79 +250,24 @@ describe('Mein Profil', () => {
   });
 });
 
-function UserManagementHarness({ onSubmit }) {
-  const [userMode, setUserMode] = useState('create');
-  const [userForm, setUserForm] = useState(EMPTY_USER_FORM);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [userQuery, setUserQuery] = useState('');
-  const [userRoleFilter, setUserRoleFilter] = useState('');
-  const [userStatusFilter, setUserStatusFilter] = useState('');
-  const users = [
-    { id: 'u1', firstName: 'Anna', lastName: 'Admin', email: 'anna@example.com', role: 'admin', emailVerifiedAt: '2024-01-01', passwordChangeRequired: false, tournamentLimit: 5 },
-  ];
-
-  function editUser(user) {
-    setUserMode('edit');
-    setUserForm({
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.role,
-      password: '',
-      emailVerified: Boolean(user.emailVerifiedAt),
-      passwordChangeRequired: Boolean(user.passwordChangeRequired),
-      tournamentLimit: user.tournamentLimit,
-    });
-    setDialogOpen(true);
-  }
-
-  function closeDialog() {
-    setDialogOpen(false);
-    setUserMode('create');
-    setUserForm(EMPTY_USER_FORM);
-  }
-
-  function handleSubmit(event) {
-    event.preventDefault();
-    onSubmit(userForm);
-    closeDialog();
-  }
-
-  return (
-    <UserManagementPanel
-      users={users}
-      stats={{ total: 1, admins: 1, unverified: 0, passwordChangeRequired: 0 }}
-      totalUsers={1}
-      userMode={userMode}
-      currentUser={{ id: 'me' }}
-      userForm={userForm}
-      setUserForm={setUserForm}
-      userQuery={userQuery}
-      setUserQuery={setUserQuery}
-      userRoleFilter={userRoleFilter}
-      setUserRoleFilter={setUserRoleFilter}
-      userStatusFilter={userStatusFilter}
-      setUserStatusFilter={setUserStatusFilter}
-      dialogOpen={dialogOpen}
-      onCloseDialog={closeDialog}
-      onCreateUser={() => {
-        setUserMode('create');
-        setUserForm(EMPTY_USER_FORM);
-        setDialogOpen(true);
-      }}
-      onSubmitUser={handleSubmit}
-      onEditUser={editUser}
-      onDeleteUser={() => {}}
-    />
-  );
-}
-
 describe('Benutzer-Seite: Liste + Dialog', () => {
-  it('öffnet den Dialog vorausgefüllt bei Bearbeiten, Abbrechen schließt ohne Submit, Speichern schließt mit Submit', () => {
-    const onSubmit = vi.fn();
-    render(<UserManagementHarness onSubmit={onSubmit} />);
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
+  it('öffnet den Dialog vorausgefüllt bei Bearbeiten, Abbrechen schließt ohne Submit, Speichern speichert und schließt', async () => {
+    const usersResponse = { users: [
+      { id: 'u1', firstName: 'Anna', lastName: 'Admin', email: 'anna@example.com', role: 'admin', emailVerifiedAt: '2024-01-01', passwordChangeRequired: false, tournamentLimit: 5 },
+    ] };
+    const authenticatedApi = vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation((path, options = {}) => {
+      if (path === '/api/users' && (!options.method || options.method === 'GET')) return Promise.resolve(usersResponse);
+      if (path === '/api/users/u1' && options.method === 'PUT') return Promise.resolve({ ok: true });
+      throw new Error(`unerwarteter API-Aufruf: ${options.method || 'GET'} ${path}`);
+    });
+
+    render(<UserManagementPanel currentUser={{ id: 'me' }} tournaments={[]} />);
+
+    await screen.findByText('Anna Admin');
     expect(screen.queryByText('Benutzer bearbeiten')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Bearbeiten'));
@@ -333,40 +278,24 @@ describe('Benutzer-Seite: Liste + Dialog', () => {
 
     fireEvent.click(screen.getByText('Abbrechen'));
     expect(screen.queryByText('Benutzer bearbeiten')).not.toBeInTheDocument();
-    expect(onSubmit).not.toHaveBeenCalled();
+    expect(authenticatedApi).not.toHaveBeenCalledWith('/api/users/u1', expect.objectContaining({ method: 'PUT' }));
 
     fireEvent.click(screen.getByText('Bearbeiten'));
     fireEvent.click(screen.getByText('Speichern'));
 
-    expect(onSubmit).toHaveBeenCalledTimes(1);
+    await screen.findByText('Benutzer wurde aktualisiert.');
+    expect(authenticatedApi).toHaveBeenCalledWith('/api/users/u1', expect.objectContaining({ method: 'PUT' }));
     expect(screen.queryByText('Benutzer bearbeiten')).not.toBeInTheDocument();
   });
 
-  it('sperrt Bearbeiten und Löschen für den technischen Turniermelde-Account', () => {
-    render(
-      <UserManagementPanel
-        users={[{ id: 'system-tournament-reports', firstName: 'Turnier', lastName: 'Meldungen (System)', email: 'system-tournament-reports@ptmonline.internal', role: 'user', emailVerifiedAt: '2026-01-01', passwordChangeRequired: false, mailEnabled: false }]}
-        stats={{ total: 1, admins: 0, unverified: 0, passwordChangeRequired: 0 }}
-        totalUsers={1}
-        userMode="create"
-        currentUser={{ id: 'admin' }}
-        userForm={EMPTY_USER_FORM}
-        setUserForm={() => {}}
-        userQuery=""
-        setUserQuery={() => {}}
-        userRoleFilter=""
-        setUserRoleFilter={() => {}}
-        userStatusFilter=""
-        setUserStatusFilter={() => {}}
-        dialogOpen={false}
-        onCloseDialog={() => {}}
-        onCreateUser={() => {}}
-        onSubmitUser={() => {}}
-        onEditUser={() => {}}
-        onDeleteUser={() => {}}
-      />,
-    );
+  it('sperrt Bearbeiten und Löschen für den technischen Turniermelde-Account', async () => {
+    vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockResolvedValue({
+      users: [{ id: 'system-tournament-reports', firstName: 'Turnier', lastName: 'Meldungen (System)', email: 'system-tournament-reports@ptmonline.internal', role: 'user', emailVerifiedAt: '2026-01-01', passwordChangeRequired: false, mailEnabled: false }],
+    });
 
+    render(<UserManagementPanel currentUser={{ id: 'admin' }} tournaments={[]} />);
+
+    await screen.findByText('Turnier Meldungen (System)');
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Löschen' })).toBeDisabled();
   });
