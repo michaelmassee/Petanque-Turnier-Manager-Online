@@ -10,7 +10,7 @@ import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { usePath, matchTournamentRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, timezoneAbbrev, formatTournamentDateTime, minorUnitsToAmount, amountToMinorUnits, currencyOptions, formatMoney, utcIsoToZonedDateTimeInput, formatDateTime, isPasswordStrong } from './lib/format.js';
-import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, tournamentPayload, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, distanceKm } from './lib/domain.js';
+import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, tournamentPayload, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, distanceKm } from './lib/domain.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
@@ -104,6 +104,7 @@ function AppContent() {
   const [homeFilterRegistrationType, setHomeFilterRegistrationType] = useState('');
   const [homeFilterType, setHomeFilterType] = useState('');
   const [homeFilterOpenOnly, setHomeFilterOpenOnly] = useState(false);
+  const [homeFilterOnlineRegistrationOnly, setHomeFilterOnlineRegistrationOnly] = useState(false);
   const [searchOrigin, setSearchOrigin] = useState(null);
   const [searchOriginQuery, setSearchOriginQuery] = useState('');
   const [searchRadiusKm, setSearchRadiusKm] = useState('25');
@@ -256,6 +257,9 @@ function AppContent() {
       if (homeFilterOpenOnly && !hasOpenRegistration(tournament)) {
         return false;
       }
+      if (homeFilterOnlineRegistrationOnly && !hasOnlineRegistrationAvailable(tournament)) {
+        return false;
+      }
       if (!query) {
         return true;
       }
@@ -288,6 +292,7 @@ function AppContent() {
     homeFilterRegistrationType,
     homeFilterType,
     homeFilterOpenOnly,
+    homeFilterOnlineRegistrationOnly,
     searchOrigin,
     searchRadiusKm,
   ]);
@@ -628,6 +633,7 @@ function AppContent() {
     setHomeFilterRegistrationType(search.filterRegistrationType || '');
     setHomeFilterType(search.filterType || '');
     setHomeFilterOpenOnly(Boolean(search.filterOpenOnly));
+    setHomeFilterOnlineRegistrationOnly(Boolean(search.filterOnlineRegistrationOnly));
     setSearchRadiusKm(search.radiusKm || '25');
     if (search.searchOrigin) {
       setSearchOrigin({ lat: search.searchOrigin.lat, lng: search.searchOrigin.lng, label: search.searchOrigin.label });
@@ -667,6 +673,7 @@ function AppContent() {
       filterRegistrationType: homeFilterRegistrationType,
       filterType: homeFilterType,
       filterOpenOnly: homeFilterOpenOnly,
+      filterOnlineRegistrationOnly: homeFilterOnlineRegistrationOnly,
       searchOrigin: searchOrigin ? { lat: searchOrigin.lat, lng: searchOrigin.lng, label: searchOrigin.label } : null,
       radiusKm: searchRadiusKm,
       notifyEnabled,
@@ -690,6 +697,7 @@ function AppContent() {
           filterRegistrationType: source.filterRegistrationType,
           filterType: source.filterType,
           filterOpenOnly: source.filterOpenOnly,
+          filterOnlineRegistrationOnly: source.filterOnlineRegistrationOnly,
           searchOrigin: source.searchOrigin,
           radiusKm: source.radiusKm,
           notifyEnabled: savedSearchForm.notifyEnabled,
@@ -721,6 +729,7 @@ function AppContent() {
         filterRegistrationType: search.filterRegistrationType,
         filterType: search.filterType,
         filterOpenOnly: search.filterOpenOnly,
+        filterOnlineRegistrationOnly: search.filterOnlineRegistrationOnly,
         searchOrigin: search.searchOrigin,
         radiusKm: search.radiusKm,
         notifyEnabled: !search.notifyEnabled,
@@ -1471,6 +1480,7 @@ function AppContent() {
     setHomeFilterRegistrationType('');
     setHomeFilterType('');
     setHomeFilterOpenOnly(false);
+    setHomeFilterOnlineRegistrationOnly(false);
   }
 
   function handleUseMyLocation() {
@@ -1847,6 +1857,8 @@ function AppContent() {
               setFilterType={setHomeFilterType}
               filterOpenOnly={homeFilterOpenOnly}
               setFilterOpenOnly={setHomeFilterOpenOnly}
+              filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
+              setFilterOnlineRegistrationOnly={setHomeFilterOnlineRegistrationOnly}
               onResetFilters={resetHomeFilters}
               searchOrigin={searchOrigin}
               searchOriginQuery={searchOriginQuery}
@@ -1914,6 +1926,7 @@ function AppContent() {
           filterRegistrationType={homeFilterRegistrationType}
           filterType={homeFilterType}
           filterOpenOnly={homeFilterOpenOnly}
+          filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
           searchOrigin={searchOrigin}
           searchRadiusKm={searchRadiusKm}
           tournaments={visibleHomeTournaments}
@@ -2137,6 +2150,8 @@ function AppContent() {
               setFilterType={setHomeFilterType}
               filterOpenOnly={homeFilterOpenOnly}
               setFilterOpenOnly={setHomeFilterOpenOnly}
+              filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
+              setFilterOnlineRegistrationOnly={setHomeFilterOnlineRegistrationOnly}
               onResetFilters={resetHomeFilters}
               searchOrigin={searchOrigin}
               searchOriginQuery={searchOriginQuery}
@@ -2232,6 +2247,7 @@ function AppContent() {
           filterRegistrationType={homeFilterRegistrationType}
           filterType={homeFilterType}
           filterOpenOnly={homeFilterOpenOnly}
+          filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
           searchOrigin={searchOrigin}
           searchRadiusKm={searchRadiusKm}
           tournaments={visibleHomeTournaments}
@@ -2549,6 +2565,7 @@ function HomeTournaments({
   filterRegistrationType,
   filterType,
   filterOpenOnly,
+  filterOnlineRegistrationOnly,
   searchOrigin,
   searchRadiusKm,
   tournaments,
@@ -2568,6 +2585,7 @@ function HomeTournaments({
     filterRegistrationType,
     filterType,
     filterOpenOnly,
+    filterOnlineRegistrationOnly,
   ].filter(Boolean).length;
   const nextTournament = tournaments[0] || null;
   const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);

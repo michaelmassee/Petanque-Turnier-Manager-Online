@@ -230,6 +230,13 @@ export function hasOpenRegistration(tournament) {
   return tournament.activeRegistrations < tournament.maxRegistrations || Boolean(tournament.waitlistEnabled);
 }
 
+export function hasOnlineRegistrationAvailable(tournament) {
+  if (tournament.visibility !== 'public' || tournament.registrationEnabled === false) {
+    return false;
+  }
+  return hasOpenRegistration(tournament);
+}
+
 export const SLOTS_FREE_TEMPLATES = {
   de: (free, max) => `${free} von ${max} Plätzen frei`,
   nl: (free, max) => `${free} van ${max} plaatsen vrij`,

@@ -11,7 +11,7 @@ import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManag
 import { UserManagementPanel } from './pages/UserManagementPanel.jsx';
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
 import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
-import { registrationStatusLabel, tournamentPayload } from './lib/domain.js';
+import { hasOnlineRegistrationAvailable, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
 
 describe('Turnier-Payload', () => {
   it('behält den Verein eines bearbeiteten Kalendereintrags bei', () => {
@@ -21,6 +21,15 @@ describe('Turnier-Payload', () => {
   it('zeigt in der Übersicht den laufenden Turnierstatus statt einer Anmelde-Meldung', () => {
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: true }, 'de')).toBe('Läuft');
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: true }, 'en')).toBe('Running');
+  });
+
+  it('erkennt nur verfügbare öffentliche Online-Anmeldungen', () => {
+    const tournament = { visibility: 'public', registrationEnabled: true, status: 'registration', maxRegistrations: 16, activeRegistrations: 15, waitlistEnabled: false };
+    expect(hasOnlineRegistrationAvailable(tournament)).toBe(true);
+    expect(hasOnlineRegistrationAvailable({ ...tournament, registrationEnabled: false })).toBe(false);
+    expect(hasOnlineRegistrationAvailable({ ...tournament, visibility: 'private' })).toBe(false);
+    expect(hasOnlineRegistrationAvailable({ ...tournament, activeRegistrations: 16 })).toBe(false);
+    expect(hasOnlineRegistrationAvailable({ ...tournament, activeRegistrations: 16, waitlistEnabled: true })).toBe(true);
   });
 });
 

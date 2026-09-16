@@ -138,6 +138,14 @@ export function tournamentMatchesSavedSearch(tournament, search) {
     if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > Date.now()) return false;
     if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < Date.now()) return false;
   }
+  if (search.filter_online_registration_only) {
+    if (tournament.registration_enabled === 0 || tournament.status !== 'registration') return false;
+    if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > Date.now()) return false;
+    if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < Date.now()) return false;
+    const maxRegistrations = Number(tournament.max_registrations || 0);
+    const activeRegistrations = Number(tournament.active_registrations || 0);
+    if (maxRegistrations && activeRegistrations >= maxRegistrations && !Number(tournament.waitlist_enabled ?? 1)) return false;
+  }
   const query = String(search.query || '').trim().toLowerCase();
   if (query) {
     const haystack = [tournament.name, tournament.location, tournament.type].join(' ').toLowerCase();

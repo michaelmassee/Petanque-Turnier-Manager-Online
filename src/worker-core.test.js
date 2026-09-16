@@ -101,6 +101,14 @@ describe('Worker-Fachlogik', () => {
     expect(tournamentMatchesSavedSearch({ ...tournament, registration_opens_at: '2099-01-01T00:00:00.000Z' }, { ...matchingSearch, filter_open_only: 1 })).toBe(false);
     expect(tournamentMatchesSavedSearch({ ...tournament, registration_deadline: '2000-01-01T00:00:00.000Z' }, { ...matchingSearch, filter_open_only: 1 })).toBe(false);
     expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_open_only: 1 })).toBe(true);
+    const onlineRegistrationSearch = { ...matchingSearch, filter_online_registration_only: 1 };
+    expect(tournamentMatchesSavedSearch({ ...tournament, registration_enabled: 1, max_registrations: 16, active_registrations: 15, waitlist_enabled: 0 }, onlineRegistrationSearch)).toBe(true);
+    expect(tournamentMatchesSavedSearch({ ...tournament, registration_enabled: 0 }, onlineRegistrationSearch)).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, status: 'running' }, onlineRegistrationSearch)).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, registration_opens_at: '2099-01-01T00:00:00.000Z' }, onlineRegistrationSearch)).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, registration_deadline: '2000-01-01T00:00:00.000Z' }, onlineRegistrationSearch)).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, max_registrations: 16, active_registrations: 16, waitlist_enabled: 0 }, onlineRegistrationSearch)).toBe(false);
+    expect(tournamentMatchesSavedSearch({ ...tournament, max_registrations: 16, active_registrations: 16, waitlist_enabled: 1 }, onlineRegistrationSearch)).toBe(true);
     expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, query: 'unbekannt' })).toBe(false);
     expect(tournamentMatchesSavedSearch({ ...tournament, latitude: null }, matchingSearch)).toBe(false);
     expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, origin_lat: null, origin_lng: null })).toBe(true);

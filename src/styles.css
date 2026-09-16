@@ -784,6 +784,8 @@ textarea:focus {
   display: grid;
   gap: 10px;
   width: min(280px, 90vw);
+  max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 100px);
+  overflow-y: auto;
   border: 1px solid #d7deea;
   border-radius: 8px;
   background: #ffffff;
@@ -848,6 +850,32 @@ textarea:focus {
   font-size: 0.85rem;
   font-weight: 700;
   color: #53627a;
+}
+
+.drawer-support {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  border-radius: 8px;
+  background: #fff2f4;
+  padding: 12px;
+  text-decoration: none;
+  color: #172033;
+}
+
+.drawer-support:hover,
+.drawer-support:focus-visible {
+  background: #ffe4e8;
+}
+
+.drawer-support strong {
+  font-size: 0.9rem;
+}
+
+.drawer-support span {
+  color: #53627a;
+  font-size: 0.8rem;
+  line-height: 1.35;
 }
 
 .location-autocomplete {

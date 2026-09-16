@@ -194,6 +194,7 @@ function savedSearchSummary(search, t) {
   if (search.filterRegistrationType) parts.push(labelFor(REGISTRATION_TYPES, search.filterRegistrationType));
   if (search.filterType) parts.push(labelFor(TOURNAMENT_TYPES, search.filterType));
   if (search.filterOpenOnly) parts.push(t('Anmeldung möglich'));
+  if (search.filterOnlineRegistrationOnly) parts.push(t('Online-Anmeldung möglich'));
   if (search.searchOrigin) parts.push(`${t('Umkreis')}: ${labelFor(RADIUS_OPTIONS, search.radiusKm)} · ${search.searchOrigin.label}`);
   return parts.length ? parts.join(' · ') : t('Alle Turniere');
 }
@@ -427,6 +428,15 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
                 </button>
               </div>
             )}
+            <a
+              className="drawer-support"
+              href="https://www.paypal.com/paypalme/michaelmassee1"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <strong>❤️ {t('Unterstützung')}</strong>
+              <span>{t('Wenn dir der Pétanque-Turnier-Manager hilft, freue ich mich über eine Unterstützung via PayPal.')}</span>
+            </a>
           </nav>
         </>
       )}
@@ -455,6 +465,8 @@ export function SearchMenuControl({
   setFilterType,
   filterOpenOnly,
   setFilterOpenOnly,
+  filterOnlineRegistrationOnly,
+  setFilterOnlineRegistrationOnly,
   onResetFilters,
   searchOrigin,
   searchOriginQuery,
@@ -566,6 +578,10 @@ export function SearchMenuControl({
                 <label className="checkbox-field">
                   <input type="checkbox" checked={filterOpenOnly} onChange={(event) => setFilterOpenOnly(event.target.checked)} />
                   {t('Anmeldung möglich')}
+                </label>
+                <label className="checkbox-field">
+                  <input type="checkbox" checked={filterOnlineRegistrationOnly} onChange={(event) => setFilterOnlineRegistrationOnly(event.target.checked)} />
+                  {t('Online-Anmeldung möglich')}
                 </label>
                 <div className="filter-actions">
                   <button className="link-button" type="button" onClick={onResetFilters}>

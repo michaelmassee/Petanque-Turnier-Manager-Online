@@ -2432,6 +2432,7 @@ function toPublicSavedSearch(row) {
     filterRegistrationType: row.filter_registration_type || '',
     filterType: row.filter_type || '',
     filterOpenOnly: Boolean(Number(row.filter_open_only)),
+    filterOnlineRegistrationOnly: Boolean(Number(row.filter_online_registration_only)),
     searchOrigin: row.origin_lat === null || row.origin_lat === undefined
       ? null
       : { lat: Number(row.origin_lat), lng: Number(row.origin_lng), label: row.origin_label || '' },
@@ -2459,6 +2460,7 @@ function normalizeSavedSearchInput(body) {
     filterRegistrationType: String(body.filterRegistrationType || ''),
     filterType: String(body.filterType || ''),
     filterOpenOnly: Boolean(body.filterOpenOnly),
+    filterOnlineRegistrationOnly: Boolean(body.filterOnlineRegistrationOnly),
     origin,
     radiusKm: origin ? String(body.radiusKm || '25') : null,
     notifyEnabled: Boolean(body.notifyEnabled),
@@ -2483,12 +2485,12 @@ async function createSavedSearch(request, db, userId) {
   const id = crypto.randomUUID();
   await db.prepare(
     `INSERT INTO saved_searches (
-      id, user_id, name, query, only_mine, filter_month, filter_formation, filter_registration_type, filter_type, filter_open_only,
+      id, user_id, name, query, only_mine, filter_month, filter_formation, filter_registration_type, filter_type, filter_open_only, filter_online_registration_only,
       origin_lat, origin_lng, origin_label, radius_km, notify_enabled, last_checked_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
   ).bind(
     id, userId, input.name, input.query, input.onlyMine ? 1 : 0, input.filterMonth, input.filterFormation,
-    input.filterRegistrationType, input.filterType, input.filterOpenOnly ? 1 : 0,
+    input.filterRegistrationType, input.filterType, input.filterOpenOnly ? 1 : 0, input.filterOnlineRegistrationOnly ? 1 : 0,
     input.origin?.lat ?? null, input.origin?.lng ?? null, input.origin?.label ?? null, input.radiusKm,
     input.notifyEnabled ? 1 : 0, now, now,
   ).run();
@@ -2505,12 +2507,12 @@ async function updateSavedSearch(request, db, id, userId) {
   const now = new Date().toISOString();
   await db.prepare(
     `UPDATE saved_searches SET name = ?, query = ?, only_mine = ?, filter_month = ?, filter_formation = ?, filter_registration_type = ?,
-     filter_type = ?, filter_open_only = ?, origin_lat = ?, origin_lng = ?, origin_label = ?, radius_km = ?, notify_enabled = ?,
+     filter_type = ?, filter_open_only = ?, filter_online_registration_only = ?, origin_lat = ?, origin_lng = ?, origin_label = ?, radius_km = ?, notify_enabled = ?,
      last_checked_at = CASE WHEN ? = 1 AND ? = 0 THEN NULL ELSE last_checked_at END, updated_at = ?
      WHERE id = ?`,
   ).bind(
     input.name, input.query, input.onlyMine ? 1 : 0, input.filterMonth, input.filterFormation, input.filterRegistrationType,
-    input.filterType, input.filterOpenOnly ? 1 : 0, input.origin?.lat ?? null, input.origin?.lng ?? null, input.origin?.label ?? null,
+    input.filterType, input.filterOpenOnly ? 1 : 0, input.filterOnlineRegistrationOnly ? 1 : 0, input.origin?.lat ?? null, input.origin?.lng ?? null, input.origin?.label ?? null,
     input.radiusKm, input.notifyEnabled ? 1 : 0, input.notifyEnabled ? 1 : 0, Number(existing.notify_enabled), now, id,
   ).run();
   const row = await db.prepare('SELECT * FROM saved_searches WHERE id = ?').bind(id).first();
@@ -2534,7 +2536,14 @@ function batches(values, size = D1_BATCH_SIZE) {
 // gelöschte Turniere sind automatisch nicht mehr Bestandteil der Live-Suche.
 async function notifySavedSearchesForPublishedTournament(env, tournament, searches = null) {
   const activeSearches = searches || (await env.DB.prepare('SELECT * FROM saved_searches WHERE notify_enabled = 1').all()).results || [];
-  const matches = activeSearches.filter((search) => tournamentMatchesSavedSearch(tournament, search));
+  let tournamentForMatching = tournament;
+  if (activeSearches.some((search) => Number(search.filter_online_registration_only))) {
+    const activeRegistrations = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')",
+    ).bind(tournament.id).first();
+    tournamentForMatching = { ...tournament, active_registrations: Number(activeRegistrations?.count || 0) };
+  }
+  const matches = activeSearches.filter((search) => tournamentMatchesSavedSearch(tournamentForMatching, search));
   if (matches.length === 0) return 0;
 
   const createdAt = new Date().toISOString();
