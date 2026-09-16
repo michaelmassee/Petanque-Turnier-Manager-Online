@@ -1,15 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
-import { Button, EditDialog, ListToolbar, SelectField } from '../components/ui.jsx';
+import { Button, EditDialog, ListToolbar, SelectField, TextArea, TextField } from '../components/ui.jsx';
 import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 
 const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '' };
+const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
 
 function placeToForm(place) {
   return {
     name: place.name, address: place.address, latitude: place.latitude, longitude: place.longitude, locationConfirmed: true,
     courtCount: String(place.courtCount ?? ''), description: place.description || '', accessible: Boolean(place.accessible), facilities: place.facilities || '',
+  };
+}
+
+function clubToForm(club) {
+  return {
+    name: club.name, description: club.description || '', websiteUrl: club.websiteUrl || '',
+    contactName: club.contactName || '', contactEmail: club.contactEmail || '', contactPhone: club.contactPhone || '',
   };
 }
 
@@ -32,6 +40,9 @@ export function ClubModerationPanel({ language }) {
   const [editPlaceId, setEditPlaceId] = useState(null);
   const [editPlaceForm, setEditPlaceForm] = useState(EMPTY_PLACE_FORM);
   const [editPlaceSaving, setEditPlaceSaving] = useState(false);
+  const [editClub, setEditClub] = useState(null);
+  const [editClubForm, setEditClubForm] = useState(EMPTY_CLUB_FORM);
+  const [editClubSaving, setEditClubSaving] = useState(false);
   const [ownerDialogClub, setOwnerDialogClub] = useState(null);
   const [selectedOwnerId, setSelectedOwnerId] = useState('');
   const [ownerSaving, setOwnerSaving] = useState(false);
@@ -149,6 +160,22 @@ export function ClubModerationPanel({ language }) {
     } catch (err) { setError(err.message); } finally { setEditPlaceSaving(false); }
   }
 
+  function openEditClub(club) {
+    setEditClub(club);
+    setEditClubForm(clubToForm(club));
+  }
+
+  async function submitEditClub(event) {
+    event.preventDefault();
+    setError(''); setMessage(''); setEditClubSaving(true);
+    try {
+      await authenticatedApi(`/api/admin/clubs/${editClub.id}`, { method: 'PUT', body: JSON.stringify(editClubForm) });
+      setEditClub(null);
+      setMessage(t('Verein aktualisiert.'));
+      await load();
+    } catch (err) { setError(err.message); } finally { setEditClubSaving(false); }
+  }
+
   return (
     <section className="user-management">
       <div className="user-management-header">
@@ -263,6 +290,7 @@ export function ClubModerationPanel({ language }) {
                     <div className="row-actions">
                       {club.status !== 'published' && <Button loading={busyId === statusId} disabled={Boolean(busyId)} onClick={() => setClubStatus(club, 'published')}>{t('Freigeben')}</Button>}
                       {club.status !== 'rejected' && <Button variant="secondary" loading={busyId === statusId} disabled={Boolean(busyId)} onClick={() => setClubStatus(club, 'rejected')}>{t('Ablehnen')}</Button>}
+                      <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openEditClub(club)}>{t('Bearbeiten')}</Button>
                       <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openChangeOwner(club)}>{t('Owner ändern')}</Button>
                       <Button variant="danger" loading={busyId === deleteId} disabled={Boolean(busyId)} onClick={() => deleteClub(club)}>{t('Löschen')}</Button>
                     </div>
@@ -282,6 +310,23 @@ export function ClubModerationPanel({ language }) {
             <Button type="submit" loading={editPlaceSaving}>{t('Speichern')}</Button>
           </div>
         </form>
+      </EditDialog>
+
+      <EditDialog open={Boolean(editClub)} title={t('Verein bearbeiten')} onClose={() => setEditClub(null)}>
+        {editClub && (
+          <form className="form" onSubmit={submitEditClub}>
+            <TextField label={t('Name')} value={editClubForm.name} onChange={(name) => setEditClubForm({ ...editClubForm, name })} required minLength={2} />
+            <TextArea label={t('Beschreibung')} value={editClubForm.description} onChange={(description) => setEditClubForm({ ...editClubForm, description })} />
+            <TextField label={t('Website')} value={editClubForm.websiteUrl} onChange={(websiteUrl) => setEditClubForm({ ...editClubForm, websiteUrl })} />
+            <TextField label={t('Kontaktperson')} value={editClubForm.contactName} onChange={(contactName) => setEditClubForm({ ...editClubForm, contactName })} required minLength={2} />
+            <TextField label={t('Kontakt-E-Mail')} type="email" value={editClubForm.contactEmail} onChange={(contactEmail) => setEditClubForm({ ...editClubForm, contactEmail })} required />
+            <TextField label={t('Kontakt-Telefon')} value={editClubForm.contactPhone} onChange={(contactPhone) => setEditClubForm({ ...editClubForm, contactPhone })} />
+            <div className="dialog-actions">
+              <Button variant="secondary" type="button" onClick={() => setEditClub(null)}>{t('Abbrechen')}</Button>
+              <Button type="submit" loading={editClubSaving}>{t('Speichern')}</Button>
+            </div>
+          </form>
+        )}
       </EditDialog>
 
       <EditDialog open={Boolean(ownerDialogClub)} title={ownerDialogClub ? t('Owner ändern für {name}').replace('{name}', ownerDialogClub.name) : ''} onClose={() => setOwnerDialogClub(null)}>

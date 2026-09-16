@@ -9,7 +9,9 @@ import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM } from './lib/constants.
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
 import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
 import { UserManagementPanel } from './pages/UserManagementPanel.jsx';
+import { ClubModerationPanel } from './pages/ClubModerationPanel.jsx';
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
+import { TournamentDescription } from './components/TournamentDescription.jsx';
 import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
 import { hasOnlineRegistrationAvailable, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
 
@@ -122,6 +124,15 @@ describe('Turnier melden', () => {
 });
 
 describe('Öffentliche Turnierdetailseite', () => {
+  it('zeigt formatierte Turnierbeschreibungen sicher an und lässt bisherigen Klartext unverändert', () => {
+    const { rerender } = render(<TournamentDescription description={'ptm-richtext:v1:{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Wichtig","marks":[{"type":"bold"}]}]}]}'} />);
+
+    expect(screen.getByText('Wichtig').tagName).toBe('STRONG');
+    rerender(<TournamentDescription description={'<strong>Bestehender Klartext</strong>'} />);
+    expect(screen.getByText('<strong>Bestehender Klartext</strong>')).toBeInTheDocument();
+    expect(document.querySelector('strong')).toBeNull();
+  });
+
   it('bietet eine auf 250 Zeichen begrenzte private Nachricht an die Turnierleitung an', () => {
     function RegistrationHarness() {
       const [form, setForm] = useState({ ...EMPTY_REGISTRATION_FORM, tournamentId: 'open-1' });
@@ -298,6 +309,42 @@ describe('Benutzer-Seite: Liste + Dialog', () => {
     await screen.findByText('Turnier Meldungen (System)');
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Löschen' })).toBeDisabled();
+  });
+});
+
+describe('Vereinsmoderation', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('ermöglicht dem Admin, einen Verein direkt zu bearbeiten', async () => {
+    const club = {
+      id: 'club-1', name: 'BC Linden', description: 'Boule im Park', websiteUrl: 'https://bc-linden.example',
+      contactName: 'Anna Admin', contactEmail: 'anna@example.com', contactPhone: '0123', status: 'published',
+      ownerId: 'owner-1', ownerName: 'Anna Admin', ownerEmail: 'anna@example.com', placeCount: 1, editorCount: 1,
+    };
+    const authenticatedApi = vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation((path, options = {}) => {
+      if (path === '/api/admin/club-editor-requests') return Promise.resolve({ requests: [] });
+      if (path === '/api/admin/pending-places') return Promise.resolve({ places: [] });
+      if (path === '/api/admin/place-reports') return Promise.resolve({ places: [] });
+      if (path === '/api/admin/clubs') return Promise.resolve({ clubs: [club] });
+      if (path === '/api/users') return Promise.resolve({ users: [] });
+      if (path === '/api/admin/clubs/club-1' && options.method === 'PUT') return Promise.resolve({ ok: true });
+      throw new Error(`unerwarteter API-Aufruf: ${options.method || 'GET'} ${path}`);
+    });
+
+    render(<ClubModerationPanel language="de" />);
+
+    await screen.findByText('BC Linden');
+    fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+
+    expect(screen.getByText('Verein bearbeiten')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Name\b/)).toHaveValue('BC Linden');
+    expect(screen.getByLabelText(/^Kontakt-E-Mail/)).toHaveValue('anna@example.com');
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await screen.findByText('Verein aktualisiert.');
+    expect(authenticatedApi).toHaveBeenCalledWith('/api/admin/clubs/club-1', expect.objectContaining({ method: 'PUT' }));
   });
 });
 

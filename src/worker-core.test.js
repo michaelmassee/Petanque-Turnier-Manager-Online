@@ -20,6 +20,14 @@ describe('Worker-Fachlogik', () => {
     expect(normalizeTournamentInput({ ...base, approvalRequired: true })).toMatchObject({ approvalRequired: true });
   });
 
+  it('akzeptiert nur die kleine, versionierte Turnierbeschreibung', () => {
+    const description = 'ptm-richtext:v1:{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Wichtig","marks":[{"type":"bold"}]}]}]}';
+    expect(normalizeTournamentInput({ ...base, description }).description).toBe(description);
+    expect(normalizeTournamentInput({ ...base, description: '<strong>Bestehender Klartext</strong>' }).description).toBe('<strong>Bestehender Klartext</strong>');
+    expect(() => normalizeTournamentInput({ ...base, description: 'ptm-richtext:v1:{"type":"doc","content":[{"type":"heading"}]}' })).toThrow('Turnierbeschreibung');
+    expect(() => normalizeTournamentInput({ ...base, description: 'ptm-richtext:v1:not-json' })).toThrow('Turnierbeschreibung');
+  });
+
   it('normalisiert ermäßigte Startgeld-Tarife und weist ungültige Tarife ab', () => {
     expect(normalizeTournamentInput({ ...base, feeTiers: [{ id: 'youth', name: 'Jugend', amountCents: 300 }] }).feeTiers).toEqual([
       { id: 'youth', name: 'Jugend', amountCents: 300, active: true },

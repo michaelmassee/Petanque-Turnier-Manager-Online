@@ -5,6 +5,7 @@ import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate, minorUnit
 import { labelFor, formationLabel, formatTournamentStartTime, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
 import { TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
+import { TournamentDescriptionEditor } from '../components/TournamentDescriptionEditor.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { authenticatedApi } from '../lib/api.js';
 
@@ -469,7 +470,13 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
       {!isCalendarEntry && (
         <TextField label={t('Kontakt-Telefon')} value={form.contactPhone} onChange={(contactPhone) => setForm({ ...form, contactPhone })} />
       )}
-      <TextArea label={t('Beschreibung')} value={form.description} onChange={(description) => setForm({ ...form, description })} />
+      <TournamentDescriptionEditor
+        label={t('Beschreibung')}
+        value={form.description}
+        onChange={(description) => setForm({ ...form, description })}
+        boldLabel={t('Fett')}
+        italicLabel={t('Kursiv')}
+      />
       <TextArea label={t('Interne Notizen')} value={form.internalNotes} onChange={(internalNotes) => setForm({ ...form, internalNotes })} />
       {!isCalendarEntry && (
         <>

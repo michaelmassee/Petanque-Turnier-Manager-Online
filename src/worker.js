@@ -8,6 +8,7 @@ import {
   isNewlyPublicTournament,
   isTournamentRoundNumberConflict,
   normalizePlayerListingPosition,
+  normalizeTournamentDescription,
   normalizeTournamentInput as normalizeCoreTournamentInput,
   registrationOpenStatus as coreRegistrationOpenStatus,
   tournamentMatchesSavedSearch,
@@ -1238,6 +1239,11 @@ export default {
         await requireAdmin(request, env.DB);
         return await listAllClubsForAdmin(env.DB);
       }
+      const adminClubMatch = url.pathname.match(/^\/api\/admin\/clubs\/([^/]+)$/);
+      if (adminClubMatch && request.method === 'PUT') {
+        await requireAdmin(request, env.DB);
+        return await updateClubAsAdmin(request, env.DB, adminClubMatch[1]);
+      }
       const adminClubStatusMatch = url.pathname.match(/^\/api\/admin\/clubs\/([^/]+)\/status$/);
       if (adminClubStatusMatch && request.method === 'PUT') {
         await requireAdmin(request, env.DB);
@@ -1250,7 +1256,6 @@ export default {
         const body = await readJson(request);
         return await updateClubOwnerAsAdmin(env.DB, adminClubOwnerMatch[1], String(body.userId || ''));
       }
-      const adminClubMatch = url.pathname.match(/^\/api\/admin\/clubs\/([^/]+)$/);
       if (adminClubMatch && request.method === 'DELETE') {
         await requireAdmin(request, env.DB);
         return await deleteClubAsAdmin(env.DB, adminClubMatch[1]);
@@ -3444,7 +3449,7 @@ async function createTournamentReport(request, env, url) {
   const formationOther = rawFormation === 'andere';
   const formation = formationOther ? 'tete' : rawFormation;
   const licenseRequired = Boolean(body.licenseRequired);
-  const description = nullableText(body.description);
+  const description = normalizeTournamentDescription(body.description);
   const websiteUrl = normalizePresentationUrl(body.websiteUrl);
   const contactName = text(body.contactName);
   const contactEmail = text(body.contactEmail).toLowerCase();
@@ -5386,6 +5391,15 @@ async function updateClubStatusAsAdmin(db, id, status) {
   const club = await db.prepare('SELECT id FROM clubs WHERE id = ?').bind(id).first();
   if (!club) throw new HttpError(404, 'Verein nicht gefunden');
   await db.prepare('UPDATE clubs SET status = ?, updated_at = ? WHERE id = ?').bind(status, new Date().toISOString(), id).run();
+  return json({ ok: true });
+}
+
+async function updateClubAsAdmin(request, db, id) {
+  const club = await db.prepare('SELECT id FROM clubs WHERE id = ?').bind(id).first();
+  if (!club) throw new HttpError(404, 'Verein nicht gefunden');
+  const input = clubInput(await readJson(request));
+  await db.prepare('UPDATE clubs SET name = ?, description = ?, website_url = ?, logo_url = ?, contact_name = ?, contact_email = ?, contact_phone = ?, updated_at = ? WHERE id = ?')
+    .bind(input.name, input.description, input.websiteUrl, input.logoUrl, input.contactName, input.contactEmail, input.contactPhone, new Date().toISOString(), id).run();
   return json({ ok: true });
 }
 

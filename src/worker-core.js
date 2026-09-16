@@ -13,6 +13,7 @@ const REGISTRATION_TYPES = ['supermelee', 'melee', 'forme'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
 export const PLAYER_LISTING_POSITIONS = ['leger', 'milieu', 'schiesser', 'egal'];
+const TOURNAMENT_DESCRIPTION_PREFIX = 'ptm-richtext:v1:';
 
 const text = (value) => String(value || '').trim();
 const nullableText = (value) => text(value) || null;
@@ -43,6 +44,28 @@ function normalizeRegistrationQuestions(value) {
   });
 }
 function nullableCoordinate(value, min, max) { if (value === undefined || value === null || value === '') return null; const number = Number(value); if (!Number.isFinite(number) || number < min || number > max) throw new HttpError(400, 'Ungültige Koordinate'); return number; }
+function isValidTournamentDescriptionDocument(document) {
+  if (!document || typeof document !== 'object' || document.type !== 'doc' || !Array.isArray(document.content) || Object.keys(document).some((key) => key !== 'type' && key !== 'content')) return false;
+  let textLength = 0;
+  return document.content.every((paragraph) => {
+    if (!paragraph || typeof paragraph !== 'object' || paragraph.type !== 'paragraph' || Object.keys(paragraph).some((key) => key !== 'type' && key !== 'content') || (paragraph.content !== undefined && !Array.isArray(paragraph.content))) return false;
+    return (paragraph.content || []).every((node) => {
+      if (!node || typeof node !== 'object' || node.type !== 'text' || typeof node.text !== 'string' || Object.keys(node).some((key) => key !== 'type' && key !== 'text' && key !== 'marks')) return false;
+      textLength += node.text.length;
+      return textLength <= 20_000 && (node.marks === undefined || (Array.isArray(node.marks) && node.marks.every((mark) => mark && typeof mark === 'object' && (mark.type === 'bold' || mark.type === 'italic') && Object.keys(mark).length === 1)));
+    });
+  });
+}
+export function normalizeTournamentDescription(value) {
+  const description = nullableText(value);
+  if (!description || !description.startsWith(TOURNAMENT_DESCRIPTION_PREFIX)) return description;
+  try {
+    if (isValidTournamentDescriptionDocument(JSON.parse(description.slice(TOURNAMENT_DESCRIPTION_PREFIX.length)))) return description;
+  } catch {
+    // The shared error below deliberately hides parser details from the API response.
+  }
+  throw new HttpError(400, 'Ungültige Turnierbeschreibung');
+}
 function normalizeRegistrationDateTime(value, { legacyUtc }) {
   const normalized = nullableText(value); if (!normalized) return null;
   if (legacyUtc) { if (Number.isNaN(new Date(normalized).getTime())) throw new HttpError(400, 'Ein gültiger Anmeldezeitpunkt ist erforderlich'); return normalized; }
@@ -94,7 +117,7 @@ export function isTournamentRoundNumberConflict(error) {
 export function normalizeTournamentInput(body, { legacyRegistrationTimes = false, registrationTypeDefault = 'forme' } = {}) {
   const rawFormation = text(body.formation || 'doublette');
   const formationOther = rawFormation === 'andere';
-  const tournament = { name: text(body.name), club: nullableText(body.club), date: text(body.date), startTime: nullableText(body.startTime), location: text(body.location), description: nullableText(body.description), type: text(body.type || 'formule_x'), formation: formationOther ? 'tete' : rawFormation, formationOther, registrationType: text(body.registrationType || registrationTypeDefault), status: text(body.status || 'draft'), maxRegistrations: nonNegativeInteger(body.maxRegistrations), registrationDeadline: normalizeRegistrationDateTime(body.registrationDeadline, { legacyUtc: legacyRegistrationTimes }), registrationOpensAt: normalizeRegistrationDateTime(body.registrationOpensAt, { legacyUtc: legacyRegistrationTimes }), entryFeeCents: nonNegativeInteger(body.entryFeeCents), feeTiers: normalizeFeeTiers(body.feeTiers), feeTiersProvided: body.feeTiers !== undefined, registrationQuestions: normalizeRegistrationQuestions(body.registrationQuestions), registrationQuestionsProvided: body.registrationQuestions !== undefined, currency: text(body.currency || 'EUR').toUpperCase(), contactName: nullableText(body.contactName), contactEmail: nullableText(body.contactEmail), contactPhone: nullableText(body.contactPhone), visibility: text(body.visibility || 'private'), internalNotes: nullableText(body.internalNotes), participantsPublic: Boolean(body.participantsPublic), licenseRequired: Boolean(body.licenseRequired), teamNameEnabled: Boolean(body.teamNameEnabled), waitlistEnabled: body.waitlistEnabled === undefined ? true : Boolean(body.waitlistEnabled), registrationEnabled: body.registrationEnabled === undefined ? true : Boolean(body.registrationEnabled), approvalRequired: Boolean(body.approvalRequired), schweizerRankingMode: text(body.schweizerRankingMode || 'mit_buchholz'), latitude: nullableCoordinate(body.latitude, -90, 90), longitude: nullableCoordinate(body.longitude, -180, 180) };
+  const tournament = { name: text(body.name), club: nullableText(body.club), date: text(body.date), startTime: nullableText(body.startTime), location: text(body.location), description: normalizeTournamentDescription(body.description), type: text(body.type || 'formule_x'), formation: formationOther ? 'tete' : rawFormation, formationOther, registrationType: text(body.registrationType || registrationTypeDefault), status: text(body.status || 'draft'), maxRegistrations: nonNegativeInteger(body.maxRegistrations), registrationDeadline: normalizeRegistrationDateTime(body.registrationDeadline, { legacyUtc: legacyRegistrationTimes }), registrationOpensAt: normalizeRegistrationDateTime(body.registrationOpensAt, { legacyUtc: legacyRegistrationTimes }), entryFeeCents: nonNegativeInteger(body.entryFeeCents), feeTiers: normalizeFeeTiers(body.feeTiers), feeTiersProvided: body.feeTiers !== undefined, registrationQuestions: normalizeRegistrationQuestions(body.registrationQuestions), registrationQuestionsProvided: body.registrationQuestions !== undefined, currency: text(body.currency || 'EUR').toUpperCase(), contactName: nullableText(body.contactName), contactEmail: nullableText(body.contactEmail), contactPhone: nullableText(body.contactPhone), visibility: text(body.visibility || 'private'), internalNotes: nullableText(body.internalNotes), participantsPublic: Boolean(body.participantsPublic), licenseRequired: Boolean(body.licenseRequired), teamNameEnabled: Boolean(body.teamNameEnabled), waitlistEnabled: body.waitlistEnabled === undefined ? true : Boolean(body.waitlistEnabled), registrationEnabled: body.registrationEnabled === undefined ? true : Boolean(body.registrationEnabled), approvalRequired: Boolean(body.approvalRequired), schweizerRankingMode: text(body.schweizerRankingMode || 'mit_buchholz'), latitude: nullableCoordinate(body.latitude, -90, 90), longitude: nullableCoordinate(body.longitude, -180, 180) };
   if (tournament.name.length < 2) throw new HttpError(400, 'Der Turniername muss mindestens 2 Zeichen enthalten');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(tournament.date)) throw new HttpError(400, 'Ein gültiges Turnierdatum ist erforderlich');
   if (tournament.startTime && !/^\d{2}:\d{2}$/.test(tournament.startTime)) throw new HttpError(400, 'Eine gültige Startzeit ist erforderlich');
