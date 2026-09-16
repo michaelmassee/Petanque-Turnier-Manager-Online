@@ -421,7 +421,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
             <path d="M3 20c0-3 2.5-5.5 5.5-5.5S14 17 14 20" />
             <path d="M14.5 20c0-2.4 1.8-4.4 4-4.7" />
           </svg>
-          {t('Spielerbörse')}
+          {t('Boule-Treff')}
         </button>
       </nav>
       {menuOpen && (

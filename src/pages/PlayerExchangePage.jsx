@@ -220,7 +220,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
   return (
     <main className="app-shell">
       <StandalonePageHeader
-        heading={t('Spielerbörse')}
+        heading={t('Boule-Treff')}
         language={language}
         setLanguage={setLanguage}
         menuOpen={menuOpen}
@@ -257,10 +257,10 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
         <div className="home-finder">
           <div className="home-finder-copy">
             <p className="eyebrow">Pétanque Turnier Manager Online</p>
-            <h2>{t('Spielerbörse')}</h2>
+            <h2>{t('Boule-Treff')}</h2>
             <p className="subtitle">{t('Finde Spieler für Turniere oder regelmäßiges Training.')}</p>
           </div>
-          <div className="home-finder-stats" aria-label={t('Spielerbörse Übersicht')}>
+          <div className="home-finder-stats" aria-label={t('Boule-Treff Übersicht')}>
             <button
               type="button"
               onClick={() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}

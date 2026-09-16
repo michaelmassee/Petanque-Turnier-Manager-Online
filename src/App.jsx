@@ -53,7 +53,7 @@ function ContextualDrawerContent({ area, currentUser, canManageTournaments, isAd
   const selectTab = (tab) => closeThen(() => onSelectTab(tab));
 
   return <>
-    <div className="drawer-menu-section" aria-label={t(area === 'turniere' ? 'Turniere' : area === 'bouleplaetze' ? 'Boule-Plätze / Vereine' : 'Spielerbörse')}>
+    <div className="drawer-menu-section" aria-label={t(area === 'turniere' ? 'Turniere' : area === 'bouleplaetze' ? 'Boule-Plätze / Vereine' : 'Boule-Treff')}>
       {area === 'turniere' && <>
         {canManageTournaments && <button className={`drawer-link ${activeTab === 'tournaments' ? 'active' : ''}`} type="button" onClick={selectTab('tournaments')}>{t('Turnierverwaltung')}</button>}
         {currentUser && <button className={`drawer-link ${activeTab === 'registrations' ? 'active' : ''}`} type="button" onClick={selectTab('registrations')}>{t('Anmeldungen')}</button>}
