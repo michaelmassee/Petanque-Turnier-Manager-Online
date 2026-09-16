@@ -5,18 +5,20 @@ import { parseTournamentDescription, serializeTournamentDescription, tournamentD
 
 const extensions = [StarterKit.configure({
   blockquote: false,
-  bulletList: false,
+  bulletList: true,
   code: false,
   codeBlock: false,
   hardBreak: false,
-  heading: false,
+  heading: { levels: [2] },
   horizontalRule: false,
-  listItem: false,
-  orderedList: false,
-  strike: false,
+  listItem: true,
+  link: false,
+  orderedList: true,
+  strike: true,
+  underline: true,
 })];
 
-export function TournamentDescriptionEditor({ label, value, onChange, boldLabel, italicLabel }) {
+export function TournamentDescriptionEditor({ label, value, onChange, boldLabel, italicLabel, underlineLabel, strikeLabel, bulletListLabel, orderedListLabel, headingLabel }) {
   const editorId = useId();
   const editor = useEditor({
     extensions,
@@ -61,6 +63,21 @@ export function TournamentDescriptionEditor({ label, value, onChange, boldLabel,
           onClick={() => editor?.chain().focus().toggleItalic().run()}
         >
           <em aria-hidden="true">I</em>
+        </button>
+        <button type="button" className="tournament-description-editor-button" aria-label={underlineLabel} aria-pressed={editor?.isActive('underline') || false} title={underlineLabel} disabled={!editor} onClick={() => editor?.chain().focus().toggleUnderline().run()}>
+          <u aria-hidden="true">U</u>
+        </button>
+        <button type="button" className="tournament-description-editor-button" aria-label={strikeLabel} aria-pressed={editor?.isActive('strike') || false} title={strikeLabel} disabled={!editor} onClick={() => editor?.chain().focus().toggleStrike().run()}>
+          <s aria-hidden="true">S</s>
+        </button>
+        <button type="button" className="tournament-description-editor-button" aria-label={bulletListLabel} aria-pressed={editor?.isActive('bulletList') || false} title={bulletListLabel} disabled={!editor} onClick={() => editor?.chain().focus().toggleBulletList().run()}>
+          <span aria-hidden="true">•</span>
+        </button>
+        <button type="button" className="tournament-description-editor-button" aria-label={orderedListLabel} aria-pressed={editor?.isActive('orderedList') || false} title={orderedListLabel} disabled={!editor} onClick={() => editor?.chain().focus().toggleOrderedList().run()}>
+          <span aria-hidden="true">1.</span>
+        </button>
+        <button type="button" className="tournament-description-editor-button" aria-label={headingLabel} aria-pressed={editor?.isActive('heading', { level: 2 }) || false} title={headingLabel} disabled={!editor} onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}>
+          <strong aria-hidden="true">H</strong>
         </button>
       </div>
       <EditorContent editor={editor} />

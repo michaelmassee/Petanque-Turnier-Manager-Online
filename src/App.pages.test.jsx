@@ -125,9 +125,13 @@ describe('Turnier melden', () => {
 
 describe('Öffentliche Turnierdetailseite', () => {
   it('zeigt formatierte Turnierbeschreibungen sicher an und lässt bisherigen Klartext unverändert', () => {
-    const { rerender } = render(<TournamentDescription description={'ptm-richtext:v1:{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Wichtig","marks":[{"type":"bold"}]}]}]}'} />);
+    const { rerender } = render(<TournamentDescription description={'ptm-richtext:v1:{"type":"doc","content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Wichtig","marks":[{"type":"bold"},{"type":"underline"}]}]},{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"Punkt","marks":[{"type":"strike"}]}]}]}]}]}'} />);
 
     expect(screen.getByText('Wichtig').tagName).toBe('STRONG');
+    expect(screen.getByText('Wichtig').closest('h2')).toBeInTheDocument();
+    expect(screen.getByText('Wichtig').closest('u')).toBeInTheDocument();
+    expect(screen.getByText('Punkt').closest('s')).toBeInTheDocument();
+    expect(screen.getByText('Punkt').closest('ul')).toBeInTheDocument();
     rerender(<TournamentDescription description={'<strong>Bestehender Klartext</strong>'} />);
     expect(screen.getByText('<strong>Bestehender Klartext</strong>')).toBeInTheDocument();
     expect(document.querySelector('strong')).toBeNull();
@@ -429,6 +433,11 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     expect(screen.getByRole('toolbar', { name: 'Beschreibung' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Fett' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Kursiv' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unterstrichen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Durchgestrichen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aufzählung' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nummerierte Liste' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Überschrift' })).toBeInTheDocument();
   });
 
   it('entfernt einen optionalen Startgeld-Tarif aus dem Turnierformular', () => {

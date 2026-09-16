@@ -476,6 +476,11 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         onChange={(description) => setForm({ ...form, description })}
         boldLabel={t('Fett')}
         italicLabel={t('Kursiv')}
+        underlineLabel={t('Unterstrichen')}
+        strikeLabel={t('Durchgestrichen')}
+        bulletListLabel={t('Aufzählung')}
+        orderedListLabel={t('Nummerierte Liste')}
+        headingLabel={t('Überschrift')}
       />
       <TextArea label={t('Interne Notizen')} value={form.internalNotes} onChange={(internalNotes) => setForm({ ...form, internalNotes })} />
       {!isCalendarEntry && (

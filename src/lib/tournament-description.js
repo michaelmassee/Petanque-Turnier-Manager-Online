@@ -1,7 +1,8 @@
 export const TOURNAMENT_DESCRIPTION_PREFIX = 'ptm-richtext:v1:';
 
 function validMark(mark) {
-  return mark && typeof mark === 'object' && Object.keys(mark).length === 1 && (mark.type === 'bold' || mark.type === 'italic');
+  return mark && typeof mark === 'object' && Object.keys(mark).length === 1
+    && ['bold', 'italic', 'underline', 'strike'].includes(mark.type);
 }
 
 function validTextNode(node) {
@@ -12,17 +13,37 @@ function validTextNode(node) {
     && (!node.marks || (Array.isArray(node.marks) && node.marks.every(validMark)));
 }
 
+function validTextblock(node) {
+  if (!node || typeof node !== 'object' || (node.content !== undefined && (!Array.isArray(node.content) || !node.content.every(validTextNode)))) return false;
+  if (node.type === 'paragraph') return Object.keys(node).every((key) => key === 'type' || key === 'content');
+  return node.type === 'heading'
+    && Object.keys(node).every((key) => key === 'type' || key === 'content' || key === 'attrs')
+    && node.attrs && Object.keys(node.attrs).length === 1 && node.attrs.level === 2;
+}
+
+function validList(node, depth) {
+  if (!node || typeof node !== 'object' || !Array.isArray(node.content) || !node.content.length || !node.content.every((item) => validListItem(item, depth + 1))) return false;
+  if (node.type === 'bulletList') return Object.keys(node).every((key) => key === 'type' || key === 'content');
+  return node.type === 'orderedList'
+    && Object.keys(node).every((key) => key === 'type' || key === 'content' || key === 'attrs')
+    && (!node.attrs || (Object.keys(node.attrs).every((key) => key === 'start' || key === 'type')
+      && (node.attrs.start === undefined || (Number.isInteger(node.attrs.start) && node.attrs.start > 0))
+      && (node.attrs.type === null || node.attrs.type === undefined)));
+}
+
+function validListItem(node, depth) {
+  return depth <= 4 && node && typeof node === 'object' && node.type === 'listItem'
+    && Object.keys(node).every((key) => key === 'type' || key === 'content')
+    && Array.isArray(node.content) && node.content.length > 0
+    && node.content.every((child) => validTextblock(child) || validList(child, depth));
+}
+
 export function isTournamentDescriptionDocument(document) {
   return document && typeof document === 'object'
     && Object.keys(document).every((key) => key === 'type' || key === 'content')
     && document.type === 'doc'
     && Array.isArray(document.content)
-    && document.content.every((paragraph) => (
-      paragraph && typeof paragraph === 'object'
-      && Object.keys(paragraph).every((key) => key === 'type' || key === 'content')
-      && paragraph.type === 'paragraph'
-      && (!paragraph.content || (Array.isArray(paragraph.content) && paragraph.content.every(validTextNode)))
-    ));
+    && document.content.every((node) => validTextblock(node) || validList(node, 0));
 }
 
 export function parseTournamentDescription(value) {

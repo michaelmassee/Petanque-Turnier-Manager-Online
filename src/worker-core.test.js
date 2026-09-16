@@ -21,10 +21,11 @@ describe('Worker-Fachlogik', () => {
   });
 
   it('akzeptiert nur die kleine, versionierte Turnierbeschreibung', () => {
-    const description = 'ptm-richtext:v1:{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Wichtig","marks":[{"type":"bold"}]}]}]}';
+    const description = 'ptm-richtext:v1:{"type":"doc","content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Wichtig","marks":[{"type":"bold"},{"type":"underline"}]}]},{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"Punkt","marks":[{"type":"strike"}]}]},{"type":"orderedList","attrs":{"start":1,"type":null},"content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"Unterpunkt","marks":[{"type":"italic"}]}]}]}]}]}]}]}';
     expect(normalizeTournamentInput({ ...base, description }).description).toBe(description);
     expect(normalizeTournamentInput({ ...base, description: '<strong>Bestehender Klartext</strong>' }).description).toBe('<strong>Bestehender Klartext</strong>');
-    expect(() => normalizeTournamentInput({ ...base, description: 'ptm-richtext:v1:{"type":"doc","content":[{"type":"heading"}]}' })).toThrow('Turnierbeschreibung');
+    expect(() => normalizeTournamentInput({ ...base, description: 'ptm-richtext:v1:{"type":"doc","content":[{"type":"heading","attrs":{"level":1},"content":[{"type":"text","text":"Nicht erlaubt"}]}]}' })).toThrow('Turnierbeschreibung');
+    expect(() => normalizeTournamentInput({ ...base, description: 'ptm-richtext:v1:{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Kein Link","marks":[{"type":"link","attrs":{"href":"https://example.test"}}]}]}]}' })).toThrow('Turnierbeschreibung');
     expect(() => normalizeTournamentInput({ ...base, description: 'ptm-richtext:v1:not-json' })).toThrow('Turnierbeschreibung');
   });
 

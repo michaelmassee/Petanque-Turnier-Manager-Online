@@ -46,15 +46,38 @@ function normalizeRegistrationQuestions(value) {
 function nullableCoordinate(value, min, max) { if (value === undefined || value === null || value === '') return null; const number = Number(value); if (!Number.isFinite(number) || number < min || number > max) throw new HttpError(400, 'Ungültige Koordinate'); return number; }
 function isValidTournamentDescriptionDocument(document) {
   if (!document || typeof document !== 'object' || document.type !== 'doc' || !Array.isArray(document.content) || Object.keys(document).some((key) => key !== 'type' && key !== 'content')) return false;
-  let textLength = 0;
-  return document.content.every((paragraph) => {
-    if (!paragraph || typeof paragraph !== 'object' || paragraph.type !== 'paragraph' || Object.keys(paragraph).some((key) => key !== 'type' && key !== 'content') || (paragraph.content !== undefined && !Array.isArray(paragraph.content))) return false;
-    return (paragraph.content || []).every((node) => {
-      if (!node || typeof node !== 'object' || node.type !== 'text' || typeof node.text !== 'string' || Object.keys(node).some((key) => key !== 'type' && key !== 'text' && key !== 'marks')) return false;
-      textLength += node.text.length;
-      return textLength <= 20_000 && (node.marks === undefined || (Array.isArray(node.marks) && node.marks.every((mark) => mark && typeof mark === 'object' && (mark.type === 'bold' || mark.type === 'italic') && Object.keys(mark).length === 1)));
-    });
-  });
+  const state = { nodes: 0, textLength: 0 };
+  const validMark = (mark) => mark && typeof mark === 'object' && Object.keys(mark).length === 1 && ['bold', 'italic', 'underline', 'strike'].includes(mark.type);
+  const validText = (node) => {
+    if (!node || typeof node !== 'object' || node.type !== 'text' || typeof node.text !== 'string' || Object.keys(node).some((key) => key !== 'type' && key !== 'text' && key !== 'marks')) return false;
+    state.nodes += 1;
+    state.textLength += node.text.length;
+    return state.nodes <= 1_000 && state.textLength <= 20_000 && (node.marks === undefined || (Array.isArray(node.marks) && node.marks.every(validMark)));
+  };
+  const validTextblock = (node) => {
+    if (!node || typeof node !== 'object' || (node.content !== undefined && (!Array.isArray(node.content) || !node.content.every(validText)))) return false;
+    state.nodes += 1;
+    if (state.nodes > 1_000) return false;
+    if (node.type === 'paragraph') return Object.keys(node).every((key) => key === 'type' || key === 'content');
+    return node.type === 'heading' && Object.keys(node).every((key) => key === 'type' || key === 'content' || key === 'attrs')
+      && node.attrs && Object.keys(node.attrs).length === 1 && node.attrs.level === 2;
+  };
+  const validListItem = (node, depth) => {
+    if (!node || typeof node !== 'object' || node.type !== 'listItem' || !Object.keys(node).every((key) => key === 'type' || key === 'content') || !Array.isArray(node.content) || !node.content.length || depth > 4) return false;
+    state.nodes += 1;
+    return state.nodes <= 1_000 && node.content.every((child) => validTextblock(child) || validList(child, depth));
+  };
+  const validList = (node, depth) => {
+    if (!node || typeof node !== 'object' || !Array.isArray(node.content) || !node.content.length || !node.content.every((item) => validListItem(item, depth + 1))) return false;
+    state.nodes += 1;
+    if (state.nodes > 1_000) return false;
+    if (node.type === 'bulletList') return Object.keys(node).every((key) => key === 'type' || key === 'content');
+    return node.type === 'orderedList' && Object.keys(node).every((key) => key === 'type' || key === 'content' || key === 'attrs')
+      && (!node.attrs || (Object.keys(node.attrs).every((key) => key === 'start' || key === 'type')
+        && (node.attrs.start === undefined || (Number.isInteger(node.attrs.start) && node.attrs.start > 0))
+        && (node.attrs.type === null || node.attrs.type === undefined)));
+  };
+  return document.content.every((node) => validTextblock(node) || validList(node, 0));
 }
 export function normalizeTournamentDescription(value) {
   const description = nullableText(value);
