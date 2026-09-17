@@ -629,9 +629,10 @@ textarea:focus {
   left: 0;
   z-index: 14;
   height: 100vh;
-  width: min(300px, 85vw);
+  width: min(340px, 90vw);
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
   align-content: start;
   padding: 18px 16px;
   background: #ffffff;
@@ -644,33 +645,59 @@ textarea:focus {
   transform: translateX(0);
 }
 
-.left-panel-link {
+.left-panel-link,
+a.left-panel-link {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  min-height: 48px;
-  border: 0;
-  border-radius: 6px;
+  justify-content: center;
+  gap: 10px;
+  min-height: 96px;
+  border: 1px solid #c7d0df;
+  border-radius: 10px;
   background: #f4f6fa;
   color: #172033;
-  padding: 10px 14px;
-  text-align: left;
+  padding: 14px 10px;
+  text-align: center;
+  text-decoration: none;
   font-weight: 800;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  box-shadow: 0 1px 2px rgb(23 32 51 / 6%);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
 
 .left-panel-link:hover {
+  background: #f7fbff;
+  border-color: #1677ff;
+  box-shadow: 0 4px 10px rgb(22 119 255 / 14%);
+  transform: translateY(-1px);
+}
+
+.left-panel-link:active {
   background: #ecf4ff;
+  box-shadow: 0 1px 2px rgb(23 32 51 / 8%);
+  transform: translateY(0);
+}
+
+.left-panel-link:focus-visible {
+  outline: 3px solid rgb(22 119 255 / 18%);
+  outline-offset: 2px;
 }
 
 .left-panel-link svg {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   stroke: currentColor;
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.8;
+  stroke-width: 1.6;
 }
 
 .search-menu {
@@ -2014,6 +2041,22 @@ textarea:focus {
   .app-shell,
   .page {
     padding: 14px;
+  }
+
+  .left-panel {
+    width: min(300px, 88vw);
+    gap: 10px;
+  }
+
+  .left-panel-link {
+    min-height: 84px;
+    padding: 12px 8px;
+    font-size: 0.85rem;
+  }
+
+  .left-panel-link svg {
+    width: 24px;
+    height: 24px;
   }
 
   .brand-text {
