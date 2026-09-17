@@ -1592,6 +1592,22 @@ a.left-panel-link {
   padding: 16px;
 }
 
+.editor-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.editor-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .form-section-header {
   display: flex;
   align-items: center;
