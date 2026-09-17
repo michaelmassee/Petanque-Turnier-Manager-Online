@@ -246,7 +246,6 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
               {place.description && <RichText value={place.description} />}
               <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${place.facilities}` : ''}</p>
               {place.clubId && <ClubBadge clubName={place.clubName} />}
-              {place.placeType === 'club_playing_area' && <p className="muted">{t('Vereins-Spielfläche')}</p>}
               <DistanceBadge distanceKm={place.distanceKm} />
               <div className="place-actions">
                 <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
