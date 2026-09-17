@@ -335,7 +335,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               onChange={(formation) => setForm({
                 ...form,
                 formation,
-                registrationType: (formation === 'tete' || formation === 'andere') ? 'forme' : form.registrationType,
+                registrationType: formation === 'tete' ? 'forme' : form.registrationType,
               })}
               options={translatedOptions(form.registrationType === 'supermelee' ? FORMATIONS.filter((option) => option.value !== 'tete' && option.value !== 'andere') : FORMATIONS)}
             />
@@ -346,10 +346,10 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
                 ...form,
                 registrationType,
                 type: registrationType === 'supermelee' ? 'rangliste' : form.type,
-                formation: registrationType === 'supermelee' && (form.formation === 'tete' || form.formation === 'andere') ? 'doublette' : form.formation,
+                formation: registrationType === 'supermelee' && form.formation === 'tete' ? 'doublette' : form.formation,
               })}
-              options={translatedOptions((form.formation === 'tete' || form.formation === 'andere') ? REGISTRATION_TYPES.filter((option) => option.value === 'forme') : REGISTRATION_TYPES)}
-              disabled={form.formation === 'tete' || form.formation === 'andere'}
+              options={translatedOptions(form.formation === 'tete' ? REGISTRATION_TYPES.filter((option) => option.value === 'forme') : REGISTRATION_TYPES)}
+              disabled={form.formation === 'tete'}
             />
             <SelectField
               label={t('Turniersystem')}

@@ -54,7 +54,13 @@ describe('Worker-Fachlogik', () => {
   it('mappt Formation "andere" auf tete + formationOther, ohne den DB-CHECK zu verletzen', () => {
     expect(normalizeTournamentInput({ ...base, formation: 'andere' })).toMatchObject({ formation: 'tete', formationOther: true, registrationType: 'forme' });
     expect(normalizeTournamentInput({ ...base, formation: 'doublette' })).toMatchObject({ formation: 'doublette', formationOther: false });
-    expect(() => normalizeTournamentInput({ ...base, formation: 'andere', registrationType: 'supermelee' })).toThrow('Formée');
+  });
+
+  it('erlaubt bei Formation "andere" jeden Anmeldetyp (nur echtes Tête ist auf Formée beschränkt)', () => {
+    expect(normalizeTournamentInput({ ...base, formation: 'andere', registrationType: 'melee' })).toMatchObject({ formation: 'tete', formationOther: true, registrationType: 'melee' });
+    expect(normalizeTournamentInput({ ...base, formation: 'andere', registrationType: 'supermelee', type: 'rangliste' })).toMatchObject({ formation: 'tete', formationOther: true, registrationType: 'supermelee' });
+    expect(() => normalizeTournamentInput({ ...base, formation: 'andere', registrationType: 'supermelee' })).toThrow('Rangliste');
+    expect(() => normalizeTournamentInput({ ...base, formation: 'tete', registrationType: 'melee' })).toThrow('Formée');
   });
 
   it.each([

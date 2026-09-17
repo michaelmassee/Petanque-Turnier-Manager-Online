@@ -148,8 +148,8 @@ export function normalizeTournamentInput(body, { legacyRegistrationTimes = false
   if (!TOURNAMENT_TYPES.includes(tournament.type)) throw new HttpError(400, 'Ungültiges Turniersystem');
   if (!FORMATION_INPUT_VALUES.includes(rawFormation)) throw new HttpError(400, 'Ungültige Formation');
   if (!REGISTRATION_TYPES.includes(tournament.registrationType)) throw new HttpError(400, 'Ungültiger Anmeldetyp');
-  if (tournament.formation === 'tete' && tournament.registrationType !== 'forme') throw new HttpError(400, 'Formation Tête ist nur mit dem Anmeldetyp Formée möglich');
-  if (tournament.registrationType === 'supermelee' && tournament.formation === 'tete') throw new HttpError(400, 'Supermêlée ist nur mit Doublette oder Triplette möglich');
+  if (rawFormation === 'tete' && tournament.registrationType !== 'forme') throw new HttpError(400, 'Formation Tête ist nur mit dem Anmeldetyp Formée möglich');
+  if (tournament.registrationType === 'supermelee' && rawFormation === 'tete') throw new HttpError(400, 'Supermêlée ist nur mit Doublette oder Triplette möglich');
   if (tournament.registrationType === 'supermelee' && tournament.type !== 'rangliste') throw new HttpError(400, 'Supermêlée erfordert das Turniersystem Rangliste');
   if (!['mit_buchholz', 'ohne_buchholz'].includes(tournament.schweizerRankingMode)) throw new HttpError(400, 'Ungültiger Schweizer Ranglistenmodus');
   if (!TOURNAMENT_STATUSES.includes(tournament.status)) throw new HttpError(400, 'Ungültiger Turnierstatus');
