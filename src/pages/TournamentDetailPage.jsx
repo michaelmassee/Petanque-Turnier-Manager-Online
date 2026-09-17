@@ -265,6 +265,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
 }
 
 function playerLabel(player) {
+  if (player.teamLabel) return player.teamLabel;
   return [player.firstName, player.lastName].filter(Boolean).join(' ') || player.id;
 }
 
