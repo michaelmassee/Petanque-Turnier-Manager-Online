@@ -835,6 +835,7 @@
   "Adresse": "Address",
   "Platzanzahl": "Number of courts",
   "Ausstattung": "Facilities",
+  "Ausstattung:": "Facilities:",
   "Bouleplatz eingereicht. Ein Admin muss ihn noch freigeben.": "Boules court submitted. An admin still needs to approve it.",
   "Vereine & Bouleplätze": "Clubs & boules courts",
   "Neue Vereine und Bouleplätze freigeben, bevor sie öffentlich sichtbar werden.": "Approve new clubs and boules courts before they become publicly visible.",

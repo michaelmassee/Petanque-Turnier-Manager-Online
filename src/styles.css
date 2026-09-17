@@ -1411,12 +1411,17 @@ a.left-panel-link {
   font-weight: 700;
 }
 
+.club-badge-clickable {
+  cursor: pointer;
+}
+
 .club-badge {
   display: inline-flex;
   align-items: center;
   width: fit-content;
   gap: 6px;
   margin-top: 2px;
+  margin-bottom: 8px;
   border: 1px solid #8fcf9c;
   border-radius: 999px;
   background: #eaf9ee;
@@ -2562,4 +2567,5 @@ a.left-panel-link {
  .places-list { display: grid; gap: 1rem; margin-top: 1rem; }
  .place-card h2 { margin: 0; }
  .place-card .distance-badge { margin-top: -.25rem; }
+ .place-card-header-clickable { cursor: pointer; }
  .place-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }

@@ -4985,7 +4985,7 @@ function clubCanEdit(club, user) {
 function toPublicBoulePlace(row, user) {
   const canEdit = row.club_id ? clubCanEdit(row, user) : Boolean(user?.role === 'admin' || (row.reported_by_user_id && row.reported_by_user_id === user?.id));
   return {
-    id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubLogoUrl: row.club_logo_url || null, placeType: row.club_id ? 'club_playing_area' : 'boule_place', separateFromClub: Boolean(Number(row.separate_from_club)), name: row.name, address: row.address,
+    id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubLogoUrl: row.club_logo_url || null, clubWebsiteUrl: row.club_website_url || null, placeType: row.club_id ? 'club_playing_area' : 'boule_place', separateFromClub: Boolean(Number(row.separate_from_club)), name: row.name, address: row.address,
     latitude: row.latitude === null ? null : Number(row.latitude), longitude: row.longitude === null ? null : Number(row.longitude),
     courtCount: Number(row.court_count || 0), description: row.description || null, accessible: Boolean(Number(row.accessible)),
     facilities: row.facilities || null, status: row.status, likeCount: Number(row.like_count || 0), liked: Boolean(Number(row.liked || 0)),
@@ -5005,7 +5005,7 @@ function toPublicClub(row, user) {
 async function listBoulePlaces(db, user, query) {
   const term = String(query || '').trim();
   const rows = await db.prepare(
-    `SELECT p.*, c.name AS club_display_name, c.logo_url AS club_logo_url, c.owner_id,
+    `SELECT p.*, c.name AS club_display_name, c.logo_url AS club_logo_url, c.website_url AS club_website_url, c.owner_id,
        EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?1) AS editor_user_id,
        (SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id) AS like_count,
        EXISTS(SELECT 1 FROM boule_place_likes l WHERE l.place_id = p.id AND l.user_id = ?1) AS liked,

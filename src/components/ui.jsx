@@ -130,11 +130,11 @@ export function DistanceBadge({ distanceKm }) {
   );
 }
 
-export function ClubBadge({ clubName }) {
+export function ClubBadge({ clubName, onClick }) {
   const { t } = useTranslation();
 
   return (
-    <span className="club-badge" title={clubName || t('Verein')}>
+    <span className={`club-badge${onClick ? ' club-badge-clickable' : ''}`} title={clubName || t('Verein')} onClick={onClick}>
       <span aria-hidden="true">🏛</span>
       <strong>{t('Verein')}</strong>
     </span>

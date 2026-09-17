@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Marker, Popup } from 'react-leaflet';
+import { Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -25,13 +25,31 @@ const clubMarker = L.divIcon({
   popupAnchor: [1, -34],
 });
 
-function PlacesMap({ places, center, maptilerApiKey }) {
+function FocusOnPlace({ focus, markerRefs }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!focus) return;
+    map.flyTo([focus.lat, focus.lng], Math.max(map.getZoom(), 15));
+    markerRefs.current[focus.id]?.openPopup();
+  }, [focus, map, markerRefs]);
+  return null;
+}
+
+function PlacesMap({ places, center, maptilerApiKey, focus }) {
   const { t } = useTranslation();
+  const markerRefs = useRef({});
+  const positions = useMemo(() => places.map((place) => [place.latitude, place.longitude]), [places]);
   return (
     <TileFallbackMap center={center} maptilerApiKey={maptilerApiKey}>
-      <FitToBounds positions={places.map((place) => [place.latitude, place.longitude])} />
+      <FitToBounds positions={positions} />
+      <FocusOnPlace focus={focus} markerRefs={markerRefs} />
       {places.map((place) => (
-        <Marker key={place.id} icon={place.clubId ? clubMarker : marker} position={[place.latitude, place.longitude]}>
+        <Marker
+          key={place.id}
+          ref={(instance) => { markerRefs.current[place.id] = instance; }}
+          icon={place.clubId ? clubMarker : marker}
+          position={[place.latitude, place.longitude]}
+        >
           <Popup><strong>{place.name}</strong>{place.clubName && <><br />{place.clubName}</>}<br /><a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a></Popup>
         </Marker>
       ))}
@@ -48,6 +66,14 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [searchMenuOpen, setSearchMenuOpen] = useState(false);
   const resultsRef = useRef(null);
+  const mapSectionRef = useRef(null);
+  const [focusPlace, setFocusPlace] = useState(null);
+
+  function handleFocusPlace(place) {
+    if (place.latitude === null || place.longitude === null) return;
+    setFocusPlace({ id: place.id, lat: place.latitude, lng: place.longitude, token: Date.now() });
+    mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   const [searchOrigin, setSearchOrigin] = useState(null);
   const [searchOriginQuery, setSearchOriginQuery] = useState('');
@@ -224,8 +250,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
 
       {error && <p className="feedback error">{error}</p>}
       {mapped.length > 0 && (
-        <div className="panel">
-          <PlacesMap places={mapped} center={center} maptilerApiKey={maptilerApiKey} />
+        <div className="panel" ref={mapSectionRef}>
+          <PlacesMap places={mapped} center={center} maptilerApiKey={maptilerApiKey} focus={focusPlace} />
         </div>
       )}
 
@@ -242,13 +268,22 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         <div className="places-list">
           {displayedPlaces.map((place) => (
             <article className="panel place-card" id={place.id} key={place.id}>
-              <div><h2 data-i18n-skip>{place.name}</h2><p className="muted" data-i18n-skip>{place.clubName ? `${place.clubName} · ` : ''}{place.address}</p></div>
+              <div
+                className={place.latitude !== null && place.longitude !== null ? 'place-card-header place-card-header-clickable' : 'place-card-header'}
+                onClick={() => handleFocusPlace(place)}
+              >
+                <h2 data-i18n-skip>{place.name}</h2>
+                <p className="muted" data-i18n-skip>{place.clubName ? `${place.clubName} · ` : ''}{place.address}</p>
+              </div>
               {place.description && <RichText value={place.description} />}
-              <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${place.facilities}` : ''}</p>
-              {place.clubId && <ClubBadge clubName={place.clubName} />}
+              <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${t('Ausstattung:')} ${place.facilities}` : ''}</p>
+              {place.clubId && (
+                <ClubBadge clubName={place.clubName} onClick={place.latitude !== null && place.longitude !== null ? () => handleFocusPlace(place) : undefined} />
+              )}
               <DistanceBadge distanceKm={place.distanceKm} />
               <div className="place-actions">
                 <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
+                {place.clubWebsiteUrl && <a className="button button-secondary" href={place.clubWebsiteUrl} target="_blank" rel="noreferrer">{t('Website')}</a>}
                 <Button variant={place.liked ? 'primary' : 'secondary'} onClick={() => toggleLike(place)}>{place.liked ? '♥' : '♡'} {place.likeCount}</Button>
                 <Button variant={place.favorited ? 'primary' : 'secondary'} onClick={() => toggleFavorite(place)}>{place.favorited ? '★' : '☆'} {t('Favorit')}</Button>
               </div>
