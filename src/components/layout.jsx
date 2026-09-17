@@ -177,7 +177,7 @@ function postboxMessageText(message, t) {
     return t(data.status === 'approved' ? 'apiKeyApproved' : 'apiKeyRevoked').replace('{label}', data.label || '');
   }
   if (message.eventType === 'saved_search_new_matches') {
-    return t('savedSearchMatchesText').replace('{name}', data.savedSearchName || '').replace('{count}', data.count ?? 0);
+    return t('savedSearchMatchesText', { count: data.count ?? 0, name: data.savedSearchName || '' });
   }
   return t('status');
 }

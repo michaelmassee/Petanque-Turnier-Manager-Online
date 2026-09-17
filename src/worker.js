@@ -2601,7 +2601,7 @@ async function notifySavedSearchesForPublishedTournament(env, tournament, search
   const notifications = matches.map((search) => ({
     id: crypto.randomUUID(),
     recipientId: search.user_id,
-    eventData: { savedSearchName: search.name, count: 1, tournamentNames: [tournament.name] },
+    eventData: { savedSearchName: search.name, count: 1, tournamentNames: [tournament.name], tournamentId: tournament.id },
   }));
 
   for (const batch of batches(notifications)) {

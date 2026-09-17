@@ -699,6 +699,10 @@ function AppContent() {
       await authenticatedApi(`/api/postbox/messages/${message.id}/read`, { method: 'POST' });
       await loadPostbox();
     }
+    if (message.eventType === 'saved_search_new_matches' && message.eventData?.tournamentId) {
+      setPostboxOpen(false);
+      navigate(`/turniere/${message.eventData.tournamentId}`);
+    }
   }
 
   async function handleSetup(event) {
