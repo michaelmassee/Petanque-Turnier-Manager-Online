@@ -1404,6 +1404,44 @@ a.left-panel-link {
   font-weight: 700;
 }
 
+.club-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  gap: 6px;
+  margin-top: 2px;
+  border: 1px solid #8fcf9c;
+  border-radius: 999px;
+  background: #eaf9ee;
+  color: #1c7a3a;
+  padding: 4px 9px;
+  font-size: .85rem;
+  line-height: 1.2;
+}
+
+.club-marker-icon {
+  position: relative;
+}
+
+.club-marker-icon .club-marker-pin {
+  filter: hue-rotate(-95deg) saturate(1.5);
+}
+
+.club-marker-icon .club-marker-flag {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  font-size: 11px;
+  background: #fff;
+  border-radius: 50%;
+  border: 1px solid #1c7a3a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .3);
+}
+
 .tournament-card-meta {
   display: flex;
   flex-wrap: wrap;

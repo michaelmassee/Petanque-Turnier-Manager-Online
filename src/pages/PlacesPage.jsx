@@ -8,13 +8,20 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Button, DistanceBadge, SelectField } from '../components/ui.jsx';
+import { Button, ClubBadge, DistanceBadge, SelectField } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx';
 
 const FALLBACK_CENTER = [51.1, 10.4];
 const marker = new L.Icon({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow, iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] });
+const clubMarker = L.divIcon({
+  className: 'club-marker-icon',
+  html: `<img class="club-marker-pin" src="${markerIcon}" width="25" height="41" /><span class="club-marker-flag" aria-hidden="true">🏛</span>`,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
 
 function PlacesMap({ places, center, maptilerApiKey }) {
   const { t } = useTranslation();
@@ -22,7 +29,7 @@ function PlacesMap({ places, center, maptilerApiKey }) {
     <TileFallbackMap center={center} maptilerApiKey={maptilerApiKey}>
       <FitToBounds positions={places.map((place) => [place.latitude, place.longitude])} />
       {places.map((place) => (
-        <Marker key={place.id} icon={marker} position={[place.latitude, place.longitude]}>
+        <Marker key={place.id} icon={place.clubId ? clubMarker : marker} position={[place.latitude, place.longitude]}>
           <Popup><strong>{place.name}</strong>{place.clubName && <><br />{place.clubName}</>}<br /><a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a></Popup>
         </Marker>
       ))}
@@ -229,6 +236,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
               <div><h2 data-i18n-skip>{place.name}</h2><p className="muted" data-i18n-skip>{place.clubName ? `${place.clubName} · ` : ''}{place.address}</p></div>
               {place.description && <p data-i18n-skip>{place.description}</p>}
               <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${place.facilities}` : ''}</p>
+              {place.clubId && <ClubBadge clubName={place.clubName} />}
               <DistanceBadge distanceKm={place.distanceKm} />
               <div className="place-actions">
                 <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
