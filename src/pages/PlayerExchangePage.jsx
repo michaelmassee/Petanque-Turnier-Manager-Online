@@ -10,6 +10,7 @@ import { distanceKm, labelFor, translatedOptions } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
 import { Button, TextArea, SelectField, DistanceBadge, EditDialog } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
+import { RichText } from '../components/RichText.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx';
 
@@ -318,7 +319,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
             {visibleListings.map((listing) => (
               <article className="panel place-card" key={listing.id}>
                 <div><h2 data-i18n-skip>{listing.title}</h2><p className="muted" data-i18n-skip>{listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {listing.locationName}{listing.eventDate ? ` · ${listing.eventDate}` : ''}</p></div>
-                {listing.description && <p data-i18n-skip>{listing.description}</p>}
+                {listing.description && <RichText value={listing.description} />}
                 {listing.ownerName && <p className="muted">{t('Von')} {listing.ownerName}</p>}
                 <DistanceBadge distanceKm={listing.distanceKm} />
                 {currentUser && (

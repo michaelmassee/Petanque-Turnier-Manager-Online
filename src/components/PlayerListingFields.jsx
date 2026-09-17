@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { TextField, TextArea, SelectField } from './ui.jsx';
+import { TextField, SelectField } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
+import { RichTextEditor } from './RichTextEditor.jsx';
 
 const TYPE_OPTIONS = [
   { value: 'tournament', label: 'Turnier' },
@@ -24,7 +25,18 @@ export function PlayerListingFields({ form, setForm, language }) {
         options={TYPE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
       />
       <TextField label={t('Titel')} value={form.title} onChange={(title) => setForm({ ...form, title })} required minLength={2} />
-      <TextArea label={t('Beschreibung')} value={form.description} onChange={(description) => setForm({ ...form, description })} />
+      <RichTextEditor
+        label={t('Beschreibung')}
+        value={form.description}
+        onChange={(description) => setForm({ ...form, description })}
+        boldLabel={t('Fett')}
+        italicLabel={t('Kursiv')}
+        underlineLabel={t('Unterstrichen')}
+        strikeLabel={t('Durchgestrichen')}
+        bulletListLabel={t('Aufzählung')}
+        orderedListLabel={t('Nummerierte Liste')}
+        headingLabel={t('Überschrift')}
+      />
       <SelectField
         label={t('Ich bin')}
         value={form.playingPosition}

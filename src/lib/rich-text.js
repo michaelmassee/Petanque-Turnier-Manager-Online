@@ -1,4 +1,4 @@
-export const TOURNAMENT_DESCRIPTION_PREFIX = 'ptm-richtext:v1:';
+export const RICH_TEXT_PREFIX = 'ptm-richtext:v1:';
 
 function validMark(mark) {
   return mark && typeof mark === 'object' && Object.keys(mark).length === 1
@@ -38,7 +38,7 @@ function validListItem(node, depth) {
     && node.content.every((child) => validTextblock(child) || validList(child, depth));
 }
 
-export function isTournamentDescriptionDocument(document) {
+export function isRichTextDocument(document) {
   return document && typeof document === 'object'
     && Object.keys(document).every((key) => key === 'type' || key === 'content')
     && document.type === 'doc'
@@ -46,18 +46,18 @@ export function isTournamentDescriptionDocument(document) {
     && document.content.every((node) => validTextblock(node) || validList(node, 0));
 }
 
-export function parseTournamentDescription(value) {
-  if (typeof value !== 'string' || !value.startsWith(TOURNAMENT_DESCRIPTION_PREFIX)) return null;
+export function parseRichText(value) {
+  if (typeof value !== 'string' || !value.startsWith(RICH_TEXT_PREFIX)) return null;
   try {
-    const document = JSON.parse(value.slice(TOURNAMENT_DESCRIPTION_PREFIX.length));
-    return isTournamentDescriptionDocument(document) ? document : null;
+    const document = JSON.parse(value.slice(RICH_TEXT_PREFIX.length));
+    return isRichTextDocument(document) ? document : null;
   } catch {
     return null;
   }
 }
 
-export function tournamentDescriptionDocument(value) {
-  const storedDocument = parseTournamentDescription(value);
+export function richTextDocument(value) {
+  const storedDocument = parseRichText(value);
   if (storedDocument) return storedDocument;
   const lines = String(value || '').split('\n');
   return {
@@ -66,8 +66,8 @@ export function tournamentDescriptionDocument(value) {
   };
 }
 
-export function serializeTournamentDescription(document) {
+export function serializeRichText(document) {
   const hasText = (document?.content || []).some((paragraph) => (paragraph.content || []).some((node) => node.text.length > 0));
   if (!hasText) return '';
-  return `${TOURNAMENT_DESCRIPTION_PREFIX}${JSON.stringify(document)}`;
+  return `${RICH_TEXT_PREFIX}${JSON.stringify(document)}`;
 }

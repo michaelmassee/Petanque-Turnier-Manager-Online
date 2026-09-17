@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { TextField, TextArea } from './ui.jsx';
+import { TextField } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
+import { RichTextEditor } from './RichTextEditor.jsx';
 
 export function BoulePlaceFields({ form, setForm, language }) {
   const { t } = useTranslation();
@@ -24,7 +25,18 @@ export function BoulePlaceFields({ form, setForm, language }) {
         language={language}
       />
       <TextField label={t('Platzanzahl')} type="number" min={0} value={form.courtCount} onChange={(courtCount) => setForm({ ...form, courtCount })} />
-      <TextArea label={t('Beschreibung')} value={form.description} onChange={(description) => setForm({ ...form, description })} />
+      <RichTextEditor
+        label={t('Beschreibung')}
+        value={form.description}
+        onChange={(description) => setForm({ ...form, description })}
+        boldLabel={t('Fett')}
+        italicLabel={t('Kursiv')}
+        underlineLabel={t('Unterstrichen')}
+        strikeLabel={t('Durchgestrichen')}
+        bulletListLabel={t('Aufzählung')}
+        orderedListLabel={t('Nummerierte Liste')}
+        headingLabel={t('Überschrift')}
+      />
       <TextField label={t('Ausstattung')} value={form.facilities} onChange={(facilities) => setForm({ ...form, facilities })} />
       <label className="checkbox-row">
         <input type="checkbox" checked={form.accessible} onChange={(event) => setForm({ ...form, accessible: event.target.checked })} />

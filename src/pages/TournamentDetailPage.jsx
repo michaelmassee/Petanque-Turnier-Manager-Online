@@ -7,7 +7,7 @@ import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney } from '../lib/format.js';
 import { labelFor, formationLabel, hasOpenRegistration, formatTournamentStartTime, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { Button, Feedback, RequiredMark } from '../components/ui.jsx';
-import { TournamentDescription } from '../components/TournamentDescription.jsx';
+import { RichText } from '../components/RichText.jsx';
 import { StandalonePageHeader, OfflineNotice } from '../components/layout.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
 
@@ -161,7 +161,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
           )}
         </>
       )}
-      {tournament.description && <TournamentDescription description={tournament.description} />}
+      {tournament.description && <RichText value={tournament.description} />}
     </div>
   );
 }

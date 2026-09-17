@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { Button, EditDialog, ListToolbar, SelectField, TextArea, TextField } from '../components/ui.jsx';
+import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 
 const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '' };
-const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
+const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', logoUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
 
 function placeToForm(place) {
   return {
@@ -16,7 +17,7 @@ function placeToForm(place) {
 
 function clubToForm(club) {
   return {
-    name: club.name, description: club.description || '', websiteUrl: club.websiteUrl || '',
+    name: club.name, description: club.description || '', websiteUrl: club.websiteUrl || '', logoUrl: club.logoUrl || '',
     contactName: club.contactName || '', contactEmail: club.contactEmail || '', contactPhone: club.contactPhone || '',
   };
 }
@@ -316,8 +317,20 @@ export function ClubModerationPanel({ language }) {
         {editClub && (
           <form className="form" onSubmit={submitEditClub}>
             <TextField label={t('Name')} value={editClubForm.name} onChange={(name) => setEditClubForm({ ...editClubForm, name })} required minLength={2} />
-            <TextArea label={t('Beschreibung')} value={editClubForm.description} onChange={(description) => setEditClubForm({ ...editClubForm, description })} />
+            <RichTextEditor
+              label={t('Beschreibung')}
+              value={editClubForm.description}
+              onChange={(description) => setEditClubForm({ ...editClubForm, description })}
+              boldLabel={t('Fett')}
+              italicLabel={t('Kursiv')}
+              underlineLabel={t('Unterstrichen')}
+              strikeLabel={t('Durchgestrichen')}
+              bulletListLabel={t('Aufzählung')}
+              orderedListLabel={t('Nummerierte Liste')}
+              headingLabel={t('Überschrift')}
+            />
             <TextField label={t('Website')} value={editClubForm.websiteUrl} onChange={(websiteUrl) => setEditClubForm({ ...editClubForm, websiteUrl })} />
+            <TextField label={t('Logo-Bildlink')} type="url" placeholder="https://…" value={editClubForm.logoUrl} onChange={(logoUrl) => setEditClubForm({ ...editClubForm, logoUrl })} />
             <TextField label={t('Kontaktperson')} value={editClubForm.contactName} onChange={(contactName) => setEditClubForm({ ...editClubForm, contactName })} required minLength={2} />
             <TextField label={t('Kontakt-E-Mail')} type="email" value={editClubForm.contactEmail} onChange={(contactEmail) => setEditClubForm({ ...editClubForm, contactEmail })} required />
             <TextField label={t('Kontakt-Telefon')} value={editClubForm.contactPhone} onChange={(contactPhone) => setEditClubForm({ ...editClubForm, contactPhone })} />

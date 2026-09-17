@@ -1,4 +1,4 @@
-import { parseTournamentDescription } from '../lib/tournament-description.js';
+import { parseRichText } from '../lib/rich-text.js';
 
 function InlineText({ node }) {
   let content = node.text;
@@ -16,25 +16,25 @@ function Textblock({ node }) {
   return node.type === 'heading' ? <h2>{content}</h2> : <p>{content}</p>;
 }
 
-function DescriptionNode({ node }) {
+function RichTextNode({ node }) {
   if (node.type === 'paragraph' || node.type === 'heading') return <Textblock node={node} />;
   const List = node.type === 'orderedList' ? 'ol' : 'ul';
   return (
     <List start={node.type === 'orderedList' && node.attrs?.start > 1 ? node.attrs.start : undefined}>
       {node.content.map((item, itemIndex) => (
-        <li key={itemIndex}>{item.content.map((child, childIndex) => <DescriptionNode key={childIndex} node={child} />)}</li>
+        <li key={itemIndex}>{item.content.map((child, childIndex) => <RichTextNode key={childIndex} node={child} />)}</li>
       ))}
     </List>
   );
 }
 
-export function TournamentDescription({ description }) {
-  const document = parseTournamentDescription(description);
-  if (!document) return <p>{description}</p>;
+export function RichText({ value }) {
+  const document = parseRichText(value);
+  if (!document) return <p data-i18n-skip>{value}</p>;
 
   return (
-    <div className="tournament-description">
-      {document.content.map((node, index) => <DescriptionNode key={index} node={node} />)}
+    <div className="rich-text" data-i18n-skip>
+      {document.content.map((node, index) => <RichTextNode key={index} node={node} />)}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   isNewlyPublicTournament,
   isTournamentRoundNumberConflict,
   normalizePlayerListingPosition,
-  normalizeTournamentDescription,
+  normalizeRichText,
   normalizeTournamentInput as normalizeCoreTournamentInput,
   registrationOpenStatus as coreRegistrationOpenStatus,
   tournamentMatchesSavedSearch,
@@ -3449,7 +3449,7 @@ async function createTournamentReport(request, env, url) {
   const formationOther = rawFormation === 'andere';
   const formation = formationOther ? 'tete' : rawFormation;
   const licenseRequired = Boolean(body.licenseRequired);
-  const description = normalizeTournamentDescription(body.description);
+  const description = normalizeRichText(body.description, 'Ungültige Turnierbeschreibung');
   const websiteUrl = normalizePresentationUrl(body.websiteUrl);
   const contactName = text(body.contactName);
   const contactEmail = text(body.contactEmail).toLowerCase();
@@ -5036,7 +5036,7 @@ function clubInput(body) {
   if (contactName.length < 2) throw new HttpError(400, 'Der Kontaktname muss mindestens 2 Zeichen enthalten');
   const contactEmail = text(body.contactEmail);
   if (!isEmail(contactEmail)) throw new HttpError(400, 'Eine gültige Kontakt-E-Mail ist erforderlich');
-  return { name, description: nullableText(body.description), websiteUrl: normalizePresentationUrl(body.websiteUrl), logoUrl: normalizePresentationUrl(body.logoUrl), contactName, contactEmail, contactPhone: nullableText(body.contactPhone) };
+  return { name, description: normalizeRichText(body.description, 'Ungültige Vereinsbeschreibung'), websiteUrl: normalizePresentationUrl(body.websiteUrl), logoUrl: normalizePresentationUrl(body.logoUrl), contactName, contactEmail, contactPhone: nullableText(body.contactPhone) };
 }
 
 async function createClub(request, db, user) {
@@ -5082,7 +5082,7 @@ async function placeInput(body, countryCode) {
   const [geo] = await geocodeLocation(address, { countryCode, limit: 1 });
   if (!geo) throw new HttpError(400, 'Kein Ort gefunden.');
   const { lat: latitude, lng: longitude } = geo;
-  return { name, address, latitude, longitude, courtCount: nonNegativeInteger(body.courtCount), description: nullableText(body.description), accessible: Boolean(body.accessible), facilities: nullableText(body.facilities) };
+  return { name, address, latitude, longitude, courtCount: nonNegativeInteger(body.courtCount), description: normalizeRichText(body.description, 'Ungültige Platzbeschreibung'), accessible: Boolean(body.accessible), facilities: nullableText(body.facilities) };
 }
 
 async function createBoulePlace(request, db, clubId, user, countryCode) {
@@ -5183,7 +5183,7 @@ async function playerListingInput(body, countryCode) {
   if (type === 'tournament' && !eventDate) throw new HttpError(400, 'Bitte gib ein Datum an');
   const [geo] = await geocodeLocation(locationName, { countryCode, limit: 1 });
   if (!geo) throw new HttpError(400, 'Kein Ort gefunden.');
-  return { type, title, description: nullableText(body.description), locationName, latitude: geo.lat, longitude: geo.lng, eventDate: eventDate || null, playingPosition };
+  return { type, title, description: normalizeRichText(body.description, 'Ungültige Beschreibung'), locationName, latitude: geo.lat, longitude: geo.lng, eventDate: eventDate || null, playingPosition };
 }
 
 async function listPlayerListings(db, user, searchParams) {

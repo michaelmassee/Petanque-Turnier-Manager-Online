@@ -11,7 +11,7 @@ import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManag
 import { UserManagementPanel } from './pages/UserManagementPanel.jsx';
 import { ClubModerationPanel } from './pages/ClubModerationPanel.jsx';
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
-import { TournamentDescription } from './components/TournamentDescription.jsx';
+import { RichText } from './components/RichText.jsx';
 import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
 import { hasOnlineRegistrationAvailable, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
 
@@ -151,14 +151,14 @@ describe('Turnier melden', () => {
 
 describe('Öffentliche Turnierdetailseite', () => {
   it('zeigt formatierte Turnierbeschreibungen sicher an und lässt bisherigen Klartext unverändert', () => {
-    const { rerender } = render(<TournamentDescription description={'ptm-richtext:v1:{"type":"doc","content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Wichtig","marks":[{"type":"bold"},{"type":"underline"}]}]},{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"Punkt","marks":[{"type":"strike"}]}]}]}]}]}'} />);
+    const { rerender } = render(<RichText value={'ptm-richtext:v1:{"type":"doc","content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Wichtig","marks":[{"type":"bold"},{"type":"underline"}]}]},{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"Punkt","marks":[{"type":"strike"}]}]}]}]}]}'} />);
 
     expect(screen.getByText('Wichtig').tagName).toBe('STRONG');
     expect(screen.getByText('Wichtig').closest('h2')).toBeInTheDocument();
     expect(screen.getByText('Wichtig').closest('u')).toBeInTheDocument();
     expect(screen.getByText('Punkt').closest('s')).toBeInTheDocument();
     expect(screen.getByText('Punkt').closest('ul')).toBeInTheDocument();
-    rerender(<TournamentDescription description={'<strong>Bestehender Klartext</strong>'} />);
+    rerender(<RichText value={'<strong>Bestehender Klartext</strong>'} />);
     expect(screen.getByText('<strong>Bestehender Klartext</strong>')).toBeInTheDocument();
     expect(document.querySelector('strong')).toBeNull();
   });
