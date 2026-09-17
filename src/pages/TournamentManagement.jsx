@@ -433,7 +433,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
                 {t('Frage hinzufügen')}
               </Button>
             </div>
-            <p className="hint">{t('Die Checkboxen werden für jeden Teilnehmer freiwillig abgefragt.')}</p>
+            <p className="hint">{t('Jedem Teilnehmer werden Fragestellungen angeboten')}</p>
             {(form.registrationQuestions || []).map((question, index) => (
               <div className="form-grid" key={question.id}>
                 <TextField
