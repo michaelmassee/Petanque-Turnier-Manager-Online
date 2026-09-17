@@ -11,6 +11,7 @@ import { RADIUS_OPTIONS } from '../lib/constants.js';
 import { Button, TextArea, SelectField, DistanceBadge, EditDialog } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
+import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx';
 
@@ -140,6 +141,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
   const [searchRadiusKm, setSearchRadiusKm] = useState('25');
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState('');
+  const [visibleCount, setVisibleCount] = useState(10);
 
   async function load() {
     setLoading(true); setError('');
@@ -162,6 +164,12 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
     }
     return results;
   }, [listings, searchOrigin, searchRadiusKm]);
+
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [query, typeFilter, playingPositionFilter, searchOrigin, searchRadiusKm, listings]);
+
+  const displayedListings = visibleListings.slice(0, visibleCount);
 
   const mapped = useMemo(() => visibleListings.filter((listing) => listing.latitude !== null && listing.longitude !== null), [visibleListings]);
   const center = mapped.length ? [mapped[0].latitude, mapped[0].longitude] : FALLBACK_CENTER;
@@ -316,7 +324,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
           </div>
         ) : (
           <div className="places-list">
-            {visibleListings.map((listing) => (
+            {displayedListings.map((listing) => (
               <article className="panel place-card" key={listing.id}>
                 <div><h2 data-i18n-skip>{listing.title}</h2><p className="muted" data-i18n-skip>{listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {listing.locationName}{listing.eventDate ? ` · ${listing.eventDate}` : ''}</p></div>
                 {listing.description && <RichText value={listing.description} />}
@@ -331,6 +339,12 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
             ))}
           </div>
         )}
+
+        <InfiniteListLoadMore
+          hasMore={visibleListings.length > visibleCount}
+          onLoadMore={() => setVisibleCount((count) => count + 10)}
+          label={t('Weitere Mitspielgesuche laden')}
+        />
 
       </section>
 

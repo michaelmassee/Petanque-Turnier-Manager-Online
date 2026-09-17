@@ -7,6 +7,7 @@ import { filterRegistrations } from '../frontend-core.js';
 import { SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
 import { formatMoney } from '../lib/format.js';
+import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false }) {
   const { t } = useTranslation();
@@ -215,6 +216,8 @@ export function RegistrationsPanel({
   const filtered = filteredRegistrations.length !== registrations.length;
   const pendingRegistrations = filteredRegistrations.filter((registration) => registration.status === 'pending');
   const otherRegistrations = filteredRegistrations.filter((registration) => registration.status !== 'pending');
+  const visiblePendingRegistrations = useInfiniteList(pendingRegistrations);
+  const visibleOtherRegistrations = useInfiniteList(otherRegistrations);
 
   function rowProps(registration) {
     const busy = busyId === `confirm-${registration.id}` ? `confirm-${registration.id}` : busyId === `delete-${registration.id}` ? `delete-${registration.id}` : '';
@@ -261,18 +264,20 @@ export function RegistrationsPanel({
             <span className="counter">{pendingRegistrations.length}</span>
             <Button loading={busyId === 'confirmAll'} disabled={Boolean(busyId) && busyId !== 'confirmAll'} onClick={onConfirmAll}>{t('Alle bestätigen')}</Button>
           </div>
-          {pendingRegistrations.map((registration) => (
+          {visiblePendingRegistrations.items.map((registration) => (
             <RegistrationRow key={registration.id} registration={registration} tournament={tournament} showConfirm onConfirm={onConfirm} onEdit={onEdit} onDelete={onDelete} {...rowProps(registration)} />
           ))}
+          <InfiniteListLoadMore hasMore={visiblePendingRegistrations.hasMore} onLoadMore={visiblePendingRegistrations.loadMore} label={t('Weitere Einträge laden')} />
         </section>
       )}
       {(otherRegistrations.length > 0 || (filteredRegistrations.length === 0 && pendingRegistrations.length === 0)) && (
         <section className="user-list" aria-label={t('Weitere Anmeldungen')}>
           {pendingRegistrations.length > 0 && <div className="section-title"><h3>{t('Weitere Anmeldungen')}</h3><span className="counter">{otherRegistrations.length}</span></div>}
-          {otherRegistrations.map((registration) => (
+          {visibleOtherRegistrations.items.map((registration) => (
             <RegistrationRow key={registration.id} registration={registration} tournament={tournament} onEdit={onEdit} onDelete={onDelete} {...rowProps(registration)} />
           ))}
           {filteredRegistrations.length === 0 && <p className="muted">{t('Keine Anmeldungen gefunden.')}</p>}
+          <InfiniteListLoadMore hasMore={visibleOtherRegistrations.hasMore} onLoadMore={visibleOtherRegistrations.loadMore} label={t('Weitere Einträge laden')} />
         </section>
       )}
     </div>

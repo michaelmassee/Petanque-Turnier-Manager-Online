@@ -5,6 +5,7 @@ import { Button, TextField, TextArea, EditDialog } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
+import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', logoUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
 const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '', separateFromClub: false };
@@ -20,6 +21,30 @@ function placeToForm(place) {
     name: place.name, address: place.address, latitude: place.latitude, longitude: place.longitude, locationConfirmed: true,
     courtCount: String(place.courtCount ?? ''), description: place.description || '', accessible: Boolean(place.accessible), facilities: place.facilities || '', separateFromClub: Boolean(place.separateFromClub),
   };
+}
+
+function ClubPlacesList({ places, t, deletingPlaceId, onEdit, onDelete }) {
+  const visiblePlaces = useInfiniteList(places);
+  return (
+    <div className="user-list club-places-list">
+      <h3>{t('Vereins-Spielflächen dieses Vereins')}</h3>
+      {visiblePlaces.items.map((place) => (
+        <article className="data-row" key={place.id}>
+          <div>
+            <strong data-i18n-skip>{place.name}</strong>
+            <span data-i18n-skip className={place.status === 'published' ? 'status registration-confirmed' : 'status registration-pending'}>
+              {statusLabel(place.status, t)} · {place.address}
+            </span>
+          </div>
+          <div className="row-actions">
+            <Button variant="secondary" disabled={Boolean(deletingPlaceId)} onClick={() => onEdit(place)}>{t('Bearbeiten')}</Button>
+            <Button variant="danger" loading={deletingPlaceId === place.id} onClick={() => onDelete(place)}>{t('Löschen')}</Button>
+          </div>
+        </article>
+      ))}
+      <InfiniteListLoadMore hasMore={visiblePlaces.hasMore} onLoadMore={visiblePlaces.loadMore} label={t('Weitere Einträge laden')} />
+    </div>
+  );
 }
 
 function clubToForm(club) {
@@ -154,6 +179,9 @@ function MyClubsPanel({ language }) {
     } catch (err) { setError(err.message); } finally { setPlaceSaving(false); }
   }
 
+  const visibleClubs = useInfiniteList(clubs);
+  const visibleMyPlaces = useInfiniteList(myPlaces);
+
   return (
     <>
       <div className="panel">
@@ -167,7 +195,7 @@ function MyClubsPanel({ language }) {
           <p className="muted">{t('Du verwaltest noch keinen Verein.')}</p>
         ) : (
           <div className="user-list">
-            {clubs.map((club) => (
+            {visibleClubs.items.map((club) => (
               <div key={club.id}>
                 <article className="data-row">
                   <div>
@@ -185,28 +213,13 @@ function MyClubsPanel({ language }) {
                   </div>
                 </article>
                 {(clubPlaces[club.id] || []).length > 0 && (
-                  <div className="user-list club-places-list">
-                    <h3>{t('Vereins-Spielflächen dieses Vereins')}</h3>
-                    {clubPlaces[club.id].map((place) => (
-                      <article className="data-row" key={place.id}>
-                        <div>
-                          <strong data-i18n-skip>{place.name}</strong>
-                          <span data-i18n-skip className={place.status === 'published' ? 'status registration-confirmed' : 'status registration-pending'}>
-                            {statusLabel(place.status, t)} · {place.address}
-                          </span>
-                        </div>
-                        <div className="row-actions">
-                          <Button variant="secondary" disabled={Boolean(deletingPlaceId)} onClick={() => openEditPlace(place)}>{t('Bearbeiten')}</Button>
-                          <Button variant="danger" loading={deletingPlaceId === place.id} onClick={() => removePlace(place)}>{t('Löschen')}</Button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
+                  <ClubPlacesList places={clubPlaces[club.id]} t={t} deletingPlaceId={deletingPlaceId} onEdit={openEditPlace} onDelete={removePlace} />
                 )}
               </div>
             ))}
           </div>
         )}
+        <InfiniteListLoadMore hasMore={visibleClubs.hasMore} onLoadMore={visibleClubs.loadMore} label={t('Weitere Einträge laden')} />
       </div>
 
       {!loading && myPlaces.length > 0 && (
@@ -215,7 +228,7 @@ function MyClubsPanel({ language }) {
             <h2>{t('Meine gemeldeten Bouleplätze')}</h2>
           </div>
           <div className="user-list">
-            {myPlaces.map((place) => (
+            {visibleMyPlaces.items.map((place) => (
               <article className="data-row" key={place.id}>
                 <div>
                   <strong data-i18n-skip>{place.name}</strong>
@@ -234,6 +247,7 @@ function MyClubsPanel({ language }) {
               </article>
             ))}
           </div>
+          <InfiniteListLoadMore hasMore={visibleMyPlaces.hasMore} onLoadMore={visibleMyPlaces.loadMore} label={t('Weitere Einträge laden')} />
         </div>
       )}
 

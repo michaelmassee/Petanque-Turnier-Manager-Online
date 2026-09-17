@@ -4,6 +4,7 @@ import { authenticatedApi } from '../lib/api.js';
 import { Button, EditDialog, ListToolbar, SelectField, TextArea, TextField } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
+import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '' };
 const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', logoUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
@@ -147,6 +148,10 @@ export function ClubModerationPanel({ language }) {
   const filteredClubs = term
     ? clubs.filter((c) => `${c.name} ${c.ownerName} ${c.ownerEmail}`.toLowerCase().includes(term))
     : clubs;
+  const visibleRequests = useInfiniteList(filteredRequests);
+  const visiblePlaces = useInfiniteList(filteredPlaces);
+  const visiblePlaceReports = useInfiniteList(filteredPlaceReports);
+  const visibleClubs = useInfiniteList(filteredClubs);
 
   async function submitEditPlace(event) {
     event.preventDefault();
@@ -208,7 +213,7 @@ export function ClubModerationPanel({ language }) {
             </div>
             <div className="user-list">
               {filteredRequests.length === 0 && <p className="muted">{t('Keine offenen Vereinsanfragen.')}</p>}
-              {filteredRequests.map((request) => {
+              {visibleRequests.items.map((request) => {
                 const id = `approve-${request.club_id}-${request.user_id}`;
                 return (
                   <article className="data-row" key={id}>
@@ -222,6 +227,7 @@ export function ClubModerationPanel({ language }) {
                   </article>
                 );
               })}
+              <InfiniteListLoadMore hasMore={visibleRequests.hasMore} onLoadMore={visibleRequests.loadMore} label={t('Weitere Einträge laden')} />
             </div>
           </div>
 
@@ -232,7 +238,7 @@ export function ClubModerationPanel({ language }) {
             </div>
             <div className="user-list">
               {filteredPlaces.length === 0 && <p className="muted">{t('Keine offenen Bouleplätze.')}</p>}
-              {filteredPlaces.map((place) => {
+              {visiblePlaces.items.map((place) => {
                 const id = `publish-${place.id}`;
                 return (
                   <article className="data-row" key={place.id}>
@@ -246,6 +252,7 @@ export function ClubModerationPanel({ language }) {
                   </article>
                 );
               })}
+              <InfiniteListLoadMore hasMore={visiblePlaces.hasMore} onLoadMore={visiblePlaces.loadMore} label={t('Weitere Einträge laden')} />
             </div>
           </div>
 
@@ -256,7 +263,7 @@ export function ClubModerationPanel({ language }) {
             </div>
             <div className="user-list">
               {filteredPlaceReports.length === 0 && <p className="muted">{t('Keine gemeldeten Bouleplätze.')}</p>}
-              {filteredPlaceReports.map((place) => (
+              {visiblePlaceReports.items.map((place) => (
                 <article className="data-row" key={place.id}>
                   <div>
                     <strong data-i18n-skip>{place.name}</strong>
@@ -271,6 +278,7 @@ export function ClubModerationPanel({ language }) {
                   </div>
                 </article>
               ))}
+              <InfiniteListLoadMore hasMore={visiblePlaceReports.hasMore} onLoadMore={visiblePlaceReports.loadMore} label={t('Weitere Einträge laden')} />
             </div>
           </div>
 
@@ -281,7 +289,7 @@ export function ClubModerationPanel({ language }) {
             </div>
             <div className="user-list">
               {filteredClubs.length === 0 && <p className="muted">{t('Keine Vereine vorhanden.')}</p>}
-              {filteredClubs.map((club) => {
+              {visibleClubs.items.map((club) => {
                 const statusId = `club-status-${club.id}`;
                 const deleteId = `club-delete-${club.id}`;
                 return (
@@ -303,6 +311,7 @@ export function ClubModerationPanel({ language }) {
                   </article>
                 );
               })}
+              <InfiniteListLoadMore hasMore={visibleClubs.hasMore} onLoadMore={visibleClubs.loadMore} label={t('Weitere Einträge laden')} />
             </div>
           </div>
         </>

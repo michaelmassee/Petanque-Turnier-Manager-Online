@@ -6,6 +6,7 @@ import { PASSWORD_STRENGTH_HINT, PASSWORD_STRENGTH_ERROR, isPasswordStrong } fro
 import { roleName, translatedOptions } from '../lib/domain.js';
 import { filterUsers } from '../frontend-core.js';
 import { SelectField, TextField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
+import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 const USER_STATUS_FILTERS = [
   { value: '', label: 'Alle Status' },
@@ -63,6 +64,7 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
 
   const roleOptions = [{ value: '', label: t('Alle Rollen') }, ...translatedOptions(ROLES)];
   const isFiltered = filtered.length !== users.length;
+  const visibleUsers = useInfiniteList(filtered);
 
   function resetFilters() {
     setQuery('');
@@ -175,7 +177,7 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
         />
         {loading ? <p className="muted">{t('Lädt …')}</p> : (
           <div className="user-list">
-            {filtered.map((user) => (
+            {visibleUsers.items.map((user) => (
               <UserRow
                 key={user.id}
                 user={user}
@@ -190,6 +192,7 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
             {filtered.length === 0 && <p className="muted">{t('Keine Benutzer gefunden.')}</p>}
           </div>
         )}
+        <InfiniteListLoadMore hasMore={visibleUsers.hasMore} onLoadMore={visibleUsers.loadMore} label={t('Weitere Einträge laden')} />
       </div>
 
       <EditDialog

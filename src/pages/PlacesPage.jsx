@@ -11,6 +11,7 @@ import { RADIUS_OPTIONS } from '../lib/constants.js';
 import { Button, ClubBadge, DistanceBadge, SelectField } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
+import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx';
 
@@ -53,6 +54,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   const [searchRadiusKm, setSearchRadiusKm] = useState('25');
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState('');
+  const [visibleCount, setVisibleCount] = useState(10);
 
   async function load() {
     setLoading(true); setError('');
@@ -73,6 +75,12 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
     }
     return results;
   }, [places, favoritesOnly, searchOrigin, searchRadiusKm]);
+
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [query, favoritesOnly, searchOrigin, searchRadiusKm, places]);
+
+  const displayedPlaces = visiblePlaces.slice(0, visibleCount);
 
   const mapped = useMemo(() => visiblePlaces.filter((place) => place.latitude !== null && place.longitude !== null && (place.placeType !== 'club_playing_area' || place.separateFromClub)), [visiblePlaces]);
   const center = mapped.length ? [mapped[0].latitude, mapped[0].longitude] : FALLBACK_CENTER;
@@ -232,7 +240,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         </div>
       ) : (
         <div className="places-list">
-          {visiblePlaces.map((place) => (
+          {displayedPlaces.map((place) => (
             <article className="panel place-card" id={place.id} key={place.id}>
               <div><h2 data-i18n-skip>{place.name}</h2><p className="muted" data-i18n-skip>{place.clubName ? `${place.clubName} · ` : ''}{place.address}</p></div>
               {place.description && <RichText value={place.description} />}
@@ -249,6 +257,11 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
           ))}
         </div>
       )}
+      <InfiniteListLoadMore
+        hasMore={visiblePlaces.length > visibleCount}
+        onLoadMore={() => setVisibleCount((count) => count + 10)}
+        label={t('Weitere Bouleplätze laden')}
+      />
     </section>
   </main>;
 }

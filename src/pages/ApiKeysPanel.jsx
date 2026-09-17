@@ -5,6 +5,7 @@ import { formatDateTime } from '../lib/format.js';
 import { API_KEY_STATUS_LABELS } from '../lib/domain.js';
 import { filterApiKeys } from '../frontend-core.js';
 import { Button, ListToolbar, EditDialog, SelectField, TextField } from '../components/ui.jsx';
+import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 const API_KEY_STATUS_FILTERS = [
   { value: '', label: 'Alle Status' },
@@ -23,6 +24,7 @@ export function OwnApiKeysPanel() {
   const [panelError, setPanelError] = useState('');
   const [revealedSecret, setRevealedSecret] = useState(null);
   const [actionId, setActionId] = useState('');
+  const visibleApiKeys = useInfiniteList(apiKeys);
 
   async function loadOwnKeys() {
     try {
@@ -110,7 +112,7 @@ export function OwnApiKeysPanel() {
           </tr>
         </thead>
         <tbody>
-          {apiKeys.map((key) => (
+          {visibleApiKeys.items.map((key) => (
             <tr key={key.id}>
               <td>{key.label}</td>
               <td>{API_KEY_STATUS_LABELS[key.status] || key.status}</td>
@@ -132,6 +134,7 @@ export function OwnApiKeysPanel() {
           )}
         </tbody>
       </table>
+      <InfiniteListLoadMore hasMore={visibleApiKeys.hasMore} onLoadMore={visibleApiKeys.loadMore} label={t('Weitere Einträge laden')} />
     </div>
   );
 }
@@ -272,6 +275,7 @@ function ApiKeysPanel({ isAdmin }) {
   }
 
   const userOptions = users.map((user) => ({ value: user.id, label: `${user.firstName} ${user.lastName} (${user.email})` }));
+  const visibleAllApiKeys = useInfiniteList(filteredApiKeys);
 
   return (
     <>
@@ -312,7 +316,7 @@ function ApiKeysPanel({ isAdmin }) {
               </tr>
             </thead>
             <tbody>
-              {filteredApiKeys.map((key) => (
+              {visibleAllApiKeys.items.map((key) => (
                 <tr key={key.id}>
                   <td>
                     {key.userName} ({key.userEmail})
@@ -346,6 +350,7 @@ function ApiKeysPanel({ isAdmin }) {
               )}
             </tbody>
           </table>
+          <InfiniteListLoadMore hasMore={visibleAllApiKeys.hasMore} onLoadMore={visibleAllApiKeys.loadMore} label={t('Weitere Einträge laden')} />
         </div>
       )}
 

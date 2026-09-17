@@ -8,6 +8,7 @@ import { TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } fro
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { authenticatedApi } from '../lib/api.js';
+import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmin }) {
   const { t } = useTranslation();
@@ -567,6 +568,7 @@ export function TournamentList({
   const { t } = useTranslation();
   const filtered = tournaments.length !== totalTournaments;
   const [shareError, setShareError] = useState('');
+  const visibleTournaments = useInfiniteList(tournaments);
 
   async function shareTournament(tournament) {
     setBusyId(`share-${tournament.id}`);
@@ -616,7 +618,7 @@ export function TournamentList({
       />
       {shareError && <p className="feedback error">{shareError}</p>}
       <div className="user-list">
-        {tournaments.map((tournament) => (
+        {visibleTournaments.items.map((tournament) => (
           <article className={`data-row tournament-row ${selectedId === tournament.id ? 'selected' : ''}`} key={tournament.id}>
             <button className="row-main" type="button" onClick={() => onSelect(tournament.id)}>
               <strong data-i18n-skip>{tournament.name}</strong>
@@ -683,6 +685,7 @@ export function TournamentList({
         ))}
         {tournaments.length === 0 && <p className="muted">{t('Keine Turniere gefunden.')}</p>}
       </div>
+      <InfiniteListLoadMore hasMore={visibleTournaments.hasMore} onLoadMore={visibleTournaments.loadMore} label={t('Weitere Einträge laden')} />
     </div>
   );
 }

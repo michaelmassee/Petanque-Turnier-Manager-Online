@@ -5,6 +5,7 @@ import { SelectField, TextField, Button, Feedback } from '../components/ui.jsx';
 import { checkRoundRequirements } from '../lib/pairing/index.js';
 import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
 import { labelFor } from '../lib/domain.js';
+import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
 // Systemwissen: 'minPlayers' trägt die Mindestanzahl als Zahl statt fest im Satz
@@ -105,6 +106,7 @@ export default function TournamentPlayManagement({ tournaments }) {
   // nachdem hier der Status auf "Läuft" gesetzt wurde - deshalb lokal vormerken,
   // welche Turniere in dieser Sitzung bereits gestartet wurden.
   const [startedTournamentIds, setStartedTournamentIds] = useState(() => new Set());
+  const visibleConfirmedRegistrations = useInfiniteList(confirmedRegistrations);
 
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
   const selectedTournamentStatus = selectedTournament
@@ -347,13 +349,14 @@ export default function TournamentPlayManagement({ tournaments }) {
           </form>
           <p className="hint">{t('Neue Spieler sind sofort für die nächste Runde aktiv.')}</p>
           <div className="round-participant-list">
-            {confirmedRegistrations.map((registration) => (
+            {visibleConfirmedRegistrations.items.map((registration) => (
               <label className="round-participant-row" key={registration.id}>
                 <span className={registration.active ? '' : 'muted'} data-i18n-skip>{playerLabel(registration)}</span>
                 <input type="checkbox" checked={registration.active} disabled={busy} onChange={(event) => handleToggleActive(registration.id, event.target.checked)} />
               </label>
             ))}
           </div>
+          <InfiniteListLoadMore hasMore={visibleConfirmedRegistrations.hasMore} onLoadMore={visibleConfirmedRegistrations.loadMore} label={t('Weitere Einträge laden')} />
         </details>
       )}
 

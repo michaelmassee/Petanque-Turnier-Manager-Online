@@ -4,6 +4,7 @@ import { authenticatedApi } from '../lib/api.js';
 import { Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { PlayerListingFields } from '../components/PlayerListingFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
+import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 const EMPTY_LISTING_FORM = { type: 'tournament', title: '', description: '', playingPosition: 'egal', locationName: '', latitude: null, longitude: null, locationConfirmed: false, eventDate: '' };
 
@@ -98,6 +99,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
   }
 
   const filterActive = Boolean(query.trim()) || Boolean(typeFilter);
+  const visibleListings = useInfiniteList(filtered);
 
   return (
     <div className="panel">
@@ -120,7 +122,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
         <p className="muted">{listings.length === 0 ? t('Du hast noch kein Mitspielgesuch veröffentlicht.') : t('Keine Mitspielgesuche gefunden.')}</p>
       ) : (
         <div className="user-list">
-          {filtered.map((listing) => (
+          {visibleListings.items.map((listing) => (
             <article className="data-row" key={listing.id}>
               <div>
                 <strong data-i18n-skip>{listing.title}</strong>
@@ -138,6 +140,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
           ))}
         </div>
       )}
+      <InfiniteListLoadMore hasMore={visibleListings.hasMore} onLoadMore={visibleListings.loadMore} label={t('Weitere Mitspielgesuche laden')} />
 
       <EditDialog open={dialogOpen} title={editId ? t('Mitspielgesuch bearbeiten') : t('Mitspielgesuch erstellen')} error={error} onClose={() => setDialogOpen(false)}>
         <form className="form" onSubmit={submit}>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { Button, Feedback, SelectField } from '../components/ui.jsx';
+import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 const IMPORT_STATUS_OPTIONS = [
   { value: 'all', label: 'Alle Termine' },
@@ -38,6 +39,7 @@ export function PetanqueAktuellImportPanel() {
   const visibleTournaments = useMemo(() => tournaments.filter((tournament) => (
     importStatus === 'all' || (importStatus === 'imported' ? tournament.imported : !tournament.imported)
   )), [tournaments, importStatus]);
+  const visibleImportTournaments = useInfiniteList(visibleTournaments);
 
   function toggle(key) {
     setSelected((current) => {
@@ -97,7 +99,7 @@ export function PetanqueAktuellImportPanel() {
               <Button disabled={selected.size === 0 || busy} loading={busy} onClick={handleImport}>{t('Ausgewählte Termine importieren')}</Button>
             </div>
             <div className="user-list import-list">
-              {visibleTournaments.map((tournament) => (
+              {visibleImportTournaments.items.map((tournament) => (
                 <label className="data-row" key={tournament.externalKey}>
                   <input type="checkbox" checked={selected.has(tournament.externalKey)} onChange={() => toggle(tournament.externalKey)} disabled={tournament.imported || busy} />
                   <span>
@@ -111,6 +113,7 @@ export function PetanqueAktuellImportPanel() {
               ))}
               {visibleTournaments.length === 0 && <p className="muted">{t('Keine künftigen Termine gefunden.')}</p>}
             </div>
+            <InfiniteListLoadMore hasMore={visibleImportTournaments.hasMore} onLoadMore={visibleImportTournaments.loadMore} label={t('Weitere Turniere laden')} />
           </>
         )}
       </div>

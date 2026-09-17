@@ -13,6 +13,7 @@ import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentIma
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
+import { InfiniteListLoadMore } from './components/InfiniteListLoadMore.jsx';
 import { AppHeader, PostboxControl, PushMigrationNotice, SearchMenuControl, SavedSearchesControl, AuthModal, StandalonePageHeader, InstallAppButton, OfflineNotice } from './components/layout.jsx';
 import { AuthShell, LanguageSelect, SetupForm, LoginForm, RegisterForm, RegisterSuccessNotice, ForgotPasswordForm, ResendVerificationForm, ResetPasswordForm, VerifyEmailForm, CancelRegistrationForm } from './auth/AuthForms.jsx';
 import { isOnlinePlayable } from './lib/pairing/index.js';
@@ -2124,28 +2125,6 @@ function HomeTournaments({
   const nextTournament = tournaments[0] || null;
   const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);
   const resultsRef = useRef(null);
-  const loadMoreRef = useRef(onLoadMore);
-  const loadMoreTriggerRef = useRef(null);
-
-  useEffect(() => {
-    loadMoreRef.current = onLoadMore;
-  }, [onLoadMore]);
-
-  useEffect(() => {
-    const trigger = loadMoreTriggerRef.current;
-    if (!hasMore || !trigger || !('IntersectionObserver' in window)) {
-      return undefined;
-    }
-
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        loadMoreRef.current();
-      }
-    }, { rootMargin: '240px 0px' });
-    observer.observe(trigger);
-    return () => observer.disconnect();
-  }, [hasMore, tournaments.length]);
-
   return (
     <section className="home-tournaments">
       <div className="home-finder">
@@ -2231,14 +2210,7 @@ function HomeTournaments({
         ))}
       </div>
 
-      {hasMore && (
-        <div className="load-more-wrap">
-          <div className="load-more-trigger" ref={loadMoreTriggerRef} aria-hidden="true" />
-          <Button variant="secondary" onClick={onLoadMore}>
-            {t('Weitere Turniere laden')}
-          </Button>
-        </div>
-      )}
+      <InfiniteListLoadMore hasMore={hasMore} onLoadMore={onLoadMore} label={t('Weitere Turniere laden')} />
 
     </section>
   );
