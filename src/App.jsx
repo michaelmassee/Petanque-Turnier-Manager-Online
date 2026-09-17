@@ -2124,6 +2124,27 @@ function HomeTournaments({
   const nextTournament = tournaments[0] || null;
   const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);
   const resultsRef = useRef(null);
+  const loadMoreRef = useRef(onLoadMore);
+  const loadMoreTriggerRef = useRef(null);
+
+  useEffect(() => {
+    loadMoreRef.current = onLoadMore;
+  }, [onLoadMore]);
+
+  useEffect(() => {
+    const trigger = loadMoreTriggerRef.current;
+    if (!hasMore || !trigger || !('IntersectionObserver' in window)) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        loadMoreRef.current();
+      }
+    }, { rootMargin: '240px 0px' });
+    observer.observe(trigger);
+    return () => observer.disconnect();
+  }, [hasMore, tournaments.length]);
 
   return (
     <section className="home-tournaments">
@@ -2212,6 +2233,7 @@ function HomeTournaments({
 
       {hasMore && (
         <div className="load-more-wrap">
+          <div className="load-more-trigger" ref={loadMoreTriggerRef} aria-hidden="true" />
           <Button variant="secondary" onClick={onLoadMore}>
             {t('Weitere Turniere laden')}
           </Button>

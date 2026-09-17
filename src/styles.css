@@ -1272,6 +1272,12 @@ a.left-panel-link {
   margin-top: 18px;
 }
 
+.load-more-trigger {
+  flex: 0 0 1px;
+  width: 1px;
+  height: 1px;
+}
+
 .filter-panel {
   display: grid;
   gap: 12px;
