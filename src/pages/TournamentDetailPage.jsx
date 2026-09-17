@@ -119,7 +119,6 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
           </p>
         </>
       )}
-      {tournament.description && <TournamentDescription description={tournament.description} />}
       {!isCalendarEntry && (
         <>
           {(tournament.feeTiers || []).map((tier) => tier.active !== false && (
@@ -162,6 +161,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
           )}
         </>
       )}
+      {tournament.description && <TournamentDescription description={tournament.description} />}
     </div>
   );
 }

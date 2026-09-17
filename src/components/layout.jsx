@@ -423,6 +423,15 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
           </svg>
           {t('Boule-Treff')}
         </button>
+        <a
+          className="left-panel-link"
+          href="https://github.com/michaelmassee/Petanque-Turnier-Manager-Online/wiki"
+          target="_blank"
+          rel="noreferrer"
+          onClick={closeLeftPanel}
+        >
+          {t('Wiki')}
+        </a>
         {isAdmin && onSelectAdminDashboard && (
           <button
             className="left-panel-link"

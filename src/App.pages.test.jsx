@@ -93,6 +93,32 @@ describe('Kopfzeile', () => {
     expect(scrollArea).toContainElement(screen.getByRole('button', { name: 'Postfach' }));
     expect(scrollArea).toContainElement(screen.getByRole('button', { name: 'Menü öffnen' }));
   });
+
+  it('verlinkt die Wiki zwischen Boule-Treff und Admin-Dashboard in der Bereichsleiste', () => {
+    render(
+      <AppHeader
+        heading="Turniere"
+        language="de"
+        setLanguage={() => {}}
+        menuOpen={false}
+        onToggleMenu={() => {}}
+        onCloseMenu={() => {}}
+        isAdmin
+        onSelectAdminDashboard={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bereiche öffnen' }));
+
+    const wikiLink = screen.getByRole('link', { name: 'Wiki' });
+    expect(wikiLink).toHaveAttribute('href', 'https://github.com/michaelmassee/Petanque-Turnier-Manager-Online/wiki');
+    expect(wikiLink).toHaveAttribute('target', '_blank');
+    expect(wikiLink).toHaveAttribute('rel', 'noreferrer');
+
+    const menuItems = Array.from(wikiLink.closest('.left-panel').children);
+    expect(menuItems.indexOf(screen.getByRole('button', { name: 'Boule-Treff' }))).toBeLessThan(menuItems.indexOf(wikiLink));
+    expect(menuItems.indexOf(wikiLink)).toBeLessThan(menuItems.indexOf(screen.getByRole('button', { name: 'Admin Dashboard' })));
+  });
 });
 
 describe('Turnier melden', () => {
