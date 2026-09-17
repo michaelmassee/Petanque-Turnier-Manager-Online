@@ -1586,6 +1586,12 @@ a.left-panel-link {
   margin-top: 8px;
 }
 
+.form-section {
+  border: 1px solid #e2e7f0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
 .form-section-header {
   display: flex;
   align-items: center;

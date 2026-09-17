@@ -391,7 +391,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             <TextField label={t('Startgeld')} inputMode="decimal" value={form.entryFeeAmount} onChange={(entryFeeAmount) => setForm({ ...form, entryFeeAmount })} />
             <SelectField label={t('Währung')} value={form.currency} onChange={(currency) => setForm({ ...form, currency })} options={currencyOptions(language)} />
           </div>
-          <div className="form">
+          <div className="form form-section">
             <div className="section-title">
               <h3>{t('Ermäßigte Startgelder')}</h3>
               <Button
@@ -421,7 +421,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               </div>
             ))}
           </div>
-          <div className="form">
+          <div className="form form-section">
             <div className="section-title">
               <h3>{t('Zusätzliche Teilnehmerfragen')}</h3>
               <Button
