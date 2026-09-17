@@ -8,7 +8,7 @@ import { StandalonePageHeader } from '../components/layout.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', logoUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
-const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '', separateFromClub: false };
+const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '' };
 
 function statusLabel(status, t) {
   if (status === 'published') return t('Veröffentlicht');
@@ -19,7 +19,7 @@ function statusLabel(status, t) {
 function placeToForm(place) {
   return {
     name: place.name, address: place.address, latitude: place.latitude, longitude: place.longitude, locationConfirmed: true,
-    courtCount: String(place.courtCount ?? ''), description: place.description || '', accessible: Boolean(place.accessible), facilities: place.facilities || '', separateFromClub: Boolean(place.separateFromClub),
+    courtCount: String(place.courtCount ?? ''), description: place.description || '', accessible: Boolean(place.accessible), facilities: place.facilities || '',
   };
 }
 
@@ -280,7 +280,7 @@ function MyClubsPanel({ language }) {
 
       <EditDialog open={placeDialogOpen} title={editPlaceId ? (placeClubId ? t('Vereins-Spielfläche bearbeiten') : t('Bouleplatz bearbeiten')) : t('Vereins-Spielfläche für diesen Verein hinzufügen')} error={error} onClose={() => setPlaceDialogOpen(false)}>
         <form className="form" onSubmit={submitPlace}>
-          <BoulePlaceFields form={placeForm} setForm={setPlaceForm} language={language} isClubPlayingArea={Boolean(placeClubId)} />
+          <BoulePlaceFields form={placeForm} setForm={setPlaceForm} language={language} />
           <div className="dialog-actions">
             <Button variant="secondary" type="button" onClick={() => setPlaceDialogOpen(false)}>{t('Abbrechen')}</Button>
             <Button type="submit" loading={placeSaving}>{editPlaceId ? t('Speichern') : t('Anlegen')}</Button>

@@ -82,7 +82,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
 
   const displayedPlaces = visiblePlaces.slice(0, visibleCount);
 
-  const mapped = useMemo(() => visiblePlaces.filter((place) => place.latitude !== null && place.longitude !== null && (place.placeType !== 'club_playing_area' || place.separateFromClub)), [visiblePlaces]);
+  const mapped = useMemo(() => visiblePlaces.filter((place) => place.latitude !== null && place.longitude !== null), [visiblePlaces]);
   const center = mapped.length ? [mapped[0].latitude, mapped[0].longitude] : FALLBACK_CENTER;
 
   async function toggleLike(place) {
