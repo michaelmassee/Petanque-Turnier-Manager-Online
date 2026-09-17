@@ -1,4 +1,7 @@
 {
+  "Die App konnte nicht wiederhergestellt werden.": "The app could not be recovered.",
+  "Bitte starte die App erneut.": "Please restart the app.",
+  "App neu starten": "Restart app",
   "Aktueller Owner:": "Current owner:",
   "An diesen Empfänger kann keine Nachricht gesendet werden": "A message cannot be sent to this recipient",
   "API key required": "API key required",

@@ -1,4 +1,7 @@
 {
+  "Die App konnte nicht wiederhergestellt werden.": "L’application n’a pas pu être rétablie.",
+  "Bitte starte die App erneut.": "Veuillez redémarrer l’application.",
+  "App neu starten": "Redémarrer l’application",
   "Aktueller Owner:": "Propriétaire actuel :",
   "An diesen Empfänger kann keine Nachricht gesendet werden": "Il n’est pas possible d’envoyer un message à ce destinataire",
   "API key required": "Clé API requise",
