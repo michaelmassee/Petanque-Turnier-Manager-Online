@@ -1327,6 +1327,18 @@ export default {
         return json({ tournament: toPublicTournament(updated, session.user) });
       }
 
+      const tournamentDuplicateMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/duplicate$/);
+      if (tournamentDuplicateMatch && request.method === 'POST') {
+        const session = await requireManagerAuth(request, env.DB);
+        const tournament = await getTournamentById(env.DB, tournamentDuplicateMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        assertCanManageTournament(tournament, session.user);
+        const duplicate = await duplicateTournament(env.DB, tournament, session.user);
+        return json({ tournament: toPublicTournament(duplicate, session.user) }, 201);
+      }
+
       const confirmPendingRegistrationsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registrations\/confirm-pending$/);
       if (confirmPendingRegistrationsMatch && request.method === 'POST') {
         const session = await requireManagerAuth(request, env.DB);
@@ -3088,6 +3100,48 @@ async function createTournament(request, env, user) {
     await notifySavedSearchesForPublishedTournament(env, created);
   }
   return json({ tournament: toPublicTournament(created, user) }, 201);
+}
+
+// Kopiert Eckdaten und Bearbeitungsrechte eines Turniers in ein neues Turnier im Status
+// "Entwurf" - bewusst ohne Anmeldungen, damit die Kopie unabhängig vom Original startet.
+async function duplicateTournament(db, existing, actingUser) {
+  const baseName = existing.name.replace(/ Kopie #\d+$/, '');
+  const siblings = await db.prepare('SELECT name FROM tournaments WHERE owner_id = ?').bind(existing.owner_id).all();
+  const copyPattern = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} Kopie #(\\d+)$`);
+  let nextNumber = 1;
+  for (const row of siblings.results || []) {
+    const match = row.name.match(copyPattern);
+    if (match) nextNumber = Math.max(nextNumber, Number(match[1]) + 1);
+  }
+  const name = `${baseName} Kopie #${nextNumber}`;
+
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  await db
+    .prepare(
+      `INSERT INTO tournaments (
+        id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
+        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, contact_name, contact_email, contact_phone,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
+        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, created_at, updated_at
+      )
+      SELECT ?, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
+        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, contact_name, contact_email, contact_phone,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
+        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, ?, ?
+      FROM tournaments WHERE id = ?`,
+    )
+    .bind(id, actingUser.id, name, now, now, existing.id)
+    .run();
+
+  for (const editorId of tournamentEditorIds(existing)) {
+    await db
+      .prepare('INSERT INTO tournament_editors (id, tournament_id, user_id, granted_by, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), id, editorId, actingUser.id, now)
+      .run();
+  }
+
+  return await getTournamentById(db, id);
 }
 
 async function fetchPetanqueAktuellCalendar() {

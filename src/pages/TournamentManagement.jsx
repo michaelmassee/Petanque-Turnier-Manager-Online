@@ -554,6 +554,7 @@ export function TournamentList({
   onSelect,
   onEdit,
   onDelete,
+  onDuplicate,
   isAdmin,
   language,
   onCreate,
@@ -671,6 +672,14 @@ export function TournamentList({
                     {t('Freigabe-Link deaktivieren')}
                   </Button>
                 )}
+                <Button
+                  variant="secondary"
+                  loading={busyId === `duplicate-${tournament.id}`}
+                  disabled={Boolean(busyId) && busyId !== `duplicate-${tournament.id}`}
+                  onClick={() => onDuplicate(tournament)}
+                >
+                  {t('Duplizieren')}
+                </Button>
                 <Button
                   variant="danger"
                   loading={busyId === `delete-${tournament.id}`}
@@ -830,6 +839,22 @@ export function TournamentManagementPage({
     await onTournamentsChanged?.();
   }
 
+  async function handleDuplicate(tournament) {
+    setError('');
+    setMessage('');
+    setBusyId(`duplicate-${tournament.id}`);
+    try {
+      const data = await authenticatedApi(`/api/tournaments/${tournament.id}/duplicate`, { method: 'POST' });
+      setMessage(`${t('Turnier wurde als Kopie angelegt:')} ${data.tournament.name}`);
+      await onTournamentsChanged?.();
+      setSelectedTournamentId(data.tournament.id);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusyId('');
+    }
+  }
+
   async function handleDelete(tournament) {
     if (
       !window.confirm(
@@ -863,6 +888,7 @@ export function TournamentManagementPage({
         onSelect={setSelectedTournamentId}
         onEdit={openEdit}
         onDelete={handleDelete}
+        onDuplicate={handleDuplicate}
         isAdmin={isAdmin}
         language={language}
         onCreate={openCreate}
