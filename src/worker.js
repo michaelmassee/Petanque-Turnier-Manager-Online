@@ -3881,10 +3881,24 @@ function toPublicMatch(row, playersById) {
 
 async function getPlayersById(db, tournamentId) {
   const result = await db.prepare('SELECT id, first_name, last_name, partner_first_name, partner_last_name, partner2_first_name, partner2_last_name, team_name FROM registrations WHERE tournament_id = ?').bind(tournamentId).all();
-  return new Map(result.results.map((row) => [row.id, {
-    id: row.id, firstName: row.first_name, lastName: row.last_name,
-    teamLabel: row.team_name || [row.first_name, row.last_name, row.partner_first_name, row.partner_last_name, row.partner2_first_name, row.partner2_last_name].filter(Boolean).join(' '),
-  }]));
+  return new Map(result.results.map((row) => {
+    // Bei Doublette/Triplette-Registrierungen ("forme") steckt das ganze Team in einer
+    // einzigen Registrierung (Partner als Felder, keine eigenen Registrierungen). Die
+    // Namen müssen daher hier schon pro Spieler mit " + " getrennt werden, sonst sieht
+    // ein Doublette-/Triplette-Team in der Auslosungsanzeige wie ein einzelner Tête-Spieler
+    // aus (siehe Bugreport: Schweizer/forme-Turnier "sieht aus wie Tête-Auslosung").
+    const names = [
+      [row.first_name, row.last_name],
+      [row.partner_first_name, row.partner_last_name],
+      [row.partner2_first_name, row.partner2_last_name],
+    ]
+      .map((parts) => parts.filter(Boolean).join(' '))
+      .filter(Boolean);
+    return [row.id, {
+      id: row.id, firstName: row.first_name, lastName: row.last_name,
+      teamLabel: row.team_name || names.join(' + '),
+    }];
+  }));
 }
 
 async function getSchweizerTeams(db, tournament) {
