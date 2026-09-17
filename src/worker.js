@@ -3017,9 +3017,9 @@ async function createTournament(request, env, user) {
   }
 
   const presentation = {
-    websiteUrl: normalizePresentationUrl(body.websiteUrl),
-    logoUrl: normalizePresentationUrl(body.logoUrl),
-    flyerUrl: normalizePresentationUrl(body.flyerUrl),
+    websiteUrl: normalizePresentationUrl(body.websiteUrl, 'websiteUrl'),
+    logoUrl: normalizePresentationUrl(body.logoUrl, 'logoUrl'),
+    flyerUrl: normalizePresentationUrl(body.flyerUrl, 'flyerUrl'),
   };
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -3336,13 +3336,13 @@ async function startTournament(env, existing, user) {
   return json({ tournament: toPublicTournament(updated, user) });
 }
 
-function normalizePresentationUrl(value) {
+function normalizePresentationUrl(value, field) {
   const trimmed = String(value || '').trim();
   if (!trimmed) {
     return null;
   }
   if (!isHttpUrl(trimmed)) {
-    throw new HttpError(400, 'Eine gültige URL (http:// oder https://) ist erforderlich');
+    throw new HttpError(400, 'Eine gültige URL (http:// oder https://) ist erforderlich', field ? { field } : undefined);
   }
   return trimmed;
 }
@@ -3450,7 +3450,7 @@ async function createTournamentReport(request, env, url) {
   const formation = formationOther ? 'tete' : rawFormation;
   const licenseRequired = Boolean(body.licenseRequired);
   const description = normalizeRichText(body.description, 'Ungültige Turnierbeschreibung');
-  const websiteUrl = normalizePresentationUrl(body.websiteUrl);
+  const websiteUrl = normalizePresentationUrl(body.websiteUrl, 'websiteUrl');
   const contactName = text(body.contactName);
   const contactEmail = text(body.contactEmail).toLowerCase();
   const language = normalizeLanguage(body.language);
@@ -3689,9 +3689,9 @@ function isPrivateIpLiteral(hostname) {
 async function updateTournamentPresentation(request, env, existing, user) {
   const db = env.DB;
   const body = await readJson(request);
-  const websiteUrl = normalizePresentationUrl(body.websiteUrl);
-  const logoUrl = normalizePresentationUrl(body.logoUrl);
-  const flyerUrl = normalizePresentationUrl(body.flyerUrl);
+  const websiteUrl = normalizePresentationUrl(body.websiteUrl, 'websiteUrl');
+  const logoUrl = normalizePresentationUrl(body.logoUrl, 'logoUrl');
+  const flyerUrl = normalizePresentationUrl(body.flyerUrl, 'flyerUrl');
   const now = new Date().toISOString();
 
   await db
@@ -5031,12 +5031,12 @@ async function getClub(db, id, user) {
 
 function clubInput(body) {
   const name = text(body.name);
-  if (name.length < 2) throw new HttpError(400, 'Der Vereinsname muss mindestens 2 Zeichen enthalten');
+  if (name.length < 2) throw new HttpError(400, 'Der Vereinsname muss mindestens 2 Zeichen enthalten', { field: 'name' });
   const contactName = text(body.contactName);
-  if (contactName.length < 2) throw new HttpError(400, 'Der Kontaktname muss mindestens 2 Zeichen enthalten');
+  if (contactName.length < 2) throw new HttpError(400, 'Der Kontaktname muss mindestens 2 Zeichen enthalten', { field: 'contactName' });
   const contactEmail = text(body.contactEmail);
-  if (!isEmail(contactEmail)) throw new HttpError(400, 'Eine gültige Kontakt-E-Mail ist erforderlich');
-  return { name, description: normalizeRichText(body.description, 'Ungültige Vereinsbeschreibung'), websiteUrl: normalizePresentationUrl(body.websiteUrl), logoUrl: normalizePresentationUrl(body.logoUrl), contactName, contactEmail, contactPhone: nullableText(body.contactPhone) };
+  if (!isEmail(contactEmail)) throw new HttpError(400, 'Eine gültige Kontakt-E-Mail ist erforderlich', { field: 'contactEmail' });
+  return { name, description: normalizeRichText(body.description, 'Ungültige Vereinsbeschreibung'), websiteUrl: normalizePresentationUrl(body.websiteUrl, 'websiteUrl'), logoUrl: normalizePresentationUrl(body.logoUrl, 'logoUrl'), contactName, contactEmail, contactPhone: nullableText(body.contactPhone) };
 }
 
 async function createClub(request, db, user) {

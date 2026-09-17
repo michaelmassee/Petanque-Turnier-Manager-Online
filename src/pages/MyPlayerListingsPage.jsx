@@ -139,7 +139,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
         </div>
       )}
 
-      <EditDialog open={dialogOpen} title={editId ? t('Mitspielgesuch bearbeiten') : t('Mitspielgesuch erstellen')} onClose={() => setDialogOpen(false)}>
+      <EditDialog open={dialogOpen} title={editId ? t('Mitspielgesuch bearbeiten') : t('Mitspielgesuch erstellen')} error={error} onClose={() => setDialogOpen(false)}>
         <form className="form" onSubmit={submit}>
           <PlayerListingFields form={form} setForm={setForm} language={language} />
           <div className="dialog-actions">

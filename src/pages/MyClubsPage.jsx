@@ -41,6 +41,7 @@ function MyClubsPanel({ language }) {
   const [editClubId, setEditClubId] = useState(null);
   const [clubForm, setClubForm] = useState(EMPTY_CLUB_FORM);
   const [clubSaving, setClubSaving] = useState(false);
+  const [invalidClubField, setInvalidClubField] = useState(null);
   const [deletingClubId, setDeletingClubId] = useState(null);
   const [placeDialogOpen, setPlaceDialogOpen] = useState(false);
   const [placeClubId, setPlaceClubId] = useState(null);
@@ -90,18 +91,20 @@ function MyClubsPanel({ language }) {
   function openCreateClub() {
     setEditClubId(null);
     setClubForm(EMPTY_CLUB_FORM);
+    setInvalidClubField(null);
     setClubDialogOpen(true);
   }
 
   function openEditClub(club) {
     setEditClubId(club.id);
     setClubForm(clubToForm(club));
+    setInvalidClubField(null);
     setClubDialogOpen(true);
   }
 
   async function submitClub(event) {
     event.preventDefault();
-    setError(''); setMessage(''); setClubSaving(true);
+    setError(''); setMessage(''); setInvalidClubField(null); setClubSaving(true);
     try {
       if (editClubId) {
         await authenticatedApi(`/api/clubs/${editClubId}`, { method: 'PUT', body: JSON.stringify(clubForm) });
@@ -113,7 +116,10 @@ function MyClubsPanel({ language }) {
       setClubDialogOpen(false);
       setClubForm(EMPTY_CLUB_FORM);
       await load();
-    } catch (err) { setError(err.message); } finally { setClubSaving(false); }
+    } catch (err) {
+      setError(err.message);
+      setInvalidClubField(err.payload?.details?.field || null);
+    } finally { setClubSaving(false); }
   }
 
   function openCreatePlace(club) {
@@ -228,9 +234,9 @@ function MyClubsPanel({ language }) {
         </div>
       )}
 
-      <EditDialog open={clubDialogOpen} title={editClubId ? t('Verein bearbeiten') : t('Verein anlegen')} onClose={() => setClubDialogOpen(false)}>
+      <EditDialog open={clubDialogOpen} title={editClubId ? t('Verein bearbeiten') : t('Verein anlegen')} error={error} onClose={() => setClubDialogOpen(false)}>
         <form className="form" onSubmit={submitClub}>
-          <TextField label={t('Name')} value={clubForm.name} onChange={(name) => setClubForm({ ...clubForm, name })} required minLength={2} />
+          <TextField label={t('Name')} value={clubForm.name} onChange={(name) => setClubForm({ ...clubForm, name })} required minLength={2} invalid={invalidClubField === 'name'} />
           <RichTextEditor
             label={t('Beschreibung')}
             value={clubForm.description}
@@ -243,10 +249,10 @@ function MyClubsPanel({ language }) {
             orderedListLabel={t('Nummerierte Liste')}
             headingLabel={t('Überschrift')}
           />
-          <TextField label={t('Website')} value={clubForm.websiteUrl} onChange={(websiteUrl) => setClubForm({ ...clubForm, websiteUrl })} />
-          <TextField label={t('Logo-Bildlink')} type="url" placeholder="https://…" value={clubForm.logoUrl} onChange={(logoUrl) => setClubForm({ ...clubForm, logoUrl })} />
-          <TextField label={t('Kontaktperson')} value={clubForm.contactName} onChange={(contactName) => setClubForm({ ...clubForm, contactName })} required minLength={2} />
-          <TextField label={t('Kontakt-E-Mail')} type="email" value={clubForm.contactEmail} onChange={(contactEmail) => setClubForm({ ...clubForm, contactEmail })} required />
+          <TextField label={t('Website')} value={clubForm.websiteUrl} onChange={(websiteUrl) => setClubForm({ ...clubForm, websiteUrl })} invalid={invalidClubField === 'websiteUrl'} />
+          <TextField label={t('Logo-Bildlink')} type="url" placeholder="https://…" value={clubForm.logoUrl} onChange={(logoUrl) => setClubForm({ ...clubForm, logoUrl })} invalid={invalidClubField === 'logoUrl'} />
+          <TextField label={t('Kontaktperson')} value={clubForm.contactName} onChange={(contactName) => setClubForm({ ...clubForm, contactName })} required minLength={2} invalid={invalidClubField === 'contactName'} />
+          <TextField label={t('Kontakt-E-Mail')} type="email" value={clubForm.contactEmail} onChange={(contactEmail) => setClubForm({ ...clubForm, contactEmail })} required invalid={invalidClubField === 'contactEmail'} />
           <TextField label={t('Kontakt-Telefon')} value={clubForm.contactPhone} onChange={(contactPhone) => setClubForm({ ...clubForm, contactPhone })} />
           <div className="dialog-actions">
             <Button variant="secondary" type="button" onClick={() => setClubDialogOpen(false)}>{t('Abbrechen')}</Button>
@@ -255,7 +261,7 @@ function MyClubsPanel({ language }) {
         </form>
       </EditDialog>
 
-      <EditDialog open={placeDialogOpen} title={editPlaceId ? t('Bouleplatz bearbeiten') : t('Bouleplatz hinzufügen')} onClose={() => setPlaceDialogOpen(false)}>
+      <EditDialog open={placeDialogOpen} title={editPlaceId ? t('Bouleplatz bearbeiten') : t('Bouleplatz hinzufügen')} error={error} onClose={() => setPlaceDialogOpen(false)}>
         <form className="form" onSubmit={submitPlace}>
           <BoulePlaceFields form={placeForm} setForm={setPlaceForm} language={language} />
           <div className="dialog-actions">

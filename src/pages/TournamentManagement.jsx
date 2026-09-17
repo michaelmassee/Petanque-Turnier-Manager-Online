@@ -225,7 +225,7 @@ function FormationHelpDialog({ onClose }) {
   );
 }
 
-export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false }) {
+export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null }) {
   const { t } = useTranslation();
   const [showFormationHelp, setShowFormationHelp] = useState(false);
   const showMailNotEnabledHint = !isAdmin && currentUser && currentUser.mailEnabled === false;
@@ -527,11 +527,11 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           </label>
         </>
       )}
-      <TextField label={t('Website')} type="url" placeholder="https://…" value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} />
+      <TextField label={t('Website')} type="url" placeholder="https://…" value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} invalid={invalidField === 'websiteUrl'} />
       {!isCalendarEntry && (
         <>
-          <TextField label={t('Logo-Bildlink')} type="url" placeholder="https://…" value={form.logoUrl} onChange={(logoUrl) => setForm({ ...form, logoUrl })} />
-          <TextField label={t('Flyer-Bildlink')} type="url" placeholder="https://…" value={form.flyerUrl} onChange={(flyerUrl) => setForm({ ...form, flyerUrl })} />
+          <TextField label={t('Logo-Bildlink')} type="url" placeholder="https://…" value={form.logoUrl} onChange={(logoUrl) => setForm({ ...form, logoUrl })} invalid={invalidField === 'logoUrl'} />
+          <TextField label={t('Flyer-Bildlink')} type="url" placeholder="https://…" value={form.flyerUrl} onChange={(flyerUrl) => setForm({ ...form, flyerUrl })} invalid={invalidField === 'flyerUrl'} />
         </>
       )}
       {canManageOwner && (
@@ -753,6 +753,7 @@ export function TournamentManagementPage({
   const [mode, setMode] = useState('create');
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState('');
+  const [invalidField, setInvalidField] = useState(null);
 
   const manageableTournaments = useMemo(() => tournaments.filter((tournament) => tournament.canManage), [tournaments]);
   const filteredTournaments = useMemo(
@@ -763,6 +764,7 @@ export function TournamentManagementPage({
   function clearFeedback() {
     setError('');
     setMessage('');
+    setInvalidField(null);
   }
 
   function openCreate() {
@@ -815,6 +817,7 @@ export function TournamentManagementPage({
       setSelectedTournamentId(data.tournament.id);
     } catch (requestError) {
       setError(requestError.message);
+      setInvalidField(requestError.payload?.details?.field || null);
     } finally {
       setSaving(false);
     }
@@ -891,6 +894,7 @@ export function TournamentManagementPage({
           currentUser={currentUser}
           boulePlaces={boulePlaces}
           saving={saving}
+          invalidField={invalidField}
         />
       </EditDialog>
     </>
