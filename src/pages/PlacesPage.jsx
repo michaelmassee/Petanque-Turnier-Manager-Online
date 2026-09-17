@@ -74,7 +74,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
     return results;
   }, [places, favoritesOnly, searchOrigin, searchRadiusKm]);
 
-  const mapped = useMemo(() => visiblePlaces.filter((place) => place.latitude !== null && place.longitude !== null), [visiblePlaces]);
+  const mapped = useMemo(() => visiblePlaces.filter((place) => place.latitude !== null && place.longitude !== null && (place.placeType !== 'club_playing_area' || place.separateFromClub)), [visiblePlaces]);
   const center = mapped.length ? [mapped[0].latitude, mapped[0].longitude] : FALLBACK_CENTER;
 
   async function toggleLike(place) {
@@ -238,6 +238,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
               {place.description && <RichText value={place.description} />}
               <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${place.facilities}` : ''}</p>
               {place.clubId && <ClubBadge clubName={place.clubName} />}
+              {place.placeType === 'club_playing_area' && <p className="muted">{t('Vereins-Spielfläche')}</p>}
               <DistanceBadge distanceKm={place.distanceKm} />
               <div className="place-actions">
                 <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>

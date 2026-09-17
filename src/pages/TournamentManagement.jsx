@@ -265,7 +265,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               locationConfirmed: place ? true : form.locationConfirmed,
             });
           }}
-          options={[{ value: '', label: t('Individuellen Ort verwenden') }, ...boulePlaces.map((place) => ({ value: place.id, label: `${place.clubName}: ${place.name}` }))]}
+          options={[{ value: '', label: t('Individuellen Ort verwenden') }, ...boulePlaces.map((place) => ({ value: place.id, label: `${place.clubName}: ${place.name}${place.placeType === 'club_playing_area' ? ` (${t('Vereins-Spielfläche')})` : ''}` }))]}
         />
       )}
       <LocationAutocomplete

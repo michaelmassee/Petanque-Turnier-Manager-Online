@@ -7,7 +7,7 @@ import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 
 const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', logoUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
-const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '' };
+const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '', separateFromClub: false };
 
 function statusLabel(status, t) {
   if (status === 'published') return t('Veröffentlicht');
@@ -18,7 +18,7 @@ function statusLabel(status, t) {
 function placeToForm(place) {
   return {
     name: place.name, address: place.address, latitude: place.latitude, longitude: place.longitude, locationConfirmed: true,
-    courtCount: String(place.courtCount ?? ''), description: place.description || '', accessible: Boolean(place.accessible), facilities: place.facilities || '',
+    courtCount: String(place.courtCount ?? ''), description: place.description || '', accessible: Boolean(place.accessible), facilities: place.facilities || '', separateFromClub: Boolean(place.separateFromClub),
   };
 }
 
@@ -79,7 +79,8 @@ function MyClubsPanel({ language }) {
   }
 
   async function removePlace(place) {
-    if (!window.confirm(`${t('Bouleplatz')} "${place.name}" ${t('wirklich löschen?')}`)) return;
+    const placeLabel = place.clubId ? t('Vereins-Spielfläche') : t('Bouleplatz');
+    if (!window.confirm(`${placeLabel} "${place.name}" ${t('wirklich löschen?')}`)) return;
     setError(''); setMessage('');
     setDeletingPlaceId(place.id);
     try {
@@ -131,6 +132,7 @@ function MyClubsPanel({ language }) {
 
   function openEditPlace(place) {
     setEditPlaceId(place.id);
+    setPlaceClubId(place.clubId || null);
     setPlaceForm(placeToForm(place));
     setPlaceDialogOpen(true);
   }
@@ -142,10 +144,10 @@ function MyClubsPanel({ language }) {
       const body = JSON.stringify({ ...placeForm, courtCount: placeForm.courtCount === '' ? 0 : Number(placeForm.courtCount) });
       if (editPlaceId) {
         await authenticatedApi(`/api/places/${editPlaceId}`, { method: 'PUT', body });
-        setMessage(t('Bouleplatz aktualisiert. Ein Admin prüft die Änderung.'));
+        setMessage(placeClubId ? t('Vereins-Spielfläche aktualisiert. Ein Admin prüft die Änderung.') : t('Bouleplatz aktualisiert. Ein Admin prüft die Änderung.'));
       } else {
         await authenticatedApi(`/api/clubs/${placeClubId}/places`, { method: 'POST', body });
-        setMessage(t('Bouleplatz eingereicht. Ein Admin muss ihn noch freigeben.'));
+        setMessage(t('Vereins-Spielfläche eingereicht. Ein Admin muss sie noch freigeben.'));
       }
       setPlaceDialogOpen(false);
       await load();
@@ -156,7 +158,7 @@ function MyClubsPanel({ language }) {
     <>
       <div className="panel">
         <div className="section-title">
-          <h2>{t('Meine Vereine')}</h2>
+          <h2>{t('Meine Vereine mit ihren Spielflächen')}</h2>
           <Button onClick={openCreateClub}>{t('Verein anlegen')}</Button>
         </div>
         {message && <p className="feedback success">{message}</p>}
@@ -176,7 +178,7 @@ function MyClubsPanel({ language }) {
                   </div>
                   <div className="row-actions">
                     <Button variant="secondary" onClick={() => openCreatePlace(club)}>
-                      {t('Bouleplatz hinzufügen')}
+                      {t('Vereins-Spielfläche für diesen Verein hinzufügen')}
                     </Button>
                     {club.canEdit && <Button variant="secondary" disabled={Boolean(deletingClubId)} onClick={() => openEditClub(club)}>{t('Bearbeiten')}</Button>}
                     {club.canEdit && <Button variant="danger" loading={deletingClubId === club.id} onClick={() => removeClub(club)}>{t('Löschen')}</Button>}
@@ -184,6 +186,7 @@ function MyClubsPanel({ language }) {
                 </article>
                 {(clubPlaces[club.id] || []).length > 0 && (
                   <div className="user-list club-places-list">
+                    <h3>{t('Vereins-Spielflächen dieses Vereins')}</h3>
                     {clubPlaces[club.id].map((place) => (
                       <article className="data-row" key={place.id}>
                         <div>
@@ -261,9 +264,9 @@ function MyClubsPanel({ language }) {
         </form>
       </EditDialog>
 
-      <EditDialog open={placeDialogOpen} title={editPlaceId ? t('Bouleplatz bearbeiten') : t('Bouleplatz hinzufügen')} error={error} onClose={() => setPlaceDialogOpen(false)}>
+      <EditDialog open={placeDialogOpen} title={editPlaceId ? (placeClubId ? t('Vereins-Spielfläche bearbeiten') : t('Bouleplatz bearbeiten')) : t('Vereins-Spielfläche für diesen Verein hinzufügen')} error={error} onClose={() => setPlaceDialogOpen(false)}>
         <form className="form" onSubmit={submitPlace}>
-          <BoulePlaceFields form={placeForm} setForm={setPlaceForm} language={language} />
+          <BoulePlaceFields form={placeForm} setForm={setPlaceForm} language={language} isClubPlayingArea={Boolean(placeClubId)} />
           <div className="dialog-actions">
             <Button variant="secondary" type="button" onClick={() => setPlaceDialogOpen(false)}>{t('Abbrechen')}</Button>
             <Button type="submit" loading={placeSaving}>{editPlaceId ? t('Speichern') : t('Anlegen')}</Button>
@@ -279,7 +282,7 @@ export function MyClubsPage({ language, setLanguage, menuOpen, setMenuOpen, navi
   return (
     <main className="app-shell">
       <StandalonePageHeader
-        heading={t('Meine Vereine')}
+        heading={t('Meine Vereine mit ihren Spielflächen')}
         language={language}
         setLanguage={setLanguage}
         menuOpen={menuOpen}

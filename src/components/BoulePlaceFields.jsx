@@ -3,7 +3,7 @@ import { TextField } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 import { RichTextEditor } from './RichTextEditor.jsx';
 
-export function BoulePlaceFields({ form, setForm, language }) {
+export function BoulePlaceFields({ form, setForm, language, isClubPlayingArea = false }) {
   const { t } = useTranslation();
   return (
     <>
@@ -42,6 +42,12 @@ export function BoulePlaceFields({ form, setForm, language }) {
         <input type="checkbox" checked={form.accessible} onChange={(event) => setForm({ ...form, accessible: event.target.checked })} />
         <span>{t('Barrierefrei')}</span>
       </label>
+      {isClubPlayingArea && (
+        <label className="checkbox-row">
+          <input type="checkbox" checked={form.separateFromClub} onChange={(event) => setForm({ ...form, separateFromClub: event.target.checked })} />
+          <span>{t('Spielfläche liegt räumlich getrennt vom Verein und auf der Karte anzeigen')}</span>
+        </label>
+      )}
     </>
   );
 }

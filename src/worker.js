@@ -4985,7 +4985,7 @@ function clubCanEdit(club, user) {
 function toPublicBoulePlace(row, user) {
   const canEdit = row.club_id ? clubCanEdit(row, user) : Boolean(user?.role === 'admin' || (row.reported_by_user_id && row.reported_by_user_id === user?.id));
   return {
-    id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubLogoUrl: row.club_logo_url || null, name: row.name, address: row.address,
+    id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubLogoUrl: row.club_logo_url || null, placeType: row.club_id ? 'club_playing_area' : 'boule_place', separateFromClub: Boolean(Number(row.separate_from_club)), name: row.name, address: row.address,
     latitude: row.latitude === null ? null : Number(row.latitude), longitude: row.longitude === null ? null : Number(row.longitude),
     courtCount: Number(row.court_count || 0), description: row.description || null, accessible: Boolean(Number(row.accessible)),
     facilities: row.facilities || null, status: row.status, likeCount: Number(row.like_count || 0), liked: Boolean(Number(row.liked || 0)),
@@ -5082,19 +5082,19 @@ async function placeInput(body, countryCode) {
   const [geo] = await geocodeLocation(address, { countryCode, limit: 1 });
   if (!geo) throw new HttpError(400, 'Kein Ort gefunden.');
   const { lat: latitude, lng: longitude } = geo;
-  return { name, address, latitude, longitude, courtCount: nonNegativeInteger(body.courtCount), description: normalizeRichText(body.description, 'Ungültige Platzbeschreibung'), accessible: Boolean(body.accessible), facilities: nullableText(body.facilities) };
+  return { name, address, latitude, longitude, courtCount: nonNegativeInteger(body.courtCount), description: normalizeRichText(body.description, 'Ungültige Platzbeschreibung'), accessible: Boolean(body.accessible), facilities: nullableText(body.facilities), separateFromClub: body.separateFromClub === undefined ? null : Boolean(body.separateFromClub) };
 }
 
 async function createBoulePlace(request, db, clubId, user, countryCode) {
   const club = await assertClubEditor(db, clubId, user); const input = await placeInput(await readJson(request), countryCode); const id = crypto.randomUUID(); const now = new Date().toISOString();
   // Neue Plätze eines bereits freigegebenen Vereins gehen direkt live, statt erneut zur Moderation zu müssen.
   const status = club.status === 'published' ? 'published' : 'pending';
-  await db.prepare('INSERT INTO boule_places (id, club_id, name, address, latitude, longitude, court_count, description, accessible, facilities, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, clubId, input.name, input.address, input.latitude, input.longitude, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, status, now, now).run();
+  await db.prepare('INSERT INTO boule_places (id, club_id, name, address, latitude, longitude, court_count, description, accessible, facilities, separate_from_club, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, clubId, input.name, input.address, input.latitude, input.longitude, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, input.separateFromClub ? 1 : 0, status, now, now).run();
   return json({ id }, 201);
 }
 
 async function assertBoulePlaceEditor(db, id, user) {
-  const place = await db.prepare('SELECT club_id, reported_by_user_id FROM boule_places WHERE id = ?').bind(id).first();
+  const place = await db.prepare('SELECT club_id, reported_by_user_id, separate_from_club FROM boule_places WHERE id = ?').bind(id).first();
   if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
   let club = null;
   if (place.club_id) {
@@ -5106,11 +5106,12 @@ async function assertBoulePlaceEditor(db, id, user) {
 }
 
 async function updateBoulePlace(request, db, id, user, countryCode) {
-  const { club } = await assertBoulePlaceEditor(db, id, user);
+  const { club, separate_from_club: existingSeparateFromClub } = await assertBoulePlaceEditor(db, id, user);
   const input = await placeInput(await readJson(request), countryCode);
   // Plätze eines bereits freigegebenen Vereins bleiben bei Bearbeitung freigegeben, statt erneut zur Moderation zu müssen.
   const status = club?.status === 'published' ? 'published' : 'pending';
-  await db.prepare('UPDATE boule_places SET name = ?, address = ?, latitude = ?, longitude = ?, court_count = ?, description = ?, accessible = ?, facilities = ?, status = ?, updated_at = ? WHERE id = ?').bind(input.name, input.address, input.latitude, input.longitude, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, status, new Date().toISOString(), id).run(); return json({ ok: true });
+  const separateFromClub = club ? (input.separateFromClub === null ? Boolean(Number(existingSeparateFromClub)) : input.separateFromClub) : false;
+  await db.prepare('UPDATE boule_places SET name = ?, address = ?, latitude = ?, longitude = ?, court_count = ?, description = ?, accessible = ?, facilities = ?, separate_from_club = ?, status = ?, updated_at = ? WHERE id = ?').bind(input.name, input.address, input.latitude, input.longitude, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, separateFromClub ? 1 : 0, status, new Date().toISOString(), id).run(); return json({ ok: true });
 }
 
 async function deleteBoulePlace(db, id, user) {
