@@ -24,6 +24,7 @@ const clubMarker = L.divIcon({
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
 });
+const facilityLabels = { toilet: 'Toilette', shelter: 'Unterstand', clubhouse: 'Vereinsheim', lighting: 'Beleuchtung', parking: 'Parkplatz', catering: 'Gastronomie', drinking_water: 'Trinkwasser', accessible: 'Barrierefrei' };
 
 function FocusOnPlace({ focus, markerRefs }) {
   const map = useMap();
@@ -273,10 +274,12 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
                 onClick={() => handleFocusPlace(place)}
               >
                 <h2 data-i18n-skip>{place.name}</h2>
+                <p className="muted">{t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}</p>
                 <p className="muted" data-i18n-skip>{place.clubName ? `${place.clubName} · ` : ''}{place.address}</p>
               </div>
               {place.description && <RichText value={place.description} />}
               <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${t('Ausstattung:')} ${place.facilities}` : ''}</p>
+              {place.facilityCodes?.length > 0 && <p className="muted">{place.facilityCodes.map((code) => t(facilityLabels[code])).join(' · ')}</p>}
               {place.clubId && (
                 <ClubBadge clubName={place.clubName} onClick={place.latitude !== null && place.longitude !== null ? () => handleFocusPlace(place) : undefined} />
               )}

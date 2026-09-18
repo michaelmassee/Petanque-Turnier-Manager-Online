@@ -1,13 +1,20 @@
 import { useTranslation } from 'react-i18next';
-import { TextField } from './ui.jsx';
+import { TextField, SelectField } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 import { RichTextEditor } from './RichTextEditor.jsx';
 
 export function BoulePlaceFields({ form, setForm, language }) {
   const { t } = useTranslation();
+  const facilityOptions = [
+    ['toilet', 'Toilette'], ['shelter', 'Unterstand'], ['clubhouse', 'Vereinsheim'], ['lighting', 'Beleuchtung'],
+    ['parking', 'Parkplatz'], ['catering', 'Gastronomie'], ['drinking_water', 'Trinkwasser'], ['accessible', 'Barrierefrei'],
+  ];
+  const codes = form.facilityCodes || [];
+  const toggleFacility = (code) => setForm({ ...form, facilityCodes: codes.includes(code) ? codes.filter((entry) => entry !== code) : [...codes, code] });
   return (
     <>
       <TextField label={t('Name')} value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+      <SelectField label={t('Spielorttyp')} value={form.venueType || 'outdoor'} onChange={(venueType) => setForm({ ...form, venueType })} options={[{ value: 'outdoor', label: t('Bouleplatz') }, { value: 'indoor', label: t('Boulehalle') }]} />
       <LocationAutocomplete
         label={t('Adresse')}
         value={form.address}
@@ -37,11 +44,14 @@ export function BoulePlaceFields({ form, setForm, language }) {
         orderedListLabel={t('Nummerierte Liste')}
         headingLabel={t('Überschrift')}
       />
-      <TextField label={t('Ausstattung')} value={form.facilities} onChange={(facilities) => setForm({ ...form, facilities })} />
-      <label className="checkbox-row">
-        <input type="checkbox" checked={form.accessible} onChange={(event) => setForm({ ...form, accessible: event.target.checked })} />
-        <span>{t('Barrierefrei')}</span>
-      </label>
+      <fieldset className="checkbox-group">
+        <legend>{t('Ausstattung')}</legend>
+        {facilityOptions.map(([code, label]) => <label className="checkbox-row" key={code}>
+          <input type="checkbox" checked={codes.includes(code)} onChange={() => toggleFacility(code)} />
+          <span>{t(label)}</span>
+        </label>)}
+      </fieldset>
+      <TextField label={t('Weitere Ausstattung/Hinweise')} value={form.facilities} onChange={(facilities) => setForm({ ...form, facilities })} />
     </>
   );
 }

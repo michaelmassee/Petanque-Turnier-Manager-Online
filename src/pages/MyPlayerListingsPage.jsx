@@ -6,13 +6,13 @@ import { PlayerListingFields } from '../components/PlayerListingFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
-const EMPTY_LISTING_FORM = { type: 'tournament', title: '', description: '', playingPosition: 'egal', locationName: '', latitude: null, longitude: null, locationConfirmed: false, eventDate: '' };
+const EMPTY_LISTING_FORM = { type: 'tournament', title: '', description: '', playingPosition: 'egal', locationName: '', latitude: null, longitude: null, locationConfirmed: false, venueId: '', eventDate: '' };
 
 function listingToForm(listing) {
   return {
     type: listing.type, title: listing.title, description: listing.description || '', playingPosition: listing.playingPosition || 'egal',
     locationName: listing.locationName, latitude: listing.latitude, longitude: listing.longitude,
-    locationConfirmed: true, eventDate: listing.eventDate || '',
+    locationConfirmed: true, venueId: '', eventDate: listing.eventDate || '',
   };
 }
 
@@ -20,6 +20,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
   const { t } = useTranslation();
   const isAdmin = currentUser?.role === 'admin';
   const [listings, setListings] = useState([]);
+  const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -45,6 +46,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, [isAdmin]);
+  useEffect(() => { authenticatedApi('/api/places').then((data) => setVenues(data.places || [])).catch(() => {}); }, []);
 
   const filtered = useMemo(() => listings.filter((listing) => {
     if (typeFilter && listing.type !== typeFilter) return false;
@@ -144,7 +146,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
 
       <EditDialog open={dialogOpen} title={editId ? t('Mitspielgesuch bearbeiten') : t('Mitspielgesuch erstellen')} error={error} onClose={() => setDialogOpen(false)}>
         <form className="form" onSubmit={submit}>
-          <PlayerListingFields form={form} setForm={setForm} language={language} />
+          <PlayerListingFields form={form} setForm={setForm} language={language} venues={venues} />
           <div className="dialog-actions">
             <Button variant="secondary" type="button" onClick={() => setDialogOpen(false)}>{t('Abbrechen')}</Button>
             <Button type="submit" loading={saving}>{editId ? t('Speichern') : t('Veröffentlichen')}</Button>

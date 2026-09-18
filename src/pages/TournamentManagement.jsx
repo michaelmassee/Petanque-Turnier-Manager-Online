@@ -266,7 +266,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               locationConfirmed: place ? true : form.locationConfirmed,
             });
           }}
-          options={[{ value: '', label: t('Individuellen Ort verwenden') }, ...boulePlaces.map((place) => ({ value: place.id, label: `${place.clubName}: ${place.name}${place.placeType === 'club_playing_area' ? ` (${t('Vereins-Spielfläche')})` : ''}` }))]}
+          options={[{ value: '', label: t('Individuellen Ort verwenden') }, ...boulePlaces.map((place) => ({ value: place.id, label: `${place.clubName ? `${place.clubName}: ` : ''}${place.name} (${t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')})` }))]}
         />
       )}
       <LocationAutocomplete
@@ -781,7 +781,11 @@ export function TournamentManagementPage({
 
   function openCreate() {
     setMode('create');
-    setForm(EMPTY_TOURNAMENT_FORM);
+    setForm({
+      ...EMPTY_TOURNAMENT_FORM,
+      contactName: currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '',
+      contactEmail: currentUser?.email || '',
+    });
     clearFeedback();
     setDialogOpen(true);
   }
