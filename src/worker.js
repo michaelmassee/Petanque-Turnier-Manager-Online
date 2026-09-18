@@ -1579,6 +1579,22 @@ export default {
         return await setRegistrationActive(env.DB, registration, Boolean(body.active));
       }
 
+      if (url.pathname === '/api/sync/tournaments' && request.method === 'GET') {
+        const auth = await requireApiKey(request, env.DB);
+        return await listManagedTournaments(env.DB, auth.user);
+      }
+
+      const syncConnectMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/connect$/);
+      if (syncConnectMatch && request.method === 'POST') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getTournamentById(env.DB, syncConnectMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        assertCanManageTournament(tournament, auth.user);
+        return await connectTournament(env.DB, tournament.id);
+      }
+
       const syncRegistrationsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registrations$/);
       if (syncRegistrationsMatch && request.method === 'GET') {
         const auth = await requireApiKey(request, env.DB);
@@ -2949,6 +2965,55 @@ async function listTournaments(db, user) {
     .all();
 
   return json({ tournaments: rows.results.map((row) => toPublicTournament(row, user)) });
+}
+
+/**
+ * Wie listTournaments(), aber ohne den oeffentlichen Fallback-Zweig: liefert
+ * ausschliesslich Turniere, die der uebergebene Nutzer (Owner oder Editor,
+ * bzw. Admin alle) verwalten darf. Fuer den PTM-Plugin-Picker (API-Key-Auth) -
+ * dort sollen keine fremden oeffentlichen Turniere anderer Nutzer erscheinen.
+ */
+async function listManagedTournaments(db, user) {
+  const rows = await db
+    .prepare(
+      `SELECT tournaments.*,
+        ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
+        (
+          SELECT COUNT(*)
+          FROM registrations
+          WHERE registrations.tournament_id = tournaments.id
+            AND registrations.status IN ('pending', 'confirmed')
+        ) AS active_registrations,
+        (
+          SELECT COUNT(*)
+          FROM registrations
+          WHERE registrations.tournament_id = tournaments.id
+            AND registrations.status = 'waitlist'
+        ) AS waitlist_registrations
+       FROM tournaments
+       WHERE (?1 = 'admin')
+          OR (tournaments.owner_id = ?2 OR EXISTS (
+               SELECT 1 FROM tournament_editors WHERE tournament_editors.tournament_id = tournaments.id AND tournament_editors.user_id = ?2
+             ))
+       ORDER BY tournaments.date ASC, tournaments.start_time ASC, tournaments.name COLLATE NOCASE`,
+    )
+    .bind(user.role, user.id)
+    .all();
+
+  return json({ tournaments: rows.results.map((row) => toPublicTournament(row, user)) });
+}
+
+/**
+ * Markiert ein Turnier als von einem Dokument verwaltet (document_managed = 1),
+ * ohne sonstige Metadaten zu ueberschreiben. Wird beim Verbinden eines
+ * Turnierdokuments mit einem bestehenden Online-Turnier aufgerufen.
+ */
+async function connectTournament(db, tournamentId) {
+  await db
+    .prepare('UPDATE tournaments SET document_managed = 1, updated_at = ? WHERE id = ?')
+    .bind(new Date().toISOString(), tournamentId)
+    .run();
+  return json({ ok: true });
 }
 
 async function resolveTournamentGeolocation(tournament, existing, now, countryCode) {
