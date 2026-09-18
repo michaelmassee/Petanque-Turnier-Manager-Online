@@ -3922,36 +3922,33 @@ async function confirmPendingRegistrations(env, tournament, appOrigin) {
 async function listPublicParticipants(db, tournamentId, currentUserEmail) {
   const result = await db
     .prepare(
-      `SELECT id, email, first_name, last_name, club, team_name, partner_first_name, partner_last_name, is_vip
+      `SELECT id, email, first_name, last_name, club, team_name, partner_first_name, partner_last_name, is_vip, status
        FROM registrations
-       WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
+       WHERE tournament_id = ? AND status IN ('pending', 'confirmed', 'waitlist')
        ORDER BY registered_at ASC`,
     )
     .bind(tournamentId)
     .all();
 
-  const waitlistRow = await db
-    .prepare(`SELECT COUNT(*) AS count FROM registrations WHERE tournament_id = ? AND status = 'waitlist'`)
-    .bind(tournamentId)
-    .first();
-
   const normalizedCurrentEmail = currentUserEmail ? currentUserEmail.toLowerCase() : null;
 
+  const toParticipant = (row) => {
+    const isMine = normalizedCurrentEmail !== null && row.email.toLowerCase() === normalizedCurrentEmail;
+    return {
+      registrationId: isMine ? row.id : null,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      club: row.club,
+      teamName: row.team_name,
+      partnerFirstName: row.partner_first_name,
+      partnerLastName: row.partner_last_name,
+      isVip: Boolean(row.is_vip),
+    };
+  };
+
   return json({
-    participants: result.results.map((row) => {
-      const isMine = normalizedCurrentEmail !== null && row.email.toLowerCase() === normalizedCurrentEmail;
-      return {
-        registrationId: isMine ? row.id : null,
-        firstName: row.first_name,
-        lastName: row.last_name,
-        club: row.club,
-        teamName: row.team_name,
-        partnerFirstName: row.partner_first_name,
-        partnerLastName: row.partner_last_name,
-        isVip: Boolean(row.is_vip),
-      };
-    }),
-    waitlistCount: Number(waitlistRow?.count || 0),
+    participants: result.results.filter((row) => row.status !== 'waitlist').map(toParticipant),
+    waitlist: result.results.filter((row) => row.status === 'waitlist').map(toParticipant),
   });
 }
 

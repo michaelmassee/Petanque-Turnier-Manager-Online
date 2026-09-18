@@ -169,7 +169,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
 function TournamentParticipants({ tournamentId, onMessage, onError }) {
   const { t } = useTranslation();
   const [participants, setParticipants] = useState(null);
-  const [waitlistCount, setWaitlistCount] = useState(0);
+  const [waitlist, setWaitlist] = useState([]);
   const [forbidden, setForbidden] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [cancellingRegistrationId, setCancellingRegistrationId] = useState('');
@@ -181,7 +181,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
       .then((data) => {
         if (!cancelled) {
           setParticipants(data.participants);
-          setWaitlistCount(data.waitlistCount || 0);
+          setWaitlist(data.waitlist || []);
         }
       })
       .catch(() => {
@@ -229,7 +229,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
     );
   }
 
-  if (!participants.length && !waitlistCount) {
+  if (!participants.length && !waitlist.length) {
     return (
       <>
         <p className="muted">{t('Noch keine Anmeldungen.')}</p>
@@ -237,39 +237,49 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
     );
   }
 
+  const renderParticipantRow = (participant, index) => (
+    <article className="data-row participants-row" key={`${participant.firstName}-${participant.lastName}-${index}`}>
+      <div data-i18n-skip>
+        <strong>
+          {participant.isVip && <span className="vip-badge" title="VIP">★</span>}
+          {participant.firstName} {participant.lastName}
+        </strong>
+        <span>{participant.club}</span>
+      </div>
+      {(participant.partnerFirstName || participant.partnerLastName) && (
+        <div data-i18n-skip>
+          <strong>
+            {participant.partnerFirstName} {participant.partnerLastName}
+          </strong>
+        </div>
+      )}
+      {participant.registrationId && (
+        <Button variant="secondary" loading={cancellingRegistrationId === participant.registrationId} onClick={() => handleCancelOwnRegistration(participant)}>
+          {t('Absagen')}
+        </Button>
+      )}
+    </article>
+  );
+
   return (
     <>
       <div className="participants-list">
-        {participants.map((participant, index) => (
-          <article className="data-row participants-row" key={`${participant.firstName}-${participant.lastName}-${index}`}>
-            <div data-i18n-skip>
-              <strong>
-                {participant.isVip && <span className="vip-badge" title="VIP">★</span>}
-                {participant.firstName} {participant.lastName}
-              </strong>
-              <span>{participant.club}</span>
-            </div>
-            {(participant.partnerFirstName || participant.partnerLastName) && (
-              <div data-i18n-skip>
-                <strong>
-                  {participant.partnerFirstName} {participant.partnerLastName}
-                </strong>
-              </div>
-            )}
-            {participant.registrationId && (
-              <Button variant="secondary" loading={cancellingRegistrationId === participant.registrationId} onClick={() => handleCancelOwnRegistration(participant)}>
-                {t('Absagen')}
-              </Button>
-            )}
-          </article>
-        ))}
+        {participants.map(renderParticipantRow)}
       </div>
+      {waitlist.length > 0 && (
+        <>
+          <h3>{t('Warteliste')}</h3>
+          <div className="participants-list">
+            {waitlist.map(renderParticipantRow)}
+          </div>
+        </>
+      )}
       <div className="registration-summary" aria-label={t('Zusammenfassung')}>
         <span className="registration-summary-item">
           <strong>{participants.length}</strong> {t('Angemeldet')}
         </span>
         <span className="registration-summary-item">
-          <strong>{waitlistCount}</strong> {t('Warteliste')}
+          <strong>{waitlist.length}</strong> {t('Warteliste')}
         </span>
       </div>
     </>
