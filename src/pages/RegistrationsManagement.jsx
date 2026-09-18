@@ -280,6 +280,19 @@ export function RegistrationsPanel({
           <InfiniteListLoadMore hasMore={visibleOtherRegistrations.hasMore} onLoadMore={visibleOtherRegistrations.loadMore} label={t('Weitere Einträge laden')} />
         </section>
       )}
+      {registrations.length > 0 && (
+        <div className="registration-summary" aria-label={t('Zusammenfassung')}>
+          <span className="registration-summary-item">
+            <strong>{registrations.filter((registration) => registration.status === 'confirmed').length}</strong> {t('Angemeldet')}
+          </span>
+          <span className="registration-summary-item">
+            <strong>{registrations.filter((registration) => registration.status === 'waitlist').length}</strong> {labelFor(REGISTRATION_STATUSES, 'waitlist')}
+          </span>
+          <span className="registration-summary-item registration-summary-total">
+            <strong>{registrations.length}</strong> {t('Gesamt')}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

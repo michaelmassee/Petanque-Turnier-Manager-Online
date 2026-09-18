@@ -1901,6 +1901,30 @@ a.left-panel-link {
   font-weight: 800;
 }
 
+.registration-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e1e6f0;
+}
+
+.registration-summary-item {
+  color: #53627a;
+  font-size: 0.9rem;
+}
+
+.registration-summary-item strong {
+  color: #1c2534;
+  margin-right: 4px;
+}
+
+.registration-summary-total {
+  margin-left: auto;
+  font-weight: 700;
+}
+
 .user-list {
   display: grid;
   gap: 12px;
