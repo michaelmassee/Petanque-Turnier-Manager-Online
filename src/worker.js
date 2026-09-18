@@ -3930,6 +3930,11 @@ async function listPublicParticipants(db, tournamentId, currentUserEmail) {
     .bind(tournamentId)
     .all();
 
+  const waitlistRow = await db
+    .prepare(`SELECT COUNT(*) AS count FROM registrations WHERE tournament_id = ? AND status = 'waitlist'`)
+    .bind(tournamentId)
+    .first();
+
   const normalizedCurrentEmail = currentUserEmail ? currentUserEmail.toLowerCase() : null;
 
   return json({
@@ -3946,6 +3951,7 @@ async function listPublicParticipants(db, tournamentId, currentUserEmail) {
         isVip: Boolean(row.is_vip),
       };
     }),
+    waitlistCount: Number(waitlistRow?.count || 0),
   });
 }
 

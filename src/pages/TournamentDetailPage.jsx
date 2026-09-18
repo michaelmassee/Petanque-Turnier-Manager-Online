@@ -169,6 +169,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
 function TournamentParticipants({ tournamentId, onMessage, onError }) {
   const { t } = useTranslation();
   const [participants, setParticipants] = useState(null);
+  const [waitlistCount, setWaitlistCount] = useState(0);
   const [forbidden, setForbidden] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [cancellingRegistrationId, setCancellingRegistrationId] = useState('');
@@ -180,6 +181,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
       .then((data) => {
         if (!cancelled) {
           setParticipants(data.participants);
+          setWaitlistCount(data.waitlistCount || 0);
         }
       })
       .catch(() => {
@@ -227,7 +229,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
     );
   }
 
-  if (!participants.length) {
+  if (!participants.length && !waitlistCount) {
     return (
       <>
         <p className="muted">{t('Noch keine Anmeldungen.')}</p>
@@ -236,31 +238,41 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
   }
 
   return (
-    <div className="participants-list">
-      {participants.map((participant, index) => (
-        <article className="data-row participants-row" key={`${participant.firstName}-${participant.lastName}-${index}`}>
-          <div data-i18n-skip>
-            <strong>
-              {participant.isVip && <span className="vip-badge" title="VIP">★</span>}
-              {participant.firstName} {participant.lastName}
-            </strong>
-            <span>{participant.club}</span>
-          </div>
-          {(participant.partnerFirstName || participant.partnerLastName) && (
+    <>
+      <div className="participants-list">
+        {participants.map((participant, index) => (
+          <article className="data-row participants-row" key={`${participant.firstName}-${participant.lastName}-${index}`}>
             <div data-i18n-skip>
               <strong>
-                {participant.partnerFirstName} {participant.partnerLastName}
+                {participant.isVip && <span className="vip-badge" title="VIP">★</span>}
+                {participant.firstName} {participant.lastName}
               </strong>
+              <span>{participant.club}</span>
             </div>
-          )}
-          {participant.registrationId && (
-            <Button variant="secondary" loading={cancellingRegistrationId === participant.registrationId} onClick={() => handleCancelOwnRegistration(participant)}>
-              {t('Absagen')}
-            </Button>
-          )}
-        </article>
-      ))}
-    </div>
+            {(participant.partnerFirstName || participant.partnerLastName) && (
+              <div data-i18n-skip>
+                <strong>
+                  {participant.partnerFirstName} {participant.partnerLastName}
+                </strong>
+              </div>
+            )}
+            {participant.registrationId && (
+              <Button variant="secondary" loading={cancellingRegistrationId === participant.registrationId} onClick={() => handleCancelOwnRegistration(participant)}>
+                {t('Absagen')}
+              </Button>
+            )}
+          </article>
+        ))}
+      </div>
+      <div className="registration-summary" aria-label={t('Zusammenfassung')}>
+        <span className="registration-summary-item">
+          <strong>{participants.length}</strong> {t('Angemeldet')}
+        </span>
+        <span className="registration-summary-item">
+          <strong>{waitlistCount}</strong> {t('Warteliste')}
+        </span>
+      </div>
+    </>
   );
 }
 
