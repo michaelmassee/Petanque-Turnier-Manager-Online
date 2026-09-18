@@ -61,6 +61,7 @@ export const REGISTRATION_STATUSES = [
   { value: 'confirmed', label: 'Bestätigt' },
   { value: 'waitlist', label: 'Warteliste' },
   { value: 'cancelled', label: 'Storniert' },
+  { value: 'withdrawn', label: 'Ausgestiegen' },
 ];
 
 export const RADIUS_OPTIONS = [

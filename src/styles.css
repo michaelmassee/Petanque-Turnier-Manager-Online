@@ -2031,6 +2031,11 @@ a.left-panel-link {
   color: #995800;
 }
 
+.registration-withdrawn {
+  background: #f1f1f1;
+  color: #5a5a5a;
+}
+
 .vip-badge {
   color: #c9971c;
   margin-right: 4px;

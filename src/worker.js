@@ -39,7 +39,10 @@ const FORMATION_REPORT_VALUES = [...FORMATIONS, 'andere'];
 const REGISTRATION_TYPES = ['supermelee', 'melee', 'forme'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
-const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
+// 'withdrawn': Turnierdokument hat den Teilnehmer waehrend eines laufenden Turniers als
+// ausgestiegen markiert (Aktiv-Spalte Meldeliste) - bewusst getrennt von 'cancelled', das eigene
+// Nebeneffekte hat (Stornierungs-Mail, Freigabe von Warteliste-/Kapazitaetsplaetzen).
+const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist', 'withdrawn'];
 const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
 const SESSION_COOKIE = 'ptm_session';
 const sessionRefreshes = new WeakMap();
@@ -395,7 +398,7 @@ const TOURNAMENT_BROADCAST_EMAILS = {
 const SYSTEM_NOTIFICATION_TEXTS = {
   de: {
     tournamentStatus: { draft: 'Entwurf', registration: 'Anmeldung offen', running: 'Läuft', finished: 'Abgeschlossen' },
-    registrationStatus: { pending: 'Offen', confirmed: 'Bestätigt', waitlist: 'Warteliste', cancelled: 'Storniert' },
+    registrationStatus: { pending: 'Offen', confirmed: 'Bestätigt', waitlist: 'Warteliste', cancelled: 'Storniert', withdrawn: 'Ausgestiegen' },
     registrationFor: (participant) => `Anmeldung von ${participant}`,
     accountEmailUnverified: 'E-Mail nicht bestätigt',
     accountPasswordChangeRequired: 'Passwortänderung erforderlich',
@@ -405,7 +408,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   nl: {
     tournamentStatus: { draft: 'Concept', registration: 'Inschrijving open', running: 'Bezig', finished: 'Afgerond' },
-    registrationStatus: { pending: 'Open', confirmed: 'Bevestigd', waitlist: 'Wachtlijst', cancelled: 'Geannuleerd' },
+    registrationStatus: { pending: 'Open', confirmed: 'Bevestigd', waitlist: 'Wachtlijst', cancelled: 'Geannuleerd', withdrawn: 'Uitgevallen' },
     registrationFor: (participant) => `Aanmelding van ${participant}`,
     accountEmailUnverified: 'e-mail niet bevestigd',
     accountPasswordChangeRequired: 'wachtwoordwijziging vereist',
@@ -415,7 +418,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   en: {
     tournamentStatus: { draft: 'Draft', registration: 'Registration open', running: 'Running', finished: 'Finished' },
-    registrationStatus: { pending: 'Pending', confirmed: 'Confirmed', waitlist: 'Waitlist', cancelled: 'Cancelled' },
+    registrationStatus: { pending: 'Pending', confirmed: 'Confirmed', waitlist: 'Waitlist', cancelled: 'Cancelled', withdrawn: 'Withdrawn' },
     registrationFor: (participant) => `Registration for ${participant}`,
     accountEmailUnverified: 'email not verified',
     accountPasswordChangeRequired: 'password change required',
@@ -425,7 +428,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   es: {
     tournamentStatus: { draft: 'Borrador', registration: 'Inscripción abierta', running: 'En curso', finished: 'Finalizado' },
-    registrationStatus: { pending: 'Pendiente', confirmed: 'Confirmado', waitlist: 'Lista de espera', cancelled: 'Cancelado' },
+    registrationStatus: { pending: 'Pendiente', confirmed: 'Confirmado', waitlist: 'Lista de espera', cancelled: 'Cancelado', withdrawn: 'Retirado' },
     registrationFor: (participant) => `Inscripción de ${participant}`,
     accountEmailUnverified: 'correo no verificado',
     accountPasswordChangeRequired: 'cambio de contraseña requerido',
@@ -435,7 +438,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   fr: {
     tournamentStatus: { draft: 'Brouillon', registration: 'Inscriptions ouvertes', running: 'En cours', finished: 'Terminé' },
-    registrationStatus: { pending: 'En attente', confirmed: 'Confirmé', waitlist: "Liste d'attente", cancelled: 'Annulé' },
+    registrationStatus: { pending: 'En attente', confirmed: 'Confirmé', waitlist: "Liste d'attente", cancelled: 'Annulé', withdrawn: 'Désisté' },
     registrationFor: (participant) => `Inscription de ${participant}`,
     accountEmailUnverified: 'e-mail non confirmé',
     accountPasswordChangeRequired: 'changement de mot de passe requis',
@@ -1606,15 +1609,34 @@ export default {
         return await disconnectTournament(env.DB, tournament.id);
       }
 
+      const syncStartMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/start$/);
+      if (syncStartMatch && request.method === 'POST') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getTournamentById(env.DB, syncStartMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        assertCanManageTournament(tournament, auth.user);
+        return await startTournamentFromSync(env, tournament, auth.user);
+      }
+
       const syncRegistrationsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registrations$/);
-      if (syncRegistrationsMatch && request.method === 'GET') {
+      if (syncRegistrationsMatch) {
         const auth = await requireApiKey(request, env.DB);
         const tournament = await getTournamentById(env.DB, syncRegistrationsMatch[1]);
         if (!tournament) {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
-        return await syncGetRegistrations(env.DB, tournament.id, url);
+
+        if (request.method === 'GET') {
+          return await syncGetRegistrations(env.DB, tournament.id, url);
+        }
+        if (request.method === 'POST') {
+          // Anmeldung ohne oeffentliche Maske: Turnierdokument erfasst lokal eine neue Meldung und
+          // legt sie hier serverseitig an, damit sie bei PTM-Online 1:1 mitgefuehrt wird.
+          return await createRegistration(request, env, tournament, { session: { user: auth.user } });
+        }
       }
 
       const syncResultsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/results$/);
@@ -3467,18 +3489,17 @@ async function updateTournament(request, env, existing, user) {
 }
 
 /**
- * Leichtgewichtiger Statuswechsel für "Turnier starten": setzt nur status auf 'running',
+ * Kern des leichtgewichtigen Statuswechsels für "Turnier starten": setzt nur status auf 'running',
  * ohne die vollständige Turnier-Eingabemaske (normalizeCoreTournamentInput mit allen Pflicht-
  * feldern) zu durchlaufen - sonst müsste die Durchführungs-Seite das komplette Turnierformular
- * mitschleppen, nur um den Status umzuschalten.
+ * mitschleppen, nur um den Status umzuschalten. Von {@link startTournament} (Web-UI, sperrt
+ * dokumentverwaltete Turniere) und {@link startTournamentFromSync} (Sync-API, das Dokument selbst
+ * ist der Aufrufer) gemeinsam genutzt.
  */
-async function startTournament(env, existing, user) {
+async function performTournamentStart(env, existing) {
   const db = env.DB;
-  if (Number(existing.document_managed || 0) === 1) {
-    throw new HttpError(409, 'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.');
-  }
   if (existing.status === 'running') {
-    return json({ tournament: toPublicTournament(existing, user) });
+    return existing;
   }
   const now = new Date().toISOString();
   const result = await db.prepare("UPDATE tournaments SET status = 'running', updated_at = ? WHERE id = ? AND status != 'running'").bind(now, existing.id).run();
@@ -3486,7 +3507,7 @@ async function startTournament(env, existing, user) {
   if (result.meta.changes === 0) {
     // Ein gleichzeitiger Request hat den Statuswechsel bereits durchgeführt -
     // Benachrichtigungen wurden bereits von diesem verschickt, nicht erneut auslösen.
-    return json({ tournament: toPublicTournament(updated, user) });
+    return updated;
   }
   if (isNewlyPublicTournament(existing, updated)) {
     await notifySavedSearchesForPublishedTournament(env, updated);
@@ -3494,6 +3515,25 @@ async function startTournament(env, existing, user) {
   await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
   const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.owner_id).all();
   await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
+  return updated;
+}
+
+async function startTournament(env, existing, user) {
+  if (Number(existing.document_managed || 0) === 1) {
+    throw new HttpError(409, 'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.');
+  }
+  const updated = await performTournamentStart(env, existing);
+  return json({ tournament: toPublicTournament(updated, user) });
+}
+
+/**
+ * Sync-Variante von {@link startTournament} für dokumentverwaltete Turniere: das Turnierdokument
+ * ist bei einer PTM-Online-Verbindung der Auslöser der ersten Spielrunde und muss das
+ * document_managed-Turnier selbst starten dürfen - anders als die Web-UI, die genau dafür gesperrt
+ * ist (siehe {@link startTournament}).
+ */
+async function startTournamentFromSync(env, existing, user) {
+  const updated = await performTournamentStart(env, existing);
   return json({ tournament: toPublicTournament(updated, user) });
 }
 
@@ -4758,7 +4798,9 @@ async function syncPostResults(request, env, tournamentId) {
         ? null
         : Number.parseInt(entry.seedingPosition, 10);
 
-    parsed.push({ id, status, seedingPosition });
+    const active = entry.active === undefined || entry.active === null ? null : (entry.active ? 1 : 0);
+
+    parsed.push({ id, status, seedingPosition, active });
   }
 
   const statusChangeIds = parsed.filter((entry) => entry.status !== null).map((entry) => entry.id);
@@ -4781,12 +4823,12 @@ async function syncPostResults(request, env, tournamentId) {
     `UPDATE registrations
      SET status = COALESCE(?, status),
          confirmed_at = CASE WHEN ? = 'confirmed' THEN COALESCE(confirmed_at, ?) WHEN ? IS NOT NULL THEN NULL ELSE confirmed_at END,
-         seeding_position = ?, updated_at = ?
+         seeding_position = ?, active = COALESCE(?, active), updated_at = ?
      WHERE id = ? AND tournament_id = ?`,
   );
   const updateResults =
     parsed.length > 0
-      ? await db.batch(parsed.map((entry) => updateStatement.bind(entry.status, entry.status, now, entry.status, entry.seedingPosition, now, entry.id, tournamentId)))
+      ? await db.batch(parsed.map((entry) => updateStatement.bind(entry.status, entry.status, now, entry.status, entry.seedingPosition, entry.active, now, entry.id, tournamentId)))
       : [];
 
   let updatedCount = 0;
