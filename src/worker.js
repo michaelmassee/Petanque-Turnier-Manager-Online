@@ -1595,6 +1595,17 @@ export default {
         return await connectTournament(env.DB, tournament.id);
       }
 
+      const syncDisconnectMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/disconnect$/);
+      if (syncDisconnectMatch && request.method === 'POST') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getTournamentById(env.DB, syncDisconnectMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        assertCanManageTournament(tournament, auth.user);
+        return await disconnectTournament(env.DB, tournament.id);
+      }
+
       const syncRegistrationsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registrations$/);
       if (syncRegistrationsMatch && request.method === 'GET') {
         const auth = await requireApiKey(request, env.DB);
@@ -3011,6 +3022,19 @@ async function listManagedTournaments(db, user) {
 async function connectTournament(db, tournamentId) {
   await db
     .prepare('UPDATE tournaments SET document_managed = 1, updated_at = ? WHERE id = ?')
+    .bind(new Date().toISOString(), tournamentId)
+    .run();
+  return json({ ok: true });
+}
+
+/**
+ * Loest die Dokument-Verwaltung eines Turniers wieder (document_managed = 0), Gegenstueck zu
+ * connectTournament. Hebt damit auch die in updateTournament() geprueften document_managed-Sperren
+ * fuer Web-UI-Edits wieder auf.
+ */
+async function disconnectTournament(db, tournamentId) {
+  await db
+    .prepare('UPDATE tournaments SET document_managed = 0, updated_at = ? WHERE id = ?')
     .bind(new Date().toISOString(), tournamentId)
     .run();
   return json({ ok: true });
