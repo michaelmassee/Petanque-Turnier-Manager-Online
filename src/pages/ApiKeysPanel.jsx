@@ -101,39 +101,41 @@ export function OwnApiKeysPanel() {
         </div>
       )}
 
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>{t('Bezeichnung')}</th>
-            <th>{t('Status')}</th>
-            <th>{t('Beantragt am')}</th>
-            <th>{t('Zuletzt genutzt')}</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {visibleApiKeys.items.map((key) => (
-            <tr key={key.id}>
-              <td>{key.label}</td>
-              <td>{API_KEY_STATUS_LABELS[key.status] || key.status}</td>
-              <td>{formatDateTime(key.requestedAt)}</td>
-              <td>{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : '–'}</td>
-              <td>
-                {key.status === 'approved' && key.secretAvailable && (
-                  <Button variant="secondary" disabled={Boolean(actionId)} loading={actionId === `reveal-${key.id}`} onClick={() => handleRevealSecret(key.id)}>
-                    {t('Schlüssel abholen')}
-                  </Button>
-                )}
-              </td>
-            </tr>
-          ))}
-          {apiKeys.length === 0 && (
+      <div className="table-scroll">
+        <table className="data-table">
+          <thead>
             <tr>
-              <td colSpan={5}>{t('Noch keine API-Schlüssel beantragt.')}</td>
+              <th>{t('Bezeichnung')}</th>
+              <th>{t('Status')}</th>
+              <th>{t('Beantragt am')}</th>
+              <th>{t('Zuletzt genutzt')}</th>
+              <th />
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {visibleApiKeys.items.map((key) => (
+              <tr key={key.id}>
+                <td>{key.label}</td>
+                <td>{API_KEY_STATUS_LABELS[key.status] || key.status}</td>
+                <td>{formatDateTime(key.requestedAt)}</td>
+                <td>{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : '–'}</td>
+                <td>
+                  {key.status === 'approved' && key.secretAvailable && (
+                    <Button variant="secondary" disabled={Boolean(actionId)} loading={actionId === `reveal-${key.id}`} onClick={() => handleRevealSecret(key.id)}>
+                      {t('Schlüssel abholen')}
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {apiKeys.length === 0 && (
+              <tr>
+                <td colSpan={5}>{t('Noch keine API-Schlüssel beantragt.')}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
       <InfiniteListLoadMore hasMore={visibleApiKeys.hasMore} onLoadMore={visibleApiKeys.loadMore} label={t('Weitere Einträge laden')} />
     </div>
   );
@@ -304,52 +306,54 @@ function ApiKeysPanel({ isAdmin }) {
             onReset={resetFilters}
             resetDisabled={!filtered}
           />
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{t('Turnierleiter')}</th>
-                <th>{t('Bezeichnung')}</th>
-                <th>{t('Status')}</th>
-                <th>{t('Beantragt am')}</th>
-                <th>{t('Zuletzt genutzt')}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {visibleAllApiKeys.items.map((key) => (
-                <tr key={key.id}>
-                  <td>
-                    {key.userName} ({key.userEmail})
-                  </td>
-                  <td>{key.label}</td>
-                  <td>{API_KEY_STATUS_LABELS[key.status] || key.status}</td>
-                  <td>{formatDateTime(key.requestedAt)}</td>
-                  <td>{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : '–'}</td>
-                  <td className="row-actions">
-                    {key.status === 'pending' && (
-                      <Button disabled={Boolean(adminActionId)} loading={adminActionId === `approve-${key.id}`} onClick={() => handleApprove(key.id)}>{t('Freischalten')}</Button>
-                    )}
-                    {key.status === 'approved' && (
-                      <Button variant="secondary" disabled={Boolean(adminActionId)} loading={adminActionId === `revoke-${key.id}`} onClick={() => handleRevoke(key.id)}>
-                        {t('Sperren')}
-                      </Button>
-                    )}
-                    <Button variant="secondary" onClick={() => openEditDialog(key)} disabled={Boolean(adminActionId)}>
-                      {t('Bearbeiten')}
-                    </Button>
-                    <Button variant="danger" disabled={Boolean(adminActionId)} loading={adminActionId === `delete-${key.id}`} onClick={() => handleDelete(key)}>
-                      {t('Löschen')}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-              {filteredApiKeys.length === 0 && (
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan={6}>{t('Keine API-Schlüssel gefunden.')}</td>
+                  <th>{t('Turnierleiter')}</th>
+                  <th>{t('Bezeichnung')}</th>
+                  <th>{t('Status')}</th>
+                  <th>{t('Beantragt am')}</th>
+                  <th>{t('Zuletzt genutzt')}</th>
+                  <th />
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {visibleAllApiKeys.items.map((key) => (
+                  <tr key={key.id}>
+                    <td>
+                      {key.userName} ({key.userEmail})
+                    </td>
+                    <td>{key.label}</td>
+                    <td>{API_KEY_STATUS_LABELS[key.status] || key.status}</td>
+                    <td>{formatDateTime(key.requestedAt)}</td>
+                    <td>{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : '–'}</td>
+                    <td className="row-actions">
+                      {key.status === 'pending' && (
+                        <Button disabled={Boolean(adminActionId)} loading={adminActionId === `approve-${key.id}`} onClick={() => handleApprove(key.id)}>{t('Freischalten')}</Button>
+                      )}
+                      {key.status === 'approved' && (
+                        <Button variant="secondary" disabled={Boolean(adminActionId)} loading={adminActionId === `revoke-${key.id}`} onClick={() => handleRevoke(key.id)}>
+                          {t('Sperren')}
+                        </Button>
+                      )}
+                      <Button variant="secondary" onClick={() => openEditDialog(key)} disabled={Boolean(adminActionId)}>
+                        {t('Bearbeiten')}
+                      </Button>
+                      <Button variant="danger" disabled={Boolean(adminActionId)} loading={adminActionId === `delete-${key.id}`} onClick={() => handleDelete(key)}>
+                        {t('Löschen')}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredApiKeys.length === 0 && (
+                  <tr>
+                    <td colSpan={6}>{t('Keine API-Schlüssel gefunden.')}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
           <InfiniteListLoadMore hasMore={visibleAllApiKeys.hasMore} onLoadMore={visibleAllApiKeys.loadMore} label={t('Weitere Einträge laden')} />
         </div>
       )}
