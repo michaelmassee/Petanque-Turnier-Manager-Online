@@ -7,22 +7,43 @@ import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 
 const EMPTY_VENUE = { name: '', venueType: 'outdoor', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilityCodes: [], facilities: '' };
-const EMPTY_ORGANIZATION = { name: '', kind: 'club', description: '', websiteUrl: '', logoUrl: '', contactName: '', contactEmail: '', contactPhone: '', venue: EMPTY_VENUE };
+const EMPTY_SOCIAL_LINKS = { facebook: '', instagram: '', x: '', youtube: '' };
+const EMPTY_ORGANIZATION = { name: '', kind: 'club', description: '', websiteUrl: '', logoUrl: '', socialLinks: EMPTY_SOCIAL_LINKS, memberOf: [], contactName: '', contactEmail: '', contactPhone: '', venue: EMPTY_VENUE };
 const venueLabel = (venue, t) => `${t(venue.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}: ${venue.name}`;
 const venueToForm = (venue) => ({ ...EMPTY_VENUE, ...venue, courtCount: String(venue.courtCount ?? ''), facilityCodes: venue.facilityCodes || [] });
-const organizationToForm = (organization) => ({ ...EMPTY_ORGANIZATION, ...organization, venue: { ...EMPTY_VENUE } });
+const organizationToForm = (organization) => ({ ...EMPTY_ORGANIZATION, ...organization, socialLinks: { ...EMPTY_SOCIAL_LINKS, ...organization.socialLinks }, memberOf: organization.memberOf || [], venue: { ...EMPTY_VENUE } });
 
 function OrganizationFields({ form, setForm, language, create }) {
   const { t } = useTranslation();
+  const setSocialLink = (platform, value) => setForm({ ...form, socialLinks: { ...form.socialLinks, [platform]: value } });
   return <>
     <SelectField label={t('Organisationstyp')} value={form.kind} onChange={(kind) => setForm({ ...form, kind })} options={[{ value: 'club', label: t('Verein') }, { value: 'group', label: t('Gruppe') }]} />
     <TextField label={t('Name')} value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
     <RichTextEditor label={t('Beschreibung')} value={form.description} onChange={(description) => setForm({ ...form, description })} boldLabel={t('Fett')} italicLabel={t('Kursiv')} underlineLabel={t('Unterstrichen')} strikeLabel={t('Durchgestrichen')} bulletListLabel={t('Aufzählung')} orderedListLabel={t('Nummerierte Liste')} headingLabel={t('Überschrift')} />
     <TextField label={t('Website')} value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} />
     <TextField label={t('Logo-Bildlink')} type="url" value={form.logoUrl} onChange={(logoUrl) => setForm({ ...form, logoUrl })} />
+    <TextField label={t('Facebook-Link')} type="url" placeholder="https://facebook.com/…" value={form.socialLinks.facebook} onChange={(value) => setSocialLink('facebook', value)} />
+    <TextField label={t('Instagram-Link')} type="url" placeholder="https://instagram.com/…" value={form.socialLinks.instagram} onChange={(value) => setSocialLink('instagram', value)} />
+    <TextField label={t('X-Link')} type="url" placeholder="https://x.com/…" value={form.socialLinks.x} onChange={(value) => setSocialLink('x', value)} />
+    <TextField label={t('YouTube-Link')} type="url" placeholder="https://youtube.com/…" value={form.socialLinks.youtube} onChange={(value) => setSocialLink('youtube', value)} />
     <TextField label={t('Kontaktperson')} value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} required minLength={2} />
     <TextField label={t('Kontakt-E-Mail')} type="email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} required />
     <TextField label={t('Kontakt-Telefon')} value={form.contactPhone} onChange={(contactPhone) => setForm({ ...form, contactPhone })} />
+    <div className="form-section">
+      <div className="section-title">
+        <h3>{t('Mitglied bei (Verbände)')}</h3>
+        <Button type="button" variant="secondary" disabled={form.memberOf.length >= 10} onClick={() => setForm({ ...form, memberOf: [...form.memberOf, ''] })}>{t('Verband hinzufügen')}</Button>
+      </div>
+      <p className="hint">{t('Zum Beispiel Deutscher Sportverband, internationale oder andere nationale Verbände.')}</p>
+      {form.memberOf.map((entry, index) => (
+        <div className="form-grid" key={index}>
+          <TextField label={`${t('Verband')} ${index + 1}`} value={entry} onChange={(value) => setForm({ ...form, memberOf: form.memberOf.map((item, itemIndex) => itemIndex === index ? value : item) })} maxLength={120} />
+          <div className="tournament-question-remove">
+            <Button type="button" variant="danger" onClick={() => setForm({ ...form, memberOf: form.memberOf.filter((_, itemIndex) => itemIndex !== index) })}>{t('Verband entfernen')}</Button>
+          </div>
+        </div>
+      ))}
+    </div>
     {create && <><h3>{t('Erster Spielort')}</h3><BoulePlaceFields form={form.venue} setForm={(venue) => setForm({ ...form, venue })} language={language} /></>}
   </>;
 }

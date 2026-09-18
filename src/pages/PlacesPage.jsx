@@ -287,6 +287,10 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
               <div className="place-actions">
                 <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
                 {place.clubWebsiteUrl && <a className="button button-secondary" href={place.clubWebsiteUrl} target="_blank" rel="noreferrer">{t('Website')}</a>}
+                {place.clubSocialLinks?.facebook && <a className="button button-secondary" href={place.clubSocialLinks.facebook} target="_blank" rel="noreferrer">Facebook</a>}
+                {place.clubSocialLinks?.instagram && <a className="button button-secondary" href={place.clubSocialLinks.instagram} target="_blank" rel="noreferrer">Instagram</a>}
+                {place.clubSocialLinks?.x && <a className="button button-secondary" href={place.clubSocialLinks.x} target="_blank" rel="noreferrer">X</a>}
+                {place.clubSocialLinks?.youtube && <a className="button button-secondary" href={place.clubSocialLinks.youtube} target="_blank" rel="noreferrer">YouTube</a>}
                 <Button variant={place.liked ? 'primary' : 'secondary'} onClick={() => toggleLike(place)}>{place.liked ? '♥' : '♡'} {place.likeCount}</Button>
                 <Button variant={place.favorited ? 'primary' : 'secondary'} onClick={() => toggleFavorite(place)}>{place.favorited ? '★' : '☆'} {t('Favorit')}</Button>
               </div>
