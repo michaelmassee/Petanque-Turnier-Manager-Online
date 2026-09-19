@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_STATUSES, VISIBILITIES, RADIUS_OPTIONS, EMPTY_PROFILE_FORM, EMPTY_AUTH_FORM, EMPTY_TOURNAMENT_REPORT_FORM, EMPTY_REGISTRATION_FORM, REGISTER_SUCCESS, VERIFY_SUCCESS, CANCEL_REGISTRATION_EXPLANATION, CANCEL_REGISTRATION_SUCCESS, PROFILE_UPDATE_SUCCESS, PROFILE_EMAIL_CHANGE_PENDING } from './lib/constants.js';
 import i18next from './lib/i18next-config.js';
 import { useTranslation } from 'react-i18next';
-import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CancelledError, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, authenticatedApi, setSessionExpiredHandler } from './lib/api.js';
 import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
@@ -489,7 +489,10 @@ function AppContent() {
         return manageable?.id || data.tournaments[0]?.id || '';
       });
     } catch (requestError) {
-      if (!silent) setError(requestError.message);
+      // Eine neuere Anfrage mit demselben Query-Key (z.B. durch refetchOnWindowFocus
+      // beim Rückflug vom Google-OAuth-Redirect oder durch queryClient.clear() nach
+      // dem Login) bricht diese hier ab - keine echte Fehlermeldung wert.
+      if (!silent && !(requestError instanceof CancelledError)) setError(requestError.message);
     }
   }
 
@@ -507,7 +510,7 @@ function AppContent() {
       setPostboxRecipients(data.recipients.recipients);
       setPostboxRecipientTournaments(data.recipients.tournaments || []);
     } catch (requestError) {
-      if (!silent) setError(requestError.message);
+      if (!silent && !(requestError instanceof CancelledError)) setError(requestError.message);
     }
   }
 
@@ -520,7 +523,7 @@ function AppContent() {
       });
       setSavedSearches(data.savedSearches);
     } catch (requestError) {
-      if (!silent) setError(requestError.message);
+      if (!silent && !(requestError instanceof CancelledError)) setError(requestError.message);
     }
   }
 
