@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { SelectField, TextField, Button, Feedback } from '../components/ui.jsx';
-import { checkRoundRequirements } from '../lib/pairing/index.js';
+import { checkRoundRequirements, getSupportedSystemLabels, isOnlinePlayable } from '../lib/pairing/index.js';
 import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
 import { labelFor } from '../lib/domain.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
@@ -17,6 +17,15 @@ function requirementText(requirement, t) {
     return `${t('Es werden mindestens')} ${requirement.min} ${t('bestätigte Meldungen benötigt.')}`;
   }
   return t(requirement.text);
+}
+
+// Baut "Schweizer-System und Supermêlée" (bzw. bei künftig mehr Systemen automatisch
+// mit Kommas + finalem "und") aus PAIRING_STRATEGIES statt die Namen an jeder
+// Hinweistext-Stelle hart zu verdrahten - Intl.ListFormat übernimmt dabei auch die
+// sprachabhängige Aufzählungsform (z. B. "and" statt "und" auf Englisch).
+function supportedSystemsList(locale) {
+  const formatter = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' });
+  return formatter.format(getSupportedSystemLabels());
 }
 
 function playerLabel(player) {
@@ -91,8 +100,14 @@ function MatchRow({ match, onSave, busy }) {
   );
 }
 
-export default function TournamentPlayManagement({ tournaments }) {
+export default function TournamentPlayManagement({ tournaments: allTournaments }) {
   const { t, i18n } = useTranslation();
+  // Nur Turniere mit implementiertem Paarungssystem (Schweizer, Supermêlée) sind
+  // online spielbar (siehe isOnlinePlayable) - alle anderen Typen werden unten im
+  // Leerzustand mit Grund aufgelistet, statt kommentarlos aus der Auswahl zu
+  // verschwinden.
+  const tournaments = allTournaments.filter(isOnlinePlayable);
+  const nonPlayableTournaments = allTournaments.filter((tournament) => !isOnlinePlayable(tournament));
   const [selectedTournamentId, setSelectedTournamentId] = useState(tournaments[0]?.id || '');
   const [rounds, setRounds] = useState([]);
   const [swissTeams, setSwissTeams] = useState([]);
@@ -251,6 +266,18 @@ export default function TournamentPlayManagement({ tournaments }) {
     return (
       <div className="panel">
         <p className="muted">{t('Keine Turniere mit Online-Durchführung verfügbar.')}</p>
+        {nonPlayableTournaments.length > 0 && (
+          <div className="hint">
+            <p>{t('Folgende Turniere unterstützen keine Online-Rundenverwaltung, da ihr Turniertyp dafür nicht implementiert ist.')} {t('Unterstützt werden nur:')} {supportedSystemsList(i18n.language)}.</p>
+            <ul>
+              {nonPlayableTournaments.map((tournament) => (
+                <li key={tournament.id} data-i18n-skip>
+                  {tournament.name} ({labelFor(TOURNAMENT_TYPES, tournament.type)})
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     );
   }
@@ -331,6 +358,14 @@ export default function TournamentPlayManagement({ tournaments }) {
           </div>
         )}
       </div>
+
+      {nonPlayableTournaments.length > 0 && (
+        <p className="hint">
+          {t('Nicht in der Auswahl:')} {nonPlayableTournaments.map((tournament) => `${tournament.name} (${labelFor(TOURNAMENT_TYPES, tournament.type)})`).join(', ')}
+          {' – '}
+          {t('diese Turniertypen unterstützen keine Online-Rundenverwaltung.')} {t('Unterstützt werden nur:')} {supportedSystemsList(i18n.language)}.
+        </p>
+      )}
 
       <Feedback message={message} error={error} />
 

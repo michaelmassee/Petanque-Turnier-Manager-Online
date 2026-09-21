@@ -16,7 +16,6 @@ import { RegistrationFields } from './components/RegistrationFields.jsx';
 import { InfiniteListLoadMore } from './components/InfiniteListLoadMore.jsx';
 import { AppHeader, PostboxControl, PushMigrationNotice, SearchMenuControl, SavedSearchesControl, AuthModal, StandalonePageHeader, InstallAppButton, OfflineNotice } from './components/layout.jsx';
 import { AuthShell, LanguageSelect, SetupForm, LoginForm, RegisterForm, RegisterSuccessNotice, ForgotPasswordForm, ResendVerificationForm, ResetPasswordForm, VerifyEmailForm, CancelRegistrationForm } from './auth/AuthForms.jsx';
-import { isOnlinePlayable } from './lib/pairing/index.js';
 
 const ImpressumPage = lazy(() => import('./pages/ImpressumPage.jsx'));
 const DatenschutzPage = lazy(() => import('./pages/DatenschutzPage.jsx'));
@@ -1970,7 +1969,7 @@ function AppContent() {
       {activeTab === 'play' && canManageTournaments && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
-            <TournamentPlayManagement tournaments={manageableTournaments.filter(isOnlinePlayable)} />
+            <TournamentPlayManagement tournaments={manageableTournaments} />
           </section>
         </Suspense>
       )}

@@ -1004,5 +1004,10 @@
   "Verband hinzufügen": "Bond toevoegen",
   "Zum Beispiel Deutscher Sportverband, internationale oder andere nationale Verbände.": "Bijvoorbeeld een nationale sportbond, internationale of andere nationale bonden.",
   "Verband": "Bond",
-  "Verband entfernen": "Bond verwijderen"
+  "Verband entfernen": "Bond verwijderen",
+  "Folgende Turniere unterstützen keine Online-Rundenverwaltung, da ihr Turniertyp dafür nicht implementiert ist.": "De volgende toernooien ondersteunen geen online rondebeheer, omdat hun toernooitype daarvoor niet geïmplementeerd is.",
+  "Unterstützt werden nur:": "Alleen ondersteund:",
+  "Nicht in der Auswahl:": "Niet in de selectie:",
+  "diese Turniertypen unterstützen keine Online-Rundenverwaltung.": "deze toernooitypes ondersteunen geen online rondebeheer.",
+  "Dieser Turniertyp unterstützt keine Online-Rundenverwaltung (nur Schweizer-System und Supermêlée).": "Dit toernooitype ondersteunt geen online rondebeheer (alleen Schweizer-System en Supermêlée worden ondersteund)."
 }

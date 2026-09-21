@@ -2,8 +2,8 @@ import { generateRound as generateSupermeleeRound, checkRequirements as checkSup
 import { generateRound as generateSchweizerRound, checkRequirements as checkSchweizerRequirements } from './schweizer.js';
 
 export const PAIRING_STRATEGIES = {
-  supermelee: { generateRound: generateSupermeleeRound, checkRequirements: checkSupermeleeRequirements },
-  schweizer: { generateRound: generateSchweizerRound, checkRequirements: checkSchweizerRequirements },
+  schweizer: { label: 'Schweizer-System', generateRound: generateSchweizerRound, checkRequirements: checkSchweizerRequirements },
+  supermelee: { label: 'Supermêlée', generateRound: generateSupermeleeRound, checkRequirements: checkSupermeleeRequirements },
 };
 
 // Supermêlée ist über registrationType codiert, alle anderen Systeme über type
@@ -19,6 +19,13 @@ export function getPlaySystemKey(tournament) {
 
 export function isOnlinePlayable(tournament) {
   return Boolean(PAIRING_STRATEGIES[getPlaySystemKey(tournament)]);
+}
+
+// Für UI-Hinweistexte ("nur X und Y werden unterstützt") - zieht die Namen direkt
+// aus PAIRING_STRATEGIES, damit ein künftig ergänztes System nicht zusätzlich an
+// jeder Hinweistext-Stelle nachgepflegt werden muss.
+export function getSupportedSystemLabels() {
+  return Object.values(PAIRING_STRATEGIES).map((strategy) => strategy.label);
 }
 
 export function getPairingStrategy(tournament) {

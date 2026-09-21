@@ -1004,5 +1004,10 @@
   "Verband hinzufügen": "Añadir federación",
   "Zum Beispiel Deutscher Sportverband, internationale oder andere nationale Verbände.": "Por ejemplo, una federación deportiva nacional, internacional u otras federaciones nacionales.",
   "Verband": "Federación",
-  "Verband entfernen": "Eliminar federación"
+  "Verband entfernen": "Eliminar federación",
+  "Folgende Turniere unterstützen keine Online-Rundenverwaltung, da ihr Turniertyp dafür nicht implementiert ist.": "Los siguientes torneos no admiten la gestión de rondas en línea porque su tipo de torneo no está implementado para ello.",
+  "Unterstützt werden nur:": "Solo compatible:",
+  "Nicht in der Auswahl:": "No en la selección:",
+  "diese Turniertypen unterstützen keine Online-Rundenverwaltung.": "estos tipos de torneo no admiten la gestión de rondas en línea.",
+  "Dieser Turniertyp unterstützt keine Online-Rundenverwaltung (nur Schweizer-System und Supermêlée).": "Este tipo de torneo no admite la gestión de rondas en línea (solo se admiten Schweizer-System y Supermêlée)."
 }

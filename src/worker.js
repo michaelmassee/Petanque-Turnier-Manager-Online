@@ -3522,6 +3522,9 @@ async function startTournament(env, existing, user) {
   if (Number(existing.document_managed || 0) === 1) {
     throw new HttpError(409, 'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.');
   }
+  if (!isOnlinePlayable(existing)) {
+    throw new HttpError(409, 'Dieser Turniertyp unterstützt keine Online-Rundenverwaltung (nur Schweizer-System und Supermêlée).');
+  }
   const updated = await performTournamentStart(env, existing);
   return json({ tournament: toPublicTournament(updated, user) });
 }

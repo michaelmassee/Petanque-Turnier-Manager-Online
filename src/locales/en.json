@@ -1004,5 +1004,10 @@
   "Verband hinzufügen": "Add federation",
   "Zum Beispiel Deutscher Sportverband, internationale oder andere nationale Verbände.": "For example a national sports federation, international or other national federations.",
   "Verband": "Federation",
-  "Verband entfernen": "Remove federation"
+  "Verband entfernen": "Remove federation",
+  "Folgende Turniere unterstützen keine Online-Rundenverwaltung, da ihr Turniertyp dafür nicht implementiert ist.": "The following tournaments do not support online round management because their tournament type is not implemented for it.",
+  "Unterstützt werden nur:": "Only supported:",
+  "Nicht in der Auswahl:": "Not in the selection:",
+  "diese Turniertypen unterstützen keine Online-Rundenverwaltung.": "these tournament types do not support online round management.",
+  "Dieser Turniertyp unterstützt keine Online-Rundenverwaltung (nur Schweizer-System und Supermêlée).": "This tournament type does not support online round management (only Schweizer-System and Supermêlée are supported)."
 }
