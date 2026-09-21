@@ -371,6 +371,16 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               disabled={form.status === 'running' || form.status === 'finished'}
             />
           )}
+          {form.type === 'formule_x' && (
+            <TextField
+              label={t('Anzahl Runden')}
+              type="number"
+              min="1"
+              max="20"
+              value={form.formuleXRounds || 4}
+              onChange={(formuleXRounds) => setForm({ ...form, formuleXRounds })}
+            />
+          )}
           {showFormationHelp && (
             <FormationHelpDialog onClose={() => setShowFormationHelp(false)} />
           )}
@@ -717,6 +727,7 @@ function tournamentToForm(tournament) {
     formation: tournament.formationOther ? 'andere' : (tournament.formation || 'doublette'),
     registrationType: tournament.registrationType || 'forme',
     schweizerRankingMode: tournament.schweizerRankingMode || 'mit_buchholz',
+    formuleXRounds: tournament.formuleXRounds || 4,
     status: tournament.status || 'draft',
     maxRegistrations: tournament.maxRegistrations || 0,
     registrationDeadline: utcIsoToZonedDateTimeInput(tournament.registrationDeadline, tournament.timezone),

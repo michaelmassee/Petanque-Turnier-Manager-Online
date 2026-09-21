@@ -147,6 +147,7 @@ export const EMPTY_TOURNAMENT_FORM = {
   registrationEnabled: true,
   approvalRequired: false,
   schweizerRankingMode: 'mit_buchholz',
+  formuleXRounds: 4,
   websiteUrl: '',
   logoUrl: '',
   flyerUrl: '',

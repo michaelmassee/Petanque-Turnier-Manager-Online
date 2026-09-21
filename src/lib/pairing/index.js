@@ -1,16 +1,18 @@
 import { generateRound as generateSupermeleeRound, checkRequirements as checkSupermeleeRequirements } from './supermelee.js';
 import { generateRound as generateSchweizerRound, checkRequirements as checkSchweizerRequirements } from './schweizer.js';
 import { generateRound as generateRoundRobinRound, checkRequirements as checkRoundRobinRequirements } from './roundrobin.js';
+import { generateRound as generateFormuleXRound, checkRequirements as checkFormuleXRequirements } from './formulex.js';
 
 export const PAIRING_STRATEGIES = {
   schweizer: { label: 'Schweizer-System', generateRound: generateSchweizerRound, checkRequirements: checkSchweizerRequirements },
   supermelee: { label: 'Supermêlée', generateRound: generateSupermeleeRound, checkRequirements: checkSupermeleeRequirements },
   jeder_gegen_jeden: { label: 'Jeder gegen Jeden', generateRound: generateRoundRobinRound, checkRequirements: checkRoundRobinRequirements },
+  formule_x: { label: 'Formule X', generateRound: generateFormuleXRound, checkRequirements: checkFormuleXRequirements },
 };
 
 // Supermêlée ist über registrationType codiert, alle anderen Systeme über type
-// (z.B. 'schweizer', 'jeder_gegen_jeden'). Neue Systeme müssen hier und in
-// PAIRING_STRATEGIES ergänzt werden - sonst nirgendwo.
+// (z.B. 'schweizer', 'jeder_gegen_jeden', 'formule_x'). Neue Systeme müssen hier und
+// in PAIRING_STRATEGIES ergänzt werden - sonst nirgendwo.
 export function getPlaySystemKey(tournament) {
   const registrationType = tournament.registrationType ?? tournament.registration_type;
   if (registrationType === 'supermelee') {
@@ -46,5 +48,6 @@ export function checkRoundRequirements(tournament, confirmedCount, roundsPlayed 
     return [];
   }
   const registrationType = tournament.registrationType ?? tournament.registration_type;
-  return strategy.checkRequirements(confirmedCount, { formation: tournament.formation, registrationType, roundsPlayed });
+  const formuleXRounds = tournament.formuleXRounds ?? tournament.formule_x_rounds ?? 4;
+  return strategy.checkRequirements(confirmedCount, { formation: tournament.formation, registrationType, roundsPlayed, formuleXRounds });
 }
