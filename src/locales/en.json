@@ -1018,5 +1018,6 @@
   "Unterstützt werden nur:": "Only supported:",
   "Nicht in der Auswahl:": "Not in the selection:",
   "diese Turniertypen unterstützen keine Online-Rundenverwaltung.": "these tournament types do not support online round management.",
-  "Dieser Turniertyp unterstützt keine Online-Rundenverwaltung (nur Schweizer-System und Supermêlée).": "This tournament type does not support online round management (only Schweizer-System and Supermêlée are supported)."
+  "Dieser Turniertyp unterstützt keine Online-Rundenverwaltung (nur Schweizer-System und Supermêlée).": "This tournament type does not support online round management (only Schweizer-System and Supermêlée are supported).",
+  "Alle Bouleplätze": "All boules courts", "Keine Bouleplätze vorhanden.": "No boules courts available.", "Keinem Verein zugeordnet": "Not assigned to a club", "Verein zuordnen": "Assign club", "Vereinszuordnung aktualisiert.": "Club assignment updated."
 }

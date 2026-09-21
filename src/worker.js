@@ -1249,10 +1249,20 @@ export default {
         await requireAdmin(request, env.DB);
         return await listPlaceReportsForAdmin(env.DB);
       }
+      if (request.method === 'GET' && url.pathname === '/api/admin/places') {
+        await requireAdmin(request, env.DB);
+        return await listAllBoulePlacesForAdmin(env.DB);
+      }
       const publishPlaceMatch = url.pathname.match(/^\/api\/admin\/places\/([^/]+)\/publish$/);
       if (publishPlaceMatch && request.method === 'POST') {
         await requireAdmin(request, env.DB);
         return await publishBoulePlace(env.DB, publishPlaceMatch[1]);
+      }
+      const adminPlaceClubMatch = url.pathname.match(/^\/api\/admin\/places\/([^/]+)\/club$/);
+      if (adminPlaceClubMatch && request.method === 'PUT') {
+        await requireAdmin(request, env.DB);
+        const body = await readJson(request);
+        return await updateBoulePlaceClubAsAdmin(env.DB, adminPlaceClubMatch[1], body.clubId);
       }
       if (request.method === 'GET' && url.pathname === '/api/admin/dashboard-stats') {
         await requireAdmin(request, env.DB);
@@ -5573,6 +5583,15 @@ async function listPlaceReportsForAdmin(db) {
   return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, null)) });
 }
 
+async function listAllBoulePlacesForAdmin(db) {
+  const rows = await db.prepare(
+    `SELECT p.*, c.name AS club_display_name, c.kind AS club_kind, c.logo_url AS club_logo_url,
+       c.website_url AS club_website_url, c.social_links AS club_social_links, c.owner_id
+     FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
+     ORDER BY p.created_at DESC`).all();
+  return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, { role: 'admin' })) });
+}
+
 async function toggleBoulePlaceLike(db, placeId, userId) {
   const place = await db.prepare("SELECT p.id FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id WHERE p.id = ? AND p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')").bind(placeId).first(); if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
   const liked = await db.prepare('SELECT 1 FROM boule_place_likes WHERE place_id = ? AND user_id = ?').bind(placeId, userId).first();
@@ -5848,6 +5867,22 @@ async function deleteClubAsAdmin(db, id) {
   const club = await db.prepare('SELECT id FROM clubs WHERE id = ?').bind(id).first();
   if (!club) throw new HttpError(404, 'Verein nicht gefunden');
   await db.prepare('DELETE FROM clubs WHERE id = ?').bind(id).run();
+  return json({ ok: true });
+}
+
+async function updateBoulePlaceClubAsAdmin(db, placeId, clubId) {
+  const place = await db.prepare('SELECT id, venue_type FROM boule_places WHERE id = ?').bind(placeId).first();
+  if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
+
+  const targetClubId = String(clubId || '').trim() || null;
+  if (targetClubId) {
+    const club = await db.prepare('SELECT id FROM clubs WHERE id = ?').bind(targetClubId).first();
+    if (!club) throw new HttpError(404, 'Verein nicht gefunden');
+    const conflict = await db.prepare('SELECT id FROM boule_places WHERE club_id = ? AND venue_type = ? AND id != ?').bind(targetClubId, place.venue_type, placeId).first();
+    if (conflict) throw new HttpError(409, 'Diese Organisation hat bereits einen Spielort dieses Typs');
+  }
+
+  await db.prepare('UPDATE boule_places SET club_id = ?, updated_at = ? WHERE id = ?').bind(targetClubId, new Date().toISOString(), placeId).run();
   return json({ ok: true });
 }
 

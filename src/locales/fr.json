@@ -1018,5 +1018,6 @@
   "Unterstützt werden nur:": "Compatible uniquement :",
   "Nicht in der Auswahl:": "Absent de la sélection :",
   "diese Turniertypen unterstützen keine Online-Rundenverwaltung.": "ces types de tournois ne prennent pas en charge la gestion des tours en ligne.",
-  "Dieser Turniertyp unterstützt keine Online-Rundenverwaltung (nur Schweizer-System und Supermêlée).": "Ce type de tournoi ne prend pas en charge la gestion des tours en ligne (seuls Schweizer-System et Supermêlée sont pris en charge)."
+  "Dieser Turniertyp unterstützt keine Online-Rundenverwaltung (nur Schweizer-System und Supermêlée).": "Ce type de tournoi ne prend pas en charge la gestion des tours en ligne (seuls Schweizer-System et Supermêlée sont pris en charge).",
+  "Alle Bouleplätze": "Tous les terrains", "Keine Bouleplätze vorhanden.": "Aucun terrain disponible.", "Keinem Verein zugeordnet": "Aucun club associé", "Verein zuordnen": "Associer un club", "Vereinszuordnung aktualisiert.": "Association du club mise à jour."
 }

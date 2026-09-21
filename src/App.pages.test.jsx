@@ -357,6 +357,7 @@ describe('Vereinsmoderation', () => {
       if (path === '/api/admin/club-editor-requests') return Promise.resolve({ requests: [] });
       if (path === '/api/admin/pending-places') return Promise.resolve({ places: [] });
       if (path === '/api/admin/place-reports') return Promise.resolve({ places: [] });
+      if (path === '/api/admin/places') return Promise.resolve({ places: [] });
       if (path === '/api/admin/clubs') return Promise.resolve({ clubs: [club] });
       if (path === '/api/users') return Promise.resolve({ users: [] });
       if (path === '/api/admin/clubs/club-1' && options.method === 'PUT') return Promise.resolve({ ok: true });
@@ -375,6 +376,31 @@ describe('Vereinsmoderation', () => {
 
     await screen.findByText('Verein aktualisiert.');
     expect(authenticatedApi).toHaveBeenCalledWith('/api/admin/clubs/club-1', expect.objectContaining({ method: 'PUT' }));
+  });
+
+  it('ordnet einen Bouleplatz einer Organisation zu', async () => {
+    const club = { id: 'club-1', name: 'BC Linden', kind: 'club', status: 'published', ownerName: 'Anna Admin', ownerEmail: 'anna@example.com', placeCount: 0, editorCount: 1 };
+    const place = { id: 'place-1', name: 'Boulepark', address: 'Parkweg 1, Linden', venueType: 'outdoor', status: 'published', clubId: null, clubName: null };
+    const authenticatedApi = vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation((path, options = {}) => {
+      if (path === '/api/admin/club-editor-requests') return Promise.resolve({ requests: [] });
+      if (path === '/api/admin/pending-places') return Promise.resolve({ places: [] });
+      if (path === '/api/admin/place-reports') return Promise.resolve({ places: [] });
+      if (path === '/api/admin/places') return Promise.resolve({ places: [place] });
+      if (path === '/api/admin/clubs') return Promise.resolve({ clubs: [club] });
+      if (path === '/api/users') return Promise.resolve({ users: [] });
+      if (path === '/api/admin/places/place-1/club' && options.method === 'PUT') return Promise.resolve({ ok: true });
+      throw new Error(`unerwarteter API-Aufruf: ${options.method || 'GET'} ${path}`);
+    });
+
+    render(<ClubModerationPanel language="de" />);
+
+    await screen.findByText('Boulepark');
+    fireEvent.click(screen.getByRole('button', { name: 'Verein zuordnen' }));
+    fireEvent.change(screen.getByLabelText('Verein'), { target: { value: 'club-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await screen.findByText('Vereinszuordnung aktualisiert.');
+    expect(authenticatedApi).toHaveBeenCalledWith('/api/admin/places/place-1/club', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ clubId: 'club-1' }) }));
   });
 });
 

@@ -34,6 +34,7 @@ export function ClubModerationPanel({ language }) {
   const [requests, setRequests] = useState([]);
   const [places, setPlaces] = useState([]);
   const [placeReports, setPlaceReports] = useState([]);
+  const [allPlaces, setAllPlaces] = useState([]);
   const [clubs, setClubs] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +43,9 @@ export function ClubModerationPanel({ language }) {
   const [editPlaceId, setEditPlaceId] = useState(null);
   const [editPlaceForm, setEditPlaceForm] = useState(EMPTY_PLACE_FORM);
   const [editPlaceSaving, setEditPlaceSaving] = useState(false);
+  const [placeClubDialog, setPlaceClubDialog] = useState(null);
+  const [selectedPlaceClubId, setSelectedPlaceClubId] = useState('');
+  const [placeClubSaving, setPlaceClubSaving] = useState(false);
   const [editClub, setEditClub] = useState(null);
   const [editClubForm, setEditClubForm] = useState(EMPTY_CLUB_FORM);
   const [editClubSaving, setEditClubSaving] = useState(false);
@@ -56,16 +60,18 @@ export function ClubModerationPanel({ language }) {
   async function load() {
     setLoading(true); setError('');
     try {
-      const [requestsData, placesData, placeReportsData, clubsData, usersData] = await Promise.all([
+      const [requestsData, placesData, placeReportsData, allPlacesData, clubsData, usersData] = await Promise.all([
         authenticatedApi('/api/admin/club-editor-requests'),
         authenticatedApi('/api/admin/pending-places'),
         authenticatedApi('/api/admin/place-reports'),
+        authenticatedApi('/api/admin/places'),
         authenticatedApi('/api/admin/clubs'),
         authenticatedApi('/api/users'),
       ]);
       setRequests(requestsData.requests || []);
       setPlaces(placesData.places || []);
       setPlaceReports(placeReportsData.places || []);
+      setAllPlaces(allPlacesData.places || []);
       setClubs(clubsData.clubs || []);
       setUsers(usersData.users || []);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
@@ -145,12 +151,16 @@ export function ClubModerationPanel({ language }) {
   const filteredPlaceReports = term
     ? placeReports.filter((p) => `${p.name} ${p.address}`.toLowerCase().includes(term))
     : placeReports;
+  const filteredAllPlaces = term
+    ? allPlaces.filter((p) => `${p.name} ${p.clubName || ''} ${p.address}`.toLowerCase().includes(term))
+    : allPlaces;
   const filteredClubs = term
     ? clubs.filter((c) => `${c.name} ${c.ownerName} ${c.ownerEmail}`.toLowerCase().includes(term))
     : clubs;
   const visibleRequests = useInfiniteList(filteredRequests);
   const visiblePlaces = useInfiniteList(filteredPlaces);
   const visiblePlaceReports = useInfiniteList(filteredPlaceReports);
+  const visibleAllPlaces = useInfiniteList(filteredAllPlaces);
   const visibleClubs = useInfiniteList(filteredClubs);
 
   async function submitEditPlace(event) {
@@ -165,6 +175,24 @@ export function ClubModerationPanel({ language }) {
       setMessage(t('Bouleplatz aktualisiert.'));
       await load();
     } catch (err) { setError(err.message); } finally { setEditPlaceSaving(false); }
+  }
+
+  function openPlaceClubDialog(place) {
+    setPlaceClubDialog(place);
+    setSelectedPlaceClubId(place.clubId || '');
+  }
+
+  async function submitPlaceClub(event) {
+    event.preventDefault();
+    setError(''); setMessage(''); setPlaceClubSaving(true);
+    try {
+      await authenticatedApi(`/api/admin/places/${placeClubDialog.id}/club`, {
+        method: 'PUT', body: JSON.stringify({ clubId: selectedPlaceClubId || null }),
+      });
+      setPlaceClubDialog(null);
+      setMessage(t('Vereinszuordnung aktualisiert.'));
+      await load();
+    } catch (err) { setError(err.message); } finally { setPlaceClubSaving(false); }
   }
 
   function openEditClub(club) {
@@ -228,6 +256,31 @@ export function ClubModerationPanel({ language }) {
                 );
               })}
               <InfiniteListLoadMore hasMore={visibleRequests.hasMore} onLoadMore={visibleRequests.loadMore} label={t('Weitere Einträge laden')} />
+            </div>
+          </div>
+
+          <div className="panel user-list-panel">
+            <div className="section-title">
+              <h2>{t('Alle Bouleplätze')}</h2>
+              <span className="counter">{filteredAllPlaces.length}</span>
+            </div>
+            <div className="user-list">
+              {filteredAllPlaces.length === 0 && <p className="muted">{t('Keine Bouleplätze vorhanden.')}</p>}
+              {visibleAllPlaces.items.map((place) => (
+                <article className="data-row" key={place.id}>
+                  <div>
+                    <strong data-i18n-skip>{place.name}</strong>
+                    <span data-i18n-skip className={place.status === 'published' ? 'status registration-confirmed' : place.status === 'rejected' ? 'status registration-cancelled' : 'status registration-pending'}>
+                      {statusLabel(place.status, t)} · {place.address}
+                    </span>
+                    <small>{place.clubName || t('Keinem Verein zugeordnet')}</small>
+                  </div>
+                  <div className="row-actions">
+                    <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openPlaceClubDialog(place)}>{t('Verein zuordnen')}</Button>
+                  </div>
+                </article>
+              ))}
+              <InfiniteListLoadMore hasMore={visibleAllPlaces.hasMore} onLoadMore={visibleAllPlaces.loadMore} label={t('Weitere Einträge laden')} />
             </div>
           </div>
 
@@ -325,6 +378,27 @@ export function ClubModerationPanel({ language }) {
             <Button type="submit" loading={editPlaceSaving}>{t('Speichern')}</Button>
           </div>
         </form>
+      </EditDialog>
+
+      <EditDialog open={Boolean(placeClubDialog)} title={t('Verein zuordnen')} error={error} onClose={() => setPlaceClubDialog(null)}>
+        {placeClubDialog && (
+          <form className="form" onSubmit={submitPlaceClub}>
+            <p className="muted" data-i18n-skip>{placeClubDialog.name}</p>
+            <SelectField
+              label={t('Verein')}
+              value={selectedPlaceClubId}
+              onChange={setSelectedPlaceClubId}
+              options={[
+                { value: '', label: t('Keinem Verein zugeordnet') },
+                ...clubs.map((club) => ({ value: club.id, label: `${club.name} (${t(club.kind === 'group' ? 'Gruppe' : 'Verein')})` })),
+              ]}
+            />
+            <div className="dialog-actions">
+              <Button variant="secondary" type="button" onClick={() => setPlaceClubDialog(null)}>{t('Abbrechen')}</Button>
+              <Button type="submit" loading={placeClubSaving}>{t('Speichern')}</Button>
+            </div>
+          </form>
+        )}
       </EditDialog>
 
       <EditDialog open={Boolean(editClub)} title={t('Verein bearbeiten')} error={error} onClose={() => setEditClub(null)}>
