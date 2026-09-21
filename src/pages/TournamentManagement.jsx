@@ -381,6 +381,16 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               onChange={(formuleXRounds) => setForm({ ...form, formuleXRounds })}
             />
           )}
+          {form.type === 'ko' && (
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={form.koPlatz3}
+                onChange={(event) => setForm({ ...form, koPlatz3: event.target.checked })}
+              />
+              {t('Spiel um Platz 3 austragen')}
+            </label>
+          )}
           {showFormationHelp && (
             <FormationHelpDialog onClose={() => setShowFormationHelp(false)} />
           )}
@@ -728,6 +738,7 @@ function tournamentToForm(tournament) {
     registrationType: tournament.registrationType || 'forme',
     schweizerRankingMode: tournament.schweizerRankingMode || 'mit_buchholz',
     formuleXRounds: tournament.formuleXRounds || 4,
+    koPlatz3: tournament.koPlatz3 === undefined ? true : Boolean(tournament.koPlatz3),
     status: tournament.status || 'draft',
     maxRegistrations: tournament.maxRegistrations || 0,
     registrationDeadline: utcIsoToZonedDateTimeInput(tournament.registrationDeadline, tournament.timezone),

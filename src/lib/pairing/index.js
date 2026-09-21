@@ -2,12 +2,14 @@ import { generateRound as generateSupermeleeRound, checkRequirements as checkSup
 import { generateRound as generateSchweizerRound, checkRequirements as checkSchweizerRequirements } from './schweizer.js';
 import { generateRound as generateRoundRobinRound, checkRequirements as checkRoundRobinRequirements } from './roundrobin.js';
 import { generateRound as generateFormuleXRound, checkRequirements as checkFormuleXRequirements } from './formulex.js';
+import { generateRound as generateKoRound, checkRequirements as checkKoRequirements } from './ko.js';
 
 export const PAIRING_STRATEGIES = {
   schweizer: { label: 'Schweizer-System', generateRound: generateSchweizerRound, checkRequirements: checkSchweizerRequirements },
   supermelee: { label: 'Supermêlée', generateRound: generateSupermeleeRound, checkRequirements: checkSupermeleeRequirements },
   jeder_gegen_jeden: { label: 'Jeder gegen Jeden', generateRound: generateRoundRobinRound, checkRequirements: checkRoundRobinRequirements },
   formule_x: { label: 'Formule X', generateRound: generateFormuleXRound, checkRequirements: checkFormuleXRequirements },
+  ko: { label: 'K.O.', generateRound: generateKoRound, checkRequirements: checkKoRequirements },
 };
 
 // Supermêlée ist über registrationType codiert, alle anderen Systeme über type

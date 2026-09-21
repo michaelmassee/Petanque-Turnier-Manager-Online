@@ -2544,6 +2544,13 @@ a.left-panel-link {
   gap: 12px;
 }
 
+.supermelee-match-stage {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #53627a;
+  text-transform: uppercase;
+}
+
 .supermelee-match-teams {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

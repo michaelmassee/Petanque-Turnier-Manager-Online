@@ -18,6 +18,7 @@ import { getPairingStrategy, isOnlinePlayable } from './lib/pairing/index.js';
 import { competitionRanks, computeRanking, sameStandardRankingPlace } from './lib/pairing/ranking.js';
 import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schweizer.js';
 import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
+import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
 import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
 
@@ -3173,10 +3174,10 @@ async function createTournament(request, env, user) {
     .prepare(
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, registration_type, status,
-        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, contact_name, contact_email, contact_phone,
+        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
         latitude, longitude, geocoded_at, timezone, boule_place_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -3199,6 +3200,7 @@ async function createTournament(request, env, user) {
       tournament.currency,
       tournament.schweizerRankingMode,
       tournament.formuleXRounds,
+      tournament.koPlatz3 ? 1 : 0,
       tournament.contactName,
       tournament.contactEmail,
       tournament.contactPhone,
@@ -3252,12 +3254,12 @@ async function duplicateTournament(db, existing, actingUser) {
     .prepare(
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
-        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, contact_name, contact_email, contact_phone,
+        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, created_at, updated_at
       )
       SELECT ?, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
-        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, contact_name, contact_email, contact_phone,
+        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, ?, ?
       FROM tournaments WHERE id = ?`,
@@ -3428,7 +3430,7 @@ async function updateTournament(request, env, existing, user) {
     .prepare(
       `UPDATE tournaments
        SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
-           formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, schweizer_ranking_mode = ?, formule_x_rounds = ?,
+           formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, schweizer_ranking_mode = ?, formule_x_rounds = ?, ko_platz3 = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
            participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, boule_place_id = ?, updated_at = ?
        WHERE id = ?`,
@@ -3452,6 +3454,7 @@ async function updateTournament(request, env, existing, user) {
       tournament.currency,
       tournament.schweizerRankingMode,
       tournament.formuleXRounds,
+      tournament.koPlatz3 ? 1 : 0,
       tournament.contactName,
       tournament.contactEmail,
       tournament.contactPhone,
@@ -4032,6 +4035,7 @@ function toPublicMatch(row, playersById) {
     scoreA: row.score_a,
     scoreB: row.score_b,
     noShow: row.no_show,
+    stageLabel: row.stage_label || null,
   };
 }
 
@@ -4059,13 +4063,29 @@ async function getPlayersById(db, tournamentId) {
 
 async function getSchweizerTeams(db, tournament) {
   const result = await db.prepare('SELECT * FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id').bind(tournament.id).all();
-  return result.results.map((row) => ({ id: row.id, members: JSON.parse(row.member_registration_ids), seedPosition: Number(row.seed_position || 0) }));
+  return result.results.map((row) => ({ id: row.id, members: JSON.parse(row.member_registration_ids), seedPosition: Number(row.seed_position || 0), bracketGroup: row.bracket_group || null }));
+}
+
+// Ordnet KO-Teams einmalig (vor der ersten Runde) einem unabhängigen Teilbaum zu (siehe
+// lib/pairing/ko.js assignGroups - GruppenAufteilungRechner-Referenz) und persistiert das,
+// damit die Zuordnung über alle folgenden Runden stabil bleibt. Idempotent: Teams, die
+// bereits eine bracket_group haben, werden nicht verändert.
+async function assignKoBracketGroups(db, tournament, teams) {
+  if (teams.every((team) => team.bracketGroup)) {
+    return teams;
+  }
+  const ordered = orderKoSeeds(teams);
+  const assignment = assignKoGroups(ordered.map((team) => team.id));
+  const groupById = new Map(assignment.map((entry) => [entry.teamId, entry.group]));
+  await db.batch(teams.map((team) => db.prepare('UPDATE tournament_teams SET bracket_group = ? WHERE id = ?').bind(groupById.get(team.id) || 'A', team.id)));
+  return teams.map((team) => ({ ...team, bracketGroup: groupById.get(team.id) || 'A' }));
 }
 
 async function createFormeTeams(db, tournament) {
   const current = await getSchweizerTeams(db, tournament);
   if (current.length) return current;
   const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1 ORDER BY registered_at").bind(tournament.id).all();
+  if (!registrations.results.length) return [];
   const nowMs = Date.now();
   // Jede Zeile bekommt einen eigenen, um 1ms pro Index versetzten Zeitstempel statt
   // desselben `now` für alle - sonst sortiert getSchweizerTeams() (ORDER BY created_at,
@@ -4145,17 +4165,22 @@ async function generateTournamentRound(db, tournament) {
   const isSchweizer = tournament.type === 'schweizer' && tournament.registration_type !== 'supermelee';
   const isRoundRobin = tournament.type === 'jeder_gegen_jeden';
   const isFormuleX = tournament.type === 'formule_x';
-  // Jeder gegen Jeden und Formule X nutzen dasselbe feste-Teams-Modell wie Schweizer-
-  // Formée: eine Meldung = ein Team über alle Runden (siehe lib/pairing/roundrobin.js,
-  // lib/pairing/formulex.js) - Mêlée-Durchmischung widerspräche beiden Systemen.
-  const usesFixedTeams = isSchweizer || isRoundRobin || isFormuleX;
+  const isKo = tournament.type === 'ko';
+  // Jeder gegen Jeden, Formule X und K.O. nutzen dasselbe feste-Teams-Modell wie
+  // Schweizer-Formée: eine Meldung = ein Team über alle Runden (siehe
+  // lib/pairing/roundrobin.js, lib/pairing/formulex.js, lib/pairing/ko.js) -
+  // Mêlée-Durchmischung widerspräche allen dreien.
+  const usesFixedTeams = isSchweizer || isRoundRobin || isFormuleX || isKo;
   let players;
   let teamsById = new Map();
   if (usesFixedTeams) {
-    const teams = isRoundRobin || isFormuleX || tournament.registration_type === 'forme'
+    let teams = isRoundRobin || isFormuleX || isKo || tournament.registration_type === 'forme'
       ? await createFormeTeams(db, tournament)
       : await getSchweizerTeams(db, tournament);
     if (!teams.length) throw new HttpError(400, 'Bitte zuerst Mêlée-Teams auslosen');
+    if (isKo) {
+      teams = await assignKoBracketGroups(db, tournament, teams);
+    }
     players = teams;
     teamsById = new Map(teams.map((team) => [team.id, team]));
   } else {
@@ -4163,14 +4188,23 @@ async function generateTournamentRound(db, tournament) {
     players = registrationsResult.results.map((row) => ({ id: row.id }));
   }
 
+  // round_number/match_index braucht nur K.O. (Winner-Advance-Rekonstruktion, siehe
+  // lib/pairing/ko.js historyForGroup), für die anderen Formate sind die Felder harmlos.
   const historyResult = await db
-    .prepare('SELECT team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, no_show FROM tournament_matches WHERE tournament_id = ?')
+    .prepare(
+      `SELECT m.team_a_registration_ids, m.team_b_registration_ids, m.team_a_id, m.team_b_id,
+              m.score_a, m.score_b, m.no_show, m.match_index, r.round_number
+       FROM tournament_matches m JOIN tournament_rounds r ON r.id = m.round_id
+       WHERE m.tournament_id = ?
+       ORDER BY r.round_number ASC, m.match_index ASC`,
+    )
     .bind(tournament.id)
     .all();
   const history = historyResult.results.map((row) => ({
     teamA: usesFixedTeams && row.team_a_id ? [row.team_a_id] : JSON.parse(row.team_a_registration_ids),
     teamB: usesFixedTeams && row.team_b_id ? [row.team_b_id] : JSON.parse(row.team_b_registration_ids),
     scoreA: row.score_a, scoreB: row.score_b, noShow: row.no_show,
+    roundNumber: row.round_number, matchIndex: row.match_index,
   }));
 
   const strategy = getPairingStrategy(tournament);
@@ -4180,7 +4214,9 @@ async function generateTournamentRound(db, tournament) {
       ? { mode: tournament.schweizer_ranking_mode }
       : isFormuleX
         ? { formuleXRounds: tournament.formule_x_rounds }
-        : { formation: tournament.formation };
+        : isKo
+          ? { platz3: !!tournament.ko_platz3 }
+          : { formation: tournament.formation };
     ({ matches } = strategy.generateRound(players, history, strategyOptions));
   } catch (error) {
     // generateRound prüft die Mindestvoraussetzungen (u.a. mind. 4 bestätigte
@@ -4197,21 +4233,22 @@ async function generateTournamentRound(db, tournament) {
   const statements = [
     db.prepare('INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES (?, ?, ?, ?)').bind(roundId, tournament.id, roundNumber, now),
   ];
-  for (const match of matches) {
+  matches.forEach((match, matchIndex) => {
     const teamA = usesFixedTeams ? teamsById.get(match.teamA[0]) : null;
     const teamB = usesFixedTeams && match.teamB.length ? teamsById.get(match.teamB[0]) : null;
     statements.push(
       db
         .prepare(
-          'INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, match_index, stage_label, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         )
         // Freilos-Anzeigewert 13:7 statt 13:0, konsistent mit den Hauptprojekt-Default-
         // Freispielpunkten (Diff 6), die swissStats() in schweizer.js verbucht. Auch für
         // Jeder-gegen-Jeden nötig, sonst blockiert ein unbewertetes Freilos-Match die
-        // nächste Runde (siehe openMatches-Check oben).
-        .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(teamA?.members || match.teamA), JSON.stringify(teamB?.members || match.teamB), teamA?.id || null, teamB?.id || null, usesFixedTeams && !teamB ? 13 : null, usesFixedTeams && !teamB ? 7 : null, now, now),
+        // nächste Runde (siehe openMatches-Check oben). K.O. kennt kein Freilos (Cadrage
+        // statt Freilos, siehe lib/pairing/ko.js), match.teamB ist dort immer belegt.
+        .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(teamA?.members || match.teamA), JSON.stringify(teamB?.members || match.teamB), teamA?.id || null, teamB?.id || null, usesFixedTeams && !teamB ? 13 : null, usesFixedTeams && !teamB ? 7 : null, matchIndex, match.label || null, now, now),
     );
-  }
+  });
   try {
     await db.batch(statements);
   } catch (error) {
@@ -4277,6 +4314,13 @@ async function getTournamentRanking(db, tournament) {
       ...entry, teamId: entry.teamId,
       members: (teamsById.get(entry.teamId)?.members || []).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
     })) });
+  }
+  if (tournament.type === 'ko') {
+    // Anders als Schweizer/Formule X/JGJ kennt das Hauptprojekt für K.O. keine
+    // separate Endrangliste (kein "KoRanglisteSheet") - die Platzierung ergibt
+    // sich direkt aus dem Turnierbaum selbst (Rundenbezeichnung, Sieger-/Platz3-
+    // Anzeige, siehe lib/pairing/ko.js). Es gibt daher bewusst keine Rangliste.
+    return json({ ranking: [] });
   }
   if (tournament.type === 'formule_x') {
     const teams = await createFormeTeams(db, tournament);
@@ -6777,6 +6821,7 @@ function toPublicTournament(row, user) {
     registrationType: row.registration_type || 'forme',
     schweizerRankingMode: row.schweizer_ranking_mode || 'mit_buchholz',
     formuleXRounds: Number(row.formule_x_rounds || 4),
+    koPlatz3: row.ko_platz3 === undefined ? true : Boolean(Number(row.ko_platz3)),
     status: row.status,
     maxRegistrations: Number(row.max_registrations || 0),
     registrationDeadline: row.registration_deadline,

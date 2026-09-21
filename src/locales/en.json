@@ -762,6 +762,8 @@
   "Anzahl Runden": "Number of rounds",
   "Ungültige Formule-X-Rundenzahl": "Invalid Formule X round count",
   "Jeder gegen Jeden ist online nur mit Anmeldeart \"Formée\" (feste Teams) spielbar.": "Round robin can only be played online with the \"Formed team\" registration type (fixed teams).",
+  "K.O. ist online nur mit Anmeldeart \"Formée\" (feste Teams) spielbar.": "Knockout can only be played online with the \"Formed team\" registration type (fixed teams).",
+  "Spiel um Platz 3 austragen": "Play a match for 3rd place",
   "Nach Turnierstart können Teams nicht mehr ausgelost werden": "Teams cannot be drawn after the tournament has started",
   "Nach Turnierende können Teams nicht mehr ausgelost werden": "Teams cannot be drawn after the tournament has ended",
   "Für die Mêlée-Auslosung werden mindestens": "Mêlée drawing requires at least",

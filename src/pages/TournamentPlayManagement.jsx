@@ -58,6 +58,7 @@ function MatchRow({ match, onSave, busy }) {
 
   return (
     <article className="supermelee-match">
+      {match.stageLabel && <div className="supermelee-match-stage" data-i18n-skip>{match.stageLabel}</div>}
       <div className="supermelee-match-teams">
         <div className="supermelee-team" data-i18n-skip>{teamLabel(match.teamA)}</div>
         <div className="supermelee-vs">{t('gegen')}</div>
