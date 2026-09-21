@@ -207,6 +207,12 @@ export default function TournamentPlayManagement({ tournaments: allTournaments }
           noEmail: true,
           confirmImmediately: true,
           language: i18n.language,
+          // Ohne diese beiden Felder lehnt resolveFeeSelections()/resolveRegistrationAnswers()
+          // in worker.js die Neuanlage ab ("Ungültige Startgeld-Auswahl"/"Ungültige
+          // Teilnehmerantworten") - bei einer Neuanmeldung (kein existing) verlangen beide
+          // zwingend ein Array, auch ein leeres.
+          feeSelections: [],
+          registrationAnswers: [],
         }),
       });
       setQuickPlayer({ firstName: '', lastName: '', licenseNr: '' });
@@ -299,7 +305,7 @@ export default function TournamentPlayManagement({ tournaments: allTournaments }
   // keine Anpassung an dieser Stelle brauchen. Nur aktive Meldungen zählen, analog zum
   // Hauptprojekt (nur Meldungen mit Spieltag-Status "JA" gehen in die Rundenauslosung ein).
   const strategyRequirementGaps = selectedTournament && selectedTournamentStatus === 'running'
-    ? checkRoundRequirements(selectedTournament, activeConfirmedCount)
+    ? checkRoundRequirements(selectedTournament, activeConfirmedCount, rounds.length)
     : [];
   const missingRequirements = [
     ...strategyRequirementGaps.map((requirement) => requirementText(requirement, t)),

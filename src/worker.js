@@ -4059,12 +4059,17 @@ async function getSchweizerTeams(db, tournament) {
   return result.results.map((row) => ({ id: row.id, members: JSON.parse(row.member_registration_ids), seedPosition: Number(row.seed_position || 0) }));
 }
 
-async function createFormeSchweizerTeams(db, tournament) {
+async function createFormeTeams(db, tournament) {
   const current = await getSchweizerTeams(db, tournament);
   if (current.length) return current;
   const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1 ORDER BY registered_at").bind(tournament.id).all();
-  const now = new Date().toISOString();
-  await db.batch(registrations.results.map((row) => db.prepare('INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), tournament.id, JSON.stringify([row.id]), Number(row.seeding_position || 0), now)));
+  const nowMs = Date.now();
+  // Jede Zeile bekommt einen eigenen, um 1ms pro Index versetzten Zeitstempel statt
+  // desselben `now` für alle - sonst sortiert getSchweizerTeams() (ORDER BY created_at,
+  // id) bei Gleichstand nach der zufälligen UUID statt der Anmeldereihenfolge, was vor
+  // allem bei Jeder-gegen-Jeden die aus Sicht der Teams nachvollziehbare Reihenfolge
+  // zerstört (Round Robin ist ansonsten unabhängig von der Reihenfolge korrekt).
+  await db.batch(registrations.results.map((row, index) => db.prepare('INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), tournament.id, JSON.stringify([row.id]), Number(row.seeding_position || 0), new Date(nowMs + index).toISOString())));
   return getSchweizerTeams(db, tournament);
 }
 
@@ -4135,11 +4140,16 @@ async function generateTournamentRound(db, tournament) {
   }
 
   const isSchweizer = tournament.type === 'schweizer' && tournament.registration_type !== 'supermelee';
+  const isRoundRobin = tournament.type === 'jeder_gegen_jeden';
+  // Jeder gegen Jeden nutzt dasselbe feste-Teams-Modell wie Schweizer-Formée: eine
+  // Meldung = ein Team über alle Runden (siehe lib/pairing/roundrobin.js) - Mêlée-
+  // Durchmischung widerspräche dem Round-Robin-Prinzip.
+  const usesFixedTeams = isSchweizer || isRoundRobin;
   let players;
   let teamsById = new Map();
-  if (isSchweizer) {
-    const teams = tournament.registration_type === 'forme'
-      ? await createFormeSchweizerTeams(db, tournament)
+  if (usesFixedTeams) {
+    const teams = isRoundRobin || tournament.registration_type === 'forme'
+      ? await createFormeTeams(db, tournament)
       : await getSchweizerTeams(db, tournament);
     if (!teams.length) throw new HttpError(400, 'Bitte zuerst Mêlée-Teams auslosen');
     players = teams;
@@ -4154,8 +4164,8 @@ async function generateTournamentRound(db, tournament) {
     .bind(tournament.id)
     .all();
   const history = historyResult.results.map((row) => ({
-    teamA: isSchweizer && row.team_a_id ? [row.team_a_id] : JSON.parse(row.team_a_registration_ids),
-    teamB: isSchweizer && row.team_b_id ? [row.team_b_id] : JSON.parse(row.team_b_registration_ids),
+    teamA: usesFixedTeams && row.team_a_id ? [row.team_a_id] : JSON.parse(row.team_a_registration_ids),
+    teamB: usesFixedTeams && row.team_b_id ? [row.team_b_id] : JSON.parse(row.team_b_registration_ids),
     scoreA: row.score_a, scoreB: row.score_b, noShow: row.no_show,
   }));
 
@@ -4179,16 +4189,18 @@ async function generateTournamentRound(db, tournament) {
     db.prepare('INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES (?, ?, ?, ?)').bind(roundId, tournament.id, roundNumber, now),
   ];
   for (const match of matches) {
-    const teamA = isSchweizer ? teamsById.get(match.teamA[0]) : null;
-    const teamB = isSchweizer && match.teamB.length ? teamsById.get(match.teamB[0]) : null;
+    const teamA = usesFixedTeams ? teamsById.get(match.teamA[0]) : null;
+    const teamB = usesFixedTeams && match.teamB.length ? teamsById.get(match.teamB[0]) : null;
     statements.push(
       db
         .prepare(
           'INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         )
         // Freilos-Anzeigewert 13:7 statt 13:0, konsistent mit den Hauptprojekt-Default-
-        // Freispielpunkten (Diff 6), die swissStats() in schweizer.js verbucht.
-        .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(teamA?.members || match.teamA), JSON.stringify(teamB?.members || match.teamB), teamA?.id || null, teamB?.id || null, isSchweizer && !teamB ? 13 : null, isSchweizer && !teamB ? 7 : null, now, now),
+        // Freispielpunkten (Diff 6), die swissStats() in schweizer.js verbucht. Auch für
+        // Jeder-gegen-Jeden nötig, sonst blockiert ein unbewertetes Freilos-Match die
+        // nächste Runde (siehe openMatches-Check oben).
+        .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(teamA?.members || match.teamA), JSON.stringify(teamB?.members || match.teamB), teamA?.id || null, teamB?.id || null, usesFixedTeams && !teamB ? 13 : null, usesFixedTeams && !teamB ? 7 : null, now, now),
     );
   }
   try {
