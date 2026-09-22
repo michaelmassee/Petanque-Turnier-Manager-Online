@@ -6,6 +6,7 @@ import { Feedback } from '../components/ui.jsx';
 export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, registrationsCount }) {
   const { t } = useTranslation();
   const [stats, setStats] = useState(null);
+  const [pendingPetanqueAktuellImports, setPendingPetanqueAktuellImports] = useState(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -17,6 +18,12 @@ export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, 
       try {
         const result = await authenticatedApi('/api/admin/dashboard-stats');
         if (!cancelled) setStats(result);
+        try {
+          const candidates = await authenticatedApi('/api/admin/petanque-aktuell/tournaments');
+          if (!cancelled) setPendingPetanqueAktuellImports((candidates.tournaments || []).filter((tournament) => !tournament.imported).length);
+        } catch {
+          if (!cancelled) setPendingPetanqueAktuellImports(undefined);
+        }
       } catch (requestError) {
         if (!cancelled) setError(requestError.message);
       } finally {
@@ -64,7 +71,7 @@ export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, 
       title: t('Vereine'),
       description: t('Vereine verwalten, einschließlich Anfragen und Berechtigungen.'),
       statLabel: t('Offene Anfragen'),
-      statValue: stats?.pendingClubEditorRequests,
+      statValue: stats?.pendingClubRequests,
       onClick: () => onSelectTab('clubs'),
     },
     {
@@ -72,7 +79,7 @@ export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, 
       title: t('Bouleplätze'),
       description: t('Bouleplätze verwalten, einschließlich Freigaben und Meldungen.'),
       statLabel: t('Offene Vorgänge'),
-      statValue: stats ? stats.pendingPlaces + stats.pendingPlaceReports : undefined,
+      statValue: stats?.pendingPlaces,
       onClick: () => onSelectTab('places'),
     },
     {
@@ -87,8 +94,8 @@ export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, 
       key: 'petanque-aktuell-import',
       title: t('Pétanque Aktuell importieren'),
       description: t('Turniere von Pétanque Aktuell importieren'),
-      statLabel: null,
-      statValue: undefined,
+      statLabel: t('Noch nicht importiert'),
+      statValue: pendingPetanqueAktuellImports,
       onClick: () => onSelectTab('petanque-aktuell-import'),
     },
     {

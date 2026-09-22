@@ -10,6 +10,7 @@ import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx
 import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
 import { UserManagementPanel } from './pages/UserManagementPanel.jsx';
 import { ClubModerationPanel } from './pages/ClubModerationPanel.jsx';
+import { AdminDashboardPage } from './pages/AdminDashboardPage.jsx';
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
 import { RichText } from './components/RichText.jsx';
 import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
@@ -47,6 +48,34 @@ describe('Entfernungs-Badge', () => {
     const { container } = render(<DistanceBadge distanceKm={undefined} />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('Admin-Dashboard', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('zeigt offene Vereinsanfragen bei Vereinen und nicht bei Bouleplätzen', async () => {
+    vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation((path) => {
+      if (path === '/api/admin/dashboard-stats') return Promise.resolve({
+        users: 0,
+        pendingApiKeys: 0,
+        pendingClubRequests: 1,
+        pendingPlaces: 0,
+        playerListings: 0,
+      });
+      if (path === '/api/admin/petanque-aktuell/tournaments') return Promise.resolve({
+        tournaments: [{ externalKey: 'imported', imported: true }, { externalKey: 'new', imported: false }],
+      });
+      throw new Error(`unerwarteter API-Aufruf: ${path}`);
+    });
+
+    render(<AdminDashboardPage onSelectTab={() => {}} onNavigate={() => {}} tournamentsCount={0} registrationsCount={0} />);
+
+    expect(await within(screen.getByRole('button', { name: /Vereine/ })).findByText('1')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /Bouleplätze/ })).getByText('0')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /Pétanque Aktuell importieren/ })).getByText('1')).toBeInTheDocument();
   });
 });
 

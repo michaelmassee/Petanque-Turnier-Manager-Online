@@ -5915,20 +5915,19 @@ async function listPendingBoulePlaces(db) {
 }
 
 async function getAdminDashboardStats(db) {
-  const [users, pendingApiKeys, pendingClubEditorRequests, pendingPlaces, pendingPlaceReports, playerListings] = await Promise.all([
+  const [users, pendingApiKeys, pendingClubEditorRequests, pendingClubs, pendingPlaces, playerListings] = await Promise.all([
     db.prepare('SELECT COUNT(*) AS count FROM users').first(),
     db.prepare("SELECT COUNT(*) AS count FROM api_keys WHERE status = 'pending'").first(),
     db.prepare('SELECT COUNT(*) AS count FROM club_editor_requests').first(),
-    db.prepare("SELECT COUNT(*) AS count FROM boule_places WHERE club_id IS NOT NULL AND status = 'pending'").first(),
+    db.prepare("SELECT COUNT(*) AS count FROM clubs WHERE status = 'pending'").first(),
     db.prepare("SELECT COUNT(*) AS count FROM boule_places WHERE club_id IS NULL AND status = 'pending'").first(),
     db.prepare('SELECT COUNT(*) AS count FROM player_listings').first(),
   ]);
   return json({
     users: Number(users.count),
     pendingApiKeys: Number(pendingApiKeys.count),
-    pendingClubEditorRequests: Number(pendingClubEditorRequests.count),
+    pendingClubRequests: Number(pendingClubs.count) + Number(pendingClubEditorRequests.count),
     pendingPlaces: Number(pendingPlaces.count),
-    pendingPlaceReports: Number(pendingPlaceReports.count),
     playerListings: Number(playerListings.count),
   });
 }
