@@ -5491,13 +5491,14 @@ async function listClubEditors(db, clubId, user) {
 }
 
 async function addClubEditor(request, db, clubId, user) {
-  await assertClubOwner(db, clubId, user);
+  const club = await assertClubOwner(db, clubId, user);
   const body = await readJson(request); const userId = text(body.userId); const email = text(body.email).toLowerCase();
   const target = userId
     ? await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first()
     : await db.prepare('SELECT id FROM users WHERE lower(email) = ?').bind(email).first();
   if (!target) throw new HttpError(404, 'Benutzer nicht gefunden');
-  await db.prepare('INSERT OR IGNORE INTO club_editors (club_id, user_id, approved_by, approved_at) VALUES (?, ?, ?, ?)').bind(clubId, userId, user.id, new Date().toISOString()).run();
+  if (club.owner_id === target.id) throw new HttpError(400, 'Der Owner hat bereits alle Bearbeitungsrechte');
+  await db.prepare('INSERT OR IGNORE INTO club_editors (club_id, user_id, approved_by, approved_at) VALUES (?, ?, ?, ?)').bind(clubId, target.id, user.id, new Date().toISOString()).run();
   return json({ ok: true });
 }
 
