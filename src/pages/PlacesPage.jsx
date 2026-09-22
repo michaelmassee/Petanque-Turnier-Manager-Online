@@ -24,6 +24,13 @@ const clubMarker = L.divIcon({
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
 });
+const groupMarker = L.divIcon({
+  className: 'club-marker-icon group-marker-icon',
+  html: `<img class="club-marker-pin" src="${markerIcon}" width="25" height="41" /><span class="club-marker-flag" aria-hidden="true">👥</span>`,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
 const facilityLabels = { toilet: 'Toilette', shelter: 'Unterstand', clubhouse: 'Vereinsheim', lighting: 'Beleuchtung', parking: 'Parkplatz', catering: 'Gastronomie', drinking_water: 'Trinkwasser', accessible: 'Barrierefrei' };
 
 function FocusOnPlace({ focus, markerRefs }) {
@@ -73,10 +80,11 @@ function PlacesMap({ places, center, maptilerApiKey, focus }) {
         <Marker
           key={id}
           ref={(instance) => { groupedPlaces.forEach((groupedPlace) => { markerRefs.current[groupedPlace.id] = instance; }); }}
-          icon={place.clubId ? clubMarker : marker}
+          icon={place.clubId ? (place.clubKind === 'group' ? groupMarker : clubMarker) : marker}
           position={[place.latitude, place.longitude]}
         >
           <Popup>
+            <ClubBadge clubName={place.clubName} clubKind={place.clubKind} />
             {place.clubName ? (
               <>
                 <strong data-i18n-skip>{place.clubName}</strong>
@@ -322,9 +330,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
               {place.description && <RichText value={place.description} />}
               <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${t('Ausstattung:')} ${place.facilities}` : ''}</p>
               {place.facilityCodes?.length > 0 && <p className="muted">{place.facilityCodes.map((code) => t(facilityLabels[code])).join(' · ')}</p>}
-              {place.clubId && (
-                <ClubBadge clubName={place.clubName} onClick={place.latitude !== null && place.longitude !== null ? () => handleFocusPlace(place) : undefined} />
-              )}
+              <ClubBadge clubName={place.clubName} clubKind={place.clubKind} onClick={place.latitude !== null && place.longitude !== null ? () => handleFocusPlace(place) : undefined} />
               <DistanceBadge distanceKm={place.distanceKm} />
               <div className="place-actions">
                 <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>

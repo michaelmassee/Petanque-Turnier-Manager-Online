@@ -3,7 +3,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import i18next from './lib/i18next-config.js';
 import { EditDialog, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
-import { DistanceBadge } from './components/ui.jsx';
+import { ClubBadge, DistanceBadge } from './components/ui.jsx';
 import { AppHeader } from './components/layout.jsx';
 import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM } from './lib/constants.js';
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
@@ -48,6 +48,19 @@ describe('Entfernungs-Badge', () => {
     const { container } = render(<DistanceBadge distanceKm={undefined} />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('Spielort-Zuordnung', () => {
+  it('kennzeichnet Verein, Gruppe und unabhängigen Bouleplatz unterschiedlich', () => {
+    const { rerender } = render(<ClubBadge clubName="BC Linden" clubKind="club" />);
+    expect(screen.getByText('Verein')).toBeInTheDocument();
+
+    rerender(<ClubBadge clubName="Boulefreunde" clubKind="group" />);
+    expect(screen.getByText('Gruppe')).toBeInTheDocument();
+
+    rerender(<ClubBadge />);
+    expect(screen.getByText('Bouleplatz ohne Verein/Gruppe')).toBeInTheDocument();
   });
 });
 

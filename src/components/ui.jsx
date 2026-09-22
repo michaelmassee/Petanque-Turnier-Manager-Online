@@ -130,13 +130,16 @@ export function DistanceBadge({ distanceKm }) {
   );
 }
 
-export function ClubBadge({ clubName, onClick }) {
+export function ClubBadge({ clubName, clubKind = 'club', onClick }) {
   const { t } = useTranslation();
+  const isIndependent = !clubName;
+  const label = isIndependent ? 'Bouleplatz ohne Verein/Gruppe' : clubKind === 'group' ? 'Gruppe' : 'Verein';
+  const icon = isIndependent ? '📍' : clubKind === 'group' ? '👥' : '🏛';
 
   return (
-    <span className={`club-badge${onClick ? ' club-badge-clickable' : ''}`} title={clubName || t('Verein')} onClick={onClick}>
-      <span aria-hidden="true">🏛</span>
-      <strong>{t('Verein')}</strong>
+    <span className={`club-badge club-badge-${isIndependent ? 'independent' : clubKind}${onClick ? ' club-badge-clickable' : ''}`} title={clubName || t(label)} onClick={onClick}>
+      <span aria-hidden="true">{icon}</span>
+      <strong>{t(label)}</strong>
     </span>
   );
 }
