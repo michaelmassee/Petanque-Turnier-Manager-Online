@@ -14,7 +14,7 @@ import {
   tournamentMatchesSavedSearch,
   validateMatchScore,
 } from './worker-core.js';
-import { getPairingStrategy, isOnlinePlayable } from './lib/pairing/index.js';
+import { checkRoundRequirements, getPairingStrategy, isOnlinePlayable, roundRequirementMessage } from './lib/pairing/index.js';
 import { competitionRanks, computeRanking, sameStandardRankingPlace } from './lib/pairing/ranking.js';
 import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schweizer.js';
 import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
@@ -3539,7 +3539,7 @@ async function startTournament(env, existing, user) {
     throw new HttpError(409, 'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.');
   }
   if (!isOnlinePlayable(existing)) {
-    throw new HttpError(409, 'Dieser Turniertyp unterstützt keine Online-Rundenverwaltung (nur Schweizer-System und Supermêlée).');
+    throw new HttpError(409, 'Dieser Turniertyp unterstützt keine Online-Rundenverwaltung.');
   }
   const updated = await performTournamentStart(env, existing);
   return json({ tournament: toPublicTournament(updated, user) });
@@ -4035,9 +4035,18 @@ async function listPublicParticipants(db, tournamentId, currentUserEmail) {
   });
 }
 
+function parseTeamIds(idsJson) {
+  if (!idsJson) return [];
+  try {
+    return JSON.parse(idsJson);
+  } catch {
+    return [];
+  }
+}
+
 function toPublicMatch(row, playersById) {
   const resolvePlayers = (idsJson) =>
-    JSON.parse(idsJson).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' });
+    parseTeamIds(idsJson).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' });
   return {
     id: row.id,
     teamA: resolvePlayers(row.team_a_registration_ids),
@@ -4158,6 +4167,17 @@ async function generateTournamentRound(db, tournament) {
     throw new HttpError(400, 'Das Turnier muss den Status "Läuft" haben, um Runden zu generieren');
   }
 
+  // Auch direkte API-Aufrufe müssen die systemabhängigen Mindestanforderungen,
+  // die zulässige Anmeldeart und das natürliche Rundenende einhalten.
+  const [activeConfirmed, existingRounds] = await Promise.all([
+    db.prepare("SELECT COUNT(*) AS count FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1").bind(tournament.id).first(),
+    db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?').bind(tournament.id).first(),
+  ]);
+  const requirement = checkRoundRequirements(tournament, Number(activeConfirmed.count), Number(existingRounds.count))[0];
+  if (requirement) {
+    throw new HttpError(400, roundRequirementMessage(requirement));
+  }
+
   const lastRound = await db
     .prepare('SELECT * FROM tournament_rounds WHERE tournament_id = ? ORDER BY round_number DESC LIMIT 1')
     .bind(tournament.id)
@@ -4211,8 +4231,8 @@ async function generateTournamentRound(db, tournament) {
     .bind(tournament.id)
     .all();
   const history = historyResult.results.map((row) => ({
-    teamA: usesFixedTeams && row.team_a_id ? [row.team_a_id] : JSON.parse(row.team_a_registration_ids),
-    teamB: usesFixedTeams && row.team_b_id ? [row.team_b_id] : JSON.parse(row.team_b_registration_ids),
+    teamA: usesFixedTeams && row.team_a_id ? [row.team_a_id] : parseTeamIds(row.team_a_registration_ids),
+    teamB: usesFixedTeams && row.team_b_id ? [row.team_b_id] : parseTeamIds(row.team_b_registration_ids),
     scoreA: row.score_a, scoreB: row.score_b, noShow: row.no_show,
     roundNumber: row.round_number, matchIndex: row.match_index,
   }));
@@ -4303,8 +4323,8 @@ async function getTournamentRanking(db, tournament) {
     .bind(tournament.id)
     .all();
   const matches = matchesResult.results.map((row) => ({
-    teamA: JSON.parse(row.team_a_registration_ids),
-    teamB: JSON.parse(row.team_b_registration_ids),
+    teamA: parseTeamIds(row.team_a_registration_ids),
+    teamB: parseTeamIds(row.team_b_registration_ids),
     scoreA: row.score_a,
     scoreB: row.score_b,
     noShow: row.no_show,

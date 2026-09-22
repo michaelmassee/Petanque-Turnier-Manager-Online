@@ -53,3 +53,12 @@ export function checkRoundRequirements(tournament, confirmedCount, roundsPlayed 
   const formuleXRounds = tournament.formuleXRounds ?? tournament.formule_x_rounds ?? 4;
   return strategy.checkRequirements(confirmedCount, { formation: tournament.formation, registrationType, roundsPlayed, formuleXRounds });
 }
+
+// Die UI zeigt diese Texte vorab, der Worker verwendet sie ebenfalls für direkte
+// API-Aufrufe. So bleiben fachliche Regeln keine reine Client-Absicherung.
+export function roundRequirementMessage(requirement) {
+  if (requirement.type === 'minPlayers') {
+    return `Für eine Runde werden mindestens ${requirement.min} bestätigte Meldungen benötigt.`;
+  }
+  return requirement.text;
+}

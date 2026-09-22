@@ -3,6 +3,7 @@ import {
   checkRequirements, findByeTeam, formuleXStats, generateRound, getSiegaufschlag,
   pairLinearWithSwap, sameFormuleXRankingPlace, sortFormuleX,
 } from './formulex.js';
+import { checkRoundRequirements, roundRequirementMessage } from './index.js';
 
 const teamsOf = (count) => Array.from({ length: count }, (_, index) => ({ id: `t${index + 1}` }));
 
@@ -239,6 +240,16 @@ describe('Formule X - Rangliste (FormuleXRanglisteRechnerTest)', () => {
 });
 
 describe('Formule X - Voraussetzungen und Rundenende', () => {
+  it('liefert für den Worker dieselben verbindlichen Voraussetzungen wie die UI', () => {
+    const tournament = { type: 'formule_x', registrationType: 'melee', formuleXRounds: 4 };
+    expect(roundRequirementMessage(checkRoundRequirements(tournament, 3, 0)[0]))
+      .toBe('Für eine Runde werden mindestens 4 bestätigte Meldungen benötigt.');
+    expect(roundRequirementMessage(checkRoundRequirements({ ...tournament, registrationType: 'forme' }, 4, 4)[0]))
+      .toBe('Alle Runden wurden bereits gespielt.');
+    expect(roundRequirementMessage(checkRoundRequirements({ ...tournament, registrationType: 'melee' }, 4, 0)[0]))
+      .toBe('Formule X ist online nur mit Anmeldeart "Formée" (feste Teams) spielbar.');
+  });
+
   it('erfordert mindestens 4 Teams', () => {
     expect(checkRequirements(3)).toEqual([{ type: 'minPlayers', min: 4 }]);
     expect(checkRequirements(4)).toEqual([]);

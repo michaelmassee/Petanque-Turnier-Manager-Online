@@ -2,14 +2,12 @@
 // algorithmen/liga/JederGegenJeden.java. Feste Teams (eine Meldung = ein Team
 // über alle Runden), bei ungerader Teamzahl rotiert ein Freilos durch.
 
+import { pairingsPerRound } from './util.js';
+
+export { pairingsPerRound };
+
 export function totalRounds(teamCount) {
   return teamCount % 2 === 1 ? teamCount : teamCount - 1;
-}
-
-export function pairingsPerRound(teamCount) {
-  const freiSpiel = teamCount % 2 === 1;
-  const letzteMeldungNr = freiSpiel ? teamCount + 1 : teamCount;
-  return Math.floor(letzteMeldungNr / 2);
 }
 
 export function checkRequirements(confirmedCount, { registrationType, roundsPlayed = 0 } = {}) {

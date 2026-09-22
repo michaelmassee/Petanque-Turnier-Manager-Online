@@ -2,6 +2,8 @@
 // FormuleXRanglisteRechner.java, algorithmen/liga/Direktvergleich.java): freie Losung in
 // Runde 1, danach Paarung nach Wertungspunkten mit Swap-Rematch-Vermeidung, Freilos an
 // das schlechtest platzierte Team ohne bisheriges Freilos.
+import { pairingsPerRound } from './util.js';
+
 const NO_SHOW_SCORE = { winner: 13, loser: 0 };
 
 function shuffle(items) {
@@ -24,11 +26,7 @@ export function getSiegaufschlag(roundsPlayed) {
   return 300;
 }
 
-export function pairingsPerRound(teamCount) {
-  const freiSpiel = teamCount % 2 === 1;
-  const letzteMeldungNr = freiSpiel ? teamCount + 1 : teamCount;
-  return Math.floor(letzteMeldungNr / 2);
-}
+export { pairingsPerRound };
 
 export function checkRequirements(confirmedCount, { registrationType, roundsPlayed = 0, formuleXRounds = 4 } = {}) {
   if (confirmedCount < 4) {
@@ -62,7 +60,7 @@ export function formuleXStats(teams, history, roundsPlayed) {
 
     const scoreA = match.noShow === 'a' ? NO_SHOW_SCORE.loser : match.noShow === 'b' ? NO_SHOW_SCORE.winner : match.scoreA;
     const scoreB = match.noShow === 'b' ? NO_SHOW_SCORE.loser : match.noShow === 'a' ? NO_SHOW_SCORE.winner : match.scoreB;
-    if (scoreA == null || scoreB == null) continue;
+    if (scoreA === null || scoreA === undefined || scoreB === null || scoreB === undefined) continue;
 
     entryA.pointsFor += scoreA; entryA.pointsAgainst += scoreB;
     entryB.pointsFor += scoreB; entryB.pointsAgainst += scoreA;
