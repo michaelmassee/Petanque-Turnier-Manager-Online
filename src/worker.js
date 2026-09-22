@@ -5822,7 +5822,7 @@ async function verifyPlaceReport(request, db) {
 }
 
 async function listClubEditorRequests(db) { const rows = await db.prepare('SELECT r.club_id, r.user_id, r.created_at, c.name AS club_name, u.first_name, u.last_name, u.email FROM club_editor_requests r JOIN clubs c ON c.id = r.club_id JOIN users u ON u.id = r.user_id ORDER BY r.created_at').all(); return json({ requests: rows.results || [] }); }
-async function approveClubEditor(db, clubId, userId, adminId) { const now = new Date().toISOString(); await db.batch([db.prepare('INSERT OR REPLACE INTO club_editors (club_id, user_id, approved_by, approved_at) VALUES (?, ?, ?, ?)').bind(clubId, userId, adminId, now), db.prepare("UPDATE clubs SET status = 'published', updated_at = ? WHERE id = ?").bind(now, clubId), db.prepare('DELETE FROM club_editor_requests WHERE club_id = ? AND user_id = ?').bind(clubId, userId)]); return json({ ok: true }); }
+async function approveClubEditor(db, clubId, userId, adminId) { const now = new Date().toISOString(); await db.batch([db.prepare('INSERT OR REPLACE INTO club_editors (club_id, user_id, approved_by, approved_at) VALUES (?, ?, ?, ?)').bind(clubId, userId, adminId, now), db.prepare("UPDATE clubs SET status = 'published', updated_at = ? WHERE id = ?").bind(now, clubId), db.prepare("UPDATE boule_places SET status = 'published', updated_at = ? WHERE club_id = ? AND status = 'pending'").bind(now, clubId), db.prepare('DELETE FROM club_editor_requests WHERE club_id = ? AND user_id = ?').bind(clubId, userId)]); return json({ ok: true }); }
 
 async function listMyClubs(db, userId) {
   const rows = await db.prepare(
@@ -5856,7 +5856,10 @@ async function updateClubStatusAsAdmin(db, id, status) {
   if (!['pending', 'published', 'rejected'].includes(status)) throw new HttpError(400, 'Ungültiger Status');
   const club = await db.prepare('SELECT id FROM clubs WHERE id = ?').bind(id).first();
   if (!club) throw new HttpError(404, 'Verein nicht gefunden');
-  await db.prepare('UPDATE clubs SET status = ?, updated_at = ? WHERE id = ?').bind(status, new Date().toISOString(), id).run();
+  const now = new Date().toISOString();
+  const statements = [db.prepare('UPDATE clubs SET status = ?, updated_at = ? WHERE id = ?').bind(status, now, id)];
+  if (status === 'published') statements.push(db.prepare("UPDATE boule_places SET status = 'published', updated_at = ? WHERE club_id = ? AND status = 'pending'").bind(now, id));
+  await db.batch(statements);
   return json({ ok: true });
 }
 
