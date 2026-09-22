@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupMapPlaces } from './PlacesPage.jsx';
+import { filterPlaces, groupMapPlaces } from './PlacesPage.jsx';
 
 describe('Kartenmarker für Bouleplätze', () => {
   it('fasst Platz und Halle eines Vereins an derselben Adresse zusammen', () => {
@@ -12,5 +12,17 @@ describe('Kartenmarker für Bouleplätze', () => {
 
     expect(groups).toHaveLength(3);
     expect(groups.find((group) => group.place.id === 'outdoor')?.places.map((place) => place.id)).toEqual(['outdoor', 'indoor']);
+  });
+
+  it('filtert Vereine und Boulehallen auch kombiniert', () => {
+    const places = [
+      { id: 'club-place', clubId: 'club-1', venueType: 'outdoor' },
+      { id: 'club-hall', clubId: 'club-1', venueType: 'indoor' },
+      { id: 'independent-hall', clubId: null, venueType: 'indoor' },
+    ];
+
+    expect(filterPlaces(places, { clubsOnly: true }).map((place) => place.id)).toEqual(['club-place', 'club-hall']);
+    expect(filterPlaces(places, { indoorOnly: true }).map((place) => place.id)).toEqual(['club-hall', 'independent-hall']);
+    expect(filterPlaces(places, { clubsOnly: true, indoorOnly: true }).map((place) => place.id)).toEqual(['club-hall']);
   });
 });

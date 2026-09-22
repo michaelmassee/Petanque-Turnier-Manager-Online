@@ -54,6 +54,12 @@ export function groupMapPlaces(places) {
   return [...groups.values()];
 }
 
+export function filterPlaces(places, { favoritesOnly = false, clubsOnly = false, indoorOnly = false } = {}) {
+  return places.filter((place) => (!favoritesOnly || place.favorited)
+    && (!clubsOnly || Boolean(place.clubId))
+    && (!indoorOnly || place.venueType === 'indoor'));
+}
+
 function PlacesMap({ places, center, maptilerApiKey, focus }) {
   const { t } = useTranslation();
   const markerRefs = useRef({});
@@ -95,6 +101,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [clubsOnly, setClubsOnly] = useState(false);
+  const [indoorOnly, setIndoorOnly] = useState(false);
   const [searchMenuOpen, setSearchMenuOpen] = useState(false);
   const resultsRef = useRef(null);
   const mapSectionRef = useRef(null);
@@ -121,7 +129,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   useEffect(() => { const timer = setTimeout(load, 180); return () => clearTimeout(timer); }, [query]);
 
   const visiblePlaces = useMemo(() => {
-    let results = favoritesOnly ? places.filter((place) => place.favorited) : places;
+    let results = filterPlaces(places, { favoritesOnly, clubsOnly, indoorOnly });
     if (searchOrigin) {
       const radius = Number(searchRadiusKm);
       results = results
@@ -131,11 +139,11 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         .sort((a, b) => a.distanceKm - b.distanceKm);
     }
     return results;
-  }, [places, favoritesOnly, searchOrigin, searchRadiusKm]);
+  }, [places, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm]);
 
   useEffect(() => {
     setVisibleCount(10);
-  }, [query, favoritesOnly, searchOrigin, searchRadiusKm, places]);
+  }, [query, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm, places]);
 
   const displayedPlaces = visiblePlaces.slice(0, visibleCount);
 
@@ -212,7 +220,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   }
 
   const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);
-  const activeFilterCount = [query, favoritesOnly].filter(Boolean).length;
+  const activeFilterCount = [query, favoritesOnly, clubsOnly, indoorOnly].filter(Boolean).length;
 
   return <main className="app-shell">
     <StandalonePageHeader
@@ -238,6 +246,10 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
           currentUser={currentUser}
           favoritesOnly={favoritesOnly}
           setFavoritesOnly={setFavoritesOnly}
+          clubsOnly={clubsOnly}
+          setClubsOnly={setClubsOnly}
+          indoorOnly={indoorOnly}
+          setIndoorOnly={setIndoorOnly}
           searchOrigin={searchOrigin}
           searchOriginQuery={searchOriginQuery}
           setSearchOriginQuery={setSearchOriginQuery}
@@ -346,6 +358,10 @@ function PlacesSearchMenu({
   currentUser,
   favoritesOnly,
   setFavoritesOnly,
+  clubsOnly,
+  setClubsOnly,
+  indoorOnly,
+  setIndoorOnly,
   searchOrigin,
   searchOriginQuery,
   setSearchOriginQuery,
@@ -386,6 +402,16 @@ function PlacesSearchMenu({
                 </label>
               </div>
             )}
+            <div className="home-search-actions">
+              <label className="checkbox-field">
+                <input type="checkbox" checked={clubsOnly} onChange={(event) => setClubsOnly(event.target.checked)} />
+                {t('Nur Vereine')}
+              </label>
+              <label className="checkbox-field">
+                <input type="checkbox" checked={indoorOnly} onChange={(event) => setIndoorOnly(event.target.checked)} />
+                {t('Nur Boulehallen')}
+              </label>
+            </div>
 
             <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
               <LocationAutocomplete
