@@ -47,6 +47,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
   const [placeClubDialog, setPlaceClubDialog] = useState(null);
   const [selectedPlaceClubId, setSelectedPlaceClubId] = useState('');
   const [placeClubSaving, setPlaceClubSaving] = useState(false);
+  const [clubPlacesDialog, setClubPlacesDialog] = useState(null);
   const [editClub, setEditClub] = useState(null);
   const [editClubForm, setEditClubForm] = useState(EMPTY_CLUB_FORM);
   const [editClubSaving, setEditClubSaving] = useState(false);
@@ -164,6 +165,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
   const visiblePlaceReports = useInfiniteList(filteredPlaceReports);
   const visibleAllPlaces = useInfiniteList(filteredAllPlaces);
   const visibleClubs = useInfiniteList(filteredClubs);
+  const clubPlaces = clubPlacesDialog ? allPlaces.filter((place) => place.clubId === clubPlacesDialog.id) : [];
 
   async function submitEditPlace(event) {
     event.preventDefault();
@@ -199,6 +201,10 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
   function openPlaceClubDialog(place) {
     setPlaceClubDialog(place);
     setSelectedPlaceClubId(place.clubId || '');
+  }
+
+  function openClubPlacesDialog(club) {
+    setClubPlacesDialog(club);
   }
 
   async function submitPlaceClub(event) {
@@ -382,6 +388,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
                     <div className="row-actions">
                       {club.status !== 'published' && <Button loading={busyId === statusId} disabled={Boolean(busyId)} onClick={() => setClubStatus(club, 'published')}>{t('Freigeben')}</Button>}
                       {club.status !== 'rejected' && <Button variant="secondary" loading={busyId === statusId} disabled={Boolean(busyId)} onClick={() => setClubStatus(club, 'rejected')}>{t('Ablehnen')}</Button>}
+                      <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openClubPlacesDialog(club)}>{t('Bouleplätze verwalten')}</Button>
                       <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openEditClub(club)}>{t('Bearbeiten')}</Button>
                       <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openChangeOwner(club)}>{t('Owner ändern')}</Button>
                       <Button variant="danger" loading={busyId === deleteId} disabled={Boolean(busyId)} onClick={() => deleteClub(club)}>{t('Löschen')}</Button>
@@ -394,6 +401,31 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
           </div>}
         </>
       )}
+
+      <EditDialog
+        open={Boolean(clubPlacesDialog)}
+        title={clubPlacesDialog ? t('Bouleplätze von {name}').replace('{name}', clubPlacesDialog.name) : ''}
+        onClose={() => setClubPlacesDialog(null)}
+      >
+        {clubPlacesDialog && (
+          <div className="user-list">
+            {clubPlaces.length === 0 && <p className="muted">{t('Keine Bouleplätze diesem Verein zugeordnet.')}</p>}
+            {clubPlaces.map((place) => (
+              <article className="data-row" key={place.id}>
+                <div>
+                  <strong data-i18n-skip>{place.name}</strong>
+                  <span data-i18n-skip>{statusLabel(place.status, t)} · {place.address}</span>
+                </div>
+                <div className="row-actions">
+                  <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setClubPlacesDialog(null); openEditPlace(place); }}>{t('Bearbeiten')}</Button>
+                  <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setClubPlacesDialog(null); openPlaceClubDialog(place); }}>{t('Verein zuordnen')}</Button>
+                  <Button variant="danger" loading={busyId === `place-delete-${place.id}`} disabled={Boolean(busyId)} onClick={() => deletePlace(place)}>{t('Löschen')}</Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </EditDialog>
 
       <EditDialog open={Boolean(editPlaceId)} title={t('Bouleplatz bearbeiten')} error={error} onClose={() => setEditPlaceId(null)}>
         <form className="form" onSubmit={submitEditPlace}>
