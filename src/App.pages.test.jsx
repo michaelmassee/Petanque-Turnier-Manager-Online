@@ -392,7 +392,7 @@ describe('Vereinsmoderation', () => {
       throw new Error(`unerwarteter API-Aufruf: ${options.method || 'GET'} ${path}`);
     });
 
-    render(<ClubModerationPanel language="de" />);
+    render(<ClubModerationPanel language="de" section="places" />);
 
     await screen.findByText('Boulepark');
     fireEvent.click(screen.getByRole('button', { name: 'Verein zuordnen' }));

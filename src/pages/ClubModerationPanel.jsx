@@ -6,13 +6,14 @@ import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
-const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, courtCount: '', description: '', accessible: false, facilities: '' };
+const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, venueType: 'outdoor', courtCount: '', description: '', accessible: false, facilities: '', facilityCodes: [] };
 const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', logoUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
 
 function placeToForm(place) {
   return {
     name: place.name, address: place.address, latitude: place.latitude, longitude: place.longitude, locationConfirmed: true,
-    courtCount: String(place.courtCount ?? ''), description: place.description || '', accessible: Boolean(place.accessible), facilities: place.facilities || '',
+    venueType: place.venueType || 'outdoor', courtCount: String(place.courtCount ?? ''), description: place.description || '',
+    accessible: Boolean(place.accessible), facilities: place.facilities || '', facilityCodes: place.facilityCodes || [],
   };
 }
 
@@ -29,7 +30,7 @@ function statusLabel(status, t) {
   return t('In Prüfung');
 }
 
-export function ClubModerationPanel({ language }) {
+export function ClubModerationPanel({ language, section = 'clubs' }) {
   const { t } = useTranslation();
   const [requests, setRequests] = useState([]);
   const [places, setPlaces] = useState([]);
@@ -56,6 +57,7 @@ export function ClubModerationPanel({ language }) {
   const [ownerError, setOwnerError] = useState('');
   const [busyId, setBusyId] = useState('');
   const [query, setQuery] = useState('');
+  const showingClubs = section === 'clubs';
 
   async function load() {
     setLoading(true); setError('');
@@ -177,6 +179,23 @@ export function ClubModerationPanel({ language }) {
     } catch (err) { setError(err.message); } finally { setEditPlaceSaving(false); }
   }
 
+  function openEditPlace(place) {
+    setEditPlaceId(place.id);
+    setEditPlaceForm(placeToForm(place));
+  }
+
+  async function deletePlace(place) {
+    if (!window.confirm(t('Bouleplatz „{name}“ wirklich löschen?').replace('{name}', place.name))) return;
+    setError(''); setMessage('');
+    const id = `place-delete-${place.id}`;
+    setBusyId(id);
+    try {
+      await authenticatedApi(`/api/places/${place.id}`, { method: 'DELETE' });
+      setMessage(t('Bouleplatz gelöscht.'));
+      await load();
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+  }
+
   function openPlaceClubDialog(place) {
     setPlaceClubDialog(place);
     setSelectedPlaceClubId(place.clubId || '');
@@ -219,8 +238,12 @@ export function ClubModerationPanel({ language }) {
     <section className="user-management">
       <div className="user-management-header">
         <div>
-          <h2>{t('Vereine & Bouleplätze')}</h2>
-          <p className="muted">{t('Neue Vereine und Bouleplätze freigeben, bevor sie öffentlich sichtbar werden.')}</p>
+          <h2>{showingClubs ? t('Vereine') : t('Bouleplätze')}</h2>
+          <p className="muted">
+            {showingClubs
+              ? t('Vereine verwalten und neue Vereinsanfragen freigeben.')
+              : t('Bouleplätze verwalten und neue Meldungen freigeben.')}
+          </p>
         </div>
       </div>
       {message && <p className="feedback success">{message}</p>}
@@ -228,13 +251,13 @@ export function ClubModerationPanel({ language }) {
       <ListToolbar
         query={query}
         onQueryChange={setQuery}
-        searchPlaceholder={t('Nach Verein, Bouleplatz oder Person suchen')}
+        searchPlaceholder={showingClubs ? t('Nach Verein oder Person suchen') : t('Nach Bouleplatz oder Adresse suchen')}
         onReset={() => setQuery('')}
         resetDisabled={!query.trim()}
       />
       {loading ? <p className="muted">{t('Lädt …')}</p> : (
         <>
-          <div className="panel user-list-panel">
+          {showingClubs && <div className="panel user-list-panel">
             <div className="section-title">
               <h2>{t('Offene Vereinsanfragen')}</h2>
               <span className="counter">{filteredRequests.length}</span>
@@ -257,9 +280,9 @@ export function ClubModerationPanel({ language }) {
               })}
               <InfiniteListLoadMore hasMore={visibleRequests.hasMore} onLoadMore={visibleRequests.loadMore} label={t('Weitere Einträge laden')} />
             </div>
-          </div>
+          </div>}
 
-          <div className="panel user-list-panel">
+          {!showingClubs && <div className="panel user-list-panel">
             <div className="section-title">
               <h2>{t('Alle Bouleplätze')}</h2>
               <span className="counter">{filteredAllPlaces.length}</span>
@@ -276,15 +299,17 @@ export function ClubModerationPanel({ language }) {
                     <small>{place.clubName || t('Keinem Verein zugeordnet')}</small>
                   </div>
                   <div className="row-actions">
+                    <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openEditPlace(place)}>{t('Bearbeiten')}</Button>
                     <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openPlaceClubDialog(place)}>{t('Verein zuordnen')}</Button>
+                    <Button variant="danger" loading={busyId === `place-delete-${place.id}`} disabled={Boolean(busyId)} onClick={() => deletePlace(place)}>{t('Löschen')}</Button>
                   </div>
                 </article>
               ))}
               <InfiniteListLoadMore hasMore={visibleAllPlaces.hasMore} onLoadMore={visibleAllPlaces.loadMore} label={t('Weitere Einträge laden')} />
             </div>
-          </div>
+          </div>}
 
-          <div className="panel user-list-panel">
+          {!showingClubs && <div className="panel user-list-panel">
             <div className="section-title">
               <h2>{t('Offene Bouleplätze')}</h2>
               <span className="counter">{filteredPlaces.length}</span>
@@ -307,9 +332,9 @@ export function ClubModerationPanel({ language }) {
               })}
               <InfiniteListLoadMore hasMore={visiblePlaces.hasMore} onLoadMore={visiblePlaces.loadMore} label={t('Weitere Einträge laden')} />
             </div>
-          </div>
+          </div>}
 
-          <div className="panel user-list-panel">
+          {!showingClubs && <div className="panel user-list-panel">
             <div className="section-title">
               <h2>{t('Gemeldete Bouleplätze (ohne Verein)')}</h2>
               <span className="counter">{filteredPlaceReports.length}</span>
@@ -325,7 +350,7 @@ export function ClubModerationPanel({ language }) {
                     </span>
                   </div>
                   <div className="row-actions">
-                    <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setEditPlaceId(place.id); setEditPlaceForm(placeToForm(place)); }}>
+                    <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openEditPlace(place)}>
                       {t('Bearbeiten')}
                     </Button>
                   </div>
@@ -333,9 +358,9 @@ export function ClubModerationPanel({ language }) {
               ))}
               <InfiniteListLoadMore hasMore={visiblePlaceReports.hasMore} onLoadMore={visiblePlaceReports.loadMore} label={t('Weitere Einträge laden')} />
             </div>
-          </div>
+          </div>}
 
-          <div className="panel user-list-panel">
+          {showingClubs && <div className="panel user-list-panel">
             <div className="section-title">
               <h2>{t('Alle Vereine')}</h2>
               <span className="counter">{filteredClubs.length}</span>
@@ -366,7 +391,7 @@ export function ClubModerationPanel({ language }) {
               })}
               <InfiniteListLoadMore hasMore={visibleClubs.hasMore} onLoadMore={visibleClubs.loadMore} label={t('Weitere Einträge laden')} />
             </div>
-          </div>
+          </div>}
         </>
       )}
 

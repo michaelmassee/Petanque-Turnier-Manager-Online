@@ -1946,9 +1946,9 @@ function AppContent() {
         </Suspense>
       )}
 
-      {activeTab === 'clubs' && isAdmin && (
+      {(activeTab === 'clubs' || activeTab === 'places') && isAdmin && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
-          <ClubModerationPanel language={language} />
+          <ClubModerationPanel language={language} section={activeTab} />
         </Suspense>
       )}
 
