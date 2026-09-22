@@ -220,6 +220,17 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
     } catch (err) { setError(err.message); } finally { setPlaceClubSaving(false); }
   }
 
+  async function removePlaceClub(place) {
+    setError(''); setMessage('');
+    const id = `place-club-${place.id}`;
+    setBusyId(id);
+    try {
+      await authenticatedApi(`/api/admin/places/${place.id}/club`, { method: 'PUT', body: JSON.stringify({ clubId: null }) });
+      setMessage(t('Vereinszuordnung entfernt.'));
+      await load();
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+  }
+
   function openEditClub(club) {
     setEditClub(club);
     setEditClubForm(clubToForm(club));
@@ -419,7 +430,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
                 <div className="row-actions">
                   <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setClubPlacesDialog(null); openEditPlace(place); }}>{t('Bearbeiten')}</Button>
                   <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setClubPlacesDialog(null); openPlaceClubDialog(place); }}>{t('Verein zuordnen')}</Button>
-                  <Button variant="danger" loading={busyId === `place-delete-${place.id}`} disabled={Boolean(busyId)} onClick={() => deletePlace(place)}>{t('Löschen')}</Button>
+                  <Button variant="secondary" loading={busyId === `place-club-${place.id}`} disabled={Boolean(busyId)} onClick={() => removePlaceClub(place)}>{t('Vereinszuordnung entfernen')}</Button>
                 </div>
               </article>
             ))}

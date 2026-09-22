@@ -36,22 +36,52 @@ function FocusOnPlace({ focus, markerRefs }) {
   return null;
 }
 
+// Spielorte desselben Vereins an derselben Adresse teilen sich einen Marker. Das
+// vermeidet überlagerte Pins und macht sichtbar, dass Platz und Halle zu einer
+// Organisation gehören.
+export function groupMapPlaces(places) {
+  const groups = new Map();
+  for (const place of places) {
+    const addressKey = String(place.address || '').trim().toLocaleLowerCase();
+    const key = place.clubId ? `club:${place.clubId}:${addressKey}` : `place:${place.id}`;
+    const group = groups.get(key);
+    if (group) {
+      group.places.push(place);
+    } else {
+      groups.set(key, { id: key, place, places: [place] });
+    }
+  }
+  return [...groups.values()];
+}
+
 function PlacesMap({ places, center, maptilerApiKey, focus }) {
   const { t } = useTranslation();
   const markerRefs = useRef({});
   const positions = useMemo(() => places.map((place) => [place.latitude, place.longitude]), [places]);
+  const markerGroups = useMemo(() => groupMapPlaces(places), [places]);
   return (
     <TileFallbackMap center={center} maptilerApiKey={maptilerApiKey}>
       <FitToBounds positions={positions} />
       <FocusOnPlace focus={focus} markerRefs={markerRefs} />
-      {places.map((place) => (
+      {markerGroups.map(({ id, place, places: groupedPlaces }) => (
         <Marker
-          key={place.id}
-          ref={(instance) => { markerRefs.current[place.id] = instance; }}
+          key={id}
+          ref={(instance) => { groupedPlaces.forEach((groupedPlace) => { markerRefs.current[groupedPlace.id] = instance; }); }}
           icon={place.clubId ? clubMarker : marker}
           position={[place.latitude, place.longitude]}
         >
-          <Popup><strong>{place.name}</strong>{place.clubName && <><br />{place.clubName}</>}<br /><a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a></Popup>
+          <Popup>
+            {place.clubName ? (
+              <>
+                <strong data-i18n-skip>{place.clubName}</strong>
+                <ul className="map-popup-venues">
+                  {groupedPlaces.map((groupedPlace) => <li key={groupedPlace.id} data-i18n-skip>{groupedPlace.name} ({t(groupedPlace.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')})</li>)}
+                </ul>
+              </>
+            ) : <strong data-i18n-skip>{place.name}</strong>}
+            <span data-i18n-skip className="map-popup-address">{place.address}</span>
+            <a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
+          </Popup>
         </Marker>
       ))}
     </TileFallbackMap>

@@ -406,13 +406,14 @@ describe('Vereinsmoderation', () => {
   it('zeigt die Bouleplätze eines Vereins direkt in der Vereinsverwaltung', async () => {
     const club = { id: 'club-1', name: 'BC Linden', status: 'published', ownerName: 'Anna Admin', ownerEmail: 'anna@example.com', placeCount: 1, editorCount: 1 };
     const place = { id: 'place-1', name: 'Boulepark', address: 'Parkweg 1, Linden', venueType: 'outdoor', status: 'published', clubId: 'club-1', clubName: 'BC Linden' };
-    vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation((path) => {
+    const authenticatedApi = vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation((path, options = {}) => {
       if (path === '/api/admin/club-editor-requests') return Promise.resolve({ requests: [] });
       if (path === '/api/admin/pending-places') return Promise.resolve({ places: [] });
       if (path === '/api/admin/place-reports') return Promise.resolve({ places: [] });
       if (path === '/api/admin/places') return Promise.resolve({ places: [place] });
       if (path === '/api/admin/clubs') return Promise.resolve({ clubs: [club] });
       if (path === '/api/users') return Promise.resolve({ users: [] });
+      if (path === '/api/admin/places/place-1/club' && options.method === 'PUT') return Promise.resolve({ ok: true });
       throw new Error(`unerwarteter API-Aufruf: ${path}`);
     });
 
@@ -424,6 +425,10 @@ describe('Vereinsmoderation', () => {
     expect(await screen.findByText('Bouleplätze von BC Linden')).toBeInTheDocument();
     expect(screen.getByText('Boulepark')).toBeInTheDocument();
     expect(screen.getByText(/Parkweg 1, Linden/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Vereinszuordnung entfernen' }));
+
+    await screen.findByText('Vereinszuordnung entfernt.');
+    expect(authenticatedApi).toHaveBeenCalledWith('/api/admin/places/place-1/club', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ clubId: null }) }));
   });
 });
 
