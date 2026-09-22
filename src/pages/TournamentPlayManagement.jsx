@@ -107,8 +107,9 @@ export default function TournamentPlayManagement({ tournaments: allTournaments }
   // online spielbar (siehe isOnlinePlayable) - alle anderen Typen werden unten im
   // Leerzustand mit Grund aufgelistet, statt kommentarlos aus der Auswahl zu
   // verschwinden.
-  const tournaments = allTournaments.filter(isOnlinePlayable);
+  const tournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && !tournament.desktopExecution);
   const nonPlayableTournaments = allTournaments.filter((tournament) => !isOnlinePlayable(tournament));
+  const desktopExecutionTournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && tournament.desktopExecution);
   const [selectedTournamentId, setSelectedTournamentId] = useState(tournaments[0]?.id || '');
   const [rounds, setRounds] = useState([]);
   const [swissTeams, setSwissTeams] = useState([]);
@@ -273,6 +274,9 @@ export default function TournamentPlayManagement({ tournaments: allTournaments }
     return (
       <div className="panel">
         <p className="muted">{t('Keine Turniere mit Online-Durchführung verfügbar.')}</p>
+        {desktopExecutionTournaments.length > 0 && (
+          <p className="hint">{t('Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.')}</p>
+        )}
         {nonPlayableTournaments.length > 0 && (
           <div className="hint">
             <p>{t('Folgende Turniere unterstützen keine Online-Rundenverwaltung, da ihr Turniertyp dafür nicht implementiert ist.')} {t('Unterstützt werden nur:')} {supportedSystemsList(i18n.language)}.</p>

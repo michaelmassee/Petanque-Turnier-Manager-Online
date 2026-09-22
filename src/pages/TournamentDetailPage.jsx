@@ -299,6 +299,11 @@ export function TournamentSchedule({ tournamentId, tournament }) {
   const isSchweizerWithBuchholz = isSchweizer && tournament?.schweizerRankingMode !== 'ohne_buchholz';
 
   useEffect(() => {
+    if (tournament?.desktopExecution) {
+      setRounds([]);
+      setRanking([]);
+      return undefined;
+    }
     let cancelled = false;
     Promise.all([api(`/api/tournaments/${tournamentId}/rounds`), api(`/api/tournaments/${tournamentId}/ranking`)])
       .then(([roundsData, rankingData]) => {
@@ -315,7 +320,11 @@ export function TournamentSchedule({ tournamentId, tournament }) {
     return () => {
       cancelled = true;
     };
-  }, [tournamentId]);
+  }, [tournamentId, tournament?.desktopExecution]);
+
+  if (tournament?.desktopExecution) {
+    return <p className="hint">{t('Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.')}</p>;
+  }
 
   if (!rounds) {
     return <p className="muted">{t('Wird geladen…')}</p>;

@@ -23,6 +23,15 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     expect(await screen.findByText('Noch keine Runde gestartet.')).toBeInTheDocument();
   });
 
+  it('kennzeichnet im Desktop durchgeführte Turniere als nicht online geführt', () => {
+    global.fetch = vi.fn();
+
+    render(<TournamentSchedule tournamentId="t1" language="de" tournament={{ desktopExecution: true }} />);
+
+    expect(screen.getByText('Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.')).toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it('zeigt die aktuelle Runde und die Rangliste rein lesend an', async () => {
     global.fetch = vi.fn((path) => {
       if (path === '/api/tournaments/t1/rounds') {
