@@ -5436,11 +5436,19 @@ function clubInput(body) {
   return { name, kind, description: normalizeRichText(body.description, 'Ungültige Organisationsbeschreibung'), websiteUrl: normalizePresentationUrl(body.websiteUrl, 'websiteUrl'), logoUrl: normalizePresentationUrl(body.logoUrl, 'logoUrl'), socialLinks: socialLinks(body.socialLinks), memberOf: memberOf(body.memberOf), contactName, contactEmail, contactPhone: nullableText(body.contactPhone) };
 }
 
+async function assertNoDuplicateBoulePlace(db, input, excludeId = '') {
+  const existing = await db.prepare('SELECT id FROM boule_places WHERE lower(trim(name)) = lower(trim(?)) AND lower(trim(address)) = lower(trim(?)) AND venue_type = ? AND id != ?').bind(input.name, input.address, input.venueType, excludeId).first();
+  if (existing) throw new HttpError(409, 'Dieser Bouleplatz ist bereits vorhanden');
+}
+
 async function createClub(request, db, user) {
   const body = await readJson(request);
   const input = clubInput(body);
   if (!body.venue || typeof body.venue !== 'object') throw new HttpError(400, 'Für eine Organisation ist ein Spielort erforderlich', { field: 'venue' });
   const venue = await placeInput(body.venue, request.headers?.get?.('CF-IPCountry'));
+  const existingClub = await db.prepare('SELECT id FROM clubs WHERE lower(trim(name)) = lower(trim(?))').bind(input.name).first();
+  if (existingClub) throw new HttpError(409, 'Dieser Verein oder diese Gruppe ist bereits vorhanden');
+  await assertNoDuplicateBoulePlace(db, venue);
   const now = new Date().toISOString(); const id = crypto.randomUUID(); const venueId = crypto.randomUUID();
   await db.batch([
     db.prepare('INSERT INTO clubs (id, name, kind, description, website_url, logo_url, social_links, member_of, contact_name, contact_email, contact_phone, status, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'pending\', ?, ?, ?)').bind(id, input.name, input.kind, input.description, input.websiteUrl, input.logoUrl, JSON.stringify(input.socialLinks), JSON.stringify(input.memberOf), input.contactName, input.contactEmail, input.contactPhone, user.id, now, now),
@@ -5528,12 +5536,14 @@ async function createBoulePlace(request, db, clubId, user, countryCode) {
   const status = club.status === 'published' ? 'published' : 'pending';
   const exists = await db.prepare('SELECT id FROM boule_places WHERE club_id = ? AND venue_type = ?').bind(clubId, input.venueType).first();
   if (exists) throw new HttpError(409, 'Diese Organisation hat bereits einen Spielort dieses Typs');
+  await assertNoDuplicateBoulePlace(db, input);
   await db.prepare('INSERT INTO boule_places (id, club_id, name, address, latitude, longitude, venue_type, court_count, description, accessible, facilities, facility_codes, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, clubId, input.name, input.address, input.latitude, input.longitude, input.venueType, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, JSON.stringify(input.facilityCodes), status, now, now).run();
   return json({ id }, 201);
 }
 
 async function createIndependentBoulePlace(request, db, user, countryCode) {
   const input = await placeInput(await readJson(request), countryCode); const id = crypto.randomUUID(); const now = new Date().toISOString();
+  await assertNoDuplicateBoulePlace(db, input);
   await db.prepare("INSERT INTO boule_places (id, club_id, name, address, latitude, longitude, venue_type, court_count, description, accessible, facilities, facility_codes, status, reported_by_user_id, created_at, updated_at) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?)")
     .bind(id, input.name, input.address, input.latitude, input.longitude, input.venueType, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, JSON.stringify(input.facilityCodes), user.id, now, now).run();
   return json({ id }, 201);
@@ -5560,6 +5570,7 @@ async function updateBoulePlace(request, db, id, user, countryCode) {
     const conflict = await db.prepare('SELECT id FROM boule_places WHERE club_id = ? AND venue_type = ? AND id != ?').bind(club.id, input.venueType, id).first();
     if (conflict) throw new HttpError(409, 'Diese Organisation hat bereits einen Spielort dieses Typs');
   }
+  await assertNoDuplicateBoulePlace(db, input, id);
   await db.prepare('UPDATE boule_places SET name = ?, address = ?, latitude = ?, longitude = ?, venue_type = ?, court_count = ?, description = ?, accessible = ?, facilities = ?, facility_codes = ?, status = ?, updated_at = ? WHERE id = ?').bind(input.name, input.address, input.latitude, input.longitude, input.venueType, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, JSON.stringify(input.facilityCodes), status, new Date().toISOString(), id).run(); return json({ ok: true });
 }
 
