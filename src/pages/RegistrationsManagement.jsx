@@ -58,7 +58,7 @@ const REGISTRATION_CSV_COLUMNS = [
   'teamName',
   'seedingPosition',
   'status',
-  'active',
+  'participation',
   'isVip',
   'feeSelections',
   'feeTotalCents',

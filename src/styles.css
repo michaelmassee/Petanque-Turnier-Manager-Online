@@ -2047,11 +2047,6 @@ a.left-panel-link {
   color: #995800;
 }
 
-.registration-withdrawn {
-  background: #f1f1f1;
-  color: #5a5a5a;
-}
-
 .vip-badge {
   color: #c9971c;
   margin-right: 4px;
@@ -2408,20 +2403,17 @@ a.left-panel-link {
 
 .round-participant-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 18px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 12px;
   padding: 6px 0;
   border-bottom: 1px solid #e5e9f0;
-  cursor: pointer;
 }
 
-.round-participant-row input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
+.round-participant-row select {
+  width: auto;
   min-height: 0;
   margin: 0;
-  padding: 0;
   justify-self: end;
 }
 

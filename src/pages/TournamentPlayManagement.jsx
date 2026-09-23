@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { SelectField, TextField, Button, Feedback } from '../components/ui.jsx';
 import { checkRoundRequirements, getSupportedSystemLabels, isOnlinePlayable } from '../lib/pairing/index.js';
-import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
-import { labelFor } from '../lib/domain.js';
+import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
+import { labelFor, translatedOptions } from '../lib/domain.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
@@ -175,16 +175,16 @@ export default function TournamentPlayManagement({ tournaments: allTournaments }
     }
   }
 
-  async function handleToggleActive(registrationId, nextActive) {
+  async function handleParticipationChange(registrationId, participation) {
     setBusy(true);
     setError('');
     try {
-      await authenticatedApi(`/api/registrations/${registrationId}/active`, {
+      await authenticatedApi(`/api/registrations/${registrationId}/participation`, {
         method: 'PUT',
-        body: JSON.stringify({ active: nextActive }),
+        body: JSON.stringify({ participation }),
       });
       setConfirmedRegistrations((current) =>
-        current.map((registration) => (registration.id === registrationId ? { ...registration, active: nextActive } : registration)),
+        current.map((registration) => (registration.id === registrationId ? { ...registration, participation } : registration)),
       );
     } catch (err) {
       setError(err.message);
@@ -295,7 +295,7 @@ export default function TournamentPlayManagement({ tournaments: allTournaments }
 
   const currentRound = rounds[rounds.length - 1] || null;
   const currentRoundOpen = currentRound ? !isRoundComplete(currentRound) : false;
-  const activeConfirmedCount = confirmedRegistrations.filter((registration) => registration.active).length;
+  const activeConfirmedCount = confirmedRegistrations.filter((registration) => registration.participation === 'active').length;
   const isSchweizerMelee = selectedTournament?.type === 'schweizer' && selectedTournament?.registrationType === 'melee';
   const isSchweizerWithBuchholz = selectedTournament?.type === 'schweizer' && selectedTournament?.schweizerRankingMode !== 'ohne_buchholz';
   const requiredMeleePlayers = selectedTournament?.formation === 'triplette' ? 18 : 12;
@@ -396,10 +396,12 @@ export default function TournamentPlayManagement({ tournaments: allTournaments }
           <p className="hint">{t('Neue Spieler sind sofort für die nächste Runde aktiv.')}</p>
           <div className="round-participant-list">
             {visibleConfirmedRegistrations.items.map((registration) => (
-              <label className="round-participant-row" key={registration.id}>
-                <span className={registration.active ? '' : 'muted'} data-i18n-skip>{playerLabel(registration)}</span>
-                <input type="checkbox" checked={registration.active} disabled={busy} onChange={(event) => handleToggleActive(registration.id, event.target.checked)} />
-              </label>
+              <div className="round-participant-row" key={registration.id}>
+                <span className={registration.participation === 'active' ? '' : 'muted'} data-i18n-skip>{playerLabel(registration)}</span>
+                <select aria-label={`${t('Teilnahme')}: ${playerLabel(registration)}`} value={registration.participation} disabled={busy} onChange={(event) => handleParticipationChange(registration.id, event.target.value)}>
+                  {translatedOptions(PARTICIPATIONS).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </div>
             ))}
           </div>
           <InfiniteListLoadMore hasMore={visibleConfirmedRegistrations.hasMore} onLoadMore={visibleConfirmedRegistrations.loadMore} label={t('Weitere Einträge laden')} />

@@ -118,6 +118,17 @@ export function validateMatchScore(value) {
   return score;
 }
 
+// Teilnahme nach dem Check-in, analog zur Aktiv-Spalte der Meldeliste im Hauptprojekt
+// (leer = inactive, 1 = active, 2 = withdrawn/ausgesetzt). Bewusst getrennt vom Anmeldestatus;
+// nur 'active' geht in die Rundenauslosung ein.
+export const PARTICIPATIONS = ['inactive', 'active', 'withdrawn'];
+
+export function parseParticipation(value, errorMessage = 'Ungültige Teilnahme') {
+  const participation = text(value);
+  if (!PARTICIPATIONS.includes(participation)) throw new HttpError(400, errorMessage);
+  return participation;
+}
+
 export function normalizePlayerListingPosition(value) {
   const position = text(value || 'egal');
   if (!PLAYER_LISTING_POSITIONS.includes(position)) throw new HttpError(400, 'Bitte wähle eine Spielposition');

@@ -61,7 +61,13 @@ export const REGISTRATION_STATUSES = [
   { value: 'confirmed', label: 'Bestätigt' },
   { value: 'waitlist', label: 'Warteliste' },
   { value: 'cancelled', label: 'Storniert' },
-  { value: 'withdrawn', label: 'Ausgestiegen' },
+];
+
+// Teilnahme nach dem Check-in, getrennt vom Anmeldestatus (analog Aktiv-Spalte der Meldeliste).
+export const PARTICIPATIONS = [
+  { value: 'inactive', label: 'Inaktiv' },
+  { value: 'active', label: 'Aktiv' },
+  { value: 'withdrawn', label: 'Ausgesetzt' },
 ];
 
 export const RADIUS_OPTIONS = [

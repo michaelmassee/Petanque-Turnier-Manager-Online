@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { assertPartnerCountMatchesFormation, isNewlyPublicTournament, isTournamentRoundNumberConflict, normalizePlayerListingPosition, normalizeTournamentInput, playerListingMatchesPosition, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
+import { assertPartnerCountMatchesFormation, isNewlyPublicTournament, isTournamentRoundNumberConflict, normalizePlayerListingPosition, normalizeTournamentInput, parseParticipation, playerListingMatchesPosition, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
 
 const base = { name: 'Testturnier', date: '2026-06-01', location: 'Musterstadt' };
 
 describe('Worker-Fachlogik', () => {
+  it('akzeptiert nur die drei Teilnahme-Zustände und keinen Anmeldestatus', () => {
+    expect(parseParticipation('inactive')).toBe('inactive');
+    expect(parseParticipation('active')).toBe('active');
+    expect(parseParticipation('withdrawn')).toBe('withdrawn');
+    expect(() => parseParticipation('confirmed')).toThrow('Ungültige Teilnahme');
+    expect(() => parseParticipation(undefined, 'Ungültige Teilnahme für Anmeldung r1')).toThrow('Anmeldung r1');
+  });
+
   it('normalisiert Spielpositionen und lässt flexible Gesuche bei jeder Positionssuche zu', () => {
     expect(normalizePlayerListingPosition()).toBe('egal');
     expect(normalizePlayerListingPosition('milieu')).toBe('milieu');

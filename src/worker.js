@@ -10,6 +10,7 @@ import {
   normalizePlayerListingPosition,
   normalizeRichText,
   normalizeTournamentInput as normalizeCoreTournamentInput,
+  parseParticipation,
   registrationOpenStatus as coreRegistrationOpenStatus,
   tournamentMatchesSavedSearch,
   validateMatchScore,
@@ -41,10 +42,8 @@ const FORMATION_REPORT_VALUES = [...FORMATIONS, 'andere'];
 const REGISTRATION_TYPES = ['supermelee', 'melee', 'forme'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
-// 'withdrawn': Turnierdokument hat den Teilnehmer waehrend eines laufenden Turniers als
-// ausgestiegen markiert (Aktiv-Spalte Meldeliste) - bewusst getrennt von 'cancelled', das eigene
-// Nebeneffekte hat (Stornierungs-Mail, Freigabe von Warteliste-/Kapazitaetsplaetzen).
-const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist', 'withdrawn'];
+// Anmeldestatus (online verwaltet) - bewusst getrennt von der Teilnahme nach dem Check-in.
+const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
 const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
 const SESSION_COOKIE = 'ptm_session';
 const sessionRefreshes = new WeakMap();
@@ -400,7 +399,7 @@ const TOURNAMENT_BROADCAST_EMAILS = {
 const SYSTEM_NOTIFICATION_TEXTS = {
   de: {
     tournamentStatus: { draft: 'Entwurf', registration: 'Anmeldung offen', running: 'Läuft', finished: 'Abgeschlossen' },
-    registrationStatus: { pending: 'Offen', confirmed: 'Bestätigt', waitlist: 'Warteliste', cancelled: 'Storniert', withdrawn: 'Ausgestiegen' },
+    registrationStatus: { pending: 'Offen', confirmed: 'Bestätigt', waitlist: 'Warteliste', cancelled: 'Storniert' },
     registrationFor: (participant) => `Anmeldung von ${participant}`,
     accountEmailUnverified: 'E-Mail nicht bestätigt',
     accountPasswordChangeRequired: 'Passwortänderung erforderlich',
@@ -410,7 +409,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   nl: {
     tournamentStatus: { draft: 'Concept', registration: 'Inschrijving open', running: 'Bezig', finished: 'Afgerond' },
-    registrationStatus: { pending: 'Open', confirmed: 'Bevestigd', waitlist: 'Wachtlijst', cancelled: 'Geannuleerd', withdrawn: 'Uitgevallen' },
+    registrationStatus: { pending: 'Open', confirmed: 'Bevestigd', waitlist: 'Wachtlijst', cancelled: 'Geannuleerd' },
     registrationFor: (participant) => `Aanmelding van ${participant}`,
     accountEmailUnverified: 'e-mail niet bevestigd',
     accountPasswordChangeRequired: 'wachtwoordwijziging vereist',
@@ -420,7 +419,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   en: {
     tournamentStatus: { draft: 'Draft', registration: 'Registration open', running: 'Running', finished: 'Finished' },
-    registrationStatus: { pending: 'Pending', confirmed: 'Confirmed', waitlist: 'Waitlist', cancelled: 'Cancelled', withdrawn: 'Withdrawn' },
+    registrationStatus: { pending: 'Pending', confirmed: 'Confirmed', waitlist: 'Waitlist', cancelled: 'Cancelled' },
     registrationFor: (participant) => `Registration for ${participant}`,
     accountEmailUnverified: 'email not verified',
     accountPasswordChangeRequired: 'password change required',
@@ -430,7 +429,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   es: {
     tournamentStatus: { draft: 'Borrador', registration: 'Inscripción abierta', running: 'En curso', finished: 'Finalizado' },
-    registrationStatus: { pending: 'Pendiente', confirmed: 'Confirmado', waitlist: 'Lista de espera', cancelled: 'Cancelado', withdrawn: 'Retirado' },
+    registrationStatus: { pending: 'Pendiente', confirmed: 'Confirmado', waitlist: 'Lista de espera', cancelled: 'Cancelado' },
     registrationFor: (participant) => `Inscripción de ${participant}`,
     accountEmailUnverified: 'correo no verificado',
     accountPasswordChangeRequired: 'cambio de contraseña requerido',
@@ -440,7 +439,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   fr: {
     tournamentStatus: { draft: 'Brouillon', registration: 'Inscriptions ouvertes', running: 'En cours', finished: 'Terminé' },
-    registrationStatus: { pending: 'En attente', confirmed: 'Confirmé', waitlist: "Liste d'attente", cancelled: 'Annulé', withdrawn: 'Désisté' },
+    registrationStatus: { pending: 'En attente', confirmed: 'Confirmé', waitlist: "Liste d'attente", cancelled: 'Annulé' },
     registrationFor: (participant) => `Inscription de ${participant}`,
     accountEmailUnverified: 'e-mail non confirmé',
     accountPasswordChangeRequired: 'changement de mot de passe requis',
@@ -1583,17 +1582,17 @@ export default {
         }
       }
 
-      const registrationActiveMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/active$/);
-      if (registrationActiveMatch && request.method === 'PUT') {
+      const registrationParticipationMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/participation$/);
+      if (registrationParticipationMatch && request.method === 'PUT') {
         const auth = await requireManagerAuth(request, env.DB);
-        const registration = await getRegistrationWithTournament(env.DB, registrationActiveMatch[1]);
+        const registration = await getRegistrationWithTournament(env.DB, registrationParticipationMatch[1]);
         if (!registration) {
           throw new HttpError(404, 'Anmeldung nicht gefunden');
         }
         assertCanManageTournament(registration, auth.user);
         assertRegistrationOnlineEditable(registration);
         const body = await readJson(request);
-        return await setRegistrationActive(env.DB, registration, Boolean(body.active));
+        return await setRegistrationParticipation(env.DB, registration, parseParticipation(body.participation));
       }
 
       if (url.pathname === '/api/sync/tournaments' && request.method === 'GET') {
@@ -3185,11 +3184,11 @@ async function upsertDocumentRegistration(request, env, tournament, localRegistr
   }
   const status = body.status === undefined ? existing.status : String(body.status);
   if (!REGISTRATION_STATUSES.includes(status)) throw new HttpError(400, 'Ungültiger Status');
-  const active = body.active === undefined ? Number(existing.active ?? 1) : (body.active ? 1 : 0);
+  const participation = body.participation === undefined ? existing.participation : parseParticipation(body.participation);
   const seedingPosition = body.seedingPosition === undefined ? existing.seeding_position : body.seedingPosition;
-  await env.DB.prepare(`UPDATE registrations SET status = ?, active = ?, seeding_position = ?,
+  await env.DB.prepare(`UPDATE registrations SET status = ?, participation = ?, seeding_position = ?,
       execution_revision = execution_revision + 1, updated_at = ? WHERE id = ?`)
-    .bind(status, active, seedingPosition, new Date().toISOString(), existing.id).run();
+    .bind(status, participation, seedingPosition, new Date().toISOString(), existing.id).run();
   return json({ registration: toPublicRegistration(await env.DB.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first()), created: false });
 }
 
@@ -4234,7 +4233,7 @@ async function assignKoBracketGroups(db, tournament, teams) {
 async function createFormeTeams(db, tournament) {
   const current = await getSchweizerTeams(db, tournament);
   if (current.length) return current;
-  const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1 ORDER BY registered_at").bind(tournament.id).all();
+  const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active' ORDER BY registered_at").bind(tournament.id).all();
   if (!registrations.results.length) return [];
   const nowMs = Date.now();
   // Jede Zeile bekommt einen eigenen, um 1ms pro Index versetzten Zeitstempel statt
@@ -4258,7 +4257,7 @@ async function drawSchweizerMeleeTeams(db, tournament) {
   if (tournament.status === 'finished') throw new HttpError(409, 'Nach Turnierende können Teams nicht mehr ausgelost werden');
   const rounds = await db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?').bind(tournament.id).first();
   if (Number(rounds.count)) throw new HttpError(409, 'Nach der ersten Runde können Teams nicht mehr ausgelost werden');
-  const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1 ORDER BY registered_at").bind(tournament.id).all();
+  const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active' ORDER BY registered_at").bind(tournament.id).all();
   const size = tournament.formation === 'triplette' ? 3 : 2;
   if (registrations.results.length < size * 6) throw new HttpError(400, 'Für eine Runde werden mindestens 6 Teams benötigt.');
   const shuffled = [...registrations.results].sort(() => Math.random() - 0.5);
@@ -4309,7 +4308,7 @@ async function generateTournamentRound(db, tournament) {
   // Auch direkte API-Aufrufe müssen die systemabhängigen Mindestanforderungen,
   // die zulässige Anmeldeart und das natürliche Rundenende einhalten.
   const [activeConfirmed, existingRounds] = await Promise.all([
-    db.prepare("SELECT COUNT(*) AS count FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1").bind(tournament.id).first(),
+    db.prepare("SELECT COUNT(*) AS count FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active'").bind(tournament.id).first(),
     db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?').bind(tournament.id).first(),
   ]);
   const requirement = checkRoundRequirements(tournament, Number(activeConfirmed.count), Number(existingRounds.count))[0];
@@ -4353,7 +4352,7 @@ async function generateTournamentRound(db, tournament) {
     players = teams;
     teamsById = new Map(teams.map((team) => [team.id, team]));
   } else {
-    const registrationsResult = await db.prepare("SELECT id FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND active = 1").bind(tournament.id).all();
+    const registrationsResult = await db.prepare("SELECT id FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active'").bind(tournament.id).all();
     players = registrationsResult.results.map((row) => ({ id: row.id }));
   }
 
@@ -4769,15 +4768,14 @@ function assertRegistrationOnlineEditable(registration) {
 }
 
 /**
- * Aktiv/Inaktiv-Status während der Turnierdurchführung (siehe migrations/0046):
- * ersetzt den match-bezogenen "nicht angetreten"-Button. Wer inaktiv gesetzt wird,
- * geht bei der nächsten Rundenauslosung nicht mehr in den Spielerpool ein
- * (generateTournamentRound filtert auf active = 1) - analog zum Hauptprojekt, wo nur
- * Meldungen mit Spieltag-Status "JA" in die Paarungsbildung einfließen.
+ * Teilnahme während der Turnierdurchführung (siehe migrations/0074): inactive / active /
+ * withdrawn (ausgesetzt). Nur 'active' geht bei der nächsten Rundenauslosung in den Spielerpool
+ * ein - analog zum Hauptprojekt, wo nur Meldungen mit Aktiv-Spalte 1 in die Paarungsbildung
+ * einfließen. Der Anmeldestatus bleibt davon unberührt.
  */
-async function setRegistrationActive(db, existing, active) {
+async function setRegistrationParticipation(db, existing, participation) {
   const now = new Date().toISOString();
-  await db.prepare('UPDATE registrations SET active = ?, updated_at = ? WHERE id = ?').bind(active ? 1 : 0, now, existing.id).run();
+  await db.prepare('UPDATE registrations SET participation = ?, updated_at = ? WHERE id = ?').bind(participation, now, existing.id).run();
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
   return json({ registration: toManagedRegistration(updated) });
 }
@@ -5079,14 +5077,15 @@ async function syncPostResults(request, env, tournamentId) {
         ? null
         : Number.parseInt(entry.seedingPosition, 10);
 
-    const active = entry.active === undefined || entry.active === null ? null : (entry.active ? 1 : 0);
+    const participation = entry.participation === undefined || entry.participation === null
+      ? null : parseParticipation(entry.participation, `Ungültige Teilnahme für Anmeldung ${id}`);
 
     const expectedExecutionRevision = entry.expectedExecutionRevision === undefined || entry.expectedExecutionRevision === null
       ? null : Number(entry.expectedExecutionRevision);
     if (expectedExecutionRevision !== null && (!Number.isInteger(expectedExecutionRevision) || expectedExecutionRevision < 1)) {
       throw new HttpError(400, `Ungültige Ausführungsrevision für Anmeldung ${id}`);
     }
-    parsed.push({ id, status, seedingPosition, active, expectedExecutionRevision });
+    parsed.push({ id, status, seedingPosition, participation, expectedExecutionRevision });
   }
 
   const statusChangeIds = parsed.filter((entry) => entry.status !== null).map((entry) => entry.id);
@@ -5122,12 +5121,12 @@ async function syncPostResults(request, env, tournamentId) {
     `UPDATE registrations
      SET status = COALESCE(?, status),
          confirmed_at = CASE WHEN ? = 'confirmed' THEN COALESCE(confirmed_at, ?) WHEN ? IS NOT NULL THEN NULL ELSE confirmed_at END,
-         seeding_position = ?, active = COALESCE(?, active), execution_revision = execution_revision + 1, updated_at = ?
+         seeding_position = ?, participation = COALESCE(?, participation), execution_revision = execution_revision + 1, updated_at = ?
      WHERE id = ? AND tournament_id = ? AND (? IS NULL OR execution_revision = ?)`,
   );
   const updateResults =
     parsed.length > 0
-      ? await db.batch(parsed.map((entry) => updateStatement.bind(entry.status, entry.status, now, entry.status, entry.seedingPosition, entry.active, now, entry.id, tournamentId, entry.expectedExecutionRevision, entry.expectedExecutionRevision)))
+      ? await db.batch(parsed.map((entry) => updateStatement.bind(entry.status, entry.status, now, entry.status, entry.seedingPosition, entry.participation, now, entry.id, tournamentId, entry.expectedExecutionRevision, entry.expectedExecutionRevision)))
       : [];
 
   let updatedCount = 0;
@@ -7140,7 +7139,7 @@ function toPublicRegistration(row) {
     isVip: Boolean(row.is_vip),
     feeSelections,
     feeTotalCents: feeSelections.reduce((total, selection) => total + Number(selection.amountCents || 0), 0),
-    active: Boolean(Number(row.active ?? 1)),
+    participation: row.participation || 'active',
     localRegistrationUuid: row.local_registration_uuid || null,
     registrationRevision: Number(row.registration_revision || 1),
     executionRevision: Number(row.execution_revision || 1),

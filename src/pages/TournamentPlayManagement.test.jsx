@@ -37,7 +37,7 @@ const CONFIRMED_REGISTRATIONS = [
   { id: 'p4', firstName: 'Dirk', lastName: 'Demo' },
   { id: 'p5', firstName: 'Eva', lastName: 'Muster' },
   { id: 'p6', firstName: 'Finn', lastName: 'Test' },
-].map((registration) => ({ ...registration, status: 'confirmed', active: true }));
+].map((registration) => ({ ...registration, status: 'confirmed', participation: 'active' }));
 
 function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registrations = CONFIRMED_REGISTRATIONS } = {}) {
   global.fetch = vi.fn((path, options = {}) => {
@@ -64,7 +64,7 @@ function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registratio
       const updated = { ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 7 }] };
       return Promise.resolve(jsonResponse({ rounds: [updated] }));
     }
-    if (/^\/api\/registrations\/.+\/active$/.test(path) && options.method === 'PUT') {
+    if (/^\/api\/registrations\/.+\/participation$/.test(path) && options.method === 'PUT') {
       return Promise.resolve(jsonResponse({ registration: {} }));
     }
     return Promise.resolve(jsonResponse({}));
@@ -124,8 +124,8 @@ describe('TournamentPlayManagement', () => {
     installFetchMock(calls, {
       rounds: [],
       registrations: [
-        { id: 'p1', status: 'confirmed', active: true },
-        { id: 'p2', status: 'pending', active: true },
+        { id: 'p1', status: 'confirmed', participation: 'active' },
+        { id: 'p2', status: 'pending', participation: 'active' },
       ],
     });
 
@@ -139,10 +139,10 @@ describe('TournamentPlayManagement', () => {
   it('schließt inaktive Teilnehmer von der Mindestanzahl-Prüfung aus und erlaubt das Reaktivieren', async () => {
     const calls = [];
     const registrations = [
-      { id: 'p1', firstName: 'Anna', lastName: 'Muster', status: 'confirmed', active: true },
-      { id: 'p2', firstName: 'Bert', lastName: 'Beispiel', status: 'confirmed', active: true },
-      { id: 'p3', firstName: 'Clara', lastName: 'Test', status: 'confirmed', active: true },
-      { id: 'p4', firstName: 'Dirk', lastName: 'Demo', status: 'confirmed', active: false },
+      { id: 'p1', firstName: 'Anna', lastName: 'Muster', status: 'confirmed', participation: 'active' },
+      { id: 'p2', firstName: 'Bert', lastName: 'Beispiel', status: 'confirmed', participation: 'active' },
+      { id: 'p3', firstName: 'Clara', lastName: 'Test', status: 'confirmed', participation: 'active' },
+      { id: 'p4', firstName: 'Dirk', lastName: 'Demo', status: 'confirmed', participation: 'withdrawn' },
     ];
     installFetchMock(calls, { rounds: [], registrations });
 
@@ -152,9 +152,9 @@ describe('TournamentPlayManagement', () => {
     expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Teilnehmer'));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Dirk Demo' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Teilnahme: Dirk Demo' }), { target: { value: 'active' } });
 
-    await waitFor(() => expect(calls).toContain('/api/registrations/p4/active'));
+    await waitFor(() => expect(calls).toContain('/api/registrations/p4/participation'));
     expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 4 (4 aktiv)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erste Runde starten' })).not.toBeDisabled();
   });
