@@ -1190,6 +1190,10 @@ export default {
         const session = await requireSession(request, env.DB);
         return await createBoulePlace(request, env.DB, clubPlaceMatch[1], session.user, request.headers.get('CF-IPCountry'));
       }
+      const placeClubLogoMatch = url.pathname.match(/^\/api\/places\/([^/]+)\/club-logo$/);
+      if (placeClubLogoMatch && request.method === 'GET') {
+        return await proxyBoulePlaceClubLogo(env.DB, placeClubLogoMatch[1]);
+      }
       const placeMatch = url.pathname.match(/^\/api\/places\/([^/]+)$/);
       if (placeMatch && request.method === 'PUT') {
         const session = await requireSession(request, env.DB);
@@ -3952,16 +3956,30 @@ const IMAGE_PROXY_MAX_BYTES = 8 * 1024 * 1024;
 const IMAGE_PROXY_CACHE_SECONDS = 60 * 60 * 6;
 
 /**
- * Streams an externally hosted tournament image (logo/website/flyer) through our own origin so
- * it satisfies the strict `img-src 'self'` CSP instead of loosening that policy to arbitrary
- * external hosts.
+ * Streams an externally hosted image through our own origin so it satisfies the strict
+ * `img-src 'self'` CSP instead of loosening that policy to arbitrary external hosts.
  */
 async function proxyTournamentImage(tournament, field) {
   const column = PROXY_IMAGE_FIELDS[field];
   if (!column) {
     throw new HttpError(400, 'Unbekanntes Bildfeld');
   }
-  const targetUrl = tournament[column];
+  return proxyExternalImage(tournament[column], `tournaments/${tournament.id}/${field}`);
+}
+
+async function proxyBoulePlaceClubLogo(db, placeId) {
+  const place = await db.prepare(
+    `SELECT p.id, c.logo_url AS club_logo_url
+     FROM boule_places p JOIN clubs c ON c.id = p.club_id
+     WHERE p.id = ? AND p.status = 'published' AND c.status = 'published'`,
+  ).bind(placeId).first();
+  if (!place) {
+    throw new HttpError(404, 'Bouleplatz nicht gefunden');
+  }
+  return proxyExternalImage(place.club_logo_url, `places/${place.id}/club-logo`);
+}
+
+async function proxyExternalImage(targetUrl, cachePath) {
   if (!targetUrl || !isHttpUrl(targetUrl)) {
     throw new HttpError(404, 'Kein Bild hinterlegt');
   }
@@ -3971,7 +3989,7 @@ async function proxyTournamentImage(tournament, field) {
 
   const cache = caches.default;
   const cacheKey = new Request(
-    `https://image-proxy.internal/tournaments/${tournament.id}/${field}?source=${encodeURIComponent(targetUrl)}`,
+    `https://image-proxy.internal/${cachePath}?source=${encodeURIComponent(targetUrl)}`,
   );
   const cached = await cache.match(cacheKey);
   if (cached) {

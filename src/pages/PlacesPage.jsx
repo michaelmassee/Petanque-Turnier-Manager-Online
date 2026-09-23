@@ -6,7 +6,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
-import { formatLocationAddress, googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
+import { clubLogoImageUrl, formatLocationAddress, googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
 import { Button, ClubBadge, DistanceBadge, SelectField } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
@@ -141,7 +141,7 @@ function PlacesMap({ places, center, maptilerApiKey, focus }) {
                   {place.clubLogoUrl && (
                     <img
                       className="map-popup-logo"
-                      src={place.clubLogoUrl}
+                      src={clubLogoImageUrl(place.id)}
                       alt=""
                       onError={(event) => { event.currentTarget.style.display = 'none'; }}
                     />
@@ -386,7 +386,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
                   {group.places[0].clubLogoUrl && (
                     <img
                       className="place-group-logo"
-                      src={group.places[0].clubLogoUrl}
+                      src={clubLogoImageUrl(group.places[0].id)}
                       alt=""
                       onError={(event) => { event.currentTarget.style.display = 'none'; }}
                     />

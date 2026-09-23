@@ -91,6 +91,10 @@ export function tournamentImageUrl(tournamentId, field, shareToken = '') {
   return `/api/tournaments/${tournamentId}/image?${params}`;
 }
 
+export function clubLogoImageUrl(placeId) {
+  return `/api/places/${placeId}/club-logo`;
+}
+
 export function tournamentPayload(form) {
   return {
     boulePlaceId: form.boulePlaceId || null,
