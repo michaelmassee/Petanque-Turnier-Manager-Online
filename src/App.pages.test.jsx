@@ -290,7 +290,8 @@ describe('Öffentliche Turnierdetailseite', () => {
     expect(screen.queryByText('Turniersystem')).not.toBeInTheDocument();
     expect(screen.queryByText('Max. Meldungen')).not.toBeInTheDocument();
     expect(screen.queryByText('Warteliste')).not.toBeInTheDocument();
-    expect(screen.queryByText('Kontakt')).not.toBeInTheDocument();
+    expect(screen.getByText('Kontakt')).toBeInTheDocument();
+    expect(screen.getByText(/kontakt@example.test/)).toBeInTheDocument();
   });
 
   it('weist auf die notwendige Freigabe durch den Turnierersteller hin', () => {

@@ -154,12 +154,12 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
           <p>
             <strong>{t('Warteliste')}</strong>: {tournament.waitlistRegistrations || 0}
           </p>
-          {(tournament.contactName || tournament.contactEmail || tournament.contactPhone) && (
-            <p>
-              <strong>{t('Kontakt')}</strong>: {[tournament.contactName, tournament.contactEmail, tournament.contactPhone].filter(Boolean).join(' · ')}
-            </p>
-          )}
         </>
+      )}
+      {(tournament.contactName || tournament.contactEmail || tournament.contactPhone) && (
+        <p>
+          <strong>{t('Kontakt')}</strong>: {[tournament.contactName, tournament.contactEmail, tournament.contactPhone].filter(Boolean).join(' · ')}
+        </p>
       )}
       {tournament.description && <RichText value={tournament.description} />}
     </div>
