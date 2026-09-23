@@ -1,6 +1,7 @@
 import { ROLES, FORMATIONS } from './constants.js';
 import { formatTournamentDateTime, timezoneAbbrev, detectViewerTimeZone, amountToMinorUnits, DISPLAY_LOCALES } from './format.js';
 import i18next from './i18next-config.js';
+export { formatLocationAddress } from '../location-format.js';
 
 export function authTitle(needsSetup, authView) {
   if (needsSetup) {

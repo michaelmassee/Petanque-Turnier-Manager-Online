@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
+import { formatLocationAddress } from '../lib/domain.js';
 import { Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { PlayerListingFields } from '../components/PlayerListingFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
@@ -129,7 +130,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
               <div>
                 <strong data-i18n-skip>{listing.title}</strong>
                 <span data-i18n-skip>
-                  {listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {listing.locationName}
+                  {listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {formatLocationAddress(listing.locationName)}
                   {listing.eventDate ? ` · ${listing.eventDate}` : ''}
                   {isAdmin && listing.ownerName ? ` · ${t('Ersteller:')} ${listing.ownerName}` : ''}
                 </span>

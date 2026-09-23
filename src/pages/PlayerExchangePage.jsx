@@ -6,7 +6,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
-import { distanceKm, labelFor, translatedOptions } from '../lib/domain.js';
+import { distanceKm, formatLocationAddress, labelFor, translatedOptions } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
 import { Button, TextArea, SelectField, DistanceBadge, EditDialog } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
@@ -306,7 +306,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
               <FitToBounds positions={mapped.map((listing) => [listing.latitude, listing.longitude])} maxZoom={12} singleZoom={11} />
               {mapped.map((listing) => (
                 <Marker key={listing.id} icon={marker} position={[listing.latitude, listing.longitude]}>
-                  <Popup><strong>{listing.title}</strong><br />{listing.locationName}</Popup>
+                  <Popup><strong>{listing.title}</strong><br />{formatLocationAddress(listing.locationName)}</Popup>
                 </Marker>
               ))}
             </TileFallbackMap>
@@ -326,7 +326,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
           <div className="places-list">
             {displayedListings.map((listing) => (
               <article className="panel place-card" key={listing.id}>
-                <div><h2 data-i18n-skip>{listing.title}</h2><p className="muted" data-i18n-skip>{listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {listing.locationName}{listing.eventDate ? ` · ${listing.eventDate}` : ''}</p></div>
+                <div><h2 data-i18n-skip>{listing.title}</h2><p className="muted" data-i18n-skip>{listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {formatLocationAddress(listing.locationName)}{listing.eventDate ? ` · ${listing.eventDate}` : ''}</p></div>
                 {listing.description && <RichText value={listing.description} />}
                 {listing.ownerName && <p className="muted">{t('Von')} {listing.ownerName}</p>}
                 <DistanceBadge distanceKm={listing.distanceKm} />

@@ -25,4 +25,11 @@ describe('Kartenmarker für Bouleplätze', () => {
     expect(filterPlaces(places, { indoorOnly: true }).map((place) => place.id)).toEqual(['club-hall', 'independent-hall']);
     expect(filterPlaces(places, { clubsOnly: true, indoorOnly: true }).map((place) => place.id)).toEqual(['club-hall']);
   });
+
+  it('behandelt einen vorhandenen Vereinsnamen auch ohne Organisations-ID als Verein', () => {
+    const place = { id: 'legacy-club-place', clubId: null, clubName: 'Boules Brothers Ostheim', address: 'Limesstraße 10-12, Ostheim', venueType: 'outdoor' };
+
+    expect(filterPlaces([place], { clubsOnly: true })).toEqual([place]);
+    expect(groupMapPlaces([place])[0].id).toBe('club:boules brothers ostheim:limesstraße 10-12, ostheim');
+  });
 });

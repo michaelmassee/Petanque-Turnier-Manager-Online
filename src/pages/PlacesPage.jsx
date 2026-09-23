@@ -6,7 +6,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
-import { googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
+import { formatLocationAddress, googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
 import { Button, ClubBadge, DistanceBadge, SelectField } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
@@ -33,6 +33,10 @@ const groupMarker = L.divIcon({
 });
 const facilityLabels = { toilet: 'Toilette', shelter: 'Unterstand', clubhouse: 'Vereinsheim', lighting: 'Beleuchtung', parking: 'Parkplatz', catering: 'Gastronomie', drinking_water: 'Trinkwasser', accessible: 'Barrierefrei' };
 
+function hasClub(place) {
+  return Boolean(place.clubId || place.clubName);
+}
+
 function FocusOnPlace({ focus, markerRefs }) {
   const map = useMap();
   useEffect(() => {
@@ -50,7 +54,8 @@ export function groupMapPlaces(places) {
   const groups = new Map();
   for (const place of places) {
     const addressKey = String(place.address || '').trim().toLocaleLowerCase();
-    const key = place.clubId ? `club:${place.clubId}:${addressKey}` : `place:${place.id}`;
+    const clubKey = place.clubId || String(place.clubName || '').trim().toLocaleLowerCase();
+    const key = hasClub(place) ? `club:${clubKey}:${addressKey}` : `place:${place.id}`;
     const group = groups.get(key);
     if (group) {
       group.places.push(place);
@@ -63,7 +68,7 @@ export function groupMapPlaces(places) {
 
 export function filterPlaces(places, { favoritesOnly = false, clubsOnly = false, indoorOnly = false } = {}) {
   return places.filter((place) => (!favoritesOnly || place.favorited)
-    && (!clubsOnly || Boolean(place.clubId))
+    && (!clubsOnly || hasClub(place))
     && (!indoorOnly || place.venueType === 'indoor'));
 }
 
@@ -80,20 +85,22 @@ function PlacesMap({ places, center, maptilerApiKey, focus }) {
         <Marker
           key={id}
           ref={(instance) => { groupedPlaces.forEach((groupedPlace) => { markerRefs.current[groupedPlace.id] = instance; }); }}
-          icon={place.clubId ? (place.clubKind === 'group' ? groupMarker : clubMarker) : marker}
+          icon={hasClub(place) ? (place.clubKind === 'group' ? groupMarker : clubMarker) : marker}
           position={[place.latitude, place.longitude]}
         >
           <Popup>
-            <ClubBadge clubName={place.clubName} clubKind={place.clubKind} />
             {place.clubName ? (
               <>
-                <strong data-i18n-skip>{place.clubName}</strong>
+                <div className="map-popup-heading">
+                  <ClubBadge clubName={place.clubName} clubKind={place.clubKind} />
+                  <strong data-i18n-skip>{place.clubName}</strong>
+                </div>
                 <ul className="map-popup-venues">
                   {groupedPlaces.map((groupedPlace) => <li key={groupedPlace.id} data-i18n-skip>{groupedPlace.name} ({t(groupedPlace.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')})</li>)}
                 </ul>
               </>
             ) : <strong data-i18n-skip>{place.name}</strong>}
-            <span data-i18n-skip className="map-popup-address">{place.address}</span>
+            <span data-i18n-skip className="map-popup-address">{formatLocationAddress(place.address)}</span>
             <a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
           </Popup>
         </Marker>
@@ -325,7 +332,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
               >
                 <h2 data-i18n-skip>{place.name}</h2>
                 <p className="muted">{t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}</p>
-                <p className="muted" data-i18n-skip>{place.clubName ? `${place.clubName} · ` : ''}{place.address}</p>
+                <p className="muted" data-i18n-skip>{place.clubName ? `${place.clubName} · ` : ''}{formatLocationAddress(place.address)}</p>
               </div>
               {place.description && <RichText value={place.description} />}
               <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${t('Ausstattung:')} ${place.facilities}` : ''}</p>

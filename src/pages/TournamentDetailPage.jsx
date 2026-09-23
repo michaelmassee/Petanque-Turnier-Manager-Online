@@ -5,7 +5,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney } from '../lib/format.js';
-import { labelFor, formationLabel, hasOpenRegistration, formatTournamentStartTime, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
+import { labelFor, formationLabel, hasOpenRegistration, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { Button, Feedback, RequiredMark } from '../components/ui.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { StandalonePageHeader, OfflineNotice } from '../components/layout.jsx';
@@ -95,7 +95,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
         <strong>{t('Datum')}</strong>: {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
       </p>
       <p>
-        <strong>{t('Ort')}</strong>: <span data-i18n-skip>{tournament.location}</span>
+        <strong>{t('Ort')}</strong>: <span data-i18n-skip>{formatLocationAddress(tournament.location)}</span>
       </p>
       {tournament.boulePlaceId && (
         <p>
@@ -556,7 +556,7 @@ export function TournamentDetailPage({
           <p className="tournament-detail-meta" data-i18n-skip>
             {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
             <span aria-hidden="true">·</span>
-            {tournament.location}
+            {formatLocationAddress(tournament.location)}
           </p>
         </header>
         <nav className="tournament-detail-tabs" aria-label={t('Turnierdetails')}>

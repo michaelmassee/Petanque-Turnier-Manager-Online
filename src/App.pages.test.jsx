@@ -14,7 +14,7 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage.jsx';
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
 import { RichText } from './components/RichText.jsx';
 import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
-import { hasOnlineRegistrationAvailable, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
+import { formatLocationAddress, hasOnlineRegistrationAvailable, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
 
 describe('Turnier-Payload', () => {
   it('behält den Verein eines bearbeiteten Kalendereintrags bei', () => {
@@ -53,6 +53,14 @@ describe('Entfernungs-Badge', () => {
     const { container } = render(<DistanceBadge distanceKm={undefined} />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('Ortsadresse', () => {
+  it('ordnet eine von Nominatim getrennt gelieferte Hausnummer hinter die Straße ein', () => {
+    expect(formatLocationAddress('Clubhaus, 18, Großgasse, Okarben')).toBe('Clubhaus, Großgasse 18, Okarben');
+    expect(formatLocationAddress('Boules Brothers, 10-12, Limesstraße, Ostheim')).toBe('Boules Brothers, Limesstraße 10-12, Ostheim');
+    expect(formatLocationAddress('Musterweg 7, Linden')).toBe('Musterweg 7, Linden');
   });
 });
 

@@ -1967,6 +1967,27 @@ a.left-panel-link {
   box-shadow: 0 0 0 3px rgb(22 119 255 / 12%);
 }
 
+.tournament-row {
+  grid-template-columns: minmax(280px, 1fr) auto;
+  grid-template-areas:
+    "main badges"
+    "main actions";
+  align-items: start;
+}
+
+.tournament-row .row-main {
+  grid-area: main;
+  align-self: center;
+}
+
+.tournament-row .badges {
+  grid-area: badges;
+}
+
+.tournament-row .row-actions {
+  grid-area: actions;
+}
+
 .data-row input[type="checkbox"] {
   width: 20px;
   height: 20px;
@@ -2138,6 +2159,13 @@ a.left-panel-link {
 
   .data-row {
     grid-template-columns: 1fr;
+  }
+
+  .tournament-row {
+    grid-template-areas:
+      "main"
+      "badges"
+      "actions";
   }
 
   .badges,
@@ -2619,6 +2647,8 @@ a.left-panel-link {
  .places-map-notice { max-width: min(90%, 34rem); }
  .places-map-error { display: flex; align-items: center; gap: .5rem; }
 .places-map-error button { border: 0; border-radius: 4px; background: #263648; color: white; padding: .3rem .5rem; font: inherit; cursor: pointer; }
+.map-popup-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
+.map-popup-heading .club-badge { margin: 0; }
 .map-popup-venues { margin: .4rem 0; padding-left: 1.1rem; }
 .map-popup-address { display: block; margin-bottom: .45rem; color: #53627a; }
  .places-list { display: grid; gap: 1rem; margin-top: 1rem; }

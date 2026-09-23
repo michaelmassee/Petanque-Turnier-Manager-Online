@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
-import { labelFor, formationLabel, formatTournamentStartTime, tournamentPayload, translatedOptions } from '../lib/domain.js';
+import { labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
 import { TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
@@ -642,7 +642,7 @@ export function TournamentList({
             <button className="row-main" type="button" onClick={() => onSelect(tournament.id)}>
               <strong data-i18n-skip>{tournament.name}</strong>
               {tournament.registrationEnabled === false && <span className="role">{t('Kalendereintrag')}</span>}
-              <span>{formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)} · <span data-i18n-skip>{tournament.location}</span></span>
+              <span>{formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)} · <span data-i18n-skip>{formatLocationAddress(tournament.location)}</span></span>
               {tournament.registrationEnabled !== false && (
                 <small>{formationLabel(tournament)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</small>
               )}

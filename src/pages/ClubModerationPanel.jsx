@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
+import { formatLocationAddress } from '../lib/domain.js';
 import { Button, EditDialog, ListToolbar, SelectField, TextArea, TextField } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
@@ -311,7 +312,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
                   <div>
                     <strong data-i18n-skip>{place.name}</strong>
                     <span data-i18n-skip className={place.status === 'published' ? 'status registration-confirmed' : place.status === 'rejected' ? 'status registration-cancelled' : 'status registration-pending'}>
-                      {statusLabel(place.status, t)} · {place.address}
+                      {statusLabel(place.status, t)} · {formatLocationAddress(place.address)}
                     </span>
                     <small>{place.clubName || t('Keinem Verein zugeordnet')}</small>
                   </div>
@@ -339,7 +340,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
                   <article className="data-row" key={place.id}>
                     <div>
                       <strong data-i18n-skip>{place.name}</strong>
-                      <span data-i18n-skip>{place.clubName} · {place.address}</span>
+                      <span data-i18n-skip>{place.clubName} · {formatLocationAddress(place.address)}</span>
                     </div>
                     <div className="row-actions">
                       <Button loading={busyId === id} onClick={() => publishPlace(place)}>{t('Freigeben')}</Button>
@@ -363,7 +364,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
                   <div>
                     <strong data-i18n-skip>{place.name}</strong>
                     <span data-i18n-skip className={place.status === 'published' ? 'status registration-confirmed' : 'status registration-pending'}>
-                      {statusLabel(place.status, t)} · {place.address}
+                      {statusLabel(place.status, t)} · {formatLocationAddress(place.address)}
                     </span>
                   </div>
                   <div className="row-actions">
@@ -425,7 +426,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
               <article className="data-row" key={place.id}>
                 <div>
                   <strong data-i18n-skip>{place.name}</strong>
-                  <span data-i18n-skip>{statusLabel(place.status, t)} · {place.address}</span>
+                  <span data-i18n-skip>{statusLabel(place.status, t)} · {formatLocationAddress(place.address)}</span>
                 </div>
                 <div className="row-actions">
                   <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setClubPlacesDialog(null); openEditPlace(place); }}>{t('Bearbeiten')}</Button>

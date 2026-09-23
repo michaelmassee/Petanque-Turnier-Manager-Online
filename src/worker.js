@@ -24,6 +24,7 @@ import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pai
 import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
 import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
+import { formatLocationAddress } from './location-format.js';
 
 const ROLES = ['admin', 'user'];
 const DEFAULT_TOURNAMENT_LIMIT = 5;
@@ -614,7 +615,7 @@ function buildTournamentIcs(tournament, appOrigin) {
   }
 
   lines.push(`SUMMARY:${icsEscapeText(tournament.name)}`);
-  lines.push(`LOCATION:${icsEscapeText(tournament.location)}`);
+  lines.push(`LOCATION:${icsEscapeText(formatLocationAddress(tournament.location))}`);
   lines.push(`DESCRIPTION:${icsEscapeText(`${appOrigin}/turniere/${tournament.id}/info`)}`);
   lines.push('END:VEVENT');
   lines.push('END:VCALENDAR');
@@ -693,7 +694,7 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link, cancelLink, participantsBlock),
+      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock),
       language,
       attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
       logFallback: `Registration confirmation email for ${recipient.email} (tournament ${tournament.id})`,
@@ -809,7 +810,7 @@ async function sendTournamentReminders(env) {
             await enqueueTransactionalEmail(env, {
               to: recipient.email,
               subject: templates.subject(tournament.name),
-              text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, tournament.location, link, cancelLink),
+              text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink),
               language,
               attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
               logFallback: `Tournament reminder email for registration ${registration.id} (tournament ${tournament.id})`,
@@ -5343,13 +5344,7 @@ function reorderHouseNumberInDisplayName(displayName, address) {
   if (!houseNumber || !road) {
     return displayName;
   }
-  const parts = String(displayName).split(', ');
-  if (parts[0] === houseNumber && parts[1] === road) {
-    parts[0] = road;
-    parts[1] = houseNumber;
-    return parts.join(', ');
-  }
-  return displayName;
+  return formatLocationAddress(displayName);
 }
 
 async function geocodeLocation(query, { limit = 5, countryCode } = {}) {
@@ -5595,7 +5590,7 @@ function rowMemberOf(value) {
 function toPublicBoulePlace(row, user) {
   const canEdit = row.club_id ? clubCanEdit(row, user) : Boolean(user?.role === 'admin' || (row.reported_by_user_id && row.reported_by_user_id === user?.id));
   return {
-    id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubKind: row.club_kind || 'club', clubLogoUrl: row.club_logo_url || null, clubWebsiteUrl: row.club_website_url || null, clubSocialLinks: rowSocialLinks(row.club_social_links), venueType: row.venue_type || 'outdoor', name: row.name, address: row.address,
+    id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubKind: row.club_kind || 'club', clubLogoUrl: row.club_logo_url || null, clubWebsiteUrl: row.club_website_url || null, clubSocialLinks: rowSocialLinks(row.club_social_links), venueType: row.venue_type || 'outdoor', name: row.name, address: formatLocationAddress(row.address),
     latitude: row.latitude === null ? null : Number(row.latitude), longitude: row.longitude === null ? null : Number(row.longitude),
     courtCount: Number(row.court_count || 0), description: row.description || null, accessible: Boolean(Number(row.accessible)),
     facilities: row.facilities || null, facilityCodes: rowFacilityCodes(row), status: row.status, likeCount: Number(row.like_count || 0), liked: Boolean(Number(row.liked || 0)),
@@ -5852,7 +5847,7 @@ const PLAYER_LISTING_LIMIT = 5;
 function toPublicPlayerListing(row, includeOwner = false) {
   return {
     id: row.id, ...(includeOwner ? { userId: row.user_id } : {}), type: row.type, title: row.title, description: row.description || null,
-    locationName: row.location_name, latitude: Number(row.latitude), longitude: Number(row.longitude),
+    locationName: formatLocationAddress(row.location_name), latitude: Number(row.latitude), longitude: Number(row.longitude),
     eventDate: row.event_date || null, ...(includeOwner && row.owner_first_name ? { ownerName: `${row.owner_first_name} ${row.owner_last_name}` } : {}),
     playingPosition: row.playing_position,
     createdAt: row.created_at, updatedAt: row.updated_at,
@@ -7094,7 +7089,7 @@ function toPublicTournament(row, user) {
     name: row.name,
     date: row.date,
     startTime: row.start_time,
-    location: row.location,
+    location: formatLocationAddress(row.location),
     boulePlaceId: row.boule_place_id || null,
     latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
     longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),

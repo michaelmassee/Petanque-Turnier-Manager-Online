@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
+import { formatLocationAddress } from '../lib/domain.js';
 import { Button, Feedback, SelectField } from '../components/ui.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
@@ -104,7 +105,7 @@ export function PetanqueAktuellImportPanel() {
                   <input type="checkbox" checked={selected.has(tournament.externalKey)} onChange={() => toggle(tournament.externalKey)} disabled={tournament.imported || busy} />
                   <span>
                     <strong data-i18n-skip>{tournament.name}</strong>
-                    <small data-i18n-skip>{tournament.date}{tournament.startTime ? ` · ${tournament.startTime}` : ''} · {tournament.location}</small>
+                    <small data-i18n-skip>{tournament.date}{tournament.startTime ? ` · ${tournament.startTime}` : ''} · {formatLocationAddress(tournament.location)}</small>
                     <small data-i18n-skip>{[tournament.sourceFormation, tournament.association, tournament.licenseRequired].filter(Boolean).join(' · ')}</small>
                   </span>
                   {tournament.imported && <span className="role">{t('Bereits importiert')}</span>}
