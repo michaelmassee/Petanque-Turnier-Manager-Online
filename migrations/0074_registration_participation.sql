@@ -5,9 +5,11 @@
 -- Ersetzt die boolesche Spalte `active` (konnte inaktiv und ausgesetzt nicht unterscheiden) und
 -- entfernt 'withdrawn' aus dem Anmeldestatus (0069). Tabellen-Rebuild, da SQLite/D1 CHECK-Constraints
 -- nicht per ALTER TABLE aendern kann (Muster wie 0069).
--- Default 'active' erhaelt das bisherige Verhalten rein online durchgefuehrter Turniere (neue und
--- per Schnelleingabe erfasste Meldungen spielen sofort mit); das Turnierdokument meldet die
--- Teilnahme bei jedem Rundenstart ohnehin explizit.
+-- Default 'inactive': aktiv wird eine Meldung erst durch den Check-in. Bei Online-Durchfuehrung
+-- erfolgt der Check-in automatisch beim Turnierstart (alle bestaetigten Meldungen), bei
+-- Desktop-Durchfuehrung meldet das Turnierdokument die Teilnahme bei jedem Rundenstart.
+-- Backfill: laufende/beendete Turniere uebernehmen den bisherigen active-Wert, noch nicht
+-- gestartete Turniere sind noch nicht eingecheckt (inactive).
 CREATE TABLE registrations_new (
   id TEXT PRIMARY KEY,
   tournament_id TEXT NOT NULL,
@@ -35,7 +37,7 @@ CREATE TABLE registrations_new (
   partner_license_nr TEXT,
   partner2_license_nr TEXT,
   cancel_token TEXT,
-  participation TEXT NOT NULL DEFAULT 'active' CHECK (participation IN ('inactive', 'active', 'withdrawn')),
+  participation TEXT NOT NULL DEFAULT 'inactive' CHECK (participation IN ('inactive', 'active', 'withdrawn')),
   fee_selections TEXT NOT NULL DEFAULT '[]',
   organizer_message TEXT,
   registration_answers TEXT NOT NULL DEFAULT '[]',
@@ -62,7 +64,12 @@ SELECT
   CASE WHEN status = 'withdrawn' THEN 'confirmed' ELSE status END,
   registered_at, confirmed_at, created_at, updated_at,
   language, reminder_sent_at, is_vip, partner_license_nr, partner2_license_nr, cancel_token,
-  CASE WHEN status = 'withdrawn' THEN 'withdrawn' WHEN active = 1 THEN 'active' ELSE 'inactive' END,
+  CASE
+    WHEN status = 'withdrawn' THEN 'withdrawn'
+    WHEN active = 1 AND (SELECT t.status FROM tournaments t WHERE t.id = registrations.tournament_id)
+      IN ('running', 'finished') THEN 'active'
+    ELSE 'inactive'
+  END,
   fee_selections, organizer_message, registration_answers,
   local_registration_uuid, registration_revision, execution_revision
 FROM registrations;

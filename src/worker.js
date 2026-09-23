@@ -9,6 +9,7 @@ import {
   isTournamentRoundNumberConflict,
   normalizePlayerListingPosition,
   normalizeRichText,
+  initialParticipation,
   normalizeTournamentInput as normalizeCoreTournamentInput,
   parseParticipation,
   registrationOpenStatus as coreRegistrationOpenStatus,
@@ -3670,7 +3671,22 @@ async function startTournament(env, existing, user) {
     throw new HttpError(409, 'Dieser Turniertyp unterstützt keine Online-Rundenverwaltung.');
   }
   const updated = await performTournamentStart(env, existing);
+  if (existing.status !== 'running') {
+    await checkInConfirmedRegistrations(env.DB, existing.id);
+  }
   return json({ tournament: toPublicTournament(updated, user) });
+}
+
+/**
+ * Automatischer Check-in beim Online-Turnierstart: alle bestätigten, noch nicht eingecheckten
+ * Meldungen werden aktiv. Bereits ausgesetzte Meldungen bleiben unverändert. Nicht für die
+ * Desktop-Durchführung ({@link startTournamentFromSync}) - dort meldet das Turnierdokument die
+ * Teilnahme selbst.
+ */
+async function checkInConfirmedRegistrations(db, tournamentId) {
+  await db.prepare(`UPDATE registrations SET participation = 'active', updated_at = ?
+      WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'inactive'`)
+    .bind(new Date().toISOString(), tournamentId).run();
 }
 
 /**
@@ -4630,8 +4646,8 @@ async function createRegistration(request, env, tournament, { session = null, sh
         id, tournament_id, first_name, last_name, email, club, license_nr,
         partner_first_name, partner_last_name, partner_email, partner_license_nr,
         partner2_first_name, partner2_last_name, partner2_email, partner2_license_nr,
-        team_name, seeding_position, status, is_vip, organizer_message, fee_selections, registration_answers, language, registered_at, confirmed_at, created_at, updated_at, cancel_token
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        team_name, seeding_position, status, participation, is_vip, organizer_message, fee_selections, registration_answers, language, registered_at, confirmed_at, created_at, updated_at, cancel_token
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -4652,6 +4668,7 @@ async function createRegistration(request, env, tournament, { session = null, sh
       registration.teamName,
       registration.seedingPosition,
       status,
+      initialParticipation(tournament, status),
       registration.isVip ? 1 : 0,
       organizerMessage,
       JSON.stringify(feeSelections),
@@ -7139,7 +7156,7 @@ function toPublicRegistration(row) {
     isVip: Boolean(row.is_vip),
     feeSelections,
     feeTotalCents: feeSelections.reduce((total, selection) => total + Number(selection.amountCents || 0), 0),
-    participation: row.participation || 'active',
+    participation: row.participation || 'inactive',
     localRegistrationUuid: row.local_registration_uuid || null,
     registrationRevision: Number(row.registration_revision || 1),
     executionRevision: Number(row.execution_revision || 1),

@@ -123,6 +123,16 @@ export function validateMatchScore(value) {
 // nur 'active' geht in die Rundenauslosung ein.
 export const PARTICIPATIONS = ['inactive', 'active', 'withdrawn'];
 
+/**
+ * Teilnahme einer neu angelegten Meldung: Bei einem online durchgefuehrten, bereits laufenden
+ * Turnier ist der Check-in schon erfolgt - bestaetigte Nachmeldungen (z. B. Schnelleingabe) spielen
+ * daher sofort mit. Sonst gilt 'inactive' bis zum Check-in (Turnierstart bzw. Turnierdokument).
+ */
+export function initialParticipation(tournament, registrationStatus) {
+  const onlineRunning = tournament.status === 'running' && Number(tournament.desktop_execution || 0) !== 1;
+  return onlineRunning && registrationStatus === 'confirmed' ? 'active' : 'inactive';
+}
+
 export function parseParticipation(value, errorMessage = 'Ungültige Teilnahme') {
   const participation = text(value);
   if (!PARTICIPATIONS.includes(participation)) throw new HttpError(400, errorMessage);
