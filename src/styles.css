@@ -2649,6 +2649,7 @@ a.left-panel-link {
 .places-map-error button { border: 0; border-radius: 4px; background: #263648; color: white; padding: .3rem .5rem; font: inherit; cursor: pointer; }
 .map-popup-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
 .map-popup-heading .club-badge { margin: 0; }
+.map-popup-logo { width: 28px; height: 28px; flex: 0 0 auto; border: 1px solid #dfe6f0; border-radius: 6px; object-fit: contain; background: #fff; }
 .map-popup-venues { margin: .4rem 0; padding-left: 1.1rem; }
 .map-popup-address { display: block; margin-bottom: .45rem; color: #53627a; }
  .places-list { display: grid; gap: 1rem; margin-top: 1rem; }
@@ -2656,6 +2657,7 @@ a.left-panel-link {
  .place-group-header { display: grid; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid #dfe6f0; }
  .place-group-title { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
  .place-group-title .club-badge { margin: 0; }
+ .place-group-logo { width: 52px; height: 52px; flex: 0 0 auto; border: 1px solid #dfe6f0; border-radius: 8px; object-fit: contain; background: #fff; }
  .place-group-title h2,
  .place-card h2,
  .place-card h3 { margin: 0; }

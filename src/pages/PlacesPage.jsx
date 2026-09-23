@@ -138,6 +138,14 @@ function PlacesMap({ places, center, maptilerApiKey, focus }) {
             {place.clubName ? (
               <>
                 <div className="map-popup-heading">
+                  {place.clubLogoUrl && (
+                    <img
+                      className="map-popup-logo"
+                      src={place.clubLogoUrl}
+                      alt=""
+                      onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                    />
+                  )}
                   <ClubBadge clubName={place.clubName} clubKind={place.clubKind} />
                   <strong data-i18n-skip>{place.clubName}</strong>
                 </div>
@@ -375,6 +383,14 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
             <section className="panel place-group" key={group.id}>
               <header className="place-group-header">
                 <div className="place-group-title">
+                  {group.places[0].clubLogoUrl && (
+                    <img
+                      className="place-group-logo"
+                      src={group.places[0].clubLogoUrl}
+                      alt=""
+                      onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                    />
+                  )}
                   <ClubBadge clubName={group.clubName} clubKind={group.clubKind} />
                   <h2 data-i18n-skip>{group.clubName}</h2>
                 </div>
