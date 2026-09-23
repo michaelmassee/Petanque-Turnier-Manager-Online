@@ -234,6 +234,11 @@ export function hasOpenRegistration(tournament) {
   return tournament.activeRegistrations < tournament.maxRegistrations || Boolean(tournament.waitlistEnabled);
 }
 
+/** Kalendereintrag = reiner Termin ohne Anmeldeverfahren; nie online durchführbar, kein Broadcast. */
+export function isCalendarEntry(tournament) {
+  return tournament.registrationEnabled === false;
+}
+
 export function hasOnlineRegistrationAvailable(tournament) {
   if (tournament.visibility !== 'public' || tournament.registrationEnabled === false) {
     return false;
@@ -258,8 +263,8 @@ export const REGISTERED_COUNT_TEMPLATES = {
 };
 
 export function registrationStatusLabel(tournament, language) {
-  if (tournament.registrationEnabled === false) {
-    return i18next.t('Kein Anmeldeverfahren', { lng: language });
+  if (isCalendarEntry(tournament)) {
+    return i18next.t('Kalendereintrag', { lng: language });
   }
 
   if (tournament.status === 'running') {

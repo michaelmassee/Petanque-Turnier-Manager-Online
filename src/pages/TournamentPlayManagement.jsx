@@ -4,7 +4,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { SelectField, TextField, Button, Feedback } from '../components/ui.jsx';
 import { checkRoundRequirements, getSupportedSystemLabels, isOnlinePlayable } from '../lib/pairing/index.js';
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
-import { labelFor, translatedOptions } from '../lib/domain.js';
+import { isCalendarEntry, labelFor, translatedOptions } from '../lib/domain.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
@@ -101,8 +101,10 @@ function MatchRow({ match, onSave, busy }) {
   );
 }
 
-export default function TournamentPlayManagement({ tournaments: allTournaments }) {
+export default function TournamentPlayManagement({ tournaments: managedTournaments }) {
   const { t, i18n } = useTranslation();
+  // Kalendereinträge sind reine Termine ohne Teilnehmer und tauchen hier gar nicht auf.
+  const allTournaments = managedTournaments.filter((tournament) => !isCalendarEntry(tournament));
   // Nur Turniere mit implementiertem Paarungssystem (Schweizer, Supermêlée) sind
   // online spielbar (siehe isOnlinePlayable) - alle anderen Typen werden unten im
   // Leerzustand mit Grund aufgelistet, statt kommentarlos aus der Auswahl zu

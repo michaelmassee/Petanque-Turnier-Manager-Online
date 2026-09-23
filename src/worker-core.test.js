@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { assertPartnerCountMatchesFormation, isNewlyPublicTournament, isTournamentRoundNumberConflict, normalizePlayerListingPosition, initialParticipation, normalizeTournamentInput, parseParticipation, playerListingMatchesPosition, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
+import { assertPartnerCountMatchesFormation, isNewlyPublicTournament, isTournamentRoundNumberConflict, normalizePlayerListingPosition, initialParticipation, isCalendarEntry, normalizeTournamentInput, parseParticipation, playerListingMatchesPosition, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
 
 const base = { name: 'Testturnier', date: '2026-06-01', location: 'Musterstadt' };
 
 describe('Worker-Fachlogik', () => {
+  it('erkennt Kalendereinträge am abgeschalteten Anmeldeverfahren', () => {
+    expect(isCalendarEntry({ registration_enabled: 0 })).toBe(true);
+    expect(isCalendarEntry({ registration_enabled: 1 })).toBe(false);
+    expect(isCalendarEntry({})).toBe(false);
+  });
+
   it('checkt neue Meldungen nur bei laufender Online-Durchführung und Bestätigung direkt ein', () => {
     expect(initialParticipation({ status: 'registration' }, 'confirmed')).toBe('inactive');
     expect(initialParticipation({ status: 'running' }, 'confirmed')).toBe('active');

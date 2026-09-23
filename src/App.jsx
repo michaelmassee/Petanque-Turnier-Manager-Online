@@ -9,7 +9,7 @@ import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { usePath, matchTournamentRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
-import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, distanceKm } from './lib/domain.js';
+import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, distanceKm } from './lib/domain.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
@@ -2042,7 +2042,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
   const hasLogo = Boolean(tournament.logoUrl) && !logoBroken;
 
   return (
-    <article className="tournament-card">
+    <article className={`tournament-card${isCalendarEntry(tournament) ? ' calendar-entry' : ''}`}>
       <button
         className="tournament-card-main"
         type="button"
@@ -2082,7 +2082,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
         </span>
       </button>
       <div className="tournament-card-meta">
-        <span className={`status status-${tournament.status}`}>{registrationStatusLabel(tournament, language)}</span>
+        <span className={`status ${isCalendarEntry(tournament) ? 'status-calendar' : `status-${tournament.status}`}`}>{registrationStatusLabel(tournament, language)}</span>
         {tournament.registrationEnabled !== false && (
           <Button
             variant="secondary"

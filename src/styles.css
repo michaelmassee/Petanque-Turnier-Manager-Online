@@ -2036,6 +2036,16 @@ a.left-panel-link {
   color: #0a5fd1;
 }
 
+.status-calendar {
+  background: #eceef2;
+  color: #4a5160;
+}
+
+.tournament-card.calendar-entry {
+  border-style: dashed;
+  background: #f7f8fa;
+}
+
 .status-finished,
 .registration-cancelled {
   background: #ffecec;

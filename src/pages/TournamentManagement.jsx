@@ -654,7 +654,7 @@ export function TournamentList({
             </button>
             <div className="badges">
               {tournament.registrationEnabled === false ? (
-                <span className={`status status-${tournament.status}`}>
+                <span className={`status ${tournament.status === 'draft' ? 'status-draft' : 'status-calendar'}`}>
                   {t(tournament.status === 'draft' ? 'Unsichtbar' : 'Sichtbar')}
                 </span>
               ) : (

@@ -81,6 +81,12 @@ describe('TournamentPlayManagement', () => {
     expect(screen.getByText('Keine Turniere mit Online-Durchführung verfügbar.')).toBeInTheDocument();
   });
 
+  it('bietet Kalendereinträge nicht zur Online-Durchführung an', () => {
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, registrationEnabled: false }]} language="de" />);
+    expect(screen.getByText('Keine Turniere mit Online-Durchführung verfügbar.')).toBeInTheDocument();
+    expect(screen.queryByText('Clubabend Supermêlée')).not.toBeInTheDocument();
+  });
+
   it('lädt die aktuelle Runde und die Rangliste für das ausgewählte Turnier', async () => {
     const calls = [];
     installFetchMock(calls, { ranking: [{ rank: 1, playerId: 'p1', firstName: 'Anna', lastName: 'Muster', wins: 1, gameDiff: 1, pointsFor: 13, pointsAgainst: 7 }] });

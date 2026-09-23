@@ -21,6 +21,11 @@ describe('Turnier-Payload', () => {
     expect(tournamentPayload({ ...EMPTY_TOURNAMENT_FORM, club: 'BC Linden' }).club).toBe('BC Linden');
   });
 
+  it('kennzeichnet Kalendereinträge unabhängig vom Turnierstatus als Kalendereintrag', () => {
+    expect(registrationStatusLabel({ status: 'running', registrationEnabled: false }, 'de')).toBe('Kalendereintrag');
+    expect(registrationStatusLabel({ status: 'registration', registrationEnabled: false }, 'de')).toBe('Kalendereintrag');
+  });
+
   it('zeigt in der Übersicht den laufenden Turnierstatus statt einer Anmelde-Meldung', () => {
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: true }, 'de')).toBe('Läuft');
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: true }, 'en')).toBe('Running');

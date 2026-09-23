@@ -99,8 +99,16 @@ function normalizeRegistrationDateTime(value, { legacyUtc }) {
   return normalized;
 }
 
+/**
+ * Kalendereintrag = reiner Termin ohne Anmeldeverfahren (petanque-aktuell-Import oder
+ * "Turnier melden"). Nie online durchführbar, kein Nachrichten-Broadcast.
+ */
+export function isCalendarEntry(tournament) {
+  return Number(tournament.registration_enabled ?? 1) === 0;
+}
+
 export function registrationOpenStatus(tournament, now = new Date()) {
-  if (tournament.registration_enabled === 0) return 'closed';
+  if (isCalendarEntry(tournament)) return 'closed';
   if (tournament.visibility !== 'public' || tournament.status !== 'registration') return 'closed';
   if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < now.getTime()) return 'deadline_passed';
   if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > now.getTime()) return 'not_yet_open';

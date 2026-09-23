@@ -10,6 +10,7 @@ import {
   normalizePlayerListingPosition,
   normalizeRichText,
   initialParticipation,
+  isCalendarEntry,
   normalizeTournamentInput as normalizeCoreTournamentInput,
   parseParticipation,
   registrationOpenStatus as coreRegistrationOpenStatus,
@@ -2361,7 +2362,7 @@ async function listPostboxRecipients(db, userId) {
     "SELECT id, first_name, last_name, role FROM users WHERE id != ? AND id != ? AND role = 'user' ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE",
   ).bind(userId, TOURNAMENT_REPORT_SYSTEM_USER_ID).all();
   const tournaments = await db.prepare(
-    'SELECT id, name FROM tournaments WHERE owner_id = ? ORDER BY name COLLATE NOCASE',
+    'SELECT id, name FROM tournaments WHERE owner_id = ? AND registration_enabled = 1 ORDER BY name COLLATE NOCASE',
   ).bind(userId).all();
   return json({
     recipients: result.results.map((user) => ({ id: user.id, firstName: user.first_name, lastName: user.last_name, role: user.role })),
@@ -2407,6 +2408,7 @@ async function sendPostboxMessage(request, env, sender) {
     const tournament = await env.DB.prepare('SELECT * FROM tournaments WHERE id = ?').bind(tournamentId).first();
     if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
     if (tournament.owner_id !== sender.id) throw new HttpError(403, 'Nur der Organisator kann an alle Teilnehmer senden');
+    if (isCalendarEntry(tournament)) throw new HttpError(409, 'Kalendereinträge haben keine Teilnehmer');
     const message = await createBroadcastPostboxMessage(env, { sender, tournament, body: text });
     return json({ message }, 201);
   }
@@ -3667,6 +3669,9 @@ async function performTournamentStart(env, existing) {
 }
 
 async function startTournament(env, existing, user) {
+  if (isCalendarEntry(existing)) {
+    throw new HttpError(409, 'Kalendereinträge können nicht gestartet werden');
+  }
   if (!isOnlinePlayable(existing)) {
     throw new HttpError(409, 'Dieser Turniertyp unterstützt keine Online-Rundenverwaltung.');
   }
@@ -3926,7 +3931,8 @@ async function verifyTournamentReport(request, env) {
   const previous = await getTournamentById(db, verification.tournament_id);
   const now = new Date().toISOString();
   await db.batch([
-    db.prepare("UPDATE tournaments SET status = 'running', updated_at = ? WHERE id = ?").bind(now, verification.tournament_id),
+    // Bestätigter Kalendereintrag wird sichtbar wie ein importierter Termin (nicht "Läuft").
+    db.prepare("UPDATE tournaments SET status = 'registration', updated_at = ? WHERE id = ?").bind(now, verification.tournament_id),
     db.prepare('UPDATE tournament_report_tokens SET used_at = ? WHERE token_hash = ?').bind(now, tokenHash),
   ]);
   const updated = await getTournamentById(db, verification.tournament_id);
@@ -4313,6 +4319,9 @@ async function listTournamentRounds(db, tournamentId) {
 }
 
 async function generateTournamentRound(db, tournament) {
+  if (isCalendarEntry(tournament)) {
+    throw new HttpError(409, 'Kalendereinträge können nicht gestartet werden');
+  }
   assertOnlineExecution(tournament);
   if (!isOnlinePlayable(tournament)) {
     throw new HttpError(400, 'Für dieses Turniersystem ist keine Online-Durchführung verfügbar');
