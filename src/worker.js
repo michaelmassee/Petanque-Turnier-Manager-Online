@@ -3822,6 +3822,7 @@ async function createTournamentReport(request, env, url) {
   const licenseRequired = Boolean(body.licenseRequired);
   const description = normalizeRichText(body.description, 'Ungültige Turnierbeschreibung');
   const websiteUrl = normalizePresentationUrl(body.websiteUrl, 'websiteUrl');
+  const flyerUrl = normalizePresentationUrl(body.flyerUrl, 'flyerUrl');
   const contactName = text(body.contactName);
   const contactEmail = text(body.contactEmail).toLowerCase();
   const language = normalizeLanguage(body.language);
@@ -3849,9 +3850,9 @@ async function createTournamentReport(request, env, url) {
     .prepare(
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, license_required,
-        registration_type, status, visibility, registration_enabled, club, website_url, contact_name, contact_email,
+        registration_type, status, visibility, registration_enabled, club, website_url, flyer_url, contact_name, contact_email,
         latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -3872,6 +3873,7 @@ async function createTournamentReport(request, env, url) {
       0,
       club,
       websiteUrl,
+      flyerUrl,
       contactName,
       contactEmail,
       geo.latitude,

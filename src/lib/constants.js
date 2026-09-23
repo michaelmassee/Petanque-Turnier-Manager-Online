@@ -170,6 +170,7 @@ export const EMPTY_TOURNAMENT_REPORT_FORM = {
   licenseRequired: false,
   description: '',
   websiteUrl: '',
+  flyerUrl: '',
   contactName: '',
   contactEmail: '',
   consentAccepted: false,
