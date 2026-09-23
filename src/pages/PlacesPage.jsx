@@ -72,6 +72,52 @@ export function filterPlaces(places, { favoritesOnly = false, clubsOnly = false,
     && (!indoorOnly || place.venueType === 'indoor'));
 }
 
+export function groupPlacesByOrganization(places) {
+  const groups = new Map();
+  for (const place of places) {
+    const clubKey = place.clubId || String(place.clubName || '').trim().toLocaleLowerCase();
+    const key = hasClub(place) ? `club:${clubKey}` : `place:${place.id}`;
+    const group = groups.get(key);
+    if (group) {
+      group.places.push(place);
+    } else {
+      groups.set(key, { id: key, clubName: place.clubName || null, clubKind: place.clubKind || 'club', places: [place] });
+    }
+  }
+  return [...groups.values()];
+}
+
+function OrganizationLinks({ place, t }) {
+  return <div className="place-actions">
+    {place.clubWebsiteUrl && <a className="button button-secondary" href={place.clubWebsiteUrl} target="_blank" rel="noreferrer">{t('Website')}</a>}
+    {place.clubSocialLinks?.facebook && <a className="button button-secondary" href={place.clubSocialLinks.facebook} target="_blank" rel="noreferrer">Facebook</a>}
+    {place.clubSocialLinks?.instagram && <a className="button button-secondary" href={place.clubSocialLinks.instagram} target="_blank" rel="noreferrer">Instagram</a>}
+    {place.clubSocialLinks?.x && <a className="button button-secondary" href={place.clubSocialLinks.x} target="_blank" rel="noreferrer">X</a>}
+    {place.clubSocialLinks?.youtube && <a className="button button-secondary" href={place.clubSocialLinks.youtube} target="_blank" rel="noreferrer">YouTube</a>}
+  </div>;
+}
+
+function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, heading = 'h2' }) {
+  const Heading = heading;
+  const canFocus = place.latitude !== null && place.longitude !== null;
+  return <>
+    <div className={canFocus ? 'place-card-header place-card-header-clickable' : 'place-card-header'} onClick={() => onFocus(place)}>
+      <Heading data-i18n-skip>{place.name}</Heading>
+      <p className="muted">{t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}</p>
+      <p className="muted" data-i18n-skip>{formatLocationAddress(place.address)}</p>
+    </div>
+    {place.description && <RichText value={place.description} />}
+    <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${t('Ausstattung:')} ${place.facilities}` : ''}</p>
+    {place.facilityCodes?.length > 0 && <p className="muted">{place.facilityCodes.map((code) => t(facilityLabels[code])).join(' · ')}</p>}
+    <DistanceBadge distanceKm={place.distanceKm} />
+    <div className="place-actions">
+      <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
+      <Button variant={place.liked ? 'primary' : 'secondary'} onClick={() => onToggleLike(place)}>{place.liked ? '♥' : '♡'} {place.likeCount}</Button>
+      <Button variant={place.favorited ? 'primary' : 'secondary'} onClick={() => onToggleFavorite(place)}>{place.favorited ? '★' : '☆'} {t('Favorit')}</Button>
+    </div>
+  </>;
+}
+
 function PlacesMap({ places, center, maptilerApiKey, focus }) {
   const { t } = useTranslation();
   const markerRefs = useRef({});
@@ -160,7 +206,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
     setVisibleCount(10);
   }, [query, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm, places]);
 
-  const displayedPlaces = visiblePlaces.slice(0, visibleCount);
+  const placeGroups = useMemo(() => groupPlacesByOrganization(visiblePlaces), [visiblePlaces]);
+  const displayedPlaceGroups = placeGroups.slice(0, visibleCount);
 
   const mapped = useMemo(() => visiblePlaces.filter((place) => place.latitude !== null && place.longitude !== null), [visiblePlaces]);
   const center = mapped.length ? [mapped[0].latitude, mapped[0].longitude] : FALLBACK_CENTER;
@@ -324,37 +371,32 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         </div>
       ) : (
         <div className="places-list">
-          {displayedPlaces.map((place) => (
-            <article className="panel place-card" id={place.id} key={place.id}>
-              <div
-                className={place.latitude !== null && place.longitude !== null ? 'place-card-header place-card-header-clickable' : 'place-card-header'}
-                onClick={() => handleFocusPlace(place)}
-              >
-                <h2 data-i18n-skip>{place.name}</h2>
-                <p className="muted">{t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}</p>
-                <p className="muted" data-i18n-skip>{place.clubName ? `${place.clubName} · ` : ''}{formatLocationAddress(place.address)}</p>
+          {displayedPlaceGroups.map((group) => group.clubName ? (
+            <section className="panel place-group" key={group.id}>
+              <header className="place-group-header">
+                <div className="place-group-title">
+                  <ClubBadge clubName={group.clubName} clubKind={group.clubKind} />
+                  <h2 data-i18n-skip>{group.clubName}</h2>
+                </div>
+                <OrganizationLinks place={group.places[0]} t={t} />
+              </header>
+              <div className="place-group-places">
+                {group.places.map((place) => (
+                  <section className="place-card" id={place.id} key={place.id}>
+                    <PlaceDetails place={place} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} heading="h3" />
+                  </section>
+                ))}
               </div>
-              {place.description && <RichText value={place.description} />}
-              <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${t('Ausstattung:')} ${place.facilities}` : ''}</p>
-              {place.facilityCodes?.length > 0 && <p className="muted">{place.facilityCodes.map((code) => t(facilityLabels[code])).join(' · ')}</p>}
-              <ClubBadge clubName={place.clubName} clubKind={place.clubKind} onClick={place.latitude !== null && place.longitude !== null ? () => handleFocusPlace(place) : undefined} />
-              <DistanceBadge distanceKm={place.distanceKm} />
-              <div className="place-actions">
-                <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
-                {place.clubWebsiteUrl && <a className="button button-secondary" href={place.clubWebsiteUrl} target="_blank" rel="noreferrer">{t('Website')}</a>}
-                {place.clubSocialLinks?.facebook && <a className="button button-secondary" href={place.clubSocialLinks.facebook} target="_blank" rel="noreferrer">Facebook</a>}
-                {place.clubSocialLinks?.instagram && <a className="button button-secondary" href={place.clubSocialLinks.instagram} target="_blank" rel="noreferrer">Instagram</a>}
-                {place.clubSocialLinks?.x && <a className="button button-secondary" href={place.clubSocialLinks.x} target="_blank" rel="noreferrer">X</a>}
-                {place.clubSocialLinks?.youtube && <a className="button button-secondary" href={place.clubSocialLinks.youtube} target="_blank" rel="noreferrer">YouTube</a>}
-                <Button variant={place.liked ? 'primary' : 'secondary'} onClick={() => toggleLike(place)}>{place.liked ? '♥' : '♡'} {place.likeCount}</Button>
-                <Button variant={place.favorited ? 'primary' : 'secondary'} onClick={() => toggleFavorite(place)}>{place.favorited ? '★' : '☆'} {t('Favorit')}</Button>
-              </div>
+            </section>
+          ) : (
+            <article className="panel place-card" id={group.places[0].id} key={group.id}>
+              <PlaceDetails place={group.places[0]} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} />
             </article>
           ))}
         </div>
       )}
       <InfiniteListLoadMore
-        hasMore={visiblePlaces.length > visibleCount}
+        hasMore={placeGroups.length > visibleCount}
         onLoadMore={() => setVisibleCount((count) => count + 10)}
         label={t('Weitere Bouleplätze laden')}
       />

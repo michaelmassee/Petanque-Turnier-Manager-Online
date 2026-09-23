@@ -2652,7 +2652,15 @@ a.left-panel-link {
 .map-popup-venues { margin: .4rem 0; padding-left: 1.1rem; }
 .map-popup-address { display: block; margin-bottom: .45rem; color: #53627a; }
  .places-list { display: grid; gap: 1rem; margin-top: 1rem; }
- .place-card h2 { margin: 0; }
+ .place-group { display: grid; gap: 1rem; }
+ .place-group-header { display: grid; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid #dfe6f0; }
+ .place-group-title { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
+ .place-group-title .club-badge { margin: 0; }
+ .place-group-title h2,
+ .place-card h2,
+ .place-card h3 { margin: 0; }
+ .place-group-places { display: grid; gap: .75rem; }
+ .place-group-places > .place-card { border: 1px solid #dfe6f0; border-radius: 8px; padding: 1rem; background: #f8fafc; }
  .place-card .distance-badge { margin-top: -.25rem; }
  .place-card-header-clickable { cursor: pointer; }
 .place-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }

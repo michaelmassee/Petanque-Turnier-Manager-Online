@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterPlaces, groupMapPlaces } from './PlacesPage.jsx';
+import { filterPlaces, groupMapPlaces, groupPlacesByOrganization } from './PlacesPage.jsx';
 
 describe('Kartenmarker für Bouleplätze', () => {
   it('fasst Platz und Halle eines Vereins an derselben Adresse zusammen', () => {
@@ -31,5 +31,17 @@ describe('Kartenmarker für Bouleplätze', () => {
 
     expect(filterPlaces([place], { clubsOnly: true })).toEqual([place]);
     expect(groupMapPlaces([place])[0].id).toBe('club:boules brothers ostheim:limesstraße 10-12, ostheim');
+  });
+
+  it('fasst die Plätze eines Vereins unabhängig von ihren Adressen in einem Listenbereich zusammen', () => {
+    const groups = groupPlacesByOrganization([
+      { id: 'outdoor', clubId: 'club-1', clubName: 'BC Linden', address: 'Parkweg 1, Linden' },
+      { id: 'indoor', clubId: 'club-1', clubName: 'BC Linden', address: 'Hallenweg 2, Linden' },
+      { id: 'independent', clubId: null, clubName: null, address: 'Dorfplatz 3, Linden' },
+    ]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toMatchObject({ clubName: 'BC Linden', places: [{ id: 'outdoor' }, { id: 'indoor' }] });
+    expect(groups[1]).toMatchObject({ clubName: null, places: [{ id: 'independent' }] });
   });
 });
