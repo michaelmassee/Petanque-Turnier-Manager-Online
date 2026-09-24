@@ -206,6 +206,7 @@ describe('Turnier melden', () => {
     expect(screen.getByRole('heading', { name: 'Report tournament' })).toBeInTheDocument();
     expect(screen.getByLabelText(/^Tournament information/)).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Other (see description)' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Logo image link/)).not.toBeRequired();
     expect(screen.getByLabelText(/^Flyer image link/)).not.toBeRequired();
     expect(screen.getByRole('button', { name: 'Report tournament' })).toBeInTheDocument();
   });
@@ -583,7 +584,7 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     expect(screen.getByRole('button', { name: 'Überschrift' })).toBeInTheDocument();
   });
 
-  it('bietet beim Bearbeiten eines Kalendereintrags den Flyer-Bildlink, aber kein Logo an', () => {
+  it('bietet beim Bearbeiten eines Kalendereintrags Logo- und Flyer-Bildlink an', () => {
     render(
       <TournamentForm
         form={{ ...EMPTY_TOURNAMENT_FORM, name: 'Stadtmeisterschaft', date: '2026-06-01', location: 'Musterstadt', club: 'BC Linden', registrationEnabled: false }}
@@ -597,7 +598,7 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     );
 
     expect(screen.getByLabelText(/^Flyer-Bildlink/)).not.toBeRequired();
-    expect(screen.queryByLabelText(/^Logo-Bildlink/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Logo-Bildlink/)).not.toBeRequired();
   });
 
   it('entfernt einen optionalen Startgeld-Tarif aus dem Turnierformular', () => {

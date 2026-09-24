@@ -48,6 +48,7 @@ function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSite
         onChange={(websiteUrl) => setForm({ ...form, websiteUrl })}
         required
       />
+      <TextField label={t('Logo-Bildlink')} type="url" placeholder="https://…" value={form.logoUrl} onChange={(logoUrl) => setForm({ ...form, logoUrl })} />
       <TextField label={t('Flyer-Bildlink')} type="url" placeholder="https://…" value={form.flyerUrl} onChange={(flyerUrl) => setForm({ ...form, flyerUrl })} />
       <div className="form-grid">
         <TextField label={t('Name (Kontakt)')} value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} required minLength={2} />

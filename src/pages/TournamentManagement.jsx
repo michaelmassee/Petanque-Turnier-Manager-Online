@@ -548,9 +548,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         </>
       )}
       <TextField label={t('Website')} type="url" placeholder="https://…" value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} invalid={invalidField === 'websiteUrl'} />
-      {!isCalendarEntry && (
-        <TextField label={t('Logo-Bildlink')} type="url" placeholder="https://…" value={form.logoUrl} onChange={(logoUrl) => setForm({ ...form, logoUrl })} invalid={invalidField === 'logoUrl'} />
-      )}
+      <TextField label={t('Logo-Bildlink')} type="url" placeholder="https://…" value={form.logoUrl} onChange={(logoUrl) => setForm({ ...form, logoUrl })} invalid={invalidField === 'logoUrl'} />
       <TextField label={t('Flyer-Bildlink')} type="url" placeholder="https://…" value={form.flyerUrl} onChange={(flyerUrl) => setForm({ ...form, flyerUrl })} invalid={invalidField === 'flyerUrl'} />
       {canManageOwner && (
         <TournamentOwnerPanel tournamentId={form.id} ownerId={form.ownerId} candidates={ownerCandidates} onOwnerChanged={(tournament) => { onOwnerChanged(tournament); setForm({ ...form, ownerId: tournament.ownerId }); }} />
