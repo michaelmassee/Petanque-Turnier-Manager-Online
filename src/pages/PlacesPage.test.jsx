@@ -35,13 +35,13 @@ describe('Kartenmarker für Bouleplätze', () => {
 
   it('fasst die Plätze eines Vereins unabhängig von ihren Adressen in einem Listenbereich zusammen', () => {
     const groups = groupPlacesByOrganization([
-      { id: 'outdoor', clubId: 'club-1', clubName: 'BC Linden', clubLogoUrl: 'https://example.test/logo.png', address: 'Parkweg 1, Linden' },
+      { id: 'outdoor', clubId: 'club-1', clubName: 'BC Linden', clubDescription: 'Gemeinsam Boule spielen', clubLogoUrl: 'https://example.test/logo.png', address: 'Parkweg 1, Linden' },
       { id: 'indoor', clubId: 'club-1', clubName: 'BC Linden', address: 'Hallenweg 2, Linden' },
       { id: 'independent', clubId: null, clubName: null, address: 'Dorfplatz 3, Linden' },
     ]);
 
     expect(groups).toHaveLength(2);
-    expect(groups[0]).toMatchObject({ clubName: 'BC Linden', places: [{ id: 'outdoor', clubLogoUrl: 'https://example.test/logo.png' }, { id: 'indoor' }] });
+    expect(groups[0]).toMatchObject({ clubName: 'BC Linden', clubDescription: 'Gemeinsam Boule spielen', places: [{ id: 'outdoor', clubLogoUrl: 'https://example.test/logo.png' }, { id: 'indoor' }] });
     expect(groups[1]).toMatchObject({ clubName: null, places: [{ id: 'independent' }] });
   });
 });

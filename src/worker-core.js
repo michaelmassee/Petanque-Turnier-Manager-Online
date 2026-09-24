@@ -257,3 +257,41 @@ export function tournamentMatchesSavedSearch(tournament, search) {
   }
   return true;
 }
+
+export const MAX_JSON_BODY_BYTES = 1024 * 1024;
+
+// Liest einen Request-/Response-Body mit harter Obergrenze. Content-Length wird nur als
+// Frühabbruch genutzt - der Header kann fehlen (chunked) oder lügen, deshalb wird beim
+// Streamen zusätzlich mitgezählt und bei Überschreitung abgebrochen.
+export async function readBodyWithLimit(message, maxBytes, errorMessage = 'Anfrage zu groß') {
+  const declaredLength = Number(message.headers.get('Content-Length') || 0);
+  if (declaredLength > maxBytes) {
+    throw new HttpError(413, errorMessage);
+  }
+  if (!message.body) {
+    return new Uint8Array(0);
+  }
+
+  const reader = message.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      // Rest des Streams verwerfen statt weiter aus dem Netz zu lesen.
+      await reader.cancel();
+      throw new HttpError(413, errorMessage);
+    }
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}

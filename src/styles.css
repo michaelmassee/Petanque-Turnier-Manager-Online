@@ -2653,18 +2653,33 @@ a.left-panel-link {
 .map-popup-venues { margin: .4rem 0; padding-left: 1.1rem; }
 .map-popup-address { display: block; margin-bottom: .45rem; color: #53627a; }
  .places-list { display: grid; gap: 1rem; margin-top: 1rem; }
- .place-group { display: grid; gap: 1rem; }
- .place-group-header { display: grid; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid #dfe6f0; }
+ .place-group,
+ .place-card-details { padding: 0; overflow: hidden; }
+ .place-group-summary,
+ .place-card-summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .75rem 1rem; cursor: pointer; list-style: none; }
+ .place-group-summary::-webkit-details-marker,
+ .place-card-summary::-webkit-details-marker { display: none; }
+ .place-group-summary::before,
+ .place-card-summary::before { content: "▸"; color: #53627a; transition: transform .15s ease; }
+ .place-group[open] > .place-group-summary::before,
+ .place-card-details[open] > .place-card-summary::before { transform: rotate(90deg); }
+ .place-group-summary { font-size: 1.05rem; font-weight: 800; }
+ .place-group-content,
+ .place-card-content { display: grid; gap: .75rem; padding: .25rem 1rem 1rem; border-top: 1px solid #dfe6f0; }
  .place-group-title { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
  .place-group-title .club-badge { margin: 0; }
- .place-group-logo { width: 52px; height: 52px; flex: 0 0 auto; border: 1px solid #dfe6f0; border-radius: 8px; object-fit: contain; background: #fff; }
+ .place-group-logo { width: 36px; height: 36px; flex: 0 0 auto; border: 1px solid #dfe6f0; border-radius: 6px; object-fit: contain; background: #fff; }
  .place-group-title h2,
  .place-card h2,
  .place-card h3 { margin: 0; }
- .place-group-places { display: grid; gap: .75rem; }
- .place-group-places > .place-card { border: 1px solid #dfe6f0; border-radius: 8px; padding: 1rem; background: #f8fafc; }
- .place-card .distance-badge { margin-top: -.25rem; }
- .place-card-header-clickable { cursor: pointer; }
+ .place-group-count,
+ .place-card-summary-facts { display: flex; align-items: center; justify-content: end; gap: .5rem; color: #53627a; font-size: .9rem; font-weight: 500; text-align: right; }
+ .place-card-summary-title { display: grid; gap: .1rem; min-width: 0; }
+ .place-card-summary-facts .distance-badge { margin: 0; }
+ .place-group-places { display: grid; gap: .5rem; }
+ .place-group-places > .place-card { background: #f8fafc; }
+ .place-card-content > :is(p, .rich-text) { margin: 0; }
+ @media (max-width: 600px) { .place-group-summary, .place-card-summary { align-items: flex-start; } .place-group-count, .place-card-summary-facts { flex-direction: column; align-items: flex-end; gap: .15rem; } }
 .place-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 
 .app-recovery {

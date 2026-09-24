@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Marker, Popup, useMap } from 'react-leaflet';
+import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -37,16 +37,6 @@ function hasClub(place) {
   return Boolean(place.clubId || place.clubName);
 }
 
-function FocusOnPlace({ focus, markerRefs }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!focus) return;
-    map.flyTo([focus.lat, focus.lng], Math.max(map.getZoom(), 15));
-    markerRefs.current[focus.id]?.openPopup();
-  }, [focus, map, markerRefs]);
-  return null;
-}
-
 // Spielorte desselben Vereins an derselben Adresse teilen sich einen Marker. Das
 // vermeidet überlagerte Pins und macht sichtbar, dass Platz und Halle zu einer
 // Organisation gehören.
@@ -81,7 +71,7 @@ export function groupPlacesByOrganization(places) {
     if (group) {
       group.places.push(place);
     } else {
-      groups.set(key, { id: key, clubName: place.clubName || null, clubKind: place.clubKind || 'club', places: [place] });
+      groups.set(key, { id: key, clubName: place.clubName || null, clubKind: place.clubKind || 'club', clubDescription: place.clubDescription || null, places: [place] });
     }
   }
   return [...groups.values()];
@@ -97,40 +87,44 @@ function OrganizationLinks({ place, t }) {
   </div>;
 }
 
-function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, heading = 'h2' }) {
+function PlaceDetails({ place, t, onToggleLike, onToggleFavorite, heading = 'h2' }) {
   const Heading = heading;
-  const canFocus = place.latitude !== null && place.longitude !== null;
-  return <>
-    <div className={canFocus ? 'place-card-header place-card-header-clickable' : 'place-card-header'} onClick={() => onFocus(place)}>
-      <Heading data-i18n-skip>{place.name}</Heading>
-      <p className="muted">{t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}</p>
+  return <details className="panel place-card place-card-details">
+    <summary className="place-card-summary">
+      <span className="place-card-summary-title">
+        <Heading data-i18n-skip>{place.name}</Heading>
+        <span className="muted">{t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}</span>
+      </span>
+      <span className="place-card-summary-facts">
+        <span>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}</span>
+        {place.accessible && <span>{t('Barrierefrei')}</span>}
+        <DistanceBadge distanceKm={place.distanceKm} />
+      </span>
+    </summary>
+    <div className="place-card-content">
       <p className="muted" data-i18n-skip>{formatLocationAddress(place.address)}</p>
+      {place.description && <RichText value={place.description} />}
+      {place.facilities && <p>{t('Ausstattung:')} {place.facilities}</p>}
+      {place.facilityCodes?.length > 0 && <p className="muted">{place.facilityCodes.map((code) => t(facilityLabels[code])).join(' · ')}</p>}
+      <div className="place-actions">
+        <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
+        <Button variant={place.liked ? 'primary' : 'secondary'} onClick={() => onToggleLike(place)}>{place.liked ? '♥' : '♡'} {place.likeCount}</Button>
+        <Button variant={place.favorited ? 'primary' : 'secondary'} onClick={() => onToggleFavorite(place)}>{place.favorited ? '★' : '☆'} {t('Favorit')}</Button>
+      </div>
     </div>
-    {place.description && <RichText value={place.description} />}
-    <p>{place.courtCount > 0 ? `${place.courtCount} ${t('Plätze')}` : t('Platzanzahl nicht angegeben')}{place.accessible ? ` · ${t('Barrierefrei')}` : ''}{place.facilities ? ` · ${t('Ausstattung:')} ${place.facilities}` : ''}</p>
-    {place.facilityCodes?.length > 0 && <p className="muted">{place.facilityCodes.map((code) => t(facilityLabels[code])).join(' · ')}</p>}
-    <DistanceBadge distanceKm={place.distanceKm} />
-    <div className="place-actions">
-      <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
-      <Button variant={place.liked ? 'primary' : 'secondary'} onClick={() => onToggleLike(place)}>{place.liked ? '♥' : '♡'} {place.likeCount}</Button>
-      <Button variant={place.favorited ? 'primary' : 'secondary'} onClick={() => onToggleFavorite(place)}>{place.favorited ? '★' : '☆'} {t('Favorit')}</Button>
-    </div>
-  </>;
+  </details>;
 }
 
-function PlacesMap({ places, center, maptilerApiKey, focus }) {
+function PlacesMap({ places, center, maptilerApiKey }) {
   const { t } = useTranslation();
-  const markerRefs = useRef({});
   const positions = useMemo(() => places.map((place) => [place.latitude, place.longitude]), [places]);
   const markerGroups = useMemo(() => groupMapPlaces(places), [places]);
   return (
     <TileFallbackMap center={center} maptilerApiKey={maptilerApiKey}>
       <FitToBounds positions={positions} />
-      <FocusOnPlace focus={focus} markerRefs={markerRefs} />
       {markerGroups.map(({ id, place, places: groupedPlaces }) => (
         <Marker
           key={id}
-          ref={(instance) => { groupedPlaces.forEach((groupedPlace) => { markerRefs.current[groupedPlace.id] = instance; }); }}
           icon={hasClub(place) ? (place.clubKind === 'group' ? groupMarker : clubMarker) : marker}
           position={[place.latitude, place.longitude]}
         >
@@ -174,14 +168,6 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   const [indoorOnly, setIndoorOnly] = useState(false);
   const [searchMenuOpen, setSearchMenuOpen] = useState(false);
   const resultsRef = useRef(null);
-  const mapSectionRef = useRef(null);
-  const [focusPlace, setFocusPlace] = useState(null);
-
-  function handleFocusPlace(place) {
-    if (place.latitude === null || place.longitude === null) return;
-    setFocusPlace({ id: place.id, lat: place.latitude, lng: place.longitude, token: Date.now() });
-    mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
 
   const [searchOrigin, setSearchOrigin] = useState(null);
   const [searchOriginQuery, setSearchOriginQuery] = useState('');
@@ -363,8 +349,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
 
       {error && <p className="feedback error">{error}</p>}
       {mapped.length > 0 && (
-        <div className="panel" ref={mapSectionRef}>
-          <PlacesMap places={mapped} center={center} maptilerApiKey={maptilerApiKey} focus={focusPlace} />
+        <div className="panel">
+          <PlacesMap places={mapped} center={center} maptilerApiKey={maptilerApiKey} />
         </div>
       )}
 
@@ -380,9 +366,9 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       ) : (
         <div className="places-list">
           {displayedPlaceGroups.map((group) => group.clubName ? (
-            <section className="panel place-group" key={group.id}>
-              <header className="place-group-header">
-                <div className="place-group-title">
+            <details className="panel place-group" key={group.id}>
+              <summary className="place-group-summary">
+                <span className="place-group-title">
                   {group.places[0].clubLogoUrl && (
                     <img
                       className="place-group-logo"
@@ -393,21 +379,21 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
                   )}
                   <ClubBadge clubName={group.clubName} clubKind={group.clubKind} />
                   <h2 data-i18n-skip>{group.clubName}</h2>
-                </div>
+                </span>
+                <span className="place-group-count">{group.places.length} {t(group.places.length === 1 ? 'Bouleplatz' : 'Bouleplätze')}</span>
+              </summary>
+              <div className="place-group-content">
                 <OrganizationLinks place={group.places[0]} t={t} />
-              </header>
-              <div className="place-group-places">
-                {group.places.map((place) => (
-                  <section className="place-card" id={place.id} key={place.id}>
-                    <PlaceDetails place={place} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} heading="h3" />
-                  </section>
-                ))}
+                {group.clubDescription && <RichText value={group.clubDescription} />}
+                <div className="place-group-places">
+                  {group.places.map((place) => (
+                    <PlaceDetails place={place} t={t} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} heading="h3" key={place.id} />
+                  ))}
+                </div>
               </div>
-            </section>
+            </details>
           ) : (
-            <article className="panel place-card" id={group.places[0].id} key={group.id}>
-              <PlaceDetails place={group.places[0]} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} />
-            </article>
+            <PlaceDetails place={group.places[0]} t={t} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} key={group.id} />
           ))}
         </div>
       )}

@@ -16,6 +16,8 @@ import {
   registrationOpenStatus as coreRegistrationOpenStatus,
   tournamentMatchesSavedSearch,
   validateMatchScore,
+  MAX_JSON_BODY_BYTES,
+  readBodyWithLimit,
 } from './worker-core.js';
 import { checkRoundRequirements, getPairingStrategy, isOnlinePlayable, roundRequirementMessage } from './lib/pairing/index.js';
 import { competitionRanks, computeRanking, sameStandardRankingPlace } from './lib/pairing/ranking.js';
@@ -4020,12 +4022,9 @@ async function proxyExternalImage(targetUrl, cachePath) {
     throw new HttpError(415, 'Ungültiger Bildtyp');
   }
 
-  const contentLength = Number(upstream.headers.get('Content-Length') || 0);
-  if (contentLength && contentLength > IMAGE_PROXY_MAX_BYTES) {
-    throw new HttpError(413, 'Bild zu groß');
-  }
+  const body = await readBodyWithLimit(upstream, IMAGE_PROXY_MAX_BYTES, 'Bild zu groß');
 
-  const response = new Response(upstream.body, {
+  const response = new Response(body, {
     status: 200,
     headers: {
       'Content-Type': contentType,
@@ -5608,7 +5607,7 @@ function rowMemberOf(value) {
 function toPublicBoulePlace(row, user) {
   const canEdit = row.club_id ? clubCanEdit(row, user) : Boolean(user?.role === 'admin' || (row.reported_by_user_id && row.reported_by_user_id === user?.id));
   return {
-    id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubKind: row.club_kind || 'club', clubLogoUrl: row.club_logo_url || null, clubWebsiteUrl: row.club_website_url || null, clubSocialLinks: rowSocialLinks(row.club_social_links), venueType: row.venue_type || 'outdoor', name: row.name, address: formatLocationAddress(row.address),
+    id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubKind: row.club_kind || 'club', clubDescription: row.club_description || null, clubLogoUrl: row.club_logo_url || null, clubWebsiteUrl: row.club_website_url || null, clubSocialLinks: rowSocialLinks(row.club_social_links), venueType: row.venue_type || 'outdoor', name: row.name, address: formatLocationAddress(row.address),
     latitude: row.latitude === null ? null : Number(row.latitude), longitude: row.longitude === null ? null : Number(row.longitude),
     courtCount: Number(row.court_count || 0), description: row.description || null, accessible: Boolean(Number(row.accessible)),
     facilities: row.facilities || null, facilityCodes: rowFacilityCodes(row), status: row.status, likeCount: Number(row.like_count || 0), liked: Boolean(Number(row.liked || 0)),
@@ -5629,7 +5628,7 @@ function toPublicClub(row, user) {
 async function listBoulePlaces(db, user, query) {
   const term = String(query || '').trim();
   const rows = await db.prepare(
-    `SELECT p.*, c.name AS club_display_name, c.kind AS club_kind, c.logo_url AS club_logo_url, c.website_url AS club_website_url, c.social_links AS club_social_links, c.owner_id,
+    `SELECT p.*, c.name AS club_display_name, c.kind AS club_kind, c.description AS club_description, c.logo_url AS club_logo_url, c.website_url AS club_website_url, c.social_links AS club_social_links, c.owner_id,
        EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?1) AS editor_user_id,
        (SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id) AS like_count,
        EXISTS(SELECT 1 FROM boule_place_likes l WHERE l.place_id = p.id AND l.user_id = ?1) AS liked,
@@ -5645,7 +5644,7 @@ async function getClub(db, id, user) {
   const club = await db.prepare(`SELECT c.*, EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?2) AS editor_user_id FROM clubs c WHERE c.id = ?1`).bind(id, user?.id || '').first();
   if (!club || (club.status !== 'published' && !clubCanEdit(club, user))) throw new HttpError(404, 'Verein nicht gefunden');
   const places = await db.prepare(
-    `SELECT p.*, c.name AS club_name, c.kind AS club_kind, c.logo_url AS club_logo_url, c.social_links AS club_social_links, c.owner_id, EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?2) AS editor_user_id,
+    `SELECT p.*, c.name AS club_name, c.kind AS club_kind, c.description AS club_description, c.logo_url AS club_logo_url, c.social_links AS club_social_links, c.owner_id, EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?2) AS editor_user_id,
       (SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id) AS like_count,
       EXISTS(SELECT 1 FROM boule_place_likes l WHERE l.place_id = p.id AND l.user_id = ?2) AS liked,
       EXISTS(SELECT 1 FROM boule_place_favorites f WHERE f.place_id = p.id AND f.user_id = ?2) AS favorited
@@ -6962,8 +6961,9 @@ function fromHex(value) {
 }
 
 async function readJson(request) {
+  const bytes = await readBodyWithLimit(request, MAX_JSON_BODY_BYTES);
   try {
-    return await request.json();
+    return JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     throw new HttpError(400, 'Invalid JSON body');
   }

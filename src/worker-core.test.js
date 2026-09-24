@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertPartnerCountMatchesFormation, isNewlyPublicTournament, isTournamentRoundNumberConflict, normalizePlayerListingPosition, initialParticipation, isCalendarEntry, normalizeTournamentInput, parseParticipation, playerListingMatchesPosition, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
+import { assertPartnerCountMatchesFormation, isNewlyPublicTournament, isTournamentRoundNumberConflict, readBodyWithLimit, normalizePlayerListingPosition, initialParticipation, isCalendarEntry, normalizeTournamentInput, parseParticipation, playerListingMatchesPosition, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
 
 const base = { name: 'Testturnier', date: '2026-06-01', location: 'Musterstadt' };
 
@@ -166,5 +166,34 @@ describe('Worker-Fachlogik', () => {
     expect(tournamentMatchesSavedSearch({ ...tournament, latitude: null }, matchingSearch)).toBe(false);
     expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, origin_lat: null, origin_lng: null })).toBe(true);
     expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, radius_km: '0.1' })).toBe(false);
+  });
+});
+
+describe('readBodyWithLimit', () => {
+  const chunkedResponse = (chunks) => new Response(new ReadableStream({
+    start(controller) {
+      chunks.forEach((chunk) => controller.enqueue(new Uint8Array(chunk)));
+      controller.close();
+    },
+  }));
+
+  it('liefert Bodies innerhalb der Grenze vollständig zurück', async () => {
+    const bytes = await readBodyWithLimit(chunkedResponse([4, 4]), 8);
+    expect(bytes.byteLength).toBe(8);
+  });
+
+  it('lehnt eine zu große Content-Length ohne Lesen mit 413 ab', async () => {
+    const request = new Request('https://example.test', { method: 'POST', body: 'x', headers: { 'Content-Length': '999' } });
+    await expect(readBodyWithLimit(request, 10)).rejects.toMatchObject({ status: 413 });
+  });
+
+  it('bricht Streams ohne Content-Length beim Überschreiten mit 413 ab', async () => {
+    await expect(readBodyWithLimit(chunkedResponse([6, 6]), 10, 'Bild zu groß'))
+      .rejects.toMatchObject({ status: 413, message: 'Bild zu groß' });
+  });
+
+  it('liefert für fehlenden Body ein leeres Array', async () => {
+    const bytes = await readBodyWithLimit(new Response(null), 10);
+    expect(bytes.byteLength).toBe(0);
   });
 });

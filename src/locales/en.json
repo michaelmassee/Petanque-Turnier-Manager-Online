@@ -150,6 +150,7 @@
   "Bezeichnung der Installation, z.B. Bürorechner": "Name of the installation, e.g. office computer",
   "Bild konnte nicht geladen werden": "Image could not be loaded",
   "Bild zu groß": "Image too large",
+  "Anfrage zu groß": "Request too large",
   "Bitte ändere dein Passwort, bevor du fortfährst.": "Please change your password before continuing.",
   "Bitte bestätige zuerst deine E-Mail-Adresse.": "Please verify your email address first.",
   "Bitte Ort aus der Liste auswählen, um Mehrdeutigkeiten zu vermeiden.": "Please pick a place from the list to avoid ambiguity.",
