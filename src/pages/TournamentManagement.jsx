@@ -259,7 +259,6 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             setForm({
               ...form,
               boulePlaceId,
-              logoUrl: place?.clubLogoUrl || form.logoUrl,
               location: place ? place.address : form.location,
               latitude: place ? place.latitude : form.latitude,
               longitude: place ? place.longitude : form.longitude,

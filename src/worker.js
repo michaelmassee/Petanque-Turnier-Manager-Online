@@ -3021,6 +3021,7 @@ async function listTournaments(db, user) {
     .prepare(
       `SELECT tournaments.*,
         ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
+        ${TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY},
         (
           SELECT COUNT(*)
           FROM registrations
@@ -3058,6 +3059,7 @@ async function listManagedTournaments(db, user) {
     .prepare(
       `SELECT tournaments.*,
         ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
+        ${TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY},
         (
           SELECT COUNT(*)
           FROM registrations
@@ -3300,7 +3302,7 @@ async function createTournament(request, env, user) {
   const db = env.DB;
   let body = await readJson(request);
   const selectedPlace = await resolveTournamentBoulePlace(db, body.boulePlaceId);
-  if (selectedPlace) body = { ...body, location: selectedPlace.address, latitude: selectedPlace.latitude, longitude: selectedPlace.longitude, logoUrl: nullableText(body.logoUrl) || selectedPlace.club_logo_url || null };
+  if (selectedPlace) body = { ...body, location: selectedPlace.address, latitude: selectedPlace.latitude, longitude: selectedPlace.longitude };
   const tournament = normalizeCoreTournamentInput(body);
 
   if (user.role !== 'admin' && tournament.registrationEnabled !== false) {
@@ -3966,7 +3968,10 @@ async function proxyTournamentImage(tournament, field) {
   if (!column) {
     throw new HttpError(400, 'Unbekanntes Bildfeld');
   }
-  return proxyExternalImage(tournament[column], `tournaments/${tournament.id}/${field}`);
+  // Ein explizit am Turnier hinterlegtes Logo hat Vorrang. Ohne ein solches
+  // verwenden wir das Logo des veröffentlichten Vereins am gewählten Spielort.
+  const targetUrl = field === 'logo' ? tournament.logo_url || tournament.venue_club_logo_url : tournament[column];
+  return proxyExternalImage(targetUrl, `tournaments/${tournament.id}/${field}`);
 }
 
 async function proxyBoulePlaceClubLogo(db, placeId) {
@@ -5522,6 +5527,7 @@ async function getTournamentById(db, id) {
     .prepare(
       `SELECT tournaments.*,
         ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
+        ${TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY},
         (
           SELECT COUNT(*)
           FROM registrations
@@ -6267,6 +6273,15 @@ const TOURNAMENT_EDITORS_JSON_SUBQUERY = `(
           JOIN users u ON u.id = te.user_id
           WHERE te.tournament_id = tournaments.id
         ) AS editors_json`;
+
+const TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY = `(
+          SELECT c.logo_url
+          FROM boule_places p
+          JOIN clubs c ON c.id = p.club_id
+          WHERE p.id = tournaments.boule_place_id
+            AND p.status = 'published'
+            AND c.status = 'published'
+        ) AS venue_club_logo_url`;
 
 function canManageTournament(tournament, user) {
   if (!user) {
@@ -7144,7 +7159,7 @@ function toPublicTournament(row, user) {
     desktopExecution: Boolean(Number(row.desktop_execution || 0)),
     websiteUrl: row.website_url || null,
     websiteIsOriginalClubSite: false,
-    logoUrl: row.logo_url || null,
+    logoUrl: row.logo_url || row.venue_club_logo_url || null,
     flyerUrl: row.flyer_url || null,
     activeRegistrations: Number(row.active_registrations || 0),
     waitlistRegistrations: Number(row.waitlist_registrations || 0),
