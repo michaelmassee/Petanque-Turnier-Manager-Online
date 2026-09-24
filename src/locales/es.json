@@ -787,7 +787,7 @@
   "Punkte-": "Puntos-",
   "Δ": "Δ",
   "Pétanque Aktuell importieren": "Importar desde Pétanque Aktuell",
-  "Wähle künftige Termine aus. Bereits importierte Termine werden täglich vollständig mit der Quelle abgeglichen.": "Selecciona eventos futuros. Los eventos ya importados se sincronizan completamente cada día con la fuente.",
+  "Wähle künftige Termine aus. Bereits importierte Termine werden täglich nur darauf geprüft, ob sie noch vorhanden sind. Um sie mit der Quelle zu aktualisieren, wähle sie erneut aus und importiere sie.": "Selecciona eventos futuros. Los eventos ya importados solo se comprueban a diario para ver si siguen existiendo. Para actualizarlos desde la fuente, selecciónalos de nuevo e impórtalos.",
   "Aktualisieren": "Actualizar",
   "Importstatus": "Estado de importación",
   "Alle Termine": "Todos los eventos",

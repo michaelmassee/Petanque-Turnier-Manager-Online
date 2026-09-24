@@ -787,7 +787,7 @@
   "Punkte-": "Points-",
   "Δ": "Δ",
   "Pétanque Aktuell importieren": "Import from Pétanque Aktuell",
-  "Wähle künftige Termine aus. Bereits importierte Termine werden täglich vollständig mit der Quelle abgeglichen.": "Select future events. Previously imported events are fully synchronized with the source daily.",
+  "Wähle künftige Termine aus. Bereits importierte Termine werden täglich nur darauf geprüft, ob sie noch vorhanden sind. Um sie mit der Quelle zu aktualisieren, wähle sie erneut aus und importiere sie.": "Select future events. Previously imported events are only checked daily to see whether they still exist. To update them from the source, select them again and import them.",
   "Aktualisieren": "Refresh",
   "Importstatus": "Import status",
   "Alle Termine": "All events",

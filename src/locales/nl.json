@@ -787,7 +787,7 @@
   "Punkte-": "Punten-",
   "Δ": "Δ",
   "Pétanque Aktuell importieren": "Pétanque Aktuell importeren",
-  "Wähle künftige Termine aus. Bereits importierte Termine werden täglich vollständig mit der Quelle abgeglichen.": "Selecteer toekomstige evenementen. Reeds geïmporteerde evenementen worden dagelijks volledig met de bron gesynchroniseerd.",
+  "Wähle künftige Termine aus. Bereits importierte Termine werden täglich nur darauf geprüft, ob sie noch vorhanden sind. Um sie mit der Quelle zu aktualisieren, wähle sie erneut aus und importiere sie.": "Selecteer toekomstige evenementen. Reeds geïmporteerde evenementen worden dagelijks alleen gecontroleerd op of ze nog bestaan. Selecteer ze opnieuw en importeer ze om ze bij te werken vanuit de bron.",
   "Aktualisieren": "Vernieuwen",
   "Importstatus": "Importstatus",
   "Alle Termine": "Alle evenementen",

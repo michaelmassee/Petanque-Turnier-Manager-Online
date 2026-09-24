@@ -37,6 +37,7 @@ export function PetanqueAktuellImportPanel() {
 
   useEffect(() => { load(); }, []);
   const selectable = useMemo(() => tournaments.filter((tournament) => !tournament.imported), [tournaments]);
+  const allNewSelected = selectable.length > 0 && selectable.every((tournament) => selected.has(tournament.externalKey));
   const visibleTournaments = useMemo(() => tournaments.filter((tournament) => (
     importStatus === 'all' || (importStatus === 'imported' ? tournament.imported : !tournament.imported)
   )), [tournaments, importStatus]);
@@ -51,8 +52,16 @@ export function PetanqueAktuellImportPanel() {
     });
   }
 
+  // Wählt nur neue Termine (ab), bereits zum erneuten Import markierte bleiben erhalten.
   function toggleAll() {
-    setSelected(selected.size === selectable.length ? new Set() : new Set(selectable.map((tournament) => tournament.externalKey)));
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const tournament of selectable) {
+        if (allNewSelected) next.delete(tournament.externalKey);
+        else next.add(tournament.externalKey);
+      }
+      return next;
+    });
   }
 
   async function handleImport() {
@@ -78,7 +87,7 @@ export function PetanqueAktuellImportPanel() {
         <div className="section-title">
           <div>
             <h2>{t('Pétanque Aktuell importieren')}</h2>
-            <p className="muted">{t('Wähle künftige Termine aus. Bereits importierte Termine werden täglich vollständig mit der Quelle abgeglichen.')}</p>
+            <p className="muted">{t('Wähle künftige Termine aus. Bereits importierte Termine werden täglich nur darauf geprüft, ob sie noch vorhanden sind. Um sie mit der Quelle zu aktualisieren, wähle sie erneut aus und importiere sie.')}</p>
           </div>
           <Button variant="secondary" disabled={loading || busy} loading={loading || busy} onClick={load}>{t('Aktualisieren')}</Button>
         </div>
@@ -94,7 +103,7 @@ export function PetanqueAktuellImportPanel() {
                 options={IMPORT_STATUS_OPTIONS.map((option) => ({ ...option, label: t(option.label) }))}
               />
               <label className="checkbox-field">
-                <input type="checkbox" checked={selectable.length > 0 && selected.size === selectable.length} onChange={toggleAll} disabled={selectable.length === 0 || busy} />
+                <input type="checkbox" checked={allNewSelected} onChange={toggleAll} disabled={selectable.length === 0 || busy} />
                 <span>{t('Alle neuen Termine auswählen')}</span>
               </label>
               <Button disabled={selected.size === 0 || busy} loading={busy} onClick={handleImport}>{t('Ausgewählte Termine importieren')}</Button>
@@ -102,7 +111,7 @@ export function PetanqueAktuellImportPanel() {
             <div className="user-list import-list">
               {visibleImportTournaments.items.map((tournament) => (
                 <label className="data-row" key={tournament.externalKey}>
-                  <input type="checkbox" checked={selected.has(tournament.externalKey)} onChange={() => toggle(tournament.externalKey)} disabled={tournament.imported || busy} />
+                  <input type="checkbox" checked={selected.has(tournament.externalKey)} onChange={() => toggle(tournament.externalKey)} disabled={busy} />
                   <span>
                     <strong data-i18n-skip>{tournament.name}</strong>
                     <small data-i18n-skip>{tournament.date}{tournament.startTime ? ` · ${tournament.startTime}` : ''} · {formatLocationAddress(tournament.location)}</small>

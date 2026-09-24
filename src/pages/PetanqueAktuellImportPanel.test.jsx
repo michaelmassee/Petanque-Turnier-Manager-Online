@@ -25,4 +25,21 @@ describe('Pétanque-Aktuell-Import', () => {
     await waitFor(() => expect(screen.getByText('Neuer Termin')).toBeInTheDocument());
     expect(screen.queryByText('Importierter Termin')).not.toBeInTheDocument();
   });
+
+  it('importiert bereits importierte Termine erneut und behält sie bei "Alle neuen auswählen"', async () => {
+    const fetchMock = vi.fn(async (url) => new Response(JSON.stringify(String(url).includes('/import') ? { created: 1, updated: 1, failed: 0 } : { tournaments }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<PetanqueAktuellImportPanel />);
+
+    const importedCheckbox = (await screen.findByText('Importierter Termin')).closest('label').querySelector('input');
+    expect(importedCheckbox).not.toBeDisabled();
+    fireEvent.click(importedCheckbox);
+    fireEvent.click(screen.getByLabelText('Alle neuen Termine auswählen'));
+    expect(importedCheckbox).toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ausgewählte Termine importieren' }));
+    await screen.findByText(/1 neu, 1 aktualisiert/);
+    const importCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/import'));
+    expect(JSON.parse(importCall[1].body).externalKeys.sort()).toEqual(['imported', 'new']);
+  });
 });
