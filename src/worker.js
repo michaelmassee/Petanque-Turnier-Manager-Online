@@ -26,7 +26,7 @@ import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pai
 import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
 import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
-import { formatLocationAddress } from './location-format.js';
+import { formatLocationAddress, geocodingFallbackQuery } from './location-format.js';
 
 const ROLES = ['admin', 'user'];
 const DEFAULT_TOURNAMENT_LIMIT = 5;
@@ -3226,7 +3226,9 @@ async function resolveTournamentGeolocation(tournament, existing, now, countryCo
     return { latitude: existing.latitude, longitude: existing.longitude, geocodedAt: existing.geocoded_at };
   }
 
-  const [result] = await geocodeLocation(tournament.location, { countryCode, limit: 1 });
+  let [result] = await geocodeLocation(tournament.location, { countryCode, limit: 1 });
+  const fallbackQuery = result ? null : geocodingFallbackQuery(tournament.location);
+  if (fallbackQuery) [result] = await geocodeLocation(fallbackQuery, { countryCode, limit: 1 });
   if (!result) {
     return { latitude: null, longitude: null, geocodedAt: null };
   }
