@@ -4640,7 +4640,9 @@ async function createRegistration(request, env, tournament, { session = null, sh
     return json({ ok: true }, 201);
   }
   const isManager = canManageTournament(tournament, session?.user || null);
-  if (isManager && Number(tournament.desktop_execution || 0) === 1) {
+  // Nach dem Desktop-Start ist das Turnierdokument alleiniger Master: Web-Pflege ist gesperrt, vor Ort
+  // erfasste Nachmeldungen legt das Dokument aber weiterhin ueber den Sync (mit Lease) an.
+  if (isManager && !syncBootstrap && Number(tournament.desktop_execution || 0) === 1) {
     throw new HttpError(409, 'Die Meldeliste wird nach Turnierstart ausschließlich im Turnierdokument geführt.');
   }
   // Der reguläre Anmeldezeitraum gilt nur für öffentliche Selbstanmeldungen.
