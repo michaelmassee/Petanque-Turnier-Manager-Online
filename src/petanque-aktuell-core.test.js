@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellFormation, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
+import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellFormation, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellPageUrls, preservedPetanqueAktuellLocation } from './petanque-aktuell-core.js';
 
 const CALENDAR = `
   <table>
@@ -67,6 +67,24 @@ describe('Pétanque-Aktuell-Import', () => {
       <div class="kalTbZl1"><div class="kalTbSp1">Nummer</div><div class="kalTbSp2">2626</div></div>
       <div class="kalTbZl2"><div class="kalTbSp1">Ort</div><div class="kalTbSp2">Khon Kaen (Thailand)</div></div>`;
     expect(parsePetanqueAktuellDetailAddress(detail)).toBeNull();
+  });
+
+  it('übernimmt das Veranstalter-Icon der Detailseite als Link', () => {
+    const detail = `
+      <div class="kalTbZl2">
+        <div class="kalTbSp1">Icon</div>
+        <div class="kalTbSp2"><img class="kalBild" src="https://petanque-aktuell.de/kialender_1/bilder/2701_Logo.jpg" style="max-width:60px"></div>
+      </div>`;
+    expect(parsePetanqueAktuellDetailLogoUrl(detail)).toBe('https://petanque-aktuell.de/kialender_1/bilder/2701_Logo.jpg');
+    expect(parsePetanqueAktuellDetailLogoUrl('<div class="kalTbSp1">Icon</div><div class="kalTbSp2"><img src="https://evil.example/x.jpg"></div>')).toBeNull();
+    expect(parsePetanqueAktuellDetailLogoUrl('<div class="kalTbSp1">PLZ</div><div class="kalTbSp2">64521</div>')).toBeNull();
+  });
+
+  it('behält beim Sync die angereicherte Adresse, solange sie den Listen-Ort enthält', () => {
+    expect(preservedPetanqueAktuellLocation('Groß-Gerau', 'Europaring 5, 64521 Groß-Gerau')).toBe('Europaring 5, 64521 Groß-Gerau');
+    expect(preservedPetanqueAktuellLocation('Groß-Gerau', 'Groß-Gerau')).toBe('Groß-Gerau');
+    expect(preservedPetanqueAktuellLocation('Darmstadt', 'Europaring 5, 64521 Groß-Gerau')).toBe('Darmstadt');
+    expect(preservedPetanqueAktuellLocation('Heidelberg', null)).toBe('Heidelberg');
   });
 
   it('übernimmt die Lizenzpflicht strukturiert vom Kalender', () => {

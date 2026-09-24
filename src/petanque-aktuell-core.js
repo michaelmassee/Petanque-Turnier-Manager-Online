@@ -144,10 +144,21 @@ export function isFuturePetanqueAktuellTournament(entry, today = new Date().toIS
   return typeof entry?.date === 'string' && entry.date > today;
 }
 
-function valueForDetailLabel(html, label) {
+function rawValueForDetailLabel(html, label) {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = String(html || '').match(new RegExp(`<div\\b[^>]*class=["']kalTbSp1["'][^>]*>\\s*${escaped}\\s*<\\/div>\\s*<div\\b[^>]*class=["']kalTbSp2["'][^>]*>([\\s\\S]*?)<\\/div>`, 'i'));
-  return decodeHtml(match?.[1]);
+  return match?.[1] || '';
+}
+
+function valueForDetailLabel(html, label) {
+  return decodeHtml(rawValueForDetailLabel(html, label));
+}
+
+// Optionales Veranstalter-Icon der Detailseite (Zeile "Icon"), als Link auf das bei
+// Pétanque Aktuell gehostete Bild - nur von deren eigener Domain übernommen.
+export function parsePetanqueAktuellDetailLogoUrl(html) {
+  const match = rawValueForDetailLabel(html, 'Icon').match(/<img\b[^>]*\bsrc\s*=\s*["']?([^\s"'>]+)/i);
+  return match ? absoluteSourceUrl(match[1]) : null;
 }
 
 // Turnier-Detailseite (kal_Aktion=detail) trägt optional PLZ, Ort und Straße+Nr. als
@@ -161,4 +172,14 @@ export function parsePetanqueAktuellDetailAddress(html) {
   if (!strasse && !plz) return null;
   const line2 = [plz, ort].filter(Boolean).join(' ');
   return [strasse, line2].filter(Boolean).join(', ') || null;
+}
+
+// Der tägliche Sync scrapt keine Detailseiten und kennt nur den bloßen Listen-Ort. Eine
+// beim Import angereicherte Adresse ("Europaring 5, 64521 Groß-Gerau") darf er nicht auf
+// "Groß-Gerau" zurücksetzen - solange sie den Listen-Ort noch enthält, bleibt sie stehen.
+export function preservedPetanqueAktuellLocation(listLocation, previousLocation) {
+  const list = String(listLocation || '').trim();
+  const previous = String(previousLocation || '').trim();
+  if (!list || previous.length <= list.length) return list;
+  return previous.toLocaleLowerCase('de').includes(list.toLocaleLowerCase('de')) ? previous : list;
 }
