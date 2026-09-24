@@ -173,13 +173,3 @@ export function parsePetanqueAktuellDetailAddress(html) {
   const line2 = [plz, ort].filter(Boolean).join(' ');
   return [strasse, line2].filter(Boolean).join(', ') || null;
 }
-
-// Der tägliche Sync scrapt keine Detailseiten und kennt nur den bloßen Listen-Ort. Eine
-// beim Import angereicherte Adresse ("Europaring 5, 64521 Groß-Gerau") darf er nicht auf
-// "Groß-Gerau" zurücksetzen - solange sie den Listen-Ort noch enthält, bleibt sie stehen.
-export function preservedPetanqueAktuellLocation(listLocation, previousLocation) {
-  const list = String(listLocation || '').trim();
-  const previous = String(previousLocation || '').trim();
-  if (!list || previous.length <= list.length) return list;
-  return previous.toLocaleLowerCase('de').includes(list.toLocaleLowerCase('de')) ? previous : list;
-}

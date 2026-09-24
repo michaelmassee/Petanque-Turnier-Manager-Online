@@ -25,7 +25,7 @@ import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schw
 import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
 import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
-import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, preservedPetanqueAktuellLocation, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
+import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
 import { formatLocationAddress } from './location-format.js';
 
 const ROLES = ['admin', 'user'];
@@ -3462,8 +3462,7 @@ async function fetchPetanqueAktuellCalendar() {
 
 // Turnier-Detailseite scrapen, um PLZ/Straße+Nr. und Icon zu ermitteln, falls der Veranstalter sie
 // gepflegt hat - die Kalender-Liste liefert nur den bloßen Ortsnamen. Nur beim expliziten
-// Import ausgeführt, nicht beim täglichen Sync (undokumentierte HTML-Struktur, soll den
-// Cron-Lauf nicht verlangsamen oder anfällig für Änderungen an der Fremdseite machen).
+// Import ausgeführt (undokumentierte HTML-Struktur der Fremdseite).
 async function fetchPetanqueAktuellDetails(id) {
   if (!id) return null;
   try {
@@ -3492,14 +3491,12 @@ async function listPetanqueAktuellCandidates(db) {
     .sort((left, right) => left.date.localeCompare(right.date) || (left.startTime || '').localeCompare(right.startTime || '') || left.name.localeCompare(right.name));
 }
 
-async function upsertPetanqueAktuellTournament(env, entry, ownerId, now, searches, { scrapeDetails = false, countryCode = null } = {}) {
+async function upsertPetanqueAktuellTournament(env, entry, ownerId, now, searches, countryCode) {
   const db = env.DB;
   const mapped = mapPetanqueAktuellTournament(entry);
-  if (scrapeDetails) {
-    const details = await fetchPetanqueAktuellDetails(entry.id);
-    if (details?.location) mapped.location = details.location;
-    mapped.logoUrl = details?.logoUrl || null;
-  }
+  const details = await fetchPetanqueAktuellDetails(entry.id);
+  if (details?.location) mapped.location = details.location;
+  mapped.logoUrl = details?.logoUrl || null;
   // resolveTournamentGeolocation() erwartet latitude/longitude explizit als null (nicht
   // undefined), um "bereits geokodiert" von "noch nie geokodiert" zu unterscheiden.
   mapped.latitude = null;
@@ -3508,13 +3505,11 @@ async function upsertPetanqueAktuellTournament(env, entry, ownerId, now, searche
   const existing = await db.prepare('SELECT tournament_id FROM petanque_aktuell_imports WHERE external_key = ?').bind(mapped.externalKey).first();
   if (existing) {
     const previous = await getTournamentById(db, existing.tournament_id);
-    if (!scrapeDetails) mapped.location = preservedPetanqueAktuellLocation(mapped.location, previous.location);
     const geo = await resolveTournamentGeolocation(mapped, previous, now, countryCode);
     const timezone = resolveTournamentTimezone(geo, previous.timezone || 'Europe/Berlin');
     await db.prepare(`UPDATE tournaments SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, formation = ?, formation_other = ?, license_required = ?, website_url = ?, flyer_url = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, status = 'registration', visibility = 'public', registration_enabled = 0, updated_at = ? WHERE id = ?`)
       .bind(mapped.name, mapped.club, mapped.date, mapped.startTime, mapped.location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.licenseRequired ? 1 : 0, mapped.websiteUrl, mapped.flyerUrl, geo.latitude, geo.longitude, geo.geocodedAt, timezone, now, existing.tournament_id).run();
-    // Icon nur beim expliziten Import setzen (der Sync scrapt keine Detailseiten) und ein
-    // vorhandenes Logo nicht löschen, wenn die Detailseite keins (mehr) liefert.
+    // Ein vorhandenes Logo nicht löschen, wenn die Detailseite keins (mehr) liefert.
     if (mapped.logoUrl) await db.prepare('UPDATE tournaments SET logo_url = ? WHERE id = ?').bind(mapped.logoUrl, existing.tournament_id).run();
     await db.prepare('UPDATE petanque_aktuell_imports SET synced_at = ? WHERE external_key = ?').bind(now, mapped.externalKey).run();
     const updated = await getTournamentById(db, existing.tournament_id);
@@ -3544,27 +3539,23 @@ async function importPetanqueAktuellTournaments(request, env, user) {
   const countryCode = request.headers.get('CF-IPCountry');
   const result = { created: 0, updated: 0, failed: 0 };
   for (const key of externalKeys) {
-    try { result[await upsertPetanqueAktuellTournament(env, selected.get(key), user.id, now, searches, { scrapeDetails: true, countryCode })] += 1; }
+    try { result[await upsertPetanqueAktuellTournament(env, selected.get(key), user.id, now, searches, countryCode)] += 1; }
     catch (error) { console.error(`Pétanque Aktuell import failed for ${key}`, error); result.failed += 1; }
   }
   return json(result, 201);
 }
 
+// Der tägliche Sync bleibt bewusst schlank: nur eine Kalender-Abfrage und die Prüfung, ob
+// der Termin noch vorhanden ist. Kein Detail-Scrape, keine Geokodierung, keine Feld-Updates -
+// dafür gibt es den expliziten Import.
 async function syncPetanqueAktuellImports(env) {
   const imports = await env.DB.prepare('SELECT external_key, tournament_id FROM petanque_aktuell_imports').all();
-  if (imports.results.length === 0) return { updated: 0, deleted: 0 };
-  const byKey = new Map((await fetchPetanqueAktuellCalendar()).map((entry) => [entry.externalKey, entry]));
-  const now = new Date().toISOString();
-  const searches = (await env.DB.prepare('SELECT * FROM saved_searches WHERE notify_enabled = 1').all()).results || [];
-  let updated = 0;
-  let deleted = 0;
-  for (const imported of imports.results) {
-    const entry = byKey.get(imported.external_key);
-    if (!entry) { await env.DB.prepare('DELETE FROM tournaments WHERE id = ?').bind(imported.tournament_id).run(); deleted += 1; continue; }
-    await upsertPetanqueAktuellTournament(env, entry, null, now, searches);
-    updated += 1;
-  }
-  return { updated, deleted };
+  if (imports.results.length === 0) return { kept: 0, deleted: 0 };
+  const available = new Set((await fetchPetanqueAktuellCalendar()).map((entry) => entry.externalKey));
+  const missing = imports.results.filter((imported) => !available.has(imported.external_key));
+  if (missing.length > 0) await env.DB.batch(missing.map((imported) => env.DB.prepare('DELETE FROM tournaments WHERE id = ?').bind(imported.tournament_id)));
+  await env.DB.prepare('UPDATE petanque_aktuell_imports SET synced_at = ?').bind(new Date().toISOString()).run();
+  return { kept: imports.results.length - missing.length, deleted: missing.length };
 }
 
 async function updateTournament(request, env, existing, user) {
