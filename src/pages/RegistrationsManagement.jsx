@@ -93,7 +93,8 @@ function registrationQuestionColumns(tournament, t) {
   })));
 }
 
-function registrationsToCsv(registrations, tournament, t) {
+export function registrationsToCsv(registrations, tournament, t) {
+  const currency = tournament?.currency;
   const questionColumns = registrationQuestionColumns(tournament, t);
   const lines = [[...REGISTRATION_CSV_COLUMNS, ...questionColumns.map((column) => column.label)].map(csvField).join(',')];
   for (const registration of registrations) {
