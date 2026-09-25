@@ -135,7 +135,14 @@ for (const { file, src } of fileSources) {
 // --- 3. Kein hartkodiertes "*" außerhalb von RequiredMark selbst ---
 const requiredMarkHit = findFunctionAcrossFiles('RequiredMark');
 const operatorLike = /\*\*|[\w)]\s*\*\s*[\w(]/;
-for (const { file, src } of fileSources) {
+// Comments never render, so a "*" inside them is irrelevant. They are blanked out (newlines kept so
+// line numbers stay correct). Only comments starting at line start / after whitespace or "{" count,
+// so "https://…" or accept="image/*" are not mistaken for comments.
+const stripComments = (src) => src
+  .replace(/(^|[\s{])\/\*[\s\S]*?\*\//g, (match) => match.replace(/[^\n]/g, ' '))
+  .replace(/(^|\s)\/\/[^\n]*/gm, (match) => match.replace(/[^\n]/g, ' '));
+for (const { file, src: rawSrc } of fileSources) {
+  const src = stripComments(rawSrc);
   src.split('\n').forEach((line, idx) => {
     if (!line.includes('*')) return;
     const lineStart = src.split('\n').slice(0, idx).join('\n').length + (idx > 0 ? 1 : 0);
