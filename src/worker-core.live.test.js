@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPlayerLiveView, parseSyncRanking, parseSyncRoundMatches, parseSyncRoundNumber, registrationBelongsToEmail } from './worker-core.js';
+import { buildPlayerLiveView, parseSyncRanking, parseSyncRoundMatches, parseSyncRoundNumber, registrationBelongsToEmail, isTournamentStale, dateDaysAgo } from './worker-core.js';
 
 const player = (id, firstName, lastName = 'X', teamLabel) => ({ id, firstName, lastName, teamLabel: teamLabel || `${firstName} ${lastName}` });
 const anna = player('r1', 'Anna');
@@ -119,5 +119,19 @@ describe('Zuordnung von Meldungen zu einem User', () => {
     expect(registrationBelongsToEmail(registration, 'b@x.de')).toBe(true);
     expect(registrationBelongsToEmail(registration, 'c@x.de')).toBe(false);
     expect(registrationBelongsToEmail(registration, '')).toBe(false);
+  });
+});
+
+describe('Automatischer Turnierabschluss', () => {
+  it('gilt genau 48 Stunden nach Turnierbeginn als abgelaufen', () => {
+    const start = '2026-09-20T08:00:00.000Z';
+    expect(isTournamentStale(start, new Date('2026-09-22T07:59:00Z'))).toBe(false);
+    expect(isTournamentStale(start, new Date('2026-09-22T08:00:00Z'))).toBe(true);
+    expect(isTournamentStale('ungültig', new Date('2026-09-22T08:00:00Z'))).toBe(false);
+  });
+
+  it('liefert das Vorauswahl-Datum in UTC', () => {
+    expect(dateDaysAgo(1, new Date('2026-09-25T01:00:00Z'))).toBe('2026-09-24');
+    expect(dateDaysAgo(4, new Date('2026-03-01T00:30:00Z'))).toBe('2026-02-25');
   });
 });

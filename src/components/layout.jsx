@@ -163,7 +163,10 @@ function base64urlToUint8Array(value) {
 function postboxMessageText(message, t) {
   if (message.kind === 'direct') return message.body;
   const data = message.eventData || {};
-  if (message.eventType === 'tournament_status_changed') return `${data.tournamentName}: ${t('Status')} ${labelFor(TOURNAMENT_STATUSES, data.status)}`;
+  if (message.eventType === 'tournament_status_changed') {
+    const status = `${data.tournamentName}: ${t('Status')} ${labelFor(TOURNAMENT_STATUSES, data.status)}`;
+    return data.automatic ? `${status}\n${t('Automatisch beendet, da der Turnierbeginn mehr als 48 Stunden zurückliegt.')}` : status;
+  }
   if (message.eventType === 'registration_status_changed') {
     const status = `${data.tournamentName}: ${t('registrationFor').replace('{participant}', data.participant || '')} ${labelFor(REGISTRATION_STATUSES, data.status)}`;
     return data.message ? `${status}\n${t('message')}: ${data.message}` : status;

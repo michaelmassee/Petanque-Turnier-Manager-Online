@@ -27,7 +27,7 @@
     "TURNSTILE_SITE_KEY": "0x4AAAAAAEtxoT1UMgPGYH14"
   },
   "triggers": {
-    "crons": ["0 1 * * *"]
+    "crons": ["0 1 * * *", "0 * * * *"]
   },
   "queues": {
     "producers": [

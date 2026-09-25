@@ -468,3 +468,18 @@ export function registrationBelongsToEmail(registration, email) {
   return [registration.email, registration.partner_email, registration.partner2_email]
     .some((value) => text(value).toLowerCase() === normalized);
 }
+
+// Nach 48 Stunden ab Turnierbeginn läuft kein Turnier mehr: Der stündliche Cron schließt es
+// automatisch ab, der Bereich "Live" blendet es aus.
+export const STALE_TOURNAMENT_HOURS = 48;
+
+export function isTournamentStale(startUtcIso, now = new Date()) {
+  const start = Date.parse(startUtcIso);
+  return Number.isFinite(start) && now.getTime() - start >= STALE_TOURNAMENT_HOURS * 60 * 60 * 1000;
+}
+
+// Grobe Vorauswahl per SQL (Kalenderdatum, UTC) - die genaue 48-Stunden-Prüfung erfolgt danach
+// mit Startzeit und Zeitzone des Turniers. `days` Tage Puffer decken alle Zeitzonen ab.
+export function dateDaysAgo(days, now = new Date()) {
+  return new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}

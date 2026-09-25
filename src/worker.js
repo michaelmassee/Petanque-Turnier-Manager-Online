@@ -18,6 +18,8 @@ import {
   parseSyncRoundNumber,
   buildPlayerLiveView,
   registrationBelongsToEmail,
+  isTournamentStale,
+  dateDaysAgo,
   registrationOpenStatus as coreRegistrationOpenStatus,
   tournamentMatchesSavedSearch,
   validateMatchScore,
@@ -449,6 +451,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     apiKeyApproved: (label) => `API-Schlüssel „${label}“ wurde freigegeben`,
     apiKeyRevoked: (label) => `API-Schlüssel „${label}“ wurde gesperrt`,
     savedSearchMatches: (name, count) => `${count} neue${count === 1 ? 's' : ''} Turnier${count === 1 ? '' : 'e'} für „${name}“`,
+    tournamentAutoFinished: 'Automatisch beendet, da der Turnierbeginn mehr als 48 Stunden zurückliegt.',
   },
   nl: {
     tournamentStatus: { draft: 'Concept', registration: 'Inschrijving open', running: 'Bezig', finished: 'Afgerond' },
@@ -460,6 +463,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     apiKeyApproved: (label) => `API-sleutel „${label}” is goedgekeurd`,
     apiKeyRevoked: (label) => `API-sleutel „${label}” is ingetrokken`,
     savedSearchMatches: (name, count) => `${count} nieuw(e) toernooi(en) voor „${name}”`,
+    tournamentAutoFinished: 'Automatisch afgerond, omdat de start van het toernooi meer dan 48 uur geleden is.',
   },
   en: {
     tournamentStatus: { draft: 'Draft', registration: 'Registration open', running: 'Running', finished: 'Finished' },
@@ -471,6 +475,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     apiKeyApproved: (label) => `API key "${label}" was approved`,
     apiKeyRevoked: (label) => `API key "${label}" was revoked`,
     savedSearchMatches: (name, count) => `${count} new tournament${count === 1 ? '' : 's'} for "${name}"`,
+    tournamentAutoFinished: 'Finished automatically because the tournament started more than 48 hours ago.',
   },
   es: {
     tournamentStatus: { draft: 'Borrador', registration: 'Inscripción abierta', running: 'En curso', finished: 'Finalizado' },
@@ -482,6 +487,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     apiKeyApproved: (label) => `La clave API «${label}» fue aprobada`,
     apiKeyRevoked: (label) => `La clave API «${label}» fue revocada`,
     savedSearchMatches: (name, count) => `${count} torneo${count === 1 ? '' : 's'} nuevo${count === 1 ? '' : 's'} para «${name}»`,
+    tournamentAutoFinished: 'Finalizado automáticamente porque el torneo comenzó hace más de 48 horas.',
   },
   fr: {
     tournamentStatus: { draft: 'Brouillon', registration: 'Inscriptions ouvertes', running: 'En cours', finished: 'Terminé' },
@@ -493,6 +499,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     apiKeyApproved: (label) => `La clé API « ${label} » a été approuvée`,
     apiKeyRevoked: (label) => `La clé API « ${label} » a été révoquée`,
     savedSearchMatches: (name, count) => `${count} nouveau${count === 1 ? '' : 'x'} tournoi${count === 1 ? '' : 's'} pour « ${name} »`,
+    tournamentAutoFinished: 'Terminé automatiquement, car le tournoi a commencé il y a plus de 48 heures.',
   },
 };
 
@@ -500,7 +507,8 @@ function buildSystemNotificationPushBody(eventType, eventData, language) {
   const texts = SYSTEM_NOTIFICATION_TEXTS[language] || SYSTEM_NOTIFICATION_TEXTS.de;
   const data = eventData || {};
   if (eventType === 'tournament_status_changed') {
-    return `${data.tournamentName}: ${texts.tournamentStatus[data.status] || data.status}`;
+    const status = `${data.tournamentName}: ${texts.tournamentStatus[data.status] || data.status}`;
+    return data.automatic ? `${status}\n${texts.tournamentAutoFinished}` : status;
   }
   if (eventType === 'registration_status_changed') {
     const status = `${data.tournamentName}: ${texts.registrationFor(data.participant || '')} ${texts.registrationStatus[data.status] || data.status}`;
@@ -867,6 +875,46 @@ async function sendCancellationEmail(env, tournament, registration, appOrigin) {
 
 const TOURNAMENT_REMINDER_LEAD_DAYS = 2;
 const APP_ORIGIN = 'https://ptmonline.org';
+// Muss mit dem täglichen Eintrag unter triggers.crons in wrangler.jsonc übereinstimmen.
+const DAILY_CRON = '0 1 * * *';
+
+// Beginn eines Turniers als UTC-Zeitpunkt (Datum + Startzeit in der Turnier-Zeitzone; ganztägige
+// Turniere zählen ab 00:00 Ortszeit).
+function tournamentStartUtcIso(tournament) {
+  const local = `${tournament.date}T${tournament.start_time || '00:00'}`;
+  try {
+    return zonedDateTimeToUtcIso(local, tournament.timezone || 'Europe/Berlin');
+  } catch {
+    return `${local}:00.000Z`;
+  }
+}
+
+/**
+ * Nach 48 Stunden ab Turnierbeginn läuft kein Turnier mehr: vergessene "Läuft"-Turniere werden
+ * automatisch abgeschlossen, damit sie nicht dauerhaft im Bereich "Live" stehen. Die
+ * Turnierleitung bekommt dazu eine Nachricht ins Postfach. Daten bleiben unverändert; ein späterer Metadaten-Sync aus dem Turnierdokument kann
+ * den Status wieder setzen.
+ */
+async function finishStaleTournaments(env, now = new Date()) {
+  const db = env.DB;
+  const candidates = await db.prepare(`SELECT id, name, owner_id, date, start_time, timezone FROM tournaments
+      WHERE status = 'running' AND date <= ?`).bind(dateDaysAgo(1, now)).all();
+  const stale = (candidates.results || []).filter((row) => isTournamentStale(tournamentStartUtcIso(row), now));
+  if (stale.length === 0) return;
+  const statement = db.prepare("UPDATE tournaments SET status = 'finished', updated_at = ? WHERE id = ? AND status = 'running'");
+  const results = await db.batch(stale.map((row) => statement.bind(now.toISOString(), row.id)));
+  console.log(`Finished ${stale.length} stale running tournament(s)`);
+  // Nur die Turnierleitung erfährt davon (Postfach + Push), Teilnehmer nicht.
+  for (let index = 0; index < stale.length; index += 1) {
+    if (!results[index]?.meta?.changes) continue;
+    const row = stale[index];
+    try {
+      await createSystemNotification(env, row.owner_id, 'tournament_status_changed', { tournamentName: row.name, status: 'finished', automatic: true });
+    } catch (error) {
+      console.error(`Failed to notify owner about auto-finished tournament ${row.id}`, error);
+    }
+  }
+}
 
 async function sendTournamentReminders(env) {
   const target = new Date();
@@ -935,12 +983,16 @@ const PWA_INSTALL_PATHS = ['/manifest.webmanifest', '/service-worker.js'];
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(
-      Promise.all([
+    // Stündlich: vergessene Turniere 48 Stunden nach Beginn abschließen. Erinnerungen und der
+    // Pétanque-Aktuell-Abgleich laufen weiterhin nur einmal täglich (DAILY_CRON).
+    const jobs = [finishStaleTournaments(env).catch((error) => console.error('Finishing stale tournaments failed', error))];
+    if (event.cron === DAILY_CRON) {
+      jobs.push(
         sendTournamentReminders(env).catch((error) => console.error('Tournament reminder cron failed', error)),
         syncPetanqueAktuellImports(env).catch((error) => console.error('Pétanque Aktuell sync cron failed', error)),
-      ]),
-    );
+      );
+    }
+    ctx.waitUntil(Promise.all(jobs));
   },
 
   async queue(batch, env) {
@@ -4854,20 +4906,22 @@ async function buildLiveResponse(db, registration) {
   });
 }
 
-// Meldungen des eingeloggten Users (Haupt- oder Partner-E-Mail) in laufenden bzw. heute/gestern
-// beendeten Turnieren - die Liste im Bereich "Live".
+// Meldungen des eingeloggten Users (Haupt- oder Partner-E-Mail) in laufenden bzw. kürzlich
+// beendeten Turnieren - die Liste im Bereich "Live". Turniere, deren Beginn mehr als 48 Stunden
+// zurückliegt, fallen heraus, auch falls der Cron (finishStaleTournaments) sie noch nicht
+// abgeschlossen hat.
 async function listMyLiveRegistrations(db, user) {
   const email = String(user.email || '').toLowerCase();
-  const since = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const since = dateDaysAgo(4);
   const result = await db.prepare(`SELECT r.id, r.tournament_id, r.first_name, r.last_name, r.partner_first_name, r.partner_last_name,
-        r.partner2_first_name, r.partner2_last_name, r.team_name, r.participation, t.name, t.date, t.start_time, t.location, t.status
+        r.partner2_first_name, r.partner2_last_name, r.team_name, r.participation, t.name, t.date, t.start_time, t.timezone, t.location, t.status
       FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
       WHERE (lower(r.email) = ? OR lower(r.partner_email) = ? OR lower(r.partner2_email) = ?)
         AND r.status = 'confirmed'
-        AND (t.status = 'running' OR (t.status = 'finished' AND t.date >= ?))
+        AND t.status IN ('running', 'finished') AND t.date > ?
       ORDER BY t.date DESC, t.start_time DESC`).bind(email, email, email, since).all();
   return json({
-    registrations: (result.results || []).map((row) => ({
+    registrations: (result.results || []).filter((row) => !isTournamentStale(tournamentStartUtcIso(row))).map((row) => ({
       id: row.id,
       tournament: { id: row.tournament_id, name: row.name, date: row.date, startTime: row.start_time || null, location: row.location || null, status: row.status },
       label: row.team_name || [[row.first_name, row.last_name], [row.partner_first_name, row.partner_last_name], [row.partner2_first_name, row.partner2_last_name]]
