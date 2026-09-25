@@ -384,6 +384,30 @@ describe('Mein Profil', () => {
     expect(screen.getByDisplayValue('anna@example.com')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
   });
+
+  it('löscht das Konto erst nach Eingabe der Bestätigung über ein eigenes Formular', () => {
+    const onDeleteAccount = vi.fn();
+    const onSubmit = vi.fn();
+    render(
+      <ProfilePanel
+        currentUser={{ pendingEmail: null }}
+        form={{ firstName: 'Anna', lastName: 'Muster', email: 'anna@example.com', club: '', licenseNr: '', currentPassword: '', newPassword: '', newPasswordConfirm: '' }}
+        setForm={() => {}}
+        onSubmit={onSubmit}
+        onDeleteAccount={onDeleteAccount}
+      />,
+    );
+
+    const deleteButton = screen.getByRole('button', { name: 'Konto löschen' });
+    expect(deleteButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/Google-Anmeldung/, { selector: 'input' }), { target: { value: 'Geheim123!' } });
+    expect(deleteButton).toBeEnabled();
+    fireEvent.click(deleteButton);
+
+    expect(onDeleteAccount).toHaveBeenCalledWith('Geheim123!');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });
 
 describe('Benutzer-Seite: Liste + Dialog', () => {

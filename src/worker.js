@@ -938,6 +938,11 @@ export default {
         return await updateOwnProfile(request, env, url, session.user.id);
       }
 
+      if (request.method === 'DELETE' && url.pathname === '/api/me') {
+        const session = await requireSession(request, env.DB);
+        return await deleteOwnAccount(request, env.DB, url, session.user.id);
+      }
+
       if (request.method === 'GET' && url.pathname === '/api/postbox') {
         const session = await requireSession(request, env.DB);
         return await getPostbox(env.DB, session.user);
@@ -2978,6 +2983,55 @@ async function updateOwnProfile(request, env, url, userId) {
   return json(response);
 }
 
+// Self-Service-Kontolöschung: eigene Turniere (inkl. Anmeldungen) werden mitgelöscht,
+// Vereine/Gruppen und selbst gepflegte Bouleplätze gehen an den ältesten anderen Admin.
+// clubs.owner_id ist ON DELETE CASCADE - ohne vorherige Übertragung würden Verein,
+// Editoren und Vereinsplätze (boule_places.club_id CASCADE) stillschweigend mitgelöscht.
+async function deleteOwnAccount(request, db, url, userId) {
+  if (userId === TOURNAMENT_REPORT_SYSTEM_USER_ID) {
+    throw new HttpError(403, 'Zugriff verweigert');
+  }
+  const existing = await db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  if (!existing) {
+    throw new HttpError(404, 'Benutzer nicht gefunden');
+  }
+
+  const body = await readJson(request);
+  const confirmation = String(body.confirmation || '');
+  let confirmed = confirmation.length > 0 && (await verifyPassword(confirmation, existing.password_salt, existing.password_hash));
+  if (!confirmed) {
+    // Google-Konten haben nur ein zufälliges Passwort - dort bestätigt die E-Mail-Adresse.
+    const oauthAccount = await db.prepare('SELECT 1 FROM oauth_accounts WHERE user_id = ? LIMIT 1').bind(userId).first();
+    confirmed = Boolean(oauthAccount) && confirmation.trim().toLowerCase() === String(existing.email).toLowerCase();
+  }
+  if (!confirmed) {
+    throw new HttpError(400, 'Passwort bzw. E-Mail-Adresse ist falsch');
+  }
+
+  const admin = await db
+    .prepare("SELECT id FROM users WHERE role = 'admin' AND id != ? AND id != ? ORDER BY created_at ASC LIMIT 1")
+    .bind(userId, TOURNAMENT_REPORT_SYSTEM_USER_ID)
+    .first();
+  if (!admin) {
+    throw new HttpError(400, 'Der letzte Administrator kann sein Konto nicht löschen');
+  }
+
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare('UPDATE clubs SET owner_id = ?, updated_at = ? WHERE owner_id = ?').bind(admin.id, now, userId),
+    // Der neue Owner hat ohnehin volle Rechte - ein zusätzlicher Editor-Eintrag wäre redundant.
+    db.prepare('DELETE FROM club_editors WHERE user_id = ? AND club_id IN (SELECT id FROM clubs WHERE owner_id = ?)').bind(admin.id, admin.id),
+    db.prepare('UPDATE boule_places SET reported_by_user_id = ?, updated_at = ? WHERE reported_by_user_id = ?').bind(admin.id, now, userId),
+    db.prepare('DELETE FROM registrations WHERE tournament_id IN (SELECT id FROM tournaments WHERE owner_id = ?)').bind(userId),
+    db.prepare('DELETE FROM tournaments WHERE owner_id = ?').bind(userId),
+    db.prepare('DELETE FROM users WHERE id = ?').bind(userId),
+  ]);
+
+  // Die Session ist per CASCADE gelöscht - kein verlängertes Cookie mehr nachschieben.
+  sessionRefreshes.delete(request);
+  return json({ ok: true }, 200, { 'Set-Cookie': expiredSessionCookie(url) });
+}
+
 async function deleteUser(db, id, currentUserId, deleteTournaments) {
   if (id === TOURNAMENT_REPORT_SYSTEM_USER_ID) {
     throw new HttpError(403, 'Zugriff verweigert');
@@ -2987,6 +3041,14 @@ async function deleteUser(db, id, currentUserId, deleteTournaments) {
   }
 
   const now = new Date().toISOString();
+
+  // Vereine/Gruppen und selbst gepflegte Bouleplätze gehen immer an den löschenden Admin:
+  // clubs.owner_id ist ON DELETE CASCADE und würde Verein samt Vereinsplätzen mitreißen.
+  await db.batch([
+    db.prepare('UPDATE clubs SET owner_id = ?, updated_at = ? WHERE owner_id = ?').bind(currentUserId, now, id),
+    db.prepare('DELETE FROM club_editors WHERE user_id = ? AND club_id IN (SELECT id FROM clubs WHERE owner_id = ?)').bind(currentUserId, currentUserId),
+    db.prepare('UPDATE boule_places SET reported_by_user_id = ?, updated_at = ? WHERE reported_by_user_id = ?').bind(currentUserId, now, id),
+  ]);
 
   if (deleteTournaments) {
     // Nur selbst besessene Turniere löschen - Turniere, bei denen dieser User

@@ -81,6 +81,8 @@ export function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, 
           <h2>{t('9. Speicherdauer')}</h2>
           <p>
             {t('Bestätigungslinks für die E-Mail-Verifizierung und Turniermeldungen sind 24 Stunden gültig, Links zum Zurücksetzen des Passworts 30 Minuten. Danach werden die zugehörigen Token automatisch gelöscht. Benutzerkonten und Turnieranmeldungen speichern wir, solange dein Konto besteht bzw. das Turnier organisiert wird, oder bis du eine Löschung beantragst.')}
+            {' '}
+            {t('Dein Konto kannst du jederzeit selbst unter „Mein Profil“ löschen.')}
           </p>
 
           <h2>{t('10. Deine Rechte')}</h2>

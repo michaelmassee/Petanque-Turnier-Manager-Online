@@ -136,6 +136,7 @@ function AppContent() {
   const [registrationForm, setRegistrationForm] = useState(EMPTY_REGISTRATION_FORM);
   const [registrationInvalidField, setRegistrationInvalidField] = useState(null);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [accountDeleting, setAccountDeleting] = useState(false);
   const [registrationSaving, setRegistrationSaving] = useState(false);
   const [authSaving, setAuthSaving] = useState(false);
   const [message, setMessageState] = useState('');
@@ -984,6 +985,29 @@ function AppContent() {
   async function handleLogout() {
     sessionExpiryHandled.current = true;
     await api('/api/logout', { method: 'POST' });
+    await resetSessionState();
+  }
+
+  async function handleDeleteAccount(confirmation) {
+    if (!window.confirm(t('Konto endgültig löschen? Deine eigenen Turniere werden mit allen Anmeldungen gelöscht. Das kann nicht rückgängig gemacht werden.'))) {
+      return;
+    }
+    setError('');
+    setMessage('');
+    setAccountDeleting(true);
+    try {
+      await authenticatedApi('/api/me', { method: 'DELETE', body: JSON.stringify({ confirmation }) });
+      sessionExpiryHandled.current = true;
+      await resetSessionState();
+      setMessage(t('Dein Konto wurde gelöscht.'));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setAccountDeleting(false);
+    }
+  }
+
+  async function resetSessionState() {
     queryClient.clear();
     setCurrentUser(null);
     setPostboxOpen(false);
@@ -1978,15 +2002,16 @@ function AppContent() {
 
       {activeTab === 'profile' && (
         <section className="single-column">
-          <ProfilePanel currentUser={currentUser} form={profileForm} setForm={setProfileForm} onSubmit={handleUpdateProfile} saving={profileSaving} />
+          <ProfilePanel currentUser={currentUser} form={profileForm} setForm={setProfileForm} onSubmit={handleUpdateProfile} saving={profileSaving} onDeleteAccount={handleDeleteAccount} deleting={accountDeleting} />
         </section>
       )}
     </main>
   );
 }
 
-export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = false }) {
+export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = false, onDeleteAccount, deleting = false }) {
   const { t } = useTranslation();
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   return (
     <>
       <div className="panel">
@@ -2030,6 +2055,32 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = fa
           <Button type="submit" loading={saving}>{t('Speichern')}</Button>
         </form>
       </div>
+      {onDeleteAccount && (
+        <div className="panel">
+          <div className="section-title">
+            <h2>{t('Konto löschen')}</h2>
+          </div>
+          <p className="muted">
+            {t('Dein Konto und deine eigenen Turniere mit allen Anmeldungen werden endgültig gelöscht. Deine Vereine, Gruppen und Bouleplätze werden an einen Administrator übertragen.')}
+          </p>
+          <form
+            className="form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onDeleteAccount(deleteConfirmation);
+            }}
+          >
+            <TextField
+              label={t('Passwort (bei Google-Anmeldung: E-Mail-Adresse)')}
+              type="password"
+              value={deleteConfirmation}
+              onChange={setDeleteConfirmation}
+              required
+            />
+            <Button type="submit" variant="danger" loading={deleting} disabled={!deleteConfirmation}>{t('Konto löschen')}</Button>
+          </form>
+        </div>
+      )}
       <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
         <OwnApiKeysPanel />
       </Suspense>
