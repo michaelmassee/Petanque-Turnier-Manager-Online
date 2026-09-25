@@ -96,7 +96,7 @@ function MatchRow({ match, onSave, busy }) {
         </Button>
       </div>
 
-      {isDraw && <p className="feedback error">{t('Unentschieden ist nicht möglich')}</p>}
+      <Feedback error={isDraw ? t('Unentschieden ist nicht möglich') : ''} />
     </article>
   );
 }

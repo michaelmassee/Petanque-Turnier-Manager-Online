@@ -4,7 +4,7 @@ import { authenticatedApi } from '../lib/api.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus } from '../lib/hooks.js';
 import { MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTIONS, TOURNAMENT_STATUSES, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor, roleName, translatedOptions } from '../lib/domain.js';
-import { EditDialog, SelectField, TextArea, Button } from './ui.jsx';
+import { Feedback, EditDialog, SelectField, TextArea, Button } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 import { RecipientPicker } from './RecipientPicker.jsx';
 import { LanguageSelect } from '../auth/AuthForms.jsx';
@@ -602,7 +602,7 @@ export function SearchMenuControl({
                 </>
               )}
             </form>
-            {geoError && <p className="feedback error">{geoError}</p>}
+            <Feedback error={geoError} />
 
             {filterOpen && (
               <div className="filter-panel">

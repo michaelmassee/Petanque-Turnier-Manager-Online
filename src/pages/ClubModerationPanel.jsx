@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { formatLocationAddress } from '../lib/domain.js';
-import { Button, EditDialog, ListToolbar, SelectField, TextArea, TextField } from '../components/ui.jsx';
+import { Feedback, Button, EditDialog, ListToolbar, SelectField, TextArea, TextField } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
@@ -264,8 +264,8 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
           </p>
         </div>
       </div>
-      {message && <p className="feedback success">{message}</p>}
-      {error && <p className="feedback error">{error}</p>}
+      <Feedback message={message} />
+      <Feedback error={error} />
       <ListToolbar
         query={query}
         onQueryChange={setQuery}
@@ -502,7 +502,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
       <EditDialog open={Boolean(ownerDialogClub)} title={ownerDialogClub ? t('Owner ändern für {name}').replace('{name}', ownerDialogClub.name) : ''} onClose={() => setOwnerDialogClub(null)}>
         {ownerDialogClub && (
           <form className="form" onSubmit={submitChangeOwner}>
-            {ownerError && <p className="feedback error">{ownerError}</p>}
+            <Feedback error={ownerError} />
             <p className="muted">
               {t('Aktueller Owner:')} <span data-i18n-skip>{ownerDialogClub.ownerName} ({ownerDialogClub.ownerEmail})</span>
             </p>

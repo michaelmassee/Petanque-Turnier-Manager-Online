@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { distanceKm, formatLocationAddress, labelFor, translatedOptions } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Button, TextArea, SelectField, DistanceBadge, EditDialog } from '../components/ui.jsx';
+import { Feedback, Button, TextArea, SelectField, DistanceBadge, EditDialog } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
@@ -39,7 +39,7 @@ function ContactDialog({ listing, onClose }) {
   return (
     <EditDialog open title={`${t('Nachricht an')} ${listing.ownerName || ''}`} error={error} onClose={onClose}>
       {sent ? (
-        <p className="feedback success">{t('Nachricht gesendet.')}</p>
+        <Feedback message={t('Nachricht gesendet.')} />
       ) : (
         <form className="form" onSubmit={submit}>
           <TextArea label={t('Nachricht')} value={body} onChange={setBody} maxLength={250} />
@@ -116,7 +116,7 @@ function PlayerExchangeSearchMenu({
                 </>
               )}
             </form>
-            {geoError && <p className="feedback error">{geoError}</p>}
+            <Feedback error={geoError} />
           </div>
         </>
       )}
@@ -299,7 +299,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
           </div>
         </div>
 
-        {error && <p className="feedback error">{error}</p>}
+        <Feedback error={error} />
         {mapped.length > 0 && (
           <div className="panel">
             <TileFallbackMap center={center} maptilerApiKey={maptilerApiKey}>

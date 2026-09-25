@@ -4,7 +4,7 @@ import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES
 import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
 import { labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
-import { TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
+import { Feedback, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { authenticatedApi } from '../lib/api.js';
@@ -62,7 +62,7 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmi
       <div className="form-section-header">
         <span>{t('Bearbeitungsrechte verwalten')}</span>
       </div>
-      {panelError && <p className="feedback error">{panelError}</p>}
+      <Feedback error={panelError} />
       {editors === null ? (
         <p className="muted">{t('Lädt …')}</p>
       ) : (
@@ -133,7 +133,7 @@ function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], onOwnerC
       <div className="form-section-header">
         <span>{t('Owner verwalten')}</span>
       </div>
-      {panelError && <p className="feedback error">{panelError}</p>}
+      <Feedback error={panelError} />
       <p className="muted">
         {t('Aktueller Owner:')} <span data-i18n-skip>{owner ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim() : ownerId}</span>
       </p>
@@ -632,7 +632,7 @@ export function TournamentList({
         onReset={onResetFilters}
         resetDisabled={!filtered}
       />
-      {shareError && <p className="feedback error">{shareError}</p>}
+      <Feedback error={shareError} />
       <div className="user-list">
         {visibleTournaments.items.map((tournament) => (
           <article className={`data-row tournament-row ${selectedId === tournament.id ? 'selected' : ''}`} key={tournament.id}>

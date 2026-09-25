@@ -1,4 +1,4 @@
-import { useState, useId } from 'react';
+import { useState, useId, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export function RequiredMark() {
@@ -108,11 +108,23 @@ export function Button({ children, type = 'button', variant = 'primary', loading
 }
 
 export function Feedback({ message, error }) {
+  const ref = useRef(null);
+
+  // The action button is often far below the message (long dialogs on phones),
+  // so bring a new message into view instead of leaving the click without visible effect.
+  useEffect(() => {
+    if (error || message) ref.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+  }, [error, message]);
+
   if (!message && !error) {
     return null;
   }
 
-  return <p className={error ? 'feedback error' : 'feedback success'}>{error || message}</p>;
+  return (
+    <p ref={ref} className={error ? 'feedback error' : 'feedback success'} role={error ? 'alert' : 'status'}>
+      {error || message}
+    </p>
+  );
 }
 
 export function DistanceBadge({ distanceKm }) {

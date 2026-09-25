@@ -4,7 +4,7 @@ import { authenticatedApi } from '../lib/api.js';
 import { EMPTY_REGISTRATION_FORM, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor, registrationPayload, translatedOptions } from '../lib/domain.js';
 import { filterRegistrations } from '../frontend-core.js';
-import { SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
+import { Feedback, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
 import { formatMoney } from '../lib/format.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
@@ -239,8 +239,8 @@ export function RegistrationsPanel({
         </Button>
         <Button onClick={onCreate}>{t('Neue Anmeldung')}</Button>
       </div>
-      {message && <p className="feedback success">{message}</p>}
-      {error && <p className="feedback error">{error}</p>}
+      <Feedback message={message} />
+      <Feedback error={error} />
       <SelectField
         label={t('Turnier anzeigen')}
         value={tournament?.id || ''}

@@ -4,7 +4,7 @@ import { authenticatedApi } from '../lib/api.js';
 import { formatDateTime } from '../lib/format.js';
 import { API_KEY_STATUS_LABELS } from '../lib/domain.js';
 import { filterApiKeys } from '../frontend-core.js';
-import { Button, ListToolbar, EditDialog, SelectField, TextField } from '../components/ui.jsx';
+import { Feedback, Button, ListToolbar, EditDialog, SelectField, TextField } from '../components/ui.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 const API_KEY_STATUS_FILTERS = [
@@ -92,7 +92,7 @@ export function OwnApiKeysPanel() {
         </Button>
       </form>
 
-      {panelError && <p className="feedback error">{panelError}</p>}
+      <Feedback error={panelError} />
 
       {revealedSecret && (
         <div className="api-key-secret-box">
@@ -290,7 +290,7 @@ function ApiKeysPanel({ isAdmin }) {
               {t('Neuer API-Schlüssel')}
             </Button>
           </div>
-          {panelError && <p className="feedback error">{panelError}</p>}
+          <Feedback error={panelError} />
           <ListToolbar
             query={query}
             onQueryChange={setQuery}

@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { clubLogoImageUrl, formatLocationAddress, googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Button, ClubBadge, DistanceBadge, SelectField } from '../components/ui.jsx';
+import { Feedback, Button, ClubBadge, DistanceBadge, SelectField } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
@@ -369,7 +369,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         </div>
       </div>
 
-      {error && <p className="feedback error">{error}</p>}
+      <Feedback error={error} />
       {mapped.length > 0 && (
         <div className="panel" ref={mapSectionRef}>
           <PlacesMap places={mapped} center={center} maptilerApiKey={maptilerApiKey} focus={focusPlace} />
@@ -510,7 +510,7 @@ function PlacesSearchMenu({
                 </>
               )}
             </form>
-            {geoError && <p className="feedback error">{geoError}</p>}
+            <Feedback error={geoError} />
           </div>
         </>
       )}

@@ -5,7 +5,7 @@ import { DEFAULT_TOURNAMENT_LIMIT, ROLES, EMPTY_USER_FORM } from '../lib/constan
 import { PASSWORD_STRENGTH_HINT, PASSWORD_STRENGTH_ERROR, isPasswordStrong } from '../lib/format.js';
 import { roleName, translatedOptions } from '../lib/domain.js';
 import { filterUsers } from '../frontend-core.js';
-import { SelectField, TextField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
+import { Feedback, SelectField, TextField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 const USER_STATUS_FILTERS = [
@@ -162,8 +162,8 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
           <span className="counter">{isFiltered ? `${filtered.length}/${users.length}` : users.length}</span>
           <Button onClick={openCreate}>{t('Neuer Benutzer')}</Button>
         </div>
-        {message && <p className="feedback success">{message}</p>}
-        {error && <p className="feedback error">{error}</p>}
+        <Feedback message={message} />
+        <Feedback error={error} />
         <ListToolbar
           query={query}
           onQueryChange={setQuery}

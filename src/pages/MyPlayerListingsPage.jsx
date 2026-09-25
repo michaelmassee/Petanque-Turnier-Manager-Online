@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { formatLocationAddress } from '../lib/domain.js';
-import { Button, ListToolbar, EditDialog } from '../components/ui.jsx';
+import { Feedback, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { PlayerListingFields } from '../components/PlayerListingFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
@@ -111,8 +111,8 @@ function MyPlayerListingsPanel({ language, currentUser }) {
         <span className="counter">{filterActive ? `${filtered.length}/${listings.length}` : listings.length}</span>
         <Button onClick={openCreate}>{t('Neues Mitspielgesuch')}</Button>
       </div>
-      {message && <p className="feedback success">{message}</p>}
-      {error && <p className="feedback error">{error}</p>}
+      <Feedback message={message} />
+      <Feedback error={error} />
       <ListToolbar
         query={query}
         onQueryChange={setQuery}
