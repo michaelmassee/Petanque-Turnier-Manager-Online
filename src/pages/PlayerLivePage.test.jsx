@@ -50,6 +50,7 @@ describe('Live-Ansicht für Spieler', () => {
     renderDetail();
 
     expect(await screen.findByText('Sommer-Supermêlée')).toBeInTheDocument();
+    expect(screen.getByText(/25\.9\.2026 Fr/)).toBeInTheDocument();
     expect(screen.getAllByText('Bert Beispiel').length).toBeGreaterThan(0);
     expect(screen.getByText('Carla Test', { selector: '.live-history-opponent' })).toBeInTheDocument();
     expect(screen.queryByText('Bahn')).not.toBeInTheDocument();

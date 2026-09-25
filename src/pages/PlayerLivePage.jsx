@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
-import { formatDate, DISPLAY_LOCALES } from '../lib/format.js';
+import { formatDate, formatWeekdayShort, DISPLAY_LOCALES } from '../lib/format.js';
 import { Button, Feedback } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { isIosSafari } from '../lib/hooks.js';
@@ -236,7 +236,7 @@ export function LiveDetail({ queryKey, path, useSession, language }) {
       <header className="live-header">
         <h2 data-i18n-skip>{tournament.name}</h2>
         <p className="muted">
-          {formatDate(tournament.date, language)}
+          {formatDate(tournament.date, language)} {formatWeekdayShort(tournament.date, language)}
           {tournament.location ? <> · <span data-i18n-skip>{tournament.location}</span></> : null}
         </p>
         <p className="live-player"><span data-i18n-skip>{registration.label}</span>{registration.participation === 'withdrawn' && <span className="live-paused">{t('Pausiert')}</span>}</p>
@@ -275,7 +275,7 @@ function MyLiveList({ navigate, language }) {
         <button key={entry.id} type="button" className="panel live-list-item" onClick={() => navigate(`/live/${encodeURIComponent(entry.id)}`)}>
           <strong data-i18n-skip>{entry.tournament.name}</strong>
           <span className="muted">
-            {formatDate(entry.tournament.date, language)}
+            {formatDate(entry.tournament.date, language)} {formatWeekdayShort(entry.tournament.date, language)}
             {entry.tournament.location ? <> · <span data-i18n-skip>{entry.tournament.location}</span></> : null}
           </span>
           <span data-i18n-skip>{entry.label}</span>
