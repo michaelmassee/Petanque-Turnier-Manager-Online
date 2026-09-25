@@ -66,6 +66,7 @@ const REGISTRATION_CSV_COLUMNS = [
   'confirmedAt',
   'createdAt',
   'updatedAt',
+  'organizerMessage',
 ];
 
 function csvField(value) {

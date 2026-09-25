@@ -406,6 +406,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     tournamentStatus: { draft: 'Entwurf', registration: 'Anmeldung offen', running: 'Läuft', finished: 'Abgeschlossen' },
     registrationStatus: { pending: 'Offen', confirmed: 'Bestätigt', waitlist: 'Warteliste', cancelled: 'Storniert' },
     registrationFor: (participant) => `Anmeldung von ${participant}`,
+    organizerMessage: 'Nachricht',
     accountEmailUnverified: 'E-Mail nicht bestätigt',
     accountPasswordChangeRequired: 'Passwortänderung erforderlich',
     apiKeyApproved: (label) => `API-Schlüssel „${label}“ wurde freigegeben`,
@@ -416,6 +417,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     tournamentStatus: { draft: 'Concept', registration: 'Inschrijving open', running: 'Bezig', finished: 'Afgerond' },
     registrationStatus: { pending: 'Open', confirmed: 'Bevestigd', waitlist: 'Wachtlijst', cancelled: 'Geannuleerd' },
     registrationFor: (participant) => `Aanmelding van ${participant}`,
+    organizerMessage: 'Bericht',
     accountEmailUnverified: 'e-mail niet bevestigd',
     accountPasswordChangeRequired: 'wachtwoordwijziging vereist',
     apiKeyApproved: (label) => `API-sleutel „${label}” is goedgekeurd`,
@@ -426,6 +428,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     tournamentStatus: { draft: 'Draft', registration: 'Registration open', running: 'Running', finished: 'Finished' },
     registrationStatus: { pending: 'Pending', confirmed: 'Confirmed', waitlist: 'Waitlist', cancelled: 'Cancelled' },
     registrationFor: (participant) => `Registration for ${participant}`,
+    organizerMessage: 'Message',
     accountEmailUnverified: 'email not verified',
     accountPasswordChangeRequired: 'password change required',
     apiKeyApproved: (label) => `API key "${label}" was approved`,
@@ -436,6 +439,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     tournamentStatus: { draft: 'Borrador', registration: 'Inscripción abierta', running: 'En curso', finished: 'Finalizado' },
     registrationStatus: { pending: 'Pendiente', confirmed: 'Confirmado', waitlist: 'Lista de espera', cancelled: 'Cancelado' },
     registrationFor: (participant) => `Inscripción de ${participant}`,
+    organizerMessage: 'Mensaje',
     accountEmailUnverified: 'correo no verificado',
     accountPasswordChangeRequired: 'cambio de contraseña requerido',
     apiKeyApproved: (label) => `La clave API «${label}» fue aprobada`,
@@ -446,6 +450,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     tournamentStatus: { draft: 'Brouillon', registration: 'Inscriptions ouvertes', running: 'En cours', finished: 'Terminé' },
     registrationStatus: { pending: 'En attente', confirmed: 'Confirmé', waitlist: "Liste d'attente", cancelled: 'Annulé' },
     registrationFor: (participant) => `Inscription de ${participant}`,
+    organizerMessage: 'Message',
     accountEmailUnverified: 'e-mail non confirmé',
     accountPasswordChangeRequired: 'changement de mot de passe requis',
     apiKeyApproved: (label) => `La clé API « ${label} » a été approuvée`,
@@ -461,7 +466,8 @@ function buildSystemNotificationPushBody(eventType, eventData, language) {
     return `${data.tournamentName}: ${texts.tournamentStatus[data.status] || data.status}`;
   }
   if (eventType === 'registration_status_changed') {
-    return `${data.tournamentName}: ${texts.registrationFor(data.participant || '')} ${texts.registrationStatus[data.status] || data.status}`;
+    const status = `${data.tournamentName}: ${texts.registrationFor(data.participant || '')} ${texts.registrationStatus[data.status] || data.status}`;
+    return data.message ? `${status}\n${texts.organizerMessage}: ${data.message}` : status;
   }
   if (eventType === 'account_status_changed') {
     const parts = [data.role];
@@ -4783,7 +4789,12 @@ async function createRegistration(request, env, tournament, { session = null, sh
 
   const created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
   if (!syncBootstrap) {
-    await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', { tournamentName: tournament.name, status: created.status, participant: `${created.first_name} ${created.last_name}` });
+    await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', {
+      tournamentName: tournament.name,
+      status: created.status,
+      participant: `${created.first_name} ${created.last_name}`,
+      ...(organizerMessage ? { message: organizerMessage } : {}),
+    });
     await notifyUserByEmail(env, created.email, 'registration_status_changed', { tournamentName: tournament.name, status: created.status }, undefined, tournament.owner_id);
   }
 

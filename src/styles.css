@@ -735,6 +735,7 @@ a.left-panel-link {
 .postbox-message.unread { border-color: #1677ff; background: #f3f8ff; }
 .postbox-panel .hint { margin: 4px 0 0; font-size: 0.85rem; color: #53627a; }
 .postbox-message small { color: #66758c; }
+.postbox-message span { white-space: pre-line; overflow-wrap: anywhere; }
 .push-migration-notice { max-width: 680px; margin: 0 auto 18px; }
 .push-migration-notice h2 { margin-top: 0; }
 

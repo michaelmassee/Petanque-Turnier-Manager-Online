@@ -52,6 +52,13 @@ describe('registrationsToCsv', () => {
     const csv = registrationsToCsv([{ id: 'r1', firstName: 'Anna' }], { registrationQuestions: [] }, t);
     expect(csv.trim().split('\r\n')).toHaveLength(2);
   });
+
+  it('exportiert die Nachricht an die Turnierleitung als eigene Spalte', () => {
+    const csv = registrationsToCsv([{ id: 'r1', firstName: 'Anna', organizerMessage: 'Komme später, ca. 10 Min.' }], TOURNAMENT, t);
+    const [header, row] = csv.replace(/^﻿/, '').trim().split('\r\n');
+    expect(header.split(',').at(-1)).toBe('organizerMessage');
+    expect(row.endsWith('"Komme später, ca. 10 Min."')).toBe(true);
+  });
 });
 
 describe('CSV-Export-Button', () => {
