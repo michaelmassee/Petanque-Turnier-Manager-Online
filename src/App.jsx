@@ -8,7 +8,7 @@ import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { usePath, matchTournamentRoute, matchLiveRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
-import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
+import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
 import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm } from './lib/domain.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
@@ -2111,7 +2111,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
       >
         <span className={`tournament-card-date${hasLogo ? ' has-logo' : ''}`}>
           <span className="tournament-card-date-text">
-            <strong>{formatDate(tournament.date, language)}</strong>
+            <strong>{formatDate(tournament.date, language)} <span className="tournament-card-weekday">{formatWeekdayShort(tournament.date, language)}</span></strong>
             <small>{formatTournamentStartTime(tournament, language)}</small>
           </span>
           {hasLogo && (

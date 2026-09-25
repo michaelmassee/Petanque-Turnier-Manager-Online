@@ -1371,6 +1371,12 @@ a.left-panel-link {
   line-height: 1.2;
 }
 
+.tournament-card-weekday {
+  color: #53627a;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .tournament-card-date small,
 .tournament-card-copy small {
   color: #53627a;

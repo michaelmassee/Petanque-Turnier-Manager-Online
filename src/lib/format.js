@@ -45,6 +45,16 @@ export function formatDate(value, language = 'de') {
   return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, { timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
+// Wochentag in Kurzform ("Sa", "Sat", "za" …) in der Anzeigesprache; das Datum ist ein reiner
+// Kalendertag, daher wie formatDate in UTC ausgewertet.
+export function formatWeekdayShort(value, language = 'de') {
+  if (!value) {
+    return '';
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
 export function timezoneAbbrev(date, timeZone, locale) {
   try {
     return new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: 'short' })
