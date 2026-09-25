@@ -17,6 +17,13 @@ describe('Worker-Fachlogik', () => {
     expect(initialParticipation({ status: 'running', desktop_execution: 1 }, 'confirmed')).toBe('inactive');
   });
 
+  it('übernimmt bei Sync-Nachmeldungen den Teilnahme-Status aus dem Turnierdokument', () => {
+    const desktopTournament = { status: 'running', desktop_execution: 1 };
+    expect(initialParticipation(desktopTournament, 'confirmed', 'active', true)).toBe('active');
+    expect(initialParticipation(desktopTournament, 'confirmed', 'withdrawn', true)).toBe('withdrawn');
+    expect(() => initialParticipation(desktopTournament, 'confirmed', 'confirmed', true)).toThrow('Ungültige Teilnahme');
+  });
+
   it('akzeptiert nur die drei Teilnahme-Zustände und keinen Anmeldestatus', () => {
     expect(parseParticipation('inactive')).toBe('inactive');
     expect(parseParticipation('active')).toBe('active');

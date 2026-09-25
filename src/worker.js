@@ -4766,7 +4766,7 @@ async function createRegistration(request, env, tournament, { session = null, sh
       registration.teamName,
       registration.seedingPosition,
       status,
-      initialParticipation(tournament, status),
+      initialParticipation(tournament, status, body.participation, syncBootstrap),
       registration.isVip ? 1 : 0,
       organizerMessage,
       JSON.stringify(feeSelections),

@@ -136,7 +136,13 @@ export const PARTICIPATIONS = ['inactive', 'active', 'withdrawn'];
  * Turnier ist der Check-in schon erfolgt - bestaetigte Nachmeldungen (z. B. Schnelleingabe) spielen
  * daher sofort mit. Sonst gilt 'inactive' bis zum Check-in (Turnierstart bzw. Turnierdokument).
  */
-export function initialParticipation(tournament, registrationStatus) {
+export function initialParticipation(tournament, registrationStatus, requestedParticipation, syncBootstrap = false) {
+  // Das Turnierdokument ist bei einer Sync-Nachmeldung die fachliche Quelle für
+  // den Check-in. Sein expliziter Zustand darf nicht durch den Desktop-Default
+  // "inactive" ersetzt werden.
+  if (syncBootstrap && requestedParticipation !== undefined) {
+    return parseParticipation(requestedParticipation);
+  }
   const onlineRunning = tournament.status === 'running' && Number(tournament.desktop_execution || 0) !== 1;
   return onlineRunning && registrationStatus === 'confirmed' ? 'active' : 'inactive';
 }
