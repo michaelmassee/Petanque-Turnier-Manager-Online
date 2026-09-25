@@ -1371,10 +1371,11 @@ a.left-panel-link {
   line-height: 1.2;
 }
 
+/* Wochentag immer in eigener Zeile unter dem Datum - einheitlich mit und ohne Logo. */
 .tournament-card-weekday {
+  display: block;
   color: #53627a;
   font-weight: 600;
-  white-space: nowrap;
 }
 
 .tournament-card-date small,
