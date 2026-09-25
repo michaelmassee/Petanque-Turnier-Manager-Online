@@ -1371,11 +1371,19 @@ a.left-panel-link {
   line-height: 1.2;
 }
 
-/* Wochentag immer in eigener Zeile unter dem Datum - einheitlich mit und ohne Logo. */
+/* Am PC ist die Datumsspalte schmal (160px, mit Logo noch schmaler): Wochentag in eigener Zeile,
+   einheitlich mit und ohne Logo. Am Handy ist die Datumsbox voll breit, dort bleibt er in der
+   Datumszeile, sonst wird die Karte unnötig hoch. */
 .tournament-card-weekday {
   display: block;
   color: #53627a;
   font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .tournament-card-weekday {
+    display: inline;
+  }
 }
 
 .tournament-card-date small,
