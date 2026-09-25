@@ -1709,6 +1709,7 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
+        await requireSyncLease(request, tournament);
         return await syncPutTournamentMetadata(request, env, tournament, auth.user);
       }
 
@@ -3189,7 +3190,7 @@ function requireSecret(value, field) {
   return normalized;
 }
 
-async function requireSyncLease(request, tournament) {
+export async function requireSyncLease(request, tournament) {
   const syncDocumentId = request.headers.get('X-PTM-Sync-Document') || '';
   const leaseToken = request.headers.get('X-PTM-Sync-Lease') || '';
   if (!tournament.sync_document_id || !tournament.sync_lease_token_hash) {
