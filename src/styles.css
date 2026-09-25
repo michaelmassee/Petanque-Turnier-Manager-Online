@@ -1851,7 +1851,25 @@ a.left-panel-link {
 }
 
 .user-row {
-  grid-template-columns: minmax(220px, 1fr) minmax(190px, auto) auto;
+  grid-template-columns: minmax(280px, 1fr) auto;
+  grid-template-areas:
+    "identity actions"
+    "badges badges";
+  align-items: start;
+}
+
+.user-row > div:first-child {
+  grid-area: identity;
+  align-self: center;
+}
+
+.user-row .badges {
+  grid-area: badges;
+  justify-content: flex-start;
+}
+
+.user-row .row-actions {
+  grid-area: actions;
 }
 
 .panel,
@@ -2180,6 +2198,14 @@ a.left-panel-link {
   .tournament-row {
     grid-template-areas:
       "main"
+      "badges"
+      "actions";
+  }
+
+  .user-row {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "identity"
       "badges"
       "actions";
   }

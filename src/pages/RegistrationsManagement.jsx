@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { EMPTY_REGISTRATION_FORM, REGISTRATION_STATUSES } from '../lib/constants.js';
-import { labelFor, registrationPayload, translatedOptions } from '../lib/domain.js';
+import { isCalendarEntry, labelFor, registrationPayload, translatedOptions } from '../lib/domain.js';
 import { filterRegistrations } from '../frontend-core.js';
 import { Feedback, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
@@ -238,7 +238,7 @@ export function RegistrationsPanel({
         >
           {t('CSV exportieren')}
         </Button>
-        <Button onClick={onCreate}>{t('Neue Anmeldung')}</Button>
+        <Button onClick={onCreate} disabled={!tournament}>{t('Neue Anmeldung')}</Button>
       </div>
       <Feedback message={message} />
       <Feedback error={error} />
@@ -321,9 +321,20 @@ export function RegistrationsManagementPage({
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState('');
 
-  const tournament = tournaments.find((item) => item.id === selectedTournamentId) || null;
+  const manageableTournaments = useMemo(
+    () => tournaments.filter((item) => item.canManage && !isCalendarEntry(item)),
+    [tournaments],
+  );
+  const tournament = manageableTournaments.find((item) => item.id === selectedTournamentId) || null;
   const manageMode = Boolean(tournament?.canManage);
-  const manageableTournaments = useMemo(() => tournaments.filter((item) => item.canManage), [tournaments]);
+
+  useEffect(() => {
+    if (manageableTournaments.length > 0 && !tournament) {
+      setSelectedTournamentId(manageableTournaments[0].id);
+    } else if (manageableTournaments.length === 0 && selectedTournamentId) {
+      setSelectedTournamentId('');
+    }
+  }, [manageableTournaments, selectedTournamentId, setSelectedTournamentId, tournament]);
 
   async function load(tournamentId) {
     if (!tournamentId) {
@@ -362,6 +373,7 @@ export function RegistrationsManagementPage({
   }
 
   function openCreate() {
+    if (!tournament) return;
     setMode('create');
     setForm({ ...EMPTY_REGISTRATION_FORM, tournamentId: selectedTournamentId });
     clearFeedback();

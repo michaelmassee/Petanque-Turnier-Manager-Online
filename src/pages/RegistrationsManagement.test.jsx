@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '../lib/i18next-config.js';
-import { RegistrationsPanel, registrationsToCsv } from './RegistrationsManagement.jsx';
+import { RegistrationsManagementPage, RegistrationsPanel, registrationsToCsv } from './RegistrationsManagement.jsx';
 
 const t = (key) => key;
 
@@ -102,5 +102,27 @@ describe('CSV-Export-Button', () => {
   it('ist ohne Anmeldungen deaktiviert', () => {
     renderPanel([]);
     expect(screen.getByRole('button', { name: 'CSV exportieren' })).toBeDisabled();
+  });
+});
+
+describe('Anmeldungsverwaltung: Turnierauswahl', () => {
+  it('blendet Kalendereinträge aus und wählt stattdessen ein Turnier mit Anmeldeverfahren', async () => {
+    const setSelectedTournamentId = vi.fn();
+    render(
+      <RegistrationsManagementPage
+        tournaments={[
+          { id: 'calendar', name: 'Kalendereintrag', canManage: true, registrationEnabled: false },
+          { id: 'registration', name: 'Sommer Cup', canManage: true, registrationEnabled: true },
+        ]}
+        selectedTournamentId="calendar"
+        setSelectedTournamentId={setSelectedTournamentId}
+        language="de"
+      />,
+    );
+
+    const tournamentSelect = screen.getByLabelText('Turnier anzeigen');
+    expect(tournamentSelect).not.toHaveTextContent('Kalendereintrag');
+    expect(tournamentSelect).toHaveTextContent('Sommer Cup');
+    await waitFor(() => expect(setSelectedTournamentId).toHaveBeenCalledWith('registration'));
   });
 });
