@@ -582,7 +582,7 @@ export function TournamentList({
   setBusyId = () => {},
 }) {
   const { t } = useTranslation();
-  const filtered = tournaments.length !== totalTournaments;
+  const filtered = Boolean(query.trim()) || Boolean(statusFilter);
   const [shareError, setShareError] = useState('');
   const visibleTournaments = useInfiniteList(tournaments);
 

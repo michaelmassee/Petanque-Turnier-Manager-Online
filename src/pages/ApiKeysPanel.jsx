@@ -187,7 +187,7 @@ function ApiKeysPanel({ isAdmin }) {
   }, [isAdmin]);
 
   const filteredApiKeys = useMemo(() => filterApiKeys(allApiKeys, query, statusFilter), [allApiKeys, query, statusFilter]);
-  const filtered = filteredApiKeys.length !== allApiKeys.length;
+  const filtered = Boolean(query.trim()) || Boolean(statusFilter);
 
   function resetFilters() {
     setQuery('');

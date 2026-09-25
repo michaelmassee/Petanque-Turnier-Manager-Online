@@ -1499,6 +1499,7 @@ function AppContent() {
 
         <HomeTournaments
           language={language}
+          query={homeQuery}
           showMineFilter={false}
           onlyMine={false}
           filterMonth={homeFilterMonth}
@@ -1831,6 +1832,7 @@ function AppContent() {
       {activeTab === 'home' && (
         <HomeTournaments
           language={language}
+          query={homeQuery}
           showMineFilter={canManageTournaments}
           onlyMine={homeOnlyMine}
           filterMonth={homeFilterMonth}
@@ -2097,8 +2099,9 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
   );
 }
 
-function HomeTournaments({
+export function HomeTournaments({
   language,
+  query = '',
   showMineFilter,
   onlyMine,
   filterMonth,
@@ -2120,6 +2123,7 @@ function HomeTournaments({
 }) {
   const { t } = useTranslation();
   const activeFilterCount = [
+    query.trim(),
     showMineFilter && onlyMine,
     filterMonth,
     filterFormation,

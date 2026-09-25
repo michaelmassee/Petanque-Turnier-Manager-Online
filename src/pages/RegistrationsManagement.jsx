@@ -214,7 +214,7 @@ export function RegistrationsPanel({
   error,
 }) {
   const { t } = useTranslation();
-  const filtered = filteredRegistrations.length !== registrations.length;
+  const filtered = Boolean(query.trim()) || Boolean(statusFilter);
   const pendingRegistrations = filteredRegistrations.filter((registration) => registration.status === 'pending');
   const otherRegistrations = filteredRegistrations.filter((registration) => registration.status !== 'pending');
   const visiblePendingRegistrations = useInfiniteList(pendingRegistrations);

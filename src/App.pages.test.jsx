@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import i18next from './lib/i18next-config.js';
-import { EditDialog, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
+import { EditDialog, HomeTournaments, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
 import { ClubBadge, DistanceBadge } from './components/ui.jsx';
 import { AppHeader } from './components/layout.jsx';
 import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM } from './lib/constants.js';
@@ -53,6 +53,37 @@ describe('Entfernungs-Badge', () => {
     const { container } = render(<DistanceBadge distanceKm={undefined} />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('Turnier-Finder', () => {
+  it('kennzeichnet einen Suchtext als aktiven Filter', () => {
+    render(
+      <HomeTournaments
+        language="de"
+        query="Linden"
+        showMineFilter={false}
+        onlyMine={false}
+        filterMonth=""
+        filterFormation=""
+        filterRegistrationType=""
+        filterType=""
+        filterOpenOnly={false}
+        filterOnlineRegistrationOnly={false}
+        searchOrigin={null}
+        searchRadiusKm="25"
+        tournaments={[]}
+        total={0}
+        hasMore={false}
+        onLoadMore={() => {}}
+        onRegister={() => {}}
+        onOpenTournament={() => {}}
+        onOpenFilters={() => {}}
+        onOpenRadiusSearch={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /Filter aktiv/ })).toBeInTheDocument();
   });
 });
 
@@ -404,6 +435,19 @@ describe('Benutzer-Seite: Liste + Dialog', () => {
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Löschen' })).toBeDisabled();
   });
+
+  it('lässt einen aktiven Rollenfilter zurücksetzen, auch wenn er alle Benutzer trifft', async () => {
+    vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockResolvedValue({
+      users: [{ id: 'u1', firstName: 'Anna', lastName: 'Admin', email: 'anna@example.com', role: 'admin', emailVerifiedAt: '2024-01-01', passwordChangeRequired: false }],
+    });
+
+    render(<UserManagementPanel currentUser={{ id: 'me' }} tournaments={[]} />);
+
+    await screen.findByText('Anna Admin');
+    fireEvent.change(screen.getByLabelText('Rolle filtern'), { target: { value: 'admin' } });
+
+    expect(screen.getByRole('button', { name: 'Filter zurücksetzen' })).toBeEnabled();
+  });
 });
 
 describe('Vereinsmoderation', () => {
@@ -561,6 +605,14 @@ function TournamentPageHarness({ onSubmit }) {
 }
 
 describe('Turniere-Seite: Liste + Dialog', () => {
+  it('lässt aktive Filter zurücksetzen, auch wenn sie alle Turniere treffen', () => {
+    render(<TournamentPageHarness onSubmit={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText('Status filtern'), { target: { value: 'registration' } });
+
+    expect(screen.getByRole('button', { name: 'Filter zurücksetzen' })).toBeEnabled();
+  });
+
   it('zeigt beim Bearbeiten die Formatierungs-Toolbar der Turnierbeschreibung', () => {
     render(
       <TournamentForm
@@ -710,6 +762,14 @@ function RegistrationsPageHarness({ onSubmit }) {
 }
 
 describe('Anmeldungen-Seite: Liste + Dialog', () => {
+  it('lässt aktive Filter zurücksetzen, auch wenn sie alle Anmeldungen treffen', () => {
+    render(<RegistrationsPageHarness onSubmit={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText('Status filtern'), { target: { value: 'pending' } });
+
+    expect(screen.getByRole('button', { name: 'Filter zurücksetzen' })).toBeEnabled();
+  });
+
   it('öffnet den Dialog vorausgefüllt bei Bearbeiten, Abbrechen schließt ohne Submit, Speichern schließt mit Submit', () => {
     const onSubmit = vi.fn();
     render(<RegistrationsPageHarness onSubmit={onSubmit} />);

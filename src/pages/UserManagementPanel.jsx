@@ -63,7 +63,7 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
   }), [users]);
 
   const roleOptions = [{ value: '', label: t('Alle Rollen') }, ...translatedOptions(ROLES)];
-  const isFiltered = filtered.length !== users.length;
+  const isFiltered = Boolean(query.trim()) || Boolean(roleFilter) || Boolean(statusFilter);
   const visibleUsers = useInfiniteList(filtered);
 
   function resetFilters() {
