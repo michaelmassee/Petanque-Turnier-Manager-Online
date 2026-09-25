@@ -18,6 +18,9 @@ import {
   parseSyncRoundNumber,
   buildPlayerLiveView,
   registrationBelongsToEmail,
+  buildLiveRoundPush,
+  chunk,
+  LIVE_PUSH_CHUNK_SIZE,
   isTournamentStale,
   dateDaysAgo,
   registrationOpenStatus as coreRegistrationOpenStatus,
@@ -62,6 +65,7 @@ const sessionRefreshes = new WeakMap();
 const GOOGLE_OAUTH_STATE_COOKIE = 'ptm_google_oauth_state';
 const FACEBOOK_OAUTH_STATE_COOKIE = 'ptm_facebook_oauth_state';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
+const SESSION_REFRESH_INTERVAL_SECONDS = 60 * 60;
 const GOOGLE_OAUTH_STATE_TTL_SECONDS = 60 * 10;
 const FACEBOOK_OAUTH_STATE_TTL_SECONDS = 60 * 10;
 const FACEBOOK_GRAPH_API_VERSION = 'v21.0';
@@ -985,7 +989,12 @@ export default {
   async scheduled(event, env, ctx) {
     // Stündlich: vergessene Turniere 48 Stunden nach Beginn abschließen. Erinnerungen und der
     // Pétanque-Aktuell-Abgleich laufen weiterhin nur einmal täglich (DAILY_CRON).
-    const jobs = [finishStaleTournaments(env).catch((error) => console.error('Finishing stale tournaments failed', error))];
+    // Das Aufräumen abgelaufener Sitzungen/Tokens lief früher vor jeder API-Anfrage (rund 8
+    // DELETE-Abfragen pro Aufruf). Alle Lesepfade prüfen das Ablaufdatum selbst, stündlich reicht.
+    const jobs = [
+      finishStaleTournaments(env).catch((error) => console.error('Finishing stale tournaments failed', error)),
+      cleanupExpiredSessions(env.DB).catch((error) => console.error('Cleanup cron failed', error)),
+    ];
     if (event.cron === DAILY_CRON) {
       jobs.push(
         sendTournamentReminders(env).catch((error) => console.error('Tournament reminder cron failed', error)),
@@ -1023,7 +1032,6 @@ export default {
     const response = await (async () => {
       try {
         assertSameOriginForUnsafeMethods(request, url);
-      await cleanupExpiredSessions(env.DB);
 
       if (request.method === 'GET' && url.pathname === '/api/bootstrap') {
         return json({ needsSetup: await needsSetup(env.DB), turnstileSiteKey: env.TURNSTILE_SITE_KEY || null, maptilerApiKey: env.MAPTILER_API_KEY || null });
@@ -1579,7 +1587,10 @@ export default {
         if (request.method === 'POST') {
           const session = await requireSession(request, env.DB);
           assertCanManageTournament(tournament, session.user);
-          return await generateTournamentRound(env.DB, tournament);
+          const response = await generateTournamentRound(env.DB, tournament);
+          const latest = await env.DB.prepare('SELECT MAX(round_number) AS round_number FROM tournament_rounds WHERE tournament_id = ?').bind(tournament.id).first();
+          if (latest?.round_number) await notifyLivePushForRound(env, tournament, Number(latest.round_number), url.origin);
+          return response;
         }
       }
 
@@ -1621,15 +1632,27 @@ export default {
         return await listMyLiveRegistrations(env.DB, session.user);
       }
 
-      const liveRegistrationMatch = url.pathname.match(/^\/api\/live\/registrations\/([^/]+)$/);
-      if (liveRegistrationMatch && request.method === 'GET') {
+      const liveRegistrationMatch = url.pathname.match(/^\/api\/live\/registrations\/([^/]+)(\/push)?$/);
+      if (liveRegistrationMatch) {
         const session = await requireSession(request, env.DB);
-        return await getMyLiveRegistration(env.DB, session.user, liveRegistrationMatch[1]);
+        const registration = await findMyLiveRegistration(env.DB, session.user, liveRegistrationMatch[1]);
+        if (!liveRegistrationMatch[2] && request.method === 'GET') return await buildLiveResponse(request, env.DB, registration);
+        if (liveRegistrationMatch[2] && request.method === 'POST') return await saveLivePushSubscription(request, env.DB, registration);
+        if (liveRegistrationMatch[2] && request.method === 'DELETE') return await removeLivePushSubscription(request, env.DB, registration);
       }
 
-      const liveTokenMatch = url.pathname.match(/^\/api\/live\/token\/([^/]+)$/);
-      if (liveTokenMatch && request.method === 'GET') {
-        return await getLiveRegistrationByToken(env.DB, decodeURIComponent(liveTokenMatch[1]));
+      const liveTokenMatch = url.pathname.match(/^\/api\/live\/token\/([^/]+)(\/push)?$/);
+      if (liveTokenMatch) {
+        const registration = await findLiveRegistrationByToken(env.DB, decodeURIComponent(liveTokenMatch[1]));
+        if (!liveTokenMatch[2] && request.method === 'GET') return await buildLiveResponse(request, env.DB, registration);
+        if (liveTokenMatch[2] && request.method === 'POST') return await saveLivePushSubscription(request, env.DB, registration);
+        if (liveTokenMatch[2] && request.method === 'DELETE') return await removeLivePushSubscription(request, env.DB, registration);
+      }
+
+      // Öffentlicher VAPID-Schlüssel für Live-Push ohne Login (der Schlüssel ist nicht geheim).
+      if (url.pathname === '/api/live/push/public-key' && request.method === 'GET') {
+        if (!env.VAPID_PUBLIC_KEY) throw new HttpError(503, 'Push-Benachrichtigungen sind nicht konfiguriert');
+        return json({ publicKey: env.VAPID_PUBLIC_KEY });
       }
 
       const registrationCancelMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/cancel$/);
@@ -1878,9 +1901,12 @@ export default {
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         assertCanManageTournament(tournament, auth.user);
         await requireSyncLease(request, tournament);
-        return request.method === 'PUT'
-          ? await syncPutRound(request, env.DB, tournament, syncRoundMatch[2])
-          : await syncDeleteRound(env.DB, tournament, syncRoundMatch[2]);
+        if (request.method === 'DELETE') return await syncDeleteRound(env.DB, tournament, syncRoundMatch[2]);
+        const response = await syncPutRound(request, env.DB, tournament, syncRoundMatch[2]);
+        const result = await response.clone().json();
+        // Nur eine neu angelegte Runde löst Push aus - spätere PUTs derselben Runde sind Ergebnis-Updates.
+        if (result.created && result.matchCount > 0) await notifyLivePushForRound(env, tournament, result.roundNumber, url.origin);
+        return response;
       }
 
       const syncRankingMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/ranking$/);
@@ -1915,6 +1941,12 @@ export default {
         return json({ error: 'Internal server error' }, 500);
       }
     })();
+    const writtenTournament = request.method !== 'GET' && response.ok
+      ? url.pathname.match(/^\/api\/(?:sync\/)?tournaments\/([^/]+)(?:\/|$)/)
+      : null;
+    if (writtenTournament) {
+      await invalidateLiveSnapshot(url.origin, decodeURIComponent(writtenTournament[1]));
+    }
     return withRefreshedSessionCookie(request, response, url);
   },
 };
@@ -4884,26 +4916,86 @@ function toLiveTournament(tournament) {
   };
 }
 
-async function buildLiveResponse(db, registration) {
-  const tournament = await getTournamentById(db, registration.tournament_id);
-  if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
-  const [{ rounds }, ranking, playersById] = await Promise.all([
+// Alle Spieler eines Turniers sehen dieselben Runden/Ranglisten-Daten, nur anders gefiltert.
+// Diese Turnier-Sicht wird daher einmal berechnet und kurz im Cloudflare-Cache (pro Rechenzentrum)
+// gehalten; Schreibzugriffe auf das Turnier löschen den Eintrag sofort (invalidateLiveSnapshot).
+const LIVE_SNAPSHOT_TTL_SECONDS = 15;
+
+function liveSnapshotCacheKey(origin, tournamentId) {
+  return new Request(`${origin}/__live-snapshot/${encodeURIComponent(tournamentId)}`);
+}
+
+function liveCache() {
+  return typeof caches !== 'undefined' && caches.default ? caches.default : null;
+}
+
+async function invalidateLiveSnapshot(origin, tournamentId) {
+  try {
+    await liveCache()?.delete(liveSnapshotCacheKey(origin, tournamentId));
+  } catch (error) {
+    console.error(`Failed to invalidate live snapshot for tournament ${tournamentId}`, error);
+  }
+}
+
+async function computeLiveSnapshot(db, tournament) {
+  const [{ rounds }, ranking] = await Promise.all([
     loadTournamentRounds(db, tournament.id),
     computeTournamentRanking(db, tournament),
-    getPlayersById(db, tournament.id),
   ]);
-  const player = playersById.get(registration.id);
+  const content = { tournament: toLiveTournament(tournament), rounds, ranking: toLiveRanking(ranking) };
+  const version = (await sha256Hex(JSON.stringify(content))).slice(0, 16);
+  return { ...content, version };
+}
+
+async function getLiveSnapshot(db, tournament, origin) {
+  const cache = liveCache();
+  const key = liveSnapshotCacheKey(origin, tournament.id);
+  if (cache) {
+    const cached = await cache.match(key);
+    if (cached) return cached.json();
+  }
+  const snapshot = await computeLiveSnapshot(db, tournament);
+  if (cache) {
+    await cache.put(key, new Response(JSON.stringify(snapshot), {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${LIVE_SNAPSHOT_TTL_SECONDS}` },
+    }));
+  }
+  return snapshot;
+}
+
+function liveRegistrationLabel(registration) {
+  return registration.team_name || [
+    [registration.first_name, registration.last_name],
+    [registration.partner_first_name, registration.partner_last_name],
+    [registration.partner2_first_name, registration.partner2_last_name],
+  ].map((parts) => parts.filter(Boolean).join(' ')).filter(Boolean).join(' + ');
+}
+
+/**
+ * Persönliche Live-Antwort. Das ETag setzt sich aus der Snapshot-Version und dem eigenen
+ * Teilnahme-Status zusammen: Hat sich nichts geändert, antwortet der Server mit 304 ohne Inhalt.
+ * Der Browser revalidiert dank "no-cache" jeden Abruf selbst (If-None-Match) und reicht bei 304
+ * die zwischengespeicherte Antwort an die App durch.
+ */
+async function buildLiveResponse(request, db, registration) {
+  const tournament = await getTournamentById(db, registration.tournament_id);
+  if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+  const snapshot = await getLiveSnapshot(db, tournament, new URL(request.url).origin);
+  const etag = `"${snapshot.version}-${registration.participation}-${registration.status}"`;
+  const cacheHeaders = { 'Cache-Control': 'private, no-cache', ETag: etag };
+  if (request.headers.get('If-None-Match') === etag) {
+    return new Response(null, { status: 304, headers: { ...SECURITY_HEADERS, ...cacheHeaders } });
+  }
   return json({
-    tournament: toLiveTournament(tournament),
+    tournament: snapshot.tournament,
     registration: {
       id: registration.id,
-      label: player?.teamLabel || [registration.first_name, registration.last_name].filter(Boolean).join(' '),
+      label: liveRegistrationLabel(registration),
       participation: registration.participation,
       status: registration.status,
     },
-    live: buildPlayerLiveView({ registrationId: registration.id, rounds, ranking: toLiveRanking(ranking) }),
-    updatedAt: new Date().toISOString(),
-  });
+    live: buildPlayerLiveView({ registrationId: registration.id, rounds: snapshot.rounds, ranking: snapshot.ranking }),
+  }, 200, cacheHeaders);
 }
 
 // Meldungen des eingeloggten Users (Haupt- oder Partner-E-Mail) in laufenden bzw. kürzlich
@@ -4931,16 +5023,16 @@ async function listMyLiveRegistrations(db, user) {
   });
 }
 
-async function getMyLiveRegistration(db, user, registrationId) {
+async function findMyLiveRegistration(db, user, registrationId) {
   const registration = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(registrationId).first();
   // Fremde Meldungen verhalten sich wie nicht vorhanden, damit IDs nicht ausprobiert werden können.
   if (!registration || registration.status !== 'confirmed' || !registrationBelongsToEmail(registration, user.email)) {
     throw new HttpError(404, 'Anmeldung nicht gefunden');
   }
-  return buildLiveResponse(db, registration);
+  return registration;
 }
 
-async function getLiveRegistrationByToken(db, token) {
+async function findLiveRegistrationByToken(db, token) {
   const trimmed = String(token || '').trim();
   const registration = trimmed.length >= 32
     ? await db.prepare('SELECT * FROM registrations WHERE live_token = ?').bind(trimmed).first()
@@ -4948,7 +5040,87 @@ async function getLiveRegistrationByToken(db, token) {
   if (!registration || registration.status !== 'confirmed') {
     throw new HttpError(404, 'Dieser Live-Link ist ungültig oder abgelaufen');
   }
-  return buildLiveResponse(db, registration);
+  return registration;
+}
+
+// Push-Abo aus der Live-Ansicht, an die Meldung gebunden (auch ohne Login über den Live-Link).
+async function saveLivePushSubscription(request, db, registration) {
+  const subscription = await readJson(request);
+  const endpoint = String(subscription.endpoint || '');
+  const p256dh = String(subscription.keys?.p256dh || '');
+  const auth = String(subscription.keys?.auth || '');
+  if (!isAllowedPushEndpoint(endpoint) || !p256dh || !auth) throw new HttpError(400, 'Ungültiges Push-Abonnement');
+  // Der Klick auf die Benachrichtigung öffnet den persönlichen Live-Link - auch bei eingeloggten Usern.
+  await ensureLiveToken(db, registration);
+  const now = new Date().toISOString();
+  await db.prepare(`INSERT INTO live_push_subscriptions (endpoint, registration_id, p256dh, auth, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(endpoint, registration_id) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth, updated_at = excluded.updated_at`)
+    .bind(endpoint, registration.id, p256dh, auth, now, now).run();
+  return json({ ok: true }, 201);
+}
+
+async function removeLivePushSubscription(request, db, registration) {
+  const body = await readJson(request);
+  await db.prepare('DELETE FROM live_push_subscriptions WHERE endpoint = ? AND registration_id = ?').bind(String(body.endpoint || ''), registration.id).run();
+  return json({ ok: true });
+}
+
+/**
+ * Benachrichtigt alle Spieler mit Live-Push-Abo, die in der neuen Runde eingeteilt sind
+ * ("Runde 3: Bahn 7 · gegen …"). Versand über die Queue in kleinen Paketen, ohne die
+ * Mail-Drosselung, damit auch der letzte Spieler einer großen Runde zeitnah informiert wird.
+ * Fehler dürfen die Rundenerstellung nie scheitern lassen.
+ */
+async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
+  try {
+    const subscriptions = await env.DB.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.live_token, r.language
+        FROM live_push_subscriptions s JOIN registrations r ON r.id = s.registration_id
+        WHERE r.tournament_id = ? AND r.status = 'confirmed'`).bind(tournament.id).all();
+    if (!subscriptions.results?.length) return;
+    const { rounds } = await loadTournamentRounds(env.DB, tournament.id);
+    const round = rounds.find((entry) => entry.roundNumber === roundNumber);
+    if (!round) return;
+    const items = [];
+    for (const subscription of subscriptions.results) {
+      const match = buildPlayerLiveView({ registrationId: subscription.registration_id, rounds: [round] }).currentMatch;
+      if (!match || !subscription.live_token) continue;
+      items.push({
+        endpoint: subscription.endpoint,
+        p256dh: subscription.p256dh,
+        auth: subscription.auth,
+        payload: buildLiveRoundPush({ tournamentName: tournament.name, match, language: subscription.language, url: buildLiveLink(appOrigin, subscription.live_token) }),
+      });
+    }
+    const messages = chunk(items, LIVE_PUSH_CHUNK_SIZE).map((part) => ({ body: { kind: 'live_push', items: part } }));
+    // sendBatch nimmt höchstens 100 Nachrichten pro Aufruf.
+    for (const batch of chunk(messages, 100)) {
+      await env.MAIL_QUEUE.sendBatch(batch);
+    }
+  } catch (error) {
+    console.error(`Failed to queue live push for tournament ${tournament.id} round ${roundNumber}`, error);
+  }
+}
+
+async function sendLivePushItems(env, items) {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) return;
+  const vapid = { subject: env.VAPID_SUBJECT, publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY };
+  await Promise.all((items || []).map(async (item) => {
+    try {
+      const pushPayload = await buildPushPayload(
+        { data: item.payload },
+        { endpoint: item.endpoint, expirationTime: null, keys: { p256dh: item.p256dh, auth: item.auth } },
+        vapid,
+      );
+      const response = await fetch(item.endpoint, pushPayload);
+      if (response.status === 404 || response.status === 410) {
+        await env.DB.prepare('DELETE FROM live_push_subscriptions WHERE endpoint = ?').bind(item.endpoint).run();
+      } else if (!response.ok) {
+        console.error('Live push failed', response.status, await response.text());
+      }
+    } catch (error) {
+      console.error('Live push failed', error);
+    }
+  }));
 }
 
 async function tournamentRegistrationIds(db, tournamentId) {
@@ -5008,7 +5180,7 @@ async function syncPutRound(request, db, tournament, roundNumberValue) {
     }
     throw error;
   }
-  return json({ roundNumber, matchCount: matches.length });
+  return json({ roundNumber, matchCount: matches.length, created: !existing });
 }
 
 async function syncDeleteRound(db, tournament, roundNumberValue) {
@@ -5828,7 +6000,9 @@ const MAIL_QUEUE_SEND_DELAY_MS = 2000;
 async function processMailQueueBatch(batch, env) {
   for (const message of batch.messages) {
     try {
-      if (message.body?.kind === 'push') {
+      if (message.body?.kind === 'live_push') {
+        await sendLivePushItems(env, message.body.items);
+      } else if (message.body?.kind === 'push') {
         await sendPushNotifications(env, message.body.userId, message.body.payload);
       } else {
         await sendTransactionalEmail(env, message.body);
@@ -5838,7 +6012,8 @@ async function processMailQueueBatch(batch, env) {
       console.error(`Queued ${message.body?.kind === 'push' ? 'push' : 'email'} delivery failed for ${message.body?.kind === 'push' ? message.body?.userId : (message.body?.failureContext || message.body?.to)}`, error);
       message.retry({ delaySeconds: 10 });
     }
-    await sleep(MAIL_QUEUE_SEND_DELAY_MS);
+    // Die Drosselung gilt den Mail-Anbietern; Live-Pushes einer Runde sollen ohne Wartezeit raus.
+    if (message.body?.kind !== 'live_push') await sleep(MAIL_QUEUE_SEND_DELAY_MS);
   }
 }
 
@@ -6889,11 +7064,14 @@ async function requireSession(request, db) {
     throw new HttpError(401, 'Anmeldung erforderlich');
   }
 
-  // Every successful use extends the server-side session. The response wrapper
+  // Every use extends the server-side session, at most once per SESSION_REFRESH_INTERVAL_SECONDS
+  // (sonst schreibt z. B. jeder Live-Abruf im 30-Sekunden-Takt in die DB). The response wrapper
   // below refreshes the HttpOnly cookie with the same expiry.
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
-  await db.prepare('UPDATE sessions SET expires_at = ? WHERE id = ?').bind(expiresAt.toISOString(), sessionId).run();
-  sessionRefreshes.set(request, { id: sessionId, expiresAt });
+  if (expiresAt.getTime() - new Date(row.expires_at).getTime() >= SESSION_REFRESH_INTERVAL_SECONDS * 1000) {
+    await db.prepare('UPDATE sessions SET expires_at = ? WHERE id = ?').bind(expiresAt.toISOString(), sessionId).run();
+    sessionRefreshes.set(request, { id: sessionId, expiresAt });
+  }
 
   return { user: toPublicUser(row) };
 }

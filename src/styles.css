@@ -2948,6 +2948,11 @@ a.left-panel-link {
   margin-left: 0;
 }
 
+.live-push {
+  display: grid;
+  gap: 8px;
+}
+
 .live-back {
   justify-self: start;
 }

@@ -12,7 +12,6 @@ function livePayload(overrides = {}) {
   return {
     tournament: { id: 't1', name: 'Sommer-Supermêlée', date: '2026-09-25', location: 'Linden', status: 'running' },
     registration: { id: 'r1', label: 'Anna Muster' },
-    updatedAt: '2026-09-25T12:00:00.000Z',
     live: {
       lastRoundNumber: 2,
       currentMatch: { roundNumber: 2, matchId: 'm2', court: null, teamLabel: 'Anna Muster', opponentLabel: 'Bert Beispiel', bye: false, ownScore: null, opponentScore: null, noShow: null, outcome: 'open' },

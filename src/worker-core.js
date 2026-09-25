@@ -483,3 +483,35 @@ export function isTournamentStale(startUtcIso, now = new Date()) {
 export function dateDaysAgo(days, now = new Date()) {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
+
+// Push bei neuer Runde (Bereich "Live"). Kurz halten: Titel = Turnier + Runde, Text = Bahn und Gegner.
+export const LIVE_ROUND_PUSH_TEXTS = {
+  de: { round: 'Runde', court: 'Bahn', versus: 'gegen', bye: 'Freilos' },
+  nl: { round: 'Ronde', court: 'Baan', versus: 'tegen', bye: 'Vrijloting' },
+  en: { round: 'Round', court: 'Lane', versus: 'vs.', bye: 'Bye' },
+  es: { round: 'Ronda', court: 'Pista', versus: 'contra', bye: 'Exento' },
+  fr: { round: 'Tour', court: 'Terrain', versus: 'contre', bye: 'Exempt' },
+};
+
+// Paketgröße pro Queue-Nachricht: Der Consumer verarbeitet bis zu 3 Nachrichten pro Aufruf und
+// muss im kostenlosen Workers-Tarif unter 50 externen Anfragen und ~10 ms CPU bleiben.
+export const LIVE_PUSH_CHUNK_SIZE = 5;
+
+export function buildLiveRoundPush({ tournamentName, match, language, url }) {
+  const texts = LIVE_ROUND_PUSH_TEXTS[language] || LIVE_ROUND_PUSH_TEXTS.de;
+  const parts = [];
+  if (match.court) parts.push(`${texts.court} ${match.court}`);
+  parts.push(match.bye ? texts.bye : `${texts.versus} ${match.opponentLabel}`);
+  return {
+    title: `${tournamentName}: ${texts.round} ${match.roundNumber}`,
+    body: parts.join(' · '),
+    url,
+    tag: `live-round-${match.roundNumber}`,
+  };
+}
+
+export function chunk(items, size) {
+  const chunks = [];
+  for (let index = 0; index < items.length; index += size) chunks.push(items.slice(index, index + size));
+  return chunks;
+}

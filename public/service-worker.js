@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ptm-online-v7';
+const CACHE_NAME = 'ptm-online-v8';
 const API_CACHE_NAME = 'ptm-online-api-v1';
 const APP_SHELL = [
   '/',
@@ -82,15 +82,19 @@ self.addEventListener('push', (event) => {
     body: payload.body || (payload.actor ? `Von ${payload.actor}` : 'In deiner Postbox wartet ein neuer Eintrag.'),
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    tag: `postbox-${payload.messageId || 'new'}`,
-    data: { url: '/' },
+    // Live-Push (neue Runde) bringt eigenes Tag und Ziel mit; Postfach-Push öffnet die Startseite.
+    tag: payload.tag || `postbox-${payload.messageId || 'new'}`,
+    data: { url: typeof payload.url === 'string' && payload.url.startsWith(self.location.origin) ? payload.url : '/' },
   }));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const url = event.notification.data?.url || '/';
   event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
     const existing = windows[0];
-    return existing ? existing.focus() : clients.openWindow(event.notification.data?.url || '/');
+    if (!existing) return clients.openWindow(url);
+    if (url === '/') return existing.focus();
+    return existing.navigate(url).then((navigated) => (navigated || existing).focus());
   }));
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPlayerLiveView, parseSyncRanking, parseSyncRoundMatches, parseSyncRoundNumber, registrationBelongsToEmail, isTournamentStale, dateDaysAgo } from './worker-core.js';
+import { buildPlayerLiveView, parseSyncRanking, parseSyncRoundMatches, parseSyncRoundNumber, registrationBelongsToEmail, isTournamentStale, dateDaysAgo, buildLiveRoundPush, chunk } from './worker-core.js';
 
 const player = (id, firstName, lastName = 'X', teamLabel) => ({ id, firstName, lastName, teamLabel: teamLabel || `${firstName} ${lastName}` });
 const anna = player('r1', 'Anna');
@@ -133,5 +133,25 @@ describe('Automatischer Turnierabschluss', () => {
   it('liefert das Vorauswahl-Datum in UTC', () => {
     expect(dateDaysAgo(1, new Date('2026-09-25T01:00:00Z'))).toBe('2026-09-24');
     expect(dateDaysAgo(4, new Date('2026-03-01T00:30:00Z'))).toBe('2026-02-25');
+  });
+});
+
+describe('Push bei neuer Runde', () => {
+  it('nennt Bahn und Gegner in der Sprache des Spielers', () => {
+    const match = { roundNumber: 3, court: '7', bye: false, opponentLabel: 'Dieter Test' };
+    expect(buildLiveRoundPush({ tournamentName: 'Sommerturnier', match, language: 'de', url: '/live/t/x' })).toEqual({
+      title: 'Sommerturnier: Runde 3', body: 'Bahn 7 · gegen Dieter Test', url: '/live/t/x', tag: 'live-round-3',
+    });
+    expect(buildLiveRoundPush({ tournamentName: 'T', match, language: 'fr', url: '/' }).body).toBe('Terrain 7 · contre Dieter Test');
+  });
+
+  it('lässt die Bahn weg, wenn keine vorhanden ist, und meldet Freilose', () => {
+    expect(buildLiveRoundPush({ tournamentName: 'T', match: { roundNumber: 1, court: null, bye: false, opponentLabel: 'Bert' }, language: 'xx', url: '/' }).body).toBe('gegen Bert');
+    expect(buildLiveRoundPush({ tournamentName: 'T', match: { roundNumber: 1, court: null, bye: true }, language: 'en', url: '/' }).body).toBe('Bye');
+  });
+
+  it('teilt Empfänger in kleine Pakete', () => {
+    expect(chunk([1, 2, 3, 4, 5, 6, 7], 3)).toEqual([[1, 2, 3], [4, 5, 6], [7]]);
+    expect(chunk([], 5)).toEqual([]);
   });
 });

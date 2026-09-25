@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
+import { currentBrowserPushSubscription, ensureBrowserPushSubscription } from '../lib/push.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus } from '../lib/hooks.js';
 import { MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTIONS, TOURNAMENT_STATUSES, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor, roleName, translatedOptions } from '../lib/domain.js';
@@ -10,34 +11,14 @@ import { RecipientPicker } from './RecipientPicker.jsx';
 import { LanguageSelect } from '../auth/AuthForms.jsx';
 
 async function subscribeToPush() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return 'unsupported';
-  if (Notification.permission === 'denied') return 'blocked';
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return 'denied';
-  const { publicKey } = await authenticatedApi('/api/push/public-key');
-  const registration = await navigator.serviceWorker.ready;
-  const applicationServerKey = base64urlToUint8Array(publicKey);
-  const existing = await registration.pushManager.getSubscription();
-  const existingKey = existing?.options?.applicationServerKey;
-  const keyChanged = existingKey && !sameBytes(new Uint8Array(existingKey), applicationServerKey);
-  if (existing && keyChanged) await existing.unsubscribe();
-  const subscription = existing && !keyChanged
-    ? existing
-    : await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
-  await authenticatedApi('/api/push/subscriptions', { method: 'POST', body: JSON.stringify(subscription.toJSON()) });
+  const result = await ensureBrowserPushSubscription(async () => (await authenticatedApi('/api/push/public-key')).publicKey);
+  if (result.status !== 'enabled') return result.status;
+  await authenticatedApi('/api/push/subscriptions', { method: 'POST', body: JSON.stringify(result.subscription.toJSON()) });
   return 'enabled';
 }
 
-function sameBytes(left, right) {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
-}
-
 async function hasActivePushSubscription() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return false;
-  if (Notification.permission !== 'granted') return false;
-  const registration = await navigator.serviceWorker.getRegistration();
-  if (!registration) return false;
-  return Boolean(await registration.pushManager.getSubscription());
+  return Boolean(await currentBrowserPushSubscription());
 }
 
 export function PushMigrationNotice({ onDismiss, onEnabled }) {
@@ -152,12 +133,6 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
       )}
     </div>
   );
-}
-
-function base64urlToUint8Array(value) {
-  const padded = value + '='.repeat((4 - (value.length % 4)) % 4);
-  const binary = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
 function postboxMessageText(message, t) {

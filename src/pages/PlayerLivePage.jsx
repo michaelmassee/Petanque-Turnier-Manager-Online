@@ -1,15 +1,108 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { formatDate, DISPLAY_LOCALES } from '../lib/format.js';
 import { Button, Feedback } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
+import { isIosSafari } from '../lib/hooks.js';
+import { currentBrowserPushSubscription, ensureBrowserPushSubscription, isPushSupported } from '../lib/push.js';
 
-const LIVE_REFRESH_MS = 30_000;
+// 60 Sekunden reichen: Beim Zurückkehren zur App wird sofort neu geladen (staleTime 0), und eine
+// neue Runde kündigt zusätzlich der Push an.
+const LIVE_REFRESH_MS = 60_000;
 
-function formatClock(iso, language) {
-  if (!iso) return '';
-  return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+function pushFlagKey(registrationId) {
+  return `ptm_live_push_${registrationId}`;
+}
+
+function readPushFlag(registrationId) {
+  try {
+    return localStorage.getItem(pushFlagKey(registrationId)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writePushFlag(registrationId, enabled) {
+  try {
+    if (enabled) localStorage.setItem(pushFlagKey(registrationId), '1');
+    else localStorage.removeItem(pushFlagKey(registrationId));
+  } catch {
+    // Merker ist nur Komfort; ohne Speicher zeigt der Button wieder "aktivieren".
+  }
+}
+
+function LivePushToggle({ path, useSession, registrationId }) {
+  const { t } = useTranslation();
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const supported = isPushSupported();
+  const request = useSession ? authenticatedApi : api;
+
+  useEffect(() => {
+    let cancelled = false;
+    currentBrowserPushSubscription()
+      .then((subscription) => { if (!cancelled) setEnabled(Boolean(subscription) && readPushFlag(registrationId)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [registrationId]);
+
+  if (!supported) {
+    return isIosSafari()
+      ? <p className="hint">{t('Benachrichtigungen bei neuer Runde: Füge die App auf dem iPhone zuerst zum Home-Bildschirm hinzu und öffne den Link dort.')}</p>
+      : null;
+  }
+
+  async function enable() {
+    setError(''); setMessage(''); setBusy(true);
+    try {
+      const result = await ensureBrowserPushSubscription(async () => (await api('/api/live/push/public-key')).publicKey);
+      if (result.status === 'blocked') throw new Error(t('Benachrichtigungen sind im Browser blockiert. Bitte in den Browser-Einstellungen erlauben.'));
+      if (result.status !== 'enabled') throw new Error(t('Benachrichtigungen wurden nicht erlaubt.'));
+      await request(`${path}/push`, { method: 'POST', body: JSON.stringify(result.subscription.toJSON()) });
+      writePushFlag(registrationId, true);
+      setEnabled(true);
+      setMessage(t('Du wirst bei jeder neuen Runde benachrichtigt.'));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disable() {
+    setError(''); setMessage(''); setBusy(true);
+    try {
+      const subscription = await currentBrowserPushSubscription();
+      if (subscription) await request(`${path}/push`, { method: 'DELETE', body: JSON.stringify({ endpoint: subscription.endpoint }) });
+      writePushFlag(registrationId, false);
+      setEnabled(false);
+      setMessage(t('Benachrichtigungen bei neuer Runde sind ausgeschaltet.'));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="live-push">
+      {enabled
+        ? <Button variant="secondary" loading={busy} onClick={disable}>{t('Benachrichtigungen ausschalten')}</Button>
+        : <Button loading={busy} onClick={enable}>{t('Bei neuer Runde benachrichtigen')}</Button>}
+      <Feedback error={error} />
+      <Feedback message={message} />
+    </div>
+  );
+}
+
+// Zeitpunkt des letzten erfolgreichen Abrufs - auch bei 304 (unverändert) aktuell.
+function formatClock(timestamp, language) {
+  if (!timestamp) return '';
+  return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, { hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
 }
 
 function scoreLabel(entry, t) {
@@ -128,6 +221,8 @@ export function LiveDetail({ queryKey, path, useSession, language }) {
     queryFn: () => (useSession ? authenticatedApi(path) : api(path)),
     refetchInterval: LIVE_REFRESH_MS,
     refetchIntervalInBackground: false,
+    // Beim Zurückkehren zur App immer sofort neu laden - unverändert kostet das nur ein 304.
+    staleTime: 0,
     retry: false,
   });
   const data = query.data;
@@ -154,8 +249,9 @@ export function LiveDetail({ queryKey, path, useSession, language }) {
       <CurrentMatchCard live={live} participation={registration.participation} />
       <RankingCard live={live} />
       <HistoryCard live={live} />
+      {tournament.status === 'running' && <LivePushToggle path={path} useSession={useSession} registrationId={registration.id} />}
       <div className="live-refresh">
-        <span className="muted">{t('Stand')}: {formatClock(data.updatedAt, language)}</span>
+        <span className="muted">{t('Stand')}: {formatClock(query.dataUpdatedAt, language)}</span>
         <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>
       </div>
     </div>
