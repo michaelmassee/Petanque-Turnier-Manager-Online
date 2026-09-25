@@ -67,6 +67,18 @@ describe('Live-Ansicht für Spieler', () => {
     expect(screen.getByText('Bahn')).toBeInTheDocument();
   });
 
+  it('zeigt einen pausierten Spieler als pausiert statt als nicht eingeteilt', async () => {
+    const payload = livePayload({ currentMatch: null });
+    payload.registration.participation = 'withdrawn';
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    renderDetail();
+
+    expect(await screen.findByText('Pausiert')).toBeInTheDocument();
+    expect(screen.getByText('Du pausierst gerade. Für neue Runden wirst du nicht ausgelost.')).toBeInTheDocument();
+    expect(screen.getByText('Du wirst erst wieder eingeteilt, wenn die Turnierleitung dich aktiv setzt.')).toBeInTheDocument();
+    expect(screen.queryByText('Du bist in der aktuellen Runde nicht eingeteilt.')).not.toBeInTheDocument();
+  });
+
   it('meldet einen ungültigen Link sichtbar', async () => {
     global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ error: 'Dieser Live-Link ist ungültig oder abgelaufen' }, 404)));
     renderDetail();

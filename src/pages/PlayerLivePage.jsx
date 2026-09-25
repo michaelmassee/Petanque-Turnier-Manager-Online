@@ -18,7 +18,7 @@ function scoreLabel(entry, t) {
   return `${entry.ownScore}:${entry.opponentScore}`;
 }
 
-function CurrentMatchCard({ live }) {
+function CurrentMatchCard({ live, participation }) {
   const { t } = useTranslation();
   const match = live.currentMatch;
   return (
@@ -28,7 +28,8 @@ function CurrentMatchCard({ live }) {
         {live.lastRoundNumber !== null && <span className="live-round">{t('Runde')} {match?.roundNumber ?? live.lastRoundNumber}</span>}
       </div>
       {live.lastRoundNumber === null && <p className="muted">{t('Noch keine Runde gestartet.')}</p>}
-      {live.lastRoundNumber !== null && !match && <p className="muted">{t('Du bist in der aktuellen Runde nicht eingeteilt.')}</p>}
+      {live.lastRoundNumber !== null && !match && participation !== 'withdrawn' && <p className="muted">{t('Du bist in der aktuellen Runde nicht eingeteilt.')}</p>}
+      {!match && participation === 'withdrawn' && <p className="muted">{t('Du wirst erst wieder eingeteilt, wenn die Turnierleitung dich aktiv setzt.')}</p>}
       {match && (
         <>
           {match.stageLabel && <p className="live-stage" data-i18n-skip>{match.stageLabel}</p>}
@@ -143,12 +144,14 @@ export function LiveDetail({ queryKey, path, useSession, language }) {
           {formatDate(tournament.date, language)}
           {tournament.location ? <> · <span data-i18n-skip>{tournament.location}</span></> : null}
         </p>
-        <p className="live-player" data-i18n-skip>{registration.label}</p>
+        <p className="live-player"><span data-i18n-skip>{registration.label}</span>{registration.participation === 'withdrawn' && <span className="live-paused">{t('Pausiert')}</span>}</p>
       </header>
       {tournament.status === 'finished' && <p className="hint">{t('Das Turnier ist beendet.')}</p>}
       {tournament.status !== 'running' && tournament.status !== 'finished' && <p className="hint">{t('Das Turnier hat noch nicht begonnen.')}</p>}
       {query.error && <Feedback error={query.error.message} />}
-      <CurrentMatchCard live={live} />
+      {registration.participation === 'withdrawn' && <p className="hint">{t('Du pausierst gerade. Für neue Runden wirst du nicht ausgelost.')}</p>}
+      {registration.participation === 'inactive' && tournament.status === 'running' && <p className="hint">{t('Du bist noch nicht eingecheckt.')}</p>}
+      <CurrentMatchCard live={live} participation={registration.participation} />
       <RankingCard live={live} />
       <HistoryCard live={live} />
       <div className="live-refresh">
@@ -180,6 +183,7 @@ function MyLiveList({ navigate, language }) {
             {entry.tournament.location ? <> · <span data-i18n-skip>{entry.tournament.location}</span></> : null}
           </span>
           <span data-i18n-skip>{entry.label}</span>
+          {entry.participation === 'withdrawn' && <span className="live-paused">{t('Pausiert')}</span>}
           {entry.tournament.status === 'finished' && <span className="muted">{t('Beendet')}</span>}
         </button>
       ))}
