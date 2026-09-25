@@ -124,8 +124,6 @@ function AppContent() {
   const [savedSearches, setSavedSearches] = useState([]);
   const [savedSearchesOpen, setSavedSearchesOpen] = useState(false);
   const [savedSearchDialogOpen, setSavedSearchDialogOpen] = useState(false);
-  // Page and dialogs share error/message: while a dialog shows it, the page-level Feedback stays hidden
-  // so the message isn't duplicated behind the backdrop (and both don't try to scroll into view).
   const [savedSearchMode, setSavedSearchMode] = useState('create');
   const [savedSearchForm, setSavedSearchForm] = useState({ id: '', name: '', notifyEnabled: false });
   const [savedSearchSaving, setSavedSearchSaving] = useState(false);
@@ -1521,6 +1519,7 @@ function AppContent() {
           </a>
         </AppHeader>
 
+        {/* While a dialog is open it shows the shared message itself – don't duplicate it behind the backdrop. */}
         {authView === 'home' && <Feedback message={message} error={error} />}
 
         <HomeTournaments
@@ -1808,6 +1807,7 @@ function AppContent() {
         {drawerContent(activeTabArea)}
       </AppHeader>
 
+      {/* While a dialog is open it shows the shared message itself – don't duplicate it behind the backdrop. */}
       {!savedSearchDialogOpen && authView !== 'publicRegistration' && <Feedback message={message} error={error} />}
 
       <EditDialog
