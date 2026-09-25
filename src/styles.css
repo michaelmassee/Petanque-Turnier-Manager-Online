@@ -2738,3 +2738,212 @@ a.left-panel-link {
 }
 
 .service-worker-update .button { min-height: 44px; }
+
+/* Bereich "Live": persönliche Turnier-Ansicht für Spieler, mobile-first */
+.live-page {
+  max-width: 720px;
+}
+
+.live-view,
+.live-list {
+  display: grid;
+  gap: 16px;
+}
+
+.live-card {
+  display: grid;
+  gap: 10px;
+  box-shadow: none;
+}
+
+.live-card h2,
+.live-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.live-header {
+  display: grid;
+  gap: 4px;
+}
+
+.live-header p {
+  margin: 0;
+}
+
+.live-player {
+  font-weight: 600;
+}
+
+.live-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.live-round,
+.live-place {
+  color: #53627a;
+  white-space: nowrap;
+}
+
+.live-place strong {
+  color: #1677ff;
+  font-size: 1.6rem;
+}
+
+.live-current {
+  border-color: #1677ff;
+}
+
+.live-court {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.live-court strong {
+  font-size: 1.6rem;
+  color: #1677ff;
+}
+
+.live-stage {
+  margin: 0;
+  color: #53627a;
+}
+
+.live-versus {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  text-align: center;
+}
+
+.live-team {
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.live-team.own {
+  font-weight: 700;
+}
+
+.live-vs {
+  color: #53627a;
+  font-size: 0.9rem;
+}
+
+.live-score {
+  margin: 0;
+  text-align: center;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.live-score.live-open {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #53627a;
+}
+
+.live-won .live-history-score,
+.live-score.live-won {
+  color: #1c7c3c;
+}
+
+.live-lost .live-history-score,
+.live-score.live-lost {
+  color: #b42318;
+}
+
+.live-history {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-history li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-top: 1px solid #e5e9f0;
+}
+
+.live-history-round {
+  color: #53627a;
+  white-space: nowrap;
+}
+
+.live-history-opponent {
+  overflow-wrap: anywhere;
+}
+
+.live-history-score {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.live-ranking summary {
+  cursor: pointer;
+  color: #1677ff;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.live-ranking .table-scroll {
+  max-height: 60vh;
+  overflow: auto;
+}
+
+/* Einzeilige Kopfzeile: die allgemeine Regel versetzt die letzte Kopfzeile um 32px (zweizeilige Tabellen). */
+.live-ranking .ranking-table thead tr:last-child th {
+  top: 0;
+}
+
+.ranking-table tbody tr.live-own-row {
+  background: #ecf4ff;
+  font-weight: 700;
+}
+
+.live-refresh {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.live-list-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 16px;
+  text-align: left;
+  color: inherit;
+  box-shadow: none;
+}
+
+.live-list-item:hover,
+.live-list-item:focus-visible {
+  border-color: #1677ff;
+}
+
+.live-back {
+  justify-self: start;
+}
+
+@media (max-width: 560px) {
+  .live-history li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .live-history-round {
+    grid-column: 1 / -1;
+    font-size: 0.85rem;
+  }
+}

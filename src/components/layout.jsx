@@ -424,6 +424,19 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
           </svg>
           {t('Boule-Treff')}
         </button>
+        <button
+          className="left-panel-link"
+          type="button"
+          onClick={() => {
+            closeLeftPanel();
+            navigate?.('/live');
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M3 12h4l2.5-6 5 12 2.5-6h4" />
+          </svg>
+          {t('Live')}
+        </button>
         <a
           className="left-panel-link"
           href="https://github.com/michaelmassee/Petanque-Turnier-Manager-Online/wiki"

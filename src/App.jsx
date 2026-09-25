@@ -6,7 +6,7 @@ import { CancelledError, QueryClientProvider, useQuery, useQueryClient } from '@
 import { api, authenticatedApi, setSessionExpiredHandler } from './lib/api.js';
 import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
-import { usePath, matchTournamentRoute } from './lib/routing.js';
+import { usePath, matchTournamentRoute, matchLiveRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
 import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm } from './lib/domain.js';
@@ -36,6 +36,7 @@ const PlaceReportPage = lazy(() => import('./pages/PlaceReportPage.jsx'));
 const PlaceEditByTokenPage = lazy(() => import('./pages/PlaceEditByTokenPage.jsx'));
 const ClubModerationPanel = lazy(() => import('./pages/ClubModerationPanel.jsx'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'));
+const PlayerLivePage = lazy(() => import('./pages/PlayerLivePage.jsx'));
 
 export { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 export { EditDialog, ListToolbar } from './components/ui.jsx';
@@ -1370,6 +1371,11 @@ function AppContent() {
 
   if (!needsSetup && currentUser && path === '/vereine') {
     return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyClubsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} isAdmin={isAdmin} onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')} onLogout={handleLogout} drawerContent={drawerContent('bouleplaetze')} postboxControl={renderPostboxControl()} /></Suspense>;
+  }
+
+  const liveRoute = matchLiveRoute(path);
+  if (!needsSetup && liveRoute) {
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerLivePage route={liveRoute} language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} isAdmin={isAdmin} onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')} onLogout={handleLogout} onLogin={loginFromDrawer} drawerContent={drawerContent('live')} postboxControl={renderPostboxControl()} /></Suspense>;
   }
 
   if (!needsSetup && path === '/spielerboerse') {

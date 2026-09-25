@@ -301,3 +301,170 @@ export async function readBodyWithLimit(message, maxBytes, errorMessage = 'Anfra
   }
   return bytes;
 }
+
+// ---------------------------------------------------------------------------
+// Persönliche Live-Ansicht (Bereich "Live") und Desktop-Sync von Runden/Rangliste
+// ---------------------------------------------------------------------------
+
+const MAX_SYNC_MATCHES_PER_ROUND = 500;
+const MAX_SYNC_RANKING_ENTRIES = 1000;
+const MAX_COURT_LENGTH = 40;
+
+function syncScore(value) {
+  return value === undefined || value === null || value === '' ? null : validateMatchScore(value);
+}
+
+function syncRegistrationIds(value, validRegistrationIds, errorMessage) {
+  if (!Array.isArray(value) || value.length > 3) throw new HttpError(400, errorMessage);
+  const ids = value.map((id) => text(id));
+  if (ids.some((id) => !id || !validRegistrationIds.has(id)) || new Set(ids).size !== ids.length) {
+    throw new HttpError(400, errorMessage);
+  }
+  return ids;
+}
+
+/**
+ * Prüft die Partien einer Spielrunde aus dem Turnierdokument. Die Runde wird serverseitig
+ * komplett ersetzt, daher muss jede Partie vollständig und jede Meldung höchstens einmal
+ * vertreten sein. Team B darf leer sein (Freilos), Scores dürfen fehlen (Partie läuft).
+ */
+export function parseSyncRoundMatches(body, validRegistrationIds) {
+  const entries = body?.matches;
+  if (!Array.isArray(entries) || entries.length > MAX_SYNC_MATCHES_PER_ROUND) {
+    throw new HttpError(400, 'Partien müssen als Array übergeben werden');
+  }
+  const seen = new Set();
+  return entries.map((entry, index) => {
+    const teamA = syncRegistrationIds(entry?.teamA, validRegistrationIds, 'Ungültige Meldung in einer Partie');
+    const teamB = syncRegistrationIds(entry?.teamB ?? [], validRegistrationIds, 'Ungültige Meldung in einer Partie');
+    if (teamA.length === 0) throw new HttpError(400, 'Ungültige Meldung in einer Partie');
+    for (const id of [...teamA, ...teamB]) {
+      if (seen.has(id)) throw new HttpError(400, 'Eine Meldung ist in der Runde mehrfach eingeteilt');
+      seen.add(id);
+    }
+    const court = nullableText(entry?.court);
+    if (court && court.length > MAX_COURT_LENGTH) throw new HttpError(400, 'Ungültige Bahn');
+    const matchIndex = entry?.matchIndex === undefined || entry?.matchIndex === null ? index : Number(entry.matchIndex);
+    if (!Number.isInteger(matchIndex) || matchIndex < 0) throw new HttpError(400, 'Ungültige Partie-Nummer');
+    return {
+      teamA,
+      teamB,
+      scoreA: syncScore(entry?.scoreA),
+      scoreB: syncScore(entry?.scoreB),
+      court,
+      stageLabel: nullableText(entry?.stageLabel),
+      matchIndex,
+    };
+  });
+}
+
+export function parseSyncRoundNumber(value) {
+  const roundNumber = Number(value);
+  if (!Number.isInteger(roundNumber) || roundNumber < 1 || roundNumber > 999) {
+    throw new HttpError(400, 'Ungültige Rundennummer');
+  }
+  return roundNumber;
+}
+
+/** Ranglisten-Snapshot aus dem Turnierdokument (Hauptprojekt ist bei Desktop-Durchführung Referenz). */
+export function parseSyncRanking(body, validRegistrationIds) {
+  const entries = body?.entries;
+  if (!Array.isArray(entries) || entries.length > MAX_SYNC_RANKING_ENTRIES) {
+    throw new HttpError(400, 'Rangliste muss als Array übergeben werden');
+  }
+  const count = (value) => (value === undefined || value === null ? null : nonNegativeInteger(value));
+  return entries.map((entry) => {
+    const rank = Number(entry?.place);
+    if (!Number.isInteger(rank) || rank < 1) throw new HttpError(400, 'Ungültiger Ranglistenplatz');
+    const registrationIds = syncRegistrationIds(entry?.registrationIds, validRegistrationIds, 'Ungültige Meldung in der Rangliste');
+    if (registrationIds.length === 0) throw new HttpError(400, 'Ungültige Meldung in der Rangliste');
+    const pointsFor = count(entry?.pointsFor);
+    const pointsAgainst = count(entry?.pointsAgainst);
+    return {
+      rank,
+      registrationIds,
+      wins: count(entry?.wins),
+      pointsFor,
+      pointsAgainst,
+      pointsDiff: pointsFor === null || pointsAgainst === null ? null : pointsFor - pointsAgainst,
+    };
+  });
+}
+
+const liveMemberLabel = (member) => [member.firstName, member.lastName].filter(Boolean).join(' ') || member.teamLabel || '?';
+const liveTeamLabel = (members) => members.map((member) => member.teamLabel || liveMemberLabel(member)).join(' + ');
+
+function liveMatchOutcome(own, other, noShow, ownSide) {
+  if (noShow) return noShow === ownSide ? 'lost' : 'won';
+  if (own === null || own === undefined || other === null || other === undefined) return 'open';
+  if (own === other) return 'open';
+  return own > other ? 'won' : 'lost';
+}
+
+/**
+ * Baut aus Runden (Format von loadTournamentRounds) und einer normalisierten Rangliste
+ * ([{ rank, registrationIds, label, wins, pointsFor, pointsAgainst, pointsDiff }]) die Sicht
+ * eines einzelnen Spielers bzw. seiner Meldung.
+ */
+export function buildPlayerLiveView({ registrationId, rounds, ranking }) {
+  const history = [];
+  for (const round of rounds || []) {
+    for (const match of round.matches || []) {
+      const inA = match.teamA.some((member) => member.id === registrationId);
+      const inB = !inA && match.teamB.some((member) => member.id === registrationId);
+      if (!inA && !inB) continue;
+      const own = inA ? match.teamA : match.teamB;
+      const opponents = inA ? match.teamB : match.teamA;
+      const ownScore = inA ? match.scoreA : match.scoreB;
+      const opponentScore = inA ? match.scoreB : match.scoreA;
+      const bye = opponents.length === 0;
+      history.push({
+        roundNumber: round.roundNumber,
+        matchId: match.id,
+        stageLabel: match.stageLabel || null,
+        court: match.court || null,
+        teamLabel: liveTeamLabel(own),
+        teammates: own.filter((member) => member.id !== registrationId).map(liveMemberLabel),
+        opponentLabel: bye ? null : liveTeamLabel(opponents),
+        bye,
+        ownScore: ownScore ?? null,
+        opponentScore: opponentScore ?? null,
+        noShow: match.noShow || null,
+        outcome: liveMatchOutcome(ownScore, opponentScore, match.noShow, inA ? 'a' : 'b'),
+      });
+    }
+  }
+
+  const lastRoundNumber = rounds?.length ? rounds[rounds.length - 1].roundNumber : null;
+  const latest = history[history.length - 1] || null;
+  const currentMatch = latest && latest.roundNumber === lastRoundNumber ? latest : null;
+  const played = history.filter((entry) => entry.outcome !== 'open');
+  const summary = {
+    played: played.length,
+    wins: played.filter((entry) => entry.outcome === 'won').length,
+    losses: played.filter((entry) => entry.outcome === 'lost').length,
+    pointsFor: played.reduce((sum, entry) => sum + (entry.ownScore || 0), 0),
+    pointsAgainst: played.reduce((sum, entry) => sum + (entry.opponentScore || 0), 0),
+  };
+
+  const entries = (ranking || []).map((entry) => ({ ...entry, own: entry.registrationIds.includes(registrationId) }));
+  const ownEntry = entries.find((entry) => entry.own) || null;
+
+  return {
+    lastRoundNumber,
+    currentMatch,
+    history: [...history].reverse(),
+    summary,
+    rankingPlace: ownEntry ? ownEntry.rank : null,
+    rankingSize: entries.length,
+    ranking: entries,
+  };
+}
+
+/** Findet die Meldungen, die zu einer E-Mail gehören (Hauptmeldung oder Partner). */
+export function registrationBelongsToEmail(registration, email) {
+  const normalized = text(email).toLowerCase();
+  if (!normalized) return false;
+  return [registration.email, registration.partner_email, registration.partner2_email]
+    .some((value) => text(value).toLowerCase() === normalized);
+}
