@@ -6,6 +6,7 @@ import { CancelledError, QueryClientProvider, useQuery, useQueryClient } from '@
 import { api, authenticatedApi, setSessionExpiredHandler } from './lib/api.js';
 import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
+import { LIVE_VIEW_AVAILABLE_EVENT, liveViewPathFor } from './postbox-core.js';
 import { usePath, matchTournamentRoute, matchLiveRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
@@ -706,6 +707,11 @@ function AppContent() {
     if (message.eventType === 'saved_search_new_matches' && message.eventData?.tournamentId) {
       setPostboxOpen(false);
       navigate(`/turniere/${message.eventData.tournamentId}`);
+    }
+    const livePath = message.eventType === LIVE_VIEW_AVAILABLE_EVENT ? liveViewPathFor(message.eventData) : null;
+    if (livePath) {
+      setPostboxOpen(false);
+      navigate(livePath);
     }
   }
 

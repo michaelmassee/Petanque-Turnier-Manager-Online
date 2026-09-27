@@ -20,3 +20,15 @@ export function isAllowedPushEndpoint(endpoint) {
 export function unreadPostboxCount(row) {
   return Number(row?.count || 0);
 }
+
+// Postfach-Ereignis nach dem Check-in: die Live-Ansicht der Meldung ist verfügbar.
+export const LIVE_VIEW_AVAILABLE_EVENT = 'live_view_available';
+
+export function liveViewAvailableEventData(tournament, registration) {
+  return { tournamentId: tournament.id, tournamentName: tournament.name, registrationId: registration.id };
+}
+
+// Ziel beim Klick auf die Nachricht: die Live-Ansicht der eigenen Meldung (Bereich "Live", mit Login).
+export function liveViewPathFor(eventData) {
+  return eventData?.registrationId ? `/live/${encodeURIComponent(eventData.registrationId)}` : null;
+}

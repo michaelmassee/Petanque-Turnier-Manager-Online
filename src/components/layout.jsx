@@ -9,6 +9,7 @@ import { Feedback, EditDialog, SelectField, TextArea, Button } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 import { RecipientPicker } from './RecipientPicker.jsx';
 import { LanguageSelect } from '../auth/AuthForms.jsx';
+import { LIVE_VIEW_AVAILABLE_EVENT } from '../postbox-core.js';
 
 async function subscribeToPush() {
   const result = await ensureBrowserPushSubscription(async () => (await authenticatedApi('/api/push/public-key')).publicKey);
@@ -157,6 +158,9 @@ function postboxMessageText(message, t) {
   }
   if (message.eventType === 'saved_search_new_matches') {
     return t('savedSearchMatchesText', { count: data.count ?? 0, name: data.savedSearchName || '' });
+  }
+  if (message.eventType === LIVE_VIEW_AVAILABLE_EVENT) {
+    return t('liveViewAvailableText', { name: data.tournamentName || '' });
   }
   return t('status');
 }

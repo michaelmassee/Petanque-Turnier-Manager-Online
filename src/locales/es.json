@@ -172,6 +172,7 @@
   "noSavedSearches": "Aún no hay búsquedas guardadas",
   "savedSearchMatchesText_one": "1 torneo nuevo para «{{name}}»",
   "savedSearchMatchesText_other": "{{count}} torneos nuevos para «{{name}}»",
+  "liveViewAvailableText": "{{name}}: estás registrado – emparejamientos y resultados ahora en la vista en directo",
   "searchResults": "Resultados de la búsqueda",
   "toggleFavorite": "Marcar/desmarcar como favorito",
   "CSV exportieren": "Exportar CSV",

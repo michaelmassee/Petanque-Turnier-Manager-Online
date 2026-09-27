@@ -172,6 +172,7 @@
   "noSavedSearches": "Nog geen opgeslagen zoekopdrachten",
   "savedSearchMatchesText_one": "1 nieuw toernooi voor „{{name}}”",
   "savedSearchMatchesText_other": "{{count}} nieuwe toernooien voor „{{name}}”",
+  "liveViewAvailableText": "{{name}}: je bent ingecheckt – indelingen en uitslagen nu in de liveweergave",
   "searchResults": "Zoekresultaten",
   "toggleFavorite": "Favoriet in-/uitschakelen",
   "CSV exportieren": "CSV exporteren",

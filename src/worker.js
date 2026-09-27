@@ -1,6 +1,6 @@
 import tzlookup from 'tz-lookup';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
-import { isAllowedPushEndpoint, unreadPostboxCount } from './postbox-core.js';
+import { isAllowedPushEndpoint, LIVE_VIEW_AVAILABLE_EVENT, liveViewAvailableEventData, unreadPostboxCount } from './postbox-core.js';
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
 import {
@@ -456,6 +456,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     apiKeyRevoked: (label) => `API-Schlüssel „${label}“ wurde gesperrt`,
     savedSearchMatches: (name, count) => `${count} neue${count === 1 ? 's' : ''} Turnier${count === 1 ? '' : 'e'} für „${name}“`,
     tournamentAutoFinished: 'Automatisch beendet, da der Turnierbeginn mehr als 48 Stunden zurückliegt.',
+    liveViewAvailable: (name) => `${name}: Du bist eingecheckt – Paarungen und Ergebnisse jetzt in der Live-Ansicht`,
   },
   nl: {
     tournamentStatus: { draft: 'Concept', registration: 'Inschrijving open', running: 'Bezig', finished: 'Afgerond' },
@@ -468,6 +469,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     apiKeyRevoked: (label) => `API-sleutel „${label}” is ingetrokken`,
     savedSearchMatches: (name, count) => `${count} nieuw(e) toernooi(en) voor „${name}”`,
     tournamentAutoFinished: 'Automatisch afgerond, omdat de start van het toernooi meer dan 48 uur geleden is.',
+    liveViewAvailable: (name) => `${name}: je bent ingecheckt – indelingen en uitslagen nu in de liveweergave`,
   },
   en: {
     tournamentStatus: { draft: 'Draft', registration: 'Registration open', running: 'Running', finished: 'Finished' },
@@ -480,6 +482,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     apiKeyRevoked: (label) => `API key "${label}" was revoked`,
     savedSearchMatches: (name, count) => `${count} new tournament${count === 1 ? '' : 's'} for "${name}"`,
     tournamentAutoFinished: 'Finished automatically because the tournament started more than 48 hours ago.',
+    liveViewAvailable: (name) => `${name}: you are checked in – pairings and results are now in the live view`,
   },
   es: {
     tournamentStatus: { draft: 'Borrador', registration: 'Inscripción abierta', running: 'En curso', finished: 'Finalizado' },
@@ -492,6 +495,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     apiKeyRevoked: (label) => `La clave API «${label}» fue revocada`,
     savedSearchMatches: (name, count) => `${count} torneo${count === 1 ? '' : 's'} nuevo${count === 1 ? '' : 's'} para «${name}»`,
     tournamentAutoFinished: 'Finalizado automáticamente porque el torneo comenzó hace más de 48 horas.',
+    liveViewAvailable: (name) => `${name}: estás registrado – emparejamientos y resultados ahora en la vista en directo`,
   },
   fr: {
     tournamentStatus: { draft: 'Brouillon', registration: 'Inscriptions ouvertes', running: 'En cours', finished: 'Terminé' },
@@ -504,6 +508,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     apiKeyRevoked: (label) => `La clé API « ${label} » a été révoquée`,
     savedSearchMatches: (name, count) => `${count} nouveau${count === 1 ? '' : 'x'} tournoi${count === 1 ? '' : 's'} pour « ${name} »`,
     tournamentAutoFinished: 'Terminé automatiquement, car le tournoi a commencé il y a plus de 48 heures.',
+    liveViewAvailable: (name) => `${name} : vous êtes enregistré – tirages et résultats dans la vue en direct`,
   },
 };
 
@@ -529,6 +534,9 @@ function buildSystemNotificationPushBody(eventType, eventData, language) {
   }
   if (eventType === 'saved_search_new_matches') {
     return texts.savedSearchMatches(data.savedSearchName || '', data.count || 0);
+  }
+  if (eventType === LIVE_VIEW_AVAILABLE_EVENT) {
+    return texts.liveViewAvailable(data.tournamentName || '');
   }
   return null;
 }
@@ -796,16 +804,18 @@ async function ensureLiveToken(db, registration) {
 }
 
 /**
- * Verschickt nach dem Check-in (Teilnahme 'active') einmalig den persönlichen Live-Link an alle
- * Team-Mitglieder mit E-Mail. Der Merker live_link_sent_at wird vor dem Versand atomar gesetzt,
- * damit Sync-Retries, erneutes Aktivieren oder parallele Aufrufe keine Doppelmails auslösen.
- * Fehler beim Versand dürfen den Check-in selbst nie scheitern lassen.
+ * Nach dem Check-in (Teilnahme 'active') einmalig: Postfach-Nachricht an alle Team-Mitglieder mit Konto (Klick
+ * öffnet die Live-Ansicht) und – sofern der Veranstalter Mails versenden darf – der persönliche Live-Link per
+ * E-Mail an alle Team-Mitglieder mit E-Mail. Der Merker live_link_sent_at wird vorher atomar gesetzt, damit
+ * Sync-Retries, erneutes Aktivieren oder parallele Aufrufe nichts doppelt auslösen.
+ * Fehler dürfen den Check-in selbst nie scheitern lassen.
  */
 async function sendLiveLinkEmails(env, tournamentId, registrationIds, appOrigin) {
   if (!registrationIds?.length) return;
   try {
     const tournament = await getTournamentById(env.DB, tournamentId);
-    if (!tournament || !(await canSendTournamentMail(env.DB, tournament))) return;
+    if (!tournament) return;
+    const mailAllowed = await canSendTournamentMail(env.DB, tournament);
     const placeholders = registrationIds.map(() => '?').join(', ');
     const rows = await env.DB.prepare(`SELECT * FROM registrations WHERE tournament_id = ? AND id IN (${placeholders})
         AND participation = 'active' AND status = 'confirmed' AND live_link_sent_at IS NULL`)
@@ -815,11 +825,14 @@ async function sendLiveLinkEmails(env, tournamentId, registrationIds, appOrigin)
       const claimed = await env.DB.prepare('UPDATE registrations SET live_link_sent_at = ? WHERE id = ? AND live_link_sent_at IS NULL')
         .bind(now, registration.id).run();
       if (!claimed.meta?.changes) continue;
+      const recipients = buildTeamRecipients(registration);
+      await notifyLiveViewInPostbox(env, tournament, registration, recipients);
+      if (!mailAllowed) continue;
       const token = await ensureLiveToken(env.DB, registration);
       const language = await resolveEmailLanguage(env.DB, tournament, registration);
       const templates = LIVE_LINK_EMAILS[language] || LIVE_LINK_EMAILS.de;
       const link = buildLiveLink(appOrigin, token);
-      for (const recipient of buildTeamRecipients(registration)) {
+      for (const recipient of recipients) {
         await enqueueTransactionalEmail(env, {
           to: recipient.email,
           subject: templates.subject(tournament.name),
@@ -833,6 +846,18 @@ async function sendLiveLinkEmails(env, tournamentId, registrationIds, appOrigin)
     }
   } catch (error) {
     console.error(`Failed to send live link emails for tournament ${tournamentId}`, error);
+  }
+}
+
+// Postfach-Nachricht "Du bist eingecheckt" für Team-Mitglieder mit Konto; ein Fehler darf die Live-Link-Mail nicht verhindern.
+async function notifyLiveViewInPostbox(env, tournament, registration, recipients) {
+  const eventData = liveViewAvailableEventData(tournament, registration);
+  for (const recipient of recipients) {
+    try {
+      await notifyUserByEmail(env, recipient.email, LIVE_VIEW_AVAILABLE_EVENT, eventData, 'Neue Statusmeldung');
+    } catch (error) {
+      console.error(`Failed to post live view message for registration ${registration.id}`, error);
+    }
   }
 }
 

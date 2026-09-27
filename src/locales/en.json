@@ -172,6 +172,7 @@
   "noSavedSearches": "No saved searches yet",
   "savedSearchMatchesText_one": "1 new tournament for “{{name}}”",
   "savedSearchMatchesText_other": "{{count}} new tournaments for “{{name}}”",
+  "liveViewAvailableText": "{{name}}: you are checked in – pairings and results are now in the live view",
   "searchResults": "Search results",
   "toggleFavorite": "Toggle favorite",
   "CSV exportieren": "Export CSV",

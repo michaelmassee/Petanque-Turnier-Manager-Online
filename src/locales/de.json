@@ -56,6 +56,7 @@
   "noSavedSearches": "Noch keine gespeicherten Suchen",
   "savedSearchMatchesText_one": "1 neues Turnier für „{{name}}“",
   "savedSearchMatchesText_other": "{{count}} neue Turniere für „{{name}}“",
+  "liveViewAvailableText": "{{name}}: Du bist eingecheckt – Paarungen und Ergebnisse jetzt in der Live-Ansicht",
   "Schweizer Ranglistenmodus": "Schweizer Ranglistenmodus",
   "Mit Buchholz": "Mit Buchholz",
   "Ohne Buchholz": "Ohne Buchholz",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAllowedPushEndpoint, unreadPostboxCount } from './postbox-core.js';
+import { isAllowedPushEndpoint, liveViewAvailableEventData, liveViewPathFor, unreadPostboxCount } from './postbox-core.js';
 
 describe('Postbox-Grundlogik', () => {
   it.each([
@@ -15,5 +15,19 @@ describe('Postbox-Grundlogik', () => {
 
   it('verwendet den serverseitigen Gesamtzähler unabhängig von der Listenlänge', () => {
     expect(unreadPostboxCount({ count: 251 })).toBe(251);
+  });
+});
+
+describe('Postfach-Nachricht zur Live-Ansicht', () => {
+  it('führt zur Live-Ansicht der eigenen Meldung', () => {
+    const eventData = liveViewAvailableEventData({ id: 't1', name: 'Herbstturnier' }, { id: 'reg 1' });
+
+    expect(eventData).toEqual({ tournamentId: 't1', tournamentName: 'Herbstturnier', registrationId: 'reg 1' });
+    expect(liveViewPathFor(eventData)).toBe('/live/reg%201');
+  });
+
+  it('ohne Meldung kein Ziel', () => {
+    expect(liveViewPathFor({})).toBeNull();
+    expect(liveViewPathFor(null)).toBeNull();
   });
 });
