@@ -25,7 +25,7 @@ describe('Feedback', () => {
 
     rerender(<Feedback error="Keine Verbindung" />);
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
 
     rerender(<Feedback />);
     rerender(<Feedback error="Keine Verbindung" />);

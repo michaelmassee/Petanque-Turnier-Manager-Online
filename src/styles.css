@@ -446,6 +446,8 @@ textarea:focus {
 .feedback {
   margin: 16px auto;
   max-width: 1180px;
+  /* A Feedback target must not disappear behind the sticky application header. */
+  scroll-margin-block-start: 120px;
   border-radius: 6px;
   padding: 10px 12px;
   font-weight: 700;

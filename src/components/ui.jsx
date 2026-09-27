@@ -112,8 +112,9 @@ export function Feedback({ message, error }) {
 
   // The action button is often far below the message (long dialogs on phones),
   // so bring a new message into view instead of leaving the click without visible effect.
+  // `scroll-margin` on .feedback keeps it below the sticky top bar.
   useEffect(() => {
-    if (error || message) ref.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+    if (error || message) ref.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   }, [error, message]);
 
   if (!message && !error) {

@@ -40,8 +40,8 @@ const feedbackSrc = feedbackStart === -1 ? '' : uiSrc.slice(feedbackStart, feedb
 if (!feedbackSrc) {
   fail('Feedback-Komponente', 'export function Feedback( nicht in src/components/ui.jsx gefunden');
 } else {
-  if (/scrollIntoView/.test(feedbackSrc) && /useEffect\(/.test(feedbackSrc)) ok('Feedback scrollt neue Meldungen ins Blickfeld');
-  else fail('Feedback scrollt neue Meldungen ins Blickfeld', 'useEffect + scrollIntoView fehlt');
+  if (/scrollIntoView/.test(feedbackSrc) && /block:\s*'start'/.test(feedbackSrc) && /useEffect\(/.test(feedbackSrc)) ok('Feedback scrollt neue Meldungen sichtbar unter die Kopfzeile');
+  else fail('Feedback scrollt neue Meldungen sichtbar unter die Kopfzeile', 'useEffect + scrollIntoView mit block: start fehlt');
 
   if (/role=\{error \? 'alert' : 'status'\}/.test(feedbackSrc)) ok('Feedback setzt role alert/status');
   else fail('Feedback setzt role alert/status', "role={error ? 'alert' : 'status'} fehlt");
