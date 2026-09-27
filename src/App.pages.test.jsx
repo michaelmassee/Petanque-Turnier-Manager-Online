@@ -564,14 +564,14 @@ describe('Vereinsmoderation', () => {
   });
 });
 
-function TournamentPageHarness({ onSubmit }) {
+function TournamentPageHarness({ onSubmit, visibility = 'private' }) {
   const [tournamentMode, setTournamentMode] = useState('create');
   const [tournamentForm, setTournamentForm] = useState(EMPTY_TOURNAMENT_FORM);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const tournaments = [
-    { id: 't1', name: 'Sommerturnier', location: 'Musterstadt', date: '2026-06-01', formation: 'doublette', registrationType: 'forme', type: 'ko', status: 'registration', visibility: 'private', activeRegistrations: 0, maxRegistrations: 16, waitlistRegistrations: 0, canManage: true },
+    { id: 't1', name: 'Sommerturnier', location: 'Musterstadt', date: '2026-06-01', formation: 'doublette', registrationType: 'forme', type: 'ko', status: 'registration', visibility, activeRegistrations: 0, maxRegistrations: 16, waitlistRegistrations: 0, canManage: true },
   ];
 
   function editTournament(tournament) {
@@ -629,6 +629,25 @@ function TournamentPageHarness({ onSubmit }) {
 }
 
 describe('Turniere-Seite: Liste + Dialog', () => {
+  it('bestätigt sichtbar, wenn ein Turnierlink in die Zwischenablage kopiert wurde', async () => {
+    const share = navigator.share;
+    const clipboard = navigator.clipboard;
+    const writeText = vi.fn().mockResolvedValue();
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+
+    try {
+      render(<TournamentPageHarness onSubmit={() => {}} visibility="public" />);
+      fireEvent.click(screen.getByRole('button', { name: 'Turnier teilen' }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Link kopiert');
+      expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/turniere/t1/info`);
+    } finally {
+      Object.defineProperty(navigator, 'share', { configurable: true, value: share });
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: clipboard });
+    }
+  });
+
   it('lässt aktive Filter zurücksetzen, auch wenn sie alle Turniere treffen', () => {
     render(<TournamentPageHarness onSubmit={() => {}} />);
 

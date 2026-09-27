@@ -584,18 +584,24 @@ export function TournamentList({
   const { t } = useTranslation();
   const filtered = Boolean(query.trim()) || Boolean(statusFilter);
   const [shareError, setShareError] = useState('');
+  const [shareMessage, setShareMessage] = useState('');
   const visibleTournaments = useInfiniteList(tournaments);
 
   async function shareTournament(tournament) {
     setBusyId(`share-${tournament.id}`);
     setShareError('');
+    setShareMessage('');
     try {
       const shareUrl = tournament.visibility === 'private'
         ? (await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' })).shareUrl
         : `${window.location.origin}/turniere/${tournament.id}/info`;
       const shareData = { title: tournament.name, text: `${tournament.name}\n${shareUrl}`, url: shareUrl };
       if (navigator.share) await navigator.share(shareData);
-      else await navigator.clipboard.writeText(shareUrl);
+      else {
+        if (!navigator.clipboard?.writeText) throw new Error(t('Teilen wird von diesem Gerät nicht unterstützt'));
+        await navigator.clipboard.writeText(shareUrl);
+        setShareMessage(t('Link kopiert'));
+      }
     } catch (error) {
       if (error.name !== 'AbortError') setShareError(error.message || t('Teilen wird von diesem Gerät nicht unterstützt'));
     } finally {
@@ -606,6 +612,7 @@ export function TournamentList({
   async function disableShareLink(tournament) {
     setBusyId(`disable-${tournament.id}`);
     setShareError('');
+    setShareMessage('');
     try {
       await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'DELETE' });
     } catch (error) {
@@ -632,6 +639,7 @@ export function TournamentList({
         onReset={onResetFilters}
         resetDisabled={!filtered}
       />
+      <Feedback message={shareMessage} />
       <Feedback error={shareError} />
       <div className="user-list">
         {visibleTournaments.items.map((tournament) => (
