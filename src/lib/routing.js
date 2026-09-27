@@ -13,10 +13,15 @@ export function usePath() {
   }, []);
 
   function navigate(next) {
-    if (next !== window.location.pathname) {
+    const target = new URL(next, window.location.origin);
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (next !== current) {
       window.history.pushState({}, '', next);
     }
-    setPath(next);
+    // The route matcher receives only a pathname. Query parameters such as a
+    // private tournament share token stay in the address bar, but must not
+    // become part of the final route segment (e.g. "spielplan?share=…").
+    setPath(target.pathname);
     window.scrollTo(0, 0);
   }
 
