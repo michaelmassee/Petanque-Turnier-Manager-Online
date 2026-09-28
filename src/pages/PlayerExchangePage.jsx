@@ -7,6 +7,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
 import { distanceKm, formatLocationAddress, labelFor, translatedOptions } from '../lib/domain.js';
+import { formatDate } from '../lib/format.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
 import { Feedback, Button, SelectField, DistanceBadge, ShareIcon } from '../components/ui.jsx';
 import { PlayerListingContactDialog } from '../components/PlayerListingContactDialog.jsx';
@@ -337,7 +338,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
           <div className="places-list">
             {displayedListings.map((listing) => (
               <article className={`panel place-card ${listing.id === highlightedId ? 'highlighted' : ''}`} id={`player-listing-${listing.id}`} key={listing.id}>
-                <div><h2 data-i18n-skip>{listing.title}</h2><p className="muted" data-i18n-skip>{listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {formatLocationAddress(listing.locationName)}{listing.eventDate ? ` · ${listing.eventDate}` : ''}</p></div>
+                <div><h2 data-i18n-skip>{listing.title}</h2><p className="muted" data-i18n-skip>{listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {formatLocationAddress(listing.locationName)}{listing.eventDate ? ` · ${formatDate(listing.eventDate, language)}` : ''}</p></div>
                 {listing.tournamentId && (
                   <button className="link-button" type="button" onClick={() => navigate(`/turniere/${encodeURIComponent(listing.tournamentId)}/info`)}>
                     {t('Verknüpftes Turnier')}: <span data-i18n-skip>{listing.tournamentName}</span>

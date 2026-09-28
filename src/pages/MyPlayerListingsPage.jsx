@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { formatLocationAddress, isUpcoming } from '../lib/domain.js';
+import { formatDate } from '../lib/format.js';
 import { Feedback, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { PlayerListingFields, applyTournamentToListingForm } from '../components/PlayerListingFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
@@ -154,7 +155,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
                 <strong data-i18n-skip>{listing.title}</strong>
                 <span data-i18n-skip>
                   {listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {formatLocationAddress(listing.locationName)}
-                  {listing.eventDate ? ` · ${listing.eventDate}` : ''}
+                  {listing.eventDate ? ` · ${formatDate(listing.eventDate, language)}` : ''}
                   {listing.tournamentName ? ` · ${t('Turnier')}: ${listing.tournamentName}` : ''}
                   {isAdmin && listing.ownerName ? ` · ${t('Ersteller:')} ${listing.ownerName}` : ''}
                 </span>

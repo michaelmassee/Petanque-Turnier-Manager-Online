@@ -8,10 +8,10 @@ function listing(index) {
   return { id: `l-${index}`, type: 'tournament', title: `Gesuch ${index}`, description: null, playingPosition: 'egal', locationName: 'Musterstadt', latitude: null, longitude: null, eventDate: null };
 }
 
-function renderPage() {
+function renderPage(language = 'de') {
   return render(
     <PlayerExchangePage
-      language="de"
+      language={language}
       setLanguage={() => {}}
       menuOpen={false}
       setMenuOpen={() => {}}
@@ -127,5 +127,21 @@ describe('Boule-Treff: Anzeige teilen', () => {
 
     await vi.waitFor(() => expect(navigator.share).toHaveBeenCalled());
     expect(within(card).queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('Boule-Treff: Datum', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ listings: [{ ...listing(1), eventDate: '2099-05-01' }] }), { status: 200 }))));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('formatiert das Datum eines Turniergesuchs in der gewählten Anzeigesprache', async () => {
+    renderPage('en');
+
+    expect(await screen.findByText(/5\/1\/2099/)).toBeInTheDocument();
   });
 });
