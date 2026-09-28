@@ -1059,5 +1059,6 @@
   "{count} davon sind gerade mit einem Turnierdokument (LibreOffice) verbunden; beim Löschen verlieren die Spieler Live-Ansicht und Ergebnisse.": "{count} of them are currently connected to a tournament document (LibreOffice); deleting them removes the live view and results for players.",
   "Mitspieler": "Partners",
   "Anmelden (Turnier)": "Register",
-  "Dieses Mitspielgesuch ist nicht mehr verfügbar.": "This player request is no longer available."
+  "Dieses Mitspielgesuch ist nicht mehr verfügbar.": "This player request is no longer available.",
+  "Teilen": "Share"
 }
