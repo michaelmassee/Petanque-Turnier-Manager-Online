@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
-import { labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, tournamentPayload, translatedOptions } from '../lib/domain.js';
+import { isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
 import { Feedback, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
@@ -597,15 +597,17 @@ export function TournamentList({
   onQueryChange,
   statusFilter,
   onStatusFilterChange,
+  hideCalendarEntries = false,
+  onHideCalendarEntriesChange = () => {},
   onResetFilters,
   busyId = '',
   setBusyId = () => {},
 }) {
   const { t } = useTranslation();
-  const filtered = Boolean(query.trim()) || Boolean(statusFilter);
+  const filtered = Boolean(query.trim()) || Boolean(statusFilter) || hideCalendarEntries;
   const [shareError, setShareError] = useState('');
   const [shareMessage, setShareMessage] = useState('');
-  const visibleTournaments = useInfiniteList(tournaments);
+  const visibleTournaments = useInfiniteList(hideCalendarEntries ? tournaments.filter((tournament) => !isCalendarEntry(tournament)) : tournaments);
 
   async function shareTournament(tournament) {
     setBusyId(`share-${tournament.id}`);
@@ -659,6 +661,14 @@ export function TournamentList({
         onReset={onResetFilters}
         resetDisabled={!filtered}
       />
+      <label className="checkbox-field tournament-list-calendar-filter">
+        <input
+          type="checkbox"
+          checked={hideCalendarEntries}
+          onChange={(event) => onHideCalendarEntriesChange(event.target.checked)}
+        />
+        {t('Kalendereinträge ausblenden')}
+      </label>
       <Feedback message={shareMessage} />
       <Feedback error={shareError} />
       <div className="user-list">
@@ -805,6 +815,7 @@ export function TournamentManagementPage({
   const [message, setMessage] = useState('');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [hideCalendarEntries, setHideCalendarEntries] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_TOURNAMENT_FORM);
   const [mode, setMode] = useState('create');
@@ -949,7 +960,9 @@ export function TournamentManagementPage({
         onQueryChange={setQuery}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
-        onResetFilters={() => { setQuery(''); setStatusFilter(''); }}
+        hideCalendarEntries={hideCalendarEntries}
+        onHideCalendarEntriesChange={setHideCalendarEntries}
+        onResetFilters={() => { setQuery(''); setStatusFilter(''); setHideCalendarEntries(false); }}
         busyId={busyId}
         setBusyId={setBusyId}
       />

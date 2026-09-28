@@ -582,14 +582,16 @@ describe('Vereinsmoderation', () => {
   });
 });
 
-function TournamentPageHarness({ onSubmit, visibility = 'private' }) {
+function TournamentPageHarness({ onSubmit, visibility = 'private', includeCalendar = false }) {
   const [tournamentMode, setTournamentMode] = useState('create');
   const [tournamentForm, setTournamentForm] = useState(EMPTY_TOURNAMENT_FORM);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [hideCalendarEntries, setHideCalendarEntries] = useState(false);
   const tournaments = [
     { id: 't1', name: 'Sommerturnier', location: 'Musterstadt', date: '2026-06-01', formation: 'doublette', registrationType: 'forme', type: 'ko', status: 'registration', visibility, activeRegistrations: 0, maxRegistrations: 16, waitlistRegistrations: 0, canManage: true },
+    ...(includeCalendar ? [{ id: 'calendar-1', name: 'Boulefest', location: 'Musterstadt', date: '2026-06-02', status: 'draft', visibility: 'public', registrationEnabled: false, canManage: true }] : []),
   ];
 
   function editTournament(tournament) {
@@ -626,9 +628,12 @@ function TournamentPageHarness({ onSubmit, visibility = 'private' }) {
         onQueryChange={setQuery}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        hideCalendarEntries={hideCalendarEntries}
+        onHideCalendarEntriesChange={setHideCalendarEntries}
         onResetFilters={() => {
           setQuery('');
           setStatusFilter('');
+          setHideCalendarEntries(false);
         }}
       />
       <EditDialog open={dialogOpen} wide title={tournamentMode === 'edit' ? 'Turnier bearbeiten' : 'Turnier anlegen'} onClose={closeDialog}>
@@ -672,6 +677,18 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     fireEvent.change(screen.getByLabelText('Status filtern'), { target: { value: 'registration' } });
 
     expect(screen.getByRole('button', { name: 'Filter zurücksetzen' })).toBeEnabled();
+  });
+
+  it('kann Kalendereinträge in der Turnierverwaltung ausblenden', () => {
+    render(<TournamentPageHarness onSubmit={() => {}} includeCalendar />);
+
+    expect(screen.getByText('Boulefest')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Kalendereinträge ausblenden'));
+
+    expect(screen.queryByText('Boulefest')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filter zurücksetzen' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(screen.getByText('Boulefest')).toBeInTheDocument();
   });
 
   it('zeigt beim Bearbeiten die Formatierungs-Toolbar der Turnierbeschreibung', () => {
