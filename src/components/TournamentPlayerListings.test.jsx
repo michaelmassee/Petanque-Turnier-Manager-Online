@@ -49,6 +49,40 @@ describe('Mitspielgesuche auf der Turnierseite', () => {
     expect(screen.queryByRole('button', { name: 'Mitspieler für dieses Turnier suchen' })).not.toBeInTheDocument();
     expect(screen.getByText('Melde dich an, um ein Mitspielgesuch zu erstellen oder zu antworten.')).toBeInTheDocument();
   });
+
+  it('klappt eine Anzeige per Klick mit Beschreibung und Kontakt-Button auf', async () => {
+    stubListings([{ id: 'l-1', title: 'Suche Schießer', playingPosition: 'schiesser', userId: 'u-2', ownerName: 'Anna B', type: 'tournament', description: 'Bin Legerin und suche für das Doublette einen Schießer.', locationName: 'Boulodrome Nord', eventDate: '2099-05-01' }]);
+
+    render(<TournamentPlayerListings tournament={tournament} currentUser={{ id: 'u-1' }} navigate={vi.fn()} />);
+    const toggle = await screen.findByRole('button', { name: /Suche Schießer/ });
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText(/suche für das Doublette/)).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/suche für das Doublette/)).toBeInTheDocument();
+    expect(screen.getByText(/Boulodrome Nord · 1\.5\.2099/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nachricht senden' })).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText(/suche für das Doublette/)).not.toBeInTheDocument();
+  });
+
+  it('führt bei der eigenen Anzeige direkt zum Bearbeiten', async () => {
+    stubListings([{ id: 'l-9', title: 'Mein Gesuch', playingPosition: 'egal', userId: 'u-1', ownerName: 'Ich Selbst', type: 'tournament' }]);
+    const navigate = vi.fn();
+
+    render(<TournamentPlayerListings tournament={tournament} currentUser={{ id: 'u-1' }} navigate={navigate} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Mein Gesuch/ }));
+
+    expect(screen.queryByRole('button', { name: 'Nachricht senden' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    expect(navigate).toHaveBeenCalledWith('/meine-anzeigen?bearbeiten=l-9');
+  });
 });
 
 describe('applyTournamentToListingForm', () => {
