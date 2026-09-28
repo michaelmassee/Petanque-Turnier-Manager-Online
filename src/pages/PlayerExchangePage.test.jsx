@@ -42,7 +42,9 @@ describe('Boule-Treff: Einstieg über ?anzeige=<id>', () => {
     const heading = await screen.findByRole('heading', { name: 'Gesuch 14' });
     const card = heading.closest('article');
     expect(card).toHaveClass('highlighted');
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    // Das Scrollen läuft in einem useEffect nach dem Rendern – darauf warten.
+    await vi.waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled());
+    expect(Element.prototype.scrollIntoView.mock.contexts).toContain(card);
     expect(screen.getByRole('heading', { name: 'Gesuch 1' }).closest('article')).not.toHaveClass('highlighted');
   });
 
