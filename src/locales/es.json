@@ -1058,5 +1058,6 @@
   "Dieser Benutzer besitzt {count} Turnier(e). OK = diese Turniere ebenfalls löschen. Abbrechen = die Turniere werden dir als Admin zugewiesen und bleiben erhalten.": "Este usuario tiene {count} torneo(s). Aceptar = eliminar también estos torneos. Cancelar = los torneos se te asignan como administrador y se conservan.",
   "{count} davon sind gerade mit einem Turnierdokument (LibreOffice) verbunden; beim Löschen verlieren die Spieler Live-Ansicht und Ergebnisse.": "{count} de ellos están conectados actualmente a un documento de torneo (LibreOffice); al eliminarlos, los jugadores pierden la vista en directo y los resultados.",
   "Mitspieler": "Compañeros",
-  "Anmelden (Turnier)": "Inscribirse"
+  "Anmelden (Turnier)": "Inscribirse",
+  "Dieses Mitspielgesuch ist nicht mehr verfügbar.": "Esta búsqueda de compañeros ya no está disponible."
 }

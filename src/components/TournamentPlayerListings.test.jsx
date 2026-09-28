@@ -28,6 +28,16 @@ describe('Mitspielgesuche auf der Turnierseite', () => {
     expect(screen.getByText('1')).toBeInTheDocument();
   });
 
+  it('öffnet eine Anzeige per Klick im Boule-Treff', async () => {
+    stubListings([{ id: 'l-1', title: 'Suche Schießer', playingPosition: 'schiesser', userId: 'u-2', ownerName: 'Anna B' }]);
+    const navigate = vi.fn();
+
+    render(<TournamentPlayerListings tournament={tournament} currentUser={null} navigate={navigate} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Suche Schießer/ }));
+
+    expect(navigate).toHaveBeenCalledWith('/spielerboerse?anzeige=l-1');
+  });
+
   it('öffnet für eigene Suche ein mit dem Turnier vorbelegtes Gesuch', async () => {
     stubListings([]);
     const navigate = vi.fn();

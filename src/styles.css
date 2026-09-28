@@ -2015,6 +2015,31 @@ a.left-panel-link {
   padding: 14px;
 }
 
+.listing-open {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.listing-open strong {
+  color: #1677ff;
+}
+
+.listing-open:hover strong,
+.listing-open:focus-visible strong {
+  text-decoration: underline;
+}
+
+.place-card.highlighted {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgb(22 119 255 / 12%);
+}
+
 .data-row.selected {
   border-color: #1677ff;
   box-shadow: 0 0 0 3px rgb(22 119 255 / 12%);

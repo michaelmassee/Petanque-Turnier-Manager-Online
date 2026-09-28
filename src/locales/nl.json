@@ -1058,5 +1058,6 @@
   "Dieser Benutzer besitzt {count} Turnier(e). OK = diese Turniere ebenfalls löschen. Abbrechen = die Turniere werden dir als Admin zugewiesen und bleiben erhalten.": "Deze gebruiker bezit {count} toernooi(en). OK = deze toernooien ook verwijderen. Annuleren = de toernooien worden aan jou als admin toegewezen en blijven behouden.",
   "{count} davon sind gerade mit einem Turnierdokument (LibreOffice) verbunden; beim Löschen verlieren die Spieler Live-Ansicht und Ergebnisse.": "{count} daarvan zijn momenteel verbonden met een toernooidocument (LibreOffice); bij verwijderen verliezen de spelers de liveweergave en de uitslagen.",
   "Mitspieler": "Medespelers",
-  "Anmelden (Turnier)": "Inschrijven"
+  "Anmelden (Turnier)": "Inschrijven",
+  "Dieses Mitspielgesuch ist nicht mehr verfügbar.": "Deze medespelersoproep is niet meer beschikbaar."
 }

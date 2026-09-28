@@ -1058,5 +1058,6 @@
   "Dieser Benutzer besitzt {count} Turnier(e). OK = diese Turniere ebenfalls löschen. Abbrechen = die Turniere werden dir als Admin zugewiesen und bleiben erhalten.": "Cet utilisateur possède {count} tournoi(s). OK = supprimer également ces tournois. Annuler = les tournois vous sont attribués en tant qu’administrateur et sont conservés.",
   "{count} davon sind gerade mit einem Turnierdokument (LibreOffice) verbunden; beim Löschen verlieren die Spieler Live-Ansicht und Ergebnisse.": "{count} d’entre eux sont actuellement connectés à un document de tournoi (LibreOffice) ; en les supprimant, les joueurs perdent la vue en direct et les résultats.",
   "Mitspieler": "Partenaires",
-  "Anmelden (Turnier)": "S’inscrire"
+  "Anmelden (Turnier)": "S’inscrire",
+  "Dieses Mitspielgesuch ist nicht mehr verfügbar.": "Cette recherche de partenaires n’est plus disponible."
 }

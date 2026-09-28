@@ -1058,5 +1058,6 @@
   "Dieser Benutzer besitzt {count} Turnier(e). OK = diese Turniere ebenfalls löschen. Abbrechen = die Turniere werden dir als Admin zugewiesen und bleiben erhalten.": "This user owns {count} tournament(s). OK = delete these tournaments as well. Cancel = the tournaments are assigned to you as admin and are kept.",
   "{count} davon sind gerade mit einem Turnierdokument (LibreOffice) verbunden; beim Löschen verlieren die Spieler Live-Ansicht und Ergebnisse.": "{count} of them are currently connected to a tournament document (LibreOffice); deleting them removes the live view and results for players.",
   "Mitspieler": "Partners",
-  "Anmelden (Turnier)": "Register"
+  "Anmelden (Turnier)": "Register",
+  "Dieses Mitspielgesuch ist nicht mehr verfügbar.": "This player request is no longer available."
 }

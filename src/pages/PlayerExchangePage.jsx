@@ -137,6 +137,28 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
     setVisibleCount(10);
   }, [query, typeFilter, playingPositionFilter, searchOrigin, searchRadiusKm, listings]);
 
+  // Einstieg von der Turnierseite: /spielerboerse?anzeige=<id> blendet die
+  // Anzeige ein (auch jenseits der ersten Seite), scrollt hin und hebt sie hervor.
+  const [highlightedId, setHighlightedId] = useState(null);
+  const requestedListingHandled = useRef(false);
+  useEffect(() => {
+    if (loading || requestedListingHandled.current) return;
+    requestedListingHandled.current = true;
+    const requestedId = new URLSearchParams(window.location.search).get('anzeige');
+    if (!requestedId) return;
+    const index = listings.findIndex((listing) => listing.id === requestedId);
+    if (index === -1) {
+      setError(t('Dieses Mitspielgesuch ist nicht mehr verfügbar.'));
+      return;
+    }
+    setVisibleCount((count) => Math.max(count, index + 1));
+    setHighlightedId(requestedId);
+  }, [loading, listings]);
+
+  useEffect(() => {
+    if (highlightedId) document.getElementById(`player-listing-${highlightedId}`)?.scrollIntoView({ block: 'center' });
+  }, [highlightedId]);
+
   const displayedListings = visibleListings.slice(0, visibleCount);
 
   const mapped = useMemo(() => visibleListings.filter((listing) => listing.latitude !== null && listing.longitude !== null), [visibleListings]);
@@ -293,7 +315,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
         ) : (
           <div className="places-list">
             {displayedListings.map((listing) => (
-              <article className="panel place-card" key={listing.id}>
+              <article className={`panel place-card ${listing.id === highlightedId ? 'highlighted' : ''}`} id={`player-listing-${listing.id}`} key={listing.id}>
                 <div><h2 data-i18n-skip>{listing.title}</h2><p className="muted" data-i18n-skip>{listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {formatLocationAddress(listing.locationName)}{listing.eventDate ? ` · ${listing.eventDate}` : ''}</p></div>
                 {listing.tournamentId && (
                   <button className="link-button" type="button" onClick={() => navigate(`/turniere/${encodeURIComponent(listing.tournamentId)}/info`)}>

@@ -8,6 +8,7 @@ const PLAYING_POSITION_LABELS = { leger: 'Leger', milieu: 'Milieu', schiesser: '
 
 // Mitspielgesuche, die mit diesem Turnier verknüpft sind: Antworten per
 // Postfach-Nachricht oder direkt ein eigenes Gesuch für das Turnier anlegen.
+// Ein Klick auf eine Anzeige öffnet sie im Boule-Treff.
 export function TournamentPlayerListings({ tournament, currentUser, navigate }) {
   const { t } = useTranslation();
   const [listings, setListings] = useState([]);
@@ -39,11 +40,17 @@ export function TournamentPlayerListings({ tournament, currentUser, navigate }) 
           {listings.map((listing) => (
             <article className="data-row" key={listing.id}>
               <div>
-                <strong data-i18n-skip>{listing.title}</strong>
-                <span>
-                  {t(PLAYING_POSITION_LABELS[listing.playingPosition] || 'Egal')}
-                  {listing.ownerName ? <> · {t('Von')} <span data-i18n-skip>{listing.ownerName}</span></> : null}
-                </span>
+                <button
+                  className="listing-open"
+                  type="button"
+                  onClick={() => navigate(`/spielerboerse?${new URLSearchParams({ anzeige: listing.id })}`)}
+                >
+                  <strong data-i18n-skip>{listing.title}</strong>
+                  <span>
+                    {t(PLAYING_POSITION_LABELS[listing.playingPosition] || 'Egal')}
+                    {listing.ownerName ? <> · {t('Von')} <span data-i18n-skip>{listing.ownerName}</span></> : null}
+                  </span>
+                </button>
               </div>
               {currentUser && (
                 <div className="row-actions">
