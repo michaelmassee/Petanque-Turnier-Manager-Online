@@ -9,6 +9,7 @@ import { labelFor, formationLabel, hasOpenRegistration, formatTournamentStartTim
 import { Button, Feedback, RequiredMark } from '../components/ui.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
+import { TournamentPlayerListings } from '../components/TournamentPlayerListings.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
 
 function ShareIcon() {
@@ -597,6 +598,9 @@ export function TournamentDetailPage({
 
         <div className="tournament-detail-content">
           {route.view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} showTitle={false} shareToken={shareToken} />}
+          {route.view === 'info' && tournament.visibility === 'public' && (
+            <TournamentPlayerListings tournament={tournament} currentUser={currentUser} navigate={navigate} />
+          )}
 
           {route.view === 'anmelden' && canRegister && (
             <PublicRegistrationPanel

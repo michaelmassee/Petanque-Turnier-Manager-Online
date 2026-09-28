@@ -1019,6 +1019,7 @@ export default {
     const jobs = [
       finishStaleTournaments(env).catch((error) => console.error('Finishing stale tournaments failed', error)),
       cleanupExpiredSessions(env.DB).catch((error) => console.error('Cleanup cron failed', error)),
+      deletePlayerListingsOfFinishedTournaments(env.DB).catch((error) => console.error('Deleting player listings of finished tournaments failed', error)),
     ];
     if (event.cron === DAILY_CRON) {
       jobs.push(
@@ -6567,50 +6568,77 @@ function toPublicPlayerListing(row, includeOwner = false) {
     locationName: formatLocationAddress(row.location_name), latitude: Number(row.latitude), longitude: Number(row.longitude),
     eventDate: row.event_date || null, ...(includeOwner && row.owner_first_name ? { ownerName: `${row.owner_first_name} ${row.owner_last_name}` } : {}),
     playingPosition: row.playing_position,
+    tournamentId: row.linked_tournament_name ? row.tournament_id : null, tournamentName: row.linked_tournament_name || null,
+    deleteWhenTournamentFinished: row.delete_when_tournament_finished !== 0,
     createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
 
-async function playerListingInput(body, countryCode) {
+// Verknüpfte Turniere nur zeigen, solange sie öffentlich sind; private oder
+// gelöschte Turniere lassen das Gesuch ohne Verweis stehen.
+const PLAYER_LISTING_SELECT = `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name, t.name AS linked_tournament_name
+     FROM player_listings l JOIN users u ON u.id = l.user_id
+     LEFT JOIN tournaments t ON t.id = l.tournament_id AND t.visibility = 'public'`;
+
+async function playerListingInput(db, body, countryCode) {
   const type = text(body.type);
   if (type !== 'tournament' && type !== 'training') throw new HttpError(400, 'Bitte wähle einen Typ');
   const title = text(body.title); if (title.length < 2) throw new HttpError(400, 'Bitte gib einen Titel ein');
   const locationName = text(body.locationName); if (locationName.length < 2) throw new HttpError(400, 'Bitte gib einen Ort ein');
-  const eventDate = type === 'tournament' ? text(body.eventDate) : '';
+  const tournamentId = type === 'tournament' ? text(body.tournamentId) : '';
+  let eventDate = type === 'tournament' ? text(body.eventDate) : '';
+  if (tournamentId) {
+    // Das Datum kommt immer aus dem Turnier, damit das Gesuch zusammen mit ihm abläuft.
+    const tournament = await db.prepare("SELECT id, date FROM tournaments WHERE id = ? AND visibility = 'public'").bind(tournamentId).first();
+    if (!tournament) throw new HttpError(400, 'Turnier nicht gefunden');
+    eventDate = tournament.date;
+  }
   const playingPosition = normalizePlayerListingPosition(body.playingPosition);
   if (type === 'tournament' && !eventDate) throw new HttpError(400, 'Bitte gib ein Datum an');
   const [geo] = await geocodeLocation(locationName, { countryCode, limit: 1 });
   if (!geo) throw new HttpError(400, 'Kein Ort gefunden.');
-  return { type, title, description: normalizeRichText(body.description, 'Ungültige Beschreibung'), locationName, latitude: geo.lat, longitude: geo.lng, eventDate: eventDate || null, playingPosition };
+  return {
+    type, title, description: normalizeRichText(body.description, 'Ungültige Beschreibung'), locationName, latitude: geo.lat, longitude: geo.lng, eventDate: eventDate || null, playingPosition,
+    tournamentId: tournamentId || null, deleteWhenTournamentFinished: body.deleteWhenTournamentFinished === false ? 0 : 1,
+  };
+}
+
+// Stündlicher Cron: Gesuche zu beendeten Turnieren entfernen, sofern der
+// Ersteller das nicht abgeschaltet hat. Vergessene Turniere schließt
+// finishStaleTournaments ohnehin 48 Stunden nach Beginn ab.
+async function deletePlayerListingsOfFinishedTournaments(db) {
+  await db.prepare(
+    `DELETE FROM player_listings
+     WHERE delete_when_tournament_finished = 1
+       AND tournament_id IN (SELECT id FROM tournaments WHERE status = 'finished')`).run();
 }
 
 async function listPlayerListings(db, user, searchParams) {
   const term = String(searchParams.get('q') || '').trim();
   const typeFilter = String(searchParams.get('type') || '').trim();
   const playingPositionFilter = String(searchParams.get('playingPosition') || '').trim();
+  const tournamentFilter = String(searchParams.get('tournamentId') || '').trim();
   const rows = await db.prepare(
-    `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name
-     FROM player_listings l JOIN users u ON u.id = l.user_id
+    `${PLAYER_LISTING_SELECT}
      WHERE (l.type = 'training' OR (l.type = 'tournament' AND l.event_date >= date('now')))
        AND (?1 = '' OR l.type = ?1)
        AND (?2 = '' OR l.title LIKE '%' || ?2 || '%' COLLATE NOCASE OR l.description LIKE '%' || ?2 || '%' COLLATE NOCASE OR l.location_name LIKE '%' || ?2 || '%' COLLATE NOCASE)
        AND (?3 = '' OR l.playing_position = ?3 OR l.playing_position = 'egal')
-     ORDER BY l.created_at DESC`).bind(typeFilter, term, playingPositionFilter).all();
+       AND (?4 = '' OR (l.tournament_id = ?4 AND t.id IS NOT NULL))
+     ORDER BY l.created_at DESC`).bind(typeFilter, term, playingPositionFilter, tournamentFilter).all();
   return json({ listings: (rows.results || []).map((row) => toPublicPlayerListing(row, Boolean(user))) });
 }
 
 async function listMyPlayerListings(db, userId) {
   const rows = await db.prepare(
-    `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name
-     FROM player_listings l JOIN users u ON u.id = l.user_id
+    `${PLAYER_LISTING_SELECT}
      WHERE l.user_id = ? ORDER BY l.created_at DESC`).bind(userId).all();
   return json({ listings: (rows.results || []).map((row) => toPublicPlayerListing(row, true)) });
 }
 
 async function listAllPlayerListings(db) {
   const rows = await db.prepare(
-    `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name
-     FROM player_listings l JOIN users u ON u.id = l.user_id
+    `${PLAYER_LISTING_SELECT}
      ORDER BY l.created_at DESC`).all();
   return json({ listings: (rows.results || []).map((row) => toPublicPlayerListing(row, true)) });
 }
@@ -6618,10 +6646,10 @@ async function listAllPlayerListings(db) {
 async function createPlayerListing(request, db, user, countryCode) {
   const count = await db.prepare('SELECT COUNT(*) AS count FROM player_listings WHERE user_id = ?').bind(user.id).first();
   if (Number(count.count) >= PLAYER_LISTING_LIMIT) throw new HttpError(400, 'Du hast bereits die maximale Anzahl an Mitspielgesuchen erreicht');
-  const input = await playerListingInput(await readJson(request), countryCode);
+  const input = await playerListingInput(db, await readJson(request), countryCode);
   const id = crypto.randomUUID(); const now = new Date().toISOString();
-  await db.prepare('INSERT INTO player_listings (id, user_id, type, title, description, location_name, latitude, longitude, event_date, playing_position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(id, user.id, input.type, input.title, input.description, input.locationName, input.latitude, input.longitude, input.eventDate, input.playingPosition, now, now).run();
+  await db.prepare('INSERT INTO player_listings (id, user_id, type, title, description, location_name, latitude, longitude, event_date, playing_position, tournament_id, delete_when_tournament_finished, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, user.id, input.type, input.title, input.description, input.locationName, input.latitude, input.longitude, input.eventDate, input.playingPosition, input.tournamentId, input.deleteWhenTournamentFinished, now, now).run();
   return json({ id }, 201);
 }
 
@@ -6634,9 +6662,9 @@ async function assertPlayerListingOwner(db, id, user) {
 
 async function updatePlayerListing(request, db, id, user, countryCode) {
   await assertPlayerListingOwner(db, id, user);
-  const input = await playerListingInput(await readJson(request), countryCode);
-  await db.prepare('UPDATE player_listings SET type = ?, title = ?, description = ?, location_name = ?, latitude = ?, longitude = ?, event_date = ?, playing_position = ?, updated_at = ? WHERE id = ?')
-    .bind(input.type, input.title, input.description, input.locationName, input.latitude, input.longitude, input.eventDate, input.playingPosition, new Date().toISOString(), id).run();
+  const input = await playerListingInput(db, await readJson(request), countryCode);
+  await db.prepare('UPDATE player_listings SET type = ?, title = ?, description = ?, location_name = ?, latitude = ?, longitude = ?, event_date = ?, playing_position = ?, tournament_id = ?, delete_when_tournament_finished = ?, updated_at = ? WHERE id = ?')
+    .bind(input.type, input.title, input.description, input.locationName, input.latitude, input.longitude, input.eventDate, input.playingPosition, input.tournamentId, input.deleteWhenTournamentFinished, new Date().toISOString(), id).run();
   return json({ ok: true });
 }
 

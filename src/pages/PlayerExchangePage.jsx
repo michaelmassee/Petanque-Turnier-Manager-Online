@@ -5,10 +5,11 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { useTranslation } from 'react-i18next';
-import { api, authenticatedApi } from '../lib/api.js';
+import { api } from '../lib/api.js';
 import { distanceKm, formatLocationAddress, labelFor, translatedOptions } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Feedback, Button, TextArea, SelectField, DistanceBadge, EditDialog } from '../components/ui.jsx';
+import { Feedback, Button, SelectField, DistanceBadge } from '../components/ui.jsx';
+import { PlayerListingContactDialog } from '../components/PlayerListingContactDialog.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
@@ -19,39 +20,6 @@ const FALLBACK_CENTER = [51.1, 10.4];
 const marker = new L.Icon({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow, iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] });
 const TYPE_FILTER_OPTIONS = [{ value: '', label: 'Alle Typen' }, { value: 'tournament', label: 'Turnier' }, { value: 'training', label: 'Training' }];
 const PLAYING_POSITION_FILTER_OPTIONS = [{ value: '', label: 'Alle Spielpositionen' }, { value: 'leger', label: 'Leger' }, { value: 'milieu', label: 'Milieu' }, { value: 'schiesser', label: 'Schießer' }, { value: 'egal', label: 'Egal' }];
-
-function ContactDialog({ listing, onClose }) {
-  const { t } = useTranslation();
-  const [body, setBody] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState('');
-  const [sent, setSent] = useState(false);
-
-  async function submit(event) {
-    event.preventDefault();
-    setError(''); setSending(true);
-    try {
-      await authenticatedApi('/api/postbox/messages', { method: 'POST', body: JSON.stringify({ recipientId: listing.userId, body }) });
-      setSent(true);
-    } catch (err) { setError(err.message); } finally { setSending(false); }
-  }
-
-  return (
-    <EditDialog open title={`${t('Nachricht an')} ${listing.ownerName || ''}`} error={error} onClose={onClose}>
-      {sent ? (
-        <Feedback message={t('Nachricht gesendet.')} />
-      ) : (
-        <form className="form" onSubmit={submit}>
-          <TextArea label={t('Nachricht')} value={body} onChange={setBody} maxLength={250} />
-          <div className="dialog-actions">
-            <Button variant="secondary" type="button" onClick={onClose}>{t('Abbrechen')}</Button>
-            <Button type="submit" disabled={!body.trim()} loading={sending}>{t('Senden')}</Button>
-          </div>
-        </form>
-      )}
-    </EditDialog>
-  );
-}
 
 function PlayerExchangeSearchMenu({
   open,
@@ -327,6 +295,11 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
             {displayedListings.map((listing) => (
               <article className="panel place-card" key={listing.id}>
                 <div><h2 data-i18n-skip>{listing.title}</h2><p className="muted" data-i18n-skip>{listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {formatLocationAddress(listing.locationName)}{listing.eventDate ? ` · ${listing.eventDate}` : ''}</p></div>
+                {listing.tournamentId && (
+                  <button className="link-button" type="button" onClick={() => navigate(`/turniere/${encodeURIComponent(listing.tournamentId)}/info`)}>
+                    {t('Verknüpftes Turnier')}: <span data-i18n-skip>{listing.tournamentName}</span>
+                  </button>
+                )}
                 {listing.description && <RichText value={listing.description} />}
                 {listing.ownerName && <p className="muted">{t('Von')} {listing.ownerName}</p>}
                 <DistanceBadge distanceKm={listing.distanceKm} />
@@ -348,7 +321,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
 
       </section>
 
-      {contactListing && <ContactDialog listing={contactListing} onClose={() => setContactListing(null)} />}
+      {contactListing && <PlayerListingContactDialog listing={contactListing} onClose={() => setContactListing(null)} />}
     </main>
   );
 }

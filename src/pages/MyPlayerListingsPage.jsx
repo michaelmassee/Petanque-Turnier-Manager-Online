@@ -1,19 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { authenticatedApi } from '../lib/api.js';
-import { formatLocationAddress } from '../lib/domain.js';
+import { api, authenticatedApi } from '../lib/api.js';
+import { formatLocationAddress, isUpcoming } from '../lib/domain.js';
 import { Feedback, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
-import { PlayerListingFields } from '../components/PlayerListingFields.jsx';
+import { PlayerListingFields, applyTournamentToListingForm } from '../components/PlayerListingFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
-const EMPTY_LISTING_FORM = { type: 'tournament', title: '', description: '', playingPosition: 'egal', locationName: '', latitude: null, longitude: null, locationConfirmed: false, venueId: '', eventDate: '' };
+const EMPTY_LISTING_FORM = { type: 'tournament', title: '', description: '', playingPosition: 'egal', locationName: '', latitude: null, longitude: null, locationConfirmed: false, venueId: '', eventDate: '', tournamentId: '', deleteWhenTournamentFinished: true };
 
 function listingToForm(listing) {
   return {
     type: listing.type, title: listing.title, description: listing.description || '', playingPosition: listing.playingPosition || 'egal',
     locationName: listing.locationName, latitude: listing.latitude, longitude: listing.longitude,
-    locationConfirmed: true, venueId: '', eventDate: listing.eventDate || '',
+    locationConfirmed: true, venueId: '', eventDate: listing.eventDate || '', tournamentId: listing.tournamentId || '',
+    deleteWhenTournamentFinished: listing.deleteWhenTournamentFinished !== false,
   };
 }
 
@@ -22,6 +23,8 @@ function MyPlayerListingsPanel({ language, currentUser }) {
   const isAdmin = currentUser?.role === 'admin';
   const [listings, setListings] = useState([]);
   const [venues, setVenues] = useState([]);
+  const [tournaments, setTournaments] = useState([]);
+  const [tournamentsLoaded, setTournamentsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -48,6 +51,26 @@ function MyPlayerListingsPanel({ language, currentUser }) {
   }
   useEffect(() => { load(); }, [isAdmin]);
   useEffect(() => { authenticatedApi('/api/places').then((data) => setVenues(data.places || [])).catch(() => {}); }, []);
+  useEffect(() => {
+    api('/api/tournaments')
+      .then((data) => setTournaments((data.tournaments || []).filter((tournament) => tournament.visibility === 'public' && tournament.status !== 'draft' && isUpcoming(tournament))))
+      .catch(() => {})
+      .finally(() => setTournamentsLoaded(true));
+  }, []);
+
+  // Einstieg von der Turnierseite: /meine-anzeigen?turnier=<id> öffnet direkt
+  // ein neues, mit diesem Turnier vorbelegtes Mitspielgesuch.
+  const requestedTournamentHandled = useRef(false);
+  useEffect(() => {
+    if (!tournamentsLoaded || requestedTournamentHandled.current) return;
+    requestedTournamentHandled.current = true;
+    const requestedId = new URLSearchParams(window.location.search).get('turnier');
+    if (!requestedId) return;
+    const tournament = tournaments.find((entry) => entry.id === requestedId);
+    setEditId(null);
+    setForm(applyTournamentToListingForm(EMPTY_LISTING_FORM, tournament));
+    setDialogOpen(true);
+  }, [tournamentsLoaded, tournaments]);
 
   const filtered = useMemo(() => listings.filter((listing) => {
     if (typeFilter && listing.type !== typeFilter) return false;
@@ -132,6 +155,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
                 <span data-i18n-skip>
                   {listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {formatLocationAddress(listing.locationName)}
                   {listing.eventDate ? ` · ${listing.eventDate}` : ''}
+                  {listing.tournamentName ? ` · ${t('Turnier')}: ${listing.tournamentName}` : ''}
                   {isAdmin && listing.ownerName ? ` · ${t('Ersteller:')} ${listing.ownerName}` : ''}
                 </span>
               </div>
@@ -147,7 +171,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
 
       <EditDialog open={dialogOpen} title={editId ? t('Mitspielgesuch bearbeiten') : t('Mitspielgesuch erstellen')} error={error} onClose={() => setDialogOpen(false)}>
         <form className="form" onSubmit={submit}>
-          <PlayerListingFields form={form} setForm={setForm} language={language} venues={venues} />
+          <PlayerListingFields form={form} setForm={setForm} language={language} venues={venues} tournaments={tournaments} />
           <div className="dialog-actions">
             <Button variant="secondary" type="button" onClick={() => setDialogOpen(false)}>{t('Abbrechen')}</Button>
             <Button type="submit" loading={saving}>{editId ? t('Speichern') : t('Veröffentlichen')}</Button>
