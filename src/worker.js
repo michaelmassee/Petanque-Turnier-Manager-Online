@@ -3443,10 +3443,17 @@ async function connectTournament(request, db, tournament) {
   }
   const now = new Date().toISOString();
   const bindingRevision = tournament.sync_document_id ? Number(tournament.sync_binding_revision || 0) : 1;
-  await db.prepare(`UPDATE tournaments
+  const connected = await db.prepare(`UPDATE tournaments
                     SET document_managed = 1, sync_document_id = ?, sync_lease_token_hash = ?,
-                        sync_binding_revision = ?, updated_at = ? WHERE id = ?`)
-    .bind(syncDocumentId, leaseTokenHash, bindingRevision, now, tournament.id).run();
+                        sync_binding_revision = ?, updated_at = ?
+                    WHERE id = ? AND (sync_document_id IS NULL OR sync_document_id = ?)`)
+    .bind(syncDocumentId, leaseTokenHash, bindingRevision, now, tournament.id, syncDocumentId).run();
+  if (!connected.meta.changes) {
+    const current = await getTournamentById(db, tournament.id);
+    throw new HttpError(409, 'Die Dokumentbindung wurde zwischenzeitlich geändert', {
+      code: 'binding_conflict', bindingRevision: Number(current.sync_binding_revision || 0),
+    });
+  }
   return json({ ok: true, syncDocumentId, bindingRevision });
 }
 
