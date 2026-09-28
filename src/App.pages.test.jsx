@@ -186,7 +186,7 @@ describe('Kopfzeile', () => {
     expect(scrollArea).toContainElement(screen.getByRole('button', { name: 'Menü öffnen' }));
   });
 
-  it('verlinkt die Wiki zwischen Boule-Treff und Admin-Dashboard in der Bereichsleiste', () => {
+  it('verlinkt die Anleitung zwischen Boule-Treff und Admin-Dashboard in der Bereichsleiste', () => {
     render(
       <AppHeader
         heading="Turniere"
@@ -202,7 +202,7 @@ describe('Kopfzeile', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Bereiche öffnen' }));
 
-    const wikiLink = screen.getByRole('link', { name: 'Wiki' });
+    const wikiLink = screen.getByRole('link', { name: 'Anleitung' });
     expect(wikiLink).toHaveAttribute('href', 'https://github.com/michaelmassee/Petanque-Turnier-Manager-Online/wiki');
     expect(wikiLink).toHaveAttribute('target', '_blank');
     expect(wikiLink).toHaveAttribute('rel', 'noreferrer');
