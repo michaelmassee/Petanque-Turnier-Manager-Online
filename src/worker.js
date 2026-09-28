@@ -6562,7 +6562,7 @@ async function toggleBoulePlaceLike(db, placeId, userId) {
 
 const PLAYER_LISTING_LIMIT = 5;
 
-function toPublicPlayerListing(row, includeOwner = false) {
+export function toPublicPlayerListing(row, includeOwner = false) {
   return {
     id: row.id, ...(includeOwner ? { userId: row.user_id } : {}), type: row.type, title: row.title, description: row.description || null,
     locationName: formatLocationAddress(row.location_name), latitude: Number(row.latitude), longitude: Number(row.longitude),
@@ -6580,7 +6580,7 @@ const PLAYER_LISTING_SELECT = `SELECT l.*, u.first_name AS owner_first_name, u.l
      FROM player_listings l JOIN users u ON u.id = l.user_id
      LEFT JOIN tournaments t ON t.id = l.tournament_id AND t.visibility = 'public'`;
 
-async function playerListingInput(db, body, countryCode) {
+export async function playerListingInput(db, body, countryCode) {
   const type = text(body.type);
   if (type !== 'tournament' && type !== 'training') throw new HttpError(400, 'Bitte wähle einen Typ');
   const title = text(body.title); if (title.length < 2) throw new HttpError(400, 'Bitte gib einen Titel ein');
@@ -6606,7 +6606,7 @@ async function playerListingInput(db, body, countryCode) {
 // Stündlicher Cron: Gesuche zu beendeten Turnieren entfernen, sofern der
 // Ersteller das nicht abgeschaltet hat. Vergessene Turniere schließt
 // finishStaleTournaments ohnehin 48 Stunden nach Beginn ab.
-async function deletePlayerListingsOfFinishedTournaments(db) {
+export async function deletePlayerListingsOfFinishedTournaments(db) {
   await db.prepare(
     `DELETE FROM player_listings
      WHERE delete_when_tournament_finished = 1
