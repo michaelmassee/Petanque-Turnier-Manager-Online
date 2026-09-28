@@ -8,7 +8,7 @@ import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTime
 import { labelFor, formationLabel, hasOpenRegistration, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { Button, Feedback, RequiredMark } from '../components/ui.jsx';
 import { RichText } from '../components/RichText.jsx';
-import { StandalonePageHeader, OfflineNotice } from '../components/layout.jsx';
+import { StandalonePageHeader } from '../components/layout.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
 
 function ShareIcon() {
@@ -546,7 +546,6 @@ export function TournamentDetailPage({
         postboxControl={postboxControl}
       />
 
-      <OfflineNotice language={language} />
       <Feedback message={message} error={error} />
 
       <section className="tournament-detail-page">

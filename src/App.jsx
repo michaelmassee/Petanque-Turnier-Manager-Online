@@ -3,19 +3,19 @@ import { TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_ST
 import i18next from './lib/i18next-config.js';
 import { useTranslation } from 'react-i18next';
 import { CancelledError, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, authenticatedApi, setSessionExpiredHandler } from './lib/api.js';
+import { api, authenticatedApi, clearOfflineApiCache, setSessionExpiredHandler } from './lib/api.js';
 import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { LIVE_VIEW_AVAILABLE_EVENT, liveViewPathFor } from './postbox-core.js';
 import { usePath, matchTournamentRoute, matchLiveRoute } from './lib/routing.js';
-import { useInstallPrompt, isIosSafari, useOnlineStatus, useRoutedTournament } from './lib/hooks.js';
+import { useInstallPrompt, isIosSafari, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
 import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm } from './lib/domain.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
 import { InfiniteListLoadMore } from './components/InfiniteListLoadMore.jsx';
-import { AppHeader, PostboxControl, PushMigrationNotice, SearchMenuControl, SavedSearchesControl, AuthModal, StandalonePageHeader, InstallAppButton, OfflineNotice } from './components/layout.jsx';
+import { AppHeader, PostboxControl, PushMigrationNotice, SearchMenuControl, SavedSearchesControl, AuthModal, StandalonePageHeader, InstallAppButton } from './components/layout.jsx';
 import { AuthShell, LanguageSelect, SetupForm, LoginForm, RegisterForm, RegisterSuccessNotice, ForgotPasswordForm, ResendVerificationForm, ResetPasswordForm, VerifyEmailForm, CancelRegistrationForm } from './auth/AuthForms.jsx';
 
 const ImpressumPage = lazy(() => import('./pages/ImpressumPage.jsx'));
@@ -1016,6 +1016,7 @@ function AppContent() {
 
   async function resetSessionState() {
     queryClient.clear();
+    await clearOfflineApiCache();
     setCurrentUser(null);
     setPostboxOpen(false);
     setPostbox({ messages: [], unreadCount: 0, todos: [] });

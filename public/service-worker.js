@@ -1,5 +1,5 @@
-const CACHE_NAME = 'ptm-online-v8';
-const API_CACHE_NAME = 'ptm-online-api-v1';
+const CACHE_NAME = 'ptm-online-v9';
+const API_CACHE_NAME = 'ptm-online-api-v2';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -14,7 +14,12 @@ const APP_SHELL = [
 // Turnier-Stammdaten, die ein Teilnehmer nach der Anmeldung offline nachschlagen
 // können soll (Ort, Zeit, Status). Bewusst kein anderer /api/-Traffic (Login,
 // Anmeldungen verwalten etc.) - das bleibt online-only.
-const CACHEABLE_API_PATTERNS = [/^\/api\/tournaments$/, /^\/api\/tournaments\/[^/]+$/];
+const CACHEABLE_API_PATTERNS = [
+  /^\/api\/tournaments$/,
+  /^\/api\/tournaments\/[^/]+$/,
+  /^\/api\/places$/,
+  /^\/api\/player-listings$/,
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

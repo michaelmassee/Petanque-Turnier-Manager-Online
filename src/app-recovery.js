@@ -3,6 +3,10 @@ const RECOVERY_WINDOW_MS = 30_000;
 
 let recoveryInProgress = false;
 
+export function shouldAttemptAutomaticRecovery(isOnline = navigator.onLine) {
+  return Boolean(isOnline);
+}
+
 function recoveryAttemptIsRecent(value, now) {
   try {
     const { timestamp } = JSON.parse(value || '');

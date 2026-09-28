@@ -17,6 +17,13 @@ export class NetworkError extends ApiError {
   constructor() { super(i18next.t('Keine Verbindung zum Server. Bitte versuche es erneut.')); }
 }
 
+// Änderungen können ohne Verbindung weder sicher gespeichert noch später
+// nachvollziehbar synchronisiert werden. Die Sperre liegt bewusst hier in der
+// gemeinsamen API-Schicht, damit kein Bereich sie versehentlich umgeht.
+export class OfflineMutationError extends ApiError {
+  constructor() { super(i18next.t('Du bist offline. Änderungen sind erst nach Wiederverbindung möglich.')); }
+}
+
 export class TimeoutError extends ApiError {
   constructor() { super(i18next.t('Die Anfrage hat zu lange gedauert. Bitte versuche es erneut.')); }
 }
@@ -71,8 +78,27 @@ async function readJsonResponse(response) {
   }
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+// Der Service Worker cached einige API-Antworten, die je nach Anmeldung
+// unterschiedlich ausfallen. Beim Sitzungsende müssen sie weg, sonst sieht auf
+// einem geteilten Gerät offline der nächste Nutzer die Daten des vorherigen.
+export async function clearOfflineApiCache() {
+  if (typeof caches === 'undefined') return;
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((key) => key.startsWith('ptm-online-api')).map((key) => caches.delete(key)));
+  } catch {
+    // Ohne Cache-Zugriff (z.B. private Modi) gibt es auch nichts zu löschen.
+  }
+}
+
 async function requestOnce(path, options, timeoutMs) {
   if (options.signal?.aborted) throw new AbortedError();
+  const method = (options.method || 'GET').toUpperCase();
+  if (!SAFE_METHODS.has(method) && typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new OfflineMutationError();
+  }
 
   const controller = new AbortController();
   let timedOut = false;

@@ -715,5 +715,5 @@ export function OfflineNotice() {
   if (online) {
     return null;
   }
-  return <p className="feedback offline">{t('Du bist offline – angezeigte Daten können veraltet sein.')}</p>;
+  return <p className="feedback offline" role="status">{t('Du bist offline – angezeigte Daten können veraltet sein. Änderungen sind bis zur Wiederverbindung deaktiviert.')}</p>;
 }

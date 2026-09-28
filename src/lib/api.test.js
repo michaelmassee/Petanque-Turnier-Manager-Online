@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, authenticatedApi, AbortedError, ApiError, InvalidResponseError, NetworkError, setSessionExpiredHandler } from './api.js';
+import { api, authenticatedApi, clearOfflineApiCache, AbortedError, ApiError, InvalidResponseError, NetworkError, OfflineMutationError, setSessionExpiredHandler } from './api.js';
 
 describe('api', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     setSessionExpiredHandler(null);
   });
 
@@ -30,6 +31,28 @@ describe('api', () => {
     const error = new NetworkError();
     expect(error).toBeInstanceOf(ApiError);
     expect(error.status).toBeUndefined();
+  });
+
+  it('blockiert Schreibzugriffe offline zentral, ohne eine Anfrage zu senden', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('navigator', { onLine: false });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(api('/api/places', { method: 'POST', body: '{}' })).rejects.toBeInstanceOf(OfflineMutationError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('löscht beim Sitzungsende nur die API-Caches des Service Workers', async () => {
+    const deleteMock = vi.fn().mockResolvedValue(true);
+    vi.stubGlobal('caches', {
+      keys: vi.fn().mockResolvedValue(['ptm-online-v9', 'ptm-online-api-v2']),
+      delete: deleteMock,
+    });
+
+    await clearOfflineApiCache();
+
+    expect(deleteMock).toHaveBeenCalledTimes(1);
+    expect(deleteMock).toHaveBeenCalledWith('ptm-online-api-v2');
   });
 
   it('startet keine Anfrage mit einem bereits abgebrochenen Signal', async () => {
