@@ -61,6 +61,18 @@ describe('Mitspielgesuche mit Turnierverknüpfung', () => {
     vi.unstubAllGlobals();
   });
 
+  it('übernimmt Datum und Koordinaten des Turniers ohne erneutes Geocoding', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const db = fakeDb({ id: 't-1', date: '2099-05-01', latitude: 51.2, longitude: 6.8 });
+
+    const input = await playerListingInput(db, { type: 'tournament', title: 'Suche', locationName: 'Boulodrome Nord', eventDate: '2000-01-01', tournamentId: 't-1', deleteWhenTournamentFinished: false }, 'DE');
+
+    expect(input).toMatchObject({ tournamentId: 't-1', eventDate: '2099-05-01', latitude: 51.2, longitude: 6.8, deleteWhenTournamentFinished: 0 });
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it('löscht per Cron nur Gesuche mit aktiver Option zu beendeten Turnieren', async () => {
     const db = fakeDb();
 

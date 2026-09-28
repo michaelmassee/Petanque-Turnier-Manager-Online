@@ -6587,15 +6587,18 @@ export async function playerListingInput(db, body, countryCode) {
   const locationName = text(body.locationName); if (locationName.length < 2) throw new HttpError(400, 'Bitte gib einen Ort ein');
   const tournamentId = type === 'tournament' ? text(body.tournamentId) : '';
   let eventDate = type === 'tournament' ? text(body.eventDate) : '';
+  let geo = null;
   if (tournamentId) {
     // Das Datum kommt immer aus dem Turnier, damit das Gesuch zusammen mit ihm abläuft.
-    const tournament = await db.prepare("SELECT id, date FROM tournaments WHERE id = ? AND visibility = 'public'").bind(tournamentId).first();
+    const tournament = await db.prepare("SELECT id, date, latitude, longitude FROM tournaments WHERE id = ? AND visibility = 'public'").bind(tournamentId).first();
     if (!tournament) throw new HttpError(400, 'Turnier nicht gefunden');
     eventDate = tournament.date;
+    // Vorhandene Turnierkoordinaten übernehmen statt die Adresse erneut zu geocodieren.
+    if (tournament.latitude !== null && tournament.longitude !== null) geo = { lat: Number(tournament.latitude), lng: Number(tournament.longitude) };
   }
   const playingPosition = normalizePlayerListingPosition(body.playingPosition);
   if (type === 'tournament' && !eventDate) throw new HttpError(400, 'Bitte gib ein Datum an');
-  const [geo] = await geocodeLocation(locationName, { countryCode, limit: 1 });
+  if (!geo) [geo] = await geocodeLocation(locationName, { countryCode, limit: 1 });
   if (!geo) throw new HttpError(400, 'Kein Ort gefunden.');
   return {
     type, title, description: normalizeRichText(body.description, 'Ungültige Beschreibung'), locationName, latitude: geo.lat, longitude: geo.lng, eventDate: eventDate || null, playingPosition,
