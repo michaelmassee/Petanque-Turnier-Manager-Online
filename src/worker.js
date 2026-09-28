@@ -3524,12 +3524,15 @@ async function upsertDocumentRegistration(request, env, tournament, localRegistr
 /**
  * Loest die Dokument-Verwaltung eines Turniers wieder (document_managed = 0), Gegenstueck zu
  * connectTournament. Hebt damit auch die in updateTournament() geprueften document_managed-Sperren
- * fuer Web-UI-Edits wieder auf.
+ * fuer Web-UI-Edits wieder auf. Ohne verbundenes Dokument kann dieses auch nicht mehr Master der
+ * Durchfuehrung sein: desktop_execution wird zurueckgesetzt (sonst bleiben Meldeliste und
+ * Online-Auslosung dauerhaft gesperrt) und der Desktop-Ranglisten-Snapshot verworfen. Bereits
+ * uebertragene Runden bleiben in tournament_matches erhalten.
  */
-async function disconnectTournament(db, tournamentId) {
+export async function disconnectTournament(db, tournamentId) {
   await db
     .prepare(`UPDATE tournaments SET document_managed = 0, sync_document_id = NULL, sync_lease_token_hash = NULL,
-              sync_takeover_request_id = NULL, updated_at = ? WHERE id = ?`)
+              sync_takeover_request_id = NULL, desktop_execution = 0, desktop_ranking_json = NULL, updated_at = ? WHERE id = ?`)
     .bind(new Date().toISOString(), tournamentId)
     .run();
   return json({ ok: true });
