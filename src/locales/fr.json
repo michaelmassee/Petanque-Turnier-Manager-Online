@@ -1056,5 +1056,7 @@
   "Dieses Turnier wird von einem Turnierdokument geführt. Das Löschen muss ausdrücklich bestätigt werden.": "Ce tournoi est géré par un document de tournoi. La suppression doit être confirmée explicitement.",
   "Benutzer „{name}“ wirklich löschen? Das kann nicht rückgängig gemacht werden.": "Supprimer vraiment l’utilisateur « {name} » ? Cette action est irréversible.",
   "Dieser Benutzer besitzt {count} Turnier(e). OK = diese Turniere ebenfalls löschen. Abbrechen = die Turniere werden dir als Admin zugewiesen und bleiben erhalten.": "Cet utilisateur possède {count} tournoi(s). OK = supprimer également ces tournois. Annuler = les tournois vous sont attribués en tant qu’administrateur et sont conservés.",
-  "{count} davon sind gerade mit einem Turnierdokument (LibreOffice) verbunden; beim Löschen verlieren die Spieler Live-Ansicht und Ergebnisse.": "{count} d’entre eux sont actuellement connectés à un document de tournoi (LibreOffice) ; en les supprimant, les joueurs perdent la vue en direct et les résultats."
+  "{count} davon sind gerade mit einem Turnierdokument (LibreOffice) verbunden; beim Löschen verlieren die Spieler Live-Ansicht und Ergebnisse.": "{count} d’entre eux sont actuellement connectés à un document de tournoi (LibreOffice) ; en les supprimant, les joueurs perdent la vue en direct et les résultats.",
+  "Mitspieler": "Partenaires",
+  "Anmelden (Turnier)": "S’inscrire"
 }

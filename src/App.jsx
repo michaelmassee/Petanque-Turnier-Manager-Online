@@ -2151,7 +2151,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
             onClick={() => onRegister(tournament)}
             disabled={tournament.visibility !== 'public' || !hasOpenRegistration(tournament)}
           >
-            {t('Anmelden')}
+            {t('Anmelden (Turnier)')}
           </Button>
         )}
       </div>

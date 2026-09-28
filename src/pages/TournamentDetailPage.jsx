@@ -507,7 +507,20 @@ export function TournamentDetailPage({
 
   const canRegister = (tournament.visibility === 'public' || Boolean(shareToken)) && tournament.registrationEnabled !== false && hasOpenRegistration(tournament);
   const canShowParticipants = (tournament.participantsPublic || tournament.canManage) && tournament.registrationEnabled !== false;
-  const canShowSchedule = canShowParticipants && isOnlinePlayable(tournament);
+  // Vor dem Start interessieren Mitspielgesuche, danach der Spielplan – so bleiben es auf
+  // kleinen Handys höchstens vier Reiter.
+  const started = tournament.status === 'running' || tournament.status === 'finished';
+  const canShowPlayerListings = tournament.visibility === 'public' && !started;
+  const canShowSchedule = canShowParticipants && isOnlinePlayable(tournament) && started;
+  const availableViews = {
+    info: true,
+    anmelden: canRegister,
+    teilnehmer: canShowParticipants,
+    mitspieler: canShowPlayerListings,
+    spielplan: canShowSchedule,
+  };
+  // Alte Links (z. B. /mitspieler nach dem Start) landen auf Info statt auf einer leeren Seite.
+  const view = availableViews[route.view] ? route.view : 'info';
 
   async function handleShare() {
     const shareUrl = window.location.href;
@@ -560,49 +573,29 @@ export function TournamentDetailPage({
           </p>
         </header>
         <nav className="tournament-detail-tabs" aria-label={t('Turnierdetails')}>
-          <button
-            className={`tournament-detail-tab ${route.view === 'info' ? 'active' : ''}`}
-            type="button"
-            onClick={() => navigate(detailPath('info'))}
-          >
-            {t('Info')}
-          </button>
-          {canRegister && (
+          {[
+            ['info', t('Info')],
+            ['anmelden', t('Anmeldung')],
+            ['teilnehmer', t('Teilnehmer')],
+            ['mitspieler', t('Mitspieler')],
+            ['spielplan', t('Spielplan')],
+          ].filter(([key]) => availableViews[key]).map(([key, label]) => (
             <button
-              className={`tournament-detail-tab ${route.view === 'anmelden' ? 'active' : ''}`}
+              key={key}
+              className={`tournament-detail-tab ${view === key ? 'active' : ''}`}
               type="button"
-              onClick={() => navigate(detailPath('anmelden'))}
+              aria-current={view === key ? 'page' : undefined}
+              onClick={() => navigate(detailPath(key))}
             >
-              {t('Anmelden')}
+              {label}
             </button>
-          )}
-          {canShowParticipants && (
-            <button
-              className={`tournament-detail-tab ${route.view === 'teilnehmer' ? 'active' : ''}`}
-              type="button"
-              onClick={() => navigate(detailPath('teilnehmer'))}
-            >
-              {t('Teilnehmer')}
-            </button>
-          )}
-          {canShowSchedule && (
-            <button
-              className={`tournament-detail-tab ${route.view === 'spielplan' ? 'active' : ''}`}
-              type="button"
-              onClick={() => navigate(detailPath('spielplan'))}
-            >
-              {t('Spielplan')}
-            </button>
-          )}
+          ))}
         </nav>
 
         <div className="tournament-detail-content">
-          {route.view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} showTitle={false} shareToken={shareToken} />}
-          {route.view === 'info' && tournament.visibility === 'public' && (
-            <TournamentPlayerListings tournament={tournament} currentUser={currentUser} navigate={navigate} />
-          )}
+          {view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} showTitle={false} shareToken={shareToken} />}
 
-          {route.view === 'anmelden' && canRegister && (
+          {view === 'anmelden' && (
             <PublicRegistrationPanel
               tournament={tournament}
               form={registrationForm}
@@ -617,7 +610,7 @@ export function TournamentDetailPage({
             />
           )}
 
-          {route.view === 'teilnehmer' && canShowParticipants && (
+          {view === 'teilnehmer' && (
             <>
               <p className="hint">
                 {t('Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.')}
@@ -626,7 +619,9 @@ export function TournamentDetailPage({
             </>
           )}
 
-          {route.view === 'spielplan' && canShowSchedule && <TournamentSchedule tournamentId={tournament.id} tournament={tournament} />}
+          {view === 'mitspieler' && <TournamentPlayerListings tournament={tournament} currentUser={currentUser} navigate={navigate} />}
+
+          {view === 'spielplan' && <TournamentSchedule tournamentId={tournament.id} tournament={tournament} />}
         </div>
       </section>
     </main>
