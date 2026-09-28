@@ -258,19 +258,26 @@ export function LiveDetail({ queryKey, path, useSession, language }) {
   );
 }
 
-function MyLiveList({ navigate, language }) {
+export function MyLiveList({ navigate, language }) {
   const { t } = useTranslation();
   const query = useQuery({ queryKey: ['live', 'me'], queryFn: () => authenticatedApi('/api/live/me'), retry: false });
+  const registrations = query.data?.registrations || [];
+
+  useEffect(() => {
+    if (registrations.length === 1 && registrations[0].tournament.status === 'running') {
+      navigate(`/live/${encodeURIComponent(registrations[0].id)}`);
+    }
+  }, [navigate, registrations]);
 
   if (query.isPending) return <p className="muted">{t('Wird geladen…')}</p>;
   if (query.error) return <Feedback error={query.error.message} />;
 
-  const registrations = query.data.registrations;
   if (!registrations.length) {
     return <p className="muted">{t('Du bist aktuell in keinem laufenden Turnier gemeldet.')}</p>;
   }
   return (
     <div className="live-list">
+      <p className="hint live-list-hint">{t('Wähle ein Turnier aus, um die Live-Ansicht zu öffnen.')}</p>
       {registrations.map((entry) => (
         <button key={entry.id} type="button" className="panel live-list-item" onClick={() => navigate(`/live/${encodeURIComponent(entry.id)}`)}>
           <strong data-i18n-skip>{entry.tournament.name}</strong>

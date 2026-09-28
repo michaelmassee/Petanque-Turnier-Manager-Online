@@ -3501,8 +3501,20 @@ async function takeoverTournamentDocument(request, db, tournament) {
 async function upsertDocumentRegistration(request, env, tournament, localRegistrationUuid) {
   const body = await readJson(request);
   const localUuid = requireUuid(localRegistrationUuid, 'localRegistrationUuid');
-  const existing = await env.DB.prepare('SELECT * FROM registrations WHERE tournament_id = ? AND local_registration_uuid = ?')
+  let existing = await env.DB.prepare('SELECT * FROM registrations WHERE tournament_id = ? AND local_registration_uuid = ?')
     .bind(tournament.id, localUuid).first();
+  let claimedExistingRegistration = false;
+  if (!existing && body.documentMaster === true && body.onlineRegistrationId !== undefined) {
+    const onlineRegistrationId = requireUuid(body.onlineRegistrationId, 'onlineRegistrationId');
+    existing = await env.DB.prepare('SELECT * FROM registrations WHERE tournament_id = ? AND id = ?')
+      .bind(tournament.id, onlineRegistrationId).first();
+    if (existing && existing.local_registration_uuid && existing.local_registration_uuid !== localUuid) {
+      throw new HttpError(409, 'Die Online-Anmeldung ist bereits einer anderen lokalen PTM-Online-ID zugeordnet', {
+        code: 'registration_mapping_conflict', registration: toPublicRegistration(existing),
+      });
+    }
+    claimedExistingRegistration = Boolean(existing);
+  }
   if (!existing) {
     // Bootstrap is the only path on which the document may seed registration-owned fields.
     body.confirmImmediately = true;
@@ -3525,9 +3537,47 @@ async function upsertDocumentRegistration(request, env, tournament, localRegistr
   if (!REGISTRATION_STATUSES.includes(status)) throw new HttpError(400, 'Ungültiger Status');
   const participation = body.participation === undefined ? existing.participation : parseParticipation(body.participation);
   const seedingPosition = body.seedingPosition === undefined ? existing.seeding_position : body.seedingPosition;
+  const documentMaster = body.documentMaster === true;
+  let documentRegistration = null;
+  if (documentMaster) {
+    // The linked Calc document owns the displayed participants.  Registration-owned values such as
+    // e-mail addresses, fees and answers deliberately remain untouched: a name correction in Calc
+    // must not transfer the personal account/contact data of an older online registration.
+    documentRegistration = normalizeRegistrationInput({
+      ...body,
+      email: existing.email,
+      partnerEmail: existing.partner_email,
+      partner2Email: existing.partner2_email,
+      status: existing.status,
+      isVip: Boolean(Number(existing.is_vip || 0)),
+      organizerMessage: existing.organizer_message,
+    }, { requireStatus: true });
+    assertPartnerCountMatchesFormation(tournament, documentRegistration);
+  }
   await env.DB.prepare(`UPDATE registrations SET status = ?, participation = ?, seeding_position = ?,
+      first_name = CASE WHEN ? THEN ? ELSE first_name END,
+      last_name = CASE WHEN ? THEN ? ELSE last_name END,
+      club = CASE WHEN ? THEN ? ELSE club END,
+      license_nr = CASE WHEN ? THEN ? ELSE license_nr END,
+      partner_first_name = CASE WHEN ? THEN ? ELSE partner_first_name END,
+      partner_last_name = CASE WHEN ? THEN ? ELSE partner_last_name END,
+      partner2_first_name = CASE WHEN ? THEN ? ELSE partner2_first_name END,
+      partner2_last_name = CASE WHEN ? THEN ? ELSE partner2_last_name END,
+      team_name = CASE WHEN ? THEN ? ELSE team_name END,
+      local_registration_uuid = CASE WHEN ? THEN ? ELSE local_registration_uuid END,
       execution_revision = execution_revision + 1, updated_at = ? WHERE id = ?`)
-    .bind(status, participation, seedingPosition, new Date().toISOString(), existing.id).run();
+    .bind(status, participation, seedingPosition,
+      documentMaster ? 1 : 0, documentRegistration?.firstName,
+      documentMaster ? 1 : 0, documentRegistration?.lastName,
+      documentMaster ? 1 : 0, documentRegistration?.club,
+      documentMaster ? 1 : 0, documentRegistration?.licenseNr,
+      documentMaster ? 1 : 0, documentRegistration?.partnerFirstName,
+      documentMaster ? 1 : 0, documentRegistration?.partnerLastName,
+      documentMaster ? 1 : 0, documentRegistration?.partner2FirstName,
+      documentMaster ? 1 : 0, documentRegistration?.partner2LastName,
+      documentMaster ? 1 : 0, documentRegistration?.teamName,
+      claimedExistingRegistration ? 1 : 0, localUuid,
+      new Date().toISOString(), existing.id).run();
   if (participation === 'active') {
     await sendLiveLinkEmails(env, tournament.id, [existing.id], new URL(request.url).origin);
   }

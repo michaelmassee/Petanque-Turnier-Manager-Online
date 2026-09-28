@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { LiveDetail } from './PlayerLivePage.jsx';
+import { LiveDetail, MyLiveList } from './PlayerLivePage.jsx';
 import { matchLiveRoute } from '../lib/routing.js';
 
 function jsonResponse(payload, status = 200) {
@@ -36,6 +36,15 @@ function renderDetail() {
   return render(
     <QueryClientProvider client={client}>
       <LiveDetail queryKey={['live', 'token', 'abc']} path="/api/live/token/abc" language="de" />
+    </QueryClientProvider>,
+  );
+}
+
+function renderList(navigate = vi.fn()) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MyLiveList navigate={navigate} language="de" />
     </QueryClientProvider>,
   );
 }
@@ -84,6 +93,32 @@ describe('Live-Ansicht für Spieler', () => {
     renderDetail();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Dieser Live-Link ist ungültig oder abgelaufen');
+  });
+
+  it('fordert bei mehreren laufenden Turnieren zur Auswahl auf', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({
+      registrations: [
+        { id: 'r1', label: 'Anna Muster', participation: 'active', tournament: { name: 'Sommer-Supermêlée', date: '2026-09-25', location: 'Linden', status: 'running' } },
+        { id: 'r2', label: 'Bert Beispiel', participation: 'active', tournament: { name: 'Herbst-Supermêlée', date: '2026-09-26', location: 'Linden', status: 'running' } },
+      ],
+    })));
+    renderList();
+
+    expect(await screen.findByText('Wähle ein Turnier aus, um die Live-Ansicht zu öffnen.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sommer-Supermêlée/ })).toBeInTheDocument();
+  });
+
+  it('öffnet das einzige laufende Turnier direkt', async () => {
+    const navigate = vi.fn();
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({
+      registrations: [
+        { id: 'r1', label: 'Anna Muster', participation: 'active', tournament: { name: 'Sommer-Supermêlée', date: '2026-09-25', location: 'Linden', status: 'running' } },
+      ],
+    })));
+    renderList(navigate);
+
+    await screen.findByText('Sommer-Supermêlée');
+    expect(navigate).toHaveBeenCalledWith('/live/r1');
   });
 });
 
