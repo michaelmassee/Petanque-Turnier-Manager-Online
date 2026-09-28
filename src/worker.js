@@ -6584,18 +6584,21 @@ export async function playerListingInput(db, body, countryCode) {
   const type = text(body.type);
   if (type !== 'tournament' && type !== 'training') throw new HttpError(400, 'Bitte wähle einen Typ');
   const title = text(body.title); if (title.length < 2) throw new HttpError(400, 'Bitte gib einen Titel ein');
-  const locationName = text(body.locationName); if (locationName.length < 2) throw new HttpError(400, 'Bitte gib einen Ort ein');
+  let locationName = text(body.locationName);
   const tournamentId = type === 'tournament' ? text(body.tournamentId) : '';
   let eventDate = type === 'tournament' ? text(body.eventDate) : '';
   let geo = null;
   if (tournamentId) {
-    // Das Datum kommt immer aus dem Turnier, damit das Gesuch zusammen mit ihm abläuft.
-    const tournament = await db.prepare("SELECT id, date, latitude, longitude FROM tournaments WHERE id = ? AND visibility = 'public'").bind(tournamentId).first();
+    // Datum und Ort kommen immer aus dem Turnier: das Gesuch läuft mit ihm ab,
+    // und Ortsname und Kartenpunkt können nicht auseinanderfallen.
+    const tournament = await db.prepare("SELECT id, date, location, latitude, longitude FROM tournaments WHERE id = ? AND visibility = 'public'").bind(tournamentId).first();
     if (!tournament) throw new HttpError(400, 'Turnier nicht gefunden');
     eventDate = tournament.date;
+    locationName = text(tournament.location);
     // Vorhandene Turnierkoordinaten übernehmen statt die Adresse erneut zu geocodieren.
     if (tournament.latitude !== null && tournament.longitude !== null) geo = { lat: Number(tournament.latitude), lng: Number(tournament.longitude) };
   }
+  if (locationName.length < 2) throw new HttpError(400, 'Bitte gib einen Ort ein');
   const playingPosition = normalizePlayerListingPosition(body.playingPosition);
   if (type === 'tournament' && !eventDate) throw new HttpError(400, 'Bitte gib ein Datum an');
   if (!geo) [geo] = await geocodeLocation(locationName, { countryCode, limit: 1 });

@@ -64,12 +64,26 @@ describe('Mitspielgesuche mit Turnierverknüpfung', () => {
   it('übernimmt Datum und Koordinaten des Turniers ohne erneutes Geocoding', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    const db = fakeDb({ id: 't-1', date: '2099-05-01', latitude: 51.2, longitude: 6.8 });
+    const db = fakeDb({ id: 't-1', date: '2099-05-01', location: 'Boulodrome Nord', latitude: 51.2, longitude: 6.8 });
 
-    const input = await playerListingInput(db, { type: 'tournament', title: 'Suche', locationName: 'Boulodrome Nord', eventDate: '2000-01-01', tournamentId: 't-1', deleteWhenTournamentFinished: false }, 'DE');
+    const input = await playerListingInput(db, { type: 'tournament', title: 'Suche', locationName: 'Fremder Ort', eventDate: '2000-01-01', tournamentId: 't-1', deleteWhenTournamentFinished: false }, 'DE');
 
-    expect(input).toMatchObject({ tournamentId: 't-1', eventDate: '2099-05-01', latitude: 51.2, longitude: 6.8, deleteWhenTournamentFinished: 0 });
+    expect(input).toMatchObject({ tournamentId: 't-1', eventDate: '2099-05-01', locationName: 'Boulodrome Nord', latitude: 51.2, longitude: 6.8, deleteWhenTournamentFinished: 0 });
     expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('geocodiert bei Turnier ohne Koordinaten den Turnierort statt des Client-Ortes', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify([{ lat: '51.3', lon: '6.9', display_name: 'Boulodrome Nord', address: {} }])));
+    vi.stubGlobal('fetch', fetchMock);
+    const db = fakeDb({ id: 't-1', date: '2099-05-01', location: 'Boulodrome Nord', latitude: null, longitude: null });
+
+    const input = await playerListingInput(db, { type: 'tournament', title: 'Suche', locationName: 'Fremder Ort', tournamentId: 't-1' }, 'DE');
+
+    expect(input).toMatchObject({ locationName: 'Boulodrome Nord', latitude: 51.3, longitude: 6.9 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain(encodeURIComponent('Boulodrome Nord'));
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain('Fremder');
     vi.unstubAllGlobals();
   });
 

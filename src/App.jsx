@@ -167,6 +167,8 @@ function AppContent() {
     if (sessionExpiryHandled.current) return;
     sessionExpiryHandled.current = true;
     queryClient.clear();
+    // Offline-API-Cache kann Antworten der abgelaufenen Sitzung enthalten.
+    void clearOfflineApiCache();
     setCurrentUser(null);
     setPostboxOpen(false);
     setPostbox({ messages: [], unreadCount: 0, todos: [] });
