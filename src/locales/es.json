@@ -1,5 +1,8 @@
 {
   "Die App konnte nicht wiederhergestellt werden.": "No se pudo recuperar la aplicación.",
+  "Mindestens zwei Zuordnungen sind erforderlich": "Se requieren al menos dos asignaciones",
+  "Lokale und Online-IDs müssen innerhalb des Tauschs eindeutig sein": "Los ID locales y en línea deben ser únicos dentro del intercambio",
+  "Eine Online-Anmeldung existiert nicht mehr": "Una inscripción en línea ya no existe",
   "Bitte starte die App erneut.": "Reinicia la aplicación.",
   "App neu starten": "Reiniciar aplicación",
   "Die App ist offline nicht vollständig verfügbar.": "La aplicación no está completamente disponible sin conexión.",

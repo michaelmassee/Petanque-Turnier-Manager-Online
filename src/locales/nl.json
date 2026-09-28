@@ -1,5 +1,8 @@
 {
   "Die App konnte nicht wiederhergestellt werden.": "De app kon niet worden hersteld.",
+  "Mindestens zwei Zuordnungen sind erforderlich": "Minimaal twee koppelingen zijn vereist",
+  "Lokale und Online-IDs müssen innerhalb des Tauschs eindeutig sein": "Lokale en online-ID's moeten binnen de wissel uniek zijn",
+  "Eine Online-Anmeldung existiert nicht mehr": "Een online-aanmelding bestaat niet meer",
   "Bitte starte die App erneut.": "Start de app opnieuw.",
   "App neu starten": "App opnieuw starten",
   "Die App ist offline nicht vollständig verfügbar.": "De app is offline niet volledig beschikbaar.",
