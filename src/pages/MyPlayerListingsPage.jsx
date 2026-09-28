@@ -72,17 +72,6 @@ function MyPlayerListingsPanel({ language, currentUser }) {
     setDialogOpen(true);
   }, [tournamentsLoaded, tournaments]);
 
-  // Einstieg von der Turnierseite: /meine-anzeigen?bearbeiten=<id> öffnet
-  // direkt den Bearbeiten-Dialog des eigenen Gesuchs.
-  const requestedEditHandled = useRef(false);
-  useEffect(() => {
-    if (loading || requestedEditHandled.current) return;
-    requestedEditHandled.current = true;
-    const requestedId = new URLSearchParams(window.location.search).get('bearbeiten');
-    const listing = requestedId && listings.find((entry) => entry.id === requestedId);
-    if (listing) openEdit(listing);
-  }, [loading, listings]);
-
   const filtered = useMemo(() => listings.filter((listing) => {
     if (typeFilter && listing.type !== typeFilter) return false;
     if (!query.trim()) return true;
