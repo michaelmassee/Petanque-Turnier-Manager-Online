@@ -455,6 +455,12 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
         <>
           <div className="nav-drawer-backdrop" onClick={onCloseMenu} />
           <nav className="nav-drawer" aria-label={t('Hauptmenü')}>
+            {currentUser && (
+              <div className="drawer-user">
+                <span data-i18n-skip>{currentUser.firstName} {currentUser.lastName}</span>
+                <strong>{roleName(currentUser.role)}</strong>
+              </div>
+            )}
             {children}
             <InstallAppButton />
             {navigate && (

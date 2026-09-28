@@ -10,7 +10,7 @@ import { LIVE_VIEW_AVAILABLE_EVENT, liveViewPathFor } from './postbox-core.js';
 import { usePath, matchTournamentRoute, matchLiveRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
-import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, roleName, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm } from './lib/domain.js';
+import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm } from './lib/domain.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
@@ -1144,8 +1144,6 @@ function AppContent() {
     setGeoError('');
   }
 
-  const roleLabel = useMemo(() => roleName(currentUser?.role), [currentUser]);
-
   function selectDrawerTab(tab) {
     setActiveTab(tab);
     setMenuOpen(false);
@@ -1813,10 +1811,6 @@ function AppContent() {
         ) : null}
         postboxControl={renderPostboxControl()}
       >
-        <div className="drawer-user">
-          <span data-i18n-skip>{currentUser.firstName} {currentUser.lastName}</span>
-          <strong>{roleLabel}</strong>
-        </div>
         {drawerContent(activeTabArea)}
       </AppHeader>
 

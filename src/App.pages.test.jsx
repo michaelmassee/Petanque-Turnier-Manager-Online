@@ -186,6 +186,24 @@ describe('Kopfzeile', () => {
     expect(scrollArea).toContainElement(screen.getByRole('button', { name: 'Menü öffnen' }));
   });
 
+  it('zeigt den angemeldeten Benutzer im Hamburger-Menü unabhängig vom Bereich', () => {
+    render(
+      <AppHeader
+        heading="Boule-Treff"
+        language="de"
+        setLanguage={() => {}}
+        menuOpen
+        onToggleMenu={() => {}}
+        onCloseMenu={() => {}}
+        currentUser={{ firstName: 'Marie', lastName: 'Curie', role: 'user' }}
+      />,
+    );
+
+    const drawer = screen.getByRole('navigation', { name: 'Hauptmenü' });
+    expect(within(drawer).getByText('Marie Curie')).toBeInTheDocument();
+    expect(within(drawer).getByText('User')).toBeInTheDocument();
+  });
+
   it('verlinkt die Anleitung zwischen Boule-Treff und Admin-Dashboard in der Bereichsleiste', () => {
     render(
       <AppHeader
