@@ -651,6 +651,44 @@ function TournamentPageHarness({ onSubmit, visibility = 'private', includeCalend
   );
 }
 
+describe('Turniere-Seite: Trennen vom Turnierdokument', () => {
+  const basis = { location: 'Musterstadt', date: '2026-06-01', formation: 'doublette', registrationType: 'forme', type: 'ko', status: 'running', visibility: 'public', activeRegistrations: 0, maxRegistrations: 16, waitlistRegistrations: 0, canManage: true };
+
+  it('bietet das Trennen für verbundene und aus dem Dokument gestartete Turniere an', () => {
+    const onDisconnect = vi.fn();
+    render(
+      <TournamentList
+        tournaments={[
+          { ...basis, id: 'online', name: 'Online-Turnier' },
+          { ...basis, id: 'verbunden', name: 'Verbundenes Turnier', documentManaged: true },
+          { ...basis, id: 'gestartet', name: 'Aus Dokument gestartet', desktopExecution: true },
+        ]}
+        totalTournaments={3}
+        selectedId=""
+        onSelect={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+        onDuplicate={() => {}}
+        onDisconnect={onDisconnect}
+        isAdmin={false}
+        language="de"
+        onCreate={() => {}}
+        query=""
+        onQueryChange={() => {}}
+        statusFilter=""
+        onStatusFilterChange={() => {}}
+        onResetFilters={() => {}}
+      />,
+    );
+
+    const trennen = screen.getAllByRole('button', { name: 'Vom Turnierdokument trennen' });
+    expect(trennen).toHaveLength(2);
+
+    fireEvent.click(trennen[1]);
+    expect(onDisconnect).toHaveBeenCalledWith(expect.objectContaining({ id: 'gestartet' }));
+  });
+});
+
 describe('Turniere-Seite: Liste + Dialog', () => {
   it('bestätigt sichtbar, wenn ein Turnierlink in die Zwischenablage kopiert wurde', async () => {
     const share = navigator.share;

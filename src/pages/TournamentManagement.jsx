@@ -21,6 +21,11 @@ function deleteTournamentConfirmation(t, tournamentName, documentManaged) {
 }
 
 /** Der Server verlangt die Bestätigung, weil das Turnier inzwischen mit einem Turnierdokument verbunden ist. */
+/** Ein Turnier ist ans Turnierdokument gebunden oder wurde bereits aus ihm gestartet. */
+function isDocumentBound(tournament) {
+  return Boolean(tournament.documentManaged || tournament.desktopExecution);
+}
+
 function isDocumentManagedConflict(error) {
   return error?.status === 409 && error?.payload?.details?.code === 'document_managed';
 }
@@ -590,6 +595,7 @@ export function TournamentList({
   onEdit,
   onDelete,
   onDuplicate,
+  onDisconnect = () => {},
   isAdmin,
   language,
   onCreate,
@@ -723,6 +729,16 @@ export function TournamentList({
                     onClick={() => disableShareLink(tournament)}
                   >
                     {t('Freigabe-Link deaktivieren')}
+                  </Button>
+                )}
+                {isDocumentBound(tournament) && (
+                  <Button
+                    variant="secondary"
+                    loading={busyId === `disconnect-${tournament.id}`}
+                    disabled={Boolean(busyId) && busyId !== `disconnect-${tournament.id}`}
+                    onClick={() => onDisconnect(tournament)}
+                  >
+                    {t('Vom Turnierdokument trennen')}
                   </Button>
                 )}
                 <Button
@@ -915,6 +931,26 @@ export function TournamentManagementPage({
     }
   }
 
+  async function handleDisconnect(tournament) {
+    const question = t('Turnier „{name}“ vom Turnierdokument trennen? Das Turnierdokument kann danach nichts mehr übertragen. Meldeliste, Runden und Rangliste werden ab dann online geführt; bisher übertragene Runden bleiben erhalten.').replace('{name}', tournament.name);
+    if (!window.confirm(question)) {
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setBusyId(`disconnect-${tournament.id}`);
+    try {
+      await authenticatedApi(`/api/tournaments/${tournament.id}/disconnect`, { method: 'POST' });
+      setMessage(t('Turnier wurde vom Turnierdokument getrennt und wird online weitergeführt.'));
+      await onTournamentsChanged?.();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusyId('');
+    }
+  }
+
   async function handleDelete(tournament) {
     const documentManaged = Boolean(tournament.documentManaged);
     if (!window.confirm(deleteTournamentConfirmation(t, tournament.name, documentManaged))) {
@@ -953,6 +989,7 @@ export function TournamentManagementPage({
         onEdit={openEdit}
         onDelete={handleDelete}
         onDuplicate={handleDuplicate}
+        onDisconnect={handleDisconnect}
         isAdmin={isAdmin}
         language={language}
         onCreate={openCreate}

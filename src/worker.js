@@ -1741,6 +1741,19 @@ export default {
         return await startTournament(env, tournament, session.user, new URL(request.url).origin);
       }
 
+      // Web-Gegenstueck zu /api/sync/.../disconnect: Der Turnierleiter trennt ohne Dokument-Lease,
+      // z. B. wenn das Turnierdokument nicht mehr verfuegbar ist, und fuehrt das Turnier online weiter.
+      const tournamentDisconnectMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/disconnect$/);
+      if (tournamentDisconnectMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, tournamentDisconnectMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        assertCanManageTournament(tournament, session.user);
+        return await disconnectTournament(env.DB, tournament.id);
+      }
+
       const presentationMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/presentation$/);
       if (presentationMatch && request.method === 'PUT') {
         const session = await requireSession(request, env.DB);
