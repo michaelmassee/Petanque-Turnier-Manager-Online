@@ -120,15 +120,18 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
   }
 
   async function handleDelete(user) {
-    if (!window.confirm(`Benutzer "${user.firstName} ${user.lastName}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) {
+    if (!window.confirm(t('Benutzer „{name}“ wirklich löschen? Das kann nicht rückgängig gemacht werden.').replace('{name}', `${user.firstName} ${user.lastName}`))) {
       return;
     }
     const ownedTournaments = tournaments.filter((tournament) => tournament.ownerId === user.id);
     let deleteTournaments = false;
     if (ownedTournaments.length > 0) {
-      deleteTournaments = window.confirm(
-        `Dieser Benutzer besitzt ${ownedTournaments.length} Turnier(e). OK = diese Turniere ebenfalls löschen. Abbrechen = die Turniere werden dir als Admin zugewiesen und bleiben erhalten.`,
-      );
+      const connectedCount = ownedTournaments.filter((tournament) => tournament.documentManaged).length;
+      const question = t('Dieser Benutzer besitzt {count} Turnier(e). OK = diese Turniere ebenfalls löschen. Abbrechen = die Turniere werden dir als Admin zugewiesen und bleiben erhalten.').replace('{count}', String(ownedTournaments.length));
+      const warning = connectedCount > 0
+        ? `\n\n${t('{count} davon sind gerade mit einem Turnierdokument (LibreOffice) verbunden; beim Löschen verlieren die Spieler Live-Ansicht und Ergebnisse.').replace('{count}', String(connectedCount))}`
+        : '';
+      deleteTournaments = window.confirm(question + warning);
     }
 
     setError(''); setMessage('');

@@ -1724,6 +1724,7 @@ export default {
         }
 
         if (request.method === 'DELETE') {
+          assertTournamentDeletable(tournament, url.searchParams.get('confirmDocumentManaged') === 'true');
           return await deleteTournament(env.DB, tournament.id);
         }
       }
@@ -4451,6 +4452,17 @@ async function syncPutTournamentMetadata(request, env, existing, user) {
     await notifySavedSearchesForPublishedTournament(env, updated);
   }
   return json({ tournament: toPublicTournament(updated, user) });
+}
+
+/**
+ * Ein mit einem Turnierdokument verbundenes Turnier (document_managed) wird nur mit ausdrücklicher Bestätigung
+ * gelöscht: Das Löschen entfernt Live-Ansicht und Ergebnisse der Spieler und nimmt dem Turnierdokument die
+ * Verbindung. Schützt auch Aufrufe an der Web-Oberfläche vorbei (API, ältere App-Stände).
+ */
+export function assertTournamentDeletable(tournament, confirmDocumentManaged) {
+  if (Number(tournament.document_managed || 0) === 1 && !confirmDocumentManaged) {
+    throw new HttpError(409, 'Dieses Turnier wird von einem Turnierdokument geführt. Das Löschen muss ausdrücklich bestätigt werden.', { code: 'document_managed' });
+  }
 }
 
 async function deleteTournament(db, id) {

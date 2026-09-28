@@ -10,6 +10,26 @@ import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { authenticatedApi } from '../lib/api.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
+/**
+ * Lösch-Rückfrage; bei einem mit einem Turnierdokument verbundenen Turnier mit deutlicher Warnung, weil Spieler
+ * Live-Ansicht und Ergebnisse verlieren und das Dokument die Verbindung.
+ */
+function deleteTournamentConfirmation(t, tournamentName, documentManaged) {
+  const question = t('Turnier „{name}“ wirklich löschen? Alle Anmeldungen dieses Turniers werden mitgelöscht und das kann nicht rückgängig gemacht werden.').replace('{name}', tournamentName);
+  if (!documentManaged) return question;
+  return `${question}\n\n${t('Achtung: Dieses Turnier wird gerade von einem Turnierdokument (LibreOffice) geführt. Beim Löschen verlieren die Spieler Live-Ansicht und Ergebnisse, und das Turnierdokument verliert die Verbindung.')}`;
+}
+
+/** Der Server verlangt die Bestätigung, weil das Turnier inzwischen mit einem Turnierdokument verbunden ist. */
+function isDocumentManagedConflict(error) {
+  return error?.status === 409 && error?.payload?.details?.code === 'document_managed';
+}
+
+function deleteTournamentRequest(tournamentId, confirmDocumentManaged) {
+  const query = confirmDocumentManaged ? '?confirmDocumentManaged=true' : '';
+  return authenticatedApi(`/api/tournaments/${tournamentId}${query}`, { method: 'DELETE' });
+}
+
 function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmin }) {
   const { t } = useTranslation();
   const [editors, setEditors] = useState(null);
@@ -885,11 +905,8 @@ export function TournamentManagementPage({
   }
 
   async function handleDelete(tournament) {
-    if (
-      !window.confirm(
-        `Turnier "${tournament.name}" wirklich löschen? Alle Anmeldungen dieses Turniers werden mitgelöscht und das kann nicht rückgängig gemacht werden.`,
-      )
-    ) {
+    const documentManaged = Boolean(tournament.documentManaged);
+    if (!window.confirm(deleteTournamentConfirmation(t, tournament.name, documentManaged))) {
       return;
     }
 
@@ -897,7 +914,14 @@ export function TournamentManagementPage({
     setMessage('');
     setBusyId(`delete-${tournament.id}`);
     try {
-      await authenticatedApi(`/api/tournaments/${tournament.id}`, { method: 'DELETE' });
+      try {
+        await deleteTournamentRequest(tournament.id, documentManaged);
+      } catch (requestError) {
+        if (!isDocumentManagedConflict(requestError)) throw requestError;
+        // Erst nach dem Laden der Liste verbunden: mit Warnung erneut fragen.
+        if (!window.confirm(deleteTournamentConfirmation(t, tournament.name, true))) return;
+        await deleteTournamentRequest(tournament.id, true);
+      }
       setMessage(t('Turnier wurde gelöscht.'));
       setSelectedTournamentId('');
       await onTournamentsChanged?.();

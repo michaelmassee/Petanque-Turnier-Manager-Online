@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { requireSyncLease } from './worker.js';
+import { assertTournamentDeletable, requireSyncLease } from './worker.js';
 
 const documentId = 'e9e9caec-e0b1-4fe0-8fee-a229279b9f73';
 const replacedDocumentId = 'd8d8caec-e0b1-4fe0-8fee-a229279b9f73';
@@ -45,5 +45,21 @@ describe('Sync-Lease für Turniermetadaten', () => {
       'X-PTM-Sync-Document': documentId,
       'X-PTM-Sync-Lease': leaseToken,
     }), tournament)).resolves.toBeUndefined();
+  });
+});
+
+describe('Löschen eines mit einem Turnierdokument verbundenen Turniers', () => {
+  it('verlangt eine ausdrückliche Bestätigung', () => {
+    expect(() => assertTournamentDeletable({ document_managed: 1 }, false))
+      .toThrow(expect.objectContaining({ status: 409, details: { code: 'document_managed' } }));
+  });
+
+  it('löscht mit Bestätigung', () => {
+    expect(() => assertTournamentDeletable({ document_managed: 1 }, true)).not.toThrow();
+  });
+
+  it('löscht nicht verbundene Turniere ohne Bestätigung', () => {
+    expect(() => assertTournamentDeletable({ document_managed: 0 }, false)).not.toThrow();
+    expect(() => assertTournamentDeletable({}, false)).not.toThrow();
   });
 });
