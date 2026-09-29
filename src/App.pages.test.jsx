@@ -582,7 +582,7 @@ describe('Vereinsmoderation', () => {
   });
 });
 
-function TournamentPageHarness({ onSubmit, visibility = 'private', includeCalendar = false }) {
+function TournamentPageHarness({ onSubmit, visibility = 'private', status = 'registration', includeCalendar = false }) {
   const [tournamentMode, setTournamentMode] = useState('create');
   const [tournamentForm, setTournamentForm] = useState(EMPTY_TOURNAMENT_FORM);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -590,7 +590,7 @@ function TournamentPageHarness({ onSubmit, visibility = 'private', includeCalend
   const [statusFilter, setStatusFilter] = useState('');
   const [hideCalendarEntries, setHideCalendarEntries] = useState(false);
   const tournaments = [
-    { id: 't1', name: 'Sommerturnier', location: 'Musterstadt', date: '2026-06-01', formation: 'doublette', registrationType: 'forme', type: 'ko', status: 'registration', visibility, activeRegistrations: 0, maxRegistrations: 16, waitlistRegistrations: 0, canManage: true },
+    { id: 't1', name: 'Sommerturnier', location: 'Musterstadt', date: '2026-06-01', formation: 'doublette', registrationType: 'forme', type: 'ko', status, visibility, activeRegistrations: 0, maxRegistrations: 16, waitlistRegistrations: 0, canManage: true },
     ...(includeCalendar ? [{ id: 'calendar-1', name: 'Boulefest', location: 'Musterstadt', date: '2026-06-02', status: 'draft', visibility: 'public', registrationEnabled: false, canManage: true }] : []),
   ];
 
@@ -786,6 +786,30 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     expect(screen.getByDisplayValue('Jugend')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Tarif entfernen' }));
     expect(screen.queryByDisplayValue('Jugend')).not.toBeInTheDocument();
+  });
+
+  it('bietet bei Turnieren mit verbundenem Dokument statt Bearbeiten die Status-Änderung an', () => {
+    const onEditPublication = vi.fn();
+    const tournament = { id: 't1', name: 'Dokumentturnier', location: 'Musterstadt', date: '2026-06-01', formation: 'triplette', registrationType: 'supermelee', type: 'rangliste', status: 'draft', visibility: 'private', activeRegistrations: 0, maxRegistrations: 0, waitlistRegistrations: 0, canManage: true, documentManaged: true };
+    render(
+      <TournamentList tournaments={[tournament]} totalTournaments={1} selectedId="" onSelect={() => {}} onEdit={() => {}} onDelete={() => {}}
+        onEditPublication={onEditPublication} isAdmin={false} language="de" onCreate={() => {}} query="" onQueryChange={() => {}}
+        statusFilter="" onStatusFilterChange={() => {}} onResetFilters={() => {}} />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Status ändern' }));
+    expect(onEditPublication).toHaveBeenCalledWith(tournament);
+  });
+
+  it('bietet Teilen auch für private Entwürfe an, nicht aber für öffentliche', () => {
+    const { unmount } = render(<TournamentPageHarness onSubmit={vi.fn()} status="draft" />);
+    expect(screen.getByRole('button', { name: 'Turnier teilen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Freigabe-Link deaktivieren' })).toBeInTheDocument();
+    unmount();
+
+    render(<TournamentPageHarness onSubmit={vi.fn()} status="draft" visibility="public" />);
+    expect(screen.queryByRole('button', { name: 'Turnier teilen' })).not.toBeInTheDocument();
   });
 
   it('öffnet den Dialog vorausgefüllt bei Bearbeiten, Abbrechen schließt ohne Submit, Speichern schließt mit Submit', () => {

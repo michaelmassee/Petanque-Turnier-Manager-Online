@@ -515,7 +515,18 @@ export function TournamentDetailPage({
   const view = availableViews[route.view] ? route.view : 'info';
 
   async function handleShare() {
-    const shareUrl = window.location.href;
+    setError('');
+    setMessage('');
+    let shareUrl = window.location.href;
+    // Ein privates Turnier ist nur über den Freigabe-Link sichtbar; Besitzer und Bearbeiter öffnen es ohne.
+    if (tournament.visibility === 'private' && !shareToken && tournament.canManage) {
+      try {
+        shareUrl = (await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' })).shareUrl;
+      } catch (shareError) {
+        setError(shareError.message);
+        return;
+      }
+    }
     const shareText = `${tournament.name}\n${shareUrl}`;
     if (navigator.share) {
       try {

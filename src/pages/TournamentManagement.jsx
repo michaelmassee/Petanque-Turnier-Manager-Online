@@ -596,6 +596,7 @@ export function TournamentList({
   onDelete,
   onDuplicate,
   onDisconnect = () => {},
+  onEditPublication = () => {},
   isAdmin,
   language,
   onCreate,
@@ -707,11 +708,14 @@ export function TournamentList({
             {tournament.canManage && (
               <div className="row-actions">
                 {tournament.documentManaged ? (
-                  <span className="muted">{t('Eckdaten im Turnierdokument')}</span>
+                  <>
+                    <span className="muted">{t('Eckdaten im Turnierdokument')}</span>
+                    <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onEditPublication(tournament)}>{t('Status ändern')}</Button>
+                  </>
                 ) : (
                   <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onEdit(tournament)}>{t('Bearbeiten')}</Button>
                 )}
-                {tournament.status !== 'draft' && (
+                {(tournament.status !== 'draft' || tournament.visibility === 'private') && (
                   <Button
                     variant="secondary"
                     loading={busyId === `share-${tournament.id}`}
@@ -721,7 +725,7 @@ export function TournamentList({
                     {t('Turnier teilen')}
                   </Button>
                 )}
-                {tournament.visibility === 'private' && tournament.status !== 'draft' && (
+                {tournament.visibility === 'private' && (
                   <Button
                     variant="secondary"
                     loading={busyId === `disable-${tournament.id}`}
@@ -838,6 +842,9 @@ export function TournamentManagementPage({
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState('');
   const [invalidField, setInvalidField] = useState(null);
+  const [publication, setPublication] = useState(null);
+  const [publicationError, setPublicationError] = useState('');
+  const [publicationSaving, setPublicationSaving] = useState(false);
 
   const manageableTournaments = useMemo(() => tournaments.filter((tournament) => tournament.canManage), [tournaments]);
   const filteredTournaments = useMemo(
@@ -908,6 +915,29 @@ export function TournamentManagementPage({
       setInvalidField(requestError.payload?.details?.field || null);
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openPublication(tournament) {
+    setPublicationError('');
+    setPublication({ id: tournament.id, name: tournament.name, currentStatus: tournament.status, status: tournament.status, visibility: tournament.visibility });
+  }
+
+  async function handlePublicationSubmit(event) {
+    event.preventDefault();
+    setPublicationError('');
+    setPublicationSaving(true);
+    try {
+      await authenticatedApi(`/api/tournaments/${publication.id}/publication`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: publication.status, visibility: publication.visibility }),
+      });
+      setPublication(null);
+      await onTournamentsChanged?.();
+    } catch (requestError) {
+      setPublicationError(requestError.message);
+    } finally {
+      setPublicationSaving(false);
     }
   }
 
@@ -990,6 +1020,7 @@ export function TournamentManagementPage({
         onDelete={handleDelete}
         onDuplicate={handleDuplicate}
         onDisconnect={handleDisconnect}
+        onEditPublication={openPublication}
         isAdmin={isAdmin}
         language={language}
         onCreate={openCreate}
@@ -1029,8 +1060,45 @@ export function TournamentManagementPage({
           invalidField={invalidField}
         />
       </EditDialog>
+
+      <EditDialog
+        open={Boolean(publication)}
+        title={t('Status und Sichtbarkeit')}
+        subtitle={publication?.name}
+        error={publicationError}
+        onClose={() => setPublication(null)}
+      >
+        {publication && (
+          <form onSubmit={handlePublicationSubmit}>
+            <div className="form-grid">
+              <SelectField
+                label={t('Status')}
+                value={publication.status}
+                onChange={(status) => setPublication({ ...publication, status })}
+                options={translatedOptions(publicationStatusOptions(publication.currentStatus))}
+              />
+              <SelectField
+                label={t('Sichtbarkeit')}
+                value={publication.visibility}
+                onChange={(visibility) => setPublication({ ...publication, visibility })}
+                options={translatedOptions(VISIBILITIES)}
+              />
+            </div>
+            <div className="dialog-actions">
+              <Button variant="secondary" type="button" onClick={() => setPublication(null)}>{t('Abbrechen')}</Button>
+              <Button type="submit" loading={publicationSaving}>{t('Speichern')}</Button>
+            </div>
+          </form>
+        )}
+      </EditDialog>
     </>
   );
+}
+
+// "Läuft" setzt nur der Turnierstart; ein laufendes Turnier kann nur noch abgeschlossen werden.
+function publicationStatusOptions(currentStatus) {
+  const allowed = currentStatus === 'running' ? ['running', 'finished'] : ['draft', 'registration', 'finished'];
+  return TOURNAMENT_STATUSES.filter((option) => allowed.includes(option.value));
 }
 
 export default TournamentManagementPage;

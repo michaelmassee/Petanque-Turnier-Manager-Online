@@ -1765,13 +1765,25 @@ export default {
         return await updateTournamentPresentation(request, env, tournament, session.user);
       }
 
+      const publicationMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/publication$/);
+      if (publicationMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, publicationMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        assertCanManageTournament(tournament, session.user);
+        return await updateTournamentPublication(request, env, tournament, session.user);
+      }
+
       const shareLinkMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/share-link$/);
       if (shareLinkMatch) {
         const session = await requireSession(request, env.DB);
         const tournament = await getTournamentById(env.DB, shareLinkMatch[1]);
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         assertCanManageTournament(tournament, session.user);
-        if (tournament.status === 'draft') throw new HttpError(400, 'Entwürfe können nicht geteilt werden');
+        // Öffentliche Entwürfe haben noch keine sichtbare Seite; private sind über den Freigabe-Link teilbar.
+        if (tournament.status === 'draft' && tournament.visibility !== 'private') throw new HttpError(400, 'Entwürfe können nicht geteilt werden');
         if (tournament.visibility !== 'private' && request.method === 'POST') {
           return json({ shareUrl: `${url.origin}/turniere/${tournament.id}/info` });
         }
@@ -3416,11 +3428,24 @@ async function listManagedTournaments(db, user) {
  * ohne sonstige Metadaten zu ueberschreiben. Wird beim Verbinden eines
  * Turnierdokuments mit einem bestehenden Online-Turnier aufgerufen.
  */
+/**
+ * Ein abgeschlossenes Turnier nimmt kein neues Turnierdokument mehr an: es könnte nur noch Namen, Ergebnisse und
+ * Rangliste des beendeten Turniers überschreiben. Das bereits gebundene Dokument bleibt davon unberührt.
+ */
+function assertBindableTournament(tournament, syncDocumentId) {
+  if (tournament.status === 'finished' && tournament.sync_document_id !== syncDocumentId) {
+    throw new HttpError(409, 'Ein abgeschlossenes Turnier kann nicht mit einem Turnierdokument verbunden werden', {
+      code: 'tournament_finished',
+    });
+  }
+}
+
 export async function connectTournament(request, db, tournament) {
   const body = await readJson(request);
   const syncDocumentId = requireUuid(body.syncDocumentId, 'syncDocumentId');
   const leaseToken = requireSecret(body.leaseToken, 'leaseToken');
   const leaseTokenHash = await sha256Hex(leaseToken);
+  assertBindableTournament(tournament, syncDocumentId);
   if (tournament.sync_document_id && tournament.sync_document_id !== syncDocumentId) {
     throw new HttpError(409, 'Dieses Turnier ist bereits mit einem anderen Turnierdokument verbunden', {
       code: 'document_bound', bindingRevision: Number(tournament.sync_binding_revision || 0),
@@ -3500,6 +3525,7 @@ export async function takeoverTournamentDocument(request, db, tournament) {
   const takeoverRequestId = requireUuid(body.takeoverRequestId, 'takeoverRequestId');
   const expectedRevision = Number(body.expectedBindingRevision);
   if (!Number.isInteger(expectedRevision) || expectedRevision < 0) throw new HttpError(400, 'expectedBindingRevision ist ungültig');
+  assertBindableTournament(tournament, syncDocumentId);
   if (tournament.sync_takeover_request_id === takeoverRequestId && tournament.sync_document_id === syncDocumentId) {
     return json({ ok: true, syncDocumentId, bindingRevision: Number(tournament.sync_binding_revision) });
   }
@@ -4051,14 +4077,44 @@ async function updateTournament(request, env, existing, user) {
   if (tournament.registrationQuestionsProvided) await pruneRegistrationAnswers(db, existing.id, registrationQuestions);
 
   const updated = await getTournamentById(db, existing.id);
+  await notifyTournamentPublicationChange(env, existing, updated);
+  return json({ tournament: toPublicTournament(updated, user) });
+}
+
+/** Veröffentlichung (gespeicherte Suchen) und Statuswechsel (Postfach) nach einer Turnieränderung melden. */
+async function notifyTournamentPublicationChange(env, existing, updated) {
   if (isNewlyPublicTournament(existing, updated)) {
     await notifySavedSearchesForPublishedTournament(env, updated);
   }
   if (updated.status !== existing.status) {
     await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
-    const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.owner_id).all();
+    const participants = await env.DB.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.owner_id).all();
     await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
   }
+}
+
+/**
+ * Status und Sichtbarkeit - auch bei einem mit dem Turnierdokument verbundenen Turnier. Das Dokument überträgt sie
+ * nicht (nur den Start über /sync/.../start), die Sperre von updateTournament gilt hier daher nicht. "Läuft" setzt
+ * ausschließlich der Turnierstart; ein laufendes Turnier kann nur abgeschlossen werden.
+ */
+export async function updateTournamentPublication(request, env, existing, user) {
+  const body = await readJson(request);
+  const status = String(body.status || '');
+  const visibility = String(body.visibility || '');
+  if (!['draft', 'registration', 'finished'].includes(status) && status !== existing.status) {
+    throw new HttpError(400, 'Ungültiger Turnierstatus');
+  }
+  if (!VISIBILITIES.includes(visibility)) {
+    throw new HttpError(400, 'Ungültige Sichtbarkeit');
+  }
+  if (existing.status === 'running' && !['running', 'finished'].includes(status)) {
+    throw new HttpError(409, 'Ein laufendes Turnier kann nur abgeschlossen werden');
+  }
+  await env.DB.prepare('UPDATE tournaments SET status = ?, visibility = ?, updated_at = ? WHERE id = ?')
+    .bind(status, visibility, new Date().toISOString(), existing.id).run();
+  const updated = await getTournamentById(env.DB, existing.id);
+  await notifyTournamentPublicationChange(env, existing, updated);
   return json({ tournament: toPublicTournament(updated, user) });
 }
 
@@ -7060,26 +7116,35 @@ function canViewTournament(tournament, user) {
   return isPubliclyVisible(tournament) || canManageTournament(tournament, user);
 }
 
-async function hasTournamentShareAccess(db, tournament, token) {
-  if (!token || tournament.visibility !== 'private' || tournament.status === 'draft') return false;
+/**
+ * Freigabe-Link eines privaten Turniers - auch im Entwurf (z. B. Vorschau für Mitorganisatoren oder ein mit dem
+ * Turnierdokument verbundenes Turnier). Anmelden kann man sich darüber erst bei offener Anmeldung.
+ */
+export async function hasTournamentShareAccess(db, tournament, token) {
+  if (!token || tournament.visibility !== 'private') return false;
   const tokenHash = await sha256Hex(token);
   const link = await db.prepare('SELECT token_hash FROM tournament_share_links WHERE tournament_id = ? AND token_hash = ?').bind(tournament.id, tokenHash).first();
   return Boolean(link);
 }
 
-async function createTournamentShareLink(db, tournamentId, origin) {
+/**
+ * Liefert den Freigabe-Link eines privaten Turniers - immer denselben, solange er nicht deaktiviert wurde. Ein Link
+ * aus der Zeit vor Migration 0079 (nur Hash gespeichert) wird einmalig durch einen neuen ersetzt.
+ */
+export async function createTournamentShareLink(db, tournamentId, origin) {
   const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
-  const tokenHash = await sha256Hex(token);
   const now = new Date().toISOString();
   await db.prepare(
-    `INSERT INTO tournament_share_links (tournament_id, token_hash, created_at, updated_at)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT(tournament_id) DO UPDATE SET token_hash = excluded.token_hash, updated_at = excluded.updated_at`,
-  ).bind(tournamentId, tokenHash, now, now).run();
-  return json({ shareUrl: `${origin}/turniere/${tournamentId}/info?share=${encodeURIComponent(token)}` });
+    `INSERT INTO tournament_share_links (tournament_id, token_hash, token, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(tournament_id) DO UPDATE SET token_hash = excluded.token_hash, token = excluded.token, updated_at = excluded.updated_at
+     WHERE tournament_share_links.token IS NULL`,
+  ).bind(tournamentId, await sha256Hex(token), token, now, now).run();
+  const link = await db.prepare('SELECT token FROM tournament_share_links WHERE tournament_id = ?').bind(tournamentId).first();
+  return json({ shareUrl: `${origin}/turniere/${tournamentId}/info?share=${encodeURIComponent(link.token)}` });
 }
 
-async function deleteTournamentShareLink(db, tournamentId) {
+export async function deleteTournamentShareLink(db, tournamentId) {
   await db.prepare('DELETE FROM tournament_share_links WHERE tournament_id = ?').bind(tournamentId).run();
   return json({ ok: true });
 }

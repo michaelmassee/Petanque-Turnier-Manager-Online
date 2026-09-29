@@ -124,6 +124,26 @@ describe('Dokumentbindung und lokale PTM-Online-IDs', () => {
     expect(turnier()).toMatchObject({ sync_document_id: ALTES_DOKUMENT });
   });
 
+  it('verbindet kein neues Dokument mit einem abgeschlossenen Turnier', async () => {
+    turnierMitBindung(null, 1);
+    db.sqlite.prepare("UPDATE tournaments SET status = 'finished' WHERE id = 't1'").run();
+
+    await expect(connectTournament(anfrage({ syncDocumentId: NEUES_DOKUMENT, leaseToken: LEASE }), db, turnier()))
+      .rejects.toMatchObject({ status: 409, details: { code: 'tournament_finished' } });
+    expect(turnier().sync_document_id).toBeNull();
+  });
+
+  it('lässt kein anderes Dokument ein abgeschlossenes Turnier übernehmen', async () => {
+    turnierMitBindung(ALTES_DOKUMENT, 3);
+    db.sqlite.prepare("UPDATE tournaments SET status = 'finished' WHERE id = 't1'").run();
+
+    await expect(takeoverTournamentDocument(anfrage({
+      syncDocumentId: NEUES_DOKUMENT, leaseToken: LEASE, takeoverRequestId: '44444444-4444-4444-8444-444444444444',
+      expectedBindingRevision: 3,
+    }), db, turnier())).rejects.toMatchObject({ status: 409, details: { code: 'tournament_finished' } });
+    expect(turnier()).toMatchObject({ sync_document_id: ALTES_DOKUMENT });
+  });
+
   it('lässt die lokalen IDs anderer Turniere unverändert', async () => {
     db.sqlite.prepare(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility,
         created_at, updated_at)

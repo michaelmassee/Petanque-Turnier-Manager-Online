@@ -606,7 +606,7 @@
   "Ungültiger Anmeldetyp": "Invalid registration type",
   "Ungültiger Bildtyp": "Invalid image type",
   "Ungültiger oder abgelaufener Reset-Token": "Invalid or expired reset token",
-  "Ungültiger Turnierstatus": "Invalid tournament status",
+  "Ungültiger Turnierstatus": "Invalid tournament status", "Ein abgeschlossenes Turnier kann nicht mit einem Turnierdokument verbunden werden": "A finished tournament cannot be connected to a tournament document", "Ein laufendes Turnier kann nur abgeschlossen werden": "A running tournament can only be finished", "Status und Sichtbarkeit": "Status and visibility", "Status ändern": "Change status",
   "Ungültiges Ergebnis": "Invalid result",
   "Ungültiges Push-Abonnement": "Invalid push subscription",
   "Ungültiges Turnier-Limit": "Invalid tournament limit",
