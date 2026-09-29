@@ -4173,8 +4173,19 @@ async function checkInConfirmedRegistrations(db, tournamentId) {
  * Sync-Variante von {@link startTournament}: Ein erster Rundenstart aus PTM legt fest, dass die
  * Durchführung in der Desktop-Anwendung erfolgt. Erst dann ist das Turnierdokument alleiniger
  * Master für Meldeliste und Ausführungsdaten.
+ *
+ * Läuft das Turnier bereits online, übernimmt das Dokument nur, solange online noch keine Runde
+ * ausgelost wurde (z. B. Start aus dem Dokument offline verloren gegangen oder Dokument nach dem
+ * Trennen neu verbunden). Mit Online-Runden wird es tatsächlich online durchgeführt: 409.
  */
-async function startTournamentFromSync(env, existing, user) {
+export async function startTournamentFromSync(env, existing, user) {
+  if (existing.status === 'running' && Number(existing.desktop_execution || 0) !== 1) {
+    const onlineRound = await env.DB.prepare('SELECT 1 FROM tournament_rounds WHERE tournament_id = ? LIMIT 1')
+      .bind(existing.id).first();
+    if (onlineRound) {
+      assertDesktopExecution(existing);
+    }
+  }
   await performTournamentStart(env, existing);
   await env.DB.prepare('UPDATE tournaments SET desktop_execution = 1, updated_at = ? WHERE id = ?')
     .bind(new Date().toISOString(), existing.id).run();
