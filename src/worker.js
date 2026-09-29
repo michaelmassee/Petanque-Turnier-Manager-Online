@@ -1921,17 +1921,6 @@ export default {
         return await upsertDocumentRegistration(request, env, tournament, syncRegistrationUpsertMatch[2]);
       }
 
-      const syncRegistrationMappingsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registration-mappings$/);
-      if (syncRegistrationMappingsMatch && request.method === 'PUT') {
-        const auth = await requireApiKey(request, env.DB);
-        const tournament = await getTournamentById(env.DB, syncRegistrationMappingsMatch[1]);
-        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
-        assertCanManageTournament(tournament, auth.user);
-        await requireSyncLease(request, tournament);
-        return await syncPutRegistrationMappings(request, env.DB, tournament);
-      }
-
-
       const syncResultsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/results$/);
       if (syncResultsMatch && request.method === 'POST') {
         const auth = await requireApiKey(request, env.DB);
@@ -3538,24 +3527,24 @@ export async function takeoverTournamentDocument(request, db, tournament) {
   return json({ ok: true, syncDocumentId, bindingRevision: nextRevision });
 }
 
-async function upsertDocumentRegistration(request, env, tournament, localRegistrationUuid) {
+/**
+ * Sync-Schreibzugriff des Turnierdokuments auf eine Anmeldung.
+ *
+ * Die lokale PTM-Online-ID (URL) ist online nur der Schlüssel der Neuanlage: Ein wiederholter Versuch (z. B. nach
+ * Netzabbruch, bevor das Dokument die Online-ID gespeichert hat) liefert die bereits angelegte Anmeldung zurück,
+ * statt eine zweite anzulegen. Bestehende Anmeldungen adressiert das Dokument über onlineRegistrationId aus seinem
+ * Sync-Blatt; die gespeicherte lokale ID wird dabei weder geprüft noch geändert, eine veraltete (z. B. von einem
+ * früher gebundenen Dokument) stört also nicht.
+ */
+export async function upsertDocumentRegistration(request, env, tournament, localRegistrationUuid) {
   const body = await readJson(request);
   const localUuid = requireUuid(localRegistrationUuid, 'localRegistrationUuid');
-  let existing = await env.DB.prepare('SELECT * FROM registrations WHERE tournament_id = ? AND local_registration_uuid = ?')
-    .bind(tournament.id, localUuid).first();
-  let claimedExistingRegistration = false;
-  if (!existing && body.documentMaster === true && body.onlineRegistrationId !== undefined) {
-    const onlineRegistrationId = requireUuid(body.onlineRegistrationId, 'onlineRegistrationId');
-    existing = await env.DB.prepare('SELECT * FROM registrations WHERE tournament_id = ? AND id = ?')
-      .bind(tournament.id, onlineRegistrationId).first();
-    if (existing && existing.local_registration_uuid && existing.local_registration_uuid !== localUuid) {
-      throw new HttpError(409, 'Die Online-Anmeldung ist bereits einer anderen lokalen PTM-Online-ID zugeordnet', {
-        code: 'registration_mapping_conflict', registration: toPublicRegistration(existing),
-      });
+  if (body.onlineRegistrationId === undefined) {
+    const created = await env.DB.prepare('SELECT * FROM registrations WHERE tournament_id = ? AND local_registration_uuid = ?')
+      .bind(tournament.id, localUuid).first();
+    if (created) {
+      return json({ registration: toPublicRegistration(created), created: false });
     }
-    claimedExistingRegistration = Boolean(existing);
-  }
-  if (!existing) {
     // Bootstrap is the only path on which the document may seed registration-owned fields.
     body.confirmImmediately = true;
     body.noEmail = true;
@@ -3566,6 +3555,12 @@ async function upsertDocumentRegistration(request, env, tournament, localRegistr
     await env.DB.prepare('UPDATE registrations SET local_registration_uuid = ? WHERE id = ?')
       .bind(localUuid, payload.registration.id).run();
     return json({ registration: { ...payload.registration, localRegistrationUuid: localUuid }, created: true }, 201);
+  }
+  const onlineRegistrationId = requireUuid(body.onlineRegistrationId, 'onlineRegistrationId');
+  const existing = await env.DB.prepare('SELECT * FROM registrations WHERE tournament_id = ? AND id = ?')
+    .bind(tournament.id, onlineRegistrationId).first();
+  if (!existing) {
+    throw new HttpError(404, 'Eine Online-Anmeldung existiert nicht mehr');
   }
   const expected = Number(body.expectedExecutionRevision);
   if (!Number.isInteger(expected) || expected !== Number(existing.execution_revision || 1)) {
@@ -3604,7 +3599,6 @@ async function upsertDocumentRegistration(request, env, tournament, localRegistr
       partner2_first_name = CASE WHEN ? THEN ? ELSE partner2_first_name END,
       partner2_last_name = CASE WHEN ? THEN ? ELSE partner2_last_name END,
       team_name = CASE WHEN ? THEN ? ELSE team_name END,
-      local_registration_uuid = CASE WHEN ? THEN ? ELSE local_registration_uuid END,
       execution_revision = execution_revision + 1, updated_at = ? WHERE id = ?`)
     .bind(status, participation, seedingPosition,
       documentMaster ? 1 : 0, documentRegistration?.firstName,
@@ -3616,55 +3610,11 @@ async function upsertDocumentRegistration(request, env, tournament, localRegistr
       documentMaster ? 1 : 0, documentRegistration?.partner2FirstName,
       documentMaster ? 1 : 0, documentRegistration?.partner2LastName,
       documentMaster ? 1 : 0, documentRegistration?.teamName,
-      claimedExistingRegistration ? 1 : 0, localUuid,
       new Date().toISOString(), existing.id).run();
   if (participation === 'active') {
     await sendLiveLinkEmails(env, tournament.id, [existing.id], new URL(request.url).origin);
   }
   return json({ registration: toPublicRegistration(await env.DB.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first()), created: false });
-}
-
-/**
- * Rebinds a complete, unambiguous set of document registrations.  Clearing all affected bindings first makes a
- * team swap atomic from the document's point of view: no transient duplicate local_registration_uuid can occur.
- */
-async function syncPutRegistrationMappings(request, db, tournament) {
-  const body = await readJson(request);
-  if (!Array.isArray(body.mappings) || body.mappings.length < 2) {
-    throw new HttpError(400, 'Mindestens zwei Zuordnungen sind erforderlich');
-  }
-  const mappings = body.mappings.map((mapping) => ({
-    localRegistrationUuid: requireUuid(mapping?.localRegistrationUuid, 'localRegistrationUuid'),
-    onlineRegistrationId: requireUuid(mapping?.onlineRegistrationId, 'onlineRegistrationId'),
-  }));
-  const localIds = new Set(mappings.map((mapping) => mapping.localRegistrationUuid));
-  const onlineIds = new Set(mappings.map((mapping) => mapping.onlineRegistrationId));
-  if (localIds.size !== mappings.length || onlineIds.size !== mappings.length) {
-    throw new HttpError(400, 'Lokale und Online-IDs müssen innerhalb des Tauschs eindeutig sein');
-  }
-  const registrations = await Promise.all(mappings.map((mapping) => db.prepare(
-    'SELECT * FROM registrations WHERE tournament_id = ? AND id = ?').bind(tournament.id, mapping.onlineRegistrationId).first()));
-  if (registrations.some((registration) => !registration)) {
-    throw new HttpError(404, 'Eine Online-Anmeldung existiert nicht mehr');
-  }
-  for (const registration of registrations) {
-    if (registration.local_registration_uuid && !localIds.has(registration.local_registration_uuid)) {
-      throw new HttpError(409, 'Eine Online-Anmeldung ist bereits einer nicht am Tausch beteiligten lokalen PTM-Online-ID zugeordnet', {
-        code: 'registration_mapping_conflict', registration: toPublicRegistration(registration),
-      });
-    }
-  }
-  await db.batch([
-    ...registrations.map((registration) => db.prepare(
-      'UPDATE registrations SET local_registration_uuid = NULL, updated_at = ? WHERE id = ?')
-      .bind(new Date().toISOString(), registration.id)),
-    ...mappings.map((mapping) => db.prepare(
-      'UPDATE registrations SET local_registration_uuid = ?, updated_at = ? WHERE tournament_id = ? AND id = ?')
-      .bind(mapping.localRegistrationUuid, new Date().toISOString(), tournament.id, mapping.onlineRegistrationId)),
-  ]);
-  const updated = await Promise.all(mappings.map((mapping) => db.prepare(
-    'SELECT * FROM registrations WHERE tournament_id = ? AND id = ?').bind(tournament.id, mapping.onlineRegistrationId).first()));
-  return json({ registrations: updated.map(toPublicRegistration) });
 }
 
 /**
