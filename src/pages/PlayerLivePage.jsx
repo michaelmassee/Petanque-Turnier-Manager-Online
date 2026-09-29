@@ -294,6 +294,18 @@ export function MyLiveList({ navigate, language }) {
   );
 }
 
+export function MyLiveBackLink({ navigate }) {
+  const { t } = useTranslation();
+  const query = useQuery({ queryKey: ['live', 'me'], queryFn: () => authenticatedApi('/api/live/me'), retry: false });
+  const runningRegistrations = (query.data?.registrations || []).filter((entry) => entry.tournament.status === 'running');
+
+  if (runningRegistrations.length <= 1) return null;
+
+  return (
+    <button type="button" className="drawer-link live-back" onClick={() => navigate('/live')}>← {t('Meine Turniere')}</button>
+  );
+}
+
 export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, isAdmin, onSelectAdminDashboard, onLogout, onLogin, drawerContent, postboxControl }) {
   const { t } = useTranslation();
 
@@ -332,7 +344,7 @@ export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenu
       />
       <section className="single-column live-page">
         {route.registrationId && currentUser && (
-          <button type="button" className="drawer-link live-back" onClick={() => navigate('/live')}>← {t('Meine Turniere')}</button>
+          <MyLiveBackLink navigate={navigate} />
         )}
         {content}
       </section>

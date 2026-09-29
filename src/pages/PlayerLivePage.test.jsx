@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { LiveDetail, MyLiveList } from './PlayerLivePage.jsx';
+import { LiveDetail, MyLiveBackLink, MyLiveList } from './PlayerLivePage.jsx';
 import { matchLiveRoute } from '../lib/routing.js';
 
 function jsonResponse(payload, status = 200) {
@@ -45,6 +45,15 @@ function renderList(navigate = vi.fn()) {
   return render(
     <QueryClientProvider client={client}>
       <MyLiveList navigate={navigate} language="de" />
+    </QueryClientProvider>,
+  );
+}
+
+function renderBackLink() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MyLiveBackLink navigate={vi.fn()} />
     </QueryClientProvider>,
   );
 }
@@ -119,6 +128,31 @@ describe('Live-Ansicht für Spieler', () => {
 
     await screen.findByText('Sommer-Supermêlée');
     expect(navigate).toHaveBeenCalledWith('/live/r1');
+  });
+
+  it('blendet den Rückweg bei nur einem laufenden Turnier aus', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({
+      registrations: [
+        { id: 'r1', tournament: { status: 'running' } },
+        { id: 'r2', tournament: { status: 'finished' } },
+      ],
+    })));
+    renderBackLink();
+
+    await vi.waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: /Meine Turniere/ })).not.toBeInTheDocument();
+  });
+
+  it('zeigt den Rückweg bei mehreren laufenden Turnieren', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({
+      registrations: [
+        { id: 'r1', tournament: { status: 'running' } },
+        { id: 'r2', tournament: { status: 'running' } },
+      ],
+    })));
+    renderBackLink();
+
+    expect(await screen.findByRole('button', { name: /Meine Turniere/ })).toBeInTheDocument();
   });
 });
 
