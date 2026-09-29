@@ -3427,7 +3427,7 @@ async function listManagedTournaments(db, user) {
  * ohne sonstige Metadaten zu ueberschreiben. Wird beim Verbinden eines
  * Turnierdokuments mit einem bestehenden Online-Turnier aufgerufen.
  */
-async function connectTournament(request, db, tournament) {
+export async function connectTournament(request, db, tournament) {
   const body = await readJson(request);
   const syncDocumentId = requireUuid(body.syncDocumentId, 'syncDocumentId');
   const leaseToken = requireSecret(body.leaseToken, 'leaseToken');
@@ -3443,11 +3443,15 @@ async function connectTournament(request, db, tournament) {
   }
   const now = new Date().toISOString();
   const bindingRevision = tournament.sync_document_id ? Number(tournament.sync_binding_revision || 0) : 1;
-  const connected = await db.prepare(`UPDATE tournaments
+  const connect = db.prepare(`UPDATE tournaments
                     SET document_managed = 1, sync_document_id = ?, sync_lease_token_hash = ?,
                         sync_binding_revision = ?, updated_at = ?
                     WHERE id = ? AND (sync_document_id IS NULL OR sync_document_id = ?)`)
-    .bind(syncDocumentId, leaseTokenHash, bindingRevision, now, tournament.id, syncDocumentId).run();
+    .bind(syncDocumentId, leaseTokenHash, bindingRevision, now, tournament.id, syncDocumentId);
+  const [connected] = tournament.sync_document_id === syncDocumentId
+    ? [await connect.run()]
+    : await db.batch([connect, clearForeignLocalRegistrationIds(db, tournament.id,
+      'sync_document_id = ? AND sync_lease_token_hash = ?', [syncDocumentId, leaseTokenHash])]);
   if (!connected.meta.changes) {
     const current = await getTournamentById(db, tournament.id);
     throw new HttpError(409, 'Die Dokumentbindung wurde zwischenzeitlich geändert', {
@@ -3486,7 +3490,21 @@ export async function requireSyncLease(request, tournament) {
   }
 }
 
-async function takeoverTournamentDocument(request, db, tournament) {
+/**
+ * Lokale PTM-Online-IDs (local_registration_uuid) gehören zum bisher gebundenen Dokument. Bindet sich ein anderes
+ * Dokument, verweisen sie auf Zeilen, die es nicht mehr gibt, und blockieren jede Zuordnung des neuen Dokuments
+ * (registration_mapping_conflict). Sie werden daher im selben Batch wie die Bindung verworfen; das neue Dokument
+ * bindet seine Anmeldungen bei Bedarf über documentMaster + onlineRegistrationId neu. Die Bedingung stellt sicher,
+ * dass nur verworfen wird, wenn genau diese Bindung auch geschrieben wurde.
+ */
+function clearForeignLocalRegistrationIds(db, tournamentId, bindingCondition, bindingParams) {
+  return db.prepare(`UPDATE registrations SET local_registration_uuid = NULL
+      WHERE tournament_id = ? AND local_registration_uuid IS NOT NULL
+        AND EXISTS (SELECT 1 FROM tournaments WHERE id = ? AND ${bindingCondition})`)
+    .bind(tournamentId, tournamentId, ...bindingParams);
+}
+
+export async function takeoverTournamentDocument(request, db, tournament) {
   const body = await readJson(request);
   const syncDocumentId = requireUuid(body.syncDocumentId, 'syncDocumentId');
   const leaseToken = requireSecret(body.leaseToken, 'leaseToken');
@@ -3497,12 +3515,17 @@ async function takeoverTournamentDocument(request, db, tournament) {
     return json({ ok: true, syncDocumentId, bindingRevision: Number(tournament.sync_binding_revision) });
   }
   const nextRevision = expectedRevision + 1;
-  const result = await db.prepare(`UPDATE tournaments
+  const takeover = db.prepare(`UPDATE tournaments
       SET document_managed = 1, sync_document_id = ?, sync_lease_token_hash = ?,
           sync_binding_revision = ?, sync_takeover_request_id = ?, updated_at = ?
       WHERE id = ? AND sync_binding_revision = ?`)
     .bind(syncDocumentId, await sha256Hex(leaseToken), nextRevision, takeoverRequestId,
-      new Date().toISOString(), tournament.id, expectedRevision).run();
+      new Date().toISOString(), tournament.id, expectedRevision);
+  const [result] = tournament.sync_document_id === syncDocumentId
+    ? [await takeover.run()]
+    : await db.batch([takeover, clearForeignLocalRegistrationIds(db, tournament.id,
+      'sync_document_id = ? AND sync_binding_revision = ? AND sync_takeover_request_id = ?',
+      [syncDocumentId, nextRevision, takeoverRequestId])]);
   if (!result.meta.changes) {
     const current = await getTournamentById(db, tournament.id);
     if (current.sync_takeover_request_id === takeoverRequestId && current.sync_document_id === syncDocumentId) {
