@@ -17,7 +17,7 @@ function livePayload(overrides = {}) {
       currentMatch: { roundNumber: 2, matchId: 'm2', court: null, teamLabel: 'Anna Muster', opponentLabel: 'Bert Beispiel', bye: false, ownScore: null, opponentScore: null, noShow: null, outcome: 'open' },
       history: [
         { roundNumber: 2, matchId: 'm2', opponentLabel: 'Bert Beispiel', bye: false, ownScore: null, opponentScore: null, outcome: 'open' },
-        { roundNumber: 1, matchId: 'm1', opponentLabel: 'Carla Test', bye: false, ownScore: 13, opponentScore: 5, outcome: 'won' },
+        { roundNumber: 1, matchId: 'm1', teammates: ['Dora Partner', 'Emil Partner'], opponentLabel: 'Carla Test', bye: false, ownScore: 13, opponentScore: 5, outcome: 'won' },
       ],
       summary: { played: 1, wins: 1, losses: 0, pointsFor: 13, pointsAgainst: 5 },
       rankingPlace: 1,
@@ -70,7 +70,9 @@ describe('Live-Ansicht für Spieler', () => {
     expect(await screen.findByText('Sommer-Supermêlée')).toBeInTheDocument();
     expect(screen.getByText(/25\.9\.2026 Fr/)).toBeInTheDocument();
     expect(screen.getAllByText('Bert Beispiel').length).toBeGreaterThan(0);
-    expect(screen.getByText('Carla Test', { selector: '.live-history-opponent' })).toBeInTheDocument();
+    expect(screen.getByText('Carla Test', { selector: '.live-history-match span' })).toBeInTheDocument();
+    expect(screen.getByText('Dora Partner + Emil Partner')).toBeInTheDocument();
+    expect(screen.getByText('Dora Partner + Emil Partner').closest('.live-history-teammates')).toHaveTextContent('mit Dora Partner + Emil Partner');
     expect(screen.queryByText('Bahn')).not.toBeInTheDocument();
     expect(screen.getByText('13:5')).toBeInTheDocument();
   });

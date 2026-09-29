@@ -2963,8 +2963,15 @@ a.left-panel-link {
   white-space: nowrap;
 }
 
-.live-history-opponent {
+.live-history-match {
+  display: grid;
+  gap: 2px;
   overflow-wrap: anywhere;
+}
+
+.live-history-teammates {
+  color: #53627a;
+  font-size: 0.9rem;
 }
 
 .live-history-score {

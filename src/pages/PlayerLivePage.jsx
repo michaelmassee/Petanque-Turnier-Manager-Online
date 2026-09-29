@@ -202,7 +202,14 @@ function HistoryCard({ live }) {
         {live.history.map((entry) => (
           <li key={entry.matchId} className={`live-${entry.outcome}`}>
             <span className="live-history-round">{t('Runde')} {entry.roundNumber}</span>
-            <span className="live-history-opponent" data-i18n-skip>{entry.bye ? t('Freilos') : entry.opponentLabel}</span>
+            <span className="live-history-match">
+              {entry.teammates?.length > 0 && (
+                <span className="live-history-teammates">{t('mit')} <span data-i18n-skip>{entry.teammates.join(' + ')}</span></span>
+              )}
+              {entry.bye
+                ? <span>{t('Freilos')}</span>
+                : <span>{t('gegen')} <span data-i18n-skip>{entry.opponentLabel}</span></span>}
+            </span>
             <span className="live-history-score">
               {scoreLabel(entry, t)}
               {entry.outcome !== 'open' && <small> · {entry.outcome === 'won' ? t('Sieg') : t('Niederlage')}</small>}
