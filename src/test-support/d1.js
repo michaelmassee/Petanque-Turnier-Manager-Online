@@ -26,6 +26,10 @@ export function d1MitSchema() {
     if (/^\s*(SELECT|WITH)\b/i.test(sql) && !/\b(INSERT|UPDATE|DELETE)\b/i.test(sql)) {
       return { success: true, results: prepared.all(...params), meta: { changes: 0 } };
     }
+    if (/\bRETURNING\b/i.test(sql)) {
+      const results = prepared.all(...params);
+      return { success: true, results, meta: { changes: results.length } };
+    }
     return { success: true, meta: { changes: prepared.run(...params).changes } };
   };
 
@@ -33,9 +37,9 @@ export function d1MitSchema() {
     sqlite,
     vorBatch(fn) { vorNaechstemBatch = fn; },
     prepare(sql) {
-      let params = [];
-      const statement = {
-        bind: (...values) => { params = values; return statement; },
+      // Wie bei D1 liefert bind() ein neues Statement; dasselbe vorbereitete Statement darf mehrfach gebunden werden.
+      const statement = (params) => ({
+        bind: (...values) => statement(values),
         run: async () => ausfuehren(sql, params),
         first: async (spalte) => {
           const zeile = sqlite.prepare(sql).get(...params) ?? null;
@@ -43,8 +47,8 @@ export function d1MitSchema() {
         },
         all: async () => ({ results: sqlite.prepare(sql).all(...params) }),
         ausfuehren: () => ausfuehren(sql, params),
-      };
-      return statement;
+      });
+      return statement([]);
     },
     async batch(statements) {
       if (vorNaechstemBatch) {

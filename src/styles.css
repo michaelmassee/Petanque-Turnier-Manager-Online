@@ -2176,6 +2176,12 @@ a.left-panel-link {
   margin-left: 4px;
 }
 
+.registration-sync-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .license-badge {
   margin-right: 4px;
   font-size: 0.9em;

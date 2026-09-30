@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import { startTournamentFromSync } from './worker.js';
+import { bindeDokument, syncAnfrage } from './test-support/sync.js';
+import { executeSyncWrite, startTournamentFromSync } from './worker.js';
 
 
 describe('Turnierstart aus dem Turnierdokument bei bereits laufendem Online-Turnier', () => {
@@ -16,10 +17,16 @@ describe('Turnierstart aus dem Turnierdokument bei bereits laufendem Online-Turn
     env.DB.sqlite.prepare(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at,
         document_managed, sync_document_id, desktop_execution)
       VALUES ('t1', 'u1', 'Turnier', '2026-09-28', 'Ort', 'doublette', 'running', 'public', '2026-09-01', '2026-09-01', 1, 'doc-1', 0)`).run();
+    bindeDokument(env.DB.sqlite, 't1');
   });
 
+  function starten() {
+    const request = syncAnfrage('POST', '/api/sync/tournaments/t1/start', {});
+    return executeSyncWrite(request, env.DB, turnier(), () => startTournamentFromSync(request, env, turnier()), { user });
+  }
+
   it('übernimmt die Durchführung, solange online noch keine Runde ausgelost wurde', async () => {
-    const response = await startTournamentFromSync(env, turnier(), user);
+    const response = await starten();
 
     expect(response.status).toBe(200);
     expect(turnier()).toMatchObject({ status: 'running', desktop_execution: 1 });
@@ -29,7 +36,7 @@ describe('Turnierstart aus dem Turnierdokument bei bereits laufendem Online-Turn
     env.DB.sqlite.prepare(`INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at)
       VALUES ('r1', 't1', 1, '2026-09-28')`).run();
 
-    await expect(startTournamentFromSync(env, turnier(), user)).rejects.toMatchObject({ status: 409 });
+    await expect(starten()).rejects.toMatchObject({ status: 409 });
     expect(turnier().desktop_execution).toBe(0);
   });
 
@@ -38,7 +45,7 @@ describe('Turnierstart aus dem Turnierdokument bei bereits laufendem Online-Turn
     env.DB.sqlite.prepare(`INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at)
       VALUES ('r1', 't1', 1, '2026-09-28')`).run();
 
-    const response = await startTournamentFromSync(env, turnier(), user);
+    const response = await starten();
 
     expect(response.status).toBe(200);
     expect(turnier().desktop_execution).toBe(1);

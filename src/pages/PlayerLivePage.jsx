@@ -33,14 +33,14 @@ function writePushFlag(registrationId, enabled) {
   }
 }
 
-function LivePushToggle({ path, useSession, registrationId }) {
+function LivePushToggle({ path, registrationId }) {
   const { t } = useTranslation();
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const supported = isPushSupported();
-  const request = useSession ? authenticatedApi : api;
+  const request = authenticatedApi;
 
   useEffect(() => {
     let cancelled = false;
@@ -221,11 +221,11 @@ function HistoryCard({ live }) {
   );
 }
 
-export function LiveDetail({ queryKey, path, useSession, language }) {
+export function LiveDetail({ queryKey, path, language }) {
   const { t } = useTranslation();
   const query = useQuery({
     queryKey,
-    queryFn: () => (useSession ? authenticatedApi(path) : api(path)),
+    queryFn: () => authenticatedApi(path),
     refetchInterval: LIVE_REFRESH_MS,
     refetchIntervalInBackground: false,
     // Beim Zurückkehren zur App immer sofort neu laden - unverändert kostet das nur ein 304.
@@ -256,7 +256,7 @@ export function LiveDetail({ queryKey, path, useSession, language }) {
       <CurrentMatchCard live={live} participation={registration.participation} />
       <RankingCard live={live} />
       <HistoryCard live={live} />
-      {tournament.status === 'running' && <LivePushToggle path={path} useSession={useSession} registrationId={registration.id} />}
+      {tournament.status === 'running' && <LivePushToggle path={path} registrationId={registration.id} />}
       <div className="live-refresh">
         <span className="muted">{t('Stand')}: {formatClock(query.dataUpdatedAt, language)}</span>
         <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>
@@ -317,17 +317,14 @@ export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenu
   const { t } = useTranslation();
 
   let content;
-  if (route.token) {
-    content = <LiveDetail queryKey={['live', 'token', route.token]} path={`/api/live/token/${encodeURIComponent(route.token)}`} language={language} />;
-  } else if (route.registrationId && currentUser) {
-    content = <LiveDetail queryKey={['live', 'registration', route.registrationId]} path={`/api/live/registrations/${encodeURIComponent(route.registrationId)}`} useSession language={language} />;
+  if (route.registrationId && currentUser) {
+    content = <LiveDetail queryKey={['live', 'registration', route.registrationId]} path={`/api/live/registrations/${encodeURIComponent(route.registrationId)}`} language={language} />;
   } else if (currentUser) {
     content = <MyLiveList navigate={navigate} language={language} />;
   } else {
     content = (
       <section className="panel live-card">
         <p>{t('Melde dich an, um deine laufenden Turniere live zu verfolgen.')}</p>
-        <p className="muted">{t('Du hast nach dem Check-in einen Link per E-Mail bekommen? Öffne ihn einfach – dafür ist keine Anmeldung nötig.')}</p>
         <Button onClick={onLogin}>{t('Anmelden')}</Button>
       </section>
     );

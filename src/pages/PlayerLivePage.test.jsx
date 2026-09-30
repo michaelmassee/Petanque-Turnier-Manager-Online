@@ -35,7 +35,7 @@ function renderDetail() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <LiveDetail queryKey={['live', 'token', 'abc']} path="/api/live/token/abc" language="de" />
+      <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de" />
     </QueryClientProvider>,
   );
 }
@@ -100,10 +100,10 @@ describe('Live-Ansicht für Spieler', () => {
   });
 
   it('meldet einen ungültigen Link sichtbar', async () => {
-    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ error: 'Dieser Live-Link ist ungültig oder abgelaufen' }, 404)));
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ error: 'Diese Meldung gehört nicht zu deinem Konto' }, 404)));
     renderDetail();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Dieser Live-Link ist ungültig oder abgelaufen');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Diese Meldung gehört nicht zu deinem Konto');
   });
 
   it('fordert bei mehreren laufenden Turnieren zur Auswahl auf', async () => {
@@ -162,7 +162,7 @@ describe('Live-Routen', () => {
   it('unterscheidet Übersicht, eigene Meldung und persönlichen Link', () => {
     expect(matchLiveRoute('/live')).toEqual({});
     expect(matchLiveRoute('/live/r1')).toEqual({ registrationId: 'r1' });
-    expect(matchLiveRoute('/live/t/abc')).toEqual({ token: 'abc' });
+    expect(matchLiveRoute('/live/t/abc')).toBeNull();
     expect(matchLiveRoute('/live/t')).toEqual({ registrationId: 't' });
     expect(matchLiveRoute('/live/a/b/c')).toBeNull();
     expect(matchLiveRoute('/turniere')).toBeNull();

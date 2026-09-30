@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import { disconnectTournament } from './worker.js';
+import { bindeDokument, syncAnfrage } from './test-support/sync.js';
+import { disconnectTournament, executeSyncWrite } from './worker.js';
 
 
 describe('Trennen eines Turniers vom Turnierdokument', () => {
@@ -15,10 +16,14 @@ describe('Trennen eines Turniers vom Turnierdokument', () => {
         document_managed, sync_document_id, sync_lease_token_hash, sync_takeover_request_id, desktop_execution, desktop_ranking_json)
       VALUES ('t1', 'u1', 'Turnier', '2026-09-28', 'Ort', 'doublette', 'running', 'public', '2026-09-01', '2026-09-01',
         1, 'doc-1', 'lease-hash', 'takeover-1', 1, '[{"place":1}]')`).run();
+    bindeDokument(db.sqlite, 't1');
   });
 
+  const trennen = () => executeSyncWrite(syncAnfrage('POST', '/api/sync/tournaments/t1/disconnect', {}), db,
+    db.sqlite.prepare('SELECT * FROM tournaments WHERE id = ?').get('t1'), () => disconnectTournament(db, 't1'));
+
   it('hebt die Desktop-Durchführung auf, damit die Meldeliste online wieder gepflegt werden kann', async () => {
-    await disconnectTournament(db, 't1');
+    await trennen();
 
     const tournament = db.sqlite.prepare('SELECT * FROM tournaments WHERE id = ?').get('t1');
     expect(tournament).toMatchObject({
@@ -35,7 +40,7 @@ describe('Trennen eines Turniers vom Turnierdokument', () => {
     db.sqlite.prepare(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at,
         document_managed, desktop_execution) VALUES ('t2', 'u1', 'Anderes', '2026-09-28', 'Ort', 'doublette', 'running', 'public', '2026-09-01', '2026-09-01', 1, 1)`).run();
 
-    await disconnectTournament(db, 't1');
+    await trennen();
 
     expect(db.sqlite.prepare('SELECT document_managed, desktop_execution FROM tournaments WHERE id = ?').get('t2'))
       .toMatchObject({ document_managed: 1, desktop_execution: 1 });

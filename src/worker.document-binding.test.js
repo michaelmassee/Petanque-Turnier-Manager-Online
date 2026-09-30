@@ -34,7 +34,7 @@ describe('Dokumentbindung und lokale PTM-Online-IDs', () => {
       VALUES ('u1', 'leitung@example.test', 'user', 'salt', 'hash', '2026-09-01', '2026-09-01')`).run();
     db.sqlite.prepare(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility,
         created_at, updated_at)
-      VALUES ('t1', 'u1', 'Turnier', '2026-09-28', 'Ort', 'tete', 'running', 'public', '2026-09-01', '2026-09-01')`).run();
+      VALUES ('t1', 'u1', 'Turnier', '2026-09-28', 'Ort', 'tete', 'registration', 'public', '2026-09-01', '2026-09-01')`).run();
     db.sqlite.prepare(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email, status,
         registered_at, created_at, updated_at, local_registration_uuid)
       VALUES ('r1', 't1', 'Eustachius', 'Goetze', 'eg@example.test', 'confirmed', '2026-09-01', '2026-09-01', '2026-09-01', ?)`)
@@ -121,5 +121,47 @@ describe('Dokumentbindung und lokale PTM-Online-IDs', () => {
 
     expect(db.sqlite.prepare("SELECT local_registration_uuid FROM registrations WHERE id = 'r2'").get()
       .local_registration_uuid).toBe(ALTE_LOKALE_ID);
+  });
+
+  describe('Wiederherstellung eines laufenden Turniers', () => {
+    beforeEach(() => {
+      db.sqlite.prepare("UPDATE tournaments SET status = 'running' WHERE id = 't1'").run();
+      db.sqlite.prepare(`INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at)
+        VALUES ('rd1', 't1', 1, '2026-09-28')`).run();
+    });
+
+    it('verlangt beim Verbinden eines neuen Dokuments die Bestätigung und nennt die Online-Runden', async () => {
+      turnierMitBindung(null, 1);
+
+      await expect(connectTournament(anfrage({ syncDocumentId: NEUES_DOKUMENT, leaseToken: LEASE }), db, turnier()))
+        .rejects.toMatchObject({ status: 409, details: { code: 'recovery_required', roundsOnline: 1 } });
+      expect(turnier().sync_document_id).toBeNull();
+    });
+
+    it('verbindet nach bestätigter Wiederherstellung und setzt den Schreibzähler zurück', async () => {
+      turnierMitBindung(null, 1);
+      db.sqlite.prepare("UPDATE tournaments SET sync_write_counter = 7 WHERE id = 't1'").run();
+
+      const antwort = await connectTournament(anfrage({
+        syncDocumentId: NEUES_DOKUMENT, leaseToken: LEASE, recovery: true, protocolVersion: 2,
+      }), db, turnier());
+
+      expect(await antwort.json()).toMatchObject({ writeCounter: 0 });
+      expect(turnier()).toMatchObject({ sync_document_id: NEUES_DOKUMENT, sync_write_counter: 0, sync_protocol: 2 });
+    });
+
+    it('verlangt die Bestätigung auch bei der Übernahme durch ein anderes Dokument', async () => {
+      turnierMitBindung(ALTES_DOKUMENT, 3);
+      const body = {
+        syncDocumentId: NEUES_DOKUMENT, leaseToken: LEASE, takeoverRequestId: '44444444-4444-4444-8444-444444444444',
+        expectedBindingRevision: 3,
+      };
+
+      await expect(takeoverTournamentDocument(anfrage(body), db, turnier()))
+        .rejects.toMatchObject({ status: 409, details: { code: 'recovery_required' } });
+      await takeoverTournamentDocument(anfrage({ ...body, recovery: true }), db, turnier());
+
+      expect(turnier()).toMatchObject({ sync_document_id: NEUES_DOKUMENT, sync_write_counter: 0 });
+    });
   });
 });

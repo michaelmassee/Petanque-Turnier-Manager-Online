@@ -188,6 +188,12 @@ function RegistrationRow({ registration, tournament, showConfirm = false, busy, 
         )}
         {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
         {registration.organizerMessage && <small data-i18n-skip>{registration.organizerMessage}</small>}
+        {(registration.overCapacity || registration.receivedAfterStart) && (
+          <small className="registration-sync-flags">
+            {registration.overCapacity && <span className="role">{t('über Kapazität')}</span>}
+            {registration.receivedAfterStart && <span className="role role-user">{t('nach Turnierstart eingegangen')}</span>}
+          </small>
+        )}
         {registration.feeSelections?.length > 0 && <small data-i18n-skip>{registration.feeSelections.map((selection) => `${selection.name}: ${formatMoney(selection.amountCents, tournament?.currency, 'de')}`).join(' · ')}{registration.feeTotalCents ? ` = ${formatMoney(registration.feeTotalCents, tournament?.currency, 'de')}` : ''}</small>}
         {(tournament?.registrationQuestions || []).map((question) => {
           const answers = (registration.registrationAnswers || []).filter((answer) => answer.questionId === question.id);

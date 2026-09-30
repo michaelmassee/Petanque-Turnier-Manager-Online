@@ -2333,7 +2333,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             <p className="hint">
               {(REGISTRATION_OPENS_TEMPLATES[language] || REGISTRATION_OPENS_TEMPLATES.de)(formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone))}
             </p>
-          ) : <p className="hint">{registrationStatusLabel(tournament, language)}</p>}
+          ) : <p className="hint">{tournament.status === 'running' ? t('Anmeldung geschlossen – Turnier läuft') : registrationStatusLabel(tournament, language)}</p>}
           <div className="row-actions stretch">
             <Button variant="secondary" onClick={onCancel}>{t('Abbrechen')}</Button>
           </div>

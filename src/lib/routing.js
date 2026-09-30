@@ -43,13 +43,11 @@ export function matchTournamentRoute(path) {
   return { id, view: sub };
 }
 
-// Bereich "Live": /live (eigene Turniere), /live/:registrationId (eingeloggt),
-// /live/t/:token (persönlicher Link aus der Check-in-Mail, ohne Login).
+// Bereich "Live": /live (eigene Turniere), /live/:registrationId (nur eingeloggt).
 export function matchLiveRoute(path) {
   const segments = path.split('/').filter(Boolean);
   if (segments[0] !== 'live') return null;
   if (segments.length === 1) return {};
-  if (segments[1] === 't' && segments[2] && segments.length === 3) return { token: decodeURIComponent(segments[2]) };
   if (segments.length === 2) return { registrationId: decodeURIComponent(segments[1]) };
   return null;
 }

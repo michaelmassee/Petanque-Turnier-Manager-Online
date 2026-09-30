@@ -596,6 +596,8 @@ export function TournamentList({
   onDelete,
   onDuplicate,
   onDisconnect = () => {},
+  onResetRunning = () => {},
+  onToggleRegistrationClosed = () => {},
   onEditPublication = () => {},
   isAdmin,
   language,
@@ -699,7 +701,11 @@ export function TournamentList({
                 </span>
               ) : (
                 <>
-                  <span className={`status status-${tournament.status}`}>{labelFor(TOURNAMENT_STATUSES, tournament.status)}</span>
+                  <span className={`status status-${tournament.status}`}>
+                    {tournament.registrationClosed && tournament.status === 'registration'
+                      ? t('Anmeldung geschlossen')
+                      : labelFor(TOURNAMENT_STATUSES, tournament.status)}
+                  </span>
                   <span className="role">{tournament.activeRegistrations}/{tournament.maxRegistrations || '∞'}</span>
                   {tournament.waitlistRegistrations > 0 && <span className="role role-user">{tournament.waitlistRegistrations} {t('Warteliste')}</span>}
                 </>
@@ -743,6 +749,26 @@ export function TournamentList({
                     onClick={() => onDisconnect(tournament)}
                   >
                     {t('Vom Turnierdokument trennen')}
+                  </Button>
+                )}
+                {tournament.status === 'running' && (
+                  <Button
+                    variant="secondary"
+                    loading={busyId === `reset-running-${tournament.id}`}
+                    disabled={Boolean(busyId) && busyId !== `reset-running-${tournament.id}`}
+                    onClick={() => onResetRunning(tournament)}
+                  >
+                    {t('Laufstatus zurücksetzen')}
+                  </Button>
+                )}
+                {tournament.status === 'registration' && tournament.registrationEnabled !== false && (
+                  <Button
+                    variant="secondary"
+                    loading={busyId === `registration-closed-${tournament.id}`}
+                    disabled={Boolean(busyId) && busyId !== `registration-closed-${tournament.id}`}
+                    onClick={() => onToggleRegistrationClosed(tournament)}
+                  >
+                    {tournament.registrationClosed ? t('Anmeldung öffnen') : t('Anmeldung schließen')}
                   </Button>
                 )}
                 <Button
@@ -981,6 +1007,45 @@ export function TournamentManagementPage({
     }
   }
 
+  async function handleResetRunning(tournament) {
+    const question = t('Laufstatus von „{name}“ zurücksetzen? Das geht nur, solange online noch kein Rundenergebnis vorliegt. Die Anmeldung bleibt danach geschlossen, bis du sie wieder öffnest.').replace('{name}', tournament.name);
+    if (!window.confirm(question)) {
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setBusyId(`reset-running-${tournament.id}`);
+    try {
+      await authenticatedApi(`/api/tournaments/${tournament.id}/reset-running`, { method: 'POST' });
+      setMessage(t('Laufstatus wurde zurückgesetzt. Die Anmeldung ist geschlossen.'));
+      await onTournamentsChanged?.();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  async function handleToggleRegistrationClosed(tournament) {
+    const closed = !tournament.registrationClosed;
+    setError('');
+    setMessage('');
+    setBusyId(`registration-closed-${tournament.id}`);
+    try {
+      await authenticatedApi(`/api/tournaments/${tournament.id}/registration-closed`, {
+        method: 'PUT',
+        body: JSON.stringify({ closed }),
+      });
+      setMessage(closed ? t('Anmeldung wurde geschlossen.') : t('Anmeldung wurde geöffnet.'));
+      await onTournamentsChanged?.();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusyId('');
+    }
+  }
+
   async function handleDelete(tournament) {
     const documentManaged = Boolean(tournament.documentManaged);
     if (!window.confirm(deleteTournamentConfirmation(t, tournament.name, documentManaged))) {
@@ -1011,6 +1076,12 @@ export function TournamentManagementPage({
 
   return (
     <>
+      {!dialogOpen && (
+        <>
+          <Feedback message={message} />
+          <Feedback error={error} />
+        </>
+      )}
       <TournamentList
         tournaments={filteredTournaments}
         totalTournaments={manageableTournaments.length}
@@ -1020,6 +1091,8 @@ export function TournamentManagementPage({
         onDelete={handleDelete}
         onDuplicate={handleDuplicate}
         onDisconnect={handleDisconnect}
+        onResetRunning={handleResetRunning}
+        onToggleRegistrationClosed={handleToggleRegistrationClosed}
         onEditPublication={openPublication}
         isAdmin={isAdmin}
         language={language}

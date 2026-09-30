@@ -286,37 +286,6 @@ export const REGISTRATION_CONFIRMATION_EMAILS = {
   },
 };
 
-export const LIVE_LINK_EMAILS = {
-  de: {
-    subject: (name) => `Du bist eingecheckt: ${name}`,
-    text: (firstName, name, link) =>
-      `Hallo ${firstName},\n\ndu bist für "${name}" eingecheckt.\n\nUnter diesem persönlichen Link siehst du während des Turniers jederzeit deine aktuelle Partie, deine Ergebnisse und deinen Ranglistenplatz:\n${link}\n\nViel Erfolg!`,
-  },
-  nl: {
-    subject: (name) => `Je bent ingecheckt: ${name}`,
-    text: (firstName, name, link) =>
-      `Hallo ${firstName},\n\nJe bent ingecheckt voor "${name}".\n\nVia deze persoonlijke link zie je tijdens het toernooi altijd je huidige partij, je uitslagen en je plaats in het klassement:\n${link}\n\nVeel succes!`,
-  },
-  en: {
-    subject: (name) => `You are checked in: ${name}`,
-    text: (firstName, name, link) =>
-      `Hi ${firstName},\n\nYou are checked in for "${name}".\n\nUse this personal link during the tournament to see your current game, your results and your ranking at any time:\n${link}\n\nGood luck!`,
-  },
-  es: {
-    subject: (name) => `Estás registrado en el torneo: ${name}`,
-    text: (firstName, name, link) =>
-      `Hola ${firstName},\n\nHas hecho el check-in para "${name}".\n\nCon este enlace personal verás durante el torneo tu partida actual, tus resultados y tu puesto en la clasificación:\n${link}\n\n¡Mucha suerte!`,
-  },
-  fr: {
-    subject: (name) => `Tu es pointé : ${name}`,
-    text: (firstName, name, link) =>
-      `Bonjour ${firstName},\n\nTu es pointé pour « ${name} ».\n\nAvec ce lien personnel, tu vois à tout moment pendant le tournoi ta partie en cours, tes résultats et ton classement :\n${link}\n\nBonne chance !`,
-  },
-};
-
-export function buildLiveLink(appOrigin, token) {
-  return `${appOrigin}/live/t/${encodeURIComponent(token)}`;
-}
 
 export const REGISTRATION_DISPLACED_EMAILS = {
   de: {
@@ -794,28 +763,17 @@ function createRandomToken() {
   return crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
 }
 
-async function ensureLiveToken(db, registration) {
-  if (registration.live_token) return registration.live_token;
-  const token = createRandomToken();
-  // Nur setzen, wenn noch leer - bei parallelem Aufruf gewinnt der erste Token.
-  await db.prepare('UPDATE registrations SET live_token = ? WHERE id = ? AND live_token IS NULL').bind(token, registration.id).run();
-  const row = await db.prepare('SELECT live_token FROM registrations WHERE id = ?').bind(registration.id).first();
-  return row?.live_token || token;
-}
-
 /**
- * Nach dem Check-in (Teilnahme 'active') einmalig: Postfach-Nachricht an alle Team-Mitglieder mit Konto (Klick
- * öffnet die Live-Ansicht) und – sofern der Veranstalter Mails versenden darf – der persönliche Live-Link per
- * E-Mail an alle Team-Mitglieder mit E-Mail. Der Merker live_link_sent_at wird vorher atomar gesetzt, damit
- * Sync-Retries, erneutes Aktivieren oder parallele Aufrufe nichts doppelt auslösen.
- * Fehler dürfen den Check-in selbst nie scheitern lassen.
+ * Nach dem Check-in (Teilnahme 'active') einmalig eine Postfach-/Push-Nachricht „Eingecheckt“ an die mit der Anmeldung
+ * verknüpften Konten; ein Klick öffnet die Live-Ansicht. Beim Check-in wird nie eine E-Mail versandt (E-09). Der
+ * Merker live_link_sent_at wird vorher atomar gesetzt, damit Wiederholungen, erneutes Aktivieren oder parallele
+ * Aufrufe nichts doppelt auslösen. Fehler dürfen den Check-in selbst nie scheitern lassen.
  */
-async function sendLiveLinkEmails(env, tournamentId, registrationIds, appOrigin) {
+async function notifyCheckedIn(env, tournamentId, registrationIds) {
   if (!registrationIds?.length) return;
   try {
     const tournament = await getTournamentById(env.DB, tournamentId);
     if (!tournament) return;
-    const mailAllowed = await canSendTournamentMail(env.DB, tournament);
     const placeholders = registrationIds.map(() => '?').join(', ');
     const rows = await env.DB.prepare(`SELECT * FROM registrations WHERE tournament_id = ? AND id IN (${placeholders})
         AND participation = 'active' AND status = 'confirmed' AND live_link_sent_at IS NULL`)
@@ -825,39 +783,18 @@ async function sendLiveLinkEmails(env, tournamentId, registrationIds, appOrigin)
       const claimed = await env.DB.prepare('UPDATE registrations SET live_link_sent_at = ? WHERE id = ? AND live_link_sent_at IS NULL')
         .bind(now, registration.id).run();
       if (!claimed.meta?.changes) continue;
-      const recipients = buildTeamRecipients(registration);
-      await notifyLiveViewInPostbox(env, tournament, registration, recipients);
-      if (!mailAllowed) continue;
-      const token = await ensureLiveToken(env.DB, registration);
-      const language = await resolveEmailLanguage(env.DB, tournament, registration);
-      const templates = LIVE_LINK_EMAILS[language] || LIVE_LINK_EMAILS.de;
-      const link = buildLiveLink(appOrigin, token);
-      for (const recipient of recipients) {
-        await enqueueTransactionalEmail(env, {
-          to: recipient.email,
-          subject: templates.subject(tournament.name),
-          text: templates.text(recipient.firstName, tournament.name, link),
-          language,
-          logFallback: `Live link email for ${recipient.email} (tournament ${tournament.id}): ${link}`,
-          failureContext: `live link for registration ${registration.id}`,
-          allowLogFallback: true,
-        });
+      const eventData = liveViewAvailableEventData(tournament, registration);
+      const accounts = new Set([registration.user_id, registration.partner_user_id, registration.partner2_user_id].filter(Boolean));
+      for (const userId of accounts) {
+        try {
+          await createSystemNotification(env, userId, LIVE_VIEW_AVAILABLE_EVENT, eventData);
+        } catch (error) {
+          console.error(`Failed to post check-in message for registration ${registration.id}`, error);
+        }
       }
     }
   } catch (error) {
-    console.error(`Failed to send live link emails for tournament ${tournamentId}`, error);
-  }
-}
-
-// Postfach-Nachricht "Du bist eingecheckt" für Team-Mitglieder mit Konto; ein Fehler darf die Live-Link-Mail nicht verhindern.
-async function notifyLiveViewInPostbox(env, tournament, registration, recipients) {
-  const eventData = liveViewAvailableEventData(tournament, registration);
-  for (const recipient of recipients) {
-    try {
-      await notifyUserByEmail(env, recipient.email, LIVE_VIEW_AVAILABLE_EVENT, eventData, 'Neue Statusmeldung');
-    } catch (error) {
-      console.error(`Failed to post live view message for registration ${registration.id}`, error);
-    }
+    console.error(`Failed to notify check-in for tournament ${tournamentId}`, error);
   }
 }
 
@@ -909,7 +846,7 @@ const DAILY_CRON = '0 1 * * *';
 
 // Beginn eines Turniers als UTC-Zeitpunkt (Datum + Startzeit in der Turnier-Zeitzone; ganztägige
 // Turniere zählen ab 00:00 Ortszeit).
-function tournamentStartUtcIso(tournament) {
+export function tournamentStartUtcIso(tournament) {
   const local = `${tournament.date}T${tournament.start_time || '00:00'}`;
   try {
     return zonedDateTimeToUtcIso(local, tournament.timezone || 'Europe/Berlin');
@@ -1505,8 +1442,10 @@ export default {
 
         if (request.method === 'POST') {
           const session = await optionalSession(request, env.DB);
-          const shareAccess = await hasTournamentShareAccess(env.DB, tournament, url.searchParams.get('share'));
-          return await createRegistration(request, env, tournament, { session, shareAccess });
+          const shareToken = url.searchParams.get('share');
+          const shareAccess = await hasTournamentShareAccess(env.DB, tournament, shareToken);
+          const shareTokenHash = shareAccess ? await sha256Hex(shareToken) : null;
+          return await createRegistration(request, env, tournament, { session, shareAccess, shareTokenHash });
         }
       }
 
@@ -1667,13 +1606,6 @@ export default {
         if (liveRegistrationMatch[2] && request.method === 'DELETE') return await removeLivePushSubscription(request, env.DB, registration);
       }
 
-      const liveTokenMatch = url.pathname.match(/^\/api\/live\/token\/([^/]+)(\/push)?$/);
-      if (liveTokenMatch) {
-        const registration = await findLiveRegistrationByToken(env.DB, decodeURIComponent(liveTokenMatch[1]));
-        if (!liveTokenMatch[2] && request.method === 'GET') return await buildLiveResponse(request, env.DB, registration);
-        if (liveTokenMatch[2] && request.method === 'POST') return await saveLivePushSubscription(request, env.DB, registration);
-        if (liveTokenMatch[2] && request.method === 'DELETE') return await removeLivePushSubscription(request, env.DB, registration);
-      }
 
       // Öffentlicher VAPID-Schlüssel für Live-Push ohne Login (der Schlüssel ist nicht geheim).
       if (url.pathname === '/api/live/push/public-key' && request.method === 'GET') {
@@ -1751,7 +1683,29 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, session.user);
-        return await disconnectTournament(env.DB, tournament.id);
+        const plan = disconnectTournament(env.DB, tournament.id);
+        await env.DB.batch([...plan.statements, auditStatement(env.DB, { tournamentId: tournament.id,
+          actorUserId: session.user.id, actorRole: actorRoleFor(tournament, session.user), action: 'binding_release',
+          target: 'tournament' })]);
+        return json(plan.response.envelope.body);
+      }
+
+      const resetRunningMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/reset-running$/);
+      if (resetRunningMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, resetRunningMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        assertCanManageTournament(tournament, session.user);
+        return await resetTournamentRunning(env.DB, tournament, session.user);
+      }
+
+      const registrationClosedMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registration-closed$/);
+      if (registrationClosedMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, registrationClosedMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        assertCanManageTournament(tournament, session.user);
+        return await setRegistrationClosed(request, env.DB, tournament, session.user);
       }
 
       const presentationMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/presentation$/);
@@ -1849,7 +1803,7 @@ export default {
         const participation = parseParticipation(body.participation);
         const response = await setRegistrationParticipation(env.DB, registration, participation);
         if (participation === 'active') {
-          await sendLiveLinkEmails(env, registration.tournament_id, [registration.id], new URL(request.url).origin);
+          await notifyCheckedIn(env, registration.tournament_id, [registration.id]);
         }
         return response;
       }
@@ -1867,7 +1821,7 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
-        return await connectTournament(request, env.DB, tournament);
+        return await connectTournament(request, env.DB, tournament, auth.user);
       }
 
       const syncTakeoverMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/takeover$/);
@@ -1876,7 +1830,7 @@ export default {
         const tournament = await getTournamentById(env.DB, syncTakeoverMatch[1]);
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         assertCanManageTournament(tournament, auth.user);
-        return await takeoverTournamentDocument(request, env.DB, tournament);
+        return await takeoverTournamentDocument(request, env.DB, tournament, auth.user);
       }
 
       const syncDisconnectMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/disconnect$/);
@@ -1887,8 +1841,7 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
-        await requireSyncLease(request, tournament);
-        return await disconnectTournament(env.DB, tournament.id);
+        return await executeSyncWrite(request, env.DB, tournament, (db) => disconnectTournament(db, tournament.id));
       }
 
       const syncStartMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/start$/);
@@ -1899,8 +1852,8 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
-        await requireSyncLease(request, tournament);
-        return await startTournamentFromSync(env, tournament, auth.user);
+        return await executeSyncWrite(request, env.DB, tournament, () => startTournamentFromSync(request, env, tournament),
+          { user: auth.user });
       }
 
       const syncRegistrationsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registrations$/);
@@ -1913,7 +1866,7 @@ export default {
         assertCanManageTournament(tournament, auth.user);
 
         if (request.method === 'GET') {
-          return await syncGetRegistrations(env.DB, tournament.id, url);
+          return await syncGetRegistrations(env.DB, tournament, url);
         }
         if (request.method === 'POST') {
           // Anmeldung ohne oeffentliche Maske: Turnierdokument erfasst lokal eine neue Meldung und
@@ -1929,8 +1882,8 @@ export default {
         const tournament = await getTournamentById(env.DB, syncRegistrationUpsertMatch[1]);
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         assertCanManageTournament(tournament, auth.user);
-        await requireSyncLease(request, tournament);
-        return await upsertDocumentRegistration(request, env, tournament, syncRegistrationUpsertMatch[2]);
+        return await executeSyncWrite(request, env.DB, tournament,
+          () => upsertDocumentRegistration(request, env, tournament, syncRegistrationUpsertMatch[2]));
       }
 
       const syncResultsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/results$/);
@@ -1941,8 +1894,7 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
-        await requireSyncLease(request, tournament);
-        return await syncPostResults(request, env, tournament.id);
+        return await executeSyncWrite(request, env.DB, tournament, () => syncPostResults(request, env, tournament.id));
       }
 
       const syncRoundMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/rounds\/([^/]+)$/);
@@ -1951,13 +1903,17 @@ export default {
         const tournament = await getTournamentById(env.DB, syncRoundMatch[1]);
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         assertCanManageTournament(tournament, auth.user);
-        await requireSyncLease(request, tournament);
-        if (request.method === 'DELETE') return await syncDeleteRound(env.DB, tournament, syncRoundMatch[2]);
-        const response = await syncPutRound(request, env.DB, tournament, syncRoundMatch[2]);
-        const result = await response.clone().json();
-        // Nur eine neu angelegte Runde löst Push aus - spätere PUTs derselben Runde sind Ergebnis-Updates.
-        if (result.created && result.matchCount > 0) await notifyLivePushForRound(env, tournament, result.roundNumber, url.origin);
-        return response;
+        if (request.method === 'DELETE') {
+          return await executeSyncWrite(request, env.DB, tournament, (db) => syncDeleteRound(db, tournament, syncRoundMatch[2]));
+        }
+        return await executeSyncWrite(request, env.DB, tournament, async (db) => {
+          const plan = await syncPutRound(request, db, tournament, syncRoundMatch[2]);
+          const { roundNumber, matchCount, created } = plan.response.envelope.body;
+          // Nur eine neu angelegte Runde löst Push aus - spätere PUTs derselben Runde sind Ergebnis-Updates. Beim
+          // Replay eines Auftrags läuft afterCommit nicht erneut.
+          return { ...plan, afterCommit: created && matchCount > 0
+            ? () => notifyLivePushForRound(env, tournament, roundNumber, url.origin) : undefined };
+        });
       }
 
       const syncRankingMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/ranking$/);
@@ -1966,8 +1922,7 @@ export default {
         const tournament = await getTournamentById(env.DB, syncRankingMatch[1]);
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         assertCanManageTournament(tournament, auth.user);
-        await requireSyncLease(request, tournament);
-        return await syncPutRanking(request, env.DB, tournament);
+        return await executeSyncWrite(request, env.DB, tournament, (db) => syncPutRanking(request, db, tournament));
       }
 
       const syncMetadataMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/metadata$/);
@@ -1978,8 +1933,18 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, auth.user);
+        return await executeSyncWrite(request, env.DB, tournament, () => syncPutTournamentMetadata(request, env, tournament),
+          { user: auth.user });
+      }
+
+      const syncMappingMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/mapping$/);
+      if (syncMappingMatch && request.method === 'GET') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getTournamentById(env.DB, syncMappingMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        assertCanManageTournament(tournament, auth.user);
         await requireSyncLease(request, tournament);
-        return await syncPutTournamentMetadata(request, env, tournament, auth.user);
+        return await syncGetMapping(env.DB, tournament.id);
       }
 
       return json({ error: 'Not found' }, 404);
@@ -3451,11 +3416,13 @@ function assertBindableTournament(tournament, syncDocumentId) {
   }
 }
 
-export async function connectTournament(request, db, tournament) {
+export async function connectTournament(request, db, tournament, user = null) {
   const body = await readJson(request);
   const syncDocumentId = requireUuid(body.syncDocumentId, 'syncDocumentId');
   const leaseToken = requireSecret(body.leaseToken, 'leaseToken');
   const leaseTokenHash = await sha256Hex(leaseToken);
+  const protocol = syncProtocolVersion(body.protocolVersion);
+  const connectRequestId = body.connectRequestId === undefined ? null : requireUuid(body.connectRequestId, 'connectRequestId');
   assertBindableTournament(tournament, syncDocumentId);
   if (tournament.sync_document_id && tournament.sync_document_id !== syncDocumentId) {
     throw new HttpError(409, 'Dieses Turnier ist bereits mit einem anderen Turnierdokument verbunden', {
@@ -3466,24 +3433,67 @@ export async function connectTournament(request, db, tournament) {
       && !(await constantTimeEquals(leaseTokenHash, tournament.sync_lease_token_hash || ''))) {
     throw new HttpError(409, 'Das lokale Dokument besitzt kein gültiges Schreib-Lease', { code: 'lease_invalid' });
   }
+  const newBinding = tournament.sync_document_id !== syncDocumentId;
+  if (newBinding) await assertRecoveryConfirmed(db, tournament, body.recovery === true);
   const now = new Date().toISOString();
   const bindingRevision = tournament.sync_document_id ? Number(tournament.sync_binding_revision || 0) : 1;
+  // Eine neue Bindung beginnt mit Schreibzähler 0; dasselbe Dokument behält seinen Stand (E-24, P-22).
   const connect = db.prepare(`UPDATE tournaments
                     SET document_managed = 1, sync_document_id = ?, sync_lease_token_hash = ?,
-                        sync_binding_revision = ?, updated_at = ?
+                        sync_binding_revision = ?, sync_protocol = ?,
+                        sync_write_counter = CASE WHEN sync_document_id = ? THEN sync_write_counter ELSE 0 END,
+                        updated_at = ?
                     WHERE id = ? AND (sync_document_id IS NULL OR sync_document_id = ?)`)
-    .bind(syncDocumentId, leaseTokenHash, bindingRevision, now, tournament.id, syncDocumentId);
-  const [connected] = tournament.sync_document_id === syncDocumentId
-    ? [await connect.run()]
-    : await db.batch([connect, clearForeignLocalRegistrationIds(db, tournament.id,
-      'sync_document_id = ? AND sync_lease_token_hash = ?', [syncDocumentId, leaseTokenHash])]);
+    .bind(syncDocumentId, leaseTokenHash, bindingRevision, protocol, syncDocumentId, now, tournament.id, syncDocumentId);
+  const statements = [connect];
+  if (newBinding) {
+    statements.push(clearForeignLocalRegistrationIds(db, tournament.id,
+      'sync_document_id = ? AND sync_lease_token_hash = ?', [syncDocumentId, leaseTokenHash]));
+    statements.push(auditStatement(db, { tournamentId: tournament.id, actorUserId: user?.id, actorRole: 'document',
+      action: 'binding_connect', target: 'tournament', details: { syncDocumentId, recovery: body.recovery === true }, now }));
+  }
+  if (connectRequestId) {
+    statements.push(db.prepare(`INSERT OR IGNORE INTO sync_requests (tournament_id, request_id, payload_hash, counter,
+        sync_document_id, state, response_json, created_at) VALUES (?, ?, '', NULL, ?, 'done', NULL, ?)`)
+      .bind(tournament.id, connectRequestId, syncDocumentId, now));
+  }
+  const [connected] = await db.batch(statements);
   if (!connected.meta.changes) {
     const current = await getTournamentById(db, tournament.id);
     throw new HttpError(409, 'Die Dokumentbindung wurde zwischenzeitlich geändert', {
       code: 'binding_conflict', bindingRevision: Number(current.sync_binding_revision || 0),
     });
   }
-  return json({ ok: true, syncDocumentId, bindingRevision });
+  const current = await getTournamentById(db, tournament.id);
+  return json({ ok: true, syncDocumentId, bindingRevision, writeCounter: Number(current.sync_write_counter || 0) });
+}
+
+function syncProtocolVersion(value) {
+  if (value === undefined || value === null) return 1;
+  const version = Number(value);
+  if (version !== 1 && version !== 2) throw new HttpError(400, 'protocolVersion ist ungültig');
+  return version;
+}
+
+/**
+ * Nach dem Turnierstart bindet ein anderes Dokument nur als ausdrückliche Wiederherstellung (E-03, KP-08). Ohne
+ * recovery liefert der Server die Zahl der Online-Runden, damit PTM die Warnung vor dem Überschreiben zeigen kann.
+ */
+async function assertRecoveryConfirmed(db, tournament, recovery) {
+  if (tournament.status !== 'running' || recovery) return;
+  const rounds = await db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?')
+    .bind(tournament.id).first();
+  throw new HttpError(409, 'Das Turnier läuft bereits; ein anderes Dokument kann nur als Wiederherstellung verbunden werden', {
+    code: 'recovery_required', roundsOnline: Number(rounds?.count || 0),
+  });
+}
+
+function auditStatement(db, { tournamentId = null, registrationId = null, actorUserId = null, actorRole, action, target = null,
+  details = null, now = new Date().toISOString() }) {
+  return db.prepare(`INSERT INTO audit_log (id, tournament_id, registration_id, actor_user_id, actor_role, action, target,
+      details_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(crypto.randomUUID(), tournamentId, registrationId, actorUserId, actorRole, action, target,
+      details ? JSON.stringify(details) : null, now);
 }
 
 function requireUuid(value, field) {
@@ -3516,6 +3526,126 @@ export async function requireSyncLease(request, tournament) {
 }
 
 /**
+ * Schreibauftrag des verbundenen Turnierdokuments nach dem Ein-Batch-Muster (Spezifikation E-24, T-19, T-23).
+ *
+ * build(db) liefert { statements, response, afterCommit? }:
+ *  - statements: fachliche Änderungen; jede trägt ihre Vorbedingungen selbst im SQL.
+ *  - response: { sql, binds } - SELECT mit genau einer Spalte, die den Antwort-Umschlag {status, body} als JSON
+ *    aus dem Zustand NACH den Änderungen berechnet - oder { envelope } mit einer vorab feststehenden Antwort.
+ *  - afterCommit(envelope): Benachrichtigungen o. Ä.; läuft nur bei der ersten Ausführung, nie beim Replay.
+ *
+ * Protokoll 2 (neuer PTM): Auftrags-ID und Schreibzähler sind Pflicht. Eintrag in sync_requests (Trigger prüfen
+ * Zähler und Bindung), Zählerstand, Änderungen und gespeicherte Antwort laufen in genau einem Batch. Eine
+ * Wiederholung mit gleicher Nutzlast liefert die gespeicherte Antwort (X-PTM-Replayed), mit anderer Nutzlast
+ * idempotency_mismatch. Protokoll 1 (bisheriger PTM): gleiche Änderungen in einem Batch, ohne Zähler.
+ */
+export async function executeSyncWrite(request, db, tournament, build, context = {}) {
+  await requireSyncLease(request, tournament);
+  const url = new URL(request.url);
+  if (Number(tournament.sync_protocol || 1) !== 2) {
+    const plan = await build(db);
+    try {
+      if (plan.statements.length > 0) await db.batch(plan.statements);
+    } catch (error) {
+      if (plan.mapError) plan.mapError(error);
+      throw error;
+    }
+    const envelope = await syncResponseEnvelope(db, plan.response);
+    if (plan.afterCommit) await plan.afterCommit(envelope);
+    return respondSyncEnvelope(db, tournament.id, envelope, context);
+  }
+
+  const requestId = requireUuid(request.headers.get('X-PTM-Request-Id'), 'X-PTM-Request-Id');
+  const counter = Number(request.headers.get('X-PTM-Sync-Counter'));
+  if (!Number.isInteger(counter) || counter < 1) throw new HttpError(400, 'X-PTM-Sync-Counter ist ungültig');
+  const bodyText = await request.clone().text();
+  const payloadHash = await sha256Hex(`${request.method} ${url.pathname}\n${bodyText}`);
+
+  const replay = await syncReplay(db, tournament.id, requestId, payloadHash, context);
+  if (replay) return replay;
+
+  const plan = await build(db);
+  const now = new Date().toISOString();
+  const finalize = plan.response.sql
+    ? db.prepare(`UPDATE sync_requests SET state = 'done', response_json = (${plan.response.sql})
+        WHERE tournament_id = ? AND request_id = ?`).bind(...(plan.response.binds || []), tournament.id, requestId)
+    : db.prepare(`UPDATE sync_requests SET state = 'done', response_json = ? WHERE tournament_id = ? AND request_id = ?`)
+      .bind(JSON.stringify(plan.response.envelope), tournament.id, requestId);
+  try {
+    await db.batch([
+      db.prepare(`INSERT INTO sync_requests (tournament_id, request_id, payload_hash, counter, sync_document_id,
+          lease_token_hash, state, created_at) VALUES (?, ?, ?, ?, ?, ?, 'claimed', ?)`)
+        .bind(tournament.id, requestId, payloadHash, counter, tournament.sync_document_id,
+          tournament.sync_lease_token_hash, now),
+      db.prepare('UPDATE tournaments SET sync_write_counter = ? WHERE id = ?').bind(counter, tournament.id),
+      ...plan.statements,
+      finalize,
+    ]);
+  } catch (error) {
+    const message = String(error?.message || error);
+    if (message.includes('document_forked')) {
+      throw new HttpError(409, 'Dieses Dokument wurde parallel verändert – ist eine Kopie der Turnierdatei im Einsatz?', {
+        code: 'document_forked',
+      });
+    }
+    if (message.includes('binding_changed')) {
+      throw new HttpError(409, 'Dieses Dokument wurde durch ein anderes Dokument abgelöst', { code: 'document_replaced' });
+    }
+    // Gleichzeitige Wiederholung desselben Auftrags: Primärschlüssel verletzt, Ergebnis des anderen Laufs liefern.
+    const concurrentReplay = await syncReplay(db, tournament.id, requestId, payloadHash, context);
+    if (concurrentReplay) return concurrentReplay;
+    if (plan.mapError) plan.mapError(error);
+    throw error;
+  }
+  const envelope = await storedSyncEnvelope(db, tournament.id, requestId);
+  if (plan.afterCommit) await plan.afterCommit(envelope);
+  return respondSyncEnvelope(db, tournament.id, envelope, context);
+}
+
+async function syncReplay(db, tournamentId, requestId, payloadHash, context) {
+  const stored = await db.prepare('SELECT payload_hash, state FROM sync_requests WHERE tournament_id = ? AND request_id = ?')
+    .bind(tournamentId, requestId).first();
+  if (!stored) return null;
+  if (stored.payload_hash !== payloadHash) {
+    throw new HttpError(409, 'Dieselbe Auftrags-ID wurde mit anderem Inhalt gesendet', { code: 'idempotency_mismatch' });
+  }
+  const envelope = await storedSyncEnvelope(db, tournamentId, requestId);
+  return respondSyncEnvelope(db, tournamentId, envelope, context, { 'X-PTM-Replayed': '1' });
+}
+
+/**
+ * Antworten mit großen DTOs (Anmeldung, Turnier) werden nicht als Kopie gespeichert, sondern beim Senden aus dem
+ * aktuellen Zustand ergänzt (hydrate). Der Umschlag selbst - Status, Erfolg oder Fehlercode - ist gespeichert und
+ * bei jeder Wiederholung identisch.
+ */
+async function respondSyncEnvelope(db, tournamentId, envelope, context, headers = {}) {
+  const body = { ...(envelope.body || {}) };
+  const hydrate = envelope.hydrate;
+  if (hydrate?.kind === 'registration') {
+    const row = await db.prepare(`SELECT * FROM registrations WHERE tournament_id = ?
+        AND (id = ? OR (? IS NOT NULL AND local_registration_uuid = ?))`)
+      .bind(tournamentId, hydrate.id || '', hydrate.uuid || null, hydrate.uuid || null).first();
+    if (row) body.registration = toPublicRegistration(row);
+  } else if (hydrate?.kind === 'tournament') {
+    const row = await getTournamentById(db, tournamentId);
+    if (row) body.tournament = toPublicTournament(row, context.user || null);
+  }
+  return json(body, envelope.status, headers);
+}
+
+async function storedSyncEnvelope(db, tournamentId, requestId) {
+  const row = await db.prepare('SELECT response_json FROM sync_requests WHERE tournament_id = ? AND request_id = ?')
+    .bind(tournamentId, requestId).first();
+  return JSON.parse(row.response_json);
+}
+
+async function syncResponseEnvelope(db, response) {
+  if (!response.sql) return response.envelope;
+  const row = await db.prepare(`SELECT (${response.sql}) AS response_json`).bind(...(response.binds || [])).first();
+  return JSON.parse(row.response_json);
+}
+
+/**
  * Lokale PTM-Online-IDs (local_registration_uuid) gehören zum bisher gebundenen Dokument. Bindet sich ein anderes
  * Dokument, verweisen sie auf Zeilen, die es nicht mehr gibt, und blockieren jede Zuordnung des neuen Dokuments
  * (registration_mapping_conflict). Sie werden daher im selben Batch wie die Bindung verworfen; das neue Dokument
@@ -3529,72 +3659,74 @@ function clearForeignLocalRegistrationIds(db, tournamentId, bindingCondition, bi
     .bind(tournamentId, tournamentId, ...bindingParams);
 }
 
-export async function takeoverTournamentDocument(request, db, tournament) {
+export async function takeoverTournamentDocument(request, db, tournament, user = null) {
   const body = await readJson(request);
   const syncDocumentId = requireUuid(body.syncDocumentId, 'syncDocumentId');
   const leaseToken = requireSecret(body.leaseToken, 'leaseToken');
   const takeoverRequestId = requireUuid(body.takeoverRequestId, 'takeoverRequestId');
+  const protocol = syncProtocolVersion(body.protocolVersion);
   const expectedRevision = Number(body.expectedBindingRevision);
   if (!Number.isInteger(expectedRevision) || expectedRevision < 0) throw new HttpError(400, 'expectedBindingRevision ist ungültig');
   assertBindableTournament(tournament, syncDocumentId);
+  const takeoverResponse = (current) => json({ ok: true, syncDocumentId, bindingRevision: Number(current.sync_binding_revision),
+    writeCounter: Number(current.sync_write_counter || 0) });
   if (tournament.sync_takeover_request_id === takeoverRequestId && tournament.sync_document_id === syncDocumentId) {
-    return json({ ok: true, syncDocumentId, bindingRevision: Number(tournament.sync_binding_revision) });
+    return takeoverResponse(tournament);
   }
+  if (tournament.sync_document_id !== syncDocumentId) await assertRecoveryConfirmed(db, tournament, body.recovery === true);
   const nextRevision = expectedRevision + 1;
+  const now = new Date().toISOString();
+  // Die Übernahme beginnt mit Schreibzähler 0: Die alte Datei verliert Lease und Zählerstand (E-08, E-24).
   const takeover = db.prepare(`UPDATE tournaments
       SET document_managed = 1, sync_document_id = ?, sync_lease_token_hash = ?,
-          sync_binding_revision = ?, sync_takeover_request_id = ?, updated_at = ?
+          sync_binding_revision = ?, sync_takeover_request_id = ?, sync_protocol = ?, sync_write_counter = 0, updated_at = ?
       WHERE id = ? AND sync_binding_revision = ?`)
-    .bind(syncDocumentId, await sha256Hex(leaseToken), nextRevision, takeoverRequestId,
-      new Date().toISOString(), tournament.id, expectedRevision);
-  const [result] = tournament.sync_document_id === syncDocumentId
-    ? [await takeover.run()]
-    : await db.batch([takeover, clearForeignLocalRegistrationIds(db, tournament.id,
-      'sync_document_id = ? AND sync_binding_revision = ? AND sync_takeover_request_id = ?',
-      [syncDocumentId, nextRevision, takeoverRequestId])]);
+    .bind(syncDocumentId, await sha256Hex(leaseToken), nextRevision, takeoverRequestId, protocol,
+      now, tournament.id, expectedRevision);
+  const bindingCondition = ['sync_document_id = ? AND sync_binding_revision = ? AND sync_takeover_request_id = ?',
+    [syncDocumentId, nextRevision, takeoverRequestId]];
+  const statements = [takeover,
+    db.prepare(`INSERT INTO audit_log (id, tournament_id, actor_user_id, actor_role, action, target, details_json, created_at)
+        SELECT ?, ?, ?, 'document', 'binding_takeover', 'tournament', ?, ?
+        WHERE EXISTS (SELECT 1 FROM tournaments WHERE id = ? AND ${bindingCondition[0]})`)
+      .bind(crypto.randomUUID(), tournament.id, user?.id || null,
+        JSON.stringify({ syncDocumentId, previousDocumentId: tournament.sync_document_id || null }), now,
+        tournament.id, ...bindingCondition[1])];
+  if (tournament.sync_document_id !== syncDocumentId) {
+    statements.push(clearForeignLocalRegistrationIds(db, tournament.id, ...bindingCondition));
+  }
+  const [result] = await db.batch(statements);
+  const current = await getTournamentById(db, tournament.id);
   if (!result.meta.changes) {
-    const current = await getTournamentById(db, tournament.id);
     if (current.sync_takeover_request_id === takeoverRequestId && current.sync_document_id === syncDocumentId) {
-      return json({ ok: true, syncDocumentId, bindingRevision: Number(current.sync_binding_revision) });
+      return takeoverResponse(current);
     }
     throw new HttpError(409, 'Die Dokumentbindung wurde zwischenzeitlich geändert', {
       code: 'binding_conflict', bindingRevision: Number(current.sync_binding_revision || 0),
     });
   }
-  return json({ ok: true, syncDocumentId, bindingRevision: nextRevision });
+  return takeoverResponse(current);
 }
 
 /**
  * Sync-Schreibzugriff des Turnierdokuments auf eine Anmeldung.
  *
- * Die lokale PTM-Online-ID (URL) ist online nur der Schlüssel der Neuanlage: Ein wiederholter Versuch (z. B. nach
+ * Die lokale PTM-Online-ID (URL) ist bei der Neuanlage der Idempotenzschlüssel: Ein wiederholter Versuch (z. B. nach
  * Netzabbruch, bevor das Dokument die Online-ID gespeichert hat) liefert die bereits angelegte Anmeldung zurück,
  * statt eine zweite anzulegen. Bestehende Anmeldungen adressiert das Dokument über onlineRegistrationId aus seinem
- * Sync-Blatt; die gespeicherte lokale ID wird dabei weder geprüft noch geändert, eine veraltete (z. B. von einem
- * früher gebundenen Dokument) stört also nicht.
+ * Sync-Blatt; dabei übernimmt der Server die lokale ID, damit die Zuordnung auch für importierte Online-Anmeldungen
+ * vom Server wiederhergestellt werden kann (T-21). Ist die ID schon einer anderen Anmeldung zugeordnet, bleibt sie
+ * unverändert.
  */
 export async function upsertDocumentRegistration(request, env, tournament, localRegistrationUuid) {
+  const db = env.DB;
   const body = await readJson(request);
   const localUuid = requireUuid(localRegistrationUuid, 'localRegistrationUuid');
   if (body.onlineRegistrationId === undefined) {
-    const created = await env.DB.prepare('SELECT * FROM registrations WHERE tournament_id = ? AND local_registration_uuid = ?')
-      .bind(tournament.id, localUuid).first();
-    if (created) {
-      return json({ registration: toPublicRegistration(created), created: false });
-    }
-    // Bootstrap is the only path on which the document may seed registration-owned fields.
-    body.confirmImmediately = true;
-    body.noEmail = true;
-    const response = await createRegistration(new Request(request.url, {
-      method: 'POST', headers: request.headers, body: JSON.stringify(body),
-    }), env, tournament, { session: { user: { id: tournament.owner_id, role: 'user' } }, syncBootstrap: true });
-    const payload = await response.clone().json();
-    await env.DB.prepare('UPDATE registrations SET local_registration_uuid = ? WHERE id = ?')
-      .bind(localUuid, payload.registration.id).run();
-    return json({ registration: { ...payload.registration, localRegistrationUuid: localUuid }, created: true }, 201);
+    return createDocumentRegistration(db, tournament, localUuid, body);
   }
   const onlineRegistrationId = requireUuid(body.onlineRegistrationId, 'onlineRegistrationId');
-  const existing = await env.DB.prepare('SELECT * FROM registrations WHERE tournament_id = ? AND id = ?')
+  const existing = await db.prepare('SELECT * FROM registrations WHERE tournament_id = ? AND id = ?')
     .bind(tournament.id, onlineRegistrationId).first();
   if (!existing) {
     throw new HttpError(404, 'Eine Online-Anmeldung existiert nicht mehr');
@@ -3626,7 +3758,8 @@ export async function upsertDocumentRegistration(request, env, tournament, local
     }, { requireStatus: true });
     assertPartnerCountMatchesFormation(tournament, documentRegistration);
   }
-  await env.DB.prepare(`UPDATE registrations SET status = ?, participation = ?, seeding_position = ?,
+  const now = new Date().toISOString();
+  const update = db.prepare(`UPDATE registrations SET status = ?, participation = ?, seeding_position = ?,
       first_name = CASE WHEN ? THEN ? ELSE first_name END,
       last_name = CASE WHEN ? THEN ? ELSE last_name END,
       club = CASE WHEN ? THEN ? ELSE club END,
@@ -3636,22 +3769,96 @@ export async function upsertDocumentRegistration(request, env, tournament, local
       partner2_first_name = CASE WHEN ? THEN ? ELSE partner2_first_name END,
       partner2_last_name = CASE WHEN ? THEN ? ELSE partner2_last_name END,
       team_name = CASE WHEN ? THEN ? ELSE team_name END,
-      execution_revision = execution_revision + 1, updated_at = ? WHERE id = ?`)
+      local_registration_uuid = CASE WHEN EXISTS (SELECT 1 FROM registrations other WHERE other.tournament_id = ?
+          AND other.local_registration_uuid = ? AND other.id != ?) THEN local_registration_uuid ELSE ? END,
+      execution_revision = execution_revision + 1, updated_at = ? WHERE id = ? AND execution_revision = ?`)
     .bind(status, participation, seedingPosition,
-      documentMaster ? 1 : 0, documentRegistration?.firstName,
-      documentMaster ? 1 : 0, documentRegistration?.lastName,
-      documentMaster ? 1 : 0, documentRegistration?.club,
-      documentMaster ? 1 : 0, documentRegistration?.licenseNr,
-      documentMaster ? 1 : 0, documentRegistration?.partnerFirstName,
-      documentMaster ? 1 : 0, documentRegistration?.partnerLastName,
-      documentMaster ? 1 : 0, documentRegistration?.partner2FirstName,
-      documentMaster ? 1 : 0, documentRegistration?.partner2LastName,
-      documentMaster ? 1 : 0, documentRegistration?.teamName,
-      new Date().toISOString(), existing.id).run();
-  if (participation === 'active') {
-    await sendLiveLinkEmails(env, tournament.id, [existing.id], new URL(request.url).origin);
+      documentMaster ? 1 : 0, documentRegistration?.firstName ?? null,
+      documentMaster ? 1 : 0, documentRegistration?.lastName ?? null,
+      documentMaster ? 1 : 0, documentRegistration?.club ?? null,
+      documentMaster ? 1 : 0, documentRegistration?.licenseNr ?? null,
+      documentMaster ? 1 : 0, documentRegistration?.partnerFirstName ?? null,
+      documentMaster ? 1 : 0, documentRegistration?.partnerLastName ?? null,
+      documentMaster ? 1 : 0, documentRegistration?.partner2FirstName ?? null,
+      documentMaster ? 1 : 0, documentRegistration?.partner2LastName ?? null,
+      documentMaster ? 1 : 0, documentRegistration?.teamName ?? null,
+      tournament.id, localUuid, existing.id, localUuid,
+      now, existing.id, expected);
+  return {
+    statements: [update],
+    response: {
+      sql: `SELECT CASE WHEN EXISTS (SELECT 1 FROM registrations WHERE id = ? AND execution_revision = ? AND updated_at = ?)
+          THEN json_object('status', 200, 'body', json_object('created', json('false')),
+            'hydrate', json_object('kind', 'registration', 'id', ?))
+          ELSE json_object('status', 409, 'body', json_object('error', 'Die Ausführungsdaten wurden zwischenzeitlich geändert',
+            'details', json_object('code', 'execution_conflict')))
+          END`,
+      binds: [existing.id, expected + 1, now, existing.id],
+    },
+    async afterCommit(envelope) {
+      if (envelope.status === 200 && participation === 'active') await notifyCheckedIn(env, tournament.id, [existing.id]);
+    },
+  };
+}
+
+/**
+ * Online-Anlage einer lokalen Meldung durch das verbundene Dokument (Spezifikation T-24). Eigener Zugangsweg, nicht
+ * der Anmeldeweg für Formular, Freigabelink und Weboberfläche: Die Nachmeldung der Turnierleitung ist eine bewusste
+ * Entscheidung und daher von Kapazität, Warteliste, Meldefrist und automatischem Anmeldeschluss ausgenommen. Überschreitet
+ * sie die Kapazität, wird sie im selben Batch als over_capacity gekennzeichnet und protokolliert. Ab `running` legt das
+ * Dokument keine Online-Anmeldung mehr an (A-05). Die lokale UUID ist der Idempotenzschlüssel der Neuanlage.
+ */
+async function createDocumentRegistration(db, tournament, localUuid, body) {
+  const created = await db.prepare('SELECT id FROM registrations WHERE tournament_id = ? AND local_registration_uuid = ?')
+    .bind(tournament.id, localUuid).first();
+  const hydrate = { kind: 'registration', uuid: localUuid };
+  if (created) {
+    return { statements: [], response: { envelope: { status: 200, body: { created: false }, hydrate } } };
   }
-  return json({ registration: toPublicRegistration(await env.DB.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first()), created: false });
+  if (['running', 'finished'].includes(tournament.status)) {
+    throw new HttpError(409, 'Anmeldung geschlossen – Turnier läuft', { code: 'tournament_running' });
+  }
+  body.email = createPlaceholderEmail();
+  const registration = normalizeRegistrationInput(body, { requireStatus: false });
+  assertCorePartnerCountMatchesFormation(tournament, registration);
+  const feeSelections = resolveFeeSelections(tournament, body.feeSelections, registration);
+  const registrationAnswers = resolveRegistrationAnswers(tournament, body.registrationAnswers, registration);
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const record = registrationRecord(id, tournament.id, registration, {
+    organizerMessage: null, feeSelections, registrationAnswers, language: normalizeLanguage(body.language), now,
+    accountLinks: { userId: null, partnerUserId: null, partner2UserId: null },
+    cancelToken: crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', ''),
+  });
+  const participation = body.participation === undefined ? 'inactive' : parseParticipation(body.participation);
+  const maxRegistrations = Number(tournament.max_registrations || 0);
+  const columns = Object.keys(record);
+  return {
+    statements: [
+      db.prepare(`INSERT INTO registrations (${columns.join(', ')}, status, participation, confirmed_at,
+          local_registration_uuid, origin, over_capacity)
+        SELECT ${columns.map(() => '?').join(', ')}, 'confirmed', ?, ?, ?, 'document',
+          CASE WHEN ? > 0 AND capacity.used >= ? THEN 1 ELSE 0 END
+        FROM (SELECT COUNT(*) AS used FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')) capacity
+        WHERE EXISTS (SELECT 1 FROM tournaments t WHERE t.id = ? AND t.status NOT IN ('running', 'finished'))
+        ON CONFLICT DO NOTHING`)
+        .bind(...Object.values(record), participation, now, localUuid, maxRegistrations, maxRegistrations,
+          tournament.id, tournament.id),
+      db.prepare(`INSERT INTO audit_log (id, tournament_id, registration_id, actor_role, action, target, created_at)
+          SELECT ?, ?, ?, 'document', 'registration_over_capacity', 'registration', ?
+          WHERE EXISTS (SELECT 1 FROM registrations WHERE id = ? AND over_capacity = 1)`)
+        .bind(crypto.randomUUID(), tournament.id, id, now, id),
+    ],
+    response: {
+      sql: `SELECT CASE WHEN EXISTS (SELECT 1 FROM registrations WHERE tournament_id = ? AND local_registration_uuid = ?)
+          THEN json_object('status', 201, 'body', json_object('created', json('true')),
+            'hydrate', json_object('kind', 'registration', 'uuid', ?))
+          ELSE json_object('status', 409, 'body', json_object('error', 'Anmeldung geschlossen – Turnier läuft',
+            'details', json_object('code', 'tournament_running')))
+          END`,
+      binds: [tournament.id, localUuid, localUuid],
+    },
+  };
 }
 
 /**
@@ -3663,12 +3870,12 @@ export async function upsertDocumentRegistration(request, env, tournament, local
  * uebertragene Runden bleiben in tournament_matches erhalten.
  */
 export async function disconnectTournament(db, tournamentId) {
-  await db
-    .prepare(`UPDATE tournaments SET document_managed = 0, sync_document_id = NULL, sync_lease_token_hash = NULL,
+  return {
+    statements: [db.prepare(`UPDATE tournaments SET document_managed = 0, sync_document_id = NULL, sync_lease_token_hash = NULL,
               sync_takeover_request_id = NULL, desktop_execution = 0, desktop_ranking_json = NULL, updated_at = ? WHERE id = ?`)
-    .bind(new Date().toISOString(), tournamentId)
-    .run();
-  return json({ ok: true });
+      .bind(new Date().toISOString(), tournamentId)],
+    response: { envelope: { status: 200, body: { ok: true } } },
+  };
 }
 
 async function resolveTournamentGeolocation(tournament, existing, now, countryCode) {
@@ -4149,13 +4356,17 @@ async function performTournamentStart(env, existing) {
     // Benachrichtigungen wurden bereits von diesem verschickt, nicht erneut auslösen.
     return updated;
   }
+  await notifyTournamentStarted(env, existing, updated);
+  return updated;
+}
+
+async function notifyTournamentStarted(env, existing, updated) {
   if (isNewlyPublicTournament(existing, updated)) {
     await notifySavedSearchesForPublishedTournament(env, updated);
   }
   await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
-  const participants = await participantAccountUserIds(db, existing.id, existing.owner_id);
+  const participants = await participantAccountUserIds(env.DB, existing.id, existing.owner_id);
   await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
-  return updated;
 }
 
 async function startTournament(env, existing, user, appOrigin) {
@@ -4168,7 +4379,7 @@ async function startTournament(env, existing, user, appOrigin) {
   const updated = await performTournamentStart(env, existing);
   if (existing.status !== 'running') {
     const checkedInIds = await checkInConfirmedRegistrations(env.DB, existing.id);
-    await sendLiveLinkEmails(env, existing.id, checkedInIds, appOrigin);
+    await notifyCheckedIn(env, existing.id, checkedInIds);
   }
   return json({ tournament: toPublicTournament(updated, user) });
 }
@@ -4195,19 +4406,84 @@ async function checkInConfirmedRegistrations(db, tournamentId) {
  * ausgelost wurde (z. B. Start aus dem Dokument offline verloren gegangen oder Dokument nach dem
  * Trennen neu verbunden). Mit Online-Runden wird es tatsächlich online durchgeführt: 409.
  */
-export async function startTournamentFromSync(env, existing, user) {
+export async function startTournamentFromSync(request, env, existing) {
+  const db = env.DB;
   if (existing.status === 'running' && Number(existing.desktop_execution || 0) !== 1) {
-    const onlineRound = await env.DB.prepare('SELECT 1 FROM tournament_rounds WHERE tournament_id = ? LIMIT 1')
+    const onlineRound = await db.prepare('SELECT 1 FROM tournament_rounds WHERE tournament_id = ? LIMIT 1')
       .bind(existing.id).first();
     if (onlineRound) {
       assertDesktopExecution(existing);
     }
   }
-  await performTournamentStart(env, existing);
-  await env.DB.prepare('UPDATE tournaments SET desktop_execution = 1, updated_at = ? WHERE id = ?')
-    .bind(new Date().toISOString(), existing.id).run();
-  const updated = await getTournamentById(env.DB, existing.id);
-  return json({ tournament: toPublicTournament(updated, user) });
+  const body = await readJson(request).catch(() => ({}));
+  const localStartedAt = body.localStartedAt && !Number.isNaN(new Date(body.localStartedAt).getTime())
+    ? new Date(body.localStartedAt).toISOString() : null;
+  const now = new Date().toISOString();
+  const statements = [
+    db.prepare(`UPDATE tournaments SET status = 'running', desktop_execution = 1,
+        local_started_at = COALESCE(local_started_at, ?), updated_at = ? WHERE id = ?`)
+      .bind(localStartedAt, now, existing.id),
+  ];
+  if (localStartedAt) {
+    // Online-Anmeldungen zwischen lokalem Start und dem hier gesetzten `running` werden markiert und nie
+    // automatisch importiert (KP-05).
+    statements.push(db.prepare(`UPDATE registrations SET received_after_start = 1
+        WHERE tournament_id = ? AND origin = 'online' AND registered_at > ?`).bind(existing.id, localStartedAt));
+  }
+  return {
+    statements,
+    response: { envelope: { status: 200, body: {}, hydrate: { kind: 'tournament' } } },
+    async afterCommit() {
+      if (existing.status !== 'running') {
+        await notifyTournamentStarted(env, existing, await getTournamentById(db, existing.id));
+      }
+    },
+  };
+}
+
+function actorRoleFor(tournament, user) {
+  if (tournament.owner_id === user.id) return 'owner';
+  return user.role === 'admin' ? 'admin' : 'editor';
+}
+
+/**
+ * Setzt ein versehentlich gestartetes Turnier (z. B. Testlauf vor der Veröffentlichung) von `running` zurück, solange
+ * online noch kein Rundenergebnis vorliegt (Spezifikation E-23). Die Online-Anmeldung bleibt dabei geschlossen, bis
+ * sie ausdrücklich wieder geöffnet wird; PTM sieht das Zurücksetzen beim nächsten Abgleich (runningResetAt).
+ */
+export async function resetTournamentRunning(db, tournament, user) {
+  const now = new Date().toISOString();
+  const [reset] = await db.batch([
+    db.prepare(`UPDATE tournaments SET status = 'registration', registration_closed = 1, running_reset_at = ?,
+        local_started_at = NULL, desktop_execution = 0, updated_at = ?
+        WHERE id = ? AND status = 'running'
+          AND NOT EXISTS (SELECT 1 FROM tournament_matches WHERE tournament_id = ? AND (score_a IS NOT NULL OR score_b IS NOT NULL))`)
+      .bind(now, now, tournament.id, tournament.id),
+    db.prepare(`INSERT INTO audit_log (id, tournament_id, actor_user_id, actor_role, action, target, created_at)
+        SELECT ?, ?, ?, ?, 'running_reset', 'tournament', ? WHERE EXISTS (SELECT 1 FROM tournaments WHERE id = ? AND running_reset_at = ?)`)
+      .bind(crypto.randomUUID(), tournament.id, user.id, actorRoleFor(tournament, user), now, tournament.id, now),
+  ]);
+  if (!reset.meta.changes) {
+    if (tournament.status !== 'running') {
+      throw new HttpError(409, 'Das Turnier läuft nicht.');
+    }
+    throw new HttpError(409, 'Es liegen bereits Rundenergebnisse vor; der Turnierstart kann nicht mehr zurückgesetzt werden.', {
+      code: 'results_exist',
+    });
+  }
+  return json({ tournament: toPublicTournament(await getTournamentById(db, tournament.id), user) });
+}
+
+export async function setRegistrationClosed(request, db, tournament, user) {
+  const body = await readJson(request);
+  if (typeof body.closed !== 'boolean') throw new HttpError(400, 'closed muss true oder false sein');
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare('UPDATE tournaments SET registration_closed = ?, updated_at = ? WHERE id = ?').bind(body.closed ? 1 : 0, now, tournament.id),
+    auditStatement(db, { tournamentId: tournament.id, actorUserId: user.id, actorRole: actorRoleFor(tournament, user),
+      action: body.closed ? 'registration_closed' : 'registration_opened', target: 'tournament', now }),
+  ]);
+  return json({ tournament: toPublicTournament(await getTournamentById(db, tournament.id), user) });
 }
 
 function normalizePresentationUrl(value, field) {
@@ -4597,7 +4873,7 @@ async function updateTournamentPresentation(request, env, existing, user) {
 }
 
 /** PTM Calc is the exclusive writer for the metadata of a linked tournament. */
-async function syncPutTournamentMetadata(request, env, existing, user) {
+async function syncPutTournamentMetadata(request, env, existing) {
   const db = env.DB;
   const body = await readJson(request);
   const legacyRegistrationTimes = body.registrationTimeSemantics !== 'tournament-local-v1';
@@ -4610,26 +4886,33 @@ async function syncPutTournamentMetadata(request, env, existing, user) {
   const timezone = resolveTournamentTimezone(geo, existing.timezone || 'Europe/Berlin');
   const registrationTimes = resolveRegistrationTimes(tournament, timezone, { legacyUtc: legacyRegistrationTimes });
 
-  await db.prepare(
+  const statement = db.prepare(
     `UPDATE tournaments
      SET name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?, formation = ?, registration_type = ?,
-         status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, contact_name = ?,
+         status = CASE WHEN status = 'running' AND ? NOT IN ('running', 'finished') THEN status ELSE ? END, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, contact_name = ?,
          contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?, participants_public = ?,
          license_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, document_managed = 1, updated_at = ?
      WHERE id = ?`,
   ).bind(
     tournament.name, tournament.date, tournament.startTime, tournament.location, tournament.description,
-    tournament.type, tournament.formation, tournament.registrationType, tournament.status, tournament.maxRegistrations,
+    tournament.type, tournament.formation, tournament.registrationType, tournament.status, tournament.status, tournament.maxRegistrations,
     registrationTimes.registrationDeadline, registrationTimes.registrationOpensAt, tournament.entryFeeCents, tournament.currency, tournament.contactName, tournament.contactEmail,
     tournament.contactPhone, tournament.visibility, tournament.internalNotes, tournament.participantsPublic ? 1 : 0,
     tournament.licenseRequired ? 1 : 0, geo.latitude, geo.longitude, geo.geocodedAt, timezone, now, existing.id,
-  ).run();
+  );
 
-  const updated = await getTournamentById(db, existing.id);
-  if (isNewlyPublicTournament(existing, updated)) {
-    await notifySavedSearchesForPublishedTournament(env, updated);
-  }
-  return json({ tournament: toPublicTournament(updated, user) });
+  // Ein laufendes Turnier kehrt über die Eckdaten nie in die Anmeldephase zurück; dafür gibt es das ausdrückliche
+  // Zurücksetzen (E-23).
+  return {
+    statements: [statement],
+    response: { envelope: { status: 200, body: {}, hydrate: { kind: 'tournament' } } },
+    async afterCommit() {
+      const updated = await getTournamentById(db, existing.id);
+      if (isNewlyPublicTournament(existing, updated)) {
+        await notifySavedSearchesForPublishedTournament(env, updated);
+      }
+    },
+  };
 }
 
 /**
@@ -4734,7 +5017,8 @@ async function confirmPendingRegistrations(env, tournament, appOrigin) {
 async function listPublicParticipants(db, tournamentId, currentUserEmail) {
   const result = await db
     .prepare(
-      `SELECT id, email, first_name, last_name, club, team_name, partner_first_name, partner_last_name, is_vip, status
+      `SELECT id, email, first_name, last_name, club, team_name, partner_first_name, partner_last_name, is_vip, status,
+         over_capacity
        FROM registrations
        WHERE tournament_id = ? AND status IN ('pending', 'confirmed', 'waitlist')
        ORDER BY registered_at ASC`,
@@ -4755,6 +5039,8 @@ async function listPublicParticipants(db, tournamentId, currentUserEmail) {
       partnerFirstName: row.partner_first_name,
       partnerLastName: row.partner_last_name,
       isVip: Boolean(row.is_vip),
+      // Von der Turnierleitung über die Kapazität hinaus nachgemeldet (T-24); öffentlich als solche erkennbar.
+      overCapacity: Boolean(Number(row.over_capacity || 0)),
     };
   };
 
@@ -5301,26 +5587,13 @@ async function participantAccountUserIds(db, tournamentId, excludedUserId) {
   ).bind(tournamentId, tournamentId, tournamentId, excludedUserId).all();
 }
 
-async function findLiveRegistrationByToken(db, token) {
-  const trimmed = String(token || '').trim();
-  const registration = trimmed.length >= 32
-    ? await db.prepare('SELECT * FROM registrations WHERE live_token = ?').bind(trimmed).first()
-    : null;
-  if (!registration || registration.status !== 'confirmed') {
-    throw new HttpError(404, 'Dieser Live-Link ist ungültig oder abgelaufen');
-  }
-  return registration;
-}
-
-// Push-Abo aus der Live-Ansicht, an die Meldung gebunden (auch ohne Login über den Live-Link).
+// Push-Abo aus der Live-Ansicht, an die Meldung gebunden.
 async function saveLivePushSubscription(request, db, registration) {
   const subscription = await readJson(request);
   const endpoint = String(subscription.endpoint || '');
   const p256dh = String(subscription.keys?.p256dh || '');
   const auth = String(subscription.keys?.auth || '');
   if (!isAllowedPushEndpoint(endpoint) || !p256dh || !auth) throw new HttpError(400, 'Ungültiges Push-Abonnement');
-  // Der Klick auf die Benachrichtigung öffnet den persönlichen Live-Link - auch bei eingeloggten Usern.
-  await ensureLiveToken(db, registration);
   const now = new Date().toISOString();
   await db.prepare(`INSERT INTO live_push_subscriptions (endpoint, registration_id, p256dh, auth, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(endpoint, registration_id) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth, updated_at = excluded.updated_at`)
@@ -5342,7 +5615,7 @@ async function removeLivePushSubscription(request, db, registration) {
  */
 async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
   try {
-    const subscriptions = await env.DB.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.live_token, r.language
+    const subscriptions = await env.DB.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.language
         FROM live_push_subscriptions s JOIN registrations r ON r.id = s.registration_id
         WHERE r.tournament_id = ? AND r.status = 'confirmed'`).bind(tournament.id).all();
     if (!subscriptions.results?.length) return;
@@ -5352,12 +5625,12 @@ async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
     const items = [];
     for (const subscription of subscriptions.results) {
       const match = buildPlayerLiveView({ registrationId: subscription.registration_id, rounds: [round] }).currentMatch;
-      if (!match || !subscription.live_token) continue;
+      if (!match) continue;
       items.push({
         endpoint: subscription.endpoint,
         p256dh: subscription.p256dh,
         auth: subscription.auth,
-        payload: buildLiveRoundPush({ tournamentName: tournament.name, match, language: subscription.language, url: buildLiveLink(appOrigin, subscription.live_token) }),
+        payload: buildLiveRoundPush({ tournamentName: tournament.name, match, language: subscription.language, url: `${appOrigin}/live/${encodeURIComponent(subscription.registration_id)}` }),
       });
     }
     const messages = chunk(items, LIVE_PUSH_CHUNK_SIZE).map((part) => ({ body: { kind: 'live_push', items: part } }));
@@ -5441,28 +5714,28 @@ async function syncPutRound(request, db, tournament, roundNumberValue) {
       .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(match.teamA), JSON.stringify(match.teamB),
         match.scoreA, match.scoreB, match.matchIndex, match.stageLabel, match.court, now, now));
   }
-  try {
-    await db.batch(statements);
-  } catch (error) {
-    if (isTournamentRoundNumberConflict(error)) {
-      throw new HttpError(409, 'Eine neue Runde wurde bereits zeitgleich erstellt. Bitte aktualisieren.');
-    }
-    throw error;
-  }
-  return json({ roundNumber, matchCount: matches.length, created: !existing });
+  return {
+    statements,
+    response: { envelope: { status: 200, body: { roundNumber, matchCount: matches.length, created: !existing } } },
+    mapError(error) {
+      if (isTournamentRoundNumberConflict(error)) {
+        throw new HttpError(409, 'Eine neue Runde wurde bereits zeitgleich erstellt. Bitte aktualisieren.');
+      }
+    },
+  };
 }
 
 async function syncDeleteRound(db, tournament, roundNumberValue) {
   assertDesktopExecution(tournament);
   const roundNumber = parseSyncRoundNumber(roundNumberValue);
   const round = await db.prepare('SELECT id FROM tournament_rounds WHERE tournament_id = ? AND round_number = ?').bind(tournament.id, roundNumber).first();
-  if (round) {
-    await db.batch([
+  return {
+    statements: round ? [
       db.prepare('DELETE FROM tournament_matches WHERE round_id = ?').bind(round.id),
       db.prepare('DELETE FROM tournament_rounds WHERE id = ?').bind(round.id),
-    ]);
-  }
-  return json({ ok: true, deleted: Boolean(round) });
+    ] : [],
+    response: { envelope: { status: 200, body: { ok: true, deleted: Boolean(round) } } },
+  };
 }
 
 async function syncPutRanking(request, db, tournament) {
@@ -5470,9 +5743,10 @@ async function syncPutRanking(request, db, tournament) {
   const body = await readJson(request);
   const entries = parseSyncRanking(body, await tournamentRegistrationIds(db, tournament.id));
   // updated_at bleibt unberührt: Der Snapshot ist Ausführungsdatum, keine Turnier-Stammdatenänderung.
-  await db.prepare('UPDATE tournaments SET desktop_ranking_json = ? WHERE id = ?')
-    .bind(JSON.stringify(entries), tournament.id).run();
-  return json({ entryCount: entries.length });
+  return {
+    statements: [db.prepare('UPDATE tournaments SET desktop_ranking_json = ? WHERE id = ?').bind(JSON.stringify(entries), tournament.id)],
+    response: { envelope: { status: 200, body: { entryCount: entries.length } } },
+  };
 }
 
 async function cancelRegistration(db, id) {
@@ -5512,31 +5786,17 @@ async function cancelRegistrationByToken(request, env) {
   return result;
 }
 
-// Reine, testbare Freischaltungslogik: prüft anhand des übergebenen `now`-Zeitpunkts
-// (Default: aktueller Server-Zeitpunkt), ob eine Anmeldung erlaubt ist. Nutzt
-// ausschließlich UTC-Instant-Vergleiche (registration_opens_at/-deadline sind bereits
-// korrekt in UTC gespeichert, siehe zonedDateTimeToUtcIso) – die Zeitzone des
-// betrachtenden Browsers oder des Servers spielt für das Ergebnis keine Rolle.
-export function registrationOpenStatus(tournament, now = new Date()) {
-  if (tournament.visibility !== 'public' || tournament.status !== 'registration') {
-    return 'closed';
-  }
-  if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < now.getTime()) {
-    return 'deadline_passed';
-  }
-  if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > now.getTime()) {
-    return 'not_yet_open';
-  }
-  return 'open';
-}
-
 const REGISTRATION_CLOSED_MESSAGES = {
   closed: 'Die Anmeldung ist geschlossen',
+  running: 'Anmeldung geschlossen – Turnier läuft',
+  started: 'Die Anmeldung ist mit Turnierbeginn geschlossen',
   deadline_passed: 'Die Meldefrist ist abgelaufen',
   not_yet_open: 'Die Anmeldung ist noch nicht geöffnet',
 };
 
-async function createRegistration(request, env, tournament, { session = null, shareAccess = false, syncBootstrap = false } = {}) {
+export async function createRegistration(request, env, tournament, {
+  session = null, shareAccess = false, shareTokenHash = null, syncBootstrap = false,
+} = {}) {
   const db = env.DB;
 
   const body = await readJson(request);
@@ -5547,18 +5807,19 @@ async function createRegistration(request, env, tournament, { session = null, sh
   }
   const isManager = canManageTournament(tournament, session?.user || null);
   // Nach dem Desktop-Start ist das Turnierdokument alleiniger Master: Web-Pflege ist gesperrt, vor Ort
-  // erfasste Nachmeldungen legt das Dokument aber weiterhin ueber den Sync (mit Lease) an.
+  // erfasste Nachmeldungen legt das Dokument über seinen eigenen Zugangsweg an (T-24).
   if (isManager && !syncBootstrap && Number(tournament.desktop_execution || 0) === 1) {
     throw new HttpError(409, 'Die Meldeliste wird nach Turnierstart ausschließlich im Turnierdokument geführt.');
+  }
+  // Ab `running` legt das Dokument keine neuen Online-Anmeldungen mehr an (A-05, E-13).
+  if (syncBootstrap && ['running', 'finished'].includes(tournament.status)) {
+    throw new HttpError(409, 'Anmeldung geschlossen – Turnier läuft', { code: 'tournament_running' });
   }
   // Der reguläre Anmeldezeitraum gilt nur für öffentliche Selbstanmeldungen.
   // Bis zum Desktop-Start dürfen Turnierleiter die Meldeliste noch pflegen;
   // danach ist das verbundene Turnierdokument der alleinige Master.
   if (!isManager) {
-    const openStatus = coreRegistrationOpenStatus({ ...tournament, visibility: shareAccess ? 'public' : tournament.visibility });
-    if (openStatus !== 'open') {
-      throw new HttpError(403, REGISTRATION_CLOSED_MESSAGES[openStatus]);
-    }
+    assertRegistrationOpen(tournament, shareAccess);
   }
   if (!isManager && body.publicationNoticeAccepted !== true) {
     throw new HttpError(400, 'Der Hinweis zur möglichen Veröffentlichung der Anmeldedaten muss bestätigt werden');
@@ -5568,6 +5829,8 @@ async function createRegistration(request, env, tournament, { session = null, sh
   }
 
   const registration = normalizeRegistrationInput(body, { requireStatus: false });
+  // VIP vergibt nur die Turnierleitung; sonst könnte eine Selbstanmeldung andere Teams verdrängen.
+  if (!isManager) registration.isVip = false;
   const organizerMessage = isManager ? null : registration.organizerMessage;
   const language = normalizeLanguage(body.language);
   assertCorePartnerCountMatchesFormation(tournament, registration);
@@ -5576,60 +5839,57 @@ async function createRegistration(request, env, tournament, { session = null, sh
   assertLicenseMatchesTournament(tournament, registration);
   await assertNoDuplicateTeamName(db, tournament.id, registration.teamName);
   await assertNoDuplicatePlayer(db, tournament.id, registration);
-  const { status, displace } = await initialRegistrationStatus(db, tournament, registration.isVip, isManager && body.confirmImmediately === true);
-  const now = new Date().toISOString();
-  const id = crypto.randomUUID();
-  const cancelToken = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
-  const appOrigin = new URL(request.url).origin;
   const accountLinks = await resolveRegistrationUserIds(db, registration);
 
-  await db
-    .prepare(
-      `INSERT INTO registrations (
-        id, tournament_id, first_name, last_name, email, club, license_nr,
-        partner_first_name, partner_last_name, partner_email, partner_license_nr,
-        partner2_first_name, partner2_last_name, partner2_email, partner2_license_nr,
-        team_name, seeding_position, status, participation, is_vip, organizer_message, fee_selections, registration_answers, language, registered_at, confirmed_at, created_at, updated_at, cancel_token,
-        user_id, partner_user_id, partner2_user_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      tournament.id,
-      registration.firstName,
-      registration.lastName,
-      registration.email,
-      registration.club,
-      registration.licenseNr,
-      registration.partnerFirstName,
-      registration.partnerLastName,
-      registration.partnerEmail,
-      registration.partnerLicenseNr,
-      registration.partner2FirstName,
-      registration.partner2LastName,
-      registration.partner2Email,
-      registration.partner2LicenseNr,
-      registration.teamName,
-      registration.seedingPosition,
-      status,
-      initialParticipation(tournament, status, body.participation, syncBootstrap),
-      registration.isVip ? 1 : 0,
-      organizerMessage,
-      JSON.stringify(feeSelections),
-      JSON.stringify(registrationAnswers),
-      language,
-      now,
-      status === 'confirmed' ? now : null,
-      now,
-      now,
-      cancelToken,
-      accountLinks.userId,
-      accountLinks.partnerUserId,
-      accountLinks.partner2UserId,
-    )
-    .run();
+  // Kapazität, VIP-Verdrängung, Warteliste und Anlage laufen in einem Batch; die Bedingungen stehen im SQL, damit
+  // parallele Anmeldungen und ein gleichzeitiger Turnierstart nicht durchrutschen (T-12). pending und confirmed
+  // belegen Kapazität, waitlist und cancelled nicht.
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const baseStatus = (isManager && body.confirmImmediately === true) || !Number(tournament.approval_required || 0)
+    ? 'confirmed' : 'pending';
+  const maxRegistrations = Number(tournament.max_registrations || 0);
+  const waitlistEnabled = Number(tournament.waitlist_enabled ?? 1) === 1;
+  const openCondition = registrationOpenSql({ isManager, syncBootstrap, shareTokenHash });
+  const statements = [];
+  if (registration.isVip && maxRegistrations > 0) {
+    statements.push(db.prepare(`UPDATE registrations SET status = ?, updated_at = ?
+        WHERE id = (SELECT id FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
+                    AND is_vip = 0 ORDER BY registered_at DESC LIMIT 1)
+          AND (SELECT COUNT(*) FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')) >= ?
+          AND EXISTS (SELECT 1 FROM tournaments t WHERE t.id = ? AND ${openCondition.sql})
+        RETURNING id`)
+      .bind(waitlistEnabled ? 'waitlist' : 'cancelled', now, tournament.id, tournament.id, maxRegistrations, tournament.id,
+        ...openCondition.binds));
+  }
+  const record = registrationRecord(id, tournament.id, registration, {
+    organizerMessage, feeSelections, registrationAnswers, language, now, accountLinks,
+    cancelToken: crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', ''),
+  });
+  const statusSql = `CASE WHEN ? = 0 OR capacity.used < ? THEN ? ELSE 'waitlist' END`;
+  const statusBinds = [maxRegistrations, maxRegistrations, baseStatus];
+  const columns = Object.keys(record);
+  statements.push(db.prepare(`INSERT INTO registrations (${columns.join(', ')}, status, participation, confirmed_at)
+      SELECT ${columns.map(() => '?').join(', ')}, ${statusSql},
+        CASE WHEN (${statusSql}) = 'confirmed' THEN ? ELSE ? END,
+        CASE WHEN (${statusSql}) = 'confirmed' THEN ? ELSE NULL END
+      FROM (SELECT COUNT(*) AS used FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')) capacity
+      WHERE EXISTS (SELECT 1 FROM tournaments t WHERE t.id = ? AND ${openCondition.sql})
+        AND (? = 0 OR capacity.used < ? OR ? = 1)`)
+    .bind(...Object.values(record), ...statusBinds,
+      ...statusBinds, initialParticipation(tournament, 'confirmed', body.participation, syncBootstrap),
+      initialParticipation(tournament, baseStatus === 'confirmed' ? 'waitlist' : baseStatus, body.participation, syncBootstrap),
+      ...statusBinds, now,
+      tournament.id, tournament.id, ...openCondition.binds, maxRegistrations, maxRegistrations, waitlistEnabled ? 1 : 0));
+  const results = await db.batch(statements);
 
   const created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
+  if (!created) {
+    await throwRegistrationRejection(db, tournament, { isManager, shareAccess, syncBootstrap });
+  }
+  // Benachrichtigungen und E-Mails erst nach dem erfolgreichen Commit.
+  const displacedId = statements.length > 1 ? results[0]?.results?.[0]?.id : null;
+  const appOrigin = new URL(request.url).origin;
   if (!syncBootstrap) {
     await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', {
       tournamentName: tournament.name,
@@ -5638,10 +5898,14 @@ async function createRegistration(request, env, tournament, { session = null, sh
       ...(organizerMessage ? { message: organizerMessage } : {}),
     });
     await notifyUserByEmail(env, created.email, 'registration_status_changed', { tournamentName: tournament.name, status: created.status }, undefined, tournament.owner_id);
-  }
-
-  if (displace && !syncBootstrap) {
-    await displaceRegistration(env, tournament, displace, appOrigin);
+    if (displacedId) {
+      const displaced = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(displacedId).first();
+      try {
+        await sendDisplacementEmail(env, tournament, displaced, !waitlistEnabled, appOrigin);
+      } catch (error) {
+        console.error(`Failed to send displacement email for registration ${displacedId}`, error);
+      }
+    }
   }
 
   const mailEnabled = await canSendTournamentMail(db, tournament);
@@ -5657,12 +5921,85 @@ async function createRegistration(request, env, tournament, { session = null, sh
     }
   }
 
-  if (created.participation === 'active') {
-    // Nachmeldung während der Durchführung: direkt eingecheckt, daher gleich den Live-Link schicken.
-    await sendLiveLinkEmails(env, tournament.id, [created.id], appOrigin);
-  }
-
   return json({ registration: toPublicRegistration(created), mailEnabled }, 201);
+}
+
+function assertRegistrationOpen(tournament, shareAccess) {
+  const openStatus = coreRegistrationOpenStatus({ ...tournament, visibility: shareAccess ? 'public' : tournament.visibility },
+    new Date(), tournamentStartUtcIso(tournament));
+  if (openStatus !== 'open') {
+    throw new HttpError(403, REGISTRATION_CLOSED_MESSAGES[openStatus],
+      openStatus === 'running' ? { code: 'tournament_running' } : undefined);
+  }
+}
+
+// SQL-Bedingung auf dem Turnier (Alias t), unter der eine Anmeldung angelegt werden darf. Zeitprüfungen (Öffnung,
+// Meldefrist, Turnierbeginn) liegen davor in JS; hier stehen nur die Zustände, die sich parallel ändern können.
+function registrationOpenSql({ isManager, syncBootstrap, shareTokenHash }) {
+  if (syncBootstrap) {
+    return { sql: "t.status NOT IN ('running', 'finished')", binds: [] };
+  }
+  if (isManager) {
+    return { sql: 'COALESCE(t.desktop_execution, 0) = 0', binds: [] };
+  }
+  return {
+    sql: `t.status = 'registration' AND COALESCE(t.registration_closed, 0) = 0
+      AND (t.visibility = 'public' OR EXISTS (SELECT 1 FROM tournament_share_links l
+                                               WHERE l.tournament_id = t.id AND l.token_hash = ?))`,
+    binds: [shareTokenHash || ''],
+  };
+}
+
+// Spalten einer neuen Anmeldung ohne die kapazitätsabhängigen Felder status, participation und confirmed_at.
+function registrationRecord(id, tournamentId, registration, {
+  organizerMessage, feeSelections, registrationAnswers, language, now, accountLinks, cancelToken,
+}) {
+  return {
+    id,
+    tournament_id: tournamentId,
+    first_name: registration.firstName,
+    last_name: registration.lastName,
+    email: registration.email,
+    club: registration.club,
+    license_nr: registration.licenseNr,
+    partner_first_name: registration.partnerFirstName,
+    partner_last_name: registration.partnerLastName,
+    partner_email: registration.partnerEmail,
+    partner_license_nr: registration.partnerLicenseNr,
+    partner2_first_name: registration.partner2FirstName,
+    partner2_last_name: registration.partner2LastName,
+    partner2_email: registration.partner2Email,
+    partner2_license_nr: registration.partner2LicenseNr,
+    team_name: registration.teamName,
+    seeding_position: registration.seedingPosition,
+    is_vip: registration.isVip ? 1 : 0,
+    organizer_message: organizerMessage,
+    fee_selections: JSON.stringify(feeSelections),
+    registration_answers: JSON.stringify(registrationAnswers),
+    language,
+    registered_at: now,
+    created_at: now,
+    updated_at: now,
+    cancel_token: cancelToken,
+    user_id: accountLinks.userId,
+    partner_user_id: accountLinks.partnerUserId,
+    partner2_user_id: accountLinks.partner2UserId,
+  };
+}
+
+// Die Anlage fand nicht statt: Grund aus dem aktuellen Zustand bestimmen.
+async function throwRegistrationRejection(db, tournament, { isManager, shareAccess, syncBootstrap }) {
+  const current = await getTournamentById(db, tournament.id);
+  if (syncBootstrap) {
+    throw new HttpError(409, 'Anmeldung geschlossen – Turnier läuft', { code: 'tournament_running' });
+  }
+  if (isManager) {
+    throw new HttpError(409, 'Die Meldeliste wird nach Turnierstart ausschließlich im Turnierdokument geführt.');
+  }
+  const stillShared = shareAccess && current.visibility === 'private'
+    && Boolean(await db.prepare('SELECT 1 FROM tournament_share_links WHERE tournament_id = ?').bind(current.id).first());
+  assertRegistrationOpen(current, stillShared);
+  throw new HttpError(403, 'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.');
 }
 
 export async function updateRegistration(request, env, existing) {
@@ -6016,7 +6353,8 @@ async function retrieveApiKeySecret(db, id, userId) {
   return json({ secret: existing.pending_secret });
 }
 
-async function syncGetRegistrations(db, tournamentId, url) {
+async function syncGetRegistrations(db, tournament, url) {
+  const tournamentId = tournament.id;
   const since = url.searchParams.get('since');
   const sinceIso = since && !Number.isNaN(new Date(since).getTime()) ? new Date(since).toISOString() : new Date(0).toISOString();
 
@@ -6025,8 +6363,7 @@ async function syncGetRegistrations(db, tournamentId, url) {
     .bind(tournamentId, sinceIso)
     .all();
 
-  const tournament = await db.prepare('SELECT registration_questions FROM tournaments WHERE id = ?').bind(tournamentId).first();
-  const questionLabels = new Map(registrationQuestionsFromRow(tournament || {}).map((question) => [question.id, question.label]));
+  const questionLabels = new Map(registrationQuestionsFromRow(tournament).map((question) => [question.id, question.label]));
   // Die Sync-API ist API-Key-geschützt. Sie liefert daher auch die organisatorischen
   // Anmeldedetails (Tarife und Antworten), damit das Turnierdokument einen vollständigen,
   // nachvollziehbaren Snapshot der Online-Meldung führen kann.
@@ -6041,7 +6378,45 @@ async function syncGetRegistrations(db, tournamentId, url) {
     };
   });
   const cursor = registrations.length > 0 ? registrations[registrations.length - 1].updatedAt : sinceIso;
-  return json({ registrations, cursor });
+  return json({ registrations, cursor, tournament: await syncTournamentState(db, tournament) });
+}
+
+// Zustand des Online-Turniers, den das Dokument für Vorabcheck, Wiederherstellung und Zählerabgleich braucht.
+async function syncTournamentState(db, tournament) {
+  const rounds = await db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?')
+    .bind(tournament.id).first();
+  return {
+    status: tournament.status,
+    registrationClosed: Boolean(Number(tournament.registration_closed || 0)),
+    runningResetAt: tournament.running_reset_at || null,
+    roundsOnline: Number(rounds?.count || 0),
+    writeCounter: Number(tournament.sync_write_counter || 0),
+  };
+}
+
+/**
+ * Zuordnung UUID ↔ Online-Anmeldungs-ID aus Sicht des Servers (Spezifikation T-21). Das Dokument baut damit ein
+ * beschädigtes Sync-Blatt wieder auf; der Server kennt die UUIDs als Idempotenzschlüssel der Online-Anlage.
+ */
+async function syncGetMapping(db, tournamentId) {
+  const result = await db.prepare(`SELECT * FROM registrations WHERE tournament_id = ? AND local_registration_uuid IS NOT NULL
+      ORDER BY registered_at ASC`).bind(tournamentId).all();
+  return json({
+    mappings: (result.results || []).map((row) => ({
+      onlineRegistrationId: row.id,
+      localRegistrationUuid: row.local_registration_uuid,
+      status: row.status,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      partnerFirstName: row.partner_first_name,
+      partnerLastName: row.partner_last_name,
+      partner2FirstName: row.partner2_first_name,
+      partner2LastName: row.partner2_last_name,
+      executionRevision: Number(row.execution_revision || 1),
+      overCapacity: Boolean(Number(row.over_capacity || 0)),
+      receivedAfterStart: Boolean(Number(row.received_after_start || 0)),
+    })),
+  });
 }
 
 async function syncPostResults(request, env, tournamentId) {
@@ -6078,7 +6453,7 @@ async function syncPostResults(request, env, tournamentId) {
     if (expectedExecutionRevision !== null && (!Number.isInteger(expectedExecutionRevision) || expectedExecutionRevision < 1)) {
       throw new HttpError(400, `Ungültige Ausführungsrevision für Anmeldung ${id}`);
     }
-    parsed.push({ id, status, seedingPosition, participation, expectedExecutionRevision });
+    parsed.push({ id, status, seedingPosition, participation, expectedExecutionRevision, notify: entry.notify === true });
   }
 
   const statusChangeIds = parsed.filter((entry) => entry.status !== null).map((entry) => entry.id);
@@ -6117,42 +6492,42 @@ async function syncPostResults(request, env, tournamentId) {
          seeding_position = ?, participation = COALESCE(?, participation), execution_revision = execution_revision + 1, updated_at = ?
      WHERE id = ? AND tournament_id = ? AND (? IS NULL OR execution_revision = ?)`,
   );
-  const updateResults =
-    parsed.length > 0
-      ? await db.batch(parsed.map((entry) => updateStatement.bind(entry.status, entry.status, now, entry.status, entry.seedingPosition, entry.participation, now, entry.id, tournamentId, entry.expectedExecutionRevision, entry.expectedExecutionRevision)))
-      : [];
-
-  let updatedCount = 0;
-  for (let index = 0; index < parsed.length; index += 1) {
-    const entry = parsed[index];
-    const changes = updateResults[index]?.meta?.changes || 0;
-    if (!changes && entry.expectedExecutionRevision !== null) {
-      throw new HttpError(409, 'Die Ausführungsdaten wurden zwischenzeitlich geändert', { code: 'execution_conflict', registrationId: entry.id });
-    }
-    updatedCount += changes;
-
-    const previous = previousById.get(entry.id);
-    // Der Dokument-Sync löst keine E-Mails aus; Notifications wären ebenfalls
-    // ein Retry-Seiteneffekt und bleiben deshalb einem expliziten API-Aufruf vorbehalten.
-    if (previous && previous.status !== entry.status && changes && entry.notify === true) {
-      await createSystemNotification(env, previous.owner_id, 'registration_status_changed', { tournamentName: previous.name, status: entry.status, participant: `${previous.first_name} ${previous.last_name}` });
-      await notifyUserByEmail(env, previous.email, 'registration_status_changed', { tournamentName: previous.name, status: entry.status }, undefined, previous.owner_id);
-      if (previous.status !== 'confirmed' && entry.status === 'confirmed') {
-        try {
-          await sendRegistrationConfirmationEmail(env, { ...previous, id: tournamentId }, previous, APP_ORIGIN);
-        } catch (error) {
-          console.error(`Failed to send synced registration confirmation email for registration ${previous.id}`, error);
+  const ids = parsed.map((entry) => entry.id);
+  const expectedIds = expectedRevisionEntries.map((entry) => entry.id);
+  const placeholders = (values) => values.map(() => '?').join(', ') || "''";
+  // Antwort aus dem Zustand nach dem Batch: geändert sind genau die Zeilen mit dem Zeitstempel dieses Auftrags. Fehlt
+  // eine Zeile mit erwarteter Revision, hat eine parallele Änderung sie verhindert (execution_conflict).
+  const responseSql = `SELECT CASE WHEN (SELECT COUNT(*) FROM registrations WHERE tournament_id = ? AND updated_at = ?
+        AND id IN (${placeholders(expectedIds)})) < ?
+      THEN json_object('status', 409, 'body', json_object('error', 'Die Ausführungsdaten wurden zwischenzeitlich geändert',
+        'details', json_object('code', 'execution_conflict')))
+      ELSE json_object('status', 200, 'body', json_object('updatedCount',
+        (SELECT COUNT(*) FROM registrations WHERE tournament_id = ? AND updated_at = ? AND id IN (${placeholders(ids)}))))
+      END`;
+  return {
+    statements: parsed.map((entry) => updateStatement.bind(entry.status, entry.status, now, entry.status, entry.seedingPosition,
+      entry.participation, now, entry.id, tournamentId, entry.expectedExecutionRevision, entry.expectedExecutionRevision)),
+    response: { sql: responseSql, binds: [tournamentId, now, ...expectedIds, expectedIds.length, tournamentId, now, ...ids] },
+    async afterCommit(envelope) {
+      if (envelope.status !== 200) return;
+      // Der Dokument-Sync löst keine E-Mails aus; Status-Benachrichtigungen bleiben einem ausdrücklichen notify
+      // vorbehalten. Einen Check-in meldet PTM Online ohne E-Mail (E-09).
+      for (const entry of parsed) {
+        const previous = previousById.get(entry.id);
+        if (!previous || previous.status === entry.status || entry.notify !== true) continue;
+        await createSystemNotification(env, previous.owner_id, 'registration_status_changed', { tournamentName: previous.name, status: entry.status, participant: `${previous.first_name} ${previous.last_name}` });
+        await notifyUserByEmail(env, previous.email, 'registration_status_changed', { tournamentName: previous.name, status: entry.status }, undefined, previous.owner_id);
+        if (previous.status !== 'confirmed' && entry.status === 'confirmed') {
+          try {
+            await sendRegistrationConfirmationEmail(env, { ...previous, id: tournamentId }, previous, APP_ORIGIN);
+          } catch (error) {
+            console.error(`Failed to send synced registration confirmation email for registration ${previous.id}`, error);
+          }
         }
       }
-    }
-  }
-
-  // Check-in aus dem Turnierdokument: Live-Link einmalig verschicken. Anders als die
-  // Status-Mails oben ist das retry-sicher, weil live_link_sent_at pro Meldung nur einmal
-  // gesetzt wird (siehe sendLiveLinkEmails).
-  await sendLiveLinkEmails(env, tournamentId, parsed.filter((entry) => entry.participation === 'active').map((entry) => entry.id), new URL(request.url).origin);
-
-  return json({ updatedCount });
+      await notifyCheckedIn(env, tournamentId, parsed.filter((entry) => entry.participation === 'active').map((entry) => entry.id));
+    },
+  };
 }
 
 async function sendViaResend(env, { to, subject, body, html, attachments, failureContext }) {
@@ -6390,41 +6765,6 @@ async function displaceRegistration(env, tournament, registrationToDisplace, app
   } catch (error) {
     console.error(`Failed to send displacement email for registration ${registrationToDisplace.id}`, error);
   }
-}
-
-async function initialRegistrationStatus(db, tournament, isVip, confirmImmediately = false) {
-  // Die Schnellaufnahme in der Turnierdurchführung ist ausschließlich für
-  // berechtigte Turnierleiter erreichbar. Sie darf einen Spieler unmittelbar
-  // in die nächste Auslosung übernehmen, ohne die öffentliche Freigabe-Regel
-  // für Selbstanmeldungen zu verändern.
-  const initialStatus = confirmImmediately || !Number(tournament.approval_required || 0) ? 'confirmed' : 'pending';
-  if (!Number(tournament.max_registrations)) {
-    return { status: initialStatus, displace: null };
-  }
-
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS count
-       FROM registrations
-       WHERE tournament_id = ? AND status IN ('pending', 'confirmed')`,
-    )
-    .bind(tournament.id)
-    .first();
-
-  const isFull = Number(row?.count || 0) >= Number(tournament.max_registrations);
-  if (!isFull) {
-    return { status: initialStatus, displace: null };
-  }
-  if (isVip) {
-    const displace = await findDisplaceableNonVip(db, tournament.id, null);
-    if (displace) {
-      return { status: initialStatus, displace };
-    }
-  }
-  if (!Number(tournament.waitlist_enabled ?? 1)) {
-    throw new HttpError(403, 'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.');
-  }
-  return { status: 'waitlist', displace: null };
 }
 
 async function addTournamentEditor(request, db, tournament, actingUser) {
@@ -8168,6 +8508,9 @@ function toPublicTournament(row, user) {
     waitlistEnabled: Boolean(Number(row.waitlist_enabled ?? 1)),
     registrationEnabled: Boolean(Number(row.registration_enabled ?? 1)),
     approvalRequired: Boolean(Number(row.approval_required || 0)),
+    registrationClosed: Boolean(Number(row.registration_closed || 0)),
+    startsAt: row.date ? tournamentStartUtcIso(row) : null,
+    runningResetAt: row.running_reset_at || null,
     documentManaged: Boolean(Number(row.document_managed || 0)),
     desktopExecution: Boolean(Number(row.desktop_execution || 0)),
     websiteUrl: row.website_url || null,
@@ -8228,6 +8571,9 @@ function toManagedRegistration(row) {
     organizerMessage: row.organizer_message || null,
     registrationAnswers: registrationAnswersFromRow(row),
     language: row.language || null,
+    origin: row.origin || 'online',
+    overCapacity: Boolean(Number(row.over_capacity || 0)),
+    receivedAfterStart: Boolean(Number(row.received_after_start || 0)),
   };
 }
 

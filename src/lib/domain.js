@@ -227,7 +227,11 @@ export function hasOpenRegistration(tournament) {
   if (tournament.status !== 'registration') {
     return false;
   }
-  if (registrationNotYetOpen(tournament)) {
+  if (tournament.registrationClosed || registrationNotYetOpen(tournament)) {
+    return false;
+  }
+  // Spätestens zum angesetzten Turnierbeginn schließt die Online-Anmeldung automatisch.
+  if (tournament.startsAt && new Date(tournament.startsAt).getTime() <= Date.now()) {
     return false;
   }
   if (tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now()) {
@@ -274,6 +278,14 @@ export function registrationStatusLabel(tournament, language) {
 
   if (tournament.status === 'running') {
     return i18next.t('Läuft', { lng: language });
+  }
+
+  if (tournament.status === 'registration' && tournament.registrationClosed) {
+    return i18next.t('Anmeldung geschlossen', { lng: language });
+  }
+
+  if (tournament.status === 'registration' && tournament.startsAt && new Date(tournament.startsAt).getTime() <= Date.now()) {
+    return i18next.t('Die Anmeldung ist mit Turnierbeginn geschlossen', { lng: language });
   }
 
   if (tournament.status === 'registration' && registrationNotYetOpen(tournament)) {

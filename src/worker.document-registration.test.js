@@ -1,18 +1,14 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import { upsertDocumentRegistration } from './worker.js';
+import { bindeDokument, syncAnfrage } from './test-support/sync.js';
+import { executeSyncWrite, upsertDocumentRegistration } from './worker.js';
 
 
 const ONLINE_ID = '44444444-4444-4444-8444-444444444444';
 const VERALTETE_LOKALE_ID = '33333333-3333-4333-8333-333333333333';
 const LOKALE_ID = '55555555-5555-4555-8555-555555555555';
 
-function anfrage(body) {
-  return new Request('https://ptm.test/api/sync', {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  });
-}
 
 describe('Sync-Schreibzugriff des Turnierdokuments auf eine Anmeldung', () => {
   let env;
@@ -30,39 +26,44 @@ describe('Sync-Schreibzugriff des Turnierdokuments auf eine Anmeldung', () => {
         registered_at, created_at, updated_at, local_registration_uuid, execution_revision)
       VALUES (?, 't1', 'Maria', 'Bieder', 'mb@example.test', 'confirmed', 'inactive', '2026-09-01', '2026-09-01', '2026-09-01', ?, 3)`)
       .run(ONLINE_ID, VERALTETE_LOKALE_ID);
+    bindeDokument(env.DB.sqlite, 't1');
   });
 
-  it('korrigiert den Namen über die Online-ID, auch wenn online eine veraltete lokale ID hängt', async () => {
-    const response = await upsertDocumentRegistration(anfrage({
+  function upsert(body, lokaleId) {
+    const request = syncAnfrage('PUT', `/api/sync/tournaments/t1/registrations/${lokaleId}`, body);
+    return executeSyncWrite(request, env.DB, turnier(), () => upsertDocumentRegistration(request, env, turnier(), lokaleId));
+  }
+
+  it('korrigiert den Namen über die Online-ID und übernimmt die lokale ID des gebundenen Dokuments', async () => {
+    const response = await upsert({
       firstName: 'Eustachius', lastName: 'Goetze', documentMaster: true, onlineRegistrationId: ONLINE_ID,
       expectedExecutionRevision: 3,
-    }), env, turnier(), LOKALE_ID);
+    }, LOKALE_ID);
 
     expect(response.status).toBe(200);
     expect(anmeldung()).toMatchObject({
       first_name: 'Eustachius', last_name: 'Goetze', email: 'mb@example.test',
-      local_registration_uuid: VERALTETE_LOKALE_ID, execution_revision: 4,
+      local_registration_uuid: LOKALE_ID, execution_revision: 4,
     });
   });
 
   it('lehnt eine veraltete Ausführungsrevision weiterhin ab', async () => {
-    await expect(upsertDocumentRegistration(anfrage({
+    await expect(upsert({
       firstName: 'Eustachius', lastName: 'Goetze', documentMaster: true, onlineRegistrationId: ONLINE_ID,
       expectedExecutionRevision: 2,
-    }), env, turnier(), LOKALE_ID)).rejects.toMatchObject({ status: 409 });
+    }, LOKALE_ID)).rejects.toMatchObject({ status: 409 });
     expect(anmeldung().last_name).toBe('Bieder');
   });
 
   it('meldet eine nicht mehr vorhandene Online-Anmeldung mit 404', async () => {
-    await expect(upsertDocumentRegistration(anfrage({
+    await expect(upsert({
       firstName: 'Eustachius', lastName: 'Goetze', documentMaster: true,
       onlineRegistrationId: '66666666-6666-4666-8666-666666666666', expectedExecutionRevision: 1,
-    }), env, turnier(), LOKALE_ID)).rejects.toMatchObject({ status: 404 });
+    }, LOKALE_ID)).rejects.toMatchObject({ status: 404 });
   });
 
   it('liefert bei wiederholter Neuanlage die bereits angelegte Anmeldung statt einer zweiten', async () => {
-    const response = await upsertDocumentRegistration(anfrage({ firstName: 'Maria', lastName: 'Bieder' }),
-      env, turnier(), VERALTETE_LOKALE_ID);
+    const response = await upsert({ firstName: 'Maria', lastName: 'Bieder' }, VERALTETE_LOKALE_ID);
 
     expect(await response.json()).toMatchObject({ created: false, registration: { id: ONLINE_ID } });
     expect(env.DB.sqlite.prepare("SELECT COUNT(*) AS anzahl FROM registrations WHERE tournament_id = 't1'").get().anzahl).toBe(1);

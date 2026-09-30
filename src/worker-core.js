@@ -107,9 +107,14 @@ export function isCalendarEntry(tournament) {
   return Number(tournament.registration_enabled ?? 1) === 0;
 }
 
-export function registrationOpenStatus(tournament, now = new Date()) {
+// startsAt = angesetzter Turnierbeginn als UTC-Zeitpunkt. Spätestens dann schließt die Online-Anmeldung
+// automatisch, auch wenn das Turnierdokument den Start nicht übertragen hat (Spezifikation E-02).
+export function registrationOpenStatus(tournament, now = new Date(), startsAt = null) {
   if (isCalendarEntry(tournament)) return 'closed';
+  if (tournament.status === 'running') return 'running';
   if (tournament.visibility !== 'public' || tournament.status !== 'registration') return 'closed';
+  if (Number(tournament.registration_closed || 0) === 1) return 'closed';
+  if (startsAt && new Date(startsAt).getTime() <= now.getTime()) return 'started';
   if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < now.getTime()) return 'deadline_passed';
   if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > now.getTime()) return 'not_yet_open';
   return 'open';

@@ -117,6 +117,18 @@ describe('Worker-Fachlogik', () => {
     expect(registrationOpenStatus(tournament, new Date('2026-06-04T12:00:00Z'))).toBe('deadline_passed');
   });
 
+  it('schließt die Anmeldung bei Start, manuellem Schluss und spätestens zum Turnierbeginn (E-02, P-65)', () => {
+    const tournament = { visibility: 'public', status: 'registration' };
+    const startsAt = '2026-06-06T08:00:00.000Z';
+    expect(registrationOpenStatus({ ...tournament, status: 'running' })).toBe('running');
+    expect(registrationOpenStatus({ ...tournament, registration_closed: 1 })).toBe('closed');
+    expect(registrationOpenStatus(tournament, new Date('2026-06-06T07:59:59Z'), startsAt)).toBe('open');
+    expect(registrationOpenStatus(tournament, new Date('2026-06-06T08:00:00Z'), startsAt)).toBe('started');
+    // Die Meldefrist ist nachrangig: nach Turnierbeginn gilt immer "started".
+    expect(registrationOpenStatus({ ...tournament, registration_deadline: '2026-06-10T10:00:00Z' },
+      new Date('2026-06-07T12:00:00Z'), startsAt)).toBe('started');
+  });
+
   it('akzeptiert nur Ergebniswerte von 0 bis 13', () => {
     expect(validateMatchScore(13)).toBe(13);
     expect(validateMatchScore('0')).toBe(0);
