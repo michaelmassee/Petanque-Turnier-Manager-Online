@@ -1,42 +1,15 @@
 // @vitest-environment node
-import { readdirSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { d1MitSchema as d1WithSchema, migrationsDir } from './test-support/d1.js';
 import {
   findMyLiveRegistration, getRegistrationWithTournament, linkUnlinkedRegistrationsForUser, listMyLiveRegistrations,
   resolveRegistrationUserIds, updateRegistration, updateUser, verifyEmail,
 } from './worker.js';
 
-const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
-const migrationsDir = new URL('../migrations/', import.meta.url);
 // The backfill statements of 0080, re-run on rows inserted after the schema setup.
 const accountLinkMigration = readFileSync(new URL('0080_registration_account_links.sql', migrationsDir), 'utf8');
 const accountLinkBackfill = accountLinkMigration.slice(accountLinkMigration.indexOf('UPDATE registrations'));
-
-function d1WithSchema() {
-  const sqlite = new DatabaseSync(':memory:');
-  readdirSync(migrationsDir).filter((name) => name.endsWith('.sql')).sort()
-    .forEach((name) => sqlite.exec(readFileSync(new URL(name, migrationsDir), 'utf8')));
-  const db = {
-    sqlite,
-    batch: async (statements) => {
-      const results = [];
-      for (const statement of statements) results.push(await statement.run());
-      return results;
-    },
-    prepare(sql) {
-      let params = [];
-      const statement = {
-        bind: (...values) => { params = values; return statement; },
-        run: async () => ({ success: true, meta: { changes: sqlite.prepare(sql).run(...params).changes } }),
-        first: async () => sqlite.prepare(sql).get(...params) ?? null,
-        all: async () => ({ results: sqlite.prepare(sql).all(...params) }),
-      };
-      return statement;
-    },
-  };
-  return db;
-}
 
 function insertUsers(db, ...users) {
   for (const [id, email] of users) {

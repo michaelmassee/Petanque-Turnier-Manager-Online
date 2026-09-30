@@ -1,51 +1,13 @@
 // @vitest-environment node
-import { readdirSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { d1MitSchema } from './test-support/d1.js';
 import { connectTournament, takeoverTournamentDocument } from './worker.js';
 
-// node:sqlite kennt Vite nicht als Builtin, daher per require laden.
-const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
-const migrationsDir = new URL('../migrations/', import.meta.url);
 
 const ALTES_DOKUMENT = '11111111-1111-4111-8111-111111111111';
 const NEUES_DOKUMENT = '22222222-2222-4222-8222-222222222222';
 const ALTE_LOKALE_ID = '33333333-3333-4333-8333-333333333333';
 const LEASE = 'lease-token-mit-ausreichender-laenge-0123456789';
-
-// D1-Ersatz auf Basis einer In-Memory-SQLite mit dem echten Schema aus allen Migrationen; batch() läuft wie bei D1
-// in einer Transaktion.
-function d1MitSchema() {
-  const sqlite = new DatabaseSync(':memory:');
-  readdirSync(migrationsDir).filter((name) => name.endsWith('.sql')).sort()
-    .forEach((name) => sqlite.exec(readFileSync(new URL(name, migrationsDir), 'utf8')));
-  const ausfuehren = (sql, params) => ({ success: true, meta: { changes: sqlite.prepare(sql).run(...params).changes } });
-  return {
-    sqlite,
-    prepare(sql) {
-      let params = [];
-      const statement = {
-        bind: (...values) => { params = values; return statement; },
-        run: async () => ausfuehren(sql, params),
-        first: async () => sqlite.prepare(sql).get(...params) ?? null,
-        all: async () => ({ results: sqlite.prepare(sql).all(...params) }),
-        ausfuehren: () => ausfuehren(sql, params),
-      };
-      return statement;
-    },
-    async batch(statements) {
-      sqlite.exec('BEGIN');
-      try {
-        const ergebnisse = statements.map((statement) => statement.ausfuehren());
-        sqlite.exec('COMMIT');
-        return ergebnisse;
-      } catch (error) {
-        sqlite.exec('ROLLBACK');
-        throw error;
-      }
-    },
-  };
-}
 
 function anfrage(body) {
   return new Request('https://ptm.test/api/sync', {

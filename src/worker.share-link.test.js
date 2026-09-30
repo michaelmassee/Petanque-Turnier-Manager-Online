@@ -1,32 +1,8 @@
 // @vitest-environment node
-import { readdirSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { d1MitSchema } from './test-support/d1.js';
 import { createTournamentShareLink, deleteTournamentShareLink, hasTournamentShareAccess } from './worker.js';
 
-// node:sqlite kennt Vite nicht als Builtin, daher per require laden.
-const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
-const migrationsDir = new URL('../migrations/', import.meta.url);
-
-// D1-Ersatz auf Basis einer In-Memory-SQLite mit dem echten Schema aus allen Migrationen.
-function d1MitSchema() {
-  const sqlite = new DatabaseSync(':memory:');
-  readdirSync(migrationsDir).filter((name) => name.endsWith('.sql')).sort()
-    .forEach((name) => sqlite.exec(readFileSync(new URL(name, migrationsDir), 'utf8')));
-  return {
-    sqlite,
-    prepare(sql) {
-      let params = [];
-      const statement = {
-        bind: (...values) => { params = values; return statement; },
-        run: async () => ({ success: true, meta: { changes: sqlite.prepare(sql).run(...params).changes } }),
-        first: async () => sqlite.prepare(sql).get(...params) ?? null,
-        all: async () => ({ results: sqlite.prepare(sql).all(...params) }),
-      };
-      return statement;
-    },
-  };
-}
 
 async function sha256Hex(text) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
