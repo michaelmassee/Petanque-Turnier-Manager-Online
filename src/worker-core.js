@@ -469,6 +469,14 @@ export function registrationBelongsToEmail(registration, email) {
     .some((value) => text(value).toLowerCase() === normalized);
 }
 
+/** Stable account identity for a registration's primary player or partners. */
+export function registrationBelongsToUser(registration, userId) {
+  const normalized = text(userId);
+  if (!normalized) return false;
+  return [registration.user_id, registration.partner_user_id, registration.partner2_user_id]
+    .some((value) => text(value) === normalized);
+}
+
 // Nach 48 Stunden ab Turnierbeginn läuft kein Turnier mehr: Der stündliche Cron schließt es
 // automatisch ab, der Bereich "Live" blendet es aus.
 export const STALE_TOURNAMENT_HOURS = 48;

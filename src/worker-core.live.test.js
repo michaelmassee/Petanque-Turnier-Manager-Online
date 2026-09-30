@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPlayerLiveView, parseSyncRanking, parseSyncRoundMatches, parseSyncRoundNumber, registrationBelongsToEmail, isTournamentStale, dateDaysAgo, buildLiveRoundPush, chunk } from './worker-core.js';
+import { buildPlayerLiveView, parseSyncRanking, parseSyncRoundMatches, parseSyncRoundNumber, registrationBelongsToEmail, registrationBelongsToUser, isTournamentStale, dateDaysAgo, buildLiveRoundPush, chunk } from './worker-core.js';
 
 const player = (id, firstName, lastName = 'X', teamLabel) => ({ id, firstName, lastName, teamLabel: teamLabel || `${firstName} ${lastName}` });
 const anna = player('r1', 'Anna');
@@ -119,6 +119,13 @@ describe('Zuordnung von Meldungen zu einem User', () => {
     expect(registrationBelongsToEmail(registration, 'b@x.de')).toBe(true);
     expect(registrationBelongsToEmail(registration, 'c@x.de')).toBe(false);
     expect(registrationBelongsToEmail(registration, '')).toBe(false);
+  });
+
+  it('verwendet für die dauerhafte Zuordnung die gespeicherte Benutzer-ID', () => {
+    const registration = { user_id: 'u-primary', partner_user_id: 'u-partner', partner2_user_id: null };
+    expect(registrationBelongsToUser(registration, 'u-primary')).toBe(true);
+    expect(registrationBelongsToUser(registration, 'u-partner')).toBe(true);
+    expect(registrationBelongsToUser(registration, 'u-other')).toBe(false);
   });
 });
 

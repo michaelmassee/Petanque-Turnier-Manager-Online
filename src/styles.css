@@ -2162,6 +2162,20 @@ a.left-panel-link {
   font-size: 0.9em;
 }
 
+.account-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 5px;
+  color: #1f5f99;
+  font-size: 0.9em;
+  vertical-align: middle;
+}
+
+.registration-team-member .account-badge {
+  margin-left: 4px;
+}
+
 .license-badge {
   margin-right: 4px;
   font-size: 0.9em;

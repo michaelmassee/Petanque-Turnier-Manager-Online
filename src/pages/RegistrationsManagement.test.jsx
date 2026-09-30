@@ -126,3 +126,17 @@ describe('Anmeldungsverwaltung: Turnierauswahl', () => {
     await waitFor(() => expect(setSelectedTournamentId).toHaveBeenCalledWith('registration'));
   });
 });
+
+describe('Anmeldungsverwaltung: Konto-Verknüpfungen', () => {
+  it('kennzeichnet nur die verbundenen Teammitglieder', () => {
+    renderPanel([{
+      id: 'r-account', firstName: 'Anna', lastName: 'Muster', status: 'confirmed', accountConnected: true,
+      partnerFirstName: 'Ben', partnerLastName: 'Gast', partnerAccountConnected: false,
+      partner2FirstName: 'Clara', partner2LastName: 'Konto', partner2AccountConnected: true,
+    }]);
+
+    expect(screen.getAllByLabelText('Mit Benutzerkonto verbunden')).toHaveLength(2);
+    expect(screen.getByText('Partner: Ben Gast')).toBeInTheDocument();
+    expect(screen.getByText('Partner 2: Clara Konto')).toBeInTheDocument();
+  });
+});

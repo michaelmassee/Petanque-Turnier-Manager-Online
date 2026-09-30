@@ -17,7 +17,7 @@ import {
   parseSyncRoundMatches,
   parseSyncRoundNumber,
   buildPlayerLiveView,
-  registrationBelongsToEmail,
+  registrationBelongsToUser,
   buildLiveRoundPush,
   chunk,
   LIVE_PUSH_CHUNK_SIZE,
@@ -2317,6 +2317,7 @@ async function findOrCreateOAuthUser(db, provider, profile) {
         .prepare('UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?')
         .bind(now, now, linked.id),
     ]);
+    await linkUnlinkedRegistrationsForUser(db, linked.id, profile.email);
     return { ...linked, email_verified_at: linked.email_verified_at || now, updated_at: now };
   }
 
@@ -2328,6 +2329,7 @@ async function findOrCreateOAuthUser(db, provider, profile) {
         .bind(now, now, existing.id),
       oauthAccountInsert(db, existing.id, provider, profile, now),
     ]);
+    await linkUnlinkedRegistrationsForUser(db, existing.id, profile.email);
     return { ...existing, email_verified_at: existing.email_verified_at || now, updated_at: now };
   }
 
@@ -2345,6 +2347,7 @@ async function findOrCreateOAuthUser(db, provider, profile) {
       .bind(userId, userFirstName, userLastName, profile.email, password.salt, password.hash, now, DEFAULT_TOURNAMENT_LIMIT, now, now),
     oauthAccountInsert(db, userId, provider, profile, now),
   ]);
+  await linkUnlinkedRegistrationsForUser(db, userId, profile.email);
 
   return {
     id: userId,
@@ -2397,6 +2400,8 @@ async function registerUser(request, env, url) {
     throw error;
   }
 
+  await linkUnlinkedRegistrationsForUser(db, id, user.email);
+
   const verificationUrl = await createEmailVerification(db, env, url, id, user.email, language);
   const response = {
     message: 'Registrierung gespeichert. Bitte bestätige deine E-Mail-Adresse über den Link in der E-Mail.',
@@ -2409,7 +2414,7 @@ async function registerUser(request, env, url) {
   return json(response, 201);
 }
 
-async function verifyEmail(request, db) {
+export async function verifyEmail(request, db) {
   const body = await readJson(request);
   const token = String(body.token || '').trim();
 
@@ -2447,6 +2452,7 @@ async function verifyEmail(request, db) {
       }
       throw error;
     }
+    await linkUnlinkedRegistrationsForUser(db, verification.user_id, verification.new_email);
     return json({ ok: true });
   }
 
@@ -2454,6 +2460,9 @@ async function verifyEmail(request, db) {
     db.prepare('UPDATE users SET email_verified_at = ?, updated_at = ? WHERE id = ?').bind(now, now, verification.user_id),
     db.prepare('UPDATE email_verification_tokens SET used_at = ? WHERE token_hash = ?').bind(now, tokenHash),
   ]);
+
+  const user = await db.prepare('SELECT email FROM users WHERE id = ?').bind(verification.user_id).first();
+  await linkUnlinkedRegistrationsForUser(db, verification.user_id, user?.email);
 
   return json({ ok: true });
 }
@@ -2659,8 +2668,8 @@ async function listPostboxRecipients(db, userId) {
 }
 
 const PARTICIPANT_TOURNAMENTS_SUBQUERY = `SELECT DISTINCT reg.tournament_id FROM registrations reg
-  JOIN users u2 ON lower(u2.email) = lower(reg.email)
-  WHERE u2.id = ? AND reg.status IN ('pending', 'confirmed')`;
+  WHERE ? IN (reg.user_id, reg.partner_user_id, reg.partner2_user_id)
+    AND reg.status IN ('pending', 'confirmed')`;
 
 async function getPostbox(db, user) {
   const result = await db.prepare(
@@ -2803,10 +2812,7 @@ async function createBroadcastPostboxMessage(env, { sender, tournament, body }) 
     }
   }
 
-  const accountUsers = await env.DB.prepare(
-    `SELECT DISTINCT u.id FROM registrations reg JOIN users u ON lower(u.email) = lower(reg.email)
-     WHERE reg.tournament_id = ? AND reg.status IN ('pending', 'confirmed') AND u.id != ?`,
-  ).bind(tournament.id, sender.id).all();
+  const accountUsers = await participantAccountUserIds(env.DB, tournament.id, sender.id);
   for (const accountUser of accountUsers.results || []) {
     await enqueuePushNotification(env, {
       userId: accountUser.id,
@@ -3084,6 +3090,8 @@ async function createUser(request, db) {
     throw error;
   }
 
+  await linkUnlinkedRegistrationsForUser(db, id, user.email);
+
   return json(
     {
       user: toPublicUser({
@@ -3104,7 +3112,7 @@ async function createUser(request, db) {
   );
 }
 
-async function updateUser(request, env, id, currentUserId) {
+export async function updateUser(request, env, id, currentUserId) {
   if (id === TOURNAMENT_REPORT_SYSTEM_USER_ID) {
     throw new HttpError(403, 'Zugriff verweigert');
   }
@@ -3158,6 +3166,9 @@ async function updateUser(request, env, id, currentUserId) {
     )
     .bind(id)
     .first();
+  if (updated.email_verified_at) {
+    await linkUnlinkedRegistrationsForUser(db, updated.id, updated.email);
+  }
   if (updated.role !== existing.role || updated.email_verified_at !== existing.email_verified_at || Number(updated.password_change_required) !== Number(existing.password_change_required)) {
     await createSystemNotification(env, id, 'account_status_changed', { role: updated.role, emailVerified: Boolean(updated.email_verified_at), passwordChangeRequired: Boolean(Number(updated.password_change_required)) });
   }
@@ -4088,7 +4099,7 @@ async function notifyTournamentPublicationChange(env, existing, updated) {
   }
   if (updated.status !== existing.status) {
     await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
-    const participants = await env.DB.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.owner_id).all();
+    const participants = await participantAccountUserIds(env.DB, existing.id, existing.owner_id);
     await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
   }
 }
@@ -4142,7 +4153,7 @@ async function performTournamentStart(env, existing) {
     await notifySavedSearchesForPublishedTournament(env, updated);
   }
   await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
-  const participants = await db.prepare("SELECT DISTINCT u.id FROM registrations r JOIN users u ON lower(u.email) = lower(r.email) WHERE r.tournament_id = ? AND r.status IN ('pending', 'confirmed') AND u.id != ?").bind(existing.id, existing.owner_id).all();
+  const participants = await participantAccountUserIds(db, existing.id, existing.owner_id);
   await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
   return updated;
 }
@@ -4649,6 +4660,51 @@ async function listRegistrations(db, tournamentId) {
     .bind(tournamentId)
     .all();
   return json({ registrations: result.results.map(toManagedRegistration) });
+}
+
+function sameEmail(a, b) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
+
+// One account belongs to one person: when several team members share an e-mail
+// address, only the first slot (player, partner, partner 2) gets the account link.
+function uniqueAccountLinks(ids) {
+  const seen = new Set();
+  return ids.map((id) => {
+    if (!id || seen.has(id)) return null;
+    seen.add(id);
+    return id;
+  });
+}
+
+export async function resolveRegistrationUserIds(db, registration) {
+  const emails = [registration.email, registration.partnerEmail, registration.partner2Email]
+    .map((email) => String(email || '').trim().toLowerCase());
+  const result = await db.prepare(
+    'SELECT id, email FROM users WHERE lower(email) IN (?, ?, ?)',
+  ).bind(...emails).all();
+  // Only link unambiguous matches: accounts differing just in e-mail case stay unlinked.
+  const usersByEmail = new Map();
+  for (const user of result.results || []) {
+    const key = String(user.email).toLowerCase();
+    usersByEmail.set(key, usersByEmail.has(key) ? null : user.id);
+  }
+  const [userId, partnerUserId, partner2UserId] = uniqueAccountLinks(emails.map((email) => usersByEmail.get(email)));
+  return { userId, partnerUserId, partner2UserId };
+}
+
+export async function linkUnlinkedRegistrationsForUser(db, userId, email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!userId || !normalizedEmail) return;
+  // Sequential batch: a slot is skipped when the account already sits in another slot.
+  await db.batch([
+    db.prepare(`UPDATE registrations SET user_id = ? WHERE user_id IS NULL AND lower(email) = ?
+      AND ? NOT IN (COALESCE(partner_user_id, ''), COALESCE(partner2_user_id, ''))`).bind(userId, normalizedEmail, userId),
+    db.prepare(`UPDATE registrations SET partner_user_id = ? WHERE partner_user_id IS NULL AND lower(partner_email) = ?
+      AND ? NOT IN (COALESCE(user_id, ''), COALESCE(partner2_user_id, ''))`).bind(userId, normalizedEmail, userId),
+    db.prepare(`UPDATE registrations SET partner2_user_id = ? WHERE partner2_user_id IS NULL AND lower(partner2_email) = ?
+      AND ? NOT IN (COALESCE(user_id, ''), COALESCE(partner_user_id, ''))`).bind(userId, normalizedEmail, userId),
+  ]);
 }
 
 async function confirmPendingRegistrations(env, tournament, appOrigin) {
@@ -5206,16 +5262,15 @@ async function buildLiveResponse(request, db, registration) {
 // beendeten Turnieren - die Liste im Bereich "Live". Turniere, deren Beginn mehr als 48 Stunden
 // zurückliegt, fallen heraus, auch falls der Cron (finishStaleTournaments) sie noch nicht
 // abgeschlossen hat.
-async function listMyLiveRegistrations(db, user) {
-  const email = String(user.email || '').toLowerCase();
+export async function listMyLiveRegistrations(db, user) {
   const since = dateDaysAgo(4);
   const result = await db.prepare(`SELECT r.id, r.tournament_id, r.first_name, r.last_name, r.partner_first_name, r.partner_last_name,
         r.partner2_first_name, r.partner2_last_name, r.team_name, r.participation, t.name, t.date, t.start_time, t.timezone, t.location, t.status
       FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
-      WHERE (lower(r.email) = ? OR lower(r.partner_email) = ? OR lower(r.partner2_email) = ?)
+      WHERE ? IN (r.user_id, r.partner_user_id, r.partner2_user_id)
         AND r.status = 'confirmed'
         AND t.status IN ('running', 'finished') AND t.date > ?
-      ORDER BY t.date DESC, t.start_time DESC`).bind(email, email, email, since).all();
+      ORDER BY t.date DESC, t.start_time DESC`).bind(user.id, since).all();
   return json({
     registrations: (result.results || []).filter((row) => !isTournamentStale(tournamentStartUtcIso(row))).map((row) => ({
       id: row.id,
@@ -5227,13 +5282,23 @@ async function listMyLiveRegistrations(db, user) {
   });
 }
 
-async function findMyLiveRegistration(db, user, registrationId) {
+export async function findMyLiveRegistration(db, user, registrationId) {
   const registration = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(registrationId).first();
   // Fremde Meldungen verhalten sich wie nicht vorhanden, damit IDs nicht ausprobiert werden können.
-  if (!registration || registration.status !== 'confirmed' || !registrationBelongsToEmail(registration, user.email)) {
+  if (!registration || registration.status !== 'confirmed' || !registrationBelongsToUser(registration, user.id)) {
     throw new HttpError(404, 'Anmeldung nicht gefunden');
   }
   return registration;
+}
+
+async function participantAccountUserIds(db, tournamentId, excludedUserId) {
+  return db.prepare(
+    `SELECT id FROM (
+       SELECT user_id AS id FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
+       UNION SELECT partner_user_id AS id FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
+       UNION SELECT partner2_user_id AS id FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
+     ) WHERE id IS NOT NULL AND id != ?`,
+  ).bind(tournamentId, tournamentId, tournamentId, excludedUserId).all();
 }
 
 async function findLiveRegistrationByToken(db, token) {
@@ -5516,6 +5581,7 @@ async function createRegistration(request, env, tournament, { session = null, sh
   const id = crypto.randomUUID();
   const cancelToken = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
   const appOrigin = new URL(request.url).origin;
+  const accountLinks = await resolveRegistrationUserIds(db, registration);
 
   await db
     .prepare(
@@ -5523,8 +5589,9 @@ async function createRegistration(request, env, tournament, { session = null, sh
         id, tournament_id, first_name, last_name, email, club, license_nr,
         partner_first_name, partner_last_name, partner_email, partner_license_nr,
         partner2_first_name, partner2_last_name, partner2_email, partner2_license_nr,
-        team_name, seeding_position, status, participation, is_vip, organizer_message, fee_selections, registration_answers, language, registered_at, confirmed_at, created_at, updated_at, cancel_token
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        team_name, seeding_position, status, participation, is_vip, organizer_message, fee_selections, registration_answers, language, registered_at, confirmed_at, created_at, updated_at, cancel_token,
+        user_id, partner_user_id, partner2_user_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -5556,6 +5623,9 @@ async function createRegistration(request, env, tournament, { session = null, sh
       now,
       now,
       cancelToken,
+      accountLinks.userId,
+      accountLinks.partnerUserId,
+      accountLinks.partner2UserId,
     )
     .run();
 
@@ -5595,7 +5665,7 @@ async function createRegistration(request, env, tournament, { session = null, sh
   return json({ registration: toPublicRegistration(created), mailEnabled }, 201);
 }
 
-async function updateRegistration(request, env, existing) {
+export async function updateRegistration(request, env, existing) {
   const db = env.DB;
   const body = await readJson(request);
   if (body.noEmail === true) {
@@ -5610,6 +5680,21 @@ async function updateRegistration(request, env, existing) {
   await assertNoDuplicatePlayer(db, existing.tournament_id, registration, existing.id);
   const now = new Date().toISOString();
   const confirmedAt = registration.status === 'confirmed' ? existing.confirmed_at || now : null;
+  const accountLinks = await resolveRegistrationUserIds(db, registration);
+  // An existing link survives edits as long as the slot's e-mail stays the same (the
+  // account e-mail may change independently). A corrected e-mail is linked anew.
+  const keptOrResolved = (existingId, existingEmail, email, resolvedId) => (
+    existingId && sameEmail(existingEmail, email) ? existingId : resolvedId
+  );
+  const [userId, partnerUserId, partner2UserId] = uniqueAccountLinks([
+    keptOrResolved(existing.user_id, existing.email, registration.email, accountLinks.userId),
+    registration.partnerFirstName
+      ? keptOrResolved(existing.partner_user_id, existing.partner_email, registration.partnerEmail, accountLinks.partnerUserId)
+      : null,
+    registration.partner2FirstName
+      ? keptOrResolved(existing.partner2_user_id, existing.partner2_email, registration.partner2Email, accountLinks.partner2UserId)
+      : null,
+  ]);
 
   await db
     .prepare(
@@ -5617,7 +5702,8 @@ async function updateRegistration(request, env, existing) {
        SET first_name = ?, last_name = ?, email = ?, club = ?, license_nr = ?,
            partner_first_name = ?, partner_last_name = ?, partner_email = ?, partner_license_nr = ?,
            partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?, partner2_license_nr = ?,
-           team_name = ?, seeding_position = ?, status = ?, is_vip = ?, fee_selections = ?, registration_answers = ?, confirmed_at = ?, updated_at = ?
+           team_name = ?, seeding_position = ?, status = ?, is_vip = ?, fee_selections = ?, registration_answers = ?, confirmed_at = ?, updated_at = ?,
+           user_id = ?, partner_user_id = ?, partner2_user_id = ?
        WHERE id = ?`,
     )
     .bind(
@@ -5642,6 +5728,9 @@ async function updateRegistration(request, env, existing) {
       JSON.stringify(registrationAnswers),
       confirmedAt,
       now,
+      userId,
+      partnerUserId,
+      partner2UserId,
       existing.id,
     )
     .run();
@@ -7081,7 +7170,7 @@ async function publishBoulePlace(db, id) {
   return json({ ok: true });
 }
 
-async function getRegistrationWithTournament(db, id) {
+export async function getRegistrationWithTournament(db, id) {
   return db
     .prepare(
       `SELECT registrations.*, tournaments.owner_id, tournaments.visibility, tournaments.status AS tournament_status, tournaments.document_managed, tournaments.desktop_execution, tournaments.formation,
@@ -8133,6 +8222,9 @@ function toPublicRegistration(row) {
 function toManagedRegistration(row) {
   return {
     ...toPublicRegistration(row),
+    accountConnected: Boolean(row.user_id),
+    partnerAccountConnected: Boolean(row.partner_user_id),
+    partner2AccountConnected: Boolean(row.partner2_user_id),
     organizerMessage: row.organizer_message || null,
     registrationAnswers: registrationAnswersFromRow(row),
     language: row.language || null,

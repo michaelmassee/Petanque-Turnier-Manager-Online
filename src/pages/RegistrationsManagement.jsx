@@ -164,14 +164,28 @@ function registrationToForm(registration) {
 function RegistrationRow({ registration, tournament, showConfirm = false, busy, busyOther, onConfirm, onEdit, onDelete }) {
   const { t } = useTranslation();
   const participantLabel = { primary: t('Hauptspieler'), partner: t('Partner'), partner2: t('Partner 2') };
+  const AccountBadge = () => <span className="account-badge" title={t('Mit Benutzerkonto verbunden')} aria-label={t('Mit Benutzerkonto verbunden')}>👤</span>;
   return (
     <article className="data-row">
       <div>
         <strong data-i18n-skip>
           {registration.isVip && <span className="vip-badge" title="VIP">★</span>}
           {registration.firstName} {registration.lastName}
+          {registration.accountConnected && <AccountBadge />}
         </strong>
         <span>{registration.noEmail ? t('ohne E-Mail-Adresse') : registration.email}</span>
+        {registration.partnerFirstName && (
+          <small className="registration-team-member" data-i18n-skip>
+            {t('Partner')}: {registration.partnerFirstName} {registration.partnerLastName}
+            {registration.partnerAccountConnected && <AccountBadge />}
+          </small>
+        )}
+        {registration.partner2FirstName && (
+          <small className="registration-team-member" data-i18n-skip>
+            {t('Partner 2')}: {registration.partner2FirstName} {registration.partner2LastName}
+            {registration.partner2AccountConnected && <AccountBadge />}
+          </small>
+        )}
         {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
         {registration.organizerMessage && <small data-i18n-skip>{registration.organizerMessage}</small>}
         {registration.feeSelections?.length > 0 && <small data-i18n-skip>{registration.feeSelections.map((selection) => `${selection.name}: ${formatMoney(selection.amountCents, tournament?.currency, 'de')}`).join(' · ')}{registration.feeTotalCents ? ` = ${formatMoney(registration.feeTotalCents, tournament?.currency, 'de')}` : ''}</small>}
