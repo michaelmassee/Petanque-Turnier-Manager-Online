@@ -7,7 +7,7 @@ import { bindeDokument, syncAnfrage } from './test-support/sync.js';
 import {
   buildLiveResponse, createRegistration, deleteTournament, executeSyncWrite, findMyLiveRegistration, getSyncTournament,
   listRegistrations, notifyCheckedIn, purgeExpiredPersonalData, syncGetRegistrations, syncPostDecisions, syncPutMeleeTeams,
-  updateTournamentPublication, upsertDocumentRegistration,
+  syncPutRegistrationClosed, updateTournamentPublication, upsertDocumentRegistration,
 } from './worker.js';
 
 const LOKAL = '55555555-5555-4555-8555-555555555555';
@@ -204,6 +204,23 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
       expect(await antwort.json()).toEqual({ recorded: 1 });
       expect(zeile("SELECT action, registration_id, target FROM audit_log WHERE action LIKE 'decision_%'"))
         .toEqual({ action: 'decision_keep_despite_online_status', registration_id: ONLINE, target: `local:${LOKAL}` });
+    });
+
+    it('schließt die Online-Anmeldung aus dem Dokument und meldet das Turnierdatum (KP-05, Vorbeugung)', async () => {
+      const schliessen = (body) => {
+        const request = syncAnfrage('PUT', '/api/sync/tournaments/t1/registration-closed', body);
+        return executeSyncWrite(request, env.DB, turnier(), (db) => syncPutRegistrationClosed(request, db, turnier(), { id: 'owner' }));
+      };
+      await expect(schliessen({ closed: 'ja' })).rejects.toMatchObject({ status: 400 });
+
+      const antwort = await schliessen({ closed: true });
+
+      expect(await antwort.json()).toEqual({ registrationClosed: true });
+      expect(turnier().registration_closed).toBe(1);
+      expect(zeile("SELECT actor_role, action FROM audit_log WHERE action = 'registration_closed'"))
+        .toEqual({ actor_role: 'document', action: 'registration_closed' });
+      const stand = await (await syncGetRegistrations(env.DB, turnier(), new URL('https://ptm.test/x'))).json();
+      expect(stand.tournament).toMatchObject({ registrationClosed: true, date: '2099-09-28' });
     });
 
     it('überträgt keine Stornierung einer bereits ausgelosten Meldung (KP-15)', async () => {

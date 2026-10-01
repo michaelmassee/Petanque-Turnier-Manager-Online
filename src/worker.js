@@ -2037,6 +2037,15 @@ export default {
         return await executeSyncWrite(request, env.DB, tournament, (db) => syncPostDecisions(request, db, tournament, auth.user));
       }
 
+      const syncRegistrationClosedMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registration-closed$/);
+      if (syncRegistrationClosedMatch && request.method === 'PUT') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncRegistrationClosedMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        return await executeSyncWrite(request, env.DB, tournament,
+          (db) => syncPutRegistrationClosed(request, db, tournament, auth.user));
+      }
+
       const syncMeleeTeamsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/melee-teams$/);
       if (syncMeleeTeamsMatch && request.method === 'PUT') {
         const auth = await requireApiKey(request, env.DB);
@@ -6958,6 +6967,7 @@ async function syncTournamentState(db, tournament) {
     .bind(tournament.id).first();
   return {
     status: tournament.status,
+    date: tournament.date || null,
     registrationClosed: Boolean(Number(tournament.registration_closed || 0)),
     runningResetAt: tournament.running_reset_at || null,
     roundsOnline: Number(rounds?.count || 0),
@@ -6989,6 +6999,25 @@ export async function syncPostDecisions(request, db, tournament, user) {
       action: `decision_${decision}`, target: localUuid ? `local:${localUuid}` : 'tournament', details: note ? { note } : null, now });
   });
   return { statements, response: { envelope: { status: 200, body: { recorded: statements.length } } } };
+}
+
+/**
+ * Das verbundene Dokument schließt (oder öffnet) die Online-Anmeldung, etwa beim letzten Abgleich vor dem Check-in,
+ * damit bis zum Rundenstart keine Anmeldungen mehr eingehen (KP-05, Vorbeugung). Gezählter Schreibvorgang wie alle
+ * Dokumentaufträge; protokolliert wie das Schließen in der Web-Oberfläche.
+ */
+export async function syncPutRegistrationClosed(request, db, tournament, user) {
+  const body = await readJson(request);
+  if (typeof body.closed !== 'boolean') throw new HttpError(400, 'closed muss true oder false sein');
+  const now = new Date().toISOString();
+  return {
+    statements: [
+      db.prepare('UPDATE tournaments SET registration_closed = ?, updated_at = ? WHERE id = ?').bind(body.closed ? 1 : 0, now, tournament.id),
+      auditStatement(db, { tournamentId: tournament.id, actorUserId: user?.id || null, actorRole: 'document',
+        action: body.closed ? 'registration_closed' : 'registration_opened', target: 'tournament', now }),
+    ],
+    response: { envelope: { status: 200, body: { registrationClosed: body.closed } } },
+  };
 }
 
 /**
