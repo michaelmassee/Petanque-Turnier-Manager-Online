@@ -9,7 +9,7 @@ import { Feedback, EditDialog, SelectField, TextArea, Button } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 import { RecipientPicker } from './RecipientPicker.jsx';
 import { LanguageSelect } from '../auth/AuthForms.jsx';
-import { LIVE_VIEW_AVAILABLE_EVENT } from '../postbox-core.js';
+import { LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT, REGISTRATION_SLOT_LINKED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT } from '../postbox-core.js';
 
 async function subscribeToPush() {
   const result = await ensureBrowserPushSubscription(async () => (await authenticatedApi('/api/push/public-key')).publicKey);
@@ -161,6 +161,15 @@ function postboxMessageText(message, t) {
   }
   if (message.eventType === LIVE_VIEW_AVAILABLE_EVENT) {
     return t('liveViewAvailableText', { name: data.tournamentName || '' });
+  }
+  if (message.eventType === REGISTRATION_SLOT_LINKED_EVENT) {
+    return t('registrationSlotLinkedText', { name: data.tournamentName || '' });
+  }
+  if (message.eventType === REGISTRATION_ACCOUNT_CONFLICT_EVENT) {
+    return t('registrationAccountConflictText', { name: data.tournamentName || '' });
+  }
+  if (message.eventType === TOURNAMENT_ADMIN_ACTION_EVENT) {
+    return t('tournamentAdminActionText', { name: data.tournamentName || '', actor: data.actorName || '', action: t(`adminAction_${data.action}`) });
   }
   return t('status');
 }

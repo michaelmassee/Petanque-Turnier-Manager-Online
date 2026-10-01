@@ -44,6 +44,7 @@ const REGISTRATION_CSV_COLUMNS = [
   'firstName',
   'lastName',
   'email',
+  'playerEmail',
   'noEmail',
   'club',
   'licenseNr',
@@ -141,6 +142,7 @@ function registrationToForm(registration) {
     firstName: registration.firstName || '',
     lastName: registration.lastName || '',
     email: registration.email || '',
+    playerEmail: registration.playerEmail || '',
     noEmail: Boolean(registration.noEmail),
     club: registration.club || '',
     licenseNr: registration.licenseNr || '',
@@ -188,10 +190,13 @@ function RegistrationRow({ registration, tournament, showConfirm = false, busy, 
         )}
         {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
         {registration.organizerMessage && <small data-i18n-skip>{registration.organizerMessage}</small>}
-        {(registration.overCapacity || registration.receivedAfterStart) && (
+        {(registration.overCapacity || registration.receivedAfterStart || registration.accountConflict || registration.possibleDuplicate || registration.incomplete) && (
           <small className="registration-sync-flags">
             {registration.overCapacity && <span className="role">{t('über Kapazität')}</span>}
             {registration.receivedAfterStart && <span className="role role-user">{t('nach Turnierstart eingegangen')}</span>}
+            {registration.accountConflict && <span className="role role-conflict" title={t('Dieselbe Person mit Konto steht in mehreren Anmeldungen. Bitte eine davon stornieren oder die Person austauschen.')}>{t('Konto doppelt angemeldet')}</span>}
+            {registration.possibleDuplicate && <span className="role role-user" title={t('Gleicher Name oder gleiche E-Mail wie eine andere Anmeldung – nur ein Hinweis.')}>{t('mögliche Dublette')}</span>}
+            {registration.incomplete && <span className="role role-user">{t('Team unvollständig')}</span>}
           </small>
         )}
         {registration.feeSelections?.length > 0 && <small data-i18n-skip>{registration.feeSelections.map((selection) => `${selection.name}: ${formatMoney(selection.amountCents, tournament?.currency, 'de')}`).join(' · ')}{registration.feeTotalCents ? ` = ${formatMoney(registration.feeTotalCents, tournament?.currency, 'de')}` : ''}</small>}
@@ -211,6 +216,31 @@ function RegistrationRow({ registration, tournament, showConfirm = false, busy, 
         <Button variant="danger" loading={busy === `delete-${registration.id}`} disabled={Boolean(busyOther)} onClick={() => onDelete(registration)}>{t('Löschen')}</Button>
       </div>
     </article>
+  );
+}
+
+function RelinkAccounts({ registration, busyId, onRelink }) {
+  const { t } = useTranslation();
+  if (!registration) return null;
+  const slots = [
+    { slot: 1, name: [registration.firstName, registration.lastName], email: registration.playerEmail, linked: registration.accountConnected },
+    { slot: 2, name: [registration.partnerFirstName, registration.partnerLastName], email: registration.partnerEmail, linked: registration.partnerAccountConnected },
+    { slot: 3, name: [registration.partner2FirstName, registration.partner2LastName], email: registration.partner2Email, linked: registration.partner2AccountConnected },
+  ].filter((entry) => entry.name.some(Boolean) && entry.email);
+  if (slots.length === 0) return null;
+  return (
+    <section className="relink-accounts" aria-label={t('Konto neu zuordnen')}>
+      <h3>{t('Konto neu zuordnen')}</h3>
+      <p className="hint">{t('Eine korrigierte E-Mail ändert ein bereits verknüpftes Konto nicht. Speichere zuerst die Korrektur und ordne dann das Konto der gespeicherten E-Mail ausdrücklich neu zu.')}</p>
+      {slots.map((entry) => (
+        <div className="row-actions" key={entry.slot}>
+          <span data-i18n-skip>{entry.name.filter(Boolean).join(' ')} · {entry.email}{entry.linked ? ' 👤' : ''}</span>
+          <Button variant="secondary" loading={busyId === `relink-${entry.slot}`} disabled={Boolean(busyId)} onClick={() => onRelink(registration, entry.slot)}>
+            {t('Konto neu zuordnen')}
+          </Button>
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -469,6 +499,17 @@ export function RegistrationsManagementPage({
     } catch (err) { setError(err.message); } finally { setBusyId(''); }
   }
 
+  // "Konto neu zuordnen" (KP-11): einziger Weg, das Konto eines bereits verknüpften Slots zu wechseln.
+  async function handleRelink(registration, slot) {
+    setError(''); setMessage('');
+    setBusyId(`relink-${slot}`);
+    try {
+      const result = await authenticatedApi(`/api/registrations/${registration.id}/slots/${slot}/relink`, { method: 'POST' });
+      setMessage(result.linked ? t('Das Konto wurde neu zugeordnet.') : t('Zur gespeicherten E-Mail gibt es kein eindeutiges bestätigtes Konto; die Verknüpfung wurde gelöst.'));
+      await load(registration.tournamentId);
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+  }
+
   async function handleConfirmAll() {
     if (!tournament) return;
     setError(''); setMessage('');
@@ -523,6 +564,13 @@ export function RegistrationsManagementPage({
           invalidField={invalidField}
           saving={saving}
         />
+        {mode === 'edit' && (
+          <RelinkAccounts
+            registration={registrations.find((entry) => entry.id === form.id)}
+            busyId={busyId}
+            onRelink={handleRelink}
+          />
+        )}
       </EditDialog>
     </>
   );

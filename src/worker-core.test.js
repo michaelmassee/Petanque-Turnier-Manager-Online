@@ -105,7 +105,8 @@ describe('Worker-Fachlogik', () => {
     expect(() => assertPartnerCountMatchesFormation({ formation: 'tete' }, { partnerFirstName: 'A', partnerLastName: 'B' })).toThrow('keinen Partner');
     expect(() => assertPartnerCountMatchesFormation({ formation: 'doublette' }, {})).toThrow('genau einen Partner');
     expect(() => assertPartnerCountMatchesFormation({ formation: 'doublette' }, { partnerFirstName: 'A', partnerLastName: 'B', partner2FirstName: 'C', partner2LastName: 'D' })).toThrow('nur einen Partner');
-    expect(() => assertPartnerCountMatchesFormation({ formation: 'triplette' }, { partnerFirstName: 'A', partnerLastName: 'B' })).toThrow('genau zwei Partner');
+    expect(() => assertPartnerCountMatchesFormation({ formation: 'triplette' }, {})).toThrow('mindestens einen Partner');
+    expect(() => assertPartnerCountMatchesFormation({ formation: 'triplette' }, { partnerFirstName: 'A', partnerLastName: 'B' })).not.toThrow();
     expect(() => assertPartnerCountMatchesFormation({ formation: 'triplette' }, { partnerFirstName: 'A', partnerLastName: 'B', partner2FirstName: 'C', partner2LastName: 'D' })).not.toThrow();
   });
 

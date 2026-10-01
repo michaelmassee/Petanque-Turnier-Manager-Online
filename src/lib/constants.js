@@ -202,6 +202,7 @@ export const EMPTY_REGISTRATION_FORM = {
   firstName: '',
   lastName: '',
   email: '',
+  playerEmail: '',
   noEmail: false,
   club: '',
   licenseNr: '',
@@ -220,6 +221,7 @@ export const EMPTY_REGISTRATION_FORM = {
   isVip: false,
   organizerMessage: '',
   publicationNoticeAccepted: false,
+  personsConsentAccepted: false,
   website: '',
 };
 

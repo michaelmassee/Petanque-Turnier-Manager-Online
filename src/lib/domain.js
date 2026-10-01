@@ -147,6 +147,7 @@ export function registrationPayload(form, language) {
     firstName: form.firstName,
     lastName: form.lastName,
     email: form.email,
+    playerEmail: form.playerEmail || null,
     noEmail: Boolean(form.noEmail),
     club: form.club || null,
     licenseNr: form.licenseNr || null,
@@ -166,6 +167,7 @@ export function registrationPayload(form, language) {
     feeSelections: form.feeSelections || [],
     registrationAnswers: form.registrationAnswers || [],
     publicationNoticeAccepted: Boolean(form.publicationNoticeAccepted),
+    personsConsentAccepted: Boolean(form.personsConsentAccepted),
     website: form.website || '',
     language,
   };

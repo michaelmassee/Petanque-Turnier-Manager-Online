@@ -129,5 +129,12 @@
   "Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.": "Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.",
   "Anmelden (Turnier)": "Anmelden",
   "Kalendereinträge ausblenden": "Kalendereinträge ausblenden",
-  "Wähle ein Turnier aus, um die Live-Ansicht zu öffnen.": "Wähle ein Turnier aus, um die Live-Ansicht zu öffnen."
+  "Wähle ein Turnier aus, um die Live-Ansicht zu öffnen.": "Wähle ein Turnier aus, um die Live-Ansicht zu öffnen.",
+  "registrationSlotLinkedText": "{{name}}: Du wurdest für dieses Turnier eingetragen. Falls du das nicht bist, wähle in der Live-Ansicht „Das bin ich nicht“.",
+  "registrationAccountConflictText": "{{name}}: Du stehst in mehreren Anmeldungen. Die Turnierleitung klärt das; bitte melde dich bei ihr.",
+  "tournamentAdminActionText": "{{name}}: {{action}} durch {{actor}}",
+  "adminAction_binding_takeover": "Dokumentbindung übernommen",
+  "adminAction_binding_release": "Dokumentbindung gelöst",
+  "adminAction_running_reset": "Turnierstart zurückgesetzt",
+  "adminAction_tournament_deleted": "Turnier gelöscht"
 }

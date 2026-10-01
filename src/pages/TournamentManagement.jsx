@@ -14,10 +14,15 @@ import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteLis
  * Lösch-Rückfrage; bei einem mit einem Turnierdokument verbundenen Turnier mit deutlicher Warnung, weil Spieler
  * Live-Ansicht und Ergebnisse verlieren und das Dokument die Verbindung.
  */
-function deleteTournamentConfirmation(t, tournamentName, documentManaged) {
-  const question = t('Turnier „{name}“ wirklich löschen? Alle Anmeldungen dieses Turniers werden mitgelöscht und das kann nicht rückgängig gemacht werden.').replace('{name}', tournamentName);
-  if (!documentManaged) return question;
-  return `${question}\n\n${t('Achtung: Dieses Turnier wird gerade von einem Turnierdokument (LibreOffice) geführt. Beim Löschen verlieren die Spieler Live-Ansicht und Ergebnisse, und das Turnierdokument verliert die Verbindung.')}`;
+// KP-07: Der Dialog nennt verbundenes Dokument, Anzahl der Anmeldungen, Turnierstatus und das Ende der Live-Ansicht.
+function deleteTournamentConfirmation(t, tournament, documentManaged) {
+  const parts = [t('Turnier „{name}“ wirklich löschen? Alle Anmeldungen dieses Turniers werden mitgelöscht und das kann nicht rückgängig gemacht werden.').replace('{name}', tournament.name)];
+  const registrations = Number(tournament.activeRegistrations || 0) + Number(tournament.waitlistRegistrations || 0);
+  parts.push(t('Anmeldungen: {count}').replace('{count}', String(registrations)));
+  if (tournament.status === 'running') parts.push(t('Achtung: Das Turnier läuft gerade.'));
+  if (registrations > 0) parts.push(t('Angemeldete sehen in ihrer Live-Ansicht danach nur noch den Hinweis, dass das Turnier gelöscht wurde.'));
+  if (documentManaged) parts.push(t('Achtung: Dieses Turnier wird gerade von einem Turnierdokument (LibreOffice) geführt. Beim Löschen verlieren die Spieler Live-Ansicht und Ergebnisse, und das Turnierdokument verliert die Verbindung.'));
+  return parts.join('\n\n');
 }
 
 /** Der Server verlangt die Bestätigung, weil das Turnier inzwischen mit einem Turnierdokument verbunden ist. */
@@ -599,6 +604,7 @@ export function TournamentList({
   onResetRunning = () => {},
   onToggleRegistrationClosed = () => {},
   onEditPublication = () => {},
+  onEditParticipantSettings = () => {},
   isAdmin,
   language,
   onCreate,
@@ -771,6 +777,11 @@ export function TournamentList({
                     {tournament.registrationClosed ? t('Anmeldung öffnen') : t('Anmeldung schließen')}
                   </Button>
                 )}
+                {tournament.registrationEnabled !== false && !isCalendarEntry(tournament) && (
+                  <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onEditParticipantSettings(tournament)}>
+                    {t('Teilnehmer-Einstellungen')}
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   loading={busyId === `duplicate-${tournament.id}`}
@@ -871,6 +882,9 @@ export function TournamentManagementPage({
   const [publication, setPublication] = useState(null);
   const [publicationError, setPublicationError] = useState('');
   const [publicationSaving, setPublicationSaving] = useState(false);
+  const [participantSettings, setParticipantSettings] = useState(null);
+  const [participantSettingsError, setParticipantSettingsError] = useState('');
+  const [participantSettingsSaving, setParticipantSettingsSaving] = useState(false);
 
   const manageableTournaments = useMemo(() => tournaments.filter((tournament) => tournament.canManage), [tournaments]);
   const filteredTournaments = useMemo(
@@ -967,6 +981,38 @@ export function TournamentManagementPage({
     }
   }
 
+  function openParticipantSettings(tournament) {
+    setParticipantSettingsError('');
+    setParticipantSettings({
+      id: tournament.id,
+      name: tournament.name,
+      checkinNotificationEnabled: tournament.checkinNotificationEnabled !== false,
+      dataRetentionMonths: String(tournament.dataRetentionMonths || 12),
+    });
+  }
+
+  async function handleParticipantSettingsSubmit(event) {
+    event.preventDefault();
+    setParticipantSettingsError('');
+    setParticipantSettingsSaving(true);
+    try {
+      await authenticatedApi(`/api/tournaments/${participantSettings.id}/participant-settings`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          checkinNotificationEnabled: participantSettings.checkinNotificationEnabled,
+          dataRetentionMonths: Number(participantSettings.dataRetentionMonths),
+        }),
+      });
+      setParticipantSettings(null);
+      setMessage(t('Teilnehmer-Einstellungen wurden gespeichert.'));
+      await onTournamentsChanged?.();
+    } catch (requestError) {
+      setParticipantSettingsError(requestError.message);
+    } finally {
+      setParticipantSettingsSaving(false);
+    }
+  }
+
   async function handleOwnerChanged() {
     await onTournamentsChanged?.();
   }
@@ -1048,7 +1094,7 @@ export function TournamentManagementPage({
 
   async function handleDelete(tournament) {
     const documentManaged = Boolean(tournament.documentManaged);
-    if (!window.confirm(deleteTournamentConfirmation(t, tournament.name, documentManaged))) {
+    if (!window.confirm(deleteTournamentConfirmation(t, tournament, documentManaged))) {
       return;
     }
 
@@ -1061,7 +1107,7 @@ export function TournamentManagementPage({
       } catch (requestError) {
         if (!isDocumentManagedConflict(requestError)) throw requestError;
         // Erst nach dem Laden der Liste verbunden: mit Warnung erneut fragen.
-        if (!window.confirm(deleteTournamentConfirmation(t, tournament.name, true))) return;
+        if (!window.confirm(deleteTournamentConfirmation(t, tournament, true))) return;
         await deleteTournamentRequest(tournament.id, true);
       }
       setMessage(t('Turnier wurde gelöscht.'));
@@ -1094,6 +1140,7 @@ export function TournamentManagementPage({
         onResetRunning={handleResetRunning}
         onToggleRegistrationClosed={handleToggleRegistrationClosed}
         onEditPublication={openPublication}
+        onEditParticipantSettings={openParticipantSettings}
         isAdmin={isAdmin}
         language={language}
         onCreate={openCreate}
@@ -1160,6 +1207,41 @@ export function TournamentManagementPage({
             <div className="dialog-actions">
               <Button variant="secondary" type="button" onClick={() => setPublication(null)}>{t('Abbrechen')}</Button>
               <Button type="submit" loading={publicationSaving}>{t('Speichern')}</Button>
+            </div>
+          </form>
+        )}
+      </EditDialog>
+
+      <EditDialog
+        open={Boolean(participantSettings)}
+        title={t('Teilnehmer-Einstellungen')}
+        subtitle={participantSettings?.name}
+        error={participantSettingsError}
+        onClose={() => setParticipantSettings(null)}
+      >
+        {participantSettings && (
+          <form onSubmit={handleParticipantSettingsSubmit}>
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={participantSettings.checkinNotificationEnabled}
+                onChange={(event) => setParticipantSettings({ ...participantSettings, checkinNotificationEnabled: event.target.checked })}
+              />
+              {t('Nachricht „Eingecheckt“ an verknüpfte Konten senden')}
+            </label>
+            <TextField
+              label={t('Kontaktdaten nach Turnierabschluss löschen nach (Monaten)')}
+              type="number"
+              min="1"
+              max="60"
+              value={participantSettings.dataRetentionMonths}
+              onChange={(dataRetentionMonths) => setParticipantSettings({ ...participantSettings, dataRetentionMonths })}
+              required
+            />
+            <p className="hint">{t('Danach werden Kontakt- und Personen-E-Mails, Tarife und Antworten gelöscht. Namen, Ergebnisse und Ranglisten bleiben erhalten.')}</p>
+            <div className="dialog-actions">
+              <Button variant="secondary" type="button" onClick={() => setParticipantSettings(null)}>{t('Abbrechen')}</Button>
+              <Button type="submit" loading={participantSettingsSaving}>{t('Speichern')}</Button>
             </div>
           </form>
         )}

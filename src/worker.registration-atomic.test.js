@@ -22,7 +22,7 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
     const request = new Request('https://ptm.test/api/tournaments/t1/registrations', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        firstName: 'Neu', lastName: 'Anmeldung', email: 'neu@example.test', publicationNoticeAccepted: true,
+        firstName: 'Neu', lastName: 'Anmeldung', email: 'neu@example.test', publicationNoticeAccepted: true, personsConsentAccepted: true,
         feeSelections: [], registrationAnswers: [], ...body,
       }),
     });
