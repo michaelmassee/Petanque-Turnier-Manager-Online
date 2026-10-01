@@ -181,6 +181,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   const [clubsOnly, setClubsOnly] = useState(false);
   const [indoorOnly, setIndoorOnly] = useState(false);
   const [searchMenuOpen, setSearchMenuOpen] = useState(false);
+  const [searchTab, setSearchTab] = useState('filters');
   const resultsRef = useRef(null);
   const mapSectionRef = useRef(null);
   const [focusPlace, setFocusPlace] = useState(null);
@@ -319,6 +320,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
           open={searchMenuOpen}
           onToggle={() => setSearchMenuOpen((open) => !open)}
           onClose={() => setSearchMenuOpen(false)}
+          activeTab={searchTab}
+          setActiveTab={setSearchTab}
           query={query}
           setQuery={setQuery}
           currentUser={currentUser}
@@ -358,16 +361,24 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
             <strong>{visiblePlaces.length}</strong>
             <span>{t('Gefundene Plätze')}</span>
           </button>
-          <button type="button" onClick={() => setSearchMenuOpen(true)} aria-label={`${activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')} ${t('– Filter öffnen')}`}>
+          <button type="button" onClick={() => { setSearchTab('filters'); setSearchMenuOpen(true); }} aria-label={`${activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')} ${t('– Filter öffnen')}`}>
             <strong>{activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')}</strong>
             <span>{t('Finder')}</span>
           </button>
-          <button type="button" onClick={() => setSearchMenuOpen(true)} aria-label={t('Umkreissuche öffnen')}>
+          <button type="button" onClick={() => { setSearchTab('radius'); setSearchMenuOpen(true); }} aria-label={t('Umkreissuche öffnen')}>
             <strong>{searchOrigin ? <>{radiusLabel} {t('Umkreis')}</> : t('Umkreissuche aus')}</strong>
             <span>{searchOrigin ? <>{t('Ausgangspunkt:')} {searchOrigin.label}</> : t('Umkreis')}</span>
           </button>
         </div>
       </div>
+
+      {(query || favoritesOnly || clubsOnly || indoorOnly || searchOrigin) && <div className="active-search-badges" aria-label={t('Filter aktiv')}>
+        {query && <button type="button" className="active-search-badge" onClick={() => setQuery('')} aria-label={`${t('Entfernen')}: ${query}`}><span>{query}</span><span aria-hidden="true">×</span></button>}
+        {favoritesOnly && <button type="button" className="active-search-badge" onClick={() => setFavoritesOnly(false)} aria-label={`${t('Entfernen')}: ${t('Nur meine Favoriten')}`}><span>{t('Nur meine Favoriten')}</span><span aria-hidden="true">×</span></button>}
+        {clubsOnly && <button type="button" className="active-search-badge" onClick={() => setClubsOnly(false)} aria-label={`${t('Entfernen')}: ${t('Nur Vereine')}`}><span>{t('Nur Vereine')}</span><span aria-hidden="true">×</span></button>}
+        {indoorOnly && <button type="button" className="active-search-badge" onClick={() => setIndoorOnly(false)} aria-label={`${t('Entfernen')}: ${t('Nur Boulehallen')}`}><span>{t('Nur Boulehallen')}</span><span aria-hidden="true">×</span></button>}
+        {searchOrigin && <button type="button" className="active-search-badge" onClick={handleClearSearchOrigin} aria-label={`${t('Entfernen')}: ${radiusLabel} ${searchOrigin.label}`}><span>{radiusLabel} · {searchOrigin.label}</span><span aria-hidden="true">×</span></button>}
+      </div>}
 
       <Feedback error={error} />
       {mapped.length > 0 && (
@@ -432,6 +443,8 @@ function PlacesSearchMenu({
   open,
   onToggle,
   onClose,
+  activeTab,
+  setActiveTab,
   query,
   setQuery,
   currentUser,
@@ -469,6 +482,11 @@ function PlacesSearchMenu({
         <>
           <div className="search-menu-backdrop" onClick={onClose} />
           <div className="search-menu-panel" role="search">
+            <div className="search-tabs" role="tablist" aria-label={t('Suche')}>
+              <button type="button" role="tab" aria-selected={activeTab === 'filters'} className={activeTab === 'filters' ? 'active' : ''} onClick={() => setActiveTab('filters')}>{t('Filter')}</button>
+              <button type="button" role="tab" aria-selected={activeTab === 'radius'} className={activeTab === 'radius' ? 'active' : ''} onClick={() => setActiveTab('radius')}>{t('Umkreissuche')}</button>
+            </div>
+            {activeTab === 'filters' ? <div className="filter-panel">
             <label className="home-search-field">
               {t('Nach Platz, Verein oder Ort suchen')}
               <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Nach Platz, Verein oder Ort suchen')} />
@@ -491,7 +509,7 @@ function PlacesSearchMenu({
                 {t('Nur Boulehallen')}
               </label>
             </div>
-
+            </div> : <>
             <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
               <LocationAutocomplete
                 label={t('Umkreissuche: Von diesem Ort aus suchen')}
@@ -511,6 +529,7 @@ function PlacesSearchMenu({
               )}
             </form>
             <Feedback error={geoError} />
+            </>}
           </div>
         </>
       )}

@@ -102,7 +102,7 @@ function AppContent() {
   const [homeQuery, setHomeQuery] = useState('');
   const [homeOnlyMine, setHomeOnlyMine] = useState(false);
   const [homeVisibleCount, setHomeVisibleCount] = useState(10);
-  const [homeFilterOpen, setHomeFilterOpen] = useState(false);
+  const [homeSearchTab, setHomeSearchTab] = useState('filters');
   const [homeFilterMonth, setHomeFilterMonth] = useState('');
   const [homeFilterFormation, setHomeFilterFormation] = useState('');
   const [homeFilterRegistrationType, setHomeFilterRegistrationType] = useState('');
@@ -351,7 +351,7 @@ function AppContent() {
 
   const authModalOpen = authView !== 'home' && authView !== 'cancelRegistration';
   const anyDialogOpen =
-    menuOpen || searchMenuOpen || homeFilterOpen || postboxOpen || savedSearchesOpen || savedSearchDialogOpen || authModalOpen;
+    menuOpen || searchMenuOpen || postboxOpen || savedSearchesOpen || savedSearchDialogOpen || authModalOpen;
   const awayFromHome = activeTab !== 'home';
   const desiredNavDepth = (awayFromHome ? 1 : 0) + (anyDialogOpen ? 1 : 0);
   const navDepthRef = useRef(0);
@@ -402,7 +402,6 @@ function AppContent() {
       if (anyDialogOpen) {
         setMenuOpen(false);
         setSearchMenuOpen(false);
-        setHomeFilterOpen(false);
         setPostboxOpen(false);
         setSavedSearchesOpen(false);
         setSavedSearchDialogOpen(false);
@@ -554,6 +553,7 @@ function AppContent() {
       setSearchOrigin(null);
       setSearchOriginQuery('');
     }
+    setHomeSearchTab('filters');
     setSavedSearchesOpen(false);
     setActiveTab('home');
   }
@@ -1470,8 +1470,8 @@ function AppContent() {
               showMineFilter={false}
               onlyMine={false}
               setOnlyMine={() => {}}
-              filterOpen={homeFilterOpen}
-              setFilterOpen={setHomeFilterOpen}
+              activeTab={homeSearchTab}
+              setActiveTab={setHomeSearchTab}
               filterMonth={homeFilterMonth}
               setFilterMonth={setHomeFilterMonth}
               filterFormation={homeFilterFormation}
@@ -1548,6 +1548,15 @@ function AppContent() {
           filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
           searchOrigin={searchOrigin}
           searchRadiusKm={searchRadiusKm}
+          onClearQuery={() => setHomeQuery('')}
+          onClearOnlyMine={() => setHomeOnlyMine(false)}
+          onClearFilterMonth={() => setHomeFilterMonth('')}
+          onClearFilterFormation={() => setHomeFilterFormation('')}
+          onClearFilterRegistrationType={() => setHomeFilterRegistrationType('')}
+          onClearFilterType={() => setHomeFilterType('')}
+          onClearFilterOpenOnly={() => setHomeFilterOpenOnly(false)}
+          onClearFilterOnlineRegistrationOnly={() => setHomeFilterOnlineRegistrationOnly(false)}
+          onClearSearchOrigin={handleClearSearchOrigin}
           tournaments={visibleHomeTournaments}
           total={filteredHomeTournaments.length}
           hasMore={hasMoreHomeTournaments}
@@ -1562,9 +1571,9 @@ function AppContent() {
           }}
           onOpenFilters={() => {
             setSearchMenuOpen(true);
-            setHomeFilterOpen(true);
+            setHomeSearchTab('filters');
           }}
-          onOpenRadiusSearch={() => setSearchMenuOpen(true)}
+          onOpenRadiusSearch={() => { setHomeSearchTab('radius'); setSearchMenuOpen(true); }}
         />
 
         {authView !== 'home' && (
@@ -1768,8 +1777,8 @@ function AppContent() {
               showMineFilter={canManageTournaments}
               onlyMine={homeOnlyMine}
               setOnlyMine={setHomeOnlyMine}
-              filterOpen={homeFilterOpen}
-              setFilterOpen={setHomeFilterOpen}
+              activeTab={homeSearchTab}
+              setActiveTab={setHomeSearchTab}
               filterMonth={homeFilterMonth}
               setFilterMonth={setHomeFilterMonth}
               filterFormation={homeFilterFormation}
@@ -1878,6 +1887,15 @@ function AppContent() {
           filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
           searchOrigin={searchOrigin}
           searchRadiusKm={searchRadiusKm}
+          onClearQuery={() => setHomeQuery('')}
+          onClearOnlyMine={() => setHomeOnlyMine(false)}
+          onClearFilterMonth={() => setHomeFilterMonth('')}
+          onClearFilterFormation={() => setHomeFilterFormation('')}
+          onClearFilterRegistrationType={() => setHomeFilterRegistrationType('')}
+          onClearFilterType={() => setHomeFilterType('')}
+          onClearFilterOpenOnly={() => setHomeFilterOpenOnly(false)}
+          onClearFilterOnlineRegistrationOnly={() => setHomeFilterOnlineRegistrationOnly(false)}
+          onClearSearchOrigin={handleClearSearchOrigin}
           tournaments={visibleHomeTournaments}
           total={filteredHomeTournaments.length}
           hasMore={hasMoreHomeTournaments}
@@ -1892,9 +1910,9 @@ function AppContent() {
           }}
           onOpenFilters={() => {
             setSearchMenuOpen(true);
-            setHomeFilterOpen(true);
+            setHomeSearchTab('filters');
           }}
-          onOpenRadiusSearch={() => setSearchMenuOpen(true)}
+          onOpenRadiusSearch={() => { setHomeSearchTab('radius'); setSearchMenuOpen(true); }}
         />
       )}
 
@@ -2174,6 +2192,15 @@ export function HomeTournaments({
   filterOnlineRegistrationOnly,
   searchOrigin,
   searchRadiusKm,
+  onClearQuery,
+  onClearOnlyMine,
+  onClearFilterMonth,
+  onClearFilterFormation,
+  onClearFilterRegistrationType,
+  onClearFilterType,
+  onClearFilterOpenOnly,
+  onClearFilterOnlineRegistrationOnly,
+  onClearSearchOrigin,
   tournaments,
   total,
   hasMore,
@@ -2196,6 +2223,17 @@ export function HomeTournaments({
   ].filter(Boolean).length;
   const nextTournament = tournaments[0] || null;
   const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);
+  const activeBadges = [
+    query.trim() && [query.trim(), onClearQuery],
+    showMineFilter && onlyMine && [t('Nur meine Turniere'), onClearOnlyMine],
+    filterMonth && [labelFor(MONTHS, filterMonth), onClearFilterMonth],
+    filterFormation && [labelFor(FORMATIONS, filterFormation), onClearFilterFormation],
+    filterRegistrationType && [labelFor(REGISTRATION_TYPES, filterRegistrationType), onClearFilterRegistrationType],
+    filterType && [labelFor(TOURNAMENT_TYPES, filterType), onClearFilterType],
+    filterOpenOnly && [t('Anmeldung möglich'), onClearFilterOpenOnly],
+    filterOnlineRegistrationOnly && [t('Online-Anmeldung möglich'), onClearFilterOnlineRegistrationOnly],
+    searchOrigin && [`${radiusLabel} · ${searchOrigin.label}`, onClearSearchOrigin],
+  ].filter(Boolean);
   const resultsRef = useRef(null);
   return (
     <section className="home-tournaments">
@@ -2257,6 +2295,16 @@ export function HomeTournaments({
           </button>
         </div>
       </div>
+
+      {activeBadges.length > 0 && (
+        <div className="active-search-badges" aria-label={t('Filter aktiv')}>
+          {activeBadges.map(([label, onClear]) => (
+            <button type="button" className="active-search-badge" key={label} onClick={onClear} aria-label={`${t('Entfernen')}: ${label}`}>
+              <span>{label}</span><span aria-hidden="true">×</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="section-title home-results-title" ref={resultsRef}>
         <p className="eyebrow">{t('Alle passenden Turniere')}</p>

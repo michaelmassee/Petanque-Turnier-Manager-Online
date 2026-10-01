@@ -807,6 +807,34 @@ a.left-panel-link {
   max-width: none;
 }
 
+.search-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #d7deea;
+}
+
+.search-tabs button {
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: #53627a;
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.search-tabs button:hover,
+.search-tabs button.active {
+  color: #0c4f8a;
+  border-bottom-color: #1677ff;
+}
+
+.search-tabs button:focus-visible {
+  outline: 3px solid rgb(22 119 255 / 18%);
+  outline-offset: -2px;
+}
+
 .hamburger-icon {
   position: relative;
   display: grid;
@@ -1233,6 +1261,33 @@ a.left-panel-link {
   margin-bottom: 22px;
   padding: 18px;
 }
+
+.active-search-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 20px;
+}
+
+.active-search-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid #94bce8;
+  border-radius: 999px;
+  background: #eaf4ff;
+  color: #0c4f8a;
+  padding: 5px 9px 5px 11px;
+  font: inherit;
+  font-size: .88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.active-search-badge:hover { background: #d9ecff; border-color: #1677ff; }
+.active-search-badge:focus-visible { outline: 3px solid rgb(22 119 255 / 24%); outline-offset: 2px; }
+.active-search-badge span:first-child { overflow-wrap: anywhere; }
 
 .home-search-field input[type="search"] {
   min-height: 50px;

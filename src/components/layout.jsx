@@ -507,13 +507,13 @@ export function SearchMenuControl({
   open,
   onToggle,
   onClose,
+  activeTab,
+  setActiveTab,
   query,
   setQuery,
   showMineFilter,
   onlyMine,
   setOnlyMine,
-  filterOpen,
-  setFilterOpen,
   filterMonth,
   setFilterMonth,
   filterFormation,
@@ -557,57 +557,22 @@ export function SearchMenuControl({
         <>
           <div className="search-menu-backdrop" onClick={onClose} />
           <div className="search-menu-panel" role="search">
-            <label className="home-search-field">
-              {t('Turnier suchen')}
-              <input
-                type="search"
-                placeholder={t('Name, Ort oder Turniersystem')}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
-            <div className="home-search-actions">
-              {showMineFilter && (
-                <label className="checkbox-field">
-                  <input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} />
-                  {t('Nur meine Turniere')}
-                </label>
-              )}
-              <Button variant="secondary" onClick={() => setFilterOpen((active) => !active)}>
-                {filterOpen ? t('Filter ausblenden') : t('Filter anzeigen')}
-              </Button>
+            <div className="search-tabs" role="tablist" aria-label={t('Suche')}>
+              <button type="button" role="tab" aria-selected={activeTab === 'filters'} className={activeTab === 'filters' ? 'active' : ''} onClick={() => setActiveTab('filters')}>{t('Filter')}</button>
+              <button type="button" role="tab" aria-selected={activeTab === 'radius'} className={activeTab === 'radius' ? 'active' : ''} onClick={() => setActiveTab('radius')}>{t('Umkreissuche')}</button>
             </div>
-
-            <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
-              <LocationAutocomplete
-                label={t('Umkreissuche: Von diesem Ort aus suchen')}
-                value={searchOriginQuery}
-                onChange={setSearchOriginQuery}
-                onSelect={onSearchOriginSelect}
-                disabled={geoLoading}
-              />
-              <Button type="submit" variant="secondary" disabled={geoLoading} loading={geoLoading}>
-                {t('Suchen')}
-              </Button>
-              <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading} loading={geoLoading}>
-                {t('Meinen Standort verwenden')}
-              </Button>
-              {searchOrigin && (
-                <>
-                  <SelectField label={t('Umkreis')} value={searchRadiusKm} onChange={setSearchRadiusKm} options={translatedOptions(RADIUS_OPTIONS)} />
-                  <span className="search-origin-label">
-                    {t('Ausgangspunkt:')} {searchOrigin.label}
-                  </span>
-                  <button className="link-button" type="button" onClick={onClearSearchOrigin}>
-                    {t('Umkreissuche beenden')}
-                  </button>
-                </>
-              )}
-            </form>
-            <Feedback error={geoError} />
-
-            {filterOpen && (
+            {activeTab === 'filters' ? (
               <div className="filter-panel">
+                <label className="home-search-field">
+                  {t('Turnier suchen')}
+                  <input type="search" placeholder={t('Name, Ort oder Turniersystem')} value={query} onChange={(event) => setQuery(event.target.value)} />
+                </label>
+                {showMineFilter && (
+                  <label className="checkbox-field">
+                    <input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} />
+                    {t('Nur meine Turniere')}
+                  </label>
+                )}
                 <div className="filter-grid">
                   <SelectField
                     label={t('Monat')}
@@ -653,6 +618,20 @@ export function SearchMenuControl({
                   )}
                 </div>
               </div>
+            ) : (
+              <>
+                <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
+                  <LocationAutocomplete label={t('Umkreissuche: Von diesem Ort aus suchen')} value={searchOriginQuery} onChange={setSearchOriginQuery} onSelect={onSearchOriginSelect} disabled={geoLoading} />
+                  <Button type="submit" variant="secondary" disabled={geoLoading} loading={geoLoading}>{t('Suchen')}</Button>
+                  <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading} loading={geoLoading}>{t('Meinen Standort verwenden')}</Button>
+                  {searchOrigin && <>
+                    <SelectField label={t('Umkreis')} value={searchRadiusKm} onChange={setSearchRadiusKm} options={translatedOptions(RADIUS_OPTIONS)} />
+                    <span className="search-origin-label">{t('Ausgangspunkt:')} {searchOrigin.label}</span>
+                    <button className="link-button" type="button" onClick={onClearSearchOrigin}>{t('Umkreissuche beenden')}</button>
+                  </>}
+                </form>
+                <Feedback error={geoError} />
+              </>
             )}
           </div>
         </>

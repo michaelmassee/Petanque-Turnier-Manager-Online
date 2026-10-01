@@ -26,6 +26,8 @@ function PlayerExchangeSearchMenu({
   open,
   onToggle,
   onClose,
+  activeTab,
+  setActiveTab,
   query,
   setQuery,
   typeFilter,
@@ -60,13 +62,18 @@ function PlayerExchangeSearchMenu({
         <>
           <div className="search-menu-backdrop" onClick={onClose} />
           <div className="search-menu-panel" role="search">
+            <div className="search-tabs" role="tablist" aria-label={t('Suche')}>
+              <button type="button" role="tab" aria-selected={activeTab === 'filters'} className={activeTab === 'filters' ? 'active' : ''} onClick={() => setActiveTab('filters')}>{t('Filter')}</button>
+              <button type="button" role="tab" aria-selected={activeTab === 'radius'} className={activeTab === 'radius' ? 'active' : ''} onClick={() => setActiveTab('radius')}>{t('Umkreissuche')}</button>
+            </div>
+            {activeTab === 'filters' ? <div className="filter-panel">
             <label className="home-search-field">
               {t('Nach Titel, Beschreibung oder Ort suchen')}
               <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Nach Titel, Beschreibung oder Ort suchen')} />
             </label>
             <SelectField label={t('Typ filtern')} value={typeFilter} onChange={setTypeFilter} options={TYPE_FILTER_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
             <SelectField label={t('Spielposition filtern')} value={playingPositionFilter} onChange={setPlayingPositionFilter} options={PLAYING_POSITION_FILTER_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
-
+            </div> : <>
             <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
               <LocationAutocomplete
                 label={t('Umkreissuche: Von diesem Ort aus suchen')}
@@ -86,6 +93,7 @@ function PlayerExchangeSearchMenu({
               )}
             </form>
             <Feedback error={geoError} />
+            </>}
           </div>
         </>
       )}
@@ -103,6 +111,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
   const [error, setError] = useState('');
   const [contactListing, setContactListing] = useState(null);
   const [searchMenuOpen, setSearchMenuOpen] = useState(false);
+  const [searchTab, setSearchTab] = useState('filters');
   const resultsRef = useRef(null);
 
   const [searchOrigin, setSearchOrigin] = useState(null);
@@ -264,6 +273,8 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
             open={searchMenuOpen}
             onToggle={() => setSearchMenuOpen((value) => !value)}
             onClose={() => setSearchMenuOpen(false)}
+            activeTab={searchTab}
+            setActiveTab={setSearchTab}
             query={query}
             setQuery={setQuery}
             typeFilter={typeFilter}
@@ -300,16 +311,23 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
               <strong>{visibleListings.length}</strong>
               <span>{t('Gefundene Mitspielgesuche')}</span>
             </button>
-            <button type="button" onClick={() => setSearchMenuOpen(true)} aria-label={`${activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')} ${t('– Filter öffnen')}`}>
+            <button type="button" onClick={() => { setSearchTab('filters'); setSearchMenuOpen(true); }} aria-label={`${activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')} ${t('– Filter öffnen')}`}>
               <strong>{activeFilterCount > 0 ? t('Filter aktiv') : t('Keine Filter aktiv')}</strong>
               <span>{playingPositionFilterLabel || typeFilterLabel || t('Finder')}</span>
             </button>
-            <button type="button" onClick={() => setSearchMenuOpen(true)} aria-label={t('Umkreissuche öffnen')}>
+            <button type="button" onClick={() => { setSearchTab('radius'); setSearchMenuOpen(true); }} aria-label={t('Umkreissuche öffnen')}>
               <strong>{searchOrigin ? <>{radiusLabel} {t('Umkreis')}</> : t('Umkreissuche aus')}</strong>
               <span>{searchOrigin ? <>{t('Ausgangspunkt:')} {searchOrigin.label}</> : t('Umkreis')}</span>
             </button>
           </div>
         </div>
+
+        {(query || typeFilter || playingPositionFilter || searchOrigin) && <div className="active-search-badges" aria-label={t('Filter aktiv')}>
+          {query && <button type="button" className="active-search-badge" onClick={() => setQuery('')} aria-label={`${t('Entfernen')}: ${query}`}><span>{query}</span><span aria-hidden="true">×</span></button>}
+          {typeFilter && <button type="button" className="active-search-badge" onClick={() => setTypeFilter('')} aria-label={`${t('Entfernen')}: ${typeFilterLabel}`}><span>{typeFilterLabel}</span><span aria-hidden="true">×</span></button>}
+          {playingPositionFilter && <button type="button" className="active-search-badge" onClick={() => setPlayingPositionFilter('')} aria-label={`${t('Entfernen')}: ${playingPositionFilterLabel}`}><span>{playingPositionFilterLabel}</span><span aria-hidden="true">×</span></button>}
+          {searchOrigin && <button type="button" className="active-search-badge" onClick={handleClearSearchOrigin} aria-label={`${t('Entfernen')}: ${radiusLabel} ${searchOrigin.label}`}><span>{radiusLabel} · {searchOrigin.label}</span><span aria-hidden="true">×</span></button>}
+        </div>}
 
         <Feedback error={error} />
         {mapped.length > 0 && (

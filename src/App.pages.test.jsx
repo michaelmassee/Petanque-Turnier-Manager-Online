@@ -4,7 +4,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import i18next from './lib/i18next-config.js';
 import { EditDialog, HomeTournaments, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
 import { ClubBadge, DistanceBadge } from './components/ui.jsx';
-import { AppHeader } from './components/layout.jsx';
+import { AppHeader, SearchMenuControl } from './components/layout.jsx';
 import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM } from './lib/constants.js';
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
 import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
@@ -84,6 +84,38 @@ describe('Turnier-Finder', () => {
     );
 
     expect(screen.getByRole('button', { name: /Filter aktiv/ })).toBeInTheDocument();
+  });
+
+  it('entfernt einen aktiven Suchtext direkt über sein Badge', () => {
+    const onClearQuery = vi.fn();
+    render(
+      <HomeTournaments
+        language="de" query="Linden" showMineFilter={false} onlyMine={false}
+        filterMonth="" filterFormation="" filterRegistrationType="" filterType="" filterOpenOnly={false} filterOnlineRegistrationOnly={false}
+        searchOrigin={null} searchRadiusKm="25" onClearQuery={onClearQuery}
+        tournaments={[]} total={0} hasMore={false} onLoadMore={() => {}} onRegister={() => {}} onOpenTournament={() => {}} onOpenFilters={() => {}} onOpenRadiusSearch={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Entfernen: Linden' }));
+    expect(onClearQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('trennt Filter und Umkreissuche in zugängliche Tabs', () => {
+    const setActiveTab = vi.fn();
+    render(
+      <SearchMenuControl
+        open onToggle={() => {}} onClose={() => {}} activeTab="filters" setActiveTab={setActiveTab}
+        query="" setQuery={() => {}} showMineFilter={false} onlyMine={false} setOnlyMine={() => {}}
+        filterMonth="" setFilterMonth={() => {}} filterFormation="" setFilterFormation={() => {}} filterRegistrationType="" setFilterRegistrationType={() => {}} filterType="" setFilterType={() => {}}
+        filterOpenOnly={false} setFilterOpenOnly={() => {}} filterOnlineRegistrationOnly={false} setFilterOnlineRegistrationOnly={() => {}} onResetFilters={() => {}}
+        searchOrigin={null} searchOriginQuery="" setSearchOriginQuery={() => {}} onSearchOriginSubmit={(event) => event.preventDefault()} onSearchOriginSelect={() => {}} onUseMyLocation={() => {}} onClearSearchOrigin={() => {}}
+        searchRadiusKm="25" setSearchRadiusKm={() => {}} geoLoading={false} geoError="" canSaveSearch={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Umkreissuche' }));
+    expect(setActiveTab).toHaveBeenCalledWith('radius');
   });
 });
 
