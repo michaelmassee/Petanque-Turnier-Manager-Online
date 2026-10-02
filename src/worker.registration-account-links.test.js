@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { d1MitSchema as d1WithSchema, migrationsDir } from './test-support/d1.js';
 import {
-  declineRegistrationSlot, findMyLiveRegistration, getRegistrationWithTournament, linkUnlinkedRegistrationsForUser,
+  findMyLiveRegistration, getRegistrationWithTournament, linkUnlinkedRegistrationsForUser,
   listMyLiveRegistrations, relinkRegistrationSlot, resolveRegistrationUserIds, updateRegistration, updateUser, verifyEmail,
 } from './worker.js';
 
@@ -127,8 +127,8 @@ describe('stabile Konto-Verknüpfungen von Anmeldungen', () => {
     db.sqlite.prepare(`INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at)
       VALUES ('owner', 'owner@example.test', 'user', 'salt', 'hash', '2026-01-01', '2026-01-01'),
              ('player', 'new-address@example.test', 'user', 'salt', 'hash', '2026-01-01', '2026-01-01')`).run();
-    db.sqlite.prepare(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at)
-      VALUES ('t1', 'owner', 'Live', '2099-01-01', 'Ort', 'doublette', 'running', 'public', '2026-01-01', '2026-01-01')`).run();
+    db.sqlite.prepare(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at, live_view_enabled)
+      VALUES ('t1', 'owner', 'Live', '2099-01-01', 'Ort', 'doublette', 'running', 'public', '2026-01-01', '2026-01-01', 1)`).run();
     db.sqlite.prepare(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email, status, registered_at, created_at, updated_at, user_id)
       VALUES ('r1', 't1', 'Anna', 'A', 'old-address@example.test', 'confirmed', '2026-01-01', '2026-01-01', '2026-01-01', 'player')`).run();
 
@@ -173,26 +173,8 @@ describe('stabile Konto-Verknüpfungen von Anmeldungen', () => {
     await edit(db, [['Anna', 'anna@example.test'], ['Dora', 'dora@example.test'], ['Clara', 'unbekannt@example.test']]);
 
     expect(accountLinks(db)).toEqual({ user_id: 'u1', partner_user_id: 'u4', partner2_user_id: 'u3' });
-    const nachricht = db.sqlite.prepare("SELECT event_type FROM postbox_messages WHERE recipient_id = 'u4'").get();
-    expect(nachricht.event_type).toBe('registration_slot_linked');
-  });
-
-  it('löst einen Slot mit "Das bin ich nicht" dauerhaft (P-60)', async () => {
-    const db = d1WithSchema();
-    insertUsers(db, ['u1', 'anna@example.test'], ['u2', 'ben@example.test']);
-    insertTripletteRegistration(db, ['anna@example.test', 'ben@example.test', null]);
-    db.sqlite.exec(accountLinkBackfill);
-
-    const registration = await findMyLiveRegistration(db, { id: 'u2' }, 'r1');
-    await declineRegistrationSlot(db, registration, { id: 'u2' });
-
-    expect(accountLinks(db).partner_user_id).toBeNull();
-    expect(db.sqlite.prepare("SELECT partner_first_name, partner_email FROM registrations WHERE id = 'r1'").get())
-      .toEqual({ partner_first_name: 'Ben', partner_email: 'ben@example.test' });
-    await linkUnlinkedRegistrationsForUser(db, 'u2', 'ben@example.test');
-    expect(accountLinks(db).partner_user_id).toBeNull();
-    expect(db.sqlite.prepare("SELECT action FROM audit_log WHERE registration_id = 'r1'").all())
-      .toContainEqual({ action: 'account_declined' });
+    // Die Live-Ansicht hängt am persönlichen Link, eine Verknüpfungsnachricht gibt es nicht mehr (E-21).
+    expect(db.sqlite.prepare("SELECT event_type FROM postbox_messages WHERE recipient_id = 'u4'").all()).toEqual([]);
   });
 
   it('ordnet ein Konto nur über die ausdrückliche Aktion neu zu (KP-11)', async () => {

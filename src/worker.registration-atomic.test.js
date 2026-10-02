@@ -22,7 +22,7 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
     const request = new Request('https://ptm.test/api/tournaments/t1/registrations', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        firstName: 'Neu', lastName: 'Anmeldung', email: 'neu@example.test', publicationNoticeAccepted: true, personsConsentAccepted: true,
+        firstName: 'Neu', lastName: 'Anmeldung', playerEmail: 'neu@example.test', publicationNoticeAccepted: true, personsConsentAccepted: true,
         feeSelections: [], registrationAnswers: [], ...body,
       }),
     });
@@ -95,7 +95,7 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
     vorhandeneAnmeldung('alt', 'confirmed', '2026-09-01T10:00:00.000Z');
     vorhandeneAnmeldung('jung', 'confirmed', '2026-09-02T10:00:00.000Z');
 
-    await anmelden({ isVip: true, email: 'vip@example.test' }, { session: leitung });
+    await anmelden({ isVip: true, playerEmail: 'vip@example.test' }, { session: leitung });
 
     expect(anmeldungen()).toEqual([
       { first_name: 'alt', status: 'confirmed', is_vip: 0 },

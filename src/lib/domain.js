@@ -131,6 +131,7 @@ export function tournamentPayload(form) {
     visibility: form.visibility,
     internalNotes: form.internalNotes || null,
     participantsPublic: Boolean(form.participantsPublic),
+    liveViewEnabled: Boolean(form.liveViewEnabled),
     licenseRequired: Boolean(form.licenseRequired),
     teamNameEnabled: Boolean(form.teamNameEnabled),
     waitlistEnabled: Boolean(form.waitlistEnabled),
@@ -146,7 +147,6 @@ export function registrationPayload(form, language) {
   return {
     firstName: form.firstName,
     lastName: form.lastName,
-    email: form.email,
     playerEmail: form.playerEmail || null,
     noEmail: Boolean(form.noEmail),
     club: form.club || null,

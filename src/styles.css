@@ -3192,6 +3192,31 @@ a.left-panel-link {
   margin-left: 0;
 }
 
+/* Auf dem Gerät gemerkter Live-Link: Öffnen-Fläche plus "Vergessen", am Handy untereinander. */
+.live-remembered {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.live-remembered-open {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .live-remembered {
+    grid-template-columns: 1fr;
+  }
+}
+
 .live-push {
   display: grid;
   gap: 8px;

@@ -1176,5 +1176,14 @@
   "Personenbezogene Daten beendeter Turniere nach Ablauf der Aufbewahrungsfrist automatisch löschen (E-Mail-Adressen, Tarife, Antworten, Nachrichten; das Protokoll wird pseudonymisiert).": "Supprimer automatiquement les données personnelles des tournois terminés à l’expiration de la durée de conservation (adresses e-mail, tarifs, réponses, messages ; le journal est pseudonymisé).",
   "Ein Löschlauf würde jetzt {{count}} beendete Turniere bereinigen. Das lässt sich nicht rückgängig machen.": "Une suppression nettoierait maintenant {{count}} tournois terminés. Cette action est irréversible.",
   "Automatische Löschung einschalten (täglich)": "Activer la suppression automatique (quotidienne)",
-  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled doit être true ou false"
+  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled doit être true ou false",
+  "Für diese Anmeldung gibt es keine Live-Ansicht.": "Il n’y a pas de vue en direct pour cette inscription.",
+  "Auf diesem Gerät gemerkt": "Enregistré sur cet appareil",
+  "Vergessen": "Oublier",
+  "Öffne den persönlichen Live-Link aus deiner Anmeldebestätigung. Mit Konto findest du deine Turniere auch hier.": "Ouvre le lien direct personnel de ta confirmation d’inscription. Avec un compte, tu retrouves aussi tes tournois ici.",
+  "Live-Ansicht für Teilnehmer: persönlicher Link in der Anmeldebestätigung, Runde, Gegner, Bahn und Push bei neuer Runde": "Vue en direct pour les participants : lien personnel dans la confirmation d’inscription, tour, adversaire, terrain et notification à chaque nouveau tour",
+  "Dieser Live-Link ist ungültig oder abgelaufen": "Ce lien direct est invalide ou a expiré",
+  "E-Mail Spieler 1": "E-mail joueur 1",
+  "E-Mail des Spielers": "E-mail du joueur",
+  "An die E-Mail-Adressen der Spieler gehen Bestätigung, Storno-Link und Live-Link. Gehört eine Adresse zu einem PTM-Online-Konto, wird es mit der Person verknüpft.": "La confirmation, le lien d’annulation et le lien direct sont envoyés aux adresses e-mail des joueurs. Si une adresse appartient à un compte PTM Online, il est associé à la personne."
 }

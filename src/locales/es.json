@@ -1176,5 +1176,14 @@
   "Personenbezogene Daten beendeter Turniere nach Ablauf der Aufbewahrungsfrist automatisch löschen (E-Mail-Adressen, Tarife, Antworten, Nachrichten; das Protokoll wird pseudonymisiert).": "Eliminar automáticamente los datos personales de los torneos finalizados al vencer el plazo de conservación (direcciones de correo, tarifas, respuestas, mensajes; el registro se seudonimiza).",
   "Ein Löschlauf würde jetzt {{count}} beendete Turniere bereinigen. Das lässt sich nicht rückgängig machen.": "Una eliminación limpiaría ahora {{count}} torneos finalizados. No se puede deshacer.",
   "Automatische Löschung einschalten (täglich)": "Activar la eliminación automática (diaria)",
-  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled debe ser true o false"
+  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled debe ser true o false",
+  "Für diese Anmeldung gibt es keine Live-Ansicht.": "No hay vista en directo para esta inscripción.",
+  "Auf diesem Gerät gemerkt": "Guardado en este dispositivo",
+  "Vergessen": "Olvidar",
+  "Öffne den persönlichen Live-Link aus deiner Anmeldebestätigung. Mit Konto findest du deine Turniere auch hier.": "Abre el enlace en directo personal de tu confirmación de inscripción. Con una cuenta, también encontrarás aquí tus torneos.",
+  "Live-Ansicht für Teilnehmer: persönlicher Link in der Anmeldebestätigung, Runde, Gegner, Bahn und Push bei neuer Runde": "Vista en directo para participantes: enlace personal en la confirmación de inscripción, ronda, rival, pista y aviso push en cada nueva ronda",
+  "Dieser Live-Link ist ungültig oder abgelaufen": "Este enlace en directo no es válido o ha caducado",
+  "E-Mail Spieler 1": "Correo jugador 1",
+  "E-Mail des Spielers": "Correo del jugador",
+  "An die E-Mail-Adressen der Spieler gehen Bestätigung, Storno-Link und Live-Link. Gehört eine Adresse zu einem PTM-Online-Konto, wird es mit der Person verknüpft.": "La confirmación, el enlace de cancelación y el enlace en directo se envían a los correos de los jugadores. Si una dirección pertenece a una cuenta de PTM Online, se vincula a esa persona."
 }

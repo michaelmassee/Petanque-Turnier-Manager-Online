@@ -575,6 +575,14 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             />
             {t('Teilnehmerliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.')}
           </label>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={Boolean(form.liveViewEnabled)}
+              onChange={(event) => setForm({ ...form, liveViewEnabled: event.target.checked })}
+            />
+            {t('Live-Ansicht für Teilnehmer: persönlicher Link in der Anmeldebestätigung, Runde, Gegner, Bahn und Push bei neuer Runde')}
+          </label>
         </>
       )}
       <TextField label={t('Website')} type="url" placeholder="https://…" value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} invalid={invalidField === 'websiteUrl'} />
@@ -604,7 +612,6 @@ export function TournamentList({
   onResetRunning = () => {},
   onToggleRegistrationClosed = () => {},
   onEditPublication = () => {},
-  onEditParticipantSettings = () => {},
   isAdmin,
   language,
   onCreate,
@@ -777,11 +784,6 @@ export function TournamentList({
                     {tournament.registrationClosed ? t('Anmeldung öffnen') : t('Anmeldung schließen')}
                   </Button>
                 )}
-                {tournament.registrationEnabled !== false && !isCalendarEntry(tournament) && (
-                  <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onEditParticipantSettings(tournament)}>
-                    {t('Teilnehmer-Einstellungen')}
-                  </Button>
-                )}
                 <Button
                   variant="secondary"
                   loading={busyId === `duplicate-${tournament.id}`}
@@ -845,6 +847,7 @@ function tournamentToForm(tournament) {
     internalNotes: tournament.internalNotes || '',
     club: tournament.club || '',
     participantsPublic: Boolean(tournament.participantsPublic),
+    liveViewEnabled: Boolean(tournament.liveViewEnabled),
     approvalRequired: Boolean(tournament.approvalRequired),
     licenseRequired: Boolean(tournament.licenseRequired),
     teamNameEnabled: Boolean(tournament.teamNameEnabled),
@@ -882,9 +885,6 @@ export function TournamentManagementPage({
   const [publication, setPublication] = useState(null);
   const [publicationError, setPublicationError] = useState('');
   const [publicationSaving, setPublicationSaving] = useState(false);
-  const [participantSettings, setParticipantSettings] = useState(null);
-  const [participantSettingsError, setParticipantSettingsError] = useState('');
-  const [participantSettingsSaving, setParticipantSettingsSaving] = useState(false);
 
   const manageableTournaments = useMemo(() => tournaments.filter((tournament) => tournament.canManage), [tournaments]);
   const filteredTournaments = useMemo(
@@ -978,36 +978,6 @@ export function TournamentManagementPage({
       setPublicationError(requestError.message);
     } finally {
       setPublicationSaving(false);
-    }
-  }
-
-  function openParticipantSettings(tournament) {
-    setParticipantSettingsError('');
-    setParticipantSettings({
-      id: tournament.id,
-      name: tournament.name,
-      checkinNotificationEnabled: tournament.checkinNotificationEnabled !== false,
-    });
-  }
-
-  async function handleParticipantSettingsSubmit(event) {
-    event.preventDefault();
-    setParticipantSettingsError('');
-    setParticipantSettingsSaving(true);
-    try {
-      await authenticatedApi(`/api/tournaments/${participantSettings.id}/participant-settings`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          checkinNotificationEnabled: participantSettings.checkinNotificationEnabled,
-        }),
-      });
-      setParticipantSettings(null);
-      setMessage(t('Teilnehmer-Einstellungen wurden gespeichert.'));
-      await onTournamentsChanged?.();
-    } catch (requestError) {
-      setParticipantSettingsError(requestError.message);
-    } finally {
-      setParticipantSettingsSaving(false);
     }
   }
 
@@ -1138,7 +1108,6 @@ export function TournamentManagementPage({
         onResetRunning={handleResetRunning}
         onToggleRegistrationClosed={handleToggleRegistrationClosed}
         onEditPublication={openPublication}
-        onEditParticipantSettings={openParticipantSettings}
         isAdmin={isAdmin}
         language={language}
         onCreate={openCreate}
@@ -1210,31 +1179,6 @@ export function TournamentManagementPage({
         )}
       </EditDialog>
 
-      <EditDialog
-        open={Boolean(participantSettings)}
-        title={t('Teilnehmer-Einstellungen')}
-        subtitle={participantSettings?.name}
-        error={participantSettingsError}
-        onClose={() => setParticipantSettings(null)}
-      >
-        {participantSettings && (
-          <form onSubmit={handleParticipantSettingsSubmit}>
-            <label className="checkbox-field">
-              <input
-                type="checkbox"
-                checked={participantSettings.checkinNotificationEnabled}
-                onChange={(event) => setParticipantSettings({ ...participantSettings, checkinNotificationEnabled: event.target.checked })}
-              />
-              {t('Nachricht „Eingecheckt“ an verknüpfte Konten senden')}
-            </label>
-            <p className="hint">{t('Kontakt- und Personen-E-Mails, Tarife und Antworten werden 12 Monate nach dem Turnier gelöscht. Namen, Ergebnisse und Ranglisten bleiben erhalten.')}</p>
-            <div className="dialog-actions">
-              <Button variant="secondary" type="button" onClick={() => setParticipantSettings(null)}>{t('Abbrechen')}</Button>
-              <Button type="submit" loading={participantSettingsSaving}>{t('Speichern')}</Button>
-            </div>
-          </form>
-        )}
-      </EditDialog>
     </>
   );
 }

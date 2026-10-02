@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { LiveDetail, MyLiveBackLink, MyLiveList, PlayerLivePage } from './PlayerLivePage.jsx';
+import {
+  LiveDetail, MyLiveBackLink, MyLiveList, PlayerLivePage, readRememberedTeams, RememberedTeams,
+} from './PlayerLivePage.jsx';
 import { matchLiveRoute } from '../lib/routing.js';
 
 function jsonResponse(payload, status = 200) {
@@ -193,35 +195,52 @@ describe('Live-Ansicht für Spieler', () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByText('Diese Anmeldung ist für dein Konto nicht sichtbar.')).toBeInTheDocument();
+    expect(await screen.findByText('Für diese Anmeldung gibt es keine Live-Ansicht.')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Anmeldung nicht gefunden');
-    expect(screen.queryByRole('button', { name: 'Das bin ich nicht' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Anna Muster/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Zu meinen Live-Turnieren' }));
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/live'));
   });
 
-  it('verwirft nach „Das bin ich nicht“ die Liste der eigenen Live-Turniere, bevor sie wieder erscheint', async () => {
-    const payload = livePayload();
-    payload.tournament.status = 'registration';
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => (String(url).endsWith('/not-me')
-      ? jsonResponse({ ok: true }) : jsonResponse(payload)));
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const navigate = vi.fn();
+  it('merkt sich einen geöffneten persönlichen Link auf dem Gerät und vergisst ihn wieder', async () => {
+    localStorage.clear();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(livePayload()));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    client.setQueryData(['live', 'me'], { registrations: [{ id: 'r1' }] });
+    const { unmount } = render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'token', 'tok1']} path="/api/live/token/tok1" language="de" token="tok1" />
+      </QueryClientProvider>,
+    );
+    await screen.findAllByText('Bert Beispiel');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/live/token/tok1', expect.anything());
+    expect(screen.queryByRole('button', { name: 'Das bin ich nicht' })).not.toBeInTheDocument();
+    await waitFor(() => expect(readRememberedTeams()).toEqual([
+      { token: 'tok1', tournamentName: 'Sommer-Supermêlée', date: '2026-09-25', location: 'Linden', label: 'Anna Muster' },
+    ]));
+    unmount();
+
+    const navigate = vi.fn();
+    render(<RememberedTeams navigate={navigate} language="de" />);
+    fireEvent.click(screen.getByRole('button', { name: /Sommer-Supermêlée/ }));
+    expect(navigate).toHaveBeenCalledWith('/live/t/tok1');
+    fireEvent.click(screen.getByRole('button', { name: 'Vergessen' }));
+    expect(readRememberedTeams()).toEqual([]);
+    expect(screen.queryByText('Auf diesem Gerät gemerkt')).not.toBeInTheDocument();
+  });
+
+  it('vergisst einen ungültigen persönlichen Link', async () => {
+    localStorage.setItem('ptm_live_teams', JSON.stringify([{ token: 'alt', tournamentName: 'Alt', date: '2026-09-25' }]));
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ error: 'Dieser Live-Link ist ungültig oder abgelaufen' }, 404));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={client}>
-        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de"
-          navigate={navigate} />
+        <LiveDetail queryKey={['live', 'token', 'alt']} path="/api/live/token/alt" language="de" token="alt" />
       </QueryClientProvider>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Das bin ich nicht' }));
-
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/live'));
-    expect(client.getQueryState(['live', 'me']).isInvalidated).toBe(true);
+    expect(await screen.findByText('Für diese Anmeldung gibt es keine Live-Ansicht.')).toBeInTheDocument();
+    await waitFor(() => expect(readRememberedTeams()).toEqual([]));
   });
 });
 
@@ -229,7 +248,7 @@ describe('Live-Routen', () => {
   it('unterscheidet Übersicht, eigene Meldung und persönlichen Link', () => {
     expect(matchLiveRoute('/live')).toEqual({});
     expect(matchLiveRoute('/live/r1')).toEqual({ registrationId: 'r1' });
-    expect(matchLiveRoute('/live/t/abc')).toBeNull();
+    expect(matchLiveRoute('/live/t/abc')).toEqual({ token: 'abc' });
     expect(matchLiveRoute('/live/t')).toEqual({ registrationId: 't' });
     expect(matchLiveRoute('/live/a/b/c')).toBeNull();
     expect(matchLiveRoute('/turniere')).toBeNull();

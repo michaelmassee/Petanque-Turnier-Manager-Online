@@ -35,6 +35,44 @@ function writePushFlag(registrationId, enabled) {
   }
 }
 
+// Auf diesem Gerät geöffnete persönliche Live-Links, damit man am Turniertag ohne Mail und ohne Login zurückfindet.
+const REMEMBERED_TEAMS_KEY = 'ptm_live_teams';
+
+export function readRememberedTeams() {
+  try {
+    const entries = JSON.parse(localStorage.getItem(REMEMBERED_TEAMS_KEY) || '[]');
+    return Array.isArray(entries) ? entries.filter((entry) => entry?.token) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRememberedTeams(entries) {
+  try {
+    localStorage.setItem(REMEMBERED_TEAMS_KEY, JSON.stringify(entries));
+  } catch {
+    // Merker ist nur Komfort; ohne Speicher bleibt der Link aus der Mail der Weg zurück.
+  }
+}
+
+function rememberTeam(token, data) {
+  const entry = {
+    token,
+    tournamentName: data.tournament.name,
+    date: data.tournament.date,
+    location: data.tournament.location || null,
+    label: data.registration.label,
+  };
+  const others = readRememberedTeams().filter((item) => item.token !== token);
+  const current = readRememberedTeams().find((item) => item.token === token);
+  if (current && JSON.stringify(current) === JSON.stringify(entry)) return;
+  writeRememberedTeams([entry, ...others]);
+}
+
+function forgetTeam(token) {
+  writeRememberedTeams(readRememberedTeams().filter((item) => item.token !== token));
+}
+
 function LivePushToggle({ path, registrationId }) {
   const { t } = useTranslation();
   const [enabled, setEnabled] = useState(false);
@@ -251,33 +289,7 @@ function RegistrationPhase({ registration, tournament }) {
   );
 }
 
-// "Das bin ich nicht" (E-22): Das eigene Konto löst sich aus der Anmeldung; Name und Anmeldung bleiben bestehen.
-function NotMeButton({ path, onDone }) {
-  const { t } = useTranslation();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  async function decline() {
-    if (!window.confirm(t('Dein Konto wird von dieser Anmeldung gelöst und nicht wieder automatisch verknüpft. Fortfahren?'))) return;
-    setError(''); setBusy(true);
-    try {
-      await authenticatedApi(`${path}/not-me`, { method: 'POST' });
-      await onDone();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="live-not-me">
-      <Feedback error={error} />
-      <p className="hint">{t('Du wurdest von jemand anderem eingetragen und spielst gar nicht mit?')}</p>
-      <Button variant="secondary" loading={busy} onClick={decline}>{t('Das bin ich nicht')}</Button>
-    </div>
-  );
-}
-
-export function LiveDetail({ queryKey, path, language, navigate = () => {} }) {
+export function LiveDetail({ queryKey, path, language, navigate = () => {}, token = null }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const query = useQuery({
@@ -290,8 +302,15 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {} }) {
     retry: false,
   });
   const data = query.data;
-  // Ohne Zugriff (z. B. nach „Das bin ich nicht“ oder aus der Anmeldung entfernt) ist ein noch zwischengespeicherter
-  // Stand veraltet: nicht mehr anzeigen.
+  const notFound = query.error?.status === 404;
+  useEffect(() => {
+    if (!token) return;
+    if (data) rememberTeam(token, data);
+    // Ungültiger oder stornierter Link: nicht weiter auf diesem Gerät anbieten.
+    else if (notFound) forgetTeam(token);
+  }, [token, data, notFound]);
+  // Ohne Zugriff (storniert, Live-Ansicht abgeschaltet oder aus der Anmeldung entfernt) ist ein noch
+  // zwischengespeicherter Stand veraltet: nicht mehr anzeigen.
   async function zurUebersicht() {
     await queryClient.invalidateQueries({ queryKey: ['live', 'me'] });
     navigate('/live');
@@ -307,11 +326,11 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {} }) {
       </section>
     );
   }
-  if (query.error?.status === 404) {
+  if (notFound) {
     return (
       <section className="panel live-card">
         <Feedback error={query.error.message} />
-        <p className="hint">{t('Diese Anmeldung ist für dein Konto nicht sichtbar.')}</p>
+        <p className="hint">{t('Für diese Anmeldung gibt es keine Live-Ansicht.')}</p>
         <Button variant="secondary" onClick={zurUebersicht}>{t('Zu meinen Live-Turnieren')}</Button>
       </section>
     );
@@ -347,27 +366,27 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {} }) {
         </span>
         <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>
       </div>
-      {tournament.status !== 'finished' && <NotMeButton path={path} onDone={zurUebersicht} />}
     </div>
   );
 }
 
-export function MyLiveList({ navigate, language }) {
+export function MyLiveList({ navigate, language, hasRemembered = false }) {
   const { t } = useTranslation();
   const query = useQuery({ queryKey: ['live', 'me'], queryFn: () => authenticatedApi('/api/live/me'), retry: false });
   const registrations = query.data?.registrations || [];
 
   useEffect(() => {
-    if (registrations.length === 1 && registrations[0].tournament.status === 'running') {
+    if (!hasRemembered && registrations.length === 1 && registrations[0].tournament.status === 'running') {
       navigate(`/live/${encodeURIComponent(registrations[0].id)}`);
     }
-  }, [navigate, registrations]);
+  }, [hasRemembered, navigate, registrations]);
 
   if (query.isPending) return <p className="muted">{t('Wird geladen…')}</p>;
   if (query.error) return <Feedback error={query.error.message} />;
 
   if (!registrations.length) {
-    return <p className="muted">{t('Du bist aktuell in keinem Turnier gemeldet.')}</p>;
+    // Gemerkte Teams stehen schon darüber; der Hinweis würde ihnen widersprechen.
+    return hasRemembered ? null : <p className="muted">{t('Du bist aktuell in keinem Turnier gemeldet.')}</p>;
   }
   return (
     <div className="live-list">
@@ -391,6 +410,30 @@ export function MyLiveList({ navigate, language }) {
   );
 }
 
+export function RememberedTeams({ navigate, language }) {
+  const { t } = useTranslation();
+  const [entries, setEntries] = useState(readRememberedTeams);
+  if (!entries.length) return null;
+  return (
+    <div className="live-list">
+      <p className="hint live-list-hint">{t('Auf diesem Gerät gemerkt')}</p>
+      {entries.map((entry) => (
+        <div key={entry.token} className="panel live-list-item live-remembered">
+          <button type="button" className="live-remembered-open" onClick={() => navigate(`/live/t/${encodeURIComponent(entry.token)}`)}>
+            <strong data-i18n-skip>{entry.tournamentName}</strong>
+            <span className="muted">
+              {formatDate(entry.date, language)} {formatWeekdayShort(entry.date, language)}
+              {entry.location ? <> · <span data-i18n-skip>{entry.location}</span></> : null}
+            </span>
+            {entry.label && <span data-i18n-skip>{entry.label}</span>}
+          </button>
+          <Button variant="secondary" onClick={() => { forgetTeam(entry.token); setEntries(readRememberedTeams()); }}>{t('Vergessen')}</Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function MyLiveBackLink({ navigate }) {
   const { t } = useTranslation();
   const query = useQuery({ queryKey: ['live', 'me'], queryFn: () => authenticatedApi('/api/live/me'), retry: false });
@@ -407,16 +450,21 @@ export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenu
   const { t } = useTranslation();
 
   let content;
-  if (route.registrationId && currentUser) {
+  if (route.token) {
+    content = <LiveDetail queryKey={['live', 'token', route.token]} path={`/api/live/token/${encodeURIComponent(route.token)}`} language={language} navigate={navigate} token={route.token} />;
+  } else if (route.registrationId && currentUser) {
     content = <LiveDetail queryKey={['live', 'registration', route.registrationId]} path={`/api/live/registrations/${encodeURIComponent(route.registrationId)}`} language={language} navigate={navigate} />;
-  } else if (currentUser) {
-    content = <MyLiveList navigate={navigate} language={language} />;
   } else {
     content = (
-      <section className="panel live-card">
-        <p>{t('Melde dich an, um deine laufenden Turniere live zu verfolgen.')}</p>
-        <Button onClick={onLogin}>{t('Anmelden')}</Button>
-      </section>
+      <>
+        <RememberedTeams navigate={navigate} language={language} />
+        {currentUser ? <MyLiveList navigate={navigate} language={language} hasRemembered={readRememberedTeams().length > 0} /> : (
+          <section className="panel live-card">
+            <p>{t('Öffne den persönlichen Live-Link aus deiner Anmeldebestätigung. Mit Konto findest du deine Turniere auch hier.')}</p>
+            <Button onClick={onLogin}>{t('Anmelden')}</Button>
+          </section>
+        )}
+      </>
     );
   }
 
@@ -440,6 +488,9 @@ export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenu
         <p className="live-beta-badge" role="status">{t('Beta – noch im Testbetrieb')}</p>
         {route.registrationId && currentUser && (
           <MyLiveBackLink navigate={navigate} />
+        )}
+        {route.token && (
+          <button type="button" className="drawer-link live-back" onClick={() => navigate('/live')}>← {t('Live')}</button>
         )}
         {content}
       </section>

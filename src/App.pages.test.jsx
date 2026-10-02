@@ -785,6 +785,19 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     expect(screen.getByRole('button', { name: 'Überschrift' })).toBeInTheDocument();
   });
 
+  it('bietet die Live-Ansicht als Turnier-Option an, beim Anlegen ausgeschaltet', () => {
+    function LiveOptionHarness() {
+      const [form, setForm] = useState({ ...EMPTY_TOURNAMENT_FORM, name: 'Sommerturnier', date: '2026-06-01', location: 'Musterstadt' });
+      return <TournamentForm form={form} setForm={setForm} onSubmit={(event) => event.preventDefault()} onCancel={() => {}} mode="create" isAdmin={false} language="de" />;
+    }
+    render(<LiveOptionHarness />);
+
+    const option = screen.getByRole('checkbox', { name: /^Live-Ansicht für Teilnehmer/ });
+    expect(option).not.toBeChecked();
+    fireEvent.click(option);
+    expect(option).toBeChecked();
+  });
+
   it('bietet beim Bearbeiten eines Kalendereintrags Logo- und Flyer-Bildlink an', () => {
     render(
       <TournamentForm
@@ -883,7 +896,7 @@ function RegistrationsPageHarness({ onSubmit }) {
 
   function editRegistration(registration) {
     setRegistrationMode('edit');
-    setRegistrationForm({ ...EMPTY_REGISTRATION_FORM, id: registration.id, firstName: registration.firstName, lastName: registration.lastName, email: registration.email });
+    setRegistrationForm({ ...EMPTY_REGISTRATION_FORM, id: registration.id, firstName: registration.firstName, lastName: registration.lastName, playerEmail: registration.email });
     setDialogOpen(true);
   }
 

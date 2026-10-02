@@ -49,5 +49,7 @@ export function matchLiveRoute(path) {
   if (segments[0] !== 'live') return null;
   if (segments.length === 1) return {};
   if (segments.length === 2) return { registrationId: decodeURIComponent(segments[1]) };
+  // Persönlicher Live-Link aus der Anmeldebestätigung (E-21), ohne Login.
+  if (segments.length === 3 && segments[1] === 't') return { token: decodeURIComponent(segments[2]) };
   return null;
 }

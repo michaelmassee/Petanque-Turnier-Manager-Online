@@ -142,7 +142,8 @@ function registrationToForm(registration) {
     firstName: registration.firstName || '',
     lastName: registration.lastName || '',
     email: registration.email || '',
-    playerEmail: registration.playerEmail || '',
+    // Ältere Anmeldungen kennen nur die frühere Kontakt-E-Mail; sie gilt jetzt als E-Mail von Spieler 1.
+    playerEmail: registration.playerEmail || (registration.noEmail ? '' : registration.email || ''),
     noEmail: Boolean(registration.noEmail),
     club: registration.club || '',
     licenseNr: registration.licenseNr || '',

@@ -44,6 +44,11 @@ describe('Worker-Fachlogik', () => {
     expect(normalizeTournamentInput({ ...base, formation: 'triplette', registrationType: 'supermelee', type: 'rangliste', visibility: 'public', latitude: '50', longitude: '8', contactEmail: 'a@b.de' })).toMatchObject({ currency: 'EUR', waitlistEnabled: true, registrationEnabled: true, approvalRequired: false, latitude: 50, longitude: 8 });
   });
 
+  it('bietet die Live-Ansicht nur an, wenn sie beim Anlegen gewählt wird (Standard aus)', () => {
+    expect(normalizeTournamentInput(base)).toMatchObject({ liveViewEnabled: false });
+    expect(normalizeTournamentInput({ ...base, liveViewEnabled: true })).toMatchObject({ liveViewEnabled: true });
+  });
+
   it('übernimmt die beim Anlegen aktivierte Anmeldeprüfung', () => {
     expect(normalizeTournamentInput({ ...base, approvalRequired: true })).toMatchObject({ approvalRequired: true });
   });

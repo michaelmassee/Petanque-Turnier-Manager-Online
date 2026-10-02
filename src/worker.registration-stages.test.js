@@ -6,7 +6,7 @@ import { d1MitSchema } from './test-support/d1.js';
 import { bindeDokument, syncAnfrage } from './test-support/sync.js';
 import {
   buildLiveResponse, createRegistration, deleteTournament, executeSyncWrite, findMyLiveRegistration, getSyncTournament,
-  listRegistrations, notifyCheckedIn, purgeExpiredPersonalData, syncGetRegistrations, syncPostDecisions, syncPutMeleeTeams,
+  listRegistrations, purgeExpiredPersonalData, syncGetRegistrations, syncPostDecisions, syncPutMeleeTeams,
   syncPutRegistrationClosed, updateTournamentPublication, upsertDocumentRegistration,
 } from './worker.js';
 
@@ -43,7 +43,7 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
   function oeffentlichAnmelden(body, session = null) {
     const request = new Request('https://ptm.test/api/tournaments/t1/registrations', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'absender@example.test', publicationNoticeAccepted: true, personsConsentAccepted: true,
+      body: JSON.stringify({ playerEmail: 'spieler1@example.test', publicationNoticeAccepted: true, personsConsentAccepted: true,
         feeSelections: [], registrationAnswers: [], ...body }),
     });
     return createRegistration(request, env, turnier(), { session });
@@ -53,8 +53,8 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
     env = { DB: d1MitSchema(), MAIL_QUEUE: { send: vi.fn() } };
     konto('owner', 'leitung@example.test');
     sql(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, registration_type, status, visibility,
-        created_at, updated_at)
-      VALUES ('t1', 'owner', 'Herbstpokal', '2099-09-28', 'Ort', 'doublette', 'forme', 'registration', 'public', '2026-09-01', '2026-09-01')`);
+        created_at, updated_at, live_view_enabled)
+      VALUES ('t1', 'owner', 'Herbstpokal', '2099-09-28', 'Ort', 'doublette', 'forme', 'registration', 'public', '2026-09-01', '2026-09-01', 1)`);
   });
 
   describe('Anmeldung und Konten (E-20, E-22, KP-06)', () => {
@@ -79,7 +79,7 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
         personsConsentAccepted: false })).rejects.toMatchObject({ status: 400 });
     });
 
-    it('verknüpft Slots nur über Slot-E-Mails; das absendende Konto bekommt weder Slot noch Hinweis (P-59, P-60)', async () => {
+    it('verknüpft Slots nur über Slot-E-Mails; das absendende Konto bekommt keinen Slot (P-59)', async () => {
       konto('verein', 'absender@example.test');
       konto('ben', 'ben@example.test');
       const antwort = await oeffentlichAnmelden({
@@ -89,8 +89,8 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
       const body = await antwort.json();
       expect(JSON.stringify(body)).not.toMatch(/accountConnected|userId|partner_user_id/);
       expect(zeile("SELECT user_id, partner_user_id FROM registrations")).toEqual({ user_id: null, partner_user_id: 'ben' });
-      expect(zeilen("SELECT recipient_id, event_type FROM postbox_messages WHERE event_type = 'registration_slot_linked'"))
-        .toEqual([{ recipient_id: 'ben', event_type: 'registration_slot_linked' }]);
+      // Keine Verknüpfungsnachricht mehr: Die Live-Ansicht hängt am persönlichen Link (E-21).
+      expect(zeilen("SELECT recipient_id FROM postbox_messages WHERE event_type = 'registration_slot_linked'")).toEqual([]);
     });
 
     it('nimmt eine zweite Anmeldung desselben Kontos an und markiert beide als Konflikt (P-29, P-68)', async () => {
@@ -247,23 +247,6 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
       await expect(findMyLiveRegistration(env.DB, { id: 'fremd' }, 'r1')).rejects.toMatchObject({ status: 404 });
       // T-22: Der Turnierersteller erfährt, dass ein anderes Konto gelöscht hat.
       expect(zeile("SELECT event_type FROM postbox_messages WHERE recipient_id = 'owner'").event_type).toBe('tournament_admin_action');
-    });
-
-    it('sendet die Check-in-Nachricht genau einmal pro Konto und nicht, wenn abgeschaltet (P-18, P-33)', async () => {
-      konto('a', 'a@example.test');
-      konto('b', 'b@example.test');
-      anmeldung('r1', { personen: [['Anna', 'Adler'], ['Ben', 'Berg']], userIds: ['a', 'b'], participation: 'active' });
-
-      await notifyCheckedIn(env, 't1', ['r1']);
-      await notifyCheckedIn(env, 't1', ['r1']);
-      expect(zeile("SELECT COUNT(*) AS anzahl FROM postbox_messages WHERE event_type = 'live_view_available'").anzahl).toBe(2);
-      expect(env.MAIL_QUEUE.send).not.toHaveBeenCalled();
-
-      setzeTurnier({ checkin_notification_enabled: 0 });
-      konto('c', 'c@example.test');
-      anmeldung('r2', { userIds: ['c'], participation: 'active' });
-      await notifyCheckedIn(env, 't1', ['r2']);
-      expect(zeile("SELECT COUNT(*) AS anzahl FROM postbox_messages WHERE recipient_id = 'c'").anzahl).toBe(0);
     });
 
     it('lehnt die Rückkehr zu Entwurf mit Anmeldungen ab und nennt die Anzahl (P-21)', async () => {

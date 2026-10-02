@@ -1,7 +1,7 @@
 import tzlookup from 'tz-lookup';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
 import {
-  isAllowedPushEndpoint, LIVE_VIEW_AVAILABLE_EVENT, liveViewAvailableEventData, REGISTRATION_ACCOUNT_CONFLICT_EVENT,
+  isAllowedPushEndpoint, LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT,
   REGISTRATION_SLOT_LINKED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT, unreadPostboxCount,
 } from './postbox-core.js';
 import { CURRENCY_CODES } from './currencies.js';
@@ -268,31 +268,35 @@ export const REGISTRATION_RECEIVED_EMAILS = {
 export const REGISTRATION_CONFIRMATION_EMAILS = {
   de: {
     subject: (name) => `Anmeldung bestätigt: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
-      `Hallo ${firstName},\n\ndeine Anmeldung für "${name}" wurde bestätigt.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}${participantsBlock}\n\nAlle Infos zum Turnier:\n${link}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '', liveLink = '') =>
+      `Hallo ${firstName},\n\ndeine Anmeldung für "${name}" wurde bestätigt.\n\nTermin: ${dateTimeLabel}\nOrt: ${location}${participantsBlock}\n\nAlle Infos zum Turnier:\n${link}${liveLink ? `\n\nDein Team live am Turniertag (Runde, Gegner, Bahn):\n${liveLink}` : ''}\n\nEinen Kalendereintrag findest du im Anhang dieser E-Mail.\n\nMöchtest du dich wieder abmelden? Nutze diesen Link:\n${cancelLink}`,
   },
   nl: {
     subject: (name) => `Deelname bevestigd: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
-      `Hallo ${firstName},\n\nJe deelname aan "${name}" is bevestigd.\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}${participantsBlock}\n\nAlle informatie over het toernooi:\n${link}\n\nEen agenda-afspraak vind je als bijlage bij deze e-mail.\n\nWil je je weer afmelden? Gebruik deze link:\n${cancelLink}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '', liveLink = '') =>
+      `Hallo ${firstName},\n\nJe deelname aan "${name}" is bevestigd.\n\nDatum: ${dateTimeLabel}\nLocatie: ${location}${participantsBlock}\n\nAlle informatie over het toernooi:\n${link}${liveLink ? `\n\nJe team live op de toernooidag (ronde, tegenstander, baan):\n${liveLink}` : ''}\n\nEen agenda-afspraak vind je als bijlage bij deze e-mail.\n\nWil je je weer afmelden? Gebruik deze link:\n${cancelLink}`,
   },
   en: {
     subject: (name) => `Participation confirmed: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
-      `Hi ${firstName},\n\nYour participation in "${name}" has been confirmed.\n\nDate: ${dateTimeLabel}\nLocation: ${location}${participantsBlock}\n\nAll tournament details:\n${link}\n\nA calendar event is attached to this email.\n\nWant to withdraw again? Use this link:\n${cancelLink}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '', liveLink = '') =>
+      `Hi ${firstName},\n\nYour participation in "${name}" has been confirmed.\n\nDate: ${dateTimeLabel}\nLocation: ${location}${participantsBlock}\n\nAll tournament details:\n${link}${liveLink ? `\n\nYour team live on tournament day (round, opponent, lane):\n${liveLink}` : ''}\n\nA calendar event is attached to this email.\n\nWant to withdraw again? Use this link:\n${cancelLink}`,
   },
   es: {
     subject: (name) => `Participación confirmada: ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
-      `Hola ${firstName},\n\nTu participación en "${name}" ha sido confirmada.\n\nFecha: ${dateTimeLabel}\nLugar: ${location}${participantsBlock}\n\nToda la información del torneo:\n${link}\n\nEncontrarás una cita de calendario adjunta a este correo.\n\n¿Quieres darte de baja de nuevo? Usa este enlace:\n${cancelLink}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '', liveLink = '') =>
+      `Hola ${firstName},\n\nTu participación en "${name}" ha sido confirmada.\n\nFecha: ${dateTimeLabel}\nLugar: ${location}${participantsBlock}\n\nToda la información del torneo:\n${link}${liveLink ? `\n\nTu equipo en directo el día del torneo (ronda, rival, pista):\n${liveLink}` : ''}\n\nEncontrarás una cita de calendario adjunta a este correo.\n\n¿Quieres darte de baja de nuevo? Usa este enlace:\n${cancelLink}`,
   },
   fr: {
     subject: (name) => `Participation confirmée : ${name}`,
-    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '') =>
-      `Bonjour ${firstName},\n\nTa participation à « ${name} » est confirmée.\n\nDate : ${dateTimeLabel}\nLieu : ${location}${participantsBlock}\n\nToutes les informations sur le tournoi :\n${link}\n\nUn rendez-vous de calendrier est joint à cet e-mail.\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '', liveLink = '') =>
+      `Bonjour ${firstName},\n\nTa participation à « ${name} » est confirmée.\n\nDate : ${dateTimeLabel}\nLieu : ${location}${participantsBlock}\n\nToutes les informations sur le tournoi :\n${link}${liveLink ? `\n\nTon équipe en direct le jour du tournoi (tour, adversaire, terrain) :\n${liveLink}` : ''}\n\nUn rendez-vous de calendrier est joint à cet e-mail.\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
   },
 };
 
+
+export function buildLiveLink(appOrigin, token) {
+  return `${appOrigin}/live/t/${encodeURIComponent(token)}`;
+}
 
 export const REGISTRATION_DISPLACED_EMAILS = {
   de: {
@@ -720,6 +724,8 @@ async function canSendTournamentMail(db, tournament) {
 function buildTeamRecipients(registration) {
   const entries = [
     { email: registration.email, firstName: registration.first_name },
+    // Slot-E-Mail der ersten Person (E-22), falls sie nicht die Kontakt-E-Mail des Melders ist.
+    { email: registration.player_email, firstName: registration.first_name },
     { email: registration.partner_email, firstName: registration.partner_first_name },
     { email: registration.partner2_email, firstName: registration.partner2_first_name },
   ];
@@ -748,12 +754,16 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
   const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
   const ics = buildTournamentIcs(tournament, appOrigin);
   const participantsBlock = buildRegistrationParticipantsBlock(registration, language);
+  // Persönlicher Live-Link (E-21), nur wenn das Turnier die Live-Ansicht anbietet. Der Aufrufer reicht teils eine
+  // zusammengesetzte Zeile durch, daher wird die Option frisch gelesen.
+  const liveOption = await env.DB.prepare('SELECT live_view_enabled FROM tournaments WHERE id = ?').bind(tournament.id).first();
+  const liveLink = isLiveViewEnabled(liveOption) ? buildLiveLink(appOrigin, await ensureLiveToken(env.DB, registration)) : '';
 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock),
+      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock, liveLink),
       language,
       attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
       logFallback: `Registration confirmation email for ${recipient.email} (tournament ${tournament.id})`,
@@ -788,39 +798,19 @@ function createRandomToken() {
   return crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
 }
 
-/**
- * Nach dem Check-in (Teilnahme 'active') eine Postfach-/Push-Nachricht „Eingecheckt“ an die mit der Anmeldung
- * verknüpften Konten, genau einmal pro Anmeldung und Konto (E-09, P-33); ein Klick öffnet die Live-Ansicht. Beim
- * Check-in wird nie eine E-Mail versandt. Der Veranstalter kann die Nachricht pro Turnier abschalten. Der Merker wird
- * vor dem Versand atomar gesetzt, damit Wiederholungen oder parallele Aufrufe nichts doppelt auslösen. Fehler dürfen
- * den Check-in selbst nie scheitern lassen.
- */
-export async function notifyCheckedIn(env, tournamentId, registrationIds) {
-  if (!registrationIds?.length) return;
-  try {
-    const tournament = await getTournamentById(env.DB, tournamentId);
-    if (!tournament || Number(tournament.checkin_notification_enabled ?? 1) !== 1) return;
-    const placeholders = registrationIds.map(() => '?').join(', ');
-    const rows = await env.DB.prepare(`SELECT * FROM registrations WHERE tournament_id = ? AND id IN (${placeholders})
-        AND participation = 'active' AND status = 'confirmed'`)
-      .bind(tournamentId, ...registrationIds).all();
-    const now = new Date().toISOString();
-    for (const registration of rows.results || []) {
-      const eventData = liveViewAvailableEventData(tournament, registration);
-      for (const userId of registrationUserIds(registration)) {
-        try {
-          const claimed = await env.DB.prepare(`INSERT OR IGNORE INTO checkin_notifications (registration_id, user_id, sent_at)
-              VALUES (?, ?, ?)`).bind(registration.id, userId, now).run();
-          if (!claimed.meta?.changes) continue;
-          await createSystemNotification(env, userId, LIVE_VIEW_AVAILABLE_EVENT, eventData);
-        } catch (error) {
-          console.error(`Failed to post check-in message for registration ${registration.id}`, error);
-        }
-      }
-    }
-  } catch (error) {
-    console.error(`Failed to notify check-in for tournament ${tournamentId}`, error);
-  }
+/** Turnier-Option „Live-Ansicht“ (Standard aus): persönlicher Link, Live-Liste und Push bei neuer Runde. */
+function isLiveViewEnabled(tournament) {
+  return Number(tournament?.live_view_enabled || 0) === 1;
+}
+
+/** Persönlicher Live-Link je Anmeldung, bewusst getrennt vom cancel_token (der Link darf nicht abmelden können). */
+async function ensureLiveToken(db, registration) {
+  if (registration.live_token) return registration.live_token;
+  const token = createRandomToken();
+  // Nur setzen, wenn noch leer - bei parallelem Aufruf gewinnt der erste Token.
+  await db.prepare('UPDATE registrations SET live_token = ? WHERE id = ? AND live_token IS NULL').bind(token, registration.id).run();
+  const row = await db.prepare('SELECT live_token FROM registrations WHERE id = ?').bind(registration.id).first();
+  return row?.live_token || token;
 }
 
 async function sendDisplacementEmail(env, tournament, registration, wasCancelled, appOrigin) {
@@ -1734,11 +1724,13 @@ export default {
         return await listMyLiveRegistrations(env.DB, session.user);
       }
 
-      const liveNotMeMatch = url.pathname.match(/^\/api\/live\/registrations\/([^/]+)\/not-me$/);
-      if (liveNotMeMatch && request.method === 'POST') {
-        const session = await requireSession(request, env.DB);
-        const registration = await findMyLiveRegistration(env.DB, session.user, liveNotMeMatch[1]);
-        return await declineRegistrationSlot(env.DB, registration, session.user);
+      // Persönlicher Live-Link ohne Login (E-21): Wer den Link hat, sieht die Team-Ansicht und kann Push abonnieren.
+      const liveTokenMatch = url.pathname.match(/^\/api\/live\/token\/([^/]+)(\/push)?$/);
+      if (liveTokenMatch) {
+        const registration = await findLiveRegistrationByToken(env.DB, decodeURIComponent(liveTokenMatch[1]));
+        if (!liveTokenMatch[2] && request.method === 'GET') return await buildLiveResponse(request, env.DB, registration);
+        if (liveTokenMatch[2] && request.method === 'POST') return await saveLivePushSubscription(request, env.DB, registration);
+        if (liveTokenMatch[2] && request.method === 'DELETE') return await removeLivePushSubscription(request, env.DB, registration);
       }
 
       const liveRegistrationMatch = url.pathname.match(/^\/api\/live\/registrations\/([^/]+)(\/push)?$/);
@@ -1855,15 +1847,6 @@ export default {
         return await setRegistrationClosed(request, env.DB, tournament, session.user);
       }
 
-      const participantSettingsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/participant-settings$/);
-      if (participantSettingsMatch && request.method === 'PUT') {
-        const session = await requireSession(request, env.DB);
-        const tournament = await getTournamentById(env.DB, participantSettingsMatch[1]);
-        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
-        assertCanManageTournament(tournament, session.user);
-        return await updateParticipantSettings(request, env.DB, tournament, session.user);
-      }
-
       const presentationMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/presentation$/);
       if (presentationMatch && request.method === 'PUT') {
         const session = await requireSession(request, env.DB);
@@ -1966,11 +1949,7 @@ export default {
         assertRegistrationOnlineEditable(registration);
         const body = await readJson(request);
         const participation = parseParticipation(body.participation);
-        const response = await setRegistrationParticipation(env.DB, registration, participation);
-        if (participation === 'active') {
-          await notifyCheckedIn(env, registration.tournament_id, [registration.id]);
-        }
-        return response;
+        return await setRegistrationParticipation(env.DB, registration, participation);
       }
 
       if (url.pathname === '/api/sync/tournaments' && request.method === 'GET') {
@@ -3937,7 +3916,7 @@ export async function upsertDocumentRegistration(request, env, tournament, local
       status: existing.status,
       isVip: Boolean(Number(existing.is_vip || 0)),
       organizerMessage: existing.organizer_message,
-    }, { requireStatus: true });
+    }, { requireStatus: true, documentSync: true });
     assertPartnerCountMatchesFormation(tournament, documentRegistration);
   }
   // Besetzung pro Person-Slot (T-18): Benutzer-IDs bleiben an ihrer Person, ein Slot ohne Benutzer-ID an Stelle eines
@@ -3992,9 +3971,6 @@ export async function upsertDocumentRegistration(request, env, tournament, local
             'details', json_object('code', 'execution_conflict')))
           END`,
       binds: [existing.id, expected + 1, now, existing.id],
-    },
-    async afterCommit(envelope) {
-      if (envelope.status === 200 && participation === 'active') await notifyCheckedIn(env, tournament.id, [existing.id]);
     },
   };
 }
@@ -4086,7 +4062,7 @@ async function createDocumentRegistration(db, tournament, localUuid, body) {
   }
   if (persons) Object.assign(body, personsToRegistrationFields(persons));
   body.email = createPlaceholderEmail();
-  const registration = normalizeRegistrationInput(body, { requireStatus: false });
+  const registration = normalizeRegistrationInput(body, { requireStatus: false, documentSync: true });
   assertCorePartnerCountMatchesFormation(tournament, registration);
   const feeSelections = resolveFeeSelections(tournament, body.feeSelections, registration);
   const registrationAnswers = resolveRegistrationAnswers(tournament, body.registrationAnswers, registration);
@@ -4259,8 +4235,8 @@ async function createTournament(request, env, user) {
         id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
-        latitude, longitude, geocoded_at, timezone, boule_place_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        latitude, longitude, geocoded_at, timezone, boule_place_id, live_view_enabled, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -4303,6 +4279,7 @@ async function createTournament(request, env, user) {
       geo.geocodedAt,
       timezone,
       selectedPlace?.id || null,
+      tournament.liveViewEnabled ? 1 : 0,
       now,
       now,
     )
@@ -4339,12 +4316,12 @@ async function duplicateTournament(db, existing, actingUser) {
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
-        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, created_at, updated_at
+        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, created_at, updated_at
       )
       SELECT ?, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
-        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, ?, ?
+        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, ?, ?
       FROM tournaments WHERE id = ?`,
     )
     .bind(id, actingUser.id, name, now, now, existing.id)
@@ -4512,7 +4489,7 @@ async function updateTournament(request, env, existing, user) {
        SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, schweizer_ranking_mode = ?, formule_x_rounds = ?, ko_platz3 = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
-           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, boule_place_id = ?, updated_at = ?
+           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, boule_place_id = ?, live_view_enabled = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -4551,6 +4528,7 @@ async function updateTournament(request, env, existing, user) {
       geo.geocodedAt,
       timezone,
       selectedPlace?.id || null,
+      tournament.liveViewEnabled ? 1 : 0,
       now,
       existing.id,
     )
@@ -4660,8 +4638,7 @@ async function startTournament(env, existing, user, appOrigin) {
   }
   const updated = await performTournamentStart(env, existing);
   if (existing.status !== 'running') {
-    const checkedInIds = await checkInConfirmedRegistrations(env.DB, existing.id);
-    await notifyCheckedIn(env, existing.id, checkedInIds);
+    await checkInConfirmedRegistrations(env.DB, existing.id);
   }
   return json({ tournament: toPublicTournament(updated, user) });
 }
@@ -4753,23 +4730,6 @@ export async function resetTournamentRunning(db, tournament, user) {
       code: 'results_exist',
     });
   }
-  return json({ tournament: toPublicTournament(await getTournamentById(db, tournament.id), user) });
-}
-
-/** Teilnehmerbezogene Einstellungen: Check-in-Nachricht an verknüpfte Konten (E-09, Standard an). */
-export async function updateParticipantSettings(request, db, tournament, user) {
-  const body = await readJson(request);
-  const enabled = body.checkinNotificationEnabled === undefined
-    ? Number(tournament.checkin_notification_enabled ?? 1) === 1 : body.checkinNotificationEnabled;
-  if (typeof enabled !== 'boolean') throw new HttpError(400, 'checkinNotificationEnabled muss true oder false sein');
-  const now = new Date().toISOString();
-  await db.batch([
-    db.prepare('UPDATE tournaments SET checkin_notification_enabled = ?, updated_at = ? WHERE id = ?')
-      .bind(enabled ? 1 : 0, now, tournament.id),
-    auditStatement(db, { tournamentId: tournament.id, actorUserId: user.id, actorRole: actorRoleFor(tournament, user),
-      action: 'participant_settings_changed', target: 'tournament',
-      details: { checkinNotificationEnabled: enabled }, now }),
-  ]);
   return json({ tournament: toPublicTournament(await getTournamentById(db, tournament.id), user) });
 }
 
@@ -5381,24 +5341,12 @@ export async function linkUnlinkedRegistrationsForUser(db, userId, email, notify
 }
 
 /**
- * Postbox-Nachricht "Du wurdest für Turnier … eingetragen" an automatisch verknüpfte Konten (E-22) und Prüfung auf
- * Doppelbelegung (KP-06 b). Das absendende Konto erfährt davon nichts. Fehler lassen die Anmeldung nie scheitern.
+ * Prüft nach neuen Slot-Verknüpfungen (E-22) auf Doppelbelegung (KP-06 b). Eine eigene Nachricht über die Verknüpfung
+ * gibt es nicht mehr: Die Live-Ansicht hängt am persönlichen Link, nicht am Konto. Fehler lassen die Anmeldung nie
+ * scheitern.
  */
-async function notifySlotLinks(env, links, { exceptUserId = null } = {}) {
-  const tournamentIds = new Set();
-  for (const link of links) {
-    tournamentIds.add(link.tournamentId);
-    if (!link.userId || link.userId === exceptUserId) continue;
-    try {
-      const tournament = await env.DB.prepare('SELECT id, name FROM tournaments WHERE id = ?').bind(link.tournamentId).first();
-      if (!tournament) continue;
-      await createSystemNotification(env, link.userId, REGISTRATION_SLOT_LINKED_EVENT, {
-        tournamentId: tournament.id, tournamentName: tournament.name, registrationId: link.registrationId,
-      });
-    } catch (error) {
-      console.error(`Failed to notify linked account for registration ${link.registrationId}`, error);
-    }
-  }
+async function notifySlotLinks(env, links) {
+  const tournamentIds = new Set(links.map((link) => link.tournamentId));
   for (const tournamentId of tournamentIds) await notifyAccountConflicts(env, tournamentId);
 }
 
@@ -6021,6 +5969,7 @@ export async function listMyLiveRegistrations(db, user) {
         t.name, t.date, t.start_time, t.timezone, t.location, t.status
       FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
       WHERE ? IN (r.user_id, r.partner_user_id, r.partner2_user_id)
+        AND t.live_view_enabled = 1
         AND r.status IN ('pending', 'confirmed', 'waitlist')
         AND (t.status = 'registration' OR (t.status IN ('running', 'finished') AND t.date > ?))
       ORDER BY t.date DESC, t.start_time DESC`).bind(user.id, since).all();
@@ -6054,14 +6003,28 @@ async function deletedLiveRegistrations(db, userId, since, registrationId = null
 }
 
 export async function findMyLiveRegistration(db, user, registrationId) {
-  const registration = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(registrationId).first();
+  const registration = await db.prepare(`SELECT r.*, t.live_view_enabled FROM registrations r
+      JOIN tournaments t ON t.id = r.tournament_id WHERE r.id = ?`).bind(registrationId).first();
+  const ownsRegistration = registration && registrationBelongsToUser(registration, user.id);
   // Fremde Meldungen verhalten sich wie nicht vorhanden, damit IDs nicht ausprobiert werden können.
-  if (!registration || registration.status === 'cancelled' || !registrationBelongsToUser(registration, user.id)) {
+  if (!registration || registration.status === 'cancelled' || !ownsRegistration || !isLiveViewEnabled(registration)) {
     const [deleted] = registration ? [] : await deletedLiveRegistrations(db, user.id, dateDaysAgo(30), registrationId);
     if (deleted) {
       throw new HttpError(410, 'Turnier wurde vom Veranstalter gelöscht', { code: 'tournament_deleted', tournamentName: deleted.tournament.name });
     }
     throw new HttpError(404, 'Anmeldung nicht gefunden');
+  }
+  return registration;
+}
+
+export async function findLiveRegistrationByToken(db, token) {
+  const trimmed = String(token || '').trim();
+  const registration = trimmed.length >= 32
+    ? await db.prepare(`SELECT r.*, t.live_view_enabled FROM registrations r
+        JOIN tournaments t ON t.id = r.tournament_id WHERE r.live_token = ?`).bind(trimmed).first()
+    : null;
+  if (!registration || registration.status === 'cancelled' || !isLiveViewEnabled(registration)) {
+    throw new HttpError(404, 'Dieser Live-Link ist ungültig oder abgelaufen');
   }
   return registration;
 }
@@ -6076,8 +6039,10 @@ async function participantAccountUserIds(db, tournamentId, excludedUserId) {
   ).bind(tournamentId, tournamentId, tournamentId, excludedUserId).all();
 }
 
-// Push-Abo aus der Live-Ansicht, an die Meldung gebunden.
+// Push-Abo aus der Live-Ansicht, an die Meldung gebunden (auch ohne Login über den persönlichen Link).
 async function saveLivePushSubscription(request, db, registration) {
+  // Der Klick auf die Benachrichtigung öffnet den persönlichen Link - auch bei eingeloggten Usern.
+  await ensureLiveToken(db, registration);
   const subscription = await readJson(request);
   const endpoint = String(subscription.endpoint || '');
   const p256dh = String(subscription.keys?.p256dh || '');
@@ -6104,7 +6069,9 @@ async function removeLivePushSubscription(request, db, registration) {
  */
 async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
   try {
-    const subscriptions = await env.DB.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.language
+    const option = await env.DB.prepare('SELECT live_view_enabled FROM tournaments WHERE id = ?').bind(tournament.id).first();
+    if (!isLiveViewEnabled(option)) return;
+    const subscriptions = await env.DB.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.live_token, r.language
         FROM live_push_subscriptions s JOIN registrations r ON r.id = s.registration_id
         WHERE r.tournament_id = ? AND r.status = 'confirmed'`).bind(tournament.id).all();
     if (!subscriptions.results?.length) return;
@@ -6114,12 +6081,12 @@ async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
     const items = [];
     for (const subscription of subscriptions.results) {
       const match = buildPlayerLiveView({ registrationId: subscription.registration_id, rounds: [round] }).currentMatch;
-      if (!match) continue;
+      if (!match || !subscription.live_token) continue;
       items.push({
         endpoint: subscription.endpoint,
         p256dh: subscription.p256dh,
         auth: subscription.auth,
-        payload: buildLiveRoundPush({ tournamentName: tournament.name, match, language: subscription.language, url: `${appOrigin}/live/${encodeURIComponent(subscription.registration_id)}` }),
+        payload: buildLiveRoundPush({ tournamentName: tournament.name, match, language: subscription.language, url: buildLiveLink(appOrigin, subscription.live_token) }),
       });
     }
     const messages = chunk(items, LIVE_PUSH_CHUNK_SIZE).map((part) => ({ body: { kind: 'live_push', items: part } }));
@@ -6321,7 +6288,7 @@ export async function createRegistration(request, env, tournament, {
     body.email = createPlaceholderEmail();
   }
 
-  const registration = normalizeRegistrationInput(body, { requireStatus: false });
+  const registration = normalizeRegistrationInput(body, { requireStatus: false, allowPlaceholder: isManager });
   // VIP vergibt nur die Turnierleitung; sonst könnte eine Selbstanmeldung andere Teams verdrängen.
   if (!isManager) registration.isVip = false;
   const organizerMessage = isManager ? null : registration.organizerMessage;
@@ -6389,7 +6356,7 @@ export async function createRegistration(request, env, tournament, {
       action: 'account_linked', target: `slot:${link.slot}`, details: { userId: link.userId, reason: 'slot_email' } })));
   }
   // Das absendende Konto erfährt nie, ob eine Slot-E-Mail verknüpft wurde (E-22); es selbst erhält keine Nachricht.
-  await notifySlotLinks(env, links, { exceptUserId: session?.user?.id || null });
+  await notifySlotLinks(env, links);
   if (!syncBootstrap) {
     await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', {
       tournamentName: tournament.name,
@@ -6509,7 +6476,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
   if (body.noEmail === true) {
     body.email = isPlaceholderEmail(existing.email) ? existing.email : createPlaceholderEmail();
   }
-  const registration = normalizeRegistrationInput(body, { requireStatus: true });
+  const registration = normalizeRegistrationInput(body, { requireStatus: true, allowPlaceholder: true });
   assertCorePartnerCountMatchesFormation(existing, registration);
   const feeSelections = resolveFeeSelections(existing, body.feeSelections, registration, existing);
   const registrationAnswers = resolveRegistrationAnswers(existing, body.registrationAnswers, registration, existing);
@@ -6649,8 +6616,7 @@ async function auditRegistrationEdit(env, existing, updated, actingUser) {
       details: { from: existing.status, to: updated.status } }));
   }
   if (statements.length > 0) await db.batch(statements);
-  await notifySlotLinks(env, newSlotLinks(existing, updated, existing.id, existing.tournament_id),
-    { exceptUserId: actingUser?.id || null });
+  await notifySlotLinks(env, newSlotLinks(existing, updated, existing.id, existing.tournament_id));
 }
 
 function sameText(a, b) {
@@ -6688,29 +6654,10 @@ export async function relinkRegistrationSlot(env, registration, slot, user) {
       details: { from: registration[column.userId] || null, to: targetUserId }, now }),
   ]);
   if (targetUserId && targetUserId !== registration[column.userId]) {
-    await notifySlotLinks(env, [{ registrationId: registration.id, tournamentId: registration.tournament_id, slot, userId: targetUserId }],
-      { exceptUserId: user.id });
+    await notifySlotLinks(env, [{ registrationId: registration.id, tournamentId: registration.tournament_id, slot, userId: targetUserId }]);
   }
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(registration.id).first();
   return json({ registration: toManagedRegistration(updated), linked: Boolean(targetUserId) });
-}
-
-/**
- * "Das bin ich nicht" (E-22, P-60): Das Konto löst sich selbst aus seinen Slots dieser Anmeldung. Name, Slot-E-Mail und
- * Anmeldung bleiben; eine automatische Wiederverknüpfung mit dieser Anmeldung ist danach ausgeschlossen.
- */
-export async function declineRegistrationSlot(db, registration, user) {
-  const now = new Date().toISOString();
-  const slots = SLOT_COLUMNS.filter((column) => registration[column.userId] === user.id);
-  await db.batch([
-    ...slots.map((column) => db.prepare(`UPDATE registrations SET ${column.userId} = NULL, updated_at = ? WHERE id = ? AND ${column.userId} = ?`)
-      .bind(now, registration.id, user.id)),
-    db.prepare('INSERT OR IGNORE INTO registration_link_declines (registration_id, user_id, created_at) VALUES (?, ?, ?)')
-      .bind(registration.id, user.id, now),
-    ...slots.map((column) => auditStatement(db, { tournamentId: registration.tournament_id, registrationId: registration.id,
-      actorUserId: user.id, actorRole: 'participant', action: 'account_declined', target: `slot:${column.slot}`, now })),
-  ]);
-  return json({ ok: true });
 }
 
 function assertRegistrationOnlineEditable(registration) {
@@ -7248,7 +7195,6 @@ async function syncPostResults(request, env, tournamentId) {
           }
         }
       }
-      await notifyCheckedIn(env, tournamentId, parsed.filter((entry) => entry.participation === 'active').map((entry) => entry.id));
     },
   };
 }
@@ -8677,6 +8623,7 @@ export function normalizeTournamentInput(body, { legacyRegistrationTimes = false
     licenseRequired: Boolean(body.licenseRequired),
     teamNameEnabled: Boolean(body.teamNameEnabled),
     waitlistEnabled: body.waitlistEnabled === undefined ? true : Boolean(body.waitlistEnabled),
+    liveViewEnabled: Boolean(body.liveViewEnabled),
     latitude: nullableCoordinate(body.latitude, -90, 90),
     longitude: nullableCoordinate(body.longitude, -180, 180),
   };
@@ -8756,13 +8703,18 @@ function normalizeRegistrationDateTime(value, { legacyUtc }) {
   return normalized;
 }
 
-function normalizeRegistrationInput(body, { requireStatus }) {
+function normalizeRegistrationInput(body, { requireStatus, allowPlaceholder = false, documentSync = false }) {
+  // Eine eigene Kontakt-E-Mail gibt es im Formular nicht mehr: Die E-Mail von Spieler 1 ist Pflicht und zugleich die
+  // E-Mail der Anmeldung. Nur die Turnierleitung darf ohne E-Mail erfassen ("Keine E-Mail-Adresse vorhanden",
+  // Platzhalter). Der Abgleich mit dem Turnierdokument behält die gespeicherte E-Mail unverändert (documentSync).
+  const placeholder = (allowPlaceholder || documentSync) && isPlaceholderEmail(text(body.email)) ? text(body.email) : null;
+  const playerEmail = placeholder && !documentSync ? null : nullableText(body.playerEmail)?.toLowerCase() || null;
   const registration = {
     firstName: text(body.firstName),
     lastName: text(body.lastName),
-    email: text(body.email).toLowerCase(),
-    // Slot-E-Mail der ersten Person (E-22); die Kontakt-E-Mail (email) verknüpft nie ein Konto.
-    playerEmail: nullableText(body.playerEmail)?.toLowerCase() || null,
+    email: documentSync ? text(body.email).toLowerCase() : placeholder || playerEmail || '',
+    // Slot-E-Mail der ersten Person (E-22).
+    playerEmail,
     club: nullableText(body.club),
     licenseNr: nullableText(body.licenseNr),
     partnerFirstName: nullableText(body.partnerFirstName),
@@ -8783,10 +8735,12 @@ function normalizeRegistrationInput(body, { requireStatus }) {
   if (registration.firstName.length < 2 || registration.lastName.length < 2) {
     throw new HttpError(400, 'Vorname und Nachname sind erforderlich');
   }
-  if (!isEmail(registration.email)) {
-    throw new HttpError(400, 'Eine gültige E-Mail ist erforderlich');
-  }
-  if (registration.playerEmail && !isEmail(registration.playerEmail)) {
+  if (documentSync) {
+    if (!isEmail(registration.email)) throw new HttpError(400, 'Eine gültige E-Mail ist erforderlich');
+    if (registration.playerEmail && !isEmail(registration.playerEmail)) {
+      throw new HttpError(400, 'Eine gültige E-Mail für Spieler 1 ist erforderlich');
+    }
+  } else if (!placeholder && !isEmail(registration.playerEmail || '')) {
     throw new HttpError(400, 'Eine gültige E-Mail für Spieler 1 ist erforderlich');
   }
   if (registration.partnerEmail && !isEmail(registration.partnerEmail)) {
@@ -9140,7 +9094,7 @@ function toPublicTournament(row, user) {
     registrationEnabled: Boolean(Number(row.registration_enabled ?? 1)),
     approvalRequired: Boolean(Number(row.approval_required || 0)),
     registrationClosed: Boolean(Number(row.registration_closed || 0)),
-    checkinNotificationEnabled: Number(row.checkin_notification_enabled ?? 1) === 1,
+    liveViewEnabled: isLiveViewEnabled(row),
     startsAt: row.date ? tournamentStartUtcIso(row) : null,
     runningResetAt: row.running_reset_at || null,
     documentManaged: Boolean(Number(row.document_managed || 0)),

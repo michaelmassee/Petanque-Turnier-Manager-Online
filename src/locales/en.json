@@ -1176,5 +1176,14 @@
   "Personenbezogene Daten beendeter Turniere nach Ablauf der Aufbewahrungsfrist automatisch löschen (E-Mail-Adressen, Tarife, Antworten, Nachrichten; das Protokoll wird pseudonymisiert).": "Automatically delete personal data of finished tournaments once the retention period has expired (email addresses, fees, answers, messages; the log is pseudonymised).",
   "Ein Löschlauf würde jetzt {{count}} beendete Turniere bereinigen. Das lässt sich nicht rückgängig machen.": "A deletion run would now clean up {{count}} finished tournaments. This cannot be undone.",
   "Automatische Löschung einschalten (täglich)": "Enable automatic deletion (daily)",
-  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled must be true or false"
+  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled must be true or false",
+  "Für diese Anmeldung gibt es keine Live-Ansicht.": "There is no live view for this registration.",
+  "Auf diesem Gerät gemerkt": "Saved on this device",
+  "Vergessen": "Forget",
+  "Öffne den persönlichen Live-Link aus deiner Anmeldebestätigung. Mit Konto findest du deine Turniere auch hier.": "Open the personal live link from your registration confirmation. With an account, you can also find your tournaments here.",
+  "Live-Ansicht für Teilnehmer: persönlicher Link in der Anmeldebestätigung, Runde, Gegner, Bahn und Push bei neuer Runde": "Live view for participants: personal link in the registration confirmation, round, opponent, lane and push for each new round",
+  "Dieser Live-Link ist ungültig oder abgelaufen": "This live link is invalid or has expired",
+  "E-Mail Spieler 1": "Email player 1",
+  "E-Mail des Spielers": "Player's email",
+  "An die E-Mail-Adressen der Spieler gehen Bestätigung, Storno-Link und Live-Link. Gehört eine Adresse zu einem PTM-Online-Konto, wird es mit der Person verknüpft.": "The confirmation, cancellation link and live link are sent to the players' email addresses. If an address belongs to a PTM Online account, it is linked to that person."
 }

@@ -2356,9 +2356,6 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
       // Wer sich selbst als Spieler 1 einträgt, wird über seine eigene Adresse mit dem Slot verknüpft (E-22).
       if (!form.playerEmail && currentUser.email) updates.playerEmail = currentUser.email;
     }
-    if (!form.email && currentUser.email) {
-      updates.email = currentUser.email;
-    }
     if (!form.club && currentUser.club) {
       updates.club = currentUser.club;
     }

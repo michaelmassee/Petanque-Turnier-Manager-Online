@@ -147,6 +147,7 @@ export const EMPTY_TOURNAMENT_FORM = {
   visibility: 'private',
   internalNotes: '',
   participantsPublic: false,
+  liveViewEnabled: false,
   licenseRequired: false,
   teamNameEnabled: false,
   waitlistEnabled: true,

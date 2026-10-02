@@ -1176,5 +1176,14 @@
   "Personenbezogene Daten beendeter Turniere nach Ablauf der Aufbewahrungsfrist automatisch löschen (E-Mail-Adressen, Tarife, Antworten, Nachrichten; das Protokoll wird pseudonymisiert).": "Persoonsgegevens van afgelopen toernooien na afloop van de bewaartermijn automatisch verwijderen (e-mailadressen, tarieven, antwoorden, berichten; het logboek wordt gepseudonimiseerd).",
   "Ein Löschlauf würde jetzt {{count}} beendete Turniere bereinigen. Das lässt sich nicht rückgängig machen.": "Een verwijderronde zou nu {{count}} afgelopen toernooien opschonen. Dit kan niet ongedaan worden gemaakt.",
   "Automatische Löschung einschalten (täglich)": "Automatisch verwijderen inschakelen (dagelijks)",
-  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled moet true of false zijn"
+  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled moet true of false zijn",
+  "Für diese Anmeldung gibt es keine Live-Ansicht.": "Voor deze inschrijving is er geen liveweergave.",
+  "Auf diesem Gerät gemerkt": "Op dit apparaat bewaard",
+  "Vergessen": "Vergeten",
+  "Öffne den persönlichen Live-Link aus deiner Anmeldebestätigung. Mit Konto findest du deine Turniere auch hier.": "Open de persoonlijke livelink uit je inschrijvingsbevestiging. Met een account vind je je toernooien ook hier.",
+  "Live-Ansicht für Teilnehmer: persönlicher Link in der Anmeldebestätigung, Runde, Gegner, Bahn und Push bei neuer Runde": "Liveweergave voor deelnemers: persoonlijke link in de inschrijvingsbevestiging, ronde, tegenstander, baan en pushmelding bij een nieuwe ronde",
+  "Dieser Live-Link ist ungültig oder abgelaufen": "Deze livelink is ongeldig of verlopen",
+  "E-Mail Spieler 1": "E-mail speler 1",
+  "E-Mail des Spielers": "E-mail van de speler",
+  "An die E-Mail-Adressen der Spieler gehen Bestätigung, Storno-Link und Live-Link. Gehört eine Adresse zu einem PTM-Online-Konto, wird es mit der Person verknüpft.": "Bevestiging, annuleringslink en livelink gaan naar de e-mailadressen van de spelers. Hoort een adres bij een PTM Online-account, dan wordt dat aan de persoon gekoppeld."
 }
