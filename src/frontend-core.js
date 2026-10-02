@@ -3,9 +3,19 @@ export function filterTournaments(tournaments, query, statusFilter) {
   return tournaments.filter((tournament) => (!statusFilter || tournament.status === statusFilter) && (!normalizedQuery || [tournament.name, tournament.location].some((value) => (value || '').toLowerCase().includes(normalizedQuery))));
 }
 
-export function filterRegistrations(registrations, query, statusFilter) {
+export function filterRegistrations(registrations, query, statusFilter, { organizerMessageFilter = '', questionFilter = '', feeFilter = '' } = {}) {
   const normalizedQuery = (query || '').trim().toLowerCase();
-  return registrations.filter((registration) => (!statusFilter || registration.status === statusFilter) && (!normalizedQuery || [registration.firstName, registration.lastName, registration.teamName].some((value) => (value || '').toLowerCase().includes(normalizedQuery))));
+  return registrations.filter((registration) => {
+    const matchesStatus = !statusFilter || registration.status === statusFilter;
+    const matchesQuery = !normalizedQuery || [registration.firstName, registration.lastName, registration.teamName].some((value) => (value || '').toLowerCase().includes(normalizedQuery));
+    const hasMessage = Boolean(registration.organizerMessage);
+    const matchesMessage = !organizerMessageFilter ||
+      (organizerMessageFilter === 'with_message' && hasMessage) ||
+      (organizerMessageFilter === 'without_message' && !hasMessage);
+    const matchesQuestion = !questionFilter || (registration.registrationAnswers || []).some((answer) => answer.questionId === questionFilter && answer.checked);
+    const matchesFee = !feeFilter || (registration.feeSelections || []).some((selection) => selection.tariffId === feeFilter);
+    return matchesStatus && matchesQuery && matchesMessage && matchesQuestion && matchesFee;
+  });
 }
 
 export function filterUsers(users, query, roleFilter, statusFilter) {

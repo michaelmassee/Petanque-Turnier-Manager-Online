@@ -127,6 +127,64 @@ describe('Anmeldungsverwaltung: Turnierauswahl', () => {
   });
 });
 
+describe('Anmeldungsverwaltung: Anmeldedetails', () => {
+  it('zeigt Nachricht, Tarife und positive Teilnehmerantworten erst nach dem Aufklappen', () => {
+    const tournament = {
+      ...TOURNAMENT,
+      registrationQuestions: [{ id: 'meal', label: 'Vegetarisches Essen?' }],
+    };
+    const registration = {
+      ...REGISTRATION_WITH_FEES,
+      feeSelections: [{ tariffId: 'member', name: 'Mitglied', amountCents: 500 }],
+      organizerMessage: 'Bitte ohne Mittagessen einplanen.',
+      registrationAnswers: [{ participant: 'primary', questionId: 'meal', checked: true }],
+    };
+    const noop = () => {};
+
+    render(
+      <RegistrationsPanel
+        tournament={tournament}
+        registrations={[registration]}
+        filteredRegistrations={[registration]}
+        tournaments={[tournament]}
+        onTournamentChange={noop}
+        onCreate={noop}
+        query=""
+        onQueryChange={noop}
+        statusFilter=""
+        onStatusFilterChange={noop}
+        onResetFilters={noop}
+        onEdit={noop}
+        onConfirm={noop}
+        onConfirmAll={noop}
+        onDelete={noop}
+        busyId=""
+      />,
+    );
+
+    const details = screen.getByText('Anmeldedetails anzeigen').closest('details');
+    expect(details).not.toHaveAttribute('open');
+    expect(screen.getByLabelText('Nachricht an Turnierleitung')).toBeInTheDocument();
+    expect(screen.getByLabelText('Frage beantwortet')).toHaveTextContent('Vegetarisches Essen?');
+    expect(screen.getByLabelText('Tarif ausgewählt')).toHaveTextContent('Mitglied');
+
+    fireEvent.click(screen.getByText('Anmeldedetails anzeigen'));
+
+    expect(details).toHaveAttribute('open');
+    expect(screen.getByRole('heading', { name: 'Nachricht an die Turnierleitung' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Gewählte Tarife' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Teilnehmerfragen' })).toBeInTheDocument();
+    expect(screen.getByText('Bitte ohne Mittagessen einplanen.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Teilnehmerfragen' }).parentElement).toHaveTextContent(/Vegetarisches Essen\?: Hauptspieler/);
+  });
+
+  it('zeigt keinen Details-Schalter ohne Zusatzangaben', () => {
+    renderPanel([{ id: 'r2', firstName: 'Ben', lastName: 'Gast', status: 'confirmed' }]);
+
+    expect(screen.queryByText('Anmeldedetails anzeigen')).not.toBeInTheDocument();
+  });
+});
+
 describe('Anmeldungsverwaltung: Konto-Verknüpfungen', () => {
   it('kennzeichnet nur die verbundenen Teammitglieder', () => {
     renderPanel([{

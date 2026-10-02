@@ -45,6 +45,21 @@ describe('filterRegistrations', () => {
   it('filtert nach Status', () => {
     expect(filterRegistrations(registrations, '', 'confirmed')).toEqual([registrations[1]]);
   });
+
+  it('filtert Nachricht, positiv beantwortete Frage und Tarif gleichzeitig', () => {
+    const detailedRegistrations = [
+      { ...registrations[0], organizerMessage: 'Bitte früher da sein.', registrationAnswers: [{ questionId: 'meal', participant: 'primary', checked: true }], feeSelections: [{ tariffId: 'member', name: 'Mitglied' }] },
+      { ...registrations[1], organizerMessage: '', registrationAnswers: [{ questionId: 'shirt', participant: 'primary', checked: true }], feeSelections: [{ tariffId: 'guest', name: 'Gast' }] },
+    ];
+
+    expect(filterRegistrations(detailedRegistrations, '', '', { organizerMessageFilter: 'with_message' })).toEqual([detailedRegistrations[0]]);
+    expect(filterRegistrations(detailedRegistrations, '', '', { organizerMessageFilter: 'without_message' })).toEqual([detailedRegistrations[1]]);
+    expect(filterRegistrations(detailedRegistrations, '', '', { questionFilter: 'meal' })).toEqual([detailedRegistrations[0]]);
+    expect(filterRegistrations(detailedRegistrations, '', '', { feeFilter: 'guest' })).toEqual([detailedRegistrations[1]]);
+    expect(filterRegistrations(detailedRegistrations, '', '', { organizerMessageFilter: 'with_message', questionFilter: 'meal', feeFilter: 'member' })).toEqual([detailedRegistrations[0]]);
+    expect(filterRegistrations([...detailedRegistrations, { id: 'r3', firstName: null, lastName: '', teamName: null, status: 'pending', registrationAnswers: [{ questionId: 'meal', checked: false }]}], '', '', { questionFilter: 'meal' })).toEqual([detailedRegistrations[0]]);
+    expect(filterRegistrations([...detailedRegistrations, { id: 'r3', firstName: null, lastName: '', teamName: null, status: 'pending' }], 'unbekannt', '', { organizerMessageFilter: 'unknown', questionFilter: 'unknown', feeFilter: 'unknown' })).toEqual([]);
+  });
 });
 
 describe('filterUsers', () => {
@@ -54,6 +69,7 @@ describe('filterUsers', () => {
 
   it('filtert per Teilstring über Name/E-Mail', () => {
     expect(filterUsers(users, 'bea@example.com', '', '')).toEqual([users[1]]);
+    expect(filterUsers([{ id: 'u3', firstName: '', lastName: null, email: 'ohne-namen@example.com', role: 'user' }], 'ohne-namen', '', '')).toHaveLength(1);
   });
 
   it('filtert nach Rolle', () => {

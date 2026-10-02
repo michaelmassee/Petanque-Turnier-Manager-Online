@@ -163,9 +163,63 @@ function registrationToForm(registration) {
   };
 }
 
+function RegistrationDetails({ registration, tournament }) {
+  const { t, i18n } = useTranslation();
+  const participantLabel = { primary: t('Hauptspieler'), partner: t('Partner'), partner2: t('Partner 2') };
+  const answersByQuestion = (tournament?.registrationQuestions || []).map((question) => ({
+    ...question,
+    participants: (registration.registrationAnswers || [])
+      .filter((answer) => answer.questionId === question.id)
+      .map((answer) => participantLabel[answer.participant])
+      .filter(Boolean),
+  })).filter((question) => question.participants.length > 0);
+  const hasMessage = Boolean(registration.organizerMessage);
+  const hasFees = registration.feeSelections?.length > 0;
+  const hasAnswers = answersByQuestion.length > 0;
+
+  if (!hasMessage && !hasFees && !hasAnswers) return null;
+
+  return (
+    <details className="registration-details">
+      <summary>{t('Anmeldedetails anzeigen')}</summary>
+      <div className="registration-details-content">
+        {hasMessage && (
+          <section>
+            <h4>{t('Nachricht an die Turnierleitung')}</h4>
+            <p data-i18n-skip>{registration.organizerMessage}</p>
+          </section>
+        )}
+        {hasFees && (
+          <section>
+            <h4>{t('Gewählte Tarife')}</h4>
+            <ul>
+              {registration.feeSelections.map((selection, index) => (
+                <li key={`${selection.participant || 'participant'}-${selection.tariffId || selection.name}-${index}`}>
+                  {selection.participant && <span>{participantLabel[selection.participant]}: </span>}
+                  <span data-i18n-skip>{selection.name}</span> – {formatMoney(selection.amountCents, tournament?.currency, i18n.language)}
+                </li>
+              ))}
+            </ul>
+            <p className="registration-details-total"><strong>{t('Gesamt')}:</strong> {formatMoney(registration.feeTotalCents || 0, tournament?.currency, i18n.language)}</p>
+          </section>
+        )}
+        {hasAnswers && (
+          <section>
+            <h4>{t('Teilnehmerfragen')}</h4>
+            <ul>
+              {answersByQuestion.map((question) => (
+                <li key={question.id}><span data-i18n-skip>{question.label}</span>: {question.participants.join(', ')}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+    </details>
+  );
+}
+
 function RegistrationRow({ registration, tournament, showConfirm = false, busy, busyOther, onConfirm, onEdit, onDelete }) {
   const { t } = useTranslation();
-  const participantLabel = { primary: t('Hauptspieler'), partner: t('Partner'), partner2: t('Partner 2') };
   const AccountBadge = () => <span className="account-badge" title={t('Mit Benutzerkonto verbunden')} aria-label={t('Mit Benutzerkonto verbunden')}>👤</span>;
   return (
     <article className="data-row">
@@ -189,7 +243,6 @@ function RegistrationRow({ registration, tournament, showConfirm = false, busy, 
           </small>
         )}
         {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
-        {registration.organizerMessage && <small data-i18n-skip>{registration.organizerMessage}</small>}
         {(registration.overCapacity || registration.receivedAfterStart || registration.accountConflict || registration.possibleDuplicate || registration.incomplete) && (
           <small className="registration-sync-flags">
             {registration.overCapacity && <span className="role">{t('über Kapazität')}</span>}
@@ -199,11 +252,7 @@ function RegistrationRow({ registration, tournament, showConfirm = false, busy, 
             {registration.incomplete && <span className="role role-user">{t('Team unvollständig')}</span>}
           </small>
         )}
-        {registration.feeSelections?.length > 0 && <small data-i18n-skip>{registration.feeSelections.map((selection) => `${selection.name}: ${formatMoney(selection.amountCents, tournament?.currency, 'de')}`).join(' · ')}{registration.feeTotalCents ? ` = ${formatMoney(registration.feeTotalCents, tournament?.currency, 'de')}` : ''}</small>}
-        {(tournament?.registrationQuestions || []).map((question) => {
-          const answers = (registration.registrationAnswers || []).filter((answer) => answer.questionId === question.id);
-          return answers.length > 0 ? <small key={question.id}><span data-i18n-skip>{question.label}</span>: {answers.map((answer) => participantLabel[answer.participant]).join(', ')}</small> : null;
-        })}
+        <RegistrationDetails registration={registration} tournament={tournament} />
       </div>
       <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
       <div className="row-actions">
@@ -255,6 +304,12 @@ export function RegistrationsPanel({
   onQueryChange,
   statusFilter,
   onStatusFilterChange,
+  organizerMessageFilter = '',
+  onOrganizerMessageFilterChange,
+  questionFilter = '',
+  onQuestionFilterChange,
+  feeFilter = '',
+  onFeeFilterChange,
   onResetFilters,
   onEdit,
   onConfirm,
@@ -265,11 +320,15 @@ export function RegistrationsPanel({
   error,
 }) {
   const { t } = useTranslation();
-  const filtered = Boolean(query.trim()) || Boolean(statusFilter);
+  const filtered = Boolean(query.trim()) || Boolean(statusFilter) || Boolean(organizerMessageFilter) || Boolean(questionFilter) || Boolean(feeFilter);
   const pendingRegistrations = filteredRegistrations.filter((registration) => registration.status === 'pending');
   const otherRegistrations = filteredRegistrations.filter((registration) => registration.status !== 'pending');
   const visiblePendingRegistrations = useInfiniteList(pendingRegistrations);
   const visibleOtherRegistrations = useInfiniteList(otherRegistrations);
+  const questionOptions = (tournament?.registrationQuestions || []).map((question) => ({ value: question.id, label: question.label }));
+  const feeOptions = [...new Map(registrations.flatMap((registration) => (registration.feeSelections || []).map((selection) => [selection.tariffId, selection.name]))).entries()]
+    .filter(([id, name]) => id && name)
+    .map(([value, label]) => ({ value, label }));
 
   function rowProps(registration) {
     const busy = busyId === `confirm-${registration.id}` ? `confirm-${registration.id}` : busyId === `delete-${registration.id}` ? `delete-${registration.id}` : '';
@@ -305,6 +364,9 @@ export function RegistrationsPanel({
         searchPlaceholder={t('Name oder Team suchen')}
         filters={[
           { label: t('Status filtern'), value: statusFilter, onChange: onStatusFilterChange, options: [{ value: '', label: t('Alle Status') }, ...translatedOptions(REGISTRATION_STATUSES)] },
+          { label: t('Nachricht an Turnierleitung'), value: organizerMessageFilter, onChange: onOrganizerMessageFilterChange, options: [{ value: '', label: t('Alle Nachrichten') }, { value: 'with_message', label: t('Mit Nachricht') }, { value: 'without_message', label: t('Ohne Nachricht') }] },
+          { label: t('Frage beantwortet'), value: questionFilter, onChange: onQuestionFilterChange, options: [{ value: '', label: t('Alle Fragen') }, ...questionOptions] },
+          { label: t('Tarif ausgewählt'), value: feeFilter, onChange: onFeeFilterChange, options: [{ value: '', label: t('Alle Tarife') }, ...feeOptions] },
         ]}
         onReset={onResetFilters}
         resetDisabled={!filtered}
@@ -364,6 +426,9 @@ export function RegistrationsManagementPage({
   const [message, setMessage] = useState('');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
+  const [organizerMessageFilter, setOrganizerMessageFilter] = useState('');
+  const [questionFilter, setQuestionFilter] = useState('');
+  const [feeFilter, setFeeFilter] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_REGISTRATION_FORM);
   const [invalidField, setInvalidField] = useState(null);
@@ -407,9 +472,18 @@ export function RegistrationsManagementPage({
   }, [tournament?.id, manageMode]);
 
   const filteredRegistrations = useMemo(
-    () => filterRegistrations(registrations, query, statusFilter),
-    [registrations, query, statusFilter],
+    () => filterRegistrations(registrations, query, statusFilter, { organizerMessageFilter, questionFilter, feeFilter }),
+    [registrations, query, statusFilter, organizerMessageFilter, questionFilter, feeFilter],
   );
+
+  function handleTournamentChange(tournamentId) {
+    setSelectedTournamentId(tournamentId);
+    setQuery('');
+    setStatusFilter('');
+    setOrganizerMessageFilter('');
+    setQuestionFilter('');
+    setFeeFilter('');
+  }
 
   useEffect(() => {
     if (initialStatusFilter) onInitialStatusFilterConsumed?.();
@@ -529,13 +603,19 @@ export function RegistrationsManagementPage({
         registrations={registrations}
         filteredRegistrations={filteredRegistrations}
         tournaments={manageableTournaments}
-        onTournamentChange={setSelectedTournamentId}
+        onTournamentChange={handleTournamentChange}
         onCreate={openCreate}
         query={query}
         onQueryChange={setQuery}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
-        onResetFilters={() => { setQuery(''); setStatusFilter(''); }}
+        organizerMessageFilter={organizerMessageFilter}
+        onOrganizerMessageFilterChange={setOrganizerMessageFilter}
+        questionFilter={questionFilter}
+        onQuestionFilterChange={setQuestionFilter}
+        feeFilter={feeFilter}
+        onFeeFilterChange={setFeeFilter}
+        onResetFilters={() => { setQuery(''); setStatusFilter(''); setOrganizerMessageFilter(''); setQuestionFilter(''); setFeeFilter(''); }}
         onEdit={openEdit}
         onConfirm={handleConfirm}
         onConfirmAll={handleConfirmAll}

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { LiveDetail, MyLiveBackLink, MyLiveList } from './PlayerLivePage.jsx';
+import { LiveDetail, MyLiveBackLink, MyLiveList, PlayerLivePage } from './PlayerLivePage.jsx';
 import { matchLiveRoute } from '../lib/routing.js';
 
 function jsonResponse(payload, status = 200) {
@@ -61,6 +61,28 @@ function renderBackLink() {
 describe('Live-Ansicht für Spieler', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('kennzeichnet die gesamte Live-Ansicht deutlich als Testbetrieb', () => {
+    render(
+      <PlayerLivePage
+        route={{}}
+        language="de"
+        setLanguage={() => {}}
+        menuOpen={false}
+        setMenuOpen={() => {}}
+        navigate={() => {}}
+        currentUser={null}
+        isAdmin={false}
+        onSelectAdminDashboard={() => {}}
+        onLogout={() => {}}
+        onLogin={() => {}}
+        drawerContent={null}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Beta – noch im Testbetrieb');
+    expect(screen.getByRole('status')).toHaveClass('live-beta-badge');
   });
 
   it('zeigt aktuelle Partie, Platz und Historie ohne Bahn, wenn keine vorhanden ist', async () => {

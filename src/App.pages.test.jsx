@@ -948,7 +948,7 @@ describe('Anmeldungen-Seite: Liste + Dialog', () => {
     render(<RegistrationsPageHarness onSubmit={onSubmit} />);
 
     expect(screen.getByText('Bitte ohne Mittagessen einplanen.')).toBeInTheDocument();
-    expect(screen.getByText('Vegetarisches Essen?')).toBeInTheDocument();
+    expect(screen.getAllByText('Vegetarisches Essen?')).toHaveLength(2);
     expect(screen.queryByText('Anmeldung bearbeiten')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Bearbeiten'));
