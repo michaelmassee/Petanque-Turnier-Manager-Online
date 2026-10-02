@@ -1682,6 +1682,15 @@ a.left-panel-link {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Jede Person einer Anmeldung bildet einen eigenen Namens-/Vereinsblock.
+ * Die allgemeine .data-row-Regel betrifft nur das erste Element und würde
+ * weitere Spieler sonst neben ihrem Verein ausgeben. */
+.participants-row > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
