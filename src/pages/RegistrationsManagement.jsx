@@ -322,6 +322,23 @@ function RelinkAccounts({ registration, busyId, onRelink }) {
   );
 }
 
+// "Live-Link neu senden" (EW-02): neuer persönlicher Link an die Spieler, der bisherige wird ungültig.
+function LiveLinkResend({ registration, tournament, busyId, onResend }) {
+  const { t } = useTranslation();
+  if (!registration || !tournament?.liveViewEnabled || registration.status !== 'confirmed') return null;
+  return (
+    <section className="relink-accounts" aria-label={t('Live-Link')}>
+      <h3>{t('Live-Link')}</h3>
+      <p className="hint">{t('Schickt den Spielern einen neuen persönlichen Live-Link. Der bisherige Link wird damit ungültig.')}</p>
+      <div className="row-actions">
+        <Button variant="secondary" loading={busyId === 'live-link'} disabled={Boolean(busyId)} onClick={() => onResend(registration)}>
+          {t('Live-Link neu senden')}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 export function RegistrationsPanel({
   tournament,
   registrations,
@@ -625,6 +642,15 @@ export function RegistrationsManagementPage({
     } catch (err) { setError(err.message); } finally { setBusyId(''); }
   }
 
+  async function handleLiveLinkResend(registration) {
+    setError(''); setMessage('');
+    setBusyId('live-link');
+    try {
+      await authenticatedApi(`/api/registrations/${registration.id}/live-link`, { method: 'POST' });
+      setMessage(t('Ein neuer Live-Link wurde an die Spieler geschickt.'));
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+  }
+
   async function handleConfirmAll() {
     if (!tournament) return;
     setError(''); setMessage('');
@@ -690,6 +716,14 @@ export function RegistrationsManagementPage({
             registration={registrations.find((entry) => entry.id === form.id)}
             busyId={busyId}
             onRelink={handleRelink}
+          />
+        )}
+        {mode === 'edit' && (
+          <LiveLinkResend
+            registration={registrations.find((entry) => entry.id === form.id)}
+            tournament={tournament}
+            busyId={busyId}
+            onResend={handleLiveLinkResend}
           />
         )}
       </EditDialog>

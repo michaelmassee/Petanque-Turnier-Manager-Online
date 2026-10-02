@@ -229,3 +229,30 @@ describe('Anmeldungsverwaltung: Konto-Verknüpfungen', () => {
     expect(screen.getByText('Lizenznummer: C-3')).toBeInTheDocument();
   });
 });
+
+describe('Anmeldungsverwaltung: Live-Link neu senden', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('schickt bei eingeschalteter Live-Ansicht einen neuen Link und meldet den Versand', async () => {
+    const registration = { id: 'r1', tournamentId: 't1', firstName: 'Anna', lastName: 'Muster', playerEmail: 'anna@example.test',
+      status: 'confirmed', participation: 'inactive', feeSelections: [], registrationAnswers: [] };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
+      const body = String(url).endsWith('/live-link') && options.method === 'POST' ? { sent: 1 } : { registrations: [registration] };
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+    render(
+      <RegistrationsManagementPage
+        tournaments={[{ id: 't1', name: 'Sommer Cup', canManage: true, registrationEnabled: true, liveViewEnabled: true }]}
+        selectedTournamentId="t1"
+        setSelectedTournamentId={() => {}}
+        language="de"
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Live-Link neu senden' }));
+
+    expect(await screen.findAllByText('Ein neuer Live-Link wurde an die Spieler geschickt.')).not.toHaveLength(0);
+    expect(fetchMock).toHaveBeenCalledWith('/api/registrations/r1/live-link', expect.objectContaining({ method: 'POST' }));
+  });
+});

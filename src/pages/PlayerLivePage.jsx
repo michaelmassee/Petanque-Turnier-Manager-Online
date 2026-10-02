@@ -58,6 +58,7 @@ function writeRememberedTeams(entries) {
 function rememberTeam(token, data) {
   const entry = {
     token,
+    registrationId: data.registration.id,
     tournamentName: data.tournament.name,
     date: data.tournament.date,
     location: data.tournament.location || null,
@@ -449,9 +450,13 @@ export function MyLiveBackLink({ navigate }) {
 export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, isAdmin, onSelectAdminDashboard, onLogout, onLogin, drawerContent, postboxControl }) {
   const { t } = useTranslation();
 
+  // Push-Nachrichten verweisen auf /live/<Meldungs-ID>, weil der Link nur gehasht gespeichert ist: Ein auf diesem Gerät
+  // gemerkter Link öffnet die Ansicht auch ohne Login.
+  const token = route.token
+    || (route.registrationId ? readRememberedTeams().find((entry) => entry.registrationId === route.registrationId)?.token : null);
   let content;
-  if (route.token) {
-    content = <LiveDetail queryKey={['live', 'token', route.token]} path={`/api/live/token/${encodeURIComponent(route.token)}`} language={language} navigate={navigate} token={route.token} />;
+  if (token) {
+    content = <LiveDetail queryKey={['live', 'token', token]} path={`/api/live/token/${encodeURIComponent(token)}`} language={language} navigate={navigate} token={token} />;
   } else if (route.registrationId && currentUser) {
     content = <LiveDetail queryKey={['live', 'registration', route.registrationId]} path={`/api/live/registrations/${encodeURIComponent(route.registrationId)}`} language={language} navigate={navigate} />;
   } else {
@@ -486,10 +491,10 @@ export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenu
       />
       <section className="single-column live-page">
         <p className="live-beta-badge" role="status">{t('Beta – noch im Testbetrieb')}</p>
-        {route.registrationId && currentUser && (
+        {route.registrationId && currentUser && !token && (
           <MyLiveBackLink navigate={navigate} />
         )}
-        {route.token && (
+        {token && (
           <button type="button" className="drawer-link live-back" onClick={() => navigate('/live')}>← {t('Live')}</button>
         )}
         {content}

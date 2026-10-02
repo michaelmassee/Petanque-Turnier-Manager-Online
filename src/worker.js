@@ -294,6 +294,35 @@ export const REGISTRATION_CONFIRMATION_EMAILS = {
 };
 
 
+// Neuer persönlicher Live-Link auf Wunsch der Turnierleitung; der vorherige Link wird damit ungültig (EW-02).
+export const LIVE_LINK_EMAILS = {
+  de: {
+    subject: (name) => `Dein Live-Link: ${name}`,
+    text: (firstName, name, liveLink) =>
+      `Hallo ${firstName},\n\nhier ist dein persönlicher Live-Link für "${name}" (Runde, Gegner, Bahn):\n${liveLink}\n\nEin früher verschickter Live-Link ist damit ungültig.`,
+  },
+  nl: {
+    subject: (name) => `Je livelink: ${name}`,
+    text: (firstName, name, liveLink) =>
+      `Hallo ${firstName},\n\nhier is je persoonlijke livelink voor "${name}" (ronde, tegenstander, baan):\n${liveLink}\n\nEen eerder verstuurde livelink is daarmee ongeldig.`,
+  },
+  en: {
+    subject: (name) => `Your live link: ${name}`,
+    text: (firstName, name, liveLink) =>
+      `Hi ${firstName},\n\nhere is your personal live link for "${name}" (round, opponent, lane):\n${liveLink}\n\nAny live link sent earlier is no longer valid.`,
+  },
+  es: {
+    subject: (name) => `Tu enlace en directo: ${name}`,
+    text: (firstName, name, liveLink) =>
+      `Hola ${firstName},\n\naquí tienes tu enlace en directo personal para "${name}" (ronda, rival, pista):\n${liveLink}\n\nCualquier enlace enviado antes ya no es válido.`,
+  },
+  fr: {
+    subject: (name) => `Ton lien direct : ${name}`,
+    text: (firstName, name, liveLink) =>
+      `Bonjour ${firstName},\n\nvoici ton lien direct personnel pour « ${name} » (tour, adversaire, terrain) :\n${liveLink}\n\nTout lien direct envoyé auparavant n’est plus valable.`,
+  },
+};
+
 export function buildLiveLink(appOrigin, token) {
   return `${appOrigin}/live/t/${encodeURIComponent(token)}`;
 }
@@ -757,7 +786,7 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
   // Persönlicher Live-Link (E-21), nur wenn das Turnier die Live-Ansicht anbietet. Der Aufrufer reicht teils eine
   // zusammengesetzte Zeile durch, daher wird die Option frisch gelesen.
   const liveOption = await env.DB.prepare('SELECT live_view_enabled FROM tournaments WHERE id = ?').bind(tournament.id).first();
-  const liveLink = isLiveViewEnabled(liveOption) ? buildLiveLink(appOrigin, await ensureLiveToken(env.DB, registration)) : '';
+  const liveLink = isLiveViewEnabled(liveOption) ? buildLiveLink(appOrigin, await issueLiveToken(env.DB, registration.id)) : '';
 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
@@ -771,6 +800,37 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
       allowLogFallback: true,
     });
   }
+}
+
+/**
+ * "Live-Link neu senden" (EW-02): erzeugt einen neuen persönlichen Link, macht den alten ungültig und schickt ihn an
+ * die E-Mail-Adressen der Spieler. Der Link selbst erscheint nie in der Antwort, nur in der Mail.
+ */
+export async function resendLiveLink(env, registration, user, appOrigin) {
+  const tournament = await getTournamentById(env.DB, registration.tournament_id);
+  if (!isLiveViewEnabled(tournament)) throw new HttpError(409, 'Für dieses Turnier ist die Live-Ansicht nicht eingeschaltet');
+  if (registration.status !== 'confirmed') throw new HttpError(409, 'Einen Live-Link gibt es nur für bestätigte Anmeldungen');
+  const recipients = buildTeamRecipients(registration);
+  if (recipients.length === 0) throw new HttpError(409, 'Die Anmeldung hat keine E-Mail-Adresse');
+  if (!(await canSendTournamentMail(env.DB, tournament))) throw new HttpError(409, 'Für dieses Turnier ist der E-Mail-Versand nicht freigeschaltet');
+  const language = await resolveEmailLanguage(env.DB, tournament, registration);
+  const templates = LIVE_LINK_EMAILS[language] || LIVE_LINK_EMAILS.de;
+  const liveLink = buildLiveLink(appOrigin, await issueLiveToken(env.DB, registration.id));
+  for (const recipient of recipients) {
+    await enqueueTransactionalEmail(env, {
+      to: recipient.email,
+      subject: templates.subject(tournament.name),
+      text: templates.text(recipient.firstName, tournament.name, liveLink),
+      language,
+      logFallback: `Live link email for ${recipient.email} (tournament ${tournament.id})`,
+      failureContext: `live link for registration ${registration.id}`,
+      allowLogFallback: true,
+    });
+  }
+  await env.DB.batch([auditStatement(env.DB, { tournamentId: tournament.id, registrationId: registration.id, actorUserId: user.id,
+    actorRole: actorRoleFor(tournament, user), action: 'live_link_reissued', target: 'registration',
+    details: { recipients: recipients.length } })]);
+  return json({ sent: recipients.length });
 }
 
 async function sendRegistrationReceivedEmail(env, tournament, registration, appOrigin) {
@@ -803,14 +863,15 @@ function isLiveViewEnabled(tournament) {
   return Number(tournament?.live_view_enabled || 0) === 1;
 }
 
-/** Persönlicher Live-Link je Anmeldung, bewusst getrennt vom cancel_token (der Link darf nicht abmelden können). */
-async function ensureLiveToken(db, registration) {
-  if (registration.live_token) return registration.live_token;
+/**
+ * Erzeugt einen neuen persönlichen Live-Link je Anmeldung (EW-02). Gespeichert wird nur der Hash, deshalb gibt es den
+ * Link im Klartext nur in der Mail, die ihn verschickt; jeder neue Link macht den vorherigen ungültig (Widerruf).
+ * Bewusst getrennt vom cancel_token: Der Link darf nicht abmelden können.
+ */
+async function issueLiveToken(db, registrationId) {
   const token = createRandomToken();
-  // Nur setzen, wenn noch leer - bei parallelem Aufruf gewinnt der erste Token.
-  await db.prepare('UPDATE registrations SET live_token = ? WHERE id = ? AND live_token IS NULL').bind(token, registration.id).run();
-  const row = await db.prepare('SELECT live_token FROM registrations WHERE id = ?').bind(registration.id).first();
-  return row?.live_token || token;
+  await db.prepare('UPDATE registrations SET live_token_hash = ? WHERE id = ?').bind(await sha256Hex(token), registrationId).run();
+  return token;
 }
 
 async function sendDisplacementEmail(env, tournament, registration, wasCancelled, appOrigin) {
@@ -1939,6 +2000,15 @@ export default {
           }
           return await deleteRegistration(env.DB, registration.id);
         }
+      }
+
+      const registrationLiveLinkMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/live-link$/);
+      if (registrationLiveLinkMatch && request.method === 'POST') {
+        const auth = await requireManagerAuth(request, env.DB);
+        const registration = await getRegistrationWithTournament(env.DB, registrationLiveLinkMatch[1]);
+        if (!registration) throw new HttpError(404, 'Anmeldung nicht gefunden');
+        assertCanManageTournament(registration, auth.user);
+        return await resendLiveLink(env, registration, auth.user, url.origin);
       }
 
       const registrationParticipationMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/participation$/);
@@ -5296,8 +5366,7 @@ function registrationFlags(tournament, row, flagsFor) {
 
 /**
  * Konten zu den Slot-E-Mails einer Anmeldung (E-22): Verknüpft wird nur eine Adresse, die genau einem verifizierten
- * Konto gehört. Die Kontakt-E-Mail verknüpft nie (E-11). Ein Konto, das sich mit "Das bin ich nicht" gelöst hat,
- * wird mit dieser Anmeldung nicht wieder automatisch verknüpft.
+ * Konto gehört.
  */
 export async function resolveRegistrationUserIds(db, registration, { registrationId = null } = {}) {
   const emails = [registration.playerEmail, registration.partnerEmail, registration.partner2Email]
@@ -5305,10 +5374,6 @@ export async function resolveRegistrationUserIds(db, registration, { registratio
   const result = await db.prepare(
     'SELECT id, email FROM users WHERE lower(email) IN (?, ?, ?) AND email_verified_at IS NOT NULL',
   ).bind(...emails).all();
-  const declined = registrationId
-    ? new Set(((await db.prepare('SELECT user_id FROM registration_link_declines WHERE registration_id = ?')
-      .bind(registrationId).all()).results || []).map((row) => row.user_id))
-    : new Set();
   // Only link unambiguous matches: accounts differing just in e-mail case stay unlinked.
   const usersByEmail = new Map();
   for (const user of result.results || []) {
@@ -5317,14 +5382,14 @@ export async function resolveRegistrationUserIds(db, registration, { registratio
   }
   const [userId, partnerUserId, partner2UserId] = uniqueAccountLinks(emails.map((email) => {
     const id = email ? usersByEmail.get(email) : null;
-    return id && !declined.has(id) ? id : null;
+    return id || null;
   }));
   return { userId, partnerUserId, partner2UserId };
 }
 
 /**
  * Verknüpft unverknüpfte Slots mit einem Konto, nachdem seine E-Mail verifiziert ist (KP-10). Liefert die neu
- * verknüpften Anmeldungen; das Konto erhält je Anmeldung eine Postbox-Nachricht mit dem Weg zu "Das bin ich nicht".
+ * verknüpften Anmeldungen.
  */
 export async function linkUnlinkedRegistrationsForUser(db, userId, email, notifyEnv = { DB: db }) {
   const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -5332,18 +5397,17 @@ export async function linkUnlinkedRegistrationsForUser(db, userId, email, notify
   const verified = await db.prepare('SELECT 1 FROM users WHERE id = ? AND lower(email) = ? AND email_verified_at IS NOT NULL')
     .bind(userId, normalizedEmail).first();
   if (!verified) return [];
-  const notDeclined = `NOT EXISTS (SELECT 1 FROM registration_link_declines d WHERE d.registration_id = registrations.id AND d.user_id = ?)`;
   // Sequential batch: a slot is skipped when the account already sits in another slot.
   const results = await db.batch([
     db.prepare(`UPDATE registrations SET user_id = ? WHERE user_id IS NULL AND lower(player_email) = ?
-      AND ? NOT IN (COALESCE(partner_user_id, ''), COALESCE(partner2_user_id, '')) AND ${notDeclined}
-      RETURNING id, tournament_id`).bind(userId, normalizedEmail, userId, userId),
+      AND ? NOT IN (COALESCE(partner_user_id, ''), COALESCE(partner2_user_id, ''))
+      RETURNING id, tournament_id`).bind(userId, normalizedEmail, userId),
     db.prepare(`UPDATE registrations SET partner_user_id = ? WHERE partner_user_id IS NULL AND lower(partner_email) = ?
-      AND ? NOT IN (COALESCE(user_id, ''), COALESCE(partner2_user_id, '')) AND ${notDeclined}
-      RETURNING id, tournament_id`).bind(userId, normalizedEmail, userId, userId),
+      AND ? NOT IN (COALESCE(user_id, ''), COALESCE(partner2_user_id, ''))
+      RETURNING id, tournament_id`).bind(userId, normalizedEmail, userId),
     db.prepare(`UPDATE registrations SET partner2_user_id = ? WHERE partner2_user_id IS NULL AND lower(partner2_email) = ?
-      AND ? NOT IN (COALESCE(user_id, ''), COALESCE(partner_user_id, '')) AND ${notDeclined}
-      RETURNING id, tournament_id`).bind(userId, normalizedEmail, userId, userId),
+      AND ? NOT IN (COALESCE(user_id, ''), COALESCE(partner_user_id, ''))
+      RETURNING id, tournament_id`).bind(userId, normalizedEmail, userId),
   ]);
   const links = results.flatMap((result, index) => (result.results || []).map((row) => ({
     registrationId: row.id, tournamentId: row.tournament_id, slot: index + 1, userId,
@@ -6044,7 +6108,7 @@ export async function findLiveRegistrationByToken(db, token) {
   const trimmed = String(token || '').trim();
   const registration = trimmed.length >= 32
     ? await db.prepare(`SELECT r.*, t.live_view_enabled FROM registrations r
-        JOIN tournaments t ON t.id = r.tournament_id WHERE r.live_token = ?`).bind(trimmed).first()
+        JOIN tournaments t ON t.id = r.tournament_id WHERE r.live_token_hash = ?`).bind(await sha256Hex(trimmed)).first()
     : null;
   if (!registration || registration.status === 'cancelled' || !isLiveViewEnabled(registration)) {
     throw new HttpError(404, 'Dieser Live-Link ist ungültig oder abgelaufen');
@@ -6064,8 +6128,6 @@ async function participantAccountUserIds(db, tournamentId, excludedUserId) {
 
 // Push-Abo aus der Live-Ansicht, an die Meldung gebunden (auch ohne Login über den persönlichen Link).
 async function saveLivePushSubscription(request, db, registration) {
-  // Der Klick auf die Benachrichtigung öffnet den persönlichen Link - auch bei eingeloggten Usern.
-  await ensureLiveToken(db, registration);
   const subscription = await readJson(request);
   const endpoint = String(subscription.endpoint || '');
   const p256dh = String(subscription.keys?.p256dh || '');
@@ -6094,7 +6156,7 @@ async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
   try {
     const option = await env.DB.prepare('SELECT live_view_enabled FROM tournaments WHERE id = ?').bind(tournament.id).first();
     if (!isLiveViewEnabled(option)) return;
-    const subscriptions = await env.DB.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.live_token, r.language
+    const subscriptions = await env.DB.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.language
         FROM live_push_subscriptions s JOIN registrations r ON r.id = s.registration_id
         WHERE r.tournament_id = ? AND r.status = 'confirmed'`).bind(tournament.id).all();
     if (!subscriptions.results?.length) return;
@@ -6104,12 +6166,14 @@ async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
     const items = [];
     for (const subscription of subscriptions.results) {
       const match = buildPlayerLiveView({ registrationId: subscription.registration_id, rounds: [round] }).currentMatch;
-      if (!match || !subscription.live_token) continue;
+      if (!match) continue;
       items.push({
         endpoint: subscription.endpoint,
         p256dh: subscription.p256dh,
         auth: subscription.auth,
-        payload: buildLiveRoundPush({ tournamentName: tournament.name, match, language: subscription.language, url: buildLiveLink(appOrigin, subscription.live_token) }),
+        // Der Link selbst ist nur gehasht gespeichert: Die App findet den auf dem Gerät gemerkten Link über die Meldungs-ID.
+        payload: buildLiveRoundPush({ tournamentName: tournament.name, match, language: subscription.language,
+          url: `${appOrigin}/live/${encodeURIComponent(subscription.registration_id)}` }),
       });
     }
     const messages = chunk(items, LIVE_PUSH_CHUNK_SIZE).map((part) => ({ body: { kind: 'live_push', items: part } }));
@@ -6673,9 +6737,6 @@ export async function relinkRegistrationSlot(env, registration, slot, user) {
   const now = new Date().toISOString();
   await db.batch([
     db.prepare(`UPDATE registrations SET ${column.userId} = ?, updated_at = ? WHERE id = ?`).bind(targetUserId, now, registration.id),
-    // Die ausdrückliche Zuordnung durch die Turnierleitung hebt ein früheres "Das bin ich nicht" dieses Kontos auf.
-    db.prepare('DELETE FROM registration_link_declines WHERE registration_id = ? AND user_id = ?')
-      .bind(registration.id, targetUserId || ''),
     auditStatement(db, { tournamentId: registration.tournament_id, registrationId: registration.id, actorUserId: user.id,
       actorRole: actorRoleFor(registration, user), action: 'account_relinked', target: `slot:${slot}`,
       details: { from: registration[column.userId] || null, to: targetUserId }, now }),

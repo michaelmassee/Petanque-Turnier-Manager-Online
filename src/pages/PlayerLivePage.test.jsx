@@ -216,7 +216,7 @@ describe('Live-Ansicht für Spieler', () => {
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/live/token/tok1', expect.anything());
     expect(screen.queryByRole('button', { name: 'Das bin ich nicht' })).not.toBeInTheDocument();
     await waitFor(() => expect(readRememberedTeams()).toEqual([
-      { token: 'tok1', tournamentName: 'Sommer-Supermêlée', date: '2026-09-25', location: 'Linden', label: 'Anna Muster' },
+      { token: 'tok1', registrationId: 'r1', tournamentName: 'Sommer-Supermêlée', date: '2026-09-25', location: 'Linden', label: 'Anna Muster' },
     ]));
     unmount();
 
@@ -227,6 +227,22 @@ describe('Live-Ansicht für Spieler', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Vergessen' }));
     expect(readRememberedTeams()).toEqual([]);
     expect(screen.queryByText('Auf diesem Gerät gemerkt')).not.toBeInTheDocument();
+  });
+
+  it('öffnet einen Push-Link auf /live/<Meldung> über den auf dem Gerät gemerkten Link, ohne Login', async () => {
+    localStorage.setItem('ptm_live_teams', JSON.stringify([{ token: 'tok1', registrationId: 'r1', tournamentName: 'Sommer-Supermêlée', date: '2026-09-25' }]));
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(livePayload()));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <PlayerLivePage route={matchLiveRoute('/live/r1')} language="de" setLanguage={() => {}} menuOpen={false} setMenuOpen={() => {}}
+          navigate={() => {}} currentUser={null} isAdmin={false} onSelectAdminDashboard={() => {}} onLogout={() => {}} onLogin={() => {}}
+          drawerContent={null} postboxControl={null} />
+      </QueryClientProvider>,
+    );
+
+    await screen.findAllByText('Bert Beispiel');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/live/token/tok1', expect.anything());
   });
 
   it('vergisst einen ungültigen persönlichen Link', async () => {
