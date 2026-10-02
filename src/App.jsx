@@ -6,7 +6,7 @@ import { CancelledError, QueryClientProvider, useQuery, useQueryClient } from '@
 import { api, authenticatedApi, clearOfflineApiCache, setSessionExpiredHandler } from './lib/api.js';
 import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
-import { LIVE_VIEW_AVAILABLE_EVENT, liveViewPathFor } from './postbox-core.js';
+import { LIVE_VIEW_EVENTS, liveViewPathFor } from './postbox-core.js';
 import { usePath, matchTournamentRoute, matchLiveRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
@@ -710,7 +710,7 @@ function AppContent() {
       setPostboxOpen(false);
       navigate(`/turniere/${message.eventData.tournamentId}`);
     }
-    const livePath = message.eventType === LIVE_VIEW_AVAILABLE_EVENT ? liveViewPathFor(message.eventData) : null;
+    const livePath = LIVE_VIEW_EVENTS.includes(message.eventType) ? liveViewPathFor(message.eventData) : null;
     if (livePath) {
       setPostboxOpen(false);
       navigate(livePath);
@@ -2353,6 +2353,8 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     if (!form.firstName && !form.lastName && currentUser.firstName && currentUser.lastName) {
       updates.firstName = currentUser.firstName;
       updates.lastName = currentUser.lastName;
+      // Wer sich selbst als Spieler 1 einträgt, wird über seine eigene Adresse mit dem Slot verknüpft (E-22).
+      if (!form.playerEmail && currentUser.email) updates.playerEmail = currentUser.email;
     }
     if (!form.email && currentUser.email) {
       updates.email = currentUser.email;
@@ -2381,7 +2383,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             <p className="hint">
               {(REGISTRATION_OPENS_TEMPLATES[language] || REGISTRATION_OPENS_TEMPLATES.de)(formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone))}
             </p>
-          ) : <p className="hint">{registrationStatusLabel(tournament, language)}</p>}
+          ) : <p className="hint">{tournament.status === 'running' ? t('Anmeldung geschlossen – Turnier läuft') : registrationStatusLabel(tournament, language)}</p>}
           <div className="row-actions stretch">
             <Button variant="secondary" onClick={onCancel}>{t('Abbrechen')}</Button>
           </div>
@@ -2430,6 +2432,18 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             />
             <span>
               {t('Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.')}
+              <RequiredMark />
+            </span>
+          </label>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={Boolean(form.personsConsentAccepted)}
+              onChange={(event) => setForm({ ...form, personsConsentAccepted: event.target.checked })}
+              required
+            />
+            <span>
+              {t('Ich bestätige, dass alle eingetragenen Personen mit der Weitergabe ihres Namens und ihrer E-Mail-Adresse an den Veranstalter einverstanden sind.')}
               <RequiredMark />
             </span>
           </label>

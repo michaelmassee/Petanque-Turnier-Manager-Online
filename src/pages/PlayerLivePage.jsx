@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { formatDate, formatWeekdayShort, DISPLAY_LOCALES } from '../lib/format.js';
+import { REGISTRATION_STATUSES } from '../lib/constants.js';
+import { labelFor } from '../lib/domain.js';
 import { Button, Feedback } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { isIosSafari } from '../lib/hooks.js';
@@ -33,14 +35,14 @@ function writePushFlag(registrationId, enabled) {
   }
 }
 
-function LivePushToggle({ path, useSession, registrationId }) {
+function LivePushToggle({ path, registrationId }) {
   const { t } = useTranslation();
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const supported = isPushSupported();
-  const request = useSession ? authenticatedApi : api;
+  const request = authenticatedApi;
 
   useEffect(() => {
     let cancelled = false;
@@ -221,11 +223,66 @@ function HistoryCard({ live }) {
   );
 }
 
-export function LiveDetail({ queryKey, path, useSession, language }) {
+// Phase der Anmeldung vor der Auslosung (KP-12): Anmeldestatus, Check-in und Teambildung.
+function RegistrationPhase({ registration, tournament }) {
   const { t } = useTranslation();
+  const lines = [];
+  if (registration.status !== 'confirmed') {
+    lines.push(`${t('Anmeldestatus')}: ${labelFor(REGISTRATION_STATUSES, registration.status)}`);
+  }
+  if (registration.participation === 'inactive') lines.push(t('Noch nicht eingecheckt.'));
+  if (registration.participation === 'active') lines.push(t('Eingecheckt.'));
+  if (registration.incomplete) lines.push(t('Team noch unvollständig.'));
+  if (registration.registrationType === 'melee' && registration.meleeTeammates === null && tournament.status !== 'finished') {
+    lines.push(t('Dein Team wird kurz vor Turnierstart gebildet.'));
+  }
+  if (registration.registrationType === 'supermelee') lines.push(t('Dein Team wird bei jeder Auslosung neu gebildet.'));
+  return (
+    <section className="panel live-card" aria-label={t('Meine Anmeldung')}>
+      <h2>{t('Meine Anmeldung')}</h2>
+      {lines.map((line) => <p key={line} className="live-phase">{line}</p>)}
+      {registration.unit === 'team' && registration.persons?.length > 0 && (
+        <p className="muted">{t('Besetzung')}: <span data-i18n-skip>{registration.persons.join(' + ')}</span></p>
+      )}
+      {registration.meleeTeammates?.length > 0 && (
+        <p className="muted">{t('Dein Team')}: <span data-i18n-skip>{registration.meleeTeammates.join(' + ')}</span></p>
+      )}
+    </section>
+  );
+}
+
+// "Das bin ich nicht" (E-22): Das eigene Konto löst sich aus der Anmeldung; Name und Anmeldung bleiben bestehen.
+function NotMeButton({ path, onDone }) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function decline() {
+    if (!window.confirm(t('Dein Konto wird von dieser Anmeldung gelöst und nicht wieder automatisch verknüpft. Fortfahren?'))) return;
+    setError(''); setBusy(true);
+    try {
+      await authenticatedApi(`${path}/not-me`, { method: 'POST' });
+      await onDone();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="live-not-me">
+      <Feedback error={error} />
+      <p className="hint">{t('Du wurdest von jemand anderem eingetragen und spielst gar nicht mit?')}</p>
+      <Button variant="secondary" loading={busy} onClick={decline}>{t('Das bin ich nicht')}</Button>
+    </div>
+  );
+}
+
+export function LiveDetail({ queryKey, path, language, navigate = () => {} }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey,
-    queryFn: () => (useSession ? authenticatedApi(path) : api(path)),
+    queryFn: () => authenticatedApi(path),
     refetchInterval: LIVE_REFRESH_MS,
     refetchIntervalInBackground: false,
     // Beim Zurückkehren zur App immer sofort neu laden - unverändert kostet das nur ein 304.
@@ -233,11 +290,36 @@ export function LiveDetail({ queryKey, path, useSession, language }) {
     retry: false,
   });
   const data = query.data;
+  // Ohne Zugriff (z. B. nach „Das bin ich nicht“ oder aus der Anmeldung entfernt) ist ein noch zwischengespeicherter
+  // Stand veraltet: nicht mehr anzeigen.
+  async function zurUebersicht() {
+    await queryClient.invalidateQueries({ queryKey: ['live', 'me'] });
+    navigate('/live');
+    queryClient.removeQueries({ queryKey });
+  }
 
   if (query.isPending) return <p className="muted">{t('Wird geladen…')}</p>;
+  if (!data && query.error?.payload?.details?.code === 'tournament_deleted') {
+    return (
+      <section className="panel live-card">
+        <h2 data-i18n-skip>{query.error.payload.details.tournamentName}</h2>
+        <p className="hint">{t('Das Turnier wurde vom Veranstalter gelöscht.')}</p>
+      </section>
+    );
+  }
+  if (query.error?.status === 404) {
+    return (
+      <section className="panel live-card">
+        <Feedback error={query.error.message} />
+        <p className="hint">{t('Diese Anmeldung ist für dein Konto nicht sichtbar.')}</p>
+        <Button variant="secondary" onClick={zurUebersicht}>{t('Zu meinen Live-Turnieren')}</Button>
+      </section>
+    );
+  }
   if (!data) return <Feedback error={query.error?.message || t('Die Live-Ansicht konnte nicht geladen werden.')} />;
 
-  const { tournament, registration, live } = data;
+  const { tournament, registration, live, dataAsOf } = data;
+  const drawn = live.lastRoundNumber !== null;
   return (
     <div className="live-view">
       <header className="live-header">
@@ -252,15 +334,20 @@ export function LiveDetail({ queryKey, path, useSession, language }) {
       {tournament.status !== 'running' && tournament.status !== 'finished' && <p className="hint">{t('Das Turnier hat noch nicht begonnen.')}</p>}
       {query.error && <Feedback error={query.error.message} />}
       {registration.participation === 'withdrawn' && <p className="hint">{t('Du pausierst gerade. Für neue Runden wirst du nicht ausgelost.')}</p>}
-      {registration.participation === 'inactive' && tournament.status === 'running' && <p className="hint">{t('Du bist noch nicht eingecheckt.')}</p>}
-      <CurrentMatchCard live={live} participation={registration.participation} />
+      {!drawn && <RegistrationPhase registration={registration} tournament={tournament} />}
+      {drawn && registration.participation === 'inactive' && <p className="hint">{t('Du bist noch nicht eingecheckt.')}</p>}
+      {(drawn || tournament.status === 'running') && <CurrentMatchCard live={live} participation={registration.participation} />}
       <RankingCard live={live} />
       <HistoryCard live={live} />
-      {tournament.status === 'running' && <LivePushToggle path={path} useSession={useSession} registrationId={registration.id} />}
+      {tournament.status === 'running' && <LivePushToggle path={path} registrationId={registration.id} />}
       <div className="live-refresh">
-        <span className="muted">{t('Stand')}: {formatClock(query.dataUpdatedAt, language)}</span>
+        <span className="muted">
+          {t('Stand')}: {formatClock(query.dataUpdatedAt, language)}
+          {dataAsOf && <> · {t('Turnierdaten vom')} {formatClock(dataAsOf, language)}</>}
+        </span>
         <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>
       </div>
+      {tournament.status !== 'finished' && <NotMeButton path={path} onDone={zurUebersicht} />}
     </div>
   );
 }
@@ -280,7 +367,7 @@ export function MyLiveList({ navigate, language }) {
   if (query.error) return <Feedback error={query.error.message} />;
 
   if (!registrations.length) {
-    return <p className="muted">{t('Du bist aktuell in keinem laufenden Turnier gemeldet.')}</p>;
+    return <p className="muted">{t('Du bist aktuell in keinem Turnier gemeldet.')}</p>;
   }
   return (
     <div className="live-list">
@@ -288,11 +375,14 @@ export function MyLiveList({ navigate, language }) {
       {registrations.map((entry) => (
         <button key={entry.id} type="button" className="panel live-list-item" onClick={() => navigate(`/live/${encodeURIComponent(entry.id)}`)}>
           <strong data-i18n-skip>{entry.tournament.name}</strong>
-          <span className="muted">
-            {formatDate(entry.tournament.date, language)} {formatWeekdayShort(entry.tournament.date, language)}
-            {entry.tournament.location ? <> · <span data-i18n-skip>{entry.tournament.location}</span></> : null}
-          </span>
-          <span data-i18n-skip>{entry.label}</span>
+          {entry.deleted ? <span className="muted">{t('Das Turnier wurde vom Veranstalter gelöscht.')}</span> : (
+            <span className="muted">
+              {formatDate(entry.tournament.date, language)} {formatWeekdayShort(entry.tournament.date, language)}
+              {entry.tournament.location ? <> · <span data-i18n-skip>{entry.tournament.location}</span></> : null}
+            </span>
+          )}
+          {entry.label && <span data-i18n-skip>{entry.label}</span>}
+          {entry.status && entry.status !== 'confirmed' && <span className="muted">{labelFor(REGISTRATION_STATUSES, entry.status)}</span>}
           {entry.participation === 'withdrawn' && <span className="live-paused">{t('Pausiert')}</span>}
           {entry.tournament.status === 'finished' && <span className="muted">{t('Beendet')}</span>}
         </button>
@@ -317,17 +407,14 @@ export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenu
   const { t } = useTranslation();
 
   let content;
-  if (route.token) {
-    content = <LiveDetail queryKey={['live', 'token', route.token]} path={`/api/live/token/${encodeURIComponent(route.token)}`} language={language} />;
-  } else if (route.registrationId && currentUser) {
-    content = <LiveDetail queryKey={['live', 'registration', route.registrationId]} path={`/api/live/registrations/${encodeURIComponent(route.registrationId)}`} useSession language={language} />;
+  if (route.registrationId && currentUser) {
+    content = <LiveDetail queryKey={['live', 'registration', route.registrationId]} path={`/api/live/registrations/${encodeURIComponent(route.registrationId)}`} language={language} navigate={navigate} />;
   } else if (currentUser) {
     content = <MyLiveList navigate={navigate} language={language} />;
   } else {
     content = (
       <section className="panel live-card">
         <p>{t('Melde dich an, um deine laufenden Turniere live zu verfolgen.')}</p>
-        <p className="muted">{t('Du hast nach dem Check-in einen Link per E-Mail bekommen? Öffne ihn einfach – dafür ist keine Anmeldung nötig.')}</p>
         <Button onClick={onLogin}>{t('Anmelden')}</Button>
       </section>
     );

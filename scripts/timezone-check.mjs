@@ -97,10 +97,16 @@ expectEqual(
   registrationOpenStatus({ ...baseTournament, visibility: 'private' }, new Date(opensAtUtc)),
   'closed',
 );
+// Laufende Turniere melden einen eigenen Grund (Anmeldung geschlossen – Turnier läuft).
 expectEqual(
   'Turnierstatus "running" bleibt geschlossen',
   registrationOpenStatus({ ...baseTournament, status: 'running' }, new Date(opensAtUtc)),
-  'closed',
+  'running',
+);
+expectEqual(
+  'ab dem angesetzten Turnierbeginn geschlossen',
+  registrationOpenStatus(baseTournament, new Date(opensAtUtc), opensAtUtc),
+  'started',
 );
 
 if (failures > 0) process.exit(1);

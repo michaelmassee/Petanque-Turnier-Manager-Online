@@ -1,7 +1,74 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
-import { Feedback } from '../components/ui.jsx';
+import { Button, Feedback } from '../components/ui.jsx';
+
+/**
+ * Automatische Löschung personenbezogener Daten (DS-04): standardmäßig aus. Zeigt vor dem Einschalten, wie viele
+ * beendete Turniere ein Löschlauf jetzt bereinigen würde.
+ */
+export function DataRetentionPanel() {
+  const { t } = useTranslation();
+  const [settings, setSettings] = useState(null);
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    authenticatedApi('/api/admin/settings/data-retention')
+      .then((result) => {
+        if (cancelled) return;
+        setSettings(result);
+        setEnabled(result.automaticPurgeEnabled);
+      })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message); });
+    return () => { cancelled = true; };
+  }, []);
+
+  async function save() {
+    setError('');
+    setMessage('');
+    setBusy(true);
+    try {
+      const result = await authenticatedApi('/api/admin/settings/data-retention', {
+        method: 'PUT',
+        body: JSON.stringify({ automaticPurgeEnabled: enabled }),
+      });
+      setSettings(result);
+      setEnabled(result.automaticPurgeEnabled);
+      setMessage(t('Einstellung gespeichert.'));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="panel">
+      <div className="section-title">
+        <div>
+          <h2>{t('Datenschutz')}</h2>
+          <p className="muted">{t('Personenbezogene Daten beendeter Turniere nach Ablauf der Aufbewahrungsfrist automatisch löschen (E-Mail-Adressen, Tarife, Antworten, Nachrichten; das Protokoll wird pseudonymisiert).')}</p>
+        </div>
+      </div>
+      <Feedback error={error} />
+      <Feedback message={message} />
+      {settings && (
+        <>
+          <p className="hint">{t('Ein Löschlauf würde jetzt {{count}} beendete Turniere bereinigen. Das lässt sich nicht rückgängig machen.', { count: settings.dueTournaments })}</p>
+          <label className="checkbox-field">
+            <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} disabled={busy} />
+            {t('Automatische Löschung einschalten (täglich)')}
+          </label>
+          <Button disabled={busy || enabled === settings.automaticPurgeEnabled} loading={busy} onClick={save}>{t('Speichern')}</Button>
+        </>
+      )}
+    </div>
+  );
+}
 
 export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, registrationsCount }) {
   const { t } = useTranslation();
@@ -133,6 +200,7 @@ export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, 
           ))}
         </div>
       </div>
+      <DataRetentionPanel />
     </section>
   );
 }

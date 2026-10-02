@@ -105,7 +105,8 @@ describe('Worker-Fachlogik', () => {
     expect(() => assertPartnerCountMatchesFormation({ formation: 'tete' }, { partnerFirstName: 'A', partnerLastName: 'B' })).toThrow('keinen Partner');
     expect(() => assertPartnerCountMatchesFormation({ formation: 'doublette' }, {})).toThrow('genau einen Partner');
     expect(() => assertPartnerCountMatchesFormation({ formation: 'doublette' }, { partnerFirstName: 'A', partnerLastName: 'B', partner2FirstName: 'C', partner2LastName: 'D' })).toThrow('nur einen Partner');
-    expect(() => assertPartnerCountMatchesFormation({ formation: 'triplette' }, { partnerFirstName: 'A', partnerLastName: 'B' })).toThrow('genau zwei Partner');
+    expect(() => assertPartnerCountMatchesFormation({ formation: 'triplette' }, {})).toThrow('mindestens einen Partner');
+    expect(() => assertPartnerCountMatchesFormation({ formation: 'triplette' }, { partnerFirstName: 'A', partnerLastName: 'B' })).not.toThrow();
     expect(() => assertPartnerCountMatchesFormation({ formation: 'triplette' }, { partnerFirstName: 'A', partnerLastName: 'B', partner2FirstName: 'C', partner2LastName: 'D' })).not.toThrow();
   });
 
@@ -115,6 +116,18 @@ describe('Worker-Fachlogik', () => {
     expect(registrationOpenStatus(tournament, new Date('2026-06-02T09:00:00Z'))).toBe('not_yet_open');
     expect(registrationOpenStatus(tournament, new Date('2026-06-02T12:00:00Z'))).toBe('open');
     expect(registrationOpenStatus(tournament, new Date('2026-06-04T12:00:00Z'))).toBe('deadline_passed');
+  });
+
+  it('schließt die Anmeldung bei Start, manuellem Schluss und spätestens zum Turnierbeginn (E-02, P-65)', () => {
+    const tournament = { visibility: 'public', status: 'registration' };
+    const startsAt = '2026-06-06T08:00:00.000Z';
+    expect(registrationOpenStatus({ ...tournament, status: 'running' })).toBe('running');
+    expect(registrationOpenStatus({ ...tournament, registration_closed: 1 })).toBe('closed');
+    expect(registrationOpenStatus(tournament, new Date('2026-06-06T07:59:59Z'), startsAt)).toBe('open');
+    expect(registrationOpenStatus(tournament, new Date('2026-06-06T08:00:00Z'), startsAt)).toBe('started');
+    // Die Meldefrist ist nachrangig: nach Turnierbeginn gilt immer "started".
+    expect(registrationOpenStatus({ ...tournament, registration_deadline: '2026-06-10T10:00:00Z' },
+      new Date('2026-06-07T12:00:00Z'), startsAt)).toBe('started');
   });
 
   it('akzeptiert nur Ergebniswerte von 0 bis 13', () => {

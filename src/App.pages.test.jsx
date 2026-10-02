@@ -163,6 +163,7 @@ describe('Admin-Dashboard', () => {
       if (path === '/api/admin/petanque-aktuell/tournaments') return Promise.resolve({
         tournaments: [{ externalKey: 'imported', imported: true }, { externalKey: 'new', imported: false }],
       });
+      if (path === '/api/admin/settings/data-retention') return Promise.resolve({ automaticPurgeEnabled: false, dueTournaments: 0 });
       throw new Error(`unerwarteter API-Aufruf: ${path}`);
     });
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { LiveDetail, MyLiveBackLink, MyLiveList } from './PlayerLivePage.jsx';
 import { matchLiveRoute } from '../lib/routing.js';
@@ -35,7 +35,7 @@ function renderDetail() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <LiveDetail queryKey={['live', 'token', 'abc']} path="/api/live/token/abc" language="de" />
+      <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de" />
     </QueryClientProvider>,
   );
 }
@@ -100,10 +100,10 @@ describe('Live-Ansicht für Spieler', () => {
   });
 
   it('meldet einen ungültigen Link sichtbar', async () => {
-    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ error: 'Dieser Live-Link ist ungültig oder abgelaufen' }, 404)));
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ error: 'Diese Meldung gehört nicht zu deinem Konto' }, 404)));
     renderDetail();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Dieser Live-Link ist ungültig oder abgelaufen');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Diese Meldung gehört nicht zu deinem Konto');
   });
 
   it('fordert bei mehreren laufenden Turnieren zur Auswahl auf', async () => {
@@ -156,13 +156,58 @@ describe('Live-Ansicht für Spieler', () => {
 
     expect(await screen.findByRole('button', { name: /Meine Turniere/ })).toBeInTheDocument();
   });
+
+  it('zeigt ohne Zugriff keinen zwischengespeicherten Stand mehr, sondern den Weg zur eigenen Liste', async () => {
+    const payload = livePayload();
+    payload.tournament.status = 'registration';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ error: 'Anmeldung nicht gefunden' }, 404));
+    const navigate = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['live', 'registration', 'r1'], payload);
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de"
+          navigate={navigate} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('Diese Anmeldung ist für dein Konto nicht sichtbar.')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Anmeldung nicht gefunden');
+    expect(screen.queryByRole('button', { name: 'Das bin ich nicht' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Anna Muster/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zu meinen Live-Turnieren' }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/live'));
+  });
+
+  it('verwirft nach „Das bin ich nicht“ die Liste der eigenen Live-Turniere, bevor sie wieder erscheint', async () => {
+    const payload = livePayload();
+    payload.tournament.status = 'registration';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => (String(url).endsWith('/not-me')
+      ? jsonResponse({ ok: true }) : jsonResponse(payload)));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const navigate = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['live', 'me'], { registrations: [{ id: 'r1' }] });
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de"
+          navigate={navigate} />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Das bin ich nicht' }));
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/live'));
+    expect(client.getQueryState(['live', 'me']).isInvalidated).toBe(true);
+  });
 });
 
 describe('Live-Routen', () => {
   it('unterscheidet Übersicht, eigene Meldung und persönlichen Link', () => {
     expect(matchLiveRoute('/live')).toEqual({});
     expect(matchLiveRoute('/live/r1')).toEqual({ registrationId: 'r1' });
-    expect(matchLiveRoute('/live/t/abc')).toEqual({ token: 'abc' });
+    expect(matchLiveRoute('/live/t/abc')).toBeNull();
     expect(matchLiveRoute('/live/t')).toEqual({ registrationId: 't' });
     expect(matchLiveRoute('/live/a/b/c')).toBeNull();
     expect(matchLiveRoute('/turniere')).toBeNull();

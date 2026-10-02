@@ -2231,6 +2231,30 @@ a.left-panel-link {
   margin-left: 4px;
 }
 
+.role-conflict {
+  background: #fde8e8;
+  color: #a12020;
+}
+
+.relink-accounts {
+  margin-top: 16px;
+  border-top: 1px solid #e3e7ef;
+  padding-top: 12px;
+}
+
+.relink-accounts .row-actions {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+
+.registration-sync-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .license-badge {
   margin-right: 4px;
   font-size: 0.9em;

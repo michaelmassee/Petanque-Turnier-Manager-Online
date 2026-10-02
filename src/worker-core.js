@@ -107,9 +107,14 @@ export function isCalendarEntry(tournament) {
   return Number(tournament.registration_enabled ?? 1) === 0;
 }
 
-export function registrationOpenStatus(tournament, now = new Date()) {
+// startsAt = angesetzter Turnierbeginn als UTC-Zeitpunkt. Spätestens dann schließt die Online-Anmeldung
+// automatisch, auch wenn das Turnierdokument den Start nicht übertragen hat (Spezifikation E-02).
+export function registrationOpenStatus(tournament, now = new Date(), startsAt = null) {
   if (isCalendarEntry(tournament)) return 'closed';
+  if (tournament.status === 'running') return 'running';
   if (tournament.visibility !== 'public' || tournament.status !== 'registration') return 'closed';
+  if (Number(tournament.registration_closed || 0) === 1) return 'closed';
+  if (startsAt && new Date(startsAt).getTime() <= now.getTime()) return 'started';
   if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < now.getTime()) return 'deadline_passed';
   if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > now.getTime()) return 'not_yet_open';
   return 'open';
@@ -202,7 +207,8 @@ export function assertPartnerCountMatchesFormation(tournament, registration) {
   const hasPartner = Boolean(registration.partnerFirstName && registration.partnerLastName); const hasPartner2 = Boolean(registration.partner2FirstName && registration.partner2LastName);
   if (formation === 'tete') { if (hasPartner || hasPartner2) throw new HttpError(400, 'Formation Tête erlaubt nur einen Teilnehmer, keinen Partner'); return; }
   if (formation === 'doublette') { if (!hasPartner) throw new HttpError(400, 'Formation Doublette erfordert genau einen Partner'); if (hasPartner2) throw new HttpError(400, 'Formation Doublette erlaubt nur einen Partner'); return; }
-  if (formation === 'triplette' && (!hasPartner || !hasPartner2)) throw new HttpError(400, 'Formation Triplette erfordert genau zwei Partner');
+  // Triplette: 2 oder 3 Personen (E-20). Mit 2 Personen ist das Team zulässig, aber bis zur Auslosung unvollständig.
+  if (formation === 'triplette' && !hasPartner) throw new HttpError(400, 'Formation Triplette erfordert mindestens einen Partner');
 }
 
 // Duplikat von distanceKm (src/lib/domain.js) - worker.js kann domain.js nicht

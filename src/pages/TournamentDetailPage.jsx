@@ -238,6 +238,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
           {participant.firstName} {participant.lastName}
         </strong>
         <span>{participant.club}</span>
+        {participant.overCapacity && <small className="muted">{t('Nachmeldung der Turnierleitung')}</small>}
       </div>
       {(participant.partnerFirstName || participant.partnerLastName) && (
         <div data-i18n-skip>

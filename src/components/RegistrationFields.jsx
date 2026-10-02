@@ -117,8 +117,10 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
         </label>
       )}
       {!(showStatus && form.noEmail) && (
-        <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+        <TextField label={t('Kontakt-E-Mail der Anmeldung')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       )}
+      <TextField label={allowsPartner ? t('E-Mail Spieler 1 (optional)') : t('E-Mail des Spielers (optional)')} type="email" value={form.playerEmail || ''} onChange={(playerEmail) => setForm({ ...form, playerEmail })} />
+      <p className="hint">{t('Mit der E-Mail einer Person wird ihr PTM-Online-Konto verknüpft, damit sie die Live-Ansicht der Anmeldung sieht. Die Kontakt-E-Mail dient nur Rückfragen und Bestätigungen.')}</p>
       <div className="form-grid">
         <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
         {licenseRequired && (
@@ -161,9 +163,10 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
       )}
       {allowsPartner2 && (
         <>
+          <p className="hint">{t('Ein Triplette-Team kann auch zu zweit angemeldet und vor Ort vervollständigt werden.')}</p>
           <div className="form-grid">
-            <TextField label={t('Partner 2 Vorname')} value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required minLength={2} invalid={invalidField === 'partner2FirstName'} />
-            <TextField label={t('Partner 2 Nachname')} value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} required minLength={2} invalid={invalidField === 'partner2FirstName'} />
+            <TextField label={t('Partner 2 Vorname')} value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required={Boolean(form.partner2LastName)} minLength={2} invalid={invalidField === 'partner2FirstName'} />
+            <TextField label={t('Partner 2 Nachname')} value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} required={Boolean(form.partner2FirstName)} minLength={2} invalid={invalidField === 'partner2FirstName'} />
           </div>
           <ParticipantQuestions participant="partner2" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner2', questionId, checked)} />
           <div className="form-grid">
