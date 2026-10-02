@@ -58,6 +58,31 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
   });
 
   describe('Anmeldung und Konten (E-20, E-22, KP-06)', () => {
+    it('speichert Verein und Lizenznummer für jede Person einer Triplette', async () => {
+      setzeTurnier({ formation: 'triplette', license_required: 1 });
+
+      const response = await oeffentlichAnmelden({
+        firstName: 'Anna', lastName: 'Adler', club: 'BC A', licenseNr: 'A-1',
+        partnerFirstName: 'Ben', partnerLastName: 'Berg', partnerClub: 'BC B', partnerLicenseNr: 'B-2',
+        partner2FirstName: 'Clara', partner2LastName: 'Cramer', partner2Club: 'BC C', partner2LicenseNr: 'C-3',
+      });
+
+      expect(response.status).toBe(201);
+      expect(zeile('SELECT club, license_nr, partner_club, partner_license_nr, partner2_club, partner2_license_nr FROM registrations'))
+        .toEqual({ club: 'BC A', license_nr: 'A-1', partner_club: 'BC B', partner_license_nr: 'B-2', partner2_club: 'BC C', partner2_license_nr: 'C-3' });
+      expect((await response.json()).registration).toMatchObject({ partnerClub: 'BC B', partnerLicenseNr: 'B-2', partner2Club: 'BC C', partner2LicenseNr: 'C-3' });
+    });
+
+    it('fordert bei Lizenzturnieren die Lizenznummer jeder eingetragenen Person', async () => {
+      setzeTurnier({ formation: 'triplette', license_required: 1 });
+
+      await expect(oeffentlichAnmelden({
+        firstName: 'Anna', lastName: 'Adler', licenseNr: 'A-1',
+        partnerFirstName: 'Ben', partnerLastName: 'Berg', partnerLicenseNr: 'B-2',
+        partner2FirstName: 'Clara', partner2LastName: 'Cramer',
+      })).rejects.toMatchObject({ status: 400, message: 'Lizenznummer für Partner 2 ist erforderlich' });
+    });
+
     it('nimmt eine Triplette mit 2 Personen als unvollständig an und lehnt 1 Person ab (P-51)', async () => {
       setzeTurnier({ formation: 'triplette' });
       await expect(oeffentlichAnmelden({ firstName: 'Solo', lastName: 'Spieler' })).rejects.toMatchObject({ status: 400 });

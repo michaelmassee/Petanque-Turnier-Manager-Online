@@ -245,6 +245,15 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
           <strong>
             {participant.partnerFirstName} {participant.partnerLastName}
           </strong>
+          <span>{participant.partnerClub}</span>
+        </div>
+      )}
+      {(participant.partner2FirstName || participant.partner2LastName) && (
+        <div data-i18n-skip>
+          <strong>
+            {participant.partner2FirstName} {participant.partner2LastName}
+          </strong>
+          <span>{participant.partner2Club}</span>
         </div>
       )}
       {participant.registrationId && (

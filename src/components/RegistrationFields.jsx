@@ -69,18 +69,18 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
   };
 
   useEffect(() => {
-    if (!allowsPartner && (form.partnerFirstName || form.partnerLastName || form.partnerEmail || form.partnerLicenseNr || form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2LicenseNr)) {
+    if (!allowsPartner && (form.partnerFirstName || form.partnerLastName || form.partnerEmail || form.partnerClub || form.partnerLicenseNr || form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2Club || form.partner2LicenseNr)) {
       setForm((current) => ({
         ...current,
-        partnerFirstName: '', partnerLastName: '', partnerEmail: '', partnerLicenseNr: '',
-        partner2FirstName: '', partner2LastName: '', partner2Email: '', partner2LicenseNr: '',
+        partnerFirstName: '', partnerLastName: '', partnerEmail: '', partnerClub: '', partnerLicenseNr: '',
+        partner2FirstName: '', partner2LastName: '', partner2Email: '', partner2Club: '', partner2LicenseNr: '',
         feeSelections: (current.feeSelections || []).filter((selection) => selection.participant !== 'partner' && selection.participant !== 'partner2'),
         registrationAnswers: (current.registrationAnswers || []).filter((answer) => answer.participant !== 'partner' && answer.participant !== 'partner2'),
       }));
-    } else if (allowsPartner && !allowsPartner2 && (form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2LicenseNr)) {
+    } else if (allowsPartner && !allowsPartner2 && (form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2Club || form.partner2LicenseNr)) {
       setForm((current) => ({
         ...current,
-        partner2FirstName: '', partner2LastName: '', partner2Email: '', partner2LicenseNr: '',
+        partner2FirstName: '', partner2LastName: '', partner2Email: '', partner2Club: '', partner2LicenseNr: '',
         feeSelections: (current.feeSelections || []).filter((selection) => selection.participant !== 'partner2'),
         registrationAnswers: (current.registrationAnswers || []).filter((answer) => answer.participant !== 'partner2'),
       }));
@@ -145,6 +145,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
             <TextField label={t('Partner E-Mail')} type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
             {licenseRequired && <TextField label={t('Partner Lizenznummer')} value={form.partnerLicenseNr} onChange={(partnerLicenseNr) => setForm({ ...form, partnerLicenseNr })} required />}
           </div>
+          <TextField label={t('Verein')} value={form.partnerClub} onChange={(partnerClub) => setForm({ ...form, partnerClub })} />
           {showFeeSelect && <SelectField label={t('Startgeld Partner')} value={selectedFee('partner')} onChange={(tariffId) => setSelectedFee('partner', tariffId)} options={feeOptions('partner')} />}
         </RegistrationSection>
       )}
@@ -160,6 +161,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
             <TextField label={t('Partner 2 E-Mail')} type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
             {licenseRequired && <TextField label={t('Partner 2 Lizenznummer')} value={form.partner2LicenseNr} onChange={(partner2LicenseNr) => setForm({ ...form, partner2LicenseNr })} required />}
           </div>
+          <TextField label={t('Verein')} value={form.partner2Club} onChange={(partner2Club) => setForm({ ...form, partner2Club })} />
           {showFeeSelect && <SelectField label={t('Startgeld Partner 2')} value={selectedFee('partner2')} onChange={(tariffId) => setSelectedFee('partner2', tariffId)} options={feeOptions('partner2')} />}
         </RegistrationSection>
       )}

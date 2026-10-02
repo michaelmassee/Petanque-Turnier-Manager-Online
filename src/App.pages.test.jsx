@@ -337,7 +337,7 @@ describe('Öffentliche Turnierdetailseite', () => {
     render(
       <PublicRegistrationPanel
         language="de"
-        tournament={{ id: 'team-1', name: 'Teamturnier', status: 'registration', visibility: 'public', maxRegistrations: 0, activeRegistrations: 0, formation: 'triplette', registrationType: 'forme', teamNameEnabled: true }}
+        tournament={{ id: 'team-1', name: 'Teamturnier', status: 'registration', visibility: 'public', maxRegistrations: 0, activeRegistrations: 0, formation: 'triplette', registrationType: 'forme', teamNameEnabled: true, licenseRequired: true }}
         form={{ ...EMPTY_REGISTRATION_FORM, tournamentId: 'team-1' }}
         setForm={() => {}}
         onSubmit={(event) => event.preventDefault()}
@@ -351,6 +351,10 @@ describe('Öffentliche Turnierdetailseite', () => {
     expect(screen.getByRole('heading', { name: 'Spieler 2', level: 3 }).closest('.registration-section')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Spieler 3', level: 3 }).closest('.registration-section')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Hinweise und Einverständnis', level: 3 }).closest('.registration-section')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Verein')).toHaveLength(3);
+    expect(screen.getByLabelText(/^Lizenznummer\b/)).toBeRequired();
+    expect(screen.getByLabelText(/^Partner Lizenznummer\b/)).toBeRequired();
+    expect(screen.getByLabelText(/^Partner 2 Lizenznummer\b/)).toBeRequired();
   });
 
   it('bietet nur bei einer möglichen Anmeldung Eingabefelder an', () => {

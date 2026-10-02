@@ -221,10 +221,10 @@ function buildRegistrationParticipantsBlock(registration, language) {
     { firstName: registration.first_name, lastName: registration.last_name, email: registration.email, club: registration.club, licenseNr: registration.license_nr },
   ];
   if (registration.partner_first_name && registration.partner_last_name) {
-    people.push({ firstName: registration.partner_first_name, lastName: registration.partner_last_name, email: registration.partner_email, club: null, licenseNr: registration.partner_license_nr });
+    people.push({ firstName: registration.partner_first_name, lastName: registration.partner_last_name, email: registration.partner_email, club: registration.partner_club, licenseNr: registration.partner_license_nr });
   }
   if (registration.partner2_first_name && registration.partner2_last_name) {
-    people.push({ firstName: registration.partner2_first_name, lastName: registration.partner2_last_name, email: registration.partner2_email, club: null, licenseNr: registration.partner2_license_nr });
+    people.push({ firstName: registration.partner2_first_name, lastName: registration.partner2_last_name, email: registration.partner2_email, club: registration.partner2_club, licenseNr: registration.partner2_license_nr });
   }
 
   const lines = people.map((person) => {
@@ -5409,7 +5409,9 @@ async function confirmPendingRegistrations(env, tournament, appOrigin) {
 async function listPublicParticipants(db, tournamentId, currentUserEmail) {
   const result = await db
     .prepare(
-      `SELECT id, email, first_name, last_name, club, team_name, partner_first_name, partner_last_name, is_vip, status,
+      `SELECT id, email, first_name, last_name, club, team_name,
+         partner_first_name, partner_last_name, partner_club,
+         partner2_first_name, partner2_last_name, partner2_club, is_vip, status,
          over_capacity
        FROM registrations
        WHERE tournament_id = ? AND status IN ('pending', 'confirmed', 'waitlist')
@@ -5430,6 +5432,10 @@ async function listPublicParticipants(db, tournamentId, currentUserEmail) {
       teamName: row.team_name,
       partnerFirstName: row.partner_first_name,
       partnerLastName: row.partner_last_name,
+      partnerClub: row.partner_club,
+      partner2FirstName: row.partner2_first_name,
+      partner2LastName: row.partner2_last_name,
+      partner2Club: row.partner2_club,
       isVip: Boolean(row.is_vip),
       // Von der Turnierleitung über die Kapazität hinaus nachgemeldet (T-24); öffentlich als solche erkennbar.
       overCapacity: Boolean(Number(row.over_capacity || 0)),
@@ -6433,10 +6439,12 @@ function registrationRecord(id, tournamentId, registration, {
     partner_first_name: registration.partnerFirstName,
     partner_last_name: registration.partnerLastName,
     partner_email: registration.partnerEmail,
+    partner_club: registration.partnerClub,
     partner_license_nr: registration.partnerLicenseNr,
     partner2_first_name: registration.partner2FirstName,
     partner2_last_name: registration.partner2LastName,
     partner2_email: registration.partner2Email,
+    partner2_club: registration.partner2Club,
     partner2_license_nr: registration.partner2LicenseNr,
     team_name: registration.teamName,
     seeding_position: registration.seedingPosition,
@@ -6502,8 +6510,8 @@ export async function updateRegistration(request, env, existing, actingUser = nu
     .prepare(
       `UPDATE registrations
        SET first_name = ?, last_name = ?, email = ?, player_email = ?, club = ?, license_nr = ?,
-           partner_first_name = ?, partner_last_name = ?, partner_email = ?, partner_license_nr = ?,
-           partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?, partner2_license_nr = ?,
+           partner_first_name = ?, partner_last_name = ?, partner_email = ?, partner_club = ?, partner_license_nr = ?,
+           partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?, partner2_club = ?, partner2_license_nr = ?,
            team_name = ?, seeding_position = ?, status = ?, is_vip = ?, fee_selections = ?, registration_answers = ?, confirmed_at = ?, updated_at = ?,
            user_id = ?, partner_user_id = ?, partner2_user_id = ?
        WHERE id = ?`,
@@ -6518,10 +6526,12 @@ export async function updateRegistration(request, env, existing, actingUser = nu
       registration.partnerFirstName,
       registration.partnerLastName,
       registration.partnerEmail,
+      registration.partnerClub,
       registration.partnerLicenseNr,
       registration.partner2FirstName,
       registration.partner2LastName,
       registration.partner2Email,
+      registration.partner2Club,
       registration.partner2LicenseNr,
       registration.teamName,
       registration.seedingPosition,
@@ -8720,10 +8730,12 @@ function normalizeRegistrationInput(body, { requireStatus, allowPlaceholder = fa
     partnerFirstName: nullableText(body.partnerFirstName),
     partnerLastName: nullableText(body.partnerLastName),
     partnerEmail: nullableText(body.partnerEmail)?.toLowerCase() || null,
+    partnerClub: nullableText(body.partnerClub),
     partnerLicenseNr: nullableText(body.partnerLicenseNr),
     partner2FirstName: nullableText(body.partner2FirstName),
     partner2LastName: nullableText(body.partner2LastName),
     partner2Email: nullableText(body.partner2Email)?.toLowerCase() || null,
+    partner2Club: nullableText(body.partner2Club),
     partner2LicenseNr: nullableText(body.partner2LicenseNr),
     teamName: nullableText(body.teamName),
     seedingPosition: body.seedingPosition === '' || body.seedingPosition === undefined ? null : nonNegativeInteger(body.seedingPosition),
@@ -9127,10 +9139,12 @@ function toPublicRegistration(row) {
     partnerFirstName: row.partner_first_name,
     partnerLastName: row.partner_last_name,
     partnerEmail: row.partner_email,
+    partnerClub: row.partner_club || null,
     partnerLicenseNr: row.partner_license_nr,
     partner2FirstName: row.partner2_first_name,
     partner2LastName: row.partner2_last_name,
     partner2Email: row.partner2_email,
+    partner2Club: row.partner2_club || null,
     partner2LicenseNr: row.partner2_license_nr,
     teamName: row.team_name,
     seedingPosition: row.seeding_position,
