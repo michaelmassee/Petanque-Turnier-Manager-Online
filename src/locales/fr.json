@@ -1156,5 +1156,10 @@
   "adminAction_running_reset": "démarrage du tournoi annulé",
   "adminAction_tournament_deleted": "tournoi supprimé",
   "Diese Anmeldung ist für dein Konto nicht sichtbar.": "Cette inscription n'est pas visible pour ton compte.",
-  "Zu meinen Live-Turnieren": "Vers mes tournois en direct"
+  "Zu meinen Live-Turnieren": "Vers mes tournois en direct",
+  "Einstellung gespeichert.": "Paramètre enregistré.",
+  "Personenbezogene Daten beendeter Turniere nach Ablauf der Aufbewahrungsfrist automatisch löschen (E-Mail-Adressen, Tarife, Antworten, Nachrichten; das Protokoll wird pseudonymisiert).": "Supprimer automatiquement les données personnelles des tournois terminés à l’expiration de la durée de conservation (adresses e-mail, tarifs, réponses, messages ; le journal est pseudonymisé).",
+  "Ein Löschlauf würde jetzt {{count}} beendete Turniere bereinigen. Das lässt sich nicht rückgängig machen.": "Une suppression nettoierait maintenant {{count}} tournois terminés. Cette action est irréversible.",
+  "Automatische Löschung einschalten (täglich)": "Activer la suppression automatique (quotidienne)",
+  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled doit être true ou false"
 }

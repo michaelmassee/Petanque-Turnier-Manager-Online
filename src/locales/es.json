@@ -1156,5 +1156,10 @@
   "adminAction_running_reset": "inicio del torneo revertido",
   "adminAction_tournament_deleted": "torneo eliminado",
   "Diese Anmeldung ist für dein Konto nicht sichtbar.": "Esta inscripción no es visible para tu cuenta.",
-  "Zu meinen Live-Turnieren": "A mis torneos en directo"
+  "Zu meinen Live-Turnieren": "A mis torneos en directo",
+  "Einstellung gespeichert.": "Ajuste guardado.",
+  "Personenbezogene Daten beendeter Turniere nach Ablauf der Aufbewahrungsfrist automatisch löschen (E-Mail-Adressen, Tarife, Antworten, Nachrichten; das Protokoll wird pseudonymisiert).": "Eliminar automáticamente los datos personales de los torneos finalizados al vencer el plazo de conservación (direcciones de correo, tarifas, respuestas, mensajes; el registro se seudonimiza).",
+  "Ein Löschlauf würde jetzt {{count}} beendete Turniere bereinigen. Das lässt sich nicht rückgängig machen.": "Una eliminación limpiaría ahora {{count}} torneos finalizados. No se puede deshacer.",
+  "Automatische Löschung einschalten (täglich)": "Activar la eliminación automática (diaria)",
+  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled debe ser true o false"
 }

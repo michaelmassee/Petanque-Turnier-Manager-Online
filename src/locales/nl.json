@@ -1156,5 +1156,10 @@
   "adminAction_running_reset": "toernooistart teruggezet",
   "adminAction_tournament_deleted": "toernooi verwijderd",
   "Diese Anmeldung ist für dein Konto nicht sichtbar.": "Deze inschrijving is niet zichtbaar voor je account.",
-  "Zu meinen Live-Turnieren": "Naar mijn live-toernooien"
+  "Zu meinen Live-Turnieren": "Naar mijn live-toernooien",
+  "Einstellung gespeichert.": "Instelling opgeslagen.",
+  "Personenbezogene Daten beendeter Turniere nach Ablauf der Aufbewahrungsfrist automatisch löschen (E-Mail-Adressen, Tarife, Antworten, Nachrichten; das Protokoll wird pseudonymisiert).": "Persoonsgegevens van afgelopen toernooien na afloop van de bewaartermijn automatisch verwijderen (e-mailadressen, tarieven, antwoorden, berichten; het logboek wordt gepseudonimiseerd).",
+  "Ein Löschlauf würde jetzt {{count}} beendete Turniere bereinigen. Das lässt sich nicht rückgängig machen.": "Een verwijderronde zou nu {{count}} afgelopen toernooien opschonen. Dit kan niet ongedaan worden gemaakt.",
+  "Automatische Löschung einschalten (täglich)": "Automatisch verwijderen inschakelen (dagelijks)",
+  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled moet true of false zijn"
 }

@@ -1156,5 +1156,10 @@
   "adminAction_running_reset": "tournament start reset",
   "adminAction_tournament_deleted": "tournament deleted",
   "Diese Anmeldung ist für dein Konto nicht sichtbar.": "This registration is not visible to your account.",
-  "Zu meinen Live-Turnieren": "To my live tournaments"
+  "Zu meinen Live-Turnieren": "To my live tournaments",
+  "Einstellung gespeichert.": "Setting saved.",
+  "Personenbezogene Daten beendeter Turniere nach Ablauf der Aufbewahrungsfrist automatisch löschen (E-Mail-Adressen, Tarife, Antworten, Nachrichten; das Protokoll wird pseudonymisiert).": "Automatically delete personal data of finished tournaments once the retention period has expired (email addresses, fees, answers, messages; the log is pseudonymised).",
+  "Ein Löschlauf würde jetzt {{count}} beendete Turniere bereinigen. Das lässt sich nicht rückgängig machen.": "A deletion run would now clean up {{count}} finished tournaments. This cannot be undone.",
+  "Automatische Löschung einschalten (täglich)": "Enable automatic deletion (daily)",
+  "automaticPurgeEnabled muss true oder false sein": "automaticPurgeEnabled must be true or false"
 }

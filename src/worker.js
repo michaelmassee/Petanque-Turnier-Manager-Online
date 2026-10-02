@@ -912,14 +912,63 @@ async function finishStaleTournaments(env, now = new Date()) {
  * Antworten auf Online-Fragen, Tarife und Nachrichten gelöscht; Namen, Ergebnisse und Ranglisten bleiben. Das Protokoll
  * bleibt erhalten, E-Mail-Adressen und Kontozuordnungen darin werden durch nicht rückführbare Kennungen ersetzt.
  */
-export async function purgeExpiredPersonalData(db, now = new Date()) {
+const AUTOMATIC_PURGE_SETTING = 'automatic_personal_data_purge';
+
+async function readSetting(db, key) {
+  return (await db.prepare('SELECT value FROM app_settings WHERE key = ?').bind(key).first())?.value ?? null;
+}
+
+/**
+ * Automatische Löschung personenbezogener Daten nach Ablauf der Aufbewahrungsfrist (DS-04): nur, wenn ein Admin sie
+ * eingeschaltet hat. Standard ist aus, damit ein Deploy nicht ungeprüft historische Turnierdaten pseudonymisiert.
+ */
+export async function isAutomaticPurgeEnabled(db) {
+  return (await readSetting(db, AUTOMATIC_PURGE_SETTING)) === 'true';
+}
+
+export async function purgeExpiredPersonalDataWennAktiviert(db, now = new Date()) {
+  if (!(await isAutomaticPurgeEnabled(db))) return;
+  await purgeExpiredPersonalData(db, now);
+}
+
+/** Beendete Turniere, deren Aufbewahrungsfrist abgelaufen ist und die noch nicht bereinigt wurden. */
+async function tournamentsDueForPurge(db, now = new Date()) {
   const candidates = await db.prepare(`SELECT id, date, data_retention_months FROM tournaments
       WHERE status = 'finished' AND personal_data_purged_at IS NULL`).all();
-  const due = (candidates.results || []).filter((row) => {
+  return (candidates.results || []).filter((row) => {
     const limit = new Date(`${row.date}T00:00:00Z`);
     limit.setUTCMonth(limit.getUTCMonth() + Number(row.data_retention_months || 12));
     return limit.getTime() <= now.getTime();
   });
+}
+
+/** Admin: Stand des Schalters und wie viele Turniere ein Löschlauf jetzt bereinigen würde. */
+export async function getDataRetentionSettings(db, now = new Date()) {
+  return json({
+    automaticPurgeEnabled: await isAutomaticPurgeEnabled(db),
+    dueTournaments: (await tournamentsDueForPurge(db, now)).length,
+  });
+}
+
+export async function updateDataRetentionSettings(request, db, adminUser) {
+  const body = await readJson(request);
+  if (typeof body.automaticPurgeEnabled !== 'boolean') {
+    throw new HttpError(400, 'automaticPurgeEnabled muss true oder false sein');
+  }
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare(`INSERT INTO app_settings (key, value, updated_at, updated_by_user_id) VALUES (?, ?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at,
+          updated_by_user_id = excluded.updated_by_user_id`)
+      .bind(AUTOMATIC_PURGE_SETTING, String(body.automaticPurgeEnabled), now, adminUser.id),
+    auditStatement(db, { actorUserId: adminUser.id, actorRole: 'admin', action: 'setting_changed',
+      target: AUTOMATIC_PURGE_SETTING, details: { enabled: body.automaticPurgeEnabled }, now }),
+  ]);
+  return getDataRetentionSettings(db);
+}
+
+export async function purgeExpiredPersonalData(db, now = new Date()) {
+  const due = await tournamentsDueForPurge(db, now);
   for (const tournament of due) {
     const nowIso = now.toISOString();
     const audits = (await db.prepare('SELECT id, action, actor_user_id, details_json FROM audit_log WHERE tournament_id = ? AND pseudonymized_at IS NULL')
@@ -1041,7 +1090,7 @@ export default {
       jobs.push(
         sendTournamentReminders(env).catch((error) => console.error('Tournament reminder cron failed', error)),
         syncPetanqueAktuellImports(env).catch((error) => console.error('Pétanque Aktuell sync cron failed', error)),
-        purgeExpiredPersonalData(env.DB).catch((error) => console.error('Purging expired personal data failed', error)),
+        purgeExpiredPersonalDataWennAktiviert(env.DB).catch((error) => console.error('Purging expired personal data failed', error)),
       );
     }
     ctx.waitUntil(Promise.all(jobs));
@@ -1477,6 +1526,12 @@ export default {
         const body = await readJson(request);
         return await updateBoulePlaceClubAsAdmin(env.DB, adminPlaceClubMatch[1], body.clubId);
       }
+      if (url.pathname === '/api/admin/settings/data-retention') {
+        const session = await requireAdmin(request, env.DB);
+        if (request.method === 'GET') return await getDataRetentionSettings(env.DB);
+        if (request.method === 'PUT') return await updateDataRetentionSettings(request, env.DB, session.user);
+      }
+
       if (request.method === 'GET' && url.pathname === '/api/admin/dashboard-stats') {
         await requireAdmin(request, env.DB);
         return await getAdminDashboardStats(env.DB);
