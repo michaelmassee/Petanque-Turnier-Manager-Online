@@ -3355,7 +3355,7 @@ async function updateOwnProfile(request, env, url, userId) {
 // Vereine/Gruppen und selbst gepflegte Bouleplätze gehen an den ältesten anderen Admin.
 // clubs.owner_id ist ON DELETE CASCADE - ohne vorherige Übertragung würden Verein,
 // Editoren und Vereinsplätze (boule_places.club_id CASCADE) stillschweigend mitgelöscht.
-async function deleteOwnAccount(request, db, url, userId) {
+export async function deleteOwnAccount(request, db, url, userId) {
   if (userId === TOURNAMENT_REPORT_SYSTEM_USER_ID) {
     throw new HttpError(403, 'Zugriff verweigert');
   }
@@ -3390,8 +3390,7 @@ async function deleteOwnAccount(request, db, url, userId) {
     // Der neue Owner hat ohnehin volle Rechte - ein zusätzlicher Editor-Eintrag wäre redundant.
     db.prepare('DELETE FROM club_editors WHERE user_id = ? AND club_id IN (SELECT id FROM clubs WHERE owner_id = ?)').bind(admin.id, admin.id),
     db.prepare('UPDATE boule_places SET reported_by_user_id = ?, updated_at = ? WHERE reported_by_user_id = ?').bind(admin.id, now, userId),
-    db.prepare('DELETE FROM registrations WHERE tournament_id IN (SELECT id FROM tournaments WHERE owner_id = ?)').bind(userId),
-    db.prepare('DELETE FROM tournaments WHERE owner_id = ?').bind(userId),
+    ...ownedTournamentDeletionStatements(db, userId, { actorUserId: userId, actorRole: 'owner', reason: 'account_deleted', now }),
     db.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ]);
 
@@ -3400,7 +3399,7 @@ async function deleteOwnAccount(request, db, url, userId) {
   return json({ ok: true }, 200, { 'Set-Cookie': expiredSessionCookie(url) });
 }
 
-async function deleteUser(db, id, currentUserId, deleteTournaments) {
+export async function deleteUser(db, id, currentUserId, deleteTournaments) {
   if (id === TOURNAMENT_REPORT_SYSTEM_USER_ID) {
     throw new HttpError(403, 'Zugriff verweigert');
   }
@@ -3410,36 +3409,23 @@ async function deleteUser(db, id, currentUserId, deleteTournaments) {
 
   const now = new Date().toISOString();
 
-  // Vereine/Gruppen und selbst gepflegte Bouleplätze gehen immer an den löschenden Admin:
-  // clubs.owner_id ist ON DELETE CASCADE und würde Verein samt Vereinsplätzen mitreißen.
-  await db.batch([
+  // Alles in einem Batch: bricht ein Schritt ab, bleibt das Konto mit Vereinen, Plätzen und Turnieren unverändert.
+  const results = await db.batch([
+    // Vereine/Gruppen und selbst gepflegte Bouleplätze gehen immer an den löschenden Admin:
+    // clubs.owner_id ist ON DELETE CASCADE und würde Verein samt Vereinsplätzen mitreißen.
     db.prepare('UPDATE clubs SET owner_id = ?, updated_at = ? WHERE owner_id = ?').bind(currentUserId, now, id),
     db.prepare('DELETE FROM club_editors WHERE user_id = ? AND club_id IN (SELECT id FROM clubs WHERE owner_id = ?)').bind(currentUserId, currentUserId),
     db.prepare('UPDATE boule_places SET reported_by_user_id = ?, updated_at = ? WHERE reported_by_user_id = ?').bind(currentUserId, now, id),
+    // Nur selbst besessene Turniere: bei denen dieser User lediglich Editor war, gehören sie anderen Ownern; der
+    // tournament_editors-Eintrag entfällt über ON DELETE CASCADE auf user_id.
+    ...(deleteTournaments
+      ? ownedTournamentDeletionStatements(db, id, { actorUserId: currentUserId, actorRole: 'admin', reason: 'account_deleted', now })
+      // Sonst an den löschenden Admin: owner_id ist NOT NULL mit FK ON DELETE CASCADE, ohne Umhängen würde das Turnier
+      // kaskadierend mitgelöscht. creator_id (rein informativ) bleibt bewusst unangetastet.
+      : [db.prepare('UPDATE tournaments SET owner_id = ?, updated_at = ? WHERE owner_id = ?').bind(currentUserId, now, id)]),
+    db.prepare('DELETE FROM users WHERE id = ?').bind(id),
   ]);
-
-  if (deleteTournaments) {
-    // Nur selbst besessene Turniere löschen - Turniere, bei denen dieser User
-    // lediglich als Editor eingetragen war, gehören anderen Ownern und dürfen
-    // nicht mitgerissen werden. Der zugehörige tournament_editors-Eintrag entfällt
-    // ohnehin automatisch über ON DELETE CASCADE auf user_id.
-    await db.batch([
-      db
-        .prepare('DELETE FROM registrations WHERE tournament_id IN (SELECT id FROM tournaments WHERE owner_id = ?)')
-        .bind(id),
-      db.prepare('DELETE FROM tournaments WHERE owner_id = ?').bind(id),
-    ]);
-  } else {
-    // Reassign to the admin performing the deletion instead of leaving owner_id
-    // pointing at a user row that no longer exists (owner_id ist NOT NULL mit
-    // FK ON DELETE CASCADE - ohne Reassignment würde das Turnier sonst kaskadierend
-    // mitgelöscht). creator_id (rein informativ) bleibt bewusst unangetastet.
-    // Editor-Zuweisungen dieses Users entfallen automatisch über ON DELETE CASCADE.
-    await db.prepare('UPDATE tournaments SET owner_id = ?, updated_at = ? WHERE owner_id = ?').bind(currentUserId, now, id).run();
-  }
-
-  const result = await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
-  if (result.meta.changes === 0) {
+  if (results.at(-1).meta.changes === 0) {
     throw new HttpError(404, 'Benutzer nicht gefunden');
   }
 
@@ -5197,11 +5183,7 @@ export async function deleteTournament(env, tournament, user = null) {
   const db = env.DB;
   const now = new Date().toISOString();
   const [, , tournamentResult] = await db.batch([
-    db.prepare(`INSERT OR REPLACE INTO tournament_tombstones (tournament_id, name, deleted_at, deleted_by_user_id, registrations_json)
-        SELECT t.id, t.name, ?, ?, COALESCE((SELECT json_group_array(json_object('id', r.id,
-            'userIds', json_array(r.user_id, r.partner_user_id, r.partner2_user_id)))
-          FROM registrations r WHERE r.tournament_id = t.id AND r.status != 'cancelled'), '[]')
-        FROM tournaments t WHERE t.id = ?`).bind(now, user?.id || null, tournament.id),
+    tombstoneStatement(db, 't.id = ?', [tournament.id], user?.id || null, now),
     db.prepare('DELETE FROM registrations WHERE tournament_id = ?').bind(tournament.id),
     db.prepare('DELETE FROM tournaments WHERE id = ?').bind(tournament.id),
     auditStatement(db, { tournamentId: tournament.id, actorUserId: user?.id || null,
@@ -5213,6 +5195,36 @@ export async function deleteTournament(env, tournament, user = null) {
   }
   await notifyOwnerAboutAction(env, tournament, user, 'tournament_deleted');
   return json({ ok: true });
+}
+
+/**
+ * Löschnachweis (KP-07) für alle Turniere, die {@code where} (auf Alias {@code t}) trifft – vor dem Löschen im selben
+ * Batch ausführen.
+ */
+function tombstoneStatement(db, where, binds, deletedByUserId, now) {
+  return db.prepare(`INSERT OR REPLACE INTO tournament_tombstones (tournament_id, name, deleted_at, deleted_by_user_id, registrations_json)
+      SELECT t.id, t.name, ?, ?, COALESCE((SELECT json_group_array(json_object('id', r.id,
+          'userIds', json_array(r.user_id, r.partner_user_id, r.partner2_user_id)))
+        FROM registrations r WHERE r.tournament_id = t.id AND r.status != 'cancelled'), '[]')
+      FROM tournaments t WHERE ${where}`).bind(now, deletedByUserId, ...binds);
+}
+
+/**
+ * Turniere eines Kontos, das gelöscht wird, mit Löschnachweis und Protokolleintrag je Turnier löschen – wie
+ * {@link deleteTournament}: ein verbundenes PTM-Dokument erhält danach tournament_deleted statt 404, verknüpfte Konten
+ * sehen in der Live-Ansicht den Löschhinweis.
+ */
+function ownedTournamentDeletionStatements(db, ownerId, { actorUserId, actorRole, reason, now }) {
+  return [
+    tombstoneStatement(db, 't.owner_id = ?', [ownerId], actorUserId, now),
+    db.prepare(`INSERT INTO audit_log (id, tournament_id, actor_user_id, actor_role, action, target, details_json, created_at)
+        SELECT lower(hex(randomblob(16))), t.id, ?, ?, 'tournament_deleted', 'tournament',
+          json_object('status', t.status, 'documentBound', json(CASE WHEN t.sync_document_id IS NULL THEN 'false' ELSE 'true' END),
+            'reason', ?), ?
+        FROM tournaments t WHERE t.owner_id = ?`).bind(actorUserId, actorRole, reason, now, ownerId),
+    db.prepare('DELETE FROM registrations WHERE tournament_id IN (SELECT id FROM tournaments WHERE owner_id = ?)').bind(ownerId),
+    db.prepare('DELETE FROM tournaments WHERE owner_id = ?').bind(ownerId),
+  ];
 }
 
 /**
