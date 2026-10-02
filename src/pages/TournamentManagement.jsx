@@ -987,7 +987,6 @@ export function TournamentManagementPage({
       id: tournament.id,
       name: tournament.name,
       checkinNotificationEnabled: tournament.checkinNotificationEnabled !== false,
-      dataRetentionMonths: String(tournament.dataRetentionMonths || 12),
     });
   }
 
@@ -1000,7 +999,6 @@ export function TournamentManagementPage({
         method: 'PUT',
         body: JSON.stringify({
           checkinNotificationEnabled: participantSettings.checkinNotificationEnabled,
-          dataRetentionMonths: Number(participantSettings.dataRetentionMonths),
         }),
       });
       setParticipantSettings(null);
@@ -1229,16 +1227,7 @@ export function TournamentManagementPage({
               />
               {t('Nachricht „Eingecheckt“ an verknüpfte Konten senden')}
             </label>
-            <TextField
-              label={t('Kontaktdaten nach Turnierabschluss löschen nach (Monaten)')}
-              type="number"
-              min="1"
-              max="60"
-              value={participantSettings.dataRetentionMonths}
-              onChange={(dataRetentionMonths) => setParticipantSettings({ ...participantSettings, dataRetentionMonths })}
-              required
-            />
-            <p className="hint">{t('Danach werden Kontakt- und Personen-E-Mails, Tarife und Antworten gelöscht. Namen, Ergebnisse und Ranglisten bleiben erhalten.')}</p>
+            <p className="hint">{t('Kontakt- und Personen-E-Mails, Tarife und Antworten werden 12 Monate nach dem Turnier gelöscht. Namen, Ergebnisse und Ranglisten bleiben erhalten.')}</p>
             <div className="dialog-actions">
               <Button variant="secondary" type="button" onClick={() => setParticipantSettings(null)}>{t('Abbrechen')}</Button>
               <Button type="submit" loading={participantSettingsSaving}>{t('Speichern')}</Button>

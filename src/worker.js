@@ -908,11 +908,13 @@ async function finishStaleTournaments(env, now = new Date()) {
 }
 
 /**
- * Datenschutz (DS-04, DS-05): Nach Abschluss eines Turniers und Ablauf seiner Frist werden Kontakt- und Slot-E-Mails,
+ * Datenschutz (DS-04, DS-05): Nach Abschluss eines Turniers und Ablauf der festen Frist von 12 Monaten werden Kontakt- und Slot-E-Mails,
  * Antworten auf Online-Fragen, Tarife und Nachrichten gelöscht; Namen, Ergebnisse und Ranglisten bleiben. Das Protokoll
  * bleibt erhalten, E-Mail-Adressen und Kontozuordnungen darin werden durch nicht rückführbare Kennungen ersetzt.
  */
 const AUTOMATIC_PURGE_SETTING = 'automatic_personal_data_purge';
+/** Feste Aufbewahrungsfrist für alle Turniere, gezählt ab Turnierdatum (DS-04). Die Spalte data_retention_months ist ungenutzt. */
+const DATA_RETENTION_MONTHS = 12;
 
 async function readSetting(db, key) {
   return (await db.prepare('SELECT value FROM app_settings WHERE key = ?').bind(key).first())?.value ?? null;
@@ -933,11 +935,11 @@ export async function purgeExpiredPersonalDataWennAktiviert(db, now = new Date()
 
 /** Beendete Turniere, deren Aufbewahrungsfrist abgelaufen ist und die noch nicht bereinigt wurden. */
 async function tournamentsDueForPurge(db, now = new Date()) {
-  const candidates = await db.prepare(`SELECT id, date, data_retention_months FROM tournaments
+  const candidates = await db.prepare(`SELECT id, date FROM tournaments
       WHERE status = 'finished' AND personal_data_purged_at IS NULL`).all();
   return (candidates.results || []).filter((row) => {
     const limit = new Date(`${row.date}T00:00:00Z`);
-    limit.setUTCMonth(limit.getUTCMonth() + Number(row.data_retention_months || 12));
+    limit.setUTCMonth(limit.getUTCMonth() + DATA_RETENTION_MONTHS);
     return limit.getTime() <= now.getTime();
   });
 }
@@ -4754,26 +4756,19 @@ export async function resetTournamentRunning(db, tournament, user) {
   return json({ tournament: toPublicTournament(await getTournamentById(db, tournament.id), user) });
 }
 
-/**
- * Teilnehmerbezogene Einstellungen: Check-in-Nachricht an verknüpfte Konten (E-09, Standard an) und Frist, nach der
- * Kontakt- und Slot-E-Mails, Tarife und Antworten nach Turnierabschluss gelöscht werden (DS-04, Standard 12 Monate).
- */
+/** Teilnehmerbezogene Einstellungen: Check-in-Nachricht an verknüpfte Konten (E-09, Standard an). */
 export async function updateParticipantSettings(request, db, tournament, user) {
   const body = await readJson(request);
   const enabled = body.checkinNotificationEnabled === undefined
     ? Number(tournament.checkin_notification_enabled ?? 1) === 1 : body.checkinNotificationEnabled;
   if (typeof enabled !== 'boolean') throw new HttpError(400, 'checkinNotificationEnabled muss true oder false sein');
-  const months = body.dataRetentionMonths === undefined ? Number(tournament.data_retention_months || 12) : Number(body.dataRetentionMonths);
-  if (!Number.isInteger(months) || months < 1 || months > 60) {
-    throw new HttpError(400, 'Die Aufbewahrungsfrist muss zwischen 1 und 60 Monaten liegen');
-  }
   const now = new Date().toISOString();
   await db.batch([
-    db.prepare('UPDATE tournaments SET checkin_notification_enabled = ?, data_retention_months = ?, updated_at = ? WHERE id = ?')
-      .bind(enabled ? 1 : 0, months, now, tournament.id),
+    db.prepare('UPDATE tournaments SET checkin_notification_enabled = ?, updated_at = ? WHERE id = ?')
+      .bind(enabled ? 1 : 0, now, tournament.id),
     auditStatement(db, { tournamentId: tournament.id, actorUserId: user.id, actorRole: actorRoleFor(tournament, user),
       action: 'participant_settings_changed', target: 'tournament',
-      details: { checkinNotificationEnabled: enabled, dataRetentionMonths: months }, now }),
+      details: { checkinNotificationEnabled: enabled }, now }),
   ]);
   return json({ tournament: toPublicTournament(await getTournamentById(db, tournament.id), user) });
 }
@@ -9146,7 +9141,6 @@ function toPublicTournament(row, user) {
     approvalRequired: Boolean(Number(row.approval_required || 0)),
     registrationClosed: Boolean(Number(row.registration_closed || 0)),
     checkinNotificationEnabled: Number(row.checkin_notification_enabled ?? 1) === 1,
-    dataRetentionMonths: Number(row.data_retention_months || 12),
     startsAt: row.date ? tournamentStartUtcIso(row) : null,
     runningResetAt: row.running_reset_at || null,
     documentManaged: Boolean(Number(row.document_managed || 0)),

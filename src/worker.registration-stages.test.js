@@ -288,7 +288,7 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
 
   describe('Datenschutz (DS-04, DS-05)', () => {
     it('löscht nach der Frist Kontaktdaten und pseudonymisiert das Protokoll', async () => {
-      setzeTurnier({ status: 'finished', date: '2025-01-10', data_retention_months: 12 });
+      setzeTurnier({ status: 'finished', date: '2025-01-10' });
       anmeldung('r1', { personen: [['Anna', 'Adler', 'anna@example.test']], userIds: ['owner'] });
       sql(`INSERT INTO audit_log (id, tournament_id, registration_id, actor_user_id, actor_role, action, target, details_json, created_at)
         VALUES ('l1', 't1', 'r1', 'owner', 'owner', 'contact_email_changed', 'registration', ?, '2025-01-01')`,
