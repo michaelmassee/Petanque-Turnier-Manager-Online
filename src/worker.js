@@ -3110,6 +3110,18 @@ function batches(values, size = D1_BATCH_SIZE) {
 // gelöschte Turniere sind automatisch nicht mehr Bestandteil der Live-Suche.
 async function notifySavedSearchesForPublishedTournament(env, tournament, searches = null) {
   const activeSearches = searches || (await env.DB.prepare('SELECT * FROM saved_searches WHERE notify_enabled = 1').all()).results || [];
+  const clubIds = [...new Set(activeSearches.map((search) => search.filter_club).filter(Boolean))];
+  const clubLocationsById = new Map(clubIds.map((clubId) => [clubId, []]));
+  if (clubIds.length) {
+    const placeholders = clubIds.map(() => '?').join(', ');
+    const rows = await env.DB.prepare(
+      `SELECT p.club_id, p.latitude, p.longitude
+       FROM boule_places p JOIN clubs c ON c.id = p.club_id
+       WHERE p.status = 'published' AND c.status = 'published' AND p.club_id IN (${placeholders})
+         AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL`,
+    ).bind(...clubIds).all();
+    for (const row of rows.results || []) clubLocationsById.get(row.club_id)?.push({ latitude: Number(row.latitude), longitude: Number(row.longitude) });
+  }
   let tournamentForMatching = tournament;
   if (activeSearches.some((search) => Number(search.filter_online_registration_only))) {
     const activeRegistrations = await env.DB.prepare(
@@ -3117,7 +3129,7 @@ async function notifySavedSearchesForPublishedTournament(env, tournament, search
     ).bind(tournament.id).first();
     tournamentForMatching = { ...tournament, active_registrations: Number(activeRegistrations?.count || 0) };
   }
-  const matches = activeSearches.filter((search) => tournamentMatchesSavedSearch(tournamentForMatching, search));
+  const matches = activeSearches.filter((search) => tournamentMatchesSavedSearch(tournamentForMatching, search, clubLocationsById.get(search.filter_club) || []));
   if (matches.length === 0) return 0;
 
   const createdAt = new Date().toISOString();
@@ -7606,8 +7618,19 @@ function toPublicClub(row, user) {
 }
 
 async function listPublishedClubs(db) {
-  const rows = await db.prepare("SELECT id, name FROM clubs WHERE status = 'published' ORDER BY name COLLATE NOCASE").all();
-  return json({ clubs: rows.results || [] });
+  const rows = await db.prepare(
+    `SELECT c.id, c.name, p.latitude, p.longitude
+     FROM clubs c
+     LEFT JOIN boule_places p ON p.club_id = c.id AND p.status = 'published' AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL
+     WHERE c.status = 'published'
+     ORDER BY c.name COLLATE NOCASE`,
+  ).all();
+  const clubs = new Map();
+  for (const row of rows.results || []) {
+    if (!clubs.has(row.id)) clubs.set(row.id, { id: row.id, name: row.name, locations: [] });
+    if (row.latitude !== null && row.longitude !== null) clubs.get(row.id).locations.push({ latitude: Number(row.latitude), longitude: Number(row.longitude) });
+  }
+  return json({ clubs: [...clubs.values()] });
 }
 
 async function listBoulePlaces(db, user, query) {

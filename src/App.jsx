@@ -10,7 +10,7 @@ import { LIVE_VIEW_EVENTS, liveViewPathFor } from './postbox-core.js';
 import { usePath, matchTournamentRoute, matchLiveRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
-import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm } from './lib/domain.js';
+import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm, clubMatchesTournament } from './lib/domain.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
@@ -206,6 +206,7 @@ function AppContent() {
   });
   const homeHeading = t('Öffentliche Turniere');
   const publishedClubs = clubsQuery.data?.clubs || [];
+  const selectedHomeClub = publishedClubs.find((club) => club.id === homeFilterClub || club.name === homeFilterClub) || null;
 
   const filteredHomeTournaments = useMemo(() => {
     const query = homeQuery.trim().toLowerCase();
@@ -228,7 +229,7 @@ function AppContent() {
       if (homeFilterType && tournament.type !== homeFilterType) {
         return false;
       }
-      if (homeFilterClub && String(tournament.club || '').trim().toLocaleLowerCase() !== homeFilterClub.trim().toLocaleLowerCase()) {
+      if (homeFilterClub && !clubMatchesTournament(selectedHomeClub, tournament)) {
         return false;
       }
       if (homeFilterOpenOnly && !hasOpenRegistration(tournament)) {
@@ -269,6 +270,7 @@ function AppContent() {
     homeFilterRegistrationType,
     homeFilterType,
     homeFilterClub,
+    selectedHomeClub,
     homeFilterOpenOnly,
     homeFilterOnlineRegistrationOnly,
     searchOrigin,
@@ -1560,6 +1562,7 @@ function AppContent() {
           filterRegistrationType={homeFilterRegistrationType}
           filterType={homeFilterType}
           filterClub={homeFilterClub}
+          filterClubLabel={selectedHomeClub?.name || homeFilterClub}
           filterOpenOnly={homeFilterOpenOnly}
           filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
           searchOrigin={searchOrigin}
@@ -1904,6 +1907,7 @@ function AppContent() {
           filterRegistrationType={homeFilterRegistrationType}
           filterType={homeFilterType}
           filterClub={homeFilterClub}
+          filterClubLabel={selectedHomeClub?.name || homeFilterClub}
           filterOpenOnly={homeFilterOpenOnly}
           filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
           searchOrigin={searchOrigin}
@@ -2211,6 +2215,7 @@ export function HomeTournaments({
   filterRegistrationType,
   filterType,
   filterClub,
+  filterClubLabel,
   filterOpenOnly,
   filterOnlineRegistrationOnly,
   searchOrigin,
@@ -2255,7 +2260,7 @@ export function HomeTournaments({
     filterFormation && [labelFor(FORMATIONS, filterFormation), onClearFilterFormation],
     filterRegistrationType && [labelFor(REGISTRATION_TYPES, filterRegistrationType), onClearFilterRegistrationType],
     filterType && [labelFor(TOURNAMENT_TYPES, filterType), onClearFilterType],
-    filterClub && [`${t('Verein')}: ${filterClub}`, onClearFilterClub],
+    filterClub && [`${t('Verein')}: ${filterClubLabel}`, onClearFilterClub],
     filterOpenOnly && [t('Anmeldung möglich'), onClearFilterOpenOnly],
     filterOnlineRegistrationOnly && [t('Online-Anmeldung möglich'), onClearFilterOnlineRegistrationOnly],
     searchOrigin && [`${radiusLabel} · ${searchOrigin.label}`, onClearSearchOrigin],

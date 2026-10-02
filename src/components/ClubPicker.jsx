@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 // Uses the same searchable, portal-based combobox behavior as RecipientPicker.
-// The value is the club name because tournament records currently store the
-// organizer club as text rather than as a club_id.
+// The value is the stable club ID. The Finder resolves it to the club's
+// published venue coordinates before matching tournaments.
 export function ClubPicker({ clubs = [], value, onChange }) {
   const { t } = useTranslation();
   const listboxId = useId();
@@ -20,7 +20,7 @@ export function ClubPicker({ clubs = [], value, onChange }) {
 
   const entries = useMemo(() => [{ id: '', value: '', label: t('Alle Vereine') }, ...clubs.map((club) => ({
     id: club.id,
-    value: club.name,
+    value: club.id,
     label: club.name,
   }))], [clubs, t]);
   const entryByValue = useMemo(() => new Map(entries.map((entry) => [entry.value, entry])), [entries]);

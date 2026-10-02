@@ -175,8 +175,8 @@ describe('Worker-Fachlogik', () => {
     expect(tournamentMatchesSavedSearch({ ...tournament, formation_other: 1 }, { ...matchingSearch, filter_formation: 'andere' })).toBe(true);
     expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_registration_type: 'melee' })).toBe(false);
     expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_type: 'ko' })).toBe(false);
-    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_club: 'PC Petanque' })).toBe(false);
-    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_club: 'bc linden' })).toBe(true);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_club: 'club-1' }, [{ latitude: 50.52, longitude: 8.58 }])).toBe(true);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_club: 'club-1' }, [{ latitude: 51, longitude: 8.58 }])).toBe(false);
     expect(tournamentMatchesSavedSearch({ ...tournament, status: 'running' }, { ...matchingSearch, filter_open_only: 1 })).toBe(false);
     expect(tournamentMatchesSavedSearch({ ...tournament, registration_opens_at: '2099-01-01T00:00:00.000Z' }, { ...matchingSearch, filter_open_only: 1 })).toBe(false);
     expect(tournamentMatchesSavedSearch({ ...tournament, registration_deadline: '2000-01-01T00:00:00.000Z' }, { ...matchingSearch, filter_open_only: 1 })).toBe(false);

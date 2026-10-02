@@ -223,6 +223,11 @@ export function distanceKm(lat1, lng1, lat2, lng2) {
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+export function clubMatchesTournament(club, tournament) {
+  if (tournament?.latitude === null || tournament?.latitude === undefined || tournament?.longitude === null || tournament?.longitude === undefined) return false;
+  return (club?.locations || []).some((location) => Number(location.latitude) === Number(tournament.latitude) && Number(location.longitude) === Number(tournament.longitude));
+}
+
 export function registrationNotYetOpen(tournament) {
   return Boolean(tournament.registrationOpensAt) && new Date(tournament.registrationOpensAt).getTime() > Date.now();
 }

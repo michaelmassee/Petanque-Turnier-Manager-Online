@@ -14,7 +14,7 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage.jsx';
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
 import { RichText } from './components/RichText.jsx';
 import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
-import { clubLogoImageUrl, formatLocationAddress, hasOnlineRegistrationAvailable, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
+import { clubLogoImageUrl, clubMatchesTournament, formatLocationAddress, hasOnlineRegistrationAvailable, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
 
 describe('Turnier-Payload', () => {
   it('behält den Verein eines bearbeiteten Kalendereintrags bei', () => {
@@ -38,6 +38,14 @@ describe('Turnier-Payload', () => {
     expect(hasOnlineRegistrationAvailable({ ...tournament, visibility: 'private' })).toBe(false);
     expect(hasOnlineRegistrationAvailable({ ...tournament, activeRegistrations: 16 })).toBe(false);
     expect(hasOnlineRegistrationAvailable({ ...tournament, activeRegistrations: 16, waitlistEnabled: true })).toBe(true);
+  });
+});
+
+describe('Vereinsfilter', () => {
+  it('findet Turniere über identische Koordinaten eines Vereins-Spielorts', () => {
+    const club = { locations: [{ latitude: 50.52, longitude: 8.58 }] };
+    expect(clubMatchesTournament(club, { latitude: 50.52, longitude: 8.58 })).toBe(true);
+    expect(clubMatchesTournament(club, { latitude: 50.5201, longitude: 8.58 })).toBe(false);
   });
 });
 
@@ -137,7 +145,7 @@ describe('Turnier-Finder', () => {
 
     fireEvent.focus(screen.getByRole('combobox', { name: 'Verein' }));
     fireEvent.click(screen.getByRole('option', { name: 'BC Linden' }));
-    expect(setFilterClub).toHaveBeenCalledWith('BC Linden');
+    expect(setFilterClub).toHaveBeenCalledWith('club-1');
   });
 });
 
