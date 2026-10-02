@@ -1,5 +1,5 @@
 // Reine Logik der Turnieranmeldung (Spezifikation turnieranmeldung-ptmonline.md): Personen-Slots, Anmeldeeinheit,
-// Doppelbelegung von Konten und mögliche Dubletten. Ohne Datenbankzugriff, damit Worker und Tests sie teilen.
+// Doppelbelegung von Personen und mögliche Dubletten. Ohne Datenbankzugriff, damit Worker und Tests sie teilen.
 
 // Personen-Slots 1–3 liegen in den Spalten Spieler, Partner, Partner 2 (Formationsstärke höchstens 3, E-20).
 export const SLOT_COLUMNS = [
@@ -61,16 +61,19 @@ export function registrationUserIds(row) {
 
 /**
  * Doppelbelegungen und mögliche Dubletten unter den aktiven Anmeldungen eines Turniers (KP-06).
- *  - accountConflicts: dieselbe Benutzer-ID in mehreren Anmeldungen (b, c) - echter Ausschlussgrund.
- *  - possibleDuplicates: gleicher normalisierter Name oder gleiche Slot-E-Mail ohne gemeinsame Benutzer-ID (b', c)
+ *  - accountConflicts: dieselbe verknüpfte Person in mehreren Anmeldungen (b, c) - echter Ausschlussgrund.
+ *  - possibleDuplicates: gleicher normalisierter Name oder gleiche Slot-E-Mail ohne gesicherte gleiche Person (b', c)
  *    - nur ein Hinweis ohne automatische Wirkung.
+ * Eine Konto- oder Kontaktadresse darf mehrere Personen und Anmeldungen verwalten. Eine Benutzer-ID allein ist deshalb
+ * kein Konflikt; gesichert ist die Doppelbelegung erst durch dieselbe Benutzer-ID und denselben Personennamen.
  * Das absendende Konto spielt keine Rolle; gezählt werden nur Personen in Slots (E-22).
  */
 export function registrationConflicts(rows) {
   const active = rows.filter((row) => ACTIVE_REGISTRATION_STATUSES.includes(row.status));
-  const byUser = new Map();
+  const byLinkedPerson = new Map();
   const byName = new Map();
   const byEmail = new Map();
+  const emailSlots = new Map();
   const add = (map, key, id) => {
     if (!key) return;
     if (!map.has(key)) map.set(key, new Set());
@@ -78,26 +81,43 @@ export function registrationConflicts(rows) {
   };
   for (const row of active) {
     for (const slot of registrationSlots(row)) {
-      add(byUser, slot.userId, row.id);
-      add(byName, normalizePlayerName(slot.firstName, slot.lastName), row.id);
-      add(byEmail, slot.email ? slot.email.toLowerCase() : null, row.id);
+      const name = normalizePlayerName(slot.firstName, slot.lastName);
+      // Ein Konto kann beispielsweise den Ehepartner und sich selbst anmelden. Die Kontoverknüpfung wird erst
+      // zusammen mit dem Namen zur belastbaren Personenkennung.
+      add(byLinkedPerson, slot.userId && name ? `${slot.userId}\u0000${name}` : null, row.id);
+      add(byName, name, row.id);
+      const email = slot.email?.toLowerCase();
+      add(byEmail, email, row.id);
+      if (email) {
+        if (!emailSlots.has(email)) emailSlots.set(email, []);
+        emailSlots.get(email).push({ registrationId: row.id, userId: slot.userId, name });
+      }
     }
   }
-  const accountConflicts = [...byUser]
+  const accountConflicts = [...byLinkedPerson]
     .filter(([, ids]) => ids.size > 1)
-    .map(([userId, ids]) => ({ userId, registrationIds: [...ids] }));
+    .map(([key, ids]) => ({ userId: key.split('\u0000', 1)[0], registrationIds: [...ids] }));
   const conflictPairs = new Set(accountConflicts.flatMap(({ registrationIds }) => pairKeys(registrationIds)));
   const possibleDuplicates = [];
   for (const [kind, map] of [['name', byName], ['email', byEmail]]) {
-    for (const ids of map.values()) {
+    for (const [value, ids] of map) {
       if (ids.size < 2) continue;
       const registrationIds = [...ids];
       // Sicher über dasselbe Konto erkannt: Das ist bereits ein Konflikt, kein zusätzlicher Hinweis.
       if (pairKeys(registrationIds).every((key) => conflictPairs.has(key))) continue;
+      // Dasselbe Konto darf verschiedene Personen mit derselben Kontaktadresse anmelden. Ohne gemeinsame
+      // Kontoverknüpfung bleibt die gleiche E-Mail dagegen ein sinnvoller, unverbindlicher Hinweis.
+      if (kind === 'email' && sharedAccountForDifferentPeople(emailSlots.get(value) || [])) continue;
       possibleDuplicates.push({ kind, registrationIds });
     }
   }
   return { accountConflicts, possibleDuplicates };
+}
+
+function sharedAccountForDifferentPeople(slots) {
+  if (slots.length < 2 || new Set(slots.map((slot) => slot.name)).size !== slots.length) return false;
+  const userIds = slots.map((slot) => slot.userId).filter(Boolean);
+  return userIds.length === slots.length && new Set(userIds).size === 1;
 }
 
 function pairKeys(ids) {

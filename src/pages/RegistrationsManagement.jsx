@@ -247,7 +247,7 @@ function RegistrationRow({ registration, tournament, showConfirm = false, busy, 
           <small className="registration-sync-flags">
             {registration.overCapacity && <span className="role">{t('über Kapazität')}</span>}
             {registration.receivedAfterStart && <span className="role role-user">{t('nach Turnierstart eingegangen')}</span>}
-            {registration.accountConflict && <span className="role role-conflict" title={t('Dieselbe Person mit Konto steht in mehreren Anmeldungen. Bitte eine davon stornieren oder die Person austauschen.')}>{t('Konto doppelt angemeldet')}</span>}
+            {registration.accountConflict && <span className="role role-conflict" title={t('Dieselbe verknüpfte Person steht in mehreren Anmeldungen. Bitte eine davon stornieren oder die Person austauschen.')}>{t('Person doppelt angemeldet')}</span>}
             {registration.possibleDuplicate && <span className="role role-user" title={t('Gleicher Name oder gleiche E-Mail wie eine andere Anmeldung – nur ein Hinweis.')}>{t('mögliche Dublette')}</span>}
             {registration.incomplete && <span className="role role-user">{t('Team unvollständig')}</span>}
           </small>

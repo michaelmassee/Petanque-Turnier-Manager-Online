@@ -1129,6 +1129,8 @@
   "Du bist aktuell in keinem Turnier gemeldet.": "You are currently not registered for any tournament.",
   "Dieselbe Person mit Konto steht in mehreren Anmeldungen. Bitte eine davon stornieren oder die Person austauschen.": "The same person with an account appears in several registrations. Please cancel one of them or replace the person.",
   "Konto doppelt angemeldet": "Account registered twice",
+  "Person doppelt angemeldet": "Person registered twice",
+  "Dieselbe verknüpfte Person steht in mehreren Anmeldungen. Bitte eine davon stornieren oder die Person austauschen.": "The same linked person appears in multiple registrations. Please cancel one registration or replace the person.",
   "Gleicher Name oder gleiche E-Mail wie eine andere Anmeldung – nur ein Hinweis.": "Same name or email as another registration – just a hint.",
   "mögliche Dublette": "possible duplicate",
   "Team unvollständig": "Team incomplete",

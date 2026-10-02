@@ -48,6 +48,37 @@ describe('Doppelte Erfassung (KP-06)', () => {
     expect(possibleDuplicates).toEqual([]);
   });
 
+  it('erlaubt, dass ein Konto verschiedene Personen für dasselbe Turnier anmeldet', () => {
+    const rows = [
+      anmeldung('r1', [['Olga', 'Massee', 'michael', 'michael@massee.de']]),
+      anmeldung('r2', [['Michael', 'Massee', 'michael', 'michael@massee.de']]),
+    ];
+    const flags = registrationFlagsById(rows);
+    expect(registrationConflicts(rows)).toEqual({ accountConflicts: [], possibleDuplicates: [] });
+    expect(flags('r1')).toEqual({ accountConflictWith: [], possibleDuplicateWith: [] });
+    expect(flags('r2')).toEqual({ accountConflictWith: [], possibleDuplicateWith: [] });
+  });
+
+  it('bleibt ein Konflikt, wenn dasselbe Konto mit Schreibvarianten desselben Namens zweimal angemeldet ist (P-29)', () => {
+    const rows = [
+      anmeldung('r1', [['José', 'Müller', 'uj', 'jose@example.test']]),
+      anmeldung('r2', [['jose', 'MULLER', 'uj', 'jose@example.test']]),
+    ];
+    expect(registrationConflicts(rows)).toEqual({
+      accountConflicts: [{ userId: 'uj', registrationIds: ['r1', 'r2'] }], possibleDuplicates: [],
+    });
+  });
+
+  it('zeigt die gleiche E-Mail bei verschiedenen Gästen weiterhin als mögliche Dublette (P-29 b\')', () => {
+    const rows = [
+      anmeldung('r1', [['Olga', 'Massee', null, 'familie@example.test']]),
+      anmeldung('r2', [['Michael', 'Massee', null, 'familie@example.test']]),
+    ];
+    expect(registrationConflicts(rows)).toEqual({
+      accountConflicts: [], possibleDuplicates: [{ kind: 'email', registrationIds: ['r1', 'r2'] }],
+    });
+  });
+
   it('zeigt gleichnamige Gäste nur als mögliche Dublette ohne Konflikt (P-29 b\', P-44)', () => {
     const rows = [anmeldung('r1', [['Jean-Paul', 'Müller']]), anmeldung('r2', [['jean paul', 'muller']])];
     const flags = registrationFlagsById(rows);
