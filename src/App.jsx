@@ -1497,6 +1497,7 @@ function AppContent() {
               filterClub={homeFilterClub}
               setFilterClub={setHomeFilterClub}
               clubs={publishedClubs}
+              currentUserId={currentUser?.id}
               filterOpenOnly={homeFilterOpenOnly}
               setFilterOpenOnly={setHomeFilterOpenOnly}
               filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
@@ -1810,6 +1811,7 @@ function AppContent() {
               filterClub={homeFilterClub}
               setFilterClub={setHomeFilterClub}
               clubs={publishedClubs}
+              currentUserId={currentUser?.id}
               filterOpenOnly={homeFilterOpenOnly}
               setFilterOpenOnly={setHomeFilterOpenOnly}
               filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}

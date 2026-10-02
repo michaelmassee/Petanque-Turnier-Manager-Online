@@ -536,6 +536,7 @@ export function SearchMenuControl({
   filterClub,
   setFilterClub,
   clubs,
+  currentUserId,
   filterOpenOnly,
   setFilterOpenOnly,
   filterOnlineRegistrationOnly,
@@ -612,7 +613,7 @@ export function SearchMenuControl({
                     onChange={setFilterType}
                     options={[{ value: '', label: t('Alle Turniersysteme') }, ...translatedOptions(TOURNAMENT_TYPES)]}
                   />
-                  <ClubPicker clubs={clubs} value={filterClub} onChange={setFilterClub} />
+                  <ClubPicker clubs={clubs} value={filterClub} onChange={setFilterClub} currentUserId={currentUserId} />
                 </div>
                 <label className="checkbox-field">
                   <input type="checkbox" checked={filterOpenOnly} onChange={(event) => setFilterOpenOnly(event.target.checked)} />

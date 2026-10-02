@@ -136,7 +136,7 @@ describe('Turnier-Finder', () => {
         open onToggle={() => {}} onClose={() => {}} activeTab="filters" setActiveTab={() => {}}
         query="" setQuery={() => {}} showMineFilter={false} onlyMine={false} setOnlyMine={() => {}}
         filterMonth="" setFilterMonth={() => {}} filterFormation="" setFilterFormation={() => {}} filterRegistrationType="" setFilterRegistrationType={() => {}} filterType="" setFilterType={() => {}}
-        filterClub="" setFilterClub={setFilterClub} clubs={[{ id: 'club-1', name: 'BC Linden' }]}
+        filterClub="" setFilterClub={setFilterClub} clubs={[{ id: 'club-1', name: 'BC Linden' }]} currentUserId="user-1"
         filterOpenOnly={false} setFilterOpenOnly={() => {}} filterOnlineRegistrationOnly={false} setFilterOnlineRegistrationOnly={() => {}} onResetFilters={() => {}}
         searchOrigin={null} searchOriginQuery="" setSearchOriginQuery={() => {}} onSearchOriginSubmit={(event) => event.preventDefault()} onSearchOriginSelect={() => {}} onUseMyLocation={() => {}} onClearSearchOrigin={() => {}}
         searchRadiusKm="25" setSearchRadiusKm={() => {}} geoLoading={false} geoError="" canSaveSearch={false}
@@ -144,6 +144,8 @@ describe('Turnier-Finder', () => {
     );
 
     fireEvent.focus(screen.getByRole('combobox', { name: 'Verein' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Als Favorit markieren/entfernen' }));
+    expect(screen.getByRole('button', { name: 'Als Favorit markieren/entfernen' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('option', { name: 'BC Linden' }));
     expect(setFilterClub).toHaveBeenCalledWith('club-1');
   });
