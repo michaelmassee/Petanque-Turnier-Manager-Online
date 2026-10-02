@@ -119,7 +119,6 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
       {!(showStatus && form.noEmail) && (
         <TextField label={allowsPartner ? t('E-Mail Spieler 1') : t('E-Mail des Spielers')} type="email" value={form.playerEmail || ''} onChange={(playerEmail) => setForm({ ...form, playerEmail })} required />
       )}
-      <p className="hint">{t('An die E-Mail-Adressen der Spieler gehen Bestätigung, Storno-Link und Live-Link. Gehört eine Adresse zu einem PTM-Online-Konto, wird es mit der Person verknüpft.')}</p>
       <div className="form-grid">
         <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
         {licenseRequired && (
