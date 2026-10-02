@@ -366,6 +366,7 @@ export function RegistrationsPanel({
   error,
 }) {
   const { t } = useTranslation();
+  const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [csvNamesOnly, setCsvNamesOnly] = useState(false);
   const [csvConfirmedOnly, setCsvConfirmedOnly] = useState(false);
   const filtered = Boolean(query.trim()) || Boolean(statusFilter) || Boolean(organizerMessageFilter) || Boolean(questionFilter) || Boolean(feeFilter);
@@ -388,25 +389,25 @@ export function RegistrationsPanel({
       <div className="section-title">
         <h2>{t('Anmeldungen')}</h2>
         <span className="counter">{filtered ? `${filteredRegistrations.length}/${registrations.length}` : registrations.length}</span>
-        <div className="csv-export-controls">
-          <label className="checkbox-row">
+        <Button variant="secondary" disabled={registrations.length === 0} onClick={() => setCsvDialogOpen(true)}>{t('CSV exportieren')}</Button>
+        <Button onClick={onCreate} disabled={!tournament}>{t('Neue Anmeldung')}</Button>
+      </div>
+      <EditDialog open={csvDialogOpen} title={t('CSV exportieren')} onClose={() => setCsvDialogOpen(false)}>
+        <div className="form dense">
+          <label className="checkbox-field">
             <input type="checkbox" checked={csvNamesOnly} onChange={(event) => setCsvNamesOnly(event.target.checked)} />
             {t('Nur Namen')}
           </label>
-          <label className="checkbox-row">
+          <label className="checkbox-field">
             <input type="checkbox" checked={csvConfirmedOnly} onChange={(event) => setCsvConfirmedOnly(event.target.checked)} />
             {t('Nur bestätigte Meldungen')}
           </label>
-          <Button
-            variant="secondary"
-            disabled={registrations.length === 0}
-            onClick={() => downloadRegistrationsCsv(tournament, registrations, t, { namesOnly: csvNamesOnly, confirmedOnly: csvConfirmedOnly })}
-          >
-            {t('CSV exportieren')}
-          </Button>
+          <div className="dialog-actions">
+            <Button variant="secondary" onClick={() => setCsvDialogOpen(false)}>{t('Abbrechen')}</Button>
+            <Button onClick={() => { downloadRegistrationsCsv(tournament, registrations, t, { namesOnly: csvNamesOnly, confirmedOnly: csvConfirmedOnly }); setCsvDialogOpen(false); }}>{t('CSV herunterladen')}</Button>
+          </div>
         </div>
-        <Button onClick={onCreate} disabled={!tournament}>{t('Neue Anmeldung')}</Button>
-      </div>
+      </EditDialog>
       <Feedback message={message} />
       <Feedback error={error} />
       <SelectField

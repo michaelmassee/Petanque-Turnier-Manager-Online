@@ -95,6 +95,8 @@ describe('CSV-Export-Button', () => {
 
     renderPanel([REGISTRATION_WITH_FEES]);
     fireEvent.click(screen.getByRole('button', { name: 'CSV exportieren' }));
+    expect(clickedLinks).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'CSV herunterladen' }));
 
     expect(clickedLinks).toHaveLength(1);
     expect(clickedLinks[0].href).toBe('blob:meldeliste');
@@ -120,9 +122,10 @@ describe('CSV-Export-Button', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     renderPanel([{ ...REGISTRATION_WITH_FEES, partnerFirstName: 'Ben', partnerLastName: 'Beispiel' }]);
+    fireEvent.click(screen.getByRole('button', { name: 'CSV exportieren' }));
     fireEvent.click(screen.getByLabelText('Nur Namen'));
     fireEvent.click(screen.getByLabelText('Nur bestätigte Meldungen'));
-    fireEvent.click(screen.getByRole('button', { name: 'CSV exportieren' }));
+    fireEvent.click(screen.getByRole('button', { name: 'CSV herunterladen' }));
 
     expect((await exportedBlob.text()).replace(/^﻿/, '').trim().split('\r\n')).toEqual(['firstName,lastName', 'Anna,Muster', 'Ben,Beispiel']);
   });
