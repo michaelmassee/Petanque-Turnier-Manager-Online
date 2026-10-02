@@ -1154,5 +1154,7 @@
   "adminAction_binding_takeover": "document binding taken over",
   "adminAction_binding_release": "document binding released",
   "adminAction_running_reset": "tournament start reset",
-  "adminAction_tournament_deleted": "tournament deleted"
+  "adminAction_tournament_deleted": "tournament deleted",
+  "Diese Anmeldung ist für dein Konto nicht sichtbar.": "This registration is not visible to your account.",
+  "Zu meinen Live-Turnieren": "To my live tournaments"
 }

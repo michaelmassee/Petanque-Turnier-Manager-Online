@@ -1154,5 +1154,7 @@
   "adminAction_binding_takeover": "vinculación del documento asumida",
   "adminAction_binding_release": "vinculación del documento eliminada",
   "adminAction_running_reset": "inicio del torneo revertido",
-  "adminAction_tournament_deleted": "torneo eliminado"
+  "adminAction_tournament_deleted": "torneo eliminado",
+  "Diese Anmeldung ist für dein Konto nicht sichtbar.": "Esta inscripción no es visible para tu cuenta.",
+  "Zu meinen Live-Turnieren": "A mis torneos en directo"
 }

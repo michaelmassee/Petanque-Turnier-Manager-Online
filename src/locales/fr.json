@@ -1154,5 +1154,7 @@
   "adminAction_binding_takeover": "liaison du document reprise",
   "adminAction_binding_release": "liaison du document supprimée",
   "adminAction_running_reset": "démarrage du tournoi annulé",
-  "adminAction_tournament_deleted": "tournoi supprimé"
+  "adminAction_tournament_deleted": "tournoi supprimé",
+  "Diese Anmeldung ist für dein Konto nicht sichtbar.": "Cette inscription n'est pas visible pour ton compte.",
+  "Zu meinen Live-Turnieren": "Vers mes tournois en direct"
 }

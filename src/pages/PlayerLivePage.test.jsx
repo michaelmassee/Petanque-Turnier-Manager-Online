@@ -157,6 +157,29 @@ describe('Live-Ansicht für Spieler', () => {
     expect(await screen.findByRole('button', { name: /Meine Turniere/ })).toBeInTheDocument();
   });
 
+  it('zeigt ohne Zugriff keinen zwischengespeicherten Stand mehr, sondern den Weg zur eigenen Liste', async () => {
+    const payload = livePayload();
+    payload.tournament.status = 'registration';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ error: 'Anmeldung nicht gefunden' }, 404));
+    const navigate = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['live', 'registration', 'r1'], payload);
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de"
+          navigate={navigate} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('Diese Anmeldung ist für dein Konto nicht sichtbar.')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Anmeldung nicht gefunden');
+    expect(screen.queryByRole('button', { name: 'Das bin ich nicht' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Anna Muster/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zu meinen Live-Turnieren' }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/live'));
+  });
+
   it('verwirft nach „Das bin ich nicht“ die Liste der eigenen Live-Turniere, bevor sie wieder erscheint', async () => {
     const payload = livePayload();
     payload.tournament.status = 'registration';

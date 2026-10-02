@@ -1154,5 +1154,7 @@
   "adminAction_binding_takeover": "documentkoppeling overgenomen",
   "adminAction_binding_release": "documentkoppeling verbroken",
   "adminAction_running_reset": "toernooistart teruggezet",
-  "adminAction_tournament_deleted": "toernooi verwijderd"
+  "adminAction_tournament_deleted": "toernooi verwijderd",
+  "Diese Anmeldung ist für dein Konto nicht sichtbar.": "Deze inschrijving is niet zichtbaar voor je account.",
+  "Zu meinen Live-Turnieren": "Naar mijn live-toernooien"
 }

@@ -290,6 +290,13 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {} }) {
     retry: false,
   });
   const data = query.data;
+  // Ohne Zugriff (z. B. nach „Das bin ich nicht“ oder aus der Anmeldung entfernt) ist ein noch zwischengespeicherter
+  // Stand veraltet: nicht mehr anzeigen.
+  async function zurUebersicht() {
+    await queryClient.invalidateQueries({ queryKey: ['live', 'me'] });
+    navigate('/live');
+    queryClient.removeQueries({ queryKey });
+  }
 
   if (query.isPending) return <p className="muted">{t('Wird geladen…')}</p>;
   if (!data && query.error?.payload?.details?.code === 'tournament_deleted') {
@@ -297,6 +304,15 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {} }) {
       <section className="panel live-card">
         <h2 data-i18n-skip>{query.error.payload.details.tournamentName}</h2>
         <p className="hint">{t('Das Turnier wurde vom Veranstalter gelöscht.')}</p>
+      </section>
+    );
+  }
+  if (query.error?.status === 404) {
+    return (
+      <section className="panel live-card">
+        <Feedback error={query.error.message} />
+        <p className="hint">{t('Diese Anmeldung ist für dein Konto nicht sichtbar.')}</p>
+        <Button variant="secondary" onClick={zurUebersicht}>{t('Zu meinen Live-Turnieren')}</Button>
       </section>
     );
   }
@@ -331,11 +347,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {} }) {
         </span>
         <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>
       </div>
-      {tournament.status !== 'finished' && <NotMeButton path={path} onDone={async () => {
-        // Das Konto hat keinen Zugriff mehr: die zwischengespeicherte Liste „Meine Live-Turniere“ ist veraltet.
-        await queryClient.invalidateQueries({ queryKey: ['live', 'me'] });
-        navigate('/live');
-      }} />}
+      {tournament.status !== 'finished' && <NotMeButton path={path} onDone={zurUebersicht} />}
     </div>
   );
 }
