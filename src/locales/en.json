@@ -1185,5 +1185,6 @@
   "Dieser Live-Link ist ungültig oder abgelaufen": "This live link is invalid or has expired",
   "E-Mail Spieler 1": "Email player 1",
   "E-Mail des Spielers": "Player's email",
-  "An die E-Mail-Adressen der Spieler gehen Bestätigung, Storno-Link und Live-Link. Gehört eine Adresse zu einem PTM-Online-Konto, wird es mit der Person verknüpft.": "The confirmation, cancellation link and live link are sent to the players' email addresses. If an address belongs to a PTM Online account, it is linked to that person."
+  "An die E-Mail-Adressen der Spieler gehen Bestätigung, Storno-Link und Live-Link. Gehört eine Adresse zu einem PTM-Online-Konto, wird es mit der Person verknüpft.": "The confirmation, cancellation link and live link are sent to the players' email addresses. If an address belongs to a PTM Online account, it is linked to that person.",
+  "Alle eingetragenen Personen sind einverstanden, dass ihre Anmeldedaten (Name, E-Mail-Adresse) zur Turnierorganisation an den Veranstalter gehen und Name, Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich schaltet.": "All registered persons agree that their registration data (name, email address) is passed to the organiser for organising the tournament and that names, club, team name and partner names may appear on the public tournament page if the organiser makes the participant list public."
 }

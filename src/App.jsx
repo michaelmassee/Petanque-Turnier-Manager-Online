@@ -2420,27 +2420,16 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
               onChange={(event) => setForm({ ...form, website: event.target.value })}
             />
           </label>
+          {/* Ein gemeinsames Einverständnis für Veröffentlichungshinweis und Weitergabe an den Veranstalter (DS-01). */}
           <label className="checkbox-field">
             <input
               type="checkbox"
-              checked={form.publicationNoticeAccepted}
-              onChange={(event) => setForm({ ...form, publicationNoticeAccepted: event.target.checked })}
+              checked={Boolean(form.publicationNoticeAccepted && form.personsConsentAccepted)}
+              onChange={(event) => setForm({ ...form, publicationNoticeAccepted: event.target.checked, personsConsentAccepted: event.target.checked })}
               required
             />
             <span>
-              {t('Ich habe verstanden, dass meine Anmeldedaten zur Turnierorganisation verarbeitet werden und mein Name sowie ggf. Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich sichtbar schaltet.')}
-              <RequiredMark />
-            </span>
-          </label>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={Boolean(form.personsConsentAccepted)}
-              onChange={(event) => setForm({ ...form, personsConsentAccepted: event.target.checked })}
-              required
-            />
-            <span>
-              {t('Ich bestätige, dass alle eingetragenen Personen mit der Weitergabe ihres Namens und ihrer E-Mail-Adresse an den Veranstalter einverstanden sind.')}
+              {t('Alle eingetragenen Personen sind einverstanden, dass ihre Anmeldedaten (Name, E-Mail-Adresse) zur Turnierorganisation an den Veranstalter gehen und Name, Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich schaltet.')}
               <RequiredMark />
             </span>
           </label>
