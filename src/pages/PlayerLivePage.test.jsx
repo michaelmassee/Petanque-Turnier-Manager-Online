@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { LiveDetail, MyLiveBackLink, MyLiveList } from './PlayerLivePage.jsx';
 import { matchLiveRoute } from '../lib/routing.js';
@@ -155,6 +155,28 @@ describe('Live-Ansicht für Spieler', () => {
     renderBackLink();
 
     expect(await screen.findByRole('button', { name: /Meine Turniere/ })).toBeInTheDocument();
+  });
+
+  it('verwirft nach „Das bin ich nicht“ die Liste der eigenen Live-Turniere, bevor sie wieder erscheint', async () => {
+    const payload = livePayload();
+    payload.tournament.status = 'registration';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => (String(url).endsWith('/not-me')
+      ? jsonResponse({ ok: true }) : jsonResponse(payload)));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const navigate = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['live', 'me'], { registrations: [{ id: 'r1' }] });
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de"
+          navigate={navigate} />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Das bin ich nicht' }));
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/live'));
+    expect(client.getQueryState(['live', 'me']).isInvalidated).toBe(true);
   });
 });
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { formatDate, formatWeekdayShort, DISPLAY_LOCALES } from '../lib/format.js';
@@ -261,7 +261,7 @@ function NotMeButton({ path, onDone }) {
     setError(''); setBusy(true);
     try {
       await authenticatedApi(`${path}/not-me`, { method: 'POST' });
-      onDone();
+      await onDone();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -279,6 +279,7 @@ function NotMeButton({ path, onDone }) {
 
 export function LiveDetail({ queryKey, path, language, navigate = () => {} }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey,
     queryFn: () => authenticatedApi(path),
@@ -330,7 +331,11 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {} }) {
         </span>
         <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>
       </div>
-      {tournament.status !== 'finished' && <NotMeButton path={path} onDone={() => navigate('/live')} />}
+      {tournament.status !== 'finished' && <NotMeButton path={path} onDone={async () => {
+        // Das Konto hat keinen Zugriff mehr: die zwischengespeicherte Liste „Meine Live-Turniere“ ist veraltet.
+        await queryClient.invalidateQueries({ queryKey: ['live', 'me'] });
+        navigate('/live');
+      }} />}
     </div>
   );
 }
