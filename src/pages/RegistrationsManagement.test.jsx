@@ -188,13 +188,21 @@ describe('Anmeldungsverwaltung: Anmeldedetails', () => {
 describe('Anmeldungsverwaltung: Konto-Verknüpfungen', () => {
   it('kennzeichnet nur die verbundenen Teammitglieder', () => {
     renderPanel([{
-      id: 'r-account', firstName: 'Anna', lastName: 'Muster', status: 'confirmed', accountConnected: true,
-      partnerFirstName: 'Ben', partnerLastName: 'Gast', partnerAccountConnected: false,
-      partner2FirstName: 'Clara', partner2LastName: 'Konto', partner2AccountConnected: true,
+      id: 'r-account', firstName: 'Anna', lastName: 'Muster', status: 'confirmed', accountConnected: true, club: 'BC Linden', licenseNr: 'A-1',
+      partnerFirstName: 'Ben', partnerLastName: 'Gast', partnerAccountConnected: false, partnerClub: 'BC Gießen', partnerLicenseNr: 'B-2',
+      partner2FirstName: 'Clara', partner2LastName: 'Konto', partner2AccountConnected: true, partner2Club: 'BC Frankfurt', partner2LicenseNr: 'C-3',
     }]);
 
     expect(screen.getAllByLabelText('Mit Benutzerkonto verbunden')).toHaveLength(2);
     expect(screen.getByText('Partner: Ben Gast')).toBeInTheDocument();
     expect(screen.getByText('Partner 2: Clara Konto')).toBeInTheDocument();
+    expect(screen.getByText('Partner: Ben Gast').tagName).toBe('SPAN');
+    expect(screen.getByText('Partner 2: Clara Konto').tagName).toBe('SPAN');
+    expect(screen.getByText('BC Linden')).toBeInTheDocument();
+    expect(screen.getByText('BC Gießen')).toBeInTheDocument();
+    expect(screen.getByText('BC Frankfurt')).toBeInTheDocument();
+    expect(screen.getByText('Lizenznummer: A-1')).toBeInTheDocument();
+    expect(screen.getByText('Lizenznummer: B-2')).toBeInTheDocument();
+    expect(screen.getByText('Lizenznummer: C-3')).toBeInTheDocument();
   });
 });

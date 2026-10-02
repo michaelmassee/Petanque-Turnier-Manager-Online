@@ -121,13 +121,13 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
           )}
         </RegistrationSection>
       )}
-      <RegistrationSection title={allowsPartner ? t('Spieler 1') : t('Spieler')}>
+      <RegistrationSection title={t('Spieler 1')}>
         <div className="form-grid">
           <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />
           <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} invalid={invalidField === 'firstName'} />
         </div>
         <ParticipantQuestions participant="primary" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('primary', questionId, checked)} />
-        {!(showStatus && form.noEmail) && <TextField label={allowsPartner ? t('E-Mail Spieler 1') : t('E-Mail des Spielers')} type="email" value={form.playerEmail || ''} onChange={(playerEmail) => setForm({ ...form, playerEmail })} required />}
+        {!(showStatus && form.noEmail) && <TextField label={t('E-Mail')} type="email" value={form.playerEmail || ''} onChange={(playerEmail) => setForm({ ...form, playerEmail })} required />}
         <div className="form-grid">
           <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
           {licenseRequired && <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} required />}
@@ -137,13 +137,13 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
       {allowsPartner && (
         <RegistrationSection title={t('Spieler 2')}>
           <div className="form-grid">
-            <TextField label={t('Partner Vorname')} value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
-            <TextField label={t('Partner Nachname')} value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
+            <TextField label={t('Vorname')} value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
+            <TextField label={t('Nachname')} value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
           </div>
           <ParticipantQuestions participant="partner" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner', questionId, checked)} />
           <div className="form-grid">
-            <TextField label={t('Partner E-Mail')} type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
-            {licenseRequired && <TextField label={t('Partner Lizenznummer')} value={form.partnerLicenseNr} onChange={(partnerLicenseNr) => setForm({ ...form, partnerLicenseNr })} required />}
+            <TextField label={t('E-Mail')} type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
+            {licenseRequired && <TextField label={t('Lizenznummer')} value={form.partnerLicenseNr} onChange={(partnerLicenseNr) => setForm({ ...form, partnerLicenseNr })} required />}
           </div>
           <TextField label={t('Verein')} value={form.partnerClub} onChange={(partnerClub) => setForm({ ...form, partnerClub })} />
           {showFeeSelect && <SelectField label={t('Startgeld Partner')} value={selectedFee('partner')} onChange={(tariffId) => setSelectedFee('partner', tariffId)} options={feeOptions('partner')} />}
@@ -153,13 +153,13 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
         <RegistrationSection title={t('Spieler 3')}>
           <p className="hint">{t('Ein Triplette-Team kann auch zu zweit angemeldet und vor Ort vervollständigt werden.')}</p>
           <div className="form-grid">
-            <TextField label={t('Partner 2 Vorname')} value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required={Boolean(form.partner2LastName)} minLength={2} invalid={invalidField === 'partner2FirstName'} />
-            <TextField label={t('Partner 2 Nachname')} value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} required={Boolean(form.partner2FirstName)} minLength={2} invalid={invalidField === 'partner2FirstName'} />
+            <TextField label={t('Vorname')} value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required={Boolean(form.partner2LastName)} minLength={2} invalid={invalidField === 'partner2FirstName'} />
+            <TextField label={t('Nachname')} value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} required={Boolean(form.partner2FirstName)} minLength={2} invalid={invalidField === 'partner2FirstName'} />
           </div>
           <ParticipantQuestions participant="partner2" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner2', questionId, checked)} />
           <div className="form-grid">
-            <TextField label={t('Partner 2 E-Mail')} type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
-            {licenseRequired && <TextField label={t('Partner 2 Lizenznummer')} value={form.partner2LicenseNr} onChange={(partner2LicenseNr) => setForm({ ...form, partner2LicenseNr })} required />}
+            <TextField label={t('E-Mail')} type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
+            {licenseRequired && <TextField label={t('Lizenznummer')} value={form.partner2LicenseNr} onChange={(partner2LicenseNr) => setForm({ ...form, partner2LicenseNr })} required />}
           </div>
           <TextField label={t('Verein')} value={form.partner2Club} onChange={(partner2Club) => setForm({ ...form, partner2Club })} />
           {showFeeSelect && <SelectField label={t('Startgeld Partner 2')} value={selectedFee('partner2')} onChange={(tariffId) => setSelectedFee('partner2', tariffId)} options={feeOptions('partner2')} />}

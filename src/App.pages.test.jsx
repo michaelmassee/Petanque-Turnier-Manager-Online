@@ -352,9 +352,8 @@ describe('Öffentliche Turnierdetailseite', () => {
     expect(screen.getByRole('heading', { name: 'Spieler 3', level: 3 }).closest('.registration-section')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Hinweise und Einverständnis', level: 3 }).closest('.registration-section')).toBeInTheDocument();
     expect(screen.getAllByLabelText('Verein')).toHaveLength(3);
-    expect(screen.getByLabelText(/^Lizenznummer\b/)).toBeRequired();
-    expect(screen.getByLabelText(/^Partner Lizenznummer\b/)).toBeRequired();
-    expect(screen.getByLabelText(/^Partner 2 Lizenznummer\b/)).toBeRequired();
+    expect(screen.getAllByLabelText(/^Lizenznummer\b/)).toHaveLength(3);
+    expect(screen.getAllByLabelText(/^Lizenznummer\b/).every((field) => field.required)).toBe(true);
   });
 
   it('bietet nur bei einer möglichen Anmeldung Eingabefelder an', () => {
@@ -992,7 +991,7 @@ describe('Anmeldungen-Seite: Liste + Dialog', () => {
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Anmeldung bearbeiten')).toBeInTheDocument();
-    expect(within(dialog).getByRole('heading', { name: 'Spieler', level: 3 }).closest('.registration-section')).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: 'Spieler 1', level: 3 }).closest('.registration-section')).toBeInTheDocument();
     expect(within(dialog).getByRole('heading', { name: 'Organisation', level: 3 }).closest('.registration-section')).toBeInTheDocument();
     expect(within(dialog).getByLabelText(/^Vorname\b/)).toHaveValue('Anna');
 
@@ -1021,9 +1020,10 @@ describe('Anmeldungen-Seite: Liste + Dialog', () => {
       />,
     );
 
-    expect(screen.getByLabelText(/^Vorname\b/)).not.toHaveClass('field-invalid');
+    const player1 = screen.getByRole('heading', { name: 'Spieler 1', level: 3 }).closest('.registration-section');
+    expect(within(player1).getByLabelText(/^Vorname\b/)).not.toHaveClass('field-invalid');
     expect(screen.getByLabelText(/^Teamname\b/)).not.toHaveClass('field-invalid');
-    expect(screen.getByRole('heading', { name: 'Spieler 1', level: 3 })).toBeInTheDocument();
+    expect(player1).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Spieler 2', level: 3 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Organisation', level: 3 })).toBeInTheDocument();
 
@@ -1039,8 +1039,8 @@ describe('Anmeldungen-Seite: Liste + Dialog', () => {
       />,
     );
 
-    expect(screen.getByLabelText(/^Vorname\b/)).toHaveClass('field-invalid');
-    expect(screen.getByLabelText(/^Nachname\b/)).toHaveClass('field-invalid');
+    expect(within(player1).getByLabelText(/^Vorname\b/)).toHaveClass('field-invalid');
+    expect(within(player1).getByLabelText(/^Nachname\b/)).toHaveClass('field-invalid');
     expect(screen.getByLabelText(/^Teamname\b/)).not.toHaveClass('field-invalid');
 
     rerender(
@@ -1055,7 +1055,7 @@ describe('Anmeldungen-Seite: Liste + Dialog', () => {
       />,
     );
 
-    expect(screen.getByLabelText(/^Vorname\b/)).not.toHaveClass('field-invalid');
+    expect(within(player1).getByLabelText(/^Vorname\b/)).not.toHaveClass('field-invalid');
     expect(screen.getByLabelText(/^Teamname\b/)).toHaveClass('field-invalid');
   });
 });

@@ -235,17 +235,27 @@ function RegistrationRow({ registration, tournament, showConfirm = false, busy, 
           {registration.accountConnected && <AccountBadge />}
         </strong>
         <span>{registration.noEmail ? t('ohne E-Mail-Adresse') : registration.email}</span>
+        {registration.club && <span className="registration-player-meta" data-i18n-skip>{registration.club}</span>}
+        {registration.licenseNr && <span className="registration-player-meta" data-i18n-skip>{t('Lizenznummer')}: {registration.licenseNr}</span>}
         {registration.partnerFirstName && (
-          <small className="registration-team-member" data-i18n-skip>
-            {t('Partner')}: {registration.partnerFirstName} {registration.partnerLastName}
-            {registration.partnerAccountConnected && <AccountBadge />}
-          </small>
+          <>
+            <span className="registration-team-member" data-i18n-skip>
+              {t('Partner')}: {registration.partnerFirstName} {registration.partnerLastName}
+              {registration.partnerAccountConnected && <AccountBadge />}
+            </span>
+            {registration.partnerClub && <span className="registration-player-meta" data-i18n-skip>{registration.partnerClub}</span>}
+            {registration.partnerLicenseNr && <span className="registration-player-meta" data-i18n-skip>{t('Lizenznummer')}: {registration.partnerLicenseNr}</span>}
+          </>
         )}
         {registration.partner2FirstName && (
-          <small className="registration-team-member" data-i18n-skip>
-            {t('Partner 2')}: {registration.partner2FirstName} {registration.partner2LastName}
-            {registration.partner2AccountConnected && <AccountBadge />}
-          </small>
+          <>
+            <span className="registration-team-member" data-i18n-skip>
+              {t('Partner 2')}: {registration.partner2FirstName} {registration.partner2LastName}
+              {registration.partner2AccountConnected && <AccountBadge />}
+            </span>
+            {registration.partner2Club && <span className="registration-player-meta" data-i18n-skip>{registration.partner2Club}</span>}
+            {registration.partner2LicenseNr && <span className="registration-player-meta" data-i18n-skip>{t('Lizenznummer')}: {registration.partner2LicenseNr}</span>}
+          </>
         )}
         {registration.teamName && <small data-i18n-skip>{registration.teamName}</small>}
         {(registration.overCapacity || registration.receivedAfterStart || registration.accountConflict || registration.possibleDuplicate || registration.incomplete) && (
