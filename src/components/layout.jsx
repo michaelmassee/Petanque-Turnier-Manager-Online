@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ClubPicker } from './ClubPicker.jsx';
 import { authenticatedApi } from '../lib/api.js';
 import { currentBrowserPushSubscription, ensureBrowserPushSubscription } from '../lib/push.js';
 import { useInstallPrompt, isIosSafari, useOnlineStatus } from '../lib/hooks.js';
@@ -185,6 +186,7 @@ function savedSearchSummary(search, t) {
   if (search.filterFormation) parts.push(labelFor(FORMATIONS, search.filterFormation));
   if (search.filterRegistrationType) parts.push(labelFor(REGISTRATION_TYPES, search.filterRegistrationType));
   if (search.filterType) parts.push(labelFor(TOURNAMENT_TYPES, search.filterType));
+  if (search.filterClub) parts.push(`${t('Verein')}: ${search.filterClub}`);
   if (search.filterOpenOnly) parts.push(t('Anmeldung möglich'));
   if (search.filterOnlineRegistrationOnly) parts.push(t('Online-Anmeldung möglich'));
   if (search.searchOrigin) parts.push(`${t('Umkreis')}: ${labelFor(RADIUS_OPTIONS, search.radiusKm)} · ${search.searchOrigin.label}`);
@@ -531,6 +533,9 @@ export function SearchMenuControl({
   setFilterRegistrationType,
   filterType,
   setFilterType,
+  filterClub,
+  setFilterClub,
+  clubs,
   filterOpenOnly,
   setFilterOpenOnly,
   filterOnlineRegistrationOnly,
@@ -607,6 +612,7 @@ export function SearchMenuControl({
                     onChange={setFilterType}
                     options={[{ value: '', label: t('Alle Turniersysteme') }, ...translatedOptions(TOURNAMENT_TYPES)]}
                   />
+                  <ClubPicker clubs={clubs} value={filterClub} onChange={setFilterClub} />
                 </div>
                 <label className="checkbox-field">
                   <input type="checkbox" checked={filterOpenOnly} onChange={(event) => setFilterOpenOnly(event.target.checked)} />

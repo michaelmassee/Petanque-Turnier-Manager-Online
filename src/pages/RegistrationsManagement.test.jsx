@@ -59,6 +59,15 @@ describe('registrationsToCsv', () => {
     expect(header.split(',').at(-1)).toBe('organizerMessage');
     expect(row.endsWith('"Komme später, ca. 10 Min."')).toBe(true);
   });
+
+  it('kann bestätigte Meldungen als reine Namensliste exportieren', () => {
+    const csv = registrationsToCsv([
+      { firstName: 'Anna', lastName: 'Muster', partnerFirstName: 'Ben', partnerLastName: 'Beispiel', status: 'confirmed' },
+      { firstName: 'Carla', lastName: 'Gast', status: 'pending' },
+    ], TOURNAMENT, t, { namesOnly: true, confirmedOnly: true });
+
+    expect(csv.replace(/^﻿/, '').trim().split('\r\n')).toEqual(['firstName,lastName', 'Anna,Muster', 'Ben,Beispiel']);
+  });
 });
 
 describe('CSV-Export-Button', () => {
@@ -102,6 +111,20 @@ describe('CSV-Export-Button', () => {
   it('ist ohne Anmeldungen deaktiviert', () => {
     renderPanel([]);
     expect(screen.getByRole('button', { name: 'CSV exportieren' })).toBeDisabled();
+  });
+
+  it('kombiniert beide CSV-Optionen beim Download', async () => {
+    let exportedBlob = null;
+    URL.createObjectURL = vi.fn((blob) => { exportedBlob = blob; return 'blob:meldeliste'; });
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    renderPanel([{ ...REGISTRATION_WITH_FEES, partnerFirstName: 'Ben', partnerLastName: 'Beispiel' }]);
+    fireEvent.click(screen.getByLabelText('Nur Namen'));
+    fireEvent.click(screen.getByLabelText('Nur bestätigte Meldungen'));
+    fireEvent.click(screen.getByRole('button', { name: 'CSV exportieren' }));
+
+    expect((await exportedBlob.text()).replace(/^﻿/, '').trim().split('\r\n')).toEqual(['firstName,lastName', 'Anna,Muster', 'Ben,Beispiel']);
   });
 });
 

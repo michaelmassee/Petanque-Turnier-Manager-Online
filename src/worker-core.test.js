@@ -161,7 +161,7 @@ describe('Worker-Fachlogik', () => {
   it('gleicht gespeicherte Suchen mit öffentlichen Turnieren und dem Umkreis ab', () => {
     const tournament = {
       name: 'Herbstpokal', location: 'Linden', type: 'rangliste', date: '2026-09-20', visibility: 'public', status: 'registration',
-      formation: 'doublette', formation_other: 0, registration_type: 'forme', latitude: 50.52, longitude: 8.58,
+      formation: 'doublette', formation_other: 0, registration_type: 'forme', club: 'BC Linden', latitude: 50.52, longitude: 8.58,
     };
     const matchingSearch = { query: 'herbst', filter_month: '09', filter_formation: 'doublette', filter_registration_type: 'forme', filter_type: 'rangliste', filter_open_only: 0, origin_lat: 50.51, origin_lng: 8.57, radius_km: '25' };
 
@@ -175,6 +175,8 @@ describe('Worker-Fachlogik', () => {
     expect(tournamentMatchesSavedSearch({ ...tournament, formation_other: 1 }, { ...matchingSearch, filter_formation: 'andere' })).toBe(true);
     expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_registration_type: 'melee' })).toBe(false);
     expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_type: 'ko' })).toBe(false);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_club: 'PC Petanque' })).toBe(false);
+    expect(tournamentMatchesSavedSearch(tournament, { ...matchingSearch, filter_club: 'bc linden' })).toBe(true);
     expect(tournamentMatchesSavedSearch({ ...tournament, status: 'running' }, { ...matchingSearch, filter_open_only: 1 })).toBe(false);
     expect(tournamentMatchesSavedSearch({ ...tournament, registration_opens_at: '2099-01-01T00:00:00.000Z' }, { ...matchingSearch, filter_open_only: 1 })).toBe(false);
     expect(tournamentMatchesSavedSearch({ ...tournament, registration_deadline: '2000-01-01T00:00:00.000Z' }, { ...matchingSearch, filter_open_only: 1 })).toBe(false);

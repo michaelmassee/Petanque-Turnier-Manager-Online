@@ -1171,6 +1171,17 @@ a.left-panel-link {
   padding: 0;
 }
 
+.csv-export-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.csv-export-controls .checkbox-row {
+  white-space: nowrap;
+}
+
 .home-tournaments {
   max-width: 1180px;
   margin: 0 auto;

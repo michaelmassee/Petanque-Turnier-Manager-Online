@@ -107,6 +107,7 @@ function AppContent() {
   const [homeFilterFormation, setHomeFilterFormation] = useState('');
   const [homeFilterRegistrationType, setHomeFilterRegistrationType] = useState('');
   const [homeFilterType, setHomeFilterType] = useState('');
+  const [homeFilterClub, setHomeFilterClub] = useState('');
   const [homeFilterOpenOnly, setHomeFilterOpenOnly] = useState(false);
   const [homeFilterOnlineRegistrationOnly, setHomeFilterOnlineRegistrationOnly] = useState(false);
   const [searchOrigin, setSearchOrigin] = useState(null);
@@ -191,6 +192,7 @@ function AppContent() {
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
 
   const tournamentsQuery = useQuery({ queryKey: ['tournaments'], queryFn: () => api('/api/tournaments') });
+  const clubsQuery = useQuery({ queryKey: ['published-clubs'], queryFn: () => api('/api/clubs') });
   const boulePlacesQuery = useQuery({ queryKey: ['boule-places-for-tournament'], queryFn: () => api('/api/places'), enabled: canManageTournaments });
   const postboxQuery = useQuery({
     queryKey: ['postbox', currentUser?.id],
@@ -203,6 +205,7 @@ function AppContent() {
     refetchIntervalInBackground: false,
   });
   const homeHeading = t('Öffentliche Turniere');
+  const publishedClubs = clubsQuery.data?.clubs || [];
 
   const filteredHomeTournaments = useMemo(() => {
     const query = homeQuery.trim().toLowerCase();
@@ -223,6 +226,9 @@ function AppContent() {
         return false;
       }
       if (homeFilterType && tournament.type !== homeFilterType) {
+        return false;
+      }
+      if (homeFilterClub && String(tournament.club || '').trim().toLocaleLowerCase() !== homeFilterClub.trim().toLocaleLowerCase()) {
         return false;
       }
       if (homeFilterOpenOnly && !hasOpenRegistration(tournament)) {
@@ -262,6 +268,7 @@ function AppContent() {
     homeFilterFormation,
     homeFilterRegistrationType,
     homeFilterType,
+    homeFilterClub,
     homeFilterOpenOnly,
     homeFilterOnlineRegistrationOnly,
     searchOrigin,
@@ -543,6 +550,7 @@ function AppContent() {
     setHomeFilterFormation(search.filterFormation || '');
     setHomeFilterRegistrationType(search.filterRegistrationType || '');
     setHomeFilterType(search.filterType || '');
+    setHomeFilterClub(search.filterClub || '');
     setHomeFilterOpenOnly(Boolean(search.filterOpenOnly));
     setHomeFilterOnlineRegistrationOnly(Boolean(search.filterOnlineRegistrationOnly));
     setSearchRadiusKm(search.radiusKm || '25');
@@ -584,6 +592,7 @@ function AppContent() {
       filterFormation: homeFilterFormation,
       filterRegistrationType: homeFilterRegistrationType,
       filterType: homeFilterType,
+      filterClub: homeFilterClub,
       filterOpenOnly: homeFilterOpenOnly,
       filterOnlineRegistrationOnly: homeFilterOnlineRegistrationOnly,
       searchOrigin: searchOrigin ? { lat: searchOrigin.lat, lng: searchOrigin.lng, label: searchOrigin.label } : null,
@@ -608,6 +617,7 @@ function AppContent() {
           filterFormation: source.filterFormation,
           filterRegistrationType: source.filterRegistrationType,
           filterType: source.filterType,
+          filterClub: source.filterClub,
           filterOpenOnly: source.filterOpenOnly,
           filterOnlineRegistrationOnly: source.filterOnlineRegistrationOnly,
           searchOrigin: source.searchOrigin,
@@ -640,6 +650,7 @@ function AppContent() {
         filterFormation: search.filterFormation,
         filterRegistrationType: search.filterRegistrationType,
         filterType: search.filterType,
+        filterClub: search.filterClub,
         filterOpenOnly: search.filterOpenOnly,
         filterOnlineRegistrationOnly: search.filterOnlineRegistrationOnly,
         searchOrigin: search.searchOrigin,
@@ -1080,6 +1091,7 @@ function AppContent() {
     setHomeFilterFormation('');
     setHomeFilterRegistrationType('');
     setHomeFilterType('');
+    setHomeFilterClub('');
     setHomeFilterOpenOnly(false);
     setHomeFilterOnlineRegistrationOnly(false);
   }
@@ -1480,6 +1492,9 @@ function AppContent() {
               setFilterRegistrationType={setHomeFilterRegistrationType}
               filterType={homeFilterType}
               setFilterType={setHomeFilterType}
+              filterClub={homeFilterClub}
+              setFilterClub={setHomeFilterClub}
+              clubs={publishedClubs}
               filterOpenOnly={homeFilterOpenOnly}
               setFilterOpenOnly={setHomeFilterOpenOnly}
               filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
@@ -1544,6 +1559,7 @@ function AppContent() {
           filterFormation={homeFilterFormation}
           filterRegistrationType={homeFilterRegistrationType}
           filterType={homeFilterType}
+          filterClub={homeFilterClub}
           filterOpenOnly={homeFilterOpenOnly}
           filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
           searchOrigin={searchOrigin}
@@ -1554,6 +1570,7 @@ function AppContent() {
           onClearFilterFormation={() => setHomeFilterFormation('')}
           onClearFilterRegistrationType={() => setHomeFilterRegistrationType('')}
           onClearFilterType={() => setHomeFilterType('')}
+          onClearFilterClub={() => setHomeFilterClub('')}
           onClearFilterOpenOnly={() => setHomeFilterOpenOnly(false)}
           onClearFilterOnlineRegistrationOnly={() => setHomeFilterOnlineRegistrationOnly(false)}
           onClearSearchOrigin={handleClearSearchOrigin}
@@ -1787,6 +1804,9 @@ function AppContent() {
               setFilterRegistrationType={setHomeFilterRegistrationType}
               filterType={homeFilterType}
               setFilterType={setHomeFilterType}
+              filterClub={homeFilterClub}
+              setFilterClub={setHomeFilterClub}
+              clubs={publishedClubs}
               filterOpenOnly={homeFilterOpenOnly}
               setFilterOpenOnly={setHomeFilterOpenOnly}
               filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
@@ -1883,6 +1903,7 @@ function AppContent() {
           filterFormation={homeFilterFormation}
           filterRegistrationType={homeFilterRegistrationType}
           filterType={homeFilterType}
+          filterClub={homeFilterClub}
           filterOpenOnly={homeFilterOpenOnly}
           filterOnlineRegistrationOnly={homeFilterOnlineRegistrationOnly}
           searchOrigin={searchOrigin}
@@ -1893,6 +1914,7 @@ function AppContent() {
           onClearFilterFormation={() => setHomeFilterFormation('')}
           onClearFilterRegistrationType={() => setHomeFilterRegistrationType('')}
           onClearFilterType={() => setHomeFilterType('')}
+          onClearFilterClub={() => setHomeFilterClub('')}
           onClearFilterOpenOnly={() => setHomeFilterOpenOnly(false)}
           onClearFilterOnlineRegistrationOnly={() => setHomeFilterOnlineRegistrationOnly(false)}
           onClearSearchOrigin={handleClearSearchOrigin}
@@ -2188,6 +2210,7 @@ export function HomeTournaments({
   filterFormation,
   filterRegistrationType,
   filterType,
+  filterClub,
   filterOpenOnly,
   filterOnlineRegistrationOnly,
   searchOrigin,
@@ -2198,6 +2221,7 @@ export function HomeTournaments({
   onClearFilterFormation,
   onClearFilterRegistrationType,
   onClearFilterType,
+  onClearFilterClub,
   onClearFilterOpenOnly,
   onClearFilterOnlineRegistrationOnly,
   onClearSearchOrigin,
@@ -2218,6 +2242,7 @@ export function HomeTournaments({
     filterFormation,
     filterRegistrationType,
     filterType,
+    filterClub,
     filterOpenOnly,
     filterOnlineRegistrationOnly,
   ].filter(Boolean).length;
@@ -2230,6 +2255,7 @@ export function HomeTournaments({
     filterFormation && [labelFor(FORMATIONS, filterFormation), onClearFilterFormation],
     filterRegistrationType && [labelFor(REGISTRATION_TYPES, filterRegistrationType), onClearFilterRegistrationType],
     filterType && [labelFor(TOURNAMENT_TYPES, filterType), onClearFilterType],
+    filterClub && [`${t('Verein')}: ${filterClub}`, onClearFilterClub],
     filterOpenOnly && [t('Anmeldung möglich'), onClearFilterOpenOnly],
     filterOnlineRegistrationOnly && [t('Online-Anmeldung möglich'), onClearFilterOnlineRegistrationOnly],
     searchOrigin && [`${radiusLabel} · ${searchOrigin.label}`, onClearSearchOrigin],

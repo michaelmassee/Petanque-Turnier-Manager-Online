@@ -97,11 +97,25 @@ function registrationQuestionColumns(tournament, t) {
   })));
 }
 
-export function registrationsToCsv(registrations, tournament, t) {
+function registrationPlayers(registration) {
+  return [
+    [registration.firstName, registration.lastName],
+    [registration.partnerFirstName, registration.partnerLastName],
+    [registration.partner2FirstName, registration.partner2LastName],
+  ].filter(([firstName, lastName]) => firstName || lastName);
+}
+
+export function registrationsToCsv(registrations, tournament, t, { namesOnly = false, confirmedOnly = false } = {}) {
+  const exportedRegistrations = confirmedOnly ? registrations.filter((registration) => registration.status === 'confirmed') : registrations;
+  if (namesOnly) {
+    const lines = [['firstName', 'lastName'].map(csvField).join(',')];
+    exportedRegistrations.forEach((registration) => registrationPlayers(registration).forEach((player) => lines.push(player.map(csvField).join(','))));
+    return `﻿${lines.join('\r\n')}\r\n`;
+  }
   const currency = tournament?.currency;
   const questionColumns = registrationQuestionColumns(tournament, t);
   const lines = [[...REGISTRATION_CSV_COLUMNS, ...questionColumns.map((column) => column.label)].map(csvField).join(',')];
-  for (const registration of registrations) {
+  for (const registration of exportedRegistrations) {
     const standardColumns = REGISTRATION_CSV_COLUMNS.map((column) => {
       if (column === 'feeSelections') return csvField((registration.feeSelections || []).map((selection) => `${selection.name} (${formatMoney(selection.amountCents, currency, 'de')})`).join('; '));
       if (column === 'feeTotalCents') return csvField(registration.feeSelections?.length ? formatMoney(registration.feeTotalCents, currency, 'de') : '');
@@ -122,8 +136,8 @@ function tournamentFileSlug(name) {
     .replace(/^-+|-+$/g, '') || 'turnier';
 }
 
-function downloadRegistrationsCsv(tournament, registrations, t) {
-  const csv = registrationsToCsv(registrations, tournament, t);
+function downloadRegistrationsCsv(tournament, registrations, t, options) {
+  const csv = registrationsToCsv(registrations, tournament, t, options);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -335,6 +349,8 @@ export function RegistrationsPanel({
   error,
 }) {
   const { t } = useTranslation();
+  const [csvNamesOnly, setCsvNamesOnly] = useState(false);
+  const [csvConfirmedOnly, setCsvConfirmedOnly] = useState(false);
   const filtered = Boolean(query.trim()) || Boolean(statusFilter) || Boolean(organizerMessageFilter) || Boolean(questionFilter) || Boolean(feeFilter);
   const pendingRegistrations = filteredRegistrations.filter((registration) => registration.status === 'pending');
   const otherRegistrations = filteredRegistrations.filter((registration) => registration.status !== 'pending');
@@ -355,13 +371,23 @@ export function RegistrationsPanel({
       <div className="section-title">
         <h2>{t('Anmeldungen')}</h2>
         <span className="counter">{filtered ? `${filteredRegistrations.length}/${registrations.length}` : registrations.length}</span>
-        <Button
-          variant="secondary"
-          disabled={registrations.length === 0}
-          onClick={() => downloadRegistrationsCsv(tournament, registrations, t)}
-        >
-          {t('CSV exportieren')}
-        </Button>
+        <div className="csv-export-controls">
+          <label className="checkbox-row">
+            <input type="checkbox" checked={csvNamesOnly} onChange={(event) => setCsvNamesOnly(event.target.checked)} />
+            {t('Nur Namen')}
+          </label>
+          <label className="checkbox-row">
+            <input type="checkbox" checked={csvConfirmedOnly} onChange={(event) => setCsvConfirmedOnly(event.target.checked)} />
+            {t('Nur bestätigte Meldungen')}
+          </label>
+          <Button
+            variant="secondary"
+            disabled={registrations.length === 0}
+            onClick={() => downloadRegistrationsCsv(tournament, registrations, t, { namesOnly: csvNamesOnly, confirmedOnly: csvConfirmedOnly })}
+          >
+            {t('CSV exportieren')}
+          </Button>
+        </div>
         <Button onClick={onCreate} disabled={!tournament}>{t('Neue Anmeldung')}</Button>
       </div>
       <Feedback message={message} />

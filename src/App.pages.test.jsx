@@ -68,6 +68,7 @@ describe('Turnier-Finder', () => {
         filterFormation=""
         filterRegistrationType=""
         filterType=""
+        filterClub=""
         filterOpenOnly={false}
         filterOnlineRegistrationOnly={false}
         searchOrigin={null}
@@ -92,6 +93,7 @@ describe('Turnier-Finder', () => {
       <HomeTournaments
         language="de" query="Linden" showMineFilter={false} onlyMine={false}
         filterMonth="" filterFormation="" filterRegistrationType="" filterType="" filterOpenOnly={false} filterOnlineRegistrationOnly={false}
+        filterClub=""
         searchOrigin={null} searchRadiusKm="25" onClearQuery={onClearQuery}
         tournaments={[]} total={0} hasMore={false} onLoadMore={() => {}} onRegister={() => {}} onOpenTournament={() => {}} onOpenFilters={() => {}} onOpenRadiusSearch={() => {}}
       />,
@@ -108,6 +110,7 @@ describe('Turnier-Finder', () => {
         open onToggle={() => {}} onClose={() => {}} activeTab="filters" setActiveTab={setActiveTab}
         query="" setQuery={() => {}} showMineFilter={false} onlyMine={false} setOnlyMine={() => {}}
         filterMonth="" setFilterMonth={() => {}} filterFormation="" setFilterFormation={() => {}} filterRegistrationType="" setFilterRegistrationType={() => {}} filterType="" setFilterType={() => {}}
+        filterClub="" setFilterClub={() => {}} clubs={[]}
         filterOpenOnly={false} setFilterOpenOnly={() => {}} filterOnlineRegistrationOnly={false} setFilterOnlineRegistrationOnly={() => {}} onResetFilters={() => {}}
         searchOrigin={null} searchOriginQuery="" setSearchOriginQuery={() => {}} onSearchOriginSubmit={(event) => event.preventDefault()} onSearchOriginSelect={() => {}} onUseMyLocation={() => {}} onClearSearchOrigin={() => {}}
         searchRadiusKm="25" setSearchRadiusKm={() => {}} geoLoading={false} geoError="" canSaveSearch={false}
@@ -116,6 +119,25 @@ describe('Turnier-Finder', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Umkreissuche' }));
     expect(setActiveTab).toHaveBeenCalledWith('radius');
+  });
+
+  it('filtert nach einem Verein über die durchsuchbare Kombobox', () => {
+    const setFilterClub = vi.fn();
+    render(
+      <SearchMenuControl
+        open onToggle={() => {}} onClose={() => {}} activeTab="filters" setActiveTab={() => {}}
+        query="" setQuery={() => {}} showMineFilter={false} onlyMine={false} setOnlyMine={() => {}}
+        filterMonth="" setFilterMonth={() => {}} filterFormation="" setFilterFormation={() => {}} filterRegistrationType="" setFilterRegistrationType={() => {}} filterType="" setFilterType={() => {}}
+        filterClub="" setFilterClub={setFilterClub} clubs={[{ id: 'club-1', name: 'BC Linden' }]}
+        filterOpenOnly={false} setFilterOpenOnly={() => {}} filterOnlineRegistrationOnly={false} setFilterOnlineRegistrationOnly={() => {}} onResetFilters={() => {}}
+        searchOrigin={null} searchOriginQuery="" setSearchOriginQuery={() => {}} onSearchOriginSubmit={(event) => event.preventDefault()} onSearchOriginSelect={() => {}} onUseMyLocation={() => {}} onClearSearchOrigin={() => {}}
+        searchRadiusKm="25" setSearchRadiusKm={() => {}} geoLoading={false} geoError="" canSaveSearch={false}
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole('combobox', { name: 'Verein' }));
+    fireEvent.click(screen.getByRole('option', { name: 'BC Linden' }));
+    expect(setFilterClub).toHaveBeenCalledWith('BC Linden');
   });
 });
 

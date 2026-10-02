@@ -244,6 +244,7 @@ export function tournamentMatchesSavedSearch(tournament, search) {
   }
   if (search.filter_registration_type && tournament.registration_type !== search.filter_registration_type) return false;
   if (search.filter_type && tournament.type !== search.filter_type) return false;
+  if (search.filter_club && String(tournament.club || '').trim().toLocaleLowerCase() !== String(search.filter_club).trim().toLocaleLowerCase()) return false;
   if (search.filter_open_only) {
     if (tournament.status !== 'registration') return false;
     if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > Date.now()) return false;
