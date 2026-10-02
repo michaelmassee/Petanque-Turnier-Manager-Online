@@ -333,6 +333,26 @@ describe('Öffentliche Turnierdetailseite', () => {
     expect(screen.getByText('Nachricht an die Turnierleitung (33/250)')).toBeInTheDocument();
   });
 
+  it('gliedert Team- und Teilnehmerangaben in klar beschriftete Bereiche', () => {
+    render(
+      <PublicRegistrationPanel
+        language="de"
+        tournament={{ id: 'team-1', name: 'Teamturnier', status: 'registration', visibility: 'public', maxRegistrations: 0, activeRegistrations: 0, formation: 'triplette', registrationType: 'forme', teamNameEnabled: true }}
+        form={{ ...EMPTY_REGISTRATION_FORM, tournamentId: 'team-1' }}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        onCancel={() => {}}
+        navigate={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Team und Spielweise', level: 3 }).closest('.registration-section')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Spieler 1', level: 3 }).closest('.registration-section')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Spieler 2', level: 3 }).closest('.registration-section')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Spieler 3', level: 3 }).closest('.registration-section')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Hinweise und Einverständnis', level: 3 }).closest('.registration-section')).toBeInTheDocument();
+  });
+
   it('bietet nur bei einer möglichen Anmeldung Eingabefelder an', () => {
     render(
       <PublicRegistrationPanel
@@ -968,6 +988,8 @@ describe('Anmeldungen-Seite: Liste + Dialog', () => {
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Anmeldung bearbeiten')).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: 'Spieler', level: 3 }).closest('.registration-section')).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: 'Organisation', level: 3 }).closest('.registration-section')).toBeInTheDocument();
     expect(within(dialog).getByLabelText(/^Vorname\b/)).toHaveValue('Anna');
 
     fireEvent.click(within(dialog).getByText('Abbrechen'));
@@ -997,6 +1019,9 @@ describe('Anmeldungen-Seite: Liste + Dialog', () => {
 
     expect(screen.getByLabelText(/^Vorname\b/)).not.toHaveClass('field-invalid');
     expect(screen.getByLabelText(/^Teamname\b/)).not.toHaveClass('field-invalid');
+    expect(screen.getByRole('heading', { name: 'Spieler 1', level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Spieler 2', level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Organisation', level: 3 })).toBeInTheDocument();
 
     rerender(
       <RegistrationForm

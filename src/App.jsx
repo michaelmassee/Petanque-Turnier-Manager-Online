@@ -2403,36 +2403,41 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             currency={tournament.currency}
             invalidField={invalidField}
           />
-          <TextArea
-            label={t('Nachricht an die Turnierleitung')}
-            value={form.organizerMessage || ''}
-            onChange={(organizerMessage) => setForm({ ...form, organizerMessage })}
-            maxLength={250}
-          />
-          <label className="website-field" aria-hidden="true">
-            {t('Website')}
-            <input
-              type="text"
-              name="website"
-              tabIndex={-1}
-              autoComplete="off"
-              value={form.website}
-              onChange={(event) => setForm({ ...form, website: event.target.value })}
-            />
-          </label>
-          {/* Ein gemeinsames Einverständnis für Veröffentlichungshinweis und Weitergabe an den Veranstalter (DS-01). */}
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={Boolean(form.publicationNoticeAccepted && form.personsConsentAccepted)}
-              onChange={(event) => setForm({ ...form, publicationNoticeAccepted: event.target.checked, personsConsentAccepted: event.target.checked })}
-              required
-            />
-            <span>
-              {t('Alle eingetragenen Personen sind einverstanden, dass ihre Anmeldedaten (Name, E-Mail-Adresse) zur Turnierorganisation an den Veranstalter gehen und Name, Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich schaltet.')}
-              <RequiredMark />
-            </span>
-          </label>
+          <section className="registration-section">
+            <h3>{t('Hinweise und Einverständnis')}</h3>
+            <div className="registration-section-content">
+              <TextArea
+                label={t('Nachricht an die Turnierleitung')}
+                value={form.organizerMessage || ''}
+                onChange={(organizerMessage) => setForm({ ...form, organizerMessage })}
+                maxLength={250}
+              />
+              <label className="website-field" aria-hidden="true">
+                {t('Website')}
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={form.website}
+                  onChange={(event) => setForm({ ...form, website: event.target.value })}
+                />
+              </label>
+              {/* Ein gemeinsames Einverständnis für Veröffentlichungshinweis und Weitergabe an den Veranstalter (DS-01). */}
+              <label className="checkbox-field">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.publicationNoticeAccepted && form.personsConsentAccepted)}
+                  onChange={(event) => setForm({ ...form, publicationNoticeAccepted: event.target.checked, personsConsentAccepted: event.target.checked })}
+                  required
+                />
+                <span>
+                  {t('Alle eingetragenen Personen sind einverstanden, dass ihre Anmeldedaten (Name, E-Mail-Adresse) zur Turnierorganisation an den Veranstalter gehen und Name, Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich schaltet.')}
+                  <RequiredMark />
+                </span>
+              </label>
+            </div>
+          </section>
           <div className="row-actions stretch">
             <Button type="submit" loading={saving}>{t('Anmeldung senden')}</Button>
             <Button variant="secondary" onClick={onCancel}>{t('Abbrechen')}</Button>

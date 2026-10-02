@@ -22,6 +22,15 @@ function ParticipantQuestions({ participant, questions, answers, onChange }) {
   );
 }
 
+function RegistrationSection({ title, children, className = '' }) {
+  return (
+    <section className={`registration-section ${className}`.trim()}>
+      <h3>{title}</h3>
+      <div className="registration-section-content">{children}</div>
+    </section>
+  );
+}
+
 export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled, feeTiers = [], registrationQuestions = [], currency = 'EUR', invalidField }) {
   const { t, i18n } = useTranslation();
   const isDrawnTeam = registrationType === 'melee' || registrationType === 'supermelee';
@@ -100,67 +109,47 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
 
   return (
     <>
-      <div className="form-grid">
-        <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />
-        <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} invalid={invalidField === 'firstName'} />
-      </div>
-      <ParticipantQuestions participant="primary" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('primary', questionId, checked)} />
-      {showFeeSelect && <SelectField label={t('Startgeld')} value={selectedFee('primary')} onChange={(tariffId) => setSelectedFee('primary', tariffId)} options={feeOptions('primary')} />}
-      {showStatus && (
-        <label className="checkbox-field">
-          <input
-            type="checkbox"
-            checked={Boolean(form.noEmail)}
-            onChange={(event) => setForm({ ...form, noEmail: event.target.checked })}
-          />
-          {t('Keine E-Mail-Adresse vorhanden')}
-        </label>
+      {(teamNameEnabled || showMeleeNotice) && (
+        <RegistrationSection title={t('Team und Spielweise')}>
+          {teamNameEnabled && <TextField label={t('Teamname')} value={form.teamName} onChange={(teamName) => setForm({ ...form, teamName })} invalid={invalidField === 'teamName'} />}
+          {showMeleeNotice && (
+            <p className="muted">
+              {registrationType === 'supermelee'
+                ? t('Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.')
+                : t('Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.')}
+            </p>
+          )}
+        </RegistrationSection>
       )}
-      {!(showStatus && form.noEmail) && (
-        <TextField label={allowsPartner ? t('E-Mail Spieler 1') : t('E-Mail des Spielers')} type="email" value={form.playerEmail || ''} onChange={(playerEmail) => setForm({ ...form, playerEmail })} required />
-      )}
-      <div className="form-grid">
-        <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
-        {licenseRequired && (
-          <TextField
-            label={t('Lizenznummer')}
-            value={form.licenseNr}
-            onChange={(licenseNr) => setForm({ ...form, licenseNr })}
-            required
-          />
-        )}
-      </div>
-      {teamNameEnabled && <TextField label={t('Teamname')} value={form.teamName} onChange={(teamName) => setForm({ ...form, teamName })} invalid={invalidField === 'teamName'} />}
-      {showMeleeNotice && (
-        <p className="muted">
-          {registrationType === 'supermelee'
-            ? t('Dieses Turnier wird als Supermêlée gespielt – die Teams werden vor jeder Runde neu ausgelost.')
-            : t('Dieses Turnier wird als Mêlée gespielt – Partner werden vor Ort ausgelost.')}
-        </p>
-      )}
+      <RegistrationSection title={allowsPartner ? t('Spieler 1') : t('Spieler')}>
+        <div className="form-grid">
+          <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />
+          <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} invalid={invalidField === 'firstName'} />
+        </div>
+        <ParticipantQuestions participant="primary" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('primary', questionId, checked)} />
+        {!(showStatus && form.noEmail) && <TextField label={allowsPartner ? t('E-Mail Spieler 1') : t('E-Mail des Spielers')} type="email" value={form.playerEmail || ''} onChange={(playerEmail) => setForm({ ...form, playerEmail })} required />}
+        <div className="form-grid">
+          <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
+          {licenseRequired && <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} required />}
+        </div>
+        {showFeeSelect && <SelectField label={t('Startgeld')} value={selectedFee('primary')} onChange={(tariffId) => setSelectedFee('primary', tariffId)} options={feeOptions('primary')} />}
+      </RegistrationSection>
       {allowsPartner && (
-        <>
+        <RegistrationSection title={t('Spieler 2')}>
           <div className="form-grid">
             <TextField label={t('Partner Vorname')} value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
             <TextField label={t('Partner Nachname')} value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
           </div>
           <ParticipantQuestions participant="partner" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner', questionId, checked)} />
-          {showFeeSelect && <SelectField label={t('Startgeld Partner')} value={selectedFee('partner')} onChange={(tariffId) => setSelectedFee('partner', tariffId)} options={feeOptions('partner')} />}
           <div className="form-grid">
             <TextField label={t('Partner E-Mail')} type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
-            {licenseRequired && (
-              <TextField
-                label={t('Partner Lizenznummer')}
-                value={form.partnerLicenseNr}
-                onChange={(partnerLicenseNr) => setForm({ ...form, partnerLicenseNr })}
-                required
-              />
-            )}
+            {licenseRequired && <TextField label={t('Partner Lizenznummer')} value={form.partnerLicenseNr} onChange={(partnerLicenseNr) => setForm({ ...form, partnerLicenseNr })} required />}
           </div>
-        </>
+          {showFeeSelect && <SelectField label={t('Startgeld Partner')} value={selectedFee('partner')} onChange={(tariffId) => setSelectedFee('partner', tariffId)} options={feeOptions('partner')} />}
+        </RegistrationSection>
       )}
       {allowsPartner2 && (
-        <>
+        <RegistrationSection title={t('Spieler 3')}>
           <p className="hint">{t('Ein Triplette-Team kann auch zu zweit angemeldet und vor Ort vervollständigt werden.')}</p>
           <div className="form-grid">
             <TextField label={t('Partner 2 Vorname')} value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required={Boolean(form.partner2LastName)} minLength={2} invalid={invalidField === 'partner2FirstName'} />
@@ -169,20 +158,17 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
           <ParticipantQuestions participant="partner2" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner2', questionId, checked)} />
           <div className="form-grid">
             <TextField label={t('Partner 2 E-Mail')} type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
-            {licenseRequired && (
-              <TextField
-                label={t('Partner 2 Lizenznummer')}
-                value={form.partner2LicenseNr}
-                onChange={(partner2LicenseNr) => setForm({ ...form, partner2LicenseNr })}
-                required
-              />
-            )}
+            {licenseRequired && <TextField label={t('Partner 2 Lizenznummer')} value={form.partner2LicenseNr} onChange={(partner2LicenseNr) => setForm({ ...form, partner2LicenseNr })} required />}
           </div>
           {showFeeSelect && <SelectField label={t('Startgeld Partner 2')} value={selectedFee('partner2')} onChange={(tariffId) => setSelectedFee('partner2', tariffId)} options={feeOptions('partner2')} />}
-        </>
+        </RegistrationSection>
       )}
       {showStatus && (
-        <>
+        <RegistrationSection title={t('Organisation')}>
+          <label className="checkbox-field">
+            <input type="checkbox" checked={Boolean(form.noEmail)} onChange={(event) => setForm({ ...form, noEmail: event.target.checked })} />
+            {t('Keine E-Mail-Adresse vorhanden')}
+          </label>
           <div className="form-grid">
             <TextField label={t('Setzposition')} type="number" min="0" value={form.seedingPosition} onChange={(seedingPosition) => setForm({ ...form, seedingPosition })} />
             <SelectField label={t('Status')} value={form.status} onChange={(status) => setForm({ ...form, status })} options={translatedOptions(REGISTRATION_STATUSES)} />
@@ -195,7 +181,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
             />
             VIP
           </label>
-        </>
+        </RegistrationSection>
       )}
     </>
   );

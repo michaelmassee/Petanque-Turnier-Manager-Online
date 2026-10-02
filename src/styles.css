@@ -196,6 +196,26 @@ small {
   gap: 12px;
 }
 
+.registration-section {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #d7deea;
+  border-radius: 10px;
+  background: #fbfcff;
+  padding: 20px;
+}
+
+.registration-section > h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 1.05rem;
+}
+
+.registration-section-content {
+  display: grid;
+  gap: 16px;
+}
+
 label {
   display: block;
   color: #364258;
@@ -2332,6 +2352,8 @@ a.left-panel-link {
 }
 
 .public-registration {
+  display: grid;
+  gap: 16px;
   margin-top: 18px;
   box-shadow: none;
 }
@@ -2545,6 +2567,15 @@ a.left-panel-link {
   .tournament-card-main,
   .tournament-card-meta {
     grid-template-columns: 1fr;
+  }
+
+  .registration-section {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .registration-section-content {
+    gap: 14px;
   }
 
   .home-finder-copy {
