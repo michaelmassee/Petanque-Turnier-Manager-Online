@@ -230,22 +230,26 @@ export function SavedSearchesControl({ open, savedSearches = [], onToggle, onClo
             <div className="section-title"><h2>{t('savedSearches')}</h2><button className="link-button" type="button" onClick={onClose}>{t('close')}</button></div>
             <div className="postbox-section">
               {savedSearches.map((search) => (
-                <div className="postbox-message" key={search.id}>
-                  <strong data-i18n-skip>{search.name}</strong>
-                  <span data-i18n-skip>{savedSearchSummary(search, t)}</span>
-                  <div className="dialog-actions">
-                    <Button variant="secondary" onClick={() => onApply(search)}>{t('applySavedSearch')}</Button>
-                    <label className="checkbox-field">
-                      <input
-                        type="checkbox"
-                        checked={search.notifyEnabled}
-                        disabled={notifyBusyId === search.id}
-                        onChange={() => handleToggleNotify(search)}
-                      />
-                      {t('notifyOnNewMatches')}
-                    </label>
-                    <Button variant="secondary" disabled={deleteBusyId === search.id} onClick={() => onEdit(search)}>{t('Bearbeiten')}</Button>
-                    <Button variant="danger" loading={deleteBusyId === search.id} onClick={() => handleDelete(search)}>{t('Löschen')}</Button>
+                <div className="postbox-message saved-search-card" key={search.id}>
+                  <div className="saved-search-card-summary">
+                    <strong data-i18n-skip>{search.name}</strong>
+                    <span data-i18n-skip>{savedSearchSummary(search, t)}</span>
+                  </div>
+                  <label className="checkbox-field saved-search-notify">
+                    <input
+                      type="checkbox"
+                      checked={search.notifyEnabled}
+                      disabled={notifyBusyId === search.id}
+                      onChange={() => handleToggleNotify(search)}
+                    />
+                    {t('notifyOnNewMatches')}
+                  </label>
+                  <div className="saved-search-actions">
+                    <Button onClick={() => onApply(search)}>{t('applySavedSearch')}</Button>
+                    <div className="saved-search-secondary-actions">
+                      <Button variant="secondary" disabled={deleteBusyId === search.id} onClick={() => onEdit(search)}>{t('Bearbeiten')}</Button>
+                      <Button variant="danger" loading={deleteBusyId === search.id} onClick={() => handleDelete(search)}>{t('Löschen')}</Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -573,6 +577,10 @@ export function SearchMenuControl({
         <>
           <div className="search-menu-backdrop" onClick={onClose} />
           <div className="search-menu-panel" role="search">
+            <div className="section-title">
+              <h2>{t('Suche')}</h2>
+              <button className="link-button" type="button" onClick={onClose}>{t('close')}</button>
+            </div>
             <div className="search-tabs" role="tablist" aria-label={t('Suche')}>
               <button type="button" role="tab" aria-selected={activeTab === 'filters'} className={activeTab === 'filters' ? 'active' : ''} onClick={() => setActiveTab('filters')}>{t('Filter')}</button>
               <button type="button" role="tab" aria-selected={activeTab === 'radius'} className={activeTab === 'radius' ? 'active' : ''} onClick={() => setActiveTab('radius')}>{t('Umkreissuche')}</button>
@@ -624,31 +632,27 @@ export function SearchMenuControl({
                   <input type="checkbox" checked={filterOnlineRegistrationOnly} onChange={(event) => setFilterOnlineRegistrationOnly(event.target.checked)} />
                   {t('Online-Anmeldung möglich')}
                 </label>
-                <div className="filter-actions">
-                  <button className="link-button" type="button" onClick={onResetFilters}>
-                    {t('Zurücksetzen')}
-                  </button>
+                <div className="dialog-actions search-menu-actions">
+                  <Button variant="secondary" type="button" onClick={onResetFilters}>{t('Zurücksetzen')}</Button>
                   {canSaveSearch && (
-                    <button className="link-button" type="button" onClick={onSaveSearch}>
-                      {t('saveThisSearch')}
-                    </button>
+                    <Button type="button" onClick={onSaveSearch}>{t('saveThisSearch')}</Button>
                   )}
                 </div>
               </div>
             ) : (
-              <>
-                <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
-                  <LocationAutocomplete label={t('Umkreissuche: Von diesem Ort aus suchen')} value={searchOriginQuery} onChange={setSearchOriginQuery} onSelect={onSearchOriginSelect} disabled={geoLoading} />
-                  <Button type="submit" variant="secondary" disabled={geoLoading} loading={geoLoading}>{t('Suchen')}</Button>
-                  <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading} loading={geoLoading}>{t('Meinen Standort verwenden')}</Button>
+              <form className="home-radius-search" onSubmit={onSearchOriginSubmit}>
+                <LocationAutocomplete label={t('Umkreissuche: Von diesem Ort aus suchen')} value={searchOriginQuery} onChange={setSearchOriginQuery} onSelect={onSearchOriginSelect} disabled={geoLoading} />
                   {searchOrigin && <>
                     <SelectField label={t('Umkreis')} value={searchRadiusKm} onChange={setSearchRadiusKm} options={translatedOptions(RADIUS_OPTIONS)} />
                     <span className="search-origin-label">{t('Ausgangspunkt:')} {searchOrigin.label}</span>
-                    <button className="link-button" type="button" onClick={onClearSearchOrigin}>{t('Umkreissuche beenden')}</button>
                   </>}
-                </form>
                 <Feedback error={geoError} />
-              </>
+                <div className="dialog-actions search-menu-actions">
+                  <Button type="submit" disabled={geoLoading} loading={geoLoading}>{t('Suchen')}</Button>
+                  <Button type="button" variant="secondary" onClick={onUseMyLocation} disabled={geoLoading} loading={geoLoading}>{t('Meinen Standort verwenden')}</Button>
+                  {searchOrigin && <Button type="button" variant="secondary" onClick={onClearSearchOrigin}>{t('Umkreissuche beenden')}</Button>}
+                </div>
+              </form>
             )}
           </div>
         </>

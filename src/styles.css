@@ -808,6 +808,11 @@ a.left-panel-link {
 .postbox-panel .hint { margin: 4px 0 0; font-size: 0.85rem; color: #53627a; }
 .postbox-message small { color: #66758c; }
 .postbox-message span { white-space: pre-line; overflow-wrap: anywhere; }
+.saved-search-card { gap: 12px; padding: 14px; }
+.saved-search-card-summary { display: grid; gap: 4px; }
+.saved-search-notify { width: fit-content; }
+.saved-search-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #e2e7f0; padding-top: 12px; }
+.saved-search-secondary-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .push-migration-notice { max-width: 680px; margin: 0 auto 18px; }
 .push-migration-notice h2 { margin-top: 0; }
 
@@ -1441,6 +1446,15 @@ a.left-panel-link {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.search-menu-actions {
+  border-top: 1px solid #e2e7f0;
+  padding-top: 12px;
+}
+
+.home-radius-search .search-menu-actions {
+  flex: 1 0 100%;
 }
 
 .tournament-card-list {
@@ -2601,6 +2615,21 @@ a.left-panel-link {
     width: calc(100vw - 28px);
     max-height: calc(100vh - 92px);
     padding: 14px;
+  }
+
+  .saved-search-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .saved-search-actions > .button,
+  .saved-search-secondary-actions {
+    width: 100%;
+  }
+
+  .saved-search-secondary-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .auth-panel,

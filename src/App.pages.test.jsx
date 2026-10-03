@@ -4,7 +4,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import i18next from './lib/i18next-config.js';
 import { EditDialog, HomeTournaments, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
 import { ClubBadge, DistanceBadge } from './components/ui.jsx';
-import { AppHeader, SearchMenuControl } from './components/layout.jsx';
+import { AppHeader, SavedSearchesControl, SearchMenuControl } from './components/layout.jsx';
 import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM } from './lib/constants.js';
 import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx';
 import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
@@ -127,6 +127,34 @@ describe('Turnier-Finder', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Umkreissuche' }));
     expect(setActiveTab).toHaveBeenCalledWith('radius');
+  });
+
+  it('gleicht den Suchdialog mit Schließen und Button-Aktionen an Postbox und Bookmarks an', () => {
+    const onClose = vi.fn();
+    const onResetFilters = vi.fn();
+    const onSaveSearch = vi.fn();
+    render(
+      <SearchMenuControl
+        open onToggle={() => {}} onClose={onClose} activeTab="filters" setActiveTab={() => {}}
+        query="" setQuery={() => {}} showMineFilter={false} onlyMine={false} setOnlyMine={() => {}}
+        filterMonth="" setFilterMonth={() => {}} filterFormation="" setFilterFormation={() => {}} filterRegistrationType="" setFilterRegistrationType={() => {}} filterType="" setFilterType={() => {}}
+        filterClub="" setFilterClub={() => {}} clubs={[]}
+        filterOpenOnly={false} setFilterOpenOnly={() => {}} filterOnlineRegistrationOnly={false} setFilterOnlineRegistrationOnly={() => {}} onResetFilters={onResetFilters}
+        searchOrigin={null} searchOriginQuery="" setSearchOriginQuery={() => {}} onSearchOriginSubmit={(event) => event.preventDefault()} onSearchOriginSelect={() => {}} onUseMyLocation={() => {}} onClearSearchOrigin={() => {}}
+        searchRadiusKm="25" setSearchRadiusKm={() => {}} geoLoading={false} geoError="" canSaveSearch onSaveSearch={onSaveSearch}
+      />,
+    );
+
+    const searchDialog = screen.getByRole('search');
+    expect(within(searchDialog).getByRole('heading', { name: 'Suche' })).toBeInTheDocument();
+    fireEvent.click(within(searchDialog).getByRole('button', { name: 'Schließen' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    const resetButton = within(searchDialog).getByRole('button', { name: 'Zurücksetzen' });
+    expect(resetButton).toHaveClass('button');
+    fireEvent.click(resetButton);
+    expect(onResetFilters).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(searchDialog).getByRole('button', { name: 'Diese Suche speichern' }));
+    expect(onSaveSearch).toHaveBeenCalledTimes(1);
   });
 
   it('filtert nach einem Verein über die durchsuchbare Kombobox', () => {
@@ -267,6 +295,34 @@ describe('Kopfzeile', () => {
     const drawer = screen.getByRole('navigation', { name: 'Hauptmenü' });
     expect(within(drawer).getByText('Marie Curie')).toBeInTheDocument();
     expect(within(drawer).getByText('User')).toBeInTheDocument();
+  });
+
+  it('ordnet die Aktionen einer gespeicherten Suche in einer eigenen Kartenfußzeile an', () => {
+    const onApply = vi.fn();
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+    render(
+      <SavedSearchesControl
+        open
+        savedSearches={[{ id: 'saved-1', name: 'Linden', notifyEnabled: true, searchOrigin: { label: 'Linden' }, radiusKm: '50' }]}
+        onToggle={() => {}}
+        onClose={() => {}}
+        onApply={onApply}
+        onToggleNotify={() => {}}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />,
+    );
+
+    const card = screen.getByText('Linden').closest('.saved-search-card');
+    expect(card).not.toBeNull();
+    expect(within(card).getByRole('checkbox', { name: 'Bei neuen Treffern benachrichtigen' })).toBeChecked();
+    const actions = card.querySelector('.saved-search-actions');
+    expect(actions).toContainElement(within(card).getByRole('button', { name: 'Anwenden' }));
+    expect(actions).toContainElement(within(card).getByRole('button', { name: 'Bearbeiten' }));
+    expect(actions).toContainElement(within(card).getByRole('button', { name: 'Löschen' }));
+    fireEvent.click(within(card).getByRole('button', { name: 'Anwenden' }));
+    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ id: 'saved-1' }));
   });
 
   it('verlinkt die Anleitung zwischen Boule-Treff und Admin-Dashboard in der Bereichsleiste', () => {
