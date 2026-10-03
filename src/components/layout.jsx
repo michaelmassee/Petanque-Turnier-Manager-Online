@@ -380,9 +380,9 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
             goToTournaments();
           }}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M12 3 3 9l9 6 9-6z" />
-            <path d="M3 9v6l9 6 9-6V9" />
+          <svg className="left-panel-icon left-panel-icon-tournaments" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+            <path d="M7.5 3v4M16.5 3v4M3.5 9h17M8 13h3M13 13h3M8 16h3" />
           </svg>
           {t('Turniere')}
         </button>
@@ -394,10 +394,9 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
             navigate?.('/plaetze');
           }}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <circle cx="12" cy="9" r="7" />
-            <path d="M12 21c3-3.6 4.5-6.4 4.5-9" />
-            <path d="M12 21c-3-3.6-4.5-6.4-4.5-9" />
+          <svg className="left-panel-icon left-panel-icon-places" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" />
+            <circle cx="12" cy="10" r="2.5" />
           </svg>
           {t('Boule-Plätze / Vereine')}
         </button>
@@ -409,7 +408,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
             navigate?.('/spielerboerse');
           }}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <svg className="left-panel-icon left-panel-icon-meetup" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <circle cx="8.5" cy="8" r="3" />
             <circle cx="16" cy="9.5" r="2.5" />
             <path d="M3 20c0-3 2.5-5.5 5.5-5.5S14 17 14 20" />
@@ -425,8 +424,9 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
             navigate?.('/live');
           }}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M3 12h4l2.5-6 5 12 2.5-6h4" />
+          <svg className="left-panel-icon left-panel-icon-live" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="2" />
+            <path d="M7.5 7.5a6.4 6.4 0 0 0 0 9M16.5 7.5a6.4 6.4 0 0 1 0 9M4.5 4.5a10.6 10.6 0 0 0 0 15M19.5 4.5a10.6 10.6 0 0 1 0 15" />
           </svg>
           {t('Live')}
         </button>
@@ -437,7 +437,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
           rel="noreferrer"
           onClick={closeLeftPanel}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <svg className="left-panel-icon left-panel-icon-guide" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" />
             <path d="M4 5.5v15" />
           </svg>
@@ -452,7 +452,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
               onSelectAdminDashboard();
             }}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <svg className="left-panel-icon left-panel-icon-admin" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2" />
               <rect x="13" y="3.5" width="7.5" height="7.5" rx="2" />
               <rect x="3.5" y="13" width="7.5" height="7.5" rx="2" />

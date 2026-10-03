@@ -737,16 +737,26 @@ a.left-panel-link {
   outline-offset: 2px;
 }
 
-.left-panel-link svg {
+.left-panel-icon {
+  box-sizing: content-box;
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
+  border-radius: 12px;
+  padding: 8px;
   stroke: currentColor;
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.6;
+  stroke-width: 1.8;
 }
+
+.left-panel-icon-tournaments { background: #e7f2ff; color: #0c5ea8; }
+.left-panel-icon-places { background: #e4f7f3; color: #087a72; }
+.left-panel-icon-meetup { background: #f1ecff; color: #6b46c1; }
+.left-panel-icon-live { background: #fff0f1; color: #c21d32; }
+.left-panel-icon-guide { background: #fff4e5; color: #a85c00; }
+.left-panel-icon-admin { background: #eaf0ff; color: #4056a1; }
 
 .search-menu {
   position: static;
