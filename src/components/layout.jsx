@@ -461,6 +461,16 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
             {t('Admin Dashboard')}
           </button>
         )}
+        <a
+          className="left-panel-support"
+          href="https://www.paypal.com/paypalme/michaelmassee1"
+          target="_blank"
+          rel="noreferrer"
+          onClick={closeLeftPanel}
+        >
+          <strong>❤️ {t('Unterstützung')}</strong>
+          <span>{t('Wenn dir der Pétanque-Turnier-Manager hilft, freue ich mich über eine Unterstützung via PayPal.')}</span>
+        </a>
       </nav>
       {menuOpen && (
         <>
@@ -498,15 +508,6 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
                 </button>
               </div>
             )}
-            <a
-              className="drawer-support"
-              href="https://www.paypal.com/paypalme/michaelmassee1"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <strong>❤️ {t('Unterstützung')}</strong>
-              <span>{t('Wenn dir der Pétanque-Turnier-Manager hilft, freue ich mich über eine Unterstützung via PayPal.')}</span>
-            </a>
           </nav>
         </>
       )}

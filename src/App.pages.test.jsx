@@ -294,6 +294,29 @@ describe('Kopfzeile', () => {
     expect(menuItems.indexOf(screen.getByRole('button', { name: 'Boule-Treff' }))).toBeLessThan(menuItems.indexOf(wikiLink));
     expect(menuItems.indexOf(wikiLink)).toBeLessThan(menuItems.indexOf(screen.getByRole('button', { name: 'Admin Dashboard' })));
   });
+
+  it('zeigt die Unterstützung als letzten Eintrag in der Bereichsleiste statt im Hamburger-Menü', () => {
+    render(
+      <AppHeader
+        heading="Turniere"
+        language="de"
+        setLanguage={() => {}}
+        menuOpen
+        onToggleMenu={() => {}}
+        onCloseMenu={() => {}}
+        isAdmin
+        onSelectAdminDashboard={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bereiche öffnen' }));
+
+    const supportLink = screen.getByRole('link', { name: /Unterstützung/ });
+    const leftPanel = supportLink.closest('.left-panel');
+    expect(leftPanel).not.toBeNull();
+    expect(leftPanel.lastElementChild).toBe(supportLink);
+    expect(within(screen.getByRole('navigation', { name: 'Hauptmenü' })).queryByRole('link', { name: /Unterstützung/ })).not.toBeInTheDocument();
+  });
 });
 
 describe('Turnier melden', () => {

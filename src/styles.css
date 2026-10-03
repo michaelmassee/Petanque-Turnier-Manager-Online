@@ -974,27 +974,28 @@ a.left-panel-link {
   color: #53627a;
 }
 
-.drawer-support {
+.left-panel-support {
   display: grid;
   gap: 4px;
-  margin-top: 10px;
+  border: 1px solid #f2b7c0;
   border-radius: 8px;
   background: #fff2f4;
   padding: 12px;
   text-decoration: none;
   color: #172033;
+  text-align: center;
 }
 
-.drawer-support:hover,
-.drawer-support:focus-visible {
+.left-panel-support:hover,
+.left-panel-support:focus-visible {
   background: #ffe4e8;
 }
 
-.drawer-support strong {
+.left-panel-support strong {
   font-size: 0.9rem;
 }
 
-.drawer-support span {
+.left-panel-support span {
   color: #53627a;
   font-size: 0.8rem;
   line-height: 1.35;
