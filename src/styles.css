@@ -1678,8 +1678,20 @@ a.left-panel-link {
   margin-top: 12px;
 }
 
-.participants-row {
+/* Doppelte Klasse: die spätere allgemeine .data-row-Regel (minmax/auto/auto)
+ * würde das Zwei-Spalten-Raster sonst überschreiben. */
+.data-row.participants-row {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.participants-row > button {
+  justify-self: start;
+}
+
+@media (max-width: 560px) {
+  .data-row.participants-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Jede Person einer Anmeldung bildet einen eigenen Namens-/Vereinsblock.
