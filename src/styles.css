@@ -758,6 +758,21 @@ a.left-panel-link {
 .left-panel-icon-guide { background: #fff4e5; color: #a85c00; }
 .left-panel-icon-admin { background: #eaf0ff; color: #4056a1; }
 
+@keyframes left-panel-live-icon-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(194 29 50 / 28%);
+  }
+
+  55% {
+    box-shadow: 0 0 0 8px rgb(194 29 50 / 0%);
+  }
+}
+
+.left-panel.open .left-panel-icon-live {
+  animation: left-panel-live-icon-pulse 1.8s ease-out infinite;
+}
+
 .search-menu {
   position: static;
 }
@@ -1040,7 +1055,8 @@ a.left-panel-link {
   .left-panel-backdrop,
   .left-panel,
   .left-panel.open > .left-panel-link,
-  .left-panel.open > .left-panel-support {
+  .left-panel.open > .left-panel-support,
+  .left-panel.open .left-panel-icon-live {
     animation: none;
     transition: none;
   }
