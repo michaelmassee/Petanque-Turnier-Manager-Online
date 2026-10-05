@@ -6,7 +6,7 @@ import { currentBrowserPushSubscription, ensureBrowserPushSubscription } from '.
 import { useInstallPrompt, isIosSafari, useOnlineStatus } from '../lib/hooks.js';
 import { MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTIONS, TOURNAMENT_STATUSES, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor, roleName, translatedOptions } from '../lib/domain.js';
-import { Feedback, EditDialog, SelectField, TextArea, Button } from './ui.jsx';
+import { Feedback, EditDialog, SelectField, TextArea, Button, CloseButton } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 import { RecipientPicker } from './RecipientPicker.jsx';
 import { AutumnGarland, AutumnPumpkin } from './AutumnDecoration.jsx';
@@ -96,7 +96,7 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
         <>
           <div className="search-menu-backdrop" onClick={onClose} />
           <section className="postbox-panel" aria-label={text('inbox')}>
-            <div className="section-title"><h2>{text('inbox')}</h2><button className="link-button" type="button" onClick={onClose}>{text('close')}</button></div>
+            <div className="section-title"><h2>{text('inbox')}</h2><CloseButton onClick={onClose} /></div>
             <div>
               {pushActive
                 ? <p className="hint">{text('enabled')}</p>
@@ -228,7 +228,7 @@ export function SavedSearchesControl({ open, savedSearches = [], onToggle, onClo
         <>
           <div className="search-menu-backdrop" onClick={onClose} />
           <section className="postbox-panel" aria-label={t('savedSearches')}>
-            <div className="section-title"><h2>{t('savedSearches')}</h2><button className="link-button" type="button" onClick={onClose}>{t('close')}</button></div>
+            <div className="section-title"><h2>{t('savedSearches')}</h2><CloseButton onClick={onClose} /></div>
             <div className="postbox-section">
               {savedSearches.map((search) => (
                 <div className="postbox-message saved-search-card" key={search.id}>
@@ -585,7 +585,7 @@ export function SearchMenuControl({
           <div className="search-menu-panel" role="search">
             <div className="section-title">
               <h2>{t('Suche')}</h2>
-              <button className="link-button" type="button" onClick={onClose}>{t('close')}</button>
+              <CloseButton onClick={onClose} />
             </div>
             <div className="search-tabs" role="tablist" aria-label={t('Suche')}>
               <button type="button" role="tab" aria-selected={activeTab === 'filters'} className={activeTab === 'filters' ? 'active' : ''} onClick={() => setActiveTab('filters')}>{t('Filter')}</button>

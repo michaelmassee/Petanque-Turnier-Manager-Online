@@ -1901,19 +1901,28 @@ a.left-panel-link {
   color: #b3261e;
 }
 
-.modal-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+.close-icon-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
   width: 32px;
   height: 32px;
   border: 0;
   border-radius: 999px;
   background: #f4f6fa;
   color: #364258;
-  font-size: 1.2rem;
-  line-height: 1;
+  cursor: pointer;
 }
+
+.modal-panel > .close-icon-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.close-icon-button:hover { background: #e2e7f0; }
+.close-icon-button:focus-visible { outline: 3px solid rgb(22 119 255 / 28%); outline-offset: 2px; }
+.close-icon-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 2; }
 
 .topbar h1 {
   margin-bottom: 0;
@@ -2662,7 +2671,7 @@ a.left-panel-link {
     padding-bottom: max(20px, env(safe-area-inset-bottom));
   }
 
-  .modal-close {
+  .modal-panel > .close-icon-button {
     min-width: 44px;
     min-height: 44px;
   }

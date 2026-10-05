@@ -185,8 +185,18 @@ export function ListToolbar({ query, onQueryChange, searchPlaceholder, filters =
   );
 }
 
-export function EditDialog({ open = true, title, subtitle, message, error, onClose, wide, nested, children }) {
+export function CloseButton({ onClick, className = '' }) {
   const { t } = useTranslation();
+  return (
+    <button className={`close-icon-button${className ? ` ${className}` : ''}`} type="button" onClick={onClick} aria-label={t('Schließen')} title={t('Schließen')}>
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="m6 6 12 12M18 6 6 18" />
+      </svg>
+    </button>
+  );
+}
+
+export function EditDialog({ open = true, title, subtitle, message, error, onClose, wide, nested, children }) {
   const titleId = useId();
 
   if (!open) {
@@ -202,9 +212,7 @@ export function EditDialog({ open = true, title, subtitle, message, error, onClo
         aria-labelledby={titleId}
         onClick={(event) => event.stopPropagation()}
       >
-        <button className="modal-close" type="button" onClick={onClose} aria-label={t('Schließen')}>
-          ×
-        </button>
+        <CloseButton onClick={onClose} />
         <h2 id={titleId}>{title}</h2>
         {subtitle && <p className="subtitle">{subtitle}</p>}
         <Feedback message={message} error={error} />

@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { clubLogoImageUrl, formatLocationAddress, googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Feedback, Button, ClubBadge, DistanceBadge, SelectField } from '../components/ui.jsx';
+import { Feedback, Button, ClubBadge, DistanceBadge, SelectField, CloseButton } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
@@ -482,6 +482,7 @@ function PlacesSearchMenu({
         <>
           <div className="search-menu-backdrop" onClick={onClose} />
           <div className="search-menu-panel" role="search">
+            <div className="section-title"><h2>{t('Suche')}</h2><CloseButton onClick={onClose} /></div>
             <div className="search-tabs" role="tablist" aria-label={t('Suche')}>
               <button type="button" role="tab" aria-selected={activeTab === 'filters'} className={activeTab === 'filters' ? 'active' : ''} onClick={() => setActiveTab('filters')}>{t('Filter')}</button>
               <button type="button" role="tab" aria-selected={activeTab === 'radius'} className={activeTab === 'radius' ? 'active' : ''} onClick={() => setActiveTab('radius')}>{t('Umkreissuche')}</button>

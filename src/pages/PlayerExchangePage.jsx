@@ -9,7 +9,7 @@ import { api } from '../lib/api.js';
 import { distanceKm, formatLocationAddress, labelFor, translatedOptions } from '../lib/domain.js';
 import { formatDate } from '../lib/format.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Feedback, Button, SelectField, DistanceBadge, ShareIcon } from '../components/ui.jsx';
+import { Feedback, Button, SelectField, DistanceBadge, ShareIcon, CloseButton } from '../components/ui.jsx';
 import { PlayerListingContactDialog } from '../components/PlayerListingContactDialog.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
@@ -62,6 +62,7 @@ function PlayerExchangeSearchMenu({
         <>
           <div className="search-menu-backdrop" onClick={onClose} />
           <div className="search-menu-panel" role="search">
+            <div className="section-title"><h2>{t('Suche')}</h2><CloseButton onClick={onClose} /></div>
             <div className="search-tabs" role="tablist" aria-label={t('Suche')}>
               <button type="button" role="tab" aria-selected={activeTab === 'filters'} className={activeTab === 'filters' ? 'active' : ''} onClick={() => setActiveTab('filters')}>{t('Filter')}</button>
               <button type="button" role="tab" aria-selected={activeTab === 'radius'} className={activeTab === 'radius' ? 'active' : ''} onClick={() => setActiveTab('radius')}>{t('Umkreissuche')}</button>
