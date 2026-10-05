@@ -658,6 +658,9 @@ textarea:focus {
   gap: 12px;
   align-content: start;
   padding: 18px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background: #ffffff;
   box-shadow: 0 24px 70px rgb(23 32 51 / 20%);
   transform: translateX(-100%);
