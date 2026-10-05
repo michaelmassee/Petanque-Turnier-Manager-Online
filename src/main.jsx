@@ -4,10 +4,13 @@ import App from './App.jsx';
 import { AppRecoveryBoundary } from './AppRecovery.jsx';
 import { ServiceWorkerUpdateBanner } from './components/ServiceWorkerUpdateBanner.jsx';
 import { OfflineNotice } from './components/layout.jsx';
+import { applySeasonClass } from './lib/seasonal.js';
 import { markServiceWorkerUpdateAvailable } from './lib/service-worker-update.js';
 import './lib/i18next-config.js';
 import './styles.css';
 import 'leaflet/dist/leaflet.css';
+
+applySeasonClass();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

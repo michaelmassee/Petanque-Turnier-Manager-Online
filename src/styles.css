@@ -3380,3 +3380,102 @@ a.left-panel-link {
     font-size: 0.85rem;
   }
 }
+
+/* Herbst-Deko (saisonal, siehe src/lib/seasonal.js) */
+.brand-logo-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.autumn-pumpkin {
+  position: absolute;
+  right: -8px;
+  bottom: -6px;
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 25%));
+  transform-origin: 50% 100%;
+  animation: autumn-wobble 4s ease-in-out infinite;
+}
+
+.autumn-garland {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.autumn-garland-leaf {
+  width: 18px;
+  height: 18px;
+  opacity: 0.85;
+}
+
+.autumn-garland-leaf-left {
+  rotate: -25deg;
+}
+
+.autumn-garland-leaf-right {
+  rotate: 25deg;
+}
+
+.autumn-garland-pumpkin {
+  width: 26px;
+  height: 26px;
+}
+
+.season-autumn .empty-state {
+  position: relative;
+  padding-right: 88px;
+}
+
+.season-autumn .empty-state::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 64px;
+  height: 32px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 36'%3E%3Cpath transform='translate(0 6) rotate(-20 16 16) scale(.8)' fill='%23e8a31c' d='M16 2l2.5 6 3.5-2-1 6 5-2-2 4.5 4 1.5-6 4 1 3-5-1v6h-2v-6l-5 1 1-3-6-4 4-1.5-2-4.5 5 2-1-6 3.5 2z'/%3E%3Cpath transform='translate(16 0) rotate(15 16 16) scale(.7)' fill='%23b5401f' d='M16 2l2.5 6 3.5-2-1 6 5-2-2 4.5 4 1.5-6 4 1 3-5-1v6h-2v-6l-5 1 1-3-6-4 4-1.5-2-4.5 5 2-1-6 3.5 2z'/%3E%3Cg transform='translate(36 2)'%3E%3Cpath d='M16 8c0-3 1-5 4-6' stroke='%233f6b2a' stroke-width='2.5' stroke-linecap='round' fill='none'/%3E%3Cellipse cx='9.5' cy='19' rx='7' ry='9' fill='%23e8700c'/%3E%3Cellipse cx='22.5' cy='19' rx='7' ry='9' fill='%23e8700c'/%3E%3Cellipse cx='16' cy='19' rx='7.5' ry='10' fill='%23ff8a1f'/%3E%3C/g%3E%3C/svg%3E") no-repeat center / contain;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+@keyframes autumn-wobble {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+
+@media (max-width: 720px) {
+  .autumn-pumpkin {
+    width: 18px;
+    height: 18px;
+    right: -6px;
+    bottom: -4px;
+  }
+
+  .season-autumn .empty-state {
+    padding-right: 66px;
+  }
+
+  .season-autumn .empty-state::after {
+    width: 48px;
+    height: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .autumn-pumpkin {
+    animation: none;
+  }
+}
+
+@media print {
+  .autumn-pumpkin,
+  .autumn-garland,
+  .season-autumn .empty-state::after {
+    display: none;
+  }
+}

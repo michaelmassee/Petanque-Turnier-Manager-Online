@@ -9,6 +9,7 @@ import { labelFor, roleName, translatedOptions } from '../lib/domain.js';
 import { Feedback, EditDialog, SelectField, TextArea, Button } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 import { RecipientPicker } from './RecipientPicker.jsx';
+import { AutumnGarland, AutumnPumpkin } from './AutumnDecoration.jsx';
 import { LanguageSelect } from '../auth/AuthForms.jsx';
 import { LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT, REGISTRATION_SLOT_LINKED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT } from '../postbox-core.js';
 
@@ -336,7 +337,10 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
           goToTournaments();
         }}
       >
-        <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="brand-logo" />
+        <span className="brand-logo-wrap">
+          <img src="/icons/logo.png" alt="Pétanque Turnier Manager Online" className="brand-logo" />
+          <AutumnPumpkin />
+        </span>
         <div className="brand-text">
           <p className="eyebrow">Pétanque Turnier Manager Online</p>
           <h1 {...(headingNoTranslate ? { 'data-i18n-skip': true } : {})}>{heading}</h1>
@@ -475,6 +479,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
           <strong>❤️ {t('Unterstützung')}</strong>
           <span>{t('Wenn dir der Pétanque-Turnier-Manager hilft, freue ich mich über eine Unterstützung via PayPal.')}</span>
         </a>
+        <AutumnGarland />
       </nav>
       {menuOpen && (
         <>
@@ -512,6 +517,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
                 </button>
               </div>
             )}
+            <AutumnGarland />
           </nav>
         </>
       )}

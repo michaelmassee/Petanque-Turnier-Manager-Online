@@ -370,7 +370,9 @@ describe('Kopfzeile', () => {
     const supportLink = screen.getByRole('link', { name: /Unterstützung/ });
     const leftPanel = supportLink.closest('.left-panel');
     expect(leftPanel).not.toBeNull();
-    expect(leftPanel.lastElementChild).toBe(supportLink);
+    // Saisonale Deko (aria-hidden) zählt nicht als Eintrag.
+    const entries = [...leftPanel.children].filter((child) => child.getAttribute('aria-hidden') !== 'true');
+    expect(entries.at(-1)).toBe(supportLink);
     expect(within(screen.getByRole('navigation', { name: 'Hauptmenü' })).queryByRole('link', { name: /Unterstützung/ })).not.toBeInTheDocument();
   });
 });
