@@ -44,6 +44,7 @@
   "todo_api_key_requests": "API-Schlüssel-Anträge prüfen",
   "todo_pending_registrations": "Ausstehende Anmeldungen bearbeiten",
   "todo_waitlist": "Wartelisten prüfen",
+  "postboxMessageTooLong": "Die Nachricht ist zu lang (maximal {{max}} Zeichen).",
   "allParticipantsOf": "Alle Teilnehmer von {name}",
   "registrationCount_one": "{{count}} Anmeldung",
   "registrationCount_other": "{{count}} Anmeldungen",

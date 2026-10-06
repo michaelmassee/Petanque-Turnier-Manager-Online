@@ -6,9 +6,12 @@ import { currentBrowserPushSubscription, ensureBrowserPushSubscription } from '.
 import { useInstallPrompt, isIosSafari, useOnlineStatus } from '../lib/hooks.js';
 import { MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTIONS, TOURNAMENT_STATUSES, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor, roleName, translatedOptions } from '../lib/domain.js';
-import { Feedback, EditDialog, SelectField, TextArea, Button, CloseButton } from './ui.jsx';
+import { Feedback, EditDialog, SelectField, Button, CloseButton } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 import { RecipientPicker } from './RecipientPicker.jsx';
+import { RichTextEditor } from './RichTextEditor.jsx';
+import { RichText } from './RichText.jsx';
+import { richTextPlainText } from '../lib/rich-text.js';
 import { AutumnGarland, AutumnPumpkin } from './AutumnDecoration.jsx';
 import { LanguageSelect } from '../auth/AuthForms.jsx';
 import { LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT, REGISTRATION_SLOT_LINKED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT } from '../postbox-core.js';
@@ -59,6 +62,8 @@ export function PushMigrationNotice({ onDismiss, onEnabled }) {
   );
 }
 
+const POSTBOX_MESSAGE_MAX_LENGTH = 500;
+
 export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick, currentUserId, sending = false }) {
   const [pushState, setPushState] = useState('');
   const [pushErrorDetail, setPushErrorDetail] = useState('');
@@ -84,6 +89,7 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
   }
 
   const badgeCount = unreadCount + todos.reduce((sum, todo) => sum + todo.count, 0);
+  const bodyLength = richTextPlainText(body).trim().length;
   return (
     <div className="postbox-menu">
       <button className="postbox-btn" type="button" aria-label={text('inbox')} aria-expanded={open} onClick={onToggle}>
@@ -113,8 +119,20 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
                 currentUserId={currentUserId}
                 required
               />
-              <TextArea label={text('message')} value={body} onChange={setBody} maxLength={250} />
-              <Button type="submit" disabled={!recipientId || !body.trim()} loading={sending}>{text('send')}</Button>
+              <RichTextEditor
+                label={`${text('message')} (${bodyLength}/${POSTBOX_MESSAGE_MAX_LENGTH})`}
+                value={body}
+                onChange={setBody}
+                boldLabel={text('Fett')}
+                italicLabel={text('Kursiv')}
+                underlineLabel={text('Unterstrichen')}
+                strikeLabel={text('Durchgestrichen')}
+                bulletListLabel={text('Aufzählung')}
+                orderedListLabel={text('Nummerierte Liste')}
+                headingLabel={text('Überschrift')}
+              />
+              {bodyLength > POSTBOX_MESSAGE_MAX_LENGTH && <p className="feedback offline">{text('postboxMessageTooLong', { max: POSTBOX_MESSAGE_MAX_LENGTH })}</p>}
+              <Button type="submit" disabled={!recipientId || !bodyLength || bodyLength > POSTBOX_MESSAGE_MAX_LENGTH} loading={sending}>{text('send')}</Button>
             </form>
             {todos.length > 0 && <div className="postbox-section"><h3>{text('todos')}</h3>{todos.map((todo) => (
               <button className="postbox-todo" key={todo.type} type="button" onClick={() => onTodoClick?.(todo.type)}>
@@ -123,11 +141,15 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
             ))}</div>}
             <div className="postbox-section"><h3>{text('messages')}</h3>
               {messages.map((message) => (
-                <button className={`postbox-message ${!message.readAt && !message.mine ? 'unread' : ''}`} key={message.id} type="button" onClick={() => onRead(message)}>
-                  <strong>{message.kind === 'system' ? text('status') : message.broadcastTournamentName ? (message.mine ? `${text('you')} → ` : `${message.senderName} → `) + text('allParticipantsOf').replace('{name}', message.broadcastTournamentName) : message.mine ? `${text('you')} → ${message.recipientName || ''}` : message.senderName}</strong>
-                  <span>{postboxMessageText(message, text)}</span>
+                // Kein <button> als Container: Links in der Nachricht wären darin ungültig und in Firefox nicht klickbar.
+                // Der Kopf bleibt ein echter Button für die Tastatur, ein Klick irgendwo auf die Nachricht wirkt wie bisher.
+                <div className={`postbox-message ${!message.readAt && !message.mine ? 'unread' : ''}`} key={message.id} onClick={() => onRead(message)}>
+                  <button className="postbox-message-open" type="button" onClick={(event) => { event.stopPropagation(); onRead(message); }}><strong>{message.kind === 'system' ? text('status') : message.broadcastTournamentName ? (message.mine ? `${text('you')} → ` : `${message.senderName} → `) + text('allParticipantsOf').replace('{name}', message.broadcastTournamentName) : message.mine ? `${text('you')} → ${message.recipientName || ''}` : message.senderName}</strong></button>
+                  {message.kind === 'direct'
+                    ? <span className="postbox-message-body"><RichText value={message.body} /></span>
+                    : <span>{postboxMessageText(message, text)}</span>}
                   <small>{new Date(message.createdAt).toLocaleString()}</small>
-                </button>
+                </div>
               ))}
               {messages.length === 0 && <p className="muted">{text('none')}</p>}
             </div>

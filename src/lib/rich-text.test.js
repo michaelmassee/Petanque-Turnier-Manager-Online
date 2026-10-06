@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRichText, serializeRichText, richTextDocument } from './rich-text.js';
+import { parseRichText, serializeRichText, richTextDocument, richTextPlainText } from './rich-text.js';
 
 describe('Rich-Text-Dokument', () => {
   it('bewahrt alte Klartexte einschließlich Zeilenumbrüchen beim Öffnen im Editor', () => {
@@ -22,5 +22,22 @@ describe('Rich-Text-Dokument', () => {
 
   it('speichert eine wieder geleerte Beschreibung weiterhin als leer', () => {
     expect(serializeRichText({ type: 'doc', content: [{ type: 'paragraph' }] })).toBe('');
+  });
+});
+
+describe('Rich-Text als Klartext', () => {
+  it('liefert sichtbaren Text mit Listenmarkern und lässt Klartext unverändert', () => {
+    const document = { type: 'doc', content: [
+      { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Info', marks: [{ type: 'bold' }] }] },
+      { type: 'paragraph' },
+      { type: 'bulletList', content: [{ type: 'listItem', content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Start 10 Uhr' }] },
+        { type: 'orderedList', attrs: { start: 3, type: null }, content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Runde' }] }] }] },
+      ] }] },
+      { type: 'orderedList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Eins' }] }] }] },
+    ] };
+    expect(richTextPlainText(serializeRichText(document))).toBe('Info\n\n• Start 10 Uhr\n  3. Runde\n1. Eins');
+    expect(richTextPlainText('Alte Nachricht')).toBe('Alte Nachricht');
+    expect(richTextPlainText(null)).toBe('');
   });
 });

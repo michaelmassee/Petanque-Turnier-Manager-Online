@@ -711,13 +711,10 @@ function AppContent() {
     });
   }
 
-  async function handleReadPostboxMessage(message) {
+  // Gelesen-Markierung passiert schon beim Öffnen der Postbox (read-all); der Klick belegt nur die Antwort vor bzw. navigiert.
+  function handleReadPostboxMessage(message) {
     if (message.kind === 'direct' && !message.mine && message.senderId) {
       setPostboxRecipientId(message.senderId);
-    }
-    if (message.recipientId === currentUser?.id && !message.readAt) {
-      await authenticatedApi(`/api/postbox/messages/${message.id}/read`, { method: 'POST' });
-      await loadPostbox();
     }
     if (message.eventType === 'saved_search_new_matches' && message.eventData?.tournamentId) {
       setPostboxOpen(false);

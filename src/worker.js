@@ -38,6 +38,7 @@ import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schw
 import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
 import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
+import { parseRichText, richTextPlainText } from './lib/rich-text.js';
 import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
 import { formatLocationAddress, geocodingFallbackQuery } from './location-format.js';
 import {
@@ -424,28 +425,28 @@ const REGISTRATION_CANCELLED_EMAILS = {
 const TOURNAMENT_BROADCAST_EMAILS = {
   de: {
     subject: (name) => `Nachricht an alle Teilnehmer: ${name}`,
-    text: (firstName, name, senderName, message) =>
-      `Hallo ${firstName},\n\n${senderName} hat allen Teilnehmern von "${name}" folgende Nachricht geschickt:\n\n${message}`,
+    text: (firstName, name, senderName) =>
+      `Hallo ${firstName},\n\n${senderName} hat allen Teilnehmern von "${name}" folgende Nachricht geschickt:`,
   },
   nl: {
     subject: (name) => `Bericht aan alle deelnemers: ${name}`,
-    text: (firstName, name, senderName, message) =>
-      `Hallo ${firstName},\n\n${senderName} heeft alle deelnemers van "${name}" het volgende bericht gestuurd:\n\n${message}`,
+    text: (firstName, name, senderName) =>
+      `Hallo ${firstName},\n\n${senderName} heeft alle deelnemers van "${name}" het volgende bericht gestuurd:`,
   },
   en: {
     subject: (name) => `Message to all participants: ${name}`,
-    text: (firstName, name, senderName, message) =>
-      `Hi ${firstName},\n\n${senderName} sent the following message to all participants of "${name}":\n\n${message}`,
+    text: (firstName, name, senderName) =>
+      `Hi ${firstName},\n\n${senderName} sent the following message to all participants of "${name}":`,
   },
   es: {
     subject: (name) => `Mensaje a todos los participantes: ${name}`,
-    text: (firstName, name, senderName, message) =>
-      `Hola ${firstName},\n\n${senderName} envió el siguiente mensaje a todos los participantes de "${name}":\n\n${message}`,
+    text: (firstName, name, senderName) =>
+      `Hola ${firstName},\n\n${senderName} envió el siguiente mensaje a todos los participantes de "${name}":`,
   },
   fr: {
     subject: (name) => `Message à tous les participants : ${name}`,
-    text: (firstName, name, senderName, message) =>
-      `Bonjour ${firstName},\n\n${senderName} a envoyé le message suivant à tous les participants de « ${name} » :\n\n${message}`,
+    text: (firstName, name, senderName) =>
+      `Bonjour ${firstName},\n\n${senderName} a envoyé le message suivant à tous les participants de « ${name} » :`,
   },
 };
 
@@ -606,10 +607,11 @@ function linkifyEmailHtml(value) {
   return String(value || '')
     .split(urlPattern)
     .map((part) => {
-      const escaped = escapeEmailHtml(part);
-      return /^https?:\/\/[^\s<]+$/.test(part)
-        ? `<a href="${escaped}" style="color:#086f61;text-decoration:underline;word-break:break-all;">${escaped}</a>`
-        : escaped;
+      if (!/^https?:\/\/[^\s<]+$/.test(part)) return escapeEmailHtml(part);
+      // Satzzeichen am Ende ("… siehe https://example.org.") gehört nicht zur Adresse, wie in RichText.
+      const trailing = part.match(/[.,;:!?)\]]+$/)?.[0] || '';
+      const url = escapeEmailHtml(trailing ? part.slice(0, -trailing.length) : part);
+      return `<a href="${url}" style="color:#086f61;text-decoration:underline;word-break:break-all;">${url}</a>${escapeEmailHtml(trailing)}`;
     })
     .join('');
 }
@@ -629,12 +631,44 @@ function renderEmailSection(text, labels) {
     .join('');
 }
 
+const EMAIL_TEXT_STYLE = 'margin:0 0 10px;color:#25332f;font-size:16px;line-height:25px;';
+
+function renderEmailInline(node) {
+  let html = linkifyEmailHtml(node.text);
+  for (const mark of node.marks || []) {
+    if (mark.type === 'bold') html = `<strong>${html}</strong>`;
+    if (mark.type === 'italic') html = `<em>${html}</em>`;
+    if (mark.type === 'underline') html = `<u>${html}</u>`;
+    if (mark.type === 'strike') html = `<s>${html}</s>`;
+  }
+  return html;
+}
+
+function renderEmailRichNode(node) {
+  const inline = (node.content || []).map(renderEmailInline).join('');
+  if (node.type === 'paragraph') return `<p style="${EMAIL_TEXT_STYLE}">${inline || '&nbsp;'}</p>`;
+  if (node.type === 'heading') return `<p style="margin:0 0 10px;color:#173b34;font-size:18px;line-height:26px;font-weight:700;">${inline}</p>`;
+  const tag = node.type === 'orderedList' ? 'ol' : 'ul';
+  const start = tag === 'ol' && node.attrs?.start > 1 ? ` start="${node.attrs.start}"` : '';
+  const items = node.content.map((item) => `<li style="margin:0 0 4px;">${item.content.map(renderEmailRichNode).join('')}</li>`).join('');
+  return `<${tag}${start} style="margin:0 0 10px;padding-left:24px;color:#25332f;font-size:16px;line-height:25px;">${items}</${tag}>`;
+}
+
+// Nutzernachricht (Rich Text oder alter Klartext) als abgesetzte Box; alle Texte werden escaped.
+function renderEmailMessageBox(value) {
+  const document = parseRichText(value);
+  const inner = document
+    ? document.content.map(renderEmailRichNode).join('')
+    : `<p style="${EMAIL_TEXT_STYLE}">${linkifyEmailHtml(value).replace(/\n/g, '<br>')}</p>`;
+  return `<div style="margin:0 0 18px;padding:16px 20px 6px;background:#f4f8f7;border:1px solid #dce6e2;border-left:4px solid #087f6f;border-radius:8px;">${inner}</div>`;
+}
+
 /**
  * Builds an email-client-safe HTML alternative for every transactional message. The plain text
  * body remains the canonical fallback, while this layout gives modern clients a readable card,
  * clear action links and a separate product footer. All dynamic content is escaped before use.
  */
-export function renderTransactionalEmailHtml(subject, text, language) {
+export function renderTransactionalEmailHtml(subject, text, language, messageBox = null) {
   const labels = EMAIL_LAYOUT_LABELS[language] || EMAIL_LAYOUT_LABELS.de;
   const [content, footer = ''] = appendEmailFooter(text, language).split('\n\n----------\n\n');
   const footerHtml = renderEmailSection(footer, labels);
@@ -645,7 +679,7 @@ export function renderTransactionalEmailHtml(subject, text, language) {
       <tr><td align="center" style="padding:32px 16px;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border-radius:14px;overflow:hidden;">
           <tr><td style="background:#07594f;padding:24px 32px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:.1px;">${EMAIL_BRAND}</td></tr>
-          <tr><td style="padding:34px 32px 24px;"><h1 style="margin:0 0 24px;color:#173b34;font-size:24px;line-height:31px;">${escapeEmailHtml(subject)}</h1>${renderEmailSection(content, labels)}</td></tr>
+          <tr><td style="padding:34px 32px 24px;"><h1 style="margin:0 0 24px;color:#173b34;font-size:24px;line-height:31px;">${escapeEmailHtml(subject)}</h1>${renderEmailSection(content, labels)}${messageBox ? renderEmailMessageBox(messageBox) : ''}</td></tr>
           <tr><td style="border-top:1px solid #dce6e2;padding:24px 32px 28px;background:#f8fbfa;">${footerHtml}</td></tr>
         </table>
         <p style="margin:16px 0 0;color:#71807b;font-size:12px;line-height:18px;">${labels.automated}</p>
@@ -2867,6 +2901,9 @@ export async function listPostboxRecipients(db, userId) {
   });
 }
 
+const POSTBOX_MESSAGE_MAX_LENGTH = 500;
+const POSTBOX_MESSAGE_MAX_STORED_LENGTH = 20_000;
+
 const PARTICIPANT_TOURNAMENTS_SUBQUERY = `SELECT DISTINCT reg.tournament_id FROM registrations reg
   WHERE ? IN (reg.user_id, reg.partner_user_id, reg.partner2_user_id)
     AND reg.status IN ('pending', 'confirmed')`;
@@ -2893,12 +2930,21 @@ async function getPostbox(db, user) {
   return json({ messages, unreadCount: unreadPostboxCount(unread), todos: await listPostboxTodos(db, user) });
 }
 
+// Nachrichtentext: Klartext oder Rich Text. Das Limit gilt für den sichtbaren Text; das Rich-Text-JSON ist nur grob gedeckelt.
+export function postboxMessageBody(value) {
+  const text = String(value || '').trim();
+  const plainText = richTextPlainText(normalizeRichText(text, 'Ungültige Nachricht')).trim();
+  if (!plainText || plainText.length > POSTBOX_MESSAGE_MAX_LENGTH || text.length > POSTBOX_MESSAGE_MAX_STORED_LENGTH) {
+    throw new HttpError(400, 'Die Nachricht muss zwischen 1 und 500 Zeichen lang sein');
+  }
+  return text;
+}
+
 async function sendPostboxMessage(request, env, sender) {
   const body = await readJson(request);
   const recipientRaw = String(body.recipientId || '').trim();
-  const text = String(body.body || '').trim();
   if (!recipientRaw) throw new HttpError(400, 'Bitte wähle einen Empfänger');
-  if (!text || text.length > 250) throw new HttpError(400, 'Die Nachricht muss zwischen 1 und 250 Zeichen lang sein');
+  const text = postboxMessageBody(body.body);
 
   if (recipientRaw.startsWith('tournament:')) {
     const tournamentId = recipientRaw.slice('tournament:'.length);
@@ -3027,7 +3073,8 @@ async function createBroadcastPostboxMessage(env, { sender, tournament, body }) 
       await enqueueTransactionalEmail(env, {
         to: recipient.email,
         subject: templates.subject(tournament.name),
-        text: templates.text(recipient.firstName, tournament.name, `${sender.firstName} ${sender.lastName}`, body),
+        text: templates.text(recipient.firstName, tournament.name, `${sender.firstName} ${sender.lastName}`),
+        messageBox: body,
         language: recipient.language,
         logFallback: `Tournament broadcast email for ${recipient.email} (tournament ${tournament.id})`,
         failureContext: `tournament broadcast for tournament ${tournament.id}`,
@@ -7366,7 +7413,9 @@ function isGoogleMailRecipient(to) {
   return Boolean(domain && GOOGLE_MAIL_DOMAINS.has(domain));
 }
 
-async function sendTransactionalEmail(env, { to, subject, text, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
+// messageBox: optionale Nutzernachricht (Klartext oder Rich Text), im HTML-Teil formatiert in einer eigenen Box,
+// im Klartext-Teil als Klartext angehängt.
+async function sendTransactionalEmail(env, { to, subject, text, messageBox = null, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
   const stratoAvailable = stratoConfigured(env);
   const resendAvailable = Boolean(env.RESEND_API_KEY && env.MAIL_FROM);
 
@@ -7378,8 +7427,8 @@ async function sendTransactionalEmail(env, { to, subject, text, language = 'de',
     throw new HttpError(503, 'E-Mail-Versand ist nicht konfiguriert.');
   }
 
-  const body = appendEmailFooter(text, language);
-  const html = renderTransactionalEmailHtml(subject, text, language);
+  const body = appendEmailFooter(messageBox ? `${text}\n\n${richTextPlainText(messageBox)}` : text, language);
+  const html = renderTransactionalEmailHtml(subject, text, language, messageBox);
 
   // Strato (Absender ptmonline@bclinden.de) hat kein SPF/DKIM-Alignment für sein
   // DMARC(p=reject)-Setup - Strato nimmt die Mail zwar an, Google verwirft sie

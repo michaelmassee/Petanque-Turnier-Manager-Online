@@ -811,6 +811,15 @@ a.left-panel-link {
 .postbox-panel .hint { margin: 4px 0 0; font-size: 0.85rem; color: #53627a; }
 .postbox-message small { color: #66758c; }
 .postbox-message span { white-space: pre-line; overflow-wrap: anywhere; }
+.postbox-message-body .rich-text { display: grid; gap: 4px; }
+.postbox-message:has(.postbox-message-open) { cursor: pointer; }
+.postbox-message-open { width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.postbox-message-open:focus-visible { outline: 3px solid rgb(22 119 255 / 35%); outline-offset: 2px; border-radius: 4px; }
+.rich-text a, .postbox-message-body a { overflow-wrap: anywhere; }
+.postbox-message-body .rich-text p, .postbox-message-body .rich-text h2, .postbox-message-body .rich-text ul, .postbox-message-body .rich-text ol { margin: 0; }
+.postbox-message-body .rich-text h2 { font-size: 1rem; }
+.postbox-message-body .rich-text ul, .postbox-message-body .rich-text ol { padding-left: 1.25rem; }
+.postbox-compose .rich-text-editor .tiptap { min-height: 72px; }
 .saved-search-card { gap: 12px; padding: 14px; }
 .saved-search-card-summary { display: grid; gap: 4px; }
 .saved-search-notify { width: fit-content; }

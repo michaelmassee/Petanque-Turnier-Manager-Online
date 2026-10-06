@@ -1,7 +1,25 @@
 import { parseRichText } from '../lib/rich-text.js';
 
+const URL_PATTERN = /(https?:\/\/[^\s<>"]+)/g;
+// Satzzeichen am Ende ("… siehe https://example.org.") gehört nicht zur Adresse.
+const TRAILING_PUNCTUATION = /[.,;:!?)\]]+$/;
+
+// Macht http(s)-Adressen im Text anklickbar; andere Schemata (javascript: etc.) bleiben reiner Text.
+export function LinkifiedText({ text }) {
+  return String(text).split(URL_PATTERN).map((part, index) => {
+    if (index % 2 === 0) return part;
+    const trailing = part.match(TRAILING_PUNCTUATION)?.[0] || '';
+    const url = trailing ? part.slice(0, -trailing.length) : part;
+    return (
+      <span key={index}>
+        <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>{trailing}
+      </span>
+    );
+  });
+}
+
 function InlineText({ node }) {
-  let content = node.text;
+  let content = <LinkifiedText text={node.text} />;
   for (const mark of node.marks || []) {
     if (mark.type === 'bold') content = <strong>{content}</strong>;
     if (mark.type === 'italic') content = <em>{content}</em>;
@@ -30,7 +48,7 @@ function RichTextNode({ node }) {
 
 export function RichText({ value }) {
   const document = parseRichText(value);
-  if (!document) return <p data-i18n-skip>{value}</p>;
+  if (!document) return <p data-i18n-skip><LinkifiedText text={value} /></p>;
 
   return (
     <div className="rich-text" data-i18n-skip>

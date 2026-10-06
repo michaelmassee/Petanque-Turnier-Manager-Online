@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { listPostboxRecipients } from './worker.js';
+import { listPostboxRecipients, postboxMessageBody, renderTransactionalEmailHtml } from './worker.js';
 import { d1MitSchema } from './test-support/d1.js';
 
 function seed(sqlite) {
@@ -33,5 +33,58 @@ describe('Postbox-Empfänger für Turnier-Broadcasts', () => {
         { id: 'tournament-2', name: 'Leeres Turnier', date: '2026-11-01', registrationCount: 0 },
       ],
     });
+  });
+});
+
+describe('Postbox-Nachrichtentext', () => {
+  const rich = (text) => `ptm-richtext:v1:${JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text, marks: [{ type: 'bold' }] }] }] })}`;
+
+  it('nimmt Klartext und Rich Text bis 500 sichtbare Zeichen an', () => {
+    expect(postboxMessageBody('  Hallo  ')).toBe('Hallo');
+    expect(postboxMessageBody('x'.repeat(500))).toHaveLength(500);
+    // Das JSON ist deutlich länger als 500 Zeichen, gezählt wird nur der Text.
+    expect(postboxMessageBody(rich('x'.repeat(500)))).toBe(rich('x'.repeat(500)));
+  });
+
+  it('lehnt leere, zu lange oder ungültige Nachrichten ab', () => {
+    expect(() => postboxMessageBody('   ')).toThrow('zwischen 1 und 500 Zeichen');
+    expect(() => postboxMessageBody('x'.repeat(501))).toThrow('zwischen 1 und 500 Zeichen');
+    expect(() => postboxMessageBody(rich('x'.repeat(501)))).toThrow('zwischen 1 und 500 Zeichen');
+    expect(() => postboxMessageBody('ptm-richtext:v1:{"type":"doc","content":[{"type":"script"}]}')).toThrow('Ungültige Nachricht');
+  });
+});
+
+describe('Postbox-Nachricht in der E-Mail', () => {
+  const doc = { type: 'doc', content: [
+    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Startzeit' }] },
+    { type: 'paragraph', content: [{ type: 'text', text: 'Neu: ' }, { type: 'text', text: '10 Uhr', marks: [{ type: 'bold' }, { type: 'italic' }, { type: 'underline' }, { type: 'strike' }] }] },
+    { type: 'paragraph' },
+    { type: 'orderedList', attrs: { start: 2, type: null }, content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: '<script>x</script> https://ptmonline.org' }] }] }] },
+    { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Punkt' }] }] }] },
+  ] };
+
+  it('rendert Rich Text formatiert und escaped in einer eigenen Box nach dem Einleitungstext', () => {
+    const html = renderTransactionalEmailHtml('Betreff', 'Hallo Anna,\n\nOlga schreibt:', 'de', `ptm-richtext:v1:${JSON.stringify(doc)}`);
+    const box = html.slice(html.indexOf('border-left:4px solid #087f6f'));
+    expect(html.indexOf('Olga schreibt:')).toBeLessThan(html.indexOf('border-left:4px solid #087f6f'));
+    expect(box).toContain('font-weight:700;">Startzeit</p>');
+    expect(box).toContain('Neu: <s><u><em><strong>10 Uhr</strong></em></u></s>');
+    expect(box).toContain('&nbsp;');
+    expect(box).toContain('<ol start="2"');
+    expect(box).toContain('<ul style=');
+    expect(box).toContain('&lt;script&gt;x&lt;/script&gt;');
+    expect(box).not.toContain('<script>');
+    expect(box).toContain('<a href="https://ptmonline.org"');
+  });
+
+  it('zeigt alte Klartext-Nachrichten mit Zeilenumbrüchen in der Box und lässt Mails ohne Nachricht unverändert', () => {
+    expect(renderTransactionalEmailHtml('Betreff', 'Hallo', 'de', 'Zeile 1\nZeile <2>')).toContain('Zeile 1<br>Zeile &lt;2&gt;</p></div>');
+    expect(renderTransactionalEmailHtml('Betreff', 'Hallo', 'de')).not.toContain('border-left:4px solid #087f6f');
+  });
+
+  it('verlinkt Adressen in der E-Mail ohne Satzzeichen am Ende', () => {
+    const html = renderTransactionalEmailHtml('Betreff', 'Hallo', 'de', 'Siehe https://ptmonline.org/turniere/1. Oder (https://example.org)!');
+    expect(html).toContain('<a href="https://ptmonline.org/turniere/1" style="color:#086f61;text-decoration:underline;word-break:break-all;">https://ptmonline.org/turniere/1</a>. Oder');
+    expect(html).toContain('>https://example.org</a>)!');
   });
 });

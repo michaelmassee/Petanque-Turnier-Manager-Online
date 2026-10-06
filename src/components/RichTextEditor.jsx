@@ -31,6 +31,11 @@ export function RichTextEditor({ label, value, onChange, boldLabel, italicLabel,
 
   useEffect(() => {
     if (!editor) return;
+    // Von außen geleert (z. B. nach dem Senden): Editor ebenfalls leeren.
+    if (!value) {
+      if (!editor.isEmpty) editor.commands.clearContent(false);
+      return;
+    }
     const nextContent = parseRichText(value);
     if (!nextContent) return;
     if (serializeRichText(editor.getJSON()) !== value) {

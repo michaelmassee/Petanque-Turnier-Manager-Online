@@ -71,3 +71,22 @@ export function serializeRichText(document) {
   if (!hasText) return '';
   return `${RICH_TEXT_PREFIX}${JSON.stringify(document)}`;
 }
+
+function plainTextLines(node, prefix = '') {
+  if (node.type === 'paragraph' || node.type === 'heading') {
+    return [`${prefix}${(node.content || []).map((child) => child.text).join('')}`];
+  }
+  const start = node.type === 'orderedList' ? node.attrs?.start || 1 : 1;
+  return node.content.flatMap((item, index) => {
+    const marker = node.type === 'orderedList' ? `${start + index}. ` : '• ';
+    const indent = ' '.repeat(prefix.length);
+    return item.content.flatMap((child, childIndex) => plainTextLines(child, childIndex === 0 ? `${indent}${marker}` : `${indent}${' '.repeat(marker.length)}`));
+  });
+}
+
+// Klartext eines gespeicherten Werts (z. B. für Zeichenlimit und E-Mail); Nicht-Rich-Text bleibt unverändert.
+export function richTextPlainText(value) {
+  const document = parseRichText(value);
+  if (!document) return String(value || '');
+  return document.content.flatMap((node) => plainTextLines(node)).join('\n').trim();
+}

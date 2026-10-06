@@ -25,7 +25,7 @@ export function PlayerListingContactDialog({ listing, onClose }) {
         <Feedback message={t('Nachricht gesendet.')} />
       ) : (
         <form className="form" onSubmit={submit}>
-          <TextArea label={t('Nachricht')} value={body} onChange={setBody} maxLength={250} />
+          <TextArea label={t('Nachricht')} value={body} onChange={setBody} maxLength={500} />
           <div className="dialog-actions">
             <Button variant="secondary" type="button" onClick={onClose}>{t('Abbrechen')}</Button>
             <Button type="submit" disabled={!body.trim()} loading={sending}>{t('Senden')}</Button>
