@@ -1294,11 +1294,6 @@ export default {
         return await sendPostboxMessage(request, env, session.user);
       }
 
-      const postboxReadMatch = url.pathname.match(/^\/api\/postbox\/messages\/([^/]+)\/read$/);
-      if (postboxReadMatch && request.method === 'POST') {
-        const session = await requireSession(request, env.DB);
-        return await markPostboxMessageRead(env.DB, postboxReadMatch[1], session.user.id);
-      }
 
       if (request.method === 'POST' && url.pathname === '/api/postbox/read-all') {
         const session = await requireSession(request, env.DB);
@@ -2964,18 +2959,6 @@ async function sendPostboxMessage(request, env, sender) {
   }
   const message = await createPostboxMessage(env, { senderId: sender.id, recipientId: recipientRaw, kind: 'direct', body: text, pushTitle: 'Neue Nachricht', pushActor: `${sender.firstName} ${sender.lastName}` });
   return json({ message }, 201);
-}
-
-async function markPostboxMessageRead(db, id, userId) {
-  const now = new Date().toISOString();
-  const result = await db.prepare(
-    `UPDATE postbox_messages SET read_at = COALESCE(read_at, ?) WHERE id = ? AND (
-       recipient_id = ?
-       OR (broadcast_tournament_id IS NOT NULL AND broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
-     )`,
-  ).bind(now, id, userId, userId).run();
-  if (!result.meta.changes) throw new HttpError(404, 'Nachricht nicht gefunden');
-  return json({ ok: true });
 }
 
 async function markAllPostboxMessagesRead(db, userId) {
