@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import i18next from './lib/i18next-config.js';
-import { EditDialog, HomeTournaments, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
+import { EditDialog, HomeTournaments, nextTournamentInfoCardIndex, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
 import { ClubBadge, DistanceBadge } from './components/ui.jsx';
 import { AppHeader, SavedSearchesControl, SearchMenuControl } from './components/layout.jsx';
 import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM } from './lib/constants.js';
@@ -65,6 +65,51 @@ describe('Entfernungs-Badge', () => {
 });
 
 describe('Turnier-Finder', () => {
+  const finderProps = {
+    language: 'de', query: '', showMineFilter: false, onlyMine: false,
+    filterMonth: '', filterFormation: '', filterRegistrationType: '', filterType: '', filterClub: '',
+    filterOpenOnly: false, filterOnlineRegistrationOnly: false, searchOrigin: null, searchRadiusKm: '25',
+    total: 5, hasMore: false, onLoadMore: () => {}, onRegister: () => {}, onOpenTournament: () => {}, onOpenFilters: () => {}, onOpenRadiusSearch: () => {},
+  };
+  const finderTournaments = Array.from({ length: 5 }, (_, index) => ({
+    id: `finder-${index}`, name: `Turnier ${index + 1}`, location: 'Linden', date: '2026-10-20', formation: 'doublette', registrationType: 'forme', type: 'ko', status: 'registration', visibility: 'public', activeRegistrations: 0, maxRegistrations: 16,
+  }));
+
+  it('setzt die hervorgehobene Infokarte nach das vierte Turnier', () => {
+    sessionStorage.setItem('ptm_tournament_info_card_index', '3');
+    const { container } = render(<HomeTournaments {...finderProps} tournaments={finderTournaments} />);
+
+    const list = container.querySelector('.tournament-card-list');
+    expect(list.children).toHaveLength(6);
+    expect(list.children[4]).toHaveClass('tournament-info-card');
+    expect(within(list.children[4]).getByRole('link', { name: 'PTM Desktop entdecken' })).toHaveAttribute('href', 'https://michaelmassee.github.io/Petanque-Turnier-Manager/');
+
+    render(<HomeTournaments {...finderProps} tournaments={finderTournaments.slice(0, 3)} total={3} />);
+    expect(screen.getAllByLabelText('Entdecke PTM Online')).toHaveLength(1);
+  });
+
+  it('blendet die Infokarte bei Suche oder Umkreissuche aus', () => {
+    const { container, rerender } = render(<HomeTournaments {...finderProps} query="Linden" tournaments={finderTournaments} />);
+    expect(container.querySelector('.tournament-info-card')).not.toBeInTheDocument();
+
+    rerender(<HomeTournaments {...finderProps} searchOrigin={{ label: 'Linden' }} tournaments={finderTournaments} />);
+    expect(container.querySelector('.tournament-info-card')).not.toBeInTheDocument();
+
+    rerender(<HomeTournaments {...finderProps} filterMonth="2026-10" tournaments={finderTournaments} />);
+    expect(container.querySelector('.tournament-info-card')).not.toBeInTheDocument();
+  });
+
+  it('rotiert die Infokarten robust über den Sitzungsspeicher', () => {
+    const values = new Map();
+    const storage = { getItem: (key) => values.get(key) || null, setItem: (key, value) => values.set(key, value) };
+
+    expect(nextTournamentInfoCardIndex(storage)).toBe(0);
+    expect(nextTournamentInfoCardIndex(storage)).toBe(1);
+    values.set('ptm_tournament_info_card_index', 'invalid');
+    expect(nextTournamentInfoCardIndex(storage)).toBe(0);
+    expect(nextTournamentInfoCardIndex({ getItem: () => { throw new Error('Speicher gesperrt'); } })).toBe(0);
+  });
+
   it('kennzeichnet einen Suchtext als aktiven Filter', () => {
     render(
       <HomeTournaments

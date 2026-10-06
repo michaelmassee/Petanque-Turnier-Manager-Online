@@ -2143,6 +2143,42 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = fa
 }
 
 
+const TOURNAMENT_INFO_CARD_STORAGE_KEY = 'ptm_tournament_info_card_index';
+
+const TOURNAMENT_INFO_CARD_CONTENT = [
+  { text: 'Turniere sollen Freude machen – nicht kompliziert sein. Registriere dich kostenlos, erstelle dein eigenes Turnier und entscheide selbst, ob du privat im Freundeskreis oder öffentlich für die Boule-Community spielen möchtest. Danach kann es direkt losgehen.' },
+  { text: 'Dein Verein verdient Sichtbarkeit, und gute Bouleplätze wollen gefunden werden. Registriere deinen Verein oder melde einen Platz, damit Spielerinnen und Spieler wissen, wo Pétanque zuhause ist. Wir freuen uns über deinen Beitrag zur Community.' },
+  { text: 'Du möchtest trainieren, suchst Spielpartner oder planst ein Turnier? Erstelle mit wenigen Klicks ein Gesuch und finde Menschen in deiner Nähe, die deine Begeisterung für Pétanque teilen.' },
+  { text: 'Du möchtest noch mehr aus deinem Turnier machen? Mit PTM Desktop planst und leitest du professionelle Turniere auf Mac, Linux oder Windows – kostenlos, leistungsstark und genau für Pétanque gemacht.', href: 'https://michaelmassee.github.io/Petanque-Turnier-Manager/' },
+];
+
+export function nextTournamentInfoCardIndex(storage) {
+  try {
+    const storedIndex = Number.parseInt(storage?.getItem(TOURNAMENT_INFO_CARD_STORAGE_KEY) || '0', 10);
+    const currentIndex = Number.isInteger(storedIndex) && storedIndex >= 0 && storedIndex < TOURNAMENT_INFO_CARD_CONTENT.length ? storedIndex : 0;
+    storage?.setItem(TOURNAMENT_INFO_CARD_STORAGE_KEY, String((currentIndex + 1) % TOURNAMENT_INFO_CARD_CONTENT.length));
+    return currentIndex;
+  } catch {
+    return 0;
+  }
+}
+
+function TournamentInfoCard({ content }) {
+  const { t } = useTranslation();
+  return (
+    <aside className="tournament-info-card" aria-label={t('Entdecke PTM Online')}>
+      <span className="tournament-info-card-icon" aria-hidden="true">i</span>
+      <div>
+        <p className="eyebrow">{t('Entdecke PTM Online')}</p>
+        <p>{t(content.text)}</p>
+        {content.href && (
+          <a href={content.href} target="_blank" rel="noreferrer">{t('PTM Desktop entdecken')}</a>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 function TournamentCard({ tournament, onOpenTournament, onRegister, language }) {
   const { t } = useTranslation();
   const [logoBroken, setLogoBroken] = useState(false);
@@ -2239,6 +2275,7 @@ export function HomeTournaments({
   onOpenRadiusSearch,
 }) {
   const { t } = useTranslation();
+  const [tournamentInfoCardIndex] = useState(() => nextTournamentInfoCardIndex(typeof window === 'undefined' ? undefined : window.sessionStorage));
   const activeFilterCount = [
     query.trim(),
     showMineFilter && onlyMine,
@@ -2264,6 +2301,8 @@ export function HomeTournaments({
     filterOnlineRegistrationOnly && [t('Online-Anmeldung möglich'), onClearFilterOnlineRegistrationOnly],
     searchOrigin && [`${radiusLabel} · ${searchOrigin.label}`, onClearSearchOrigin],
   ].filter(Boolean);
+  const showTournamentInfoCard = activeBadges.length === 0;
+  const tournamentInfoCard = TOURNAMENT_INFO_CARD_CONTENT[tournamentInfoCardIndex];
   const resultsRef = useRef(null);
   return (
     <section className="home-tournaments">
@@ -2349,15 +2388,16 @@ export function HomeTournaments({
       )}
 
       <div className="tournament-card-list">
-        {tournaments.map((tournament) => (
+        {tournaments.map((tournament, index) => [
           <TournamentCard
             key={tournament.id}
             tournament={tournament}
             onOpenTournament={onOpenTournament}
             onRegister={onRegister}
             language={language}
-          />
-        ))}
+          />,
+          showTournamentInfoCard && index === 3 && <TournamentInfoCard key="tournament-info-card" content={tournamentInfoCard} />,
+        ])}
       </div>
 
       <InfiniteListLoadMore hasMore={hasMore} onLoadMore={onLoadMore} label={t('Weitere Turniere laden')} />

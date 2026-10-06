@@ -1478,6 +1478,67 @@ a.left-panel-link {
   gap: 10px;
 }
 
+.tournament-info-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  border: 2px solid #75aee8;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eaf5ff, #f7fbff 58%, #fff8dc);
+  padding: 22px;
+  box-shadow: 0 12px 30px rgb(22 119 255 / 14%);
+}
+
+.tournament-info-card-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #1677ff;
+  box-shadow: 0 3px 8px rgb(22 119 255 / 28%);
+  color: #fff;
+  font-family: Georgia, serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tournament-info-card .eyebrow {
+  margin-bottom: 6px;
+  color: #0c5ea8;
+}
+
+.tournament-info-card p:not(.eyebrow) {
+  max-width: 850px;
+  margin: 0;
+  color: #24344d;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.tournament-info-card a {
+  display: inline-flex;
+  margin-top: 13px;
+  border-radius: 6px;
+  background: #0c5ea8;
+  color: #fff;
+  padding: 8px 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.tournament-info-card a:hover {
+  background: #084b87;
+}
+
+.tournament-info-card a:focus-visible {
+  outline: 3px solid rgb(22 119 255 / 32%);
+  outline-offset: 3px;
+}
+
 .tournament-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2555,6 +2616,17 @@ a.left-panel-link {
 }
 
 @media (max-width: 560px) {
+  .tournament-info-card {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .tournament-info-card-icon {
+    width: 30px;
+    height: 30px;
+    font-size: 1.1rem;
+  }
+
   .app-shell,
   .page {
     padding: 14px;
