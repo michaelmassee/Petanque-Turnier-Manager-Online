@@ -27,6 +27,8 @@ describe('RecipientPicker', () => {
 
     fireEvent.click(option);
     expect(onChange).toHaveBeenCalledWith('tournament:tournament-1');
+    // Im Eingabefeld nur die Kurzform, damit der Text am Handy nicht abgeschnitten wird.
+    expect(screen.getByRole('combobox')).toHaveValue('Herbstturnier · 6.10.2026');
   });
 
   it('macht die angezeigten Turnierdaten durchsuchbar und zeigt null Meldungen', () => {

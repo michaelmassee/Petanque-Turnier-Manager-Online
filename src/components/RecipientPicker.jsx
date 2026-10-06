@@ -30,15 +30,18 @@ export function RecipientPicker({ label, recipients, recipientTournaments = [], 
       id: `tournament:${tournament.id}`,
       value: `tournament:${tournament.id}`,
       label: `${t('allParticipantsOf').replace('{name}', tournament.name)} · ${formatDate(tournament.date, i18n.language)} · ${t('registrationCount', { count: tournament.registrationCount || 0 })}`,
+      // Kurzform fürs Eingabefeld nach der Auswahl, damit es am Handy nicht abgeschnitten wird.
+      selectedLabel: `${tournament.name} · ${formatDate(tournament.date, i18n.language)}`,
     }));
     const recipientEntries = recipients.map((recipient) => ({
       kind: 'recipient',
       id: recipient.id,
       value: recipient.id,
       label: `${recipient.firstName} ${recipient.lastName}`,
+      selectedLabel: `${recipient.firstName} ${recipient.lastName}`,
     }));
     return [...tournamentEntries, ...recipientEntries];
-  }, [recipients, recipientTournaments, t]);
+  }, [recipients, recipientTournaments, t, i18n.language]);
 
   const entryByValue = useMemo(() => {
     const map = new Map();
@@ -54,7 +57,7 @@ export function RecipientPicker({ label, recipients, recipientTournaments = [], 
   useEffect(() => {
     if (userEditedRef.current) return;
     const entry = value ? entryByValue.get(value) : null;
-    setDisplayValue(entry ? entry.label : '');
+    setDisplayValue(entry ? entry.selectedLabel : '');
   }, [value, entryByValue]);
 
   useEffect(() => {
@@ -90,7 +93,7 @@ export function RecipientPicker({ label, recipients, recipientTournaments = [], 
     setActiveIndex(-1);
     userEditedRef.current = false;
     const entry = value ? entryByValue.get(value) : null;
-    setDisplayValue(entry ? entry.label : '');
+    setDisplayValue(entry ? entry.selectedLabel : '');
     setQuery('');
   }
 
@@ -122,7 +125,7 @@ export function RecipientPicker({ label, recipients, recipientTournaments = [], 
   function handleSelect(entry) {
     userEditedRef.current = false;
     onChange(entry.value);
-    setDisplayValue(entry.label);
+    setDisplayValue(entry.selectedLabel);
     setQuery('');
     setOpen(false);
     setActiveIndex(-1);
