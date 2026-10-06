@@ -45,6 +45,8 @@
   "todo_pending_registrations": "Ausstehende Anmeldungen bearbeiten",
   "todo_waitlist": "Wartelisten prüfen",
   "allParticipantsOf": "Alle Teilnehmer von {name}",
+  "registrationCount_one": "{{count}} Anmeldung",
+  "registrationCount_other": "{{count}} Anmeldungen",
   "favorites": "Favoriten",
   "recentRecipients": "Zuletzt verwendet",
   "allTournamentsSection": "Turnier-Broadcasts",

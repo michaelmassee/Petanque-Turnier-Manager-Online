@@ -2844,16 +2844,26 @@ async function listUsers(db) {
   return json({ users: result.results.map(toPublicUser) });
 }
 
-async function listPostboxRecipients(db, userId) {
+export async function listPostboxRecipients(db, userId) {
   const result = await db.prepare(
     "SELECT id, first_name, last_name, role FROM users WHERE id != ? AND id != ? AND role = 'user' ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE",
   ).bind(userId, TOURNAMENT_REPORT_SYSTEM_USER_ID).all();
   const tournaments = await db.prepare(
-    'SELECT id, name FROM tournaments WHERE owner_id = ? AND registration_enabled = 1 ORDER BY name COLLATE NOCASE',
+    `SELECT t.id, t.name, t.date, COUNT(r.id) AS registration_count
+     FROM tournaments t
+     LEFT JOIN registrations r ON r.tournament_id = t.id AND r.status IN ('pending', 'confirmed')
+     WHERE t.owner_id = ? AND t.registration_enabled = 1
+     GROUP BY t.id, t.name, t.date
+     ORDER BY t.name COLLATE NOCASE`,
   ).bind(userId).all();
   return json({
     recipients: result.results.map((user) => ({ id: user.id, firstName: user.first_name, lastName: user.last_name, role: user.role })),
-    tournaments: tournaments.results.map((tournament) => ({ id: tournament.id, name: tournament.name })),
+    tournaments: tournaments.results.map((tournament) => ({
+      id: tournament.id,
+      name: tournament.name,
+      date: tournament.date,
+      registrationCount: Number(tournament.registration_count),
+    })),
   });
 }
 

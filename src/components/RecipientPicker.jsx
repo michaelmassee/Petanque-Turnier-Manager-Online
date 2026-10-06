@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { RequiredMark } from './ui.jsx';
+import { formatDate } from '../lib/format.js';
 import {
   loadFavoriteRecipientIds,
   toggleFavoriteRecipientId,
@@ -9,7 +10,7 @@ import {
 } from '../lib/postboxRecipientStorage.js';
 
 export function RecipientPicker({ label, recipients, recipientTournaments = [], value, onChange, currentUserId, required }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const listboxId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -28,7 +29,7 @@ export function RecipientPicker({ label, recipients, recipientTournaments = [], 
       kind: 'tournament',
       id: `tournament:${tournament.id}`,
       value: `tournament:${tournament.id}`,
-      label: t('allParticipantsOf').replace('{name}', tournament.name),
+      label: `${t('allParticipantsOf').replace('{name}', tournament.name)} · ${formatDate(tournament.date, i18n.language)} · ${t('registrationCount', { count: tournament.registrationCount || 0 })}`,
     }));
     const recipientEntries = recipients.map((recipient) => ({
       kind: 'recipient',
