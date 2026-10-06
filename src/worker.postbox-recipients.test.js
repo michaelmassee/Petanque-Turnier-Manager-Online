@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
-import { listPostboxRecipients, postboxMessageBody, renderTransactionalEmailHtml } from './worker.js';
+import { describe, expect, it, vi } from 'vitest';
+import { createBroadcastPostboxMessage, listPostboxRecipients, postboxMessageBody, renderTransactionalEmailHtml } from './worker.js';
 import { d1MitSchema } from './test-support/d1.js';
 
 function seed(sqlite) {
@@ -17,10 +17,11 @@ function seed(sqlite) {
   anmeldung('offen', 'pending');
   anmeldung('bestaetigt', 'confirmed');
   anmeldung('warteliste', 'waitlist');
+  anmeldung('storniert', 'cancelled');
 }
 
 describe('Postbox-Empfänger für Turnier-Broadcasts', () => {
-  it('liefert Turnierdatum und zählt nur offene oder bestätigte Meldungen, auch null', async () => {
+  it('liefert Turnierdatum und zählt offene, bestätigte und Wartelisten-Meldungen, auch null', async () => {
     const db = d1MitSchema();
     seed(db.sqlite);
 
@@ -29,10 +30,28 @@ describe('Postbox-Empfänger für Turnier-Broadcasts', () => {
     await expect(response.json()).resolves.toEqual({
       recipients: [{ id: 'recipient-1', firstName: 'Ada', lastName: 'Beispiel', role: 'user' }],
       tournaments: [
-        { id: 'tournament-1', name: 'Herbstturnier', date: '2026-10-06', registrationCount: 2 },
+        { id: 'tournament-1', name: 'Herbstturnier', date: '2026-10-06', registrationCount: 3 },
         { id: 'tournament-2', name: 'Leeres Turnier', date: '2026-11-01', registrationCount: 0 },
       ],
     });
+  });
+});
+
+describe('Versand eines Turnier-Broadcasts', () => {
+  it('erreicht offene, bestätigte und Wartelisten-Meldungen per E-Mail und Push, stornierte nicht', async () => {
+    const db = d1MitSchema();
+    seed(db.sqlite);
+    db.sqlite.exec(`UPDATE users SET mail_enabled = 1 WHERE id = 'organizer-1';
+      UPDATE registrations SET user_id = 'recipient-1' WHERE id = 'warteliste';`);
+    const send = vi.fn(async () => {});
+    const sender = { id: 'organizer-1', email: 'orga@example.test', firstName: 'Olga', lastName: 'Orga' };
+
+    await createBroadcastPostboxMessage({ DB: db, MAIL_QUEUE: { send } }, { sender, tournament: { id: 'tournament-1', owner_id: 'organizer-1', name: 'Herbstturnier' }, body: 'Start 10 Uhr' });
+
+    const mails = send.mock.calls.map(([payload]) => payload).filter((payload) => payload.to);
+    expect(mails.map((mail) => mail.to).sort()).toEqual(['bestaetigt@example.test', 'offen@example.test', 'warteliste@example.test']);
+    expect(mails[0]).toMatchObject({ messageBox: 'Start 10 Uhr' });
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ kind: 'push', userId: 'recipient-1' }));
   });
 });
 

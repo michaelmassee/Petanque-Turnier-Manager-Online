@@ -2880,7 +2880,7 @@ export async function listPostboxRecipients(db, userId) {
   const tournaments = await db.prepare(
     `SELECT t.id, t.name, t.date, COUNT(r.id) AS registration_count
      FROM tournaments t
-     LEFT JOIN registrations r ON r.tournament_id = t.id AND r.status IN ('pending', 'confirmed')
+     LEFT JOIN registrations r ON r.tournament_id = t.id AND r.status IN ${BROADCAST_REGISTRATION_STATUSES_SQL}
      WHERE t.owner_id = ? AND t.registration_enabled = 1
      GROUP BY t.id, t.name, t.date
      ORDER BY t.name COLLATE NOCASE`,
@@ -2899,9 +2899,13 @@ export async function listPostboxRecipients(db, userId) {
 const POSTBOX_MESSAGE_MAX_LENGTH = 500;
 const POSTBOX_MESSAGE_MAX_STORED_LENGTH = 20_000;
 
+// Ein Turnier-Broadcast erreicht offene, bestätigte und Wartelisten-Meldungen.
+const BROADCAST_REGISTRATION_STATUSES_SQL = "('pending', 'confirmed', 'waitlist')";
+
+// Turniere, deren Broadcasts der Nutzer sieht.
 const PARTICIPANT_TOURNAMENTS_SUBQUERY = `SELECT DISTINCT reg.tournament_id FROM registrations reg
   WHERE ? IN (reg.user_id, reg.partner_user_id, reg.partner2_user_id)
-    AND reg.status IN ('pending', 'confirmed')`;
+    AND reg.status IN ${BROADCAST_REGISTRATION_STATUSES_SQL}`;
 
 async function getPostbox(db, user) {
   const result = await db.prepare(
@@ -3012,7 +3016,7 @@ async function createPostboxMessage(env, { senderId = null, recipientId, kind, b
   return message;
 }
 
-async function createBroadcastPostboxMessage(env, { sender, tournament, body }) {
+export async function createBroadcastPostboxMessage(env, { sender, tournament, body }) {
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   await env.DB.prepare(
@@ -3029,7 +3033,7 @@ async function createBroadcastPostboxMessage(env, { sender, tournament, body }) 
   const message = toPostboxMessage(row, sender.id);
 
   const registrations = await env.DB.prepare(
-    "SELECT * FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')",
+    `SELECT * FROM registrations WHERE tournament_id = ? AND status IN ${BROADCAST_REGISTRATION_STATUSES_SQL}`,
   ).bind(tournament.id).all();
 
   const uniqueRecipients = new Map();
@@ -3041,7 +3045,7 @@ async function createBroadcastPostboxMessage(env, { sender, tournament, body }) 
     }
   }
 
-  const accountUsers = await participantAccountUserIds(env.DB, tournament.id, sender.id);
+  const accountUsers = await participantAccountUserIds(env.DB, tournament.id, sender.id, { includeWaitlist: true });
   for (const accountUser of accountUsers.results || []) {
     await enqueuePushNotification(env, {
       userId: accountUser.id,
@@ -6156,12 +6160,13 @@ export async function findLiveRegistrationByToken(db, token) {
   return registration;
 }
 
-async function participantAccountUserIds(db, tournamentId, excludedUserId) {
+async function participantAccountUserIds(db, tournamentId, excludedUserId, { includeWaitlist = false } = {}) {
+  const statuses = includeWaitlist ? BROADCAST_REGISTRATION_STATUSES_SQL : "('pending', 'confirmed')";
   return db.prepare(
     `SELECT id FROM (
-       SELECT user_id AS id FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
-       UNION SELECT partner_user_id AS id FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
-       UNION SELECT partner2_user_id AS id FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
+       SELECT user_id AS id FROM registrations WHERE tournament_id = ? AND status IN ${statuses}
+       UNION SELECT partner_user_id AS id FROM registrations WHERE tournament_id = ? AND status IN ${statuses}
+       UNION SELECT partner2_user_id AS id FROM registrations WHERE tournament_id = ? AND status IN ${statuses}
      ) WHERE id IS NOT NULL AND id != ?`,
   ).bind(tournamentId, tournamentId, tournamentId, excludedUserId).all();
 }
