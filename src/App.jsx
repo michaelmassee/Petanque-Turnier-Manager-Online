@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_STATUSES, VISIBILITIES, RADIUS_OPTIONS, EMPTY_PROFILE_FORM, EMPTY_AUTH_FORM, EMPTY_TOURNAMENT_REPORT_FORM, EMPTY_REGISTRATION_FORM, REGISTER_SUCCESS, VERIFY_SUCCESS, CANCEL_REGISTRATION_EXPLANATION, CANCEL_REGISTRATION_SUCCESS, PROFILE_UPDATE_SUCCESS, PROFILE_EMAIL_CHANGE_PENDING } from './lib/constants.js';
 import i18next from './lib/i18next-config.js';
 import { useTranslation } from 'react-i18next';
@@ -2083,15 +2083,18 @@ function AppContent() {
 
       {activeTab === 'profile' && (
         <section className="single-column">
-          <ProfilePanel currentUser={currentUser} form={profileForm} setForm={setProfileForm} onSubmit={handleUpdateProfile} saving={profileSaving} onDeleteAccount={handleDeleteAccount} deleting={accountDeleting} />
+          <ProfilePanel currentUser={currentUser} form={profileForm} setForm={setProfileForm} onSubmit={handleUpdateProfile} saving={profileSaving} onDeleteAccount={handleDeleteAccount} deleting={accountDeleting} clubNames={publishedClubNames} />
         </section>
       )}
     </main>
   );
 }
 
-export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = false, onDeleteAccount, deleting = false }) {
+// clubNames: veröffentlichte Vereine als Vorschläge für das Vereinsfeld (Freitext bleibt möglich).
+export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = false, onDeleteAccount, deleting = false, clubNames = [] }) {
   const { t, i18n } = useTranslation();
+  const clubListId = useId();
+  const clubList = clubNames.length > 0 ? clubListId : undefined;
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const usernameLocked = Boolean(currentUser.usernameChangeAllowedAt) || !currentUser.emailVerifiedAt;
   let usernameHint = t('Du kannst deinen Benutzernamen alle 30 Tage ändern.');
@@ -2134,7 +2137,12 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = fa
             placeholder="+49 171 1234567"
           />
           <p className="hint">{t('Optional. Nur für dich und die Administratoren sichtbar. Beim Anlegen eines Turniers wird sie als Kontakt-Telefon vorgeschlagen.')}</p>
-          <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
+          <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} list={clubList} />
+          {clubList && (
+            <datalist id={clubListId}>
+              {clubNames.map((name) => <option key={name} value={name} />)}
+            </datalist>
+          )}
           <p className="hint">{t('Benutzername und Verein werden anderen Nutzern angezeigt, damit man dich auch bei gleichem Namen unterscheiden kann.')}</p>
           <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
           <TextField

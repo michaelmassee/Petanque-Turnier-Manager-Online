@@ -638,6 +638,23 @@ describe('Mein Profil', () => {
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
   });
 
+  it('schlägt im Vereinsfeld die Vereine aus der DB vor', () => {
+    const { container } = render(
+      <ProfilePanel
+        currentUser={{ pendingEmail: null }}
+        form={{ firstName: 'Anna', lastName: 'Muster', email: 'anna@example.com', club: '', licenseNr: '', currentPassword: '', newPassword: '', newPasswordConfirm: '' }}
+        setForm={() => {}}
+        onSubmit={() => {}}
+        clubNames={['BC Linden', 'Boule Club Hamburg']}
+      />,
+    );
+
+    const verein = screen.getByLabelText(/^Verein/);
+    const listId = verein.getAttribute('list');
+    expect(listId).toBeTruthy();
+    expect([...container.querySelectorAll(`datalist[id="${listId}"] option`)].map((option) => option.value)).toEqual(['BC Linden', 'Boule Club Hamburg']);
+  });
+
   it('löscht das Konto erst nach Eingabe der Bestätigung über ein eigenes Formular', () => {
     const onDeleteAccount = vi.fn();
     const onSubmit = vi.fn();
