@@ -7981,13 +7981,14 @@ async function getClub(db, id, user) {
   return json({ club: toPublicClub(club, user), places: (places.results || []).map((row) => toPublicBoulePlace(row, user)) });
 }
 
-function clubInput(body) {
+// Mit Owner ist die Organisation über dessen Konto erreichbar, Kontaktperson und -E-Mail sind dann optional.
+function clubInput(body, ownerId) {
   const name = text(body.name);
   if (name.length < 2) throw new HttpError(400, 'Der Vereinsname muss mindestens 2 Zeichen enthalten', { field: 'name' });
-  const contactName = text(body.contactName);
-  if (contactName.length < 2) throw new HttpError(400, 'Der Kontaktname muss mindestens 2 Zeichen enthalten', { field: 'contactName' });
-  const contactEmail = text(body.contactEmail);
-  if (!isEmail(contactEmail)) throw new HttpError(400, 'Eine gültige Kontakt-E-Mail ist erforderlich', { field: 'contactEmail' });
+  const contactName = nullableText(body.contactName);
+  if ((contactName || !ownerId) && (contactName || '').length < 2) throw new HttpError(400, 'Der Kontaktname muss mindestens 2 Zeichen enthalten', { field: 'contactName' });
+  const contactEmail = nullableText(body.contactEmail);
+  if ((contactEmail || !ownerId) && !isEmail(contactEmail || '')) throw new HttpError(400, 'Eine gültige Kontakt-E-Mail ist erforderlich', { field: 'contactEmail' });
   const kind = String(body.kind || 'club').trim();
   if (!['club', 'group'].includes(kind)) throw new HttpError(400, 'Ungültiger Organisationstyp', { field: 'kind' });
   return { name, kind, description: normalizeRichText(body.description, 'Ungültige Organisationsbeschreibung'), websiteUrl: normalizePresentationUrl(body.websiteUrl, 'websiteUrl'), logoUrl: normalizePresentationUrl(body.logoUrl, 'logoUrl'), socialLinks: socialLinks(body.socialLinks), memberOf: memberOf(body.memberOf), contactName, contactEmail, contactPhone: nullableText(body.contactPhone) };
@@ -8000,7 +8001,7 @@ async function assertNoDuplicateBoulePlace(db, input, excludeId = '') {
 
 async function createClub(request, db, user) {
   const body = await readJson(request);
-  const input = clubInput(body);
+  const input = clubInput(body, user.id);
   if (!body.venue || typeof body.venue !== 'object') throw new HttpError(400, 'Für eine Organisation ist ein Spielort erforderlich', { field: 'venue' });
   const venue = await placeInput(body.venue, request.headers?.get?.('CF-IPCountry'));
   const existingClub = await db.prepare('SELECT id FROM clubs WHERE lower(trim(name)) = lower(trim(?))').bind(input.name).first();
@@ -8029,7 +8030,7 @@ async function assertClubOwner(db, clubId, user) {
 }
 
 export async function updateClub(request, db, id, user) {
-  const club = await assertClubEditor(db, id, user); const input = clubInput(await readJson(request)); const now = new Date().toISOString();
+  const club = await assertClubEditor(db, id, user); const input = clubInput(await readJson(request), club.owner_id); const now = new Date().toISOString();
   // Bereits freigegebene Vereine bleiben bei Bearbeitung freigegeben, statt erneut zur Moderation zu müssen.
   const status = club.status === 'published' ? 'published' : 'pending';
   await db.batch([
@@ -8468,9 +8469,9 @@ async function updateClubStatusAsAdmin(db, id, status) {
 }
 
 export async function updateClubAsAdmin(request, db, id) {
-  const club = await db.prepare('SELECT id FROM clubs WHERE id = ?').bind(id).first();
+  const club = await db.prepare('SELECT id, owner_id FROM clubs WHERE id = ?').bind(id).first();
   if (!club) throw new HttpError(404, 'Verein nicht gefunden');
-  const input = clubInput(await readJson(request));
+  const input = clubInput(await readJson(request), club.owner_id);
   await db.batch([
     db.prepare('UPDATE clubs SET name = ?, description = ?, website_url = ?, logo_url = ?, contact_name = ?, contact_email = ?, contact_phone = ?, updated_at = ? WHERE id = ?')
       .bind(input.name, input.description, input.websiteUrl, input.logoUrl, input.contactName, input.contactEmail, input.contactPhone, new Date().toISOString(), id),

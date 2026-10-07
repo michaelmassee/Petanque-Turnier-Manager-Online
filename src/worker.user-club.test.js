@@ -50,6 +50,16 @@ describe('Profil-Verein', () => {
     expect(profil()).toEqual({ club: 'Boule Club Linden', club_id: 'linden' });
   });
 
+  it('speichert Vereine mit Owner auch ohne Kontaktperson und -E-Mail, prüft sie aber, wenn angegeben', async () => {
+    const admin = { id: 'admin', role: 'admin' };
+    const put = (body) => new Request(url, { method: 'PUT', body: JSON.stringify(body) });
+    await updateClub(put({ name: 'Boule Club Linden e.V.', contactName: '', contactEmail: '' }), db, 'linden', admin);
+    expect(db.sqlite.prepare("SELECT contact_name, contact_email FROM clubs WHERE id = 'linden'").get()).toEqual({ contact_name: null, contact_email: null });
+    await updateClubAsAdmin(put({ name: 'Boule Club Linden e.V.' }), db, 'linden');
+    await expect(updateClub(put({ name: 'Boule Club Linden e.V.', contactEmail: 'keine-mail' }), db, 'linden', admin)).rejects.toMatchObject({ status: 400 });
+    await expect(updateClubAsAdmin(put({ name: 'Boule Club Linden e.V.', contactName: 'A' }), db, 'linden')).rejects.toMatchObject({ status: 400 });
+  });
+
   it('löst beim Löschen des Vereins nur die Verknüpfung, Konto und Vereinstext bleiben', async () => {
     await speichern('Boule Club Linden e.V.');
     db.sqlite.exec("DELETE FROM clubs WHERE id = 'linden'");

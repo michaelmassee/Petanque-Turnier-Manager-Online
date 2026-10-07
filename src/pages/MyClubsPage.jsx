@@ -27,8 +27,8 @@ function OrganizationFields({ form, setForm, language, create }) {
     <TextField label={t('Instagram-Link')} type="url" placeholder="https://instagram.com/…" value={form.socialLinks.instagram} onChange={(value) => setSocialLink('instagram', value)} />
     <TextField label={t('X-Link')} type="url" placeholder="https://x.com/…" value={form.socialLinks.x} onChange={(value) => setSocialLink('x', value)} />
     <TextField label={t('YouTube-Link')} type="url" placeholder="https://youtube.com/…" value={form.socialLinks.youtube} onChange={(value) => setSocialLink('youtube', value)} />
-    <TextField label={t('Kontaktperson')} value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} required minLength={2} />
-    <TextField label={t('Kontakt-E-Mail')} type="email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} required />
+    <TextField label={t('Kontaktperson')} value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} minLength={2} />
+    <TextField label={t('Kontakt-E-Mail')} type="email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} />
     <TextField label={t('Kontakt-Telefon')} value={form.contactPhone} onChange={(contactPhone) => setForm({ ...form, contactPhone })} />
     <div className="form-section">
       <div className="section-title">
