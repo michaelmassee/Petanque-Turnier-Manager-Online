@@ -3626,7 +3626,7 @@ export async function updateOwnProfile(request, env, url, userId) {
   const newPassword = body.newPassword === undefined ? '' : String(body.newPassword);
   const language = normalizeLanguage(body.language);
   const licenseNr = nullableText(body.licenseNr);
-  const club = nullableText(body.club);
+  const { club, clubId } = await resolveProfileClub(db, nullableText(body.club));
   // Ältere Clients ohne Feld lassen eine gespeicherte Nummer unverändert.
   const phone = body.phone === undefined ? existing.phone ?? null : normalizePhone(body.phone);
 
@@ -3675,16 +3675,16 @@ export async function updateOwnProfile(request, env, url, userId) {
         db
           .prepare(
             `UPDATE users
-             SET first_name = ?, last_name = ?, pending_email = ?, club = ?, license_nr = ?, phone = ?, password_salt = ?, password_hash = ?, updated_at = ?
+             SET first_name = ?, last_name = ?, pending_email = ?, club = ?, club_id = ?, license_nr = ?, phone = ?, password_salt = ?, password_hash = ?, updated_at = ?
              WHERE id = ?`,
           )
-          .bind(firstName, lastName, pendingEmail, club, licenseNr, phone, password.salt, password.hash, now, userId),
+          .bind(firstName, lastName, pendingEmail, club, clubId, licenseNr, phone, password.salt, password.hash, now, userId),
         db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(userId, currentSessionId || ''),
       ]);
     } else {
       await db
-        .prepare('UPDATE users SET first_name = ?, last_name = ?, pending_email = ?, club = ?, license_nr = ?, phone = ?, updated_at = ? WHERE id = ?')
-        .bind(firstName, lastName, pendingEmail, club, licenseNr, phone, now, userId)
+        .prepare('UPDATE users SET first_name = ?, last_name = ?, pending_email = ?, club = ?, club_id = ?, license_nr = ?, phone = ?, updated_at = ? WHERE id = ?')
+        .bind(firstName, lastName, pendingEmail, club, clubId, licenseNr, phone, now, userId)
         .run();
     }
   } catch (error) {
@@ -3701,7 +3701,7 @@ export async function updateOwnProfile(request, env, url, userId) {
 
   const updated = await db
     .prepare(
-      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, license_nr, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, club_id, license_nr, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?',
     )
     .bind(userId)
     .first();
@@ -3711,6 +3711,22 @@ export async function updateOwnProfile(request, env, url, userId) {
     response.verificationUrl = verificationUrl;
   }
   return json(response);
+}
+
+// Profil-Verein: Entspricht der Text (ohne Groß-/Kleinschreibung) einem freigegebenen Verein, wird das Profil
+// mit ihm verknüpft und der Vereinsname in dessen Schreibweise übernommen; sonst bleibt es Freitext.
+async function resolveProfileClub(db, club) {
+  if (!club) return { club: null, clubId: null };
+  const match = await db
+    .prepare("SELECT id, name FROM clubs WHERE status = 'published' AND trim(name) = ? COLLATE NOCASE ORDER BY created_at LIMIT 1")
+    .bind(club)
+    .first();
+  return match ? { club: match.name, clubId: match.id } : { club, clubId: null };
+}
+
+// Vereinsumbenennung auf verknüpfte Profile übertragen, damit überall der aktuelle Name erscheint.
+function syncLinkedUserClubName(db, clubId, name) {
+  return db.prepare('UPDATE users SET club = ? WHERE club_id = ?').bind(name, clubId);
 }
 
 // Self-Service-Kontolöschung: eigene Turniere (inkl. Anmeldungen) werden mitgelöscht,
@@ -8012,11 +8028,14 @@ async function assertClubOwner(db, clubId, user) {
   return club;
 }
 
-async function updateClub(request, db, id, user) {
+export async function updateClub(request, db, id, user) {
   const club = await assertClubEditor(db, id, user); const input = clubInput(await readJson(request)); const now = new Date().toISOString();
   // Bereits freigegebene Vereine bleiben bei Bearbeitung freigegeben, statt erneut zur Moderation zu müssen.
   const status = club.status === 'published' ? 'published' : 'pending';
-  await db.prepare('UPDATE clubs SET name = ?, kind = ?, description = ?, website_url = ?, logo_url = ?, social_links = ?, member_of = ?, contact_name = ?, contact_email = ?, contact_phone = ?, status = ?, updated_at = ? WHERE id = ?').bind(input.name, input.kind, input.description, input.websiteUrl, input.logoUrl, JSON.stringify(input.socialLinks), JSON.stringify(input.memberOf), input.contactName, input.contactEmail, input.contactPhone, status, now, id).run();
+  await db.batch([
+    db.prepare('UPDATE clubs SET name = ?, kind = ?, description = ?, website_url = ?, logo_url = ?, social_links = ?, member_of = ?, contact_name = ?, contact_email = ?, contact_phone = ?, status = ?, updated_at = ? WHERE id = ?').bind(input.name, input.kind, input.description, input.websiteUrl, input.logoUrl, JSON.stringify(input.socialLinks), JSON.stringify(input.memberOf), input.contactName, input.contactEmail, input.contactPhone, status, now, id),
+    syncLinkedUserClubName(db, id, input.name),
+  ]);
   return await getClub(db, id, user);
 }
 
@@ -8448,12 +8467,15 @@ async function updateClubStatusAsAdmin(db, id, status) {
   return json({ ok: true });
 }
 
-async function updateClubAsAdmin(request, db, id) {
+export async function updateClubAsAdmin(request, db, id) {
   const club = await db.prepare('SELECT id FROM clubs WHERE id = ?').bind(id).first();
   if (!club) throw new HttpError(404, 'Verein nicht gefunden');
   const input = clubInput(await readJson(request));
-  await db.prepare('UPDATE clubs SET name = ?, description = ?, website_url = ?, logo_url = ?, contact_name = ?, contact_email = ?, contact_phone = ?, updated_at = ? WHERE id = ?')
-    .bind(input.name, input.description, input.websiteUrl, input.logoUrl, input.contactName, input.contactEmail, input.contactPhone, new Date().toISOString(), id).run();
+  await db.batch([
+    db.prepare('UPDATE clubs SET name = ?, description = ?, website_url = ?, logo_url = ?, contact_name = ?, contact_email = ?, contact_phone = ?, updated_at = ? WHERE id = ?')
+      .bind(input.name, input.description, input.websiteUrl, input.logoUrl, input.contactName, input.contactEmail, input.contactPhone, new Date().toISOString(), id),
+    syncLinkedUserClubName(db, id, input.name),
+  ]);
   return json({ ok: true });
 }
 
@@ -9389,6 +9411,7 @@ function toPublicUser(row) {
     phone: row.phone || null,
     role: row.role,
     club: row.club || null,
+    clubId: row.club_id || null,
     licenseNr: row.license_nr || null,
     emailVerifiedAt: row.email_verified_at || null,
     passwordChangeRequired: Boolean(Number(row.password_change_required || 0)),

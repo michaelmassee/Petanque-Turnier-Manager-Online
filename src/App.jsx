@@ -2097,6 +2097,8 @@ function AppContent() {
 export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = false, onDeleteAccount, deleting = false, clubNames = [] }) {
   const { t, i18n } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
+  // Gleiche Regel wie im Worker (resolveProfileClub): Name eines freigegebenen Vereins, ohne Groß-/Kleinschreibung.
+  const clubLinked = clubNames.some((name) => name.trim().toLowerCase() === (form.club || '').trim().toLowerCase());
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const usernameLocked = Boolean(currentUser.usernameChangeAllowedAt) || !currentUser.emailVerifiedAt;
   let usernameHint = t('Du kannst deinen Benutzernamen alle 30 Tage ändern.');
@@ -2141,6 +2143,8 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = fa
           <p className="hint">{t('Optional. Nur für dich und die Administratoren sichtbar. Beim Anlegen eines Turniers wird sie als Kontakt-Telefon vorgeschlagen.')}</p>
           <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} list={clubSuggestions.listId} />
           {clubSuggestions.datalist}
+          {clubLinked && <p className="hint">{t('Dein Verein ist mit dem Vereinsverzeichnis verknüpft.')}</p>}
+          {!clubLinked && (form.club || '').trim() && clubNames.length > 0 && <p className="hint">{t('Wähle deinen Verein aus der Liste, damit er mit dem Vereinsverzeichnis verknüpft wird.')}</p>}
           <p className="hint">{t('Benutzername und Verein werden anderen Nutzern angezeigt, damit man dich auch bei gleichem Namen unterscheiden kann.')}</p>
           <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
           <TextField
