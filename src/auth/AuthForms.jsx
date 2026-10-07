@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PASSWORD_STRENGTH_HINT } from '../lib/format.js';
 import { TextField, Button } from '../components/ui.jsx';
+import { UsernameField } from '../components/UsernameField.jsx';
+import { suggestUsername } from '../lib/username.js';
 
 export function AuthShell({ title, subtitle, children, language, setLanguage }) {
   return (
@@ -85,8 +87,8 @@ export function SetupForm({ form, setForm, onSubmit, saving = false }) {
   const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
-      <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
-      <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
+      <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} maxLength={50} />
+      <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} maxLength={50} />
       <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <TextField label={t('Passwort')} type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required minLength={8} />
       <TextField label={t('Passwort bestätigen')} type="password" value={form.passwordConfirm} onChange={(passwordConfirm) => setForm({ ...form, passwordConfirm })} required minLength={8} />
@@ -121,10 +123,25 @@ export function LoginForm({ form, setForm, onSubmit, onGoogleLogin, onForgot, on
 
 export function RegisterForm({ form, setForm, onSubmit, onBack, navigate, saving = false }) {
   const { t } = useTranslation();
+  // Solange der Benutzername nicht selbst bearbeitet wurde, folgt er dem Namen (vorname.nachname).
+  const [usernameEdited, setUsernameEdited] = useState(false);
+
+  function updateName(changes) {
+    const next = { ...form, ...changes };
+    const namesComplete = next.firstName.trim().length >= 2 && next.lastName.trim().length >= 2;
+    setForm(usernameEdited ? next : { ...next, username: namesComplete ? suggestUsername(next.firstName, next.lastName) : '' });
+  }
+
   return (
     <form className="form" onSubmit={onSubmit}>
-      <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
-      <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
+      <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => updateName({ firstName })} required minLength={2} maxLength={50} />
+      <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => updateName({ lastName })} required minLength={2} maxLength={50} />
+      <UsernameField
+        value={form.username || ''}
+        onChange={(username) => { setUsernameEdited(true); setForm({ ...form, username }); }}
+        required
+        hint={t('Damit dich andere eindeutig finden – auch bei gleichem Namen. Du kannst ihn später im Profil ändern.')}
+      />
       <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <TextField label={t('Passwort')} type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} required minLength={8} />
       <p className="hint">{t(PASSWORD_STRENGTH_HINT)}</p>

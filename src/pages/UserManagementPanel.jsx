@@ -7,6 +7,8 @@ import { roleName, translatedOptions } from '../lib/domain.js';
 import { filterUsers } from '../frontend-core.js';
 import { Feedback, SelectField, TextField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
+import { UsernameField } from '../components/UsernameField.jsx';
+import { UsernameReportsPanel } from './UsernameReportsPanel.jsx';
 
 const USER_STATUS_FILTERS = [
   { value: '', label: 'Alle Status' },
@@ -20,6 +22,9 @@ function userToForm(user) {
     id: user.id,
     firstName: user.firstName,
     lastName: user.lastName,
+    username: user.username || '',
+    originalUsername: user.username || '',
+    usernameChangeReason: '',
     email: user.email,
     role: user.role,
     password: '',
@@ -96,7 +101,8 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
     event.preventDefault();
     setError(''); setMessage('');
 
-    const payload = { ...form };
+    const { originalUsername, ...payload } = form;
+    if (payload.username === originalUsername) delete payload.usernameChangeReason;
     if (mode === 'edit' && !payload.password) {
       delete payload.password;
     }
@@ -158,6 +164,8 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
           <UserStat label={t('Passwortwechsel')} value={stats.passwordChangeRequired} />
         </div>
       </div>
+
+      <UsernameReportsPanel onUsersChanged={load} />
 
       <div className="panel user-list-panel">
         <div className="section-title">
@@ -237,6 +245,7 @@ function UserRow({ user, currentUser, selected, busy, busyOther, onEdit, onDelet
     <article className={`data-row user-row ${selected ? 'selected' : ''}`}>
       <div>
         <strong data-i18n-skip>{user.firstName} {user.lastName}</strong>
+        {user.username && <span className="user-handle" data-i18n-skip>@{user.username}{user.club ? ` · ${user.club}` : ''}</span>}
         <span>{user.email}</span>
       </div>
       <div className="badges">
@@ -268,8 +277,20 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwo
   const { t } = useTranslation();
   return (
     <form className="form" onSubmit={onSubmit}>
-      <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
-      <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
+      <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} maxLength={50} />
+      <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} maxLength={50} />
+      <UsernameField
+        value={form.username}
+        onChange={(username) => setForm({ ...form, username })}
+        currentUsername={form.originalUsername || null}
+        hint={form.originalUsername ? '' : t('Leer lassen, um ihn aus dem Namen zu erzeugen.')}
+      />
+      {form.originalUsername && form.username !== form.originalUsername && (
+        <>
+          <TextField label={t('Grund der Änderung (optional)')} value={form.usernameChangeReason} onChange={(usernameChangeReason) => setForm({ ...form, usernameChangeReason })} maxLength={200} />
+          <p className="hint">{t('Der Nutzer wird benachrichtigt. Der bisherige Name @{{username}} wird gesperrt und kann nicht erneut vergeben werden.', { username: form.originalUsername })}</p>
+        </>
+      )}
       <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
       <SelectField label={t('Rolle')} value={form.role} onChange={(role) => setForm({ ...form, role })} options={translatedOptions(ROLES)} />
       <label className="checkbox-row">

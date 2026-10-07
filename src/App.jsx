@@ -13,6 +13,8 @@ import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLAT
 import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm, clubMatchesTournament } from './lib/domain.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
+import { UsernameField } from './components/UsernameField.jsx';
+import { UsernameConfirmNotice } from './components/UsernameConfirmNotice.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
 import { InfiniteListLoadMore } from './components/InfiniteListLoadMore.jsx';
 import { AppHeader, PostboxControl, PushMigrationNotice, SearchMenuControl, SavedSearchesControl, AuthModal, StandalonePageHeader, InstallAppButton } from './components/layout.jsx';
@@ -526,6 +528,11 @@ function AppContent() {
     }
   }
 
+  async function lookupPostboxRecipientByEmail(email) {
+    const data = await authenticatedApi(`/api/postbox/recipients/lookup?email=${encodeURIComponent(email)}`);
+    return data.recipient || null;
+  }
+
   async function loadSavedSearches(silent = false) {
     try {
       const data = await queryClient.fetchQuery({
@@ -895,6 +902,7 @@ function AppContent() {
         body: JSON.stringify({
           firstName: profileForm.firstName,
           lastName: profileForm.lastName,
+          username: profileForm.username,
           email: profileForm.email,
           club: profileForm.club,
           licenseNr: profileForm.licenseNr,
@@ -907,6 +915,7 @@ function AppContent() {
       setProfileForm({
         firstName: data.user.firstName,
         lastName: data.user.lastName,
+        username: data.user.username || '',
         email: data.user.pendingEmail || data.user.email,
         club: data.user.club || '',
         licenseNr: data.user.licenseNr || '',
@@ -1174,6 +1183,7 @@ function AppContent() {
     setProfileForm({
       firstName: currentUser.firstName,
       lastName: currentUser.lastName,
+      username: currentUser.username || '',
       email: currentUser.pendingEmail || currentUser.email,
       club: currentUser.club || '',
       licenseNr: currentUser.licenseNr || '',
@@ -1219,6 +1229,7 @@ function AppContent() {
       onRead={handleReadPostboxMessage}
       onSubmit={handleSendPostboxMessage}
       onTodoClick={handlePostboxTodoClick}
+      onLookupRecipientEmail={lookupPostboxRecipientByEmail}
     />;
   }
 
@@ -1881,6 +1892,14 @@ function AppContent() {
         </form>
       </EditDialog>
 
+      {currentUser?.username && !currentUser.usernameConfirmed && (
+        <UsernameConfirmNotice
+          username={currentUser.username}
+          onConfirmed={() => setCurrentUser((user) => ({ ...user, usernameConfirmed: true }))}
+          onChange={openProfileFromDrawer}
+        />
+      )}
+
       {currentUser && !pushMigrationDismissed && (
         <PushMigrationNotice
           language={language}
@@ -2064,8 +2083,14 @@ function AppContent() {
 }
 
 export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = false, onDeleteAccount, deleting = false }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const usernameLocked = Boolean(currentUser.usernameChangeAllowedAt) || !currentUser.emailVerifiedAt;
+  let usernameHint = t('Du kannst deinen Benutzernamen alle 30 Tage ändern.');
+  if (!currentUser.emailVerifiedAt) usernameHint = t('Der Benutzername kann erst nach Bestätigung der E-Mail-Adresse geändert werden');
+  else if (currentUser.usernameChangeAllowedAt) {
+    usernameHint = t('Nächste Änderung möglich ab {{date}}.', { date: formatDate(currentUser.usernameChangeAllowedAt.slice(0, 10), i18n.language) });
+  }
   return (
     <>
       <div className="panel">
@@ -2079,10 +2104,19 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = fa
           </p>
         )}
         <form className="form" onSubmit={onSubmit}>
-          <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} />
-          <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} />
+          <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} maxLength={50} />
+          <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} maxLength={50} />
+          <UsernameField
+            value={form.username}
+            onChange={(username) => setForm({ ...form, username })}
+            currentUsername={currentUser.username}
+            disabled={usernameLocked}
+            required={Boolean(currentUser.username)}
+            hint={usernameHint}
+          />
           <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
           <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
+          <p className="hint">{t('Benutzername und Verein werden anderen Nutzern angezeigt, damit man dich auch bei gleichem Namen unterscheiden kann.')}</p>
           <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
           <TextField
             label={t('Aktuelles Passwort')}

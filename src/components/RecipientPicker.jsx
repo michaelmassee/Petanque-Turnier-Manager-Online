@@ -3,13 +3,33 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { RequiredMark } from './ui.jsx';
 import { formatDate } from '../lib/format.js';
+import { formatUserMeta, formatUserName } from '../lib/userLabel.js';
 import {
   loadFavoriteRecipientIds,
   toggleFavoriteRecipientId,
   loadRecentRecipientValues,
 } from '../lib/postboxRecipientStorage.js';
 
-export function RecipientPicker({ label, recipients, recipientTournaments = [], value, onChange, currentUserId, required }) {
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Stabiler Default: ein neues [] pro Render würde die Einträge neu berechnen und die Auswahl zurücksetzen.
+const NO_TOURNAMENTS = [];
+
+function recipientEntry(recipient) {
+  const name = formatUserName(recipient);
+  const meta = formatUserMeta(recipient);
+  return {
+    kind: 'recipient',
+    id: recipient.id,
+    value: recipient.id,
+    label: name,
+    meta,
+    searchText: `${name} ${meta} ${recipient.username || ''}`.toLowerCase(),
+    selectedLabel: recipient.username ? `${name} (@${recipient.username})` : name,
+  };
+}
+
+// onLookupEmail(email) → Empfänger oder null: findet Nutzer über die exakte E-Mail, ohne sie anzuzeigen.
+export function RecipientPicker({ label, recipients, recipientTournaments = NO_TOURNAMENTS, value, onChange, currentUserId, required, onLookupEmail }) {
   const { t, i18n } = useTranslation();
   const listboxId = useId();
   const [open, setOpen] = useState(false);
@@ -23,6 +43,8 @@ export function RecipientPicker({ label, recipients, recipientTournaments = [], 
   const menuRef = useRef(null);
   const inputRef = useRef(null);
   const userEditedRef = useRef(false);
+  const [emailMatches, setEmailMatches] = useState([]);
+  const [emailLookupPending, setEmailLookupPending] = useState(false);
 
   const entries = useMemo(() => {
     const tournamentEntries = recipientTournaments.map((tournament) => ({
@@ -33,15 +55,31 @@ export function RecipientPicker({ label, recipients, recipientTournaments = [], 
       // Kurzform fürs Eingabefeld nach der Auswahl, damit es am Handy nicht abgeschnitten wird.
       selectedLabel: `${tournament.name} · ${formatDate(tournament.date, i18n.language)}`,
     }));
-    const recipientEntries = recipients.map((recipient) => ({
-      kind: 'recipient',
-      id: recipient.id,
-      value: recipient.id,
-      label: `${recipient.firstName} ${recipient.lastName}`,
-      selectedLabel: `${recipient.firstName} ${recipient.lastName}`,
-    }));
+    const knownIds = new Set(recipients.map((recipient) => recipient.id));
+    const recipientEntries = [...recipients, ...emailMatches.filter((recipient) => !knownIds.has(recipient.id))].map(recipientEntry);
     return [...tournamentEntries, ...recipientEntries];
-  }, [recipients, recipientTournaments, t, i18n.language]);
+  }, [recipients, emailMatches, recipientTournaments, t, i18n.language]);
+
+  const trimmedQuery = query.trim().toLowerCase();
+  const queryIsEmail = Boolean(onLookupEmail) && EMAIL_PATTERN.test(trimmedQuery);
+  useEffect(() => {
+    if (!queryIsEmail) return undefined;
+    let cancelled = false;
+    setEmailLookupPending(true);
+    const timer = setTimeout(async () => {
+      try {
+        const recipient = await onLookupEmail(trimmedQuery);
+        if (!cancelled && recipient) {
+          setEmailMatches((current) => [...current.filter((entry) => entry.id !== recipient.id), { ...recipient, matchedEmail: trimmedQuery }]);
+        }
+      } catch {
+        // Kein Treffer oder Fehler: Die Liste bleibt leer, die E-Mail wird nicht weiter verraten.
+      } finally {
+        if (!cancelled) setEmailLookupPending(false);
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [queryIsEmail, trimmedQuery, onLookupEmail]);
 
   const entryByValue = useMemo(() => {
     const map = new Map();
@@ -100,7 +138,8 @@ export function RecipientPicker({ label, recipients, recipientTournaments = [], 
   const visibleSections = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
     if (trimmed) {
-      const filtered = entries.filter((entry) => entry.label.toLowerCase().includes(trimmed));
+      const byEmail = new Set(emailMatches.filter((recipient) => recipient.matchedEmail === trimmed).map((recipient) => recipient.id));
+      const filtered = entries.filter((entry) => byEmail.has(entry.id) || (entry.searchText || entry.label.toLowerCase()).includes(trimmed));
       return [{ heading: t('searchResults'), items: filtered }];
     }
     const recipientEntries = entries.filter((entry) => entry.kind === 'recipient');
@@ -118,7 +157,7 @@ export function RecipientPicker({ label, recipients, recipientTournaments = [], 
     if (tournamentEntries.length) sections.push({ heading: t('allTournamentsSection'), items: tournamentEntries });
     sections.push({ heading: t('allRecipientsSection'), items: rest });
     return sections;
-  }, [entries, query, favoriteIds, recentValues, entryByValue, t]);
+  }, [entries, emailMatches, query, favoriteIds, recentValues, entryByValue, t]);
 
   const flatItems = useMemo(() => visibleSections.flatMap((section) => section.items), [visibleSections]);
 
@@ -202,7 +241,12 @@ export function RecipientPicker({ label, recipients, recipientTournaments = [], 
           className="recipient-picker-results"
           style={{ position: 'fixed', top: menuRect.top, left: menuRect.left, width: menuRect.width }}
         >
-          {flatItems.length === 0 && <li className="recipient-picker-empty muted">{t('noRecipientsFound')}</li>}
+          {flatItems.length === 0 && (
+            <li className="recipient-picker-empty muted">
+              {queryIsEmail && emailLookupPending ? t('searchingByEmail') : t('noRecipientsFound')}
+              {!queryIsEmail && onLookupEmail ? <span className="recipient-picker-hint">{t('recipientEmailSearchHint')}</span> : null}
+            </li>
+          )}
           {visibleSections.map((section) => (
             section.items.length === 0 ? null : (
               <li key={section.heading} className="recipient-picker-group">
@@ -220,7 +264,8 @@ export function RecipientPicker({ label, recipients, recipientTournaments = [], 
                           onMouseEnter={() => setActiveIndex(index)}
                           onClick={() => handleSelect(entry)}
                         >
-                          {entry.label}
+                          <span className="recipient-picker-label">{entry.label}</span>
+                          {entry.meta ? <small className="recipient-picker-meta">{entry.meta}</small> : null}
                         </button>
                         {entry.kind === 'recipient' && (
                           <button

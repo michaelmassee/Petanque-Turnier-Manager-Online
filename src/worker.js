@@ -38,6 +38,7 @@ import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schw
 import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
 import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
+import { normalizeUsername, usernameCandidates, usernameProblem, USERNAME_CHANGE_INTERVAL_DAYS, withUsernameSuffix } from './lib/username.js';
 import { parseRichText, richTextPlainText } from './lib/rich-text.js';
 import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
 import { formatLocationAddress, geocodingFallbackQuery } from './location-format.js';
@@ -47,6 +48,7 @@ import {
 } from './registration-core.js';
 
 const ROLES = ['admin', 'user'];
+const USER_NAME_MAX_LENGTH = 50;
 const DEFAULT_TOURNAMENT_LIMIT = 5;
 const TOURNAMENT_TYPES = [
   'formule_x',
@@ -470,6 +472,8 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     slotLinked: (name) => `${name}: Du wurdest für dieses Turnier eingetragen. Falls du das nicht bist, wähle in der Live-Ansicht „Das bin ich nicht“.`,
     accountConflict: (name) => `${name}: Du stehst in mehreren Anmeldungen. Die Turnierleitung klärt das; bitte melde dich bei ihr.`,
     adminAction: (name, action) => `${name}: ${({ binding_takeover: 'Dokumentbindung übernommen', binding_release: 'Dokumentbindung gelöst', running_reset: 'Turnierstart zurückgesetzt', tournament_deleted: 'Turnier gelöscht' })[action] || action}`,
+    usernameChangedByAdmin: (username) => `Ein Admin hat deinen Benutzernamen in @${username} geändert.`,
+    usernameReported: (username) => `Benutzername @${username} wurde gemeldet`,
   },
   nl: {
     tournamentStatus: { draft: 'Concept', registration: 'Inschrijving open', running: 'Bezig', finished: 'Afgerond' },
@@ -486,6 +490,8 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     slotLinked: (name) => `${name}: je bent voor dit toernooi ingeschreven. Ben jij dit niet, kies dan in de live-weergave „Dit ben ik niet”.`,
     accountConflict: (name) => `${name}: je staat in meerdere inschrijvingen. De wedstrijdleiding lost dit op; neem contact met haar op.`,
     adminAction: (name, action) => `${name}: ${({ binding_takeover: 'documentkoppeling overgenomen', binding_release: 'documentkoppeling verbroken', running_reset: 'toernooistart teruggezet', tournament_deleted: 'toernooi verwijderd' })[action] || action}`,
+    usernameChangedByAdmin: (username) => `Een beheerder heeft je gebruikersnaam gewijzigd in @${username}.`,
+    usernameReported: (username) => `Gebruikersnaam @${username} is gemeld`,
   },
   en: {
     tournamentStatus: { draft: 'Draft', registration: 'Registration open', running: 'Running', finished: 'Finished' },
@@ -502,6 +508,8 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     slotLinked: (name) => `${name}: you have been entered for this tournament. If this is not you, choose “This is not me” in the live view.`,
     accountConflict: (name) => `${name}: you appear in several registrations. The organizers will resolve this; please contact them.`,
     adminAction: (name, action) => `${name}: ${({ binding_takeover: 'document binding taken over', binding_release: 'document binding released', running_reset: 'tournament start reset', tournament_deleted: 'tournament deleted' })[action] || action}`,
+    usernameChangedByAdmin: (username) => `An admin changed your username to @${username}.`,
+    usernameReported: (username) => `Username @${username} was reported`,
   },
   es: {
     tournamentStatus: { draft: 'Borrador', registration: 'Inscripción abierta', running: 'En curso', finished: 'Finalizado' },
@@ -518,6 +526,8 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     slotLinked: (name) => `${name}: te han inscrito en este torneo. Si no eres tú, elige «No soy yo» en la vista en directo.`,
     accountConflict: (name) => `${name}: figuras en varias inscripciones. La organización lo resolverá; ponte en contacto con ella.`,
     adminAction: (name, action) => `${name}: ${({ binding_takeover: 'vinculación del documento asumida', binding_release: 'vinculación del documento eliminada', running_reset: 'inicio del torneo revertido', tournament_deleted: 'torneo eliminado' })[action] || action}`,
+    usernameChangedByAdmin: (username) => `Un administrador ha cambiado tu nombre de usuario a @${username}.`,
+    usernameReported: (username) => `Se ha denunciado el nombre de usuario @${username}`,
   },
   fr: {
     tournamentStatus: { draft: 'Brouillon', registration: 'Inscriptions ouvertes', running: 'En cours', finished: 'Terminé' },
@@ -534,6 +544,8 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     slotLinked: (name) => `${name} : vous avez été inscrit à ce tournoi. Si ce n’est pas vous, choisissez « Ce n’est pas moi » dans la vue en direct.`,
     accountConflict: (name) => `${name} : vous figurez dans plusieurs inscriptions. L’organisation va régler cela ; veuillez la contacter.`,
     adminAction: (name, action) => `${name} : ${({ binding_takeover: 'liaison du document reprise', binding_release: 'liaison du document supprimée', running_reset: 'démarrage du tournoi annulé', tournament_deleted: 'tournoi supprimé' })[action] || action}`,
+    usernameChangedByAdmin: (username) => `Un administrateur a changé ton nom d’utilisateur en @${username}.`,
+    usernameReported: (username) => `Le nom d’utilisateur @${username} a été signalé`,
   },
 };
 
@@ -566,6 +578,8 @@ function buildSystemNotificationPushBody(eventType, eventData, language) {
   if (eventType === REGISTRATION_SLOT_LINKED_EVENT) return texts.slotLinked(data.tournamentName || '');
   if (eventType === REGISTRATION_ACCOUNT_CONFLICT_EVENT) return texts.accountConflict(data.tournamentName || '');
   if (eventType === TOURNAMENT_ADMIN_ACTION_EVENT) return texts.adminAction(data.tournamentName || '', data.action);
+  if (eventType === 'username_changed_by_admin') return texts.usernameChangedByAdmin(data.newUsername || '');
+  if (eventType === 'username_reported') return texts.usernameReported(data.username || '');
   return null;
 }
 
@@ -1244,6 +1258,10 @@ export default {
         return await registerUser(request, env, url);
       }
 
+      if (request.method === 'GET' && url.pathname === '/api/username-available') {
+        return await checkUsernameAvailability(env.DB, url);
+      }
+
       if (request.method === 'POST' && url.pathname === '/api/email/verify') {
         return await verifyEmail(request, env.DB, env);
       }
@@ -1274,6 +1292,11 @@ export default {
         return await updateOwnProfile(request, env, url, session.user.id);
       }
 
+      if (request.method === 'POST' && url.pathname === '/api/me/username/confirm') {
+        const session = await requireSession(request, env.DB);
+        return await confirmOwnUsername(env.DB, session.user.id);
+      }
+
       if (request.method === 'DELETE' && url.pathname === '/api/me') {
         const session = await requireSession(request, env.DB);
         return await deleteOwnAccount(request, env.DB, url, session.user.id);
@@ -1287,6 +1310,11 @@ export default {
       if (request.method === 'GET' && url.pathname === '/api/postbox/recipients') {
         const session = await requireSession(request, env.DB);
         return await listPostboxRecipients(env.DB, session.user.id);
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/postbox/recipients/lookup') {
+        const session = await requireSession(request, env.DB);
+        return await lookupPostboxRecipientByEmail(env.DB, session.user.id, url.searchParams.get('email'));
       }
 
       if (request.method === 'POST' && url.pathname === '/api/postbox/messages') {
@@ -1346,6 +1374,23 @@ export default {
         if (request.method === 'POST') {
           return await createUser(request, env.DB);
         }
+      }
+
+      const usernameReportMatch = url.pathname.match(/^\/api\/users\/([^/]+)\/username-report$/);
+      if (usernameReportMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        return await reportUsername(request, env, usernameReportMatch[1], session.user.id);
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/admin/username-reports') {
+        await requireAdmin(request, env.DB);
+        return await listUsernameReports(env.DB);
+      }
+
+      const usernameReportResolveMatch = url.pathname.match(/^\/api\/admin\/username-reports\/([^/]+)\/resolve$/);
+      if (usernameReportResolveMatch && request.method === 'POST') {
+        const session = await requireAdmin(request, env.DB);
+        return await resolveUsernameReport(request, env, usernameReportResolveMatch[1], session.user.id);
       }
 
       const userMatch = url.pathname.match(/^\/api\/users\/([^/]+)$/);
@@ -2288,18 +2333,17 @@ async function setupAdmin(request, db, url) {
   const password = await hashPassword(user.password);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
-
-  await db
+  const username = await saveAccountWithUsername(db, { chosen: user.username, firstName: user.firstName, lastName: user.lastName }, (candidate) => db
     .prepare(
-      `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'admin', ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, first_name, last_name, username, email, role, password_salt, password_hash, email_verified_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'admin', ?, ?, ?, ?, ?)`,
     )
-    .bind(id, user.firstName, user.lastName, user.email, password.salt, password.hash, now, now, now)
-    .run();
+    .bind(id, user.firstName, user.lastName, candidate, user.email, password.salt, password.hash, now, now, now)
+    .run());
 
   const session = await createSession(db, id);
   return json(
-    { user: toPublicUser({ id, first_name: user.firstName, last_name: user.lastName, email: user.email, role: 'admin', email_verified_at: now, created_at: now, updated_at: now }) },
+    { user: toPublicUser({ id, first_name: user.firstName, last_name: user.lastName, username, email: user.email, role: 'admin', email_verified_at: now, created_at: now, updated_at: now }) },
     201,
     { 'Set-Cookie': sessionCookie(session.id, session.expiresAt, url) },
   );
@@ -2515,7 +2559,7 @@ async function fetchGoogleProfile(accessToken) {
   };
 }
 
-async function findOrCreateOAuthUser(db, provider, profile, env = { DB: db }) {
+export async function findOrCreateOAuthUser(db, provider, profile, env = { DB: db }) {
   const linked = await db
     .prepare(
       `SELECT users.*
@@ -2555,22 +2599,26 @@ async function findOrCreateOAuthUser(db, provider, profile, env = { DB: db }) {
   const password = await hashPassword(crypto.randomUUID() + crypto.randomUUID());
   const userId = crypto.randomUUID();
   const userFullName = profile.name.length >= 2 ? profile.name : profile.email;
-  const { firstName: userFirstName, lastName: userLastName } = splitFullName(userFullName);
-
-  await db.batch([
+  const splitName = splitFullName(userFullName);
+  const userFirstName = splitName.firstName.slice(0, USER_NAME_MAX_LENGTH);
+  const userLastName = splitName.lastName.slice(0, USER_NAME_MAX_LENGTH);
+  // Automatisch vergeben, der Nutzer bestätigt oder ändert ihn danach (Hinweis-Banner).
+  const username = await saveAccountWithUsername(db, { firstName: userFirstName, lastName: userLastName }, (candidate) => db.batch([
     db
       .prepare(
-        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'user', ?, ?, ?, 0, ?, 0, ?, ?)`,
+        `INSERT INTO users (id, first_name, last_name, username, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'user', ?, ?, ?, 0, ?, 0, ?, ?)`,
       )
-      .bind(userId, userFirstName, userLastName, profile.email, password.salt, password.hash, now, DEFAULT_TOURNAMENT_LIMIT, now, now),
+      .bind(userId, userFirstName, userLastName, candidate, profile.email, password.salt, password.hash, now, DEFAULT_TOURNAMENT_LIMIT, now, now),
     oauthAccountInsert(db, userId, provider, profile, now),
-  ]);
+  ]));
   await linkUnlinkedRegistrationsForUser(db, userId, profile.email, env);
 
   return {
     id: userId,
-    name: userName,
+    first_name: userFirstName,
+    last_name: userLastName,
+    username,
     email: profile.email,
     role: 'user',
     email_verified_at: now,
@@ -2590,7 +2638,7 @@ function oauthAccountInsert(db, userId, provider, profile, now) {
     .bind(crypto.randomUUID(), userId, provider, profile.providerUserId, profile.email, now, now);
 }
 
-async function registerUser(request, env, url) {
+export async function registerUser(request, env, url) {
   const db = env.DB;
   const body = await readJson(request);
   // Automated submissions that populate the hidden website field receive the normal
@@ -2600,23 +2648,22 @@ async function registerUser(request, env, url) {
   }
   const user = normalizeUserInput({ ...body, role: 'user' }, { requirePassword: true });
   const language = normalizeLanguage(body.language);
-  const password = await hashPassword(user.password);
   const now = new Date().toISOString();
+  // Ältere Clients ohne Benutzernamen-Feld erhalten einen Vorschlag, den sie später bestätigen.
+  const usernameConfirmedAt = user.username ? now : null;
+  const password = await hashPassword(user.password);
   const id = crypto.randomUUID();
 
   try {
-    await db
+    await saveAccountWithUsername(db, { chosen: user.username, firstName: user.firstName, lastName: user.lastName }, (candidate) => db
       .prepare(
-        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, language, mail_enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'user', ?, ?, NULL, ?, 0, ?, ?)`,
+        `INSERT INTO users (id, first_name, last_name, username, username_confirmed_at, email, role, password_salt, password_hash, email_verified_at, language, mail_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'user', ?, ?, NULL, ?, 0, ?, ?)`,
       )
-      .bind(id, user.firstName, user.lastName, user.email, password.salt, password.hash, language, now, now)
-      .run();
+      .bind(id, user.firstName, user.lastName, candidate, usernameConfirmedAt, user.email, password.salt, password.hash, language, now, now)
+      .run());
   } catch (error) {
-    if (String(error.message || '').includes('UNIQUE')) {
-      throw new HttpError(409, 'E-Mail-Adresse bereits vergeben');
-    }
-    throw error;
+    throw accountConflictError(error) || error;
   }
 
   await linkUnlinkedRegistrationsForUser(db, id, user.email);
@@ -2867,7 +2914,7 @@ async function resetPassword(request, db) {
 async function listUsers(db) {
   const result = await db
     .prepare(
-      'SELECT id, first_name, last_name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, role, club, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
     )
     .all();
   return json({ users: result.results.map(toPublicUser) });
@@ -2875,7 +2922,7 @@ async function listUsers(db) {
 
 export async function listPostboxRecipients(db, userId) {
   const result = await db.prepare(
-    "SELECT id, first_name, last_name, role FROM users WHERE id != ? AND id != ? AND role = 'user' ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE",
+    "SELECT id, first_name, last_name, username, club, role FROM users WHERE id != ? AND id != ? AND role = 'user' ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE",
   ).bind(userId, TOURNAMENT_REPORT_SYSTEM_USER_ID).all();
   const tournaments = await db.prepare(
     `SELECT t.id, t.name, t.date, COUNT(r.id) AS registration_count
@@ -2886,7 +2933,7 @@ export async function listPostboxRecipients(db, userId) {
      ORDER BY t.name COLLATE NOCASE`,
   ).bind(userId).all();
   return json({
-    recipients: result.results.map((user) => ({ id: user.id, firstName: user.first_name, lastName: user.last_name, role: user.role })),
+    recipients: result.results.map(toPostboxRecipient),
     tournaments: tournaments.results.map((tournament) => ({
       id: tournament.id,
       name: tournament.name,
@@ -2894,6 +2941,98 @@ export async function listPostboxRecipients(db, userId) {
       registrationCount: Number(tournament.registration_count),
     })),
   });
+}
+
+function toPostboxRecipient(user) {
+  return { id: user.id, firstName: user.first_name, lastName: user.last_name, username: user.username || null, club: user.club || null, role: user.role };
+}
+
+// Exakte E-Mail findet einen Empfänger, ohne dass die Adresse zurückgegeben wird.
+export async function lookupPostboxRecipientByEmail(db, userId, email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!isEmail(normalized)) throw new HttpError(400, 'Eine gültige E-Mail ist erforderlich');
+  const user = await db
+    .prepare("SELECT id, first_name, last_name, username, club, role FROM users WHERE email = ? AND id != ? AND id != ? AND role = 'user'")
+    .bind(normalized, userId, TOURNAMENT_REPORT_SYSTEM_USER_ID)
+    .first();
+  if (!user) throw new HttpError(404, 'Kein Benutzer mit dieser E-Mail-Adresse gefunden');
+  return json({ recipient: toPostboxRecipient(user) });
+}
+
+const USERNAME_REPORTS_PER_DAY = 10;
+
+export async function reportUsername(request, env, reportedUserId, reporterId) {
+  const db = env.DB;
+  const body = await readJson(request);
+  const reason = nullableText(body.reason)?.slice(0, 500) || null;
+  if (reportedUserId === reporterId) throw new HttpError(400, 'Du kannst dich nicht selbst melden');
+  const reported = await db.prepare('SELECT id, username FROM users WHERE id = ?').bind(reportedUserId).first();
+  if (!reported?.username) throw new HttpError(404, 'Benutzer nicht gefunden');
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const recent = await db.prepare('SELECT COUNT(*) AS count FROM username_reports WHERE reporter_id = ? AND created_at > ?').bind(reporterId, since).first();
+  if (Number(recent?.count || 0) >= USERNAME_REPORTS_PER_DAY) throw new HttpError(429, 'Zu viele Meldungen. Bitte versuche es morgen erneut.');
+
+  try {
+    await db
+      .prepare('INSERT INTO username_reports (id, reported_user_id, reporter_id, reported_username, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), reported.id, reporterId, reported.username, reason, new Date().toISOString())
+      .run();
+  } catch (error) {
+    if (String(error.message || '').includes('UNIQUE')) throw new HttpError(409, 'Du hast diesen Benutzernamen bereits gemeldet');
+    throw error;
+  }
+
+  const { results: admins } = await db.prepare("SELECT id FROM users WHERE role = 'admin'").all();
+  for (const admin of admins) {
+    await createSystemNotification(env, admin.id, USERNAME_REPORTED_EVENT, { username: reported.username });
+  }
+  return json({ ok: true }, 201);
+}
+
+export async function listUsernameReports(db) {
+  const { results } = await db.prepare(
+    `SELECT r.id, r.reported_user_id, r.reported_username, r.reason, r.created_at,
+            u.first_name, u.last_name, u.username, u.club,
+            rep.first_name AS reporter_first_name, rep.last_name AS reporter_last_name, rep.username AS reporter_username
+     FROM username_reports r
+     JOIN users u ON u.id = r.reported_user_id
+     LEFT JOIN users rep ON rep.id = r.reporter_id
+     WHERE r.status = 'open'
+     ORDER BY r.created_at`,
+  ).all();
+  return json({
+    reports: results.map((row) => ({
+      id: row.id,
+      reportedUser: { id: row.reported_user_id, firstName: row.first_name, lastName: row.last_name, username: row.username, club: row.club || null },
+      reportedUsername: row.reported_username,
+      reporter: row.reporter_username
+        ? { firstName: row.reporter_first_name, lastName: row.reporter_last_name, username: row.reporter_username }
+        : null,
+      reason: row.reason || null,
+      createdAt: row.created_at,
+    })),
+  });
+}
+
+export async function resolveUsernameReport(request, env, reportId, adminId) {
+  const db = env.DB;
+  const body = await readJson(request);
+  const report = await db.prepare("SELECT id, reported_user_id FROM username_reports WHERE id = ? AND status = 'open'").bind(reportId).first();
+  if (!report) throw new HttpError(404, 'Meldung nicht gefunden');
+
+  if (body.action === 'dismiss') {
+    await db.prepare("UPDATE username_reports SET status = 'dismissed', resolved_by = ?, resolved_at = ? WHERE id = ?")
+      .bind(adminId, new Date().toISOString(), reportId).run();
+    return json({ ok: true });
+  }
+  if (body.action !== 'rename') throw new HttpError(400, 'Ungültige Aktion');
+
+  const user = await db.prepare('SELECT id, username FROM users WHERE id = ?').bind(report.reported_user_id).first();
+  if (!user) throw new HttpError(404, 'Benutzer nicht gefunden');
+  const newUsername = await assertUsernameAllowed(db, body.newUsername, { userId: user.id });
+  if (newUsername === user.username) throw new HttpError(400, 'Bitte einen neuen Benutzernamen angeben');
+  await renameUsernameByAdmin(env, user, newUsername, nullableText(body.reason), adminId);
+  return json({ ok: true });
 }
 
 const POSTBOX_MESSAGE_MAX_LENGTH = 500;
@@ -2909,7 +3048,7 @@ const PARTICIPANT_TOURNAMENTS_SUBQUERY = `SELECT DISTINCT reg.tournament_id FROM
 
 async function getPostbox(db, user) {
   const result = await db.prepare(
-    `SELECT m.*, s.first_name AS sender_first_name, s.last_name AS sender_last_name, r.first_name AS recipient_first_name, r.last_name AS recipient_last_name, t.name AS broadcast_tournament_name
+    `SELECT m.*, s.first_name AS sender_first_name, s.last_name AS sender_last_name, s.username AS sender_username, r.first_name AS recipient_first_name, r.last_name AS recipient_last_name, r.username AS recipient_username, t.name AS broadcast_tournament_name
      FROM postbox_messages m
      LEFT JOIN users s ON s.id = m.sender_id
      LEFT JOIN users r ON r.id = m.recipient_id
@@ -3322,20 +3461,17 @@ async function createUser(request, db) {
   const passwordChangeRequired = body.passwordChangeRequired === true ? 1 : 0;
   const tournamentLimit = resolveTournamentLimit(body, DEFAULT_TOURNAMENT_LIMIT);
   const mailEnabled = body.mailEnabled === true ? 1 : 0;
-
+  let username;
   try {
-    await db
+    username = await saveAccountWithUsername(db, { chosen: user.username, firstName: user.firstName, lastName: user.lastName }, (candidate) => db
       .prepare(
-        `INSERT INTO users (id, first_name, last_name, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, first_name, last_name, username, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, user.firstName, user.lastName, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, now)
-      .run();
+      .bind(id, user.firstName, user.lastName, candidate, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, now)
+      .run());
   } catch (error) {
-    if (String(error.message || '').includes('UNIQUE')) {
-      throw new HttpError(409, 'E-Mail-Adresse bereits vergeben');
-    }
-    throw error;
+    throw accountConflictError(error) || error;
   }
 
   await linkUnlinkedRegistrationsForUser(db, id, user.email);
@@ -3346,6 +3482,7 @@ async function createUser(request, db) {
         id,
         first_name: user.firstName,
         last_name: user.lastName,
+        username,
         email: user.email,
         role: user.role,
         email_verified_at: emailVerifiedAt,
@@ -3381,6 +3518,9 @@ export async function updateUser(request, env, id, currentUserId) {
   if (id === currentUserId && user.role !== 'admin') {
     throw new HttpError(400, 'Du kannst deine eigene Admin-Rolle nicht entfernen');
   }
+  const newUsername = user.username && user.username !== existing.username
+    ? await assertUsernameAllowed(db, user.username, { userId: id })
+    : null;
 
   try {
     if (user.password) {
@@ -3402,15 +3542,15 @@ export async function updateUser(request, env, id, currentUserId) {
         .run();
     }
   } catch (error) {
-    if (String(error.message || '').includes('UNIQUE')) {
-      throw new HttpError(409, 'E-Mail-Adresse bereits vergeben');
-    }
-    throw error;
+    throw accountConflictError(error) || error;
+  }
+  if (newUsername) {
+    await renameUsernameByAdmin(env, existing, newUsername, nullableText(body.usernameChangeReason), currentUserId);
   }
 
   const updated = await db
     .prepare(
-      'SELECT id, first_name, last_name, email, pending_email, role, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, role, club, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users WHERE id = ?',
     )
     .bind(id)
     .first();
@@ -3423,7 +3563,51 @@ export async function updateUser(request, env, id, currentUserId) {
   return json({ user: toPublicUser(updated) });
 }
 
-async function updateOwnProfile(request, env, url, userId) {
+const USERNAME_CHANGED_BY_ADMIN_EVENT = 'username_changed_by_admin';
+const USERNAME_REPORTED_EVENT = 'username_reported';
+
+// Admin-Umbenennung: Der alte Name wird gesperrt, offene Meldungen gelten als erledigt, der Nutzer wird informiert
+// und soll den neuen Namen bestätigen. Die 30-Tage-Frist des Nutzers bleibt unberührt.
+async function renameUsernameByAdmin(env, user, newUsername, reason, adminId) {
+  const db = env.DB;
+  const now = new Date().toISOString();
+  const statements = [
+    db.prepare('UPDATE users SET username = ?, username_confirmed_at = NULL, updated_at = ? WHERE id = ?').bind(newUsername, now, user.id),
+    db.prepare("UPDATE username_reports SET status = 'resolved', resolved_by = ?, resolved_at = ? WHERE reported_user_id = ? AND status = 'open'")
+      .bind(adminId, now, user.id),
+  ];
+  if (user.username) {
+    statements.push(db.prepare('INSERT OR IGNORE INTO blocked_usernames (username, reason, created_by, created_at) VALUES (?, ?, ?, ?)')
+      .bind(user.username, reason, adminId, now));
+  }
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    throw accountConflictError(error) || error;
+  }
+  await createSystemNotification(env, user.id, USERNAME_CHANGED_BY_ADMIN_EVENT, { oldUsername: user.username || null, newUsername, reason });
+}
+
+async function resolveOwnUsernameChange(db, existing, value) {
+  if (value === undefined || value === null || value === '') return null;
+  const username = normalizeUsername(value);
+  if (username === existing.username) return null;
+  if (!existing.email_verified_at) {
+    throw new HttpError(400, 'Der Benutzername kann erst nach Bestätigung der E-Mail-Adresse geändert werden');
+  }
+  if (usernameChangeAllowedAt(existing.username_changed_at)) {
+    throw new HttpError(400, 'Der Benutzername kann nur alle 30 Tage geändert werden');
+  }
+  return assertUsernameAllowed(db, username, { userId: existing.id });
+}
+
+export async function confirmOwnUsername(db, userId) {
+  const now = new Date().toISOString();
+  await db.prepare('UPDATE users SET username_confirmed_at = COALESCE(username_confirmed_at, ?) WHERE id = ? AND username IS NOT NULL').bind(now, userId).run();
+  return json({ ok: true });
+}
+
+export async function updateOwnProfile(request, env, url, userId) {
   const db = env.DB;
   const existing = await db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
   if (!existing) {
@@ -3443,6 +3627,10 @@ async function updateOwnProfile(request, env, url, userId) {
   if (firstName.length < 2 || lastName.length < 2) {
     throw new HttpError(400, 'Vorname und Nachname müssen mindestens 2 Zeichen enthalten');
   }
+  if (firstName.length > USER_NAME_MAX_LENGTH || lastName.length > USER_NAME_MAX_LENGTH) {
+    throw new HttpError(400, 'Vorname und Nachname dürfen höchstens 50 Zeichen enthalten');
+  }
+  const newUsername = await resolveOwnUsernameChange(db, existing, body.username);
 
   if (!isEmail(email)) {
     throw new HttpError(400, 'Eine gültige E-Mail ist erforderlich');
@@ -3471,6 +3659,10 @@ async function updateOwnProfile(request, env, url, userId) {
   const currentSessionId = getCookie(request, SESSION_COOKIE);
 
   try {
+    if (newUsername) {
+      await db.prepare('UPDATE users SET username = ?, username_changed_at = ?, username_confirmed_at = ? WHERE id = ?')
+        .bind(newUsername, now, now, userId).run();
+    }
     if (passwordChanged) {
       const password = await hashPassword(newPassword);
       await db.batch([
@@ -3490,10 +3682,7 @@ async function updateOwnProfile(request, env, url, userId) {
         .run();
     }
   } catch (error) {
-    if (String(error.message || '').includes('UNIQUE')) {
-      throw new HttpError(409, 'E-Mail-Adresse bereits vergeben');
-    }
-    throw error;
+    throw accountConflictError(error) || error;
   }
 
   let verificationUrl = null;
@@ -3506,7 +3695,7 @@ async function updateOwnProfile(request, env, url, userId) {
 
   const updated = await db
     .prepare(
-      'SELECT id, first_name, last_name, email, pending_email, role, club, license_nr, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, role, club, license_nr, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?',
     )
     .bind(userId)
     .first();
@@ -7981,7 +8170,7 @@ export function toPublicPlayerListing(row, includeOwner = false) {
   return {
     id: row.id, ...(includeOwner ? { userId: row.user_id } : {}), type: row.type, title: row.title, description: row.description || null,
     locationName: formatLocationAddress(row.location_name), latitude: Number(row.latitude), longitude: Number(row.longitude),
-    eventDate: row.event_date || null, ...(includeOwner && row.owner_first_name ? { ownerName: `${row.owner_first_name} ${row.owner_last_name}` } : {}),
+    eventDate: row.event_date || null, ...(includeOwner && row.owner_first_name ? { ownerName: `${row.owner_first_name} ${row.owner_last_name}`, ownerUsername: row.owner_username || null } : {}),
     playingPosition: row.playing_position,
     tournamentId: row.linked_tournament_name ? row.tournament_id : null, tournamentName: row.linked_tournament_name || null,
     deleteWhenTournamentFinished: row.delete_when_tournament_finished !== 0,
@@ -7991,7 +8180,7 @@ export function toPublicPlayerListing(row, includeOwner = false) {
 
 // Verknüpfte Turniere nur zeigen, solange sie öffentlich sind; private oder
 // gelöschte Turniere lassen das Gesuch ohne Verweis stehen.
-const PLAYER_LISTING_SELECT = `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name, t.name AS linked_tournament_name
+const PLAYER_LISTING_SELECT = `SELECT l.*, u.first_name AS owner_first_name, u.last_name AS owner_last_name, u.username AS owner_username, t.name AS linked_tournament_name
      FROM player_listings l JOIN users u ON u.id = l.user_id
      LEFT JOIN tournaments t ON t.id = l.tournament_id AND t.visibility = 'public'`;
 
@@ -8209,7 +8398,7 @@ async function verifyPlaceReport(request, db) {
   return json({ ok: true, placeId: verification.place_id });
 }
 
-async function listClubEditorRequests(db) { const rows = await db.prepare('SELECT r.club_id, r.user_id, r.created_at, c.name AS club_name, u.first_name, u.last_name, u.email FROM club_editor_requests r JOIN clubs c ON c.id = r.club_id JOIN users u ON u.id = r.user_id ORDER BY r.created_at').all(); return json({ requests: rows.results || [] }); }
+async function listClubEditorRequests(db) { const rows = await db.prepare('SELECT r.club_id, r.user_id, r.created_at, c.name AS club_name, u.first_name, u.last_name, u.username, u.email FROM club_editor_requests r JOIN clubs c ON c.id = r.club_id JOIN users u ON u.id = r.user_id ORDER BY r.created_at').all(); return json({ requests: rows.results || [] }); }
 async function approveClubEditor(db, clubId, userId, adminId) { const now = new Date().toISOString(); await db.batch([db.prepare('INSERT OR REPLACE INTO club_editors (club_id, user_id, approved_by, approved_at) VALUES (?, ?, ?, ?)').bind(clubId, userId, adminId, now), db.prepare("UPDATE clubs SET status = 'published', updated_at = ? WHERE id = ?").bind(now, clubId), db.prepare("UPDATE boule_places SET status = 'published', updated_at = ? WHERE club_id = ? AND status = 'pending'").bind(now, clubId), db.prepare('DELETE FROM club_editor_requests WHERE club_id = ? AND user_id = ?').bind(clubId, userId)]); return json({ ok: true }); }
 
 async function listMyClubs(db, userId) {
@@ -8421,7 +8610,7 @@ function tournamentEditorIds(tournament) {
 }
 
 const TOURNAMENT_EDITORS_JSON_SUBQUERY = `(
-          SELECT COALESCE(json_group_array(json_object('id', te.user_id, 'firstName', u.first_name, 'lastName', u.last_name)), '[]')
+          SELECT COALESCE(json_group_array(json_object('id', te.user_id, 'firstName', u.first_name, 'lastName', u.last_name, 'username', u.username)), '[]')
           FROM tournament_editors te
           JOIN users u ON u.id = te.user_id
           WHERE te.tournament_id = tournaments.id
@@ -8547,7 +8736,7 @@ async function requireSession(request, db) {
 
   const row = await db
     .prepare(
-      `SELECT users.id, users.first_name, users.last_name, users.email, users.pending_email, users.role, users.club, users.license_nr, users.email_verified_at, users.password_change_required,
+      `SELECT users.id, users.first_name, users.last_name, users.username, users.username_changed_at, users.username_confirmed_at, users.email, users.pending_email, users.role, users.club, users.license_nr, users.email_verified_at, users.password_change_required,
               users.tournament_limit, users.mail_enabled, users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
@@ -8703,9 +8892,13 @@ function normalizeUserInput(body, { requirePassword }) {
   const email = String(body.email || '').trim().toLowerCase();
   const role = String(body.role || 'user').trim().toLowerCase();
   const password = body.password === undefined ? '' : String(body.password);
+  const username = body.username === undefined || body.username === null || body.username === '' ? null : normalizeUsername(body.username);
 
   if (firstName.length < 2 || lastName.length < 2) {
     throw new HttpError(400, 'Vorname und Nachname müssen mindestens 2 Zeichen enthalten');
+  }
+  if (firstName.length > USER_NAME_MAX_LENGTH || lastName.length > USER_NAME_MAX_LENGTH) {
+    throw new HttpError(400, 'Vorname und Nachname dürfen höchstens 50 Zeichen enthalten');
   }
 
   if (!isEmail(email)) {
@@ -8720,7 +8913,100 @@ function normalizeUserInput(body, { requirePassword }) {
     assertPasswordStrength(password);
   }
 
-  return { firstName, lastName, email, role, password };
+  return { firstName, lastName, email, role, password, username };
+}
+
+const USERNAME_PROBLEM_MESSAGES = {
+  invalid: 'Der Benutzername muss 3 bis 30 Zeichen lang sein und darf nur a–z, 0–9 sowie . _ - enthalten (nicht am Anfang oder Ende)',
+  reserved: 'Dieser Benutzername ist nicht erlaubt',
+  offensive: 'Dieser Benutzername ist nicht erlaubt',
+};
+
+function usernameChangeAllowedAt(changedAt) {
+  if (!changedAt) return null;
+  const allowedAt = new Date(new Date(changedAt).getTime() + USERNAME_CHANGE_INTERVAL_DAYS * 24 * 60 * 60 * 1000);
+  return allowedAt.getTime() > Date.now() ? allowedAt.toISOString() : null;
+}
+
+// Vergebene und von Admins gesperrte Namen gelten als belegt.
+async function usernameTaken(db, username, exceptUserId = null) {
+  const row = await db
+    .prepare('SELECT 1 AS taken FROM users WHERE username = ? AND id != ? UNION ALL SELECT 1 FROM blocked_usernames WHERE username = ? LIMIT 1')
+    .bind(username, exceptUserId || '', username)
+    .first();
+  return Boolean(row);
+}
+
+export async function assertUsernameAllowed(db, value, { userId = null } = {}) {
+  const username = normalizeUsername(value);
+  const problem = usernameProblem(username);
+  if (problem) throw new HttpError(400, USERNAME_PROBLEM_MESSAGES[problem]);
+  if (await usernameTaken(db, username, userId)) throw new HttpError(409, 'Benutzername bereits vergeben');
+  return username;
+}
+
+// Erster freier Name zu den Basisvorschlägen, bei Kollision mit angehängter Zahl (anna.schmidt2 …).
+async function findAvailableUsername(db, bases) {
+  for (const base of bases) {
+    const prefix = base.slice(0, 26);
+    const { results } = await db
+      .prepare('SELECT username FROM users WHERE substr(username, 1, ?) = ? UNION SELECT username FROM blocked_usernames WHERE substr(username, 1, ?) = ?')
+      .bind(prefix.length, prefix, prefix.length, prefix)
+      .all();
+    const taken = new Set(results.map((row) => row.username));
+    if (!taken.has(base) && !usernameProblem(base)) return base;
+    for (let number = 2; number < 10000; number += 1) {
+      const candidate = withUsernameSuffix(base, number);
+      if (!taken.has(candidate) && !usernameProblem(candidate)) return candidate;
+    }
+  }
+  throw new HttpError(500, 'Kein freier Benutzername gefunden');
+}
+
+export function generateUsername(db, firstName, lastName) {
+  return findAvailableUsername(db, usernameCandidates(firstName, lastName));
+}
+
+const GENERATED_USERNAME_ATTEMPTS = 3;
+
+function isUsernameConflict(error) {
+  const message = String(error?.message || '');
+  return message.includes('UNIQUE') && message.includes('username');
+}
+
+// Speichert ein Konto mit Benutzernamen. Ein automatisch erzeugter Name kann zwischen Prüfung und Speichern parallel
+// vergeben werden (gleichnamige Anmeldungen); dann sucht der Worker den nächsten freien Namen und speichert erneut.
+// Ein selbst gewählter Name wird nie ersetzt, dort meldet der Aufrufer die Kollision.
+async function saveAccountWithUsername(db, { chosen = null, firstName, lastName }, save) {
+  if (chosen) {
+    const username = await assertUsernameAllowed(db, chosen);
+    await save(username);
+    return username;
+  }
+  for (let attempt = 1; ; attempt += 1) {
+    const username = await generateUsername(db, firstName, lastName);
+    try {
+      await save(username);
+      return username;
+    } catch (error) {
+      if (!isUsernameConflict(error) || attempt >= GENERATED_USERNAME_ATTEMPTS) throw error;
+    }
+  }
+}
+
+// UNIQUE-Verletzung beim Speichern eines Kontos: E-Mail oder Benutzername (parallele Anmeldung).
+function accountConflictError(error) {
+  const message = String(error?.message || '');
+  if (!message.includes('UNIQUE')) return null;
+  return new HttpError(409, message.includes('username') ? 'Benutzername bereits vergeben' : 'E-Mail-Adresse bereits vergeben');
+}
+
+export async function checkUsernameAvailability(db, url) {
+  const username = normalizeUsername(url.searchParams.get('u'));
+  const problem = usernameProblem(username);
+  if (problem) return json({ available: false, problem, suggestion: null });
+  if (!(await usernameTaken(db, username))) return json({ available: true, problem: null, suggestion: null });
+  return json({ available: false, problem: 'taken', suggestion: await findAvailableUsername(db, [username]) });
 }
 
 function resolveTournamentLimit(body, fallback) {
@@ -9080,6 +9366,9 @@ function toPublicUser(row) {
     id: row.id,
     firstName: row.first_name,
     lastName: row.last_name,
+    username: row.username || null,
+    usernameConfirmed: Boolean(row.username_confirmed_at),
+    usernameChangeAllowedAt: usernameChangeAllowedAt(row.username_changed_at),
     email: row.email,
     pendingEmail: row.pending_email || null,
     role: row.role,
@@ -9101,8 +9390,10 @@ function toPostboxMessage(row, currentUserId) {
     id: row.id,
     senderId: row.sender_id || null,
     senderName: row.sender_id ? `${row.sender_first_name || ''} ${row.sender_last_name || ''}`.trim() : null,
+    senderUsername: row.sender_username || null,
     recipientId: row.recipient_id,
     recipientName: row.recipient_first_name != null ? `${row.recipient_first_name || ''} ${row.recipient_last_name || ''}`.trim() : null,
+    recipientUsername: row.recipient_username || null,
     broadcastTournamentId: row.broadcast_tournament_id || null,
     broadcastTournamentName: row.broadcast_tournament_name || null,
     kind: row.kind,

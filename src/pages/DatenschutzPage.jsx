@@ -51,6 +51,13 @@ export function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, 
             {t('Wenn du die Facebook Anmeldung nutzt, erhalten wir von Facebook deine E-Mail-Adresse, deinen Namen und eine technische Facebook-Konto-ID. Wir verwenden diese Daten nur, um dein Benutzerkonto anzulegen, dich anzumelden und dein Facebook-Konto deinem Benutzerkonto zuzuordnen.')}
           </p>
 
+          <p>
+            {t('Bei der Registrierung wählst du einen eindeutigen Benutzernamen; bei der Google- oder Facebook-Anmeldung wird er automatisch aus deinem Namen erzeugt. Damit gleichnamige Nutzer unterscheidbar sind, sehen andere angemeldete Nutzer (z. B. bei der Empfängerauswahl im Postfach oder bei der Vergabe von Bearbeitungsrechten) deinen Namen, deinen Benutzernamen und – falls im Profil angegeben – deinen Verein (Art. 6 Abs. 1 lit. b und f DSGVO). Bist du Bearbeiter eines öffentlichen Turniers, ist dein Benutzername auch auf der Turnierseite sichtbar. Deine E-Mail-Adresse wird anderen Nutzern nicht angezeigt; wer sie bereits kennt, kann dich darüber als Empfänger finden.')}
+          </p>
+          <p>
+            {t('Angemeldete Nutzer können anstößige Benutzernamen melden. Wir speichern dazu den gemeldeten Namen, den meldenden Nutzer, einen optionalen Grund und den Zeitpunkt. Meldungen sind nur für Administratoren sichtbar und dienen der Moderation (Art. 6 Abs. 1 lit. f DSGVO). Ändert ein Administrator einen Benutzernamen, wird der bisherige Name gesperrt, damit er nicht erneut vergeben wird.')}
+          </p>
+
           <h2>{t('5. Turnieranmeldungen und öffentliche Teilnehmerlisten')}</h2>
           <p>
             {t('Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).')}

@@ -144,5 +144,7 @@
   "adminAction_binding_takeover": "Dokumentbindung übernommen",
   "adminAction_binding_release": "Dokumentbindung gelöst",
   "adminAction_running_reset": "Turnierstart zurückgesetzt",
-  "adminAction_tournament_deleted": "Turnier gelöscht"
+  "adminAction_tournament_deleted": "Turnier gelöscht",
+  "searchingByEmail": "Suche per E-Mail-Adresse …",
+  "recipientEmailSearchHint": "Tipp: Suche nach Name, @Benutzername, Verein oder der vollständigen E-Mail-Adresse."
 }

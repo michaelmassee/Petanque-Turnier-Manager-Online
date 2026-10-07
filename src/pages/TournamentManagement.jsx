@@ -8,6 +8,8 @@ import { Feedback, TextField, TextArea, SelectField, Button, ListToolbar, EditDi
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { authenticatedApi } from '../lib/api.js';
+import { formatUserLabel, formatUserName } from '../lib/userLabel.js';
+import { UsernameReportButton } from '../components/UsernameReportDialog.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 /**
@@ -40,7 +42,7 @@ function deleteTournamentRequest(tournamentId, confirmDocumentManaged) {
   return authenticatedApi(`/api/tournaments/${tournamentId}${query}`, { method: 'DELETE' });
 }
 
-function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmin }) {
+function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmin, currentUserId }) {
   const { t } = useTranslation();
   const [editors, setEditors] = useState(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState('');
@@ -104,7 +106,11 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmi
                 const isOwner = editor.id === ownerId;
                 return (
                   <li key={editor.id}>
-                    <span data-i18n-skip>{`${editor.firstName || ''} ${editor.lastName || ''}`.trim()}</span>
+                    <span data-i18n-skip>
+                      {formatUserName(editor)}
+                      {editor.username && <span className="user-handle"> @{editor.username}</span>}
+                    </span>
+                    <UsernameReportButton user={editor} currentUserId={currentUserId} />
                     {(!isOwner || isAdmin) && (
                       <Button variant="secondary" type="button" disabled={busy} loading={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
                     )}
@@ -121,7 +127,7 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmi
                 onChange={setSelectedCandidateId}
                 options={[
                   { value: '', label: t('Bitte wählen') },
-                  ...availableCandidates.map((candidate) => ({ value: candidate.id, label: `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() })),
+                  ...availableCandidates.map((candidate) => ({ value: candidate.id, label: formatUserLabel(candidate) })),
                 ]}
               />
               <Button type="button" disabled={busy || !selectedCandidateId} loading={busy} onClick={handleAdd}>{t('Hinzufügen')}</Button>
@@ -165,7 +171,7 @@ function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], onOwnerC
       </div>
       <Feedback error={panelError} />
       <p className="muted">
-        {t('Aktueller Owner:')} <span data-i18n-skip>{owner ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim() : ownerId}</span>
+        {t('Aktueller Owner:')} <span data-i18n-skip>{owner ? formatUserLabel(owner) : t('Unbekannter Benutzer')}</span>
       </p>
       {otherCandidates.length > 0 && (
         <div className="inline-form">
@@ -175,7 +181,7 @@ function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], onOwnerC
             onChange={setSelectedOwnerId}
             options={[
               { value: '', label: t('Bitte wählen') },
-              ...otherCandidates.map((candidate) => ({ value: candidate.id, label: `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() })),
+              ...otherCandidates.map((candidate) => ({ value: candidate.id, label: formatUserLabel(candidate) })),
             ]}
           />
           <Button type="button" disabled={busy || !selectedOwnerId} loading={busy} onClick={handleChangeOwner}>{t('Übernehmen')}</Button>
@@ -591,7 +597,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
       {canManageOwner && (
         <TournamentOwnerPanel tournamentId={form.id} ownerId={form.ownerId} candidates={ownerCandidates} onOwnerChanged={(tournament) => { onOwnerChanged(tournament); setForm({ ...form, ownerId: tournament.ownerId }); }} />
       )}
-      {canManageEditors && <TournamentEditorsPanel tournamentId={form.id} candidates={editorCandidates} ownerId={form.ownerId} isAdmin={isAdmin} />}
+      {canManageEditors && <TournamentEditorsPanel tournamentId={form.id} candidates={editorCandidates} ownerId={form.ownerId} isAdmin={isAdmin} currentUserId={currentUser?.id} />}
       <div className="dialog-actions">
         <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>
         <Button type="submit" loading={saving}>{mode === 'edit' ? t('Turnier speichern') : t('Turnier anlegen')}</Button>

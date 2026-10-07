@@ -48,7 +48,7 @@ export function TournamentPlayerListings({ tournament, currentUser, navigate }) 
                   <strong data-i18n-skip>{listing.title}</strong>
                   <span>
                     {t(PLAYING_POSITION_LABELS[listing.playingPosition] || 'Egal')}
-                    {listing.ownerName ? <> · {t('Von')} <span data-i18n-skip>{listing.ownerName}</span></> : null}
+                    {listing.ownerName ? <> · {t('Von')} <span data-i18n-skip>{listing.ownerName}{listing.ownerUsername ? ` @${listing.ownerUsername}` : ''}</span></> : null}
                   </span>
                 </button>
               </div>

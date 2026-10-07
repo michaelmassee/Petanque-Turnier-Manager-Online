@@ -157,7 +157,7 @@ function MyPlayerListingsPanel({ language, currentUser }) {
                   {listing.type === 'tournament' ? t('Turnier') : t('Training')} · {t(listing.playingPosition === 'leger' ? 'Leger' : listing.playingPosition === 'milieu' ? 'Milieu' : listing.playingPosition === 'schiesser' ? 'Schießer' : 'Egal')} · {formatLocationAddress(listing.locationName)}
                   {listing.eventDate ? ` · ${formatDate(listing.eventDate, language)}` : ''}
                   {listing.tournamentName ? ` · ${t('Turnier')}: ${listing.tournamentName}` : ''}
-                  {isAdmin && listing.ownerName ? ` · ${t('Ersteller:')} ${listing.ownerName}` : ''}
+                  {isAdmin && listing.ownerName ? ` · ${t('Ersteller:')} ${listing.ownerName}${listing.ownerUsername ? ` @${listing.ownerUsername}` : ''}` : ''}
                 </span>
               </div>
               <div className="row-actions">

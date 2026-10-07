@@ -20,7 +20,7 @@ export function PlayerListingContactDialog({ listing, onClose }) {
   }
 
   return (
-    <EditDialog open title={`${t('Nachricht an')} ${listing.ownerName || ''}`} error={error} onClose={onClose}>
+    <EditDialog open title={`${t('Nachricht an')} ${listing.ownerName || ''}${listing.ownerUsername ? ` (@${listing.ownerUsername})` : ''}`} error={error} onClose={onClose}>
       {sent ? (
         <Feedback message={t('Nachricht gesendet.')} />
       ) : (

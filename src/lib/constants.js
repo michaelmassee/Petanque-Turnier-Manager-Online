@@ -86,6 +86,9 @@ export const EMPTY_USER_FORM = {
   id: '',
   firstName: '',
   lastName: '',
+  username: '',
+  originalUsername: '',
+  usernameChangeReason: '',
   email: '',
   role: 'user',
   password: '',
@@ -98,6 +101,7 @@ export const EMPTY_USER_FORM = {
 export const EMPTY_PROFILE_FORM = {
   firstName: '',
   lastName: '',
+  username: '',
   email: '',
   club: '',
   licenseNr: '',
@@ -109,6 +113,7 @@ export const EMPTY_PROFILE_FORM = {
 export const EMPTY_AUTH_FORM = {
   firstName: '',
   lastName: '',
+  username: '',
   email: '',
   password: '',
   passwordConfirm: '',

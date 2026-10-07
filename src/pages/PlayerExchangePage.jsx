@@ -16,6 +16,7 @@ import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx';
+import { UsernameReportButton } from '../components/UsernameReportDialog.jsx';
 
 const FALLBACK_CENTER = [51.1, 10.4];
 const marker = new L.Icon({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow, iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] });
@@ -364,7 +365,12 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
                   </button>
                 )}
                 {listing.description && <RichText value={listing.description} />}
-                {listing.ownerName && <p className="muted">{t('Von')} {listing.ownerName}</p>}
+                {listing.ownerName && (
+                  <p className="muted">
+                    {t('Von')} <span data-i18n-skip>{listing.ownerName}{listing.ownerUsername && <span className="user-handle"> @{listing.ownerUsername}</span>}</span>
+                    <UsernameReportButton user={{ id: listing.userId, username: listing.ownerUsername }} currentUserId={currentUser?.id} />
+                  </p>
+                )}
                 <DistanceBadge distanceKm={listing.distanceKm} />
                 <div className="place-actions">
                   {currentUser && (

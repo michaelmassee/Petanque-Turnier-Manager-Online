@@ -28,7 +28,7 @@ describe('Postbox-Empfänger für Turnier-Broadcasts', () => {
     const response = await listPostboxRecipients(db, 'organizer-1');
 
     await expect(response.json()).resolves.toEqual({
-      recipients: [{ id: 'recipient-1', firstName: 'Ada', lastName: 'Beispiel', role: 'user' }],
+      recipients: [{ id: 'recipient-1', firstName: 'Ada', lastName: 'Beispiel', username: null, club: null, role: 'user' }],
       tournaments: [
         { id: 'tournament-1', name: 'Herbstturnier', date: '2026-10-06', registrationCount: 3 },
         { id: 'tournament-2', name: 'Leeres Turnier', date: '2026-11-01', registrationCount: 0 },

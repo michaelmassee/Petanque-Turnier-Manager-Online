@@ -6,6 +6,7 @@ import { Feedback, Button, EditDialog, ListToolbar, SelectField, TextArea, TextF
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
+import { formatUserLabel } from '../lib/userLabel.js';
 
 const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, venueType: 'outdoor', courtCount: '', description: '', accessible: false, facilities: '', facilityCodes: [] };
 const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', logoUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
@@ -288,7 +289,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
                   <article className="data-row" key={id}>
                     <div>
                       <strong data-i18n-skip>{request.club_name}</strong>
-                      <span data-i18n-skip>{request.first_name} {request.last_name} ({request.email})</span>
+                      <span data-i18n-skip>{request.first_name} {request.last_name}{request.username ? ` @${request.username}` : ''} ({request.email})</span>
                     </div>
                     <div className="row-actions">
                       <Button loading={busyId === id} onClick={() => approveRequest(request)}>{t('Freigeben')}</Button>
@@ -512,7 +513,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
               onChange={setSelectedOwnerId}
               options={[
                 { value: '', label: t('Bitte wählen') },
-                ...users.filter((u) => u.id !== ownerDialogClub.ownerId).map((u) => ({ value: u.id, label: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email })),
+                ...users.filter((u) => u.id !== ownerDialogClub.ownerId).map((u) => ({ value: u.id, label: `${formatUserLabel(u, { withClub: false }) || u.email} · ${u.email}` })),
               ]}
             />
             <div className="dialog-actions">

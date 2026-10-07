@@ -9,6 +9,7 @@ import { labelFor, roleName, translatedOptions } from '../lib/domain.js';
 import { Feedback, EditDialog, SelectField, Button, CloseButton } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 import { RecipientPicker } from './RecipientPicker.jsx';
+import { UsernameReportButton } from './UsernameReportDialog.jsx';
 import { RichTextEditor } from './RichTextEditor.jsx';
 import { RichText } from './RichText.jsx';
 import { richTextPlainText } from '../lib/rich-text.js';
@@ -64,7 +65,7 @@ export function PushMigrationNotice({ onDismiss, onEnabled }) {
 
 const POSTBOX_MESSAGE_MAX_LENGTH = 500;
 
-export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick, currentUserId, sending = false }) {
+export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick, currentUserId, sending = false, onLookupRecipientEmail }) {
   const [pushState, setPushState] = useState('');
   const [pushErrorDetail, setPushErrorDetail] = useState('');
   const [pushActive, setPushActive] = useState(false);
@@ -117,6 +118,7 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
                 value={recipientId}
                 onChange={setRecipientId}
                 currentUserId={currentUserId}
+                onLookupEmail={onLookupRecipientEmail}
                 required
               />
               <RichTextEditor
@@ -144,7 +146,12 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
                 // Kein <button> als Container: Links in der Nachricht wären darin ungültig und in Firefox nicht klickbar.
                 // Der Kopf bleibt ein echter Button für die Tastatur, ein Klick irgendwo auf die Nachricht wirkt wie bisher.
                 <div className={`postbox-message ${!message.readAt && !message.mine ? 'unread' : ''}`} key={message.id} onClick={() => onRead(message)}>
-                  <button className="postbox-message-open" type="button" onClick={(event) => { event.stopPropagation(); onRead(message); }}><strong>{message.kind === 'system' ? text('status') : message.broadcastTournamentName ? (message.mine ? `${text('you')} → ` : `${message.senderName} → `) + text('allParticipantsOf').replace('{name}', message.broadcastTournamentName) : message.mine ? `${text('you')} → ${message.recipientName || ''}` : message.senderName}</strong></button>
+                  <div className="postbox-message-head">
+                    <button className="postbox-message-open" type="button" onClick={(event) => { event.stopPropagation(); onRead(message); }}><strong>{postboxMessageHeading(message, text)}</strong></button>
+                    {!message.mine && message.kind !== 'system' && (
+                      <UsernameReportButton user={{ id: message.senderId, username: message.senderUsername }} currentUserId={currentUserId} />
+                    )}
+                  </div>
                   {message.kind === 'direct'
                     ? <span className="postbox-message-body"><RichText value={message.body} /></span>
                     : <span>{postboxMessageText(message, text)}</span>}
@@ -158,6 +165,20 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
       )}
     </div>
   );
+}
+
+function UserHandle({ username }) {
+  return username ? <span className="user-handle"> @{username}</span> : null;
+}
+
+function postboxMessageHeading(message, t) {
+  if (message.kind === 'system') return t('status');
+  if (message.broadcastTournamentName) {
+    const target = t('allParticipantsOf').replace('{name}', message.broadcastTournamentName);
+    return message.mine ? `${t('you')} → ${target}` : <>{message.senderName}<UserHandle username={message.senderUsername} /> → {target}</>;
+  }
+  if (message.mine) return <>{t('you')} → {message.recipientName || ''}<UserHandle username={message.recipientUsername} /></>;
+  return <>{message.senderName}<UserHandle username={message.senderUsername} /></>;
 }
 
 function postboxMessageText(message, t) {
@@ -191,6 +212,13 @@ function postboxMessageText(message, t) {
   }
   if (message.eventType === REGISTRATION_ACCOUNT_CONFLICT_EVENT) {
     return t('registrationAccountConflictText', { name: data.tournamentName || '' });
+  }
+  if (message.eventType === 'username_changed_by_admin') {
+    const text = t('Ein Admin hat deinen Benutzernamen in @{{username}} geändert.', { username: data.newUsername || '' });
+    return data.reason ? `${text}\n${t('Grund')}: ${data.reason}` : text;
+  }
+  if (message.eventType === 'username_reported') {
+    return t('Benutzername @{{username}} wurde gemeldet – bitte in der Benutzerverwaltung prüfen.', { username: data.username || '' });
   }
   if (message.eventType === TOURNAMENT_ADMIN_ACTION_EVENT) {
     return t('tournamentAdminActionText', { name: data.tournamentName || '', actor: data.actorName || '', action: t(`adminAction_${data.action}`) });
@@ -509,7 +537,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
           <nav className="nav-drawer" aria-label={t('Hauptmenü')}>
             {currentUser && (
               <div className="drawer-user">
-                <span data-i18n-skip>{currentUser.firstName} {currentUser.lastName}</span>
+                <span data-i18n-skip>{currentUser.firstName} {currentUser.lastName}{currentUser.username ? ` @${currentUser.username}` : ''}</span>
                 <strong>{roleName(currentUser.role)}</strong>
               </div>
             )}

@@ -814,6 +814,8 @@ a.left-panel-link {
 .postbox-message-body .rich-text { display: grid; gap: 4px; }
 .postbox-message:has(.postbox-message-open) { cursor: pointer; }
 .postbox-message-open { width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.postbox-message-head { display: flex; align-items: center; gap: 4px; }
+.postbox-message-head .postbox-message-open { flex: 1; min-width: 0; }
 .postbox-message-open:focus-visible { outline: 3px solid rgb(22 119 255 / 35%); outline-offset: 2px; border-radius: 4px; }
 .rich-text a, .postbox-message-body a { overflow-wrap: anywhere; }
 .postbox-message-body .rich-text p, .postbox-message-body .rich-text h2, .postbox-message-body .rich-text ul, .postbox-message-body .rich-text ol { margin: 0; }
@@ -827,6 +829,8 @@ a.left-panel-link {
 .saved-search-secondary-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .push-migration-notice { max-width: 680px; margin: 0 auto 18px; }
 .push-migration-notice h2 { margin-top: 0; }
+.username-confirm-notice { max-width: 680px; margin: 0 auto 18px; }
+.username-confirm-notice h2 { margin-top: 0; }
 
 .search-menu-btn:hover {
   border-color: #1677ff;
@@ -1181,6 +1185,7 @@ a.left-panel-link {
 
 .recipient-picker-option {
   flex: 1;
+  min-width: 0;
   display: block;
   width: 100%;
   min-height: 44px;
@@ -1192,6 +1197,26 @@ a.left-panel-link {
   color: #172033;
   font-weight: 400;
   cursor: pointer;
+}
+
+.recipient-picker-label,
+.recipient-picker-meta,
+.recipient-picker-hint {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipient-picker-meta,
+.recipient-picker-hint {
+  color: #5b6475;
+  font-size: 0.85em;
+}
+
+.recipient-picker-hint {
+  white-space: normal;
+  margin-top: 4px;
 }
 
 .recipient-picker-option:hover,
@@ -3577,4 +3602,54 @@ a.left-panel-link {
   .season-autumn .empty-state::after {
     display: none;
   }
+}
+
+.username-report-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #5b6475;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.username-report-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.username-report-btn:hover {
+  color: #b42318;
+}
+
+.user-handle {
+  color: #5b6475;
+  font-weight: 400;
+  font-size: 0.9em;
+}
+
+.username-field {
+  display: grid;
+  gap: 4px;
+}
+
+.username-field .hint {
+  margin: 0;
+}
+
+.field-hint-error {
+  color: #b42318;
+}
+
+.field-hint-ok {
+  color: #087f6f;
 }
