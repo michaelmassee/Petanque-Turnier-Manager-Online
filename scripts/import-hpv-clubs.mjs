@@ -61,9 +61,14 @@ function address(entry) {
   return [clean(entry.address), city].filter(Boolean).join(', ');
 }
 
-function coordinate(value, min, max) {
-  const number = Number(value);
-  return Number.isFinite(number) && number !== 0 && number >= min && number <= max ? number : null;
+// Alle HPV-Vereine liegen in Deutschland. Einige Quelleinträge haben Breite und Länge vertauscht.
+const inGermany = (latitude, longitude) => latitude >= 47.2 && latitude <= 55.1 && longitude >= 5.8 && longitude <= 15.1;
+
+function coordinates(location) {
+  const latitude = Number(location?.latitude); const longitude = Number(location?.longitude);
+  if (inGermany(latitude, longitude)) return { latitude, longitude };
+  if (inGermany(longitude, latitude)) return { latitude: longitude, longitude: latitude };
+  return { latitude: null, longitude: null };
 }
 
 function placeDescription(entries) {
@@ -96,7 +101,7 @@ let placeCount = 0;
 function insertPlace({ clubId, clubName, name, entry, venueType = 'outdoor', description }) {
   const place = {
     id: crypto.randomUUID(), clubId, clubName, name, address: address(entry), venueType, description,
-    latitude: coordinate(entry.location?.latitude, -90, 90), longitude: coordinate(entry.location?.longitude, -180, 180),
+    ...coordinates(entry.location),
   };
   // Vereinsplätze nur anlegen, wenn der Verein in diesem Lauf wirklich neu entstanden ist (kein verwaister Platz).
   const clubCondition = clubId ? `EXISTS (SELECT 1 FROM clubs WHERE id = ${quote(clubId)})` : '1';
