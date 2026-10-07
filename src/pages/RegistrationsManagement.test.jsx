@@ -146,9 +146,10 @@ describe('Anmeldungsverwaltung: Turnierauswahl', () => {
       />,
     );
 
-    const tournamentSelect = screen.getByLabelText('Turnier anzeigen');
-    expect(tournamentSelect).not.toHaveTextContent('Kalendereintrag');
-    expect(tournamentSelect).toHaveTextContent('Sommer Cup');
+    fireEvent.focus(screen.getByRole('combobox', { name: 'Turnier anzeigen' }));
+    const options = screen.getAllByRole('option').map((option) => option.textContent);
+    expect(options.join(' ')).not.toContain('Kalendereintrag');
+    expect(options.join(' ')).toContain('Sommer Cup');
     await waitFor(() => expect(setSelectedTournamentId).toHaveBeenCalledWith('registration'));
   });
 });

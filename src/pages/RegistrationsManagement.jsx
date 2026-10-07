@@ -6,6 +6,7 @@ import { isCalendarEntry, labelFor, registrationPayload, translatedOptions } fro
 import { filterRegistrations } from '../frontend-core.js';
 import { Feedback, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
+import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { formatMoney } from '../lib/format.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
@@ -364,6 +365,7 @@ export function RegistrationsPanel({
   busyId,
   message,
   error,
+  currentUserId,
 }) {
   const { t } = useTranslation();
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
@@ -410,11 +412,12 @@ export function RegistrationsPanel({
       </EditDialog>
       <Feedback message={message} />
       <Feedback error={error} />
-      <SelectField
+      <TournamentPicker
         label={t('Turnier anzeigen')}
+        tournaments={tournaments}
         value={tournament?.id || ''}
         onChange={onTournamentChange}
-        options={tournaments.map((item) => ({ value: item.id, label: item.name }))}
+        currentUserId={currentUserId}
       />
       {!tournament?.canManage && <p className="muted">{t('Für dieses Turnier sind Anmeldungen nur für Admins und zuständige Turnierleiter sichtbar.')}</p>}
       <ListToolbar
@@ -478,6 +481,7 @@ export function RegistrationsManagementPage({
   language,
   initialStatusFilter = '',
   onInitialStatusFilterConsumed,
+  currentUserId,
 }) {
   const { t } = useTranslation();
   const [registrations, setRegistrations] = useState([]);
@@ -691,6 +695,7 @@ export function RegistrationsManagementPage({
         busyId={busyId}
         message={message}
         error={error}
+        currentUserId={currentUserId}
       />
 
       <EditDialog

@@ -87,6 +87,24 @@ describe('TournamentPlayManagement', () => {
     expect(screen.queryByText('Clubabend Supermêlée')).not.toBeInTheDocument();
   });
 
+  it('bietet in der Turnierauswahl auch über Favoriten und Verlauf nur online startbare Turniere an', async () => {
+    installFetchMock([]);
+    const desktop = { ...TOURNAMENT, id: 't2', name: 'Desktop-Turnier', desktopExecution: true };
+    const liga = { ...TOURNAMENT, id: 't3', name: 'Liga ohne Online-Durchführung', registrationType: 'forme', type: 'liga' };
+    // Favoriten und Verlauf stammen ggf. von der Meldungsseite und enthalten dort erlaubte, hier aber nicht startbare Turniere.
+    localStorage.setItem('ptm_tournament_favorites_user-1', JSON.stringify(['t2', 't3']));
+    localStorage.setItem('ptm_tournament_recents_user-1', JSON.stringify(['t3', 't2']));
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT, desktop, liga]} currentUserId="user-1" language="de" />);
+    fireEvent.focus(screen.getByRole('combobox'));
+
+    const options = screen.getAllByRole('option').map((option) => option.textContent);
+    expect(options).toHaveLength(1);
+    expect(options[0]).toContain('Clubabend Supermêlée');
+    expect(screen.queryByText('Favoriten')).not.toBeInTheDocument();
+    localStorage.clear();
+  });
+
   it('lädt die aktuelle Runde und die Rangliste für das ausgewählte Turnier', async () => {
     const calls = [];
     installFetchMock(calls, { ranking: [{ rank: 1, playerId: 'p1', firstName: 'Anna', lastName: 'Muster', wins: 1, gameDiff: 1, pointsFor: 13, pointsAgainst: 7 }] });

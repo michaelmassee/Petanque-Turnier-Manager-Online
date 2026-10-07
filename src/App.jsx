@@ -2019,6 +2019,7 @@ function AppContent() {
               language={language}
               initialStatusFilter={pendingRegistrationsFilter}
               onInitialStatusFilterConsumed={() => setPendingRegistrationsFilter('')}
+              currentUserId={currentUser?.id}
             />
           </section>
         </Suspense>
@@ -2068,7 +2069,7 @@ function AppContent() {
       {activeTab === 'play' && canManageTournaments && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
-            <TournamentPlayManagement tournaments={manageableTournaments} />
+            <TournamentPlayManagement tournaments={manageableTournaments} currentUserId={currentUser?.id} />
           </section>
         </Suspense>
       )}

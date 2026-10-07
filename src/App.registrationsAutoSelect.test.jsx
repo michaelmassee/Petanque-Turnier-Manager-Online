@@ -84,7 +84,8 @@ describe('Anmeldungen: automatische Turnierauswahl beim ersten Öffnen', () => {
     fireEvent.click(screen.getByText('Anmeldungen'));
 
     expect(await screen.findByText('Anna Muster')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Eigenes Turnier')).toBeInTheDocument();
+    // Die Turnierauswahl zeigt nach der Auswahl „Name · Datum“.
+    expect(screen.getByRole('combobox', { name: 'Turnier anzeigen' }).value).toMatch(/^Eigenes Turnier/);
 
     await waitFor(() => expect(calls).toContain('/api/tournaments/t2/registrations'));
     expect(calls).not.toContain('/api/tournaments/t1/registrations');

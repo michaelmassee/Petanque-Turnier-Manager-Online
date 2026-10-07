@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
-import { SelectField, TextField, Button, Feedback } from '../components/ui.jsx';
+import { TextField, Button, Feedback } from '../components/ui.jsx';
+import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { checkRoundRequirements, getSupportedSystemLabels, isOnlinePlayable } from '../lib/pairing/index.js';
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
 import { isCalendarEntry, labelFor, translatedOptions } from '../lib/domain.js';
@@ -101,7 +102,7 @@ function MatchRow({ match, onSave, busy }) {
   );
 }
 
-export default function TournamentPlayManagement({ tournaments: managedTournaments }) {
+export default function TournamentPlayManagement({ tournaments: managedTournaments, currentUserId }) {
   const { t, i18n } = useTranslation();
   // Kalendereinträge sind reine Termine ohne Teilnehmer und tauchen hier gar nicht auf.
   const allTournaments = managedTournaments.filter((tournament) => !isCalendarEntry(tournament));
@@ -345,11 +346,12 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   return (
     <div className="supermelee-manage">
       <div className="panel supermelee-toolbar">
-        <SelectField
+        <TournamentPicker
           label={t('Turnier')}
+          tournaments={tournaments}
           value={selectedTournamentId}
           onChange={setSelectedTournamentId}
-          options={tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }))}
+          currentUserId={currentUserId}
         />
         {selectedTournament && selectedTournamentStatus !== 'running' && (
           <div className="supermelee-toolbar-actions">
