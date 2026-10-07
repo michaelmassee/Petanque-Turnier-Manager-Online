@@ -12,6 +12,8 @@ import { formatUserLabel, formatUserName } from '../lib/userLabel.js';
 import { UsernameReportButton } from '../components/UsernameReportDialog.jsx';
 import { useClubSuggestions } from '../components/ClubSuggestions.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
+import { TournamentQrDialog } from '../components/TournamentQrDialog.jsx';
+import { registrationUrlFromShareUrl } from '../lib/qr-style.js';
 
 /**
  * Lösch-Rückfrage; bei einem mit einem Turnierdokument verbundenen Turnier mit deutlicher Warnung, weil Spieler
@@ -635,21 +637,47 @@ export function TournamentList({
   onResetFilters,
   busyId = '',
   setBusyId = () => {},
+  qrSourceTournaments = tournaments,
+  currentUserId,
+  onQrDesignSaved = () => {},
 }) {
   const { t } = useTranslation();
   const filtered = Boolean(query.trim()) || Boolean(statusFilter) || hideCalendarEntries;
   const [shareError, setShareError] = useState('');
   const [shareMessage, setShareMessage] = useState('');
+  const [qrTarget, setQrTarget] = useState(null);
   const visibleTournaments = useInfiniteList(hideCalendarEntries ? tournaments.filter((tournament) => !isCalendarEntry(tournament)) : tournaments);
+
+  // Öffentliche Turniere über ihre Info-Seite, private über den Freigabe-Link.
+  async function tournamentShareUrl(tournament) {
+    return tournament.visibility === 'private'
+      ? (await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' })).shareUrl
+      : `${window.location.origin}/turniere/${tournament.id}/info`;
+  }
+
+  async function openQrCode(tournament) {
+    setBusyId(`qr-${tournament.id}`);
+    setShareError('');
+    setShareMessage('');
+    try {
+      const [shareUrl, data] = await Promise.all([
+        tournamentShareUrl(tournament),
+        authenticatedApi(`/api/tournaments/${tournament.id}/qr-design`),
+      ]);
+      setQrTarget({ tournament, url: registrationUrlFromShareUrl(shareUrl), design: data.design });
+    } catch (error) {
+      setShareError(error.message);
+    } finally {
+      setBusyId('');
+    }
+  }
 
   async function shareTournament(tournament) {
     setBusyId(`share-${tournament.id}`);
     setShareError('');
     setShareMessage('');
     try {
-      const shareUrl = tournament.visibility === 'private'
-        ? (await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' })).shareUrl
-        : `${window.location.origin}/turniere/${tournament.id}/info`;
+      const shareUrl = await tournamentShareUrl(tournament);
       const shareData = { title: tournament.name, text: `${tournament.name}\n${shareUrl}`, url: shareUrl };
       if (navigator.share) await navigator.share(shareData);
       else {
@@ -755,6 +783,16 @@ export function TournamentList({
                     {t('Turnier teilen')}
                   </Button>
                 )}
+                {tournament.registrationEnabled !== false && (tournament.status !== 'draft' || tournament.visibility === 'private') && (
+                  <Button
+                    variant="secondary"
+                    loading={busyId === `qr-${tournament.id}`}
+                    disabled={Boolean(busyId) && busyId !== `qr-${tournament.id}`}
+                    onClick={() => openQrCode(tournament)}
+                  >
+                    {t('QR-Code')}
+                  </Button>
+                )}
                 {tournament.visibility === 'private' && (
                   <Button
                     variant="secondary"
@@ -818,6 +856,17 @@ export function TournamentList({
         {tournaments.length === 0 && <p className="muted">{t('Keine Turniere gefunden.')}</p>}
       </div>
       <InfiniteListLoadMore hasMore={visibleTournaments.hasMore} onLoadMore={visibleTournaments.loadMore} label={t('Weitere Einträge laden')} />
+      {qrTarget && (
+        <TournamentQrDialog
+          tournament={qrTarget.tournament}
+          url={qrTarget.url}
+          initialDesign={qrTarget.design}
+          sourceTournaments={qrSourceTournaments}
+          currentUserId={currentUserId}
+          onSaved={onQrDesignSaved}
+          onClose={() => setQrTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1133,6 +1182,9 @@ export function TournamentManagementPage({
         onResetFilters={() => { setQuery(''); setStatusFilter(''); setHideCalendarEntries(false); }}
         busyId={busyId}
         setBusyId={setBusyId}
+        qrSourceTournaments={manageableTournaments}
+        currentUserId={currentUser?.id}
+        onQrDesignSaved={onTournamentsChanged}
       />
 
       <EditDialog

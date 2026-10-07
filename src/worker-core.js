@@ -1,5 +1,6 @@
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
+import { sanitizeQrDesign } from './lib/qr-design.js';
 
 const TOURNAMENT_TYPES = ['formule_x', 'jeder_gegen_jeden', 'ko', 'kaskaden', 'liga', 'maastrichter', 'poule_ab', 'rangliste', 'schweizer', 'trip_tete'];
 const FORMATIONS = ['tete', 'doublette', 'triplette'];
@@ -529,4 +530,14 @@ export function chunk(items, size) {
   const chunks = [];
   for (let index = 0; index < items.length; index += size) chunks.push(items.slice(index, index + size));
   return chunks;
+}
+
+export const MAX_QR_DESIGN_BYTES = 4096;
+
+// Validiert das QR-Code-Design aus dem Request-Body ({ design: {...} }) für tournaments.qr_design.
+export function normalizeQrDesign(body) {
+  const design = body?.design;
+  if (!design || typeof design !== 'object' || Array.isArray(design)) throw new HttpError(400, 'Ungültiges QR-Code-Design');
+  if (JSON.stringify(design).length > MAX_QR_DESIGN_BYTES) throw new HttpError(400, 'QR-Code-Design ist zu groß');
+  return sanitizeQrDesign(design);
 }

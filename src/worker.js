@@ -31,7 +31,9 @@ import {
   validateMatchScore,
   MAX_JSON_BODY_BYTES,
   readBodyWithLimit,
+  normalizeQrDesign,
 } from './worker-core.js';
+import { parseStoredQrDesign } from './lib/qr-design.js';
 import { checkRoundRequirements, getPairingStrategy, isOnlinePlayable, roundRequirementMessage } from './lib/pairing/index.js';
 import { competitionRanks, computeRanking, sameStandardRankingPlace } from './lib/pairing/ranking.js';
 import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schweizer.js';
@@ -2020,6 +2022,16 @@ export default {
         }
         if (request.method === 'POST') return await createTournamentShareLink(env.DB, tournament.id, url.origin);
         if (request.method === 'DELETE') return await deleteTournamentShareLink(env.DB, tournament.id);
+      }
+
+      const qrDesignMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/qr-design$/);
+      if (qrDesignMatch && (request.method === 'GET' || request.method === 'PUT')) {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, qrDesignMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        assertCanManageTournament(tournament, session.user);
+        if (request.method === 'GET') return json({ design: parseStoredQrDesign(tournament.qr_design) });
+        return json({ design: await saveTournamentQrDesign(env.DB, tournament.id, await readJson(request)) });
       }
 
       const imageProxyMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/image$/);
@@ -4639,7 +4651,15 @@ async function createTournament(request, env, user) {
 
 // Kopiert Eckdaten und Bearbeitungsrechte eines Turniers in ein neues Turnier im Status
 // "Entwurf" - bewusst ohne Anmeldungen, damit die Kopie unabhängig vom Original startet.
-async function duplicateTournament(db, existing, actingUser) {
+// Speichert das QR-Code-Design eines Turniers. updated_at bleibt unverändert: Das Design ist
+// reine Darstellung und soll keine Turnier-Synchronisation auslösen.
+export async function saveTournamentQrDesign(db, tournamentId, body) {
+  const design = normalizeQrDesign(body);
+  await db.prepare('UPDATE tournaments SET qr_design = ? WHERE id = ?').bind(JSON.stringify(design), tournamentId).run();
+  return design;
+}
+
+export async function duplicateTournament(db, existing, actingUser) {
   const baseName = existing.name.replace(/ Kopie #\d+$/, '');
   const siblings = await db.prepare('SELECT name FROM tournaments WHERE owner_id = ?').bind(existing.owner_id).all();
   const copyPattern = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} Kopie #(\\d+)$`);
@@ -4658,12 +4678,12 @@ async function duplicateTournament(db, existing, actingUser) {
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
-        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, created_at, updated_at
+        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, qr_design, created_at, updated_at
       )
       SELECT ?, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
-        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, ?, ?
+        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, qr_design, ?, ?
       FROM tournaments WHERE id = ?`,
     )
     .bind(id, actingUser.id, name, now, now, existing.id)
@@ -7829,7 +7849,7 @@ async function updateTournamentOwner(request, db, tournament) {
   return await getTournamentById(db, tournament.id);
 }
 
-async function getTournamentById(db, id) {
+export async function getTournamentById(db, id) {
   return db
     .prepare(
       `SELECT tournaments.*,
@@ -9535,7 +9555,7 @@ function resolveFeeSelections(tournament, input, registration, existing = null) 
   });
 }
 
-function toPublicTournament(row, user) {
+export function toPublicTournament(row, user) {
   return {
     id: row.id,
     ownerId: row.owner_id,
@@ -9590,6 +9610,8 @@ function toPublicTournament(row, user) {
     activeRegistrations: Number(row.active_registrations || 0),
     waitlistRegistrations: Number(row.waitlist_registrations || 0),
     canManage: canManageTournament(row, user),
+    // Nur Verwalter erfahren, ob ein QR-Design existiert (Auswahl „Design übernehmen von …“).
+    hasQrDesign: canManageTournament(row, user) ? Boolean(row.qr_design) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

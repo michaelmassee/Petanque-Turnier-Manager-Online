@@ -3653,3 +3653,120 @@ a.left-panel-link {
 .field-hint-ok {
   color: #087f6f;
 }
+
+/* Anmelde-QR-Code (TournamentQrDialog): Vorschau links, Einstellungen rechts; am Handy untereinander. */
+.qr-dialog {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.qr-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+}
+
+.qr-preview-canvas {
+  width: min(100%, 360px);
+  height: auto;
+  border: 1px solid #d8dee9;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.qr-url {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.qr-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.qr-settings > .button {
+  align-self: flex-start;
+}
+
+.qr-color-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qr-color-field input[type="color"] {
+  width: 64px;
+  height: 36px;
+  padding: 2px;
+}
+
+.qr-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.qr-swatch {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #b8c2d3;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.qr-swatch.active {
+  outline: 3px solid #1677ff;
+  outline-offset: 2px;
+}
+
+.qr-unsaved {
+  display: block;
+  margin-top: 12px;
+  text-align: right;
+}
+
+@media (max-width: 720px) {
+  .qr-dialog {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .qr-preview {
+    position: static;
+  }
+}
+
+.qr-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: -4px;
+}
+
+.qr-suggestion {
+  max-width: 100%;
+  border: 1px solid #b8c2d3;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #f4f6fa;
+  color: #172033;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qr-suggestion:hover,
+.qr-suggestion:focus-visible {
+  border-color: #1677ff;
+  background: #e8f1ff;
+}
+
