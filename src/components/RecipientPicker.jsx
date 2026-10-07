@@ -33,7 +33,8 @@ export function RecipientPicker({ label, recipients, recipientTournaments = NO_T
 
   const entries = useMemo(() => {
     const tournamentEntries = recipientTournaments.map((tournament) => {
-      const entryLabel = t('allParticipantsOf').replace('{name}', tournament.name);
+      // Nur der Turniername: die Gruppe „Turnier-Broadcasts“ sagt bereits, dass alle Teilnehmer erreicht werden.
+      const entryLabel = tournament.name;
       // Zweite Zeile wie beim Benutzernamen: Datum und Anzahl der Meldungen.
       const meta = `${formatDate(tournament.date, i18n.language)} · ${t('registrationCount', { count: tournament.registrationCount || 0 })}`;
       return {
