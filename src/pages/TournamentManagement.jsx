@@ -910,6 +910,7 @@ export function TournamentManagementPage({
       ...EMPTY_TOURNAMENT_FORM,
       contactName: currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '',
       contactEmail: currentUser?.email || '',
+      contactPhone: currentUser?.phone || '',
     });
     clearFeedback();
     setDialogOpen(true);

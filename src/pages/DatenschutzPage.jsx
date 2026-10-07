@@ -59,7 +59,7 @@ export function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, 
           </p>
 
           <p>
-            {t('Freiwillig kannst du in deinem Profil eine Handynummer hinterlegen. Sie ist nur für dich und die Administratoren sichtbar, wird nicht an andere Nutzer oder Turnierleiter weitergegeben und kann jederzeit im Profil geändert oder gelöscht werden (Art. 6 Abs. 1 lit. a DSGVO).')}
+            {t('Freiwillig kannst du in deinem Profil eine Handynummer hinterlegen. Sie ist nur für dich und die Administratoren sichtbar und kann jederzeit im Profil geändert oder gelöscht werden (Art. 6 Abs. 1 lit. a DSGVO). Legst du ein Turnier an, wird sie als Kontakt-Telefon vorgeschlagen; öffentlich auf der Turnierseite sichtbar wird sie erst, wenn du das Turnier mit dieser Nummer speicherst.')}
           </p>
 
           <h2>{t('5. Turnieranmeldungen und öffentliche Teilnehmerlisten')}</h2>

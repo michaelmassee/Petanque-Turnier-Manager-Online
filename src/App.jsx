@@ -2129,7 +2129,7 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = fa
             maxLength={30}
             placeholder="+49 171 1234567"
           />
-          <p className="hint">{t('Optional. Nur für dich und die Administratoren sichtbar.')}</p>
+          <p className="hint">{t('Optional. Nur für dich und die Administratoren sichtbar. Beim Anlegen eines Turniers wird sie als Kontakt-Telefon vorgeschlagen.')}</p>
           <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
           <p className="hint">{t('Benutzername und Verein werden anderen Nutzern angezeigt, damit man dich auch bei gleichem Namen unterscheiden kann.')}</p>
           <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
