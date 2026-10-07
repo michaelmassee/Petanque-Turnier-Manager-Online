@@ -5,7 +5,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney } from '../lib/format.js';
-import { labelFor, formationLabel, hasOpenRegistration, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
+import { labelFor, formationLabel, hasOpenRegistration, registrationStatusLabel, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { Button, Feedback, RequiredMark, ShareIcon } from '../components/ui.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
@@ -523,13 +523,16 @@ export function TournamentDetailPage({
   };
   // Alte Links (z. B. /mitspieler nach dem Start) landen auf Info statt auf einer leeren Seite.
   const view = availableViews[route.view] ? route.view : 'info';
+  // Wer über den Anmelde-/QR-Link kommt, obwohl gerade keine Anmeldung möglich ist, landet auf Info – mit Grund.
+  const registrationUnavailable = route.view === 'anmelden' && view !== 'anmelden';
 
   async function handleShare() {
     setError('');
     setMessage('');
     let shareUrl = window.location.href;
-    // Ein privates Turnier ist nur über den Freigabe-Link sichtbar; Besitzer und Bearbeiter öffnen es ohne.
-    if (tournament.visibility === 'private' && !shareToken && tournament.canManage) {
+    // Verwalter teilen den festen Link /q/<qr_token> (derselbe wie im QR-Code), der sich nie ändert; bei privaten
+    // Turnieren aktiviert das zugleich den Freigabe-Link. Öffentliche Entwürfe sind noch nicht teilbar.
+    if (tournament.canManage && (tournament.status !== 'draft' || tournament.visibility === 'private')) {
       try {
         shareUrl = (await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' })).shareUrl;
       } catch (shareError) {
@@ -606,6 +609,13 @@ export function TournamentDetailPage({
         </nav>
 
         <div className="tournament-detail-content">
+          {registrationUnavailable && (
+            <p className="feedback offline registration-unavailable">
+              {tournament.registrationEnabled === false
+                ? t('Für dieses Turnier gibt es keine Online-Anmeldung.')
+                : `${t('Eine Online-Anmeldung ist derzeit nicht möglich:')} ${registrationStatusLabel(tournament, language)}`}
+            </p>
+          )}
           {view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} showTitle={false} shareToken={shareToken} />}
 
           {view === 'anmelden' && (

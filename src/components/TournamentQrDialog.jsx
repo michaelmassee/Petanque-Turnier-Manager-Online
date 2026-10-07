@@ -26,6 +26,14 @@ function saveBlob(blob, fileName) {
   setTimeout(() => URL.revokeObjectURL(href), 1000);
 }
 
+// Rendert den QR-Code (ohne Header/Footer) für design/url als Bitmap; Vorschau und Export nutzen dieselbe Funktion.
+async function createQrBitmap(design, url) {
+  const QRCodeStyling = await loadQrCodeStyling();
+  const logoUrl = await loadQrLogo(design);
+  const blob = await new QRCodeStyling(toQrOptions(design, url, { logoUrl })).getRawData('png');
+  return createImageBitmap(blob);
+}
+
 function canvasToBlob(canvas) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob'))), 'image/png');
@@ -86,6 +94,9 @@ export function TournamentQrDialog({ tournament, url, initialDesign = null, sour
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const canvasRef = useRef(null);
+  // Welches Design/URL die sichtbare Vorschau gerade zeigt – sie wird verzögert und asynchron gezeichnet.
+  const previewKeyRef = useRef('');
+  const currentKey = JSON.stringify([design, url]);
 
   const dirty = JSON.stringify(design) !== JSON.stringify(savedDesign ?? sanitizeQrDesign(DEFAULT_QR_DESIGN));
   const weakContrast = hasWeakQrContrast(design);
@@ -105,11 +116,11 @@ export function TournamentQrDialog({ tournament, url, initialDesign = null, sour
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const QRCodeStyling = await loadQrCodeStyling();
-        const logoUrl = await loadQrLogo(design);
-        const blob = await new QRCodeStyling(toQrOptions(design, url, { logoUrl })).getRawData('png');
-        const image = await createImageBitmap(blob);
-        if (!cancelled && canvasRef.current) drawQrImage(canvasRef.current, image, design);
+        const image = await createQrBitmap(design, url);
+        if (!cancelled && canvasRef.current) {
+          drawQrImage(canvasRef.current, image, design);
+          previewKeyRef.current = JSON.stringify([design, url]);
+        }
       } catch (previewError) {
         console.error('QR preview failed', previewError);
         if (!cancelled) setError(t('QR-Code konnte nicht erzeugt werden'));
@@ -120,6 +131,15 @@ export function TournamentQrDialog({ tournament, url, initialDesign = null, sour
       clearTimeout(timer);
     };
   }, [design, url, t]);
+
+  // PNG des aktuellen Designs: die Vorschau, wenn sie schon genau dieses Design zeigt (schnell – wichtig, damit
+  // das Teilen-Menü noch als Reaktion auf den Klick gilt), sonst frisch gerendert. Nie die leere/veraltete Vorschau.
+  async function currentPngBlob() {
+    if (canvasRef.current && previewKeyRef.current === currentKey) return canvasToBlob(canvasRef.current);
+    const canvas = document.createElement('canvas');
+    drawQrImage(canvas, await createQrBitmap(design, url), design);
+    return canvasToBlob(canvas);
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -162,7 +182,7 @@ export function TournamentQrDialog({ tournament, url, initialDesign = null, sour
     setMessage('');
     try {
       if (extension === 'png') {
-        saveBlob(await canvasToBlob(canvasRef.current), qrFileName(tournament.name, 'png', t('Turnier')));
+        saveBlob(await currentPngBlob(), qrFileName(tournament.name, 'png', t('Turnier')));
       } else {
         const QRCodeStyling = await loadQrCodeStyling();
         const svgBlob = await new QRCodeStyling(toQrOptions(design, url, { type: 'svg', logoUrl: await loadQrLogo(design) })).getRawData('svg');
@@ -185,7 +205,7 @@ export function TournamentQrDialog({ tournament, url, initialDesign = null, sour
     setError('');
     setMessage('');
     try {
-      const blob = await canvasToBlob(canvasRef.current);
+      const blob = await currentPngBlob();
       const file = new File([blob], qrFileName(tournament.name, 'png', t('Turnier')), { type: 'image/png' });
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: tournament.name, text: `${tournament.name}\n${url}` });

@@ -1306,5 +1306,7 @@
   "Design von anderem Turnier importieren": "Importer le design d’un autre tournoi",
   "Noch kein anderes Turnier mit gespeichertem QR-Code-Design. Sobald du bei einem anderen Turnier ein Design speicherst, kannst du es hier übernehmen.": "Aucun autre tournoi n’a encore de design de code QR enregistré. Dès que vous enregistrez un design pour un autre tournoi, vous pourrez l’importer ici.",
   "Design übernehmen von …": "Reprendre le design de …",
-  "PTM-Logo in Code-Farbe": "Logo PTM dans la couleur du code"
+  "PTM-Logo in Code-Farbe": "Logo PTM dans la couleur du code",
+  "Für dieses Turnier gibt es keine Online-Anmeldung.": "Ce tournoi n’a pas d’inscription en ligne.",
+  "Eine Online-Anmeldung ist derzeit nicht möglich:": "L’inscription en ligne n’est pas possible pour le moment :"
 }

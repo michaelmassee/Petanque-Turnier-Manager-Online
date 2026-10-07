@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_QR_DESIGN, sanitizeQrDesign } from './qr-design.js';
 import {
-  composeQrSvg, contrastRatio, tintLogoPixels, footerSuggestions, headerSuggestions, hasWeakQrContrast, layoutQrImage, qrFileName, registrationUrlFromShareUrl, toQrOptions, wrapText,
+  composeQrSvg, contrastRatio, tintLogoPixels, footerSuggestions, headerSuggestions, hasWeakQrContrast, layoutQrImage, qrFileName, toQrOptions, wrapText,
 } from './qr-style.js';
 
 // Mess-Attrappe: jedes Zeichen ist 10 px breit.
@@ -73,11 +73,6 @@ describe('QR-Code-Darstellung', () => {
     expect(svg.match(/<\?xml/g)).toHaveLength(1);
     expect(svg).toContain('<svg x="80" y="');
     expect(svg.match(/<text /g)).toHaveLength(1);
-  });
-
-  it('leitet die Anmelde-URL aus dem Teilen-Link ab und behält den Freigabe-Schlüssel', () => {
-    expect(registrationUrlFromShareUrl('https://ptm.test/turniere/t1/info')).toBe('https://ptm.test/turniere/t1/anmelden');
-    expect(registrationUrlFromShareUrl('https://ptm.test/turniere/t1/info?share=abc')).toBe('https://ptm.test/turniere/t1/anmelden?share=abc');
   });
 
   it('bildet einen sicheren Dateinamen', () => {

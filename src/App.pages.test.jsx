@@ -1013,13 +1013,18 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
 
+    // Geteilt wird der feste Link /q/<qr_token> vom Server – auch bei öffentlichen Turnieren.
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ shareUrl: 'https://ptmonline.org/q/fester-link-0001' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
     try {
       render(<TournamentPageHarness onSubmit={() => {}} visibility="public" />);
       fireEvent.click(screen.getByRole('button', { name: 'Turnier teilen' }));
 
       expect(await screen.findByRole('status')).toHaveTextContent('Link kopiert');
-      expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/turniere/t1/info`);
+      expect(fetchMock).toHaveBeenCalledWith('/api/tournaments/t1/share-link', expect.objectContaining({ method: 'POST' }));
+      expect(writeText).toHaveBeenCalledWith('https://ptmonline.org/q/fester-link-0001');
     } finally {
+      fetchMock.mockRestore();
       Object.defineProperty(navigator, 'share', { configurable: true, value: share });
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: clipboard });
     }

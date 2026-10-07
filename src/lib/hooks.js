@@ -74,6 +74,13 @@ export function useRoutedTournament(id, tournaments, shareToken = '') {
       return;
     }
 
+    // Ohne ID (z. B. unbekannter fester QR-Link /q/…) gibt es nichts zu laden.
+    if (!id) {
+      setFetched(null);
+      setNotFound(true);
+      return;
+    }
+
     let cancelled = false;
     setNotFound(false);
     api(`/api/tournaments/${id}${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`)

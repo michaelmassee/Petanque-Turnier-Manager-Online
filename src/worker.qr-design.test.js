@@ -2,7 +2,7 @@
 // Anmelde-QR-Code: Design pro Turnier speichern/laden, beim Duplizieren mitkopieren, nur für Verwalter.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import worker, { duplicateTournament, getTournamentById, toPublicTournament } from './worker.js';
+import worker, { duplicateTournament, ensureTournamentQrToken, getTournamentById, hasTournamentShareAccess, toPublicTournament } from './worker.js';
 
 const DESIGN = {
   fgColor: '#123456',
@@ -41,14 +41,14 @@ describe('QR-Code-Design pro Turnier', () => {
     const antwort = await anfrage('GET', 's1');
 
     expect(antwort.status).toBe(200);
-    expect(await antwort.json()).toEqual({ design: null });
+    expect(await antwort.json()).toMatchObject({ design: null });
   });
 
   it('speichert das Design und lädt es beim nächsten Öffnen wieder', async () => {
     const gespeichert = await anfrage('PUT', 's1', { design: DESIGN });
     expect(gespeichert.status).toBe(200);
 
-    expect(await (await anfrage('GET', 's1')).json()).toEqual({ design: DESIGN });
+    expect((await (await anfrage('GET', 's1')).json()).design).toEqual(DESIGN);
     // Reine Darstellung: keine Turnier-Änderung, die eine Synchronisation auslöst.
     expect(env.DB.sqlite.prepare("SELECT updated_at FROM tournaments WHERE id = 't1'").get().updated_at).toBe('2026-09-01');
   });
@@ -99,4 +99,91 @@ describe('QR-Code-Design pro Turnier', () => {
     expect(toPublicTournament(zeile, null).hasQrDesign).toBeUndefined();
     expect(toPublicTournament(zeile, null)).not.toHaveProperty('qrDesign');
   });
+
+  describe('fester Link /q/<qr_token> für QR-Code und Teilen', () => {
+    const teilen = (session = 's1') => worker.fetch(new Request('https://ptmonline.org/api/tournaments/t1/share-link', {
+      method: 'POST', headers: { Cookie: `ptm_session=${session}` },
+    }), env).then((r) => r.json());
+    const deaktivieren = () => worker.fetch(new Request('https://ptmonline.org/api/tournaments/t1/share-link', {
+      method: 'DELETE', headers: { Cookie: `ptm_session=s1` },
+    }), env);
+    const scannen = (link) => worker.fetch(new Request(link), env);
+    const qrUrl = async () => (await (await anfrage('GET', 's1')).json()).qrUrl;
+
+    beforeEach(() => {
+      env.ASSETS = { fetch: async () => new Response('<!doctype html>app', { status: 200, headers: { 'Content-Type': 'text/html' } }) };
+    });
+
+    it('liefert immer denselben Link – beim erneuten Öffnen, beim Teilen und nach Design-Änderungen', async () => {
+      const erster = await qrUrl();
+      await anfrage('PUT', 's1', { design: DESIGN });
+
+      expect(erster).toMatch(/^https:\/\/ptmonline\.org\/q\/[A-Za-z0-9_-]{22}$/);
+      expect(await qrUrl()).toBe(erster);
+      expect((await teilen()).shareUrl).toBe(erster);
+    });
+
+    it('bleibt gleich bei Sichtbarkeitswechsel und Deaktivieren/Reaktivieren der Freigabe', async () => {
+      const link = await qrUrl();
+
+      sql("UPDATE tournaments SET visibility = 'private' WHERE id = 't1'");
+      expect((await teilen()).shareUrl).toBe(link);
+      await deaktivieren();
+      expect((await teilen()).shareUrl).toBe(link);
+      sql("UPDATE tournaments SET visibility = 'public' WHERE id = 't1'");
+      expect(await qrUrl()).toBe(link);
+    });
+
+    it('leitet öffentliche Turniere auf die Anmeldeseite weiter', async () => {
+      const antwort = await scannen(await qrUrl());
+
+      expect(antwort.status).toBe(302);
+      expect(antwort.headers.get('Location')).toBe('https://ptmonline.org/turniere/t1/anmelden');
+      expect(antwort.headers.get('Cache-Control')).toBe('no-store');
+    });
+
+    it('folgt bei privaten Turnieren dem Freigabe-Link: aktiv → Zugriff, deaktiviert → kein Zugriff, wieder geteilt → Zugriff', async () => {
+      sql("UPDATE tournaments SET visibility = 'private' WHERE id = 't1'");
+      const link = (await teilen()).shareUrl;
+      const ziel = async () => new URL((await scannen(link)).headers.get('Location'));
+
+      const aktiv = await ziel();
+      expect(aktiv.pathname).toBe('/turniere/t1/anmelden');
+      expect(await hasTournamentShareAccess(env.DB, await getTournamentById(env.DB, 't1'), aktiv.searchParams.get('share'))).toBe(true);
+
+      await deaktivieren();
+      expect((await ziel()).searchParams.has('share')).toBe(false);
+
+      await teilen();
+      const wieder = await ziel();
+      expect(await hasTournamentShareAccess(env.DB, await getTournamentById(env.DB, 't1'), wieder.searchParams.get('share'))).toBe(true);
+    });
+
+    it('fällt bei unbekanntem Schlüssel (z. B. gelöschtes Turnier) auf die App durch', async () => {
+      const link = await qrUrl();
+      sql("DELETE FROM tournaments WHERE id = 't1'");
+
+      const antwort = await scannen(link);
+
+      expect(antwort.status).toBe(200);
+      expect(await antwort.text()).toContain('app');
+    });
+
+    it('gibt der Kopie beim Duplizieren einen eigenen Schlüssel', async () => {
+      const link = await qrUrl();
+      const kopie = await duplicateTournament(env.DB, await getTournamentById(env.DB, 't1'), { id: 'u1', role: 'user' });
+
+      expect(kopie.qr_token).toBeNull();
+      expect(`https://ptmonline.org/q/${await ensureTournamentQrToken(env.DB, kopie.id)}`).not.toBe(link);
+    });
+
+    it('verweigert Fremden das Erzeugen des Links', async () => {
+      const antwort = await worker.fetch(new Request('https://ptmonline.org/api/tournaments/t1/share-link', {
+        method: 'POST', headers: { Cookie: 'ptm_session=s2' },
+      }), env);
+
+      expect(antwort.status).toBe(403);
+    });
+  });
 });
+

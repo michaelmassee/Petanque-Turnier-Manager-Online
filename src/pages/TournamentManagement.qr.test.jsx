@@ -54,29 +54,50 @@ describe('Turnierverwaltung: QR-Code zur Anmeldung', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it('öffnet für ein privates Turnier den Code auf die Anmeldeseite mit Freigabe-Schlüssel und lädt das gespeicherte Design', async () => {
+  it('nutzt bei privaten Turnieren den festen Link, aktiviert dabei die Freigabe und lädt das gespeicherte Design', async () => {
     authenticatedApi.mockImplementation(async (path) => (path.endsWith('/share-link')
-      ? { shareUrl: 'https://ptm.test/turniere/privat/info?share=geheim' }
-      : { design: { header: 'Gespeicherter Header' } }));
+      ? { shareUrl: 'https://ptmonline.org/q/fester-link-privat-01' }
+      : { design: { header: 'Gespeicherter Header' }, qrUrl: 'https://ptmonline.org/q/fester-link-privat-01' }));
     renderList([{ ...BASIS, id: 'privat', name: 'Privates Turnier', visibility: 'private' }]);
 
     fireEvent.click(screen.getByRole('button', { name: 'QR-Code' }));
 
     expect(await screen.findByRole('dialog', { name: 'QR-Code zur Anmeldung' })).toBeInTheDocument();
-    expect(screen.getByText('https://ptm.test/turniere/privat/anmelden?share=geheim')).toBeInTheDocument();
+    expect(screen.getByText('https://ptmonline.org/q/fester-link-privat-01')).toBeInTheDocument();
     expect(screen.getByLabelText('Header-Text')).toHaveValue('Gespeicherter Header');
     expect(authenticatedApi).toHaveBeenCalledWith('/api/tournaments/privat/share-link', { method: 'POST' });
     expect(authenticatedApi).toHaveBeenCalledWith('/api/tournaments/privat/qr-design');
   });
 
-  it('nutzt für öffentliche Turniere die Anmeldeseite ohne Freigabe-Link', async () => {
-    authenticatedApi.mockResolvedValue({ design: null });
+  it('nutzt bei öffentlichen Turnieren den festen Link ohne Freigabe-Aufruf', async () => {
+    authenticatedApi.mockResolvedValue({ design: null, qrUrl: 'https://ptmonline.org/q/fester-link-offen-01' });
     renderList([{ ...BASIS, id: 'offen', name: 'Offenes Turnier' }]);
 
     fireEvent.click(screen.getByRole('button', { name: 'QR-Code' }));
 
-    expect(await screen.findByText(`${window.location.origin}/turniere/offen/anmelden`)).toBeInTheDocument();
+    expect(await screen.findByText('https://ptmonline.org/q/fester-link-offen-01')).toBeInTheDocument();
     expect(authenticatedApi).toHaveBeenCalledTimes(1);
+    expect(authenticatedApi).toHaveBeenCalledWith('/api/tournaments/offen/qr-design');
+  });
+
+  it('teilt beim Turnier-Teilen denselben festen Link wie im QR-Code', async () => {
+    const writeText = vi.fn().mockResolvedValue();
+    const share = navigator.share;
+    const clipboard = navigator.clipboard;
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    authenticatedApi.mockResolvedValue({ shareUrl: 'https://ptmonline.org/q/fester-link-offen-01' });
+    try {
+      renderList([{ ...BASIS, id: 'offen', name: 'Offenes Turnier' }]);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Turnier teilen' }));
+
+      expect(await screen.findByText('Link kopiert')).toBeInTheDocument();
+      expect(writeText).toHaveBeenCalledWith('https://ptmonline.org/q/fester-link-offen-01');
+    } finally {
+      Object.defineProperty(navigator, 'share', { configurable: true, value: share });
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: clipboard });
+    }
   });
 
   it('zeigt keinen QR-Code für Kalendereinträge und öffentliche Entwürfe', () => {

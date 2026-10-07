@@ -1220,6 +1220,14 @@ export default {
       }
     }
 
+    // Fester Anmelde-QR-Link /q/<qr_token>: leitet auf das aktuelle Ziel weiter. Unbekannte Schlüssel
+    // (z. B. gelöschtes Turnier) fallen auf die App durch, die dort „Turnier nicht gefunden“ zeigt.
+    const qrLinkMatch = url.pathname.match(/^\/q\/([A-Za-z0-9_-]{16,64})\/?$/);
+    if (qrLinkMatch && (request.method === 'GET' || request.method === 'HEAD')) {
+      const target = await resolveQrLinkTarget(env.DB, qrLinkMatch[1]);
+      if (target) return redirect(`${url.origin}${target}`, 302);
+    }
+
     if (!url.pathname.startsWith('/api/')) {
       return withSecurityHeaders(await env.ASSETS.fetch(request), url);
     }
@@ -2017,10 +2025,13 @@ export default {
         assertCanManageTournament(tournament, session.user);
         // Öffentliche Entwürfe haben noch keine sichtbare Seite; private sind über den Freigabe-Link teilbar.
         if (tournament.status === 'draft' && tournament.visibility !== 'private') throw new HttpError(400, 'Entwürfe können nicht geteilt werden');
-        if (tournament.visibility !== 'private' && request.method === 'POST') {
-          return json({ shareUrl: `${url.origin}/turniere/${tournament.id}/info` });
+        if (request.method === 'POST') {
+          // Geteilt wird immer der feste Link /q/<qr_token> (derselbe wie im QR-Code). Er bleibt gleich, egal ob
+          // privat/öffentlich oder Freigabe deaktiviert und wieder aktiviert; bei privaten Turnieren aktiviert
+          // Teilen den Freigabe-Link, auf den der feste Link weiterleitet.
+          if (tournament.visibility === 'private') await createTournamentShareLink(env.DB, tournament.id, url.origin);
+          return json({ shareUrl: qrLinkUrl(url, await ensureTournamentQrToken(env.DB, tournament.id)) });
         }
-        if (request.method === 'POST') return await createTournamentShareLink(env.DB, tournament.id, url.origin);
         if (request.method === 'DELETE') return await deleteTournamentShareLink(env.DB, tournament.id);
       }
 
@@ -2030,7 +2041,10 @@ export default {
         const tournament = await getTournamentById(env.DB, qrDesignMatch[1]);
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         assertCanManageTournament(tournament, session.user);
-        if (request.method === 'GET') return json({ design: parseStoredQrDesign(tournament.qr_design) });
+        if (request.method === 'GET') {
+          const qrToken = await ensureTournamentQrToken(env.DB, tournament.id);
+          return json({ design: parseStoredQrDesign(tournament.qr_design), qrUrl: qrLinkUrl(url, qrToken) });
+        }
         return json({ design: await saveTournamentQrDesign(env.DB, tournament.id, await readJson(request)) });
       }
 
@@ -2926,7 +2940,7 @@ async function resetPassword(request, db) {
 async function listUsers(db) {
   const result = await db
     .prepare(
-      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, club_id, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
     )
     .all();
   return json({ users: result.results.map(toPublicUser) });
@@ -3566,7 +3580,7 @@ export async function updateUser(request, env, id, currentUserId) {
 
   const updated = await db
     .prepare(
-      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, club_id, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users WHERE id = ?',
     )
     .bind(id)
     .first();
@@ -4651,6 +4665,35 @@ async function createTournament(request, env, user) {
 
 // Kopiert Eckdaten und Bearbeitungsrechte eines Turniers in ein neues Turnier im Status
 // "Entwurf" - bewusst ohne Anmeldungen, damit die Kopie unabhängig vom Original startet.
+// Fester Link für QR-Code und „Turnier teilen“; immer die Produktiv-Domain (lokal die Dev-Adresse).
+function qrLinkUrl(url, qrToken) {
+  return `${isLocalhost(url) ? url.origin : APP_ORIGIN}/q/${qrToken}`;
+}
+
+function randomQrToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+// Liefert den festen QR-Schlüssel des Turniers und erzeugt ihn beim ersten Mal. Er ändert sich danach nie –
+// auch nicht bei Sichtbarkeitswechsel oder deaktiviertem Freigabe-Link –, damit gedruckte QR-Codes gültig bleiben.
+export async function ensureTournamentQrToken(db, tournamentId) {
+  await db.prepare('UPDATE tournaments SET qr_token = ? WHERE id = ? AND qr_token IS NULL').bind(randomQrToken(), tournamentId).run();
+  const row = await db.prepare('SELECT qr_token FROM tournaments WHERE id = ?').bind(tournamentId).first();
+  return row.qr_token;
+}
+
+// Ziel des festen QR-Links: immer die Anmeldeseite (die App zeigt bei geschlossener Anmeldung die Info mit Hinweis).
+// Private Turniere folgen dem Freigabe-Link: aktiv → mit Schlüssel, deaktiviert → ohne (kein Zugriff), bis wieder geteilt wird.
+export async function resolveQrLinkTarget(db, qrToken) {
+  const tournament = await db.prepare('SELECT id, visibility FROM tournaments WHERE qr_token = ?').bind(qrToken).first();
+  if (!tournament) return null;
+  const path = `/turniere/${encodeURIComponent(tournament.id)}/anmelden`;
+  if (tournament.visibility !== 'private') return path;
+  const link = await db.prepare('SELECT token FROM tournament_share_links WHERE tournament_id = ?').bind(tournament.id).first();
+  return link?.token ? `${path}?share=${encodeURIComponent(link.token)}` : path;
+}
+
 // Speichert das QR-Code-Design eines Turniers. updated_at bleibt unverändert: Das Design ist
 // reine Darstellung und soll keine Turnier-Synchronisation auslösen.
 export async function saveTournamentQrDesign(db, tournamentId, body) {
@@ -8739,7 +8782,7 @@ async function requireApiKey(request, db) {
   const keyHash = await sha256Hex(secret);
   const row = await db
     .prepare(
-      `SELECT api_keys.id AS api_key_id, users.id, users.first_name, users.last_name, users.email, users.role, users.club, users.license_nr,
+      `SELECT api_keys.id AS api_key_id, users.id, users.first_name, users.last_name, users.email, users.role, users.club, users.club_id, users.license_nr,
               users.email_verified_at, users.password_change_required, users.tournament_limit, users.created_at, users.updated_at
        FROM api_keys
        JOIN users ON users.id = api_keys.user_id
@@ -8787,7 +8830,7 @@ async function requireSession(request, db) {
 
   const row = await db
     .prepare(
-      `SELECT users.id, users.first_name, users.last_name, users.username, users.username_changed_at, users.username_confirmed_at, users.email, users.pending_email, users.phone, users.role, users.club, users.license_nr, users.email_verified_at, users.password_change_required,
+      `SELECT users.id, users.first_name, users.last_name, users.username, users.username_changed_at, users.username_confirmed_at, users.email, users.pending_email, users.phone, users.role, users.club, users.club_id, users.license_nr, users.email_verified_at, users.password_change_required,
               users.tournament_limit, users.mail_enabled, users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id

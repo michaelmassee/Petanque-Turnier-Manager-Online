@@ -97,4 +97,39 @@ describe('Turnierdetail-Reiter', () => {
     expect(screen.queryByText('Mitspielgesuche zu diesem Turnier')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Info' })).toHaveAttribute('aria-current', 'page');
   });
+
+  it('zeigt über den Anmelde-/QR-Link bei geschlossener Anmeldung die Info mit Grund', () => {
+    renderDetail(tournamentWith({ registrationClosed: true }), 'anmelden');
+
+    expect(screen.getByText(/Eine Online-Anmeldung ist derzeit nicht möglich: Anmeldung geschlossen/)).toBeInTheDocument();
+    expect(tabNames()).not.toContain('Anmelden');
+  });
+
+  it('erklärt bei Kalendereinträgen, dass es keine Online-Anmeldung gibt', () => {
+    renderDetail(tournamentWith({ registrationEnabled: false }), 'anmelden');
+
+    expect(screen.getByText('Für dieses Turnier gibt es keine Online-Anmeldung.')).toBeInTheDocument();
+  });
+
+  it('zeigt bei offener Anmeldung keinen Hinweis', () => {
+    renderDetail(tournamentWith({}), 'anmelden');
+
+    expect(screen.queryByText(/Eine Online-Anmeldung ist derzeit nicht möglich/)).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei unbekanntem festem QR-Link „Turnier nicht gefunden“', async () => {
+    const route = matchTournamentRoute('/q/unbekannterSchluessel0001');
+    expect(route).toEqual({ id: '', view: 'info' });
+
+    render(
+      <TournamentDetailPage
+        route={route} tournaments={[]} currentUser={null} language="de" setLanguage={() => {}} navigate={() => {}}
+        menuOpen={false} setMenuOpen={() => {}} registrationForm={EMPTY_REGISTRATION_FORM} setRegistrationForm={() => {}}
+        onSubmitRegistration={() => {}} registrationSaving={false} message="" error="" setMessage={() => {}} setError={() => {}}
+      />,
+    );
+
+    expect(await screen.findByText('Turnier nicht gefunden')).toBeInTheDocument();
+  });
 });
+

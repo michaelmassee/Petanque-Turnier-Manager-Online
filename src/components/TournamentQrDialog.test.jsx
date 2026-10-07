@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '../lib/i18next-config.js';
 import { authenticatedApi } from '../lib/api.js';
+import { drawQrImage } from '../lib/qr-style.js';
 import { TournamentQrDialog } from './TournamentQrDialog.jsx';
 
 const qrMock = vi.hoisted(() => ({ instances: [] }));
@@ -22,10 +23,14 @@ vi.mock('qr-code-styling', () => ({
 vi.mock('../lib/api.js', () => ({ authenticatedApi: vi.fn() }));
 
 // Das Logo-Bild lädt in jsdom nicht; das Einfärben wird in qr-style.test.js auf Pixelebene geprüft.
-vi.mock('../lib/qr-style.js', async (importOriginal) => ({
-  ...(await importOriginal()),
-  loadQrLogo: (design) => Promise.resolve(design.logoInCodeColor ? `data:image/png;base64,${design.fgColor}` : '/icons/logo.png'),
-}));
+vi.mock('../lib/qr-style.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    loadQrLogo: (design) => Promise.resolve(design.logoInCodeColor ? `data:image/png;base64,${design.fgColor}` : '/icons/logo.png'),
+    drawQrImage: vi.fn(actual.drawQrImage),
+  };
+});
 
 const TOURNAMENT = { id: 't1', name: 'Herbstturnier' };
 const URL_ANMELDUNG = 'https://ptm.test/turniere/t1/anmelden';
@@ -251,6 +256,60 @@ describe('QR-Code zur Turnieranmeldung', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Design speichern' }));
     await screen.findByText('QR-Code-Design gespeichert');
     expect(JSON.parse(authenticatedApi.mock.calls[0][1].body).design.logoInCodeColor).toBe(true);
+  });
+
+  describe('Export liest nie eine leere oder veraltete Vorschau', () => {
+    let exportierteCanvas;
+    let click;
+
+    beforeEach(() => {
+      exportierteCanvas = [];
+      drawQrImage.mockClear();
+      vi.stubGlobal('URL', Object.assign(globalThis.URL, { createObjectURL: vi.fn(() => 'blob:qr'), revokeObjectURL: vi.fn() }));
+      click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function toBlob(callback) {
+        exportierteCanvas.push(this);
+        callback(new Blob(['png'], { type: 'image/png' }));
+      });
+    });
+
+    const vorschau = () => document.querySelector('.qr-preview-canvas');
+    const gezeichnetFuer = (canvas) => drawQrImage.mock.calls.filter(([ziel]) => ziel === canvas).map(([, , design]) => design);
+
+    it('rendert beim sofortigen PNG-Export nach Öffnen und Designänderung das aktuelle Design selbst', async () => {
+      renderDialog({ initialDesign: GESPEICHERT });
+      fireEvent.change(screen.getByLabelText('Footer-Text'), { target: { value: 'Sofort exportiert' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'PNG herunterladen' }));
+      await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+
+      const [canvas] = exportierteCanvas;
+      expect(canvas).not.toBe(vorschau());
+      expect(gezeichnetFuer(canvas)).toEqual([expect.objectContaining({ footer: 'Sofort exportiert', header: 'Jetzt anmelden' })]);
+    });
+
+    it('teilt auch beim sofortigen Klick das aktuelle Design', async () => {
+      const share = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal('navigator', { ...navigator, canShare: () => true, share });
+      renderDialog({ initialDesign: GESPEICHERT });
+      fireEvent.change(screen.getByLabelText('Header-Text'), { target: { value: 'Neu' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Bild teilen' }));
+      await waitFor(() => expect(share).toHaveBeenCalled());
+
+      expect(exportierteCanvas[0]).not.toBe(vorschau());
+      expect(gezeichnetFuer(exportierteCanvas[0])).toEqual([expect.objectContaining({ header: 'Neu' })]);
+    });
+
+    it('nutzt die fertige Vorschau direkt, wenn sie das aktuelle Design zeigt', async () => {
+      renderDialog({ initialDesign: GESPEICHERT });
+      await waitFor(() => expect(gezeichnetFuer(vorschau())).toHaveLength(1));
+
+      fireEvent.click(screen.getByRole('button', { name: 'PNG herunterladen' }));
+      await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+
+      expect(exportierteCanvas).toEqual([vorschau()]);
+    });
   });
 });
 

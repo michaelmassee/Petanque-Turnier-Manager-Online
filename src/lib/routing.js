@@ -30,6 +30,11 @@ export function usePath() {
 
 export function matchTournamentRoute(path) {
   const segments = path.split('/').filter(Boolean);
+  // Fester Anmelde-/Teilen-Link /q/<qr_token>: Bekannte Schlüssel leitet der Worker weiter; landet die App hier,
+  // gibt es das Turnier nicht (mehr) → Seite „Turnier nicht gefunden“.
+  if (segments[0] === 'q' && segments.length === 2) {
+    return { id: '', view: 'info' };
+  }
   if (segments[0] !== 'turniere' || !segments[1]) {
     return null;
   }

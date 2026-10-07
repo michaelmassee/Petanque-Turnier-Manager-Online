@@ -13,7 +13,6 @@ import { UsernameReportButton } from '../components/UsernameReportDialog.jsx';
 import { useClubSuggestions } from '../components/ClubSuggestions.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { TournamentQrDialog } from '../components/TournamentQrDialog.jsx';
-import { registrationUrlFromShareUrl } from '../lib/qr-style.js';
 
 /**
  * Lösch-Rückfrage; bei einem mit einem Turnierdokument verbundenen Turnier mit deutlicher Warnung, weil Spieler
@@ -648,11 +647,10 @@ export function TournamentList({
   const [qrTarget, setQrTarget] = useState(null);
   const visibleTournaments = useInfiniteList(hideCalendarEntries ? tournaments.filter((tournament) => !isCalendarEntry(tournament)) : tournaments);
 
-  // Öffentliche Turniere über ihre Info-Seite, private über den Freigabe-Link.
+  // Fester Link /q/<qr_token> – derselbe wie im QR-Code, unabhängig von Sichtbarkeit und Freigabe-Link-Status.
+  // Bei privaten Turnieren aktiviert der Aufruf zugleich den Freigabe-Link.
   async function tournamentShareUrl(tournament) {
-    return tournament.visibility === 'private'
-      ? (await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' })).shareUrl
-      : `${window.location.origin}/turniere/${tournament.id}/info`;
+    return (await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' })).shareUrl;
   }
 
   async function openQrCode(tournament) {
@@ -660,11 +658,11 @@ export function TournamentList({
     setShareError('');
     setShareMessage('');
     try {
-      const [shareUrl, data] = await Promise.all([
-        tournamentShareUrl(tournament),
-        authenticatedApi(`/api/tournaments/${tournament.id}/qr-design`),
-      ]);
-      setQrTarget({ tournament, url: registrationUrlFromShareUrl(shareUrl), design: data.design });
+      // Ein QR-Code für ein privates Turnier ist ein Teilen: Freigabe-Link aktivieren. Der QR-Code selbst nutzt
+      // aber immer den festen Link /q/<qr_token>, der sich nie ändert (siehe resolveQrLinkTarget im Worker).
+      if (tournament.visibility === 'private') await tournamentShareUrl(tournament);
+      const data = await authenticatedApi(`/api/tournaments/${tournament.id}/qr-design`);
+      setQrTarget({ tournament, url: data.qrUrl, design: data.design });
     } catch (error) {
       setShareError(error.message);
     } finally {

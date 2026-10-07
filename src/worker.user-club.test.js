@@ -3,7 +3,7 @@
 // und die einmalige Bereinigung der Bestandsdaten in Migration 0094.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema, migrationSql } from './test-support/d1.js';
-import { updateClub, updateClubAsAdmin, updateOwnProfile } from './worker.js';
+import worker, { updateClub, updateClubAsAdmin, updateOwnProfile } from './worker.js';
 
 const clubBody = (name) => ({ name, contactName: 'Kontakt', contactEmail: 'kontakt@example.test' });
 
@@ -23,6 +23,19 @@ describe('Profil-Verein', () => {
       INSERT INTO clubs (id, name, status, owner_id, created_at, updated_at) VALUES
         ('linden', 'Boule Club Linden e.V.', 'published', 'admin', '2026-01-01', '2026-01-01'),
         ('offen', 'Noch nicht freigegeben', 'pending', 'admin', '2026-01-01', '2026-01-01')`);
+  });
+
+  it('liefert die Vereinszuordnung auch nach Session-Reload und in der Admin-Nutzerliste', async () => {
+    await speichern('Boule Club Linden e.V.');
+    db.sqlite.exec(`INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES
+      ('s-anna', 'anna', '2099-01-01T00:00:00.000Z', '2026-01-01'), ('s-admin', 'admin', '2099-01-01T00:00:00.000Z', '2026-01-01')`);
+    const abrufen = (path, session) => worker.fetch(new Request(`https://ptm.test${path}`, { headers: { Cookie: `ptm_session=${session}` } }), { DB: db });
+
+    const sitzung = await (await abrufen('/api/session', 's-anna')).json();
+    const nutzerliste = await (await abrufen('/api/users', 's-admin')).json();
+
+    expect(sitzung.user).toMatchObject({ club: 'Boule Club Linden e.V.', clubId: 'linden' });
+    expect(nutzerliste.users.find((user) => user.id === 'anna')).toMatchObject({ clubId: 'linden' });
   });
 
   it('verknüpft einen freigegebenen Verein unabhängig von Groß-/Kleinschreibung und übernimmt dessen Schreibweise', async () => {

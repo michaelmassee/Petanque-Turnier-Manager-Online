@@ -185,13 +185,6 @@ export function composeQrSvg(qrSvgText, design, layout) {
     + `<rect width="100%" height="100%" fill="${design.bgColor}"/>${text(layout.header, 700)}${inner}${text(layout.footer, 500)}</svg>`;
 }
 
-// Turnier-URL (…/info[?share=…]) auf die Anmeldeseite umbiegen; ein Freigabe-Schlüssel bleibt erhalten.
-export function registrationUrlFromShareUrl(shareUrl) {
-  const url = new URL(shareUrl);
-  url.pathname = url.pathname.replace(/\/info\/?$/, '/anmelden');
-  return url.toString();
-}
-
 function fileSlug(text) {
   return String(text || '')
     .normalize('NFKD')
