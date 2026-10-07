@@ -51,10 +51,12 @@ export function RecipientPicker({ label, recipients, recipientTournaments = NO_T
       kind: 'tournament',
       id: `tournament:${tournament.id}`,
       value: `tournament:${tournament.id}`,
-      label: `${t('allParticipantsOf').replace('{name}', tournament.name)} · ${formatDate(tournament.date, i18n.language)} · ${t('registrationCount', { count: tournament.registrationCount || 0 })}`,
+      label: t('allParticipantsOf').replace('{name}', tournament.name),
+      // Zweite Zeile wie beim Benutzernamen: Datum und Anzahl der Meldungen.
+      meta: `${formatDate(tournament.date, i18n.language)} · ${t('registrationCount', { count: tournament.registrationCount || 0 })}`,
       // Kurzform fürs Eingabefeld nach der Auswahl, damit es am Handy nicht abgeschnitten wird.
       selectedLabel: `${tournament.name} · ${formatDate(tournament.date, i18n.language)}`,
-    }));
+    })).map((entry) => ({ ...entry, searchText: `${entry.label} ${entry.meta}`.toLowerCase() }));
     const knownIds = new Set(recipients.map((recipient) => recipient.id));
     const recipientEntries = [...recipients, ...emailMatches.filter((recipient) => !knownIds.has(recipient.id))].map(recipientEntry);
     return [...tournamentEntries, ...recipientEntries];

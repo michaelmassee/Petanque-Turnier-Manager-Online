@@ -23,7 +23,8 @@ describe('RecipientPicker', () => {
 
     fireEvent.focus(screen.getByRole('combobox'));
     const option = screen.getByRole('option', { name: /Herbstturnier/ });
-    expect(option).toHaveTextContent('Alle Teilnehmer von Herbstturnier · 6.10.2026 · 2 Anmeldungen');
+    expect(option.querySelector('.recipient-picker-label')).toHaveTextContent('Alle Teilnehmer von Herbstturnier');
+    expect(option.querySelector('.recipient-picker-meta')).toHaveTextContent('6.10.2026 · 2 Anmeldungen');
 
     fireEvent.click(option);
     expect(onChange).toHaveBeenCalledWith('tournament:tournament-1');
