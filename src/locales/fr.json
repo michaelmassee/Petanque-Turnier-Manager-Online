@@ -1264,7 +1264,6 @@
   "QR-Code zur Anmeldung": "Code QR d’inscription",
   "Vorschau des QR-Codes": "Aperçu du code QR",
   "Geringer Kontrast: Der QR-Code lässt sich eventuell nicht scannen. Dunkle Farbe auf hellem Hintergrund verwenden.": "Contraste faible : le code QR risque de ne pas être lisible. Utilisez une couleur foncée sur un fond clair.",
-  "Design übernehmen von …": "Reprendre le design de …",
   "Design wird geladen …": "Chargement du design …",
   "Header-Text": "Texte d’en-tête",
   "Footer-Text": "Texte de pied de page",
@@ -1285,7 +1284,6 @@
   "Eckmarken-Style": "Style des repères d’angle",
   "Eckig": "Carré",
   "Rund": "Rond",
-  "PTM-Logo anzeigen": "Afficher le logo PTM",
   "Nicht gespeicherte Änderungen am Design": "Modifications du design non enregistrées",
   "Link kopieren": "Copier le lien",
   "SVG herunterladen": "Télécharger le SVG",
@@ -1298,5 +1296,15 @@
   "Jetzt anmelden:": "Inscrivez-vous :",
   "Vorschläge für den Header-Text": "Suggestions pour le texte d’en-tête",
   "Vorschläge:": "Suggestions :",
-  "Vorschläge für den Footer-Text": "Suggestions pour le texte de pied de page"
+  "Vorschläge für den Footer-Text": "Suggestions pour le texte de pied de page",
+  "Runde Punkte": "Points ronds",
+  "Tab übernimmt:": "Tab accepte :",
+  "PTM-Logo anzeigen": "Afficher le logo PTM",
+  "Bild teilen": "Partager l’image",
+  "Bild in die Zwischenablage kopiert": "Image copiée dans le presse-papiers",
+  "Bild konnte nicht geteilt werden": "L’image n’a pas pu être partagée",
+  "Design von anderem Turnier importieren": "Importer le design d’un autre tournoi",
+  "Noch kein anderes Turnier mit gespeichertem QR-Code-Design. Sobald du bei einem anderen Turnier ein Design speicherst, kannst du es hier übernehmen.": "Aucun autre tournoi n’a encore de design de code QR enregistré. Dès que vous enregistrez un design pour un autre tournoi, vous pourrez l’importer ici.",
+  "Design übernehmen von …": "Reprendre le design de …",
+  "PTM-Logo in Code-Farbe": "Logo PTM dans la couleur du code"
 }

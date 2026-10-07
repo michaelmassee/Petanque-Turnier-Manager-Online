@@ -16,7 +16,55 @@ export function qrCodeSize(width = QR_IMAGE_WIDTH) {
   return width - 2 * PADDING;
 }
 
-export function toQrOptions(design, url, { type = 'canvas', size = qrCodeSize() } = {}) {
+function hexToRgb(hex) {
+  return [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16));
+}
+
+// Färbt RGBA-Pixel des Logos zweifarbig ein: dunkle/farbige Teile → Code-Farbe, helle (z. B. die weißen
+// Podest-Zahlen) → Hintergrundfarbe. Transparenz bleibt erhalten. Ändert data in place.
+export function tintLogoPixels(data, fgColor, bgColor) {
+  const fg = hexToRgb(fgColor);
+  const bg = hexToRgb(bgColor);
+  for (let i = 0; i < data.length; i += 4) {
+    const luminance = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
+    const light = Math.min(1, Math.max(0, (luminance - 0.55) / 0.3));
+    for (let channel = 0; channel < 3; channel += 1) {
+      data[i + channel] = Math.round(fg[channel] + (bg[channel] - fg[channel]) * light);
+    }
+  }
+  return data;
+}
+
+const tintedLogoCache = new Map();
+
+// Liefert die Logo-URL für das Design: Original oder (Option „PTM-Logo in Code-Farbe“) eine eingefärbte data:-URL.
+export function loadQrLogo(design) {
+  if (!design.logoInCodeColor) return Promise.resolve(QR_LOGO_URL);
+  const key = `${design.fgColor}/${design.bgColor}`;
+  if (!tintedLogoCache.has(key)) {
+    const promise = new Promise((resolve, reject) => {
+      const logo = new Image();
+      logo.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = logo.naturalWidth;
+        canvas.height = logo.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(logo, 0, 0);
+        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        tintLogoPixels(pixels.data, design.fgColor, design.bgColor);
+        ctx.putImageData(pixels, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      logo.onerror = () => reject(new Error('logo'));
+      logo.src = QR_LOGO_URL;
+    });
+    promise.catch(() => tintedLogoCache.delete(key));
+    tintedLogoCache.set(key, promise);
+  }
+  return tintedLogoCache.get(key);
+}
+
+export function toQrOptions(design, url, { type = 'canvas', size = qrCodeSize(), logoUrl = QR_LOGO_URL } = {}) {
   const cornerColor = design.cornerColor || design.fgColor;
   return {
     type,
@@ -25,9 +73,10 @@ export function toQrOptions(design, url, { type = 'canvas', size = qrCodeSize() 
     margin: 0,
     data: url,
     qrOptions: { errorCorrectionLevel: 'H' },
-    ...(design.showLogo
-      ? { image: QR_LOGO_URL, imageOptions: { hideBackgroundDots: true, imageSize: 0.3, margin: 8, crossOrigin: 'anonymous' } }
-      : {}),
+    // Das PTM-Logo ist immer enthalten. Ein eingefärbtes Logo ist bereits eine data:-URL: dann kein
+    // Nachladen per XHR (saveAsBlob), das scheitert an der CSP (connect-src 'self') und lässt das Rendern hängen.
+    image: logoUrl,
+    imageOptions: { hideBackgroundDots: true, saveAsBlob: !logoUrl.startsWith('data:'), imageSize: 0.3, margin: 8, crossOrigin: 'anonymous' },
     dotsOptions: { type: design.dotType, color: design.fgColor },
     cornersSquareOptions: { type: design.cornerType, color: cornerColor },
     cornersDotOptions: { type: design.cornerType === 'square' ? 'square' : 'dot', color: cornerColor },
@@ -143,15 +192,20 @@ export function registrationUrlFromShareUrl(shareUrl) {
   return url.toString();
 }
 
-export function qrFileName(tournamentName, extension) {
-  const slug = String(tournamentName || 'turnier')
+function fileSlug(text) {
+  return String(text || '')
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 60) || 'turnier';
-  return `qr-${slug}.${extension}`;
+    .slice(0, 60);
+}
+
+// Dateiname für den Download; fallback ist der übersetzte Ersatzname, wenn der Turniername nichts Verwertbares hergibt.
+export function qrFileName(tournamentName, extension, fallback = '') {
+  const slug = fileSlug(tournamentName) || fileSlug(fallback);
+  return slug ? `qr-${slug}.${extension}` : `qr.${extension}`;
 }
 
 function uniqueSuggestions(candidates, maxLength) {
@@ -159,14 +213,17 @@ function uniqueSuggestions(candidates, maxLength) {
     .map((text) => text.slice(0, maxLength));
 }
 
-// Vorschläge für den Header-Text aus Turniername und Datum; Bausteine kommen übersetzt herein.
+// Vorschläge für den Header-Text aus Turniername, Verein und Datum; Bausteine kommen übersetzt herein.
 export function headerSuggestions(tournament, { callToAction, prefix, dateLabel = '' }, maxLength = 120) {
   const name = String(tournament?.name || '').trim();
+  const club = String(tournament?.club || '').trim();
   return uniqueSuggestions([
     callToAction,
     name,
     name && `${prefix} ${name}`,
     name && dateLabel && `${name} · ${dateLabel}`,
+    club && name && `${club} · ${name}`,
+    club && `${prefix} ${club}`,
   ], maxLength);
 }
 

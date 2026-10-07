@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_QR_DESIGN, sanitizeQrDesign } from './qr-design.js';
 import {
-  composeQrSvg, contrastRatio, footerSuggestions, headerSuggestions, hasWeakQrContrast, layoutQrImage, qrFileName, registrationUrlFromShareUrl, toQrOptions, wrapText,
+  composeQrSvg, contrastRatio, tintLogoPixels, footerSuggestions, headerSuggestions, hasWeakQrContrast, layoutQrImage, qrFileName, registrationUrlFromShareUrl, toQrOptions, wrapText,
 } from './qr-style.js';
 
 // Mess-Attrappe: jedes Zeichen ist 10 px breit.
@@ -29,7 +29,7 @@ describe('QR-Code-Darstellung', () => {
       data: 'https://ptm.test/x',
       qrOptions: { errorCorrectionLevel: 'H' },
       image: '/icons/logo.png',
-      imageOptions: { hideBackgroundDots: true },
+      imageOptions: { hideBackgroundDots: true, saveAsBlob: true, imageSize: 0.3 },
       dotsOptions: { type: 'dots', color: '#123456' },
       cornersSquareOptions: { type: 'dot', color: '#aa0000' },
       cornersDotOptions: { type: 'dot', color: '#aa0000' },
@@ -37,10 +37,10 @@ describe('QR-Code-Darstellung', () => {
     });
   });
 
-  it('lässt das Logo weg, wenn es abgeschaltet ist, und nutzt sonst die Code-Farbe für die Ecken', () => {
-    const options = toQrOptions(design({ showLogo: false }), 'https://ptm.test/x');
+  it('enthält immer das Logo und nutzt ohne eigene Eckfarbe die Code-Farbe', () => {
+    const options = toQrOptions(design(), 'https://ptm.test/x');
 
-    expect(options).not.toHaveProperty('image');
+    expect(options.image).toBe('/icons/logo.png');
     expect(options.cornersSquareOptions.color).toBe('#000000');
     expect(options.cornersDotOptions.type).toBe('square');
   });
@@ -82,12 +82,16 @@ describe('QR-Code-Darstellung', () => {
 
   it('bildet einen sicheren Dateinamen', () => {
     expect(qrFileName('Pétanque-Cup 2026 / Herbst', 'png')).toBe('qr-petanque-cup-2026-herbst.png');
-    expect(qrFileName('', 'svg')).toBe('qr-turnier.svg');
+    expect(qrFileName('', 'svg', 'Tournament')).toBe('qr-tournament.svg');
+    expect(qrFileName('🎉', 'png', 'Toernooi')).toBe('qr-toernooi.png');
+    expect(qrFileName('', 'png')).toBe('qr.png');
   });
 
   it('bereinigt Designs aus unsicherer Quelle', () => {
     expect(sanitizeQrDesign(null)).toEqual(DEFAULT_QR_DESIGN);
-    expect(sanitizeQrDesign({ fgColor: '#ABCDEF', showLogo: 'ja', textSize: 'xl' })).toMatchObject({ fgColor: '#abcdef', showLogo: false, textSize: 'm' });
+    expect(sanitizeQrDesign({ fgColor: '#ABCDEF', textSize: 'xl' })).toMatchObject({ fgColor: '#abcdef', textSize: 'm' });
+    // Früher gespeichertes showLogo wird ignoriert – das Logo ist immer enthalten.
+    expect(sanitizeQrDesign({ showLogo: false })).not.toHaveProperty('showLogo');
   });
 
   it('schlägt Header-Texte aus Turniername und Datum vor, ohne Dubletten', () => {
@@ -95,6 +99,10 @@ describe('QR-Code-Darstellung', () => {
 
     expect(headerSuggestions({ name: 'Herbstturnier' }, texte)).toEqual([
       'Jetzt anmelden!', 'Herbstturnier', 'Jetzt anmelden: Herbstturnier', 'Herbstturnier · 4.10.2026',
+    ]);
+    expect(headerSuggestions({ name: 'Herbstturnier', club: 'BC Musterstadt' }, texte)).toEqual([
+      'Jetzt anmelden!', 'Herbstturnier', 'Jetzt anmelden: Herbstturnier', 'Herbstturnier · 4.10.2026',
+      'BC Musterstadt · Herbstturnier', 'Jetzt anmelden: BC Musterstadt',
     ]);
     expect(headerSuggestions({ name: '' }, texte)).toEqual(['Jetzt anmelden!']);
     expect(headerSuggestions({ name: 'Jetzt anmelden!' }, { ...texte, dateLabel: '' })).toEqual(['Jetzt anmelden!', 'Jetzt anmelden: Jetzt anmelden!']);
@@ -113,4 +121,36 @@ describe('QR-Code-Darstellung', () => {
     expect(footerSuggestions({ name: 'Herbstturnier', club: null })).toEqual(['Herbstturnier']);
   });
 
+
+
+  it('übernimmt ein eingefärbtes Logo als data:-URL ohne Nachladen', () => {
+    const options = toQrOptions(design(), 'https://ptm.test/x', { logoUrl: 'data:image/png;base64,abc' });
+
+    expect(options.image).toBe('data:image/png;base64,abc');
+    expect(options.imageOptions).toMatchObject({ hideBackgroundDots: true, saveAsBlob: false });
+  });
+
+  it('färbt das Logo zweifarbig: Dunkles/Farbiges in Code-Farbe, Helles in Hintergrundfarbe, Alpha bleibt', () => {
+    const pixel = (r, g, b, a) => [r, g, b, a];
+    const data = new Uint8ClampedArray([
+      ...pixel(0, 0, 0, 255), // schwarz
+      ...pixel(22, 119, 255, 255), // PTM-Blau
+      ...pixel(255, 255, 255, 255), // weiße Podest-Zahl
+      ...pixel(255, 255, 255, 0), // transparent
+    ]);
+
+    tintLogoPixels(data, '#0f6b3a', '#fff4e0');
+
+    expect([...data.slice(0, 4)]).toEqual([15, 107, 58, 255]);
+    expect([...data.slice(4, 8)]).toEqual([15, 107, 58, 255]);
+    expect([...data.slice(8, 12)]).toEqual([255, 244, 224, 255]);
+    expect(data[15]).toBe(0);
+  });
+
+  it('speichert die Option „Logo in Code-Farbe“ nur als echten Boolean', () => {
+    expect(sanitizeQrDesign({ logoInCodeColor: true }).logoInCodeColor).toBe(true);
+    expect(sanitizeQrDesign({ logoInCodeColor: 'ja' }).logoInCodeColor).toBe(false);
+    expect(sanitizeQrDesign({}).logoInCodeColor).toBe(false);
+  });
 });
+

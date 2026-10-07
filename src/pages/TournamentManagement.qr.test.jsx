@@ -14,6 +14,12 @@ vi.mock('qr-code-styling', () => ({
 
 vi.mock('../lib/api.js', () => ({ authenticatedApi: vi.fn() }));
 
+// Das Logo-Bild lädt in jsdom nicht; das Einfärben wird in qr-style.test.js auf Pixelebene geprüft.
+vi.mock('../lib/qr-style.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  loadQrLogo: (design) => Promise.resolve(design.logoInCodeColor ? `data:image/png;base64,${design.fgColor}` : '/icons/logo.png'),
+}));
+
 const BASIS = {
   location: 'Musterstadt', date: '2099-06-01', formation: 'doublette', registrationType: 'forme', type: 'ko', status: 'registration',
   visibility: 'public', activeRegistrations: 0, maxRegistrations: 16, waitlistRegistrations: 0, canManage: true,

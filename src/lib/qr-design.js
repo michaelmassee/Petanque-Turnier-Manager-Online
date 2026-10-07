@@ -13,7 +13,8 @@ export const DEFAULT_QR_DESIGN = Object.freeze({
   cornerColor: '',
   dotType: 'square',
   cornerType: 'square',
-  showLogo: true,
+  // PTM-Logo zweifarbig in Code-/Hintergrundfarbe statt im Original.
+  logoInCodeColor: false,
   header: '',
   footer: '',
   textSize: 'm',
@@ -47,7 +48,7 @@ export function sanitizeQrDesign(value) {
     cornerColor: input.cornerColor ? color(input.cornerColor, '') : '',
     dotType: oneOf(input.dotType, QR_DOT_TYPES, DEFAULT_QR_DESIGN.dotType),
     cornerType: oneOf(input.cornerType, QR_CORNER_TYPES, DEFAULT_QR_DESIGN.cornerType),
-    showLogo: input.showLogo === undefined ? DEFAULT_QR_DESIGN.showLogo : input.showLogo === true,
+    logoInCodeColor: input.logoInCodeColor === true,
     header: designText(input.header),
     footer: designText(input.footer),
     textSize: oneOf(input.textSize, QR_TEXT_SIZES, DEFAULT_QR_DESIGN.textSize),

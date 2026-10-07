@@ -3692,8 +3692,17 @@ a.left-panel-link {
   min-width: 0;
 }
 
-.qr-settings > .button {
-  align-self: flex-start;
+.qr-preview > .button {
+  padding: 6px 14px;
+  font-size: 0.9rem;
+}
+
+.qr-dialog-actions {
+  align-items: center;
+}
+
+.qr-dialog-actions-spacer {
+  flex: 1;
 }
 
 .qr-color-field {
@@ -3741,6 +3750,14 @@ a.left-panel-link {
   .qr-preview {
     position: static;
   }
+
+  .qr-dialog-actions-spacer {
+    display: none;
+  }
+
+  .qr-dialog-actions .button {
+    flex: 1 1 auto;
+  }
 }
 
 .qr-suggestions {
@@ -3770,3 +3787,13 @@ a.left-panel-link {
   background: #e8f1ff;
 }
 
+
+.qr-import {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px dashed #b8c2d3;
+  border-radius: 8px;
+  background: #f8fafd;
+}

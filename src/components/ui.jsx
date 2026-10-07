@@ -9,6 +9,14 @@ export function ShareIcon({ size = 20 }) {
   );
 }
 
+export function DownloadIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M5 20h14v-2H5v2zm14-11h-4V3H9v6H5l7 7 7-7z" />
+    </svg>
+  );
+}
+
 export function RequiredMark() {
   return <span className="required-mark" aria-hidden="true"> *</span>;
 }

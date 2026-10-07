@@ -1264,7 +1264,6 @@
   "QR-Code zur Anmeldung": "Código QR de inscripción",
   "Vorschau des QR-Codes": "Vista previa del código QR",
   "Geringer Kontrast: Der QR-Code lässt sich eventuell nicht scannen. Dunkle Farbe auf hellem Hintergrund verwenden.": "Contraste bajo: es posible que el código QR no se pueda escanear. Usa un color oscuro sobre fondo claro.",
-  "Design übernehmen von …": "Copiar diseño de …",
   "Design wird geladen …": "Cargando diseño …",
   "Header-Text": "Texto de cabecera",
   "Footer-Text": "Texto de pie",
@@ -1285,7 +1284,6 @@
   "Eckmarken-Style": "Estilo de las marcas de esquina",
   "Eckig": "Cuadrado",
   "Rund": "Redondo",
-  "PTM-Logo anzeigen": "Mostrar logotipo de PTM",
   "Nicht gespeicherte Änderungen am Design": "Cambios de diseño sin guardar",
   "Link kopieren": "Copiar enlace",
   "SVG herunterladen": "Descargar SVG",
@@ -1298,5 +1296,15 @@
   "Jetzt anmelden:": "Inscríbete ya:",
   "Vorschläge für den Header-Text": "Sugerencias para el texto de cabecera",
   "Vorschläge:": "Sugerencias:",
-  "Vorschläge für den Footer-Text": "Sugerencias para el texto de pie"
+  "Vorschläge für den Footer-Text": "Sugerencias para el texto de pie",
+  "Runde Punkte": "Puntos redondos",
+  "Tab übernimmt:": "Tab acepta:",
+  "PTM-Logo anzeigen": "Mostrar logotipo de PTM",
+  "Bild teilen": "Compartir imagen",
+  "Bild in die Zwischenablage kopiert": "Imagen copiada al portapapeles",
+  "Bild konnte nicht geteilt werden": "No se pudo compartir la imagen",
+  "Design von anderem Turnier importieren": "Importar diseño de otro torneo",
+  "Noch kein anderes Turnier mit gespeichertem QR-Code-Design. Sobald du bei einem anderen Turnier ein Design speicherst, kannst du es hier übernehmen.": "Ningún otro torneo tiene todavía un diseño de código QR guardado. En cuanto guardes un diseño en otro torneo, podrás importarlo aquí.",
+  "Design übernehmen von …": "Copiar diseño de …",
+  "PTM-Logo in Code-Farbe": "Logotipo de PTM en el color del código"
 }

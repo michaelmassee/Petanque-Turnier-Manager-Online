@@ -1264,7 +1264,6 @@
   "QR-Code zur Anmeldung": "QR-code voor inschrijving",
   "Vorschau des QR-Codes": "Voorbeeld van de QR-code",
   "Geringer Kontrast: Der QR-Code lässt sich eventuell nicht scannen. Dunkle Farbe auf hellem Hintergrund verwenden.": "Laag contrast: de QR-code is mogelijk niet scanbaar. Gebruik een donkere kleur op een lichte achtergrond.",
-  "Design übernehmen von …": "Ontwerp overnemen van …",
   "Design wird geladen …": "Ontwerp wordt geladen …",
   "Header-Text": "Koptekst",
   "Footer-Text": "Voettekst",
@@ -1285,7 +1284,6 @@
   "Eckmarken-Style": "Stijl van de hoekmarkeringen",
   "Eckig": "Hoekig",
   "Rund": "Rond",
-  "PTM-Logo anzeigen": "PTM-logo tonen",
   "Nicht gespeicherte Änderungen am Design": "Niet-opgeslagen wijzigingen aan het ontwerp",
   "Link kopieren": "Link kopiëren",
   "SVG herunterladen": "SVG downloaden",
@@ -1298,5 +1296,15 @@
   "Jetzt anmelden:": "Schrijf je nu in:",
   "Vorschläge für den Header-Text": "Suggesties voor de koptekst",
   "Vorschläge:": "Suggesties:",
-  "Vorschläge für den Footer-Text": "Suggesties voor de voettekst"
+  "Vorschläge für den Footer-Text": "Suggesties voor de voettekst",
+  "Runde Punkte": "Ronde stippen",
+  "Tab übernimmt:": "Tab neemt over:",
+  "PTM-Logo anzeigen": "PTM-logo tonen",
+  "Bild teilen": "Afbeelding delen",
+  "Bild in die Zwischenablage kopiert": "Afbeelding naar klembord gekopieerd",
+  "Bild konnte nicht geteilt werden": "Afbeelding kon niet worden gedeeld",
+  "Design von anderem Turnier importieren": "Ontwerp van ander toernooi importeren",
+  "Noch kein anderes Turnier mit gespeichertem QR-Code-Design. Sobald du bei einem anderen Turnier ein Design speicherst, kannst du es hier übernehmen.": "Nog geen ander toernooi met een opgeslagen QR-codeontwerp. Zodra je bij een ander toernooi een ontwerp opslaat, kun je het hier overnemen.",
+  "Design übernehmen von …": "Ontwerp overnemen van …",
+  "PTM-Logo in Code-Farbe": "PTM-logo in codekleur"
 }

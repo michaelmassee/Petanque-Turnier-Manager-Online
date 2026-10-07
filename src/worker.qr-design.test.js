@@ -10,7 +10,7 @@ const DESIGN = {
   cornerColor: '#aa0000',
   dotType: 'rounded',
   cornerType: 'extra-rounded',
-  showLogo: false,
+  logoInCodeColor: true,
   header: 'Jetzt anmelden!',
   footer: 'Boule-Club Musterstadt',
   textSize: 'l',

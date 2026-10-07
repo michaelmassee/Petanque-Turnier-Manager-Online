@@ -21,9 +21,15 @@ vi.mock('qr-code-styling', () => ({
 
 vi.mock('../lib/api.js', () => ({ authenticatedApi: vi.fn() }));
 
+// Das Logo-Bild lädt in jsdom nicht; das Einfärben wird in qr-style.test.js auf Pixelebene geprüft.
+vi.mock('../lib/qr-style.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  loadQrLogo: (design) => Promise.resolve(design.logoInCodeColor ? `data:image/png;base64,${design.fgColor}` : '/icons/logo.png'),
+}));
+
 const TOURNAMENT = { id: 't1', name: 'Herbstturnier' };
 const URL_ANMELDUNG = 'https://ptm.test/turniere/t1/anmelden';
-const GESPEICHERT = { fgColor: '#123456', bgColor: '#ffffff', cornerColor: '', dotType: 'rounded', cornerType: 'dot', showLogo: true, header: 'Jetzt anmelden', footer: 'BC Muster', textSize: 'm' };
+const GESPEICHERT = { fgColor: '#123456', bgColor: '#ffffff', cornerColor: '', dotType: 'rounded', cornerType: 'dot', header: 'Jetzt anmelden', footer: 'BC Muster', textSize: 'm' };
 
 const ctx = {
   font: '', fillStyle: '', textAlign: '', textBaseline: '',
@@ -110,7 +116,7 @@ describe('QR-Code zur Turnieranmeldung', () => {
     fireEvent.click(screen.getByRole('button', { name: 'SVG herunterladen' }));
     await waitFor(() => expect(click).toHaveBeenCalledTimes(2));
 
-    expect(letzteOptionen().type).toBe('svg');
+    expect(qrMock.instances.some((instance) => instance.options.type === 'svg')).toBe(true);
     const svg = await createObjectURL.mock.calls[1][0].text();
     expect(svg).toContain('>Jetzt anmelden</text>');
     expect(svg).toContain('>BC Muster</text>');
@@ -126,7 +132,7 @@ describe('QR-Code zur Turnieranmeldung', () => {
       ],
     });
 
-    fireEvent.focus(screen.getByRole('combobox', { name: 'Design übernehmen von …' }));
+    fireEvent.focus(screen.getByRole('combobox', { name: 'Design von anderem Turnier importieren' }));
     const liste = screen.getByRole('listbox');
     expect(within(liste).getAllByRole('option').map((option) => option.textContent)).toEqual([expect.stringContaining('Wintercup')]);
     fireEvent.click(within(liste).getByRole('option', { name: /Wintercup/ }));
@@ -139,10 +145,12 @@ describe('QR-Code zur Turnieranmeldung', () => {
     expect(screen.getByText('Nicht gespeicherte Änderungen am Design')).toBeInTheDocument();
   });
 
-  it('blendet die Übernahme aus, wenn kein anderes Turnier ein Design hat', () => {
+  it('zeigt den Import auch ohne Quelle und erklärt, warum nichts auswählbar ist', () => {
     renderDialog({ sourceTournaments: [{ id: 't1', name: 'Herbstturnier', canManage: true, hasQrDesign: true }] });
 
-    expect(screen.queryByRole('combobox', { name: 'Design übernehmen von …' })).not.toBeInTheDocument();
+    expect(screen.getByText('Design von anderem Turnier importieren')).toBeInTheDocument();
+    expect(screen.getByText(/Noch kein anderes Turnier mit gespeichertem QR-Code-Design/)).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Design von anderem Turnier importieren' })).not.toBeInTheDocument();
   });
 
   it('schlägt Header-Texte vor und übernimmt einen Vorschlag per Klick', () => {
@@ -165,4 +173,84 @@ describe('QR-Code zur Turnieranmeldung', () => {
     expect(screen.getByLabelText('Footer-Text')).toHaveValue('BC Musterstadt · Herbstturnier');
   });
 
+
+  describe('Bild teilen', () => {
+    const teilen = () => fireEvent.click(screen.getByRole('button', { name: 'Bild teilen' }));
+
+    beforeEach(() => {
+      vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function toBlob(callback) { callback(new Blob(['png'], { type: 'image/png' })); });
+    });
+
+    it('teilt das PNG mit Turniername und Anmeldelink über das Teilen-Menü', async () => {
+      const share = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal('navigator', { ...navigator, canShare: () => true, share });
+      renderDialog();
+
+      teilen();
+
+      await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+      const [daten] = share.mock.calls[0];
+      expect(daten.files[0]).toBeInstanceOf(File);
+      expect(daten.files[0].name).toBe('qr-herbstturnier.png');
+      expect(daten.files[0].type).toBe('image/png');
+      expect(daten.text).toBe(`Herbstturnier\n${URL_ANMELDUNG}`);
+    });
+
+    it('kopiert das Bild in die Zwischenablage, wenn Dateien nicht geteilt werden können', async () => {
+      const write = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal('ClipboardItem', class { constructor(items) { this.items = items; } });
+      vi.stubGlobal('navigator', { ...navigator, canShare: () => false, clipboard: { write } });
+      renderDialog();
+
+      teilen();
+
+      expect(await screen.findByText('Bild in die Zwischenablage kopiert')).toBeInTheDocument();
+      expect(write.mock.calls[0][0][0].items).toHaveProperty('image/png');
+    });
+
+    it('meldet, wenn das Gerät weder Teilen noch Bild-Zwischenablage kann', async () => {
+      vi.stubGlobal('navigator', { ...navigator, canShare: undefined, clipboard: undefined });
+      renderDialog();
+
+      teilen();
+
+      expect(await screen.findByText('Teilen wird von diesem Gerät nicht unterstützt')).toBeInTheDocument();
+    });
+
+    it('zeigt keinen Fehler, wenn das Teilen abgebrochen wird', async () => {
+      const share = vi.fn().mockRejectedValue(Object.assign(new Error('abgebrochen'), { name: 'AbortError' }));
+      vi.stubGlobal('navigator', { ...navigator, canShare: () => true, share });
+      renderDialog();
+
+      teilen();
+
+      await waitFor(() => expect(share).toHaveBeenCalled());
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Bild teilen' })).toBeEnabled());
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('meldet einen Fehler beim Teilen', async () => {
+      vi.stubGlobal('navigator', { ...navigator, canShare: () => true, share: vi.fn().mockRejectedValue(new Error('kaputt')) });
+      renderDialog();
+
+      teilen();
+
+      expect(await screen.findByText('Bild konnte nicht geteilt werden')).toBeInTheDocument();
+    });
+  });
+
+  it('färbt das PTM-Logo auf Wunsch in der Code-Farbe ein und speichert die Option', async () => {
+    authenticatedApi.mockImplementation(async (path, options) => ({ design: JSON.parse(options.body).design }));
+    renderDialog({ initialDesign: GESPEICHERT });
+    await waitFor(() => expect(letzteOptionen().image).toBe('/icons/logo.png'));
+
+    fireEvent.click(screen.getByLabelText('PTM-Logo in Code-Farbe'));
+
+    await waitFor(() => expect(letzteOptionen().image).toBe('data:image/png;base64,#123456'));
+    expect(letzteOptionen().imageOptions.saveAsBlob).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Design speichern' }));
+    await screen.findByText('QR-Code-Design gespeichert');
+    expect(JSON.parse(authenticatedApi.mock.calls[0][1].body).design.logoInCodeColor).toBe(true);
+  });
 });
+
