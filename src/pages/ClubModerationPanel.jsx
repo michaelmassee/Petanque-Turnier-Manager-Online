@@ -162,7 +162,12 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
   const filteredClubs = term
     ? clubs.filter((c) => `${c.name} ${c.ownerName} ${c.ownerEmail}`.toLowerCase().includes(term))
     : clubs;
-  const visibleRequests = useInfiniteList(filteredRequests);
+  // Offen sind neue Organisationen zur Freigabe und Bearbeiter-Anfragen - wie im Dashboard-Zähler.
+  const openRequests = [
+    ...filteredClubs.filter((club) => club.status === 'pending').map((club) => ({ key: `club-${club.id}`, club })),
+    ...filteredRequests.map((request) => ({ key: `approve-${request.club_id}-${request.user_id}`, request })),
+  ];
+  const visibleRequests = useInfiniteList(openRequests);
   const visiblePlaces = useInfiniteList(filteredPlaces);
   const visiblePlaceReports = useInfiniteList(filteredPlaceReports);
   const visibleAllPlaces = useInfiniteList(filteredAllPlaces);
@@ -279,12 +284,28 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
           {showingClubs && <div className="panel user-list-panel">
             <div className="section-title">
               <h2>{t('Offene Vereinsanfragen')}</h2>
-              <span className="counter">{filteredRequests.length}</span>
+              <span className="counter">{openRequests.length}</span>
             </div>
             <div className="user-list">
-              {filteredRequests.length === 0 && <p className="muted">{t('Keine offenen Vereinsanfragen.')}</p>}
-              {visibleRequests.items.map((request) => {
-                const id = `approve-${request.club_id}-${request.user_id}`;
+              {openRequests.length === 0 && <p className="muted">{t('Keine offenen Vereinsanfragen.')}</p>}
+              {visibleRequests.items.map(({ key, club, request }) => {
+                if (club) {
+                  const statusId = `club-status-${club.id}`;
+                  return (
+                    <article className="data-row" key={key}>
+                      <div>
+                        <strong data-i18n-skip>{club.name}</strong>
+                        <span data-i18n-skip className="status registration-pending">{statusLabel(club.status, t)} · {club.ownerName} ({club.ownerEmail})</span>
+                      </div>
+                      <div className="row-actions">
+                        <Button loading={busyId === statusId} disabled={Boolean(busyId)} onClick={() => setClubStatus(club, 'published')}>{t('Freigeben')}</Button>
+                        <Button variant="secondary" loading={busyId === statusId} disabled={Boolean(busyId)} onClick={() => setClubStatus(club, 'rejected')}>{t('Ablehnen')}</Button>
+                        <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openEditClub(club)}>{t('Bearbeiten')}</Button>
+                      </div>
+                    </article>
+                  );
+                }
+                const id = key;
                 return (
                   <article className="data-row" key={id}>
                     <div>

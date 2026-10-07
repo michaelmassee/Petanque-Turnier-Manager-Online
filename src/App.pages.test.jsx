@@ -818,6 +818,32 @@ describe('Vereinsmoderation', () => {
     expect(authenticatedApi).toHaveBeenCalledWith('/api/admin/clubs/club-1', expect.objectContaining({ method: 'PUT' }));
   });
 
+  it('listet neue Organisationen unter den offenen Vereinsanfragen und gibt sie dort frei', async () => {
+    const pending = { id: 'club-2', name: 'KSG Bönstadt', status: 'pending', ownerName: 'Ada Admin', ownerEmail: 'ada@example.com', placeCount: 1, editorCount: 0 };
+    const published = { id: 'club-1', name: 'BC Linden', status: 'published', ownerName: 'Anna Admin', ownerEmail: 'anna@example.com', placeCount: 1, editorCount: 1 };
+    const authenticatedApi = vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation((path, options = {}) => {
+      if (path === '/api/admin/club-editor-requests') return Promise.resolve({ requests: [] });
+      if (path === '/api/admin/pending-places') return Promise.resolve({ places: [] });
+      if (path === '/api/admin/place-reports') return Promise.resolve({ places: [] });
+      if (path === '/api/admin/places') return Promise.resolve({ places: [] });
+      if (path === '/api/admin/clubs') return Promise.resolve({ clubs: [pending, published] });
+      if (path === '/api/users') return Promise.resolve({ users: [] });
+      if (path === '/api/admin/clubs/club-2/status' && options.method === 'PUT') return Promise.resolve({ ok: true });
+      throw new Error(`unerwarteter API-Aufruf: ${options.method || 'GET'} ${path}`);
+    });
+
+    render(<ClubModerationPanel language="de" />);
+
+    const offen = (await screen.findByRole('heading', { name: 'Offene Vereinsanfragen' })).closest('.panel');
+    expect(within(offen).getByText('1')).toBeInTheDocument();
+    expect(within(offen).getByText('KSG Bönstadt')).toBeInTheDocument();
+    expect(within(offen).queryByText('BC Linden')).not.toBeInTheDocument();
+    fireEvent.click(within(offen).getByRole('button', { name: 'Freigeben' }));
+
+    await screen.findByText('Vereinsstatus aktualisiert.');
+    expect(authenticatedApi).toHaveBeenCalledWith('/api/admin/clubs/club-2/status', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ status: 'published' }) }));
+  });
+
   it('ordnet einen Bouleplatz einer Organisation zu', async () => {
     const club = { id: 'club-1', name: 'BC Linden', kind: 'club', status: 'published', ownerName: 'Anna Admin', ownerEmail: 'anna@example.com', placeCount: 0, editorCount: 1 };
     const place = { id: 'place-1', name: 'Boulepark', address: 'Parkweg 1, Linden', venueType: 'outdoor', status: 'published', clubId: null, clubName: null };
