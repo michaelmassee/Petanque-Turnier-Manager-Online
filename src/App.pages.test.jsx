@@ -450,6 +450,27 @@ describe('Turnier melden', () => {
     expect(screen.getByLabelText(/^Flyer image link/)).not.toBeRequired();
     expect(screen.getByRole('button', { name: 'Report tournament' })).toBeInTheDocument();
   });
+
+  it('belegt Name, E-Mail und Telefon des angemeldeten Nutzers als Kontakt vor', () => {
+    render(
+      <TournamentReportPage
+        language="de"
+        setLanguage={() => {}}
+        menuOpen={false}
+        setMenuOpen={() => {}}
+        navigate={() => {}}
+        currentUser={{ id: 'u1', firstName: 'Anna', lastName: 'Schmidt', email: 'anna@example.test', phone: '+49 171 1234567', role: 'user' }}
+        onLogout={() => {}}
+        turnstileSiteKey={null}
+        verifyStatus=""
+      />,
+    );
+
+    expect(screen.getByLabelText(/^Name \(Kontakt\)/)).toHaveValue('Anna Schmidt');
+    expect(screen.getByLabelText(/^E-Mail \(Kontakt\)/)).toHaveValue('anna@example.test');
+    expect(screen.getByLabelText(/^Telefon \(Kontakt\)/)).toHaveValue('+49 171 1234567');
+    expect(screen.getByLabelText(/^Telefon \(Kontakt\)/)).not.toBeRequired();
+  });
 });
 
 describe('Öffentliche Turnierdetailseite', () => {

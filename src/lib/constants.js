@@ -182,6 +182,7 @@ export const EMPTY_TOURNAMENT_REPORT_FORM = {
   flyerUrl: '',
   contactName: '',
   contactEmail: '',
+  contactPhone: '',
   consentAccepted: false,
   website: '',
 };

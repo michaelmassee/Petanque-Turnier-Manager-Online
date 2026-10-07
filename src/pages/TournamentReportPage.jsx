@@ -53,7 +53,17 @@ function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSite
       <div className="form-grid">
         <TextField label={t('Name (Kontakt)')} value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} required minLength={2} />
         <TextField label={t('E-Mail (Kontakt)')} type="email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} required />
+        <TextField
+          label={t('Telefon (Kontakt)')}
+          type="tel"
+          value={form.contactPhone}
+          onChange={(contactPhone) => setForm({ ...form, contactPhone })}
+          autoComplete="tel"
+          inputMode="tel"
+          maxLength={30}
+        />
       </div>
+      <p className="hint">{t('Name, E-Mail und Telefon werden nach der Freigabe als Kontakt auf der Turnierseite angezeigt.')}</p>
       <label className="website-field" aria-hidden="true">
         Website
         <input
@@ -109,6 +119,7 @@ export function TournamentReportPage({
     ...EMPTY_TOURNAMENT_REPORT_FORM,
     contactName: currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '',
     contactEmail: currentUser?.email || '',
+    contactPhone: currentUser?.phone || '',
   }));
   const [submitted, setSubmitted] = useState(false);
   const [message, setMessage] = useState('');

@@ -5161,7 +5161,7 @@ async function resolveDefaultReportOwnerId(db) {
  * and is auto-deleted if unconfirmed within 24h or once its date is in the past
  * (see cleanupExpiredSessions).
  */
-async function createTournamentReport(request, env, url) {
+export async function createTournamentReport(request, env, url) {
   const db = env.DB;
   const body = await readJson(request);
 
@@ -5190,6 +5190,7 @@ async function createTournamentReport(request, env, url) {
   const flyerUrl = normalizePresentationUrl(body.flyerUrl, 'flyerUrl');
   const contactName = text(body.contactName);
   const contactEmail = text(body.contactEmail).toLowerCase();
+  const contactPhone = normalizePhone(body.contactPhone);
   const language = normalizeLanguage(body.language);
 
   if (club.length < 2) throw new HttpError(400, 'Der Verein muss mindestens 2 Zeichen enthalten');
@@ -5216,8 +5217,8 @@ async function createTournamentReport(request, env, url) {
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, license_required,
         registration_type, status, visibility, registration_enabled, club, website_url, logo_url, flyer_url, contact_name, contact_email,
-        latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        contact_phone, latitude, longitude, geocoded_at, timezone, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -5242,6 +5243,7 @@ async function createTournamentReport(request, env, url) {
       flyerUrl,
       contactName,
       contactEmail,
+      contactPhone,
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,

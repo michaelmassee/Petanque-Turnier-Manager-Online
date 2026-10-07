@@ -72,7 +72,7 @@ export function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, 
 
           <h2>{t('6. Turniermeldungen')}</h2>
           <p>
-            {t('Wenn du ein fremdes Turnier zur Veröffentlichung vorschlägst, verarbeiten wir deinen Namen und deine E-Mail-Adresse zur Rückfrage und Bestätigung sowie zur Moderation durch unsere Administratoren (Art. 6 Abs. 1 lit. a, lit. f DSGVO).')}
+            {t('Wenn du ein fremdes Turnier zur Veröffentlichung vorschlägst, verarbeiten wir deinen Namen, deine E-Mail-Adresse und optional deine Telefonnummer zur Rückfrage und Bestätigung sowie zur Moderation durch unsere Administratoren (Art. 6 Abs. 1 lit. a, lit. f DSGVO). Nach der Freigabe werden diese Angaben als Kontakt öffentlich auf der Turnierseite angezeigt.')}
           </p>
 
           <h2>{t('7. Cookies und lokaler Speicher')}</h2>
