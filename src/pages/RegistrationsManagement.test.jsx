@@ -67,7 +67,25 @@ describe('registrationsToCsv', () => {
       { firstName: 'Carla', lastName: 'Gast', status: 'pending' },
     ], TOURNAMENT, t, { namesOnly: true, confirmedOnly: true });
 
-    expect(csv.replace(/^﻿/, '').trim().split('\r\n')).toEqual(['firstName,lastName', 'Anna,Muster', 'Ben,Beispiel']);
+    expect(csv.replace(/^﻿/, '').trim().split('\r\n')).toEqual(['firstName,lastName,partnerFirstName,partnerLastName', 'Anna,Muster,Ben,Beispiel']);
+  });
+
+  it('schreibt jede Meldung in eine Zeile, auch Triplettes und Einzelmeldungen gemischt', () => {
+    const csv = registrationsToCsv([
+      { firstName: 'Anna', lastName: 'Muster', partnerFirstName: 'Ben', partnerLastName: 'Beispiel', partner2FirstName: 'Cleo', partner2LastName: 'Drei' },
+      { firstName: 'Dora', lastName: 'Solo' },
+    ], TOURNAMENT, t, { namesOnly: true });
+
+    expect(csv.replace(/^﻿/, '').trim().split('\r\n')).toEqual([
+      'firstName,lastName,partnerFirstName,partnerLastName,partner2FirstName,partner2LastName',
+      'Anna,Muster,Ben,Beispiel,Cleo,Drei',
+      'Dora,Solo,,,,',
+    ]);
+  });
+
+  it('exportiert nur Namen ohne Partner zweispaltig', () => {
+    const csv = registrationsToCsv([{ firstName: 'Anna', lastName: 'Muster' }], TOURNAMENT, t, { namesOnly: true });
+    expect(csv.replace(/^﻿/, '').trim().split('\r\n')).toEqual(['firstName,lastName', 'Anna,Muster']);
   });
 });
 
@@ -128,7 +146,7 @@ describe('CSV-Export-Button', () => {
     fireEvent.click(screen.getByLabelText('Nur bestätigte Meldungen'));
     fireEvent.click(screen.getByRole('button', { name: 'CSV herunterladen' }));
 
-    expect((await exportedBlob.text()).replace(/^﻿/, '').trim().split('\r\n')).toEqual(['firstName,lastName', 'Anna,Muster', 'Ben,Beispiel']);
+    expect((await exportedBlob.text()).replace(/^﻿/, '').trim().split('\r\n')).toEqual(['firstName,lastName,partnerFirstName,partnerLastName', 'Anna,Muster,Ben,Beispiel']);
   });
 });
 

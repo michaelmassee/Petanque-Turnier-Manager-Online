@@ -104,19 +104,26 @@ function registrationQuestionColumns(tournament, t) {
   })));
 }
 
-function registrationPlayers(registration) {
-  return [
-    [registration.firstName, registration.lastName],
-    [registration.partnerFirstName, registration.partnerLastName],
-    [registration.partner2FirstName, registration.partner2LastName],
-  ].filter(([firstName, lastName]) => firstName || lastName);
+const REGISTRATION_NAME_COLUMNS = [
+  ['firstName', 'lastName'],
+  ['partnerFirstName', 'partnerLastName'],
+  ['partner2FirstName', 'partner2LastName'],
+];
+
+function hasPlayerName(registration, [firstNameKey, lastNameKey]) {
+  return Boolean(registration[firstNameKey] || registration[lastNameKey]);
 }
 
 export function registrationsToCsv(registrations, tournament, t, { namesOnly = false, confirmedOnly = false } = {}) {
   const exportedRegistrations = confirmedOnly ? registrations.filter((registration) => registration.status === 'confirmed') : registrations;
   if (namesOnly) {
-    const lines = [['firstName', 'lastName'].map(csvField).join(',')];
-    exportedRegistrations.forEach((registration) => registrationPlayers(registration).forEach((player) => lines.push(player.map(csvField).join(','))));
+    // Eine Zeile pro Meldung: Teams stehen mit allen Spielern in derselben Zeile.
+    const slotCount = Math.max(1, ...REGISTRATION_NAME_COLUMNS.map((slot, index) => (
+      exportedRegistrations.some((registration) => hasPlayerName(registration, slot)) ? index + 1 : 0
+    )));
+    const nameColumns = REGISTRATION_NAME_COLUMNS.slice(0, slotCount).flat();
+    const lines = [nameColumns.map(csvField).join(',')];
+    exportedRegistrations.forEach((registration) => lines.push(nameColumns.map((column) => csvField(registration[column])).join(',')));
     return `﻿${lines.join('\r\n')}\r\n`;
   }
   const currency = tournament?.currency;
