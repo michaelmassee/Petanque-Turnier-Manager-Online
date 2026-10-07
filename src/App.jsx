@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { TOURNAMENT_TYPES, FORMATIONS, REGISTRATION_TYPES, MONTHS, TOURNAMENT_STATUSES, VISIBILITIES, RADIUS_OPTIONS, EMPTY_PROFILE_FORM, EMPTY_AUTH_FORM, EMPTY_TOURNAMENT_REPORT_FORM, EMPTY_REGISTRATION_FORM, REGISTER_SUCCESS, VERIFY_SUCCESS, CANCEL_REGISTRATION_EXPLANATION, CANCEL_REGISTRATION_SUCCESS, PROFILE_UPDATE_SUCCESS, PROFILE_EMAIL_CHANGE_PENDING } from './lib/constants.js';
 import i18next from './lib/i18next-config.js';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,7 @@ import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentIma
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { UsernameField } from './components/UsernameField.jsx';
+import { useClubSuggestions } from './components/ClubSuggestions.jsx';
 import { UsernameConfirmNotice } from './components/UsernameConfirmNotice.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
 import { InfiniteListLoadMore } from './components/InfiniteListLoadMore.jsx';
@@ -1349,6 +1350,7 @@ function AppContent() {
           onLogout={handleLogout}
           turnstileSiteKey={turnstileSiteKey}
           verifyStatus={reportVerifyStatus}
+          clubNames={publishedClubNames}
           drawerContent={drawerContent('turniere')}
           postboxControl={renderPostboxControl()}
         />
@@ -2006,6 +2008,7 @@ function AppContent() {
               currentUser={currentUser}
               boulePlaces={boulePlacesQuery.data?.places || []}
               postboxRecipients={postboxRecipients}
+              clubNames={publishedClubNames}
               selectedTournamentId={selectedTournamentId}
               setSelectedTournamentId={setSelectedTournamentId}
               onTournamentsChanged={() => loadTournaments(true)}
@@ -2093,8 +2096,7 @@ function AppContent() {
 // clubNames: veröffentlichte Vereine als Vorschläge für das Vereinsfeld (Freitext bleibt möglich).
 export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = false, onDeleteAccount, deleting = false, clubNames = [] }) {
   const { t, i18n } = useTranslation();
-  const clubListId = useId();
-  const clubList = clubNames.length > 0 ? clubListId : undefined;
+  const clubSuggestions = useClubSuggestions(clubNames);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const usernameLocked = Boolean(currentUser.usernameChangeAllowedAt) || !currentUser.emailVerifiedAt;
   let usernameHint = t('Du kannst deinen Benutzernamen alle 30 Tage ändern.');
@@ -2137,12 +2139,8 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = fa
             placeholder="+49 171 1234567"
           />
           <p className="hint">{t('Optional. Nur für dich und die Administratoren sichtbar. Beim Anlegen eines Turniers wird sie als Kontakt-Telefon vorgeschlagen.')}</p>
-          <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} list={clubList} />
-          {clubList && (
-            <datalist id={clubListId}>
-              {clubNames.map((name) => <option key={name} value={name} />)}
-            </datalist>
-          )}
+          <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} list={clubSuggestions.listId} />
+          {clubSuggestions.datalist}
           <p className="hint">{t('Benutzername und Verein werden anderen Nutzern angezeigt, damit man dich auch bei gleichem Namen unterscheiden kann.')}</p>
           <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
           <TextField

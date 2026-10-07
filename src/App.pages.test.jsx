@@ -21,6 +21,23 @@ describe('Turnier-Payload', () => {
     expect(tournamentPayload({ ...EMPTY_TOURNAMENT_FORM, club: 'BC Linden' }).club).toBe('BC Linden');
   });
 
+  it('schlägt beim Bearbeiten eines Kalendereintrags Vereine aus der DB vor', () => {
+    const { container } = render(
+      <TournamentForm
+        form={{ ...EMPTY_TOURNAMENT_FORM, id: 't1', registrationEnabled: false, club: '' }}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        onCancel={() => {}}
+        mode="edit"
+        language="de"
+        clubNames={['BC Linden']}
+      />,
+    );
+
+    const listId = screen.getByLabelText(/^Verein/).getAttribute('list');
+    expect(container.querySelector(`datalist[id="${listId}"] option`).value).toBe('BC Linden');
+  });
+
   it('kennzeichnet Kalendereinträge unabhängig vom Turnierstatus als Kalendereintrag', () => {
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: false }, 'de')).toBe('Kalendereintrag');
     expect(registrationStatusLabel({ status: 'registration', registrationEnabled: false }, 'de')).toBe('Kalendereintrag');
@@ -449,6 +466,27 @@ describe('Turnier melden', () => {
     expect(screen.getByLabelText(/^Logo image link/)).not.toBeRequired();
     expect(screen.getByLabelText(/^Flyer image link/)).not.toBeRequired();
     expect(screen.getByRole('button', { name: 'Report tournament' })).toBeInTheDocument();
+  });
+
+  it('schlägt im Vereinsfeld die Vereine aus der DB vor', () => {
+    const { container } = render(
+      <TournamentReportPage
+        language="de"
+        setLanguage={() => {}}
+        menuOpen={false}
+        setMenuOpen={() => {}}
+        navigate={() => {}}
+        currentUser={null}
+        onLogout={() => {}}
+        turnstileSiteKey={null}
+        verifyStatus=""
+        clubNames={['BC Linden', 'Boule Club Hamburg']}
+      />,
+    );
+
+    const listId = screen.getByLabelText(/^Verein/).getAttribute('list');
+    expect(listId).toBeTruthy();
+    expect([...container.querySelectorAll(`datalist[id="${listId}"] option`)].map((option) => option.value)).toEqual(['BC Linden', 'Boule Club Hamburg']);
   });
 
   it('belegt Name, E-Mail und Telefon des angemeldeten Nutzers als Kontakt vor', () => {

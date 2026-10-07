@@ -10,6 +10,7 @@ import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { authenticatedApi } from '../lib/api.js';
 import { formatUserLabel, formatUserName } from '../lib/userLabel.js';
 import { UsernameReportButton } from '../components/UsernameReportDialog.jsx';
+import { useClubSuggestions } from '../components/ClubSuggestions.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 /**
@@ -262,8 +263,9 @@ function FormationHelpDialog({ onClose }) {
   );
 }
 
-export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null }) {
+export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [] }) {
   const { t } = useTranslation();
+  const clubSuggestions = useClubSuggestions(clubNames);
   const [showFormationHelp, setShowFormationHelp] = useState(false);
   const showMailNotEnabledHint = !isAdmin && currentUser && currentUser.mailEnabled === false;
   const canManageEditors = mode === 'edit' && form.id && Boolean(currentUser) && (isAdmin || form.ownerId === currentUser.id);
@@ -279,7 +281,10 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         <p className="feedback offline">{MAIL_NOT_ENABLED_HINT_TEMPLATES[language] || MAIL_NOT_ENABLED_HINT_TEMPLATES.de}</p>
       )}
       {isCalendarEntry && (
-        <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} required minLength={2} />
+        <>
+          <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} required minLength={2} list={clubSuggestions.listId} />
+          {clubSuggestions.datalist}
+        </>
       )}
       <TextField label={t('Name')} value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
       <div className="form-grid">
@@ -875,6 +880,7 @@ export function TournamentManagementPage({
   selectedTournamentId,
   setSelectedTournamentId,
   onTournamentsChanged,
+  clubNames = [],
 }) {
   const { t } = useTranslation();
   const [error, setError] = useState('');
@@ -1152,6 +1158,7 @@ export function TournamentManagementPage({
           boulePlaces={boulePlaces}
           saving={saving}
           invalidField={invalidField}
+          clubNames={clubNames}
         />
       </EditDialog>
 

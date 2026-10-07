@@ -1,9 +1,10 @@
-import { useEffect, useId } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { REGISTRATION_STATUSES } from '../lib/constants.js';
 import { translatedOptions } from '../lib/domain.js';
 import { formatMoney } from '../lib/format.js';
 import { SelectField, TextField } from './ui.jsx';
+import { useClubSuggestions } from './ClubSuggestions.jsx';
 
 function ParticipantQuestions({ participant, questions, answers, onChange }) {
   if (questions.length === 0) return null;
@@ -34,8 +35,8 @@ function RegistrationSection({ title, children, className = '' }) {
 // clubNames: veröffentlichte Vereine als Vorschläge für die Vereinsfelder (Freitext bleibt möglich).
 export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled, feeTiers = [], registrationQuestions = [], currency = 'EUR', invalidField, clubNames = [] }) {
   const { t, i18n } = useTranslation();
-  const clubListId = useId();
-  const clubList = clubNames.length > 0 ? clubListId : undefined;
+  const clubSuggestions = useClubSuggestions(clubNames);
+  const clubList = clubSuggestions.listId;
   const isDrawnTeam = registrationType === 'melee' || registrationType === 'supermelee';
   const allowsPartner = isDrawnTeam ? false : (formation ? formation !== 'tete' : true);
   const allowsPartner2 = isDrawnTeam ? false : formation === 'triplette';
@@ -124,11 +125,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
           )}
         </RegistrationSection>
       )}
-      {clubList && (
-        <datalist id={clubListId}>
-          {clubNames.map((name) => <option key={name} value={name} />)}
-        </datalist>
-      )}
+      {clubSuggestions.datalist}
       <RegistrationSection title={t('Spieler 1')}>
         <div className="form-grid">
           <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />

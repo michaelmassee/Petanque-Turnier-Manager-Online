@@ -4,9 +4,11 @@ import { EMPTY_TOURNAMENT_REPORT_FORM, FORMATIONS } from '../lib/constants.js';
 import { api } from '../lib/api.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
+import { useClubSuggestions } from '../components/ClubSuggestions.jsx';
 
-function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSiteKey, saving }) {
+function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSiteKey, saving, clubNames }) {
   const { t } = useTranslation();
+  const clubSuggestions = useClubSuggestions(clubNames);
   useEffect(() => {
     if (!turnstileSiteKey || document.querySelector('script[data-turnstile]')) {
       return;
@@ -21,7 +23,8 @@ function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSite
 
   return (
     <form className="form dense" onSubmit={onSubmit}>
-      <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} required minLength={2} />
+      <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} required minLength={2} list={clubSuggestions.listId} />
+      {clubSuggestions.datalist}
       <TextField label={t('Turnier-Informationen')} value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
       <TextField label={t('Ort')} value={form.location} onChange={(location) => setForm({ ...form, location })} required minLength={2} />
       <div className="form-grid">
@@ -105,6 +108,7 @@ export function TournamentReportPage({
   menuOpen,
   setMenuOpen,
   navigate,
+  clubNames = [],
   currentUser,
   isAdmin,
   onSelectAdminDashboard,
@@ -184,6 +188,7 @@ export function TournamentReportPage({
                 navigate={navigate}
                 turnstileSiteKey={turnstileSiteKey}
                 saving={saving}
+                clubNames={clubNames}
               />
               <Feedback message={message} error={error} />
             </>
