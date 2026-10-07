@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { formatDate } from '../lib/format.js';
@@ -42,24 +42,25 @@ function canvasToBlob(canvas) {
 
 function ColorField({ label, value, onChange }) {
   const { t } = useTranslation();
+  const inputId = useId();
   return (
     <div className="qr-color-field">
-      <label>
-        {label}
-        <input type="color" value={value} onChange={(event) => onChange(event.target.value)} />
-      </label>
-      <div className="qr-swatches" role="group" aria-label={label}>
-        {QR_COLOR_SWATCHES.map((color) => (
-          <button
-            key={color}
-            type="button"
-            className={`qr-swatch${value === color ? ' active' : ''}`}
-            style={{ backgroundColor: color }}
-            aria-label={`${t('Farbe')} ${color}`}
-            aria-pressed={value === color}
-            onClick={() => onChange(color)}
-          />
-        ))}
+      <label htmlFor={inputId}>{label}</label>
+      <div className="qr-color-row">
+        <input id={inputId} type="color" value={value} onChange={(event) => onChange(event.target.value)} />
+        <div className="qr-swatches" role="group" aria-label={label}>
+          {QR_COLOR_SWATCHES.map((color) => (
+            <button
+              key={color}
+              type="button"
+              className={`qr-swatch${value === color ? ' active' : ''}`}
+              style={{ backgroundColor: color }}
+              aria-label={`${t('Farbe')} ${color}`}
+              aria-pressed={value === color}
+              onClick={() => onChange(color)}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -94,6 +95,7 @@ export function TournamentQrDialog({ tournament, url, initialDesign = null, sour
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const canvasRef = useRef(null);
+  const sectionId = useId();
   // Welches Design/URL die sichtbare Vorschau gerade zeigt – sie wird verzögert und asynchron gezeichnet.
   const previewKeyRef = useRef('');
   const currentKey = JSON.stringify([design, url]);
@@ -247,8 +249,6 @@ export function TournamentQrDialog({ tournament, url, initialDesign = null, sour
           {weakContrast && (
             <p className="feedback offline">{t('Geringer Kontrast: Der QR-Code lässt sich eventuell nicht scannen. Dunkle Farbe auf hellem Hintergrund verwenden.')}</p>
           )}
-        </div>
-        <div className="qr-settings">
           <div className="qr-import">
             {sources.length > 0 ? (
               <TournamentPicker
@@ -266,54 +266,69 @@ export function TournamentQrDialog({ tournament, url, initialDesign = null, sour
             )}
             {copyingFrom && <small className="muted">{t('Design wird geladen …')}</small>}
           </div>
-          <TextField label={t('Header-Text')} value={design.header} maxLength={QR_TEXT_MAX_LENGTH} onChange={(header) => update({ header })} data-i18n-skip />
-          <SuggestionChips label={t('Vorschläge für den Header-Text')} suggestions={headerTexts} onPick={(header) => update({ header })} />
-          <TextField label={t('Footer-Text')} value={design.footer} maxLength={QR_TEXT_MAX_LENGTH} onChange={(footer) => update({ footer })} data-i18n-skip />
-          <SuggestionChips label={t('Vorschläge für den Footer-Text')} suggestions={footerTexts} onPick={(footer) => update({ footer })} />
-          <SelectField
-            label={t('Textgröße')}
-            value={design.textSize}
-            onChange={(textSize) => update({ textSize })}
-            options={[{ value: 's', label: t('Klein') }, { value: 'm', label: t('Mittel') }, { value: 'l', label: t('Groß') }]}
-          />
-          <ColorField label={t('Farbe des Codes')} value={design.fgColor} onChange={(fgColor) => update({ fgColor })} />
-          <ColorField label={t('Hintergrundfarbe')} value={design.bgColor} onChange={(bgColor) => update({ bgColor })} />
-          <label className="checkbox-field">
-            <input type="checkbox" checked={design.logoInCodeColor} onChange={(event) => update({ logoInCodeColor: event.target.checked })} />
-            {t('PTM-Logo in Code-Farbe')}
-          </label>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={Boolean(design.cornerColor)}
-              onChange={(event) => update({ cornerColor: event.target.checked ? design.fgColor : '' })}
+        </div>
+        <div className="qr-settings">
+          <section className="qr-section" aria-labelledby={`${sectionId}-texte`}>
+            <h3 id={`${sectionId}-texte`} className="qr-section-title">{t('Texte')}</h3>
+            <TextField label={t('Header-Text')} value={design.header} maxLength={QR_TEXT_MAX_LENGTH} onChange={(header) => update({ header })} data-i18n-skip />
+            <SuggestionChips label={t('Vorschläge für den Header-Text')} suggestions={headerTexts} onPick={(header) => update({ header })} />
+            <TextField label={t('Footer-Text')} value={design.footer} maxLength={QR_TEXT_MAX_LENGTH} onChange={(footer) => update({ footer })} data-i18n-skip />
+            <SuggestionChips label={t('Vorschläge für den Footer-Text')} suggestions={footerTexts} onPick={(footer) => update({ footer })} />
+            <SelectField
+              label={t('Textgröße')}
+              value={design.textSize}
+              onChange={(textSize) => update({ textSize })}
+              options={[{ value: 's', label: t('Klein') }, { value: 'm', label: t('Mittel') }, { value: 'l', label: t('Groß') }]}
             />
-            {t('Eigene Farbe für die Eckmarken')}
-          </label>
-          {design.cornerColor && <ColorField label={t('Farbe der Eckmarken')} value={design.cornerColor} onChange={(cornerColor) => update({ cornerColor })} />}
-          <SelectField
-            label={t('Punkt-Style')}
-            value={design.dotType}
-            onChange={(dotType) => update({ dotType })}
-            options={[
-              { value: 'square', label: t('Quadrate') },
-              { value: 'dots', label: t('Runde Punkte') },
-              { value: 'rounded', label: t('Abgerundet') },
-              { value: 'extra-rounded', label: t('Stark abgerundet') },
-              { value: 'classy', label: t('Klassisch') },
-              { value: 'classy-rounded', label: t('Klassisch abgerundet') },
-            ]}
-          />
-          <SelectField
-            label={t('Eckmarken-Style')}
-            value={design.cornerType}
-            onChange={(cornerType) => update({ cornerType })}
-            options={[
-              { value: 'square', label: t('Eckig') },
-              { value: 'extra-rounded', label: t('Abgerundet') },
-              { value: 'dot', label: t('Rund') },
-            ]}
-          />
+          </section>
+          <section className="qr-section" aria-labelledby={`${sectionId}-farben`}>
+            <h3 id={`${sectionId}-farben`} className="qr-section-title">{t('Farben')}</h3>
+            <ColorField label={t('Farbe des Codes')} value={design.fgColor} onChange={(fgColor) => update({ fgColor })} />
+            <ColorField label={t('Hintergrundfarbe')} value={design.bgColor} onChange={(bgColor) => update({ bgColor })} />
+            <div className="qr-options">
+              <label className="checkbox-row">
+                <input type="checkbox" checked={design.logoInCodeColor} onChange={(event) => update({ logoInCodeColor: event.target.checked })} />
+                {t('PTM-Logo in Code-Farbe')}
+              </label>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={Boolean(design.cornerColor)}
+                  onChange={(event) => update({ cornerColor: event.target.checked ? design.fgColor : '' })}
+                />
+                {t('Eigene Farbe für die Eckmarken')}
+              </label>
+            </div>
+            {design.cornerColor && <ColorField label={t('Farbe der Eckmarken')} value={design.cornerColor} onChange={(cornerColor) => update({ cornerColor })} />}
+          </section>
+          <section className="qr-section" aria-labelledby={`${sectionId}-form`}>
+            <h3 id={`${sectionId}-form`} className="qr-section-title">{t('Form')}</h3>
+            <div className="qr-style-grid">
+              <SelectField
+                label={t('Punkt-Style')}
+                value={design.dotType}
+                onChange={(dotType) => update({ dotType })}
+                options={[
+                  { value: 'square', label: t('Quadrate') },
+                  { value: 'dots', label: t('Runde Punkte') },
+                  { value: 'rounded', label: t('Abgerundet') },
+                  { value: 'extra-rounded', label: t('Stark abgerundet') },
+                  { value: 'classy', label: t('Klassisch') },
+                  { value: 'classy-rounded', label: t('Klassisch abgerundet') },
+                ]}
+              />
+              <SelectField
+                label={t('Eckmarken-Style')}
+                value={design.cornerType}
+                onChange={(cornerType) => update({ cornerType })}
+                options={[
+                  { value: 'square', label: t('Eckig') },
+                  { value: 'extra-rounded', label: t('Abgerundet') },
+                  { value: 'dot', label: t('Rund') },
+                ]}
+              />
+            </div>
+          </section>
         </div>
       </div>
       {dirty && <small className="muted qr-unsaved">{t('Nicht gespeicherte Änderungen am Design')}</small>}

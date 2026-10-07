@@ -3654,11 +3654,12 @@ a.left-panel-link {
   color: #087f6f;
 }
 
-/* Anmelde-QR-Code (TournamentQrDialog): Vorschau links, Einstellungen rechts; am Handy untereinander. */
+/* Anmelde-QR-Code (TournamentQrDialog): Vorschau + Import links (beim Scrollen fixiert), Einstellungen rechts in
+   Gruppen; Buttonleiste unten angeheftet. Am Handy einspaltig, Buttons im 2er-Raster. */
 .qr-dialog {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: 24px;
   align-items: start;
 }
 
@@ -3666,13 +3667,13 @@ a.left-panel-link {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   position: sticky;
   top: 0;
 }
 
 .qr-preview-canvas {
-  width: min(100%, 360px);
+  width: min(100%, 340px);
   height: auto;
   border: 1px solid #d8dee9;
   border-radius: 8px;
@@ -3685,79 +3686,48 @@ a.left-panel-link {
   text-align: center;
 }
 
-.qr-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
 .qr-preview > .button {
   padding: 6px 14px;
   font-size: 0.9rem;
 }
 
-.qr-dialog-actions {
-  align-items: center;
-}
-
-.qr-dialog-actions-spacer {
-  flex: 1;
-}
-
-.qr-color-field {
+.qr-import {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  align-self: stretch;
+  padding: 12px;
+  border: 1px dashed #b8c2d3;
+  border-radius: 8px;
+  background: #f8fafd;
 }
 
-.qr-color-field input[type="color"] {
-  width: 64px;
-  height: 36px;
-  padding: 2px;
-}
-
-.qr-swatches {
+.qr-settings {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
 }
 
-.qr-swatch {
-  width: 28px;
-  height: 28px;
-  border: 1px solid #b8c2d3;
-  border-radius: 50%;
-  padding: 0;
+.qr-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
 }
 
-.qr-swatch.active {
-  outline: 3px solid #1677ff;
-  outline-offset: 2px;
+.qr-section + .qr-section {
+  padding-top: 16px;
+  border-top: 1px solid #e3e8f0;
 }
 
-.qr-unsaved {
-  display: block;
-  margin-top: 12px;
-  text-align: right;
-}
-
-@media (max-width: 720px) {
-  .qr-dialog {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .qr-preview {
-    position: static;
-  }
-
-  .qr-dialog-actions-spacer {
-    display: none;
-  }
-
-  .qr-dialog-actions .button {
-    flex: 1 1 auto;
-  }
+.qr-section-title {
+  margin: 0;
+  color: #53627a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .qr-suggestions {
@@ -3787,13 +3757,151 @@ a.left-panel-link {
   background: #e8f1ff;
 }
 
-
-.qr-import {
+.qr-color-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px;
-  border: 1px dashed #b8c2d3;
-  border-radius: 8px;
-  background: #f8fafd;
+}
+
+.qr-color-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.qr-color-row input[type="color"] {
+  width: 48px;
+  height: 34px;
+  min-height: 0;
+  padding: 2px;
+  margin: 0;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.qr-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.qr-swatch {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #b8c2d3;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.qr-swatch.active {
+  outline: 3px solid #1677ff;
+  outline-offset: 2px;
+}
+
+.qr-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.qr-options .checkbox-row {
+  font-weight: 600;
+}
+
+.qr-options .checkbox-row input {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.qr-style-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.qr-unsaved {
+  display: block;
+  margin-top: 12px;
+  text-align: right;
+}
+
+/* Buttonleiste bleibt am unteren Rand des (scrollenden) Dialogs sichtbar. */
+.qr-dialog-actions {
+  position: sticky;
+  bottom: -28px;
+  z-index: 1;
+  align-items: center;
+  margin: 12px -28px -28px;
+  padding: 12px 28px;
+  border-top: 1px solid #e3e8f0;
+  background: #ffffff;
+}
+
+.qr-dialog-actions-spacer {
+  flex: 1;
+}
+
+@media (max-width: 720px) {
+  .qr-dialog {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .qr-preview {
+    position: static;
+  }
+
+  .qr-preview-canvas {
+    width: min(100%, 260px);
+  }
+}
+
+@media (max-width: 560px) {
+  .qr-style-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Zwei Reihen statt drei, damit die angeheftete Leiste wenig Höhe kostet:
+     [Bild teilen][SVG][PNG] / [Zurücksetzen][Design speichern]. DOM-Reihenfolge:
+     Zurücksetzen, Abstandhalter, Bild teilen, SVG, PNG, Design speichern. */
+  .qr-dialog-actions {
+    bottom: calc(-1 * max(20px, env(safe-area-inset-bottom)));
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px -20px calc(-1 * max(20px, env(safe-area-inset-bottom)));
+    padding: 10px 20px max(10px, env(safe-area-inset-bottom));
+  }
+
+  .qr-dialog-actions-spacer {
+    display: none;
+  }
+
+  .qr-dialog-actions .button {
+    justify-content: center;
+    min-height: 44px;
+    padding: 8px 10px;
+  }
+
+  .qr-dialog-actions .button:nth-child(3) {
+    grid-column: span 2;
+  }
+
+  .qr-dialog-actions .button:first-child {
+    order: 1;
+    grid-column: span 2;
+  }
+
+  .qr-dialog-actions .button-primary {
+    order: 2;
+    grid-column: span 2;
+  }
+
+  .qr-unsaved {
+    text-align: left;
+  }
 }
