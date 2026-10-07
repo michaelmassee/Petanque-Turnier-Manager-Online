@@ -10,7 +10,7 @@ import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { formatMoney } from '../lib/format.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
-export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false, currentUserId }) {
+export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false, currentUserId, clubNames }) {
   const { t } = useTranslation();
   const selectedValue = form.tournamentId || selectedTournamentId;
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedValue);
@@ -36,6 +36,7 @@ export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournament
         registrationQuestions={selectedTournament?.registrationQuestions}
         currency={selectedTournament?.currency}
         invalidField={invalidField}
+        clubNames={clubNames}
       />
       <div className="dialog-actions">
         {onCancel && <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>}
@@ -487,6 +488,7 @@ export function RegistrationsManagementPage({
   initialStatusFilter = '',
   onInitialStatusFilterConsumed,
   currentUserId,
+  clubNames,
 }) {
   const { t } = useTranslation();
   const [registrations, setRegistrations] = useState([]);
@@ -722,6 +724,7 @@ export function RegistrationsManagementPage({
           invalidField={invalidField}
           saving={saving}
           currentUserId={currentUserId}
+          clubNames={clubNames}
         />
         {mode === 'edit' && (
           <RelinkAccounts

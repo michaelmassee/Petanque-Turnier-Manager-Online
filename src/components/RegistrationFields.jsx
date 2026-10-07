@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { REGISTRATION_STATUSES } from '../lib/constants.js';
 import { translatedOptions } from '../lib/domain.js';
@@ -31,8 +31,11 @@ function RegistrationSection({ title, children, className = '' }) {
   );
 }
 
-export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled, feeTiers = [], registrationQuestions = [], currency = 'EUR', invalidField }) {
+// clubNames: veröffentlichte Vereine als Vorschläge für die Vereinsfelder (Freitext bleibt möglich).
+export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled, feeTiers = [], registrationQuestions = [], currency = 'EUR', invalidField, clubNames = [] }) {
   const { t, i18n } = useTranslation();
+  const clubListId = useId();
+  const clubList = clubNames.length > 0 ? clubListId : undefined;
   const isDrawnTeam = registrationType === 'melee' || registrationType === 'supermelee';
   const allowsPartner = isDrawnTeam ? false : (formation ? formation !== 'tete' : true);
   const allowsPartner2 = isDrawnTeam ? false : formation === 'triplette';
@@ -121,6 +124,11 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
           )}
         </RegistrationSection>
       )}
+      {clubList && (
+        <datalist id={clubListId}>
+          {clubNames.map((name) => <option key={name} value={name} />)}
+        </datalist>
+      )}
       <RegistrationSection title={t('Spieler 1')}>
         <div className="form-grid">
           <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />
@@ -129,7 +137,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
         <ParticipantQuestions participant="primary" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('primary', questionId, checked)} />
         {!(showStatus && form.noEmail) && <TextField label={t('E-Mail')} type="email" value={form.playerEmail || ''} onChange={(playerEmail) => setForm({ ...form, playerEmail })} required />}
         <div className="form-grid">
-          <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
+          <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} list={clubList} />
           {licenseRequired && <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} required />}
         </div>
         {showFeeSelect && <SelectField label={t('Startgeld')} value={selectedFee('primary')} onChange={(tariffId) => setSelectedFee('primary', tariffId)} options={feeOptions('primary')} />}
@@ -145,7 +153,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
             <TextField label={t('E-Mail')} type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
             {licenseRequired && <TextField label={t('Lizenznummer')} value={form.partnerLicenseNr} onChange={(partnerLicenseNr) => setForm({ ...form, partnerLicenseNr })} required />}
           </div>
-          <TextField label={t('Verein')} value={form.partnerClub} onChange={(partnerClub) => setForm({ ...form, partnerClub })} />
+          <TextField label={t('Verein')} value={form.partnerClub} onChange={(partnerClub) => setForm({ ...form, partnerClub })} list={clubList} />
           {showFeeSelect && <SelectField label={t('Startgeld Partner')} value={selectedFee('partner')} onChange={(tariffId) => setSelectedFee('partner', tariffId)} options={feeOptions('partner')} />}
         </RegistrationSection>
       )}
@@ -161,7 +169,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
             <TextField label={t('E-Mail')} type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
             {licenseRequired && <TextField label={t('Lizenznummer')} value={form.partner2LicenseNr} onChange={(partner2LicenseNr) => setForm({ ...form, partner2LicenseNr })} required />}
           </div>
-          <TextField label={t('Verein')} value={form.partner2Club} onChange={(partner2Club) => setForm({ ...form, partner2Club })} />
+          <TextField label={t('Verein')} value={form.partner2Club} onChange={(partner2Club) => setForm({ ...form, partner2Club })} list={clubList} />
           {showFeeSelect && <SelectField label={t('Startgeld Partner 2')} value={selectedFee('partner2')} onChange={(tariffId) => setSelectedFee('partner2', tariffId)} options={feeOptions('partner2')} />}
         </RegistrationSection>
       )}

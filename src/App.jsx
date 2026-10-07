@@ -208,6 +208,7 @@ function AppContent() {
   });
   const homeHeading = t('Öffentliche Turniere');
   const publishedClubs = clubsQuery.data?.clubs || [];
+  const publishedClubNames = useMemo(() => [...new Set(publishedClubs.map((club) => club.name))], [publishedClubs]);
   const selectedHomeClub = publishedClubs.find((club) => club.id === homeFilterClub || club.name === homeFilterClub) || null;
 
   const filteredHomeTournaments = useMemo(() => {
@@ -1737,6 +1738,7 @@ function AppContent() {
                 language={language}
                 currentUser={currentUser}
                 invalidField={registrationInvalidField}
+                clubNames={publishedClubNames}
                 embedded
               />
             )}
@@ -1988,6 +1990,7 @@ function AppContent() {
             language={language}
             currentUser={currentUser}
             invalidField={registrationInvalidField}
+            clubNames={publishedClubNames}
             embedded
           />
         </AuthModal>
@@ -2023,6 +2026,7 @@ function AppContent() {
               initialStatusFilter={pendingRegistrationsFilter}
               onInitialStatusFilterConsumed={() => setPendingRegistrationsFilter('')}
               currentUserId={currentUser?.id}
+              clubNames={publishedClubNames}
             />
           </section>
         </Suspense>
@@ -2455,7 +2459,7 @@ export function HomeTournaments({
   );
 }
 
-export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, language, embedded = false, currentUser = null, invalidField = null, saving = false }) {
+export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, language, embedded = false, currentUser = null, invalidField = null, saving = false, clubNames = [] }) {
   const { t } = useTranslation();
   useEffect(() => {
     if (!form.id && form.tournamentId !== tournament.id) {
@@ -2521,6 +2525,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             registrationQuestions={tournament.registrationQuestions}
             currency={tournament.currency}
             invalidField={invalidField}
+            clubNames={clubNames}
           />
           <section className="registration-section">
             <h3>{t('Hinweise und Einverständnis')}</h3>
