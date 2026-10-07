@@ -66,3 +66,16 @@ export function withUsernameSuffix(base, number) {
   const suffix = String(number);
   return `${fitLength(base, suffix.length)}${suffix}`;
 }
+
+// Erster freier Name zu den Basisvorschlägen, bei Kollision mit angehängter Zahl (anna.schmidt2 …).
+// taken: Set der vergebenen und gesperrten Namen. Liefert null, wenn nichts frei ist.
+export function firstFreeUsername(bases, taken) {
+  for (const base of bases) {
+    if (!taken.has(base) && !usernameProblem(base)) return base;
+    for (let number = 2; number < 10000; number += 1) {
+      const candidate = withUsernameSuffix(base, number);
+      if (!taken.has(candidate) && !usernameProblem(candidate)) return candidate;
+    }
+  }
+  return null;
+}

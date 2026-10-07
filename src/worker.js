@@ -38,7 +38,7 @@ import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schw
 import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
 import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
-import { normalizeUsername, usernameCandidates, usernameProblem, USERNAME_CHANGE_INTERVAL_DAYS, withUsernameSuffix } from './lib/username.js';
+import { firstFreeUsername, normalizeUsername, usernameCandidates, usernameProblem, USERNAME_CHANGE_INTERVAL_DAYS } from './lib/username.js';
 import { parseRichText, richTextPlainText } from './lib/rich-text.js';
 import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
 import { formatLocationAddress, geocodingFallbackQuery } from './location-format.js';
@@ -8953,12 +8953,8 @@ async function findAvailableUsername(db, bases) {
       .prepare('SELECT username FROM users WHERE substr(username, 1, ?) = ? UNION SELECT username FROM blocked_usernames WHERE substr(username, 1, ?) = ?')
       .bind(prefix.length, prefix, prefix.length, prefix)
       .all();
-    const taken = new Set(results.map((row) => row.username));
-    if (!taken.has(base) && !usernameProblem(base)) return base;
-    for (let number = 2; number < 10000; number += 1) {
-      const candidate = withUsernameSuffix(base, number);
-      if (!taken.has(candidate) && !usernameProblem(candidate)) return candidate;
-    }
+    const username = firstFreeUsername([base], new Set(results.map((row) => row.username)));
+    if (username) return username;
   }
   throw new HttpError(500, 'Kein freier Benutzername gefunden');
 }

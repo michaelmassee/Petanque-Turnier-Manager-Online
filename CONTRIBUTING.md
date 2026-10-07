@@ -18,6 +18,14 @@ npm audit --audit-level=high
 XDG_CONFIG_HOME=/tmp/wrangler-config npx wrangler deploy --dry-run
 ```
 
+## Release
+
+Deploy only with `npm run deploy` from `master`. It runs, in order: quality gate, remote D1 migrations,
+username backfill (`npm run db:backfill:remote`), `wrangler deploy`, and the backfill again for accounts the
+previous Worker created during the rollout. Do not run `wrangler deploy` on its own after a migration that
+needs a data backfill. Afterwards verify that the `users` row count is unchanged and that
+`SELECT COUNT(*) FROM users WHERE username IS NULL` returns `0`.
+
 ## Code Rules
 
 - Keep changes small and reviewable.

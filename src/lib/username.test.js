@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeUsername, suggestUsername, usernameCandidates, usernameProblem, withUsernameSuffix } from './username.js';
+import { firstFreeUsername, normalizeUsername, suggestUsername, usernameCandidates, usernameProblem, withUsernameSuffix } from './username.js';
 import { isOffensiveUsername } from './usernameBlocklist.js';
 import { formatUserLabel, formatUserMeta, formatUserName } from './userLabel.js';
 
@@ -34,6 +34,13 @@ describe('Benutzername', () => {
 
   it('weicht bei anstößigem Vorschlag auf vorname.n bzw. spieler aus', () => {
     expect(usernameCandidates('Anna', 'Hitler')).toEqual(['anna.h', 'anna', 'spieler']);
+  });
+
+  it('wählt den ersten freien Namen und überspringt belegte, gesperrte und anstößige Varianten', () => {
+    expect(firstFreeUsername(['anna.schmidt'], new Set())).toBe('anna.schmidt');
+    expect(firstFreeUsername(['anna.schmidt'], new Set(['anna.schmidt', 'anna.schmidt2']))).toBe('anna.schmidt3');
+    expect(firstFreeUsername(['anna.14'], new Set(['anna.14', ...Array.from({ length: 86 }, (_, i) => `anna.14${i + 2}`)]))).toBe('anna.1489');
+    expect(firstFreeUsername([], new Set())).toBeNull();
   });
 
   it('hängt eine Zahl an und kürzt dafür den Namen', () => {

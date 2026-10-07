@@ -79,6 +79,18 @@ Ergebnisse synchronisieren.
 > Danach steuerst du Anmeldung, Teilnehmerliste und Kommunikation zentral an
 > einem Ort.
 
+## 🛠️ Entwicklung und Deployment
+
+* `npm run dev` baut die App, wendet die D1-Migrationen lokal an, vergibt fehlende Benutzernamen und startet `wrangler dev`.
+* `npm run deploy` (nur von `master`) führt das Quality-Gate aus und dann in dieser Reihenfolge:
+  1. D1-Migrationen remote anwenden (`db:migrate:remote`)
+  2. Fehlende Benutzernamen vergeben (`db:backfill:remote`, Skript `scripts/backfill-usernames.mjs`)
+  3. `wrangler deploy`
+  4. Backfill erneut, für Konten, die der alte Worker während des Deploys ohne Benutzernamen angelegt hat
+
+  Der Backfill ist idempotent und bricht den Ablauf ab, wenn danach noch Konten ohne Benutzernamen übrig sind.
+  Nach dem Deploy prüfen: Zahl der Konten unverändert, `SELECT COUNT(*) FROM users WHERE username IS NULL` ergibt `0`.
+
 ## 🤝 Mitwirken
 
 Fehlerberichte, Ideen und Pull Requests sind willkommen. Bitte beachte vor

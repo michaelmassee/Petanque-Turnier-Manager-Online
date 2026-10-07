@@ -4,12 +4,15 @@
 //
 //   node scripts/backfill-usernames.mjs --local            # SQL erzeugen und anzeigen
 //   node scripts/backfill-usernames.mjs --local --apply    # zusätzlich ausführen
-//   node scripts/backfill-usernames.mjs --remote --apply   # Produktion (nur auf Anweisung)
+//   node scripts/backfill-usernames.mjs --remote --apply   # Produktion; läuft automatisch in `npm run deploy`
+//
+// Idempotent: berührt nur Konten ohne Benutzernamen. Mit --apply endet es mit Fehlercode, wenn danach noch Konten
+// ohne Benutzernamen übrig sind – `npm run deploy` bricht dann ab.
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { usernameCandidates, usernameProblem, withUsernameSuffix } from '../src/lib/username.js';
+import { firstFreeUsername, usernameCandidates } from '../src/lib/username.js';
 
 const args = new Set(process.argv.slice(2));
 const target = args.has('--remote') ? '--remote' : args.has('--local') ? '--local' : null;
@@ -33,15 +36,10 @@ const taken = new Set([
 
 function pick(user) {
   // Reservierte Namen sind für normale Konten gesperrt; der System-User erhält einen festen.
-  if (SYSTEM_USERNAMES[user.id]) return SYSTEM_USERNAMES[user.id];
-  for (const base of usernameCandidates(user.first_name, user.last_name)) {
-    if (!taken.has(base)) return base;
-    for (let number = 2; number < 10000; number += 1) {
-      const candidate = withUsernameSuffix(base, number);
-      if (!taken.has(candidate) && !usernameProblem(candidate)) return candidate;
-    }
-  }
-  throw new Error(`Kein freier Benutzername für ${user.id}`);
+  if (SYSTEM_USERNAMES[user.id] && !taken.has(SYSTEM_USERNAMES[user.id])) return SYSTEM_USERNAMES[user.id];
+  const username = firstFreeUsername(usernameCandidates(user.first_name, user.last_name), taken);
+  if (!username) throw new Error(`Kein freier Benutzername für ${user.id}`);
+  return username;
 }
 
 const quote = (value) => `'${String(value).replaceAll("'", "''")}'`;
@@ -62,7 +60,7 @@ console.log(`${statements.length} Konten ohne Benutzernamen, SQL: ${file}`);
 console.log(statements.slice(0, 20).join('\n'));
 
 if (args.has('--apply')) {
-  execFileSync('npx', ['wrangler', 'd1', 'execute', 'DB', target, '--file', file], { stdio: 'inherit' });
+  execFileSync('npx', ['wrangler', 'd1', 'execute', 'DB', target, '--yes', '--file', file], { stdio: 'inherit' });
   const [rest] = query('SELECT COUNT(*) AS count FROM users WHERE username IS NULL');
   console.log(`Ohne Benutzernamen danach: ${rest.count}`);
   if (rest.count !== 0) process.exit(1);
