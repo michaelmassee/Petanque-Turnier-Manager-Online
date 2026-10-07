@@ -21,7 +21,7 @@ export function filterRegistrations(registrations, query, statusFilter, { organi
 export function filterUsers(users, query, roleFilter, statusFilter) {
   const normalizedQuery = (query || '').trim().toLowerCase();
   return users.filter((user) => {
-    const matchesQuery = !normalizedQuery || [user.firstName, user.lastName, user.email, user.username, user.username && `@${user.username}`, user.club].some((value) => (value || '').toLowerCase().includes(normalizedQuery));
+    const matchesQuery = !normalizedQuery || [user.firstName, user.lastName, user.email, user.phone, user.username, user.username && `@${user.username}`, user.club].some((value) => (value || '').toLowerCase().includes(normalizedQuery));
     const matchesRole = !roleFilter || user.role === roleFilter;
     const matchesStatus = !statusFilter ||
       (statusFilter === 'verified' && Boolean(user.emailVerifiedAt)) ||

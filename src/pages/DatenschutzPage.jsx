@@ -58,6 +58,10 @@ export function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, 
             {t('Angemeldete Nutzer können anstößige Benutzernamen melden. Wir speichern dazu den gemeldeten Namen, den meldenden Nutzer, einen optionalen Grund und den Zeitpunkt. Meldungen sind nur für Administratoren sichtbar und dienen der Moderation (Art. 6 Abs. 1 lit. f DSGVO). Ändert ein Administrator einen Benutzernamen, wird der bisherige Name gesperrt, damit er nicht erneut vergeben wird.')}
           </p>
 
+          <p>
+            {t('Freiwillig kannst du in deinem Profil eine Handynummer hinterlegen. Sie ist nur für dich und die Administratoren sichtbar, wird nicht an andere Nutzer oder Turnierleiter weitergegeben und kann jederzeit im Profil geändert oder gelöscht werden (Art. 6 Abs. 1 lit. a DSGVO).')}
+          </p>
+
           <h2>{t('5. Turnieranmeldungen und öffentliche Teilnehmerlisten')}</h2>
           <p>
             {t('Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).')}

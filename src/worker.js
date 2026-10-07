@@ -2914,7 +2914,7 @@ async function resetPassword(request, db) {
 async function listUsers(db) {
   const result = await db
     .prepare(
-      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, role, club, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
     )
     .all();
   return json({ users: result.results.map(toPublicUser) });
@@ -3550,7 +3550,7 @@ export async function updateUser(request, env, id, currentUserId) {
 
   const updated = await db
     .prepare(
-      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, role, club, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users WHERE id = ?',
     )
     .bind(id)
     .first();
@@ -3623,6 +3623,8 @@ export async function updateOwnProfile(request, env, url, userId) {
   const language = normalizeLanguage(body.language);
   const licenseNr = nullableText(body.licenseNr);
   const club = nullableText(body.club);
+  // Ältere Clients ohne Feld lassen eine gespeicherte Nummer unverändert.
+  const phone = body.phone === undefined ? existing.phone ?? null : normalizePhone(body.phone);
 
   if (firstName.length < 2 || lastName.length < 2) {
     throw new HttpError(400, 'Vorname und Nachname müssen mindestens 2 Zeichen enthalten');
@@ -3669,16 +3671,16 @@ export async function updateOwnProfile(request, env, url, userId) {
         db
           .prepare(
             `UPDATE users
-             SET first_name = ?, last_name = ?, pending_email = ?, club = ?, license_nr = ?, password_salt = ?, password_hash = ?, updated_at = ?
+             SET first_name = ?, last_name = ?, pending_email = ?, club = ?, license_nr = ?, phone = ?, password_salt = ?, password_hash = ?, updated_at = ?
              WHERE id = ?`,
           )
-          .bind(firstName, lastName, pendingEmail, club, licenseNr, password.salt, password.hash, now, userId),
+          .bind(firstName, lastName, pendingEmail, club, licenseNr, phone, password.salt, password.hash, now, userId),
         db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(userId, currentSessionId || ''),
       ]);
     } else {
       await db
-        .prepare('UPDATE users SET first_name = ?, last_name = ?, pending_email = ?, club = ?, license_nr = ?, updated_at = ? WHERE id = ?')
-        .bind(firstName, lastName, pendingEmail, club, licenseNr, now, userId)
+        .prepare('UPDATE users SET first_name = ?, last_name = ?, pending_email = ?, club = ?, license_nr = ?, phone = ?, updated_at = ? WHERE id = ?')
+        .bind(firstName, lastName, pendingEmail, club, licenseNr, phone, now, userId)
         .run();
     }
   } catch (error) {
@@ -3695,7 +3697,7 @@ export async function updateOwnProfile(request, env, url, userId) {
 
   const updated = await db
     .prepare(
-      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, role, club, license_nr, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, license_nr, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?',
     )
     .bind(userId)
     .first();
@@ -8736,7 +8738,7 @@ async function requireSession(request, db) {
 
   const row = await db
     .prepare(
-      `SELECT users.id, users.first_name, users.last_name, users.username, users.username_changed_at, users.username_confirmed_at, users.email, users.pending_email, users.role, users.club, users.license_nr, users.email_verified_at, users.password_change_required,
+      `SELECT users.id, users.first_name, users.last_name, users.username, users.username_changed_at, users.username_confirmed_at, users.email, users.pending_email, users.phone, users.role, users.club, users.license_nr, users.email_verified_at, users.password_change_required,
               users.tournament_limit, users.mail_enabled, users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
@@ -8921,6 +8923,17 @@ const USERNAME_PROBLEM_MESSAGES = {
   reserved: 'Dieser Benutzername ist nicht erlaubt',
   offensive: 'Dieser Benutzername ist nicht erlaubt',
 };
+
+// Optionale Handynummer: Ziffern, Leerzeichen und + / - ( ) ., 6–15 Ziffern (E.164-Länge), höchstens 30 Zeichen.
+export function normalizePhone(value) {
+  const phone = String(value ?? '').trim().replace(/\s+/g, ' ');
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (phone.length > 30 || !/^\+?[0-9 ()/.-]+$/.test(phone) || digits.length < 6 || digits.length > 15) {
+    throw new HttpError(400, 'Bitte eine gültige Handynummer angeben (z. B. +49 171 1234567)');
+  }
+  return phone;
+}
 
 function usernameChangeAllowedAt(changedAt) {
   if (!changedAt) return null;
@@ -9367,6 +9380,7 @@ function toPublicUser(row) {
     usernameChangeAllowedAt: usernameChangeAllowedAt(row.username_changed_at),
     email: row.email,
     pendingEmail: row.pending_email || null,
+    phone: row.phone || null,
     role: row.role,
     club: row.club || null,
     licenseNr: row.license_nr || null,

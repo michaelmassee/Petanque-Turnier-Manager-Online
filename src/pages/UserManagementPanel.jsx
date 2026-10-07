@@ -247,6 +247,7 @@ function UserRow({ user, currentUser, selected, busy, busyOther, onEdit, onDelet
         <strong data-i18n-skip>{user.firstName} {user.lastName}</strong>
         {user.username && <span className="user-handle" data-i18n-skip>@{user.username}{user.club ? ` · ${user.club}` : ''}</span>}
         <span>{user.email}</span>
+        {user.phone && <span data-i18n-skip>{user.phone}</span>}
       </div>
       <div className="badges">
         <span className={`role role-${user.role}`}>{roleName(user.role)}</span>

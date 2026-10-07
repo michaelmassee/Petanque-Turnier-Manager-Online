@@ -103,6 +103,7 @@ export const EMPTY_PROFILE_FORM = {
   lastName: '',
   username: '',
   email: '',
+  phone: '',
   club: '',
   licenseNr: '',
   currentPassword: '',

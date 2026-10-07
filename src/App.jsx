@@ -904,6 +904,7 @@ function AppContent() {
           lastName: profileForm.lastName,
           username: profileForm.username,
           email: profileForm.email,
+          phone: profileForm.phone,
           club: profileForm.club,
           licenseNr: profileForm.licenseNr,
           currentPassword: profileForm.currentPassword,
@@ -917,6 +918,7 @@ function AppContent() {
         lastName: data.user.lastName,
         username: data.user.username || '',
         email: data.user.pendingEmail || data.user.email,
+        phone: data.user.phone || '',
         club: data.user.club || '',
         licenseNr: data.user.licenseNr || '',
         currentPassword: '',
@@ -1185,6 +1187,7 @@ function AppContent() {
       lastName: currentUser.lastName,
       username: currentUser.username || '',
       email: currentUser.pendingEmail || currentUser.email,
+      phone: currentUser.phone || '',
       club: currentUser.club || '',
       licenseNr: currentUser.licenseNr || '',
       currentPassword: '',
@@ -2116,6 +2119,17 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = fa
             hint={usernameHint}
           />
           <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+          <TextField
+            label={t('Handynummer')}
+            type="tel"
+            value={form.phone}
+            onChange={(phone) => setForm({ ...form, phone })}
+            autoComplete="tel"
+            inputMode="tel"
+            maxLength={30}
+            placeholder="+49 171 1234567"
+          />
+          <p className="hint">{t('Optional. Nur für dich und die Administratoren sichtbar.')}</p>
           <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} />
           <p className="hint">{t('Benutzername und Verein werden anderen Nutzern angezeigt, damit man dich auch bei gleichem Namen unterscheiden kann.')}</p>
           <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
