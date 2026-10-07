@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '../lib/i18next-config.js';
-import { RegistrationsManagementPage, RegistrationsPanel, registrationsToCsv } from './RegistrationsManagement.jsx';
+import { RegistrationForm, RegistrationsManagementPage, RegistrationsPanel, registrationsToCsv } from './RegistrationsManagement.jsx';
+import { EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
 
 const t = (key) => key;
 
@@ -151,6 +152,36 @@ describe('Anmeldungsverwaltung: Turnierauswahl', () => {
     expect(options.join(' ')).not.toContain('Kalendereintrag');
     expect(options.join(' ')).toContain('Sommer Cup');
     await waitFor(() => expect(setSelectedTournamentId).toHaveBeenCalledWith('registration'));
+  });
+});
+
+describe('Anmeldungsverwaltung: Dialog „Anmeldung erfassen“', () => {
+  it('wählt das Turnier über die Turnier-Combobox mit Datum und Meldungen', () => {
+    const setForm = vi.fn();
+    const form = { ...EMPTY_REGISTRATION_FORM, tournamentId: 'a' };
+    render(
+      <RegistrationForm
+        form={form}
+        setForm={setForm}
+        onSubmit={(event) => event.preventDefault()}
+        tournaments={[
+          { id: 'a', name: 'Sommer Cup', date: '2026-07-01', formation: 'tete', registrationType: 'forme', canManage: true, activeRegistrations: 4 },
+          { id: 'b', name: 'Herbst Cup', date: '2026-10-03', formation: 'tete', registrationType: 'forme', canManage: true, activeRegistrations: 1, waitlistRegistrations: 1 },
+        ]}
+        selectedTournamentId="a"
+        currentUserId="user-1"
+        manageMode
+      />,
+    );
+
+    const input = screen.getByRole('combobox', { name: 'Turnier' });
+    expect(input).toHaveValue('Sommer Cup · 1.7.2026');
+    fireEvent.focus(input);
+    const option = screen.getByRole('option', { name: /Herbst Cup/ });
+    expect(option).toHaveTextContent('3.10.2026 · 2 Anmeldungen');
+    fireEvent.click(option);
+    expect(setForm).toHaveBeenCalledWith({ ...form, tournamentId: 'b' });
+    localStorage.clear();
   });
 });
 

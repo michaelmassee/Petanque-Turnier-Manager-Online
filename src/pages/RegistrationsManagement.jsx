@@ -4,21 +4,26 @@ import { authenticatedApi } from '../lib/api.js';
 import { EMPTY_REGISTRATION_FORM, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { isCalendarEntry, labelFor, registrationPayload, translatedOptions } from '../lib/domain.js';
 import { filterRegistrations } from '../frontend-core.js';
-import { Feedback, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
+import { Feedback, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { formatMoney } from '../lib/format.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
-export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false }) {
+export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false, currentUserId }) {
   const { t } = useTranslation();
   const selectedValue = form.tournamentId || selectedTournamentId;
-  const options = tournaments.map((tournament) => ({ value: tournament.id, label: tournament.name }));
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedValue);
 
   return (
     <form className="form dense" onSubmit={onSubmit}>
-      <SelectField label={t('Turnier')} value={selectedValue} onChange={(tournamentId) => setForm({ ...form, tournamentId })} options={options} />
+      <TournamentPicker
+        label={t('Turnier')}
+        tournaments={tournaments}
+        value={selectedValue}
+        onChange={(tournamentId) => setForm({ ...form, tournamentId })}
+        currentUserId={currentUserId}
+      />
       <RegistrationFields
         form={form}
         setForm={setForm}
@@ -716,6 +721,7 @@ export function RegistrationsManagementPage({
           manageMode={manageMode}
           invalidField={invalidField}
           saving={saving}
+          currentUserId={currentUserId}
         />
         {mode === 'edit' && (
           <RelinkAccounts
