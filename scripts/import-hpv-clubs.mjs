@@ -24,6 +24,8 @@ const SECOND_PLACE = {
   'boule club linden e.v.': { merge: true },
   'bornheim boules e.v.': { independent: true, name: 'Günthersburgpark' },
 };
+// Nicht importieren: ISD trägt in der Quelle Adresse, Koordinaten und Logo eines anderen Eintrags.
+const EXCLUDED = new Set(['isd e.v. intosports steinbach deutschland']);
 
 const args = new Set(process.argv.slice(2));
 const target = args.has('--remote') ? '--remote' : args.has('--local') ? '--local' : null;
@@ -80,7 +82,8 @@ function placeDescription(entries) {
 
 const response = await fetch(VEREINE_URL);
 if (!response.ok) throw new Error(`${VEREINE_URL}: HTTP ${response.status}`);
-const entries = JSON.parse((await response.text()).replace(/^﻿/, ''));
+const entries = JSON.parse((await response.text()).replace(/^﻿/, ''))
+  .filter((entry) => !EXCLUDED.has(key(entry.name)));
 
 const groups = new Map();
 for (const entry of entries) {
