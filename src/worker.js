@@ -3451,7 +3451,7 @@ async function sendPushNotifications(env, userId, payload) {
   }));
 }
 
-async function createUser(request, db) {
+export async function createUser(request, db) {
   const body = await readJson(request);
   const user = normalizeUserInput(body, { requirePassword: true });
   const password = await hashPassword(user.password);
@@ -3461,14 +3461,15 @@ async function createUser(request, db) {
   const passwordChangeRequired = body.passwordChangeRequired === true ? 1 : 0;
   const tournamentLimit = resolveTournamentLimit(body, DEFAULT_TOURNAMENT_LIMIT);
   const mailEnabled = body.mailEnabled === true ? 1 : 0;
+  const phone = normalizePhone(body.phone);
   let username;
   try {
     username = await saveAccountWithUsername(db, { chosen: user.username, firstName: user.firstName, lastName: user.lastName }, (candidate) => db
       .prepare(
-        `INSERT INTO users (id, first_name, last_name, username, email, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, first_name, last_name, username, email, phone, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, user.firstName, user.lastName, candidate, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, now)
+      .bind(id, user.firstName, user.lastName, candidate, user.email, phone, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, now)
       .run());
   } catch (error) {
     throw accountConflictError(error) || error;
@@ -3484,6 +3485,7 @@ async function createUser(request, db) {
         last_name: user.lastName,
         username,
         email: user.email,
+        phone,
         role: user.role,
         email_verified_at: emailVerifiedAt,
         password_change_required: passwordChangeRequired,
@@ -3521,6 +3523,8 @@ export async function updateUser(request, env, id, currentUserId) {
   const newUsername = user.username && user.username !== existing.username
     ? await assertUsernameAllowed(db, user.username, { userId: id })
     : null;
+  // Ältere Clients ohne Feld lassen eine gespeicherte Nummer unverändert.
+  const phone = body.phone === undefined ? existing.phone ?? null : normalizePhone(body.phone);
 
   try {
     if (user.password) {
@@ -3528,17 +3532,17 @@ export async function updateUser(request, env, id, currentUserId) {
       await db
         .prepare(
           `UPDATE users
-           SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, mail_enabled = ?, updated_at = ?
+           SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, phone = ?, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, mail_enabled = ?, updated_at = ?
            WHERE id = ?`,
         )
-        .bind(user.firstName, user.lastName, user.email, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, id)
+        .bind(user.firstName, user.lastName, user.email, phone, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, id)
         .run();
     } else {
       await db
         .prepare(
-          'UPDATE users SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, role = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, mail_enabled = ?, updated_at = ? WHERE id = ?',
+          'UPDATE users SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, phone = ?, role = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, mail_enabled = ?, updated_at = ? WHERE id = ?',
         )
-        .bind(user.firstName, user.lastName, user.email, user.role, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, id)
+        .bind(user.firstName, user.lastName, user.email, phone, user.role, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, id)
         .run();
     }
   } catch (error) {

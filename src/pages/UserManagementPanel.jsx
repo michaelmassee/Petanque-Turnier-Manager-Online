@@ -26,6 +26,7 @@ function userToForm(user) {
     originalUsername: user.username || '',
     usernameChangeReason: '',
     email: user.email,
+    phone: user.phone || '',
     role: user.role,
     password: '',
     emailVerified: Boolean(user.emailVerifiedAt),
@@ -293,6 +294,16 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwo
         </>
       )}
       <TextField label={t('E-Mail')} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+      <TextField
+        label={t('Handynummer')}
+        type="tel"
+        value={form.phone}
+        onChange={(phone) => setForm({ ...form, phone })}
+        autoComplete="off"
+        inputMode="tel"
+        maxLength={30}
+        placeholder="+49 171 1234567"
+      />
       <SelectField label={t('Rolle')} value={form.role} onChange={(role) => setForm({ ...form, role })} options={translatedOptions(ROLES)} />
       <label className="checkbox-row">
         <input

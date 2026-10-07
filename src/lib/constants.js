@@ -90,6 +90,7 @@ export const EMPTY_USER_FORM = {
   originalUsername: '',
   usernameChangeReason: '',
   email: '',
+  phone: '',
   role: 'user',
   password: '',
   emailVerified: true,
