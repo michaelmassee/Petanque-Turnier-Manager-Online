@@ -1,6 +1,9 @@
 import { useEffect, useId } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+// ProseMirror-Grundregeln (u. a. white-space: pre-wrap) als normales Stylesheet: TipTap würde sie sonst als
+// <style>-Element einfügen, das die CSP (style-src 'self') blockiert.
+import 'prosemirror-view/style/prosemirror.css';
 import { parseRichText, serializeRichText, richTextDocument } from '../lib/rich-text.js';
 
 const extensions = [StarterKit.configure({
@@ -25,6 +28,7 @@ export function RichTextEditor({ label, value, onChange, boldLabel, italicLabel,
     content: richTextDocument(value),
     immediatelyRender: true,
     shouldRerenderOnTransaction: true,
+    injectCSS: false,
     editorProps: { attributes: { id: editorId, 'aria-label': label } },
     onUpdate: ({ editor: currentEditor }) => onChange(serializeRichText(currentEditor.getJSON())),
   });
