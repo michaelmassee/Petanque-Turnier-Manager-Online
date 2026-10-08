@@ -365,7 +365,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           <div className="supermelee-toolbar-actions">
             <p className="hint">
               {t('Bestätigte Meldungen')} · {labelFor(REGISTRATION_TYPES, selectedTournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, selectedTournament.type)} · {labelFor(FORMATIONS, selectedTournament.formation)}: {confirmedRegistrations.length} ({activeConfirmedCount} {t('aktiv')})
-              {selectedTournament.type === 'schweizer' && ` · ${t(selectedTournament.schweizerRankingMode === 'ohne_buchholz' ? 'Ohne Buchholz' : 'Mit Buchholz')}`}
+              {selectedTournament.type === 'schweizer' && ` · ${t(selectedTournament.schweizerRankingMode === 'ohne_buchholz' ? 'Ohne Buchholz' : 'Mit Buchholz und Feinbuchholz')}`}
             </p>
             {isSchweizerMelee && !rounds.length && (
               <Button variant="secondary" disabled={busy || !canDrawMeleeTeams} loading={busy} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>

@@ -417,7 +417,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               value={form.schweizerRankingMode || 'mit_buchholz'}
               onChange={(schweizerRankingMode) => setForm({ ...form, schweizerRankingMode })}
               options={[
-                { value: 'mit_buchholz', label: t('Mit Buchholz') },
+                { value: 'mit_buchholz', label: t('Mit Buchholz und Feinbuchholz') },
                 { value: 'ohne_buchholz', label: t('Ohne Buchholz') },
               ]}
               disabled={form.status === 'running' || form.status === 'finished'}
