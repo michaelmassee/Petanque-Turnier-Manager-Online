@@ -3,6 +3,19 @@ import { parseRichText } from '../lib/rich-text.js';
 const URL_PATTERN = /(https?:\/\/[^\s<>"]+)/g;
 // Satzzeichen am Ende ("… siehe https://example.org.") gehört nicht zur Adresse.
 const TRAILING_PUNCTUATION = /[.,;:!?)\]]+$/;
+// Eigene Adressen (z. B. der Turnierlink aus "Nachricht an Team") bleiben im selben Fenster. ptmonline.org zählt
+// immer dazu, weil der Worker Links mit der Produktions-Domain erzeugt, auch wenn die App lokal läuft.
+const OWN_HOSTS = new Set(['ptmonline.org', 'www.ptmonline.org']);
+
+function ownAppPath(url) {
+  try {
+    const target = new URL(url);
+    if (target.host !== window.location.host && !OWN_HOSTS.has(target.host)) return null;
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return null;
+  }
+}
 
 // Macht http(s)-Adressen im Text anklickbar; andere Schemata (javascript: etc.) bleiben reiner Text.
 export function LinkifiedText({ text }) {
@@ -10,9 +23,13 @@ export function LinkifiedText({ text }) {
     if (index % 2 === 0) return part;
     const trailing = part.match(TRAILING_PUNCTUATION)?.[0] || '';
     const url = trailing ? part.slice(0, -trailing.length) : part;
+    const ownPath = ownAppPath(url);
     return (
       <span key={index}>
-        <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>{trailing}
+        {ownPath
+          ? <a href={ownPath}>{url}</a>
+          : <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>}
+        {trailing}
       </span>
     );
   });
