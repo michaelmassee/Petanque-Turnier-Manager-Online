@@ -65,7 +65,7 @@ export function PushMigrationNotice({ onDismiss, onEnabled }) {
 
 const POSTBOX_MESSAGE_MAX_LENGTH = 500;
 
-export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick, currentUserId, sending = false, onLookupRecipientEmail }) {
+export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick, onNavigate, currentUserId, sending = false, onLookupRecipientEmail }) {
   const [pushState, setPushState] = useState('');
   const [pushErrorDetail, setPushErrorDetail] = useState('');
   const [pushActive, setPushActive] = useState(false);
@@ -153,7 +153,7 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
                     )}
                   </div>
                   {message.kind === 'direct'
-                    ? <span className="postbox-message-body"><RichText value={message.body} /></span>
+                    ? <span className="postbox-message-body"><RichText value={message.body} onNavigate={onNavigate} /></span>
                     : <span>{postboxMessageText(message, text)}</span>}
                   <small>{new Date(message.createdAt).toLocaleString()}</small>
                 </div>

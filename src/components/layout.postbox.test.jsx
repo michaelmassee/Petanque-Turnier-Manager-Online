@@ -60,3 +60,23 @@ describe('Postbox-Nachricht mit Link', () => {
     expect(onRead).toHaveBeenCalledWith(message);
   });
 });
+
+describe('Links in Postbox-Nachrichten', () => {
+  it('navigiert bei eigenen Links in der App und lässt externe Links normal öffnen', () => {
+    const onNavigate = vi.fn();
+    const onRead = vi.fn();
+    renderPostbox({ onNavigate, onRead, messages: [
+      { id: 'm1', kind: 'direct', body: 'Turnier: https://ptmonline.org/turniere/t1/info Infos: https://example.org/flyer', senderName: 'Anna', createdAt: '2026-10-06T08:00:00Z', readAt: null, mine: false },
+    ] });
+
+    expect(fireEvent.click(screen.getByRole('link', { name: 'https://ptmonline.org/turniere/t1/info' }))).toBe(false);
+    expect(onNavigate).toHaveBeenCalledWith('/turniere/t1/info');
+
+    onNavigate.mockClear();
+    const external = screen.getByRole('link', { name: 'https://example.org/flyer' });
+    expect(external).toHaveAttribute('target', '_blank');
+    expect(external).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(fireEvent.click(external)).toBe(true);
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+});

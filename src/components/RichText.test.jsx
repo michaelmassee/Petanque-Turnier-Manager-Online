@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { RichText } from './RichText.jsx';
 import { serializeRichText } from '../lib/rich-text.js';
 
@@ -33,5 +33,22 @@ describe('RichText verlinkt Adressen', () => {
     expect(production).not.toHaveAttribute('target');
     expect(local).toHaveAttribute('href', '/live?x=1#a');
     expect(local).not.toHaveAttribute('target');
+  });
+
+  it('navigiert bei eigenen Links über das App-Routing statt neu zu laden', () => {
+    const onNavigate = vi.fn();
+    render(<RichText value="Turnier: https://ptmonline.org/turniere/t1/info und https://example.org" onNavigate={onNavigate} />);
+    const [own, external] = screen.getAllByRole('link');
+
+    expect(fireEvent.click(own)).toBe(false);
+    expect(onNavigate).toHaveBeenCalledWith('/turniere/t1/info');
+
+    onNavigate.mockClear();
+    expect(fireEvent.click(own, { ctrlKey: true })).toBe(true);
+    // Externe Links bleiben echte Links: neuer Tab, Klick wird nicht abgefangen.
+    expect(external).toHaveAttribute('href', 'https://example.org');
+    expect(external).toHaveAttribute('target', '_blank');
+    expect(fireEvent.click(external)).toBe(true);
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 });

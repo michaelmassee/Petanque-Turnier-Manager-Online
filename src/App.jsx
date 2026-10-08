@@ -1234,6 +1234,7 @@ function AppContent() {
       onRead={handleReadPostboxMessage}
       onSubmit={handleSendPostboxMessage}
       onTodoClick={handlePostboxTodoClick}
+      onNavigate={(nextPath) => { setPostboxOpen(false); navigate(nextPath); }}
       onLookupRecipientEmail={lookupPostboxRecipientByEmail}
     />;
   }
