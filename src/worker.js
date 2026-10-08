@@ -332,6 +332,24 @@ export function buildLiveLink(appOrigin, token) {
   return `${appOrigin}/live/t/${encodeURIComponent(token)}`;
 }
 
+const WHATSAPP_GROUP_EMAIL_LABELS = {
+  de: 'Tritt der WhatsApp-Gruppe zum Turnier bei:',
+  nl: 'Word lid van de WhatsApp-groep van het toernooi:',
+  en: 'Join the tournament WhatsApp group:',
+  es: 'Únete al grupo de WhatsApp del torneo:',
+  fr: 'Rejoins le groupe WhatsApp du tournoi :',
+};
+
+/**
+ * Absatz mit dem WhatsApp-Gruppenlink des Turniers für Mails an Gemeldete/Teammitglieder, sonst ''. Die Aufrufer
+ * reichen teils zusammengesetzte Zeilen ohne alle Turnierspalten durch, daher wird der Link frisch gelesen.
+ */
+export async function whatsappGroupEmailBlock(db, tournamentId, language) {
+  const row = await db.prepare('SELECT whatsapp_group_url FROM tournaments WHERE id = ?').bind(tournamentId).first();
+  if (!row?.whatsapp_group_url) return '';
+  return `\n\n${WHATSAPP_GROUP_EMAIL_LABELS[language] || WHATSAPP_GROUP_EMAIL_LABELS.de}\n${row.whatsapp_group_url}`;
+}
+
 export const REGISTRATION_DISPLACED_EMAILS = {
   de: {
     subject: (name) => `Änderung deiner Anmeldung: ${name}`,
@@ -684,7 +702,7 @@ function renderEmailMessageBox(value) {
  * body remains the canonical fallback, while this layout gives modern clients a readable card,
  * clear action links and a separate product footer. All dynamic content is escaped before use.
  */
-export function renderTransactionalEmailHtml(subject, text, language, messageBox = null) {
+export function renderTransactionalEmailHtml(subject, text, language, messageBox = null, textAfterMessageBox = '') {
   const labels = EMAIL_LAYOUT_LABELS[language] || EMAIL_LAYOUT_LABELS.de;
   const [content, footer = ''] = appendEmailFooter(text, language).split('\n\n----------\n\n');
   const footerHtml = renderEmailSection(footer, labels);
@@ -695,7 +713,7 @@ export function renderTransactionalEmailHtml(subject, text, language, messageBox
       <tr><td align="center" style="padding:32px 16px;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border-radius:14px;overflow:hidden;">
           <tr><td style="background:#07594f;padding:24px 32px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:.1px;">${EMAIL_BRAND}</td></tr>
-          <tr><td style="padding:34px 32px 24px;"><h1 style="margin:0 0 24px;color:#173b34;font-size:24px;line-height:31px;">${escapeEmailHtml(subject)}</h1>${renderEmailSection(content, labels)}${messageBox ? renderEmailMessageBox(messageBox) : ''}</td></tr>
+          <tr><td style="padding:34px 32px 24px;"><h1 style="margin:0 0 24px;color:#173b34;font-size:24px;line-height:31px;">${escapeEmailHtml(subject)}</h1>${renderEmailSection(content, labels)}${messageBox ? renderEmailMessageBox(messageBox) : ''}${textAfterMessageBox ? renderEmailSection(textAfterMessageBox.trim(), labels) : ''}</td></tr>
           <tr><td style="border-top:1px solid #dce6e2;padding:24px 32px 28px;background:#f8fbfa;">${footerHtml}</td></tr>
         </table>
         <p style="margin:16px 0 0;color:#71807b;font-size:12px;line-height:18px;">${labels.automated}</p>
@@ -837,12 +855,13 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
   // zusammengesetzte Zeile durch, daher wird die Option frisch gelesen.
   const liveOption = await env.DB.prepare('SELECT live_view_enabled FROM tournaments WHERE id = ?').bind(tournament.id).first();
   const liveLink = isLiveViewEnabled(liveOption) ? buildLiveLink(appOrigin, await issueLiveToken(env.DB, registration.id)) : '';
+  const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock, liveLink),
+      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock, liveLink) + whatsappBlock,
       language,
       attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
       logFallback: `Registration confirmation email for ${recipient.email} (tournament ${tournament.id})`,
@@ -866,11 +885,12 @@ export async function resendLiveLink(env, registration, user, appOrigin) {
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = LIVE_LINK_EMAILS[language] || LIVE_LINK_EMAILS.de;
   const liveLink = buildLiveLink(appOrigin, await issueLiveToken(env.DB, registration.id));
+  const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
   for (const recipient of recipients) {
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, liveLink),
+      text: templates.text(recipient.firstName, tournament.name, liveLink) + whatsappBlock,
       language,
       logFallback: `Live link email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `live link for registration ${registration.id}`,
@@ -890,12 +910,13 @@ async function sendRegistrationReceivedEmail(env, tournament, registration, appO
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
   const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
   const participantsBlock = buildRegistrationParticipantsBlock(registration, language);
+  const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, link, cancelLink, participantsBlock),
+      text: templates.text(recipient.firstName, tournament.name, link, cancelLink, participantsBlock) + whatsappBlock,
       language,
       logFallback: `Registration received email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `registration receipt for registration ${registration.id}`,
@@ -930,6 +951,8 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
   const templates = REGISTRATION_DISPLACED_EMAILS[language] || REGISTRATION_DISPLACED_EMAILS.de;
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
   const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
+  // Stornierte bekommen keinen Gruppenlink mehr, Wartende bleiben Teil des Turniers.
+  const whatsappBlock = wasCancelled ? '' : await whatsappGroupEmailBlock(env.DB, tournament.id, language);
 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
@@ -937,7 +960,7 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
       subject: templates.subject(tournament.name),
       text: wasCancelled
         ? templates.textCancelled(recipient.firstName, tournament.name, link)
-        : templates.textWaitlisted(recipient.firstName, tournament.name, link, cancelLink),
+        : templates.textWaitlisted(recipient.firstName, tournament.name, link, cancelLink) + whatsappBlock,
       language,
       logFallback: `Displacement email for ${recipient.email} (tournament ${tournament.id}, cancelled=${wasCancelled})`,
       failureContext: `displacement notice for registration ${registration.id}`,
@@ -1148,13 +1171,14 @@ async function sendTournamentReminders(env) {
         const link = `${APP_ORIGIN}/turniere/${tournament.id}/info`;
         const cancelLink = buildCancelLink(APP_ORIGIN, registration.cancel_token);
         const ics = buildTournamentIcs(tournament, APP_ORIGIN);
+        const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
 
         try {
           for (const recipient of recipients) {
             await enqueueTransactionalEmail(env, {
               to: recipient.email,
               subject: templates.subject(tournament.name),
-              text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink),
+              text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink) + whatsappBlock,
               language,
               attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
               logFallback: `Tournament reminder email for registration ${registration.id} (tournament ${tournament.id})`,
@@ -3227,6 +3251,7 @@ export async function createBroadcastPostboxMessage(env, { sender, tournament, b
         subject: templates.subject(tournament.name),
         text: templates.text(recipient.firstName, tournament.name, `${sender.firstName} ${sender.lastName}`),
         messageBox: body,
+        textAfterMessageBox: await whatsappGroupEmailBlock(env.DB, tournament.id, recipient.language),
         language: recipient.language,
         logFallback: `Tournament broadcast email for ${recipient.email} (tournament ${tournament.id})`,
         failureContext: `tournament broadcast for tournament ${tournament.id}`,
@@ -4655,6 +4680,7 @@ async function createTournament(request, env, user) {
 
   await db.prepare('UPDATE tournaments SET fee_tiers = ? WHERE id = ?').bind(JSON.stringify(tournament.feeTiers), id).run();
   await db.prepare('UPDATE tournaments SET registration_questions = ? WHERE id = ?').bind(JSON.stringify(tournament.registrationQuestions), id).run();
+  await db.prepare('UPDATE tournaments SET whatsapp_group_url = ? WHERE id = ?').bind(normalizePresentationUrl(body.whatsappGroupUrl, 'whatsappGroupUrl'), id).run();
 
   const created = await getTournamentById(db, id);
   if (isPubliclyVisible(created)) {
@@ -4720,12 +4746,12 @@ export async function duplicateTournament(db, existing, actingUser) {
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, qr_design, created_at, updated_at
       )
       SELECT ?, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, qr_design, ?, ?
       FROM tournaments WHERE id = ?`,
     )
@@ -5518,7 +5544,7 @@ function isPrivateIpLiteral(hostname) {
 }
 
 /**
- * Website/Logo/Flyer are presentation-only extras, not part of the tournament document's core
+ * Website/Logo/Flyer/WhatsApp group are presentation-only extras, not part of the tournament document's core
  * data, so this bypasses the document_managed lock enforced by updateTournament.
  */
 async function updateTournamentPresentation(request, env, existing, user) {
@@ -5527,11 +5553,12 @@ async function updateTournamentPresentation(request, env, existing, user) {
   const websiteUrl = normalizePresentationUrl(body.websiteUrl, 'websiteUrl');
   const logoUrl = normalizePresentationUrl(body.logoUrl, 'logoUrl');
   const flyerUrl = normalizePresentationUrl(body.flyerUrl, 'flyerUrl');
+  const whatsappGroupUrl = normalizePresentationUrl(body.whatsappGroupUrl, 'whatsappGroupUrl');
   const now = new Date().toISOString();
 
   await db
-    .prepare('UPDATE tournaments SET website_url = ?, logo_url = ?, flyer_url = ?, updated_at = ? WHERE id = ?')
-    .bind(websiteUrl, logoUrl, flyerUrl, now, existing.id)
+    .prepare('UPDATE tournaments SET website_url = ?, logo_url = ?, flyer_url = ?, whatsapp_group_url = ?, updated_at = ? WHERE id = ?')
+    .bind(websiteUrl, logoUrl, flyerUrl, whatsappGroupUrl, now, existing.id)
     .run();
 
   const updated = await getTournamentById(db, existing.id);
@@ -7679,7 +7706,7 @@ function isGoogleMailRecipient(to) {
 
 // messageBox: optionale Nutzernachricht (Klartext oder Rich Text), im HTML-Teil formatiert in einer eigenen Box,
 // im Klartext-Teil als Klartext angehängt.
-async function sendTransactionalEmail(env, { to, subject, text, messageBox = null, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
+async function sendTransactionalEmail(env, { to, subject, text, messageBox = null, textAfterMessageBox = '', language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
   const stratoAvailable = stratoConfigured(env);
   const resendAvailable = Boolean(env.RESEND_API_KEY && env.MAIL_FROM);
 
@@ -7691,8 +7718,8 @@ async function sendTransactionalEmail(env, { to, subject, text, messageBox = nul
     throw new HttpError(503, 'E-Mail-Versand ist nicht konfiguriert.');
   }
 
-  const body = appendEmailFooter(messageBox ? `${text}\n\n${richTextPlainText(messageBox)}` : text, language);
-  const html = renderTransactionalEmailHtml(subject, text, language, messageBox);
+  const body = appendEmailFooter(messageBox ? `${text}\n\n${richTextPlainText(messageBox)}${textAfterMessageBox}` : text + textAfterMessageBox, language);
+  const html = renderTransactionalEmailHtml(subject, text, language, messageBox, textAfterMessageBox);
 
   // Strato (Absender ptmonline@bclinden.de) hat kein SPF/DKIM-Alignment für sein
   // DMARC(p=reject)-Setup - Strato nimmt die Mail zwar an, Google verwirft sie
@@ -9650,6 +9677,8 @@ export function toPublicTournament(row, user) {
     websiteIsOriginalClubSite: false,
     logoUrl: row.logo_url || row.venue_club_logo_url || null,
     flyerUrl: row.flyer_url || null,
+    // Der Gruppenlink geht nur per Mail an Gemeldete, öffentlich würde jeder beitreten können.
+    whatsappGroupUrl: canManageTournament(row, user) ? row.whatsapp_group_url || null : undefined,
     activeRegistrations: Number(row.active_registrations || 0),
     waitlistRegistrations: Number(row.waitlist_registrations || 0),
     canManage: canManageTournament(row, user),

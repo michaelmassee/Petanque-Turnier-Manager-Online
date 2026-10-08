@@ -166,6 +166,7 @@ export const EMPTY_TOURNAMENT_FORM = {
   websiteUrl: '',
   logoUrl: '',
   flyerUrl: '',
+  whatsappGroupUrl: '',
 };
 
 export const EMPTY_TOURNAMENT_REPORT_FORM = {

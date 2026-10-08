@@ -600,6 +600,8 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
       <TextField label={t('Website')} type="url" placeholder="https://…" value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} invalid={invalidField === 'websiteUrl'} />
       <TextField label={t('Logo-Bildlink')} type="url" placeholder="https://…" value={form.logoUrl} onChange={(logoUrl) => setForm({ ...form, logoUrl })} invalid={invalidField === 'logoUrl'} />
       <TextField label={t('Flyer-Bildlink')} type="url" placeholder="https://…" value={form.flyerUrl} onChange={(flyerUrl) => setForm({ ...form, flyerUrl })} invalid={invalidField === 'flyerUrl'} />
+      <TextField label={t('WhatsApp-Gruppe (Einladungslink)')} type="url" placeholder="https://chat.whatsapp.com/…" value={form.whatsappGroupUrl} onChange={(whatsappGroupUrl) => setForm({ ...form, whatsappGroupUrl })} invalid={invalidField === 'whatsappGroupUrl'} />
+      <p className="hint">{t('Der Link wird in jede E-Mail an die Gemeldeten und ihre Teammitglieder eingefügt und nicht öffentlich angezeigt.')}</p>
       {canManageOwner && (
         <TournamentOwnerPanel tournamentId={form.id} ownerId={form.ownerId} candidates={ownerCandidates} onOwnerChanged={(tournament) => { onOwnerChanged(tournament); setForm({ ...form, ownerId: tournament.ownerId }); }} />
       )}
@@ -914,6 +916,7 @@ function tournamentToForm(tournament) {
     websiteUrl: tournament.websiteUrl || '',
     logoUrl: tournament.logoUrl || '',
     flyerUrl: tournament.flyerUrl || '',
+    whatsappGroupUrl: tournament.whatsappGroupUrl || '',
   };
 }
 
@@ -1000,6 +1003,7 @@ export function TournamentManagementPage({
             websiteUrl: form.websiteUrl,
             logoUrl: form.logoUrl,
             flyerUrl: form.flyerUrl,
+            whatsappGroupUrl: form.whatsappGroupUrl,
           }),
         });
       } else {
