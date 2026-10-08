@@ -146,5 +146,20 @@
   "adminAction_running_reset": "Turnierstart zurückgesetzt",
   "adminAction_tournament_deleted": "Turnier gelöscht",
   "searchingByEmail": "Suche per E-Mail-Adresse …",
-  "recipientEmailSearchHint": "Tipp: Suche nach Name, @Benutzername, Verein oder der vollständigen E-Mail-Adresse."
+  "recipientEmailSearchHint": "Tipp: Suche nach Name, @Benutzername, Verein oder der vollständigen E-Mail-Adresse.",
+  "Flyer erstellen": "Flyer erstellen",
+  "Flyer-Design gespeichert": "Flyer-Design gespeichert",
+  "Vorlage": "Vorlage",
+  "Format": "Format",
+  "Akzentfarbe": "Akzentfarbe",
+  "Untertitel": "Untertitel",
+  "Zusatztext": "Zusatztext",
+  "Angaben anzeigen": "Angaben anzeigen",
+  "Kapazität": "Kapazität",
+  "Maximal {count} Anmeldungen": "Maximal {count} Anmeldungen",
+  "Der Text passt nicht in das gewählte Flyerformat. Bitte kürze Überschrift, Untertitel oder Zusatztext.": "Der Text passt nicht in das gewählte Flyerformat. Bitte kürze Überschrift, Untertitel oder Zusatztext.",
+  "PDF herunterladen": "PDF herunterladen",
+  "Flyer konnte nicht erzeugt werden": "Flyer konnte nicht erzeugt werden",
+  "Modern": "Modern",
+  "Sportlich": "Sportlich"
 }

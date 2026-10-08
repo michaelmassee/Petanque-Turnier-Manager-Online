@@ -13,6 +13,7 @@ import { UsernameReportButton } from '../components/UsernameReportDialog.jsx';
 import { useClubSuggestions } from '../components/ClubSuggestions.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { TournamentQrDialog } from '../components/TournamentQrDialog.jsx';
+import { TournamentFlyerDialog } from '../components/TournamentFlyerDialog.jsx';
 
 /**
  * Lösch-Rückfrage; bei einem mit einem Turnierdokument verbundenen Turnier mit deutlicher Warnung, weil Spieler
@@ -659,6 +660,7 @@ export function TournamentList({
   const [shareError, setShareError] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [qrTarget, setQrTarget] = useState(null);
+  const [flyerTarget, setFlyerTarget] = useState(null);
   const visibleTournaments = useInfiniteList(hideCalendarEntries ? tournaments.filter((tournament) => !isCalendarEntry(tournament)) : tournaments);
 
   // Fester Link /q/<qr_token> – derselbe wie im QR-Code, unabhängig von Sichtbarkeit und Freigabe-Link-Status.
@@ -677,6 +679,19 @@ export function TournamentList({
       if (tournament.visibility === 'private') await tournamentShareUrl(tournament);
       const data = await authenticatedApi(`/api/tournaments/${tournament.id}/qr-design`);
       setQrTarget({ tournament, url: data.qrUrl, design: data.design });
+    } catch (error) {
+      setShareError(error.message);
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  async function openFlyer(tournament) {
+    setBusyId(`flyer-${tournament.id}`);
+    setShareError('');
+    try {
+      const data = await authenticatedApi(`/api/tournaments/${tournament.id}/qr-design`);
+      setFlyerTarget({ tournament, url: data.qrUrl });
     } catch (error) {
       setShareError(error.message);
     } finally {
@@ -788,6 +803,14 @@ export function TournamentList({
                 ) : (
                   <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onEdit(tournament)}>{t('Bearbeiten')}</Button>
                 )}
+                <Button
+                  variant="secondary"
+                  loading={busyId === `flyer-${tournament.id}`}
+                  disabled={Boolean(busyId) && busyId !== `flyer-${tournament.id}`}
+                  onClick={() => openFlyer(tournament)}
+                >
+                  {t('Flyer erstellen')}
+                </Button>
                 {(tournament.status !== 'draft' || tournament.visibility === 'private') && (
                   <Button
                     variant="secondary"
@@ -882,6 +905,7 @@ export function TournamentList({
           onClose={() => setQrTarget(null)}
         />
       )}
+      {flyerTarget && <TournamentFlyerDialog tournament={flyerTarget.tournament} qrUrl={flyerTarget.url} onClose={() => setFlyerTarget(null)} />}
     </div>
   );
 }

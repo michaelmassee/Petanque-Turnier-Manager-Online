@@ -34,6 +34,7 @@ import {
   normalizeQrDesign,
 } from './worker-core.js';
 import { parseStoredQrDesign } from './lib/qr-design.js';
+import { sanitizeFlyerConfig } from './lib/flyer-config.js';
 import { checkRoundRequirements, getPairingStrategy, isOnlinePlayable, roundRequirementMessage } from './lib/pairing/index.js';
 import { competitionRanks, computeRanking, sameStandardRankingPlace } from './lib/pairing/ranking.js';
 import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schweizer.js';
@@ -2155,6 +2156,16 @@ export default {
           return json({ design: parseStoredQrDesign(tournament.qr_design), qrUrl: qrLinkUrl(url, qrToken) });
         }
         return json({ design: await saveTournamentQrDesign(env.DB, tournament.id, await readJson(request)) });
+      }
+
+      const flyerConfigMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/flyer-config$/);
+      if (flyerConfigMatch && (request.method === 'GET' || request.method === 'PUT')) {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, flyerConfigMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        assertCanManageTournament(tournament, session.user);
+        if (request.method === 'GET') return await getTournamentFlyerConfig(env.DB, tournament.id);
+        return await saveTournamentFlyerConfig(env.DB, tournament.id, session.user.id, await readJson(request));
       }
 
       const imageProxyMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/image$/);
@@ -4826,6 +4837,34 @@ export async function saveTournamentQrDesign(db, tournamentId, body) {
   const design = normalizeQrDesign(body);
   await db.prepare('UPDATE tournaments SET qr_design = ? WHERE id = ?').bind(JSON.stringify(design), tournamentId).run();
   return design;
+}
+
+async function getTournamentFlyerConfig(db, tournamentId) {
+  const row = await db.prepare('SELECT config_json, revision, updated_at FROM tournament_flyer_configs WHERE tournament_id = ?').bind(tournamentId).first();
+  if (!row) return json({ config: null, revision: 0, updatedAt: null });
+  let stored = null;
+  try { stored = JSON.parse(row.config_json); } catch { stored = null; }
+  return json({ config: sanitizeFlyerConfig(stored), revision: Number(row.revision), updatedAt: row.updated_at });
+}
+
+async function saveTournamentFlyerConfig(db, tournamentId, userId, body) {
+  const expectedRevision = Number(body.expectedRevision);
+  if (!Number.isInteger(expectedRevision) || expectedRevision < 0) throw new HttpError(400, 'Ungültige Flyer-Revision');
+  const config = sanitizeFlyerConfig(body.config);
+  const now = new Date().toISOString();
+  let result;
+  if (expectedRevision === 0) {
+    result = await db.prepare(
+      'INSERT OR IGNORE INTO tournament_flyer_configs (tournament_id, config_json, revision, updated_at, updated_by) VALUES (?, ?, 1, ?, ?)',
+    ).bind(tournamentId, JSON.stringify(config), now, userId).run();
+  } else {
+    result = await db.prepare(
+      'UPDATE tournament_flyer_configs SET config_json = ?, revision = revision + 1, updated_at = ?, updated_by = ? WHERE tournament_id = ? AND revision = ?',
+    ).bind(JSON.stringify(config), now, userId, tournamentId, expectedRevision).run();
+  }
+  if (!result.meta.changes) throw new HttpError(409, 'Der Flyer wurde inzwischen geändert. Bitte neu laden.', { code: 'flyer_revision_conflict' });
+  const saved = await db.prepare('SELECT revision, updated_at FROM tournament_flyer_configs WHERE tournament_id = ?').bind(tournamentId).first();
+  return json({ config, revision: Number(saved.revision), updatedAt: saved.updated_at });
 }
 
 export async function duplicateTournament(db, existing, actingUser) {

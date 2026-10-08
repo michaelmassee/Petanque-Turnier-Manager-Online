@@ -3685,6 +3685,37 @@ a.left-panel-link {
   background: #ffffff;
 }
 
+/* Flyer-Editor: Die erzeugte Datei bleibt lokal; die Vorschau nutzt dieselbe SVG-Scene. */
+.flyer-editor {
+  display: grid;
+  grid-template-columns: minmax(15rem, 21rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.flyer-settings {
+  display: grid;
+  gap: .8rem;
+}
+
+.flyer-settings fieldset {
+  display: grid;
+  gap: .35rem;
+  border: 1px solid var(--border-color, #d5dbe5);
+  border-radius: .5rem;
+  padding: .75rem;
+}
+
+.flyer-settings legend { padding: 0 .25rem; }
+.flyer-preview { min-width: 0; }
+.flyer-preview-page { max-width: 31rem; margin: 0 auto; box-shadow: 0 .25rem 1.2rem rgb(0 0 0 / .16); background: #fff; }
+.flyer-preview-page img { display: block; width: 100%; height: auto; }
+
+@media (max-width: 760px) {
+  .flyer-editor { grid-template-columns: 1fr; }
+  .flyer-preview { order: -1; }
+}
+
 .qr-url {
   max-width: 100%;
   overflow-wrap: anywhere;
