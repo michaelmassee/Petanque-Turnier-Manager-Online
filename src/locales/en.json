@@ -1340,5 +1340,19 @@
   "Anmeldeschluss": "Registration deadline",
   "Ungültige Flyer-Revision": "Invalid flyer revision",
   "Flyer-Vorschau": "Flyer preview",
-  "Der Flyer wurde inzwischen geändert. Bitte neu laden.": "The flyer has been changed in the meantime. Please reload."
+  "Der Flyer wurde inzwischen geändert. Bitte neu laden.": "The flyer has been changed in the meantime. Please reload.",
+  "Pétanque-Turnier": "Pétanque tournament",
+  "Jetzt anmelden": "Register now",
+  "Eigenes Hintergrundbild": "Custom background image",
+  "Hintergrundbild entfernen": "Remove background image",
+  "Das Hintergrundbild und diese Vorlage werden nur auf diesem Gerät gespeichert und nie hochgeladen.": "The background image and this template are stored only on this device and are never uploaded.",
+  "Alle Flyer-Einstellungen und dieses Hintergrundbild werden nur auf diesem Gerät gespeichert und nie hochgeladen.": "All flyer settings and this background image are stored only on this device and are never uploaded.",
+  "Das Hintergrundbild konnte nicht lokal gespeichert werden. Es bleibt nur geöffnet, solange dieser Dialog offen ist.": "The background image could not be stored locally. It remains available only while this dialog is open.",
+  "Das Hintergrundbild konnte nicht lokal entfernt werden.": "The background image could not be removed locally.",
+  "Bitte wähle ein Bild bis 15 MB im unterstützten Bildformat aus.": "Please choose a supported image up to 15 MB.",
+  "Bitte wähle ein Bild bis 15 MB aus. Unterstützt werden alle Bildformate, die dein Browser verarbeiten kann.": "Please choose an image up to 15 MB. All image formats your browser can process are supported.",
+  "Wähle zuerst ein Hintergrundbild aus.": "Choose a background image first.",
+  "Powered by Petanque Turnier Manager Online": "Powered by Petanque Turnier Manager Online",
+  "Die Flyer-Einstellungen konnten nicht lokal geladen werden.": "The flyer settings could not be loaded locally.",
+  "Die Flyer-Einstellungen konnten nicht lokal gespeichert werden.": "The flyer settings could not be stored locally."
 }

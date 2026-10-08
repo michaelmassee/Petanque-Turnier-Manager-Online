@@ -45,6 +45,17 @@ export function formatDate(value, language = 'de') {
   return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, { timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
+// Ausgeschriebenes Datum mit Wochentag ("Dienstag, 20. Oktober 2026"), z. B. als Blickfang auf dem Flyer.
+export function formatDateLong(value, language = 'de') {
+  if (!value) {
+    return '';
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
 // Wochentag in Kurzform ("Sa", "Sat", "za" …) in der Anzeigesprache; das Datum ist ein reiner
 // Kalendertag, daher wie formatDate in UTC ausgewertet.
 export function formatWeekdayShort(value, language = 'de') {

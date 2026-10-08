@@ -691,7 +691,7 @@ export function TournamentList({
     setShareError('');
     try {
       const data = await authenticatedApi(`/api/tournaments/${tournament.id}/qr-design`);
-      setFlyerTarget({ tournament, url: data.qrUrl });
+      setFlyerTarget({ tournament, url: data.qrUrl, design: data.design });
     } catch (error) {
       setShareError(error.message);
     } finally {
@@ -905,7 +905,7 @@ export function TournamentList({
           onClose={() => setQrTarget(null)}
         />
       )}
-      {flyerTarget && <TournamentFlyerDialog tournament={flyerTarget.tournament} qrUrl={flyerTarget.url} onClose={() => setFlyerTarget(null)} />}
+      {flyerTarget && <TournamentFlyerDialog tournament={flyerTarget.tournament} qrUrl={flyerTarget.url} qrDesign={flyerTarget.design} currentUserId={currentUserId} onClose={() => setFlyerTarget(null)} />}
     </div>
   );
 }

@@ -161,5 +161,17 @@
   "PDF herunterladen": "PDF herunterladen",
   "Flyer konnte nicht erzeugt werden": "Flyer konnte nicht erzeugt werden",
   "Modern": "Modern",
-  "Sportlich": "Sportlich"
+  "Sportlich": "Sportlich",
+  "Eigenes Hintergrundbild": "Eigenes Hintergrundbild",
+  "Hintergrundbild entfernen": "Hintergrundbild entfernen",
+  "Das Hintergrundbild und diese Vorlage werden nur auf diesem Gerät gespeichert und nie hochgeladen.": "Das Hintergrundbild und diese Vorlage werden nur auf diesem Gerät gespeichert und nie hochgeladen.",
+  "Alle Flyer-Einstellungen und dieses Hintergrundbild werden nur auf diesem Gerät gespeichert und nie hochgeladen.": "Alle Flyer-Einstellungen und dieses Hintergrundbild werden nur auf diesem Gerät gespeichert und nie hochgeladen.",
+  "Das Hintergrundbild konnte nicht lokal gespeichert werden. Es bleibt nur geöffnet, solange dieser Dialog offen ist.": "Das Hintergrundbild konnte nicht lokal gespeichert werden. Es bleibt nur geöffnet, solange dieser Dialog offen ist.",
+  "Das Hintergrundbild konnte nicht lokal entfernt werden.": "Das Hintergrundbild konnte nicht lokal entfernt werden.",
+  "Bitte wähle ein Bild bis 15 MB im unterstützten Bildformat aus.": "Bitte wähle ein Bild bis 15 MB im unterstützten Bildformat aus.",
+  "Bitte wähle ein Bild bis 15 MB aus. Unterstützt werden alle Bildformate, die dein Browser verarbeiten kann.": "Bitte wähle ein Bild bis 15 MB aus. Unterstützt werden alle Bildformate, die dein Browser verarbeiten kann.",
+  "Wähle zuerst ein Hintergrundbild aus.": "Wähle zuerst ein Hintergrundbild aus.",
+  "Powered by Petanque Turnier Manager Online": "Powered by Petanque Turnier Manager Online",
+  "Die Flyer-Einstellungen konnten nicht lokal geladen werden.": "Die Flyer-Einstellungen konnten nicht lokal geladen werden.",
+  "Die Flyer-Einstellungen konnten nicht lokal gespeichert werden.": "Die Flyer-Einstellungen konnten nicht lokal gespeichert werden."
 }

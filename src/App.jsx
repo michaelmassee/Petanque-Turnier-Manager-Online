@@ -6,6 +6,7 @@ import { CancelledError, QueryClientProvider, useQuery, useQueryClient } from '@
 import { api, authenticatedApi, clearOfflineApiCache, setSessionExpiredHandler } from './lib/api.js';
 import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
+import { pruneExpiredFlyerDesigns } from './lib/flyer-background-storage.js';
 import { LIVE_VIEW_EVENTS, liveViewPathFor } from './postbox-core.js';
 import { usePath, matchTournamentRoute, matchLiveRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useRoutedTournament } from './lib/hooks.js';
@@ -148,6 +149,8 @@ function AppContent() {
   const [message, setMessageState] = useState('');
   const [error, setErrorState] = useState('');
   const sessionExpiryHandled = useRef(false);
+
+  useEffect(() => { void pruneExpiredFlyerDesigns().catch(() => {}); }, []);
 
   function setMessage(text) {
     setMessageState(text);

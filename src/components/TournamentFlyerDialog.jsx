@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { authenticatedApi } from '../lib/api.js';
 import { tournamentImageUrl } from '../lib/domain.js';
 import { DEFAULT_FLYER_CONFIG, FLYER_TEMPLATES, FLYER_VISIBLE_FIELDS, sanitizeFlyerConfig } from '../lib/flyer-config.js';
 import { FLYER_FONT_URLS } from '../lib/flyer-font-urls.js';
 import { createFlyerFontLoader } from '../lib/flyer-fonts.js';
 import { renderFlyerPdf, renderFlyerSvg } from '../lib/flyer-render.js';
 import { buildFlyerScene, flyerFileName, flyerSceneText } from '../lib/flyer-scene.js';
+import { loadFlyerLocalDesign, removeFlyerBackground, saveFlyerBackground, saveFlyerLocalConfig, setFlyerBackgroundActive } from '../lib/flyer-background-storage.js';
+import { DEFAULT_QR_DESIGN, sanitizeQrDesign } from '../lib/qr-design.js';
+import { loadQrLogo, toQrOptions } from '../lib/qr-style.js';
 import { Button, EditDialog, Feedback, SelectField, TextArea, TextField } from './ui.jsx';
 
-const TEMPLATE_LABELS = { modern: 'Modern', sporty: 'Sportlich', classic: 'Klassisch' };
+const TEMPLATE_LABELS = { modern: 'Modern', sporty: 'Sportlich', classic: 'Klassisch', background: 'Eigenes Hintergrundbild' };
 const FIELD_LABELS = { date: 'Datum', location: 'Ort', formation: 'Turnier', fees: 'Startgeld', capacity: 'Kapazität', deadline: 'Anmeldeschluss', status: 'Status' };
 const PNG_DPI = 150;
 const LOGO_MAX_PIXELS = 1200;
+// Kantenlänge des QR-Bildes: auf rund 40 mm Druckbreite gut 750 dpi.
+const QR_PIXELS = 1200;
+const BACKGROUND_MAX_BYTES = 15 * 1024 * 1024;
+const BACKGROUND_MAX_PIXELS = 3000;
+const IMAGE_ACCEPT = ['image', String.fromCharCode(42)].join('/');
 
 // Modulweit, damit bereits geladene Teilschriften beim nächsten Öffnen nicht erneut geladen werden.
 const ensureFlyerFonts = createFlyerFontLoader(async (subset, weight) => {
@@ -44,6 +51,32 @@ function dataUrlToBytes(dataUrl) {
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
+function blobFromCanvas(canvas, type, quality) {
+  return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('canvas'))), type, quality));
+}
+
+/** Normalisiert lokale Fotos für die Vorschau und den PDF-Export, ohne je ein Netzwerk zu berühren. */
+async function prepareBackground(blob) {
+  const type = String(blob?.type || '').toLowerCase();
+  const nameLooksLikeImage = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i.test(String(blob?.name || ''));
+  if (!blob || blob.size > BACKGROUND_MAX_BYTES || (!type.startsWith('image/') && !nameLooksLikeImage)) throw new Error('invalid-background');
+  // `img-src` erlaubt bewusst data:, aber nicht blob:. Daher muss auch die lokale Quelldatei vor dem Laden
+  // in eine Data-URL umgewandelt werden – alle vom jeweiligen Browser dekodierbaren Bildformate funktionieren so.
+  const image = await loadImage(await blobToDataUrl(blob));
+  if (!image.naturalWidth || !image.naturalHeight) throw new Error('invalid-background');
+  const scale = Math.min(1, BACKGROUND_MAX_PIXELS / Math.max(image.naturalWidth, image.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(image.naturalWidth * scale);
+  canvas.height = Math.round(image.naturalHeight * scale);
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const normalized = await blobFromCanvas(canvas, 'image/jpeg', 0.9);
+  const dataUrl = await blobToDataUrl(normalized);
+  return { blob: normalized, dataUrl, bytes: dataUrlToBytes(dataUrl), width: canvas.width, height: canvas.height, type: normalized.type };
+}
+
 /**
  * Lädt das Logo über den Bild-Proxy und normalisiert es zu PNG: Das SVG braucht eine Data-URL
  * (als <img> lädt es keine externen Bilder), das PDF kann nur PNG/JPEG einbetten.
@@ -60,6 +93,18 @@ async function loadLogo(url) {
   canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
   const dataUrl = canvas.toDataURL('image/png');
   return { width: image.naturalWidth, height: image.naturalHeight, dataUrl, png: dataUrlToBytes(dataUrl) };
+}
+
+/**
+ * Derselbe QR-Code wie im QR-Dialog: gespeichertes Design des Turniers, immer mit PTM-Logo.
+ * Als PNG-Data-URL, damit SVG (als <img>) und PDF ihn ohne Nachladen einbetten können.
+ */
+async function createQrImage(design, url) {
+  const QRCodeStyling = (await import('qr-code-styling')).default;
+  const logoUrl = await loadQrLogo(design);
+  const blob = await new QRCodeStyling(toQrOptions(design, url, { logoUrl, size: QR_PIXELS })).getRawData('png');
+  const dataUrl = await blobToDataUrl(blob);
+  return { dataUrl, png: dataUrlToBytes(dataUrl), background: design.bgColor };
 }
 
 // Data-URL statt blob:, weil die CSP für Bilder nur 'self' und data: erlaubt.
@@ -90,39 +135,45 @@ function saveBlob(blob, name) {
 }
 
 /** Flyer-Editor: Gespeichert wird nur die Gestaltung, PNG/PDF entstehen lokal und werden nur heruntergeladen. */
-export function TournamentFlyerDialog({ tournament, qrUrl, onClose }) {
+export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUserId, onClose }) {
   const { t, i18n } = useTranslation();
   const [config, setConfig] = useState(DEFAULT_FLYER_CONFIG);
-  const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState('');
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const [fontSet, setFontSet] = useState(null);
-  const [qrModules, setQrModules] = useState(null);
+  const [qr, setQr] = useState(null);
   const [logo, setLogo] = useState(null);
+  const [background, setBackground] = useState(null);
+  const [backgroundActive, setBackgroundActive] = useState(false);
+  const [backgroundNotice, setBackgroundNotice] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    authenticatedApi(`/api/tournaments/${tournament.id}/flyer-config`)
-      .then((data) => {
+    setLoading(true);
+    loadFlyerLocalDesign(currentUserId, tournament.id)
+      .then(async (record) => {
         if (cancelled) return;
-        setConfig(sanitizeFlyerConfig(data.config || DEFAULT_FLYER_CONFIG));
-        setRevision(data.revision);
+        setConfig(sanitizeFlyerConfig(record?.config || DEFAULT_FLYER_CONFIG));
+        if (!record?.blob) return;
+        const next = await prepareBackground(record.blob);
+        if (!cancelled) {
+          setBackground(next);
+          setBackgroundActive(record.active !== false);
+        }
       })
-      .catch((err) => !cancelled && setError(err.message))
+      .catch(() => !cancelled && setBackgroundNotice(t('Die Flyer-Einstellungen konnten nicht lokal geladen werden.')))
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
-  }, [tournament.id]);
+  }, [currentUserId, tournament.id, t]);
 
   useEffect(() => {
     let cancelled = false;
-    import('qrcode')
-      .then((module) => !cancelled && setQrModules(module.default.create(qrUrl, { errorCorrectionLevel: 'M' }).modules))
+    createQrImage(sanitizeQrDesign(qrDesign ?? DEFAULT_QR_DESIGN), qrUrl)
+      .then((value) => !cancelled && setQr(value))
       .catch(() => !cancelled && setError(t('QR-Code konnte nicht erzeugt werden')));
     return () => { cancelled = true; };
-  }, [qrUrl, t]);
+  }, [qrUrl, qrDesign, t]);
 
   useEffect(() => {
     if (!tournament.logoUrl) return undefined;
@@ -135,7 +186,8 @@ export function TournamentFlyerDialog({ tournament, qrUrl, onClose }) {
   }, [tournament.id, tournament.logoUrl]);
 
   // Erst grob setzen, um die benötigten Zeichen zu kennen, dann passende Teilschriften nachladen.
-  const draftScene = useMemo(() => buildFlyerScene(tournament, config, i18n.language, t), [tournament, config, i18n.language, t]);
+  const selectedTemplate = backgroundActive ? 'background' : config.templateId;
+  const draftScene = useMemo(() => buildFlyerScene(tournament, config, i18n.language, t, { background: backgroundActive ? background : null }), [tournament, config, i18n.language, t, background, backgroundActive]);
   const sceneText = flyerSceneText(draftScene);
   useEffect(() => {
     let cancelled = false;
@@ -146,42 +198,67 @@ export function TournamentFlyerDialog({ tournament, qrUrl, onClose }) {
   }, [sceneText, t]);
 
   const scene = useMemo(
-    () => (fontSet ? buildFlyerScene(tournament, config, i18n.language, t, { measure: fontSet.measure, logo }) : null),
-    [tournament, config, i18n.language, t, fontSet, logo],
+    () => (fontSet ? buildFlyerScene(tournament, config, i18n.language, t, { measure: fontSet.measure, logo, background: backgroundActive ? background : null }) : null),
+    [tournament, config, i18n.language, t, fontSet, logo, background, backgroundActive],
   );
   const previewUrl = useMemo(
-    () => (scene && qrModules ? svgDataUrl(renderFlyerSvg(scene, { fontSet, qrModules, logo })) : ''),
-    [scene, fontSet, qrModules, logo],
+    () => (scene && qr ? svgDataUrl(renderFlyerSvg(scene, { fontSet, qr, logo, background: backgroundActive ? background : null })) : ''),
+    [scene, fontSet, qr, logo, background, backgroundActive],
   );
-  const update = (changes) => setConfig((current) => ({ ...current, ...changes }));
+  const update = (changes) => setConfig((current) => {
+    const next = sanitizeFlyerConfig({ ...current, ...changes });
+    saveFlyerLocalConfig(currentUserId, tournament.id, next)
+      .catch(() => setBackgroundNotice(t('Die Flyer-Einstellungen konnten nicht lokal gespeichert werden.')));
+    return next;
+  });
 
-  async function save() {
-    setSaving(true);
+  async function chooseBackground(file) {
+    if (!file) return;
     setError('');
-    setMessage('');
+    setBackgroundNotice('');
     try {
-      const data = await authenticatedApi(`/api/tournaments/${tournament.id}/flyer-config`, {
-        method: 'PUT',
-        body: JSON.stringify({ config, expectedRevision: revision }),
-      });
-      setConfig(sanitizeFlyerConfig(data.config));
-      setRevision(data.revision);
-      setMessage(t('Flyer-Design gespeichert'));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
+      const next = await prepareBackground(file);
+      setBackground(next);
+      setBackgroundActive(true);
+      try {
+        await saveFlyerBackground(currentUserId, tournament.id, next.blob, true);
+      } catch {
+        setBackgroundNotice(t('Das Hintergrundbild konnte nicht lokal gespeichert werden. Es bleibt nur geöffnet, solange dieser Dialog offen ist.'));
+      }
+    } catch {
+      setError(t('Bitte wähle ein Bild bis 15 MB aus. Unterstützt werden alle Bildformate, die dein Browser verarbeiten kann.'));
     }
+  }
+
+  async function selectTemplate(templateId) {
+    if (templateId === 'background') {
+      if (!background) {
+        setBackgroundNotice(t('Wähle zuerst ein Hintergrundbild aus.'));
+        return;
+      }
+      setBackgroundActive(true);
+      try { await setFlyerBackgroundActive(currentUserId, tournament.id, true); } catch { setBackgroundNotice(t('Das Hintergrundbild konnte nicht lokal gespeichert werden. Es bleibt nur geöffnet, solange dieser Dialog offen ist.')); }
+      return;
+    }
+    setBackgroundActive(false);
+    update({ templateId });
+    try { await setFlyerBackgroundActive(currentUserId, tournament.id, false); } catch { /* Das Bild bleibt in dieser Sitzung dennoch deaktiviert. */ }
+  }
+
+  async function clearBackground() {
+    setBackground(null);
+    setBackgroundActive(false);
+    setBackgroundNotice('');
+    try { await removeFlyerBackground(currentUserId, tournament.id); } catch { setBackgroundNotice(t('Das Hintergrundbild konnte nicht lokal entfernt werden.')); }
   }
 
   async function download(kind) {
     if (!previewUrl || scene.overflow) return;
     setExporting(kind);
     setError('');
-    setMessage('');
     try {
       const blob = kind === 'pdf'
-        ? new Blob([await renderFlyerPdf(scene, { fontSet, qrModules, logo, title: tournament.name })], { type: 'application/pdf' })
+        ? new Blob([await renderFlyerPdf(scene, { fontSet, qr, logo, background: backgroundActive ? background : null, title: tournament.name })], { type: 'application/pdf' })
         : await svgToPng(previewUrl, scene.page);
       saveBlob(blob, flyerFileName(tournament, scene.design.format, kind));
     } catch {
@@ -193,16 +270,23 @@ export function TournamentFlyerDialog({ tournament, qrUrl, onClose }) {
 
   const ready = Boolean(previewUrl);
   return (
-    <EditDialog wide title={t('Flyer erstellen')} subtitle={tournament.name} message={message} error={error} onClose={onClose}>
+    <EditDialog wide title={t('Flyer erstellen')} subtitle={tournament.name} error={error} onClose={onClose}>
       {loading ? <p className="muted">{t('Lädt …')}</p> : (
         <div className="flyer-editor">
           <div className="flyer-settings">
             <SelectField
               label={t('Vorlage')}
-              value={config.templateId}
-              onChange={(templateId) => update({ templateId })}
-              options={FLYER_TEMPLATES.map((value) => ({ value, label: t(TEMPLATE_LABELS[value]) }))}
+              value={selectedTemplate}
+              onChange={selectTemplate}
+              options={[...FLYER_TEMPLATES, 'background'].map((value) => ({ value, label: t(TEMPLATE_LABELS[value]) }))}
             />
+            <label className="flyer-background-picker">
+              {t('Eigenes Hintergrundbild')}
+              <input type="file" accept={IMAGE_ACCEPT} onChange={(event) => chooseBackground(event.target.files?.[0])} />
+            </label>
+            {background && <div className="dialog-actions flyer-background-actions"><Button variant="secondary" type="button" onClick={clearBackground}>{t('Hintergrundbild entfernen')}</Button></div>}
+            <small className="muted">{t('Alle Flyer-Einstellungen und dieses Hintergrundbild werden nur auf diesem Gerät gespeichert und nie hochgeladen.')}</small>
+            {backgroundNotice && <small className="muted">{backgroundNotice}</small>}
             <SelectField
               label={t('Format')}
               value={config.format}
@@ -233,7 +317,6 @@ export function TournamentFlyerDialog({ tournament, qrUrl, onClose }) {
                 </label>
               ))}
             </fieldset>
-            <Button loading={saving} onClick={save}>{t('Design speichern')}</Button>
           </div>
           <div className="flyer-preview">
             {scene?.overflow && <Feedback error={t('Der Text passt nicht in das gewählte Flyerformat. Bitte kürze Überschrift, Untertitel oder Zusatztext.')} />}

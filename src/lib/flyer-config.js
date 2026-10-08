@@ -2,13 +2,6 @@ export const FLYER_TEMPLATES = ['modern', 'sporty', 'classic'];
 export const FLYER_FORMATS = ['a4', 'a5'];
 export const FLYER_VISIBLE_FIELDS = ['date', 'location', 'formation', 'fees', 'capacity', 'deadline', 'status'];
 
-// Textfarbe je Vorlage; Vorschau, PNG und PDF lesen sie aus derselben Scene.
-export const FLYER_TEMPLATE_STYLES = Object.freeze({
-  modern: { textColor: '#172033' },
-  sporty: { textColor: '#0f6b3a' },
-  classic: { textColor: '#172033' },
-});
-
 export const DEFAULT_FLYER_CONFIG = Object.freeze({
   schemaVersion: 1,
   templateId: 'modern',

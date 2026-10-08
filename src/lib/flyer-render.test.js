@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import QRCode from 'qrcode';
 import { describe, expect, it } from 'vitest';
 import { createFlyerFontLoader } from './flyer-fonts.js';
 import { renderFlyerPdf, renderFlyerSvg } from './flyer-render.js';
@@ -28,11 +27,29 @@ describe('flyer fonts and rendering', () => {
     const scene0 = buildFlyerScene(tournament, { format: 'a5' }, 'de', t);
     const fontSet = await loadFonts(scene0.elements.filter((element) => element.type === 'text').map((element) => element.text).join(''));
     const scene = buildFlyerScene(tournament, { format: 'a5' }, 'de', t, { measure: fontSet.measure });
-    const qrModules = QRCode.create('https://ptmonline.org/q/abc', { errorCorrectionLevel: 'M' }).modules;
-    const svg = renderFlyerSvg(scene, { fontSet, qrModules, logo: null });
-    expect(svg).toContain('PTMFlyer-latin-ext-700');
+    // Platzhalter für das QR-Bild aus qr-code-styling (im Browser erzeugt).
+    const png = new Uint8Array(readFileSync('public/icons/logo.png'));
+    const qr = { png, dataUrl: `data:image/png;base64,${Buffer.from(png).toString('base64')}`, background: '#ffffff' };
+    const svg = renderFlyerSvg(scene, { fontSet, qr, logo: null });
+    expect(svg).toContain('PTMFlyer-latin-ext-');
     expect(svg).toContain('@font-face');
-    const pdf = await renderFlyerPdf(scene, { fontSet, qrModules, logo: null, title: tournament.name });
+    expect(svg).toContain(qr.dataUrl);
+    const pdf = await renderFlyerPdf(scene, { fontSet, qr, logo: null, title: tournament.name });
+    expect(new TextDecoder().decode(pdf.slice(0, 5))).toBe('%PDF-');
+  });
+
+  it('embeds a local background image underneath the flyer scene', async () => {
+    const png = new Uint8Array(readFileSync('public/icons/logo.png'));
+    const background = { bytes: png, dataUrl: `data:image/png;base64,${Buffer.from(png).toString('base64')}`, width: 400, height: 100, type: 'image/png' };
+    const scene0 = buildFlyerScene(tournament, {}, 'de', t, { background });
+    expect(scene0.design.templateId).toBe('background');
+    expect(scene0.elements.some((element) => element.type === 'background')).toBe(true);
+    const fontSet = await loadFonts(scene0.elements.filter((element) => element.type === 'text').map((element) => element.text).join(''));
+    const scene = buildFlyerScene(tournament, {}, 'de', t, { measure: fontSet.measure, background });
+    const qr = { png, dataUrl: background.dataUrl, background: '#ffffff' };
+    const svg = renderFlyerSvg(scene, { fontSet, qr, logo: null, background });
+    expect(svg).toContain('preserveAspectRatio="xMidYMid slice"');
+    const pdf = await renderFlyerPdf(scene, { fontSet, qr, logo: null, background, title: tournament.name });
     expect(new TextDecoder().decode(pdf.slice(0, 5))).toBe('%PDF-');
   });
 });

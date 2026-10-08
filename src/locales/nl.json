@@ -1340,5 +1340,19 @@
   "Anmeldeschluss": "Inschrijving sluit",
   "Ungültige Flyer-Revision": "Ongeldige flyerrevisie",
   "Flyer-Vorschau": "Flyervoorbeeld",
-  "Der Flyer wurde inzwischen geändert. Bitte neu laden.": "De flyer is intussen gewijzigd. Laad opnieuw."
+  "Der Flyer wurde inzwischen geändert. Bitte neu laden.": "De flyer is intussen gewijzigd. Laad opnieuw.",
+  "Pétanque-Turnier": "Jeu-de-boulestoernooi",
+  "Jetzt anmelden": "Nu inschrijven",
+  "Eigenes Hintergrundbild": "Eigen achtergrondafbeelding",
+  "Hintergrundbild entfernen": "Achtergrondafbeelding verwijderen",
+  "Das Hintergrundbild und diese Vorlage werden nur auf diesem Gerät gespeichert und nie hochgeladen.": "De achtergrondafbeelding en dit sjabloon worden alleen op dit apparaat opgeslagen en nooit geüpload.",
+  "Alle Flyer-Einstellungen und dieses Hintergrundbild werden nur auf diesem Gerät gespeichert und nie hochgeladen.": "Alle flyerinstellingen en deze achtergrondafbeelding worden alleen op dit apparaat opgeslagen en nooit geüpload.",
+  "Das Hintergrundbild konnte nicht lokal gespeichert werden. Es bleibt nur geöffnet, solange dieser Dialog offen ist.": "De achtergrondafbeelding kon niet lokaal worden opgeslagen. Deze blijft alleen beschikbaar zolang dit venster open is.",
+  "Das Hintergrundbild konnte nicht lokal entfernt werden.": "De achtergrondafbeelding kon niet lokaal worden verwijderd.",
+  "Bitte wähle ein Bild bis 15 MB im unterstützten Bildformat aus.": "Kies een ondersteunde afbeelding tot 15 MB.",
+  "Bitte wähle ein Bild bis 15 MB aus. Unterstützt werden alle Bildformate, die dein Browser verarbeiten kann.": "Kies een afbeelding tot 15 MB. Alle indelingen die je browser kan verwerken worden ondersteund.",
+  "Wähle zuerst ein Hintergrundbild aus.": "Kies eerst een achtergrondafbeelding.",
+  "Powered by Petanque Turnier Manager Online": "Powered by Petanque Turnier Manager Online",
+  "Die Flyer-Einstellungen konnten nicht lokal geladen werden.": "De flyerinstellingen konden niet lokaal worden geladen.",
+  "Die Flyer-Einstellungen konnten nicht lokal gespeichert werden.": "De flyerinstellingen konden niet lokaal worden opgeslagen."
 }

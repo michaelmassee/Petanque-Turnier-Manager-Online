@@ -3707,6 +3707,9 @@ a.left-panel-link {
 }
 
 .flyer-settings legend { padding: 0 .25rem; }
+.flyer-background-picker { display: grid; gap: .35rem; }
+.flyer-background-picker input { max-width: 100%; }
+.flyer-background-actions { justify-content: flex-start; }
 .flyer-preview { min-width: 0; }
 .flyer-preview-page { max-width: 31rem; margin: 0 auto; box-shadow: 0 .25rem 1.2rem rgb(0 0 0 / .16); background: #fff; }
 .flyer-preview-page img { display: block; width: 100%; height: auto; }

@@ -1340,5 +1340,19 @@
   "Anmeldeschluss": "Date limite d’inscription",
   "Ungültige Flyer-Revision": "Révision de flyer invalide",
   "Flyer-Vorschau": "Aperçu du flyer",
-  "Der Flyer wurde inzwischen geändert. Bitte neu laden.": "Le flyer a été modifié entre-temps. Recharge la page."
+  "Der Flyer wurde inzwischen geändert. Bitte neu laden.": "Le flyer a été modifié entre-temps. Recharge la page.",
+  "Pétanque-Turnier": "Concours de pétanque",
+  "Jetzt anmelden": "Inscris-toi",
+  "Eigenes Hintergrundbild": "Image d’arrière-plan personnelle",
+  "Hintergrundbild entfernen": "Supprimer l’image d’arrière-plan",
+  "Das Hintergrundbild und diese Vorlage werden nur auf diesem Gerät gespeichert und nie hochgeladen.": "L’image d’arrière-plan et ce modèle sont enregistrés uniquement sur cet appareil et ne sont jamais téléversés.",
+  "Alle Flyer-Einstellungen und dieses Hintergrundbild werden nur auf diesem Gerät gespeichert und nie hochgeladen.": "Tous les réglages du flyer et cette image d’arrière-plan sont enregistrés uniquement sur cet appareil et ne sont jamais téléversés.",
+  "Das Hintergrundbild konnte nicht lokal gespeichert werden. Es bleibt nur geöffnet, solange dieser Dialog offen ist.": "L’image d’arrière-plan n’a pas pu être enregistrée localement. Elle reste disponible seulement tant que cette boîte de dialogue est ouverte.",
+  "Das Hintergrundbild konnte nicht lokal entfernt werden.": "L’image d’arrière-plan n’a pas pu être supprimée localement.",
+  "Bitte wähle ein Bild bis 15 MB im unterstützten Bildformat aus.": "Choisissez une image prise en charge de 15 Mo maximum.",
+  "Bitte wähle ein Bild bis 15 MB aus. Unterstützt werden alle Bildformate, die dein Browser verarbeiten kann.": "Choisissez une image de 15 Mo maximum. Tous les formats que votre navigateur peut traiter sont pris en charge.",
+  "Wähle zuerst ein Hintergrundbild aus.": "Choisissez d’abord une image d’arrière-plan.",
+  "Powered by Petanque Turnier Manager Online": "Powered by Petanque Turnier Manager Online",
+  "Die Flyer-Einstellungen konnten nicht lokal geladen werden.": "Les réglages du flyer n’ont pas pu être chargés localement.",
+  "Die Flyer-Einstellungen konnten nicht lokal gespeichert werden.": "Les réglages du flyer n’ont pas pu être enregistrés localement."
 }
