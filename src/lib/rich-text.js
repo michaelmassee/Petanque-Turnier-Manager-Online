@@ -66,9 +66,14 @@ export function richTextDocument(value) {
   };
 }
 
+// Rekursiv, weil Listen Text erst in listItem → paragraph enthalten (ein Dokument kann mit einer Liste beginnen).
+function containsText(node) {
+  if (node?.type === 'text') return node.text.length > 0;
+  return (node?.content || []).some(containsText);
+}
+
 export function serializeRichText(document) {
-  const hasText = (document?.content || []).some((paragraph) => (paragraph.content || []).some((node) => node.text.length > 0));
-  if (!hasText) return '';
+  if (!containsText(document)) return '';
   return `${RICH_TEXT_PREFIX}${JSON.stringify(document)}`;
 }
 

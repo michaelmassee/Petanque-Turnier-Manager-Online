@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { tournamentImageUrl } from '../lib/domain.js';
 import { DEFAULT_FLYER_CONFIG, FLYER_TEMPLATES, FLYER_VISIBLE_FIELDS, sanitizeFlyerConfig } from '../lib/flyer-config.js';
 import { FLYER_FONT_URLS } from '../lib/flyer-font-urls.js';
-import { createFlyerFontLoader } from '../lib/flyer-fonts.js';
 import { renderFlyerPdf, renderFlyerSvg } from '../lib/flyer-render.js';
-import { buildFlyerScene, flyerFileName, flyerSceneText } from '../lib/flyer-scene.js';
+import { buildFlyerScene, flyerFileName } from '../lib/flyer-scene.js';
+import { createFlyerTypesetter } from '../lib/flyer-text.js';
+import satoriLayoutWasmUrl from 'satori/layout.wasm?url';
 import { loadFlyerLocalDesign, removeFlyerBackground, saveFlyerBackground, saveFlyerBackgroundPanelTransparency, saveFlyerLocalConfig, setFlyerBackgroundActive } from '../lib/flyer-background-storage.js';
 import { DEFAULT_QR_DESIGN, sanitizeQrDesign } from '../lib/qr-design.js';
 import { loadQrLogo, toQrOptions } from '../lib/qr-style.js';
@@ -21,12 +22,22 @@ const QR_PIXELS = 1200;
 const BACKGROUND_MAX_BYTES = 15 * 1024 * 1024;
 const BACKGROUND_MAX_PIXELS = 3000;
 const IMAGE_ACCEPT = ['image', String.fromCharCode(42)].join('/');
+// Kurz warten, bis die Eingabe ruht, bevor der Flyer neu gesetzt wird.
+const PREVIEW_DELAY_MS = 150;
 
-// Modulweit, damit bereits geladene Teilschriften beim nächsten Öffnen nicht erneut geladen werden.
-const ensureFlyerFonts = createFlyerFontLoader(async (subset, weight) => {
-  const response = await fetch(FLYER_FONT_URLS[`${subset}-${weight}`]);
-  if (!response.ok) throw new Error(`font ${subset}-${weight}: ${response.status}`);
+// Modulweit, damit geladene Teilschriften und gesetzte Textblöcke beim nächsten Öffnen erhalten bleiben.
+const typesetFlyerText = createFlyerTypesetter(async (subset, weight, style) => {
+  const key = `${subset}-${weight}-${style}`;
+  const response = await fetch(FLYER_FONT_URLS[key]);
+  if (!response.ok) throw new Error(`font ${key}: ${response.status}`);
   return response.arrayBuffer();
+}, async () => {
+  // Der Standard-Build von satori dekodiert sein eingebettetes WASM mit Node-Buffer; im Browser daher die
+  // Standalone-Variante mit layout.wasm als eigenem Asset (script-src erlaubt dafür 'wasm-unsafe-eval').
+  const [{ default: satori, init }, response] = await Promise.all([import('satori/standalone'), fetch(satoriLayoutWasmUrl)]);
+  if (!response.ok) throw new Error(`satori layout.wasm: ${response.status}`);
+  await init(await response.arrayBuffer());
+  return satori;
 });
 
 function loadImage(src) {
@@ -142,7 +153,7 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState('');
   const [error, setError] = useState('');
-  const [fontSet, setFontSet] = useState(null);
+  const [scene, setScene] = useState(null);
   const [qr, setQr] = useState(null);
   const [logo, setLogo] = useState(null);
   const [background, setBackground] = useState(null);
@@ -188,26 +199,27 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
     return () => { cancelled = true; };
   }, [tournament.id, tournament.logoUrl]);
 
-  // Erst grob setzen, um die benötigten Zeichen zu kennen, dann passende Teilschriften nachladen.
   const selectedTemplate = backgroundActive ? 'background' : config.templateId;
-  const draftScene = useMemo(() => buildFlyerScene(tournament, config, i18n.language, t, { background: backgroundActive ? background : null, backgroundPanelTransparency }), [tournament, config, i18n.language, t, background, backgroundActive, backgroundPanelTransparency]);
-  const sceneText = flyerSceneText(draftScene);
+  const activeBackground = backgroundActive ? background : null;
+  // Texte setzt satori asynchron; die Vorschau zeigt bis zum neuen Ergebnis den letzten Stand.
   useEffect(() => {
     let cancelled = false;
-    ensureFlyerFonts(sceneText)
-      .then((next) => !cancelled && setFontSet((current) => (current?.entries.length === next.entries.length ? current : next)))
-      .catch(() => !cancelled && setError(t('Flyer konnte nicht erzeugt werden')));
-    return () => { cancelled = true; };
-  }, [sceneText, t]);
+    const timer = setTimeout(() => {
+      buildFlyerScene(tournament, config, i18n.language, t, { typeset: typesetFlyerText, logo, background: activeBackground, backgroundPanelTransparency })
+        .then((next) => !cancelled && setScene(next))
+        .catch(() => !cancelled && setError(t('Flyer konnte nicht erzeugt werden')));
+    }, PREVIEW_DELAY_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [tournament, config, i18n.language, t, logo, activeBackground, backgroundPanelTransparency]);
 
-  const scene = useMemo(
-    () => (fontSet ? buildFlyerScene(tournament, config, i18n.language, t, { measure: fontSet.measure, logo, background: backgroundActive ? background : null, backgroundPanelTransparency }) : null),
-    [tournament, config, i18n.language, t, fontSet, logo, background, backgroundActive, backgroundPanelTransparency],
+  const svg = useMemo(
+    () => (scene && qr ? renderFlyerSvg(scene, { qr, logo, background: activeBackground }) : ''),
+    [scene, qr, logo, activeBackground],
   );
-  const previewUrl = useMemo(
-    () => (scene && qr ? svgDataUrl(renderFlyerSvg(scene, { fontSet, qr, logo, background: backgroundActive ? background : null })) : ''),
-    [scene, fontSet, qr, logo, background, backgroundActive],
-  );
+  const previewUrl = useMemo(() => (svg ? svgDataUrl(svg) : ''), [svg]);
   const update = (changes) => setConfig((current) => {
     const next = sanitizeFlyerConfig({ ...current, ...changes });
     saveFlyerLocalConfig(currentUserId, tournament.id, next)
@@ -268,7 +280,7 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
     setError('');
     try {
       const blob = kind === 'pdf'
-        ? new Blob([await renderFlyerPdf(scene, { fontSet, qr, logo, background: backgroundActive ? background : null, title: tournament.name })], { type: 'application/pdf' })
+        ? new Blob([await renderFlyerPdf(svg, scene.page, { title: tournament.name })], { type: 'application/pdf' })
         : await svgToPng(previewUrl, scene.page);
       saveBlob(blob, flyerFileName(tournament, scene.design.format, kind));
     } catch {

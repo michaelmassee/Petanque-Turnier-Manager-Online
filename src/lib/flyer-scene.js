@@ -2,15 +2,12 @@ import { formatDateLong, formatMoney, formatTournamentDateTime } from './format.
 import { formationLabel, labelFor, registrationStatusLabel } from './domain.js';
 import { REGISTRATION_TYPES, TOURNAMENT_TYPES } from './constants.js';
 import { sanitizeFlyerConfig } from './flyer-config.js';
-import { approximateMeasure } from './flyer-fonts.js';
+import { richTextNode, stackNode, textNode } from './flyer-text.js';
 import { richTextPlainText } from './rich-text.js';
 
 // Alle Maße in mm. Die Scene ist das einzige Layout: SVG-Vorschau, PNG und PDF zeichnen nur ihre Elemente
-// ('path' für alle Formen, 'text', 'image' für das Logo, 'qr').
+// ('path' für alle Formen, 'text' für von satori gesetzte Textblöcke, 'image' für das Logo, 'qr').
 const SIZES = { a4: { width: 210, height: 297 }, a5: { width: 148, height: 210 } };
-// Anteil der Schriftgröße über bzw. unter der Grundlinie (Noto Sans).
-const ASCENT = 0.8;
-const DESCENT = 0.25;
 
 const PALETTES = {
   modern: { text: '#172033', muted: '#4b5565', paper: '#ffffff' },
@@ -155,63 +152,22 @@ function gravel(x, y, width, height, s, seed = 7) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Text
+// Text (gesetzt von satori, siehe flyer-text.js)
 // ---------------------------------------------------------------------------------------------
 
-function breakWord(word, maxWidth, size, weight, measure) {
-  const parts = [];
-  let part = '';
-  for (const char of word) {
-    if (part && measure(part + char, size, weight) > maxWidth) {
-      parts.push(part);
-      part = char;
-    } else part += char;
-  }
-  if (part) parts.push(part);
-  return parts;
+/** Element für einen gesetzten Textblock an Position x/top (mm). */
+function textElement(x, top, block) {
+  return { type: 'text', x: n(x), y: n(top), width: n(block.width), height: n(block.height), markup: block.markup };
 }
 
-/** Bricht nach gemessener Breite um; Wörter, die allein zu breit sind (URLs, lange Ortsnamen), werden geteilt. */
-export function wrapText(text, maxWidth, size, weight, measure) {
-  const lines = [];
-  let line = '';
-  for (const word of String(text || '').split(/\s+/).filter(Boolean)) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (measure(candidate, size, weight) <= maxWidth) {
-      line = candidate;
-      continue;
-    }
-    if (line) lines.push(line);
-    if (measure(word, size, weight) <= maxWidth) {
-      line = word;
-      continue;
-    }
-    const parts = breakWord(word, maxWidth, size, weight, measure);
-    lines.push(...parts.slice(0, -1));
-    line = parts[parts.length - 1];
-  }
-  if (line) lines.push(line);
-  return lines;
+/** Setzt einen Textblock ab Oberkante `top` in die Breite `width`; liefert die Unterkante. */
+async function placeText(elements, ctx, node, { x, top, width }) {
+  const block = await ctx.typeset(node, width);
+  elements.push(textElement(x, top, block));
+  return top + block.height;
 }
 
-/**
- * Setzt Zeilen ab `top` (Oberkante) in eine Spalte und liefert die neue Oberkante sowie die Unterkante
- * der letzten Schrift.
- */
-function typeset(elements, measure, lines, { x, width, top, size, lineHeight, weight = 400, color, opacity, align = 'left' }) {
-  let cursor = top;
-  let bottom = top;
-  for (const line of lines) {
-    const baseline = cursor + size * ASCENT;
-    if (line) {
-      const lineX = align === 'center' ? x + (width - measure(line, size, weight)) / 2 : x;
-      elements.push({ type: 'text', x: n(lineX), y: n(baseline), size, weight, color, ...(opacity < 1 ? { opacity } : {}), text: line });
-      bottom = baseline + size * DESCENT;
-    }
-    cursor += lineHeight;
-  }
-  return { top: cursor, bottom };
-}
+const hasRichText = (value) => Boolean(richTextPlainText(value).trim());
 
 // ---------------------------------------------------------------------------------------------
 // Inhalte
@@ -242,35 +198,42 @@ function collectContent(tournament, visible, language, t) {
   if (visible.has('capacity') && tournament.maxRegistrations) facts.push({ label: t('Kapazität'), values: [t('Maximal {count} Anmeldungen').replace('{count}', String(tournament.maxRegistrations))] });
   if (visible.has('deadline') && tournament.registrationDeadline) facts.push({ label: t('Anmeldeschluss'), values: [formatTournamentDateTime(tournament.registrationDeadline, language, tournament.timezone)] });
   if (visible.has('status')) facts.push({ label: t('Status'), values: [registrationStatusLabel(tournament, language)] });
-  const description = richTextPlainText(tournament.description).trim();
-  if (visible.has('description') && description) facts.push({ label: t('Beschreibung'), values: [description] });
-  return { highlight, facts: facts.map((fact) => ({ ...fact, values: fact.values.filter(Boolean) })).filter((fact) => fact.values.length) };
+  // Die Beschreibung behält ihre Formatierungen und bekommt die volle Breite.
+  if (visible.has('description') && hasRichText(tournament.description)) facts.push({ label: t('Beschreibung'), rich: tournament.description, values: [], wide: true });
+  return {
+    highlight,
+    facts: facts.map((fact) => ({ ...fact, values: fact.values.filter(Boolean) })).filter((fact) => fact.values.length || fact.rich),
+  };
 }
 
-/** Angaben als Raster mit zwei Spalten; jede Angabe: Beschriftung in Akzentfarbe, darunter der Wert. */
-function factGrid(elements, measure, facts, { x, width, top, columns, gap, sizes, colors, align, bullet }) {
-  const columnWidth = (width - gap * (columns - 1)) / columns;
-  const indent = bullet ? sizes.label * 1.9 : 0;
+/** Angaben als Raster mit zwei Spalten (breite Angaben über beide); Beschriftung in Akzentfarbe, darunter der Wert. */
+async function factGrid(elements, ctx, facts, { x, width, top, columns, gap, colors, align, bullet }) {
+  const { m } = ctx;
+  const indent = bullet ? m.label * 1.9 : 0;
+  const rows = [];
+  for (const fact of facts) {
+    const last = rows[rows.length - 1];
+    if (fact.wide || !last || last.length >= columns || last[0].wide) rows.push([fact]);
+    else last.push(fact);
+  }
   let rowTop = top;
   let bottom = top;
-  for (let index = 0; index < facts.length; index += columns) {
+  for (const row of rows) {
+    const rowColumns = row[0].wide ? 1 : columns;
+    const columnWidth = (width - gap * (rowColumns - 1)) / rowColumns;
     let rowEnd = rowTop;
-    facts.slice(index, index + columns).forEach((fact, column) => {
+    for (const [column, fact] of row.entries()) {
       const columnX = x + column * (columnWidth + gap);
-      const textX = columnX + indent;
-      const textWidth = columnWidth - indent;
-      if (bullet) elements.push(...bullet(columnX + sizes.label * 0.6, rowTop + sizes.label * 0.45, sizes.label * 0.6));
-      const label = typeset(elements, measure, [fact.label.toLocaleUpperCase()], {
-        x: textX, width: textWidth, top: rowTop, size: sizes.label, lineHeight: sizes.label * 1.75, weight: 700, color: colors.label, align,
-      });
-      const values = fact.values.flatMap((value) => wrapText(value, textWidth, sizes.value, 400, measure));
-      const block = typeset(elements, measure, values, {
-        x: textX, width: textWidth, top: label.top, size: sizes.value, lineHeight: sizes.value * 1.3, color: colors.value, align,
-      });
-      rowEnd = Math.max(rowEnd, block.top);
-      bottom = Math.max(bottom, block.bottom);
-    });
-    rowTop = rowEnd + sizes.value * 1.15;
+      if (bullet) elements.push(...bullet(columnX + m.label * 0.6, rowTop + m.label * 0.75, m.label * 0.6));
+      const value = fact.rich
+        ? richTextNode(fact.rich, { size: m.value, color: colors.value, align, lineHeight: 1.3 })
+        : stackNode(fact.values.map((line) => textNode(line, { size: m.value, color: colors.value, align, lineHeight: 1.3 })));
+      const node = stackNode([textNode(fact.label.toLocaleUpperCase(ctx.language), { size: m.label, weight: 700, color: colors.label, align, lineHeight: 1.5 }), value], { gap: 0.3 * m.s });
+      const end = await placeText(elements, ctx, node, { x: columnX + indent, top: rowTop, width: columnWidth - indent });
+      rowEnd = Math.max(rowEnd, end);
+      bottom = Math.max(bottom, end);
+    }
+    rowTop = rowEnd + m.value * 1.15;
   }
   return bottom;
 }
@@ -279,8 +242,8 @@ function factGrid(elements, measure, facts, { x, width, top, columns, gap, sizes
  * Setzt den Inhaltsbereich (Datum + Raster) und schiebt ihn bei freiem Platz etwas nach unten,
  * damit keine große Lücke über dem Fußbereich bleibt. `layout(target, top)` liefert die Unterkante.
  */
-function placeBody(elements, layout, top, limit, s) {
-  const probeBottom = layout([], top);
+async function placeBody(elements, layout, top, limit, s) {
+  const probeBottom = await layout([], top);
   const free = limit - probeBottom;
   const offset = free > 0 ? Math.min(free * 0.45, 40 * s) : 0;
   return layout(elements, top + offset);
@@ -294,15 +257,14 @@ function cardSize(qrSize, s) {
 }
 
 /** QR-Code auf weißer Karte mit Aufforderung darunter. */
-function qrCard(elements, measure, { x, y, qrSize, s, caption, captionColor }) {
+async function qrCard(elements, ctx, { x, y, qrSize, s, caption, captionColor }) {
   const pad = QR_CARD_PAD * s;
-  const captionSize = QR_CAPTION * s;
   const { width, height } = cardSize(qrSize, s);
   elements.push(shape(rectPath(x + 0.6 * s, y + 0.9 * s, width, height, 2.5 * s), { fill: '#000000', opacity: 0.12 }));
   elements.push(shape(rectPath(x, y, width, height, 2.5 * s), { fill: '#ffffff' }));
   elements.push({ type: 'qr', x: n(x + pad), y: n(y + pad), size: n(qrSize) });
-  typeset(elements, measure, [caption], {
-    x, width, top: y + pad + qrSize + pad * 0.35, size: captionSize, lineHeight: captionSize, weight: 700, color: captionColor, align: 'center',
+  await placeText(elements, ctx, textNode(caption, { size: QR_CAPTION * s, weight: 700, color: captionColor, align: 'center', lineHeight: 1.2 }), {
+    x, top: y + pad + qrSize + pad * 0.1, width,
   });
 }
 
@@ -333,64 +295,62 @@ function metricsFor(page) {
   };
 }
 
-function noteLinesFor(ctx, width, measure) {
-  return richTextPlainText(ctx.design.additionalText).split('\n')
-    .flatMap((paragraph) => (paragraph ? wrapText(paragraph, width, ctx.m.note, 400, measure) : ['']));
+/** Zusatztext mit seinen Formatierungen (fett, kursiv, Listen …) gesetzt für die verfügbare Breite. */
+async function noteBlock(ctx, { width, color, align = 'left' }) {
+  if (!hasRichText(ctx.design.additionalText)) return null;
+  return ctx.typeset(richTextNode(ctx.design.additionalText, { size: ctx.m.note, color, align, lineHeight: 1.4 }), width);
 }
 
 /** Dezente Markenzeile am unteren Blattrand, unabhängig von Zusatztext und QR-Karte. */
-function poweredBy(elements, measure, ctx, color) {
+async function poweredBy(elements, ctx, color) {
   const { page, m, t } = ctx;
   const size = Math.max(2.1 * m.s, 1.7);
-  typeset(elements, measure, [t('Powered by Petanque Turnier Manager Online')], {
-    x: 0, width: page.width, top: page.height - 4.4 * m.s, size, lineHeight: size, color, opacity: 0.86, align: 'center',
+  await placeText(elements, ctx, textNode(t('Powered by Petanque Turnier Manager Online'), { size, color, align: 'center', lineHeight: 1, opacity: 0.86 }), {
+    x: 0, top: page.height - 4.4 * m.s - size * 0.8, width: page.width,
   });
 }
 
 /** Fußbereich links Zusatztext, rechts QR-Karte; liefert die Oberkante des Bereichs. */
-function footerRow(elements, measure, ctx, { noteColor, background }) {
+async function footerRow(elements, ctx, { noteColor, background }) {
   const { page, m, t } = ctx;
   const { s } = m;
   const card = cardSize(m.qr, s);
   const cardX = page.width - m.margin - card.width;
-  const noteWidth = cardX - m.margin - 6 * s;
-  const noteLines = noteLinesFor(ctx, noteWidth, measure);
-  const noteHeight = noteLines.length * m.note * 1.4;
-  const contentTop = page.height - m.margin * 0.8 - Math.max(card.height, noteHeight);
+  const notes = await noteBlock(ctx, { width: cardX - m.margin - 6 * s, color: noteColor });
+  const contentTop = page.height - m.margin * 0.8 - Math.max(card.height, notes ? notes.height + 1.5 * s : 0);
   const bandTop = contentTop - 9 * s;
   background(bandTop);
-  typeset(elements, measure, noteLines, { x: m.margin, width: noteWidth, top: contentTop + 1.5 * s, size: m.note, lineHeight: m.note * 1.4, color: noteColor });
-  qrCard(elements, measure, { x: cardX, y: contentTop, qrSize: m.qr, s, caption: t('Jetzt anmelden'), captionColor: ctx.accentText });
-  poweredBy(elements, measure, ctx, noteColor);
+  if (notes) elements.push(textElement(m.margin, contentTop + 1.5 * s, notes));
+  await qrCard(elements, ctx, { x: cardX, y: contentTop, qrSize: m.qr, s, caption: t('Jetzt anmelden'), captionColor: ctx.accentText });
+  await poweredBy(elements, ctx, noteColor);
   return bandTop;
 }
 
-function heroText(elements, measure, ctx, { top, color, kickerColor, align = 'left', x, width, reserved = 0, uppercaseTitle = false }) {
+async function heroText(elements, ctx, { top, color, kickerColor, align = 'left', x, width, reserved = 0, uppercaseTitle = false }) {
   const { m, design, tournament, t, language } = ctx;
-  let cursor = top;
-  cursor = typeset(elements, measure, [t('Pétanque-Turnier').toLocaleUpperCase(language)], {
-    x, width, top: cursor, size: m.kicker, lineHeight: m.kicker * 2.1, weight: 700, color: kickerColor, align,
-  }).top;
+  // Neben einem Logo oben rechts bleibt für Dachzeile und Titel nur die restliche Breite.
+  const titleWidth = width - reserved;
+  let cursor = await placeText(elements, ctx, textNode(t('Pétanque-Turnier').toLocaleUpperCase(language), {
+    size: m.kicker, weight: 700, color: kickerColor, align, lineHeight: 1.7,
+  }), { x, top, width: titleWidth });
   const rawTitle = design.headline || tournament.name;
   const titleText = uppercaseTitle ? rawTitle.toLocaleUpperCase(language) : rawTitle;
   // Lange Überschriften kleiner setzen, statt den Kopf über die halbe Seite wachsen zu lassen.
-  let titleSize = m.title;
-  // Neben einem Logo oben rechts bleibt für Dachzeile und Titel nur die restliche Breite.
-  const titleWidth = width - reserved;
-  let titleLines = wrapText(titleText, titleWidth, titleSize, 700, measure);
-  for (const factor of [0.82, 0.68]) {
-    if (titleLines.length <= 2) break;
-    titleSize = m.title * factor;
-    titleLines = wrapText(titleText, titleWidth, titleSize, 700, measure);
+  let title = null;
+  for (const factor of [1, 0.82, 0.68]) {
+    const size = m.title * factor;
+    const node = textNode(titleText, { size, weight: 700, color, align, lineHeight: 1.12 });
+    title = { node, block: await ctx.typeset(node, titleWidth) };
+    if (title.block.height <= size * 1.12 * 2 + 0.5) break;
   }
-  const title = typeset(elements, measure, titleLines, {
-    x, width: titleWidth, top: cursor, size: titleSize, lineHeight: titleSize * 1.12, weight: 700, color, align,
-  });
-  cursor = title.top + 2 * m.s;
-  const subtitle = typeset(elements, measure, wrapText(design.subtitle, titleWidth, m.subtitle, 400, measure), {
-    x, width: titleWidth, top: cursor, size: m.subtitle, lineHeight: m.subtitle * 1.35, color, opacity: 0.88, align,
-  });
-  return Math.max(title.bottom, subtitle.bottom);
+  elements.push(textElement(x, cursor, title.block));
+  cursor += title.block.height;
+  if (design.subtitle) {
+    cursor = await placeText(elements, ctx, textNode(design.subtitle, { size: m.subtitle, color, align, lineHeight: 1.35, opacity: 0.88 }), {
+      x, top: cursor + 2 * m.s, width: titleWidth,
+    });
+  }
+  return cursor;
 }
 
 /** Logo auf weißer Karte oben rechts im Kopf; liefert die Breite, die der Kopftext freilassen muss. */
@@ -416,24 +376,21 @@ function centeredLogo(elements, ctx, { x, top, width }) {
 }
 
 /** Datum groß, Startzeit in Akzentfarbe – links mit Akzentbalken oder zentriert. */
-function dateHighlight(elements, measure, ctx, { x, width, top, align, color, bar }) {
+async function dateHighlight(elements, ctx, { x, width, top, align, color, bar }) {
   const { highlight, m } = ctx;
   if (!highlight) return { top, bottom: top };
   const { s } = m;
   const textX = bar ? x + 5 * s : x;
-  const textWidth = bar ? width - 5 * s : width;
-  const date = typeset(elements, measure, wrapText(highlight.date, textWidth, m.date, 700, measure), {
-    x: textX, width: textWidth, top, size: m.date, lineHeight: m.date * 1.18, weight: 700, color, align,
-  });
-  const time = typeset(elements, measure, highlight.time ? [highlight.time] : [], {
-    x: textX, width: textWidth, top: date.top + 0.8 * s, size: m.time, lineHeight: m.time * 1.3, weight: 700, color: ctx.accentText, align,
-  });
-  const bottom = Math.max(date.bottom, time.bottom);
+  const node = stackNode([
+    textNode(highlight.date, { size: m.date, weight: 700, color, align, lineHeight: 1.18 }),
+    highlight.time && textNode(highlight.time, { size: m.time, weight: 700, color: ctx.accentText, align, lineHeight: 1.3 }),
+  ], { gap: 0.8 * s });
+  const bottom = await placeText(elements, ctx, node, { x: textX, top, width: bar ? width - 5 * s : width });
   if (bar) elements.push(shape(rectPath(x, top, 1.8 * s, bottom - top, 0.9 * s), { fill: ctx.accent }));
   return { top: bottom + 8 * s, bottom };
 }
 
-function buildModern(elements, measure, ctx) {
+async function buildModern(elements, ctx) {
   const { page, m, accent, facts, palette } = ctx;
   const { s } = m;
   const contentWidth = page.width - 2 * m.margin;
@@ -441,7 +398,7 @@ function buildModern(elements, measure, ctx) {
   const heroIndex = elements.length;
 
   const reserved = cornerLogo(elements, ctx);
-  const textBottom = heroText(elements, measure, ctx, { top: m.margin * 1.1, color: heroColor, kickerColor: heroColor, x: m.margin, width: contentWidth, reserved });
+  const textBottom = await heroText(elements, ctx, { top: m.margin * 1.1, color: heroColor, kickerColor: heroColor, x: m.margin, width: contentWidth, reserved });
   const heroBottom = textBottom + 25 * s;
   const rise = 16 * s;
   // Kopf in Akzentfarbe mit schräger Kante und angedeuteten Wurfkreisen.
@@ -471,16 +428,16 @@ function buildModern(elements, measure, ctx) {
   elements.push(...cochonnet(jackX, jackY, 4.2 * s));
   compositionBottom = Math.max(compositionBottom, jackY + 4.2 * s);
 
-  const footerTop = footerRow(elements, measure, ctx, {
+  const footerTop = await footerRow(elements, ctx, {
     noteColor: '#4a3f2a',
     background: (bandTop) => elements.push(...gravel(0, bandTop, page.width, page.height - bandTop, s)),
   });
   const limit = footerTop - 6 * s;
-  const bodyBottom = placeBody(elements, (target, bodyTop) => {
-    const afterDate = dateHighlight(target, measure, ctx, { x: m.margin, width: contentWidth, top: bodyTop, color: palette.text, bar: true });
-    const grid = factGrid(target, measure, facts, {
+  const bodyBottom = await placeBody(elements, async (target, bodyTop) => {
+    const afterDate = await dateHighlight(target, ctx, { x: m.margin, width: contentWidth, top: bodyTop, color: palette.text, bar: true });
+    const grid = await factGrid(target, ctx, facts, {
       x: m.margin, width: contentWidth, top: afterDate.top, columns: 2, gap: 9 * s, align: 'left',
-      sizes: m, colors: { label: ctx.accentText, value: palette.text },
+      colors: { label: ctx.accentText, value: palette.text },
       bullet: (cx, cy, r) => [shape(circlePath(cx, cy, r), { fill: ctx.accentText }), shape(circlePath(cx - r * 0.3, cy - r * 0.3, r * 0.35), { fill: '#ffffff', opacity: 0.7 })],
     });
     return Math.max(afterDate.bottom, grid);
@@ -488,14 +445,14 @@ function buildModern(elements, measure, ctx) {
   return { bodyBottom, limit };
 }
 
-function buildSporty(elements, measure, ctx) {
+async function buildSporty(elements, ctx) {
   const { page, m, accent, facts, palette } = ctx;
   const { s } = m;
   const contentWidth = page.width - 2 * m.margin;
   const heroIndex = elements.length;
   // Rechts bleibt Platz für Streifen und Kugel, damit sie den Kopftext nicht kreuzen.
   const reserved = Math.max(cornerLogo(elements, ctx), 52 * s);
-  const textBottom = heroText(elements, measure, ctx, {
+  const textBottom = await heroText(elements, ctx, {
     top: m.margin * 1.1, color: '#ffffff', kickerColor: mix(accent, '#ffffff', 0.35), x: m.margin, width: contentWidth, reserved, uppercaseTitle: true,
   });
   const heroBottom = textBottom + 24 * s;
@@ -527,7 +484,7 @@ function buildSporty(elements, measure, ctx) {
   });
   elements.push(...boule(cx, cy, r, { shadow: false }));
 
-  const footerTop = footerRow(elements, measure, ctx, {
+  const footerTop = await footerRow(elements, ctx, {
     noteColor: '#ffffff',
     background: (bandTop) => {
       elements.push(shape(rectPath(0, bandTop, page.width, page.height - bandTop), { fill: palette.field }));
@@ -535,11 +492,11 @@ function buildSporty(elements, measure, ctx) {
     },
   });
   const limit = footerTop - 6 * s;
-  const bodyBottom = placeBody(elements, (target, bodyTop) => {
-    const afterDate = dateHighlight(target, measure, ctx, { x: m.margin, width: contentWidth, top: bodyTop, color: palette.text, bar: true });
-    const grid = factGrid(target, measure, facts, {
+  const bodyBottom = await placeBody(elements, async (target, bodyTop) => {
+    const afterDate = await dateHighlight(target, ctx, { x: m.margin, width: contentWidth, top: bodyTop, color: palette.text, bar: true });
+    const grid = await factGrid(target, ctx, facts, {
       x: m.margin, width: contentWidth, top: afterDate.top, columns: 2, gap: 9 * s, align: 'left',
-      sizes: m, colors: { label: ctx.accentText, value: palette.text },
+      colors: { label: ctx.accentText, value: palette.text },
       bullet: (bx, by, br) => [shape(polygonPath([[bx - br, by + br], [bx - br * 0.2, by - br], [bx + br, by - br], [bx + br * 0.2, by + br]]), { fill: ctx.accentText })],
     });
     return Math.max(afterDate.bottom, grid);
@@ -558,7 +515,7 @@ function ornament(elements, cx, cy, s, color) {
   elements.push(...cochonnet(cx, cy + 2.4 * s, 1.8 * s, { shadow: false }));
 }
 
-function buildClassic(elements, measure, ctx) {
+async function buildClassic(elements, ctx) {
   const { page, m, facts, palette } = ctx;
   const { s } = m;
   const inset = 7 * s;
@@ -572,34 +529,33 @@ function buildClassic(elements, measure, ctx) {
   const x = m.margin + 4 * s;
   const width = page.width - 2 * x;
   const top = centeredLogo(elements, ctx, { x, top: m.margin + 5 * s, width });
-  const textBottom = heroText(elements, measure, ctx, { top, color: palette.text, kickerColor: ctx.accentText, align: 'center', x, width });
+  const textBottom = await heroText(elements, ctx, { top, color: palette.text, kickerColor: ctx.accentText, align: 'center', x, width });
   const ornamentY = textBottom + 10 * s;
   ornament(elements, page.width / 2, ornamentY, s, palette.frame);
 
   // Fußbereich zentriert: Zusatztext, darunter die QR-Karte.
   const card = cardSize(m.qr, s);
-  const noteLines = noteLinesFor(ctx, width, measure);
-  const noteHeight = noteLines.length * m.note * 1.4;
+  const notes = await noteBlock(ctx, { width, color: palette.muted, align: 'center' });
   const cardY = page.height - m.margin - 5 * s - card.height;
-  const notesTop = cardY - (noteLines.length ? noteHeight + 4 * s : 0);
-  typeset(elements, measure, noteLines, { x, width, top: notesTop, size: m.note, lineHeight: m.note * 1.4, color: palette.muted, align: 'center' });
-  qrCard(elements, measure, { x: (page.width - card.width) / 2, y: cardY, qrSize: m.qr, s, caption: ctx.t('Jetzt anmelden'), captionColor: ctx.accentText });
-  poweredBy(elements, measure, ctx, palette.muted);
+  const notesTop = cardY - (notes ? notes.height + 4 * s : 0);
+  if (notes) elements.push(textElement(x, notesTop, notes));
+  await qrCard(elements, ctx, { x: (page.width - card.width) / 2, y: cardY, qrSize: m.qr, s, caption: ctx.t('Jetzt anmelden'), captionColor: ctx.accentText });
+  await poweredBy(elements, ctx, palette.muted);
   const separatorY = notesTop - 7 * s;
   elements.push(shape(linePath(page.width / 2 - 34 * s, separatorY, page.width / 2 + 34 * s, separatorY), { stroke: palette.frame, strokeWidth: 0.6 * s }));
   const limit = separatorY - 5 * s;
 
-  const bodyBottom = placeBody(elements, (target, bodyTop) => {
-    const afterDate = dateHighlight(target, measure, ctx, { x, width, top: bodyTop, align: 'center', color: palette.text, bar: false });
-    const grid = factGrid(target, measure, facts, {
-      x, width, top: afterDate.top, columns: 2, gap: 9 * s, align: 'center', sizes: m, colors: { label: ctx.accentText, value: palette.text },
+  const bodyBottom = await placeBody(elements, async (target, bodyTop) => {
+    const afterDate = await dateHighlight(target, ctx, { x, width, top: bodyTop, align: 'center', color: palette.text, bar: false });
+    const grid = await factGrid(target, ctx, facts, {
+      x, width, top: afterDate.top, columns: 2, gap: 9 * s, align: 'center', colors: { label: ctx.accentText, value: palette.text },
     });
     return Math.max(afterDate.bottom, grid);
   }, ornamentY + 11 * s, limit, s);
   return { bodyBottom, limit };
 }
 
-function buildBackground(elements, measure, ctx) {
+async function buildBackground(elements, ctx) {
   const { page, m, facts, palette } = ctx;
   const { s } = m;
   const contentWidth = page.width - 2 * m.margin;
@@ -607,10 +563,10 @@ function buildBackground(elements, measure, ctx) {
   elements.push({ type: 'background' });
   elements.push(shape(rectPath(0, 0, page.width, page.height), { fill: '#07131f', opacity: 0.62 }));
   const reserved = cornerLogo(elements, ctx);
-  const textBottom = heroText(elements, measure, ctx, {
+  const textBottom = await heroText(elements, ctx, {
     top: m.margin * 1.1, color: '#ffffff', kickerColor: '#ffffff', x: m.margin, width: contentWidth, reserved,
   });
-  const footerTop = footerRow(elements, measure, ctx, {
+  const footerTop = await footerRow(elements, ctx, {
     noteColor: '#ffffff',
     background: (bandTop) => elements.push(shape(rectPath(0, bandTop, page.width, page.height - bandTop), { fill: '#07131f', opacity: 0.76 })),
   });
@@ -623,11 +579,11 @@ function buildBackground(elements, measure, ctx) {
     }),
     role: 'background-textbox',
   });
-  const bodyBottom = placeBody(elements, (target, top) => {
-    const afterDate = dateHighlight(target, measure, ctx, { x: m.margin, width: contentWidth, top, color: palette.text, bar: true });
-    const grid = factGrid(target, measure, facts, {
+  const bodyBottom = await placeBody(elements, async (target, top) => {
+    const afterDate = await dateHighlight(target, ctx, { x: m.margin, width: contentWidth, top, color: palette.text, bar: true });
+    const grid = await factGrid(target, ctx, facts, {
       x: m.margin, width: contentWidth, top: afterDate.top, columns: 2, gap: 9 * s, align: 'left',
-      sizes: m, colors: { label: ctx.accentText, value: palette.text },
+      colors: { label: ctx.accentText, value: palette.text },
       bullet: (cx, cy, r) => [shape(circlePath(cx, cy, r), { fill: ctx.accentText })],
     });
     return Math.max(afterDate.bottom, grid);
@@ -638,10 +594,10 @@ function buildBackground(elements, measure, ctx) {
 const BUILDERS = { modern: buildModern, sporty: buildSporty, classic: buildClassic, background: buildBackground };
 
 /**
- * @param options.measure (text, sizeMm, weight) => Breite in mm; ohne geladene Schriften eine Schätzung
+ * @param options.typeset (satoriNode, widthMm) => Promise<{ markup, width, height }>, siehe createFlyerTypesetter
  * @param options.logo natürliche Größe des Logos { width, height } oder null
  */
-export function buildFlyerScene(tournament, config, language, t, { measure = approximateMeasure, logo = null, background = null, backgroundPanelTransparency = 50 } = {}) {
+export async function buildFlyerScene(tournament, config, language, t, { typeset, logo = null, background = null, backgroundPanelTransparency = 50 }) {
   const design = sanitizeFlyerConfig(config);
   const page = SIZES[design.format];
   const templateId = background ? 'background' : design.templateId;
@@ -649,20 +605,15 @@ export function buildFlyerScene(tournament, config, language, t, { measure = app
   const accent = design.accentColor;
   const panelTransparency = Math.min(100, Math.max(0, Number(backgroundPanelTransparency) || 0));
   const ctx = {
-    page, design, tournament, t, language, logo, palette, accent,
+    page, design, tournament, t, language, logo, palette, accent, typeset,
     backgroundPanelTransparency: panelTransparency,
     accentText: readableAccent(accent),
     m: metricsFor(page),
     ...collectContent(tournament, new Set(design.visibleFields), language, t),
   };
   const elements = [shape(rectPath(0, 0, page.width, page.height), { fill: palette.paper })];
-  const { bodyBottom, limit } = BUILDERS[templateId](elements, measure, ctx);
+  const { bodyBottom, limit } = await BUILDERS[templateId](elements, ctx);
   return { page, design: { ...design, templateId }, elements, overflow: bodyBottom > limit, bodyBottom, bodyLimit: limit };
-}
-
-/** Alle Zeichen, die gesetzt werden – zum Nachladen passender Teilschriften. */
-export function flyerSceneText(scene) {
-  return scene.elements.filter((element) => element.type === 'text').map((element) => element.text).join('');
 }
 
 export function flyerFileName(tournament, format, extension) {

@@ -40,4 +40,11 @@ describe('Rich-Text als Klartext', () => {
     expect(richTextPlainText('Alte Nachricht')).toBe('Alte Nachricht');
     expect(richTextPlainText(null)).toBe('');
   });
+
+  it('serializes documents that start with a list and treats empty lists as empty', () => {
+    const listItem = (value) => ({ type: 'listItem', content: [{ type: 'paragraph', ...(value ? { content: [{ type: 'text', text: value }] } : {}) }] });
+    const startsWithList = { type: 'doc', content: [{ type: 'bulletList', content: [listItem('Kaffee')] }] };
+    expect(parseRichText(serializeRichText(startsWithList))).toEqual(startsWithList);
+    expect(serializeRichText({ type: 'doc', content: [{ type: 'bulletList', content: [listItem('')] }] })).toBe('');
+  });
 });
