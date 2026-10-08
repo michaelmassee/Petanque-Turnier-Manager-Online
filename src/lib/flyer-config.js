@@ -1,3 +1,5 @@
+import { parseRichText, richTextPlainText } from './rich-text.js';
+
 export const FLYER_TEMPLATES = ['modern', 'sporty', 'classic'];
 export const FLYER_FORMATS = ['a4', 'a5'];
 export const FLYER_VISIBLE_FIELDS = ['date', 'location', 'formation', 'fees', 'capacity', 'deadline', 'status', 'description'];
@@ -58,4 +60,3 @@ export function sanitizeFlyerConfig(value) {
     visibleFields: visible,
   };
 }
-import { parseRichText, richTextPlainText } from './rich-text.js';
