@@ -309,3 +309,29 @@ describe('Anmeldungsverwaltung: Live-Link neu senden', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/registrations/r1/live-link', expect.objectContaining({ method: 'POST' }));
   });
 });
+
+describe('Anmeldungsverwaltung: Nachricht an Team', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('öffnet pro Anmeldung einen Nachrichtendialog mit Empfängern und Richtext-Editor', async () => {
+    const registration = { id: 'r1', tournamentId: 't1', firstName: 'Anna', lastName: 'Muster', partnerFirstName: 'Paul', partnerLastName: 'Partner',
+      status: 'confirmed', participation: 'inactive', feeSelections: [], registrationAnswers: [] };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ registrations: [registration] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    render(
+      <RegistrationsManagementPage
+        tournaments={[{ id: 't1', name: 'Sommer Cup', canManage: true, registrationEnabled: true }]}
+        selectedTournamentId="t1"
+        setSelectedTournamentId={() => {}}
+        language="de"
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Nachricht an Team' }));
+
+    expect(screen.getByRole('heading', { name: 'Nachricht an Team' })).toBeInTheDocument();
+    expect(screen.getByText('Anna Muster, Paul Partner')).toBeInTheDocument();
+    expect(screen.getByText(/Der Link zum Turnier wird mitgeschickt/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fett' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Senden' })).toBeDisabled();
+  });
+});

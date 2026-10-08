@@ -1313,5 +1313,10 @@
   "Eine Online-Anmeldung ist derzeit nicht möglich:": "L’inscription en ligne n’est pas possible pour le moment :",
   "Texte": "Textes",
   "Farben": "Couleurs",
-  "Form": "Forme"
+  "Form": "Forme",
+  "Nachricht an Team": "Message à l'équipe",
+  "Die Nachricht geht per E-Mail an alle Teammitglieder und in die Postbox verknüpfter Konten. Der Link zum Turnier wird mitgeschickt.": "Le message est envoyé par e-mail à tous les membres de l'équipe et dans la boîte de réception des comptes liés. Le lien vers le tournoi est joint.",
+  "Nachricht an das Team wurde gesendet ({{emailed}} E-Mail(s), {{postbox}} Postbox).": "Message envoyé à l'équipe ({{emailed}} e-mail(s), {{postbox}} boîte de réception).",
+  "Für dieses Turnier ist der E-Mail-Versand nicht freigeschaltet und kein Konto ist verknüpft": "L'envoi d'e-mails n'est pas activé pour ce tournoi et aucun compte n'est lié",
+  "Diese Anmeldung hat weder eine E-Mail-Adresse noch ein verknüpftes Konto": "Cette inscription n'a ni adresse e-mail ni compte lié"
 }

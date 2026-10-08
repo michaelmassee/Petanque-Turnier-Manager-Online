@@ -1313,5 +1313,10 @@
   "Eine Online-Anmeldung ist derzeit nicht möglich:": "Online registration is currently not possible:",
   "Texte": "Texts",
   "Farben": "Colors",
-  "Form": "Shape"
+  "Form": "Shape",
+  "Nachricht an Team": "Message team",
+  "Die Nachricht geht per E-Mail an alle Teammitglieder und in die Postbox verknüpfter Konten. Der Link zum Turnier wird mitgeschickt.": "The message is emailed to all team members and delivered to the inbox of linked accounts. The tournament link is included.",
+  "Nachricht an das Team wurde gesendet ({{emailed}} E-Mail(s), {{postbox}} Postbox).": "Message sent to the team ({{emailed}} email(s), {{postbox}} inbox).",
+  "Für dieses Turnier ist der E-Mail-Versand nicht freigeschaltet und kein Konto ist verknüpft": "Email sending is not enabled for this tournament and no account is linked",
+  "Diese Anmeldung hat weder eine E-Mail-Adresse noch ein verknüpftes Konto": "This registration has neither an email address nor a linked account"
 }

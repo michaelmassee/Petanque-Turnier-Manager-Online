@@ -41,7 +41,7 @@ import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pai
 import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
 import { firstFreeUsername, normalizeUsername, usernameCandidates, usernameProblem, USERNAME_CHANGE_INTERVAL_DAYS } from './lib/username.js';
-import { parseRichText, richTextPlainText } from './lib/rich-text.js';
+import { parseRichText, richTextDocument, richTextPlainText, serializeRichText } from './lib/rich-text.js';
 import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
 import { formatLocationAddress, geocodingFallbackQuery } from './location-format.js';
 import {
@@ -469,6 +469,40 @@ const TOURNAMENT_BROADCAST_EMAILS = {
     subject: (name) => `Message à tous les participants : ${name}`,
     text: (firstName, name, senderName) =>
       `Bonjour ${firstName},\n\n${senderName} a envoyé le message suivant à tous les participants de « ${name} » :`,
+  },
+};
+
+// "Nachricht an Team": Turnierleitung schreibt den Personen einer einzelnen Anmeldung.
+const TEAM_MESSAGE_EMAILS = {
+  de: {
+    subject: (name) => `Nachricht der Turnierleitung: ${name}`,
+    text: (firstName, name, senderName) =>
+      `Hallo ${firstName},\n\n${senderName} hat dir zu deiner Anmeldung für "${name}" folgende Nachricht geschickt:`,
+    linkLabel: 'Alle Infos zum Turnier:',
+  },
+  nl: {
+    subject: (name) => `Bericht van de toernooileiding: ${name}`,
+    text: (firstName, name, senderName) =>
+      `Hallo ${firstName},\n\n${senderName} heeft je over je inschrijving voor "${name}" het volgende bericht gestuurd:`,
+    linkLabel: 'Alle informatie over het toernooi:',
+  },
+  en: {
+    subject: (name) => `Message from the tournament organizers: ${name}`,
+    text: (firstName, name, senderName) =>
+      `Hi ${firstName},\n\n${senderName} sent you the following message about your registration for "${name}":`,
+    linkLabel: 'All tournament details:',
+  },
+  es: {
+    subject: (name) => `Mensaje de la organización del torneo: ${name}`,
+    text: (firstName, name, senderName) =>
+      `Hola ${firstName},\n\n${senderName} te envió el siguiente mensaje sobre tu inscripción en "${name}":`,
+    linkLabel: 'Toda la información del torneo:',
+  },
+  fr: {
+    subject: (name) => `Message de l'organisation du tournoi : ${name}`,
+    text: (firstName, name, senderName) =>
+      `Bonjour ${firstName},\n\n${senderName} t'a envoyé le message suivant au sujet de ton inscription à « ${name} » :`,
+    linkLabel: 'Toutes les informations sur le tournoi :',
   },
 };
 
@@ -901,6 +935,57 @@ export async function resendLiveLink(env, registration, user, appOrigin) {
     actorRole: actorRoleFor(tournament, user), action: 'live_link_reissued', target: 'registration',
     details: { recipients: recipients.length } })]);
   return json({ sent: recipients.length });
+}
+
+/**
+ * "Nachricht an Team": Die Turnierleitung schreibt allen Personen einer Anmeldung - per E-Mail an jede hinterlegte
+ * Adresse und in die Postbox jedes verknüpften Kontos. Mail und Postbox enthalten den Link zum Turnier.
+ */
+export async function sendTeamMessage(env, registration, sender, rawBody, appOrigin) {
+  const body = postboxMessageBody(rawBody);
+  const tournament = await getTournamentById(env.DB, registration.tournament_id);
+  const link = `${appOrigin}/turniere/${tournament.id}/info`;
+  const senderName = `${sender.firstName} ${sender.lastName}`.trim();
+  const senderEmail = String(sender.email || '').toLowerCase();
+  const mailAllowed = await canSendTournamentMail(env.DB, tournament);
+  const emailRecipients = mailAllowed ? buildTeamRecipients(registration).filter((recipient) => recipient.email.toLowerCase() !== senderEmail) : [];
+  const accountIds = [...new Set([registration.user_id, registration.partner_user_id, registration.partner2_user_id])]
+    .filter((id) => id && id !== sender.id);
+  if (emailRecipients.length === 0 && accountIds.length === 0) {
+    if (!mailAllowed) throw new HttpError(409, 'Für dieses Turnier ist der E-Mail-Versand nicht freigeschaltet und kein Konto ist verknüpft');
+    throw new HttpError(409, 'Diese Anmeldung hat weder eine E-Mail-Adresse noch ein verknüpftes Konto');
+  }
+
+  const document = richTextDocument(body);
+  const postboxBody = serializeRichText({
+    ...document,
+    content: [...document.content, { type: 'paragraph', content: [{ type: 'text', text: `${tournament.name}: ${link}` }] }],
+  });
+  for (const recipientId of accountIds) {
+    await createPostboxMessage(env, { senderId: sender.id, recipientId, kind: 'direct', body: postboxBody, pushTitle: 'Neue Nachricht', pushActor: senderName });
+  }
+
+  const language = await resolveEmailLanguage(env.DB, tournament, registration);
+  const templates = TEAM_MESSAGE_EMAILS[language] || TEAM_MESSAGE_EMAILS.de;
+  const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
+  for (const recipient of emailRecipients) {
+    await enqueueTransactionalEmail(env, {
+      to: recipient.email,
+      subject: templates.subject(tournament.name),
+      text: templates.text(recipient.firstName || '', tournament.name, senderName),
+      messageBox: body,
+      textAfterMessageBox: `\n\n${templates.linkLabel}\n${link}${whatsappBlock}`,
+      language,
+      logFallback: `Team message email for ${recipient.email} (tournament ${tournament.id})`,
+      failureContext: `team message for registration ${registration.id}`,
+      allowLogFallback: true,
+    });
+  }
+
+  await env.DB.batch([auditStatement(env.DB, { tournamentId: tournament.id, registrationId: registration.id, actorUserId: sender.id,
+    actorRole: actorRoleFor(tournament, sender), action: 'team_message_sent', target: 'registration',
+    details: { emails: emailRecipients.length, postbox: accountIds.length } })]);
+  return json({ emailed: emailRecipients.length, postbox: accountIds.length });
 }
 
 async function sendRegistrationReceivedEmail(env, tournament, registration, appOrigin) {
@@ -2133,6 +2218,17 @@ export default {
         if (!registration) throw new HttpError(404, 'Anmeldung nicht gefunden');
         assertCanManageTournament(registration, auth.user);
         return await resendLiveLink(env, registration, auth.user, url.origin);
+      }
+
+      const registrationMessageMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/message$/);
+      if (registrationMessageMatch && request.method === 'POST') {
+        // Nur mit Login, nicht per API-Schlüssel: die Nachricht trägt den Namen der Person als Absender.
+        const session = await requireSession(request, env.DB);
+        const registration = await getRegistrationWithTournament(env.DB, registrationMessageMatch[1]);
+        if (!registration) throw new HttpError(404, 'Anmeldung nicht gefunden');
+        assertCanManageTournament(registration, session.user);
+        const body = await readJson(request);
+        return await sendTeamMessage(env, registration, session.user, body.body, url.origin);
       }
 
       const registrationParticipationMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/participation$/);

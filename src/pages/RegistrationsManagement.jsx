@@ -9,6 +9,10 @@ import { RegistrationFields } from '../components/RegistrationFields.jsx';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { formatMoney } from '../lib/format.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
+import { RichTextEditor } from '../components/RichTextEditor.jsx';
+import { richTextPlainText } from '../lib/rich-text.js';
+
+const TEAM_MESSAGE_MAX_LENGTH = 500;
 
 export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false, currentUserId, clubNames }) {
   const { t } = useTranslation();
@@ -251,7 +255,7 @@ function RegistrationDetails({ registration, tournament }) {
   );
 }
 
-function RegistrationRow({ registration, tournament, showConfirm = false, busy, busyOther, onConfirm, onEdit, onDelete }) {
+function RegistrationRow({ registration, tournament, showConfirm = false, busy, busyOther, onConfirm, onEdit, onMessage, onDelete }) {
   const { t } = useTranslation();
   const AccountBadge = () => <span className="account-badge" title={t('Mit Benutzerkonto verbunden')} aria-label={t('Mit Benutzerkonto verbunden')}>👤</span>;
   return (
@@ -305,6 +309,7 @@ function RegistrationRow({ registration, tournament, showConfirm = false, busy, 
           </Button>
         )}
         <Button variant="secondary" disabled={Boolean(busy)} onClick={() => onEdit(registration)}>{t('Bearbeiten')}</Button>
+        <Button variant="secondary" disabled={Boolean(busy)} onClick={() => onMessage(registration)}>{t('Nachricht an Team')}</Button>
         <Button variant="danger" loading={busy === `delete-${registration.id}`} disabled={Boolean(busyOther)} onClick={() => onDelete(registration)}>{t('Löschen')}</Button>
       </div>
     </article>
@@ -353,6 +358,57 @@ function LiveLinkResend({ registration, tournament, busyId, onResend }) {
   );
 }
 
+// "Nachricht an Team": E-Mail an alle Adressen der Anmeldung und Postbox der verknüpften Konten, jeweils mit Turnierlink.
+function TeamMessageDialog({ registration, onClose, onSent }) {
+  const { t } = useTranslation();
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const bodyLength = richTextPlainText(body).trim().length;
+  const names = registration
+    ? [[registration.firstName, registration.lastName], [registration.partnerFirstName, registration.partnerLastName], [registration.partner2FirstName, registration.partner2LastName]]
+      .map((name) => name.filter(Boolean).join(' ')).filter(Boolean).join(', ')
+    : '';
+
+  useEffect(() => { setBody(''); setError(''); }, [registration?.id]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSending(true);
+    try {
+      const result = await authenticatedApi(`/api/registrations/${registration.id}/message`, { method: 'POST', body: JSON.stringify({ body }) });
+      onSent(result);
+    } catch (err) { setError(err.message); } finally { setSending(false); }
+  }
+
+  return (
+    <EditDialog open={Boolean(registration)} title={t('Nachricht an Team')} error={error} onClose={onClose}>
+      <form className="form dense" onSubmit={handleSubmit}>
+        <p className="hint"><span>{t('recipient')}: </span><span data-i18n-skip>{names || registration?.teamName}</span></p>
+        <p className="hint">{t('Die Nachricht geht per E-Mail an alle Teammitglieder und in die Postbox verknüpfter Konten. Der Link zum Turnier wird mitgeschickt.')}</p>
+        <RichTextEditor
+          label={`${t('message')} (${bodyLength}/${TEAM_MESSAGE_MAX_LENGTH})`}
+          value={body}
+          onChange={setBody}
+          boldLabel={t('Fett')}
+          italicLabel={t('Kursiv')}
+          underlineLabel={t('Unterstrichen')}
+          strikeLabel={t('Durchgestrichen')}
+          bulletListLabel={t('Aufzählung')}
+          orderedListLabel={t('Nummerierte Liste')}
+          headingLabel={t('Überschrift')}
+        />
+        {bodyLength > TEAM_MESSAGE_MAX_LENGTH && <p className="feedback offline">{t('postboxMessageTooLong', { max: TEAM_MESSAGE_MAX_LENGTH })}</p>}
+        <div className="dialog-actions">
+          <Button variant="secondary" type="button" onClick={onClose}>{t('Abbrechen')}</Button>
+          <Button type="submit" disabled={!bodyLength || bodyLength > TEAM_MESSAGE_MAX_LENGTH} loading={sending}>{t('send')}</Button>
+        </div>
+      </form>
+    </EditDialog>
+  );
+}
+
 export function RegistrationsPanel({
   tournament,
   registrations,
@@ -372,6 +428,7 @@ export function RegistrationsPanel({
   onFeeFilterChange,
   onResetFilters,
   onEdit,
+  onMessage,
   onConfirm,
   onConfirmAll,
   onDelete,
@@ -454,7 +511,7 @@ export function RegistrationsPanel({
             <Button loading={busyId === 'confirmAll'} disabled={Boolean(busyId) && busyId !== 'confirmAll'} onClick={onConfirmAll}>{t('Alle bestätigen')}</Button>
           </div>
           {visiblePendingRegistrations.items.map((registration) => (
-            <RegistrationRow key={registration.id} registration={registration} tournament={tournament} showConfirm onConfirm={onConfirm} onEdit={onEdit} onDelete={onDelete} {...rowProps(registration)} />
+            <RegistrationRow key={registration.id} registration={registration} tournament={tournament} showConfirm onConfirm={onConfirm} onEdit={onEdit} onMessage={onMessage} onDelete={onDelete} {...rowProps(registration)} />
           ))}
           <InfiniteListLoadMore hasMore={visiblePendingRegistrations.hasMore} onLoadMore={visiblePendingRegistrations.loadMore} label={t('Weitere Einträge laden')} />
         </section>
@@ -463,7 +520,7 @@ export function RegistrationsPanel({
         <section className="user-list" aria-label={t('Weitere Anmeldungen')}>
           {pendingRegistrations.length > 0 && <div className="section-title"><h3>{t('Weitere Anmeldungen')}</h3><span className="counter">{otherRegistrations.length}</span></div>}
           {visibleOtherRegistrations.items.map((registration) => (
-            <RegistrationRow key={registration.id} registration={registration} tournament={tournament} onEdit={onEdit} onDelete={onDelete} {...rowProps(registration)} />
+            <RegistrationRow key={registration.id} registration={registration} tournament={tournament} onEdit={onEdit} onMessage={onMessage} onDelete={onDelete} {...rowProps(registration)} />
           ))}
           {filteredRegistrations.length === 0 && <p className="muted">{t('Keine Anmeldungen gefunden.')}</p>}
           <InfiniteListLoadMore hasMore={visibleOtherRegistrations.hasMore} onLoadMore={visibleOtherRegistrations.loadMore} label={t('Weitere Einträge laden')} />
@@ -512,6 +569,7 @@ export function RegistrationsManagementPage({
   const [mode, setMode] = useState('create');
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState('');
+  const [messageRegistration, setMessageRegistration] = useState(null);
 
   const manageableTournaments = useMemo(
     () => tournaments.filter((item) => item.canManage && !isCalendarEntry(item)),
@@ -670,6 +728,16 @@ export function RegistrationsManagementPage({
     } catch (err) { setError(err.message); } finally { setBusyId(''); }
   }
 
+  function openTeamMessage(registration) {
+    clearFeedback();
+    setMessageRegistration(registration);
+  }
+
+  function handleTeamMessageSent(result) {
+    setMessageRegistration(null);
+    setMessage(t('Nachricht an das Team wurde gesendet ({{emailed}} E-Mail(s), {{postbox}} Postbox).', { emailed: result.emailed, postbox: result.postbox }));
+  }
+
   async function handleConfirmAll() {
     if (!tournament) return;
     setError(''); setMessage('');
@@ -703,6 +771,7 @@ export function RegistrationsManagementPage({
         onFeeFilterChange={setFeeFilter}
         onResetFilters={() => { setQuery(''); setStatusFilter(''); setOrganizerMessageFilter(''); setQuestionFilter(''); setFeeFilter(''); }}
         onEdit={openEdit}
+        onMessage={openTeamMessage}
         onConfirm={handleConfirm}
         onConfirmAll={handleConfirmAll}
         onDelete={handleDelete}
@@ -749,6 +818,8 @@ export function RegistrationsManagementPage({
           />
         )}
       </EditDialog>
+
+      <TeamMessageDialog registration={messageRegistration} onClose={() => setMessageRegistration(null)} onSent={handleTeamMessageSent} />
     </>
   );
 }
