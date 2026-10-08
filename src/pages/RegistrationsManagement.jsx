@@ -245,7 +245,7 @@ function RegistrationDetails({ registration, tournament }) {
             <h4>{t('Teilnehmerfragen')}</h4>
             <ul>
               {answersByQuestion.map((question) => (
-                <li key={question.id}><span data-i18n-skip>{question.label}</span>: {question.participants.join(', ')}</li>
+                <li key={question.id}><span className="registration-question-label" data-i18n-skip>{question.label}</span>: {question.participants.join(', ')}</li>
               ))}
             </ul>
           </section>

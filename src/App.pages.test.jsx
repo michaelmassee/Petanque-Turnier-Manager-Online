@@ -74,6 +74,25 @@ describe('Turnier-Payload', () => {
     vi.restoreAllMocks();
   });
 
+  it('erfasst Teilnehmerfragen in einer mehrzeiligen Textbox', () => {
+    render(
+      <TournamentForm
+        form={{ ...EMPTY_TOURNAMENT_FORM, registrationEnabled: true, registrationQuestions: [{ id: 'q1', label: 'Mittagessen?' }] }}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        onCancel={() => {}}
+        mode="create"
+        language="de"
+      />,
+    );
+
+    const field = screen.getByLabelText(/^Frage 1/);
+    expect(field.tagName).toBe('TEXTAREA');
+    expect(field).toHaveValue('Mittagessen?');
+    expect(field).toHaveAttribute('maxLength', '250');
+    expect(screen.getByText(/Frage 1 \(12\/250\)/)).toBeInTheDocument();
+  });
+
   it('kennzeichnet Kalendereinträge unabhängig vom Turnierstatus als Kalendereintrag', () => {
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: false }, 'de')).toBe('Kalendereintrag');
     expect(registrationStatusLabel({ status: 'registration', registrationEnabled: false }, 'de')).toBe('Kalendereintrag');

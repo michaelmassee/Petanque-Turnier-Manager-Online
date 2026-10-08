@@ -383,6 +383,11 @@ textarea:focus {
   justify-self: start;
 }
 
+/* Teilnehmerfragen werden in einer Textbox erfasst; Zeilenumbrüche bleiben sichtbar. */
+.registration-question-label {
+  white-space: pre-line;
+}
+
 .link-button {
   min-height: 32px;
   border: 0;

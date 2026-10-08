@@ -508,13 +508,14 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             <p className="hint">{t('Jedem Teilnehmer werden Fragestellungen angeboten')}</p>
             {(form.registrationQuestions || []).map((question, index) => (
               <div className="form-grid" key={question.id}>
-                <TextField
+                <TextArea
                   label={`${t('Frage')} ${index + 1}`}
                   value={question.label}
                   onChange={(label) => setForm({ ...form, registrationQuestions: form.registrationQuestions.map((item, itemIndex) => itemIndex === index ? { ...item, label } : item) })}
                   required
                   minLength={2}
                   maxLength={250}
+                  rows={3}
                 />
                 <div className="tournament-question-remove">
                   <Button

@@ -15,7 +15,7 @@ function ParticipantQuestions({ participant, questions, answers, onChange }) {
         return (
           <label className="checkbox-field" key={question.id} data-i18n-skip>
             <input type="checkbox" checked={checked} onChange={(event) => onChange(question.id, event.target.checked)} />
-            {question.label}
+            <span className="registration-question-label">{question.label}</span>
           </label>
         );
       })}
