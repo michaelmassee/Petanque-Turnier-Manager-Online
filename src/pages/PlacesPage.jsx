@@ -97,7 +97,7 @@ function OrganizationLinks({ place, t }) {
   </div>;
 }
 
-function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, heading = 'h2' }) {
+function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onNavigate, heading = 'h2' }) {
   const Heading = heading;
   return <details className="panel place-card place-card-details">
     <summary className="place-card-summary">
@@ -113,7 +113,7 @@ function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, headi
     </summary>
     <div className="place-card-content">
       <p className="muted" data-i18n-skip>{formatLocationAddress(place.address)}</p>
-      {place.description && <RichText value={place.description} />}
+      {place.description && <RichText value={place.description} onNavigate={onNavigate} />}
       {place.facilities && <p>{t('Ausstattung:')} {place.facilities}</p>}
       {place.facilityCodes?.length > 0 && <p className="muted">{place.facilityCodes.map((code) => t(facilityLabels[code])).join(' · ')}</p>}
       <div className="place-actions">
@@ -417,16 +417,16 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
               </summary>
               <div className="place-group-content">
                 <OrganizationLinks place={group.places[0]} t={t} />
-                {group.clubDescription && <RichText value={group.clubDescription} />}
+                {group.clubDescription && <RichText value={group.clubDescription} onNavigate={navigate} />}
                 <div className="place-group-places">
                   {group.places.map((place) => (
-                    <PlaceDetails place={place} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} heading="h3" key={place.id} />
+                    <PlaceDetails onNavigate={navigate} place={place} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} heading="h3" key={place.id} />
                   ))}
                 </div>
               </div>
             </details>
           ) : (
-            <PlaceDetails place={group.places[0]} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} key={group.id} />
+            <PlaceDetails onNavigate={navigate} place={group.places[0]} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} key={group.id} />
           ))}
         </div>
       )}

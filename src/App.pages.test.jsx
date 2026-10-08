@@ -658,6 +658,28 @@ describe('Öffentliche Turnierdetailseite', () => {
 
     expect(screen.getByText('Anmeldungen müssen vom Turnierersteller bestätigt werden.')).toBeInTheDocument();
   });
+
+  it('navigiert bei eigenen Links in der Beschreibung ohne Neuladen, externe Links öffnen normal', () => {
+    const onNavigate = vi.fn();
+    render(
+      <TournamentInfo
+        language="de"
+        onShare={() => {}}
+        onNavigate={onNavigate}
+        tournament={{
+          id: 'link-1', name: 'Herbstturnier', date: '2026-10-10', location: 'Bouleplatz', formation: 'doublette', registrationType: 'forme', type: 'formule_x',
+          description: 'Vorrunde: https://ptmonline.org/turniere/t2/info Flyer: https://example.org/flyer.pdf',
+        }}
+      />,
+    );
+
+    expect(fireEvent.click(screen.getByRole('link', { name: 'https://ptmonline.org/turniere/t2/info' }))).toBe(false);
+    expect(onNavigate).toHaveBeenCalledWith('/turniere/t2/info');
+    const external = screen.getByRole('link', { name: 'https://example.org/flyer.pdf' });
+    expect(external).toHaveAttribute('target', '_blank');
+    expect(fireEvent.click(external)).toBe(true);
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('Mein Profil', () => {

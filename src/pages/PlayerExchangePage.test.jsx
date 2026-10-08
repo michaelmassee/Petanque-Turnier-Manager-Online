@@ -145,3 +145,21 @@ describe('Boule-Treff: Datum', () => {
     expect(await screen.findByText(/5\/1\/2099/)).toBeInTheDocument();
   });
 });
+
+describe('Boule-Treff: Links in der Beschreibung', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('navigiert bei eigenen Links ohne Neuladen und lässt externe Links normal öffnen', async () => {
+    const listings = [{ ...listing(1), description: 'Turnier: https://ptmonline.org/turniere/t1/info Verein: https://example.org' }];
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ listings }), { status: 200 }))));
+    const navigate = vi.fn();
+    render(<PlayerExchangePage language="de" setLanguage={() => {}} menuOpen={false} setMenuOpen={() => {}} navigate={navigate} currentUser={null} isAdmin={false} />);
+
+    expect(fireEvent.click(await screen.findByRole('link', { name: 'https://ptmonline.org/turniere/t1/info' }))).toBe(false);
+    expect(navigate).toHaveBeenCalledWith('/turniere/t1/info');
+    const external = screen.getByRole('link', { name: 'https://example.org' });
+    expect(external).toHaveAttribute('target', '_blank');
+    expect(fireEvent.click(external)).toBe(true);
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+});

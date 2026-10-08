@@ -364,7 +364,7 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
                     {t('Verknüpftes Turnier')}: <span data-i18n-skip>{listing.tournamentName}</span>
                   </button>
                 )}
-                {listing.description && <RichText value={listing.description} />}
+                {listing.description && <RichText value={listing.description} onNavigate={navigate} />}
                 {listing.ownerName && (
                   <p className="muted">
                     {t('Von')} <span data-i18n-skip>{listing.ownerName}{listing.ownerUsername && <span className="user-handle"> @{listing.ownerUsername}</span>}</span>

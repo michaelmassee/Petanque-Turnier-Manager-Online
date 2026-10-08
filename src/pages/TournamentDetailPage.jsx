@@ -12,7 +12,7 @@ import { StandalonePageHeader } from '../components/layout.jsx';
 import { TournamentPlayerListings } from '../components/TournamentPlayerListings.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
 
-export function TournamentInfo({ tournament, language, onShare, showTitle = true, shareToken = '' }) {
+export function TournamentInfo({ tournament, language, onShare, showTitle = true, shareToken = '', onNavigate }) {
   const { t } = useTranslation();
   const isCalendarEntry = tournament.registrationEnabled === false;
   const mapsUrl = googleMapsUrl(tournament);
@@ -154,7 +154,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
           <strong>{t('Kontakt')}</strong>: {[tournament.contactName, tournament.contactEmail, tournament.contactPhone].filter(Boolean).join(' · ')}
         </p>
       )}
-      {tournament.description && <RichText value={tournament.description} />}
+      {tournament.description && <RichText value={tournament.description} onNavigate={onNavigate} />}
     </div>
   );
 }
@@ -616,7 +616,7 @@ export function TournamentDetailPage({
                 : `${t('Eine Online-Anmeldung ist derzeit nicht möglich:')} ${registrationStatusLabel(tournament, language)}`}
             </p>
           )}
-          {view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} showTitle={false} shareToken={shareToken} />}
+          {view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} showTitle={false} shareToken={shareToken} onNavigate={navigate} />}
 
           {view === 'anmelden' && (
             <PublicRegistrationPanel
