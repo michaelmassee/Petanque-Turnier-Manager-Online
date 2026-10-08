@@ -3962,6 +3962,8 @@ async function listTournaments(db, user) {
     .prepare(
       `SELECT tournaments.*,
         ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
+        ${TOURNAMENT_OWNER_JSON_SUBQUERY},
+        ${TOURNAMENT_CREATOR_JSON_SUBQUERY},
         ${TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY},
         (
           SELECT COUNT(*)
@@ -4000,6 +4002,8 @@ async function listManagedTournaments(db, user) {
     .prepare(
       `SELECT tournaments.*,
         ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
+        ${TOURNAMENT_OWNER_JSON_SUBQUERY},
+        ${TOURNAMENT_CREATOR_JSON_SUBQUERY},
         ${TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY},
         (
           SELECT COUNT(*)
@@ -5930,13 +5934,13 @@ async function confirmPendingRegistrations(env, tournament, appOrigin) {
   return json({ confirmedCount: confirmedRegistrations.length });
 }
 
-async function listPublicParticipants(db, tournamentId, currentUserEmail) {
+export async function listPublicParticipants(db, tournamentId, currentUserEmail) {
   const result = await db
     .prepare(
       `SELECT id, email, first_name, last_name, club, team_name,
          partner_first_name, partner_last_name, partner_club,
          partner2_first_name, partner2_last_name, partner2_club, is_vip, status,
-         over_capacity
+         over_capacity, user_id, partner_user_id, partner2_user_id
        FROM registrations
        WHERE tournament_id = ? AND status IN ('pending', 'confirmed', 'waitlist')
        ORDER BY registered_at ASC`,
@@ -5963,6 +5967,10 @@ async function listPublicParticipants(db, tournamentId, currentUserEmail) {
       isVip: Boolean(row.is_vip),
       // Von der Turnierleitung über die Kapazität hinaus nachgemeldet (T-24); öffentlich als solche erkennbar.
       overCapacity: Boolean(Number(row.over_capacity || 0)),
+      // Nur ob die Person mit einem Konto verknüpft ist (👤), nie welches Konto.
+      accountConnected: Boolean(row.user_id),
+      partnerAccountConnected: Boolean(row.partner_user_id),
+      partner2AccountConnected: Boolean(row.partner2_user_id),
     };
   };
 
@@ -8020,6 +8028,8 @@ export async function getTournamentById(db, id) {
     .prepare(
       `SELECT tournaments.*,
         ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
+        ${TOURNAMENT_OWNER_JSON_SUBQUERY},
+        ${TOURNAMENT_CREATOR_JSON_SUBQUERY},
         ${TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY},
         (
           SELECT COUNT(*)
@@ -8832,6 +8842,40 @@ const TOURNAMENT_EDITORS_JSON_SUBQUERY = `(
           JOIN users u ON u.id = te.user_id
           WHERE te.tournament_id = tournaments.id
         ) AS editors_json`;
+
+// Owner fürs Verwaltungs-UI (Liste, Bearbeiterliste); toPublicTournament gibt ihn nur an Verwaltungsberechtigte heraus.
+const TOURNAMENT_OWNER_JSON_SUBQUERY = `(
+          SELECT json_object('id', u.id, 'firstName', u.first_name, 'lastName', u.last_name, 'username', u.username)
+          FROM users u
+          WHERE u.id = tournaments.owner_id
+        ) AS owner_json`;
+
+// Ersteller für "Turnier wurde erstellt von" auf der öffentlichen Turnierseite (nur Name und Benutzername).
+const TOURNAMENT_CREATOR_JSON_SUBQUERY = `(
+          SELECT json_object('firstName', u.first_name, 'lastName', u.last_name, 'username', u.username)
+          FROM users u
+          WHERE u.id = tournaments.creator_id
+        ) AS creator_json`;
+
+function parseUserJson(value) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function tournamentOwner(row) {
+  return parseUserJson(row.owner_json);
+}
+
+// Kalendereinträge (Pétanque-Aktuell-Import, "Turnier melden") tragen den ersten Admin als Ersteller ein - das ist
+// kein echter Ersteller, daher nur bei Turnieren mit Online-Anmeldung.
+function tournamentCreatedBy(row) {
+  if (!Number(row.registration_enabled ?? 1)) return null;
+  return parseUserJson(row.creator_json);
+}
 
 const TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY = `(
           SELECT COALESCE(
@@ -9778,6 +9822,8 @@ export function toPublicTournament(row, user) {
     activeRegistrations: Number(row.active_registrations || 0),
     waitlistRegistrations: Number(row.waitlist_registrations || 0),
     canManage: canManageTournament(row, user),
+    owner: canManageTournament(row, user) ? tournamentOwner(row) : undefined,
+    createdBy: tournamentCreatedBy(row),
     // Nur Verwalter erfahren, ob ein QR-Design existiert (Auswahl „Design übernehmen von …“).
     hasQrDesign: canManageTournament(row, user) ? Boolean(row.qr_design) : undefined,
     createdAt: row.created_at,

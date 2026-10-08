@@ -44,7 +44,7 @@ function deleteTournamentRequest(tournamentId, confirmDocumentManaged) {
   return authenticatedApi(`/api/tournaments/${tournamentId}${query}`, { method: 'DELETE' });
 }
 
-function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmin, currentUserId }) {
+function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, owner, isAdmin, currentUserId }) {
   const { t } = useTranslation();
   const [editors, setEditors] = useState(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState('');
@@ -101,6 +101,17 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, isAdmi
         <p className="muted">{t('Lädt …')}</p>
       ) : (
         <>
+          {owner && (
+            <ul className="editor-list">
+              <li>
+                <span data-i18n-skip>
+                  {formatUserName(owner)}
+                  {owner.username && <span className="user-handle"> @{owner.username}</span>}
+                </span>
+                <span className="role">{t('Owner')}</span>
+              </li>
+            </ul>
+          )}
           {editors.length === 0 && <p className="muted">{t('Noch keine weiteren Bearbeiter für dieses Turnier.')}</p>}
           {editors.length > 0 && (
             <ul className="editor-list">
@@ -264,7 +275,7 @@ function FormationHelpDialog({ onClose }) {
   );
 }
 
-export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [] }) {
+export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, owner, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [] }) {
   const { t } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
   const [showFormationHelp, setShowFormationHelp] = useState(false);
@@ -605,7 +616,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
       {canManageOwner && (
         <TournamentOwnerPanel tournamentId={form.id} ownerId={form.ownerId} candidates={ownerCandidates} onOwnerChanged={(tournament) => { onOwnerChanged(tournament); setForm({ ...form, ownerId: tournament.ownerId }); }} />
       )}
-      {canManageEditors && <TournamentEditorsPanel tournamentId={form.id} candidates={editorCandidates} ownerId={form.ownerId} isAdmin={isAdmin} currentUserId={currentUser?.id} />}
+      {canManageEditors && <TournamentEditorsPanel tournamentId={form.id} candidates={editorCandidates} ownerId={form.ownerId} owner={owner} isAdmin={isAdmin} currentUserId={currentUser?.id} />}
       <div className="dialog-actions">
         <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>
         <Button type="submit" loading={saving}>{mode === 'edit' ? t('Turnier speichern') : t('Turnier anlegen')}</Button>
@@ -741,6 +752,9 @@ export function TournamentList({
               <span>{formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)} · <span data-i18n-skip>{formatLocationAddress(tournament.location)}</span></span>
               {tournament.registrationEnabled !== false && (
                 <small>{formationLabel(tournament)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</small>
+              )}
+              {tournament.owner && (
+                <small>{t('Owner:')} <span data-i18n-skip>{formatUserName(tournament.owner)}{tournament.owner.username && <span className="user-handle"> @{tournament.owner.username}</span>}</span></small>
               )}
               {isAdmin && tournament.editors?.length > 0 && (
                 <small>{t('Bearbeiter:')} <span data-i18n-skip>{tournament.editors.map((editor) => `${editor.firstName || ''} ${editor.lastName || ''}`.trim()).join(', ')}</span></small>
@@ -1204,6 +1218,7 @@ export function TournamentManagementPage({
           onCancel={closeDialog}
           mode={mode}
           isAdmin={isAdmin}
+          owner={tournaments.find((item) => item.id === form.id)?.owner}
           editorCandidates={postboxRecipients.filter((recipient) => recipient.id !== form.ownerId)}
           ownerCandidates={postboxRecipients}
           onOwnerChanged={handleOwnerChanged}

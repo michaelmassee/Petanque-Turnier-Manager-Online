@@ -6,8 +6,9 @@ import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney } from '../lib/format.js';
 import { labelFor, formationLabel, hasOpenRegistration, registrationStatusLabel, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
-import { Button, Feedback, RequiredMark, ShareIcon } from '../components/ui.jsx';
+import { AccountBadge, Button, Feedback, RequiredMark, ShareIcon } from '../components/ui.jsx';
 import { RichText } from '../components/RichText.jsx';
+import { formatUserName } from '../lib/userLabel.js';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { TournamentPlayerListings } from '../components/TournamentPlayerListings.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
@@ -154,6 +155,11 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
           <strong>{t('Kontakt')}</strong>: {[tournament.contactName, tournament.contactEmail, tournament.contactPhone].filter(Boolean).join(' · ')}
         </p>
       )}
+      {tournament.createdBy && (
+        <p>
+          <strong>{t('Turnier wurde erstellt von')}</strong>: <span data-i18n-skip>{formatUserName(tournament.createdBy)}{tournament.createdBy.username && <span className="user-handle"> @{tournament.createdBy.username}</span>}</span>
+        </p>
+      )}
       {tournament.description && <RichText value={tournament.description} onNavigate={onNavigate} />}
     </div>
   );
@@ -236,6 +242,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
         <strong>
           {participant.isVip && <span className="vip-badge" title="VIP">★</span>}
           {participant.firstName} {participant.lastName}
+          {participant.accountConnected && <AccountBadge />}
         </strong>
         <span>{participant.club}</span>
         {participant.overCapacity && <small className="muted">{t('Nachmeldung der Turnierleitung')}</small>}
@@ -244,6 +251,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
         <div data-i18n-skip>
           <strong>
             {participant.partnerFirstName} {participant.partnerLastName}
+            {participant.partnerAccountConnected && <AccountBadge />}
           </strong>
           <span>{participant.partnerClub}</span>
         </div>
@@ -252,6 +260,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
         <div data-i18n-skip>
           <strong>
             {participant.partner2FirstName} {participant.partner2LastName}
+            {participant.partner2AccountConnected && <AccountBadge />}
           </strong>
           <span>{participant.partner2Club}</span>
         </div>

@@ -159,6 +159,12 @@ export function DistanceBadge({ distanceKm }) {
   );
 }
 
+// 👤 hinter einem Namen: Die Person ist mit einem Benutzerkonto verknüpft.
+export function AccountBadge() {
+  const { t } = useTranslation();
+  return <span className="account-badge" title={t('Mit Benutzerkonto verbunden')} aria-label={t('Mit Benutzerkonto verbunden')}>👤</span>;
+}
+
 export function ClubBadge({ clubName, clubKind = 'club', onClick }) {
   const { t } = useTranslation();
   const isIndependent = !clubName;

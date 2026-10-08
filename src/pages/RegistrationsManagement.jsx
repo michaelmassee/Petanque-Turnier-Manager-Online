@@ -4,7 +4,7 @@ import { authenticatedApi } from '../lib/api.js';
 import { EMPTY_REGISTRATION_FORM, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { isCalendarEntry, labelFor, registrationPayload, translatedOptions } from '../lib/domain.js';
 import { filterRegistrations } from '../frontend-core.js';
-import { Feedback, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
+import { Feedback, Button, ListToolbar, EditDialog, AccountBadge } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { formatMoney } from '../lib/format.js';
@@ -257,7 +257,6 @@ function RegistrationDetails({ registration, tournament }) {
 
 function RegistrationRow({ registration, tournament, showConfirm = false, busy, busyOther, onConfirm, onEdit, onMessage, onDelete }) {
   const { t } = useTranslation();
-  const AccountBadge = () => <span className="account-badge" title={t('Mit Benutzerkonto verbunden')} aria-label={t('Mit Benutzerkonto verbunden')}>👤</span>;
   return (
     <article className="data-row">
       <div>

@@ -38,6 +38,42 @@ describe('Turnier-Payload', () => {
     expect(container.querySelector(`datalist[id="${listId}"] option`).value).toBe('BC Linden');
   });
 
+  it('zeigt in der Turnierverwaltung den Owner in der Liste', () => {
+    const noop = () => {};
+    render(
+      <TournamentList
+        tournaments={[{ id: 't1', name: 'Herbstturnier', date: '2026-10-10', location: 'Ort', registrationEnabled: true, status: 'registration', canManage: true,
+          owner: { id: 'u1', firstName: 'Lea', lastName: 'Leitung', username: 'lea' } }]}
+        totalTournaments={1} selectedId="" onSelect={noop} onEdit={noop} onDelete={noop} isAdmin={false} language="de" onCreate={noop}
+        query="" onQueryChange={noop} statusFilter="" onStatusFilterChange={noop} hideCalendarEntries={false} onHideCalendarEntriesChange={noop} onResetFilters={noop}
+      />,
+    );
+
+    expect(screen.getByText('Owner:').closest('small')).toHaveTextContent('Owner: Lea Leitung @lea');
+  });
+
+  it('zeigt beim Bearbeiten den Owner oben in der Bearbeiterliste', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ editors: [{ id: 'u2', firstName: 'Ed', lastName: 'Editor' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    render(
+      <TournamentForm
+        form={{ ...EMPTY_TOURNAMENT_FORM, id: 't1', ownerId: 'u1' }}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        onCancel={() => {}}
+        mode="edit"
+        language="de"
+        currentUser={{ id: 'u1' }}
+        owner={{ id: 'u1', firstName: 'Lea', lastName: 'Leitung', username: 'lea' }}
+        editorCandidates={[]}
+      />,
+    );
+
+    expect(await screen.findByText('Ed Editor')).toBeInTheDocument();
+    const ownerEntry = screen.getByText('Lea Leitung').closest('li');
+    expect(within(ownerEntry).getByText('Owner')).toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
   it('kennzeichnet Kalendereinträge unabhängig vom Turnierstatus als Kalendereintrag', () => {
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: false }, 'de')).toBe('Kalendereintrag');
     expect(registrationStatusLabel({ status: 'registration', registrationEnabled: false }, 'de')).toBe('Kalendereintrag');
@@ -657,6 +693,26 @@ describe('Öffentliche Turnierdetailseite', () => {
     );
 
     expect(screen.getByText('Anmeldungen müssen vom Turnierersteller bestätigt werden.')).toBeInTheDocument();
+  });
+
+  it('zeigt den Ersteller zwischen den Turnierdaten und der Beschreibung', () => {
+    render(
+      <TournamentInfo
+        language="de"
+        onShare={() => {}}
+        tournament={{
+          id: 'c-1', name: 'Herbstturnier', date: '2026-10-10', location: 'Bouleplatz', formation: 'doublette', registrationType: 'forme', type: 'formule_x',
+          contactName: 'Kai Kontakt', description: 'Beschreibungstext', createdBy: { firstName: 'Eva', lastName: 'Ersteller', username: 'eva' },
+        }}
+      />,
+    );
+
+    const createdBy = screen.getByText('Turnier wurde erstellt von').closest('p');
+    expect(createdBy).toHaveTextContent('Turnier wurde erstellt von: Eva Ersteller @eva');
+    const contact = screen.getByText('Kontakt').closest('p');
+    const description = screen.getByText('Beschreibungstext');
+    expect(contact.compareDocumentPosition(createdBy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(createdBy.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('navigiert bei eigenen Links in der Beschreibung ohne Neuladen, externe Links öffnen normal', () => {

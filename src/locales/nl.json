@@ -1318,5 +1318,8 @@
   "Die Nachricht geht per E-Mail an alle Teammitglieder und in die Postbox verknüpfter Konten. Der Link zum Turnier wird mitgeschickt.": "Het bericht gaat per e-mail naar alle teamleden en naar de postbus van gekoppelde accounts. De link naar het toernooi wordt meegestuurd.",
   "Nachricht an das Team wurde gesendet ({{emailed}} E-Mail(s), {{postbox}} Postbox).": "Bericht aan het team verzonden ({{emailed}} e-mail(s), {{postbox}} postbus).",
   "Für dieses Turnier ist der E-Mail-Versand nicht freigeschaltet und kein Konto ist verknüpft": "E-mail versturen is voor dit toernooi niet vrijgegeven en er is geen account gekoppeld",
-  "Diese Anmeldung hat weder eine E-Mail-Adresse noch ein verknüpftes Konto": "Deze inschrijving heeft geen e-mailadres en geen gekoppeld account"
+  "Diese Anmeldung hat weder eine E-Mail-Adresse noch ein verknüpftes Konto": "Deze inschrijving heeft geen e-mailadres en geen gekoppeld account",
+  "Owner": "Eigenaar",
+  "Owner:": "Eigenaar:",
+  "Turnier wurde erstellt von": "Toernooi aangemaakt door"
 }

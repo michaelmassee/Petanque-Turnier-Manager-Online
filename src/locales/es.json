@@ -1318,5 +1318,8 @@
   "Die Nachricht geht per E-Mail an alle Teammitglieder und in die Postbox verknüpfter Konten. Der Link zum Turnier wird mitgeschickt.": "El mensaje se envía por correo a todos los miembros del equipo y al buzón de las cuentas vinculadas. Se incluye el enlace al torneo.",
   "Nachricht an das Team wurde gesendet ({{emailed}} E-Mail(s), {{postbox}} Postbox).": "Mensaje enviado al equipo ({{emailed}} correo(s), {{postbox}} buzón).",
   "Für dieses Turnier ist der E-Mail-Versand nicht freigeschaltet und kein Konto ist verknüpft": "El envío de correos no está habilitado para este torneo y no hay ninguna cuenta vinculada",
-  "Diese Anmeldung hat weder eine E-Mail-Adresse noch ein verknüpftes Konto": "Esta inscripción no tiene dirección de correo ni cuenta vinculada"
+  "Diese Anmeldung hat weder eine E-Mail-Adresse noch ein verknüpftes Konto": "Esta inscripción no tiene dirección de correo ni cuenta vinculada",
+  "Owner": "Propietario",
+  "Owner:": "Propietario:",
+  "Turnier wurde erstellt von": "Torneo creado por"
 }

@@ -133,3 +133,24 @@ describe('Turnierdetail-Reiter', () => {
   });
 });
 
+
+describe('Öffentliche Meldeliste', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('zeigt hinter jedem mit einem Konto verknüpften Teammitglied das User-Symbol', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({
+      participants: [{ firstName: 'Anna', lastName: 'Konto', accountConnected: true, partnerFirstName: 'Ben', partnerLastName: 'Ohne', partnerAccountConnected: false,
+        partner2FirstName: 'Cleo', partner2LastName: 'Konto', partner2AccountConnected: true }],
+      waitlist: [],
+    })));
+
+    renderDetail(tournamentWith({}), 'teilnehmer');
+
+    const anna = (await screen.findByText(/Anna/)).closest('strong');
+    expect(anna.querySelector('.account-badge')).not.toBeNull();
+    expect(screen.getByText(/Ben/).closest('strong').querySelector('.account-badge')).toBeNull();
+    expect(screen.getByText(/Cleo/).closest('strong').querySelector('.account-badge')).not.toBeNull();
+  });
+});
