@@ -91,6 +91,13 @@ export async function saveFlyerBackground(userId, tournamentId, blob, active = t
   return updateRecord(key, (record) => ({ ...record, blob, active }));
 }
 
+export async function saveFlyerBackgroundPanelTransparency(userId, tournamentId, transparency) {
+  const key = keyFor(userId, tournamentId);
+  if (!key) throw new Error('invalid-flyer-key');
+  const value = Math.min(100, Math.max(0, Math.round(Number(transparency) || 0)));
+  return updateRecord(key, (record) => ({ ...record, backgroundPanelTransparency: value }));
+}
+
 export async function setFlyerBackgroundActive(userId, tournamentId, active) {
   const key = keyFor(userId, tournamentId);
   if (!key) return null;

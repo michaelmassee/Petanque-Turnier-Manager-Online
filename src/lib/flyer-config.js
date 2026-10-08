@@ -1,6 +1,6 @@
 export const FLYER_TEMPLATES = ['modern', 'sporty', 'classic'];
 export const FLYER_FORMATS = ['a4', 'a5'];
-export const FLYER_VISIBLE_FIELDS = ['date', 'location', 'formation', 'fees', 'capacity', 'deadline', 'status'];
+export const FLYER_VISIBLE_FIELDS = ['date', 'location', 'formation', 'fees', 'capacity', 'deadline', 'status', 'description'];
 
 export const DEFAULT_FLYER_CONFIG = Object.freeze({
   schemaVersion: 1,
@@ -11,7 +11,8 @@ export const DEFAULT_FLYER_CONFIG = Object.freeze({
   headline: '',
   subtitle: '',
   additionalText: '',
-  visibleFields: FLYER_VISIBLE_FIELDS,
+  // Die Beschreibung ist bewusst optional: Lange Freitexte sollen einen kompakten Flyer nicht ungefragt überfüllen.
+  visibleFields: ['date', 'location', 'formation', 'fees', 'capacity', 'deadline', 'status'],
 });
 
 const COLOR = /^#[0-9a-f]{6}$/i;
@@ -33,6 +34,13 @@ function multilineText(value, maxLength) {
     .slice(0, maxLength);
 }
 
+function additionalText(value) {
+  const plain = multilineText(richTextPlainText(value), 600);
+  if (!plain) return '';
+  // Gültiger, begrenzter Rich Text bleibt für die Flyer-Ausgabe erhalten; alte Klartexte bleiben kompatibel.
+  return parseRichText(value) && richTextPlainText(value).length <= 600 ? value : plain;
+}
+
 export function sanitizeFlyerConfig(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const visible = Array.isArray(source.visibleFields)
@@ -46,7 +54,8 @@ export function sanitizeFlyerConfig(value) {
     accentColor: COLOR.test(source.accentColor || '') ? source.accentColor.toLowerCase() : DEFAULT_FLYER_CONFIG.accentColor,
     headline: text(source.headline, 80),
     subtitle: text(source.subtitle, 120),
-    additionalText: multilineText(source.additionalText, 600),
+    additionalText: additionalText(source.additionalText),
     visibleFields: visible,
   };
 }
+import { parseRichText, richTextPlainText } from './rich-text.js';

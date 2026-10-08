@@ -3710,6 +3710,10 @@ a.left-panel-link {
 .flyer-background-picker { display: grid; gap: .35rem; }
 .flyer-background-picker input { max-width: 100%; }
 .flyer-background-actions { justify-content: flex-start; }
+.flyer-background-transparency { display: grid; gap: .35rem; }
+.flyer-background-transparency > span { display: flex; align-items: center; gap: .6rem; }
+.flyer-background-transparency input { flex: 1; }
+.flyer-background-transparency output { min-width: 3rem; font-variant-numeric: tabular-nums; }
 .flyer-preview { min-width: 0; }
 .flyer-preview-page { max-width: 31rem; margin: 0 auto; box-shadow: 0 .25rem 1.2rem rgb(0 0 0 / .16); background: #fff; }
 .flyer-preview-page img { display: block; width: 100%; height: auto; }

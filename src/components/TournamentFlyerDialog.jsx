@@ -6,13 +6,14 @@ import { FLYER_FONT_URLS } from '../lib/flyer-font-urls.js';
 import { createFlyerFontLoader } from '../lib/flyer-fonts.js';
 import { renderFlyerPdf, renderFlyerSvg } from '../lib/flyer-render.js';
 import { buildFlyerScene, flyerFileName, flyerSceneText } from '../lib/flyer-scene.js';
-import { loadFlyerLocalDesign, removeFlyerBackground, saveFlyerBackground, saveFlyerLocalConfig, setFlyerBackgroundActive } from '../lib/flyer-background-storage.js';
+import { loadFlyerLocalDesign, removeFlyerBackground, saveFlyerBackground, saveFlyerBackgroundPanelTransparency, saveFlyerLocalConfig, setFlyerBackgroundActive } from '../lib/flyer-background-storage.js';
 import { DEFAULT_QR_DESIGN, sanitizeQrDesign } from '../lib/qr-design.js';
 import { loadQrLogo, toQrOptions } from '../lib/qr-style.js';
-import { Button, EditDialog, Feedback, SelectField, TextArea, TextField } from './ui.jsx';
+import { RichTextEditor } from './RichTextEditor.jsx';
+import { Button, EditDialog, Feedback, SelectField, TextField } from './ui.jsx';
 
 const TEMPLATE_LABELS = { modern: 'Modern', sporty: 'Sportlich', classic: 'Klassisch', background: 'Eigenes Hintergrundbild' };
-const FIELD_LABELS = { date: 'Datum', location: 'Ort', formation: 'Turnier', fees: 'Startgeld', capacity: 'Kapazität', deadline: 'Anmeldeschluss', status: 'Status' };
+const FIELD_LABELS = { date: 'Datum', location: 'Ort', formation: 'Turnier', fees: 'Startgeld', capacity: 'Kapazität', deadline: 'Anmeldeschluss', status: 'Status', description: 'Beschreibung' };
 const PNG_DPI = 150;
 const LOGO_MAX_PIXELS = 1200;
 // Kantenlänge des QR-Bildes: auf rund 40 mm Druckbreite gut 750 dpi.
@@ -146,6 +147,7 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
   const [logo, setLogo] = useState(null);
   const [background, setBackground] = useState(null);
   const [backgroundActive, setBackgroundActive] = useState(false);
+  const [backgroundPanelTransparency, setBackgroundPanelTransparency] = useState(50);
   const [backgroundNotice, setBackgroundNotice] = useState('');
 
   useEffect(() => {
@@ -155,6 +157,7 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
       .then(async (record) => {
         if (cancelled) return;
         setConfig(sanitizeFlyerConfig(record?.config || DEFAULT_FLYER_CONFIG));
+        if (Number.isFinite(record?.backgroundPanelTransparency)) setBackgroundPanelTransparency(Math.min(100, Math.max(0, record.backgroundPanelTransparency)));
         if (!record?.blob) return;
         const next = await prepareBackground(record.blob);
         if (!cancelled) {
@@ -187,7 +190,7 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
 
   // Erst grob setzen, um die benötigten Zeichen zu kennen, dann passende Teilschriften nachladen.
   const selectedTemplate = backgroundActive ? 'background' : config.templateId;
-  const draftScene = useMemo(() => buildFlyerScene(tournament, config, i18n.language, t, { background: backgroundActive ? background : null }), [tournament, config, i18n.language, t, background, backgroundActive]);
+  const draftScene = useMemo(() => buildFlyerScene(tournament, config, i18n.language, t, { background: backgroundActive ? background : null, backgroundPanelTransparency }), [tournament, config, i18n.language, t, background, backgroundActive, backgroundPanelTransparency]);
   const sceneText = flyerSceneText(draftScene);
   useEffect(() => {
     let cancelled = false;
@@ -198,8 +201,8 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
   }, [sceneText, t]);
 
   const scene = useMemo(
-    () => (fontSet ? buildFlyerScene(tournament, config, i18n.language, t, { measure: fontSet.measure, logo, background: backgroundActive ? background : null }) : null),
-    [tournament, config, i18n.language, t, fontSet, logo, background, backgroundActive],
+    () => (fontSet ? buildFlyerScene(tournament, config, i18n.language, t, { measure: fontSet.measure, logo, background: backgroundActive ? background : null, backgroundPanelTransparency }) : null),
+    [tournament, config, i18n.language, t, fontSet, logo, background, backgroundActive, backgroundPanelTransparency],
   );
   const previewUrl = useMemo(
     () => (scene && qr ? svgDataUrl(renderFlyerSvg(scene, { fontSet, qr, logo, background: backgroundActive ? background : null })) : ''),
@@ -211,6 +214,13 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
       .catch(() => setBackgroundNotice(t('Die Flyer-Einstellungen konnten nicht lokal gespeichert werden.')));
     return next;
   });
+
+  function updateBackgroundPanelTransparency(value) {
+    const next = Math.min(100, Math.max(0, Number(value) || 0));
+    setBackgroundPanelTransparency(next);
+    saveFlyerBackgroundPanelTransparency(currentUserId, tournament.id, next)
+      .catch(() => setBackgroundNotice(t('Die Flyer-Einstellungen konnten nicht lokal gespeichert werden.')));
+  }
 
   async function chooseBackground(file) {
     if (!file) return;
@@ -285,6 +295,10 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
               <input type="file" accept={IMAGE_ACCEPT} onChange={(event) => chooseBackground(event.target.files?.[0])} />
             </label>
             {background && <div className="dialog-actions flyer-background-actions"><Button variant="secondary" type="button" onClick={clearBackground}>{t('Hintergrundbild entfernen')}</Button></div>}
+            {backgroundActive && <label className="flyer-background-transparency">
+              {t('Transparenz der Textbox')}
+              <span><input type="range" min="0" max="100" value={backgroundPanelTransparency} onChange={(event) => updateBackgroundPanelTransparency(event.target.value)} /> <output>{backgroundPanelTransparency}%</output></span>
+            </label>}
             <small className="muted">{t('Alle Flyer-Einstellungen und dieses Hintergrundbild werden nur auf diesem Gerät gespeichert und nie hochgeladen.')}</small>
             {backgroundNotice && <small className="muted">{backgroundNotice}</small>}
             <SelectField
@@ -299,7 +313,18 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
             </label>
             <TextField label={t('Überschrift')} value={config.headline} maxLength={80} onChange={(headline) => update({ headline })} />
             <TextField label={t('Untertitel')} value={config.subtitle} maxLength={120} onChange={(subtitle) => update({ subtitle })} />
-            <TextArea label={t('Zusatztext')} value={config.additionalText} maxLength={600} onChange={(additionalText) => update({ additionalText })} />
+            <RichTextEditor
+              label={t('Zusatztext')}
+              value={config.additionalText}
+              onChange={(additionalText) => update({ additionalText })}
+              boldLabel={t('Fett')}
+              italicLabel={t('Kursiv')}
+              underlineLabel={t('Unterstrichen')}
+              strikeLabel={t('Durchgestrichen')}
+              bulletListLabel={t('Aufzählung')}
+              orderedListLabel={t('Nummerierte Liste')}
+              headingLabel={t('Überschrift')}
+            />
             <fieldset>
               <legend>{t('Angaben anzeigen')}</legend>
               {FLYER_VISIBLE_FIELDS.map((field) => (

@@ -77,4 +77,19 @@ describe('flyer scene', () => {
       expect(scene.elements.some((element) => element.text === 'Powered by Petanque Turnier Manager Online'), templateId).toBe(true);
     }
   });
+
+  it('uses the configured transparency for the centered background textbox', () => {
+    const scene = buildFlyerScene(tournament, {}, 'de', t, { background: { dataUrl: 'data:image/png;base64,x' }, backgroundPanelTransparency: 50 });
+    const textbox = scene.elements.find((element) => element.role === 'background-textbox');
+    expect(textbox.opacity).toBe(0.5);
+  });
+
+  it('includes the tournament description only when selected', () => {
+    const withDescription = { ...tournament, description: 'Verpflegung und Getränke sind verfügbar.' };
+    const scene = buildFlyerScene(withDescription, { visibleFields: ['description'] }, 'de', t);
+    expect(scene.elements.some((element) => element.text === 'BESCHREIBUNG')).toBe(true);
+    expect(scene.elements.filter((element) => element.type === 'text').map((element) => element.text).join(' ')).toContain('Verpflegung und Getränke sind verfügbar.');
+    const hidden = buildFlyerScene(withDescription, { visibleFields: ['location'] }, 'de', t);
+    expect(hidden.elements.some((element) => element.text === 'BESCHREIBUNG')).toBe(false);
+  });
 });

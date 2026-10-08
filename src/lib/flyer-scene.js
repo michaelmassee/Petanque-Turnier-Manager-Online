@@ -3,6 +3,7 @@ import { formationLabel, labelFor, registrationStatusLabel } from './domain.js';
 import { REGISTRATION_TYPES, TOURNAMENT_TYPES } from './constants.js';
 import { sanitizeFlyerConfig } from './flyer-config.js';
 import { approximateMeasure } from './flyer-fonts.js';
+import { richTextPlainText } from './rich-text.js';
 
 // Alle Maße in mm. Die Scene ist das einzige Layout: SVG-Vorschau, PNG und PDF zeichnen nur ihre Elemente
 // ('path' für alle Formen, 'text', 'image' für das Logo, 'qr').
@@ -241,6 +242,8 @@ function collectContent(tournament, visible, language, t) {
   if (visible.has('capacity') && tournament.maxRegistrations) facts.push({ label: t('Kapazität'), values: [t('Maximal {count} Anmeldungen').replace('{count}', String(tournament.maxRegistrations))] });
   if (visible.has('deadline') && tournament.registrationDeadline) facts.push({ label: t('Anmeldeschluss'), values: [formatTournamentDateTime(tournament.registrationDeadline, language, tournament.timezone)] });
   if (visible.has('status')) facts.push({ label: t('Status'), values: [registrationStatusLabel(tournament, language)] });
+  const description = richTextPlainText(tournament.description).trim();
+  if (visible.has('description') && description) facts.push({ label: t('Beschreibung'), values: [description] });
   return { highlight, facts: facts.map((fact) => ({ ...fact, values: fact.values.filter(Boolean) })).filter((fact) => fact.values.length) };
 }
 
@@ -331,7 +334,7 @@ function metricsFor(page) {
 }
 
 function noteLinesFor(ctx, width, measure) {
-  return ctx.design.additionalText.split('\n')
+  return richTextPlainText(ctx.design.additionalText).split('\n')
     .flatMap((paragraph) => (paragraph ? wrapText(paragraph, width, ctx.m.note, 400, measure) : ['']));
 }
 
@@ -613,8 +616,13 @@ function buildBackground(elements, measure, ctx) {
   });
   const limit = footerTop - 6 * s;
   const bodyTop = textBottom + 15 * s;
-  // Helle Karte sichert Lesbarkeit unabhängig vom gewählten Motiv.
-  elements.push(shape(rectPath(m.margin - 4 * s, bodyTop - 5 * s, contentWidth + 8 * s, limit - bodyTop + 9 * s, 4 * s), { fill: '#ffffff', opacity: 0.94 }));
+  // Die mittige Informations-Textbox bleibt lesbar, ihre Transparenz ist im Editor einstellbar.
+  elements.push({
+    ...shape(rectPath(m.margin - 4 * s, bodyTop - 5 * s, contentWidth + 8 * s, limit - bodyTop + 9 * s, 4 * s), {
+      fill: '#ffffff', opacity: (100 - ctx.backgroundPanelTransparency) / 100,
+    }),
+    role: 'background-textbox',
+  });
   const bodyBottom = placeBody(elements, (target, top) => {
     const afterDate = dateHighlight(target, measure, ctx, { x: m.margin, width: contentWidth, top, color: palette.text, bar: true });
     const grid = factGrid(target, measure, facts, {
@@ -633,14 +641,16 @@ const BUILDERS = { modern: buildModern, sporty: buildSporty, classic: buildClass
  * @param options.measure (text, sizeMm, weight) => Breite in mm; ohne geladene Schriften eine Schätzung
  * @param options.logo natürliche Größe des Logos { width, height } oder null
  */
-export function buildFlyerScene(tournament, config, language, t, { measure = approximateMeasure, logo = null, background = null } = {}) {
+export function buildFlyerScene(tournament, config, language, t, { measure = approximateMeasure, logo = null, background = null, backgroundPanelTransparency = 50 } = {}) {
   const design = sanitizeFlyerConfig(config);
   const page = SIZES[design.format];
   const templateId = background ? 'background' : design.templateId;
   const palette = PALETTES[templateId];
   const accent = design.accentColor;
+  const panelTransparency = Math.min(100, Math.max(0, Number(backgroundPanelTransparency) || 0));
   const ctx = {
     page, design, tournament, t, language, logo, palette, accent,
+    backgroundPanelTransparency: panelTransparency,
     accentText: readableAccent(accent),
     m: metricsFor(page),
     ...collectContent(tournament, new Set(design.visibleFields), language, t),
