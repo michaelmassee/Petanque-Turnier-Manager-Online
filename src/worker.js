@@ -2471,8 +2471,8 @@ async function constantTimeEquals(a, b) {
 }
 
 async function needsSetup(db) {
-  const row = await db.prepare('SELECT COUNT(*) AS count FROM users').first();
-  return Number(row?.count || 0) === 0;
+  const row = await db.prepare('SELECT EXISTS (SELECT 1 FROM users) AS present').first();
+  return !Number(row?.present);
 }
 
 async function setupAdmin(request, db, url) {
@@ -3194,8 +3194,9 @@ const POSTBOX_MESSAGE_MAX_STORED_LENGTH = 20_000;
 const BROADCAST_REGISTRATION_STATUSES_SQL = "('pending', 'confirmed', 'waitlist')";
 
 // Turniere, deren Broadcasts der Nutzer sieht.
+// ?1 = User-ID. Einzelne Gleichheiten statt `?1 IN (...)`, damit SQLite die drei Indizes per Multi-Index-OR nutzt.
 const PARTICIPANT_TOURNAMENTS_SUBQUERY = `SELECT DISTINCT reg.tournament_id FROM registrations reg
-  WHERE ? IN (reg.user_id, reg.partner_user_id, reg.partner2_user_id)
+  WHERE (reg.user_id = ?1 OR reg.partner_user_id = ?1 OR reg.partner2_user_id = ?1)
     AND reg.status IN ${BROADCAST_REGISTRATION_STATUSES_SQL}`;
 
 async function getPostbox(db, user) {
@@ -3205,10 +3206,10 @@ async function getPostbox(db, user) {
      LEFT JOIN users s ON s.id = m.sender_id
      LEFT JOIN users r ON r.id = m.recipient_id
      LEFT JOIN tournaments t ON t.id = m.broadcast_tournament_id
-     WHERE m.recipient_id = ? OR m.sender_id = ?
+     WHERE m.recipient_id = ?1 OR m.sender_id = ?1
         OR (m.broadcast_tournament_id IS NOT NULL AND m.broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
      ORDER BY m.created_at DESC LIMIT 25`,
-  ).bind(user.id, user.id, user.id).all();
+  ).bind(user.id).all();
   const messages = result.results.map((row) => toPostboxMessage(row, user.id));
   return json({ messages, ...(await postboxSummary(db, user)) });
 }
@@ -3217,10 +3218,10 @@ export async function postboxSummary(db, user) {
   const unread = await db.prepare(
     `SELECT COUNT(*) AS count FROM postbox_messages m
      WHERE m.read_at IS NULL AND (
-       m.recipient_id = ?
+       m.recipient_id = ?1
        OR (m.broadcast_tournament_id IS NOT NULL AND m.broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
      )`,
-  ).bind(user.id, user.id).first();
+  ).bind(user.id).first();
   return { unreadCount: unreadPostboxCount(unread), todos: await listPostboxTodos(db, user) };
 }
 
@@ -3263,11 +3264,11 @@ async function sendPostboxMessage(request, env, sender) {
 async function markAllPostboxMessagesRead(db, userId) {
   const now = new Date().toISOString();
   await db.prepare(
-    `UPDATE postbox_messages SET read_at = COALESCE(read_at, ?) WHERE read_at IS NULL AND (
-       recipient_id = ?
+    `UPDATE postbox_messages SET read_at = COALESCE(read_at, ?2) WHERE read_at IS NULL AND (
+       recipient_id = ?1
        OR (broadcast_tournament_id IS NOT NULL AND broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
      )`,
-  ).bind(now, userId, userId).run();
+  ).bind(userId, now).run();
   return json({ ok: true });
 }
 
@@ -6514,10 +6515,10 @@ export async function listMyLiveRegistrations(db, user) {
         r.partner2_first_name, r.partner2_last_name, r.team_name, r.participation, r.status AS registration_status,
         t.name, t.date, t.start_time, t.timezone, t.location, t.status
       FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
-      WHERE ? IN (r.user_id, r.partner_user_id, r.partner2_user_id)
+      WHERE (r.user_id = ?1 OR r.partner_user_id = ?1 OR r.partner2_user_id = ?1)
         AND t.live_view_enabled = 1
         AND r.status IN ('pending', 'confirmed', 'waitlist')
-        AND (t.status = 'registration' OR (t.status IN ('running', 'finished') AND t.date > ?))
+        AND (t.status = 'registration' OR (t.status IN ('running', 'finished') AND t.date > ?2))
       ORDER BY t.date DESC, t.start_time DESC`).bind(user.id, since).all();
   const deleted = await deletedLiveRegistrations(db, user.id, since);
   return json({
