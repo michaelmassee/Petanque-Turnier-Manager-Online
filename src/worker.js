@@ -1658,7 +1658,7 @@ export default {
         return await createClub(request, env.DB, session.user);
       }
       if (request.method === 'GET' && url.pathname === '/api/clubs') {
-        return await listPublishedClubs(env.DB);
+        return await listPublishedClubs(env.DB, url.origin);
       }
       if (request.method === 'GET' && url.pathname === '/api/clubs/mine') {
         const session = await requireSession(request, env.DB);
@@ -2413,6 +2413,9 @@ export default {
       : null;
     if (writtenTournament) {
       await invalidateLiveSnapshot(url.origin, decodeURIComponent(writtenTournament[1]));
+    }
+    if (request.method !== 'GET' && response.ok && PUBLISHED_CLUBS_WRITE_PATH.test(url.pathname)) {
+      await invalidatePublishedClubs(url.origin);
     }
     return withRefreshedSessionCookie(request, response, url);
   },
@@ -6410,13 +6413,13 @@ function liveSnapshotCacheKey(origin, tournamentId) {
   return new Request(`${origin}/__live-snapshot/${encodeURIComponent(tournamentId)}`);
 }
 
-function liveCache() {
+function edgeCache() {
   return typeof caches !== 'undefined' && caches.default ? caches.default : null;
 }
 
 async function invalidateLiveSnapshot(origin, tournamentId) {
   try {
-    await liveCache()?.delete(liveSnapshotCacheKey(origin, tournamentId));
+    await edgeCache()?.delete(liveSnapshotCacheKey(origin, tournamentId));
   } catch (error) {
     console.error(`Failed to invalidate live snapshot for tournament ${tournamentId}`, error);
   }
@@ -6433,7 +6436,7 @@ async function computeLiveSnapshot(db, tournament) {
 }
 
 async function getLiveSnapshot(db, tournament, origin) {
-  const cache = liveCache();
+  const cache = edgeCache();
   const key = liveSnapshotCacheKey(origin, tournament.id);
   if (cache) {
     const cached = await cache.match(key);
@@ -8142,7 +8145,42 @@ function toPublicClub(row, user) {
   };
 }
 
-async function listPublishedClubs(db) {
+// GET /api/clubs lädt jeder App-Start (Filter, Vereinsvorschläge) und liest dabei alle Vereine und Plätze.
+// Darum kurz im Cloudflare-Cache (pro Rechenzentrum) halten; Schreibzugriffe auf Vereine/Plätze löschen
+// den Eintrag sofort (invalidatePublishedClubs), andere Rechenzentren sehen die Änderung spätestens nach der TTL.
+const PUBLISHED_CLUBS_TTL_SECONDS = 300;
+const PUBLISHED_CLUBS_WRITE_PATH = /^\/api\/(?:admin\/)?(?:clubs|places|place-reports)(?:\/|$)/;
+
+function publishedClubsCacheKey(origin) {
+  return new Request(`${origin}/__published-clubs`);
+}
+
+async function invalidatePublishedClubs(origin) {
+  try {
+    await edgeCache()?.delete(publishedClubsCacheKey(origin));
+  } catch (error) {
+    console.error('Failed to invalidate published clubs cache', error);
+  }
+}
+
+async function listPublishedClubs(db, origin) {
+  const cache = edgeCache();
+  const key = publishedClubsCacheKey(origin);
+  if (cache) {
+    const cached = await cache.match(key);
+    // Neu verpacken, damit der Browser die Cache-TTL nicht übernimmt und eigene Änderungen sofort sieht.
+    if (cached) return json(await cached.json());
+  }
+  const payload = await loadPublishedClubs(db);
+  if (cache) {
+    await cache.put(key, new Response(JSON.stringify(payload), {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${PUBLISHED_CLUBS_TTL_SECONDS}` },
+    }));
+  }
+  return json(payload);
+}
+
+async function loadPublishedClubs(db) {
   const rows = await db.prepare(
     `SELECT c.id, c.name, p.latitude, p.longitude
      FROM clubs c
@@ -8155,7 +8193,7 @@ async function listPublishedClubs(db) {
     if (!clubs.has(row.id)) clubs.set(row.id, { id: row.id, name: row.name, locations: [] });
     if (row.latitude !== null && row.longitude !== null) clubs.get(row.id).locations.push({ latitude: Number(row.latitude), longitude: Number(row.longitude) });
   }
-  return json({ clubs: [...clubs.values()] });
+  return { clubs: [...clubs.values()] };
 }
 
 async function listBoulePlaces(db, user, query) {
