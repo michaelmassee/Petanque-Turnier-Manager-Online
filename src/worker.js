@@ -3964,7 +3964,6 @@ async function listTournaments(db, user) {
         ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
         ${TOURNAMENT_OWNER_JSON_SUBQUERY},
         ${TOURNAMENT_CREATOR_JSON_SUBQUERY},
-        ${TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY},
         (
           SELECT COUNT(*)
           FROM registrations
@@ -4004,7 +4003,6 @@ async function listManagedTournaments(db, user) {
         ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
         ${TOURNAMENT_OWNER_JSON_SUBQUERY},
         ${TOURNAMENT_CREATOR_JSON_SUBQUERY},
-        ${TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY},
         (
           SELECT COUNT(*)
           FROM registrations
@@ -8030,7 +8028,6 @@ export async function getTournamentById(db, id) {
         ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
         ${TOURNAMENT_OWNER_JSON_SUBQUERY},
         ${TOURNAMENT_CREATOR_JSON_SUBQUERY},
-        ${TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY},
         (
           SELECT COUNT(*)
           FROM registrations
@@ -8876,33 +8873,6 @@ function tournamentCreatedBy(row) {
   if (!Number(row.registration_enabled ?? 1)) return null;
   return parseUserJson(row.creator_json);
 }
-
-const TOURNAMENT_VENUE_CLUB_LOGO_SUBQUERY = `(
-          SELECT COALESCE(
-            (
-              SELECT c.logo_url
-              FROM boule_places p
-              JOIN clubs c ON c.id = p.club_id
-              WHERE p.id = tournaments.boule_place_id
-                AND p.status = 'published'
-                AND c.status = 'published'
-            ),
-            (
-              SELECT CASE WHEN COUNT(DISTINCT c.id) = 1 THEN MIN(c.logo_url) END
-              FROM boule_places p
-              JOIN clubs c ON c.id = p.club_id
-              WHERE tournaments.boule_place_id IS NULL
-                AND (
-                  (tournaments.latitude IS NOT NULL AND tournaments.longitude IS NOT NULL
-                    AND p.latitude = tournaments.latitude AND p.longitude = tournaments.longitude)
-                  OR ((tournaments.latitude IS NULL OR tournaments.longitude IS NULL)
-                    AND lower(trim(p.address)) = lower(trim(tournaments.location)))
-                )
-                AND p.status = 'published'
-                AND c.status = 'published'
-            )
-          )
-        ) AS venue_club_logo_url`;
 
 function canManageTournament(tournament, user) {
   if (!user) {
@@ -9815,6 +9785,7 @@ export function toPublicTournament(row, user) {
     desktopExecution: Boolean(Number(row.desktop_execution || 0)),
     websiteUrl: row.website_url || null,
     websiteIsOriginalClubSite: false,
+    // venue_club_logo_url wird per Trigger (Migration 0099) beim Schreiben berechnet.
     logoUrl: row.logo_url || row.venue_club_logo_url || null,
     flyerUrl: row.flyer_url || null,
     // Der Gruppenlink geht nur per Mail an Gemeldete, öffentlich würde jeder beitreten können.
