@@ -200,15 +200,26 @@ function AppContent() {
   const tournamentsQuery = useQuery({ queryKey: ['tournaments'], queryFn: () => api('/api/tournaments') });
   const clubsQuery = useQuery({ queryKey: ['published-clubs'], queryFn: () => api('/api/clubs') });
   const boulePlacesQuery = useQuery({ queryKey: ['boule-places-for-tournament'], queryFn: () => api('/api/places'), enabled: canManageTournaments });
-  const postboxQuery = useQuery({
-    queryKey: ['postbox', currentUser?.id],
-    queryFn: async () => {
-      const [postbox, recipients] = await Promise.all([authenticatedApi('/api/postbox'), authenticatedApi('/api/postbox/recipients')]);
-      return { postbox, recipients };
-    },
-    enabled: Boolean(currentUser),
+  // Polling nur für die Badge-Zahlen; Nachrichten und Empfänger erst bei geöffneter Postbox (D1-Leselimit).
+  const postboxSummaryQuery = useQuery({
+    queryKey: ['postbox-summary', currentUser?.id],
+    queryFn: () => authenticatedApi('/api/postbox/summary'),
+    enabled: Boolean(currentUser) && !postboxOpen,
     refetchInterval: 60_000,
     refetchIntervalInBackground: false,
+  });
+  const postboxQuery = useQuery({
+    queryKey: ['postbox', currentUser?.id],
+    queryFn: () => authenticatedApi('/api/postbox'),
+    enabled: Boolean(currentUser) && postboxOpen,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+  });
+  const postboxRecipientsQuery = useQuery({
+    queryKey: ['postbox-recipients', currentUser?.id],
+    queryFn: () => authenticatedApi('/api/postbox/recipients'),
+    enabled: Boolean(currentUser) && postboxOpen,
+    staleTime: 5 * 60_000,
   });
   const homeHeading = t('Öffentliche Turniere');
   const publishedClubs = clubsQuery.data?.clubs || [];
@@ -445,11 +456,21 @@ function AppContent() {
   }, [tournamentsQuery.data]);
 
   useEffect(() => {
+    if (!postboxSummaryQuery.data) return;
+    const { unreadCount, todos } = postboxSummaryQuery.data;
+    setPostbox((previous) => ({ ...previous, unreadCount, todos }));
+  }, [postboxSummaryQuery.data]);
+
+  useEffect(() => {
     if (!postboxQuery.data) return;
-    setPostbox(postboxQuery.data.postbox);
-    setPostboxRecipients(postboxQuery.data.recipients.recipients);
-    setPostboxRecipientTournaments(postboxQuery.data.recipients.tournaments || []);
+    setPostbox(postboxQuery.data);
   }, [postboxQuery.data]);
+
+  useEffect(() => {
+    if (!postboxRecipientsQuery.data) return;
+    setPostboxRecipients(postboxRecipientsQuery.data.recipients);
+    setPostboxRecipientTournaments(postboxRecipientsQuery.data.tournaments || []);
+  }, [postboxRecipientsQuery.data]);
 
   useEffect(() => {
     if (currentUser) {
@@ -519,15 +540,10 @@ function AppContent() {
     try {
       const data = await queryClient.fetchQuery({
         queryKey: ['postbox', currentUser?.id],
-        queryFn: async () => {
-          const [postbox, recipients] = await Promise.all([authenticatedApi('/api/postbox'), authenticatedApi('/api/postbox/recipients')]);
-          return { postbox, recipients };
-        },
+        queryFn: () => authenticatedApi('/api/postbox'),
         staleTime: 0,
       });
-      setPostbox(data.postbox);
-      setPostboxRecipients(data.recipients.recipients);
-      setPostboxRecipientTournaments(data.recipients.tournaments || []);
+      setPostbox(data);
     } catch (requestError) {
       if (!silent && !(requestError instanceof CancelledError)) setError(requestError.message);
     }

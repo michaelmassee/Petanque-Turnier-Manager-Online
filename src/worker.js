@@ -1426,6 +1426,12 @@ export default {
         return await getPostbox(env.DB, session.user);
       }
 
+      // Für das Polling: nur Badge-Zahlen, ohne Nachrichtenliste.
+      if (request.method === 'GET' && url.pathname === '/api/postbox/summary') {
+        const session = await requireSession(request, env.DB);
+        return json(await postboxSummary(env.DB, session.user));
+      }
+
       if (request.method === 'GET' && url.pathname === '/api/postbox/recipients') {
         const session = await requireSession(request, env.DB);
         return await listPostboxRecipients(env.DB, session.user.id);
@@ -3204,6 +3210,10 @@ async function getPostbox(db, user) {
      ORDER BY m.created_at DESC LIMIT 25`,
   ).bind(user.id, user.id, user.id).all();
   const messages = result.results.map((row) => toPostboxMessage(row, user.id));
+  return json({ messages, ...(await postboxSummary(db, user)) });
+}
+
+export async function postboxSummary(db, user) {
   const unread = await db.prepare(
     `SELECT COUNT(*) AS count FROM postbox_messages m
      WHERE m.read_at IS NULL AND (
@@ -3211,7 +3221,7 @@ async function getPostbox(db, user) {
        OR (m.broadcast_tournament_id IS NOT NULL AND m.broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
      )`,
   ).bind(user.id, user.id).first();
-  return json({ messages, unreadCount: unreadPostboxCount(unread), todos: await listPostboxTodos(db, user) });
+  return { unreadCount: unreadPostboxCount(unread), todos: await listPostboxTodos(db, user) };
 }
 
 // Nachrichtentext: Klartext oder Rich Text. Das Limit gilt für den sichtbaren Text; das Rich-Text-JSON ist nur grob gedeckelt.

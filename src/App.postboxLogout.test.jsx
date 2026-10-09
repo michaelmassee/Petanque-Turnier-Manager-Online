@@ -27,6 +27,7 @@ describe('Postbox nach Logout', () => {
         if (postboxRequests === 1) return Promise.resolve(jsonResponse({ messages: [{ id: 'm1', kind: 'direct', body: 'Geheime Nachricht', mine: false, senderName: 'Absender', createdAt: '2026-01-01T00:00:00.000Z' }], unreadCount: 1, todos: [] }));
         return new Promise(() => {});
       }
+      if (path === '/api/postbox/summary') return Promise.resolve(jsonResponse({ unreadCount: 1, todos: [] }));
       if (path === '/api/postbox/recipients') return Promise.resolve(jsonResponse({ recipients: [], tournaments: [] }));
       if (path === '/api/logout') return Promise.resolve(jsonResponse({}));
       if (path === '/api/login') return Promise.resolve(jsonResponse({ user: { id: 'u2', firstName: 'Zweite', lastName: 'Person', role: 'user' } }));

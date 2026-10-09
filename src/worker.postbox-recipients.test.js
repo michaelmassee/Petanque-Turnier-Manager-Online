@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
-import { createBroadcastPostboxMessage, listPostboxRecipients, postboxMessageBody, renderTransactionalEmailHtml } from './worker.js';
+import { createBroadcastPostboxMessage, listPostboxRecipients, postboxMessageBody, postboxSummary, renderTransactionalEmailHtml } from './worker.js';
 import { d1MitSchema } from './test-support/d1.js';
 
 function seed(sqlite) {
@@ -33,6 +33,22 @@ describe('Postbox-Empfänger für Turnier-Broadcasts', () => {
         { id: 'tournament-1', name: 'Herbstturnier', date: '2026-10-06', registrationCount: 3 },
         { id: 'tournament-2', name: 'Leeres Turnier', date: '2026-11-01', registrationCount: 0 },
       ],
+    });
+  });
+});
+
+describe('Postbox-Zusammenfassung fürs Polling', () => {
+  it('liefert nur Ungelesen-Zahl und Todos, keine Nachrichten', async () => {
+    const db = d1MitSchema();
+    seed(db.sqlite);
+    db.sqlite.exec(`INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, created_at) VALUES
+      ('m1', 'recipient-1', 'organizer-1', 'direct', 'Hallo', '2026-01-02'),
+      ('m2', 'recipient-1', 'organizer-1', 'direct', 'Gelesen', '2026-01-03');
+      UPDATE postbox_messages SET read_at = '2026-01-04' WHERE id = 'm2';`);
+
+    await expect(postboxSummary(db, { id: 'organizer-1', role: 'user' })).resolves.toEqual({
+      unreadCount: 1,
+      todos: [{ type: 'pending_registrations', count: 1 }, { type: 'waitlist', count: 1 }],
     });
   });
 });
