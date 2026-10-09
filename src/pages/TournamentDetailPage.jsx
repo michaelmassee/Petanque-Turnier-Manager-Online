@@ -4,7 +4,7 @@ import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FO
 import { api, authenticatedApi } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
-import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney } from '../lib/format.js';
+import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
 import { labelFor, formationLabel, hasOpenRegistration, registrationStatusLabel, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { AccountBadge, Button, Feedback, RequiredMark, ShareIcon } from '../components/ui.jsx';
 import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
@@ -87,7 +87,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
       {showTimezoneHint && <p className="hint">{(TIMEZONE_HINT_TEMPLATES[language] || TIMEZONE_HINT_TEMPLATES.de)(tournamentTimeZone)}</p>}
       {showTitle && <h2 data-i18n-skip>{tournament.name}</h2>}
       <p>
-        <strong>{t('Datum')}</strong>: {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
+        <strong>{t('Datum')}</strong>: {formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
       </p>
       <p>
         <strong>{t('Ort')}</strong>: <span data-i18n-skip>{formatLocationAddress(tournament.location)}</span>
@@ -593,7 +593,7 @@ export function TournamentDetailPage({
           <p className="eyebrow">{t('Turnierdetails')}</p>
           <h1 data-i18n-skip>{tournament.name}</h1>
           <p className="tournament-detail-meta" data-i18n-skip>
-            {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
+            {formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
             <span aria-hidden="true">·</span>
             {formatLocationAddress(tournament.location)}
           </p>
