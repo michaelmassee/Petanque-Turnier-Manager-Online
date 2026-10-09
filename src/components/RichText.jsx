@@ -19,7 +19,7 @@ function ownAppPath(url) {
 
 // Normaler Linksklick auf einen eigenen Link geht über das App-Routing (onNavigate), damit die App nicht neu lädt.
 // Strg-/Cmd-/Mittelklick bleibt Browser-Verhalten (neuer Tab).
-function handleOwnLinkClick(event, path, onNavigate) {
+export function handleOwnLinkClick(event, path, onNavigate) {
   if (!onNavigate || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
   onNavigate(path);

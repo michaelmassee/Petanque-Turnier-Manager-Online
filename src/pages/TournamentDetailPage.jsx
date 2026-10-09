@@ -7,7 +7,7 @@ import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney } from '../lib/format.js';
 import { labelFor, formationLabel, hasOpenRegistration, registrationStatusLabel, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { AccountBadge, Button, Feedback, RequiredMark, ShareIcon } from '../components/ui.jsx';
-import { RichText } from '../components/RichText.jsx';
+import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
 import { formatUserName } from '../lib/userLabel.js';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { TournamentPlayerListings } from '../components/TournamentPlayerListings.jsx';
@@ -17,6 +17,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
   const { t } = useTranslation();
   const isCalendarEntry = tournament.registrationEnabled === false;
   const mapsUrl = googleMapsUrl(tournament);
+  const placePath = `/plaetze#${encodeURIComponent(tournament.boulePlaceId || '')}`;
   const viewerTimeZone = detectViewerTimeZone();
   const tournamentTimeZone = tournament.timezone || 'UTC';
   const showTimezoneHint = Boolean(viewerTimeZone && viewerTimeZone !== tournamentTimeZone);
@@ -93,7 +94,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
       </p>
       {tournament.boulePlaceId && (
         <p>
-          <strong>{t('Bouleplatz')}</strong>: <a href={`/plaetze#${encodeURIComponent(tournament.boulePlaceId)}`}>{t('Öffentlichen Bouleplatz ansehen')}</a>
+          <strong>{t('Bouleplatz')}</strong>: <a href={placePath} onClick={(event) => handleOwnLinkClick(event, placePath, onNavigate)}>{t('Öffentlichen Bouleplatz ansehen')}</a>
         </p>
       )}
       <p>

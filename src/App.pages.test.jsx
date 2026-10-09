@@ -692,6 +692,23 @@ describe('Öffentliche Turnierdetailseite', () => {
     expect(screen.getByText(/kontakt@example.test/)).toBeInTheDocument();
   });
 
+  it('öffnet den verknüpften Bouleplatz über das App-Routing statt per Seiten-Neuladen', () => {
+    const onNavigate = vi.fn();
+    render(
+      <TournamentInfo
+        language="de"
+        onShare={() => {}}
+        onNavigate={onNavigate}
+        tournament={{ id: 't-1', name: 'Turnier', date: '2026-10-11', location: 'Clubhaus', boulePlaceId: 'place 1' }}
+      />,
+    );
+
+    const link = screen.getByRole('link', { name: 'Öffentlichen Bouleplatz ansehen' });
+    expect(link).toHaveAttribute('href', '/plaetze#place%201');
+    fireEvent.click(link);
+    expect(onNavigate).toHaveBeenCalledWith('/plaetze#place%201');
+  });
+
   it('weist auf die notwendige Freigabe durch den Turnierersteller hin', () => {
     render(
       <TournamentInfo

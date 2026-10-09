@@ -134,7 +134,6 @@ function PlacesMap({ places, center, maptilerApiKey, focus }) {
   return (
     <TileFallbackMap center={center} maptilerApiKey={maptilerApiKey}>
       <FitToBounds positions={positions} />
-      <FocusOnPlace focus={focus} markerRefs={markerRefs} />
       {markerGroups.map(({ id, place, places: groupedPlaces }) => (
         <Marker
           key={id}
@@ -167,6 +166,8 @@ function PlacesMap({ places, center, maptilerApiKey, focus }) {
           </Popup>
         </Marker>
       ))}
+      {/* Nach den Markern, damit sie beim ersten Rendern (Link mit #placeId) schon auf der Karte liegen und openPopup greift. */}
+      <FocusOnPlace focus={focus} markerRefs={markerRefs} />
     </TileFallbackMap>
   );
 }
@@ -205,6 +206,15 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
     catch (err) { setError(err.message); } finally { setLoading(false); }
   }
   useEffect(() => { const timer = setTimeout(load, 180); return () => clearTimeout(timer); }, [query]);
+
+  // Link „Öffentlichen Bouleplatz ansehen“ aus den Turnierdetails: /plaetze#<placeId> zeigt den Platz auf der Karte.
+  const [linkedPlaceId, setLinkedPlaceId] = useState(() => decodeURIComponent(window.location.hash.slice(1)));
+  useEffect(() => {
+    if (!linkedPlaceId || loading) return;
+    const place = places.find((entry) => entry.id === linkedPlaceId);
+    if (place) handleFocusPlace(place);
+    setLinkedPlaceId('');
+  }, [linkedPlaceId, loading, places]);
 
   const visiblePlaces = useMemo(() => {
     let results = filterPlaces(places, { favoritesOnly, clubsOnly, indoorOnly });
