@@ -45,7 +45,7 @@ function deleteTournamentRequest(tournamentId, confirmDocumentManaged) {
   return authenticatedApi(`/api/tournaments/${tournamentId}${query}`, { method: 'DELETE' });
 }
 
-function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, owner, isAdmin, currentUserId }) {
+function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, owner, currentUserId }) {
   const { t } = useTranslation();
   const [editors, setEditors] = useState(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState('');
@@ -61,7 +61,10 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, owner,
     return () => { cancelled = true; };
   }, [tournamentId]);
 
-  const availableCandidates = candidates.filter((candidate) => !(editors || []).some((editor) => editor.id === candidate.id));
+  // Schutz für noch nicht migrierte/inkonsistente Bestände: Der Owner steht
+  // ausschließlich in der eigenen Owner-Zeile, nie nochmals als Bearbeiter.
+  const additionalEditors = (editors || []).filter((editor) => editor.id !== ownerId);
+  const availableCandidates = candidates.filter((candidate) => candidate.id !== ownerId && !additionalEditors.some((editor) => editor.id === candidate.id));
 
   async function handleAdd(event) {
     event.preventDefault();
@@ -113,24 +116,19 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, owner,
               </li>
             </ul>
           )}
-          {editors.length === 0 && <p className="muted">{t('Noch keine weiteren Bearbeiter für dieses Turnier.')}</p>}
-          {editors.length > 0 && (
+          {additionalEditors.length === 0 && <p className="muted">{t('Noch keine weiteren Bearbeiter für dieses Turnier.')}</p>}
+          {additionalEditors.length > 0 && (
             <ul className="editor-list">
-              {editors.map((editor) => {
-                const isOwner = editor.id === ownerId;
-                return (
+              {additionalEditors.map((editor) => (
                   <li key={editor.id}>
                     <span data-i18n-skip>
                       {formatUserName(editor)}
                       {editor.username && <span className="user-handle"> @{editor.username}</span>}
                     </span>
                     <UsernameReportButton user={editor} currentUserId={currentUserId} />
-                    {(!isOwner || isAdmin) && (
-                      <Button variant="secondary" type="button" disabled={busy} loading={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
-                    )}
+                    <Button variant="secondary" type="button" disabled={busy} loading={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
                   </li>
-                );
-              })}
+              ))}
             </ul>
           )}
           {availableCandidates.length > 0 && (
@@ -618,7 +616,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
       {canManageOwner && (
         <TournamentOwnerPanel tournamentId={form.id} ownerId={form.ownerId} candidates={ownerCandidates} onOwnerChanged={(tournament) => { onOwnerChanged(tournament); setForm({ ...form, ownerId: tournament.ownerId }); }} />
       )}
-      {canManageEditors && <TournamentEditorsPanel tournamentId={form.id} candidates={editorCandidates} ownerId={form.ownerId} owner={owner} isAdmin={isAdmin} currentUserId={currentUser?.id} />}
+      {canManageEditors && <TournamentEditorsPanel tournamentId={form.id} candidates={editorCandidates} ownerId={form.ownerId} owner={owner} currentUserId={currentUser?.id} />}
       <div className="dialog-actions">
         <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>
         <Button type="submit" loading={saving}>{mode === 'edit' ? t('Turnier speichern') : t('Turnier anlegen')}</Button>

@@ -6,6 +6,19 @@ import { d1MitSchema } from './test-support/d1.js';
 import { getTournamentById, listPublicParticipants, toPublicTournament } from './worker.js';
 
 describe('Owner des Turniers', () => {
+  it('liefert den Owner nicht zusätzlich als Bearbeiter', async () => {
+    const db = d1MitSchema();
+    db.sqlite.prepare(`INSERT INTO users (id, email, role, first_name, last_name, password_salt, password_hash, created_at, updated_at)
+      VALUES ('u1', 'leitung@example.test', 'user', 'Lea', 'Leitung', 'salt', 'hash', '2026-09-01', '2026-09-01')`).run();
+    db.sqlite.prepare(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at)
+      VALUES ('t1', 'u1', 'Turnier', '2099-09-28', 'Ort', 'doublette', 'registration', 'public', '2026-09-01', '2026-09-01')`).run();
+    db.sqlite.prepare(`INSERT INTO tournament_editors (id, tournament_id, user_id, created_at)
+      VALUES ('e1', 't1', 'u1', '2026-09-01')`).run();
+
+    const row = await getTournamentById(db, 't1');
+    expect(toPublicTournament(row, { id: 'u1', role: 'user' }).editors).toEqual([]);
+  });
+
   it('liefert Name und Benutzername nur an die Turnierverwaltung', async () => {
     const db = d1MitSchema();
     db.sqlite.prepare(`INSERT INTO users (id, email, role, first_name, last_name, username, password_salt, password_hash, created_at, updated_at)

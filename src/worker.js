@@ -8869,13 +8869,21 @@ function canViewParticipants(tournament, user) {
 }
 
 function tournamentEditors(tournament) {
-  if (Array.isArray(tournament.editors)) return tournament.editors;
-  if (!tournament.editors_json) return [];
-  try {
-    return JSON.parse(tournament.editors_json);
-  } catch {
+  let editors;
+  if (Array.isArray(tournament.editors)) {
+    editors = tournament.editors;
+  } else if (!tournament.editors_json) {
     return [];
+  } else {
+    try {
+      editors = JSON.parse(tournament.editors_json);
+    } catch {
+      return [];
+    }
   }
+  // Der Owner hat seine Rechte bereits über tournaments.owner_id. Alte manager_id-
+  // Übernahmen können ihn trotzdem noch in tournament_editors enthalten.
+  return editors.filter((editor) => editor.id !== tournament.owner_id);
 }
 
 function tournamentEditorIds(tournament) {
@@ -8886,7 +8894,7 @@ const TOURNAMENT_EDITORS_JSON_SUBQUERY = `(
           SELECT COALESCE(json_group_array(json_object('id', te.user_id, 'firstName', u.first_name, 'lastName', u.last_name, 'username', u.username)), '[]')
           FROM tournament_editors te
           JOIN users u ON u.id = te.user_id
-          WHERE te.tournament_id = tournaments.id
+          WHERE te.tournament_id = tournaments.id AND te.user_id != tournaments.owner_id
         ) AS editors_json`;
 
 // Owner fürs Verwaltungs-UI (Liste, Bearbeiterliste); toPublicTournament gibt ihn nur an Verwaltungsberechtigte heraus.
