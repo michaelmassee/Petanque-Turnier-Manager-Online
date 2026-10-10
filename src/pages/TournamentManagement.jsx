@@ -125,8 +125,10 @@ function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, owner,
                       {formatUserName(editor)}
                       {editor.username && <span className="user-handle"> @{editor.username}</span>}
                     </span>
-                    <UsernameReportButton user={editor} currentUserId={currentUserId} />
-                    <Button variant="secondary" type="button" disabled={busy} loading={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
+                    <span className="editor-actions">
+                      <UsernameReportButton user={editor} currentUserId={currentUserId} />
+                      <Button variant="secondary" type="button" disabled={busy} loading={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
+                    </span>
                   </li>
               ))}
             </ul>

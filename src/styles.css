@@ -1934,11 +1934,25 @@ a.left-panel-link {
 }
 
 .editor-list li {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
+}
+
+.editor-list li > [data-i18n-skip] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.editor-list .role {
+  justify-self: end;
 }
 
 .form-section-header {
@@ -2804,6 +2818,19 @@ a.left-panel-link {
   .tournament-card-main,
   .tournament-card-meta {
     grid-template-columns: 1fr;
+  }
+
+  /* Bearbeiter bleiben als klare Einheit: erst der Name, darunter Melden und
+     Entfernen. Das verhindert, dass Flex-Zeilen das Icon und den Button bei
+     langen Namen in unterschiedliche, wechselnde Zeilen schieben. */
+  .editor-list li {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .editor-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .registration-section {
