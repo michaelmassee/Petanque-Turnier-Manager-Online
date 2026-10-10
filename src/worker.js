@@ -46,7 +46,7 @@ import { parseRichText, richTextDocument, richTextPlainText, serializeRichText }
 import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
 import { formatLocationAddress, geocodingFallbackQuery } from './location-format.js';
 import {
-  SLOT_COLUMNS, isIncompleteTeam, nextSlotUserId, normalizePlayerName, registrationConflicts,
+  ACTIVE_REGISTRATION_STATUSES, SLOT_COLUMNS, isIncompleteTeam, nextSlotUserId, normalizePlayerName, registrationConflicts,
   registrationFlagsById, registrationSlots, registrationUnit, registrationUserIds, uniqueAccountLinks,
 } from './registration-core.js';
 
@@ -72,6 +72,8 @@ const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
 // Anmeldestatus (online verwaltet) - bewusst getrennt von der Teilnahme nach dem Check-in.
 const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist', 'rejected'];
+// Stornierte und abgelehnte Meldungen belegen weder Teamnamen noch Live-Zugang oder Turnierzustand.
+const ACTIVE_REGISTRATION_STATUSES_SQL = `(${ACTIVE_REGISTRATION_STATUSES.map((status) => `'${status}'`).join(', ')})`;
 const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
 const SESSION_COOKIE = 'ptm_session';
 const sessionRefreshes = new WeakMap();
@@ -2244,7 +2246,7 @@ export default {
         }
 
         if (request.method === 'DELETE') {
-          if (registration.status !== 'cancelled') {
+          if (registration.status !== 'cancelled' && registration.status !== 'rejected') {
             try {
               await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, owner_id: registration.owner_id }, registration, APP_ORIGIN);
             } catch (error) {
@@ -4438,6 +4440,7 @@ export async function upsertDocumentRegistration(request, env, tournament, local
   }
   const status = body.status === undefined ? existing.status : String(body.status);
   if (!REGISTRATION_STATUSES.includes(status)) throw new HttpError(400, 'Ungültiger Status');
+  assertNotRejectedByStatusEdit(existing.status, status);
   if (status === 'cancelled' && existing.status !== 'cancelled' && await registrationWasDrawn(db, tournament.id, existing.id)) {
     // Ab `running` wird eine Stornierung nur übertragen, solange die Meldung in keiner Runde ausgelost wurde (KP-15).
     throw new HttpError(409, 'Die Meldung wurde bereits ausgelost und kann nur lokal ausgesetzt werden', { code: 'registration_drawn' });
@@ -4471,6 +4474,8 @@ export async function upsertDocumentRegistration(request, env, tournament, local
       partner2_user_id = ?, partner2_email = ?` : '';
   const slotBinds = slotLinks ? slotLinks.flatMap((link) => [link.userId, link.email]) : [];
   const update = db.prepare(`UPDATE registrations SET status = ?, participation = ?, seeding_position = ?,
+      rejection_reason = CASE WHEN ? THEN rejection_reason END, rejected_at = CASE WHEN ? THEN rejected_at END,
+      rejected_by = CASE WHEN ? THEN rejected_by END,
       first_name = CASE WHEN ? THEN ? ELSE first_name END,
       last_name = CASE WHEN ? THEN ? ELSE last_name END,
       club = CASE WHEN ? THEN ? ELSE club END,
@@ -4486,6 +4491,7 @@ export async function upsertDocumentRegistration(request, env, tournament, local
           AND other.local_registration_uuid = ? AND other.id != ?) THEN local_registration_uuid ELSE ? END${slotSql},
       execution_revision = execution_revision + 1, updated_at = ? WHERE id = ? AND execution_revision = ?`)
     .bind(status, participation, seedingPosition,
+      ...Array(3).fill(status === 'rejected' ? 1 : 0),
       documentMaster ? 1 : 0, documentRegistration?.firstName ?? null,
       documentMaster ? 1 : 0, documentRegistration?.lastName ?? null,
       documentMaster ? 1 : 0, documentRegistration?.club ?? null,
@@ -5147,7 +5153,7 @@ async function notifyTournamentPublicationChange(env, existing, updated) {
 // Zurück zu Entwurf nur ohne bestehende Anmeldungen (Zustandsmodell, P-21); die Ablehnung nennt die Anzahl.
 async function assertDraftTransitionAllowed(db, existing, status) {
   if (status !== 'draft' || existing.status === 'draft') return;
-  const row = await db.prepare("SELECT COUNT(*) AS count FROM registrations WHERE tournament_id = ? AND status != 'cancelled'")
+  const row = await db.prepare(`SELECT COUNT(*) AS count FROM registrations WHERE tournament_id = ? AND status IN ${ACTIVE_REGISTRATION_STATUSES_SQL}`)
     .bind(existing.id).first();
   const count = Number(row?.count || 0);
   if (count > 0) {
@@ -5800,7 +5806,7 @@ function tombstoneStatement(db, where, binds, deletedByUserId, now) {
   return db.prepare(`INSERT OR REPLACE INTO tournament_tombstones (tournament_id, name, deleted_at, deleted_by_user_id, registrations_json)
       SELECT t.id, t.name, ?, ?, COALESCE((SELECT json_group_array(json_object('id', r.id,
           'userIds', json_array(r.user_id, r.partner_user_id, r.partner2_user_id)))
-        FROM registrations r WHERE r.tournament_id = t.id AND r.status != 'cancelled'), '[]')
+        FROM registrations r WHERE r.tournament_id = t.id AND r.status IN ${ACTIVE_REGISTRATION_STATUSES_SQL}), '[]')
       FROM tournaments t WHERE ${where}`).bind(now, deletedByUserId, ...binds);
 }
 
@@ -6608,7 +6614,7 @@ export async function findMyLiveRegistration(db, user, registrationId) {
       JOIN tournaments t ON t.id = r.tournament_id WHERE r.id = ?`).bind(registrationId).first();
   const ownsRegistration = registration && registrationBelongsToUser(registration, user.id);
   // Fremde Meldungen verhalten sich wie nicht vorhanden, damit IDs nicht ausprobiert werden können.
-  if (!registration || registration.status === 'cancelled' || !ownsRegistration || !isLiveViewEnabled(registration)) {
+  if (!registration || !ACTIVE_REGISTRATION_STATUSES.includes(registration.status) || !ownsRegistration || !isLiveViewEnabled(registration)) {
     const [deleted] = registration ? [] : await deletedLiveRegistrations(db, user.id, dateDaysAgo(30), registrationId);
     if (deleted) {
       throw new HttpError(410, 'Turnier wurde vom Veranstalter gelöscht', { code: 'tournament_deleted', tournamentName: deleted.tournament.name });
@@ -6624,7 +6630,7 @@ export async function findLiveRegistrationByToken(db, token) {
     ? await db.prepare(`SELECT r.*, t.live_view_enabled FROM registrations r
         JOIN tournaments t ON t.id = r.tournament_id WHERE r.live_token_hash = ?`).bind(await sha256Hex(trimmed)).first()
     : null;
-  if (!registration || registration.status === 'cancelled' || !isLiveViewEnabled(registration)) {
+  if (!registration || !ACTIVE_REGISTRATION_STATUSES.includes(registration.status) || !isLiveViewEnabled(registration)) {
     throw new HttpError(404, 'Dieser Live-Link ist ungültig oder abgelaufen');
   }
   return registration;
@@ -6829,7 +6835,7 @@ async function cancelRegistrationByToken(request, env) {
     throw new HttpError(404, 'Anmeldung nicht gefunden');
   }
 
-  if (registration.status === 'cancelled') {
+  if (registration.status === 'cancelled' || registration.status === 'rejected') {
     return json({ registration: toPublicRegistration(registration) });
   }
 
@@ -7081,6 +7087,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
     body.email = isPlaceholderEmail(existing.email) ? existing.email : createPlaceholderEmail();
   }
   const registration = normalizeRegistrationInput(body, { requireStatus: true, allowPlaceholder: true });
+  assertNotRejectedByStatusEdit(existing.status, registration.status);
   assertCorePartnerCountMatchesFormation(existing, registration);
   const feeSelections = resolveFeeSelections(existing, body.feeSelections, registration, existing);
   const registrationAnswers = resolveRegistrationAnswers(existing, body.registrationAnswers, registration, existing);
@@ -7088,6 +7095,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
   await assertNoDuplicateTeamName(db, existing.tournament_id, registration.teamName, existing.id);
   const now = new Date().toISOString();
   const confirmedAt = registration.status === 'confirmed' ? existing.confirmed_at || now : null;
+  const keepsRejection = registration.status === 'rejected';
   assertCompositionEditable(existing, registration);
   const accountLinks = await resolveRegistrationUserIds(db, registration, { registrationId: existing.id });
   // Gleiche Person: Verknüpfung bleibt, auch bei korrigierter E-Mail (KP-11). Andere Person: neu über die Slot-E-Mail
@@ -7109,7 +7117,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
            partner_first_name = ?, partner_last_name = ?, partner_email = ?, partner_club = ?, partner_license_nr = ?,
            partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?, partner2_club = ?, partner2_license_nr = ?,
            team_name = ?, seeding_position = ?, status = ?, is_vip = ?, fee_selections = ?, registration_answers = ?, confirmed_at = ?, updated_at = ?,
-           user_id = ?, partner_user_id = ?, partner2_user_id = ?
+           user_id = ?, partner_user_id = ?, partner2_user_id = ?, rejection_reason = ?, rejected_at = ?, rejected_by = ?
        WHERE id = ?`,
     )
     .bind(
@@ -7140,6 +7148,9 @@ export async function updateRegistration(request, env, existing, actingUser = nu
       userId,
       partnerUserId,
       partner2UserId,
+      keepsRejection ? existing.rejection_reason : null,
+      keepsRejection ? existing.rejected_at : null,
+      keepsRejection ? existing.rejected_by : null,
       existing.id,
     )
     .run();
@@ -7162,6 +7173,14 @@ export async function updateRegistration(request, env, existing, actingUser = nu
     }
   }
   return json({ registration: toManagedRegistration(updated) });
+}
+
+// Abgelehnt wird nur über POST /api/registrations/:id/reject: Nur dort entstehen Grund, Zeitpunkt, Bearbeiter und die
+// Mitteilung an das Team. Verlässt eine Meldung den Status wieder, werden diese Angaben bei der Statusänderung geleert.
+function assertNotRejectedByStatusEdit(previousStatus, nextStatus) {
+  if (nextStatus === 'rejected' && previousStatus !== 'rejected') {
+    throw new HttpError(400, 'Eine Anmeldung kann nur über die Ablehnen-Funktion abgelehnt werden');
+  }
 }
 
 export async function rejectRegistration(request, env, existing, actingUser) {
@@ -7783,11 +7802,17 @@ async function syncPostResults(request, env, tournamentId) {
       previousById.set(row.id, row);
     }
   }
+  for (const entry of parsed) {
+    if (entry.status !== null) assertNotRejectedByStatusEdit(previousById.get(entry.id)?.status, entry.status);
+  }
 
   const updateStatement = db.prepare(
     `UPDATE registrations
      SET status = COALESCE(?, status),
          confirmed_at = CASE WHEN ? = 'confirmed' THEN COALESCE(confirmed_at, ?) WHEN ? IS NOT NULL THEN NULL ELSE confirmed_at END,
+         rejection_reason = CASE WHEN COALESCE(?, status) = 'rejected' THEN rejection_reason END,
+         rejected_at = CASE WHEN COALESCE(?, status) = 'rejected' THEN rejected_at END,
+         rejected_by = CASE WHEN COALESCE(?, status) = 'rejected' THEN rejected_by END,
          seeding_position = ?, participation = COALESCE(?, participation), execution_revision = execution_revision + 1, updated_at = ?
      WHERE id = ? AND tournament_id = ? AND (? IS NULL OR execution_revision = ?)`,
   );
@@ -7804,7 +7829,8 @@ async function syncPostResults(request, env, tournamentId) {
         (SELECT COUNT(*) FROM registrations WHERE tournament_id = ? AND updated_at = ? AND id IN (${placeholders(ids)}))))
       END`;
   return {
-    statements: parsed.map((entry) => updateStatement.bind(entry.status, entry.status, now, entry.status, entry.seedingPosition,
+    statements: parsed.map((entry) => updateStatement.bind(entry.status, entry.status, now, entry.status,
+      entry.status, entry.status, entry.status, entry.seedingPosition,
       entry.participation, now, entry.id, tournamentId, entry.expectedExecutionRevision, entry.expectedExecutionRevision)),
     response: { sql: responseSql, binds: [tournamentId, now, ...expectedIds, expectedIds.length, tournamentId, now, ...ids] },
     async afterCommit(envelope) {
@@ -9594,7 +9620,7 @@ async function assertNoDuplicateTeamName(db, tournamentId, teamName, excludeId) 
   const existing = await db
     .prepare(
       `SELECT id FROM registrations
-       WHERE tournament_id = ? AND status != 'cancelled' AND LOWER(TRIM(team_name)) = LOWER(TRIM(?))
+       WHERE tournament_id = ? AND status IN ${ACTIVE_REGISTRATION_STATUSES_SQL} AND LOWER(TRIM(team_name)) = LOWER(TRIM(?))
        ${excludeId ? 'AND id != ?' : ''}
        LIMIT 1`,
     )

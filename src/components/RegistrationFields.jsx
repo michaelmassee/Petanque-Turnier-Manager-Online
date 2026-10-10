@@ -178,7 +178,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
           </label>
           <div className="form-grid">
             <TextField label={t('Setzposition')} type="number" min="0" value={form.seedingPosition} onChange={(seedingPosition) => setForm({ ...form, seedingPosition })} />
-            <SelectField label={t('Status')} value={form.status} onChange={(status) => setForm({ ...form, status })} options={translatedOptions(REGISTRATION_STATUSES)} />
+            <SelectField label={t('Status')} value={form.status} onChange={(status) => setForm({ ...form, status })} options={translatedOptions(REGISTRATION_STATUSES.filter((option) => option.value !== 'rejected' || form.status === 'rejected'))} />
           </div>
           <label className="checkbox-field">
             <input

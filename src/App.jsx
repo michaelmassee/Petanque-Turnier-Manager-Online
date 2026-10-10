@@ -152,6 +152,12 @@ function AppContent() {
   const sessionExpiryHandled = useRef(false);
 
   useEffect(() => { void pruneExpiredFlyerDesigns().catch(() => {}); }, []);
+  // Die Freigabe-Ansicht gilt nur für den Sprung aus der Postbox; ein anderes Turnier oder ein anderer Tab beendet sie.
+  useEffect(() => {
+    if (approvalInboxTournamentId && (activeTab !== 'registrations' || selectedTournamentId !== approvalInboxTournamentId)) {
+      setApprovalInboxTournamentId('');
+    }
+  }, [activeTab, selectedTournamentId, approvalInboxTournamentId]);
 
   function setMessage(text) {
     setMessageState(text);
