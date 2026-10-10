@@ -744,7 +744,7 @@ function AppContent() {
     if (message.kind === 'direct' && !message.mine && message.senderId) {
       setPostboxRecipientId(message.senderId);
     }
-    if (message.eventType === 'saved_search_new_matches' && message.eventData?.tournamentId) {
+    if (message.kind === 'system' && message.eventData?.tournamentId) {
       setPostboxOpen(false);
       navigate(`/turniere/${message.eventData.tournamentId}`);
     }

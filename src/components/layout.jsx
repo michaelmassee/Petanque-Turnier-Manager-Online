@@ -189,7 +189,8 @@ function postboxMessageText(message, t) {
     return data.automatic ? `${status}\n${t('Automatisch beendet, da der Turnierbeginn mehr als 48 Stunden zurückliegt.')}` : status;
   }
   if (message.eventType === 'registration_status_changed') {
-    const status = `${data.tournamentName}: ${t('registrationFor').replace('{participant}', data.participant || '')} ${labelFor(REGISTRATION_STATUSES, data.status)}`;
+    const subject = data.ownRegistration ? t('Deine Anmeldung') : data.participant ? t('registrationFor').replace('{participant}', data.participant) : '';
+    const status = `${data.tournamentName}: ${subject ? `${subject} ` : ''}${labelFor(REGISTRATION_STATUSES, data.status)}`;
     return data.message ? `${status}\n${t('message')}: ${data.message}` : status;
   }
   if (message.eventType === 'account_status_changed') {

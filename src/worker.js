@@ -516,6 +516,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     tournamentStatus: { draft: 'Entwurf', registration: 'Anmeldung offen', running: 'Läuft', finished: 'Abgeschlossen' },
     registrationStatus: { pending: 'Offen', confirmed: 'Bestätigt', waitlist: 'Warteliste', cancelled: 'Storniert' },
     registrationFor: (participant) => `Anmeldung von ${participant}`,
+    ownRegistration: 'Deine Anmeldung',
     organizerMessage: 'Nachricht',
     accountEmailUnverified: 'E-Mail nicht bestätigt',
     accountPasswordChangeRequired: 'Passwortänderung erforderlich',
@@ -534,6 +535,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     tournamentStatus: { draft: 'Concept', registration: 'Inschrijving open', running: 'Bezig', finished: 'Afgerond' },
     registrationStatus: { pending: 'Open', confirmed: 'Bevestigd', waitlist: 'Wachtlijst', cancelled: 'Geannuleerd' },
     registrationFor: (participant) => `Aanmelding van ${participant}`,
+    ownRegistration: 'Jouw inschrijving',
     organizerMessage: 'Bericht',
     accountEmailUnverified: 'e-mail niet bevestigd',
     accountPasswordChangeRequired: 'wachtwoordwijziging vereist',
@@ -552,6 +554,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     tournamentStatus: { draft: 'Draft', registration: 'Registration open', running: 'Running', finished: 'Finished' },
     registrationStatus: { pending: 'Pending', confirmed: 'Confirmed', waitlist: 'Waitlist', cancelled: 'Cancelled' },
     registrationFor: (participant) => `Registration for ${participant}`,
+    ownRegistration: 'Your registration',
     organizerMessage: 'Message',
     accountEmailUnverified: 'email not verified',
     accountPasswordChangeRequired: 'password change required',
@@ -570,6 +573,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     tournamentStatus: { draft: 'Borrador', registration: 'Inscripción abierta', running: 'En curso', finished: 'Finalizado' },
     registrationStatus: { pending: 'Pendiente', confirmed: 'Confirmado', waitlist: 'Lista de espera', cancelled: 'Cancelado' },
     registrationFor: (participant) => `Inscripción de ${participant}`,
+    ownRegistration: 'Tu inscripción',
     organizerMessage: 'Mensaje',
     accountEmailUnverified: 'correo no verificado',
     accountPasswordChangeRequired: 'cambio de contraseña requerido',
@@ -588,6 +592,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     tournamentStatus: { draft: 'Brouillon', registration: 'Inscriptions ouvertes', running: 'En cours', finished: 'Terminé' },
     registrationStatus: { pending: 'En attente', confirmed: 'Confirmé', waitlist: "Liste d'attente", cancelled: 'Annulé' },
     registrationFor: (participant) => `Inscription de ${participant}`,
+    ownRegistration: 'Votre inscription',
     organizerMessage: 'Message',
     accountEmailUnverified: 'e-mail non confirmé',
     accountPasswordChangeRequired: 'changement de mot de passe requis',
@@ -612,7 +617,8 @@ function buildSystemNotificationPushBody(eventType, eventData, language) {
     return data.automatic ? `${status}\n${texts.tournamentAutoFinished}` : status;
   }
   if (eventType === 'registration_status_changed') {
-    const status = `${data.tournamentName}: ${texts.registrationFor(data.participant || '')} ${texts.registrationStatus[data.status] || data.status}`;
+    const subject = data.ownRegistration ? texts.ownRegistration : data.participant ? texts.registrationFor(data.participant) : '';
+    const status = `${data.tournamentName}: ${subject ? `${subject} ` : ''}${texts.registrationStatus[data.status] || data.status}`;
     return data.message ? `${status}\n${texts.organizerMessage}: ${data.message}` : status;
   }
   if (eventType === 'account_status_changed') {
@@ -1110,7 +1116,7 @@ async function finishStaleTournaments(env, now = new Date()) {
     if (!results[index]?.meta?.changes) continue;
     const row = stale[index];
     try {
-      await createSystemNotification(env, row.owner_id, 'tournament_status_changed', { tournamentName: row.name, status: 'finished', automatic: true });
+      await createSystemNotification(env, row.owner_id, 'tournament_status_changed', { tournamentId: row.id, tournamentName: row.name, status: 'finished', automatic: true });
     } catch (error) {
       console.error(`Failed to notify owner about auto-finished tournament ${row.id}`, error);
     }
@@ -2212,7 +2218,7 @@ export default {
             } catch (error) {
               console.error(`Failed to send deletion notice email for registration ${registration.id}`, error);
             }
-            await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentName: registration.name, status: 'cancelled' }, undefined, registration.owner_id);
+            await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentId: registration.tournament_id, tournamentName: registration.name, status: 'cancelled', ownRegistration: true }, undefined, registration.owner_id);
           }
           return await deleteRegistration(env.DB, registration.id);
         }
@@ -5095,9 +5101,9 @@ async function notifyTournamentPublicationChange(env, existing, updated) {
     await notifySavedSearchesForPublishedTournament(env, updated);
   }
   if (updated.status !== existing.status) {
-    await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
+    await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentId: existing.id, tournamentName: updated.name, status: updated.status });
     const participants = await participantAccountUserIds(env.DB, existing.id, existing.owner_id);
-    await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
+    await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentId: existing.id, tournamentName: updated.name, status: updated.status })));
   }
 }
 
@@ -5168,9 +5174,9 @@ async function notifyTournamentStarted(env, existing, updated) {
   if (isNewlyPublicTournament(existing, updated)) {
     await notifySavedSearchesForPublishedTournament(env, updated);
   }
-  await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status });
+  await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentId: existing.id, tournamentName: updated.name, status: updated.status });
   const participants = await participantAccountUserIds(env.DB, existing.id, existing.owner_id);
-  await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentName: updated.name, status: updated.status })));
+  await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentId: existing.id, tournamentName: updated.name, status: updated.status })));
 }
 
 async function startTournament(env, existing, user, appOrigin) {
@@ -5936,8 +5942,8 @@ async function confirmPendingRegistrations(env, tournament, appOrigin) {
   const confirmedRegistrations = registrations.filter((registration, index) => Number(updateResults[index]?.meta?.changes || 0) > 0);
 
   for (const registration of confirmedRegistrations) {
-    await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', { tournamentName: tournament.name, status: 'confirmed', participant: `${registration.first_name} ${registration.last_name}` });
-    await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentName: tournament.name, status: 'confirmed' }, undefined, tournament.owner_id);
+    await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', { tournamentId: tournament.id, tournamentName: tournament.name, status: 'confirmed', participant: `${registration.first_name} ${registration.last_name}` });
+    await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentId: tournament.id, tournamentName: tournament.name, status: 'confirmed', ownRegistration: true }, undefined, tournament.owner_id);
     try {
       await sendRegistrationConfirmationEmail(env, tournament, registration, appOrigin);
     } catch (error) {
@@ -6923,12 +6929,12 @@ export async function createRegistration(request, env, tournament, {
   await notifySlotLinks(env, links);
   if (!syncBootstrap) {
     await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', {
-      tournamentName: tournament.name,
+      tournamentId: tournament.id, tournamentName: tournament.name,
       status: created.status,
       participant: `${created.first_name} ${created.last_name}`,
       ...(organizerMessage ? { message: organizerMessage } : {}),
     });
-    await notifyUserByEmail(env, created.email, 'registration_status_changed', { tournamentName: tournament.name, status: created.status }, undefined, tournament.owner_id);
+    await notifyUserByEmail(env, created.email, 'registration_status_changed', { tournamentId: tournament.id, tournamentName: tournament.name, status: created.status, ownRegistration: true }, undefined, tournament.owner_id);
     if (displacedId) {
       const displaced = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(displacedId).first();
       try {
@@ -7113,8 +7119,8 @@ export async function updateRegistration(request, env, existing, actingUser = nu
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
   await auditRegistrationEdit(env, existing, updated, actingUser);
   if (updated.status !== existing.status) {
-    await createSystemNotification(env, existing.owner_id, 'registration_status_changed', { tournamentName: existing.name, status: updated.status, participant: `${updated.first_name} ${updated.last_name}` });
-    await notifyUserByEmail(env, updated.email, 'registration_status_changed', { tournamentName: existing.name, status: updated.status }, undefined, existing.owner_id);
+    await createSystemNotification(env, existing.owner_id, 'registration_status_changed', { tournamentId: existing.tournament_id, tournamentName: existing.name, status: updated.status, participant: `${updated.first_name} ${updated.last_name}` });
+    await notifyUserByEmail(env, updated.email, 'registration_status_changed', { tournamentId: existing.tournament_id, tournamentName: existing.name, status: updated.status, ownRegistration: true }, undefined, existing.owner_id);
     if (existing.status !== 'confirmed' && updated.status === 'confirmed') {
       try {
         await sendRegistrationConfirmationEmail(env, { ...existing, id: existing.tournament_id }, updated, new URL(request.url).origin);
@@ -7750,8 +7756,8 @@ async function syncPostResults(request, env, tournamentId) {
       for (const entry of parsed) {
         const previous = previousById.get(entry.id);
         if (!previous || previous.status === entry.status || entry.notify !== true) continue;
-        await createSystemNotification(env, previous.owner_id, 'registration_status_changed', { tournamentName: previous.name, status: entry.status, participant: `${previous.first_name} ${previous.last_name}` });
-        await notifyUserByEmail(env, previous.email, 'registration_status_changed', { tournamentName: previous.name, status: entry.status }, undefined, previous.owner_id);
+        await createSystemNotification(env, previous.owner_id, 'registration_status_changed', { tournamentId, tournamentName: previous.name, status: entry.status, participant: `${previous.first_name} ${previous.last_name}` });
+        await notifyUserByEmail(env, previous.email, 'registration_status_changed', { tournamentId, tournamentName: previous.name, status: entry.status, ownRegistration: true }, undefined, previous.owner_id);
         if (previous.status !== 'confirmed' && entry.status === 'confirmed') {
           try {
             await sendRegistrationConfirmationEmail(env, { ...previous, id: tournamentId }, previous, APP_ORIGIN);

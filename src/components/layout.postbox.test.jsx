@@ -61,6 +61,22 @@ describe('Postbox-Nachricht mit Link', () => {
   });
 });
 
+describe('Statusmeldungen zur Anmeldung', () => {
+  it('nennt bei der eigenen Anmeldung keinen leeren Teilnehmernamen und bleibt anklickbar', () => {
+    const onRead = vi.fn();
+    const message = {
+      id: 'm-status', kind: 'system', eventType: 'registration_status_changed',
+      eventData: { tournamentId: 't1', tournamentName: 'Sonntag Chill Kill Turnier', status: 'pending', ownRegistration: true },
+      createdAt: '2026-10-10T08:56:21Z', readAt: null, mine: false,
+    };
+    renderPostbox({ messages: [message], onRead });
+
+    expect(screen.getByText('Sonntag Chill Kill Turnier: Deine Anmeldung Offen')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Statusmeldung' }));
+    expect(onRead).toHaveBeenCalledWith(message);
+  });
+});
+
 describe('Links in Postbox-Nachrichten', () => {
   it('navigiert bei eigenen Links in der App und lässt externe Links normal öffnen', () => {
     const onNavigate = vi.fn();
