@@ -138,6 +138,7 @@ function AppContent() {
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState('');
   const [pendingRegistrationsFilter, setPendingRegistrationsFilter] = useState('');
+  const [approvalInboxTournamentId, setApprovalInboxTournamentId] = useState('');
   const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
   const [authForm, setAuthForm] = useState(EMPTY_AUTH_FORM);
   const [registrationForm, setRegistrationForm] = useState(EMPTY_REGISTRATION_FORM);
@@ -744,7 +745,14 @@ function AppContent() {
     if (message.kind === 'direct' && !message.mine && message.senderId) {
       setPostboxRecipientId(message.senderId);
     }
-    if (message.kind === 'system' && message.eventData?.tournamentId) {
+    if (message.eventType === 'registration_status_changed' && message.eventData?.tournamentId && !message.eventData?.ownRegistration
+      && tournaments.some((tournament) => tournament.id === message.eventData.tournamentId && tournament.canManage)) {
+      setSelectedTournamentId(message.eventData.tournamentId);
+      setApprovalInboxTournamentId(message.eventData.tournamentId);
+      setActiveTab('registrations');
+      setPostboxOpen(false);
+      if (path !== '/') navigate('/');
+    } else if (message.kind === 'system' && message.eventData?.tournamentId) {
       setPostboxOpen(false);
       navigate(`/turniere/${message.eventData.tournamentId}`);
     }
@@ -2048,6 +2056,8 @@ function AppContent() {
               language={language}
               initialStatusFilter={pendingRegistrationsFilter}
               onInitialStatusFilterConsumed={() => setPendingRegistrationsFilter('')}
+              approvalInboxActive={approvalInboxTournamentId === selectedTournamentId}
+              onExitApprovalInbox={() => setApprovalInboxTournamentId('')}
               currentUserId={currentUser?.id}
               clubNames={publishedClubNames}
             />

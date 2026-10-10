@@ -61,6 +61,7 @@ export const REGISTRATION_STATUSES = [
   { value: 'confirmed', label: 'Bestätigt' },
   { value: 'waitlist', label: 'Warteliste' },
   { value: 'cancelled', label: 'Storniert' },
+  { value: 'rejected', label: 'Abgelehnt' },
 ];
 
 // Teilnahme nach dem Check-in, getrennt vom Anmeldestatus (analog Aktiv-Spalte der Meldeliste).

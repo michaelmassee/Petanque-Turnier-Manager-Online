@@ -2431,7 +2431,8 @@ a.left-panel-link {
 }
 
 .status-finished,
-.registration-cancelled {
+.registration-cancelled,
+.registration-rejected {
   background: #ffecec;
   color: #9d2424;
 }

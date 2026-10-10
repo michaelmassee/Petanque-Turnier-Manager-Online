@@ -4,7 +4,7 @@ import { authenticatedApi } from '../lib/api.js';
 import { EMPTY_REGISTRATION_FORM, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { isCalendarEntry, labelFor, registrationPayload, translatedOptions } from '../lib/domain.js';
 import { filterRegistrations } from '../frontend-core.js';
-import { Feedback, Button, ListToolbar, EditDialog, AccountBadge } from '../components/ui.jsx';
+import { Feedback, Button, ListToolbar, EditDialog, AccountBadge, TextArea } from '../components/ui.jsx';
 import { RegistrationFields } from '../components/RegistrationFields.jsx';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { formatMoney } from '../lib/format.js';
@@ -211,10 +211,11 @@ function RegistrationDetails({ registration, tournament }) {
       .filter(Boolean),
   })).filter((question) => question.participants.length > 0);
   const hasMessage = Boolean(registration.organizerMessage);
+  const hasRejectionReason = Boolean(registration.rejectionReason);
   const hasFees = registration.feeSelections?.length > 0;
   const hasAnswers = answersByQuestion.length > 0;
 
-  if (!hasMessage && !hasFees && !hasAnswers) return null;
+  if (!hasMessage && !hasRejectionReason && !hasFees && !hasAnswers) return null;
 
   return (
     <details className="registration-details">
@@ -224,6 +225,12 @@ function RegistrationDetails({ registration, tournament }) {
           <section>
             <h4>{t('Nachricht an die Turnierleitung')}</h4>
             <p data-i18n-skip>{registration.organizerMessage}</p>
+          </section>
+        )}
+        {hasRejectionReason && (
+          <section>
+            <h4>{t('Ablehnungsgrund')}</h4>
+            <p data-i18n-skip>{registration.rejectionReason}</p>
           </section>
         )}
         {hasFees && (
@@ -255,7 +262,7 @@ function RegistrationDetails({ registration, tournament }) {
   );
 }
 
-function RegistrationRow({ registration, tournament, showConfirm = false, busy, busyOther, onConfirm, onEdit, onMessage, onDelete }) {
+function RegistrationRow({ registration, tournament, showConfirm = false, showReject = false, busy, busyOther, onConfirm, onReject, onEdit, onMessage, onDelete }) {
   const { t } = useTranslation();
   return (
     <article className="data-row">
@@ -307,6 +314,7 @@ function RegistrationRow({ registration, tournament, showConfirm = false, busy, 
             {t('Bestätigen')}
           </Button>
         )}
+        {showReject && <Button variant="danger" disabled={Boolean(busyOther)} onClick={() => onReject(registration)}>{t('Ablehnen')}</Button>}
         <Button variant="secondary" disabled={Boolean(busy)} onClick={() => onEdit(registration)}>{t('Bearbeiten')}</Button>
         <Button variant="secondary" disabled={Boolean(busy)} onClick={() => onMessage(registration)}>{t('Nachricht an Team')}</Button>
         <Button variant="danger" loading={busy === `delete-${registration.id}`} disabled={Boolean(busyOther)} onClick={() => onDelete(registration)}>{t('Löschen')}</Button>
@@ -430,6 +438,9 @@ export function RegistrationsPanel({
   onMessage,
   onConfirm,
   onConfirmAll,
+  onReject,
+  approvalInboxActive = false,
+  onExitApprovalInbox,
   onDelete,
   busyId,
   message,
@@ -453,6 +464,26 @@ export function RegistrationsPanel({
   function rowProps(registration) {
     const busy = busyId === `confirm-${registration.id}` ? `confirm-${registration.id}` : busyId === `delete-${registration.id}` ? `delete-${registration.id}` : '';
     return { busy, busyOther: Boolean(busyId) && !busy };
+  }
+
+  if (approvalInboxActive) {
+    return (
+      <div className="panel approval-inbox">
+        <div className="section-title">
+          <div><h2>{t('Anmeldungen genehmigen')}</h2><p className="muted" data-i18n-skip>{tournament?.name}</p></div>
+          <Button variant="secondary" onClick={onExitApprovalInbox}>{t('Alle Anmeldungen anzeigen')}</Button>
+        </div>
+        <Feedback message={message} />
+        <Feedback error={error} />
+        {pendingRegistrations.length === 0 ? <p className="muted">{t('Keine offenen Anmeldungen.')}</p> : (
+          <section className="user-list" aria-label={t('Offene Anmeldungen')}>
+            <div className="section-title"><h3>{t('Offene Anmeldungen')}</h3><span className="counter">{pendingRegistrations.length}</span><Button loading={busyId === 'confirmAll'} disabled={Boolean(busyId) && busyId !== 'confirmAll'} onClick={onConfirmAll}>{t('Alle bestätigen')}</Button></div>
+            {visiblePendingRegistrations.items.map((registration) => <RegistrationRow key={registration.id} registration={registration} tournament={tournament} showConfirm showReject onConfirm={onConfirm} onReject={onReject} onEdit={onEdit} onMessage={onMessage} onDelete={onDelete} {...rowProps(registration)} />)}
+            <InfiniteListLoadMore hasMore={visiblePendingRegistrations.hasMore} onLoadMore={visiblePendingRegistrations.loadMore} label={t('Weitere Einträge laden')} />
+          </section>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -550,6 +581,8 @@ export function RegistrationsManagementPage({
   language,
   initialStatusFilter = '',
   onInitialStatusFilterConsumed,
+  approvalInboxActive = false,
+  onExitApprovalInbox,
   currentUserId,
   clubNames,
 }) {
@@ -569,6 +602,8 @@ export function RegistrationsManagementPage({
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState('');
   const [messageRegistration, setMessageRegistration] = useState(null);
+  const [rejectionRegistration, setRejectionRegistration] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const manageableTournaments = useMemo(
     () => tournaments.filter((item) => item.canManage && !isCalendarEntry(item)),
@@ -707,6 +742,18 @@ export function RegistrationsManagementPage({
     } catch (err) { setError(err.message); } finally { setBusyId(''); }
   }
 
+  async function handleReject() {
+    if (!rejectionRegistration) return;
+    setError(''); setMessage(''); setBusyId(`reject-${rejectionRegistration.id}`);
+    try {
+      await authenticatedApi(`/api/registrations/${rejectionRegistration.id}/reject`, { method: 'POST', body: JSON.stringify({ reason: rejectionReason }) });
+      setMessage(t('Anmeldung wurde abgelehnt.'));
+      setRejectionRegistration(null); setRejectionReason('');
+      await load(rejectionRegistration.tournamentId);
+      onTournamentsChanged?.();
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+  }
+
   // "Konto neu zuordnen" (KP-11): einziger Weg, das Konto eines bereits verknüpften Slots zu wechseln.
   async function handleRelink(registration, slot) {
     setError(''); setMessage('');
@@ -773,12 +820,22 @@ export function RegistrationsManagementPage({
         onMessage={openTeamMessage}
         onConfirm={handleConfirm}
         onConfirmAll={handleConfirmAll}
+        onReject={(registration) => { setRejectionRegistration(registration); setRejectionReason(''); }}
+        approvalInboxActive={approvalInboxActive}
+        onExitApprovalInbox={onExitApprovalInbox}
         onDelete={handleDelete}
         busyId={busyId}
         message={message}
         error={error}
         currentUserId={currentUserId}
       />
+      <EditDialog open={Boolean(rejectionRegistration)} title={t('Anmeldung ablehnen')} onClose={() => setRejectionRegistration(null)}>
+        <div className="form dense">
+          <p className="hint">{t('Der Grund ist optional und wird nur dem betroffenen Team mitgeteilt.')}</p>
+          <TextArea label={t('Ablehnungsgrund')} value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} maxLength={500} />
+          <div className="dialog-actions"><Button variant="secondary" onClick={() => setRejectionRegistration(null)}>{t('Abbrechen')}</Button><Button variant="danger" loading={busyId === `reject-${rejectionRegistration?.id}`} onClick={handleReject}>{t('Ablehnen')}</Button></div>
+        </div>
+      </EditDialog>
 
       <EditDialog
         open={dialogOpen}

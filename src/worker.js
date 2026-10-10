@@ -71,7 +71,7 @@ const REGISTRATION_TYPES = ['supermelee', 'melee', 'forme'];
 const TOURNAMENT_STATUSES = ['draft', 'registration', 'running', 'finished'];
 const VISIBILITIES = ['public', 'private'];
 // Anmeldestatus (online verwaltet) - bewusst getrennt von der Teilnahme nach dem Check-in.
-const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist'];
+const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist', 'rejected'];
 const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
 const SESSION_COOKIE = 'ptm_session';
 const sessionRefreshes = new WeakMap();
@@ -269,6 +269,14 @@ export const REGISTRATION_RECEIVED_EMAILS = {
     text: (firstName, name, link, cancelLink, participantsBlock = '') =>
       `Bonjour ${firstName},\n\nton inscription pour « ${name} » a bien été reçue.${participantsBlock}\n\nL’organisateur du tournoi doit encore confirmer ton inscription. Tu recevras un autre e-mail dès que ta participation sera confirmée.\n\nToutes les informations sur le tournoi :\n${link}\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
   },
+};
+
+const REGISTRATION_REJECTION_EMAILS = {
+  de: { subject: (name) => `Anmeldung abgelehnt: ${name}`, text: (firstName, name, link, reason) => `Hallo ${firstName},\n\ndeine Anmeldung für "${name}" wurde leider abgelehnt.${reason ? `\n\nGrund der Turnierleitung:\n${reason}` : ''}\n\nAlle Infos zum Turnier:\n${link}` },
+  nl: { subject: (name) => `Inschrijving afgewezen: ${name}`, text: (firstName, name, link, reason) => `Hallo ${firstName},\n\nje inschrijving voor "${name}" is afgewezen.${reason ? `\n\nReden van de toernooiorganisator:\n${reason}` : ''}\n\nAlle informatie over het toernooi:\n${link}` },
+  en: { subject: (name) => `Registration rejected: ${name}`, text: (firstName, name, link, reason) => `Hi ${firstName},\n\nyour registration for "${name}" was rejected.${reason ? `\n\nReason from the tournament organizer:\n${reason}` : ''}\n\nAll tournament details:\n${link}` },
+  es: { subject: (name) => `Inscripción rechazada: ${name}`, text: (firstName, name, link, reason) => `Hola ${firstName},\n\ntu inscripción para "${name}" fue rechazada.${reason ? `\n\nMotivo del organizador del torneo:\n${reason}` : ''}\n\nToda la información del torneo:\n${link}` },
+  fr: { subject: (name) => `Inscription refusée : ${name}`, text: (firstName, name, link, reason) => `Bonjour ${firstName},\n\nton inscription à « ${name} » a été refusée.${reason ? `\n\nMotif de l’organisateur :\n${reason}` : ''}\n\nToutes les informations sur le tournoi :\n${link}` },
 };
 
 export const REGISTRATION_CONFIRMATION_EMAILS = {
@@ -514,7 +522,7 @@ const TEAM_MESSAGE_EMAILS = {
 const SYSTEM_NOTIFICATION_TEXTS = {
   de: {
     tournamentStatus: { draft: 'Entwurf', registration: 'Anmeldung offen', running: 'Läuft', finished: 'Abgeschlossen' },
-    registrationStatus: { pending: 'Offen', confirmed: 'Bestätigt', waitlist: 'Warteliste', cancelled: 'Storniert' },
+    registrationStatus: { pending: 'Offen', confirmed: 'Bestätigt', waitlist: 'Warteliste', cancelled: 'Storniert', rejected: 'Abgelehnt' },
     registrationFor: (participant) => `Anmeldung von ${participant}`,
     ownRegistration: 'Deine Anmeldung',
     organizerMessage: 'Nachricht',
@@ -533,7 +541,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   nl: {
     tournamentStatus: { draft: 'Concept', registration: 'Inschrijving open', running: 'Bezig', finished: 'Afgerond' },
-    registrationStatus: { pending: 'Open', confirmed: 'Bevestigd', waitlist: 'Wachtlijst', cancelled: 'Geannuleerd' },
+    registrationStatus: { pending: 'Open', confirmed: 'Bevestigd', waitlist: 'Wachtlijst', cancelled: 'Geannuleerd', rejected: 'Afgewezen' },
     registrationFor: (participant) => `Aanmelding van ${participant}`,
     ownRegistration: 'Jouw inschrijving',
     organizerMessage: 'Bericht',
@@ -552,7 +560,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   en: {
     tournamentStatus: { draft: 'Draft', registration: 'Registration open', running: 'Running', finished: 'Finished' },
-    registrationStatus: { pending: 'Pending', confirmed: 'Confirmed', waitlist: 'Waitlist', cancelled: 'Cancelled' },
+    registrationStatus: { pending: 'Pending', confirmed: 'Confirmed', waitlist: 'Waitlist', cancelled: 'Cancelled', rejected: 'Rejected' },
     registrationFor: (participant) => `Registration for ${participant}`,
     ownRegistration: 'Your registration',
     organizerMessage: 'Message',
@@ -571,7 +579,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   es: {
     tournamentStatus: { draft: 'Borrador', registration: 'Inscripción abierta', running: 'En curso', finished: 'Finalizado' },
-    registrationStatus: { pending: 'Pendiente', confirmed: 'Confirmado', waitlist: 'Lista de espera', cancelled: 'Cancelado' },
+    registrationStatus: { pending: 'Pendiente', confirmed: 'Confirmado', waitlist: 'Lista de espera', cancelled: 'Cancelado', rejected: 'Rechazado' },
     registrationFor: (participant) => `Inscripción de ${participant}`,
     ownRegistration: 'Tu inscripción',
     organizerMessage: 'Mensaje',
@@ -590,7 +598,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
   },
   fr: {
     tournamentStatus: { draft: 'Brouillon', registration: 'Inscriptions ouvertes', running: 'En cours', finished: 'Terminé' },
-    registrationStatus: { pending: 'En attente', confirmed: 'Confirmé', waitlist: "Liste d'attente", cancelled: 'Annulé' },
+    registrationStatus: { pending: 'En attente', confirmed: 'Confirmé', waitlist: "Liste d'attente", cancelled: 'Annulé', rejected: 'Refusé' },
     registrationFor: (participant) => `Inscription de ${participant}`,
     ownRegistration: 'Votre inscription',
     organizerMessage: 'Message',
@@ -1013,6 +1021,20 @@ async function sendRegistrationReceivedEmail(env, tournament, registration, appO
       logFallback: `Registration received email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `registration receipt for registration ${registration.id}`,
       allowLogFallback: true,
+    });
+  }
+}
+
+async function sendRegistrationRejectionEmail(env, tournament, registration, appOrigin, reason) {
+  if (!(await canSendTournamentMail(env.DB, tournament))) return;
+  const language = await resolveEmailLanguage(env.DB, tournament, registration);
+  const templates = REGISTRATION_REJECTION_EMAILS[language] || REGISTRATION_REJECTION_EMAILS.de;
+  const link = `${appOrigin}/turniere/${tournament.id}/info`;
+  for (const recipient of buildTeamRecipients(registration)) {
+    await enqueueTransactionalEmail(env, {
+      to: recipient.email, subject: templates.subject(tournament.name), text: templates.text(recipient.firstName, tournament.name, link, reason), language,
+      logFallback: `Registration rejection email for ${recipient.email} (tournament ${tournament.id})`,
+      failureContext: `registration rejection for registration ${registration.id}`, allowLogFallback: true,
     });
   }
 }
@@ -2195,6 +2217,16 @@ export default {
         if (!registration) throw new HttpError(404, 'Anmeldung nicht gefunden');
         assertCanManageTournament(registration, auth.user);
         return await relinkRegistrationSlot(env, registration, Number(registrationRelinkMatch[2]), auth.user);
+      }
+
+      const registrationRejectMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/reject$/);
+      if (registrationRejectMatch && request.method === 'POST') {
+        const auth = await requireManagerAuth(request, env.DB);
+        const registration = await getRegistrationWithTournament(env.DB, registrationRejectMatch[1]);
+        if (!registration) throw new HttpError(404, 'Anmeldung nicht gefunden');
+        assertCanManageTournament(registration, auth.user);
+        assertRegistrationOnlineEditable(registration);
+        return await rejectRegistration(request, env, registration, auth.user);
       }
 
       const registrationMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)$/);
@@ -7132,6 +7164,32 @@ export async function updateRegistration(request, env, existing, actingUser = nu
   return json({ registration: toManagedRegistration(updated) });
 }
 
+export async function rejectRegistration(request, env, existing, actingUser) {
+  if (existing.status !== 'pending') throw new HttpError(409, 'Nur offene Anmeldungen können abgelehnt werden');
+  const body = await readJson(request);
+  const reason = nullableText(body.reason);
+  if (reason && reason.length > 500) throw new HttpError(400, 'Der Ablehnungsgrund darf maximal 500 Zeichen enthalten.');
+  const now = new Date().toISOString();
+  await env.DB.prepare(`UPDATE registrations
+      SET status = 'rejected', rejection_reason = ?, rejected_at = ?, rejected_by = ?, participation = 'inactive', updated_at = ?
+      WHERE id = ? AND status = 'pending'`)
+    .bind(reason, now, actingUser.id, now, existing.id).run();
+  const updated = await env.DB.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
+  if (!updated || updated.status !== 'rejected') throw new HttpError(409, 'Die Anmeldung wurde bereits bearbeitet');
+  await auditRegistrationEdit(env, existing, updated, actingUser);
+  const event = { tournamentId: existing.tournament_id, tournamentName: existing.name, status: 'rejected', ownRegistration: true, ...(reason ? { reason } : {}) };
+  await createSystemNotification(env, existing.owner_id, 'registration_status_changed', {
+    tournamentId: existing.tournament_id, tournamentName: existing.name, status: 'rejected', participant: `${existing.first_name} ${existing.last_name}`,
+  });
+  await notifyUserByEmail(env, updated.email, 'registration_status_changed', event, undefined, existing.owner_id);
+  try {
+    await sendRegistrationRejectionEmail(env, { ...existing, id: existing.tournament_id }, updated, new URL(request.url).origin, reason);
+  } catch (error) {
+    console.error(`Failed to send registration rejection email for registration ${updated.id}`, error);
+  }
+  return json({ registration: toManagedRegistration(updated) });
+}
+
 /**
  * Manuelle Online-Änderungen der Besetzung (T-18): Ist ein PTM-Dokument verbunden, gehört die Besetzung ab
  * Anmeldeschluss bzw. `running` dem Dokument (Check-in-Änderungen nur in PTM). Ohne Dokument bleibt die Weboberfläche
@@ -9925,6 +9983,8 @@ function toManagedRegistration(row) {
     partnerAccountConnected: Boolean(row.partner_user_id),
     partner2AccountConnected: Boolean(row.partner2_user_id),
     organizerMessage: row.organizer_message || null,
+    rejectionReason: row.rejection_reason || null,
+    rejectedAt: row.rejected_at || null,
     registrationAnswers: registrationAnswersFromRow(row),
     language: row.language || null,
     origin: row.origin || 'online',

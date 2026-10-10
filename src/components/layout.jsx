@@ -191,7 +191,8 @@ function postboxMessageText(message, t) {
   if (message.eventType === 'registration_status_changed') {
     const subject = data.ownRegistration ? t('Deine Anmeldung') : data.participant ? t('registrationFor').replace('{participant}', data.participant) : '';
     const status = `${data.tournamentName}: ${subject ? `${subject} ` : ''}${labelFor(REGISTRATION_STATUSES, data.status)}`;
-    return data.message ? `${status}\n${t('message')}: ${data.message}` : status;
+    const detail = data.reason || data.message;
+    return detail ? `${status}\n${data.reason ? t('Ablehnungsgrund') : t('message')}: ${detail}` : status;
   }
   if (message.eventType === 'account_status_changed') {
     const parts = [t('accountRoleUpdated').replace('{role}', roleName(data.role))];
