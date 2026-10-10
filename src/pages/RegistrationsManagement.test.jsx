@@ -17,7 +17,7 @@ const REGISTRATION_WITH_FEES = {
   feeTotalCents: 500,
 };
 
-function renderPanel(registrations) {
+function renderPanel(registrations, props = {}) {
   const noop = () => {};
   return render(
     <RegistrationsPanel
@@ -37,6 +37,7 @@ function renderPanel(registrations) {
       onConfirmAll={noop}
       onDelete={noop}
       busyId=""
+      {...props}
     />,
   );
 }
@@ -333,5 +334,18 @@ describe('Anmeldungsverwaltung: Nachricht an Team', () => {
     expect(screen.getByText(/Der Link zum Turnier wird mitgeschickt/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Fett' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Senden' })).toBeDisabled();
+  });
+});
+
+describe('Anmeldungsverwaltung: Ablehnen', () => {
+  it('bietet Ablehnen auch in der normalen Liste nur für offene Anmeldungen an', () => {
+    const onReject = vi.fn();
+    const pending = { id: 'r-pending', firstName: 'Otto', lastName: 'Offen', status: 'pending' };
+    renderPanel([pending, { id: 'r-confirmed', firstName: 'Bea', lastName: 'Bestätigt', status: 'confirmed' }], { onReject });
+
+    const buttons = screen.getAllByRole('button', { name: 'Ablehnen' });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    expect(onReject).toHaveBeenCalledWith(pending);
   });
 });

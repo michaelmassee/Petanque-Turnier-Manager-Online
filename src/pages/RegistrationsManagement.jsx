@@ -541,7 +541,7 @@ export function RegistrationsPanel({
             <Button loading={busyId === 'confirmAll'} disabled={Boolean(busyId) && busyId !== 'confirmAll'} onClick={onConfirmAll}>{t('Alle bestätigen')}</Button>
           </div>
           {visiblePendingRegistrations.items.map((registration) => (
-            <RegistrationRow key={registration.id} registration={registration} tournament={tournament} showConfirm onConfirm={onConfirm} onEdit={onEdit} onMessage={onMessage} onDelete={onDelete} {...rowProps(registration)} />
+            <RegistrationRow key={registration.id} registration={registration} tournament={tournament} showConfirm showReject onConfirm={onConfirm} onReject={onReject} onEdit={onEdit} onMessage={onMessage} onDelete={onDelete} {...rowProps(registration)} />
           ))}
           <InfiniteListLoadMore hasMore={visiblePendingRegistrations.hasMore} onLoadMore={visiblePendingRegistrations.loadMore} label={t('Weitere Einträge laden')} />
         </section>
