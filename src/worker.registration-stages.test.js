@@ -118,6 +118,17 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
       expect(zeilen("SELECT recipient_id FROM postbox_messages WHERE event_type = 'registration_slot_linked'")).toEqual([]);
     });
 
+    it('merkt das anmeldende Konto getrennt von den Personen-Slots für spätere Stornierungen', async () => {
+      konto('verein', 'absender@example.test');
+
+      await oeffentlichAnmelden({
+        firstName: 'Anna', lastName: 'Adler', partnerFirstName: 'Ben', partnerLastName: 'Berg',
+      }, { user: { id: 'verein', role: 'user', email: 'absender@example.test' } });
+
+      expect(zeile('SELECT registrant_user_id, user_id, partner_user_id FROM registrations'))
+        .toEqual({ registrant_user_id: 'verein', user_id: null, partner_user_id: null });
+    });
+
     it('nimmt eine zweite Anmeldung desselben Kontos an und markiert beide als Konflikt (P-29, P-68)', async () => {
       konto('x', 'x@example.test');
       anmeldung('r1', { personen: [['Xaver', 'Xander', 'x@example.test'], ['Ben', 'Berg']], userIds: ['x'] });

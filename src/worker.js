@@ -2075,7 +2075,7 @@ export default {
         if (!registration) {
           throw new HttpError(404, 'Anmeldung nicht gefunden');
         }
-        const isOwnRegistration = registration.email.toLowerCase() === session.user.email.toLowerCase();
+        const isOwnRegistration = canCancelOwnRegistration(registration, session.user);
         if (!isOwnRegistration && !canManageTournament(registration, session.user)) {
           throw new HttpError(403, 'Zugriff verweigert');
         }
@@ -5994,7 +5994,7 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
       `SELECT id, email, first_name, last_name, club, team_name,
          partner_first_name, partner_last_name, partner_club,
          partner2_first_name, partner2_last_name, partner2_club, is_vip, status,
-         over_capacity, user_id, partner_user_id, partner2_user_id
+         over_capacity, user_id, partner_user_id, partner2_user_id, registrant_user_id
        FROM registrations
        WHERE tournament_id = ? AND status IN ('pending', 'confirmed', 'waitlist')
        ORDER BY registered_at ASC`,
@@ -6003,10 +6003,10 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
     .all();
 
   const toParticipant = (row) => {
-    // Absagen darf weiterhin nur das anmeldende Kontaktkonto; Teammitglieder sehen ihre
-    // unbestätigte Meldung, können aber nicht das gesamte Team versehentlich abmelden.
-    const isRegistrant = Boolean(currentUser?.email)
-      && text(row.email).toLowerCase() === text(currentUser.email).toLowerCase();
+    // Absagen darf weiterhin nur das anmeldende Konto bzw. bei alten Meldungen
+    // das Kontaktkonto; Teammitglieder sehen ihre unbestätigte Meldung, können
+    // aber nicht das gesamte Team versehentlich abmelden.
+    const isRegistrant = canCancelOwnRegistration(row, currentUser);
     return {
       registrationId: isRegistrant ? row.id : null,
       firstName: row.first_name,
@@ -6044,6 +6044,14 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
     participants: confirmed.map(toParticipant),
     ownUnconfirmed,
   });
+}
+
+/** Only the submitting account (or legacy contact account) may cancel a team registration. */
+export function canCancelOwnRegistration(registration, user) {
+  return Boolean(user?.id) && (
+    registration.registrant_user_id === user.id
+    || registrationBelongsToEmail(registration, user.email)
+  );
 }
 
 function parseTeamIds(idsJson) {
@@ -6930,6 +6938,10 @@ export async function createRegistration(request, env, tournament, {
     organizerMessage, feeSelections, registrationAnswers, language, now, accountLinks,
     cancelToken: crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', ''),
   });
+  // Das anmeldende Konto ist bewusst getrennt von den Personen-Slots: Ein Konto
+  // kann etwa ein Team mit fremden E-Mail-Adressen anmelden und darf diese eigene
+  // Meldung später dennoch stornieren.
+  record.registrant_user_id = isManager ? null : session?.user?.id || null;
   const statusSql = `CASE WHEN ? = 0 OR capacity.used < ? THEN ? ELSE 'waitlist' END`;
   const statusBinds = [maxRegistrations, maxRegistrations, baseStatus];
   const columns = Object.keys(record);
