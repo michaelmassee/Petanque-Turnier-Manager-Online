@@ -1196,7 +1196,7 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     expect(screen.getByRole('button', { name: 'Überschrift' })).toBeInTheDocument();
   });
 
-  it('bietet die Live-Ansicht als Turnier-Option an, beim Anlegen ausgeschaltet', () => {
+  it('deaktiviert die noch nicht fertige Live-Ansicht im Turnierformular', () => {
     function LiveOptionHarness() {
       const [form, setForm] = useState({ ...EMPTY_TOURNAMENT_FORM, name: 'Sommerturnier', date: '2026-06-01', location: 'Musterstadt' });
       return <TournamentForm form={form} setForm={setForm} onSubmit={(event) => event.preventDefault()} onCancel={() => {}} mode="create" isAdmin={false} language="de" />;
@@ -1205,8 +1205,7 @@ describe('Turniere-Seite: Liste + Dialog', () => {
 
     const option = screen.getByRole('checkbox', { name: /^Live-Ansicht für Teilnehmer/ });
     expect(option).not.toBeChecked();
-    fireEvent.click(option);
-    expect(option).toBeChecked();
+    expect(option).toBeDisabled();
   });
 
   it('bietet beim Bearbeiten eines Kalendereintrags Logo- und Flyer-Bildlink an', () => {

@@ -49,6 +49,26 @@ describe('Mitspielgesuche auf der Turnierseite', () => {
     expect(navigate).toHaveBeenCalledWith('/meine-anzeigen?turnier=t-1');
   });
 
+  it('lässt angemeldete Nutzer Push-Hinweise für neue Gesuche ein- und ausschalten', async () => {
+    const fetchMock = vi.fn(async (url, options = {}) => new Response(JSON.stringify(
+      String(url).includes('player-listing-notification')
+        ? { enabled: options.method === 'PUT' }
+        : { listings: [] },
+    ), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<TournamentPlayerListings tournament={tournament} currentUser={{ id: 'u-1' }} navigate={vi.fn()} />);
+
+    const option = await screen.findByRole('checkbox', { name: 'Bei neuen Mitspielgesuchen benachrichtigen' });
+    expect(option).not.toBeChecked();
+    fireEvent.click(option);
+    await screen.findByRole('checkbox', { name: 'Bei neuen Mitspielgesuchen benachrichtigen', checked: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/tournaments/t-1/player-listing-notification',
+      expect.objectContaining({ method: 'PUT', body: JSON.stringify({ enabled: true }) }),
+    );
+  });
+
   it('zeigt Gästen die Gesuche ohne Antwort- oder Erstellmöglichkeit', async () => {
     stubListings([{ id: 'l-1', title: 'Suche Leger', playingPosition: 'leger' }]);
 

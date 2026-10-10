@@ -1037,6 +1037,7 @@
   "Kein Turnier verknüpfen": "Don't link a tournament",
   "Gesuch löschen, wenn das Turnier beendet ist": "Delete request when the tournament has finished",
   "Mitspielgesuche zu diesem Turnier": "Player requests for this tournament",
+  "Bei neuen Mitspielgesuchen benachrichtigen": "Notify me about new player requests",
   "Zu diesem Turnier gibt es noch keine Mitspielgesuche.": "There are no player requests for this tournament yet.",
   "Mitspieler für dieses Turnier suchen": "Find players for this tournament",
   "Melde dich an, um ein Mitspielgesuch zu erstellen oder zu antworten.": "Log in to create a player request or to reply.",

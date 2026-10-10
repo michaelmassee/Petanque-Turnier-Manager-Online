@@ -1774,9 +1774,18 @@ export default {
         const session = await requireSession(request, env.DB);
         return await listMyPlayerListings(env.DB, session.user.id);
       }
+      const playerListingNotificationMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/player-listing-notification$/);
+      if (playerListingNotificationMatch && request.method === 'GET') {
+        const session = await requireSession(request, env.DB);
+        return await getPlayerListingNotification(env.DB, playerListingNotificationMatch[1], session.user.id);
+      }
+      if (playerListingNotificationMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        return await updatePlayerListingNotification(request, env.DB, playerListingNotificationMatch[1], session.user.id);
+      }
       if (request.method === 'POST' && url.pathname === '/api/player-listings') {
         const session = await requireSession(request, env.DB);
-        return await createPlayerListing(request, env.DB, session.user, request.headers.get('CF-IPCountry'));
+        return await createPlayerListing(request, env, session.user, request.headers.get('CF-IPCountry'));
       }
       const playerListingMatch = url.pathname.match(/^\/api\/player-listings\/([^/]+)$/);
       if (playerListingMatch && request.method === 'PUT') {
@@ -8514,6 +8523,13 @@ async function toggleBoulePlaceLike(db, placeId, userId) {
 }
 
 const PLAYER_LISTING_LIMIT = 5;
+const PLAYER_LISTING_PUSH_TITLES = {
+  de: 'Neues Mitspielgesuch',
+  en: 'New player search',
+  nl: 'Nieuwe spelersoproep',
+  es: 'Nueva búsqueda de compañeros',
+  fr: 'Nouvelle recherche de partenaires',
+};
 
 export function toPublicPlayerListing(row, includeOwner = false) {
   return {
@@ -8602,13 +8618,59 @@ async function listAllPlayerListings(db) {
   return json({ listings: (rows.results || []).map((row) => toPublicPlayerListing(row, true)) });
 }
 
-async function createPlayerListing(request, db, user, countryCode) {
+async function getPlayerListingNotification(db, tournamentId, userId) {
+  const tournament = await db.prepare("SELECT id FROM tournaments WHERE id = ? AND visibility = 'public'").bind(tournamentId).first();
+  if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+  const subscription = await db.prepare('SELECT 1 FROM tournament_player_listing_notifications WHERE tournament_id = ? AND user_id = ?').bind(tournamentId, userId).first();
+  return json({ enabled: Boolean(subscription) });
+}
+
+async function updatePlayerListingNotification(request, db, tournamentId, userId) {
+  const tournament = await db.prepare("SELECT id FROM tournaments WHERE id = ? AND visibility = 'public'").bind(tournamentId).first();
+  if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+  const enabled = Boolean((await readJson(request)).enabled);
+  if (enabled) {
+    await db.prepare('INSERT OR IGNORE INTO tournament_player_listing_notifications (tournament_id, user_id, created_at) VALUES (?, ?, ?)').bind(tournamentId, userId, new Date().toISOString()).run();
+  } else {
+    await db.prepare('DELETE FROM tournament_player_listing_notifications WHERE tournament_id = ? AND user_id = ?').bind(tournamentId, userId).run();
+  }
+  return json({ enabled });
+}
+
+async function notifyPlayerListingSubscribers(env, tournamentId, creatorId, title) {
+  const subscribers = await env.DB.prepare(
+    `SELECT n.user_id, u.language
+     FROM tournament_player_listing_notifications n JOIN users u ON u.id = n.user_id
+     WHERE n.tournament_id = ? AND n.user_id != ?`,
+  ).bind(tournamentId, creatorId).all();
+  await Promise.all((subscribers.results || []).map(({ user_id: userId, language }) => enqueuePushNotification(env, {
+    userId,
+    payload: {
+      title: PLAYER_LISTING_PUSH_TITLES[language] || PLAYER_LISTING_PUSH_TITLES.de,
+      body: title,
+      tag: `player-listing-${tournamentId}`,
+      url: `${APP_ORIGIN}/turniere/${tournamentId}`,
+    },
+  })));
+}
+
+async function createPlayerListing(request, env, user, countryCode) {
+  const { DB: db } = env;
   const count = await db.prepare('SELECT COUNT(*) AS count FROM player_listings WHERE user_id = ?').bind(user.id).first();
   if (Number(count.count) >= PLAYER_LISTING_LIMIT) throw new HttpError(400, 'Du hast bereits die maximale Anzahl an Mitspielgesuchen erreicht');
   const input = await playerListingInput(db, await readJson(request), countryCode);
   const id = crypto.randomUUID(); const now = new Date().toISOString();
   await db.prepare('INSERT INTO player_listings (id, user_id, type, title, description, location_name, latitude, longitude, event_date, playing_position, tournament_id, delete_when_tournament_finished, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(id, user.id, input.type, input.title, input.description, input.locationName, input.latitude, input.longitude, input.eventDate, input.playingPosition, input.tournamentId, input.deleteWhenTournamentFinished, now, now).run();
+  if (input.tournamentId) {
+    try {
+      await notifyPlayerListingSubscribers(env, input.tournamentId, user.id, input.title);
+    } catch (error) {
+      // Das Gesuch ist bereits gespeichert; ein temporär gestörter Push-Queue-
+      // Versand darf die erfolgreiche Veröffentlichung nicht rückgängig machen.
+      console.error('Player listing notification dispatch failed', error);
+    }
+  }
   return json({ id }, 201);
 }
 

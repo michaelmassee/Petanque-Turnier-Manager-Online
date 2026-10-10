@@ -605,6 +605,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             <input
               type="checkbox"
               checked={Boolean(form.liveViewEnabled)}
+              disabled
               onChange={(event) => setForm({ ...form, liveViewEnabled: event.target.checked })}
             />
             {t('Live-Ansicht für Teilnehmer: persönlicher Link in der Anmeldebestätigung, Runde, Gegner, Bahn und Push bei neuer Runde')}

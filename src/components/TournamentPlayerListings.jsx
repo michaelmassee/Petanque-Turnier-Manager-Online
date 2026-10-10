@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../lib/api.js';
+import { api, authenticatedApi } from '../lib/api.js';
 import { Button, Feedback } from './ui.jsx';
 import { PlayerListingContactDialog } from './PlayerListingContactDialog.jsx';
 
@@ -15,6 +15,9 @@ export function TournamentPlayerListings({ tournament, currentUser, navigate }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [contactListing, setContactListing] = useState(null);
+  const [notifyOnNewListings, setNotifyOnNewListings] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(Boolean(currentUser));
+  const [notificationSaving, setNotificationSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -25,6 +28,35 @@ export function TournamentPlayerListings({ tournament, currentUser, navigate }) 
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [tournament.id]);
+
+  useEffect(() => {
+    let active = true;
+    if (!currentUser) {
+      setNotificationLoading(false);
+      return () => { active = false; };
+    }
+    setNotificationLoading(true);
+    authenticatedApi(`/api/tournaments/${tournament.id}/player-listing-notification`)
+      .then((data) => { if (active) setNotifyOnNewListings(Boolean(data.enabled)); })
+      .catch((err) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setNotificationLoading(false); });
+    return () => { active = false; };
+  }, [tournament.id, currentUser?.id]);
+
+  async function updateNotification(enabled) {
+    setNotificationSaving(true);
+    setError('');
+    try {
+      const data = await authenticatedApi(`/api/tournaments/${tournament.id}/player-listing-notification`, {
+        method: 'PUT', body: JSON.stringify({ enabled }),
+      });
+      setNotifyOnNewListings(Boolean(data.enabled));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setNotificationSaving(false);
+    }
+  }
 
   return (
     <section className="panel tournament-player-listings">
@@ -62,9 +94,20 @@ export function TournamentPlayerListings({ tournament, currentUser, navigate }) 
         </div>
       )}
       {currentUser ? (
-        <div className="place-actions">
-          <Button onClick={() => navigate(`/meine-anzeigen?${new URLSearchParams({ turnier: tournament.id })}`)}>{t('Mitspieler für dieses Turnier suchen')}</Button>
-        </div>
+        <>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={notifyOnNewListings}
+              disabled={notificationLoading || notificationSaving}
+              onChange={(event) => updateNotification(event.target.checked)}
+            />
+            {t('Bei neuen Mitspielgesuchen benachrichtigen')}
+          </label>
+          <div className="place-actions">
+            <Button onClick={() => navigate(`/meine-anzeigen?${new URLSearchParams({ turnier: tournament.id })}`)}>{t('Mitspieler für dieses Turnier suchen')}</Button>
+          </div>
+        </>
       ) : (
         <p className="hint">{t('Melde dich an, um ein Mitspielgesuch zu erstellen oder zu antworten.')}</p>
       )}
