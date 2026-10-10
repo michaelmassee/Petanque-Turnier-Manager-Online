@@ -4015,22 +4015,7 @@ export async function deleteUser(db, id, currentUserId, deleteTournaments) {
 async function listTournaments(db, user) {
   const rows = await db
     .prepare(
-      `SELECT tournaments.*,
-        ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
-        ${TOURNAMENT_OWNER_JSON_SUBQUERY},
-        ${TOURNAMENT_CREATOR_JSON_SUBQUERY},
-        (
-          SELECT COUNT(*)
-          FROM registrations
-          WHERE registrations.tournament_id = tournaments.id
-            AND registrations.status IN ('pending', 'confirmed')
-        ) AS active_registrations,
-        (
-          SELECT COUNT(*)
-          FROM registrations
-          WHERE registrations.tournament_id = tournaments.id
-            AND registrations.status = 'waitlist'
-        ) AS waitlist_registrations
+      `SELECT tournaments.*
        FROM tournaments
        WHERE (?1 IS NOT NULL AND ?1 = 'admin')
           OR (?2 IS NOT NULL AND (tournaments.owner_id = ?2 OR EXISTS (
@@ -4042,7 +4027,8 @@ async function listTournaments(db, user) {
     .bind(user?.role || null, user?.id || null)
     .all();
 
-  return json({ tournaments: rows.results.map((row) => toPublicTournament(row, user)) });
+  const tournaments = await withTournamentPeople(db, rows.results);
+  return json({ tournaments: tournaments.map((row) => toPublicTournament(row, user)) });
 }
 
 /**
@@ -4054,22 +4040,7 @@ async function listTournaments(db, user) {
 async function listManagedTournaments(db, user) {
   const rows = await db
     .prepare(
-      `SELECT tournaments.*,
-        ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
-        ${TOURNAMENT_OWNER_JSON_SUBQUERY},
-        ${TOURNAMENT_CREATOR_JSON_SUBQUERY},
-        (
-          SELECT COUNT(*)
-          FROM registrations
-          WHERE registrations.tournament_id = tournaments.id
-            AND registrations.status IN ('pending', 'confirmed')
-        ) AS active_registrations,
-        (
-          SELECT COUNT(*)
-          FROM registrations
-          WHERE registrations.tournament_id = tournaments.id
-            AND registrations.status = 'waitlist'
-        ) AS waitlist_registrations
+      `SELECT tournaments.*
        FROM tournaments
        WHERE (?1 = 'admin')
           OR (tournaments.owner_id = ?2 OR EXISTS (
@@ -4080,7 +4051,8 @@ async function listManagedTournaments(db, user) {
     .bind(user.role, user.id)
     .all();
 
-  return json({ tournaments: rows.results.map((row) => toPublicTournament(row, user)) });
+  const tournaments = await withTournamentPeople(db, rows.results);
+  return json({ tournaments: tournaments.map((row) => toPublicTournament(row, user)) });
 }
 
 /**
@@ -8144,19 +8116,7 @@ export async function getTournamentById(db, id) {
       `SELECT tournaments.*,
         ${TOURNAMENT_EDITORS_JSON_SUBQUERY},
         ${TOURNAMENT_OWNER_JSON_SUBQUERY},
-        ${TOURNAMENT_CREATOR_JSON_SUBQUERY},
-        (
-          SELECT COUNT(*)
-          FROM registrations
-          WHERE registrations.tournament_id = tournaments.id
-            AND registrations.status IN ('pending', 'confirmed')
-        ) AS active_registrations,
-        (
-          SELECT COUNT(*)
-          FROM registrations
-          WHERE registrations.tournament_id = tournaments.id
-            AND registrations.status = 'waitlist'
-        ) AS waitlist_registrations
+        ${TOURNAMENT_CREATOR_JSON_SUBQUERY}
        FROM tournaments
        WHERE tournaments.id = ?`,
     )
@@ -8991,6 +8951,39 @@ function tournamentEditors(tournament) {
 
 function tournamentEditorIds(tournament) {
   return tournamentEditors(tournament).map((editor) => editor.id);
+}
+
+// Für Turnierlisten: Bearbeiter, Owner und Ersteller gesammelt nachladen, statt sie per Unterabfrage pro Turnier
+// nachzuschlagen – jeder beteiligte Benutzer wird so nur einmal gelesen (D1-Tageslimit für gelesene Zeilen).
+// tournament_editors wird bewusst ganz gelesen: Index-Lookups per json_each zählen pro Turnier-ID als gelesene Zeilen
+// und kosten mehr als die kleine Tabelle. Liefert dieselben *_json-Felder wie die Unterabfragen unten, die
+// getTournamentById() weiter nutzt.
+export async function withTournamentPeople(db, rows) {
+  if (!rows.length) return rows;
+  const tournamentIds = new Set(rows.map((row) => row.id));
+  const editorRows = (await db.prepare('SELECT tournament_id, user_id FROM tournament_editors').all()).results
+    .filter((editor) => tournamentIds.has(editor.tournament_id));
+  const userIds = [...new Set([...rows.flatMap((row) => [row.owner_id, row.creator_id]), ...editorRows.map((editor) => editor.user_id)].filter(Boolean))];
+  const userResult = await db.prepare('SELECT id, first_name, last_name, username FROM users WHERE id IN (SELECT value FROM json_each(?))')
+    .bind(JSON.stringify(userIds)).all();
+  const usersById = new Map(userResult.results.map((u) => [u.id, { id: u.id, firstName: u.first_name, lastName: u.last_name, username: u.username }]));
+  const editorsByTournament = new Map();
+  for (const { tournament_id: tournamentId, user_id: userId } of editorRows) {
+    const editor = usersById.get(userId);
+    if (!editor) continue;
+    if (!editorsByTournament.has(tournamentId)) editorsByTournament.set(tournamentId, []);
+    editorsByTournament.get(tournamentId).push(editor);
+  }
+  return rows.map((row) => {
+    const owner = usersById.get(row.owner_id);
+    const creator = usersById.get(row.creator_id);
+    return {
+      ...row,
+      editors_json: JSON.stringify((editorsByTournament.get(row.id) || []).filter((editor) => editor.id !== row.owner_id)),
+      owner_json: owner ? JSON.stringify(owner) : null,
+      creator_json: creator ? JSON.stringify({ firstName: creator.firstName, lastName: creator.lastName, username: creator.username }) : null,
+    };
+  });
 }
 
 const TOURNAMENT_EDITORS_JSON_SUBQUERY = `(
