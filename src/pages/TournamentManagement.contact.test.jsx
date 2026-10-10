@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '../lib/i18next-config.js';
 import { TournamentManagementPage } from './TournamentManagement.jsx';
 
 describe('Neues Turnier: Kontakt aus dem Profil', () => {
   const renderPage = (currentUser) => render(
-    <TournamentManagementPage tournaments={[]} currentUser={currentUser} language="de" setSelectedTournamentId={() => {}} />,
+    <QueryClientProvider client={new QueryClient()}>
+      <TournamentManagementPage tournaments={[]} currentUser={currentUser} language="de" setSelectedTournamentId={() => {}} />
+    </QueryClientProvider>,
   );
 
   it('belegt Kontaktname, E-Mail und Handynummer vor', () => {

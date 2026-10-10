@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
 import { isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, tournamentPayload, translatedOptions } from '../lib/domain.js';
@@ -987,6 +988,17 @@ export function TournamentManagementPage({
   const [publicationError, setPublicationError] = useState('');
   const [publicationSaving, setPublicationSaving] = useState(false);
 
+  // Kandidaten für Bearbeitungsrechte/Owner-Wechsel erst laden, wenn Owner oder Admin ein Turnier bearbeiten – nur sie
+  // sehen diese Bereiche. Die Liste liest die ganze users-Tabelle (D1-Leselimit); gleicher Query-Key wie die Postbox,
+  // damit beide denselben Cache nutzen.
+  const recipientsQuery = useQuery({
+    queryKey: ['postbox-recipients', currentUser?.id],
+    queryFn: () => authenticatedApi('/api/postbox/recipients'),
+    enabled: Boolean(currentUser) && dialogOpen && mode === 'edit' && Boolean(form.id) && (isAdmin || form.ownerId === currentUser.id),
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const userCandidates = recipientsQuery.data?.recipients || postboxRecipients;
   const manageableTournaments = useMemo(() => tournaments.filter((tournament) => tournament.canManage), [tournaments]);
   const filteredTournaments = useMemo(
     () => filterTournaments(manageableTournaments, query, statusFilter),
@@ -1244,8 +1256,8 @@ export function TournamentManagementPage({
           mode={mode}
           isAdmin={isAdmin}
           owner={tournaments.find((item) => item.id === form.id)?.owner}
-          editorCandidates={postboxRecipients.filter((recipient) => recipient.id !== form.ownerId)}
-          ownerCandidates={postboxRecipients}
+          editorCandidates={userCandidates.filter((recipient) => recipient.id !== form.ownerId)}
+          ownerCandidates={userCandidates}
           onOwnerChanged={handleOwnerChanged}
           language={language}
           currentUser={currentUser}
