@@ -169,7 +169,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
 function TournamentParticipants({ tournamentId, onMessage, onError }) {
   const { t } = useTranslation();
   const [participants, setParticipants] = useState(null);
-  const [waitlist, setWaitlist] = useState([]);
+  const [ownUnconfirmed, setOwnUnconfirmed] = useState([]);
   const [forbidden, setForbidden] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [cancellingRegistrationId, setCancellingRegistrationId] = useState('');
@@ -181,7 +181,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
       .then((data) => {
         if (!cancelled) {
           setParticipants(data.participants);
-          setWaitlist(data.waitlist || []);
+          setOwnUnconfirmed(data.ownUnconfirmed || []);
         }
       })
       .catch(() => {
@@ -229,7 +229,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
     );
   }
 
-  if (!participants.length && !waitlist.length) {
+  if (!participants.length && !ownUnconfirmed.length) {
     return (
       <>
         <p className="muted">{t('Noch keine Anmeldungen.')}</p>
@@ -279,20 +279,25 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
       <div className="participants-list">
         {participants.map(renderParticipantRow)}
       </div>
-      {waitlist.length > 0 && (
+      {ownUnconfirmed.length > 0 && (
         <>
-          <h3>{t('Warteliste')}</h3>
+          <h3>{t('Deine Anmeldung')}</h3>
           <div className="participants-list">
-            {waitlist.map(renderParticipantRow)}
+            {ownUnconfirmed.map((participant, index) => (
+              <div key={`${participant.registrationId}-${participant.status}-${index}`}>
+                <p className="hint">{participant.status === 'waitlist'
+                  ? t('Deine Anmeldung steht auf der Warteliste und ist nur für dich sichtbar.')
+                  : t('Deine Anmeldung wartet noch auf die Bestätigung der Turnierleitung und ist nur für dich sichtbar.')}
+                </p>
+                {renderParticipantRow(participant, index)}
+              </div>
+            ))}
           </div>
         </>
       )}
       <div className="registration-summary" aria-label={t('Zusammenfassung')}>
         <span className="registration-summary-item">
           <strong>{participants.length}</strong> {t('Angemeldet')}
-        </span>
-        <span className="registration-summary-item">
-          <strong>{waitlist.length}</strong> {t('Warteliste')}
         </span>
       </div>
     </>

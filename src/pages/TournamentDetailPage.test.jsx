@@ -153,4 +153,16 @@ describe('Öffentliche Meldeliste', () => {
     expect(screen.getByText(/Ben/).closest('strong').querySelector('.account-badge')).toBeNull();
     expect(screen.getByText(/Cleo/).closest('strong').querySelector('.account-badge')).not.toBeNull();
   });
+
+  it('zeigt eine eigene unbestätigte Anmeldung mit eindeutigem Hinweis', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({
+      participants: [],
+      ownUnconfirmed: [{ registrationId: 'r1', firstName: 'Anna', lastName: 'Wartet', status: 'pending' }],
+    })));
+
+    renderDetail(tournamentWith({}), 'teilnehmer');
+
+    expect(await screen.findByText('Deine Anmeldung wartet noch auf die Bestätigung der Turnierleitung und ist nur für dich sichtbar.')).toBeInTheDocument();
+    expect(screen.getByText('Anna Wartet')).toBeInTheDocument();
+  });
 });

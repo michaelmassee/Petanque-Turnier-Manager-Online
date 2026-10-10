@@ -20,6 +20,7 @@ import {
   parseSyncRoundMatches,
   parseSyncRoundNumber,
   buildPlayerLiveView,
+  registrationBelongsToEmail,
   registrationBelongsToUser,
   buildLiveRoundPush,
   chunk,
@@ -1920,7 +1921,7 @@ export default {
           if (!canViewParticipants(tournament, session?.user || null)) {
             throw new HttpError(403, 'Zugriff verweigert');
           }
-          return await listPublicParticipants(env.DB, tournament.id, session?.user?.email || null);
+          return await listPublicParticipants(env.DB, tournament.id, session?.user || null);
         }
       }
 
@@ -5946,7 +5947,7 @@ async function confirmPendingRegistrations(env, tournament, appOrigin) {
   return json({ confirmedCount: confirmedRegistrations.length });
 }
 
-export async function listPublicParticipants(db, tournamentId, currentUserEmail) {
+export async function listPublicParticipants(db, tournamentId, currentUser = null) {
   const result = await db
     .prepare(
       `SELECT id, email, first_name, last_name, club, team_name,
@@ -5960,12 +5961,13 @@ export async function listPublicParticipants(db, tournamentId, currentUserEmail)
     .bind(tournamentId)
     .all();
 
-  const normalizedCurrentEmail = currentUserEmail ? currentUserEmail.toLowerCase() : null;
-
   const toParticipant = (row) => {
-    const isMine = normalizedCurrentEmail !== null && row.email.toLowerCase() === normalizedCurrentEmail;
+    // Absagen darf weiterhin nur das anmeldende Kontaktkonto; Teammitglieder sehen ihre
+    // unbestätigte Meldung, können aber nicht das gesamte Team versehentlich abmelden.
+    const isRegistrant = Boolean(currentUser?.email)
+      && text(row.email).toLowerCase() === text(currentUser.email).toLowerCase();
     return {
-      registrationId: isMine ? row.id : null,
+      registrationId: isRegistrant ? row.id : null,
       firstName: row.first_name,
       lastName: row.last_name,
       club: row.club,
@@ -5986,9 +5988,20 @@ export async function listPublicParticipants(db, tournamentId, currentUserEmail)
     };
   };
 
+  const confirmed = result.results.filter((row) => row.status === 'confirmed');
+  // Offene und Wartelisten-Meldungen gehören nicht in die öffentliche Meldeliste. Nur die
+  // angemeldete Person darf ihre eigene Meldung sehen, damit sie deren Zustand nachvollziehen
+  // und sie bei Bedarf absagen kann.
+  const ownUnconfirmed = result.results
+    .filter((row) => row.status !== 'confirmed' && (
+      registrationBelongsToUser(row, currentUser?.id)
+      || registrationBelongsToEmail(row, currentUser?.email)
+    ))
+    .map((row) => ({ ...toParticipant(row), status: row.status }));
+
   return json({
-    participants: result.results.filter((row) => row.status !== 'waitlist').map(toParticipant),
-    waitlist: result.results.filter((row) => row.status === 'waitlist').map(toParticipant),
+    participants: confirmed.map(toParticipant),
+    ownUnconfirmed,
   });
 }
 

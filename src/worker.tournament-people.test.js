@@ -62,4 +62,23 @@ describe('Öffentliche Meldeliste', () => {
     expect(participant).toMatchObject({ accountConnected: true, partnerAccountConnected: false, partner2AccountConnected: false });
     expect(JSON.stringify(participant)).not.toContain('u1');
   });
+
+  it('zeigt unbestätigte Meldungen ausschließlich dem zugehörigen Konto', async () => {
+    const db = d1MitSchema();
+    db.sqlite.prepare(`INSERT INTO users (id, email, role, first_name, last_name, password_salt, password_hash, created_at, updated_at)
+      VALUES ('u1', 'maria@example.test', 'user', 'Maria', 'Bieder', 'salt', 'hash', '2026-09-01', '2026-09-01')`).run();
+    db.sqlite.prepare(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at)
+      VALUES ('t1', 'u1', 'Turnier', '2099-09-28', 'Ort', 'doublette', 'registration', 'public', '2026-09-01', '2026-09-01')`).run();
+    db.sqlite.prepare(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email, user_id, status,
+        participation, registered_at, created_at, updated_at, execution_revision, language)
+      VALUES ('pending', 't1', 'Maria', 'Bieder', 'maria@example.test', 'u1', 'pending', 'inactive',
+        '2026-09-01', '2026-09-01', '2026-09-01', 1, 'de')`).run();
+
+    const anonymous = await (await listPublicParticipants(db, 't1')).json();
+    expect(anonymous).toEqual({ participants: [], ownUnconfirmed: [] });
+
+    const mine = await (await listPublicParticipants(db, 't1', { id: 'u1', email: 'maria@example.test' })).json();
+    expect(mine.participants).toEqual([]);
+    expect(mine.ownUnconfirmed).toEqual([expect.objectContaining({ registrationId: 'pending', status: 'pending' })]);
+  });
 });
