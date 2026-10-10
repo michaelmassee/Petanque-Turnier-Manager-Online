@@ -2250,6 +2250,142 @@ a.left-panel-link {
   font-weight: 800;
 }
 
+.visitor-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.visitor-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.visitor-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid #d7deea;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 12px 14px;
+}
+
+.visitor-total-label,
+.visitor-total-split {
+  color: #53627a;
+  font-size: 0.8rem;
+}
+
+.visitor-total-label {
+  font-weight: 800;
+}
+
+.visitor-total strong {
+  font-size: 1.6rem;
+  color: #172033;
+}
+
+@media (max-width: 560px) {
+  .visitor-totals {
+    gap: 6px;
+  }
+
+  .visitor-total {
+    padding: 8px;
+  }
+
+  .visitor-total strong {
+    font-size: 1.25rem;
+  }
+
+  .visitor-total-label,
+  .visitor-total-split {
+    font-size: 0.72rem;
+  }
+}
+
+.visitor-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  color: #53627a;
+  font-size: 0.85rem;
+}
+
+.visitor-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.visitor-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.visitor-swatch-users,
+.visitor-chart-users {
+  background: #0a5fd1;
+  fill: #0a5fd1;
+}
+
+.visitor-swatch-guests,
+.visitor-chart-guests {
+  background: #eb6834;
+  fill: #eb6834;
+}
+
+.visitor-readout {
+  margin: 10px 0 4px;
+  color: #172033;
+  font-size: 0.9rem;
+}
+
+.visitor-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: pan-y;
+}
+
+.visitor-chart-grid {
+  stroke: #e3e8f0;
+  stroke-width: 1;
+}
+
+.visitor-chart-axis {
+  fill: #53627a;
+  font-size: 11px;
+}
+
+.visitor-chart-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.visitor-chart-bar.is-active .visitor-chart-hit {
+  fill: rgba(10, 95, 209, 0.08);
+}
+
+.visitor-table {
+  margin-top: 12px;
+}
+
+.visitor-table summary {
+  cursor: pointer;
+  color: #0a5fd1;
+  font-weight: 700;
+}
+
+.visitor-table td:not(:first-child),
+.visitor-table th:not(:first-child) {
+  text-align: right;
+}
+
 .section-title {
   display: flex;
   flex-wrap: wrap;

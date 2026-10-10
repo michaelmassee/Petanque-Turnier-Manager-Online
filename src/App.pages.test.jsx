@@ -341,6 +341,15 @@ describe('Admin-Dashboard', () => {
         tournaments: [{ externalKey: 'imported', imported: true }, { externalKey: 'new', imported: false }],
       });
       if (path === '/api/admin/settings/data-retention') return Promise.resolve({ automaticPurgeEnabled: false, dueTournaments: 0 });
+      if (path.startsWith('/api/admin/visitor-stats')) return Promise.resolve({
+        range: 30,
+        days: [{ day: '2026-10-10', users: 1, guests: 2 }],
+        totals: {
+          today: { users: 1, guests: 2, total: 3 },
+          range: { users: 1, guests: 2, total: 3 },
+          allTime: { users: 1, guests: 2, total: 3, since: '2026-10-10' },
+        },
+      });
       throw new Error(`unerwarteter API-Aufruf: ${path}`);
     });
 

@@ -83,6 +83,9 @@ export function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, 
             {t('Zusätzlich speichern wir deine gewählte Sprache in deinem Browser (localStorage), um sie bei deinem nächsten Besuch beizubehalten. Diese Daten verlassen dein Gerät nicht.')}
           </p>
           <p>{t('Wir setzen keine Analyse-, Marketing- oder Tracking-Cookies ein.')}</p>
+          <p>
+            {t('Für eine anonyme Besucherstatistik zählen wir eindeutige Besucher pro Tag. Bei angemeldeten Nutzern wird dazu die Benutzer-ID, bei Gästen ein Hashwert aus IP-Adresse und Browserkennung mit täglich wechselndem Geheimwert kurzzeitig gespeichert; die IP-Adresse selbst wird nicht gespeichert, und auf deinem Gerät wird nichts abgelegt. Diese Einträge werden nach spätestens zwei Tagen gelöscht, dauerhaft bleiben nur die Tagessummen ohne Personenbezug (Art. 6 Abs. 1 lit. f DSGVO, berechtigtes Interesse an der Reichweitenmessung).')}
+          </p>
 
           <h2>{t('8. Versand von E-Mails')}</h2>
           <p>
@@ -106,7 +109,7 @@ export function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, 
           </p>
 
           <h2>{t('11. Stand')}</h2>
-          <p>{t('Diese Datenschutzerklärung wurde zuletzt am 26. August 2026 aktualisiert.')}</p>
+          <p>{t('Diese Datenschutzerklärung wurde zuletzt am 10. Oktober 2026 aktualisiert.')}</p>
         </div>
       </section>
     </main>

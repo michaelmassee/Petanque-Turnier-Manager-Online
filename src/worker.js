@@ -1614,6 +1614,17 @@ export default {
         return await deleteApiKey(env.DB, adminApiKeyMatch[1]);
       }
 
+      if (request.method === 'POST' && url.pathname === '/api/visit') {
+        const session = await optionalSession(request, env.DB);
+        await recordVisit(env.DB, {
+          userId: session?.user?.id || null,
+          ip: request.headers.get('CF-Connecting-IP') || '',
+          userAgent: request.headers.get('User-Agent') || '',
+          secret: env.VISIT_HASH_SECRET,
+        });
+        return json({ ok: true });
+      }
+
       if (url.pathname === '/api/tournaments') {
         if (request.method === 'GET') {
           const session = await optionalSession(request, env.DB);
@@ -1816,6 +1827,11 @@ export default {
         const session = await requireAdmin(request, env.DB);
         if (request.method === 'GET') return await getDataRetentionSettings(env.DB);
         if (request.method === 'PUT') return await updateDataRetentionSettings(request, env.DB, session.user);
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/admin/visitor-stats') {
+        await requireAdmin(request, env.DB);
+        return await getVisitorStats(env.DB, Number(url.searchParams.get('days')));
       }
 
       if (request.method === 'GET' && url.pathname === '/api/admin/dashboard-stats') {
@@ -8831,6 +8847,75 @@ async function listPendingBoulePlaces(db) {
   return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, null)) });
 }
 
+const VISITOR_STATS_RANGES = [30, 90, 365];
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function utcDay(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Zählt einen eindeutigen Besucher pro Tag (UTC): angemeldet über die Nutzer-ID, als Gast über einen Hash aus IP und
+ * Browser mit täglich wechselndem Salt – nichts wird auf dem Gerät gespeichert, und Hashes verschiedener Tage lassen
+ * sich nicht verknüpfen. Ein erneuter Aufruf am selben Tag schreibt nichts (INSERT OR IGNORE); die Tagessumme
+ * pflegt der Trigger aus Migration 0104.
+ */
+export async function recordVisit(db, { userId, ip, userAgent, secret, now = new Date() }) {
+  const day = utcDay(now);
+  let visitorKey;
+  if (userId) {
+    visitorKey = `user:${userId}`;
+  } else {
+    // Ohne Secret wäre der Hash über bekannte IPs zurückzurechnen – Gäste dann lieber nicht zählen.
+    if (!secret) return;
+    const salt = await sha256Hex(`${secret}:${day}`);
+    visitorKey = `guest:${await sha256Hex(`${salt}:${ip}:${userAgent}`)}`;
+  }
+  await db.prepare('INSERT OR IGNORE INTO visitor_days (day, visitor_key, kind) VALUES (?, ?, ?)')
+    .bind(day, visitorKey, userId ? 'user' : 'guest').run();
+}
+
+export async function getVisitorStats(db, requestedDays, now = new Date()) {
+  const range = VISITOR_STATS_RANGES.includes(requestedDays) ? requestedDays : VISITOR_STATS_RANGES[0];
+  const today = utcDay(now);
+  const from = utcDay(new Date(now.getTime() - (range - 1) * DAY_MS));
+  const [rows, allTimeRows] = await Promise.all([
+    db.prepare('SELECT day, kind, visitors FROM visitor_daily_counts WHERE day >= ? AND day <= ? ORDER BY day').bind(from, today).all(),
+    db.prepare('SELECT kind, SUM(visitors) AS visitors, MIN(day) AS since FROM visitor_daily_counts GROUP BY kind').all(),
+  ]);
+  // Lückenlos von from bis heute, damit das Diagramm Tage ohne Besuch als 0 zeigt.
+  const byDay = new Map();
+  for (let index = 0; index < range; index += 1) {
+    const day = utcDay(new Date(new Date(`${from}T00:00:00Z`).getTime() + index * DAY_MS));
+    byDay.set(day, { day, users: 0, guests: 0 });
+  }
+  for (const row of rows.results) {
+    const entry = byDay.get(row.day);
+    if (entry) entry[row.kind === 'user' ? 'users' : 'guests'] = Number(row.visitors);
+  }
+  const days = [...byDay.values()];
+  const sum = (entries) => {
+    const users = entries.reduce((total, entry) => total + entry.users, 0);
+    const guests = entries.reduce((total, entry) => total + entry.guests, 0);
+    return { users, guests, total: users + guests };
+  };
+  const allTime = { users: 0, guests: 0 };
+  let since = null;
+  for (const row of allTimeRows.results) {
+    allTime[row.kind === 'user' ? 'users' : 'guests'] = Number(row.visitors);
+    if (row.since && (!since || row.since < since)) since = row.since;
+  }
+  return json({
+    range,
+    days,
+    totals: {
+      today: sum(days.filter((entry) => entry.day === today)),
+      range: sum(days),
+      allTime: { ...allTime, total: allTime.users + allTime.guests, since },
+    },
+  });
+}
+
 async function getAdminDashboardStats(db) {
   const [users, pendingApiKeys, pendingClubEditorRequests, pendingClubs, pendingPlaces, playerListings] = await Promise.all([
     db.prepare('SELECT COUNT(*) AS count FROM users').first(),
@@ -9162,6 +9247,9 @@ async function cleanupExpiredSessions(db) {
   await db.prepare('DELETE FROM sessions WHERE expires_at <= ?').bind(new Date().toISOString()).run();
   await db.prepare('DELETE FROM password_reset_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').bind(new Date().toISOString()).run();
   await db.prepare('DELETE FROM email_verification_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').bind(new Date().toISOString()).run();
+  // Besucher-Schlüssel braucht es nur zur Deduplizierung von heute (und gestern rund um Mitternacht); die
+  // Tagessummen in visitor_daily_counts bleiben.
+  await db.prepare('DELETE FROM visitor_days WHERE day < ?').bind(utcDay(new Date(Date.now() - DAY_MS))).run();
   const attemptsCutoff = new Date(Date.now() - LOGIN_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
   await db.prepare('DELETE FROM login_attempts WHERE created_at <= ?').bind(attemptsCutoff).run();
   const geocodeAttemptsCutoff = new Date(Date.now() - GEOCODE_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();

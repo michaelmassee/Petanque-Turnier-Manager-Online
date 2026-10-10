@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { Button, Feedback } from '../components/ui.jsx';
+import { formatDate } from '../lib/format.js';
 
 /**
  * Automatische Löschung personenbezogener Daten (DS-04): standardmäßig aus. Zeigt vor dem Einschalten, wie viele
@@ -65,6 +66,214 @@ export function DataRetentionPanel() {
           </label>
           <Button disabled={busy || enabled === settings.automaticPurgeEnabled} loading={busy} onClick={save}>{t('Speichern')}</Button>
         </>
+      )}
+    </div>
+  );
+}
+
+const VISITOR_RANGES = [30, 90, 365];
+const CHART_DEFAULT_WIDTH = 720;
+const CHART_HEIGHT = 200;
+const CHART_PADDING = { top: 12, right: 8, bottom: 24, left: 36 };
+
+// Ein Jahr Tagessäulen wäre zu schmal: bei 365 Tagen je 7 Tage zu einer Säule zusammenfassen.
+function groupVisitorDays(days, range) {
+  if (range < 365) return days.map((entry) => ({ ...entry, from: entry.day, to: entry.day }));
+  const groups = [];
+  for (let index = days.length % 7; index < days.length; index += 7) {
+    const week = days.slice(index, index + 7);
+    groups.push({
+      from: week[0].day,
+      to: week.at(-1).day,
+      users: week.reduce((sum, entry) => sum + entry.users, 0),
+      guests: week.reduce((sum, entry) => sum + entry.guests, 0),
+    });
+  }
+  return groups;
+}
+
+function niceMax(value) {
+  if (value <= 4) return 4;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const step = [1, 2, 2.5, 5, 10].find((factor) => factor * magnitude >= value / 4) * magnitude;
+  return Math.ceil(value / step) * step;
+}
+
+// Säule mit abgerundetem oberem Ende, unten bündig an der Grundlinie bzw. am darunterliegenden Segment.
+function barPath(x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height);
+  return `M${x},${y + height}V${y + r}Q${x},${y} ${x + r},${y}H${x + width - r}Q${x + width},${y} ${x + width},${y + r}V${y + height}Z`;
+}
+
+// Breite des Containers in Pixeln, damit das SVG 1:1 rendert und Achsenschrift auf Handy und Desktop gleich groß bleibt.
+function useElementWidth(ref, fallback) {
+  const [width, setWidth] = useState(fallback);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width > 0) setWidth(Math.round(entry.contentRect.width));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+  return width;
+}
+
+function VisitorChart({ bars, language, activeIndex, onActivate }) {
+  const { t } = useTranslation();
+  const containerRef = useRef(null);
+  const chartWidth = useElementWidth(containerRef, CHART_DEFAULT_WIDTH);
+  const plotWidth = chartWidth - CHART_PADDING.left - CHART_PADDING.right;
+  const plotHeight = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
+  const maxValue = niceMax(Math.max(...bars.map((bar) => bar.users + bar.guests), 0));
+  const slot = plotWidth / bars.length;
+  const barWidth = Math.max(slot - 2, 1);
+  const yFor = (value) => CHART_PADDING.top + plotHeight - (value / maxValue) * plotHeight;
+  const ticks = [0, maxValue / 2, maxValue];
+  const labelIndexes = [...new Set([0, Math.floor((bars.length - 1) / 2), bars.length - 1])];
+
+  return (
+    <div ref={containerRef}>
+      <svg className="visitor-chart" viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`} role="img"
+        aria-label={t('Besucher pro Tag, angemeldete Nutzer und Gäste gestapelt')} onMouseLeave={() => onActivate(null)}>
+        {ticks.map((tick) => (
+          <g key={tick}>
+            <line className="visitor-chart-grid" x1={CHART_PADDING.left} x2={chartWidth - CHART_PADDING.right} y1={yFor(tick)} y2={yFor(tick)} />
+            <text className="visitor-chart-axis" x={CHART_PADDING.left - 6} y={yFor(tick)} textAnchor="end" dominantBaseline="middle">{tick}</text>
+          </g>
+        ))}
+        {bars.map((bar, index) => {
+          const x = CHART_PADDING.left + index * slot + (slot - barWidth) / 2;
+          const userHeight = (bar.users / maxValue) * plotHeight;
+          const guestHeight = (bar.guests / maxValue) * plotHeight;
+          const baseline = CHART_PADDING.top + plotHeight;
+          // 2px Abstand zwischen den Segmenten, sofern beide vorhanden sind.
+          const gap = bar.users && bar.guests ? 2 : 0;
+          const radius = barWidth >= 6 ? 4 : 1;
+          return (
+            <g key={bar.from} className={activeIndex === index ? 'visitor-chart-bar is-active' : 'visitor-chart-bar'}>
+              {bar.users > 0 && (
+                <path className="visitor-chart-users" d={bar.guests ? `M${x},${baseline}V${baseline - userHeight}H${x + barWidth}V${baseline}Z` : barPath(x, baseline - userHeight, barWidth, userHeight, radius)} />
+              )}
+              {bar.guests > 0 && (
+                <path className="visitor-chart-guests" d={barPath(x, baseline - userHeight - gap - guestHeight, barWidth, guestHeight, radius)} />
+              )}
+              <rect className="visitor-chart-hit" x={CHART_PADDING.left + index * slot} y={CHART_PADDING.top} width={slot} height={plotHeight}
+                onMouseEnter={() => onActivate(index)} onClick={() => onActivate(index)} />
+            </g>
+          );
+        })}
+        {labelIndexes.map((index) => (
+          <text key={index} className="visitor-chart-axis" x={CHART_PADDING.left + index * slot + slot / 2} y={CHART_HEIGHT - 6}
+            textAnchor={index === 0 ? 'start' : index === bars.length - 1 ? 'end' : 'middle'}>
+            {formatDate(bars[index].from, language)}
+          </text>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function VisitorTotal({ label, totals }) {
+  const { t } = useTranslation();
+  return (
+    <div className="visitor-total">
+      <span className="visitor-total-label">{label}</span>
+      <strong>{totals.total}</strong>
+      <span className="visitor-total-split">
+        {t('{{users}} Nutzer · {{guests}} Gäste', { users: totals.users, guests: totals.guests })}
+      </span>
+    </div>
+  );
+}
+
+/** Eindeutige Besucher pro Tag, getrennt nach angemeldeten Nutzern und Gästen, mit Summen und Verlauf. */
+export function VisitorStatsPanel() {
+  const { t, i18n } = useTranslation();
+  const [range, setRange] = useState(VISITOR_RANGES[0]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeIndex, setActiveIndex] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    authenticatedApi(`/api/admin/visitor-stats?days=${range}`)
+      .then((result) => { if (!cancelled) { setStats(result); setActiveIndex(null); } })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [range]);
+
+  const bars = useMemo(() => (stats ? groupVisitorDays(stats.days, stats.range) : []), [stats]);
+  const shownBar = bars[activeIndex ?? bars.length - 1];
+  const rangeLabel = (days) => t('Letzte {{count}} Tage', { count: days });
+  const barLabel = (bar) => (bar.from === bar.to
+    ? formatDate(bar.from, i18n.language)
+    : `${formatDate(bar.from, i18n.language)} – ${formatDate(bar.to, i18n.language)}`);
+
+  return (
+    <div className="panel">
+      <div className="section-title">
+        <div>
+          <h2>{t('Besucher')}</h2>
+          <p className="muted">{t('Eindeutige Besucher pro Tag. Wer sich im Lauf eines Tages anmeldet, zählt einmal als Gast und einmal als Nutzer.')}</p>
+        </div>
+        <div className="visitor-range" role="group" aria-label={t('Zeitraum')}>
+          {VISITOR_RANGES.map((days) => (
+            <Button key={days} variant={range === days ? 'primary' : 'secondary'} aria-pressed={range === days}
+              loading={loading && range === days} onClick={() => setRange(days)}>
+              {t('{{count}} Tage', { count: days })}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <Feedback error={error} />
+      {stats && (
+        <div aria-busy={loading}>
+          <div className="visitor-totals">
+            <VisitorTotal label={t('Heute')} totals={stats.totals.today} />
+            <VisitorTotal label={rangeLabel(stats.range)} totals={stats.totals.range} />
+            <VisitorTotal
+              label={stats.totals.allTime.since
+                ? t('Gesamt seit {{date}}', { date: formatDate(stats.totals.allTime.since, i18n.language) })
+                : t('Gesamt')}
+              totals={stats.totals.allTime}
+            />
+          </div>
+          <div className="visitor-legend">
+            <span><span className="visitor-swatch visitor-swatch-users" aria-hidden="true" />{t('Angemeldete Nutzer')}</span>
+            <span><span className="visitor-swatch visitor-swatch-guests" aria-hidden="true" />{t('Gäste')}</span>
+          </div>
+          {shownBar && (
+            <p className="visitor-readout" aria-live="polite">
+              <strong>{barLabel(shownBar)}</strong>
+              {' '}
+              {t('{{total}} Besucher: {{users}} Nutzer · {{guests}} Gäste', {
+                total: shownBar.users + shownBar.guests, users: shownBar.users, guests: shownBar.guests,
+              })}
+            </p>
+          )}
+          <VisitorChart bars={bars} language={i18n.language} activeIndex={activeIndex} onActivate={setActiveIndex} />
+          <details className="visitor-table">
+            <summary>{t('Als Tabelle anzeigen')}</summary>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr><th>{stats.range < 365 ? t('Tag') : t('Woche')}</th><th>{t('Nutzer')}</th><th>{t('Gäste')}</th><th>{t('Summe')}</th></tr>
+                </thead>
+                <tbody>
+                  {[...bars].reverse().map((bar) => (
+                    <tr key={bar.from}><td>{barLabel(bar)}</td><td>{bar.users}</td><td>{bar.guests}</td><td>{bar.users + bar.guests}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
       )}
     </div>
   );
@@ -200,6 +409,7 @@ export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, 
           ))}
         </div>
       </div>
+      <VisitorStatsPanel />
       <DataRetentionPanel />
     </section>
   );

@@ -152,6 +152,12 @@ function AppContent() {
   const sessionExpiryHandled = useRef(false);
 
   useEffect(() => { void pruneExpiredFlyerDesigns().catch(() => {}); }, []);
+  // Besucherstatistik: ein Ping nach dem Laden der Sitzung und bei An-/Abmeldung; der Server zählt pro Tag nur einmal.
+  const visitUserId = currentUser?.id || null;
+  useEffect(() => {
+    if (loading) return;
+    void api('/api/visit', { method: 'POST' }).catch(() => {});
+  }, [loading, visitUserId]);
   // Die Freigabe-Ansicht gilt nur für den Sprung aus der Postbox; ein anderes Turnier oder ein anderer Tab beendet sie.
   useEffect(() => {
     if (approvalInboxTournamentId && (activeTab !== 'registrations' || selectedTournamentId !== approvalInboxTournamentId)) {
