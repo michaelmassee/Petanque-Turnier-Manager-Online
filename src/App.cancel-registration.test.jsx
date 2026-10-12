@@ -10,7 +10,7 @@ function response(payload) {
 describe('Abmeldung über persönlichen Link', () => {
   beforeEach(() => {
     queryClient.clear();
-    window.history.replaceState({}, '', '/?cancel_token=cancel-token');
+    window.history.replaceState({}, '', '/?cancel_token=cancel-1');
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
@@ -33,7 +33,7 @@ describe('Abmeldung über persönlichen Link', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Anmeldung stornieren' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/registrations/cancel-by-token', expect.objectContaining({
-      method: 'POST', body: JSON.stringify({ token: 'cancel-token' }),
+      method: 'POST', body: JSON.stringify({ token: 'cancel-1' }),
     })));
     expect(await screen.findByText('Deine Anmeldung wurde storniert.')).toBeInTheDocument();
   });

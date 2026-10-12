@@ -14,7 +14,7 @@ describe('Abmeldung: Berechtigungen', () => {
 
   function cancelByToken() {
     return worker.fetch(new Request('https://ptm.test/api/registrations/cancel-by-token', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: 'cancel-token' }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: 'cancel-1' }),
     }), env);
   }
 
@@ -41,7 +41,7 @@ describe('Abmeldung: Berechtigungen', () => {
       INSERT INTO tournament_editors (id, tournament_id, user_id, granted_by, created_at)
       VALUES ('editor-right', 't1', 'editor', 'owner', '2026-01-01');
       INSERT INTO registrations (id, tournament_id, first_name, last_name, email, registrant_user_id, partner_user_id, partner2_user_id, status, participation, cancel_token, registered_at, created_at, updated_at)
-      VALUES ('r1', 't1', 'Anna', 'Anmeldung', 'anmeldung@example.test', 'registrant', 'member', 'member2', 'confirmed', 'inactive', 'cancel-token', '2026-01-01', '2026-01-01', '2026-01-01');`);
+      VALUES ('r1', 't1', 'Anna', 'Anmeldung', 'anmeldung@example.test', 'registrant', 'member', 'member2', 'confirmed', 'inactive', 'cancel-1', '2026-01-01', '2026-01-01', '2026-01-01');`);
   });
 
   it('storniert über den persönlichen Abmelde-Link ohne Konto', async () => {
