@@ -352,6 +352,38 @@ const WHATSAPP_GROUP_EMAIL_LABELS = {
   fr: 'Rejoins le groupe WhatsApp du tournoi :',
 };
 
+const DIRECTIONS_EMAIL_LABELS = {
+  de: 'Anfahrt zum Turnier:',
+  nl: 'Route naar het toernooi:',
+  en: 'Directions to the tournament:',
+  es: 'Cómo llegar al torneo:',
+  fr: 'Itinéraire vers le tournoi :',
+};
+
+export function buildDirectionsLink(location) {
+  const destination = formatLocationAddress(location).trim();
+  return destination ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}` : '';
+}
+
+export function directionsEmailBlock(tournament, language) {
+  const directionsLink = buildDirectionsLink(tournament?.location);
+  if (!directionsLink) return '';
+  return `\n\n${DIRECTIONS_EMAIL_LABELS[language] || DIRECTIONS_EMAIL_LABELS.de}\n${directionsLink}`;
+}
+
+function tournamentEmailActions(tournament, appOrigin, language, extra = []) {
+  return [
+    emailAction('tournament', `${appOrigin}/turniere/${tournament.id}/info`, language),
+    emailAction('directions', buildDirectionsLink(tournament.location), language),
+    ...extra,
+  ].filter(Boolean);
+}
+
+function whatsappEmailAction(block, language) {
+  const url = String(block || '').match(/https?:\/\/\S+/)?.[0];
+  return emailAction('whatsapp', url, language);
+}
+
 /**
  * Absatz mit dem WhatsApp-Gruppenlink des Turniers für Mails an Gemeldete/Teammitglieder, sonst ''. Die Aufrufer
  * reichen teils zusammengesetzte Zeilen ohne alle Turnierspalten durch, daher wird der Link frisch gelesen.
@@ -658,11 +690,11 @@ function buildSystemNotificationPushBody(eventType, eventData, language) {
 const DESKTOP_APP_URL = 'https://michaelmassee.github.io/Petanque-Turnier-Manager/';
 
 const EMAIL_FOOTERS = {
-  de: `Pétanque Turnier Manager Online\nFinde dein nächstes Turnier – nach Ort, Verein oder Turniersystem – und melde dich direkt online an.\n\nFür Turnierleiter: Der Pétanque Turnier Manager ist die Profi-Software zur Turnierverwaltung:\n${DESKTOP_APP_URL}`,
-  nl: `Pétanque Turnier Manager Online\nVind je volgende toernooi – op locatie, club of toernooisysteem – en schrijf je direct online in.\n\nVoor toernooileiders: Pétanque Turnier Manager is de professionele software voor toernooibeheer:\n${DESKTOP_APP_URL}`,
-  en: `Pétanque Turnier Manager Online\nFind your next tournament – by location, club or tournament system – and register directly online.\n\nFor tournament directors: Pétanque Turnier Manager is the professional software for running tournaments:\n${DESKTOP_APP_URL}`,
-  es: `Pétanque Turnier Manager Online\nEncuentra tu próximo torneo – por lugar, club o sistema de torneo – e inscríbete directamente en línea.\n\nPara directores de torneo: Pétanque Turnier Manager es el software profesional para gestionar torneos:\n${DESKTOP_APP_URL}`,
-  fr: `Pétanque Turnier Manager Online\nTrouve ton prochain tournoi – par lieu, club ou système de tournoi – et inscris-toi directement en ligne.\n\nPour les organisateurs de tournois : Pétanque Turnier Manager est le logiciel professionnel de gestion de tournois :\n${DESKTOP_APP_URL}`,
+  de: `Pétanque Turnier Manager Online\nEntdecke Pétanqueturniere in deiner Nähe – filtere nach Ort, Verein oder Spielsystem und melde dich mit wenigen Klicks an.\n\nFür Turnierleitungen: Mit dem Pétanque Turnier Manager planst, organisierst und leitest du Turniere professionell – von der Anmeldung bis zur Ergebnisverwaltung.\n\n${DESKTOP_APP_URL}`,
+  nl: `Pétanque Turnier Manager Online\nVind je volgende toernooi – op locatie, club of toernooisysteem – en schrijf je direct online in.\n\nVoor toernooileiders: Pétanque Turnier Manager is de professionele software voor toernooibeheer:\n\n${DESKTOP_APP_URL}`,
+  en: `Pétanque Turnier Manager Online\nFind your next tournament – by location, club or tournament system – and register directly online.\n\nFor tournament directors: Pétanque Turnier Manager is the professional software for running tournaments:\n\n${DESKTOP_APP_URL}`,
+  es: `Pétanque Turnier Manager Online\nEncuentra tu próximo torneo – por lugar, club o sistema de torneo – e inscríbete directamente en línea.\n\nPara directores de torneo: Pétanque Turnier Manager es el software profesional para gestionar torneos:\n\n${DESKTOP_APP_URL}`,
+  fr: `Pétanque Turnier Manager Online\nTrouve ton prochain tournoi – par lieu, club ou système de tournoi – et inscris-toi directement en ligne.\n\nPour les organisateurs de tournois : Pétanque Turnier Manager est le logiciel professionnel de gestion de tournois :\n\n${DESKTOP_APP_URL}`,
 };
 
 export function appendEmailFooter(text, language) {
@@ -672,12 +704,29 @@ export function appendEmailFooter(text, language) {
 
 const EMAIL_BRAND = 'Pétanque Turnier Manager Online';
 const EMAIL_LAYOUT_LABELS = {
-  de: { openLink: 'Link öffnen', automated: `Diese E-Mail wurde automatisch von ${EMAIL_BRAND} versendet.` },
-  nl: { openLink: 'Link openen', automated: `Deze e-mail is automatisch verzonden door ${EMAIL_BRAND}.` },
-  en: { openLink: 'Open link', automated: `This email was sent automatically by ${EMAIL_BRAND}.` },
-  es: { openLink: 'Abrir enlace', automated: `Este correo se ha enviado automáticamente desde ${EMAIL_BRAND}.` },
-  fr: { openLink: 'Ouvrir le lien', automated: `Cet e-mail a été envoyé automatiquement par ${EMAIL_BRAND}.` },
+  de: { openLink: 'Link öffnen', automated: `Diese E-Mail wurde automatisch von ${EMAIL_BRAND} versendet.`, desktop: 'Desktop-App öffnen', legal: 'Impressum', privacy: 'Datenschutz' },
+  nl: { openLink: 'Link openen', automated: `Deze e-mail is automatisch verzonden door ${EMAIL_BRAND}.`, desktop: 'Desktop-app openen', legal: 'Colofon', privacy: 'Privacy' },
+  en: { openLink: 'Open link', automated: `This email was sent automatically by ${EMAIL_BRAND}.`, desktop: 'Open desktop app', legal: 'Legal notice', privacy: 'Privacy' },
+  es: { openLink: 'Abrir enlace', automated: `Este correo se ha enviado automáticamente desde ${EMAIL_BRAND}.`, desktop: 'Abrir aplicación de escritorio', legal: 'Aviso legal', privacy: 'Privacidad' },
+  fr: { openLink: 'Ouvrir le lien', automated: `Cet e-mail a été envoyé automatiquement par ${EMAIL_BRAND}.`, desktop: "Ouvrir l’application de bureau", legal: 'Mentions légales', privacy: 'Confidentialité' },
 };
+
+const EMAIL_ACTION_LABELS = {
+  de: { tournament: 'Turnier ansehen', directions: 'Anfahrt planen', live: 'Live-Ansicht öffnen', cancel: 'Anmeldung stornieren', whatsapp: 'WhatsApp-Gruppe öffnen', confirm: 'Bestätigen', edit: 'Bouleplatz bearbeiten', reset: 'Passwort zurücksetzen' },
+  nl: { tournament: 'Toernooi bekijken', directions: 'Route plannen', live: 'Liveweergave openen', cancel: 'Inschrijving afmelden', whatsapp: 'WhatsApp-groep openen', confirm: 'Bevestigen', edit: 'Baan bewerken', reset: 'Wachtwoord opnieuw instellen' },
+  en: { tournament: 'View tournament', directions: 'Plan directions', live: 'Open live view', cancel: 'Withdraw registration', whatsapp: 'Open WhatsApp group', confirm: 'Confirm', edit: 'Edit boules court', reset: 'Reset password' },
+  es: { tournament: 'Ver torneo', directions: 'Planificar ruta', live: 'Abrir vista en directo', cancel: 'Cancelar inscripción', whatsapp: 'Abrir grupo de WhatsApp', confirm: 'Confirmar', edit: 'Editar pista', reset: 'Restablecer contraseña' },
+  fr: { tournament: 'Voir le tournoi', directions: 'Préparer l’itinéraire', live: 'Ouvrir la vue en direct', cancel: 'Annuler l’inscription', whatsapp: 'Ouvrir le groupe WhatsApp', confirm: 'Confirmer', edit: 'Modifier le terrain', reset: 'Réinitialiser le mot de passe' },
+};
+
+const EMAIL_ACTION_ICONS = { tournament: '▣', directions: '⌖', live: '▶', cancel: '×', whatsapp: '◉', confirm: '✓', edit: '✎', reset: '↻', desktop: '↗', legal: '§', privacy: '◌' };
+
+export function emailAction(kind, url, language, tone = null) {
+  if (!url) return null;
+  const labels = EMAIL_ACTION_LABELS[language] || EMAIL_ACTION_LABELS.de;
+  const layout = EMAIL_LAYOUT_LABELS[language] || EMAIL_LAYOUT_LABELS.de;
+  return { url, label: labels[kind] || layout[kind] || layout.openLink, icon: EMAIL_ACTION_ICONS[kind] || '↗', tone: tone || (kind === 'cancel' ? 'danger' : 'primary') };
+}
 
 function escapeEmailHtml(value) {
   return String(value || '')
@@ -702,19 +751,36 @@ function linkifyEmailHtml(value) {
     .join('');
 }
 
-function renderEmailSection(text, labels) {
+function renderEmailButton(action) {
+  const colors = action.tone === 'danger'
+    ? { background: '#b42318', border: '#b42318' }
+    : action.tone === 'secondary'
+      ? { background: '#eef5f3', border: '#bfd5cf', color: '#07594f' }
+      : { background: '#087f6f', border: '#087f6f' };
+  const color = colors.color || '#ffffff';
+  return `<p style="margin:18px 0;"><a href="${escapeEmailHtml(action.url)}" style="display:inline-block;background:${colors.background};border:1px solid ${colors.border};border-radius:10px;color:${color};font-weight:700;padding:13px 20px;text-decoration:none;"><span aria-hidden="true" style="font-size:16px;margin-right:8px;">${escapeEmailHtml(action.icon)}</span>${escapeEmailHtml(action.label)}</a></p>`;
+}
+
+function renderEmailSection(text, labels, actions = []) {
+  const actionByUrl = new Map(actions.filter(Boolean).map((action) => [action.url, action]));
   return text
     .split(/\n{2,}/)
     .filter(Boolean)
     .map((paragraph) => {
       const trimmed = paragraph.trim();
       if (/^https?:\/\/[^\s<]+$/.test(trimmed)) {
-        const href = escapeEmailHtml(trimmed);
-        return `<p style="margin:24px 0;"><a href="${href}" style="display:inline-block;background:#087f6f;border-radius:8px;color:#ffffff;font-weight:700;padding:13px 20px;text-decoration:none;">${labels.openLink}</a></p><p style="margin:0;color:#5e6d69;font-size:13px;line-height:20px;word-break:break-all;">${href}</p>`;
+        return renderEmailButton(actionByUrl.get(trimmed) || { url: trimmed, label: labels.openLink, icon: '↗', tone: 'primary' });
       }
       return `<p style="margin:0 0 18px;color:#25332f;font-size:16px;line-height:25px;">${linkifyEmailHtml(paragraph).replace(/\n/g, '<br>')}</p>`;
     })
     .join('');
+}
+
+function standaloneEmailUrls(text) {
+  return new Set(String(text || '')
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => /^https?:\/\/[^\s<]+$/.test(paragraph)));
 }
 
 const EMAIL_TEXT_STYLE = 'margin:0 0 10px;color:#25332f;font-size:16px;line-height:25px;';
@@ -754,10 +820,24 @@ function renderEmailMessageBox(value) {
  * body remains the canonical fallback, while this layout gives modern clients a readable card,
  * clear action links and a separate product footer. All dynamic content is escaped before use.
  */
-export function renderTransactionalEmailHtml(subject, text, language, messageBox = null, textAfterMessageBox = '') {
+export function renderTransactionalEmailHtml(subject, text, language, messageBox = null, textAfterMessageBox = '', actions = []) {
   const labels = EMAIL_LAYOUT_LABELS[language] || EMAIL_LAYOUT_LABELS.de;
   const [content, footer = ''] = appendEmailFooter(text, language).split('\n\n----------\n\n');
-  const footerHtml = renderEmailSection(footer, labels);
+  const visibleActionUrls = new Set([
+    ...standaloneEmailUrls(content),
+    ...standaloneEmailUrls(textAfterMessageBox),
+  ]);
+  const additionalActionButtons = actions
+    .filter(Boolean)
+    .filter((action) => !visibleActionUrls.has(action.url))
+    .map(renderEmailButton)
+    .join('');
+  const footerActions = [
+    emailAction('desktop', DESKTOP_APP_URL, language, 'secondary'),
+    { url: 'https://ptmonline.org/impressum', label: labels.legal, icon: EMAIL_ACTION_ICONS.legal, tone: 'secondary' },
+    { url: 'https://ptmonline.org/datenschutz', label: labels.privacy, icon: EMAIL_ACTION_ICONS.privacy, tone: 'secondary' },
+  ];
+  const footerHtml = `${renderEmailSection(footer, labels, footerActions)}${footerActions.slice(1).map(renderEmailButton).join('')}`;
   return `<!doctype html>
 <html lang="${escapeEmailHtml(language || 'de')}">
   <body style="margin:0;padding:0;background:#eef3f1;font-family:Arial,Helvetica,sans-serif;">
@@ -765,7 +845,7 @@ export function renderTransactionalEmailHtml(subject, text, language, messageBox
       <tr><td align="center" style="padding:32px 16px;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border-radius:14px;overflow:hidden;">
           <tr><td style="background:#07594f;padding:24px 32px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:.1px;">${EMAIL_BRAND}</td></tr>
-          <tr><td style="padding:34px 32px 24px;"><h1 style="margin:0 0 24px;color:#173b34;font-size:24px;line-height:31px;">${escapeEmailHtml(subject)}</h1>${renderEmailSection(content, labels)}${messageBox ? renderEmailMessageBox(messageBox) : ''}${textAfterMessageBox ? renderEmailSection(textAfterMessageBox.trim(), labels) : ''}</td></tr>
+          <tr><td style="padding:34px 32px 24px;"><h1 style="margin:0 0 24px;color:#173b34;font-size:24px;line-height:31px;">${escapeEmailHtml(subject)}</h1>${renderEmailSection(content, labels, actions)}${messageBox ? renderEmailMessageBox(messageBox) : ''}${textAfterMessageBox ? renderEmailSection(textAfterMessageBox.trim(), labels, actions) : ''}${additionalActionButtons}</td></tr>
           <tr><td style="border-top:1px solid #dce6e2;padding:24px 32px 28px;background:#f8fbfa;">${footerHtml}</td></tr>
         </table>
         <p style="margin:16px 0 0;color:#71807b;font-size:12px;line-height:18px;">${labels.automated}</p>
@@ -905,13 +985,15 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
   const participantsBlock = buildRegistrationParticipantsBlock(registration, language);
   // Persönlicher Live-Link (E-21). Die Live-Ansicht gehört zu jedem Turnier.
   const liveLink = buildLiveLink(appOrigin, await issueLiveToken(env.DB, registration.id));
+  const directionsBlock = directionsEmailBlock(tournament, language);
   const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock, liveLink) + whatsappBlock,
+      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock, liveLink) + directionsBlock + whatsappBlock,
+      actions: tournamentEmailActions(tournament, appOrigin, language, [emailAction('cancel', cancelLink, language), emailAction('live', liveLink, language), whatsappEmailAction(whatsappBlock, language)]),
       language,
       attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
       logFallback: `Registration confirmation email for ${recipient.email} (tournament ${tournament.id})`,
@@ -934,12 +1016,14 @@ export async function resendLiveLink(env, registration, user, appOrigin) {
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = LIVE_LINK_EMAILS[language] || LIVE_LINK_EMAILS.de;
   const liveLink = buildLiveLink(appOrigin, await issueLiveToken(env.DB, registration.id));
+  const directionsBlock = directionsEmailBlock(tournament, language);
   const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
   for (const recipient of recipients) {
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, liveLink) + whatsappBlock,
+      text: templates.text(recipient.firstName, tournament.name, liveLink) + directionsBlock + whatsappBlock,
+      actions: tournamentEmailActions(tournament, appOrigin, language, [emailAction('live', liveLink, language), whatsappEmailAction(whatsappBlock, language)]),
       language,
       logFallback: `Live link email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `live link for registration ${registration.id}`,
@@ -982,6 +1066,7 @@ export async function sendTeamMessage(env, registration, sender, rawBody, appOri
 
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = TEAM_MESSAGE_EMAILS[language] || TEAM_MESSAGE_EMAILS.de;
+  const directionsBlock = directionsEmailBlock(tournament, language);
   const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
   for (const recipient of emailRecipients) {
     await enqueueTransactionalEmail(env, {
@@ -989,7 +1074,8 @@ export async function sendTeamMessage(env, registration, sender, rawBody, appOri
       subject: templates.subject(tournament.name),
       text: templates.text(recipient.firstName || '', tournament.name, senderName),
       messageBox: body,
-      textAfterMessageBox: `\n\n${templates.linkLabel}\n${link}${whatsappBlock}`,
+      textAfterMessageBox: `\n\n${templates.linkLabel}\n${link}${directionsBlock}${whatsappBlock}`,
+      actions: tournamentEmailActions(tournament, appOrigin, language, [whatsappEmailAction(whatsappBlock, language)]),
       language,
       logFallback: `Team message email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `team message for registration ${registration.id}`,
@@ -1010,13 +1096,15 @@ async function sendRegistrationReceivedEmail(env, tournament, registration, appO
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
   const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
   const participantsBlock = buildRegistrationParticipantsBlock(registration, language);
+  const directionsBlock = directionsEmailBlock(tournament, language);
   const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, link, cancelLink, participantsBlock) + whatsappBlock,
+      text: templates.text(recipient.firstName, tournament.name, link, cancelLink, participantsBlock) + directionsBlock + whatsappBlock,
+      actions: tournamentEmailActions(tournament, appOrigin, language, [emailAction('cancel', cancelLink, language), whatsappEmailAction(whatsappBlock, language)]),
       language,
       logFallback: `Registration received email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `registration receipt for registration ${registration.id}`,
@@ -1032,7 +1120,7 @@ async function sendRegistrationRejectionEmail(env, tournament, registration, app
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
-      to: recipient.email, subject: templates.subject(tournament.name), text: templates.text(recipient.firstName, tournament.name, link, reason), language,
+      to: recipient.email, subject: templates.subject(tournament.name), text: templates.text(recipient.firstName, tournament.name, link, reason), actions: tournamentEmailActions(tournament, appOrigin, language), language,
       logFallback: `Registration rejection email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `registration rejection for registration ${registration.id}`, allowLogFallback: true,
     });
@@ -1060,6 +1148,7 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
   const templates = REGISTRATION_DISPLACED_EMAILS[language] || REGISTRATION_DISPLACED_EMAILS.de;
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
   const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
+  const directionsBlock = directionsEmailBlock(tournament, language);
   // Stornierte bekommen keinen Gruppenlink mehr, Wartende bleiben Teil des Turniers.
   const whatsappBlock = wasCancelled ? '' : await whatsappGroupEmailBlock(env.DB, tournament.id, language);
 
@@ -1069,7 +1158,8 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
       subject: templates.subject(tournament.name),
       text: wasCancelled
         ? templates.textCancelled(recipient.firstName, tournament.name, link)
-        : templates.textWaitlisted(recipient.firstName, tournament.name, link, cancelLink) + whatsappBlock,
+        : templates.textWaitlisted(recipient.firstName, tournament.name, link, cancelLink) + directionsBlock + whatsappBlock,
+      actions: tournamentEmailActions(tournament, appOrigin, language, wasCancelled ? [] : [emailAction('cancel', cancelLink, language), whatsappEmailAction(whatsappBlock, language)]),
       language,
       logFallback: `Displacement email for ${recipient.email} (tournament ${tournament.id}, cancelled=${wasCancelled})`,
       failureContext: `displacement notice for registration ${registration.id}`,
@@ -1089,6 +1179,7 @@ async function sendCancellationEmail(env, tournament, registration, appOrigin) {
       to: recipient.email,
       subject: templates.subject(tournament.name),
       text: templates.text(recipient.firstName, tournament.name, link),
+      actions: tournamentEmailActions(tournament, appOrigin, language),
       language,
       logFallback: `Cancellation email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `cancellation notice for registration ${registration.id}`,
@@ -1280,6 +1371,7 @@ async function sendTournamentReminders(env) {
         const link = `${APP_ORIGIN}/turniere/${tournament.id}/info`;
         const cancelLink = buildCancelLink(APP_ORIGIN, registration.cancel_token);
         const ics = buildTournamentIcs(tournament, APP_ORIGIN);
+        const directionsBlock = directionsEmailBlock(tournament, language);
         const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
 
         try {
@@ -1287,7 +1379,8 @@ async function sendTournamentReminders(env) {
             await enqueueTransactionalEmail(env, {
               to: recipient.email,
               subject: templates.subject(tournament.name),
-              text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink) + whatsappBlock,
+              text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink) + directionsBlock + whatsappBlock,
+              actions: tournamentEmailActions(tournament, APP_ORIGIN, language, [emailAction('cancel', cancelLink, language), whatsappEmailAction(whatsappBlock, language)]),
               language,
               attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
               logFallback: `Tournament reminder email for registration ${registration.id} (tournament ${tournament.id})`,
@@ -3080,6 +3173,7 @@ async function sendEmailVerificationEmail(env, email, verificationUrl, language,
     to: email,
     subject: emailText.subject,
     text: emailText.text(verificationUrl),
+    actions: [emailAction('confirm', verificationUrl, language)],
     language,
     logFallback: `Email verification link for ${email}: ${verificationUrl}`,
     failureContext: `email verification email for ${email}`,
@@ -3092,6 +3186,7 @@ async function sendPasswordResetEmail(env, email, resetUrl, allowLogFallback) {
     to: email,
     subject: 'Passwort zurücksetzen',
     text: `Du kannst dein Passwort über diesen Link zurücksetzen:\n\n${resetUrl}\n\nDer Link ist 30 Minuten gültig.`,
+    actions: [emailAction('reset', resetUrl, 'de')],
     logFallback: `Password reset link for ${email}: ${resetUrl}`,
     failureContext: `password reset email for ${email}`,
     allowLogFallback,
@@ -3426,13 +3521,16 @@ export async function createBroadcastPostboxMessage(env, { sender, tournament, b
   const mailAllowed = await canSendTournamentMail(env.DB, tournament);
   for (const recipient of mailAllowed ? uniqueRecipients.values() : []) {
     const templates = TOURNAMENT_BROADCAST_EMAILS[recipient.language] || TOURNAMENT_BROADCAST_EMAILS.de;
+    const directionsBlock = directionsEmailBlock(tournament, recipient.language);
+    const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, recipient.language);
     try {
       await enqueueTransactionalEmail(env, {
         to: recipient.email,
         subject: templates.subject(tournament.name),
         text: templates.text(recipient.firstName, tournament.name, `${sender.firstName} ${sender.lastName}`),
         messageBox: body,
-        textAfterMessageBox: await whatsappGroupEmailBlock(env.DB, tournament.id, recipient.language),
+        textAfterMessageBox: directionsBlock + whatsappBlock,
+        actions: [emailAction('directions', buildDirectionsLink(tournament.location), recipient.language), whatsappEmailAction(whatsappBlock, recipient.language)].filter(Boolean),
         language: recipient.language,
         logFallback: `Tournament broadcast email for ${recipient.email} (tournament ${tournament.id})`,
         failureContext: `tournament broadcast for tournament ${tournament.id}`,
@@ -5539,6 +5637,7 @@ export async function createTournamentReport(request, env, url) {
     to: contactEmail,
     subject: emailText.subject,
     text: emailText.text(verificationUrl),
+    actions: [emailAction('confirm', verificationUrl, language)],
     language,
     logFallback: `Tournament report verification link for ${contactEmail}: ${verificationUrl}`,
     failureContext: `tournament report verification email for ${contactEmail}`,
@@ -7977,7 +8076,7 @@ function isGoogleMailRecipient(to) {
 
 // messageBox: optionale Nutzernachricht (Klartext oder Rich Text), im HTML-Teil formatiert in einer eigenen Box,
 // im Klartext-Teil als Klartext angehängt.
-async function sendTransactionalEmail(env, { to, subject, text, messageBox = null, textAfterMessageBox = '', language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
+async function sendTransactionalEmail(env, { to, subject, text, messageBox = null, textAfterMessageBox = '', actions = [], language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
   const stratoAvailable = stratoConfigured(env);
   const resendAvailable = Boolean(env.RESEND_API_KEY && env.MAIL_FROM);
 
@@ -7990,7 +8089,7 @@ async function sendTransactionalEmail(env, { to, subject, text, messageBox = nul
   }
 
   const body = appendEmailFooter(messageBox ? `${text}\n\n${richTextPlainText(messageBox)}${textAfterMessageBox}` : text + textAfterMessageBox, language);
-  const html = renderTransactionalEmailHtml(subject, text, language, messageBox, textAfterMessageBox);
+  const html = renderTransactionalEmailHtml(subject, text, language, messageBox, textAfterMessageBox, actions);
 
   // Strato (Absender ptmonline@bclinden.de) hat kein SPF/DKIM-Alignment für sein
   // DMARC(p=reject)-Setup - Strato nimmt die Mail zwar an, Google verwirft sie
@@ -8828,6 +8927,7 @@ async function createPlaceReport(request, env, url) {
     to: contactEmail,
     subject: emailText.subject,
     text: emailText.text(verificationUrl, editUrl),
+    actions: [emailAction('confirm', verificationUrl, language), emailAction('edit', editUrl, language)],
     language,
     logFallback: `Boule place report verification link for ${contactEmail}: ${verificationUrl} (edit: ${editUrl})`,
     failureContext: `boule place report verification email for ${contactEmail}`,

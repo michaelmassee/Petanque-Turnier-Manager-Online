@@ -37,6 +37,10 @@ describe('Nachricht an Team', () => {
       expect(mail.subject).toBe('Nachricht der Turnierleitung: Herbstturnier');
       expect(mail.messageBox).toBe('Bitte Lizenz mitbringen.');
       expect(mail.textAfterMessageBox).toContain('https://ptm.test/turniere/t1/info');
+      expect(mail.actions).toEqual(expect.arrayContaining([
+        expect.objectContaining({ label: 'Turnier ansehen', icon: '▣' }),
+        expect.objectContaining({ label: 'Anfahrt planen', icon: '⌖' }),
+      ]));
     }
   });
 

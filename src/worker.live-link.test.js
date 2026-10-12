@@ -93,7 +93,14 @@ describe('Persönlicher Live-Link (E-21)', () => {
   it('schickt den Live-Link mit jeder Anmeldebestätigung', async () => {
     await anmelden();
     const token = linkAusMail('neu@example.test');
+    const confirmationMail = gesendeteTexte().find((mail) => mail.to === 'neu@example.test');
     expect(token).toMatch(/^[0-9a-f]{64}$/);
+    expect(confirmationMail.actions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Turnier ansehen', icon: '▣' }),
+      expect.objectContaining({ label: 'Anfahrt planen', icon: '⌖' }),
+      expect.objectContaining({ label: 'Live-Ansicht öffnen', icon: '▶' }),
+      expect.objectContaining({ label: 'Anmeldung stornieren', icon: '×', tone: 'danger' }),
+    ]));
     // Nur der Hash liegt in der Datenbank, nie der Link selbst.
     expect(zeile("SELECT live_token_hash FROM registrations WHERE email = 'neu@example.test'").live_token_hash)
       .toBe(await sha256Hex(token));
@@ -113,6 +120,11 @@ describe('Persönlicher Live-Link (E-21)', () => {
     expect(await antwort.json()).toEqual({ sent: 1 });
     const neu = linkAusMail('maria@example.test');
     expect(neu).not.toBe(TOKEN);
+    expect(gesendeteTexte().find((mail) => mail.to === 'maria@example.test').actions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Turnier ansehen', icon: '▣' }),
+      expect.objectContaining({ label: 'Anfahrt planen', icon: '⌖' }),
+      expect.objectContaining({ label: 'Live-Ansicht öffnen', icon: '▶' }),
+    ]));
     expect((await liveAbrufen(neu)).status).toBe(200);
     expect((await liveAbrufen(TOKEN)).status).toBe(404);
     expect(zeile("SELECT action FROM audit_log WHERE action = 'live_link_reissued'")).toBeTruthy();
