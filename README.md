@@ -59,6 +59,14 @@ und Französisch.
 * Runden auslosen, Ergebnisse eintragen und Ranglisten live anzeigen
 * Interne Postbox, Aufgabenhinweise und Push-Benachrichtigungen
 
+Nach Turnierende können Turnierersteller und Bearbeiter über die Postbox einmalig die
+PDF-Endrangliste an aktive, bestätigte Teilnehmeradressen senden. Administratoren sind
+ausgeschlossen. Die PDF-Erzeugung erfolgt erst beim Versandklick im Browser, nicht im
+Cloudflare Worker. Die vorhandene Mail-Queue versendet den gespeicherten Anhang blind,
+einzeln und ohne erneuten Sendeversuch pro Adresse. Das PDF enthält die Ranglistennamen
+auch bei nicht öffentlicher Teilnehmerliste. Für diesen Ablauf muss Migration `0108`
+vor dem Worker-Deployment angewendet werden.
+
 ### 🔗 Gemeinsam mit dem Desktop-Programm
 
 Der Pétanque-Turnier-Manager Online kann eigenständig verwendet werden oder

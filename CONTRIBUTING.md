@@ -2,6 +2,26 @@
 
 This is a public repository. Security checks are part of the normal coding flow.
 
+## Test prerequisites
+
+Ranking PDF regression tests use `pdftotext` from Poppler to verify the actual extracted
+WinAnsi text, transliteration and page layout. Install `poppler-utils` on Debian/Ubuntu (or `poppler`
+with Homebrew on macOS) before running the test suite. CI installs it explicitly.
+
+Ranking PDFs are generated in the browser only after an explicit Postbox send click.
+The Worker must not import jsPDF or generate PDFs: large rankings exceed the Free-plan
+CPU budget even with standard fonts. Helvetica preserves WinAnsi characters; unsupported
+Latin characters are transliterated and remaining unsupported characters become `?`.
+The Worker accepts bounded PDF attachments (128 KiB per required language), stores them
+once per tournament, and sends metadata-only jobs through the existing mail queue in
+blocks of at most 100. The consumer batch size is one. Uploads are restricted to the
+authorized tournament owner/editors; administrators remain excluded. The ranking snapshot
+revision is checked before dispatch. Blind, at-most-once delivery still does not promise
+successful delivery or retries after an email-provider failure.
+
+Migration `0108` must run before deploying this Worker. Personal-data cleanup removes
+the stored PDFs as well as recipient addresses but keeps the tournament-wide send lock.
+
 ## Commit Checklist
 
 Run before every commit:

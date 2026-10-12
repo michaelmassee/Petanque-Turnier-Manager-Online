@@ -77,6 +77,29 @@ describe('Statusmeldungen zur Anmeldung', () => {
   });
 });
 
+describe('Endranglistenversand', () => {
+  it('zeigt die stille Einmal-Aktion nur solange der Versand nicht ausgelöst wurde', () => {
+    const onSendRankingEmail = vi.fn();
+    const message = {
+      id: 'ranking-1', kind: 'system', eventType: 'tournament_ranking_email_available',
+      eventData: { tournamentId: 't1', tournamentName: 'Herbstpokal' }, createdAt: '2026-10-12T12:00:00Z', readAt: null, mine: false,
+    };
+    const { rerender } = renderPostbox({ messages: [message], onSendRankingEmail });
+    expect(screen.getByText('Endrangliste für Herbstpokal ist verfügbar.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Rangliste als PDF an Teilnehmende senden' }));
+    expect(onSendRankingEmail).toHaveBeenCalledWith(message);
+
+    rerender(<PostboxControl open unreadCount={0} messages={[{ ...message, rankingEmailSent: true }]} recipients={[]} recipientId="user-2" setRecipientId={vi.fn()} body="" setBody={vi.fn()} onToggle={vi.fn()} onClose={vi.fn()} onRead={vi.fn()} onSubmit={vi.fn()} currentUserId="user-1" onSendRankingEmail={onSendRankingEmail} />);
+    expect(screen.queryByRole('button', { name: 'Rangliste als PDF an Teilnehmende senden' })).not.toBeInTheDocument();
+  });
+
+  it('zeigt eine Ablehnung direkt bei der Versandaktion', () => {
+    const message = { id: 'ranking-error', kind: 'system', eventType: 'tournament_ranking_email_available', eventData: { tournamentId: 't1', tournamentName: 'Herbstpokal' }, createdAt: '2026-10-12T12:00:00Z', readAt: null, mine: false };
+    renderPostbox({ messages: [message], onSendRankingEmail: vi.fn(), rankingEmailError: { id: 'ranking-error', text: 'E-Mail-Versand nicht freigeschaltet' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('E-Mail-Versand nicht freigeschaltet');
+  });
+});
+
 describe('Links in Postbox-Nachrichten', () => {
   it('navigiert bei eigenen Links in der App und lässt externe Links normal öffnen', () => {
     const onNavigate = vi.fn();

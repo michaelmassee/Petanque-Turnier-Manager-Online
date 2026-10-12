@@ -1,4 +1,6 @@
 {
+  "Ungültiger PDF-Anhang": "Pièce jointe PDF non valide",
+  "Die Rangliste wurde geändert. Bitte erneut versuchen.": "Le classement a changé. Veuillez réessayer.",
   "Die App konnte nicht wiederhergestellt werden.": "L’application n’a pas pu être rétablie.",
   "Eine Online-Anmeldung existiert nicht mehr": "Une inscription en ligne n’existe plus",
   "Bitte starte die App erneut.": "Veuillez redémarrer l’application.",
@@ -1418,5 +1420,13 @@
   "Die Cloudflare-Statistik konnte nicht abgerufen werden": "Impossible de récupérer les statistiques Cloudflare",
   "Ungültiger Tag für die Cloudflare-Statistik": "Jour non valide pour les statistiques Cloudflare",
   "Ganze Abfrage anzeigen": "Afficher la requête complète",
-  "Abfrage einklappen": "Réduire la requête"
+  "Abfrage einklappen": "Réduire la requête",
+  "Endrangliste für {{name}} ist verfügbar.": "Le classement final de {{name}} est disponible.",
+  "Rangliste als PDF an Teilnehmende senden": "Envoyer le classement en PDF aux participants",
+  "Die Rangliste kann erst nach Turnierende versendet werden": "Le classement ne peut être envoyé qu'après la fin du tournoi",
+  "Für dieses Turnier ist keine Rangliste vorhanden": "Il n'y a pas de classement pour ce tournoi",
+  "Für dieses Turnier gibt es keine erreichbaren Teilnehmenden": "Il n'y a aucun participant joignable pour ce tournoi",
+  "Der Versand der Rangliste konnte nicht gestartet werden": "L'envoi du classement n'a pas pu être démarré",
+  "Der Versand der Rangliste konnte nicht vollständig zugestellt werden.": "L'envoi du classement n'a pas pu être entièrement distribué.",
+  "Der Versand der Rangliste für {{name}} konnte nicht vollständig zugestellt werden.": "L'envoi du classement de {{name}} n'a pas pu être entièrement distribué."
 }

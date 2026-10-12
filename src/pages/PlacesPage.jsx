@@ -210,6 +210,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   // Link „Bouleplatz ansehen“ aus den Turnierdetails: /plaetze#<placeId> öffnet dessen Detailkarte und fokussiert ihn auf der Karte.
   const [linkedPlaceId] = useState(() => decodeURIComponent(window.location.hash.slice(1)));
   const linkedPlaceRef = useRef(null);
+  const linkedPlaceScrolledRef = useRef(false);
 
   const visiblePlaces = useMemo(() => {
     let results = filterPlaces(places, { favoritesOnly, clubsOnly, indoorOnly });
@@ -229,7 +230,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   }, [query, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm, places]);
 
   const placeGroups = useMemo(() => groupPlacesByOrganization(visiblePlaces), [visiblePlaces]);
-  const displayedPlaceGroups = placeGroups.slice(0, visibleCount);
+  const displayedPlaceGroups = useMemo(() => placeGroups.slice(0, visibleCount), [placeGroups, visibleCount]);
 
   useEffect(() => {
     if (!linkedPlaceId || loading) return;
@@ -244,7 +245,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   }, [linkedPlaceId, loading, placeGroups]);
 
   useEffect(() => {
-    if (!linkedPlaceId || loading || !linkedPlaceRef.current) return;
+    if (!linkedPlaceId || loading || !linkedPlaceRef.current || linkedPlaceScrolledRef.current) return;
+    linkedPlaceScrolledRef.current = true;
     linkedPlaceRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [linkedPlaceId, loading, displayedPlaceGroups]);
 

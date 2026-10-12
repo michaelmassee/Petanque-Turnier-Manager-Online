@@ -128,6 +128,8 @@ function AppContent() {
   const [postboxRecipientId, setPostboxRecipientId] = useState('');
   const [postboxBody, setPostboxBody] = useState('');
   const [postboxSending, setPostboxSending] = useState(false);
+  const [rankingEmailSendingId, setRankingEmailSendingId] = useState(null);
+  const [rankingEmailError, setRankingEmailError] = useState(null);
   const [savedSearches, setSavedSearches] = useState([]);
   const [savedSearchesOpen, setSavedSearchesOpen] = useState(false);
   const [savedSearchDialogOpen, setSavedSearchDialogOpen] = useState(false);
@@ -738,6 +740,23 @@ function AppContent() {
     }
   }
 
+  async function handleSendRankingEmail(message) {
+    const tournamentId = message.eventData?.tournamentId;
+    if (!tournamentId) return;
+    setRankingEmailError(null);
+    setRankingEmailSendingId(message.id);
+    try {
+      const { sendTournamentRankingEmail } = await import('./lib/ranking-email.js');
+      await sendTournamentRankingEmail(tournamentId);
+      await loadPostbox(true);
+    } catch (requestError) {
+      // Keine Versandstatistik, aber eine abgelehnte Aktion muss direkt bei ihr stehen.
+      setRankingEmailError({ id: message.id, text: requestError.message });
+    } finally {
+      setRankingEmailSendingId(null);
+    }
+  }
+
   async function handleOpenPostbox() {
     setMenuOpen(false);
     setSearchMenuOpen(false);
@@ -1268,10 +1287,13 @@ function AppContent() {
       body={postboxBody}
       setBody={setPostboxBody}
       sending={postboxSending}
+      rankingEmailSendingId={rankingEmailSendingId}
+      rankingEmailError={rankingEmailError}
       onToggle={handleOpenPostbox}
       onClose={() => setPostboxOpen(false)}
       onRead={handleReadPostboxMessage}
       onSubmit={handleSendPostboxMessage}
+      onSendRankingEmail={handleSendRankingEmail}
       onTodoClick={handlePostboxTodoClick}
       onNavigate={(nextPath) => { setPostboxOpen(false); navigate(nextPath); }}
       onLookupRecipientEmail={lookupPostboxRecipientByEmail}

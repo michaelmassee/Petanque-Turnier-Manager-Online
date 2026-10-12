@@ -761,26 +761,62 @@ function renderEmailButton(action) {
   return `<p style="margin:18px 0;"><a href="${escapeEmailHtml(action.url)}" style="display:inline-block;background:${colors.background};border:1px solid ${colors.border};border-radius:10px;color:${color};font-weight:700;padding:13px 20px;text-decoration:none;"><span aria-hidden="true" style="font-size:16px;margin-right:8px;">${escapeEmailHtml(action.icon)}</span>${escapeEmailHtml(action.label)}</a></p>`;
 }
 
-function renderEmailSection(text, labels, actions = []) {
+function renderEmailButtonOnce(action, renderedUrls) {
+  if (!action || renderedUrls.has(action.url)) return '';
+  renderedUrls.add(action.url);
+  return renderEmailButton(action);
+}
+
+function renderEmailSection(text, labels, actions = [], renderedUrls = new Set()) {
   const actionByUrl = new Map(actions.filter(Boolean).map((action) => [action.url, action]));
   return text
     .split(/\n{2,}/)
     .filter(Boolean)
     .map((paragraph) => {
-      const trimmed = paragraph.trim();
-      if (/^https?:\/\/[^\s<]+$/.test(trimmed)) {
-        return renderEmailButton(actionByUrl.get(trimmed) || { url: trimmed, label: labels.openLink, icon: '↗', tone: 'primary' });
+      const parts = [];
+      let textLines = [];
+      const flushText = () => {
+        if (textLines.length) {
+          parts.push(`<p style="margin:0 0 18px;color:#25332f;font-size:16px;line-height:25px;">${linkifyEmailHtml(textLines.join('\n')).replace(/\n/g, '<br>')}</p>`);
+          textLines = [];
+        }
+      };
+      // Die echten Vorlagen setzen die URL oft direkt unter eine Beschriftung,
+      // nicht in einen eigenen Absatz. Begleittext bleibt dabei erhalten.
+      for (const line of paragraph.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (/^https?:\/\/[^\s<]+$/.test(trimmed)) {
+          flushText();
+          parts.push(renderEmailButtonOnce(actionByUrl.get(trimmed) || { url: trimmed, label: labels.openLink, icon: '↗', tone: 'primary' }, renderedUrls));
+        } else {
+          textLines.push(line);
+        }
       }
-      return `<p style="margin:0 0 18px;color:#25332f;font-size:16px;line-height:25px;">${linkifyEmailHtml(paragraph).replace(/\n/g, '<br>')}</p>`;
+      flushText();
+      return parts.join('');
     })
     .join('');
 }
 
-function standaloneEmailUrls(text) {
-  return new Set(String(text || '')
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter((paragraph) => /^https?:\/\/[^\s<]+$/.test(paragraph)));
+function emailFooterActions(language) {
+  const labels = EMAIL_LAYOUT_LABELS[language] || EMAIL_LAYOUT_LABELS.de;
+  return [
+    emailAction('desktop', DESKTOP_APP_URL, language, 'secondary'),
+    { url: 'https://ptmonline.org/impressum', label: labels.legal, icon: EMAIL_ACTION_ICONS.legal, tone: 'secondary' },
+    { url: 'https://ptmonline.org/datenschutz', label: labels.privacy, icon: EMAIL_ACTION_ICONS.privacy, tone: 'secondary' },
+  ];
+}
+
+function appendMissingEmailActions(text, actions) {
+  const urls = new Set([...text.matchAll(/https?:\/\/[^\s<]+/g)]
+    .map(([url]) => url.replace(/[.,;:!?)\]]+$/, '')));
+  let result = text;
+  for (const action of actions) {
+    if (!action || urls.has(action.url)) continue;
+    result += `\n\n${action.label}\n${action.url}`;
+    urls.add(action.url);
+  }
+  return result;
 }
 
 const EMAIL_TEXT_STYLE = 'margin:0 0 10px;color:#25332f;font-size:16px;line-height:25px;';
@@ -822,22 +858,16 @@ function renderEmailMessageBox(value) {
  */
 export function renderTransactionalEmailHtml(subject, text, language, messageBox = null, textAfterMessageBox = '', actions = []) {
   const labels = EMAIL_LAYOUT_LABELS[language] || EMAIL_LAYOUT_LABELS.de;
-  const [content, footer = ''] = appendEmailFooter(text, language).split('\n\n----------\n\n');
-  const visibleActionUrls = new Set([
-    ...standaloneEmailUrls(content),
-    ...standaloneEmailUrls(textAfterMessageBox),
-  ]);
+  const renderedUrls = new Set();
+  const contentHtml = renderEmailSection(text, labels, actions, renderedUrls);
+  const afterMessageHtml = renderEmailSection(textAfterMessageBox.trim(), labels, actions, renderedUrls);
   const additionalActionButtons = actions
-    .filter(Boolean)
-    .filter((action) => !visibleActionUrls.has(action.url))
-    .map(renderEmailButton)
+    .map((action) => renderEmailButtonOnce(action, renderedUrls))
     .join('');
-  const footerActions = [
-    emailAction('desktop', DESKTOP_APP_URL, language, 'secondary'),
-    { url: 'https://ptmonline.org/impressum', label: labels.legal, icon: EMAIL_ACTION_ICONS.legal, tone: 'secondary' },
-    { url: 'https://ptmonline.org/datenschutz', label: labels.privacy, icon: EMAIL_ACTION_ICONS.privacy, tone: 'secondary' },
-  ];
-  const footerHtml = `${renderEmailSection(footer, labels, footerActions)}${footerActions.slice(1).map(renderEmailButton).join('')}`;
+  const footerActions = emailFooterActions(language);
+  const footerUrls = new Set();
+  const footerHtml = renderEmailSection(EMAIL_FOOTERS[language] || EMAIL_FOOTERS.de, labels, footerActions, footerUrls)
+    + footerActions.map((action) => renderEmailButtonOnce(action, footerUrls)).join('');
   return `<!doctype html>
 <html lang="${escapeEmailHtml(language || 'de')}">
   <body style="margin:0;padding:0;background:#eef3f1;font-family:Arial,Helvetica,sans-serif;">
@@ -845,7 +875,7 @@ export function renderTransactionalEmailHtml(subject, text, language, messageBox
       <tr><td align="center" style="padding:32px 16px;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border-radius:14px;overflow:hidden;">
           <tr><td style="background:#07594f;padding:24px 32px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:.1px;">${EMAIL_BRAND}</td></tr>
-          <tr><td style="padding:34px 32px 24px;"><h1 style="margin:0 0 24px;color:#173b34;font-size:24px;line-height:31px;">${escapeEmailHtml(subject)}</h1>${renderEmailSection(content, labels, actions)}${messageBox ? renderEmailMessageBox(messageBox) : ''}${textAfterMessageBox ? renderEmailSection(textAfterMessageBox.trim(), labels, actions) : ''}${additionalActionButtons}</td></tr>
+          <tr><td style="padding:34px 32px 24px;"><h1 style="margin:0 0 24px;color:#173b34;font-size:24px;line-height:31px;">${escapeEmailHtml(subject)}</h1>${contentHtml}${messageBox ? renderEmailMessageBox(messageBox) : ''}${afterMessageHtml}${additionalActionButtons}</td></tr>
           <tr><td style="border-top:1px solid #dce6e2;padding:24px 32px 28px;background:#f8fbfa;">${footerHtml}</td></tr>
         </table>
         <p style="margin:16px 0 0;color:#71807b;font-size:12px;line-height:18px;">${labels.automated}</p>
@@ -1225,6 +1255,7 @@ async function finishStaleTournaments(env, now = new Date()) {
     const row = stale[index];
     try {
       await createSystemNotification(env, row.owner_id, 'tournament_status_changed', { tournamentId: row.id, tournamentName: row.name, status: 'finished', automatic: true });
+      await notifyRankingEmailAvailable(env, await getTournamentById(env.DB, row.id));
     } catch (error) {
       console.error(`Failed to notify owner about auto-finished tournament ${row.id}`, error);
     }
@@ -1319,6 +1350,11 @@ export async function purgeExpiredPersonalData(db, now = new Date()) {
       db.prepare(`UPDATE registrations SET email = 'ohne-email-' || lower(hex(randomblob(16))) || '@ohne-email.invalid',
           player_email = NULL, partner_email = NULL, partner2_email = NULL, fee_selections = '[]', registration_answers = '[]',
           organizer_message = NULL WHERE tournament_id = ?`).bind(tournament.id),
+      // Empfängeradressen dürfen nicht über die Aufbewahrungsfrist hinaus im
+      // Versandprotokoll bleiben. Fehlende Zustellungen stoppen auch wartende
+      // Queue-Nachrichten; die turnierweite Einmal-Sperre bleibt bestehen.
+      db.prepare('DELETE FROM tournament_ranking_email_deliveries WHERE tournament_id = ?').bind(tournament.id),
+      db.prepare("UPDATE tournament_ranking_email_dispatches SET requested_by = NULL, pdf_attachments = '{}' WHERE tournament_id = ?").bind(tournament.id),
       ...audits.map((row) => {
         let details = null;
         try { details = row.details_json ? JSON.parse(row.details_json) : null; } catch { details = null; }
@@ -2286,6 +2322,15 @@ export default {
         return await updateTournamentPublication(request, env, tournament, session.user);
       }
 
+      const rankingEmailMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/ranking-email$/);
+      if (rankingEmailMatch && ['GET', 'POST'].includes(request.method)) {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, rankingEmailMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        if (request.method === 'GET') return json(await prepareTournamentRankingEmail(env, tournament, session.user));
+        return await requestTournamentRankingEmail(env, tournament, session.user, await readJson(request));
+      }
+
       const shareLinkMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/share-link$/);
       if (shareLinkMatch) {
         const session = await requireSession(request, env.DB);
@@ -2516,7 +2561,7 @@ export default {
         const auth = await requireApiKey(request, env.DB);
         const tournament = await getSyncTournament(env.DB, syncRankingMatch[1]);
         assertCanManageTournament(tournament, auth.user);
-        return await executeSyncWrite(request, env.DB, tournament, (db) => syncPutRanking(request, db, tournament));
+        return await executeSyncWrite(request, env.DB, tournament, (db) => syncPutRanking(request, db, tournament, env));
       }
 
       const syncMetadataMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/metadata$/);
@@ -3380,6 +3425,13 @@ async function getPostbox(db, user) {
      ORDER BY m.created_at DESC LIMIT 25`,
   ).bind(user.id).all();
   const messages = result.results.map((row) => toPostboxMessage(row, user.id));
+  const rankingTournamentIds = [...new Set(messages.filter((message) => message.eventType === 'tournament_ranking_email_available').map((message) => message.eventData?.tournamentId).filter(Boolean))];
+  if (rankingTournamentIds.length) {
+    const placeholders = rankingTournamentIds.map(() => '?').join(', ');
+    const dispatches = await db.prepare(`SELECT tournament_id FROM tournament_ranking_email_dispatches WHERE tournament_id IN (${placeholders})`).bind(...rankingTournamentIds).all();
+    const dispatched = new Set((dispatches.results || []).map((row) => row.tournament_id));
+    messages.forEach((message) => { if (message.eventType === 'tournament_ranking_email_available') message.rankingEmailSent = dispatched.has(message.eventData?.tournamentId); });
+  }
   return json({ messages, ...(await postboxSummary(db, user)) });
 }
 
@@ -3456,11 +3508,14 @@ async function listPostboxTodos(db, user) {
   return todos;
 }
 
-async function createPostboxMessage(env, { senderId = null, recipientId, kind, body = null, eventType = null, eventData = null, pushTitle = 'Neue Nachricht', pushActor = '' }) {
-  const id = crypto.randomUUID();
+async function createPostboxMessage(env, { senderId = null, recipientId, kind, body = null, eventType = null, eventData = null, pushTitle = 'Neue Nachricht', pushActor = '', deduplicationKey = null }) {
+  const id = deduplicationKey ? await sha256Hex(deduplicationKey) : crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  await env.DB.prepare('INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, event_type, event_data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+  const inserted = await env.DB.prepare(`INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, event_type, event_data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)${deduplicationKey ? ' ON CONFLICT(id) DO NOTHING' : ''}`)
     .bind(id, senderId, recipientId, kind, body, eventType, eventData ? JSON.stringify(eventData) : null, createdAt).run();
+  // Derselbe Anlass kann über mehrere Sync-Pfade gleichzeitig eintreffen.
+  // Nur die atomar angelegte Nachricht darf auch einen Push auslösen.
+  if (deduplicationKey && !inserted.meta.changes) return null;
   await env.DB.prepare(
     `DELETE FROM postbox_messages WHERE recipient_id = ? AND id NOT IN (
        SELECT id FROM postbox_messages WHERE recipient_id = ? ORDER BY created_at DESC LIMIT 25
@@ -5250,7 +5305,119 @@ async function notifyTournamentPublicationChange(env, existing, updated) {
     await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentId: existing.id, tournamentName: updated.name, status: updated.status });
     const participants = await participantAccountUserIds(env.DB, existing.id, existing.owner_id);
     await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentId: existing.id, tournamentName: updated.name, status: updated.status })));
+    if (updated.status === 'finished') await notifyRankingEmailAvailable(env, updated);
   }
+}
+
+function canDispatchTournamentRankingEmail(tournament, user) {
+  return Boolean(user) && user.role !== 'admin' && (tournament.owner_id === user.id || tournamentEditorIds(tournament).includes(user.id));
+}
+
+async function notifyRankingEmailAvailable(env, tournament) {
+  if (!tournament || tournament.status !== 'finished') return;
+  if (!(await canSendTournamentMail(env.DB, tournament))) return;
+  const [ranking, dispatch] = await Promise.all([
+    computeTournamentRanking(env.DB, tournament),
+    env.DB.prepare('SELECT tournament_id FROM tournament_ranking_email_dispatches WHERE tournament_id = ?').bind(tournament.id).first(),
+  ]);
+  if (ranking.length === 0 || dispatch) return;
+  const recipientIds = [...new Set([tournament.owner_id, ...tournamentEditorIds(tournament)])];
+  const eligible = await env.DB.prepare(`SELECT id FROM users WHERE role = 'user' AND id IN (${recipientIds.map(() => '?').join(', ')})`).bind(...recipientIds).all();
+  await Promise.all((eligible.results || []).map((recipient) => createPostboxMessage(env, {
+    recipientId: recipient.id, kind: 'system', eventType: 'tournament_ranking_email_available',
+    eventData: { tournamentId: tournament.id, tournamentName: tournament.name }, pushTitle: 'Neue Statusmeldung',
+    deduplicationKey: JSON.stringify(['tournament_ranking_email_available', tournament.id, recipient.id]),
+  })));
+}
+
+function rankingEmailRecipients(registrations) {
+  const recipients = new Map();
+  for (const registration of registrations) {
+    for (const recipient of buildTeamRecipients(registration)) {
+      const email = String(recipient.email || '').trim().toLowerCase();
+      if (email && !recipients.has(email)) recipients.set(email, { email, language: LANGUAGES.includes(registration.language) ? registration.language : 'de' });
+    }
+  }
+  return [...recipients.values()];
+}
+
+const RANKING_EMAIL_TEXT = {
+  de: (name) => ({ subject: `Endrangliste: ${name}`, text: `Hallo,\n\nanbei erhältst du die Endrangliste des Turniers ${name} als PDF.` }),
+  en: (name) => ({ subject: `Final ranking: ${name}`, text: `Hello,\n\nattached is the final ranking for ${name} as a PDF.` }),
+  fr: (name) => ({ subject: `Classement final : ${name}`, text: `Bonjour,\n\nle classement final de ${name} est joint au format PDF.` }),
+  es: (name) => ({ subject: `Clasificación final: ${name}`, text: `Hola,\n\nadjuntamos la clasificación final de ${name} en PDF.` }),
+  nl: (name) => ({ subject: `Eindranglijst: ${name}`, text: `Hallo,\n\nbijgevoegd staat de eindranglijst van ${name} als PDF.` }),
+};
+
+async function rankingEmailData(env, tournament, user) {
+  if (!canDispatchTournamentRankingEmail(tournament, user)) throw new HttpError(403, 'Zugriff verweigert');
+  if (tournament.status !== 'finished') throw new HttpError(409, 'Die Rangliste kann erst nach Turnierende versendet werden');
+  if (!(await canSendTournamentMail(env.DB, tournament))) throw new HttpError(409, 'Für dieses Turnier ist der E-Mail-Versand nicht freigeschaltet');
+  const ranking = await computeTournamentRanking(env.DB, tournament);
+  if (ranking.length === 0) throw new HttpError(409, 'Für dieses Turnier ist keine Rangliste vorhanden');
+  const registrations = await env.DB.prepare("SELECT * FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active'").bind(tournament.id).all();
+  const recipients = rankingEmailRecipients(registrations.results || []);
+  if (!recipients.length) throw new HttpError(409, 'Für dieses Turnier gibt es keine erreichbaren Teilnehmenden');
+  const documentTournament = { name: tournament.name, date: tournament.date, location: formatLocationAddress(tournament.location) };
+  const documentRanking = toLiveRanking(ranking);
+  const revision = await sha256Hex(JSON.stringify({ tournament: documentTournament, ranking: documentRanking }));
+  return { tournament: documentTournament, ranking: documentRanking, recipients, revision };
+}
+
+export async function prepareTournamentRankingEmail(env, tournament, user) {
+  const data = await rankingEmailData(env, tournament, user);
+  const sent = Boolean(await env.DB.prepare('SELECT tournament_id FROM tournament_ranking_email_dispatches WHERE tournament_id = ?').bind(tournament.id).first());
+  if (sent) return { sent: true };
+  return { tournament: data.tournament, ranking: data.ranking, revision: data.revision, languages: [...new Set(data.recipients.map((recipient) => recipient.language))] };
+}
+
+function validateRankingAttachments(attachments, recipients) {
+  const result = {};
+  for (const language of new Set(recipients.map((recipient) => recipient.language))) {
+    const attachment = attachments?.[language];
+    const content = attachment?.content;
+    // Je PDF höchstens 128 KiB; der Queue-Auftrag enthält nur die Adresse,
+    // der fertige Anhang wird einmalig im Versandauftrag gespeichert.
+    if (attachment?.filename !== 'rangliste.pdf' || typeof content !== 'string' || content.length > 174_764
+      || content.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(content)
+      || content.length / 4 * 3 - (content.endsWith('==') ? 2 : content.endsWith('=') ? 1 : 0) > 131_072
+      || !atob(content.slice(0, 12)).startsWith('%PDF-') || !atob(content.slice(-32)).trimEnd().endsWith('%%EOF')) {
+      throw new HttpError(400, 'Ungültiger PDF-Anhang');
+    }
+    result[language] = { filename: 'rangliste.pdf', content };
+  }
+  return result;
+}
+
+export async function requestTournamentRankingEmail(env, tournament, user, document = {}) {
+  const { recipients, revision } = await rankingEmailData(env, tournament, user);
+  if (await env.DB.prepare('SELECT tournament_id FROM tournament_ranking_email_dispatches WHERE tournament_id = ?').bind(tournament.id).first()) return json({ ok: true });
+  if (!document || typeof document !== 'object' || Array.isArray(document)) throw new HttpError(400, 'Ungültiger PDF-Anhang');
+  if (document.revision !== revision) throw new HttpError(409, 'Die Rangliste wurde geändert. Bitte erneut versuchen.');
+  const attachments = validateRankingAttachments(document.attachments, recipients);
+  const now = new Date().toISOString();
+  const claimed = await env.DB.prepare('INSERT OR IGNORE INTO tournament_ranking_email_dispatches (tournament_id, requested_by, requested_at, pdf_attachments) VALUES (?, ?, ?, ?)').bind(tournament.id, user.id, now, JSON.stringify(attachments)).run();
+  // Turnierweite Sperre: Weitere Klicks, auch von anderen Leitungen, lösen nichts aus.
+  if (!claimed.meta.changes) return json({ ok: true });
+  for (let offset = 0; offset < recipients.length; offset += 100) {
+    const chunk = recipients.slice(offset, offset + 100);
+    try {
+      // Der Consumer benötigt einen dauerhaften Datensatz zur Deduplizierung bei
+      // mehrfacher Queue-Zustellung. Das fertige PDF liegt einmalig im Versandauftrag.
+      // json_each hält die Parameterzahl unabhängig von der Blockgröße bei drei.
+      await env.DB.prepare(`INSERT INTO tournament_ranking_email_deliveries (tournament_id, email, language, created_at)
+        SELECT ?, json_extract(value, '$.email'), json_extract(value, '$.language'), ? FROM json_each(?)`)
+        .bind(tournament.id, now, JSON.stringify(chunk)).run();
+      await env.MAIL_QUEUE.sendBatch(chunk.map((recipient) => ({ body: {
+        kind: 'tournament_ranking_pdf', tournamentId: tournament.id, tournamentName: tournament.name, email: recipient.email, language: recipient.language,
+      } })));
+    } catch (error) {
+      // Wie beim Postbox-Broadcast: blind einreihen, Fehler protokollieren und mit
+      // dem nächsten Block fortfahren. Kein erneuter Versandauftrag.
+      console.error(`Failed to queue ranking email for tournament ${tournament.id}`, error);
+    }
+  }
+  return json({ ok: true });
 }
 
 /**
@@ -5867,9 +6034,7 @@ async function syncPutTournamentMetadata(request, env, existing) {
     response: { envelope: { status: 200, body: {}, hydrate: { kind: 'tournament' } } },
     async afterCommit() {
       const updated = await getTournamentById(db, existing.id);
-      if (isNewlyPublicTournament(existing, updated)) {
-        await notifySavedSearchesForPublishedTournament(env, updated);
-      }
+      await notifyTournamentPublicationChange(env, existing, updated);
     },
   };
 }
@@ -6473,7 +6638,9 @@ async function reportLiveMatchResult(request, db, registration) {
     throw new HttpError(403, 'Die Turnierleitung hat keine Ergebnismeldungen durch Spieler freigegeben');
   }
   if (tournament.status !== 'running') throw new HttpError(409, 'Das Turnier läuft nicht');
-  if (registration.participation === 'withdrawn') throw new HttpError(403, 'Du kannst nur das Ergebnis deiner aktuellen offenen Partie melden');
+  if (registration.status !== 'confirmed' || registration.participation !== 'active') {
+    throw new HttpError(403, 'Du kannst nur das Ergebnis deiner aktuellen offenen Partie melden');
+  }
   assertOnlineExecution(tournament);
 
   const match = await db.prepare(`SELECT m.id,
@@ -6495,10 +6662,18 @@ async function reportLiveMatchResult(request, db, registration) {
   if (ownScore === opponentScore) throw new HttpError(400, 'Ungültiges Ergebnis');
   const scoreA = Number(match.in_a) === 1 ? ownScore : opponentScore;
   const scoreB = Number(match.in_a) === 1 ? opponentScore : ownScore;
+  // Alle veränderlichen Voraussetzungen müssen auch beim Schreiben gelten, nicht nur bei der Vorab-Auswahl.
   const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, updated_at = ?
-      WHERE id = ? AND score_a IS NULL AND score_b IS NULL AND no_show IS NULL`)
-    .bind(scoreA, scoreB, new Date().toISOString(), match.id).run();
-  if (!saved.meta.changes) throw new HttpError(409, 'Das Ergebnis wurde bereits gemeldet');
+      WHERE id = ? AND score_a IS NULL AND score_b IS NULL AND no_show IS NULL
+        AND EXISTS (SELECT 1 FROM tournaments t WHERE t.id = tournament_matches.tournament_id
+          AND t.status = 'running' AND t.player_result_reporting_enabled = 1 AND COALESCE(t.desktop_execution, 0) = 0)
+        AND EXISTS (SELECT 1 FROM registrations r WHERE r.id = ? AND r.tournament_id = tournament_matches.tournament_id
+          AND r.status = 'confirmed' AND r.participation = 'active')
+        AND EXISTS (SELECT 1 FROM json_each(CASE WHEN ? = 1 THEN team_a_registration_ids ELSE team_b_registration_ids END) j WHERE j.value = ?)
+        AND EXISTS (SELECT 1 FROM tournament_rounds r WHERE r.id = tournament_matches.round_id
+          AND r.round_number = (SELECT MAX(round_number) FROM tournament_rounds WHERE tournament_id = tournament_matches.tournament_id))`)
+    .bind(scoreA, scoreB, new Date().toISOString(), match.id, registration.id, Number(match.in_a), registration.id).run();
+  if (!saved.meta.changes) throw new HttpError(409, 'Du kannst nur das Ergebnis deiner aktuellen offenen Partie melden');
   await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
 }
 
@@ -6949,7 +7124,7 @@ async function syncDeleteRound(db, tournament, roundNumberValue) {
   };
 }
 
-async function syncPutRanking(request, db, tournament) {
+async function syncPutRanking(request, db, tournament, env) {
   assertDesktopExecution(tournament);
   const body = await readJson(request);
   const entries = parseSyncRanking(body, await tournamentRegistrationIds(db, tournament.id));
@@ -6957,6 +7132,9 @@ async function syncPutRanking(request, db, tournament) {
   return {
     statements: [db.prepare('UPDATE tournaments SET desktop_ranking_json = ? WHERE id = ?').bind(JSON.stringify(entries), tournament.id)],
     response: { envelope: { status: 200, body: { entryCount: entries.length } } },
+    async afterCommit() {
+      await notifyRankingEmailAvailable(env, await getTournamentById(db, tournament.id));
+    },
   };
 }
 
@@ -8088,7 +8266,8 @@ async function sendTransactionalEmail(env, { to, subject, text, messageBox = nul
     throw new HttpError(503, 'E-Mail-Versand ist nicht konfiguriert.');
   }
 
-  const body = appendEmailFooter(messageBox ? `${text}\n\n${richTextPlainText(messageBox)}${textAfterMessageBox}` : text + textAfterMessageBox, language);
+  const content = messageBox ? `${text}\n\n${richTextPlainText(messageBox)}${textAfterMessageBox}` : text + textAfterMessageBox;
+  const body = appendMissingEmailActions(appendEmailFooter(appendMissingEmailActions(content, actions), language), emailFooterActions(language));
   const html = renderTransactionalEmailHtml(subject, text, language, messageBox, textAfterMessageBox, actions);
 
   // Strato (Absender ptmonline@bclinden.de) hat kein SPF/DKIM-Alignment für sein
@@ -8149,17 +8328,48 @@ async function processMailQueueBatch(batch, env) {
         await sendLivePushItems(env, message.body.items);
       } else if (message.body?.kind === 'push') {
         await sendPushNotifications(env, message.body.userId, message.body.payload);
+      } else if (message.body?.kind === 'tournament_ranking_pdf') {
+        await sendQueuedRankingPdf(env, message.body);
       } else {
         await sendTransactionalEmail(env, message.body);
       }
       message.ack();
     } catch (error) {
       console.error(`Queued ${message.body?.kind === 'push' ? 'push' : 'email'} delivery failed for ${message.body?.kind === 'push' ? message.body?.userId : (message.body?.failureContext || message.body?.to)}`, error);
-      message.retry({ delaySeconds: 10 });
+      if (message.body?.kind === 'tournament_ranking_pdf') {
+        message.ack();
+      }
+      else message.retry({ delaySeconds: 10 });
     }
     // Die Drosselung gilt den Mail-Anbietern; Live-Pushes einer Runde sollen ohne Wartezeit raus.
     if (message.body?.kind !== 'live_push') await sleep(MAIL_QUEUE_SEND_DELAY_MS);
   }
+}
+
+async function sendQueuedRankingPdf(env, payload) {
+  const delivery = await env.DB.prepare(`SELECT d.attempted_at, d.language, json_extract(s.pdf_attachments, '$.' || d.language) AS pdf_attachment FROM tournament_ranking_email_deliveries d
+    JOIN tournament_ranking_email_dispatches s ON s.tournament_id = d.tournament_id
+    WHERE d.tournament_id = ? AND d.email = ?`).bind(payload.tournamentId, payload.email).first();
+  if (!delivery || delivery.attempted_at) return;
+  const tournament = await getTournamentById(env.DB, payload.tournamentId);
+  if (!tournament || tournament.personal_data_purged_at) return;
+  const language = delivery.language;
+  const template = (RANKING_EMAIL_TEXT[language] || RANKING_EMAIL_TEXT.de)(tournament.name);
+  const attachment = JSON.parse(delivery.pdf_attachment || 'null');
+  if (!attachment) throw new Error(`Ranking attachment missing for tournament ${payload.tournamentId}`);
+  // Keine PDF-Erzeugung im Worker. Erst den bereits fertigen Anhang laden,
+  // dann atomar genau einen Sendeversuch pro Adresse erlauben.
+  const claimed = await env.DB.prepare("UPDATE tournament_ranking_email_deliveries SET attempted_at = ? WHERE tournament_id = ? AND email = ? AND attempted_at IS NULL RETURNING tournament_id").bind(new Date().toISOString(), payload.tournamentId, payload.email).first();
+  if (!claimed) return;
+  const current = await env.DB.prepare('SELECT personal_data_purged_at FROM tournaments WHERE id = ?').bind(payload.tournamentId).first();
+  if (!current || current.personal_data_purged_at) return;
+  await sendTransactionalEmail(env, {
+    to: payload.email, subject: template.subject, text: template.text, language,
+    attachments: [attachment],
+    logFallback: `Tournament ranking email for ${payload.email} (tournament ${tournament.id})`,
+    failureContext: `tournament ranking for tournament ${tournament.id}`,
+    allowLogFallback: true,
+  });
 }
 
 function reorderHouseNumberInDisplayName(displayName, address) {

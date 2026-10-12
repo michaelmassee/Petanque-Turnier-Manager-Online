@@ -1,4 +1,6 @@
 {
+  "Ungültiger PDF-Anhang": "Invalid PDF attachment",
+  "Die Rangliste wurde geändert. Bitte erneut versuchen.": "The ranking has changed. Please try again.",
   "Die App konnte nicht wiederhergestellt werden.": "The app could not be recovered.",
   "Eine Online-Anmeldung existiert nicht mehr": "An online registration no longer exists",
   "Bitte starte die App erneut.": "Please restart the app.",
@@ -1418,5 +1420,13 @@
   "Die Cloudflare-Statistik konnte nicht abgerufen werden": "The Cloudflare statistics could not be retrieved",
   "Ungültiger Tag für die Cloudflare-Statistik": "Invalid day for the Cloudflare statistics",
   "Ganze Abfrage anzeigen": "Show full query",
-  "Abfrage einklappen": "Collapse query"
+  "Abfrage einklappen": "Collapse query",
+  "Endrangliste für {{name}} ist verfügbar.": "Final ranking for {{name}} is available.",
+  "Rangliste als PDF an Teilnehmende senden": "Send ranking as PDF to participants",
+  "Die Rangliste kann erst nach Turnierende versendet werden": "The ranking can only be sent after the tournament has finished",
+  "Für dieses Turnier ist keine Rangliste vorhanden": "There is no ranking for this tournament",
+  "Für dieses Turnier gibt es keine erreichbaren Teilnehmenden": "There are no reachable participants for this tournament",
+  "Der Versand der Rangliste konnte nicht gestartet werden": "The ranking delivery could not be started",
+  "Der Versand der Rangliste konnte nicht vollständig zugestellt werden.": "The ranking delivery could not be completed.",
+  "Der Versand der Rangliste für {{name}} konnte nicht vollständig zugestellt werden.": "The ranking delivery for {{name}} could not be completed."
 }

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 import worker from './worker.js';
 
@@ -9,6 +9,8 @@ describe('Ergebnismeldung durch Spieler', () => {
   const melden = (session, body, registrationId = 'r1') => worker.fetch(new Request(`https://ptm.test/api/live/registrations/${registrationId}/result`, {
     method: 'POST', headers: { Cookie: `ptm_session=${session}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }), env);
+
+  afterEach(() => env.DB.sqlite.close());
 
   beforeEach(() => {
     env = { DB: d1MitSchema() };
@@ -54,9 +56,47 @@ describe('Ergebnismeldung durch Spieler', () => {
     expect(env.DB.sqlite.prepare("SELECT score_a, score_b FROM tournament_matches WHERE id = 'match1'").get()).toEqual({ score_a: 7, score_b: 13 });
   });
 
-  it('verweigert einem zurückgezogenen Spieler die Ergebnismeldung', async () => {
-    sql("UPDATE registrations SET participation = 'withdrawn' WHERE id = 'r1'");
+  it.each(['inactive', 'withdrawn'])('verweigert einem %s gesetzten Spieler die Ergebnismeldung', async (participation) => {
+    sql("UPDATE registrations SET participation = ? WHERE id = 'r1'", participation);
     expect((await melden('player-session', { ownScore: 13, opponentScore: 7 })).status).toBe(403);
+    expect(env.DB.sqlite.prepare("SELECT score_a, score_b FROM tournament_matches WHERE id = 'match1'").get())
+      .toEqual({ score_a: null, score_b: null });
+  });
+
+  it.each(['pending', 'waitlist'])('verweigert eine nicht bestätigte Anmeldung (%s)', async (status) => {
+    sql("UPDATE registrations SET status = ? WHERE id = 'r1'", status);
+    expect((await melden('player-session', { ownScore: 13, opponentScore: 7 })).status).toBe(403);
+    expect(env.DB.sqlite.prepare("SELECT score_a, score_b FROM tournament_matches WHERE id = 'match1'").get())
+      .toEqual({ score_a: null, score_b: null });
+  });
+
+  it.each([
+    ['Turnierabschluss', "UPDATE tournaments SET status = 'finished' WHERE id = 't1'"],
+    ['entzogener Freigabe', "UPDATE tournaments SET player_result_reporting_enabled = 0 WHERE id = 't1'"],
+    ['Desktop-Durchführung', "UPDATE tournaments SET desktop_execution = 1 WHERE id = 't1'"],
+    ['inaktiver Teilnahme', "UPDATE registrations SET participation = 'inactive' WHERE id = 'r1'"],
+    ['pausierter Teilnahme', "UPDATE registrations SET participation = 'withdrawn' WHERE id = 'r1'"],
+    ['stornierter Anmeldung', "UPDATE registrations SET status = 'cancelled' WHERE id = 'r1'"],
+    ['neuer Runde', "INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES ('round2', 't1', 2, '2026-01-01')"],
+    ['vertauschten Teams', `UPDATE tournament_matches SET team_a_registration_ids = '["r2"]', team_b_registration_ids = '["r1"]' WHERE id = 'match1'`],
+  ])('speichert nach zwischenzeitlicher Änderung (%s) kein Ergebnis', async (_reason, statement) => {
+    const body = { ownScore: 13, opponentScore: 7 };
+    const request = new Request('https://ptm.test/api/live/registrations/r1/result', {
+      method: 'POST', headers: { Cookie: 'ptm_session=player-session', 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    // Der Body wird erst nach der Auswahl der aktuellen Partie gelesen.
+    const getReader = request.body.getReader.bind(request.body);
+    const readBody = vi.spyOn(request.body, 'getReader').mockImplementation(() => {
+      sql(statement);
+      return getReader();
+    });
+
+    const response = await worker.fetch(request, env);
+
+    expect(readBody).toHaveBeenCalledOnce();
+    expect(response.status).toBe(409);
+    expect(env.DB.sqlite.prepare("SELECT score_a, score_b FROM tournament_matches WHERE id = 'match1'").get())
+      .toEqual({ score_a: null, score_b: null });
   });
 
   it.each([

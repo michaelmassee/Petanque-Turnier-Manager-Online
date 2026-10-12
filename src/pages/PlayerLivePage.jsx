@@ -399,7 +399,8 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
       {!drawn && <RegistrationPhase registration={registration} tournament={tournament} />}
       {drawn && registration.participation === 'inactive' && <p className="hint">{t('Du bist noch nicht eingecheckt.')}</p>}
       {(drawn || tournament.status === 'running') && <CurrentMatchCard key={live.currentMatch?.matchId || 'no-current-match'} live={live} participation={registration.participation}
-        canReportResult={canReportResult && tournament.playerResultReportingEnabled && tournament.status === 'running'} path={path}
+        canReportResult={canReportResult && tournament.playerResultReportingEnabled && tournament.status === 'running'
+          && registration.status === 'confirmed' && registration.participation === 'active'} path={path}
         onResultSaved={(updated) => queryClient.setQueryData(queryKey, updated)} />}
       <RankingCard live={live} />
       <HistoryCard live={live} />

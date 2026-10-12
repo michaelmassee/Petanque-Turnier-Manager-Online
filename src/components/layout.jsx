@@ -65,7 +65,7 @@ export function PushMigrationNotice({ onDismiss, onEnabled }) {
 
 const POSTBOX_MESSAGE_MAX_LENGTH = 500;
 
-export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick, onNavigate, currentUserId, sending = false, onLookupRecipientEmail }) {
+export function PostboxControl({ open, unreadCount, messages, todos = [], recipients, recipientTournaments = [], recipientId, setRecipientId, body, setBody, onToggle, onClose, onRead, onSubmit, onTodoClick, onNavigate, currentUserId, sending = false, onLookupRecipientEmail, onSendRankingEmail, rankingEmailSendingId = null, rankingEmailError = null }) {
   const [pushState, setPushState] = useState('');
   const [pushErrorDetail, setPushErrorDetail] = useState('');
   const [pushActive, setPushActive] = useState(false);
@@ -155,6 +155,12 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
                   {message.kind === 'direct'
                     ? <span className="postbox-message-body"><RichText value={message.body} onNavigate={onNavigate} /></span>
                     : <span>{postboxMessageText(message, text)}</span>}
+                  {message.eventType === 'tournament_ranking_email_available' && !message.rankingEmailSent && onSendRankingEmail && (
+                    <div className="dialog-actions">
+                      <Button type="button" loading={rankingEmailSendingId === message.id} onClick={(event) => { event.stopPropagation(); onSendRankingEmail(message); }}>{text('Rangliste als PDF an Teilnehmende senden')}</Button>
+                    </div>
+                  )}
+                  {rankingEmailError?.id === message.id && <Feedback error={rankingEmailError.text} />}
                   <small>{new Date(message.createdAt).toLocaleString()}</small>
                 </div>
               ))}
@@ -188,6 +194,8 @@ function postboxMessageText(message, t) {
     const status = `${data.tournamentName}: ${t('Status')} ${labelFor(TOURNAMENT_STATUSES, data.status)}`;
     return data.automatic ? `${status}\n${t('Automatisch beendet, da der Turnierbeginn mehr als 48 Stunden zurückliegt.')}` : status;
   }
+  if (message.eventType === 'tournament_ranking_email_available') return t('Endrangliste für {{name}} ist verfügbar.', { name: data.tournamentName || '' });
+  if (message.eventType === 'tournament_ranking_email_failed') return t('Der Versand der Rangliste für {{name}} konnte nicht vollständig zugestellt werden.', { name: data.tournamentName || '' });
   if (message.eventType === 'registration_status_changed') {
     const subject = data.ownRegistration ? t('Deine Anmeldung') : data.participant ? t('registrationFor').replace('{participant}', data.participant) : '';
     const status = `${data.tournamentName}: ${subject ? `${subject} ` : ''}${labelFor(REGISTRATION_STATUSES, data.status)}`;

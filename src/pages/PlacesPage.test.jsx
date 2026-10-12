@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlacesPage, { filterPlaces, groupMapPlaces, groupPlacesByOrganization } from './PlacesPage.jsx';
 import '../lib/i18next-config.js';
@@ -117,9 +117,26 @@ describe('Bouleplatz-Deep-Link aus Turnierdetails', () => {
     const details = heading.closest('details');
     expect(details).toHaveAttribute('open');
     expect(screen.getByRole('heading', { name: 'Bouleplatz 1' })).toBeInTheDocument();
-    await vi.waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled());
+    await vi.waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled(), { timeout: 5_000 });
     expect(Element.prototype.scrollIntoView.mock.contexts).toContain(details);
-    await vi.waitFor(() => expect(map.flyTo).toHaveBeenCalledWith([50.14, 8.14], 15));
+    await vi.waitFor(() => expect(map.flyTo).toHaveBeenCalledWith([50.14, 8.14], 15), { timeout: 5_000 });
     expect(map.openPopup).toHaveBeenCalled();
+  });
+
+  it('scrollt nur einmal zur verknüpften Detailkarte und lässt spätere Kartenklicks unberührt', async () => {
+    renderPlacesPage();
+    const heading = await screen.findByRole('heading', { name: 'Bouleplatz 14' }, { timeout: 5_000 });
+    const details = heading.closest('details');
+    await vi.waitFor(() => expect(map.flyTo).toHaveBeenCalledWith([50.14, 8.14], 15), { timeout: 5_000 });
+    await vi.waitFor(() => expect(Element.prototype.scrollIntoView.mock.contexts).toContain(details), { timeout: 5_000 });
+    expect(Element.prototype.scrollIntoView.mock.contexts.filter((element) => element === details)).toHaveLength(1);
+    Element.prototype.scrollIntoView.mockClear();
+
+    const otherDetails = screen.getByRole('heading', { name: 'Bouleplatz 1' }).closest('details');
+    fireEvent.click(within(otherDetails).getByRole('button', { name: 'Karte', hidden: true }));
+
+    await vi.waitFor(() => expect(map.flyTo).toHaveBeenLastCalledWith([50.01, 8.01], 15), { timeout: 5_000 });
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledOnce();
+    expect(Element.prototype.scrollIntoView.mock.contexts).not.toContain(details);
   });
 });

@@ -14,7 +14,7 @@ function jsonResponse(payload, status = 200) {
 function livePayload(overrides = {}) {
   return {
     tournament: { id: 't1', name: 'Sommer-Supermêlée', date: '2026-09-25', location: 'Linden', status: 'running' },
-    registration: { id: 'r1', label: 'Anna Muster' },
+    registration: { id: 'r1', label: 'Anna Muster', status: 'confirmed', participation: 'active' },
     live: {
       lastRoundNumber: 2,
       currentMatch: { roundNumber: 2, matchId: 'm2', court: null, teamLabel: 'Anna Muster', opponentLabel: 'Bert Beispiel', bye: false, ownScore: null, opponentScore: null, noShow: null, outcome: 'open' },
@@ -218,6 +218,14 @@ describe('Live-Ansicht für Spieler', () => {
   it.each([
     ['die Turnierleitung die Meldung nicht freigibt', (payload) => { payload.tournament.playerResultReportingEnabled = false; }],
     ['das Turnier beendet ist', (payload) => { payload.tournament.playerResultReportingEnabled = true; payload.tournament.status = 'finished'; }],
+    ...['inactive', 'withdrawn'].map((participation) => [`die Teilnahme ${participation} ist`, (payload) => {
+      payload.tournament.playerResultReportingEnabled = true;
+      payload.registration.participation = participation;
+    }]),
+    ['die Anmeldung nicht bestätigt ist', (payload) => {
+      payload.tournament.playerResultReportingEnabled = true;
+      payload.registration.status = 'waitlist';
+    }],
   ])('blendet die Ergebnismeldung aus, wenn %s', async (_reason, changePayload) => {
     const payload = livePayload();
     changePayload(payload);

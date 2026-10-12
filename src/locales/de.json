@@ -1,4 +1,6 @@
 {
+  "Ungültiger PDF-Anhang": "Ungültiger PDF-Anhang",
+  "Die Rangliste wurde geändert. Bitte erneut versuchen.": "Die Rangliste wurde geändert. Bitte erneut versuchen.",
   "Die App konnte nicht wiederhergestellt werden.": "Die App konnte nicht wiederhergestellt werden.",
   "Bitte starte die App erneut.": "Bitte starte die App erneut.",
   "App neu starten": "App neu starten",
@@ -182,5 +184,10 @@
   "Powered by Petanque Turnier Manager Online": "Powered by Petanque Turnier Manager Online",
   "Die Flyer-Einstellungen konnten nicht lokal geladen werden.": "Die Flyer-Einstellungen konnten nicht lokal geladen werden.",
   "Die Flyer-Einstellungen konnten nicht lokal gespeichert werden.": "Die Flyer-Einstellungen konnten nicht lokal gespeichert werden.",
-  "Transparenz der Textbox": "Transparenz der Textbox"
+  "Transparenz der Textbox": "Transparenz der Textbox",
+  "Endrangliste für {{name}} ist verfügbar.": "Endrangliste für {{name}} ist verfügbar.",
+  "Rangliste als PDF an Teilnehmende senden": "Rangliste als PDF an Teilnehmende senden",
+  "Der Versand der Rangliste konnte nicht gestartet werden": "Der Versand der Rangliste konnte nicht gestartet werden",
+  "Der Versand der Rangliste konnte nicht vollständig zugestellt werden.": "Der Versand der Rangliste konnte nicht vollständig zugestellt werden.",
+  "Der Versand der Rangliste für {{name}} konnte nicht vollständig zugestellt werden.": "Der Versand der Rangliste für {{name}} konnte nicht vollständig zugestellt werden."
 }
