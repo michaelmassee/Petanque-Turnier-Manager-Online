@@ -349,3 +349,104 @@ describe('Anmeldungsverwaltung: Ablehnen', () => {
     expect(onReject).toHaveBeenCalledWith(pending);
   });
 });
+
+describe('Anmeldungsverwaltung: Freigabe und Storno durch die Turnierleitung', () => {
+  function response(payload) {
+    return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  function managedRegistration(id, status = 'pending') {
+    return { id, tournamentId: 't1', firstName: `Spieler ${id}`, lastName: 'Test', email: `${id}@example.test`, status, participation: 'inactive', feeSelections: [], registrationAnswers: [] };
+  }
+
+  function renderManagement(initialRegistrations) {
+    let registrations = initialRegistrations.map((registration) => ({ ...registration }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
+      const path = String(url);
+      if (path === '/api/tournaments/t1/registrations') return response({ registrations });
+      if (path === '/api/tournaments/t1/registrations/confirm-pending') {
+        const pending = registrations.filter((registration) => registration.status === 'pending');
+        registrations = registrations.map((registration) => registration.status === 'pending' ? { ...registration, status: 'confirmed' } : registration);
+        return response({ confirmedCount: pending.length });
+      }
+      if (path.endsWith('/reject')) {
+        const id = path.split('/')[3];
+        registrations = registrations.filter((registration) => registration.id !== id);
+        return response({ ok: true });
+      }
+      if (options.method === 'PUT') {
+        const id = path.split('/').at(-1);
+        registrations = registrations.map((registration) => registration.id === id ? { ...registration, status: 'confirmed' } : registration);
+        return response({ ok: true });
+      }
+      if (options.method === 'DELETE') {
+        const id = path.split('/').at(-1);
+        registrations = registrations.filter((registration) => registration.id !== id);
+        return response({ ok: true });
+      }
+      throw new Error(`Unerwartete Anfrage: ${path}`);
+    });
+    render(
+      <RegistrationsManagementPage
+        tournaments={[{ ...TOURNAMENT, registrationEnabled: true }]}
+        selectedTournamentId="t1"
+        setSelectedTournamentId={() => {}}
+        language="de"
+      />,
+    );
+    return fetchMock;
+  }
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('bestätigt eine offene Anmeldung einzeln und lädt die Liste danach neu', async () => {
+    const fetchMock = renderManagement([managedRegistration('pending-1')]);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+
+    expect(await screen.findByText('Anmeldung wurde bestätigt.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/registrations/pending-1', expect.objectContaining({ method: 'PUT' }));
+    expect(screen.queryByRole('button', { name: 'Bestätigen' })).not.toBeInTheDocument();
+  });
+
+  it('bestätigt alle offenen Anmeldungen, ohne bereits bestätigte zu verändern', async () => {
+    const fetchMock = renderManagement([managedRegistration('pending-1'), managedRegistration('pending-2'), managedRegistration('confirmed-1', 'confirmed')]);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Alle bestätigen' }));
+
+    expect(await screen.findByText('2 offene Anmeldung(en) wurden bestätigt.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/tournaments/t1/registrations/confirm-pending', expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('lehnt eine offene Anmeldung mit optionalem Grund ab', async () => {
+    const fetchMock = renderManagement([managedRegistration('pending-1')]);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ablehnen' }));
+    fireEvent.change(screen.getByLabelText(/^Ablehnungsgrund/), { target: { value: 'Startfeld voll' } });
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(dialog.querySelector('.button-danger'));
+
+    expect(await screen.findByText('Anmeldung wurde abgelehnt.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/registrations/pending-1/reject', expect.objectContaining({ method: 'POST', body: JSON.stringify({ reason: 'Startfeld voll' }) }));
+  });
+
+  it.each(['Turnierleiter', 'Bearbeiter'])('storniert eine Anmeldung als %s erst nach Bestätigung', async () => {
+    const fetchMock = renderManagement([managedRegistration('confirmed-1', 'confirmed')]);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Löschen' }));
+
+    expect(await screen.findByText('Anmeldung wurde gelöscht.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/registrations/confirmed-1', expect.objectContaining({ method: 'DELETE' }));
+  });
+
+  it('behält die Anmeldung, wenn die Turnierleitung das Storno abbricht', async () => {
+    const fetchMock = renderManagement([managedRegistration('confirmed-1', 'confirmed')]);
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Löschen' }));
+
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/registrations/confirmed-1', expect.objectContaining({ method: 'DELETE' }));
+    expect(screen.getByText(/Spieler confirmed-1/)).toBeInTheDocument();
+  });
+});

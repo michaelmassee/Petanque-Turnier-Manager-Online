@@ -498,8 +498,11 @@ export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenu
 
   // Push-Nachrichten verweisen auf /live/<Meldungs-ID>, weil der Link nur gehasht gespeichert ist: Ein auf diesem Gerät
   // gemerkter Link öffnet die Ansicht auch ohne Login.
+  // Ein gemerkter Link ist der Login-freie Fallback für Push-Links. Ist der Spieler
+  // angemeldet, muss /live/<Meldung> aber bewusst über sein Konto laden: Nur dieser
+  // Zugriff darf eine von der Turnierleitung freigegebene Ergebnismeldung anbieten.
   const token = route.token
-    || (route.registrationId ? readRememberedTeams().find((entry) => entry.registrationId === route.registrationId)?.token : null);
+    || (!currentUser && route.registrationId ? readRememberedTeams().find((entry) => entry.registrationId === route.registrationId)?.token : null);
   let content;
   if (token) {
     content = <LiveDetail queryKey={['live', 'token', token]} path={`/api/live/token/${encodeURIComponent(token)}`} language={language} navigate={navigate} token={token} />;

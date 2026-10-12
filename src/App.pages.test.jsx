@@ -626,6 +626,27 @@ describe('Turnier melden', () => {
 });
 
 describe('Öffentliche Turnierdetailseite', () => {
+  it('bietet die Freigabeprüfung beim Anlegen öffentlicher und privater Turniere an', () => {
+    for (const visibility of ['public', 'private']) {
+      const form = { ...EMPTY_TOURNAMENT_FORM, visibility, approvalRequired: false };
+      const setForm = vi.fn();
+      const { unmount } = render(
+        <TournamentForm
+          form={form}
+          setForm={setForm}
+          onSubmit={(event) => event.preventDefault()}
+          onCancel={() => {}}
+          mode="create"
+          language="de"
+        />,
+      );
+
+      fireEvent.click(screen.getByLabelText('Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen'));
+      expect(setForm).toHaveBeenCalledWith({ ...form, approvalRequired: true });
+      unmount();
+    }
+  });
+
   it('zeigt formatierte Turnierbeschreibungen sicher an und lässt bisherigen Klartext unverändert', () => {
     const { rerender } = render(<RichText value={'ptm-richtext:v1:{"type":"doc","content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Wichtig","marks":[{"type":"bold"},{"type":"underline"}]}]},{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"Punkt","marks":[{"type":"strike"}]}]}]}]}]}'} />);
 

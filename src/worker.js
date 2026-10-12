@@ -6016,12 +6016,11 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
     .all();
 
   const toParticipant = (row) => {
-    // Absagen darf weiterhin nur das anmeldende Konto bzw. bei alten Meldungen
-    // das Kontaktkonto; Teammitglieder sehen ihre unbestätigte Meldung, können
-    // aber nicht das gesamte Team versehentlich abmelden.
-    const isRegistrant = canCancelOwnRegistration(row, currentUser);
+    // Jedes verknüpfte Teammitglied darf die gemeinsame Anmeldung absagen. Bei
+    // älteren Meldungen bleibt die E-Mail-Zuordnung als Fallback erhalten.
+    const canCancel = canCancelOwnRegistration(row, currentUser);
     return {
-      registrationId: isRegistrant ? row.id : null,
+      registrationId: canCancel ? row.id : null,
       firstName: row.first_name,
       lastName: row.last_name,
       club: row.club,
@@ -6059,10 +6058,11 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
   });
 }
 
-/** Only the submitting account (or legacy contact account) may cancel a team registration. */
+/** A linked team member, the submitting account, or a legacy contact account may cancel a team registration. */
 export function canCancelOwnRegistration(registration, user) {
   return Boolean(user?.id) && (
     registration.registrant_user_id === user.id
+    || registrationBelongsToUser(registration, user.id)
     || registrationBelongsToEmail(registration, user.email)
   );
 }

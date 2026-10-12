@@ -832,7 +832,7 @@ export function RegistrationsManagementPage({
       <EditDialog open={Boolean(rejectionRegistration)} title={t('Anmeldung ablehnen')} onClose={() => setRejectionRegistration(null)}>
         <div className="form dense">
           <p className="hint">{t('Der Grund ist optional und wird nur dem betroffenen Team mitgeteilt.')}</p>
-          <TextArea label={t('Ablehnungsgrund')} value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} maxLength={500} />
+          <TextArea label={t('Ablehnungsgrund')} value={rejectionReason} onChange={setRejectionReason} maxLength={500} />
           <div className="dialog-actions"><Button variant="secondary" onClick={() => setRejectionRegistration(null)}>{t('Abbrechen')}</Button><Button variant="danger" loading={busyId === `reject-${rejectionRegistration?.id}`} onClick={handleReject}>{t('Ablehnen')}</Button></div>
         </div>
       </EditDialog>

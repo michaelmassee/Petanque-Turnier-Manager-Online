@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import { createRegistration } from './worker.js';
+import worker, { createRegistration } from './worker.js';
 
 describe('Atomare Online-Anmeldung (T-12)', () => {
   let env;
@@ -27,6 +27,12 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
       }),
     });
     return createRegistration(request, env, turnier(), optionen);
+  }
+
+  function stornieren(token) {
+    return worker.fetch(new Request('https://ptm.test/api/registrations/cancel-by-token', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }),
+    }), env);
   }
 
   beforeEach(() => {
@@ -116,5 +122,17 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
       { first_name: 'b', status: 'confirmed', is_vip: 0 },
       { first_name: 'Neu', status: 'waitlist', is_vip: 0 },
     ]);
+  });
+
+  it('storniert per persönlichem Link nur die zugehörige Anmeldung und bleibt dabei idempotent', async () => {
+    vorhandeneAnmeldung('erste', 'confirmed');
+    vorhandeneAnmeldung('zweite', 'confirmed');
+
+    expect((await stornieren('token-erste')).status).toBe(200);
+    expect(env.DB.sqlite.prepare("SELECT status FROM registrations WHERE id = 'erste'").get().status).toBe('cancelled');
+    expect(env.DB.sqlite.prepare("SELECT status FROM registrations WHERE id = 'zweite'").get().status).toBe('confirmed');
+
+    expect((await stornieren('token-erste')).status).toBe(200);
+    expect((await stornieren('unbekannt')).status).toBe(404);
   });
 });

@@ -30,6 +30,10 @@ function jsonResponse(payload) {
   return { ok: true, json: () => Promise.resolve(payload) };
 }
 
+function errorResponse(error, status = 409) {
+  return { ok: false, status, headers: { get: () => null }, json: () => Promise.resolve({ error }) };
+}
+
 const CONFIRMED_REGISTRATIONS = [
   { id: 'p1', firstName: 'Anna', lastName: 'Muster' },
   { id: 'p2', firstName: 'Bert', lastName: 'Beispiel' },
@@ -54,6 +58,9 @@ function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registratio
     if (path === '/api/tournaments/t1/registrations' && options.method === 'POST') {
       return Promise.resolve(jsonResponse({ registration: { firstName: 'Gina', lastName: 'Neu' } }));
     }
+    if (path === '/api/tournaments/t1/start' && options.method === 'POST') {
+      return Promise.resolve(jsonResponse({ tournament: { id: 't1', status: 'running' } }));
+    }
     if (path === '/api/tournaments/t1/rounds' && options.method === 'POST') {
       return Promise.resolve(jsonResponse({
         rounds: [...rounds, { id: 'r2', roundNumber: 2, matches: [] }],
@@ -63,6 +70,9 @@ function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registratio
     if (path === '/api/tournaments/t1/matches/m1/result' && options.method === 'PUT') {
       const updated = { ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 7 }] };
       return Promise.resolve(jsonResponse({ rounds: [updated] }));
+    }
+    if (path === '/api/tournaments/t1/teams/draw' && options.method === 'POST') {
+      return Promise.resolve(jsonResponse({ teams: Array.from({ length: 6 }, (_, index) => ({ id: `team-${index}` })) }));
     }
     if (/^\/api\/registrations\/.+\/participation$/.test(path) && options.method === 'PUT') {
       return Promise.resolve(jsonResponse({ registration: {} }));
@@ -141,6 +151,64 @@ describe('TournamentPlayManagement', () => {
 
     await screen.findByText('Neue Runde wurde erstellt.');
     expect(calls.filter((path) => path === '/api/tournaments/t1/rounds').length).toBeGreaterThan(1);
+  });
+
+  it('startet ein angemeldetes Turnier und schaltet danach die Rundenverwaltung frei', async () => {
+    const calls = [];
+    installFetchMock(calls, { rounds: [] });
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, status: 'registration' }]} language="de" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Turnier starten' }));
+
+    expect(await screen.findByText('Turnier wurde gestartet.')).toBeInTheDocument();
+    expect(calls).toContain('/api/tournaments/t1/start');
+    expect(screen.getByRole('button', { name: 'Erste Runde starten' })).toBeInTheDocument();
+  });
+
+  it('zeigt einen Fehler, wenn der Turnierstart vom Server abgelehnt wird', async () => {
+    const calls = [];
+    installFetchMock(calls, { rounds: [] });
+    global.fetch.mockImplementation((path, options = {}) => {
+      calls.push(path);
+      if (path === '/api/tournaments/t1/start' && options.method === 'POST') return Promise.resolve(errorResponse('Das Turnier läuft bereits.'));
+      if (path === '/api/tournaments/t1/rounds') return Promise.resolve(jsonResponse({ rounds: [] }));
+      if (path === '/api/tournaments/t1/ranking') return Promise.resolve(jsonResponse({ ranking: [] }));
+      if (path === '/api/tournaments/t1/registrations') return Promise.resolve(jsonResponse({ registrations: CONFIRMED_REGISTRATIONS }));
+      return Promise.resolve(jsonResponse({}));
+    });
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, status: 'registration' }]} language="de" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Turnier starten' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Das Turnier läuft bereits.');
+    expect(screen.getByRole('button', { name: 'Turnier starten' })).toBeInTheDocument();
+  });
+
+  it('erstellt die erste Runde für ein bereits laufendes Turnier', async () => {
+    const calls = [];
+    installFetchMock(calls, { rounds: [] });
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, type: 'formule_x', registrationType: 'forme', formation: 'tete' }]} language="de" />);
+
+    await screen.findByRole('button', { name: 'Erste Runde starten' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Erste Runde starten' })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Erste Runde starten' }));
+
+    expect(await screen.findByText('Neue Runde wurde erstellt.')).toBeInTheDocument();
+    expect(calls).toContain('/api/tournaments/t1/rounds');
+  });
+
+  it('lost vor der ersten Runde die Teams eines Schweizer-Mêlée aus', async () => {
+    const calls = [];
+    const registrations = Array.from({ length: 12 }, (_, index) => ({ id: `p${index}`, firstName: `Spieler ${index}`, status: 'confirmed', participation: 'active' }));
+    installFetchMock(calls, {
+      rounds: [], registrations,
+    });
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, type: 'schweizer', registrationType: 'melee', formation: 'doublette' }]} language="de" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mêlée-Teams auslosen' }));
+
+    expect(await screen.findByText('Mêlée-Teams wurden ausgelost: 6')).toBeInTheDocument();
+    expect(calls).toContain('/api/tournaments/t1/teams/draw');
   });
 
   it('zeigt fehlende Voraussetzungen und deaktiviert den Button bei zu wenigen bestätigten Meldungen', async () => {

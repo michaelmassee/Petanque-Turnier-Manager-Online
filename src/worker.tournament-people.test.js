@@ -82,7 +82,7 @@ describe('Öffentliche Meldeliste', () => {
     expect(mine.ownUnconfirmed).toEqual([expect.objectContaining({ registrationId: 'pending', status: 'pending' })]);
   });
 
-  it('gibt dem anmeldenden Konto die Storno-ID, nicht aber einem bloß verknüpften Teammitglied', async () => {
+  it('gibt dem anmeldenden Konto und verknüpften Teammitgliedern die Storno-ID', async () => {
     const db = d1MitSchema();
     db.sqlite.exec(`INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at)
       VALUES ('creator', 'creator@example.test', 'user', 'salt', 'hash', '2026-09-01', '2026-09-01'),
@@ -97,16 +97,18 @@ describe('Öffentliche Meldeliste', () => {
     const creator = await (await listPublicParticipants(db, 't1', { id: 'creator', email: 'creator@example.test' })).json();
     const player = await (await listPublicParticipants(db, 't1', { id: 'player', email: 'player@example.test' })).json();
     expect(creator.participants[0].registrationId).toBe('r1');
-    expect(player.participants[0].registrationId).toBeNull();
+    expect(player.participants[0].registrationId).toBe('r1');
   });
 
-  it('erlaubt die Stornierung nur dem Anmeldekonto und weiterhin dem alten Kontaktkonto', () => {
+  it('erlaubt die Stornierung dem Anmeldekonto, allen verknüpften Teammitgliedern und dem alten Kontaktkonto', () => {
     const registration = {
-      email: 'contact@example.test', user_id: 'player', registrant_user_id: 'creator',
+      email: 'contact@example.test', user_id: 'player', partner_user_id: 'partner', partner2_user_id: 'partner2', registrant_user_id: 'creator',
       partner_email: null, partner2_email: null,
     };
     expect(canCancelOwnRegistration(registration, { id: 'creator', email: 'creator@example.test' })).toBe(true);
     expect(canCancelOwnRegistration(registration, { id: 'contact', email: 'contact@example.test' })).toBe(true);
-    expect(canCancelOwnRegistration(registration, { id: 'player', email: 'player@example.test' })).toBe(false);
+    expect(canCancelOwnRegistration(registration, { id: 'player', email: 'player@example.test' })).toBe(true);
+    expect(canCancelOwnRegistration(registration, { id: 'partner', email: 'partner@example.test' })).toBe(true);
+    expect(canCancelOwnRegistration(registration, { id: 'partner2', email: 'partner2@example.test' })).toBe(true);
   });
 });

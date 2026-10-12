@@ -5,6 +5,7 @@ import {
   LiveDetail, MyLiveBackLink, MyLiveList, PlayerLivePage, readRememberedTeams, RememberedTeams,
 } from './PlayerLivePage.jsx';
 import { matchLiveRoute } from '../lib/routing.js';
+import { TOURNAMENT_TYPES } from '../lib/constants.js';
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } });
@@ -56,6 +57,29 @@ function renderBackLink() {
   return render(
     <QueryClientProvider client={client}>
       <MyLiveBackLink navigate={vi.fn()} />
+    </QueryClientProvider>,
+  );
+}
+
+function renderPlayerLivePage(route, currentUser = null) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <PlayerLivePage
+        route={route}
+        language="de"
+        setLanguage={() => {}}
+        menuOpen={false}
+        setMenuOpen={() => {}}
+        navigate={() => {}}
+        currentUser={currentUser}
+        isAdmin={false}
+        onSelectAdminDashboard={() => {}}
+        onLogout={() => {}}
+        onLogin={() => {}}
+        drawerContent={null}
+        postboxControl={null}
+      />
     </QueryClientProvider>,
   );
 }
@@ -123,10 +147,12 @@ describe('Live-Ansicht für Spieler', () => {
     expect(screen.queryByText('Du bist in der aktuellen Runde nicht eingeteilt.')).not.toBeInTheDocument();
   });
 
-  it('meldet das Ergebnis aus eigener Sicht und zeigt den Erfolg nach dem Speichern', async () => {
+  it.each(TOURNAMENT_TYPES)('meldet das Ergebnis für $label aus eigener Sicht', async ({ value: type }) => {
     const initial = livePayload();
+    initial.tournament.type = type;
     initial.tournament.playerResultReportingEnabled = true;
     const updated = livePayload();
+    updated.tournament.type = type;
     updated.tournament.playerResultReportingEnabled = true;
     updated.live.currentMatch.ownScore = 13;
     updated.live.currentMatch.opponentScore = 7;
@@ -157,6 +183,25 @@ describe('Live-Ansicht für Spieler', () => {
     await waitFor(() => expect(screen.queryByText('Ergebnis gemeldet.')).not.toBeInTheDocument());
   });
 
+  it.each([
+    ['die Turnierleitung die Meldung nicht freigibt', (payload) => { payload.tournament.playerResultReportingEnabled = false; }],
+    ['das Turnier beendet ist', (payload) => { payload.tournament.playerResultReportingEnabled = true; payload.tournament.status = 'finished'; }],
+  ])('blendet die Ergebnismeldung aus, wenn %s', async (_reason, changePayload) => {
+    const payload = livePayload();
+    changePayload(payload);
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de" canReportResult />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText('Sommer-Supermêlée');
+    expect(screen.queryByLabelText('Eigene Punkte')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ergebnis melden' })).not.toBeInTheDocument();
+  });
+
   it('sperrt die Ergebnismeldung während des Speicherns gegen Doppelklicks', async () => {
     const initial = livePayload();
     initial.tournament.playerResultReportingEnabled = true;
@@ -184,6 +229,29 @@ describe('Live-Ansicht für Spieler', () => {
     expect(global.fetch).toHaveBeenCalledTimes(2);
     finish(jsonResponse(livePayload()));
     await waitFor(() => expect(button).not.toBeDisabled());
+  });
+
+  it('zeigt einen Fehler beim Speichern eines Spielergebnisses und lässt eine Korrektur zu', async () => {
+    const initial = livePayload();
+    initial.tournament.playerResultReportingEnabled = true;
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(initial))
+      .mockResolvedValueOnce(jsonResponse({ error: 'Das Ergebnis wurde inzwischen geändert.' }, 409));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de" canReportResult />
+      </QueryClientProvider>,
+    );
+
+    const ownScore = await screen.findByLabelText('Eigene Punkte');
+    fireEvent.change(ownScore, { target: { value: '13' } });
+    fireEvent.change(screen.getByLabelText('Gegnerische Punkte'), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ergebnis melden' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Das Ergebnis wurde inzwischen geändert.');
+    expect(ownScore).toHaveValue(13);
+    expect(screen.getByRole('button', { name: 'Ergebnis melden' })).not.toBeDisabled();
   });
 
   it('meldet einen ungültigen Link sichtbar', async () => {
@@ -320,6 +388,30 @@ describe('Live-Ansicht für Spieler', () => {
 
     await screen.findAllByText('Bert Beispiel');
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/live/token/tok1', expect.anything());
+  });
+
+  it('lädt einen persönlichen Live-Link auch mit Konto ausschließlich über den Link', async () => {
+    localStorage.clear();
+    const payload = livePayload();
+    payload.tournament.playerResultReportingEnabled = true;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(payload));
+    renderPlayerLivePage(matchLiveRoute('/live/t/tok1'), { id: 'player' });
+
+    await screen.findAllByText('Bert Beispiel');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/live/token/tok1', expect.anything());
+    expect(screen.queryByLabelText('Eigene Punkte')).not.toBeInTheDocument();
+  });
+
+  it('lädt die eigene Meldung mit Konto über den Nutzerzugriff, auch wenn ein Link gemerkt ist', async () => {
+    localStorage.setItem('ptm_live_teams', JSON.stringify([{ token: 'tok1', registrationId: 'r1', tournamentName: 'Sommer-Supermêlée', date: '2026-09-25' }]));
+    const payload = livePayload();
+    payload.tournament.playerResultReportingEnabled = true;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(payload));
+    renderPlayerLivePage(matchLiveRoute('/live/r1'), { id: 'player' });
+
+    expect(await screen.findByLabelText('Eigene Punkte')).toBeInTheDocument();
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/live/registrations/r1', expect.anything());
+    expect(globalThis.fetch).not.toHaveBeenCalledWith('/api/live/token/tok1', expect.anything());
   });
 
   it('vergisst einen ungültigen persönlichen Link', async () => {
