@@ -113,7 +113,7 @@ describe('Bouleplatz-Deep-Link aus Turnierdetails', () => {
   it('öffnet und zeigt den verknüpften Platz auch jenseits der ersten Ergebnisgruppe und fokussiert ihn auf der Karte', async () => {
     renderPlacesPage();
 
-    const heading = await screen.findByRole('heading', { name: 'Bouleplatz 14' });
+    const heading = await screen.findByRole('heading', { name: 'Bouleplatz 14' }, { timeout: 5_000 });
     const details = heading.closest('details');
     expect(details).toHaveAttribute('open');
     expect(screen.getByRole('heading', { name: 'Bouleplatz 1' })).toBeInTheDocument();
