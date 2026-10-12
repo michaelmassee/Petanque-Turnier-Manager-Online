@@ -97,9 +97,9 @@ function OrganizationLinks({ place, t }) {
   </div>;
 }
 
-function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onNavigate, heading = 'h2' }) {
+function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onNavigate, heading = 'h2', forceOpen = false, detailRef }) {
   const Heading = heading;
-  return <details className="panel place-card place-card-details">
+  return <details className="panel place-card place-card-details" open={forceOpen || undefined} ref={detailRef}>
     <summary className="place-card-summary">
       <span className="place-card-summary-title">
         <Heading data-i18n-skip>{place.name}</Heading>
@@ -207,14 +207,9 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   }
   useEffect(() => { const timer = setTimeout(load, 180); return () => clearTimeout(timer); }, [query]);
 
-  // Link „Öffentlichen Bouleplatz ansehen“ aus den Turnierdetails: /plaetze#<placeId> zeigt den Platz auf der Karte.
-  const [linkedPlaceId, setLinkedPlaceId] = useState(() => decodeURIComponent(window.location.hash.slice(1)));
-  useEffect(() => {
-    if (!linkedPlaceId || loading) return;
-    const place = places.find((entry) => entry.id === linkedPlaceId);
-    if (place) handleFocusPlace(place);
-    setLinkedPlaceId('');
-  }, [linkedPlaceId, loading, places]);
+  // Link „Bouleplatz ansehen“ aus den Turnierdetails: /plaetze#<placeId> öffnet dessen Detailkarte und fokussiert ihn auf der Karte.
+  const [linkedPlaceId] = useState(() => decodeURIComponent(window.location.hash.slice(1)));
+  const linkedPlaceRef = useRef(null);
 
   const visiblePlaces = useMemo(() => {
     let results = filterPlaces(places, { favoritesOnly, clubsOnly, indoorOnly });
@@ -235,6 +230,23 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
 
   const placeGroups = useMemo(() => groupPlacesByOrganization(visiblePlaces), [visiblePlaces]);
   const displayedPlaceGroups = placeGroups.slice(0, visibleCount);
+
+  useEffect(() => {
+    if (!linkedPlaceId || loading) return;
+    const place = places.find((entry) => entry.id === linkedPlaceId);
+    if (place) handleFocusPlace(place);
+  }, [linkedPlaceId, loading, places]);
+
+  useEffect(() => {
+    if (!linkedPlaceId || loading) return;
+    const groupIndex = placeGroups.findIndex((group) => group.places.some((place) => place.id === linkedPlaceId));
+    if (groupIndex !== -1) setVisibleCount((count) => Math.max(count, groupIndex + 1));
+  }, [linkedPlaceId, loading, placeGroups]);
+
+  useEffect(() => {
+    if (!linkedPlaceId || loading || !linkedPlaceRef.current) return;
+    linkedPlaceRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [linkedPlaceId, loading, displayedPlaceGroups]);
 
   const mapped = useMemo(() => visiblePlaces.filter((place) => place.latitude !== null && place.longitude !== null), [visiblePlaces]);
   const center = mapped.length ? [mapped[0].latitude, mapped[0].longitude] : FALLBACK_CENTER;
@@ -409,7 +421,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       ) : (
         <div className="places-list">
           {displayedPlaceGroups.map((group) => group.clubName ? (
-            <details className="panel place-group" key={group.id}>
+            <details className="panel place-group" key={group.id} open={group.places.some((place) => place.id === linkedPlaceId) || undefined}>
               <summary className="place-group-summary">
                 <span className="place-group-badge"><ClubBadge clubName={group.clubName} clubKind={group.clubKind} /></span>
                 <span className="place-group-title">
@@ -430,13 +442,13 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
                 {group.clubDescription && <RichText value={group.clubDescription} onNavigate={navigate} />}
                 <div className="place-group-places">
                   {group.places.map((place) => (
-                    <PlaceDetails onNavigate={navigate} place={place} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} heading="h3" key={place.id} />
+                    <PlaceDetails onNavigate={navigate} place={place} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} heading="h3" forceOpen={place.id === linkedPlaceId} detailRef={place.id === linkedPlaceId ? linkedPlaceRef : undefined} key={place.id} />
                   ))}
                 </div>
               </div>
             </details>
           ) : (
-            <PlaceDetails onNavigate={navigate} place={group.places[0]} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} key={group.id} />
+            <PlaceDetails onNavigate={navigate} place={group.places[0]} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} forceOpen={group.places[0].id === linkedPlaceId} detailRef={group.places[0].id === linkedPlaceId ? linkedPlaceRef : undefined} key={group.id} />
           ))}
         </div>
       )}

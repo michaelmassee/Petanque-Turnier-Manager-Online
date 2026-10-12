@@ -762,7 +762,7 @@ describe('Öffentliche Turnierdetailseite', () => {
       />,
     );
 
-    const link = screen.getByRole('link', { name: 'Öffentlichen Bouleplatz ansehen' });
+    const link = screen.getByRole('link', { name: 'Bouleplatz ansehen' });
     expect(link).toHaveAttribute('href', '/plaetze#place%201');
     fireEvent.click(link);
     expect(onNavigate).toHaveBeenCalledWith('/plaetze#place%201');

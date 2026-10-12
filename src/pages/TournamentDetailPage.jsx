@@ -94,7 +94,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
       </p>
       {tournament.boulePlaceId && (
         <p>
-          <strong>{t('Bouleplatz')}</strong>: <a href={placePath} onClick={(event) => handleOwnLinkClick(event, placePath, onNavigate)}>{t('Öffentlichen Bouleplatz ansehen')}</a>
+          <strong>{t('Bouleplatz')}</strong>: <a href={placePath} onClick={(event) => handleOwnLinkClick(event, placePath, onNavigate)}>{t('Bouleplatz ansehen')}</a>
         </p>
       )}
       <p>
