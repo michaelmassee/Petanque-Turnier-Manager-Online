@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { Button, Feedback } from '../components/ui.jsx';
-import { formatDate } from '../lib/format.js';
+import { DISPLAY_LOCALES, formatDate } from '../lib/format.js';
 
 /**
  * Automatische Löschung personenbezogener Daten (DS-04): standardmäßig aus. Zeigt vor dem Einschalten, wie viele
@@ -279,6 +279,267 @@ export function VisitorStatsPanel() {
   );
 }
 
+const USAGE_RANGES = [7, 14, 30];
+const USAGE_METRICS = [
+  { key: 'rowsRead', label: 'D1 gelesene Zeilen' },
+  { key: 'rowsWritten', label: 'D1 geschriebene Zeilen' },
+  { key: 'requests', label: 'Worker-Requests' },
+];
+const USAGE_CHART_PADDING = { ...CHART_PADDING, left: 52 };
+
+function numberFormatter(language, options) {
+  return new Intl.NumberFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, options);
+}
+
+function usageTone(value, limit) {
+  if (!limit) return '';
+  if (value >= limit) return ' is-over';
+  return value >= limit * 0.8 ? ' is-warn' : '';
+}
+
+// Einfaches Säulendiagramm für eine Kennzahl. Das Tageslimit wird als Linie gezeigt, sobald der Verbrauch
+// mindestens die Hälfte davon erreicht; sonst würde die Linie alle Säulen auf wenige Pixel stauchen.
+function UsageChart({ bars, limit, labelFor, labelIndexes, language, activeIndex, onActivate, onSelect, ariaLabel }) {
+  const containerRef = useRef(null);
+  const chartWidth = useElementWidth(containerRef, CHART_DEFAULT_WIDTH);
+  const padding = USAGE_CHART_PADDING;
+  const plotWidth = chartWidth - padding.left - padding.right;
+  const plotHeight = CHART_HEIGHT - padding.top - padding.bottom;
+  const dataMax = Math.max(...bars.map((bar) => bar.value), 0);
+  const showLimit = Boolean(limit) && dataMax >= limit / 2;
+  const maxValue = niceMax(showLimit ? Math.max(dataMax, limit) : dataMax);
+  const slot = plotWidth / bars.length;
+  const barWidth = Math.max(slot - 2, 1);
+  const baseline = padding.top + plotHeight;
+  const yFor = (value) => baseline - (value / maxValue) * plotHeight;
+  const compact = numberFormatter(language, { notation: 'compact', maximumFractionDigits: 1 });
+
+  return (
+    <div ref={containerRef}>
+      <svg className="visitor-chart" viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`} role="img" aria-label={ariaLabel} onMouseLeave={() => onActivate(null)}>
+        {[0, maxValue / 2, maxValue].map((tick) => (
+          <g key={tick}>
+            <line className="visitor-chart-grid" x1={padding.left} x2={chartWidth - padding.right} y1={yFor(tick)} y2={yFor(tick)} />
+            <text className="visitor-chart-axis" x={padding.left - 6} y={yFor(tick)} textAnchor="end" dominantBaseline="middle">{compact.format(tick)}</text>
+          </g>
+        ))}
+        {bars.map((bar, index) => {
+          const x = padding.left + index * slot + (slot - barWidth) / 2;
+          const height = (bar.value / maxValue) * plotHeight;
+          return (
+            <g key={bar.key} className={activeIndex === index ? 'visitor-chart-bar is-active' : 'visitor-chart-bar'}>
+              {bar.value > 0 && <path className={`usage-chart-bar${usageTone(bar.value, limit)}`} d={barPath(x, baseline - height, barWidth, height, barWidth >= 6 ? 4 : 1)} />}
+              <rect className="visitor-chart-hit" x={padding.left + index * slot} y={padding.top} width={slot} height={plotHeight}
+                onMouseEnter={() => onActivate(index)} onClick={() => { onActivate(index); onSelect?.(index); }} />
+            </g>
+          );
+        })}
+        {showLimit && <line className="usage-chart-limit" x1={padding.left} x2={chartWidth - padding.right} y1={yFor(limit)} y2={yFor(limit)} />}
+        {labelIndexes.map((index) => (
+          <text key={index} className="visitor-chart-axis" x={padding.left + index * slot + slot / 2} y={CHART_HEIGHT - 6}
+            textAnchor={index === 0 ? 'start' : index === bars.length - 1 ? 'end' : 'middle'}>
+            {labelFor(index)}
+          </text>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+// Lange SQL-Texte zunächst auf drei Zeilen gekürzt; Antippen klappt die ganze Abfrage auf.
+function UsageQuery({ query }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <button type="button" className={expanded ? 'usage-query is-expanded' : 'usage-query'} aria-expanded={expanded}
+      title={expanded ? t('Abfrage einklappen') : t('Ganze Abfrage anzeigen')} onClick={() => setExpanded(!expanded)}>
+      <code data-i18n-skip>{query}</code>
+    </button>
+  );
+}
+
+function UsageDayDetail({ date, metric, language }) {
+  const { t } = useTranslation();
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeHour, setActiveHour] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    authenticatedApi(`/api/admin/cloudflare-usage?date=${encodeURIComponent(date)}`)
+      .then((result) => { if (!cancelled) { setDetail(result); setActiveHour(null); } })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [date]);
+
+  const number = numberFormatter(language);
+  const metricLabel = t(USAGE_METRICS.find((entry) => entry.key === metric).label);
+  const hours = detail?.date === date ? detail.hours : [];
+  const shownHour = activeHour === null ? null : hours[activeHour];
+  const hourLabel = (hour) => `${String(hour).padStart(2, '0')}:00`;
+
+  return (
+    <div className="usage-day" aria-busy={loading}>
+      <h3>{t('Verlauf am {{date}} (UTC)', { date: formatDate(date, language) })}</h3>
+      <Feedback error={error} />
+      {loading && !hours.length && <p className="muted">{t('Lädt …')}</p>}
+      {hours.length > 0 && (
+        <>
+          <p className="visitor-readout" aria-live="polite">
+            {shownHour
+              ? <><strong>{hourLabel(shownHour.hour)}–{hourLabel((shownHour.hour + 1) % 24)}</strong> {metricLabel}: {number.format(shownHour[metric])}</>
+              : t('{{metric}} pro Stunde', { metric: metricLabel })}
+          </p>
+          <UsageChart bars={hours.map((entry) => ({ key: entry.hour, value: entry[metric] }))}
+            labelFor={(index) => hourLabel(hours[index].hour)} labelIndexes={[0, 6, 12, 18, 23]} language={language}
+            activeIndex={activeHour} onActivate={setActiveHour} ariaLabel={t('{{metric}} pro Stunde', { metric: metricLabel })} />
+          <h3>{t('Teuerste D1-Abfragen')}</h3>
+          {detail.topQueries.length === 0 && <p className="muted">{t('Keine Abfragen an diesem Tag.')}</p>}
+          <ol className="usage-queries">
+            {detail.topQueries.map((entry) => (
+              <li key={entry.query}>
+                <span className="usage-query-stats">
+                  {t('{{rows}} Zeilen gelesen · {{count}} Aufrufe · {{perCall}} je Aufruf', {
+                    rows: number.format(entry.rowsRead),
+                    count: number.format(entry.count),
+                    perCall: number.format(entry.count ? Math.round(entry.rowsRead / entry.count) : 0),
+                  })}
+                </span>
+                <UsageQuery query={entry.query} />
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Cloudflare-Verbrauch gegenüber den Tageslimits des Free-Plans, mit Tagesverlauf und Details je Tag. */
+export function CloudflareUsagePanel() {
+  const { t, i18n } = useTranslation();
+  const language = i18n.language;
+  const [range, setRange] = useState(USAGE_RANGES[0]);
+  const [metric, setMetric] = useState(USAGE_METRICS[0].key);
+  const [usage, setUsage] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeIndex, setActiveIndex] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    authenticatedApi(`/api/admin/cloudflare-usage?days=${range}`)
+      .then((result) => { if (!cancelled) { setUsage(result); setActiveIndex(null); } })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [range]);
+
+  const days = usage?.days || [];
+  // Standardmäßig der letzte vollständige Tag (gestern), weil der heutige noch läuft.
+  const detailDay = selectedDay && days.some((entry) => entry.day === selectedDay) ? selectedDay : days.at(-2)?.day || days.at(-1)?.day;
+  const shownDay = days[activeIndex ?? days.findIndex((entry) => entry.day === detailDay)];
+  const number = numberFormatter(language);
+  const percent = numberFormatter(language, { style: 'percent', maximumFractionDigits: 1 });
+  const metricLabel = (key) => t(USAGE_METRICS.find((entry) => entry.key === key).label);
+  const peakOf = (key) => days.reduce((best, entry) => (entry[key] > (best?.[key] ?? -1) ? entry : best), null);
+
+  return (
+    <div className="panel">
+      <div className="section-title">
+        <div>
+          <h2>{t('Cloudflare-Auslastung')}</h2>
+          <p className="muted">{t('Verbrauch gegenüber den Tageslimits des Cloudflare-Free-Plans. Tage in UTC, die Limits gelten bis 00:00 UTC. Werte können einige Minuten verzögert sein.')}</p>
+        </div>
+        {usage?.configured !== false && (
+          <div className="visitor-range" role="group" aria-label={t('Zeitraum')}>
+            {USAGE_RANGES.map((days) => (
+              <Button key={days} variant={range === days ? 'primary' : 'secondary'} aria-pressed={range === days}
+                loading={loading && range === days} onClick={() => setRange(days)}>
+                {t('{{count}} Tage', { count: days })}
+              </Button>
+            ))}
+          </div>
+        )}
+      </div>
+      <Feedback error={error} />
+      {usage?.configured === false && (
+        <p className="hint">{t('Nicht eingerichtet: Der Worker braucht die Secrets CF_ANALYTICS_API_TOKEN (Recht „Account Analytics: Read“) und CF_ACCOUNT_ID.')}</p>
+      )}
+      {days.length > 0 && (
+        <div aria-busy={loading}>
+          <div className="visitor-totals usage-totals">
+            {USAGE_METRICS.map(({ key }) => {
+              const today = days.at(-1)[key];
+              const peak = peakOf(key);
+              return (
+                <div key={key} className={`visitor-total usage-total${usageTone(today, usage.limits[key])}`}>
+                  <span className="visitor-total-label">{metricLabel(key)} · {t('Heute')}</span>
+                  <strong>{number.format(today)}</strong>
+                  <span className="visitor-total-split">
+                    {t('{{percent}} von {{limit}}', { percent: percent.format(today / usage.limits[key]), limit: number.format(usage.limits[key]) })}
+                  </span>
+                  <span className="visitor-total-split">
+                    {t('Höchstwert {{value}} am {{date}}', { value: number.format(peak[key]), date: formatDate(peak.day, language) })}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="visitor-range usage-metrics" role="group" aria-label={t('Kennzahl')}>
+            {USAGE_METRICS.map(({ key }) => (
+              <Button key={key} variant={metric === key ? 'primary' : 'secondary'} aria-pressed={metric === key} onClick={() => setMetric(key)}>
+                {metricLabel(key)}
+              </Button>
+            ))}
+          </div>
+          {shownDay && (
+            <p className="visitor-readout" aria-live="polite">
+              <strong>{formatDate(shownDay.day, language)}</strong>
+              {' '}
+              {USAGE_METRICS.map(({ key }) => `${metricLabel(key)}: ${number.format(shownDay[key])} (${percent.format(shownDay[key] / usage.limits[key])})`).join(' · ')}
+            </p>
+          )}
+          <UsageChart bars={days.map((entry) => ({ key: entry.day, value: entry[metric] }))} limit={usage.limits[metric]}
+            labelFor={(index) => formatDate(days[index].day, language)}
+            labelIndexes={[...new Set([0, Math.floor((days.length - 1) / 2), days.length - 1])]} language={language}
+            activeIndex={activeIndex} onActivate={setActiveIndex} onSelect={(index) => setSelectedDay(days[index].day)}
+            ariaLabel={t('{{metric}} pro Tag', { metric: metricLabel(metric) })} />
+          <p className="muted usage-hint">{t('Einen Tag antippen, um Stundenverlauf und teuerste Abfragen zu sehen.')}</p>
+          <details className="visitor-table">
+            <summary>{t('Als Tabelle anzeigen')}</summary>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr><th>{t('Tag')}</th>{USAGE_METRICS.map(({ key }) => <th key={key}>{metricLabel(key)}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {[...days].reverse().map((entry) => (
+                    <tr key={entry.day}>
+                      <td>{formatDate(entry.day, language)}</td>
+                      {USAGE_METRICS.map(({ key }) => (
+                        <td key={key} className={usageTone(entry[key], usage.limits[key]).trim()}>{number.format(entry[key])}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+          {detailDay && <UsageDayDetail date={detailDay} metric={metric} language={language} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, registrationsCount }) {
   const { t } = useTranslation();
   const [stats, setStats] = useState(null);
@@ -410,6 +671,7 @@ export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, 
         </div>
       </div>
       <VisitorStatsPanel />
+      <CloudflareUsagePanel />
       <DataRetentionPanel />
     </section>
   );

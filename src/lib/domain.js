@@ -131,7 +131,7 @@ export function tournamentPayload(form) {
     visibility: form.visibility,
     internalNotes: form.internalNotes || null,
     participantsPublic: Boolean(form.participantsPublic),
-    liveViewEnabled: Boolean(form.liveViewEnabled),
+    playerResultReportingEnabled: Boolean(form.playerResultReportingEnabled),
     licenseRequired: Boolean(form.licenseRequired),
     teamNameEnabled: Boolean(form.teamNameEnabled),
     waitlistEnabled: Boolean(form.waitlistEnabled),

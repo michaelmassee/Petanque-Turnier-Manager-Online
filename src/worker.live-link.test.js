@@ -1,5 +1,5 @@
 // @vitest-environment node
-// Live-Ansicht über den persönlichen Link (E-21): ohne Konto, nur bei eingeschalteter Turnier-Option „Live-Ansicht“.
+// Live-Ansicht über den persönlichen Link (E-21): ohne Konto für jedes Turnier verfügbar.
 // Der Link kommt mit der Anmeldebestätigung; beim Check-in gibt es weder E-Mail noch Postbox-Nachricht (E-09).
 // Gespeichert wird nur der Hash des Links; "Live-Link neu senden" macht den bisherigen ungültig (EW-02).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -49,13 +49,12 @@ describe('Persönlicher Live-Link (E-21)', () => {
     expect((await antwort.json()).registration).toMatchObject({ id: ONLINE_ID, persons: ['Maria Bieder'] });
   });
 
-  it('gilt nicht für unbekannte, stornierte oder Turniere ohne Live-Ansicht', async () => {
+  it('gilt nicht für unbekannte oder stornierte Anmeldungen', async () => {
     expect((await liveAbrufen('b'.repeat(64))).status).toBe(404);
 
     sql("UPDATE tournaments SET live_view_enabled = 0 WHERE id = 't1'");
-    expect((await liveAbrufen(TOKEN)).status).toBe(404);
+    expect((await liveAbrufen(TOKEN)).status).toBe(200);
 
-    sql("UPDATE tournaments SET live_view_enabled = 1 WHERE id = 't1'");
     sql("UPDATE registrations SET status = 'cancelled' WHERE id = ?", ONLINE_ID);
     expect((await liveAbrufen(TOKEN)).status).toBe(404);
   });
@@ -69,8 +68,8 @@ describe('Persönlicher Live-Link (E-21)', () => {
     expect(verknuepft.registrations.map((entry) => entry.id)).toEqual([ONLINE_ID]);
 
     sql("UPDATE tournaments SET live_view_enabled = 0 WHERE id = 't1'");
-    const ohneLive = await (await listMyLiveRegistrations(env.DB, { id: 'melder', email: 'melder@example.test' })).json();
-    expect(ohneLive.registrations).toEqual([]);
+    const auchOhneAltesFlag = await (await listMyLiveRegistrations(env.DB, { id: 'melder', email: 'melder@example.test' })).json();
+    expect(auchOhneAltesFlag.registrations.map((entry) => entry.id)).toEqual([ONLINE_ID]);
   });
 
   it('verlangt die E-Mail von Spieler 1; eine eigene Kontakt-E-Mail gibt es nicht mehr', async () => {
@@ -91,7 +90,7 @@ describe('Persönlicher Live-Link (E-21)', () => {
     return createRegistration(request, env, turnier());
   }
 
-  it('schickt den Link mit der Anmeldebestätigung, nur bei eingeschalteter Live-Ansicht', async () => {
+  it('schickt den Live-Link mit jeder Anmeldebestätigung', async () => {
     await anmelden();
     const token = linkAusMail('neu@example.test');
     expect(token).toMatch(/^[0-9a-f]{64}$/);
@@ -104,7 +103,7 @@ describe('Persönlicher Live-Link (E-21)', () => {
     env.MAIL_QUEUE.send.mockClear();
     sql("DELETE FROM registrations WHERE email = 'neu@example.test'");
     await anmelden();
-    expect(gesendeteTexte().find((mail) => mail.to === 'neu@example.test').text).not.toContain('/live/');
+    expect(gesendeteTexte().find((mail) => mail.to === 'neu@example.test').text).toContain('/live/');
   });
 
   it('sendet auf Wunsch der Turnierleitung einen neuen Link; der alte wird ungültig', async () => {
@@ -119,16 +118,16 @@ describe('Persönlicher Live-Link (E-21)', () => {
     expect(zeile("SELECT action FROM audit_log WHERE action = 'live_link_reissued'")).toBeTruthy();
   });
 
-  it('sendet keinen neuen Link ohne Live-Ansicht oder für nicht bestätigte Anmeldungen', async () => {
+  it('sendet keinen neuen Link für nicht bestätigte Anmeldungen', async () => {
     sql("UPDATE tournaments SET live_view_enabled = 0 WHERE id = 't1'");
     const registration = zeile('SELECT * FROM registrations WHERE id = ?', ONLINE_ID);
-    await expect(resendLiveLink(env, registration, { id: 'u1' }, 'https://ptm.test')).rejects.toMatchObject({ status: 409 });
+    await expect(resendLiveLink(env, registration, { id: 'u1' }, 'https://ptm.test')).resolves.toMatchObject({ status: 200 });
 
-    sql("UPDATE tournaments SET live_view_enabled = 1 WHERE id = 't1'");
+    env.MAIL_QUEUE.send.mockClear();
     await expect(resendLiveLink(env, { ...registration, status: 'waitlist' }, { id: 'u1' }, 'https://ptm.test'))
       .rejects.toMatchObject({ status: 409 });
     expect(env.MAIL_QUEUE.send).not.toHaveBeenCalled();
-    expect((await liveAbrufen(TOKEN)).status).toBe(200);
+    expect((await liveAbrufen(TOKEN)).status).toBe(404);
   });
 
   it('meldet den Check-in weder per E-Mail noch per Postfach (E-09)', async () => {

@@ -6,6 +6,7 @@ import { d1MitSchema } from './test-support/d1.js';
 import { bindeDokument, syncAnfrage } from './test-support/sync.js';
 import {
   buildLiveResponse, createRegistration, deleteTournament, executeSyncWrite, findMyLiveRegistration, getSyncTournament,
+  listMyLiveRegistrations,
   listRegistrations, purgeExpiredPersonalData, syncGetRegistrations, syncPostDecisions, syncPutMeleeTeams,
   syncPutRegistrationClosed, updateTournamentPublication, upsertDocumentRegistration,
 } from './worker.js';
@@ -281,6 +282,7 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
       await expect(getSyncTournament(env.DB, 'unbekannt')).rejects.toMatchObject({ status: 404 });
       await expect(findMyLiveRegistration(env.DB, { id: 'x' }, 'r1')).rejects.toMatchObject({ status: 410 });
       await expect(findMyLiveRegistration(env.DB, { id: 'fremd' }, 'r1')).rejects.toMatchObject({ status: 404 });
+      expect((await (await listMyLiveRegistrations(env.DB, { id: 'x' })).json()).registrations).toEqual([]);
       // T-22: Der Turnierersteller erfährt, dass ein anderes Konto gelöscht hat.
       expect(zeile("SELECT event_type FROM postbox_messages WHERE recipient_id = 'owner'").event_type).toBe('tournament_admin_action');
     });

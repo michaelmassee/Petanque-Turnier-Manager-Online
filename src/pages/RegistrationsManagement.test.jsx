@@ -287,7 +287,7 @@ describe('Anmeldungsverwaltung: Konto-Verknüpfungen', () => {
 describe('Anmeldungsverwaltung: Live-Link neu senden', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('schickt bei eingeschalteter Live-Ansicht einen neuen Link und meldet den Versand', async () => {
+  it('schickt unabhängig vom alten Live-Flag einen neuen Link und meldet den Versand', async () => {
     const registration = { id: 'r1', tournamentId: 't1', firstName: 'Anna', lastName: 'Muster', playerEmail: 'anna@example.test',
       status: 'confirmed', participation: 'inactive', feeSelections: [], registrationAnswers: [] };
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
@@ -296,7 +296,7 @@ describe('Anmeldungsverwaltung: Live-Link neu senden', () => {
     });
     render(
       <RegistrationsManagementPage
-        tournaments={[{ id: 't1', name: 'Sommer Cup', canManage: true, registrationEnabled: true, liveViewEnabled: true }]}
+        tournaments={[{ id: 't1', name: 'Sommer Cup', canManage: true, registrationEnabled: true }]}
         selectedTournamentId="t1"
         setSelectedTournamentId={() => {}}
         language="de"

@@ -123,6 +123,69 @@ describe('Live-Ansicht für Spieler', () => {
     expect(screen.queryByText('Du bist in der aktuellen Runde nicht eingeteilt.')).not.toBeInTheDocument();
   });
 
+  it('meldet das Ergebnis aus eigener Sicht und zeigt den Erfolg nach dem Speichern', async () => {
+    const initial = livePayload();
+    initial.tournament.playerResultReportingEnabled = true;
+    const updated = livePayload();
+    updated.tournament.playerResultReportingEnabled = true;
+    updated.live.currentMatch.ownScore = 13;
+    updated.live.currentMatch.opponentScore = 7;
+    updated.live.currentMatch.outcome = 'won';
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(initial))
+      .mockResolvedValueOnce(jsonResponse(updated));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de" canReportResult />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByLabelText('Eigene Punkte');
+    fireEvent.change(screen.getByLabelText('Eigene Punkte'), { target: { value: '13' } });
+    fireEvent.change(screen.getByLabelText('Gegnerische Punkte'), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ergebnis melden' }));
+
+    expect(await screen.findByText('Ergebnis gemeldet.')).toHaveAttribute('role', 'status');
+    expect(global.fetch).toHaveBeenLastCalledWith('/api/live/registrations/r1/result', expect.objectContaining({ method: 'POST' }));
+
+    const nextRound = livePayload();
+    nextRound.tournament.playerResultReportingEnabled = true;
+    nextRound.live.lastRoundNumber = 3;
+    nextRound.live.currentMatch = { ...nextRound.live.currentMatch, matchId: 'm3', roundNumber: 3 };
+    client.setQueryData(['live', 'registration', 'r1'], nextRound);
+    await waitFor(() => expect(screen.queryByText('Ergebnis gemeldet.')).not.toBeInTheDocument());
+  });
+
+  it('sperrt die Ergebnismeldung während des Speicherns gegen Doppelklicks', async () => {
+    const initial = livePayload();
+    initial.tournament.playerResultReportingEnabled = true;
+    let finish;
+    const saving = new Promise((resolve) => { finish = resolve; });
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(initial))
+      .mockReturnValueOnce(saving);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de" canReportResult />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByLabelText('Eigene Punkte');
+    fireEvent.change(screen.getByLabelText('Eigene Punkte'), { target: { value: '13' } });
+    fireEvent.change(screen.getByLabelText('Gegnerische Punkte'), { target: { value: '7' } });
+    const button = screen.getByRole('button', { name: 'Ergebnis melden' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    finish(jsonResponse(livePayload()));
+    await waitFor(() => expect(button).not.toBeDisabled());
+  });
+
   it('meldet einen ungültigen Link sichtbar', async () => {
     global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ error: 'Diese Meldung gehört nicht zu deinem Konto' }, 404)));
     renderDetail();
@@ -154,6 +217,20 @@ describe('Live-Ansicht für Spieler', () => {
 
     await screen.findByText('Sommer-Supermêlée');
     expect(navigate).toHaveBeenCalledWith('/live/r1');
+  });
+
+  it('zeigt gelöschte Turniere nicht in der Live-Auswahl', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({
+      registrations: [
+        { id: 'r1', label: 'Anna Muster', tournament: { name: 'Aktives Turnier', date: '2026-09-25', status: 'running' } },
+        { id: 'r2', deleted: true, label: 'Bert Beispiel', tournament: { name: 'Gelöschtes Turnier', deleted: true } },
+      ],
+    })));
+    renderList();
+
+    expect(await screen.findByText('Aktives Turnier')).toBeInTheDocument();
+    expect(screen.queryByText('Gelöschtes Turnier')).not.toBeInTheDocument();
+    expect(screen.queryByText('Das Turnier wurde vom Veranstalter gelöscht.')).not.toBeInTheDocument();
   });
 
   it('blendet den Rückweg bei nur einem laufenden Turnier aus', async () => {

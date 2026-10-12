@@ -10,7 +10,7 @@ import { TournamentForm, TournamentList } from './pages/TournamentManagement.jsx
 import { RegistrationForm, RegistrationsPanel } from './pages/RegistrationsManagement.jsx';
 import { UserManagementPanel } from './pages/UserManagementPanel.jsx';
 import { ClubModerationPanel } from './pages/ClubModerationPanel.jsx';
-import { AdminDashboardPage } from './pages/AdminDashboardPage.jsx';
+import { AdminDashboardPage, CloudflareUsagePanel } from './pages/AdminDashboardPage.jsx';
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
 import { RichText } from './components/RichText.jsx';
 import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
@@ -350,6 +350,7 @@ describe('Admin-Dashboard', () => {
           allTime: { users: 1, guests: 2, total: 3, since: '2026-10-10' },
         },
       });
+      if (path.startsWith('/api/admin/cloudflare-usage')) return Promise.resolve({ configured: false });
       throw new Error(`unerwarteter API-Aufruf: ${path}`);
     });
 
@@ -358,6 +359,55 @@ describe('Admin-Dashboard', () => {
     expect(await within(screen.getByRole('button', { name: /Vereine/ })).findByText('1')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /Bouleplätze/ })).getByText('0')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /Pétanque Aktuell importieren/ })).getByText('1')).toBeInTheDocument();
+    expect(await screen.findByText(/Nicht eingerichtet: Der Worker braucht die Secrets/)).toBeInTheDocument();
+  });
+
+  it('zeigt die Cloudflare-Auslastung mit Tageslimit und lädt Stundenverlauf und teuerste Abfragen des gewählten Tages', async () => {
+    const api = vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation((path) => {
+      if (path === '/api/admin/cloudflare-usage?days=7') return Promise.resolve({
+        configured: true,
+        range: 7,
+        today: '2026-10-12',
+        limits: { requests: 100000, rowsRead: 5000000, rowsWritten: 100000 },
+        days: [
+          { day: '2026-10-06', requests: 5435, rowsRead: 548804, rowsWritten: 324 },
+          { day: '2026-10-07', requests: 6933, rowsRead: 4173149, rowsWritten: 2178 },
+          { day: '2026-10-08', requests: 6969, rowsRead: 5589657, rowsWritten: 412 },
+          { day: '2026-10-09', requests: 5673, rowsRead: 554469, rowsWritten: 921 },
+          { day: '2026-10-10', requests: 6314, rowsRead: 240773, rowsWritten: 1753 },
+          { day: '2026-10-11', requests: 7409, rowsRead: 203730, rowsWritten: 1261 },
+          { day: '2026-10-12', requests: 1472, rowsRead: 53898, rowsWritten: 260 },
+        ],
+      });
+      if (path.startsWith('/api/admin/cloudflare-usage?date=')) {
+        const date = decodeURIComponent(path.split('date=')[1]);
+        return Promise.resolve({
+          date,
+          hours: Array.from({ length: 24 }, (_, hour) => ({ hour, requests: hour, rowsRead: hour * 100, rowsWritten: 0 })),
+          topQueries: [{ query: `SELECT tournaments.* FROM tournaments -- ${date}`, count: 356, rowsRead: 54832, rowsWritten: 0 }],
+        });
+      }
+      throw new Error(`unerwarteter API-Aufruf: ${path}`);
+    });
+
+    const { container } = render(<CloudflareUsagePanel />);
+
+    // Standard ist der letzte vollständige Tag (gestern).
+    expect(await screen.findByText('SELECT tournaments.* FROM tournaments -- 2026-10-11')).toBeInTheDocument();
+    expect(screen.getByText('54.832 Zeilen gelesen · 356 Aufrufe · 154 je Aufruf')).toBeInTheDocument();
+    expect(container.querySelector('.visitor-readout').textContent).toContain('D1 gelesene Zeilen: 203.730');
+    // Der 08.10. lag über dem Limit für gelesene Zeilen: Limitlinie und rot markierte Säule.
+    expect(container.querySelector('.usage-chart-limit')).not.toBeNull();
+    expect(container.querySelectorAll('.usage-chart-bar.is-over')).toHaveLength(1);
+    expect(container.querySelectorAll('.usage-chart-bar.is-warn')).toHaveLength(1);
+
+    const dayBars = container.querySelectorAll('.visitor-chart')[0].querySelectorAll('.visitor-chart-hit');
+    fireEvent.click(dayBars[2]);
+    expect(await screen.findByText('SELECT tournaments.* FROM tournaments -- 2026-10-08')).toBeInTheDocument();
+    expect(api).toHaveBeenCalledWith('/api/admin/cloudflare-usage?date=2026-10-08');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Worker-Requests' }));
+    expect(container.querySelector('.usage-chart-limit')).toBeNull();
   });
 });
 
@@ -1196,16 +1246,18 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     expect(screen.getByRole('button', { name: 'Überschrift' })).toBeInTheDocument();
   });
 
-  it('deaktiviert die noch nicht fertige Live-Ansicht im Turnierformular', () => {
+  it('bietet die optionale Ergebnismeldung durch Spieler im Turnierformular an', () => {
     function LiveOptionHarness() {
       const [form, setForm] = useState({ ...EMPTY_TOURNAMENT_FORM, name: 'Sommerturnier', date: '2026-06-01', location: 'Musterstadt' });
       return <TournamentForm form={form} setForm={setForm} onSubmit={(event) => event.preventDefault()} onCancel={() => {}} mode="create" isAdmin={false} language="de" />;
     }
     render(<LiveOptionHarness />);
 
-    const option = screen.getByRole('checkbox', { name: /^Live-Ansicht für Teilnehmer/ });
-    expect(option).not.toBeChecked();
-    expect(option).toBeDisabled();
+    const playerResults = screen.getByRole('checkbox', { name: /Spieler dürfen Ergebnisse/ });
+    expect(playerResults).not.toBeDisabled();
+    fireEvent.click(playerResults);
+    expect(playerResults).toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: /^Live-Ansicht für Teilnehmer/ })).not.toBeInTheDocument();
   });
 
   it('bietet beim Bearbeiten eines Kalendereintrags Logo- und Flyer-Bildlink an', () => {

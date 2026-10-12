@@ -152,9 +152,49 @@ function scoreLabel(entry, t) {
   return `${entry.ownScore}:${entry.opponentScore}`;
 }
 
-function CurrentMatchCard({ live, participation }) {
+function PlayerResultReport({ path, onSaved }) {
   const { t } = useTranslation();
+  const [scoreA, setScoreA] = useState('');
+  const [scoreB, setScoreB] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const invalid = scoreA === '' || scoreB === '' || Number(scoreA) === Number(scoreB);
+
+  async function submit(event) {
+    event.preventDefault();
+    setError(''); setBusy(true);
+    try {
+      const updated = await authenticatedApi(`${path}/result`, { method: 'POST', body: JSON.stringify({ ownScore: Number(scoreA), opponentScore: Number(scoreB) }) });
+      onSaved(updated);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="live-result-report" onSubmit={submit}>
+      <p className="hint">{t('Ergebnis dieser Partie melden')}</p>
+      <div className="supermelee-result-row">
+        <input className="score-input" type="number" inputMode="numeric" min="0" max="13" value={scoreA} onChange={(event) => setScoreA(event.target.value)} aria-label={t('Eigene Punkte')} />
+        <span className="supermelee-score-sep">:</span>
+        <input className="score-input" type="number" inputMode="numeric" min="0" max="13" value={scoreB} onChange={(event) => setScoreB(event.target.value)} aria-label={t('Gegnerische Punkte')} />
+        <Button type="submit" disabled={invalid || busy} loading={busy}>{t('Ergebnis melden')}</Button>
+      </div>
+      <Feedback error={error || (scoreA !== '' && scoreB !== '' && Number(scoreA) === Number(scoreB) ? t('Unentschieden ist nicht möglich') : '')} />
+    </form>
+  );
+}
+
+function CurrentMatchCard({ live, participation, canReportResult, path, onResultSaved }) {
+  const { t } = useTranslation();
+  const [message, setMessage] = useState('');
   const match = live.currentMatch;
+  function resultSaved(updated) {
+    setMessage(t('Ergebnis gemeldet.'));
+    onResultSaved(updated);
+  }
   return (
     <section className="panel live-card live-current" aria-label={t('Aktuelle Partie')}>
       <div className="live-card-head">
@@ -182,6 +222,8 @@ function CurrentMatchCard({ live, participation }) {
             </div>
           )}
           <p className={`live-score live-${match.outcome}`}>{scoreLabel(match, t)}</p>
+          {canReportResult && !match.bye && match.outcome === 'open' && <PlayerResultReport path={path} onSaved={resultSaved} />}
+          <Feedback message={message} />
         </>
       )}
     </section>
@@ -290,7 +332,7 @@ function RegistrationPhase({ registration, tournament }) {
   );
 }
 
-export function LiveDetail({ queryKey, path, language, navigate = () => {}, token = null }) {
+export function LiveDetail({ queryKey, path, language, navigate = () => {}, token = null, canReportResult = false }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const query = useQuery({
@@ -356,7 +398,9 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
       {registration.participation === 'withdrawn' && <p className="hint">{t('Du pausierst gerade. Für neue Runden wirst du nicht ausgelost.')}</p>}
       {!drawn && <RegistrationPhase registration={registration} tournament={tournament} />}
       {drawn && registration.participation === 'inactive' && <p className="hint">{t('Du bist noch nicht eingecheckt.')}</p>}
-      {(drawn || tournament.status === 'running') && <CurrentMatchCard live={live} participation={registration.participation} />}
+      {(drawn || tournament.status === 'running') && <CurrentMatchCard key={live.currentMatch?.matchId || 'no-current-match'} live={live} participation={registration.participation}
+        canReportResult={canReportResult && tournament.playerResultReportingEnabled && tournament.status === 'running'} path={path}
+        onResultSaved={(updated) => queryClient.setQueryData(queryKey, updated)} />}
       <RankingCard live={live} />
       <HistoryCard live={live} />
       {tournament.status === 'running' && <LivePushToggle path={path} registrationId={registration.id} />}
@@ -374,7 +418,9 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
 export function MyLiveList({ navigate, language, hasRemembered = false }) {
   const { t } = useTranslation();
   const query = useQuery({ queryKey: ['live', 'me'], queryFn: () => authenticatedApi('/api/live/me'), retry: false });
-  const registrations = query.data?.registrations || [];
+  // Ältere, zwischengespeicherte Antworten können noch Löschhinweise enthalten.
+  // Sie dürfen in der Live-Auswahl niemals als auswählbares Turnier erscheinen.
+  const registrations = (query.data?.registrations || []).filter((entry) => !entry.deleted && !entry.tournament?.deleted);
 
   useEffect(() => {
     if (!hasRemembered && registrations.length === 1 && registrations[0].tournament.status === 'running') {
@@ -458,7 +504,7 @@ export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenu
   if (token) {
     content = <LiveDetail queryKey={['live', 'token', token]} path={`/api/live/token/${encodeURIComponent(token)}`} language={language} navigate={navigate} token={token} />;
   } else if (route.registrationId && currentUser) {
-    content = <LiveDetail queryKey={['live', 'registration', route.registrationId]} path={`/api/live/registrations/${encodeURIComponent(route.registrationId)}`} language={language} navigate={navigate} />;
+    content = <LiveDetail queryKey={['live', 'registration', route.registrationId]} path={`/api/live/registrations/${encodeURIComponent(route.registrationId)}`} language={language} navigate={navigate} canReportResult />;
   } else {
     content = (
       <>

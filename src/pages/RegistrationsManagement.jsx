@@ -351,7 +351,7 @@ function RelinkAccounts({ registration, busyId, onRelink }) {
 // "Live-Link neu senden" (EW-02): neuer persönlicher Link an die Spieler, der bisherige wird ungültig.
 function LiveLinkResend({ registration, tournament, busyId, onResend }) {
   const { t } = useTranslation();
-  if (!registration || !tournament?.liveViewEnabled || registration.status !== 'confirmed') return null;
+  if (!registration || registration.status !== 'confirmed') return null;
   return (
     <section className="relink-accounts" aria-label={t('Live-Link')}>
       <h3>{t('Live-Link')}</h3>

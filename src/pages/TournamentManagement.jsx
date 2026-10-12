@@ -604,11 +604,10 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           <label className="checkbox-field">
             <input
               type="checkbox"
-              checked={Boolean(form.liveViewEnabled)}
-              disabled
-              onChange={(event) => setForm({ ...form, liveViewEnabled: event.target.checked })}
+              checked={Boolean(form.playerResultReportingEnabled)}
+              onChange={(event) => setForm({ ...form, playerResultReportingEnabled: event.target.checked })}
             />
-            {t('Live-Ansicht für Teilnehmer: persönlicher Link in der Anmeldebestätigung, Runde, Gegner, Bahn und Push bei neuer Runde')}
+            {t('Spieler dürfen Ergebnisse ihrer laufenden Partie in der Live-Ansicht melden')}
           </label>
         </>
       )}
@@ -948,7 +947,7 @@ function tournamentToForm(tournament) {
     internalNotes: tournament.internalNotes || '',
     club: tournament.club || '',
     participantsPublic: Boolean(tournament.participantsPublic),
-    liveViewEnabled: Boolean(tournament.liveViewEnabled),
+    playerResultReportingEnabled: Boolean(tournament.playerResultReportingEnabled),
     approvalRequired: Boolean(tournament.approvalRequired),
     licenseRequired: Boolean(tournament.licenseRequired),
     teamNameEnabled: Boolean(tournament.teamNameEnabled),
