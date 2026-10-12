@@ -49,7 +49,7 @@ describe('Persönlicher Live-Link (E-21)', () => {
     expect((await antwort.json()).registration).toMatchObject({ id: ONLINE_ID, persons: ['Maria Bieder'] });
   });
 
-  it('gilt nicht für unbekannte oder stornierte Anmeldungen', async () => {
+  it('gilt nicht für unbekannte, stornierte oder abgelehnte Anmeldungen', async () => {
     expect((await liveAbrufen('b'.repeat(64))).status).toBe(404);
 
     sql("UPDATE tournaments SET live_view_enabled = 0 WHERE id = 't1'");
@@ -57,6 +57,21 @@ describe('Persönlicher Live-Link (E-21)', () => {
 
     sql("UPDATE registrations SET status = 'cancelled' WHERE id = ?", ONLINE_ID);
     expect((await liveAbrufen(TOKEN)).status).toBe(404);
+
+    sql("UPDATE registrations SET status = 'rejected' WHERE id = ?", ONLINE_ID);
+    expect((await liveAbrufen(TOKEN)).status).toBe(404);
+  });
+
+  it.each(['pending', 'waitlist'])('zeigt die persönliche Anmeldung auch mit Status %s vor dem Check-in', async (status) => {
+    sql('UPDATE registrations SET status = ?, participation = ? WHERE id = ?', status, 'inactive', ONLINE_ID);
+
+    const response = await liveAbrufen(TOKEN);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      registration: { id: ONLINE_ID, status, participation: 'inactive' },
+      live: { currentMatch: null, lastRoundNumber: null },
+    });
   });
 
   it('zeigt die Anmeldung unter „Live“ nur verknüpften Konten, nicht dem Melder über die E-Mail (E-21)', async () => {

@@ -147,6 +147,38 @@ describe('Live-Ansicht für Spieler', () => {
     expect(screen.queryByText('Du bist in der aktuellen Runde nicht eingeteilt.')).not.toBeInTheDocument();
   });
 
+  it('zeigt vor Turnierstart Status, Check-in und fehlende Auslosung der eigenen Anmeldung', async () => {
+    const payload = livePayload({ lastRoundNumber: null, currentMatch: null, history: [], ranking: [], rankingPlace: null, rankingSize: 0 });
+    payload.tournament.status = 'registration';
+    Object.assign(payload.registration, { status: 'waitlist', participation: 'inactive', incomplete: true, registrationType: 'melee', meleeTeammates: null });
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    renderDetail();
+
+    expect(await screen.findByText('Das Turnier hat noch nicht begonnen.')).toBeInTheDocument();
+    expect(screen.getByText('Anmeldestatus: Warteliste')).toBeInTheDocument();
+    expect(screen.getByText('Noch nicht eingecheckt.')).toBeInTheDocument();
+    expect(screen.getByText('Team noch unvollständig.')).toBeInTheDocument();
+    expect(screen.getByText('Dein Team wird kurz vor Turnierstart gebildet.')).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Runde gestartet.')).not.toBeInTheDocument();
+  });
+
+  it('kennzeichnet die Live-Ansicht nach Turnierende, ohne persönliche Ergebnisse zu erlauben', async () => {
+    const payload = livePayload();
+    payload.tournament.status = 'finished';
+    payload.tournament.playerResultReportingEnabled = true;
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de" canReportResult />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('Das Turnier ist beendet.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Eigene Punkte')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ergebnis melden' })).not.toBeInTheDocument();
+  });
+
   it.each(TOURNAMENT_TYPES)('meldet das Ergebnis für $label aus eigener Sicht', async ({ value: type }) => {
     const initial = livePayload();
     initial.tournament.type = type;

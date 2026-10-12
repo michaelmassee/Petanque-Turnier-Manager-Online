@@ -92,6 +92,11 @@ describe('Sync von Runden und Rangliste aus dem Turnierdokument', () => {
     expect(() => parseSyncRoundMatches({ matches: [{ teamA: ['r1'], matchIndex: -1 }] }, ids)).toThrow('Ungültige Partie-Nummer');
   });
 
+  it('weist eine übergroße Runde vor der Verarbeitung ab', () => {
+    expect(() => parseSyncRoundMatches({ matches: Array.from({ length: 501 }, () => ({ teamA: ['r1'] })) }, ids))
+      .toThrow('Partien müssen als Array übergeben werden');
+  });
+
   it('prüft die Rundennummer', () => {
     expect(parseSyncRoundNumber('3')).toBe(3);
     expect(() => parseSyncRoundNumber('0')).toThrow('Ungültige Rundennummer');
@@ -109,6 +114,13 @@ describe('Sync von Runden und Rangliste aus dem Turnierdokument', () => {
     expect(() => parseSyncRanking({ entries: 'x' }, ids)).toThrow('Rangliste muss als Array übergeben werden');
     expect(() => parseSyncRanking({ entries: [{ place: 0, registrationIds: ['r1'] }] }, ids)).toThrow('Ungültiger Ranglistenplatz');
     expect(() => parseSyncRanking({ entries: [{ place: 1, registrationIds: [] }] }, ids)).toThrow('Ungültige Meldung in der Rangliste');
+  });
+
+  it('behandelt unvollständige Punktewerte als unbekannt und begrenzt die Snapshot-Größe', () => {
+    expect(parseSyncRanking({ entries: [{ place: 1, registrationIds: ['r1'], pointsFor: 13 }] }, ids)[0])
+      .toMatchObject({ pointsFor: 13, pointsAgainst: null, pointsDiff: null });
+    expect(() => parseSyncRanking({ entries: Array.from({ length: 1001 }, () => ({ place: 1, registrationIds: ['r1'] })) }, ids))
+      .toThrow('Rangliste muss als Array übergeben werden');
   });
 });
 
