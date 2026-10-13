@@ -1,4 +1,6 @@
 {
+  "openingNotificationSubscribeShort": "Erinnern",
+  "openingNotificationActiveShort": "Aktiv",
   "openingNotificationSubscribe": "Benachrichtigen, wenn Anmeldung öffnet",
   "openingNotificationActive": "Benachrichtigung aktiv",
   "openingNotificationDeactivate": "Benachrichtigung deaktivieren",

@@ -32,9 +32,16 @@ describe('Anmelde-Öffnungsbenachrichtigung', () => {
     setup(<TournamentRegistrationAction tournament={tournament} currentUser={{ id: 'u1' }} onRegister={() => {}} />);
     const button = await screen.findByRole('button', { name: 'Benachrichtigen, wenn Anmeldung öffnet' });
     await waitFor(() => expect(button).toBeEnabled());
+    expect(button).toHaveTextContent('Erinnern');
+    expect(button).toHaveAttribute('title', 'Benachrichtigen, wenn Anmeldung öffnet');
+    expect(button.querySelector('svg')).toHaveAttribute('fill', 'none');
     fireEvent.click(button);
-    expect(await screen.findByRole('button', { name: 'Benachrichtigung aktiv' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Benachrichtigung aktiv' }));
+    const activeButton = await screen.findByRole('button', { name: 'Benachrichtigung aktiv' });
+    expect(activeButton).toHaveAttribute('aria-pressed', 'true');
+    expect(activeButton).toHaveTextContent('Aktiv');
+    expect(activeButton).toHaveAttribute('title', 'Benachrichtigung deaktivieren');
+    expect(activeButton.querySelector('svg')).toHaveAttribute('fill', 'currentColor');
+    fireEvent.click(activeButton);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Benachrichtigen, wenn Anmeldung öffnet' })).toHaveAttribute('aria-pressed', 'false'));
     expect(requests.map((request) => request.method)).toEqual(['GET', 'PUT', 'DELETE']);
   });

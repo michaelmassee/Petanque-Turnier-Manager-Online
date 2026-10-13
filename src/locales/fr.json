@@ -1,4 +1,6 @@
 {
+  "openingNotificationSubscribeShort": "Me prévenir",
+  "openingNotificationActiveShort": "Actif",
   "openingNotificationSubscribe": "Me prévenir à l’ouverture des inscriptions",
   "openingNotificationActive": "Notification activée",
   "openingNotificationDeactivate": "Désactiver la notification",

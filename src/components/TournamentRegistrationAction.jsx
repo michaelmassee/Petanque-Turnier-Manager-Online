@@ -28,6 +28,7 @@ function OpeningSubscriptionControl({ tournament, userId }) {
   const opensAt = new Date(tournament.registrationOpensAt).getTime();
   const active = subscriptions.data?.tournamentIds.includes(tournament.id) || false;
   const waitingForRelease = !Number.isFinite(opensAt) || clock >= opensAt;
+  const description = active ? t('openingNotificationActive') : waitingForRelease ? t('registrationOpeningInProgress') : t('openingNotificationSubscribe');
   useEffect(() => {
     if (!Number.isFinite(opensAt)) return;
     const remaining = opensAt - Date.now();
@@ -58,8 +59,14 @@ function OpeningSubscriptionControl({ tournament, userId }) {
   return <div>
     <Button variant="secondary" onClick={toggle} loading={saving} aria-pressed={active}
       disabled={subscriptions.isLoading || Boolean(subscriptions.error) || (!active && waitingForRelease)}
-      title={active ? t('openingNotificationDeactivate') : undefined}>
-      {active ? t('openingNotificationActive') : waitingForRelease ? t('registrationOpeningInProgress') : t('openingNotificationSubscribe')}
+      aria-label={description}
+      title={active ? t('openingNotificationDeactivate') : description}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor"
+        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z" />
+        <path d="M10 21h4" />
+      </svg>
+      {active ? t('openingNotificationActiveShort') : waitingForRelease ? t('registrationOpeningInProgress') : t('openingNotificationSubscribeShort')}
     </Button>
     <Feedback error={error || subscriptions.error?.message} />
   </div>;

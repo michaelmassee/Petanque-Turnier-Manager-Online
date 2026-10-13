@@ -1,4 +1,6 @@
 {
+  "openingNotificationSubscribeShort": "Remind me",
+  "openingNotificationActiveShort": "Active",
   "openingNotificationSubscribe": "Notify me when registration opens",
   "openingNotificationActive": "Notification active",
   "openingNotificationDeactivate": "Disable notification",
