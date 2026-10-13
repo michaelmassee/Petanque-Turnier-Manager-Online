@@ -23,7 +23,7 @@ function tournamentWith(overrides) {
   };
 }
 
-function renderDetail(tournament, view = 'info') {
+function renderDetail(tournament, view = 'info', navigate = () => {}) {
   return render(
     <TournamentDetailPage
       route={{ id: tournament.id, view }}
@@ -31,7 +31,7 @@ function renderDetail(tournament, view = 'info') {
       currentUser={null}
       language="de"
       setLanguage={() => {}}
-      navigate={() => {}}
+      navigate={navigate}
       menuOpen={false}
       setMenuOpen={() => {}}
       registrationForm={EMPTY_REGISTRATION_FORM}
@@ -54,6 +54,16 @@ function tabNames() {
 describe('Turnierdetail-Reiter', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('verlinkt den gespeicherten Bouleplatz aus einem Kalendereintrag mit dem Platzfilter', () => {
+    const navigate = vi.fn();
+    renderDetail(tournamentWith({ registrationEnabled: false, boulePlaceId: 'place-14' }), 'info', navigate);
+
+    const link = screen.getByRole('link', { name: 'Bouleplatz ansehen' });
+    expect(link).toHaveAttribute('href', '/plaetze#place-14');
+    fireEvent.click(link);
+    expect(navigate).toHaveBeenCalledExactlyOnceWith('/plaetze#place-14');
   });
 
   it('erkennt die Mitspieler-Route', () => {

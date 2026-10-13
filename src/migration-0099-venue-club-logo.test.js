@@ -1,6 +1,7 @@
 // @vitest-environment node
 // Migration 0099: Das Vereinslogo des Spielorts wird per Trigger beim Schreiben am Turnier gespeichert,
-// statt bei jedem Abruf der Turnierliste berechnet zu werden.
+// statt bei jedem Abruf der Turnierliste berechnet zu werden. Seit 0109 wird der
+// gefundene Platz ebenfalls gespeichert; Logo und Platz-ID bleiben zusammen.
 import { describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 
@@ -51,7 +52,8 @@ describe('Migration 0099 (Vereinslogo des Spielorts als Spalte)', () => {
 
     sqlite.exec("UPDATE clubs SET status = 'published' WHERE id = 'c1'");
     sqlite.exec("UPDATE boule_places SET latitude = 2 WHERE id = 'p1'");
-    expect(logo('t1')).toBeNull();
+    expect(sqlite.prepare("SELECT boule_place_id FROM tournaments WHERE id = 't1'").get().boule_place_id).toBe('p1');
+    expect(logo('t1')).toBe('https://example.test/neu.png');
 
     sqlite.exec(`INSERT INTO boule_places (id, club_id, name, address, latitude, longitude, venue_type, status, created_at,
         updated_at)
@@ -59,16 +61,19 @@ describe('Migration 0099 (Vereinslogo des Spielorts als Spalte)', () => {
     expect(logo('t1')).toBe('https://example.test/neu.png');
 
     sqlite.exec("DELETE FROM boule_places WHERE id = 'p2'");
+    expect(logo('t1')).toBe('https://example.test/neu.png');
+    sqlite.exec("DELETE FROM boule_places WHERE id = 'p1'");
     expect(logo('t1')).toBeNull();
   });
 
-  it('liefert kein Logo, wenn mehrere Vereine am selben Ort spielen', () => {
+  it('behält Platz und Logo beim ersten Treffer, wenn weitere Vereine am selben Ort hinzukommen', () => {
     const { sqlite, turnier, logo } = aufbauen();
     turnier('t1', { latitude: 50.5, longitude: 9.5 });
     sqlite.exec(`INSERT INTO clubs (id, name, logo_url, status, owner_id, created_at, updated_at)
       VALUES ('c2', 'Zweiter Club', 'https://example.test/zwei.png', 'published', 'owner', '2026-01-01', '2026-01-01');
       INSERT INTO boule_places (id, club_id, name, address, latitude, longitude, status, created_at, updated_at)
       VALUES ('p2', 'c2', 'Platz 2', 'Nebenstr. 2', 50.5, 9.5, 'published', '2026-01-01', '2026-01-01')`);
-    expect(logo('t1')).toBeNull();
+    expect(sqlite.prepare("SELECT boule_place_id FROM tournaments WHERE id = 't1'").get().boule_place_id).toBe('p1');
+    expect(logo('t1')).toBe('https://example.test/logo.png');
   });
 });
