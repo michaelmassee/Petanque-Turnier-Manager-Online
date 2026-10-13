@@ -106,6 +106,7 @@ describe('Persönlicher Live-Link (E-21)', () => {
   }
 
   it('schickt den Live-Link mit jeder Anmeldebestätigung', async () => {
+    sql("UPDATE tournaments SET contact_email = 'kontakt@example.test' WHERE id = 't1'");
     await anmelden();
     const token = linkAusMail('neu@example.test');
     const confirmationMail = gesendeteTexte().find((mail) => mail.to === 'neu@example.test');
@@ -115,6 +116,7 @@ describe('Persönlicher Live-Link (E-21)', () => {
       expect.objectContaining({ label: 'Anfahrt planen', icon: '⌖' }),
       expect.objectContaining({ label: 'Live-Ansicht öffnen', icon: '▶' }),
       expect.objectContaining({ label: 'Anmeldung stornieren', icon: '×', tone: 'danger' }),
+      expect.objectContaining({ label: 'Nachricht an Turnierleitung', icon: '✉' }),
     ]));
     // Nur der Hash liegt in der Datenbank, nie der Link selbst.
     expect(zeile("SELECT live_token_hash FROM registrations WHERE email = 'neu@example.test'").live_token_hash)

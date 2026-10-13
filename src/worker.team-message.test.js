@@ -29,6 +29,7 @@ describe('Nachricht an Team', () => {
   });
 
   it('schickt allen Teammitgliedern eine Mail mit Nachricht und Turnierlink', async () => {
+    sql("UPDATE tournaments SET contact_email = 'kontakt@example.test' WHERE id = 't1'");
     const response = await sendTeamMessage(env, anmeldung(), LEITUNG, 'Bitte Lizenz mitbringen.', 'https://ptm.test');
 
     expect(await response.json()).toEqual({ emailed: 2, postbox: 1 });
@@ -40,7 +41,11 @@ describe('Nachricht an Team', () => {
       expect(mail.actions).toEqual(expect.arrayContaining([
         expect.objectContaining({ label: 'Turnier ansehen', icon: '▣' }),
         expect.objectContaining({ label: 'Anfahrt planen', icon: '⌖' }),
+        expect.objectContaining({ label: 'Nachricht an Turnierleitung', icon: '✉' }),
       ]));
+      const contact = new URL(mail.actions.find((action) => action.icon === '✉').url);
+      expect(decodeURIComponent(contact.pathname)).toBe('kontakt@example.test');
+      expect(contact.searchParams.get('body')).toContain('https://ptm.test/turniere/t1/info');
     }
   });
 

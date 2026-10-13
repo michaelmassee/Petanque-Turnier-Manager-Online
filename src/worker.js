@@ -371,10 +371,40 @@ export function directionsEmailBlock(tournament, language) {
   return `\n\n${DIRECTIONS_EMAIL_LABELS[language] || DIRECTIONS_EMAIL_LABELS.de}\n${directionsLink}`;
 }
 
+const TOURNAMENT_CONTACT_EMAIL_LABELS = {
+  de: { subject: 'Nachricht zum Turnier', greeting: 'Hallo Turnierleitung,', tournament: 'Turnier', date: 'Termin', location: 'Ort', link: 'Turnierlink', message: 'Meine Nachricht:', closing: 'Viele Grüße' },
+  nl: { subject: 'Bericht over het toernooi', greeting: 'Hallo toernooiorganisatie,', tournament: 'Toernooi', date: 'Datum', location: 'Locatie', link: 'Toernooilink', message: 'Mijn bericht:', closing: 'Met vriendelijke groet' },
+  en: { subject: 'Message about the tournament', greeting: 'Hello tournament organizers,', tournament: 'Tournament', date: 'Date', location: 'Location', link: 'Tournament link', message: 'My message:', closing: 'Kind regards' },
+  es: { subject: 'Mensaje sobre el torneo', greeting: 'Hola, organización del torneo:', tournament: 'Torneo', date: 'Fecha', location: 'Lugar', link: 'Enlace del torneo', message: 'Mi mensaje:', closing: 'Saludos' },
+  fr: { subject: 'Message concernant le tournoi', greeting: 'Bonjour à l’organisation du tournoi,', tournament: 'Tournoi', date: 'Date', location: 'Lieu', link: 'Lien du tournoi', message: 'Mon message :', closing: 'Cordialement' },
+};
+
+export function buildTournamentContactLink(tournament, appOrigin, language) {
+  const email = String(tournament.contact_email ?? tournament.contactEmail ?? '').trim();
+  if (!email || !isEmail(email)) return '';
+  const labels = TOURNAMENT_CONTACT_EMAIL_LABELS[language] || TOURNAMENT_CONTACT_EMAIL_LABELS.de;
+  const name = String(tournament.name || '').replace(/[\r\n]+/g, ' ');
+  const dateTime = tournament.date
+    ? formatTournamentDateTime({ ...tournament, start_time: tournament.start_time ?? tournament.startTime }, language)
+    : '';
+  const location = formatLocationAddress(tournament.location);
+  const link = `${appOrigin}/turniere/${encodeURIComponent(tournament.id)}/info`;
+  const subject = `${labels.subject}: ${name}${dateTime ? ` (${dateTime})` : ''}`;
+  const body = [
+    labels.greeting, '', `${labels.tournament}: ${name}`,
+    ...(dateTime ? [`${labels.date}: ${dateTime}${tournament.timezone ? ` (${tournament.timezone})` : ''}`] : []),
+    ...(location ? [`${labels.location}: ${location}`] : []),
+    `${labels.link}: ${link}`, '', labels.message, '', '', labels.closing,
+  ].join('\r\n');
+  const recipient = encodeURIComponent(email).replace('%40', '@');
+  return `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 function tournamentEmailActions(tournament, appOrigin, language, extra = []) {
   return [
     emailAction('tournament', `${appOrigin}/turniere/${tournament.id}/info`, language),
     emailAction('directions', buildDirectionsLink(tournament.location), language),
+    emailAction('contact', buildTournamentContactLink(tournament, appOrigin, language), language, 'secondary'),
     ...extra,
   ].filter(Boolean);
 }
@@ -712,14 +742,14 @@ const EMAIL_LAYOUT_LABELS = {
 };
 
 const EMAIL_ACTION_LABELS = {
-  de: { tournament: 'Turnier ansehen', directions: 'Anfahrt planen', live: 'Live-Ansicht öffnen', cancel: 'Anmeldung stornieren', whatsapp: 'WhatsApp-Gruppe öffnen', confirm: 'Bestätigen', edit: 'Bouleplatz bearbeiten', reset: 'Passwort zurücksetzen' },
-  nl: { tournament: 'Toernooi bekijken', directions: 'Route plannen', live: 'Liveweergave openen', cancel: 'Inschrijving afmelden', whatsapp: 'WhatsApp-groep openen', confirm: 'Bevestigen', edit: 'Baan bewerken', reset: 'Wachtwoord opnieuw instellen' },
-  en: { tournament: 'View tournament', directions: 'Plan directions', live: 'Open live view', cancel: 'Withdraw registration', whatsapp: 'Open WhatsApp group', confirm: 'Confirm', edit: 'Edit boules court', reset: 'Reset password' },
-  es: { tournament: 'Ver torneo', directions: 'Planificar ruta', live: 'Abrir vista en directo', cancel: 'Cancelar inscripción', whatsapp: 'Abrir grupo de WhatsApp', confirm: 'Confirmar', edit: 'Editar pista', reset: 'Restablecer contraseña' },
-  fr: { tournament: 'Voir le tournoi', directions: 'Préparer l’itinéraire', live: 'Ouvrir la vue en direct', cancel: 'Annuler l’inscription', whatsapp: 'Ouvrir le groupe WhatsApp', confirm: 'Confirmer', edit: 'Modifier le terrain', reset: 'Réinitialiser le mot de passe' },
+  de: { tournament: 'Turnier ansehen', directions: 'Anfahrt planen', live: 'Live-Ansicht öffnen', cancel: 'Anmeldung stornieren', whatsapp: 'WhatsApp-Gruppe öffnen', confirm: 'Bestätigen', edit: 'Bouleplatz bearbeiten', reset: 'Passwort zurücksetzen', contact: 'Nachricht an Turnierleitung' },
+  nl: { tournament: 'Toernooi bekijken', directions: 'Route plannen', live: 'Liveweergave openen', cancel: 'Inschrijving afmelden', whatsapp: 'WhatsApp-groep openen', confirm: 'Bevestigen', edit: 'Baan bewerken', reset: 'Wachtwoord opnieuw instellen', contact: 'Bericht aan de toernooiorganisatie' },
+  en: { tournament: 'View tournament', directions: 'Plan directions', live: 'Open live view', cancel: 'Withdraw registration', whatsapp: 'Open WhatsApp group', confirm: 'Confirm', edit: 'Edit boules court', reset: 'Reset password', contact: 'Message the tournament organizers' },
+  es: { tournament: 'Ver torneo', directions: 'Planificar ruta', live: 'Abrir vista en directo', cancel: 'Cancelar inscripción', whatsapp: 'Abrir grupo de WhatsApp', confirm: 'Confirmar', edit: 'Editar pista', reset: 'Restablecer contraseña', contact: 'Mensaje a la organización del torneo' },
+  fr: { tournament: 'Voir le tournoi', directions: 'Préparer l’itinéraire', live: 'Ouvrir la vue en direct', cancel: 'Annuler l’inscription', whatsapp: 'Ouvrir le groupe WhatsApp', confirm: 'Confirmer', edit: 'Modifier le terrain', reset: 'Réinitialiser le mot de passe', contact: 'Contacter l’organisation du tournoi' },
 };
 
-const EMAIL_ACTION_ICONS = { tournament: '▣', directions: '⌖', live: '▶', cancel: '×', whatsapp: '◉', confirm: '✓', edit: '✎', reset: '↻', desktop: '↗', legal: '§', privacy: '◌' };
+const EMAIL_ACTION_ICONS = { tournament: '▣', directions: '⌖', live: '▶', cancel: '×', whatsapp: '◉', confirm: '✓', edit: '✎', reset: '↻', contact: '✉', desktop: '↗', legal: '§', privacy: '◌' };
 
 export function emailAction(kind, url, language, tone = null) {
   if (!url) return null;
@@ -761,26 +791,42 @@ function renderEmailButton(action) {
   return `<p style="margin:18px 0;"><a href="${escapeEmailHtml(action.url)}" style="display:inline-block;background:${colors.background};border:1px solid ${colors.border};border-radius:10px;color:${color};font-weight:700;padding:13px 20px;text-decoration:none;"><span aria-hidden="true" style="font-size:16px;margin-right:8px;">${escapeEmailHtml(action.icon)}</span>${escapeEmailHtml(action.label)}</a></p>`;
 }
 
-function renderEmailSection(text, labels, actions = []) {
+function renderEmailSection(text, labels, actions = [], renderedActionUrls = new Set()) {
   const actionByUrl = new Map(actions.filter(Boolean).map((action) => [action.url, action]));
   return text
     .split(/\n{2,}/)
     .filter(Boolean)
     .map((paragraph) => {
       const trimmed = paragraph.trim();
-      if (/^https?:\/\/[^\s<]+$/.test(trimmed)) {
-        return renderEmailButton(actionByUrl.get(trimmed) || { url: trimmed, label: labels.openLink, icon: '↗', tone: 'primary' });
+      if (/^https?:\/\/[^\s<]+$/.test(trimmed) && !actionByUrl.has(trimmed)) {
+        return renderEmailButton({ url: trimmed, label: labels.openLink, icon: '↗', tone: 'primary' });
       }
-      return `<p style="margin:0 0 18px;color:#25332f;font-size:16px;line-height:25px;">${linkifyEmailHtml(paragraph).replace(/\n/g, '<br>')}</p>`;
+      const parts = [];
+      let lines = [];
+      const flushText = () => {
+        if (lines.length) {
+          parts.push(`<p style="margin:0 0 18px;color:#25332f;font-size:16px;line-height:25px;">${linkifyEmailHtml(lines.join('\n')).replace(/\n/g, '<br>')}</p>`);
+          lines = [];
+        }
+      };
+      // Die Mailvorlagen verwenden „Beschriftung:\nURL“ im selben Absatz.
+      // Nur bekannte Aktions-URLs ersetzen, sonstige Textlinks beibehalten.
+      for (const line of paragraph.split('\n')) {
+        const action = actionByUrl.get(line.trim());
+        if (!action) {
+          lines.push(line);
+          continue;
+        }
+        flushText();
+        if (!renderedActionUrls.has(action.url)) {
+          parts.push(renderEmailButton(action));
+          renderedActionUrls.add(action.url);
+        }
+      }
+      flushText();
+      return parts.join('');
     })
     .join('');
-}
-
-function standaloneEmailUrls(text) {
-  return new Set(String(text || '')
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter((paragraph) => /^https?:\/\/[^\s<]+$/.test(paragraph)));
 }
 
 const EMAIL_TEXT_STYLE = 'margin:0 0 10px;color:#25332f;font-size:16px;line-height:25px;';
@@ -823,13 +869,12 @@ function renderEmailMessageBox(value) {
 export function renderTransactionalEmailHtml(subject, text, language, messageBox = null, textAfterMessageBox = '', actions = []) {
   const labels = EMAIL_LAYOUT_LABELS[language] || EMAIL_LAYOUT_LABELS.de;
   const [content, footer = ''] = appendEmailFooter(text, language).split('\n\n----------\n\n');
-  const visibleActionUrls = new Set([
-    ...standaloneEmailUrls(content),
-    ...standaloneEmailUrls(textAfterMessageBox),
-  ]);
-  const additionalActionButtons = actions
-    .filter(Boolean)
-    .filter((action) => !visibleActionUrls.has(action.url))
+  const renderedActionUrls = new Set();
+  const contentHtml = renderEmailSection(content, labels, actions, renderedActionUrls);
+  const afterMessageHtml = textAfterMessageBox ? renderEmailSection(textAfterMessageBox.trim(), labels, actions, renderedActionUrls) : '';
+  const uniqueActions = new Map(actions.filter(Boolean).map((action) => [action.url, action]));
+  const additionalActionButtons = [...uniqueActions.values()]
+    .filter((action) => !renderedActionUrls.has(action.url))
     .map(renderEmailButton)
     .join('');
   const footerActions = [
@@ -845,7 +890,7 @@ export function renderTransactionalEmailHtml(subject, text, language, messageBox
       <tr><td align="center" style="padding:32px 16px;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border-radius:14px;overflow:hidden;">
           <tr><td style="background:#07594f;padding:24px 32px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:.1px;">${EMAIL_BRAND}</td></tr>
-          <tr><td style="padding:34px 32px 24px;"><h1 style="margin:0 0 24px;color:#173b34;font-size:24px;line-height:31px;">${escapeEmailHtml(subject)}</h1>${renderEmailSection(content, labels, actions)}${messageBox ? renderEmailMessageBox(messageBox) : ''}${textAfterMessageBox ? renderEmailSection(textAfterMessageBox.trim(), labels, actions) : ''}${additionalActionButtons}</td></tr>
+          <tr><td style="padding:34px 32px 24px;"><h1 style="margin:0 0 24px;color:#173b34;font-size:24px;line-height:31px;">${escapeEmailHtml(subject)}</h1>${contentHtml}${messageBox ? renderEmailMessageBox(messageBox) : ''}${afterMessageHtml}${additionalActionButtons}</td></tr>
           <tr><td style="border-top:1px solid #dce6e2;padding:24px 32px 28px;background:#f8fbfa;">${footerHtml}</td></tr>
         </table>
         <p style="margin:16px 0 0;color:#71807b;font-size:12px;line-height:18px;">${labels.automated}</p>
@@ -2179,7 +2224,7 @@ export default {
         }
         const result = await cancelRegistration(env.DB, registration.id);
         try {
-          await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, owner_id: registration.owner_id }, registration, APP_ORIGIN);
+          await sendCancellationEmail(env, { ...registration, id: registration.tournament_id }, registration, APP_ORIGIN);
         } catch (error) {
           console.error(`Failed to send cancellation email for registration ${registration.id}`, error);
         }
@@ -2371,7 +2416,7 @@ export default {
         if (request.method === 'DELETE') {
           if (registration.status !== 'cancelled' && registration.status !== 'rejected') {
             try {
-              await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, owner_id: registration.owner_id }, registration, APP_ORIGIN);
+              await sendCancellationEmail(env, { ...registration, id: registration.tournament_id }, registration, APP_ORIGIN);
             } catch (error) {
               console.error(`Failed to send deletion notice email for registration ${registration.id}`, error);
             }
@@ -3530,7 +3575,11 @@ export async function createBroadcastPostboxMessage(env, { sender, tournament, b
         text: templates.text(recipient.firstName, tournament.name, `${sender.firstName} ${sender.lastName}`),
         messageBox: body,
         textAfterMessageBox: directionsBlock + whatsappBlock,
-        actions: [emailAction('directions', buildDirectionsLink(tournament.location), recipient.language), whatsappEmailAction(whatsappBlock, recipient.language)].filter(Boolean),
+        actions: [
+          emailAction('directions', buildDirectionsLink(tournament.location), recipient.language),
+          emailAction('contact', buildTournamentContactLink(tournament, APP_ORIGIN, recipient.language), recipient.language, 'secondary'),
+          whatsappEmailAction(whatsappBlock, recipient.language),
+        ].filter(Boolean),
         language: recipient.language,
         logFallback: `Tournament broadcast email for ${recipient.email} (tournament ${tournament.id})`,
         failureContext: `tournament broadcast for tournament ${tournament.id}`,
@@ -6990,7 +7039,7 @@ async function cancelRegistrationByToken(request, env) {
 
   const result = await cancelRegistration(env.DB, registration.id);
   try {
-    await sendCancellationEmail(env, { id: registration.tournament_id, name: registration.name, owner_id: registration.owner_id }, registration, APP_ORIGIN);
+    await sendCancellationEmail(env, { ...registration, id: registration.tournament_id }, registration, APP_ORIGIN);
   } catch (error) {
     console.error(`Failed to send cancellation email for registration ${registration.id}`, error);
   }
@@ -7944,7 +7993,7 @@ async function syncPostResults(request, env, tournamentId) {
     const placeholders = statusChangeIds.map(() => '?').join(', ');
     const previousRows = await db
       .prepare(
-        `SELECT r.*, t.name, t.owner_id, t.date, t.start_time, t.location, t.waitlist_enabled FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
+        `SELECT r.*, t.name, t.owner_id, t.date, t.start_time, t.location, t.timezone, t.contact_email, t.waitlist_enabled FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
          WHERE r.tournament_id = ? AND r.id IN (${placeholders})`,
       )
       .bind(tournamentId, ...statusChangeIds)
@@ -8088,7 +8137,9 @@ async function sendTransactionalEmail(env, { to, subject, text, messageBox = nul
     throw new HttpError(503, 'E-Mail-Versand ist nicht konfiguriert.');
   }
 
-  const body = appendEmailFooter(messageBox ? `${text}\n\n${richTextPlainText(messageBox)}${textAfterMessageBox}` : text + textAfterMessageBox, language);
+  const contactLinks = [...new Map(actions.filter((action) => action?.url.startsWith('mailto:')).map((action) => [action.url, action])).values()]
+    .map((action) => `\n\n${action.label}:\n${action.url}`).join('');
+  const body = appendEmailFooter((messageBox ? `${text}\n\n${richTextPlainText(messageBox)}${textAfterMessageBox}` : text + textAfterMessageBox) + contactLinks, language);
   const html = renderTransactionalEmailHtml(subject, text, language, messageBox, textAfterMessageBox, actions);
 
   // Strato (Absender ptmonline@bclinden.de) hat kein SPF/DKIM-Alignment für sein
@@ -9192,7 +9243,7 @@ export async function getRegistrationWithTournament(db, id) {
       `SELECT registrations.*, tournaments.owner_id, tournaments.visibility, tournaments.status AS tournament_status, tournaments.document_managed, tournaments.desktop_execution, tournaments.formation,
               tournaments.registration_type, tournaments.license_required, tournaments.max_registrations, tournaments.waitlist_enabled, tournaments.entry_fee_cents, tournaments.fee_tiers, tournaments.registration_questions,
               tournaments.name, tournaments.date, tournaments.start_time, tournaments.location,
-              tournaments.registration_deadline, tournaments.sync_document_id, tournaments.timezone,
+              tournaments.registration_deadline, tournaments.sync_document_id, tournaments.timezone, tournaments.contact_email,
               ${TOURNAMENT_EDITORS_JSON_SUBQUERY}
        FROM registrations
        JOIN tournaments ON tournaments.id = registrations.tournament_id
@@ -9205,7 +9256,7 @@ export async function getRegistrationWithTournament(db, id) {
 async function getRegistrationByCancelToken(db, token) {
   return db
     .prepare(
-      `SELECT registrations.*, tournaments.owner_id, tournaments.name, tournaments.date, tournaments.start_time, tournaments.location, tournaments.status AS tournament_status, tournaments.document_managed, tournaments.desktop_execution
+      `SELECT registrations.*, tournaments.owner_id, tournaments.name, tournaments.date, tournaments.start_time, tournaments.location, tournaments.timezone, tournaments.contact_email, tournaments.status AS tournament_status, tournaments.document_managed, tournaments.desktop_execution
        FROM registrations
        JOIN tournaments ON tournaments.id = registrations.tournament_id
        WHERE registrations.cancel_token = ?`,
