@@ -66,8 +66,9 @@ export function groupMapPlaces(places) {
   return [...groups.values()];
 }
 
-export function filterPlaces(places, { favoritesOnly = false, clubsOnly = false, indoorOnly = false } = {}) {
-  return places.filter((place) => (!favoritesOnly || place.favorited)
+export function filterPlaces(places, { placeId = '', favoritesOnly = false, clubsOnly = false, indoorOnly = false } = {}) {
+  return places.filter((place) => (!placeId || place.id === placeId)
+    && (!favoritesOnly || place.favorited)
     && (!clubsOnly || hasClub(place))
     && (!indoorOnly || place.venueType === 'indoor'));
 }
@@ -187,11 +188,18 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   const mapSectionRef = useRef(null);
   const [focusPlace, setFocusPlace] = useState(null);
 
-  function handleFocusPlace(place) {
+  function handleFocusPlace(place, scrollToMap = true) {
     if (place.latitude === null || place.longitude === null) return;
-    setFocusPlace({ id: place.id, lat: place.latitude, lng: place.longitude, token: Date.now() });
-    mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setFocusPlace({ id: place.id, lat: place.latitude, lng: place.longitude, scrollToMap });
   }
+
+  // Erst nach dem Rendern und den Karteneffekten scrollen, damit das Öffnen
+  // des Markers die Scrollbewegung nicht durch eine weitere Aktualisierung stört.
+  useEffect(() => {
+    if (focusPlace?.scrollToMap) {
+      mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [focusPlace]);
 
   const [searchOrigin, setSearchOrigin] = useState(null);
   const [searchOriginQuery, setSearchOriginQuery] = useState('');
@@ -207,13 +215,19 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   }
   useEffect(() => { const timer = setTimeout(load, 180); return () => clearTimeout(timer); }, [query]);
 
-  // Link „Bouleplatz ansehen“ aus den Turnierdetails: /plaetze#<placeId> öffnet dessen Detailkarte und fokussiert ihn auf der Karte.
-  const [linkedPlaceId] = useState(() => decodeURIComponent(window.location.hash.slice(1)));
+  // Link aus den Turnierdetails: nur diesen Platz in Liste und Karte anzeigen.
+  const [linkedPlaceId, setLinkedPlaceId] = useState(() => decodeURIComponent(window.location.hash.slice(1)));
   const linkedPlaceRef = useRef(null);
   const linkedPlaceScrolledRef = useRef(false);
 
+  function clearLinkedPlaceFilter() {
+    setLinkedPlaceId('');
+    setFocusPlace(null);
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
+  }
+
   const visiblePlaces = useMemo(() => {
-    let results = filterPlaces(places, { favoritesOnly, clubsOnly, indoorOnly });
+    let results = filterPlaces(places, { placeId: linkedPlaceId, favoritesOnly, clubsOnly, indoorOnly });
     if (searchOrigin) {
       const radius = Number(searchRadiusKm);
       results = results
@@ -223,11 +237,11 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         .sort((a, b) => a.distanceKm - b.distanceKm);
     }
     return results;
-  }, [places, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm]);
+  }, [places, linkedPlaceId, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm]);
 
   useEffect(() => {
     setVisibleCount(10);
-  }, [query, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm, places]);
+  }, [query, linkedPlaceId, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm, places]);
 
   const placeGroups = useMemo(() => groupPlacesByOrganization(visiblePlaces), [visiblePlaces]);
   const displayedPlaceGroups = useMemo(() => placeGroups.slice(0, visibleCount), [placeGroups, visibleCount]);
@@ -235,14 +249,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   useEffect(() => {
     if (!linkedPlaceId || loading) return;
     const place = places.find((entry) => entry.id === linkedPlaceId);
-    if (place) handleFocusPlace(place);
+    if (place) handleFocusPlace(place, false);
   }, [linkedPlaceId, loading, places]);
-
-  useEffect(() => {
-    if (!linkedPlaceId || loading) return;
-    const groupIndex = placeGroups.findIndex((group) => group.places.some((place) => place.id === linkedPlaceId));
-    if (groupIndex !== -1) setVisibleCount((count) => Math.max(count, groupIndex + 1));
-  }, [linkedPlaceId, loading, placeGroups]);
 
   useEffect(() => {
     if (!linkedPlaceId || loading || !linkedPlaceRef.current || linkedPlaceScrolledRef.current) return;
@@ -323,7 +331,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   }
 
   const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);
-  const activeFilterCount = [query, favoritesOnly, clubsOnly, indoorOnly].filter(Boolean).length;
+  const linkedPlaceLabel = places.find((place) => place.id === linkedPlaceId)?.name || linkedPlaceId;
+  const activeFilterCount = [query, linkedPlaceId, favoritesOnly, clubsOnly, indoorOnly].filter(Boolean).length;
 
   return <main className="app-shell">
     <StandalonePageHeader
@@ -396,7 +405,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         </div>
       </div>
 
-      {(query || favoritesOnly || clubsOnly || indoorOnly || searchOrigin) && <div className="active-search-badges" aria-label={t('Filter aktiv')}>
+      {(query || linkedPlaceId || favoritesOnly || clubsOnly || indoorOnly || searchOrigin) && <div className="active-search-badges" aria-label={t('Filter aktiv')}>
+        {linkedPlaceId && <button type="button" className="active-search-badge" onClick={clearLinkedPlaceFilter} aria-label={`${t('Entfernen')}: ${linkedPlaceLabel}`}><span data-i18n-skip>{linkedPlaceLabel}</span><span aria-hidden="true">×</span></button>}
         {query && <button type="button" className="active-search-badge" onClick={() => setQuery('')} aria-label={`${t('Entfernen')}: ${query}`}><span>{query}</span><span aria-hidden="true">×</span></button>}
         {favoritesOnly && <button type="button" className="active-search-badge" onClick={() => setFavoritesOnly(false)} aria-label={`${t('Entfernen')}: ${t('Nur meine Favoriten')}`}><span>{t('Nur meine Favoriten')}</span><span aria-hidden="true">×</span></button>}
         {clubsOnly && <button type="button" className="active-search-badge" onClick={() => setClubsOnly(false)} aria-label={`${t('Entfernen')}: ${t('Nur Vereine')}`}><span>{t('Nur Vereine')}</span><span aria-hidden="true">×</span></button>}
@@ -406,7 +416,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
 
       <Feedback error={error} />
       {mapped.length > 0 && (
-        <div className="panel" ref={mapSectionRef}>
+        <div className="panel places-map-panel" ref={mapSectionRef}>
           <PlacesMap places={mapped} center={center} maptilerApiKey={maptilerApiKey} focus={focusPlace} />
         </div>
       )}
