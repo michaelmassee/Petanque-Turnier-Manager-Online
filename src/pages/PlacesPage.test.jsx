@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlacesPage, { filterPlaces, groupMapPlaces, groupPlacesByOrganization } from './PlacesPage.jsx';
 import '../lib/i18next-config.js';
@@ -7,9 +7,9 @@ import '../lib/i18next-config.js';
 const map = vi.hoisted(() => ({ flyTo: vi.fn(), getZoom: vi.fn(() => 12), openPopup: vi.fn() }));
 
 vi.mock('react-leaflet', () => ({
-  Marker: forwardRef(function Marker({ children }, ref) {
+  Marker: forwardRef(function Marker({ children, position }, ref) {
     useImperativeHandle(ref, () => ({ openPopup: map.openPopup }));
-    return <div>{children}</div>;
+    return <div data-testid="place-marker" data-position={position.join(',')}>{children}</div>;
   }),
   Popup: ({ children }) => <div>{children}</div>,
   useMap: () => ({ flyTo: map.flyTo, getZoom: map.getZoom }),
@@ -110,16 +110,89 @@ describe('Bouleplatz-Deep-Link aus Turnierdetails', () => {
     window.history.replaceState({}, '', '/');
   });
 
-  it('öffnet und zeigt den verknüpften Platz auch jenseits der ersten Ergebnisgruppe und fokussiert ihn auf der Karte', async () => {
+  it('filtert Liste und Karte auf den verknüpften Platz und öffnet dessen Details', async () => {
     renderPlacesPage();
 
     const heading = await screen.findByRole('heading', { name: 'Bouleplatz 14' }, { timeout: 5_000 });
     const details = heading.closest('details');
     expect(details).toHaveAttribute('open');
-    expect(screen.getByRole('heading', { name: 'Bouleplatz 1' })).toBeInTheDocument();
-    await vi.waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'Bouleplatz 1' })).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('place-marker')).toHaveLength(1);
+    expect(screen.getByTestId('place-marker')).toHaveAttribute('data-position', '50.14,8.14');
+    expect(screen.getByRole('button', { name: '1 gefundene Bouleplätze – zur Liste springen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Entfernen: Bouleplatz 14' })).toBeInTheDocument();
+    await vi.waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled(), { timeout: 5_000 });
     expect(Element.prototype.scrollIntoView.mock.contexts).toContain(details);
-    await vi.waitFor(() => expect(map.flyTo).toHaveBeenCalledWith([50.14, 8.14], 15));
+    await vi.waitFor(() => expect(map.flyTo).toHaveBeenCalledWith([50.14, 8.14], 15), { timeout: 5_000 });
     expect(map.openPopup).toHaveBeenCalled();
+  });
+
+  it('scrollt nur einmal zur verknüpften Detailkarte und lässt spätere Kartenklicks unberührt', async () => {
+    renderPlacesPage();
+    const heading = await screen.findByRole('heading', { name: 'Bouleplatz 14' }, { timeout: 5_000 });
+    const details = heading.closest('details');
+    await vi.waitFor(() => expect(map.flyTo).toHaveBeenCalledWith([50.14, 8.14], 15), { timeout: 5_000 });
+    await vi.waitFor(() => expect(Element.prototype.scrollIntoView.mock.contexts).toContain(details), { timeout: 5_000 });
+    expect(Element.prototype.scrollIntoView.mock.contexts.filter((element) => element === details)).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Entfernen: Bouleplatz 14' }));
+    expect(window.location.hash).toBe('');
+    expect(screen.getByRole('button', { name: '15 gefundene Bouleplätze – zur Liste springen' })).toBeInTheDocument();
+    expect(screen.getAllByTestId('place-marker')).toHaveLength(15);
+    expect(fetch).toHaveBeenCalledOnce();
+    Element.prototype.scrollIntoView.mockClear();
+
+    const otherDetails = screen.getByRole('heading', { name: 'Bouleplatz 1' }).closest('details');
+    fireEvent.click(within(otherDetails).getByRole('button', { name: 'Karte', hidden: true }));
+
+    await vi.waitFor(() => expect(map.flyTo).toHaveBeenLastCalledWith([50.01, 8.01], 15), { timeout: 5_000 });
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledOnce();
+    expect(Element.prototype.scrollIntoView.mock.contexts).not.toContain(details);
+  });
+
+  it('zeigt auch bei mehreren Spielorten eines Vereins nur den verknüpften Spielort', async () => {
+    fetch.mockResolvedValue(new Response(JSON.stringify({ places: [
+      place(14, { clubId: 'club-1', clubName: 'BC Linden' }),
+      place(15, { clubId: 'club-1', clubName: 'BC Linden', venueType: 'indoor' }),
+    ] }), { status: 200 }));
+    renderPlacesPage();
+
+    expect(await screen.findByRole('heading', { name: 'Bouleplatz 14' }, { timeout: 5_000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Bouleplatz 15' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Bouleplatz 15 (Boulehalle)')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('place-marker')).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: 'BC Linden' }).closest('details')).toHaveAttribute('open');
+  });
+
+  it('zeigt bei einem nicht verfügbaren verknüpften Platz keine anderen Plätze', async () => {
+    window.history.replaceState({}, '', '/plaetze#missing-place');
+    renderPlacesPage();
+
+    expect(await screen.findByText('Noch keine veröffentlichten Bouleplätze gefunden.', {}, { timeout: 5_000 })).toBeInTheDocument();
+    expect(screen.queryAllByTestId('place-marker')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Entfernen: missing-place' }));
+    expect(screen.getByRole('heading', { name: 'Bouleplatz 1' })).toBeInTheDocument();
+  });
+
+  it('scrollt bei jedem Kartenklick nach der Markeraktualisierung zur Karte', async () => {
+    window.history.replaceState({}, '', '/plaetze');
+    const { container } = renderPlacesPage();
+    const heading = await screen.findByRole('heading', { name: 'Bouleplatz 1' }, { timeout: 5_000 });
+    const details = heading.closest('details');
+    fireEvent.click(within(details).getByText('Bouleplatz 1'));
+    const button = within(details).getByRole('button', { name: 'Karte' });
+    const mapPanel = container.querySelector('.places-map-panel');
+
+    for (let click = 0; click < 2; click += 1) {
+      map.flyTo.mockClear();
+      map.openPopup.mockClear();
+      Element.prototype.scrollIntoView.mockClear();
+      fireEvent.click(button);
+
+      expect(map.flyTo).toHaveBeenCalledWith([50.01, 8.01], 15);
+      expect(map.openPopup).toHaveBeenCalled();
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalledExactlyOnceWith({ behavior: 'smooth', block: 'start' });
+      expect(Element.prototype.scrollIntoView.mock.contexts).toEqual([mapPanel]);
+      expect(map.openPopup.mock.invocationCallOrder[0]).toBeLessThan(Element.prototype.scrollIntoView.mock.invocationCallOrder[0]);
+    }
   });
 });
