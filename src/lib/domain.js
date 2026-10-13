@@ -230,7 +230,7 @@ export function clubMatchesTournament(club, tournament) {
 }
 
 export function registrationNotYetOpen(tournament) {
-  return Boolean(tournament.registrationOpensAt) && new Date(tournament.registrationOpensAt).getTime() > Date.now();
+  return Boolean(tournament.registrationOpeningPending) || (Boolean(tournament.registrationOpensAt) && new Date(tournament.registrationOpensAt).getTime() > Date.now());
 }
 
 export function hasOpenRegistration(tournament) {

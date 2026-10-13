@@ -84,14 +84,19 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   let payload = { title: 'Neue Nachricht', actor: '' };
   try { payload = event.data?.json() || payload; } catch { /* use safe fallback */ }
-  event.waitUntil(self.registration.showNotification(payload.title || 'Neue Nachricht', {
+  const notification = self.registration.showNotification(payload.title || 'Neue Nachricht', {
     body: payload.body || (payload.actor ? `Von ${payload.actor}` : 'In deiner Postbox wartet ein neuer Eintrag.'),
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     // Live-Push (neue Runde) bringt eigenes Tag und Ziel mit; Postfach-Push öffnet die Startseite.
     tag: payload.tag || `postbox-${payload.messageId || 'new'}`,
     data: { url: typeof payload.url === 'string' && payload.url.startsWith(self.location.origin) ? payload.url : '/' },
-  }));
+  });
+  const refresh = payload.eventType === 'tournament_registration_opened' && payload.tournamentId
+    ? clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      for (const client of windows) client.postMessage({ type: 'tournament-registration-opened', tournamentId: payload.tournamentId });
+    }) : Promise.resolve();
+  event.waitUntil(Promise.all([notification, refresh]));
 });
 
 self.addEventListener('notificationclick', (event) => {

@@ -1,4 +1,6 @@
 import tzlookup from 'tz-lookup';
+import { REGISTRATION_OPENED_EVENT, OPENING_MESSAGES, synchronizeOpeningSchedule } from './registration-opening.js';
+export { RegistrationOpeningScheduler } from './registration-opening.js';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
 import {
   isAllowedPushEndpoint, LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT,
@@ -683,6 +685,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
 };
 
 function buildSystemNotificationPushBody(eventType, eventData, language) {
+  if (eventType === REGISTRATION_OPENED_EVENT) return (OPENING_MESSAGES[language] || OPENING_MESSAGES.de).replace('{{name}}', eventData?.tournamentName || '');
   const texts = SYSTEM_NOTIFICATION_TEXTS[language] || SYSTEM_NOTIFICATION_TEXTS.de;
   const data = eventData || {};
   if (eventType === 'tournament_status_changed') {
@@ -1460,6 +1463,11 @@ export default {
       cleanupExpiredSessions(env.DB).catch((error) => console.error('Cleanup cron failed', error)),
       deletePlayerListingsOfFinishedTournaments(env.DB).catch((error) => console.error('Deleting player listings of finished tournaments failed', error)),
     ];
+    // Recover pending schedule writes (including first deployment), not opening-date polling.
+    if (env.REGISTRATION_OPENING_SCHEDULER) jobs.push((async () => {
+      const change = await env.DB.prepare('SELECT dirty FROM registration_opening_schedule_changes WHERE id = 1').first();
+      if (change?.dirty) await synchronizeOpeningSchedule(env);
+    })().catch((error) => console.error('Opening schedule synchronization failed', error)));
     if (event.cron === DAILY_CRON) {
       jobs.push(
         sendTournamentReminders(env).catch((error) => console.error('Tournament reminder cron failed', error)),
@@ -2211,6 +2219,41 @@ export default {
         return json({ publicKey: env.VAPID_PUBLIC_KEY });
       }
 
+      if (url.pathname === '/api/me/registration-opening-subscriptions' && request.method === 'GET') {
+        const session = await requireSession(request, env.DB);
+        const rows = await env.DB.prepare(`SELECT s.tournament_id FROM registration_opening_subscriptions s
+          JOIN tournaments t ON t.id = s.tournament_id WHERE s.user_id = ? AND t.registration_opening_pending = 1
+          AND t.status = 'registration' AND t.visibility = 'public' AND t.registration_closed = 0`).bind(session.user.id).all();
+        return json({ tournamentIds: rows.results.map((row) => row.tournament_id) });
+      }
+      if (url.pathname === '/api/admin/registration-opening-scheduler/sync' && request.method === 'POST') {
+        await requireAdmin(request, env.DB);
+        await synchronizeOpeningSchedule(env);
+        return json({ ok: true });
+      }
+      const openingSubscriptionMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registration-opening-subscription$/);
+      if (openingSubscriptionMatch && ['PUT', 'DELETE'].includes(request.method)) {
+        const session = await requireSession(request, env.DB);
+        const tournamentId = openingSubscriptionMatch[1];
+        if (request.method === 'DELETE') {
+          await env.DB.prepare('DELETE FROM registration_opening_subscriptions WHERE user_id = ? AND tournament_id = ?')
+            .bind(session.user.id, tournamentId).run();
+          return json({ active: false });
+        }
+        const now = new Date().toISOString();
+        const result = await env.DB.prepare(`INSERT INTO registration_opening_subscriptions (id, user_id, tournament_id, created_at)
+          SELECT ?, ?, t.id, ? FROM tournaments t WHERE t.id = ? AND t.visibility = 'public' AND t.status = 'registration'
+          AND t.registration_enabled = 1 AND t.registration_closed = 0 AND t.registration_opening_pending = 1
+          AND t.registration_opens_at > ? ON CONFLICT(user_id, tournament_id) DO NOTHING`)
+          .bind(crypto.randomUUID(), session.user.id, now, tournamentId, now).run();
+        const existing = result.meta.changes || await env.DB.prepare('SELECT id FROM registration_opening_subscriptions WHERE user_id = ? AND tournament_id = ?')
+          .bind(session.user.id, tournamentId).first();
+        if (!existing) throw new HttpError(409, 'Für dieses Turnier ist keine Öffnungsbenachrichtigung verfügbar.');
+        // The subscription is committed; scheduler recovery must not turn it into a failed request.
+        try { await synchronizeOpeningSchedule(env); }
+        catch (error) { console.error('Registration opening schedule remains pending', error); }
+        return json({ active: true });
+      }
       const registrationCancelMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/cancel$/);
       if (registrationCancelMatch && request.method === 'POST') {
         const session = await requireSession(request, env.DB);
@@ -2622,6 +2665,15 @@ export default {
       : null;
     if (writtenTournament) {
       await invalidateLiveSnapshot(url.origin, decodeURIComponent(writtenTournament[1]));
+    }
+    if (response.ok && request.method !== 'GET' && env.REGISTRATION_OPENING_SCHEDULER
+      && (/^\/api\/(?:sync\/)?tournaments(?:\/[^/]+(?:\/(?:metadata|publication|registration-closed|start|reset))?)?$/.test(url.pathname)
+        || /^\/api\/(?:tournament-reports|admin\/petanque-aktuell\/import)/.test(url.pathname))) {
+      try { await synchronizeOpeningSchedule(env); }
+      catch (error) {
+        // Keep the committed mutation response. The dirty marker enables recovery on later writes/cron.
+        console.error('Registration opening schedule remains pending', error);
+      }
     }
     if (request.method !== 'GET' && response.ok && PUBLISHED_CLUBS_WRITE_PATH.test(url.pathname)) {
       await invalidatePublishedClubs(url.origin);
@@ -7218,7 +7270,7 @@ function registrationOpenSql({ isManager, syncBootstrap, shareTokenHash }) {
     return { sql: 'COALESCE(t.desktop_execution, 0) = 0', binds: [] };
   }
   return {
-    sql: `t.status = 'registration' AND COALESCE(t.registration_closed, 0) = 0
+    sql: `t.status = 'registration' AND COALESCE(t.registration_closed, 0) = 0 AND COALESCE(t.registration_opening_pending, 0) = 0
       AND (t.visibility = 'public' OR EXISTS (SELECT 1 FROM tournament_share_links l
                                                WHERE l.tournament_id = t.id AND l.token_hash = ?))`,
     binds: [shareTokenHash || ''],
@@ -10298,6 +10350,7 @@ export function toPublicTournament(row, user) {
     maxRegistrations: Number(row.max_registrations || 0),
     registrationDeadline: row.registration_deadline,
     registrationOpensAt: row.registration_opens_at,
+    registrationOpeningPending: Boolean(Number(row.registration_opening_pending || 0)),
     timezone: row.timezone || 'Europe/Berlin',
     entryFeeCents: Number(row.entry_fee_cents || 0),
     feeTiers: feeTiersFromRow(row),

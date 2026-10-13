@@ -1,4 +1,11 @@
 {
+  "openingNotificationSubscribe": "Me prévenir à l’ouverture des inscriptions",
+  "openingNotificationActive": "Notification activée",
+  "openingNotificationDeactivate": "Désactiver la notification",
+  "registrationOpeningInProgress": "Les inscriptions sont en cours d’ouverture …",
+  "registrationOpenedNotification": "{{name}} : Les inscriptions sont maintenant ouvertes.",
+  "Für dieses Turnier ist keine Öffnungsbenachrichtigung verfügbar.": "Aucune notification d’ouverture n’est disponible pour ce tournoi.",
+  "Die Anmeldefreigabe konnte noch nicht eingeplant werden. Bitte erneut versuchen.": "L’ouverture des inscriptions n’a pas encore pu être programmée. Réessayez.",
   "Die App konnte nicht wiederhergestellt werden.": "L’application n’a pas pu être rétablie.",
   "Eine Online-Anmeldung existiert nicht mehr": "Une inscription en ligne n’existe plus",
   "Bitte starte die App erneut.": "Veuillez redémarrer l’application.",

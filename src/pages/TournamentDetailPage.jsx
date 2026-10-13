@@ -12,6 +12,7 @@ import { formatUserName } from '../lib/userLabel.js';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { TournamentPlayerListings } from '../components/TournamentPlayerListings.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
+import { TournamentRegistrationAction } from '../components/TournamentRegistrationAction.jsx';
 
 export function TournamentInfo({ tournament, language, onShare, showTitle = true, shareToken = '', onNavigate }) {
   const { t } = useTranslation();
@@ -632,6 +633,7 @@ export function TournamentDetailPage({
             </p>
           )}
           {view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} showTitle={false} shareToken={shareToken} onNavigate={navigate} />}
+          {view === 'info' && tournament.registrationOpeningPending && <TournamentRegistrationAction tournament={tournament} currentUser={currentUser} onRegister={() => navigate(detailPath('anmelden'))} />}
 
           {view === 'anmelden' && (
             <PublicRegistrationPanel

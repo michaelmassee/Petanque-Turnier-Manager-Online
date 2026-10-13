@@ -206,6 +206,9 @@ function postboxMessageText(message, t) {
   if (message.eventType === 'saved_search_new_matches') {
     return t('savedSearchMatchesText', { count: data.count ?? 0, name: data.savedSearchName || '' });
   }
+  if (message.eventType === 'tournament_registration_opened') {
+    return t('registrationOpenedNotification', { name: data.tournamentName || '' });
+  }
   if (message.eventType === LIVE_VIEW_AVAILABLE_EVENT) {
     return t('liveViewAvailableText', { name: data.tournamentName || '' });
   }

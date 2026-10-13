@@ -91,6 +91,18 @@ Ergebnisse synchronisieren.
   Der Backfill ist idempotent und bricht den Ablauf ab, wenn danach noch Konten ohne Benutzernamen übrig sind.
   Nach dem Deploy prüfen: Zahl der Konten unverändert, `SELECT COUNT(*) FROM users WHERE username IS NULL` ergibt `0`.
 
+## Geplanter Anmeldebeginn
+
+Turniere mit zukünftigem Anmeldebeginn werden durch einen SQLite-basierten Durable-Object-Alarm freigegeben, auch ohne Abonnenten. Freigabe, Postbox-Nachrichten und Abschluss der einmaligen Abos werden gemeinsam in D1 gespeichert. Push wird danach nur für Konten mit Push-Freigabe über die vorhandene Queue eingereiht.
+
+Ein gemeinsamer Scheduler setzt nur den nächsten Alarm. Terminänderungen planen ihn neu; manuelle Sperren haben Vorrang. Persönliche Abo-Zustände werden auf Nachfrage geladen und für alle Karten wiederverwendet. Fällige Turniere, Ereignisse und offene Push-Aufträge haben eigene Indizes. Die Arbeit pro Alarm ist begrenzt, um D1-Free-Limits einzuhalten.
+
+Beim ersten Release: Migration `0110_registration_opening_notifications.sql` anwenden und den Worker mit der neuen Durable-Object-Bindung deployen. Anschließend als eingeloggter Admin einmal `POST /api/admin/registration-opening-scheduler/sync` aufrufen, damit auch bereits vorhandene Termine sofort eingeplant sind. Der bestehende stündliche Wartungslauf prüft als Fehlerabsicherung nur eine Änderungsmarkierung; er fragt nicht regelmäßig die Öffnungsdaten aller Turniere ab. Bei einem Queue-Fehler bleiben Push-Aufträge gespeichert und der Alarm wiederholt den fehlgeschlagenen Schritt mit wachsendem Abstand.
+
+Die Funktion verschickt keine E-Mails. Gäste können keine Öffnungsbenachrichtigung abonnieren.
+
+Der lokale Alarmtest läuft mit einem isolierten Miniflare und benötigt einen lokalen Listener. Nach einem Dry-Run (`wrangler deploy --dry-run --outdir /tmp/ptm-opening-smoke`) prüft `node scripts/registration-opening-smoke.mjs /tmp/ptm-opening-smoke` die echte Alarm-Ausführung mit und ohne Abo. Der Test verwendet weder Produktionsdaten noch echte Push-Empfänger.
+
 ## 🤝 Mitwirken
 
 Fehlerberichte, Ideen und Pull Requests sind willkommen. Bitte beachte vor

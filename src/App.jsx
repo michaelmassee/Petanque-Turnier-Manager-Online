@@ -19,6 +19,7 @@ import { useClubSuggestions } from './components/ClubSuggestions.jsx';
 import { UsernameConfirmNotice } from './components/UsernameConfirmNotice.jsx';
 import { RegistrationFields } from './components/RegistrationFields.jsx';
 import { InfiniteListLoadMore } from './components/InfiniteListLoadMore.jsx';
+import { TournamentRegistrationAction } from './components/TournamentRegistrationAction.jsx';
 import { AppHeader, PostboxControl, PushMigrationNotice, SearchMenuControl, SavedSearchesControl, AuthModal, StandalonePageHeader, InstallAppButton } from './components/layout.jsx';
 import { AuthShell, LanguageSelect, SetupForm, LoginForm, RegisterForm, RegisterSuccessNotice, ForgotPasswordForm, ResendVerificationForm, ResetPasswordForm, VerifyEmailForm, CancelRegistrationForm } from './auth/AuthForms.jsx';
 
@@ -121,6 +122,16 @@ function AppContent() {
   const [geoError, setGeoError] = useState('');
   const [path, navigate] = usePath();
   const [currentUser, setCurrentUser] = useState(null);
+  useEffect(() => {
+    if (!navigator.serviceWorker) return;
+    const refreshOpening = (event) => {
+      if (event.data?.type !== 'tournament-registration-opened') return;
+      queryClient.invalidateQueries({ queryKey: ['tournaments'] }, { cancelRefetch: false });
+      if (currentUser?.id) queryClient.invalidateQueries({ queryKey: ['registration-opening-subscriptions', currentUser.id] }, { cancelRefetch: false });
+    };
+    navigator.serviceWorker.addEventListener('message', refreshOpening);
+    return () => navigator.serviceWorker.removeEventListener('message', refreshOpening);
+  }, [currentUser?.id]);
   const [postboxOpen, setPostboxOpen] = useState(false);
   const [postbox, setPostbox] = useState({ messages: [], unreadCount: 0, todos: [] });
   const [postboxRecipients, setPostboxRecipients] = useState([]);
@@ -764,6 +775,10 @@ function AppContent() {
       setActiveTab('registrations');
       setPostboxOpen(false);
       if (path !== '/') navigate('/');
+    } else if (message.eventType === 'tournament_registration_opened' && message.eventData?.tournamentId) {
+      setPostboxOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+      navigate(`/turniere/${message.eventData.tournamentId}/anmelden`);
     } else if (message.kind === 'system' && message.eventData?.tournamentId) {
       setPostboxOpen(false);
       navigate(`/turniere/${message.eventData.tournamentId}`);
@@ -1609,6 +1624,7 @@ function AppContent() {
 
         <HomeTournaments
           language={language}
+          currentUser={currentUser}
           query={homeQuery}
           showMineFilter={false}
           onlyMine={false}
@@ -1964,6 +1980,7 @@ function AppContent() {
       {activeTab === 'home' && (
         <HomeTournaments
           language={language}
+          currentUser={currentUser}
           query={homeQuery}
           showMineFilter={canManageTournaments}
           onlyMine={homeOnlyMine}
@@ -2284,7 +2301,7 @@ function TournamentInfoCard({ content }) {
   );
 }
 
-function TournamentCard({ tournament, onOpenTournament, onRegister, language }) {
+function TournamentCard({ tournament, onOpenTournament, onRegister, language, currentUser }) {
   const { t } = useTranslation();
   const [logoBroken, setLogoBroken] = useState(false);
   const hasLogo = Boolean(tournament.logoUrl) && !logoBroken;
@@ -2331,15 +2348,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
       </button>
       <div className="tournament-card-meta">
         <span className={`status ${isCalendarEntry(tournament) ? 'status-calendar' : `status-${tournament.status}`}`}>{registrationStatusLabel(tournament, language)}</span>
-        {tournament.registrationEnabled !== false && (
-          <Button
-            variant="secondary"
-            onClick={() => onRegister(tournament)}
-            disabled={tournament.visibility !== 'public' || !hasOpenRegistration(tournament)}
-          >
-            {t('Anmelden (Turnier)')}
-          </Button>
-        )}
+        <TournamentRegistrationAction tournament={tournament} currentUser={currentUser} onRegister={onRegister} />
       </div>
     </article>
   );
@@ -2347,6 +2356,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language }) 
 
 export function HomeTournaments({
   language,
+  currentUser,
   query = '',
   showMineFilter,
   onlyMine,
@@ -2500,6 +2510,7 @@ export function HomeTournaments({
             onOpenTournament={onOpenTournament}
             onRegister={onRegister}
             language={language}
+            currentUser={currentUser}
           />,
           showTournamentInfoCard && index === 3 && <TournamentInfoCard key="tournament-info-card" content={tournamentInfoCard} />,
         ])}

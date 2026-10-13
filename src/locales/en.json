@@ -1,4 +1,11 @@
 {
+  "openingNotificationSubscribe": "Notify me when registration opens",
+  "openingNotificationActive": "Notification active",
+  "openingNotificationDeactivate": "Disable notification",
+  "registrationOpeningInProgress": "Registration is being opened …",
+  "registrationOpenedNotification": "{{name}}: Registration is now open.",
+  "Für dieses Turnier ist keine Öffnungsbenachrichtigung verfügbar.": "An opening notification is not available for this tournament.",
+  "Die Anmeldefreigabe konnte noch nicht eingeplant werden. Bitte erneut versuchen.": "Registration opening could not be scheduled yet. Please try again.",
   "Die App konnte nicht wiederhergestellt werden.": "The app could not be recovered.",
   "Eine Online-Anmeldung existiert nicht mehr": "An online registration no longer exists",
   "Bitte starte die App erneut.": "Please restart the app.",

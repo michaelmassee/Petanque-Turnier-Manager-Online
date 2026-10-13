@@ -1,4 +1,11 @@
 {
+  "openingNotificationSubscribe": "Benachrichtigen, wenn Anmeldung öffnet",
+  "openingNotificationActive": "Benachrichtigung aktiv",
+  "openingNotificationDeactivate": "Benachrichtigung deaktivieren",
+  "registrationOpeningInProgress": "Anmeldung wird freigegeben …",
+  "registrationOpenedNotification": "{{name}}: Die Anmeldung ist jetzt geöffnet.",
+  "Für dieses Turnier ist keine Öffnungsbenachrichtigung verfügbar.": "Für dieses Turnier ist keine Öffnungsbenachrichtigung verfügbar.",
+  "Die Anmeldefreigabe konnte noch nicht eingeplant werden. Bitte erneut versuchen.": "Die Anmeldefreigabe konnte noch nicht eingeplant werden. Bitte erneut versuchen.",
   "Die App konnte nicht wiederhergestellt werden.": "Die App konnte nicht wiederhergestellt werden.",
   "Bitte starte die App erneut.": "Bitte starte die App erneut.",
   "App neu starten": "App neu starten",

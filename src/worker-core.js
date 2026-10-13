@@ -117,7 +117,7 @@ export function registrationOpenStatus(tournament, now = new Date(), startsAt = 
   if (Number(tournament.registration_closed || 0) === 1) return 'closed';
   if (startsAt && new Date(startsAt).getTime() <= now.getTime()) return 'started';
   if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < now.getTime()) return 'deadline_passed';
-  if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > now.getTime()) return 'not_yet_open';
+  if (Number(tournament.registration_opening_pending || 0) === 1 || (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > now.getTime())) return 'not_yet_open';
   return 'open';
 }
 
@@ -248,11 +248,13 @@ export function tournamentMatchesSavedSearch(tournament, search, clubLocations =
   if (search.filter_club && !clubLocations.some((location) => Number(location.latitude) === Number(tournament.latitude) && Number(location.longitude) === Number(tournament.longitude))) return false;
   if (search.filter_open_only) {
     if (tournament.status !== 'registration') return false;
+    if (Number(tournament.registration_opening_pending || 0)) return false;
     if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > Date.now()) return false;
     if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < Date.now()) return false;
   }
   if (search.filter_online_registration_only) {
     if (tournament.registration_enabled === 0 || tournament.status !== 'registration') return false;
+    if (Number(tournament.registration_opening_pending || 0)) return false;
     if (tournament.registration_opens_at && new Date(tournament.registration_opens_at).getTime() > Date.now()) return false;
     if (tournament.registration_deadline && new Date(tournament.registration_deadline).getTime() < Date.now()) return false;
     const maxRegistrations = Number(tournament.max_registrations || 0);

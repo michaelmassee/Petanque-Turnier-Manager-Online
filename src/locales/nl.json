@@ -1,4 +1,11 @@
 {
+  "openingNotificationSubscribe": "Waarschuw mij wanneer de inschrijving opent",
+  "openingNotificationActive": "Melding actief",
+  "openingNotificationDeactivate": "Melding uitschakelen",
+  "registrationOpeningInProgress": "De inschrijving wordt geopend …",
+  "registrationOpenedNotification": "{{name}}: De inschrijving is nu geopend.",
+  "Für dieses Turnier ist keine Öffnungsbenachrichtigung verfügbar.": "Een openingsmelding is niet beschikbaar voor dit toernooi.",
+  "Die Anmeldefreigabe konnte noch nicht eingeplant werden. Bitte erneut versuchen.": "Het openen van de inschrijving kon nog niet worden gepland. Probeer het opnieuw.",
   "Die App konnte nicht wiederhergestellt werden.": "De app kon niet worden hersteld.",
   "Eine Online-Anmeldung existiert nicht mehr": "Een online-aanmelding bestaat niet meer",
   "Bitte starte die App erneut.": "Start de app opnieuw.",

@@ -1,4 +1,11 @@
 {
+  "openingNotificationSubscribe": "Avisarme cuando se abra la inscripción",
+  "openingNotificationActive": "Notificación activa",
+  "openingNotificationDeactivate": "Desactivar notificación",
+  "registrationOpeningInProgress": "Se está abriendo la inscripción …",
+  "registrationOpenedNotification": "{{name}}: La inscripción ya está abierta.",
+  "Für dieses Turnier ist keine Öffnungsbenachrichtigung verfügbar.": "No hay aviso de apertura disponible para este torneo.",
+  "Die Anmeldefreigabe konnte noch nicht eingeplant werden. Bitte erneut versuchen.": "Todavía no se pudo programar la apertura de la inscripción. Inténtalo de nuevo.",
   "Die App konnte nicht wiederhergestellt werden.": "No se pudo recuperar la aplicación.",
   "Eine Online-Anmeldung existiert nicht mehr": "Una inscripción en línea ya no existe",
   "Bitte starte die App erneut.": "Reinicia la aplicación.",
