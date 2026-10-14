@@ -16,7 +16,92 @@ async function build(config, options = {}, base = tournament) {
   return { scene, nodes: typeset.nodes };
 }
 
+async function buildWithFactPositions(config, options, base) {
+  const typeset = recordingTypesetter();
+  const labels = ['ORT', 'TURNIER', 'STARTGELD', 'KAPAZITÄT', 'ANMELDESCHLUSS', 'STATUS', 'BESCHREIBUNG'];
+  const markups = new Map();
+  const scene = await buildFlyerScene(base, config, 'de', t, { ...options, typeset: async (node, width) => {
+    const block = await typeset(node, width);
+    const label = labels.find((value) => findTextNode([node], value));
+    if (label) markups.set(block.markup, label);
+    return block;
+  } });
+  const positions = new Map(scene.elements.filter((element) => element.type === 'text' && markups.has(element.markup))
+    .map((element) => [markups.get(element.markup), element]));
+  return { scene, positions };
+}
+
 describe('flyer scene', () => {
+  it('fills the shorter background column without waiting for a tall entry on the left', async () => {
+    for (const format of ['a4', 'a5']) {
+      for (const backgroundHideFooter of [false, true]) {
+        const { scene, positions } = await buildWithFactPositions({ format, backgroundHideFooter, visibleFields: ['location', 'formation', 'fees', 'capacity'] },
+          { background: { dataUrl: 'data:image/png;base64,x' } },
+          { ...tournament, location: 'Bouleplatz Linden mit Vereinsheim und ausreichend Parkplätzen. '.repeat(5) });
+        const location = positions.get('ORT');
+        const formation = positions.get('TURNIER');
+        const fees = positions.get('STARTGELD');
+        const capacity = positions.get('KAPAZITÄT');
+        expect(scene.overflow).toBe(false);
+        expect(formation.y).toBe(location.y);
+        expect(fees.x).toBe(formation.x);
+        expect(fees.y).toBeGreaterThanOrEqual(formation.y + formation.height);
+        expect(capacity.x).toBe(formation.x);
+        expect(capacity.y).toBeGreaterThanOrEqual(fees.y + fees.height);
+        expect(capacity.y).toBeLessThan(location.y + location.height);
+      }
+    }
+  });
+
+  it('places the description below both independent columns and keeps the QR card free', async () => {
+    for (const format of ['a4', 'a5']) {
+      const { scene, positions } = await buildWithFactPositions({ format, backgroundHideFooter: true, visibleFields: ['location', 'formation', 'fees', 'capacity', 'description'], additionalText: 'Kaffee und Kuchen.' },
+        { background: { dataUrl: 'data:image/png;base64,x' } },
+        { ...tournament, location: 'Bouleplatz Linden mit Vereinsheim. '.repeat(6), description: 'Verpflegung vor Ort.' });
+      const description = positions.get('BESCHREIBUNG');
+      for (const [label, block] of positions) {
+        if (label !== 'BESCHREIBUNG') expect(description.y).toBeGreaterThanOrEqual(block.y + block.height);
+      }
+      expect(scene.overflow).toBe(false);
+      const qr = scene.elements.find((element) => element.type === 'qr');
+      for (const block of scene.elements.filter((element) => element.type === 'text')) {
+        expect(block.x + block.width > qr.x && block.x < qr.x + qr.size
+          && block.y + block.height > qr.y && block.y < qr.y + qr.size).toBe(false);
+      }
+    }
+  });
+
+  it('still reports overflowing background information in both footer modes', async () => {
+    for (const backgroundHideFooter of [false, true]) {
+      const { scene } = await build({ format: 'a5', backgroundHideFooter }, { background: { dataUrl: 'data:image/png;base64,x' } },
+        { ...tournament, location: 'Sehr langer Ortsname mit weiteren Informationen. '.repeat(80) });
+      expect(scene.overflow).toBe(true);
+      expect(scene.bodyBottom).toBeGreaterThan(scene.bodyLimit);
+    }
+  });
+
+  it('moves a block to the left when the shorter right column would reach the QR card', async () => {
+    for (const format of ['a4', 'a5']) {
+      const scale = format === 'a4' ? 1 : 148 / 210;
+      // Definierte Blockhöhen isolieren die Entscheidung an der QR-Grenze vom Schriftumbruch.
+      const typeset = async (node, width) => {
+        const label = ['ORT', 'TURNIER', 'STARTGELD'].find((value) => findTextNode([node], value));
+        return { width, height: ({ ORT: 170, TURNIER: 160, STARTGELD: 40 }[label] || 2) * scale, markup: label || '' };
+      };
+      const scene = await buildFlyerScene(tournament, { format, backgroundHideFooter: true, visibleFields: ['location', 'formation', 'fees'] }, 'de', t,
+        { typeset, background: { dataUrl: 'data:image/png;base64,x' } });
+      const location = scene.elements.find((element) => element.markup === 'ORT');
+      const formation = scene.elements.find((element) => element.markup === 'TURNIER');
+      const fees = scene.elements.find((element) => element.markup === 'STARTGELD');
+      const qr = scene.elements.find((element) => element.type === 'qr');
+      expect(formation.y + formation.height).toBeLessThan(location.y + location.height);
+      expect(fees.x).toBe(location.x);
+      expect(fees.y).toBeGreaterThan(location.y + location.height);
+      expect(fees.y + fees.height).toBeGreaterThan(qr.y);
+      expect(fees.x + fees.width).toBeLessThan(qr.x);
+      expect(scene.overflow).toBe(false);
+    }
+  });
   it('uses the real registration capacity wording and A5 dimensions', async () => {
     const { scene, nodes } = await build({ format: 'a5' });
     expect(scene.page).toEqual({ width: 148, height: 210 });
@@ -81,6 +166,45 @@ describe('flyer scene', () => {
   it('uses the configured transparency for the centered background textbox', async () => {
     const { scene } = await build({}, { background: { dataUrl: 'data:image/png;base64,x' }, backgroundPanelTransparency: 50 });
     expect(scene.elements.find((element) => element.role === 'background-textbox').opacity).toBe(0.5);
+  });
+
+  it('expands the background information box while preserving the bottom-right QR code and additional text', async () => {
+    const background = { dataUrl: 'data:image/png;base64,x' };
+    for (const format of ['a4', 'a5']) {
+      const normal = await build({ format }, { background });
+      const expanded = await build({ format, backgroundHideFooter: true, additionalText: 'Kaffee und Kuchen vor Ort.' }, { background });
+      const qr = expanded.scene.elements.find((element) => element.type === 'qr');
+      expect(qr).toEqual(normal.scene.elements.find((element) => element.type === 'qr'));
+      expect(expanded.scene.bodyLimit).toBeGreaterThan(normal.scene.bodyLimit + 30);
+      expect(expanded.scene.overflow).toBe(false);
+      expect(findTextNode(expanded.nodes, 'Kaffee und Kuchen vor Ort.')).not.toBeNull();
+      expect(findTextNode(expanded.nodes, 'Powered by Petanque Turnier Manager Online')).not.toBeNull();
+      const panelIndex = expanded.scene.elements.findIndex((element) => element.role === 'background-textbox');
+      expect(expanded.scene.elements.indexOf(qr)).toBeGreaterThan(panelIndex);
+      for (const block of expanded.scene.elements.filter((element) => element.type === 'text')) {
+        const overlaps = block.x + block.width > qr.x && block.x < qr.x + qr.size
+          && block.y + block.height > qr.y && block.y < qr.y + qr.size;
+        expect(overlaps).toBe(false);
+      }
+    }
+  });
+
+  it('flows longer information beside the QR card without overlapping it', async () => {
+    const { scene } = await build({ format: 'a5', backgroundHideFooter: true, visibleFields: ['description'] },
+      { background: { dataUrl: 'data:image/png;base64,x' } },
+      { ...tournament, description: 'Verpflegung und Getränke sind vor Ort verfügbar. '.repeat(60) });
+    const qr = scene.elements.find((element) => element.type === 'qr');
+    const alongside = scene.elements.filter((element) => element.type === 'text' && element.y + element.height > qr.y && element.y < qr.y + qr.size);
+    expect(alongside.length).toBeGreaterThan(0);
+    for (const block of alongside) expect(block.x + block.width).toBeLessThan(qr.x);
+  });
+
+  it('does not hide the footer in built-in templates', async () => {
+    for (const templateId of FLYER_TEMPLATES) {
+      const normal = await build({ templateId });
+      const hidden = await build({ templateId, backgroundHideFooter: true });
+      expect(hidden.scene.elements).toEqual(normal.scene.elements);
+    }
   });
 
   it('keeps the formatting of the additional text and the tournament description', async () => {

@@ -1443,6 +1443,8 @@
   "Ergebnis gemeldet von": "Résultat saisi par",
   "Neue Ergebnismeldungen von Teams: {{count}}": "Nouveaux résultats saisis par les équipes : {{count}}",
   "Gesehen": "Vu",
+  "Untere Box ausblenden": "Masquer la zone inférieure",
+  "Der QR-Code bleibt rechts unten. Der Zusatztext erscheint im vergrößerten Informationsbereich.": "Le code QR reste en bas à droite. Le texte supplémentaire apparaît dans la zone d’informations agrandie.",
   "Dieses Turnier ist mit einem Turnierdokument verbunden und wird dort gestartet.": "Ce tournoi est lié à un document de tournoi et y est démarré.",
   "Ungültige Einstellung Spiel um Platz 3": "Paramètre invalide pour le match pour la troisième place"
 }

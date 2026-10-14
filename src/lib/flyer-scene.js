@@ -206,8 +206,51 @@ function collectContent(tournament, visible, language, t) {
   };
 }
 
+function factNode(ctx, fact, colors, align) {
+  const value = fact.rich
+    ? richTextNode(fact.rich, { size: ctx.m.value, color: colors.value, align, lineHeight: 1.3 })
+    : stackNode(fact.values.map((line) => textNode(line, { size: ctx.m.value, color: colors.value, align, lineHeight: 1.3 })));
+  return stackNode([textNode(fact.label.toLocaleUpperCase(ctx.language), { size: ctx.m.label, weight: 700, color: colors.label, align, lineHeight: 1.5 }), value], { gap: 0.3 * ctx.m.s });
+}
+
+/** Unabhängige Spalten: Der nächste zusammenhängende Eintrag nutzt die kürzere freie Spalte. */
+async function factColumns(elements, ctx, facts, { x, width, top, gap, colors, align, bullet, exclusion }) {
+  const { m } = ctx;
+  const indent = bullet ? m.label * 1.9 : 0;
+  const columnWidth = (width - gap) / 2;
+  const cursors = [top, top];
+  let bottom = top;
+  for (const fact of facts) {
+    const node = factNode(ctx, fact, colors, align);
+    let column = cursors[0] <= cursors[1] ? 0 : 1;
+    let blockTop = fact.wide ? Math.max(...cursors) : cursors[column];
+    let blockX = fact.wide ? x : x + column * (columnWidth + gap);
+    let availableWidth = fact.wide ? width : columnWidth;
+    let block = await ctx.typeset(node, availableWidth - indent);
+    const overlapsQr = exclusion && blockX + availableWidth > exclusion.x
+      && blockTop + block.height > exclusion.y && blockTop < exclusion.bottom;
+    if (overlapsQr) {
+      if (fact.wide) {
+        availableWidth = exclusion.x - x - gap;
+        block = await ctx.typeset(node, availableWidth - indent);
+      } else {
+        column = 0;
+        blockTop = cursors[0];
+        blockX = x;
+      }
+    }
+    if (bullet) elements.push(...bullet(blockX + m.label * 0.6, blockTop + m.label * 0.75, m.label * 0.6));
+    elements.push(textElement(blockX + indent, blockTop, block));
+    const end = blockTop + block.height;
+    bottom = Math.max(bottom, end);
+    if (fact.wide) cursors.fill(end + m.value * 1.15);
+    else cursors[column] = end + m.value * 1.15;
+  }
+  return bottom;
+}
+
 /** Angaben als Raster mit zwei Spalten (breite Angaben über beide); Beschriftung in Akzentfarbe, darunter der Wert. */
-async function factGrid(elements, ctx, facts, { x, width, top, columns, gap, colors, align, bullet }) {
+async function factGrid(elements, ctx, facts, { x, width, top, columns, gap, colors, align, bullet, exclusion = null }) {
   const { m } = ctx;
   const indent = bullet ? m.label * 1.9 : 0;
   const rows = [];
@@ -219,20 +262,24 @@ async function factGrid(elements, ctx, facts, { x, width, top, columns, gap, col
   let rowTop = top;
   let bottom = top;
   for (const row of rows) {
-    const rowColumns = row[0].wide ? 1 : columns;
-    const columnWidth = (width - gap * (rowColumns - 1)) / rowColumns;
-    let rowEnd = rowTop;
-    for (const [column, fact] of row.entries()) {
-      const columnX = x + column * (columnWidth + gap);
-      if (bullet) elements.push(...bullet(columnX + m.label * 0.6, rowTop + m.label * 0.75, m.label * 0.6));
-      const value = fact.rich
-        ? richTextNode(fact.rich, { size: m.value, color: colors.value, align, lineHeight: 1.3 })
-        : stackNode(fact.values.map((line) => textNode(line, { size: m.value, color: colors.value, align, lineHeight: 1.3 })));
-      const node = stackNode([textNode(fact.label.toLocaleUpperCase(ctx.language), { size: m.label, weight: 700, color: colors.label, align, lineHeight: 1.5 }), value], { gap: 0.3 * m.s });
-      const end = await placeText(elements, ctx, node, { x: columnX + indent, top: rowTop, width: columnWidth - indent });
-      rowEnd = Math.max(rowEnd, end);
-      bottom = Math.max(bottom, end);
-    }
+    const drawRow = async (target, availableWidth) => {
+      const rowColumns = row[0].wide ? 1 : columns;
+      const columnWidth = (availableWidth - gap * (rowColumns - 1)) / rowColumns;
+      let rowEnd = rowTop;
+      for (const [column, fact] of row.entries()) {
+        const columnX = x + column * (columnWidth + gap);
+        if (bullet) target.push(...bullet(columnX + m.label * 0.6, rowTop + m.label * 0.75, m.label * 0.6));
+        const node = factNode(ctx, fact, colors, align);
+        const end = await placeText(target, ctx, node, { x: columnX + indent, top: rowTop, width: columnWidth - indent });
+        rowEnd = Math.max(rowEnd, end);
+      }
+      return rowEnd;
+    };
+    const probeEnd = exclusion ? await drawRow([], width) : rowTop;
+    const availableWidth = exclusion && probeEnd > exclusion.y && rowTop < exclusion.bottom
+      ? exclusion.x - x - gap : width;
+    const rowEnd = await drawRow(elements, availableWidth);
+    bottom = Math.max(bottom, rowEnd);
     rowTop = rowEnd + m.value * 1.15;
   }
   return bottom;
@@ -242,10 +289,10 @@ async function factGrid(elements, ctx, facts, { x, width, top, columns, gap, col
  * Setzt den Inhaltsbereich (Datum + Raster) und schiebt ihn bei freiem Platz etwas nach unten,
  * damit keine große Lücke über dem Fußbereich bleibt. `layout(target, top)` liefert die Unterkante.
  */
-async function placeBody(elements, layout, top, limit, s) {
+async function placeBody(elements, layout, top, limit, s, maxOffset = 40) {
   const probeBottom = await layout([], top);
   const free = limit - probeBottom;
-  const offset = free > 0 ? Math.min(free * 0.45, 40 * s) : 0;
+  const offset = free > 0 ? Math.min(free * 0.45, maxOffset * s) : 0;
   return layout(elements, top + offset);
 }
 
@@ -566,11 +613,24 @@ async function buildBackground(elements, ctx) {
   const textBottom = await heroText(elements, ctx, {
     top: m.margin * 1.1, color: '#ffffff', kickerColor: '#ffffff', x: m.margin, width: contentWidth, reserved,
   });
-  const footerTop = await footerRow(elements, ctx, {
-    noteColor: '#ffffff',
-    background: (bandTop) => elements.push(shape(rectPath(0, bandTop, page.width, page.height - bandTop), { fill: '#07131f', opacity: 0.76 })),
-  });
-  const limit = footerTop - 6 * s;
+  let exclusion = null;
+  const qrElements = [];
+  let limit;
+  if (ctx.design.backgroundHideFooter) {
+    const card = cardSize(m.qr, s);
+    const x = page.width - m.margin - card.width;
+    const y = page.height - m.margin * 0.8 - card.height;
+    await qrCard(qrElements, ctx, { x, y, qrSize: m.qr, s, caption: ctx.t('Jetzt anmelden'), captionColor: ctx.accentText });
+    await poweredBy(qrElements, ctx, '#ffffff');
+    exclusion = { x: x - 3 * s, y: y - 3 * s, bottom: y + card.height + 3 * s };
+    limit = page.height - m.margin;
+  } else {
+    const footerTop = await footerRow(elements, ctx, {
+      noteColor: '#ffffff',
+      background: (bandTop) => elements.push(shape(rectPath(0, bandTop, page.width, page.height - bandTop), { fill: '#07131f', opacity: 0.76 })),
+    });
+    limit = footerTop - 6 * s;
+  }
   const bodyTop = textBottom + 15 * s;
   // Die mittige Informations-Textbox bleibt lesbar, ihre Transparenz ist im Editor einstellbar.
   elements.push({
@@ -581,13 +641,27 @@ async function buildBackground(elements, ctx) {
   });
   const bodyBottom = await placeBody(elements, async (target, top) => {
     const afterDate = await dateHighlight(target, ctx, { x: m.margin, width: contentWidth, top, color: palette.text, bar: true });
-    const grid = await factGrid(target, ctx, facts, {
+    const grid = await factColumns(target, ctx, facts, {
       x: m.margin, width: contentWidth, top: afterDate.top, columns: 2, gap: 9 * s, align: 'left',
       colors: { label: ctx.accentText, value: palette.text },
       bullet: (cx, cy, r) => [shape(circlePath(cx, cy, r), { fill: ctx.accentText })],
+      exclusion,
     });
-    return Math.max(afterDate.bottom, grid);
-  }, bodyTop, limit, s);
+    let bottom = Math.max(afterDate.bottom, grid);
+    if (ctx.design.backgroundHideFooter) {
+      const noteTop = bottom + 6 * s;
+      let notes = await noteBlock(ctx, { width: contentWidth, color: palette.text });
+      if (notes && noteTop + notes.height > exclusion.y && noteTop < exclusion.bottom) {
+        notes = await noteBlock(ctx, { width: exclusion.x - m.margin - 9 * s, color: palette.text });
+      }
+      if (notes) {
+        target.push(textElement(m.margin, noteTop, notes));
+        bottom = noteTop + notes.height;
+      }
+    }
+    return bottom;
+  }, bodyTop, limit, s, exclusion ? 0 : 40);
+  elements.push(...qrElements);
   return { bodyBottom, limit };
 }
 

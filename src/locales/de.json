@@ -208,5 +208,7 @@
   "Neu": "Neu",
   "Ergebnis gemeldet von": "Ergebnis gemeldet von",
   "Neue Ergebnismeldungen von Teams: {{count}}": "Neue Ergebnismeldungen von Teams: {{count}}",
-  "Gesehen": "Gesehen"
+  "Gesehen": "Gesehen",
+  "Untere Box ausblenden": "Untere Box ausblenden",
+  "Der QR-Code bleibt rechts unten. Der Zusatztext erscheint im vergrößerten Informationsbereich.": "Der QR-Code bleibt rechts unten. Der Zusatztext erscheint im vergrößerten Informationsbereich."
 }

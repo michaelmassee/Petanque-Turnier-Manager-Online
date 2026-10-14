@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_FLYER_CONFIG, sanitizeFlyerConfig } from './flyer-config.js';
 
 describe('flyer configuration', () => {
+  it('keeps the background footer visible for older designs and accepts only an explicit hide option', () => {
+    expect(sanitizeFlyerConfig({}).backgroundHideFooter).toBe(false);
+    expect(sanitizeFlyerConfig({ backgroundHideFooter: 'true' }).backgroundHideFooter).toBe(false);
+    expect(sanitizeFlyerConfig({ backgroundHideFooter: true }).backgroundHideFooter).toBe(true);
+  });
   it('keeps only supported, bounded presentation values', () => {
     const config = sanitizeFlyerConfig({
       templateId: 'unknown', format: 'poster', accentColor: 'red', headline: `Titel${'x'.repeat(100)}`,
