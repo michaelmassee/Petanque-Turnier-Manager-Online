@@ -249,42 +249,6 @@ async function factColumns(elements, ctx, facts, { x, width, top, gap, colors, a
   return bottom;
 }
 
-/** Angaben als Raster mit zwei Spalten (breite Angaben über beide); Beschriftung in Akzentfarbe, darunter der Wert. */
-async function factGrid(elements, ctx, facts, { x, width, top, columns, gap, colors, align, bullet, exclusion = null }) {
-  const { m } = ctx;
-  const indent = bullet ? m.label * 1.9 : 0;
-  const rows = [];
-  for (const fact of facts) {
-    const last = rows[rows.length - 1];
-    if (fact.wide || !last || last.length >= columns || last[0].wide) rows.push([fact]);
-    else last.push(fact);
-  }
-  let rowTop = top;
-  let bottom = top;
-  for (const row of rows) {
-    const drawRow = async (target, availableWidth) => {
-      const rowColumns = row[0].wide ? 1 : columns;
-      const columnWidth = (availableWidth - gap * (rowColumns - 1)) / rowColumns;
-      let rowEnd = rowTop;
-      for (const [column, fact] of row.entries()) {
-        const columnX = x + column * (columnWidth + gap);
-        if (bullet) target.push(...bullet(columnX + m.label * 0.6, rowTop + m.label * 0.75, m.label * 0.6));
-        const node = factNode(ctx, fact, colors, align);
-        const end = await placeText(target, ctx, node, { x: columnX + indent, top: rowTop, width: columnWidth - indent });
-        rowEnd = Math.max(rowEnd, end);
-      }
-      return rowEnd;
-    };
-    const probeEnd = exclusion ? await drawRow([], width) : rowTop;
-    const availableWidth = exclusion && probeEnd > exclusion.y && rowTop < exclusion.bottom
-      ? exclusion.x - x - gap : width;
-    const rowEnd = await drawRow(elements, availableWidth);
-    bottom = Math.max(bottom, rowEnd);
-    rowTop = rowEnd + m.value * 1.15;
-  }
-  return bottom;
-}
-
 /**
  * Setzt den Inhaltsbereich (Datum + Raster) und schiebt ihn bei freiem Platz etwas nach unten,
  * damit keine große Lücke über dem Fußbereich bleibt. `layout(target, top)` liefert die Unterkante.
@@ -482,8 +446,8 @@ async function buildModern(elements, ctx) {
   const limit = footerTop - 6 * s;
   const bodyBottom = await placeBody(elements, async (target, bodyTop) => {
     const afterDate = await dateHighlight(target, ctx, { x: m.margin, width: contentWidth, top: bodyTop, color: palette.text, bar: true });
-    const grid = await factGrid(target, ctx, facts, {
-      x: m.margin, width: contentWidth, top: afterDate.top, columns: 2, gap: 9 * s, align: 'left',
+    const grid = await factColumns(target, ctx, facts, {
+      x: m.margin, width: contentWidth, top: afterDate.top, gap: 9 * s, align: 'left',
       colors: { label: ctx.accentText, value: palette.text },
       bullet: (cx, cy, r) => [shape(circlePath(cx, cy, r), { fill: ctx.accentText }), shape(circlePath(cx - r * 0.3, cy - r * 0.3, r * 0.35), { fill: '#ffffff', opacity: 0.7 })],
     });
@@ -541,8 +505,8 @@ async function buildSporty(elements, ctx) {
   const limit = footerTop - 6 * s;
   const bodyBottom = await placeBody(elements, async (target, bodyTop) => {
     const afterDate = await dateHighlight(target, ctx, { x: m.margin, width: contentWidth, top: bodyTop, color: palette.text, bar: true });
-    const grid = await factGrid(target, ctx, facts, {
-      x: m.margin, width: contentWidth, top: afterDate.top, columns: 2, gap: 9 * s, align: 'left',
+    const grid = await factColumns(target, ctx, facts, {
+      x: m.margin, width: contentWidth, top: afterDate.top, gap: 9 * s, align: 'left',
       colors: { label: ctx.accentText, value: palette.text },
       bullet: (bx, by, br) => [shape(polygonPath([[bx - br, by + br], [bx - br * 0.2, by - br], [bx + br, by - br], [bx + br * 0.2, by + br]]), { fill: ctx.accentText })],
     });
@@ -594,8 +558,8 @@ async function buildClassic(elements, ctx) {
 
   const bodyBottom = await placeBody(elements, async (target, bodyTop) => {
     const afterDate = await dateHighlight(target, ctx, { x, width, top: bodyTop, align: 'center', color: palette.text, bar: false });
-    const grid = await factGrid(target, ctx, facts, {
-      x, width, top: afterDate.top, columns: 2, gap: 9 * s, align: 'center', colors: { label: ctx.accentText, value: palette.text },
+    const grid = await factColumns(target, ctx, facts, {
+      x, width, top: afterDate.top, gap: 9 * s, align: 'center', colors: { label: ctx.accentText, value: palette.text },
     });
     return Math.max(afterDate.bottom, grid);
   }, ornamentY + 11 * s, limit, s);
@@ -642,7 +606,7 @@ async function buildBackground(elements, ctx) {
   const bodyBottom = await placeBody(elements, async (target, top) => {
     const afterDate = await dateHighlight(target, ctx, { x: m.margin, width: contentWidth, top, color: palette.text, bar: true });
     const grid = await factColumns(target, ctx, facts, {
-      x: m.margin, width: contentWidth, top: afterDate.top, columns: 2, gap: 9 * s, align: 'left',
+      x: m.margin, width: contentWidth, top: afterDate.top, gap: 9 * s, align: 'left',
       colors: { label: ctx.accentText, value: palette.text },
       bullet: (cx, cy, r) => [shape(circlePath(cx, cy, r), { fill: ctx.accentText })],
       exclusion,

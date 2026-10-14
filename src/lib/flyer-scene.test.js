@@ -32,23 +32,25 @@ async function buildWithFactPositions(config, options, base) {
 }
 
 describe('flyer scene', () => {
-  it('fills the shorter background column without waiting for a tall entry on the left', async () => {
-    for (const format of ['a4', 'a5']) {
-      for (const backgroundHideFooter of [false, true]) {
-        const { scene, positions } = await buildWithFactPositions({ format, backgroundHideFooter, visibleFields: ['location', 'formation', 'fees', 'capacity'] },
-          { background: { dataUrl: 'data:image/png;base64,x' } },
-          { ...tournament, location: 'Bouleplatz Linden mit Vereinsheim und ausreichend Parkplätzen. '.repeat(5) });
-        const location = positions.get('ORT');
-        const formation = positions.get('TURNIER');
-        const fees = positions.get('STARTGELD');
-        const capacity = positions.get('KAPAZITÄT');
-        expect(scene.overflow).toBe(false);
-        expect(formation.y).toBe(location.y);
-        expect(fees.x).toBe(formation.x);
-        expect(fees.y).toBeGreaterThanOrEqual(formation.y + formation.height);
-        expect(capacity.x).toBe(formation.x);
-        expect(capacity.y).toBeGreaterThanOrEqual(fees.y + fees.height);
-        expect(capacity.y).toBeLessThan(location.y + location.height);
+  it('fills the shorter column in every template without waiting for a tall entry on the left', async () => {
+    for (const templateId of [...FLYER_TEMPLATES, 'background']) {
+      for (const format of ['a4', 'a5']) {
+        for (const backgroundHideFooter of templateId === 'background' ? [false, true] : [false]) {
+          const { scene, positions } = await buildWithFactPositions({ templateId, format, backgroundHideFooter, visibleFields: ['location', 'formation', 'fees', 'capacity'] },
+            templateId === 'background' ? { background: { dataUrl: 'data:image/png;base64,x' } } : {},
+            { ...tournament, location: 'Bouleplatz Linden mit Vereinsheim und ausreichend Parkplätzen. '.repeat(3) });
+          const location = positions.get('ORT');
+          const formation = positions.get('TURNIER');
+          const fees = positions.get('STARTGELD');
+          const capacity = positions.get('KAPAZITÄT');
+          expect(scene.overflow).toBe(false);
+          expect(formation.y).toBe(location.y);
+          expect(fees.x).toBe(formation.x);
+          expect(fees.y).toBeGreaterThanOrEqual(formation.y + formation.height);
+          expect(capacity.x).toBe(formation.x);
+          expect(capacity.y).toBeGreaterThanOrEqual(fees.y + fees.height);
+          expect(capacity.y).toBeLessThan(location.y + location.height);
+        }
       }
     }
   });
