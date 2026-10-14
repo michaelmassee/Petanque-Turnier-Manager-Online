@@ -186,7 +186,7 @@ describe('Live-Ansicht für Spieler', () => {
     expect(screen.queryByText('Rangliste anzeigen')).not.toBeInTheDocument();
   });
 
-  it('kennzeichnet die gesamte Live-Ansicht deutlich als Testbetrieb', () => {
+  it('zeigt keinen Beta-Hinweis mehr', () => {
     render(
       <PlayerLivePage
         route={{}}
@@ -204,8 +204,7 @@ describe('Live-Ansicht für Spieler', () => {
       />,
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent('Beta – noch im Testbetrieb');
-    expect(screen.getByRole('status')).toHaveClass('live-beta-badge');
+    expect(screen.queryByText('Beta – noch im Testbetrieb')).not.toBeInTheDocument();
   });
 
   it('zeigt aktuelle Partie, Platz und Historie ohne Bahn, wenn keine vorhanden ist', async () => {

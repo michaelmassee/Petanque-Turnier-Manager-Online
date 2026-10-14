@@ -573,7 +573,6 @@ export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenu
         postboxControl={postboxControl}
       />
       <section className="single-column live-page">
-        <p className="live-beta-badge" role="status">{t('Beta – noch im Testbetrieb')}</p>
         {route.registrationId && currentUser && !token && (
           <MyLiveBackLink navigate={navigate} />
         )}
