@@ -549,6 +549,47 @@ describe('TournamentPlayManagement', () => {
     expect(screen.getByText('Dirk Demo', { selector: 'strong' }).closest('article')).toHaveClass('is-player-reported');
   });
 
+  function installServiceWorkerMessages() {
+    const target = new EventTarget();
+    Object.defineProperty(navigator, 'serviceWorker', { value: target, configurable: true });
+    return {
+      send: (data) => act(() => { target.dispatchEvent(new MessageEvent('message', { data })); }),
+      remove: () => { delete navigator.serviceWorker; },
+    };
+  }
+
+  it('lädt die Runden nach einem Push „Ergebnis gemeldet“ einmal nach, ohne zu pollen', async () => {
+    const serviceWorker = installServiceWorkerMessages();
+    let view;
+    try {
+      const calls = [];
+      installFetchMock(calls);
+      view = render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
+      await screen.findByLabelText('Punkte Team A');
+      const roundLoads = () => calls.filter((path) => path === '/api/tournaments/t1/rounds').length;
+      expect(roundLoads()).toBe(1);
+
+      installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13, reportedBy: { id: 'p4', firstName: 'Dirk', lastName: 'Demo' } }] }] });
+      serviceWorker.send({ type: 'tournament-result-reported', tournamentId: 'anderes-turnier' });
+      serviceWorker.send({ type: 'tournament-result-reported', tournamentId: 't1' });
+
+      expect(await screen.findByText('Neu')).toBeInTheDocument();
+      expect(roundLoads()).toBe(2);
+    } finally {
+      view?.unmount();
+      serviceWorker.remove();
+    }
+  });
+
+  it('wählt das Turnier aus einer Push-Benachrichtigung aus', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    const second = { ...TOURNAMENT, id: 't2', name: 'Zweites Turnier' };
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT, second]} focus={{ tournamentId: 't2' }} />);
+
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t2/rounds'));
+  });
+
   it('lädt Spielermeldungen beim Zurückkehren in den Tab', async () => {
     const calls = [];
     installFetchMock(calls);

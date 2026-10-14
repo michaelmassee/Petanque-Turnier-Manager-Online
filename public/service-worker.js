@@ -90,11 +90,20 @@ self.addEventListener('push', (event) => {
     badge: '/icons/icon-192.png',
     // Live-Push (neue Runde) bringt eigenes Tag und Ziel mit; Postfach-Push öffnet die Startseite.
     tag: payload.tag || `postbox-${payload.messageId || 'new'}`,
-    data: { url: typeof payload.url === 'string' && payload.url.startsWith(self.location.origin) ? payload.url : '/' },
+    data: {
+      url: typeof payload.url === 'string' && payload.url.startsWith(self.location.origin) ? payload.url : '/',
+      eventType: payload.eventType || null,
+      tournamentId: payload.tournamentId || null,
+    },
   });
-  const refresh = payload.eventType === 'tournament_registration_opened' && payload.tournamentId
+  // Offene App-Fenster laden gezielt neu, statt selbst regelmäßig nachzufragen.
+  const messageType = {
+    tournament_registration_opened: 'tournament-registration-opened',
+    tournament_result_reported: 'tournament-result-reported',
+  }[payload.eventType];
+  const refresh = messageType && payload.tournamentId
     ? clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
-      for (const client of windows) client.postMessage({ type: 'tournament-registration-opened', tournamentId: payload.tournamentId });
+      for (const client of windows) client.postMessage({ type: messageType, tournamentId: payload.tournamentId });
     }) : Promise.resolve();
   event.waitUntil(Promise.all([notification, refresh]));
 });
@@ -105,6 +114,11 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
     const existing = windows[0];
     if (!existing) return clients.openWindow(url);
+    // Offene App nicht neu laden (ungespeicherte Eingaben), sondern zur Rundenverwaltung wechseln lassen.
+    if (event.notification.data?.eventType === 'tournament_result_reported') {
+      existing.postMessage({ type: 'open-tournament-play', tournamentId: event.notification.data.tournamentId });
+      return existing.focus();
+    }
     if (url === '/') return existing.focus();
     return existing.navigate(url).then((navigated) => (navigated || existing).focus());
   }));

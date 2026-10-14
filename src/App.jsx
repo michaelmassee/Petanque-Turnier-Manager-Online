@@ -101,7 +101,19 @@ function AppContent() {
   const [reportVerifyStatus, setReportVerifyStatus] = useState(null);
   const [placeReportVerifyStatus, setPlaceReportVerifyStatus] = useState(null);
   const [authView, setAuthView] = useState('home');
-  const [activeTab, setActiveTab] = useState('home');
+  // Push "Ergebnis gemeldet" öffnet /?tab=play&tournament=<id> direkt in der Rundenverwaltung.
+  const [playFocus, setPlayFocus] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tab') === 'play' ? { tournamentId: params.get('tournament') || '' } : null;
+  });
+  const [activeTab, setActiveTab] = useState(() => (playFocus ? 'play' : 'home'));
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('tab')) return;
+    url.searchParams.delete('tab');
+    url.searchParams.delete('tournament');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchMenuOpen, setSearchMenuOpen] = useState(false);
   const [homeQuery, setHomeQuery] = useState('');
@@ -132,6 +144,17 @@ function AppContent() {
     navigator.serviceWorker.addEventListener('message', refreshOpening);
     return () => navigator.serviceWorker.removeEventListener('message', refreshOpening);
   }, [currentUser?.id]);
+  useEffect(() => {
+    if (!navigator.serviceWorker) return;
+    const openPlay = (event) => {
+      if (event.data?.type !== 'open-tournament-play') return;
+      setPlayFocus({ tournamentId: event.data.tournamentId || '' });
+      setActiveTab('play');
+      setMenuOpen(false);
+    };
+    navigator.serviceWorker.addEventListener('message', openPlay);
+    return () => navigator.serviceWorker.removeEventListener('message', openPlay);
+  }, []);
   const [postboxOpen, setPostboxOpen] = useState(false);
   const [postbox, setPostbox] = useState({ messages: [], unreadCount: 0, todos: [] });
   const [postboxRecipients, setPostboxRecipients] = useState([]);
@@ -2138,7 +2161,7 @@ function AppContent() {
       {activeTab === 'play' && canManageTournaments && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
-            <TournamentPlayManagement tournaments={manageableTournaments} currentUserId={currentUser?.id} />
+            <TournamentPlayManagement tournaments={manageableTournaments} currentUserId={currentUser?.id} focus={playFocus} />
           </section>
         </Suspense>
       )}

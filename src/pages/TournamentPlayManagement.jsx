@@ -159,7 +159,7 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, n
   );
 }
 
-export default function TournamentPlayManagement({ tournaments: managedTournaments, currentUserId }) {
+export default function TournamentPlayManagement({ tournaments: managedTournaments, currentUserId, focus = null }) {
   const { t, i18n } = useTranslation();
   // Kalendereinträge sind reine Termine ohne Teilnehmer und tauchen hier gar nicht auf.
   const allTournaments = managedTournaments.filter((tournament) => !isCalendarEntry(tournament));
@@ -171,6 +171,12 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const nonPlayableTournaments = allTournaments.filter((tournament) => !isOnlinePlayable(tournament));
   const desktopExecutionTournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && tournament.desktopExecution);
   const [selectedTournamentId, setSelectedTournamentId] = useState(tournaments[0]?.id || '');
+  // Aus einer Push-Benachrichtigung gewähltes Turnier übernehmen, sobald es in der Liste ist.
+  const focusTournamentId = focus?.tournamentId || '';
+  const focusAvailable = tournaments.some((tournament) => tournament.id === focusTournamentId);
+  useEffect(() => {
+    if (focusAvailable) setSelectedTournamentId(focusTournamentId);
+  }, [focus, focusTournamentId, focusAvailable]);
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -236,6 +242,17 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     setMessage('');
     setError('');
   }, [selectedTournamentId]);
+
+  useEffect(() => {
+    if (!navigator.serviceWorker) return;
+    // Push "Ergebnis gemeldet": nur dann einmal nachladen - kein Polling.
+    const refreshReported = (event) => {
+      if (event.data?.type !== 'tournament-result-reported' || event.data.tournamentId !== selectedTournamentId) return;
+      queryClient.invalidateQueries({ queryKey: ['tournament-play', selectedTournamentId, 'rounds'] }, { cancelRefetch: false });
+    };
+    navigator.serviceWorker.addEventListener('message', refreshReported);
+    return () => navigator.serviceWorker.removeEventListener('message', refreshReported);
+  }, [queryClient, selectedTournamentId]);
 
   async function loadData(tournamentId) {
     await queryClient.invalidateQueries({ queryKey: ['tournament-play', tournamentId] });

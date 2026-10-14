@@ -2210,7 +2210,7 @@ export default {
       if (liveResultMatch && request.method === 'POST') {
         const session = await requireSession(request, env.DB);
         const registration = await findMyLiveRegistration(env.DB, session.user, liveResultMatch[1]);
-        await reportLiveMatchResult(request, env.DB, registration);
+        await reportLiveMatchResult(request, env, registration, session.user.id);
         return await buildLiveResponse(request, env.DB, registration);
       }
       if (liveRegistrationMatch) {
@@ -6631,7 +6631,8 @@ export async function setTournamentRoundResults(request, db, tournament, roundId
 
 // Eine Ergebnismeldung ist nur für die eigene, noch offene Partie der letzten Runde möglich.
 // Persönliche Live-Links reichen absichtlich nicht: Der Spieler muss über sein Konto einer Anmeldung zugeordnet sein.
-async function reportLiveMatchResult(request, db, registration) {
+async function reportLiveMatchResult(request, env, registration, reporterUserId) {
+  const db = env.DB;
   const tournament = await getTournamentById(db, registration.tournament_id);
   if (!tournament || !Number(tournament.player_result_reporting_enabled || 0)) {
     throw new HttpError(403, 'Die Turnierleitung hat keine Ergebnismeldungen durch Spieler freigegeben');
@@ -6664,6 +6665,51 @@ async function reportLiveMatchResult(request, db, registration) {
     .bind(scoreA, scoreB, registration.id, new Date().toISOString(), match.id).run();
   if (!saved.meta.changes) throw new HttpError(409, 'Das Ergebnis wurde bereits gemeldet');
   await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
+  try {
+    await queueResultReportedPush(env, new URL(request.url).origin, tournament, registration, reporterUserId, { matchId: match.id, ownScore, opponentScore });
+  } catch (error) {
+    // Die Meldung ist gespeichert; ein fehlender Push darf sie nicht als Fehler zurückmelden.
+    console.error(`Failed to queue result push for tournament ${tournament.id}`, error);
+  }
+}
+
+const RESULT_REPORTED_TEXTS = {
+  de: { title: 'Ergebnis gemeldet', body: (tournament, team, score) => `${tournament}: ${team} meldet ${score}` },
+  en: { title: 'Result reported', body: (tournament, team, score) => `${tournament}: ${team} reports ${score}` },
+  es: { title: 'Resultado comunicado', body: (tournament, team, score) => `${tournament}: ${team} comunica ${score}` },
+  fr: { title: 'Résultat saisi', body: (tournament, team, score) => `${tournament} : ${team} indique ${score}` },
+  nl: { title: 'Uitslag doorgegeven', body: (tournament, team, score) => `${tournament}: ${team} meldt ${score}` },
+};
+
+// Push an Besitzer und Bearbeiter mit Konto-Push-Abo, damit die Turnierleitung Meldungen ohne Polling sieht.
+// Kostet eine kleine indizierte Abfrage; Versand läuft über die vorhandene Queue.
+async function queueResultReportedPush(env, origin, tournament, registration, reporterUserId, result) {
+  if (!env.MAIL_QUEUE) return;
+  const managerIds = [...new Set([tournament.owner_id, ...tournamentEditorIds(tournament)])].filter((id) => id && id !== reporterUserId);
+  if (!managerIds.length) return;
+  const recipients = await env.DB.prepare(`SELECT u.id, u.language FROM users u
+      WHERE u.id IN (${managerIds.map(() => '?').join(', ')})
+        AND EXISTS (SELECT 1 FROM push_subscriptions ps WHERE ps.user_id = u.id)`).bind(...managerIds).all();
+  if (!recipients.results?.length) return;
+  const score = `${result.ownScore}:${result.opponentScore}`;
+  const url = `${origin}/?tab=play&tournament=${encodeURIComponent(tournament.id)}`;
+  await env.MAIL_QUEUE.sendBatch(recipients.results.map((recipient) => {
+    const texts = RESULT_REPORTED_TEXTS[recipient.language] || RESULT_REPORTED_TEXTS.de;
+    return {
+      body: {
+        kind: 'push',
+        userId: recipient.id,
+        payload: {
+          title: texts.title,
+          body: texts.body(tournament.name, liveRegistrationLabel(registration), score),
+          tag: `result-${result.matchId}`,
+          url,
+          eventType: 'tournament_result_reported',
+          tournamentId: tournament.id,
+        },
+      },
+    };
+  }));
 }
 
 async function getTournamentRanking(db, tournament) {

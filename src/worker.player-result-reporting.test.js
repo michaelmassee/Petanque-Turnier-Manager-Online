@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 import worker from './worker.js';
 
@@ -11,7 +11,7 @@ describe('Ergebnismeldung durch Spieler', () => {
   }), env);
 
   beforeEach(() => {
-    env = { DB: d1MitSchema() };
+    env = { DB: d1MitSchema(), MAIL_QUEUE: { sendBatch: vi.fn().mockResolvedValue(undefined) } };
     sql(`INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at)
       VALUES ('player', 'spieler@example.test', 'user', 'salt', 'hash', '2026-01-01', '2026-01-01'),
              ('other', 'andere@example.test', 'user', 'salt', 'hash', '2026-01-01', '2026-01-01'),
@@ -44,6 +44,44 @@ describe('Ergebnismeldung durch Spieler', () => {
     expect(env.DB.sqlite.prepare("SELECT result_reported_by FROM tournament_matches WHERE id = 'match1'").get()).toEqual({ result_reported_by: 'r2' });
     const { rounds } = await (await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/rounds', { headers: { Cookie: 'ptm_session=player-session' } }), env)).json();
     expect(rounds[0].matches[0].reportedBy).toMatchObject({ id: 'r2', firstName: 'Bert', lastName: 'B' });
+  });
+
+  it('benachrichtigt die Turnierleitung per Push über eine Teammeldung', async () => {
+    sql(`INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, created_at, updated_at)
+      VALUES ('https://push.test/owner', 'player', 'key', 'auth', '2026-01-01', '2026-01-01')`);
+
+    expect((await melden('other-session', { ownScore: 13, opponentScore: 7 }, 'r2')).status).toBe(200);
+
+    expect(env.MAIL_QUEUE.sendBatch).toHaveBeenCalledWith([{ body: { kind: 'push', userId: 'player', payload: {
+      title: 'Ergebnis gemeldet',
+      body: 'Turnier: Bert B meldet 13:7',
+      tag: 'result-match1',
+      url: 'https://ptm.test/?tab=play&tournament=t1',
+      eventType: 'tournament_result_reported',
+      tournamentId: 't1',
+    } } }]);
+  });
+
+  it('schickt keinen Push ohne Push-Abo der Turnierleitung oder an den Meldenden selbst', async () => {
+    expect((await melden('other-session', { ownScore: 13, opponentScore: 7 }, 'r2')).status).toBe(200);
+    sql("UPDATE tournament_matches SET score_a = NULL, score_b = NULL, result_reported_by = NULL WHERE id = 'match1'");
+    sql(`INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, created_at, updated_at)
+      VALUES ('https://push.test/owner', 'player', 'key', 'auth', '2026-01-01', '2026-01-01')`);
+    expect((await melden('player-session', { ownScore: 13, opponentScore: 7 })).status).toBe(200);
+
+    expect(env.MAIL_QUEUE.sendBatch).not.toHaveBeenCalled();
+  });
+
+  it('meldet das gespeicherte Ergebnis auch dann als Erfolg, wenn der Push nicht eingereiht werden kann', async () => {
+    sql(`INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, created_at, updated_at)
+      VALUES ('https://push.test/owner', 'player', 'key', 'auth', '2026-01-01', '2026-01-01')`);
+    env.MAIL_QUEUE.sendBatch.mockRejectedValue(new Error('queue down'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect((await melden('other-session', { ownScore: 13, opponentScore: 7 }, 'r2')).status).toBe(200);
+    expect(env.DB.sqlite.prepare("SELECT score_a, score_b FROM tournament_matches WHERE id = 'match1'").get()).toEqual({ score_a: 7, score_b: 13 });
+    expect(consoleError).toHaveBeenCalledWith('Failed to queue result push for tournament t1', expect.any(Error));
+    consoleError.mockRestore();
   });
 
   it('verweigert die Meldung, wenn die Turnierleitung sie nicht freigegeben hat', async () => {
