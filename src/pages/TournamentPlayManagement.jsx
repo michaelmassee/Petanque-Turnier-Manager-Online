@@ -59,21 +59,21 @@ function MatchRow({ match, draft, onChange, onSave, busy, isNewReport }) {
   const isDraw = scoreA !== '' && scoreB !== '' && scoreA === scoreB;
 
   return (
-    <article className={`supermelee-match${match.reportedBy ? ' is-player-reported' : ''}${isNewReport ? ' is-new-report' : ''}`}>
-      {match.stageLabel && <div className="supermelee-match-stage" data-i18n-skip>{match.stageLabel}</div>}
+    <article className={`play-match${match.reportedBy ? ' is-player-reported' : ''}${isNewReport ? ' is-new-report' : ''}`}>
+      {match.stageLabel && <div className="play-match-stage" data-i18n-skip>{match.stageLabel}</div>}
       {match.reportedBy && (
-        <p className="supermelee-report-badge">
-          {isNewReport && <span className="supermelee-report-new">{t('Neu')}</span>}
+        <p className="play-report-badge">
+          {isNewReport && <span className="play-report-new">{t('Neu')}</span>}
           <span>{t('Ergebnis gemeldet von')} <strong data-i18n-skip>{playerLabel(match.reportedBy)}</strong></span>
         </p>
       )}
-      <div className="supermelee-match-teams">
-        <div className="supermelee-team" data-i18n-skip>{teamLabel(match.teamA)}</div>
-        <div className="supermelee-vs">{t('gegen')}</div>
-        <div className="supermelee-team is-second" data-i18n-skip>{teamLabel(match.teamB)}</div>
+      <div className="play-match-teams">
+        <div className="play-team" data-i18n-skip>{teamLabel(match.teamA)}</div>
+        <div className="play-vs">{t('gegen')}</div>
+        <div className="play-team is-second" data-i18n-skip>{teamLabel(match.teamB)}</div>
       </div>
 
-      <div className="supermelee-result-row">
+      <div className="play-result-row">
         <input
           className="score-input"
           type="text"
@@ -85,7 +85,7 @@ function MatchRow({ match, draft, onChange, onSave, busy, isNewReport }) {
           onChange={(event) => onChange({ scoreA: sanitizeScore(event.target.value) })}
           aria-label={t('Punkte Team A')}
         />
-        <span className="supermelee-score-sep">:</span>
+        <span className="play-score-sep">:</span>
         <input
           className="score-input"
           type="text"
@@ -140,19 +140,19 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, n
   return (
     <>
       {newReports > 0 && (
-        <div className="supermelee-report-banner" role="status">
+        <div className="play-report-banner" role="status">
           <span>{t('Neue Ergebnismeldungen von Teams: {{count}}', { count: newReports })}</span>
           <Button variant="secondary" onClick={onReportsSeen}>{t('Gesehen')}</Button>
         </div>
       )}
-      <div className="supermelee-round-buttons" role="group" aria-label={t('Rundenaktionen')}>
+      <div className="play-round-buttons" role="group" aria-label={t('Rundenaktionen')}>
         <Button disabled={busy || refreshing || !changes.length || invalid} loading={busy} onClick={async () => {
           const cleared = await onSaveAll(round, changes);
           setDrafts((current) => Object.fromEntries(Object.entries(current).filter(([id]) => !cleared.includes(id))));
         }}>{t('Alle speichern')}</Button>
         {onRefresh && <Button variant="secondary" disabled={busy} loading={refreshing} onClick={onRefresh}>{t('Aktualisieren')}</Button>}
       </div>
-      <div className="supermelee-match-list">
+      <div className="play-match-list">
         {round.matches.map((match) => <MatchRow key={match.id} match={match} draft={drafts[match.id]} onChange={(draft) => changeDraft(match.id, draft)} onSave={onSave} busy={busy} isNewReport={newReportIds.includes(match.id)} />)}
       </div>
     </>
@@ -508,7 +508,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   function RoundAction() {
     if (!showRoundAction) return null;
     return (
-      <div className="supermelee-round-action">
+      <div className="play-round-action">
         {missingRequirements.length > 0 && (
           <div className="round-requirements">
             {missingRequirements.map((requirement) => <p className="hint" key={requirement}>{requirement}</p>)}
@@ -522,8 +522,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   }
 
   return (
-    <div className="supermelee-manage">
-      <div className="panel supermelee-toolbar">
+    <div className="play-manage">
+      <div className="panel play-toolbar">
         <TournamentPicker
           label={t('Turnier')}
           tournaments={tournaments}
@@ -532,7 +532,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           currentUserId={currentUserId}
         />
         {selectedTournament && selectedTournamentStatus !== 'running' && (
-          <div className="supermelee-toolbar-actions">
+          <div className="play-toolbar-actions">
             {isSchweizerMelee && !rounds.length && (
               <Button variant="secondary" disabled={busy || !selectedTournamentId || !canDrawMeleeTeams} loading={busy} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>
             )}
@@ -540,7 +540,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           </div>
         )}
         {selectedTournamentStatus === 'running' && (
-          <div className="supermelee-toolbar-actions">
+          <div className="play-toolbar-actions">
             <p className="hint">
               {t('Bestätigte Meldungen')} · {labelFor(REGISTRATION_TYPES, selectedTournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, selectedTournament.type)} · {labelFor(FORMATIONS, selectedTournament.formation)}: {confirmedRegistrations.length} ({activeConfirmedCount} {t('aktiv')})
               {selectedTournament.type === 'schweizer' && ` · ${t(selectedTournament.schweizerRankingMode === 'ohne_buchholz' ? 'Ohne Buchholz' : 'Mit Buchholz und Feinbuchholz')}`}
@@ -568,7 +568,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
       {selectedTournamentStatus === 'running' && (
         <details className="panel round-participants">
-          <summary className="supermelee-round-summary"><span>{t('Teilnehmer')}</span><span className="counter">{activeConfirmedCount}</span></summary>
+          <summary className="play-round-summary"><span>{t('Teilnehmer')}</span><span className="counter">{activeConfirmedCount}</span></summary>
           <form className="quick-player-form" onSubmit={handleQuickPlayerSubmit}>
             <TextField label={t('Vorname')} value={quickPlayer.firstName} onChange={(firstName) => setQuickPlayer({ ...quickPlayer, firstName })} required minLength={2} />
             <TextField label={t('Nachname')} value={quickPlayer.lastName} onChange={(lastName) => setQuickPlayer({ ...quickPlayer, lastName })} required minLength={2} />
@@ -591,7 +591,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       )}
 
       {currentRound && (
-        <section className="panel supermelee-current-round">
+        <section className="panel play-current-round">
           <div className="section-title"><h2>{t('Runde')} {currentRound.roundNumber}</h2><span className={`status ${currentRoundOpen ? 'status-running' : 'registration-confirmed'}`}>{currentRoundOpen ? t('Offen') : t('Abgeschlossen')}</span></div>
           <RoundResults key={`${selectedTournamentId}:${currentRound.id}`} round={currentRound} onSave={handleSaveResult} onSaveAll={handleSaveAll} onRefresh={() => roundsQuery.refetch()} busy={busy} refreshing={roundsQuery.isFetching} newReportIds={newReportIds} onReportsSeen={() => setNewReportIds([])} />
           <RoundAction />
@@ -601,11 +601,11 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       {!currentRound && <RoundAction />}
 
       {Boolean(olderRoundsNewestFirst.length) && (
-        <section className="supermelee-rounds">
+        <section className="play-rounds">
           <h2>{t('Vergangene Runden')}</h2>
           {olderRoundsNewestFirst.map((round) => (
-            <details key={`${selectedTournamentId}:${round.id}`} className="panel supermelee-round">
-              <summary className="supermelee-round-summary"><span>{t('Runde')} {round.roundNumber}</span><span className="status registration-confirmed">{t('Abgeschlossen')}</span></summary>
+            <details key={`${selectedTournamentId}:${round.id}`} className="panel play-round">
+              <summary className="play-round-summary"><span>{t('Runde')} {round.roundNumber}</span><span className="status registration-confirmed">{t('Abgeschlossen')}</span></summary>
               <RoundResults round={round} onSave={handleSaveResult} onSaveAll={handleSaveAll} busy={busy} newReportIds={newReportIds} onReportsSeen={() => setNewReportIds([])} />
             </details>
           ))}
@@ -614,7 +614,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
       {Boolean(ranking.length) && (
         <details className="panel ranking-panel">
-          <summary className="supermelee-round-summary"><span>{t('Rangliste')}</span></summary>
+          <summary className="play-round-summary"><span>{t('Rangliste')}</span></summary>
           <div className="table-scroll">
             {// Spalten/Überschriften wie im Hauptprojekt: Schweizer-Rangliste (Platz, Team, Siege,
             // BHZ/FBHZ, Punkte +/-/Delta) bzw. JGJ-/Supermêlée-Rangliste (Platz, Spieler, Spiele

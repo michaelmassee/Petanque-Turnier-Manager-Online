@@ -356,7 +356,7 @@ export function TournamentSchedule({ tournamentId, tournament }) {
   const currentRound = rounds[rounds.length - 1];
 
   return (
-    <div className="supermelee-schedule">
+    <div className="play-schedule">
       <h3>
         {t('Runde')} {currentRound.roundNumber}
       </h3>

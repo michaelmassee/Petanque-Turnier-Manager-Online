@@ -210,9 +210,9 @@ function PlayerResultReport({ path, onSaved }) {
   return (
     <form className="live-result-report" onSubmit={submit}>
       <p className="hint">{t('Ergebnis dieser Partie melden')}</p>
-      <div className="supermelee-result-row">
+      <div className="play-result-row">
         <input className="score-input" type="number" inputMode="numeric" min="0" max="13" value={scoreA} onChange={(event) => setScoreA(event.target.value)} aria-label={t('Eigene Punkte')} />
-        <span className="supermelee-score-sep">:</span>
+        <span className="play-score-sep">:</span>
         <input className="score-input" type="number" inputMode="numeric" min="0" max="13" value={scoreB} onChange={(event) => setScoreB(event.target.value)} aria-label={t('Gegnerische Punkte')} />
         <Button type="submit" disabled={invalid || busy} loading={busy}>{t('Ergebnis melden')}</Button>
       </div>
