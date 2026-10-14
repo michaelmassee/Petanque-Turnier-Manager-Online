@@ -1427,5 +1427,13 @@
   "Die Cloudflare-Statistik konnte nicht abgerufen werden": "Impossible de récupérer les statistiques Cloudflare",
   "Ungültiger Tag für die Cloudflare-Statistik": "Jour non valide pour les statistiques Cloudflare",
   "Ganze Abfrage anzeigen": "Afficher la requête complète",
-  "Abfrage einklappen": "Réduire la requête"
+  "Abfrage einklappen": "Réduire la requête",
+  "Für diese Partie liegt bereits ein Ergebnis vor: {{result}}. Möchtest du es wirklich überschreiben?": "Un résultat existe déjà pour cette partie : {{result}}. Voulez-vous vraiment le remplacer ?",
+  "Für diese Partie liegt bereits ein anderes Ergebnis vor. Bitte bestätige das Überschreiben.": "Un autre résultat existe déjà pour cette partie. Veuillez confirmer son remplacement.",
+  "Nicht angetreten": "Absent",
+  "Wertung": "Points de classement",
+  "Spieldifferenz": "Différence de parties",
+  "Punkte−": "Points−",
+  "Ungültige Ranglistenwerte": "Valeurs de classement invalides",
+  "Benachrichtigungen für neue Runden aktivieren": "Activer les notifications pour les nouveaux tours"
 }

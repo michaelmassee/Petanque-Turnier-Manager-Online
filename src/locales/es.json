@@ -1427,5 +1427,13 @@
   "Die Cloudflare-Statistik konnte nicht abgerufen werden": "No se pudieron obtener las estadísticas de Cloudflare",
   "Ungültiger Tag für die Cloudflare-Statistik": "Día no válido para las estadísticas de Cloudflare",
   "Ganze Abfrage anzeigen": "Mostrar la consulta completa",
-  "Abfrage einklappen": "Contraer la consulta"
+  "Abfrage einklappen": "Contraer la consulta",
+  "Für diese Partie liegt bereits ein Ergebnis vor: {{result}}. Möchtest du es wirklich überschreiben?": "Ya existe un resultado para esta partida: {{result}}. ¿Seguro que quieres sobrescribirlo?",
+  "Für diese Partie liegt bereits ein anderes Ergebnis vor. Bitte bestätige das Überschreiben.": "Ya existe otro resultado para esta partida. Confirma que quieres sobrescribirlo.",
+  "Nicht angetreten": "No se presentó",
+  "Wertung": "Puntos de valoración",
+  "Spieldifferenz": "Diferencia de partidas",
+  "Punkte−": "Puntos−",
+  "Ungültige Ranglistenwerte": "Valores de clasificación no válidos",
+  "Benachrichtigungen für neue Runden aktivieren": "Activar notificaciones para nuevas rondas"
 }

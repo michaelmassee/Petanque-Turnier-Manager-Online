@@ -191,5 +191,13 @@
   "Powered by Petanque Turnier Manager Online": "Powered by Petanque Turnier Manager Online",
   "Die Flyer-Einstellungen konnten nicht lokal geladen werden.": "Die Flyer-Einstellungen konnten nicht lokal geladen werden.",
   "Die Flyer-Einstellungen konnten nicht lokal gespeichert werden.": "Die Flyer-Einstellungen konnten nicht lokal gespeichert werden.",
-  "Transparenz der Textbox": "Transparenz der Textbox"
+  "Transparenz der Textbox": "Transparenz der Textbox",
+  "Für diese Partie liegt bereits ein Ergebnis vor: {{result}}. Möchtest du es wirklich überschreiben?": "Für diese Partie liegt bereits ein Ergebnis vor: {{result}}. Möchtest du es wirklich überschreiben?",
+  "Für diese Partie liegt bereits ein anderes Ergebnis vor. Bitte bestätige das Überschreiben.": "Für diese Partie liegt bereits ein anderes Ergebnis vor. Bitte bestätige das Überschreiben.",
+  "Nicht angetreten": "Nicht angetreten",
+  "Wertung": "Wertung",
+  "Spieldifferenz": "Spieldifferenz",
+  "Punkte−": "Punkte−",
+  "Ungültige Ranglistenwerte": "Ungültige Ranglistenwerte",
+  "Benachrichtigungen für neue Runden aktivieren": "Benachrichtigungen für neue Runden aktivieren"
 }

@@ -1427,5 +1427,13 @@
   "Die Cloudflare-Statistik konnte nicht abgerufen werden": "De Cloudflare-statistieken konden niet worden opgehaald",
   "Ungültiger Tag für die Cloudflare-Statistik": "Ongeldige dag voor de Cloudflare-statistieken",
   "Ganze Abfrage anzeigen": "Volledige query tonen",
-  "Abfrage einklappen": "Query inklappen"
+  "Abfrage einklappen": "Query inklappen",
+  "Für diese Partie liegt bereits ein Ergebnis vor: {{result}}. Möchtest du es wirklich überschreiben?": "Voor deze partij is al een resultaat opgeslagen: {{result}}. Wil je het echt overschrijven?",
+  "Für diese Partie liegt bereits ein anderes Ergebnis vor. Bitte bestätige das Überschreiben.": "Voor deze partij is al een ander resultaat opgeslagen. Bevestig dat je het wilt overschrijven.",
+  "Nicht angetreten": "Niet opgekomen",
+  "Wertung": "Waarderingspunten",
+  "Spieldifferenz": "Wedstrijdverschil",
+  "Punkte−": "Punten−",
+  "Ungültige Ranglistenwerte": "Ongeldige ranglijstwaarden",
+  "Benachrichtigungen für neue Runden aktivieren": "Meldingen voor nieuwe rondes inschakelen"
 }

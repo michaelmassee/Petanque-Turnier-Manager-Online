@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   LiveDetail, MyLiveBackLink, MyLiveList, PlayerLivePage, readRememberedTeams, RememberedTeams,
@@ -87,6 +87,103 @@ function renderPlayerLivePage(route, currentUser = null) {
 describe('Live-Ansicht für Spieler', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  function installPushBrowser(permission = 'granted', hasSubscription = true) {
+    const subscription = { endpoint: 'https://push.test/endpoint', toJSON: () => ({ endpoint: 'https://push.test/endpoint', keys: { p256dh: 'key', auth: 'auth' } }) };
+    const pushManager = {
+      getSubscription: vi.fn().mockResolvedValue(hasSubscription ? subscription : null),
+      subscribe: vi.fn().mockResolvedValue(subscription),
+    };
+    const registration = { pushManager };
+    const requestPermission = vi.fn().mockResolvedValue(permission);
+    vi.stubGlobal('Notification', { permission, requestPermission });
+    vi.stubGlobal('PushManager', function PushManager() {});
+    vi.stubGlobal('navigator', { onLine: true, userAgent: 'test', serviceWorker: {
+      getRegistration: vi.fn().mockResolvedValue(registration), ready: Promise.resolve(registration),
+    } });
+    global.fetch = vi.fn((path) => Promise.resolve(jsonResponse(path.endsWith('/push') ? {} : path.endsWith('/public-key') ? { publicKey: 'AQID' } : livePayload())));
+    return { requestPermission, pushManager };
+  }
+
+  it('aktiviert Runden-Push bei vorhandener Browser-Erlaubnis ohne bestehendes Abo automatisch', async () => {
+    const { requestPermission, pushManager } = installPushBrowser('granted', false);
+    renderDetail();
+    await screen.findByRole('button', { name: 'Benachrichtigungen ausschalten' });
+    const writes = global.fetch.mock.calls.filter(([path, options]) => path.endsWith('/push') && options.method === 'POST');
+    expect(writes).toHaveLength(1);
+    expect(localStorage.getItem('ptm_live_push_r1')).toBe('1');
+    expect(requestPermission).not.toHaveBeenCalled();
+    expect(pushManager.subscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('meldet bei bestehendem Abo ohne Merker nicht automatisch an (früher ausgeschaltet)', async () => {
+    const { pushManager } = installPushBrowser('granted', true);
+    renderDetail();
+    await screen.findByRole('button', { name: 'Benachrichtigungen für neue Runden aktivieren' });
+    expect(global.fetch.mock.calls.filter(([path]) => path.endsWith('/push'))).toHaveLength(0);
+    expect(pushManager.subscribe).not.toHaveBeenCalled();
+  });
+
+  it('registriert ein bereits aktiviertes Runden-Push-Abo beim erneuten Öffnen nicht erneut', async () => {
+    installPushBrowser();
+    localStorage.setItem('ptm_live_push_r1', '1');
+    renderDetail();
+    await screen.findByRole('button', { name: 'Benachrichtigungen ausschalten' });
+    expect(global.fetch.mock.calls.filter(([path]) => path.endsWith('/push'))).toHaveLength(0);
+  });
+
+  it('respektiert eine ausdrücklich ausgeschaltete Runden-Benachrichtigung', async () => {
+    installPushBrowser();
+    localStorage.setItem('ptm_live_push_r1', '1');
+    const view = renderDetail();
+    fireEvent.click(await screen.findByRole('button', { name: 'Benachrichtigungen ausschalten' }));
+    await screen.findByRole('button', { name: 'Benachrichtigungen für neue Runden aktivieren' });
+    expect(localStorage.getItem('ptm_live_push_r1')).toBe('0');
+    view.unmount();
+    renderDetail();
+    await screen.findByRole('button', { name: 'Benachrichtigungen für neue Runden aktivieren' });
+    expect(global.fetch.mock.calls.filter(([path, options]) => path.endsWith('/push') && options.method === 'POST')).toHaveLength(0);
+  });
+
+  it.each(['default', 'denied'])('fordert Push-Erlaubnis beim Öffnen nicht ungefragt an (%s)', async (permission) => {
+    const { requestPermission } = installPushBrowser(permission);
+    renderDetail();
+    await screen.findByRole('button', { name: 'Benachrichtigungen für neue Runden aktivieren' });
+    expect(requestPermission).not.toHaveBeenCalled();
+    expect(global.fetch.mock.calls.filter(([path]) => path.endsWith('/push'))).toHaveLength(0);
+  });
+
+  it.each([
+    ['schweizer', 'forme', 'mit_buchholz', ['Platz', 'Team', 'Siege', 'BHZ', 'FBHZ', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '5', '12', '13', '5', '8']],
+    ['schweizer', 'forme', 'ohne_buchholz', ['Platz', 'Team', 'Siege', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '13', '5', '8']],
+    ['formule_x', 'forme', null, ['Platz', 'Team', 'Siege', 'Wertung', 'Niederlagen', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '121', '0', '13', '5', '8']],
+    ['rangliste', 'supermelee', null, ['Platz', 'Spieler', 'Siege', 'Niederlagen', 'Spieldifferenz', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '0', '1', '13', '5', '8']],
+    ['jeder_gegen_jeden', 'forme', null, ['Platz', 'Team', 'Siege', 'Niederlagen', 'Spieldifferenz', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '0', '1', '13', '5', '8']],
+    ['maastrichter', 'forme', 'mit_buchholz', ['Platz', 'Team', 'Siege', 'BHZ', 'FBHZ', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '5', '12', '13', '5', '8']],
+  ])('zeigt die passende Rangliste für %s / %s / %s', async (type, registrationType, schweizerRankingMode, headers, values) => {
+    const payload = livePayload();
+    Object.assign(payload.tournament, { type, registrationType, schweizerRankingMode });
+    Object.assign(payload.live.ranking[0], { bhz: 5, fbhz: 12, wertung: 121, losses: 0, gameDiff: 1, pointsFor: 13, pointsAgainst: 5 });
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse(payload));
+    renderDetail();
+    const table = await screen.findByRole('table', { hidden: true });
+    fireEvent.click(screen.getByText('Rangliste anzeigen'));
+    expect(within(table).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(headers);
+    const own = table.querySelector('.live-own-row');
+    expect(within(own).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(values);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('zeigt keine generische Rangliste für K.O.', async () => {
+    const payload = livePayload();
+    payload.tournament.type = 'ko';
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse(payload));
+    renderDetail();
+    await screen.findByText('Sommer-Supermêlée');
+    expect(screen.queryByText('Rangliste anzeigen')).not.toBeInTheDocument();
   });
 
   it('kennzeichnet die gesamte Live-Ansicht deutlich als Testbetrieb', () => {

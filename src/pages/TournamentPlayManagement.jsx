@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { TextField, Button, Feedback } from '../components/ui.jsx';
@@ -52,8 +53,19 @@ function isRoundComplete(round) {
 
 function MatchRow({ match, onSave, busy }) {
   const { t } = useTranslation();
-  const [scoreA, setScoreA] = useState(match.scoreA ?? '');
-  const [scoreB, setScoreB] = useState(match.scoreB ?? '');
+  const serverScoreA = match.scoreA ?? '';
+  const serverScoreB = match.scoreB ?? '';
+  const [scoreA, setScoreA] = useState(serverScoreA);
+  const [scoreB, setScoreB] = useState(serverScoreB);
+  const shownServerScores = useRef({ a: serverScoreA, b: serverScoreB });
+  // Neue Serverwerte (z. B. Spielermeldung) nur in Felder übernehmen, die niemand gerade bearbeitet.
+  useEffect(() => {
+    const shown = shownServerScores.current;
+    setScoreA((current) => (current === shown.a ? serverScoreA : current));
+    setScoreB((current) => (current === shown.b ? serverScoreB : current));
+    shownServerScores.current = { a: serverScoreA, b: serverScoreB };
+  }, [serverScoreA, serverScoreB]);
+
   const decided = match.scoreA != null || match.scoreB != null || match.noShow;
   const isDraw = scoreA !== '' && scoreB !== '' && scoreA === scoreB;
 
@@ -91,7 +103,13 @@ function MatchRow({ match, onSave, busy }) {
         <Button
           disabled={busy || scoreA === '' || scoreB === '' || isDraw}
           loading={busy}
-          onClick={() => onSave(match.id, { scoreA: Number(scoreA), scoreB: Number(scoreB) })}
+          onClick={async () => {
+            const keptResult = await onSave(match.id, { scoreA: Number(scoreA), scoreB: Number(scoreB) });
+            if (keptResult) {
+              setScoreA(keptResult.scoreA ?? '');
+              setScoreB(keptResult.scoreB ?? '');
+            }
+          }}
         >
           {decided ? t('Ergebnis ändern') : t('Ergebnis speichern')}
         </Button>
@@ -114,10 +132,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const nonPlayableTournaments = allTournaments.filter((tournament) => !isOnlinePlayable(tournament));
   const desktopExecutionTournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && tournament.desktopExecution);
   const [selectedTournamentId, setSelectedTournamentId] = useState(tournaments[0]?.id || '');
-  const [rounds, setRounds] = useState([]);
-  const [swissTeams, setSwissTeams] = useState([]);
-  const [ranking, setRanking] = useState([]);
-  const [confirmedRegistrations, setConfirmedRegistrations] = useState([]);
+  const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -126,42 +141,51 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   // nachdem hier der Status auf "Läuft" gesetzt wurde - deshalb lokal vormerken,
   // welche Turniere in dieser Sitzung bereits gestartet wurden.
   const [startedTournamentIds, setStartedTournamentIds] = useState(() => new Set());
-  const visibleConfirmedRegistrations = useInfiniteList(confirmedRegistrations);
 
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
   const selectedTournamentStatus = selectedTournament
     ? (startedTournamentIds.has(selectedTournament.id) ? 'running' : selectedTournament.status)
     : null;
 
-  async function loadData(tournamentId) {
-    if (!tournamentId) {
-      setRounds([]);
-      setSwissTeams([]);
-      setRanking([]);
-      setConfirmedRegistrations([]);
-      return;
-    }
-    try {
-      const [roundsData, rankingData, registrationsData] = await Promise.all([
-        api(`/api/tournaments/${tournamentId}/rounds`),
-        api(`/api/tournaments/${tournamentId}/ranking`),
-        authenticatedApi(`/api/tournaments/${tournamentId}/registrations`),
-      ]);
-      setRounds(roundsData.rounds);
-      setSwissTeams(roundsData.teams || []);
-      setRanking(rankingData.ranking);
-      setConfirmedRegistrations(registrationsData.registrations.filter((registration) => registration.status === 'confirmed'));
-    } catch (err) {
-      setError(err.message);
-    }
-  }
+  const queryKey = ['tournament-play', selectedTournamentId];
+  const roundsQuery = useQuery({
+    queryKey: [...queryKey, 'rounds'],
+    queryFn: ({ signal }) => api(`/api/tournaments/${selectedTournamentId}/rounds`, { signal }),
+    enabled: Boolean(selectedTournament),
+    refetchOnWindowFocus: !busy,
+    staleTime: 30_000,
+  });
+  const rounds = roundsQuery.data?.rounds || [];
+  const swissTeams = roundsQuery.data?.teams || [];
+  const rankingQuery = useQuery({
+    // Structural query keys keep the ranking cached when a refresh changes no results.
+    queryKey: [...queryKey, 'ranking', roundsQuery.data?.rounds],
+    queryFn: ({ signal }) => api(`/api/tournaments/${selectedTournamentId}/ranking`, { signal }),
+    enabled: Boolean(selectedTournament) && roundsQuery.isSuccess,
+    refetchOnWindowFocus: false,
+    // Alte Rangliste stehen lassen, bis die neue da ist - sonst flackert die Tabelle nach jedem Ergebnis.
+    placeholderData: keepPreviousData,
+  });
+  const registrationsQuery = useQuery({
+    queryKey: [...queryKey, 'registrations'],
+    queryFn: ({ signal }) => authenticatedApi(`/api/tournaments/${selectedTournamentId}/registrations`, { signal }),
+    enabled: Boolean(selectedTournament),
+    refetchOnWindowFocus: false,
+  });
+  const ranking = rankingQuery.data?.ranking || [];
+  const confirmedRegistrations = (registrationsQuery.data?.registrations || [])
+    .filter((registration) => registration.status === 'confirmed');
+  const visibleConfirmedRegistrations = useInfiniteList(confirmedRegistrations);
+  const queryError = roundsQuery.error || rankingQuery.error || registrationsQuery.error;
 
   useEffect(() => {
     setMessage('');
     setError('');
-    loadData(selectedTournamentId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTournamentId]);
+
+  async function loadData(tournamentId) {
+    await queryClient.invalidateQueries({ queryKey: ['tournament-play', tournamentId] });
+  }
 
   async function handleStartTournament() {
     setBusy(true);
@@ -186,9 +210,10 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
         method: 'PUT',
         body: JSON.stringify({ participation }),
       });
-      setConfirmedRegistrations((current) =>
-        current.map((registration) => (registration.id === registrationId ? { ...registration, participation } : registration)),
-      );
+      queryClient.setQueryData([...queryKey, 'registrations'], (current) => ({
+        ...current,
+        registrations: current.registrations.map((registration) => (registration.id === registrationId ? { ...registration, participation } : registration)),
+      }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -235,8 +260,9 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     setError('');
     setMessage('');
     try {
+      await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
       const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/rounds`, { method: 'POST' });
-      setRounds(data.rounds);
+      queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, rounds: data.rounds }));
       setMessage(t('Neue Runde wurde erstellt.'));
     } catch (err) {
       setError(err.message);
@@ -248,24 +274,48 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   async function handleDrawMeleeTeams() {
     setBusy(true); setError(''); setMessage('');
     try {
+      await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
       const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/teams/draw`, { method: 'POST' });
-      setSwissTeams(data.teams || []);
+      queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, teams: data.teams || [] }));
       setMessage(`${t('Mêlée-Teams wurden ausgelost:')} ${data.teams.length}`);
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   }
 
+  function confirmResultOverwrite(result) {
+    const existing = result.noShow ? t('Nicht angetreten') : `${result.scoreA}:${result.scoreB}`;
+    return window.confirm(t('Für diese Partie liegt bereits ein Ergebnis vor: {{result}}. Möchtest du es wirklich überschreiben?', { result: existing }));
+  }
+
   async function handleSaveResult(matchId, result) {
+    const match = rounds.flatMap((round) => round.matches).find((entry) => entry.id === matchId);
+    let expectedResult = { scoreA: match?.scoreA ?? null, scoreB: match?.scoreB ?? null, noShow: match?.noShow ?? null };
+    let confirmOverwrite = expectedResult.scoreA != null || expectedResult.scoreB != null || Boolean(expectedResult.noShow);
+    if (confirmOverwrite && !confirmResultOverwrite(expectedResult)) return;
     setBusy(true);
     setError('');
     setMessage('');
     try {
-      const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/matches/${matchId}/result`, {
-        method: 'PUT',
-        body: JSON.stringify(result),
+      await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
+      const save = () => authenticatedApi(`/api/tournaments/${selectedTournamentId}/matches/${matchId}/result`, {
+        method: 'PUT', body: JSON.stringify({ ...result, expectedResult, confirmOverwrite }),
       });
-      setRounds(data.rounds);
-      const rankingData = await api(`/api/tournaments/${selectedTournamentId}/ranking`);
-      setRanking(rankingData.ranking);
+      let data;
+      try {
+        data = await save();
+      } catch (err) {
+        const details = err.payload?.details;
+        if (err.status !== 409 || details?.code !== 'result_confirmation_required' || !details.currentResult) throw err;
+        expectedResult = details.currentResult;
+        queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({
+          ...current,
+          rounds: current.rounds.map((round) => ({ ...round, matches: round.matches.map((entry) => entry.id === matchId ? { ...entry, ...expectedResult } : entry) })),
+        }));
+        // Abgelehnt: Die Zeile zeigt danach das tatsächlich gespeicherte Ergebnis statt der Eingabe.
+        if (!confirmResultOverwrite(expectedResult)) return expectedResult;
+        confirmOverwrite = true;
+        data = await save();
+      }
+      queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, rounds: data.rounds }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -353,6 +403,11 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           onChange={setSelectedTournamentId}
           currentUserId={currentUserId}
         />
+        {selectedTournament && (
+          <Button variant="secondary" disabled={busy} loading={roundsQuery.isFetching} onClick={() => roundsQuery.refetch()}>
+            {t('Aktualisieren')}
+          </Button>
+        )}
         {selectedTournament && selectedTournamentStatus !== 'running' && (
           <div className="supermelee-toolbar-actions">
             {isSchweizerMelee && !rounds.length && (
@@ -382,7 +437,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
         </p>
       )}
 
-      <Feedback message={message} error={error} />
+      <Feedback message={message} error={error || queryError?.message} />
 
       {isSchweizerMelee && !rounds.length && activeConfirmedCount < requiredMeleePlayers && (
         <p className="hint">{t('Für die Mêlée-Auslosung werden mindestens')} {requiredMeleePlayers} {t('aktive bestätigte Meldungen benötigt.')}</p>

@@ -6542,27 +6542,44 @@ async function generateTournamentRound(db, tournament) {
   return listTournamentRounds(db, tournament.id);
 }
 
-async function setTournamentMatchResult(request, db, tournament, matchId) {
+export async function setTournamentMatchResult(request, db, tournament, matchId) {
   assertOnlineExecution(tournament);
   const match = await db.prepare('SELECT * FROM tournament_matches WHERE id = ? AND tournament_id = ?').bind(matchId, tournament.id).first();
-  if (!match) {
-    throw new HttpError(404, 'Spiel nicht gefunden');
-  }
+  if (!match) throw new HttpError(404, 'Spiel nicht gefunden');
 
   const body = await readJson(request);
-  const now = new Date().toISOString();
-
-  if (body.noShow === 'a' || body.noShow === 'b') {
-    await db.prepare('UPDATE tournament_matches SET no_show = ?, score_a = NULL, score_b = NULL, updated_at = ? WHERE id = ?').bind(body.noShow, now, matchId).run();
-  } else {
-    const scoreA = validateMatchScore(body.scoreA);
-    const scoreB = validateMatchScore(body.scoreB);
-    if (scoreA === scoreB) {
-      throw new HttpError(400, 'Ungültiges Ergebnis');
-    }
-    await db.prepare('UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, updated_at = ? WHERE id = ?').bind(scoreA, scoreB, now, matchId).run();
+  const currentResult = { scoreA: match.score_a, scoreB: match.score_b, noShow: match.no_show };
+  const expected = {
+    scoreA: body.expectedResult?.scoreA ?? null,
+    scoreB: body.expectedResult?.scoreB ?? null,
+    noShow: body.expectedResult?.noShow ?? null,
+  };
+  const conflict = (result) => new HttpError(409, 'Für diese Partie liegt bereits ein anderes Ergebnis vor. Bitte bestätige das Überschreiben.', {
+    code: 'result_confirmation_required', currentResult: result,
+  });
+  if ((match.score_a != null || match.score_b != null || match.no_show) && body.confirmOverwrite !== true) {
+    throw conflict(currentResult);
+  }
+  if (expected.scoreA !== currentResult.scoreA || expected.scoreB !== currentResult.scoreB || expected.noShow !== currentResult.noShow) {
+    throw conflict(currentResult);
   }
 
+  const noShow = body.noShow === 'a' || body.noShow === 'b' ? body.noShow : null;
+  const scoreA = noShow ? null : validateMatchScore(body.scoreA);
+  const scoreB = noShow ? null : validateMatchScore(body.scoreB);
+  if (!noShow && scoreA === scoreB) throw new HttpError(400, 'Ungültiges Ergebnis');
+  // Only replace the exact result that the organizer saw and confirmed. A player
+  // or another organizer can save between the SELECT and UPDATE.
+  const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = ?, updated_at = ?
+      WHERE id = ? AND tournament_id = ? AND score_a IS ? AND score_b IS ? AND no_show IS ?`)
+    .bind(scoreA, scoreB, noShow, new Date().toISOString(), matchId, tournament.id, expected.scoreA, expected.scoreB, expected.noShow).run();
+  if (!saved.meta.changes) {
+    const latest = await db.prepare('SELECT score_a, score_b, no_show FROM tournament_matches WHERE id = ? AND tournament_id = ?')
+      .bind(matchId, tournament.id).first();
+    if (!latest) throw new HttpError(404, 'Spiel nicht gefunden');
+    throw conflict({ scoreA: latest.score_a, scoreB: latest.score_b, noShow: latest.no_show });
+  }
+  await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
   return listTournamentRounds(db, tournament.id);
 }
 
@@ -6687,7 +6704,7 @@ async function desktopRankingSnapshot(db, tournament) {
 }
 
 // Vereinheitlicht die systemabhängigen Ranglisten-Formen (Spieler-, Team- und Snapshot-Einträge)
-// für die Live-Ansicht auf { rank, registrationIds, label, wins, pointsFor, pointsAgainst, pointsDiff }.
+// für die Live-Ansicht; systemabhängige Wertungskriterien bleiben erhalten.
 function toLiveRanking(ranking) {
   return ranking.map((entry) => {
     const members = entry.members || [entry];
@@ -6696,6 +6713,11 @@ function toLiveRanking(ranking) {
       registrationIds: entry.registrationIds || members.map((member) => member.id || member.playerId),
       label: members.map((member) => member.teamLabel || [member.firstName, member.lastName].filter(Boolean).join(' ') || '?').join(' + '),
       wins: entry.wins ?? null,
+      losses: entry.losses ?? (entry.wins != null && entry.gameDiff != null ? entry.wins - entry.gameDiff : null),
+      gameDiff: entry.gameDiff ?? null,
+      bhz: entry.bhz ?? null,
+      fbhz: entry.fbhz ?? null,
+      wertung: entry.wertung ?? null,
       pointsFor: entry.pointsFor ?? null,
       pointsAgainst: entry.pointsAgainst ?? null,
       pointsDiff: entry.pointsDiff ?? null,
@@ -6712,6 +6734,8 @@ function toLiveTournament(tournament) {
     location: tournament.location || null,
     status: tournament.status,
     type: tournament.type,
+    registrationType: tournament.registration_type || 'forme',
+    schweizerRankingMode: tournament.schweizer_ranking_mode || 'mit_buchholz',
     desktopExecution: Number(tournament.desktop_execution || 0) === 1,
     playerResultReportingEnabled: Number(tournament.player_result_reporting_enabled || 0) === 1,
   };

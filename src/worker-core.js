@@ -383,6 +383,15 @@ export function parseSyncRanking(body, validRegistrationIds) {
     throw new HttpError(400, 'Rangliste muss als Array übergeben werden');
   }
   const count = (value) => (value === undefined || value === null ? null : nonNegativeInteger(value));
+  const difference = (value) => {
+    if (value === null) return null;
+    if (typeof value !== 'number' && (typeof value !== 'string' || value.trim() === '')) {
+      throw new HttpError(400, 'Ungültige Ranglistenwerte');
+    }
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed)) throw new HttpError(400, 'Ungültige Ranglistenwerte');
+    return parsed;
+  };
   return entries.map((entry) => {
     const rank = Number(entry?.place);
     if (!Number.isInteger(rank) || rank < 1) throw new HttpError(400, 'Ungültiger Ranglistenplatz');
@@ -394,6 +403,8 @@ export function parseSyncRanking(body, validRegistrationIds) {
       rank,
       registrationIds,
       wins: count(entry?.wins),
+      ...Object.fromEntries(['losses', 'bhz', 'fbhz', 'wertung'].filter((key) => entry[key] !== undefined).map((key) => [key, count(entry[key])])),
+      ...(entry.gameDiff !== undefined ? { gameDiff: difference(entry.gameDiff) } : {}),
       pointsFor,
       pointsAgainst,
       pointsDiff: pointsFor === null || pointsAgainst === null ? null : pointsFor - pointsAgainst,

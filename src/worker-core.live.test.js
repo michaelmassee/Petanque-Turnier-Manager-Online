@@ -116,6 +116,13 @@ describe('Sync von Runden und Rangliste aus dem Turnierdokument', () => {
     expect(() => parseSyncRanking({ entries: [{ place: 1, registrationIds: [] }] }, ids)).toThrow('Ungültige Meldung in der Rangliste');
   });
 
+  it('übernimmt systemabhängige Wertungskriterien aus synchronisierten Ranglisten', () => {
+    const ranking = parseSyncRanking({ entries: [{ place: 1, registrationIds: ['r1'], wins: 2, losses: 3, gameDiff: -1, bhz: 5, fbhz: 12, wertung: 242 }] }, ids);
+    expect(ranking[0]).toMatchObject({ wins: 2, losses: 3, gameDiff: -1, bhz: 5, fbhz: 12, wertung: 242 });
+    expect(() => parseSyncRanking({ entries: [{ place: 1, registrationIds: ['r1'], gameDiff: 'invalid' }] }, ids)).toThrow('Ungültige Ranglistenwerte');
+    expect(() => parseSyncRanking({ entries: [{ place: 1, registrationIds: ['r1'], gameDiff: '' }] }, ids)).toThrow('Ungültige Ranglistenwerte');
+  });
+
   it('behandelt unvollständige Punktewerte als unbekannt und begrenzt die Snapshot-Größe', () => {
     expect(parseSyncRanking({ entries: [{ place: 1, registrationIds: ['r1'], pointsFor: 13 }] }, ids)[0])
       .toMatchObject({ pointsFor: 13, pointsAgainst: null, pointsDiff: null });

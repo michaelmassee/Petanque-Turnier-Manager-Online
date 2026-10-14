@@ -20,16 +20,16 @@ function pushFlagKey(registrationId) {
 
 function readPushFlag(registrationId) {
   try {
-    return localStorage.getItem(pushFlagKey(registrationId)) === '1';
+    return localStorage.getItem(pushFlagKey(registrationId));
   } catch {
-    return false;
+    return null;
   }
 }
 
 function writePushFlag(registrationId, enabled) {
   try {
     if (enabled) localStorage.setItem(pushFlagKey(registrationId), '1');
-    else localStorage.removeItem(pushFlagKey(registrationId));
+    else localStorage.setItem(pushFlagKey(registrationId), '0');
   } catch {
     // Merker ist nur Komfort; ohne Speicher zeigt der Button wieder "aktivieren".
   }
@@ -85,11 +85,35 @@ function LivePushToggle({ path, registrationId }) {
 
   useEffect(() => {
     let cancelled = false;
-    currentBrowserPushSubscription()
-      .then((subscription) => { if (!cancelled) setEnabled(Boolean(subscription) && readPushFlag(registrationId)); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [registrationId]);
+    const controller = new AbortController();
+    async function activateDefault() {
+      if (!supported || Notification.permission !== 'granted' || readPushFlag(registrationId) === '0') return;
+      setBusy(true);
+      try {
+        const existing = await currentBrowserPushSubscription();
+        if (cancelled) return;
+        if (existing) {
+          // Mit vorhandenem Abo nie automatisch anmelden: Ältere Versionen haben beim Ausschalten
+          // den Merker gelöscht, ein fehlender Merker kann also "ausgeschaltet" bedeuten.
+          if (readPushFlag(registrationId) === '1') setEnabled(true);
+          return;
+        }
+        const result = await ensureBrowserPushSubscription(async () => (await api('/api/live/push/public-key', { signal: controller.signal })).publicKey);
+        if (cancelled || result.status !== 'enabled') return;
+        await authenticatedApi(`${path}/push`, { method: 'POST', signal: controller.signal, body: JSON.stringify(result.subscription.toJSON()) });
+        if (!cancelled) {
+          writePushFlag(registrationId, true);
+          setEnabled(true);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    }
+    activateDefault();
+    return () => { cancelled = true; controller.abort(); };
+  }, [path, registrationId, supported]);
 
   if (!supported) {
     return isIosSafari()
@@ -133,7 +157,7 @@ function LivePushToggle({ path, registrationId }) {
     <div className="live-push">
       {enabled
         ? <Button variant="secondary" loading={busy} onClick={disable}>{t('Benachrichtigungen ausschalten')}</Button>
-        : <Button loading={busy} onClick={enable}>{t('Bei neuer Runde benachrichtigen')}</Button>}
+        : <Button loading={busy} onClick={enable}>{t('Benachrichtigungen für neue Runden aktivieren')}</Button>}
       <Feedback error={error} />
       <Feedback message={message} />
     </div>
@@ -230,9 +254,25 @@ function CurrentMatchCard({ live, participation, canReportResult, path, onResult
   );
 }
 
-function RankingCard({ live }) {
+function RankingCard({ live, tournament }) {
   const { t } = useTranslation();
-  if (!live.ranking.length) return null;
+  if (!live.ranking.length || tournament.type === 'ko') return null;
+  const swiss = tournament.type === 'schweizer' || tournament.type === 'maastrichter';
+  const formuleX = tournament.type === 'formule_x';
+  const columns = [
+    { key: 'rank', label: t('Platz') },
+    { key: 'label', label: tournament.registrationType === 'supermelee' ? t('Spieler') : t('Team') },
+    { key: 'wins', label: t('Siege') },
+    ...(swiss && tournament.schweizerRankingMode !== 'ohne_buchholz' ? [
+      { key: 'bhz', label: t('BHZ') }, { key: 'fbhz', label: t('FBHZ') },
+    ] : []),
+    ...(formuleX ? [{ key: 'wertung', label: t('Wertung') }] : []),
+    ...(!swiss ? [{ key: 'losses', label: t('Niederlagen') }] : []),
+    ...(!swiss && !formuleX ? [{ key: 'gameDiff', label: t('Spieldifferenz') }] : []),
+    { key: 'pointsFor', label: t('Punkte+') },
+    { key: 'pointsAgainst', label: t('Punkte−') },
+    { key: 'pointsDiff', label: t('Δ') },
+  ];
   return (
     <section className="panel live-card" aria-label={t('Mein Platz')}>
       <div className="live-card-head">
@@ -252,19 +292,13 @@ function RankingCard({ live }) {
           <table className="ranking-table">
             <thead>
               <tr>
-                <th>{t('Platz')}</th>
-                <th>{t('Team')}</th>
-                <th>{t('Siege')}</th>
-                <th>{t('Δ')}</th>
+                {columns.map((column) => <th key={column.key}>{column.label}</th>)}
               </tr>
             </thead>
             <tbody>
               {live.ranking.map((entry) => (
                 <tr key={entry.registrationIds.join('-')} className={entry.own ? 'live-own-row' : undefined}>
-                  <td>{entry.rank}</td>
-                  <td data-i18n-skip>{entry.label}</td>
-                  <td>{entry.wins ?? ''}</td>
-                  <td>{entry.pointsDiff ?? ''}</td>
+                  {columns.map((column) => <td key={column.key} data-i18n-skip={column.key === 'label' || undefined}>{entry[column.key] ?? '—'}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -401,7 +435,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
       {(drawn || tournament.status === 'running') && <CurrentMatchCard key={live.currentMatch?.matchId || 'no-current-match'} live={live} participation={registration.participation}
         canReportResult={canReportResult && tournament.playerResultReportingEnabled && tournament.status === 'running'} path={path}
         onResultSaved={(updated) => queryClient.setQueryData(queryKey, updated)} />}
-      <RankingCard live={live} />
+      <RankingCard live={live} tournament={tournament} />
       <HistoryCard live={live} />
       {tournament.status === 'running' && <LivePushToggle path={path} registrationId={registration.id} />}
       <div className="live-refresh">

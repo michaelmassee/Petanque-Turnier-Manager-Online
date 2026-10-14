@@ -1,6 +1,12 @@
-import { describe, expect, it, afterEach, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, expect, it, afterEach, vi } from 'vitest';
+import { render as rtlRender, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TournamentPlayManagement from './TournamentPlayManagement.jsx';
+
+function render(ui) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 const TOURNAMENT = {
   id: 't1',
@@ -83,6 +89,8 @@ function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registratio
 
 describe('TournamentPlayManagement', () => {
   afterEach(() => {
+    focusManager.setFocused(undefined);
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -205,7 +213,8 @@ describe('TournamentPlayManagement', () => {
     });
     render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, type: 'schweizer', registrationType: 'melee', formation: 'doublette' }]} language="de" />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Mêlée-Teams auslosen' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mêlée-Teams auslosen' })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Mêlée-Teams auslosen' }));
 
     expect(await screen.findByText('Mêlée-Teams wurden ausgelost: 6')).toBeInTheDocument();
     expect(calls).toContain('/api/tournaments/t1/teams/draw');
@@ -263,6 +272,140 @@ describe('TournamentPlayManagement', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ergebnis speichern' }));
 
     await waitFor(() => expect(calls).toContain('/api/tournaments/t1/matches/m1/result'));
+  });
+
+  it.each([true, false])('überschreibt vorhandene Ergebnisse nur nach Bestätigung (%s)', async (confirmed) => {
+    const calls = [];
+    const existing = { ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 5 }] };
+    installFetchMock(calls, { rounds: [existing] });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(confirmed);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByLabelText('Punkte Team A');
+    fireEvent.change(screen.getByLabelText('Punkte Team B'), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ergebnis ändern' }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('13:5'));
+    if (confirmed) {
+      await waitFor(() => expect(calls).toContain('/api/tournaments/t1/matches/m1/result'));
+      const [, options] = global.fetch.mock.calls.find(([path]) => path.endsWith('/result'));
+      expect(JSON.parse(options.body)).toMatchObject({ scoreA: 13, scoreB: 7, confirmOverwrite: true, expectedResult: { scoreA: 13, scoreB: 5, noShow: null } });
+    } else {
+      expect(calls.some((path) => path.endsWith('/result'))).toBe(false);
+      expect(screen.getByLabelText('Punkte Team B')).toHaveValue('7');
+    }
+  });
+
+  it.each([true, false])('warnt auch bei einer zwischenzeitlichen Teammeldung (%s)', async (confirmed) => {
+    installFetchMock([]);
+    const fetchOriginal = global.fetch;
+    let writes = 0;
+    global.fetch = vi.fn((path, options = {}) => {
+      if (path.endsWith('/result') && ++writes === 1) {
+        return Promise.resolve({ ...errorResponse('Bitte bestätige das Überschreiben.'), json: async () => ({
+          error: 'Bitte bestätige das Überschreiben.',
+          details: { code: 'result_confirmation_required', currentResult: { scoreA: 6, scoreB: 13, noShow: null } },
+        }) });
+      }
+      return fetchOriginal(path, options);
+    });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(confirmed);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByLabelText('Punkte Team A');
+    fireEvent.change(screen.getByLabelText('Punkte Team A'), { target: { value: '13' } });
+    fireEvent.change(screen.getByLabelText('Punkte Team B'), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ergebnis speichern' }));
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.stringContaining('6:13')));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Ergebnis ändern' })).toBeEnabled());
+    expect(writes).toBe(confirmed ? 2 : 1);
+    if (confirmed) {
+      const [, options] = global.fetch.mock.calls.filter(([path]) => path.endsWith('/result'))[1];
+      expect(JSON.parse(options.body)).toMatchObject({ scoreA: 13, scoreB: 7, confirmOverwrite: true, expectedResult: { scoreA: 6, scoreB: 13, noShow: null } });
+    } else {
+      expect(screen.getByLabelText('Punkte Team A')).toHaveValue('6');
+      expect(screen.getByLabelText('Punkte Team B')).toHaveValue('13');
+    }
+  });
+
+  it('übernimmt Spielermeldungen beim Aktualisieren in Ergebnisfelder, Rangliste und Rundenfreigabe', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
+    await screen.findByLabelText('Punkte Team A');
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
+    expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeDisabled();
+
+    installFetchMock(calls, {
+      rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13 }] }],
+      ranking: [{ rank: 1, playerId: 'p4', firstName: 'Dirk', lastName: 'Demo', wins: 1, gameDiff: 1, pointsFor: 13, pointsAgainst: 7 }],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Punkte Team A')).toHaveValue('7'));
+    await waitFor(() => expect(screen.getByText('Rangliste').closest('details')).toHaveTextContent('Dirk Demo'));
+    expect(screen.getByLabelText('Punkte Team B')).toHaveValue('13');
+    expect(screen.getByRole('button', { name: 'Ergebnis ändern' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeEnabled();
+    expect(screen.getByText('Rangliste').closest('details')).toHaveTextContent('Dirk Demo');
+    expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(2);
+    expect(calls.filter((path) => path.endsWith('/registrations'))).toHaveLength(1);
+
+  });
+
+  it('bewahrt Entwürfe bei unveränderten Ergebnissen und lädt keine Rangliste oder Teilnehmer erneut', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
+    await screen.findByLabelText('Punkte Team A');
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
+    fireEvent.change(screen.getByLabelText('Punkte Team A'), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
+    expect(screen.getByLabelText('Punkte Team A')).toHaveValue('12');
+    await waitFor(() => expect(calls.filter((path) => path.endsWith('/rounds'))).toHaveLength(2));
+    expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(1);
+    expect(calls.filter((path) => path.endsWith('/registrations'))).toHaveLength(1);
+  });
+
+  it('überschreibt beim Aktualisieren keine gerade getippten Ergebnisse', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
+    await screen.findByLabelText('Punkte Team A');
+    fireEvent.change(screen.getByLabelText('Punkte Team A'), { target: { value: '12' } });
+    installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13 }] }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Punkte Team B')).toHaveValue('13'));
+    expect(screen.getByLabelText('Punkte Team A')).toHaveValue('12');
+  });
+
+  it('lädt Spielermeldungen beim Zurückkehren in den Tab', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
+    await screen.findByLabelText('Punkte Team A');
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
+    installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 6 }] }] });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 31_000);
+    act(() => { focusManager.setFocused(false); });
+    act(() => { focusManager.setFocused(true); });
+    await waitFor(() => expect(screen.getByLabelText('Punkte Team A')).toHaveValue('13'));
+    expect(screen.getByLabelText('Punkte Team B')).toHaveValue('6');
+    expect(calls.filter((path) => path.endsWith('/registrations'))).toHaveLength(1);
+  });
+
+  it('verursacht auch bei erlaubten Spielermeldungen keine regelmäßigen Lesezugriffe', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const view = render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
+    await screen.findByLabelText('Punkte Team A');
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
+    const count = calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
+    expect(calls).toHaveLength(count);
+    view.unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
+    expect(calls).toHaveLength(count);
   });
 
   it('erlaubt in den Ergebnisfeldern nur Ziffern, begrenzt auf maximal 13', async () => {

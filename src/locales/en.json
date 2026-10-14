@@ -1427,5 +1427,13 @@
   "Die Cloudflare-Statistik konnte nicht abgerufen werden": "The Cloudflare statistics could not be retrieved",
   "Ungültiger Tag für die Cloudflare-Statistik": "Invalid day for the Cloudflare statistics",
   "Ganze Abfrage anzeigen": "Show full query",
-  "Abfrage einklappen": "Collapse query"
+  "Abfrage einklappen": "Collapse query",
+  "Für diese Partie liegt bereits ein Ergebnis vor: {{result}}. Möchtest du es wirklich überschreiben?": "A result already exists for this match: {{result}}. Do you really want to overwrite it?",
+  "Für diese Partie liegt bereits ein anderes Ergebnis vor. Bitte bestätige das Überschreiben.": "A different result already exists for this match. Please confirm that you want to overwrite it.",
+  "Nicht angetreten": "Did not show up",
+  "Wertung": "Rating points",
+  "Spieldifferenz": "Game difference",
+  "Punkte−": "Points−",
+  "Ungültige Ranglistenwerte": "Invalid ranking values",
+  "Benachrichtigungen für neue Runden aktivieren": "Enable notifications for new rounds"
 }

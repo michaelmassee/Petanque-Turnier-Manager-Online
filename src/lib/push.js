@@ -20,7 +20,7 @@ function sameBytes(left, right) {
 export async function ensureBrowserPushSubscription(loadPublicKey) {
   if (!isPushSupported()) return { status: 'unsupported' };
   if (Notification.permission === 'denied') return { status: 'blocked' };
-  const permission = await Notification.requestPermission();
+  const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
   if (permission !== 'granted') return { status: 'denied' };
   const publicKey = await loadPublicKey();
   const registration = await navigator.serviceWorker.ready;
