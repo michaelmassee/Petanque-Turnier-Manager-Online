@@ -3520,6 +3520,13 @@ a.left-panel-link {
   gap: 16px;
 }
 
+/* Breite Tabellen dürfen die Grid-Elemente nicht über die Bildschirmbreite vergrößern. */
+.live-view,
+.live-card,
+.live-ranking {
+  min-width: 0;
+}
+
 .live-card {
   display: grid;
   gap: 10px;
@@ -3673,6 +3680,7 @@ a.left-panel-link {
 }
 
 .live-ranking .table-scroll {
+  max-width: 100%;
   max-height: 60vh;
   overflow: auto;
 }
