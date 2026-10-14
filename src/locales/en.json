@@ -1434,5 +1434,6 @@
   "Spieldifferenz": "Game difference",
   "Punkte−": "Points−",
   "Ungültige Ranglistenwerte": "Invalid ranking values",
-  "Benachrichtigungen für neue Runden aktivieren": "Enable notifications for new rounds"
+  "Benachrichtigungen für neue Runden aktivieren": "Enable notifications for new rounds",
+  "Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.": "Reporting results via the live view is switched off. Please report your result directly to the tournament organizers."
 }

@@ -211,7 +211,7 @@ function PlayerResultReport({ path, onSaved }) {
   );
 }
 
-function CurrentMatchCard({ live, participation, canReportResult, path, onResultSaved }) {
+function CurrentMatchCard({ live, participation, canReportResult, reportingDisabled, path, onResultSaved }) {
   const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const match = live.currentMatch;
@@ -247,6 +247,7 @@ function CurrentMatchCard({ live, participation, canReportResult, path, onResult
           )}
           <p className={`live-score live-${match.outcome}`}>{scoreLabel(match, t)}</p>
           {canReportResult && !match.bye && match.outcome === 'open' && <PlayerResultReport path={path} onSaved={resultSaved} />}
+          {reportingDisabled && !match.bye && match.outcome === 'open' && <p className="hint">{t('Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.')}</p>}
           <Feedback message={message} />
         </>
       )}
@@ -433,7 +434,8 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
       {!drawn && <RegistrationPhase registration={registration} tournament={tournament} />}
       {drawn && registration.participation === 'inactive' && <p className="hint">{t('Du bist noch nicht eingecheckt.')}</p>}
       {(drawn || tournament.status === 'running') && <CurrentMatchCard key={live.currentMatch?.matchId || 'no-current-match'} live={live} participation={registration.participation}
-        canReportResult={canReportResult && tournament.playerResultReportingEnabled && tournament.status === 'running'} path={path}
+        canReportResult={canReportResult && tournament.playerResultReportingEnabled && tournament.status === 'running'}
+        reportingDisabled={tournament.status === 'running' && (!tournament.playerResultReportingEnabled || tournament.desktopExecution)} path={path}
         onResultSaved={(updated) => queryClient.setQueryData(queryKey, updated)} />}
       <RankingCard live={live} tournament={tournament} />
       <HistoryCard live={live} />

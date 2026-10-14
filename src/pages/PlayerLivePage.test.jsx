@@ -330,6 +330,28 @@ describe('Live-Ansicht für Spieler', () => {
     expect(screen.queryByRole('button', { name: 'Ergebnis melden' })).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['abgeschalteter Meldung', (payload) => { payload.tournament.playerResultReportingEnabled = false; }, true],
+    ['Desktop-Durchführung', (payload) => { payload.tournament.playerResultReportingEnabled = true; payload.tournament.desktopExecution = true; }, true],
+    ['freigegebener Meldung', (payload) => { payload.tournament.playerResultReportingEnabled = true; }, false],
+    ['beendetem Turnier', (payload) => { payload.tournament.status = 'finished'; }, false],
+  ])('zeigt den Turnierleitungs-Hinweis passend bei %s', async (_reason, changePayload, shown) => {
+    const payload = livePayload();
+    changePayload(payload);
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de" canReportResult />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText('Sommer-Supermêlée');
+    const hint = screen.queryByText('Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.');
+    if (shown) expect(hint).toBeInTheDocument();
+    else expect(hint).not.toBeInTheDocument();
+  });
+
   it('sperrt die Ergebnismeldung während des Speicherns gegen Doppelklicks', async () => {
     const initial = livePayload();
     initial.tournament.playerResultReportingEnabled = true;
