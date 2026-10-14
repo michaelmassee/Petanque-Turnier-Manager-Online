@@ -484,7 +484,7 @@ describe('TournamentPlayManagement', () => {
       rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13 }] }],
       ranking: [{ rank: 1, playerId: 'p4', firstName: 'Dirk', lastName: 'Demo', wins: 1, gameDiff: 1, pointsFor: 13, pointsAgainst: 7 }],
     });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Aktualisieren' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
 
     await waitFor(() => expect(screen.getByLabelText('Punkte Team A')).toHaveValue('7'));
     await waitFor(() => expect(screen.getByText('Rangliste').closest('details')).toHaveTextContent('Dirk Demo'));
@@ -504,7 +504,7 @@ describe('TournamentPlayManagement', () => {
     await screen.findByLabelText('Punkte Team A');
     await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
     fireEvent.change(screen.getByLabelText('Punkte Team A'), { target: { value: '12' } });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Aktualisieren' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
     expect(screen.getByLabelText('Punkte Team A')).toHaveValue('12');
     await waitFor(() => expect(calls.filter((path) => path.endsWith('/rounds'))).toHaveLength(2));
     expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(1);
@@ -518,7 +518,7 @@ describe('TournamentPlayManagement', () => {
     await screen.findByLabelText('Punkte Team A');
     fireEvent.change(screen.getByLabelText('Punkte Team A'), { target: { value: '12' } });
     installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13 }] }] });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Aktualisieren' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
 
     await waitFor(() => expect(screen.getByLabelText('Punkte Team B')).toHaveValue('13'));
     expect(screen.getByLabelText('Punkte Team A')).toHaveValue('12');
@@ -536,7 +536,7 @@ describe('TournamentPlayManagement', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
 
     installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13, reportedBy: reporter }, second] }] });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Aktualisieren' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
 
     const banner = await screen.findByRole('status');
     expect(banner).toHaveTextContent('Neue Ergebnismeldungen von Teams: 1');

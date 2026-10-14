@@ -150,7 +150,7 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, n
           const cleared = await onSaveAll(round, changes);
           setDrafts((current) => Object.fromEntries(Object.entries(current).filter(([id]) => !cleared.includes(id))));
         }}>{t('Alle speichern')}</Button>
-        <Button variant="secondary" disabled={busy} loading={refreshing} onClick={onRefresh}>{t('Aktualisieren')}</Button>
+        {onRefresh && <Button variant="secondary" disabled={busy} loading={refreshing} onClick={onRefresh}>{t('Aktualisieren')}</Button>}
       </div>
       <div className="supermelee-match-list">
         {round.matches.map((match) => <MatchRow key={match.id} match={match} draft={drafts[match.id]} onChange={(draft) => changeDraft(match.id, draft)} onSave={onSave} busy={busy} isNewReport={newReportIds.includes(match.id)} />)}
@@ -514,11 +514,6 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           onChange={setSelectedTournamentId}
           currentUserId={currentUserId}
         />
-        {selectedTournament && (
-          <Button variant="secondary" disabled={busy} loading={roundsQuery.isFetching} onClick={() => roundsQuery.refetch()}>
-            {t('Aktualisieren')}
-          </Button>
-        )}
         {selectedTournament && selectedTournamentStatus !== 'running' && (
           <div className="supermelee-toolbar-actions">
             {isSchweizerMelee && !rounds.length && (
@@ -594,7 +589,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           {olderRoundsNewestFirst.map((round) => (
             <details key={`${selectedTournamentId}:${round.id}`} className="panel supermelee-round">
               <summary className="supermelee-round-summary"><span>{t('Runde')} {round.roundNumber}</span><span className="status registration-confirmed">{t('Abgeschlossen')}</span></summary>
-              <RoundResults round={round} onSave={handleSaveResult} onSaveAll={handleSaveAll} onRefresh={() => roundsQuery.refetch()} busy={busy} refreshing={roundsQuery.isFetching} newReportIds={newReportIds} onReportsSeen={() => setNewReportIds([])} />
+              <RoundResults round={round} onSave={handleSaveResult} onSaveAll={handleSaveAll} busy={busy} newReportIds={newReportIds} onReportsSeen={() => setNewReportIds([])} />
             </details>
           ))}
         </section>
