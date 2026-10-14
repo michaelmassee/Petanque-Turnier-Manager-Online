@@ -41,7 +41,15 @@ const REMEMBERED_TEAMS_KEY = 'ptm_live_teams';
 export function readRememberedTeams() {
   try {
     const entries = JSON.parse(localStorage.getItem(REMEMBERED_TEAMS_KEY) || '[]');
-    return Array.isArray(entries) ? entries.filter((entry) => entry?.token) : [];
+    if (!Array.isArray(entries)) return [];
+    const seen = new Set();
+    return entries.filter((entry) => {
+      if (!entry?.token) return false;
+      const key = entry.registrationId || entry.token;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   } catch {
     return [];
   }
@@ -71,7 +79,9 @@ function rememberTeam(token, data) {
 }
 
 function forgetTeam(token) {
-  writeRememberedTeams(readRememberedTeams().filter((item) => item.token !== token));
+  const entries = readRememberedTeams();
+  const registrationId = entries.find((entry) => entry.token === token)?.registrationId;
+  writeRememberedTeams(entries.filter((item) => item.token !== token && (!registrationId || item.registrationId !== registrationId)));
 }
 
 function LivePushToggle({ path, registrationId }) {
@@ -454,25 +464,35 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
 export function MyLiveList({ navigate, language, hasRemembered = false }) {
   const { t } = useTranslation();
   const query = useQuery({ queryKey: ['live', 'me'], queryFn: () => authenticatedApi('/api/live/me'), retry: false });
+  const [rememberedEntries, setRememberedEntries] = useState(readRememberedTeams);
   // Ältere, zwischengespeicherte Antworten können noch Löschhinweise enthalten.
   // Sie dürfen in der Live-Auswahl niemals als auswählbares Turnier erscheinen.
   const registrations = (query.data?.registrations || []).filter((entry) => !entry.deleted && !entry.tournament?.deleted);
 
+  // Prefer account access for the same registration: it also permits result reporting.
+  const accountIds = new Set((query.data?.registrations || []).map((entry) => entry.id));
+  const additionalRemembered = rememberedEntries.filter((entry) => !accountIds.has(entry.registrationId));
+
   useEffect(() => {
-    if (!hasRemembered && registrations.length === 1 && registrations[0].tournament.status === 'running') {
+    if (!hasRemembered && !additionalRemembered.length && registrations.length === 1 && registrations[0].tournament.status === 'running') {
       navigate(`/live/${encodeURIComponent(registrations[0].id)}`);
     }
-  }, [hasRemembered, navigate, registrations]);
+  }, [hasRemembered, additionalRemembered.length, navigate, registrations]);
 
   if (query.isPending) return <p className="muted">{t('Wird geladen…')}</p>;
-  if (query.error) return <Feedback error={query.error.message} />;
+  if (query.error) return <>
+    <RememberedTeams navigate={navigate} language={language} entries={rememberedEntries} onChange={setRememberedEntries} />
+    <Feedback error={query.error.message} />
+  </>;
 
   if (!registrations.length) {
-    // Gemerkte Teams stehen schon darüber; der Hinweis würde ihnen widersprechen.
-    return hasRemembered ? null : <p className="muted">{t('Du bist aktuell in keinem Turnier gemeldet.')}</p>;
+    // Gemerkte Links bleiben auch ohne eigene Konto-Anmeldungen erreichbar.
+    return additionalRemembered.length ? <RememberedTeams navigate={navigate} language={language} entries={additionalRemembered} onChange={setRememberedEntries} />
+      : hasRemembered ? null : <p className="muted">{t('Du bist aktuell in keinem Turnier gemeldet.')}</p>;
   }
   return (
     <div className="live-list">
+      <RememberedTeams navigate={navigate} language={language} entries={additionalRemembered} onChange={setRememberedEntries} />
       <p className="hint live-list-hint">{t('Wähle ein Turnier aus, um die Live-Ansicht zu öffnen.')}</p>
       {registrations.map((entry) => (
         <button key={entry.id} type="button" className="panel live-list-item" onClick={() => navigate(`/live/${encodeURIComponent(entry.id)}`)}>
@@ -493,9 +513,10 @@ export function MyLiveList({ navigate, language, hasRemembered = false }) {
   );
 }
 
-export function RememberedTeams({ navigate, language }) {
+export function RememberedTeams({ navigate, language, entries: providedEntries, onChange }) {
   const { t } = useTranslation();
-  const [entries, setEntries] = useState(readRememberedTeams);
+  const [localEntries, setEntries] = useState(readRememberedTeams);
+  const entries = providedEntries || localEntries;
   if (!entries.length) return null;
   return (
     <div className="live-list">
@@ -510,7 +531,7 @@ export function RememberedTeams({ navigate, language }) {
             </span>
             {entry.label && <span data-i18n-skip>{entry.label}</span>}
           </button>
-          <Button variant="secondary" onClick={() => { forgetTeam(entry.token); setEntries(readRememberedTeams()); }}>{t('Vergessen')}</Button>
+          <Button variant="secondary" onClick={() => { forgetTeam(entry.token); const remaining = readRememberedTeams(); setEntries(remaining); onChange?.(remaining); }}>{t('Vergessen')}</Button>
         </div>
       ))}
     </div>
@@ -545,15 +566,13 @@ export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenu
   } else if (route.registrationId && currentUser) {
     content = <LiveDetail queryKey={['live', 'registration', route.registrationId]} path={`/api/live/registrations/${encodeURIComponent(route.registrationId)}`} language={language} navigate={navigate} canReportResult />;
   } else {
-    content = (
+    content = currentUser ? <MyLiveList navigate={navigate} language={language} /> : (
       <>
         <RememberedTeams navigate={navigate} language={language} />
-        {currentUser ? <MyLiveList navigate={navigate} language={language} hasRemembered={readRememberedTeams().length > 0} /> : (
-          <section className="panel live-card">
-            <p>{t('Öffne den persönlichen Live-Link aus deiner Anmeldebestätigung. Mit Konto findest du deine Turniere auch hier.')}</p>
-            <Button onClick={onLogin}>{t('Anmelden')}</Button>
-          </section>
-        )}
+        <section className="panel live-card">
+          <p>{t('Öffne den persönlichen Live-Link aus deiner Anmeldebestätigung. Mit Konto findest du deine Turniere auch hier.')}</p>
+          <Button onClick={onLogin}>{t('Anmelden')}</Button>
+        </section>
       </>
     );
   }

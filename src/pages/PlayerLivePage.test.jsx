@@ -524,6 +524,55 @@ describe('Live-Ansicht für Spieler', () => {
     expect(screen.queryByText('Auf diesem Gerät gemerkt')).not.toBeInTheDocument();
   });
 
+  it('zeigt mit Konto dieselbe Anmeldung aus gemerkten Links und Kontoliste nur einmal', async () => {
+    const registrations = ['r1', 'r2'].map((id, index) => ({ id, label: 'Anna Muster', tournament: { id: `t${index}`, name: `Turnier ${index}`, date: '2026-10-14', status: 'running' } }));
+    localStorage.setItem('ptm_live_teams', JSON.stringify(registrations.map((entry, index) => ({ token: `token${index}`, registrationId: entry.id, tournamentName: entry.tournament.name, label: entry.label, date: entry.tournament.date }))));
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ registrations }));
+    renderPlayerLivePage({}, { id: 'user-1' });
+    await screen.findByText('Wähle ein Turnier aus, um die Live-Ansicht zu öffnen.');
+    expect(screen.getAllByText('Turnier 0')).toHaveLength(1);
+    expect(screen.getAllByText('Turnier 1')).toHaveLength(1);
+    expect(screen.queryByText('Auf diesem Gerät gemerkt')).not.toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(readRememberedTeams()).toHaveLength(2);
+  });
+
+  it('öffnet eine einzelne laufende Konto-Anmeldung auch bei identischem gemerktem Link direkt', async () => {
+    localStorage.setItem('ptm_live_teams', JSON.stringify([{ token: 'tok1', registrationId: 'r1', tournamentName: 'Turnier', date: '2026-10-14' }]));
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ registrations: [{ id: 'r1', tournament: { id: 't1', name: 'Turnier', date: '2026-10-14', status: 'running' } }] }));
+    const navigate = vi.fn();
+    renderList(navigate);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/live/r1'));
+    expect(screen.queryByRole('button', { name: 'Vergessen' })).not.toBeInTheDocument();
+  });
+
+  it('behält weitere gemerkte Anmeldungen desselben Turniers und erlaubt das Vergessen ohne neuen Abruf', async () => {
+    localStorage.setItem('ptm_live_teams', JSON.stringify([{ token: 'tok2', registrationId: 'r2', tournamentName: 'Turnier', label: 'Anderes Team', date: '2026-10-14' }]));
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ registrations: [{ id: 'r1', label: 'Eigenes Team', tournament: { id: 't1', name: 'Turnier', date: '2026-10-14', status: 'running' } }] }));
+    const navigate = vi.fn();
+    renderList(navigate);
+    fireEvent.click(await screen.findByRole('button', { name: /Anderes Team/ }));
+    expect(navigate).toHaveBeenCalledWith('/live/t/tok2');
+    expect(navigate).not.toHaveBeenCalledWith('/live/r1');
+    expect(screen.getAllByText('Turnier')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Vergessen' }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/live/r1'));
+    expect(screen.queryByText('Anderes Team')).not.toBeInTheDocument();
+    expect(readRememberedTeams()).toEqual([]);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('zeigt ohne Konto mehrere gespeicherte Tokens derselben Anmeldung nur einmal', () => {
+    localStorage.setItem('ptm_live_teams', JSON.stringify([
+      { token: 'new', registrationId: 'r1', tournamentName: 'Turnier', date: '2026-10-14' },
+      { token: 'old', registrationId: 'r1', tournamentName: 'Turnier', date: '2026-10-14' },
+    ]));
+    renderPlayerLivePage({});
+    expect(screen.getAllByText('Turnier')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Vergessen' }));
+    expect(readRememberedTeams()).toEqual([]);
+  });
+
   it('öffnet einen Push-Link auf /live/<Meldung> über den auf dem Gerät gemerkten Link, ohne Login', async () => {
     localStorage.setItem('ptm_live_teams', JSON.stringify([{ token: 'tok1', registrationId: 'r1', tournamentName: 'Sommer-Supermêlée', date: '2026-09-25' }]));
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(livePayload()));
