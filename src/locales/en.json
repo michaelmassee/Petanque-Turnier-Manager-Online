@@ -1435,5 +1435,12 @@
   "Punkte−": "Points−",
   "Ungültige Ranglistenwerte": "Invalid ranking values",
   "Benachrichtigungen für neue Runden aktivieren": "Enable notifications for new rounds",
-  "Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.": "Reporting results via the live view is switched off. Please report your result directly to the tournament organizers."
+  "Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.": "Reporting results via the live view is switched off. Please report your result directly to the tournament organizers.",
+  "Rundenaktionen": "Round actions",
+  "Alle speichern": "Save all",
+  "Ungültige Rundenergebnisse": "Invalid round results",
+  "Gespeicherte Ergebnisse: {{count}}.": "Saved results: {{count}}.",
+  "Ergebnis gemeldet von": "Result reported by",
+  "Neue Ergebnismeldungen von Teams: {{count}}": "New results reported by teams: {{count}}",
+  "Gesehen": "Seen"
 }

@@ -38,6 +38,14 @@ describe('Ergebnismeldung durch Spieler', () => {
     expect(env.DB.sqlite.prepare("SELECT score_a, score_b FROM tournament_matches WHERE id = 'match1'").get()).toEqual({ score_a: 13, score_b: 7 });
   });
 
+  it('merkt sich, wer gemeldet hat, und zeigt es der Turnierleitung in den Runden', async () => {
+    await melden('other-session', { ownScore: 13, opponentScore: 7 }, 'r2');
+
+    expect(env.DB.sqlite.prepare("SELECT result_reported_by FROM tournament_matches WHERE id = 'match1'").get()).toEqual({ result_reported_by: 'r2' });
+    const { rounds } = await (await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/rounds', { headers: { Cookie: 'ptm_session=player-session' } }), env)).json();
+    expect(rounds[0].matches[0].reportedBy).toMatchObject({ id: 'r2', firstName: 'Bert', lastName: 'B' });
+  });
+
   it('verweigert die Meldung, wenn die Turnierleitung sie nicht freigegeben hat', async () => {
     sql("UPDATE tournaments SET player_result_reporting_enabled = 0 WHERE id = 't1'");
     expect((await melden('player-session', { ownScore: 13, opponentScore: 7 })).status).toBe(403);

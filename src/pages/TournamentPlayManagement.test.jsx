@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from 'vitest';
-import { render as rtlRender, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TournamentPlayManagement from './TournamentPlayManagement.jsx';
 
@@ -274,6 +274,153 @@ describe('TournamentPlayManagement', () => {
     await waitFor(() => expect(calls).toContain('/api/tournaments/t1/matches/m1/result'));
   });
 
+  function installBulkMock(rounds, onBatch = null) {
+    const calls = [];
+    installFetchMock(calls, { rounds });
+    const original = global.fetch;
+    global.fetch = vi.fn((path, options = {}) => {
+      if (path.endsWith('/results') && options.method === 'PUT') {
+        const results = JSON.parse(options.body).results;
+        if (onBatch) return Promise.resolve(jsonResponse(onBatch(results)));
+        rounds = rounds.map((round) => ({ ...round, matches: round.matches.map((match) => {
+          const result = results.find((entry) => entry.matchId === match.id);
+          return result ? { ...match, scoreA: result.scoreA, scoreB: result.scoreB } : match;
+        }) }));
+        return Promise.resolve(jsonResponse({ rounds, savedMatchIds: results.map((entry) => entry.matchId), conflicts: [] }));
+      }
+      return original(path, options);
+    });
+    return calls;
+  }
+
+  it('speichert nur geänderte Ergebnisse gemeinsam und lädt die Rangliste genau einmal neu', async () => {
+    const matches = [ROUND_1.matches[0], { ...ROUND_1.matches[0], id: 'm2', scoreA: 13, scoreB: 5 }, { ...ROUND_1.matches[0], id: 'm3' }];
+    const calls = installBulkMock([{ ...ROUND_1, matches }]);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByRole('button', { name: 'Alle speichern' });
+    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(1));
+    fireEvent.change(screen.getAllByLabelText('Punkte Team A')[0], { target: { value: '13' } });
+    fireEvent.change(screen.getAllByLabelText('Punkte Team B')[0], { target: { value: '7' } });
+    fireEvent.change(screen.getAllByLabelText('Punkte Team A')[2], { target: { value: '6' } });
+    fireEvent.change(screen.getAllByLabelText('Punkte Team B')[2], { target: { value: '13' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Alle speichern' }));
+    await screen.findByText(/Gespeicherte Ergebnisse:/);
+    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(2));
+    const writes = global.fetch.mock.calls.filter(([path]) => path.endsWith('/results'));
+    expect(writes).toHaveLength(1);
+    expect(JSON.parse(writes[0][1].body).results.map((entry) => entry.matchId)).toEqual(['m1', 'm3']);
+    expect(calls.filter((path) => path.endsWith('/rounds'))).toHaveLength(1);
+    expect(calls.filter((path) => path.endsWith('/registrations'))).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Alle speichern' })).toBeDisabled();
+  });
+
+  it('begrenzt große Runden auf Sammelanfragen und erhält nach Teilfehlern nur die ungespeicherten Eingaben', async () => {
+    let rounds = [{ ...ROUND_1, matches: Array.from({ length: 26 }, (_, index) => ({ ...ROUND_1.matches[0], id: `m${index}` })) }];
+    const calls = installBulkMock(rounds, (results) => {
+      rounds = rounds.map((round) => ({ ...round, matches: round.matches.map((match) => {
+        const saved = results.find((result) => result.matchId === match.id);
+        return saved ? { ...match, scoreA: saved.scoreA, scoreB: saved.scoreB } : match;
+      }) }));
+      return { rounds, savedMatchIds: results.map((entry) => entry.matchId), conflicts: [] };
+    });
+    const original = global.fetch;
+    let attempts = 0;
+    global.fetch = vi.fn((path, options = {}) => path.endsWith('/results') && ++attempts === 2
+      ? Promise.resolve(errorResponse('Speichern fehlgeschlagen', 500)) : original(path, options));
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByRole('button', { name: 'Alle speichern' });
+    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(1));
+    screen.getAllByLabelText('Punkte Team A').forEach((input) => fireEvent.change(input, { target: { value: '13' } }));
+    screen.getAllByLabelText('Punkte Team B').forEach((input) => fireEvent.change(input, { target: { value: '7' } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alle speichern' }));
+    await screen.findByText(/Speichern fehlgeschlagen/);
+    expect(screen.getByRole('alert')).toHaveTextContent('Gespeicherte Ergebnisse: 25.');
+    expect(screen.getByRole('button', { name: 'Alle speichern' })).toBeEnabled();
+    expect(screen.getAllByLabelText('Punkte Team B')[25]).toHaveValue('7');
+    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(2));
+    fireEvent.click(screen.getByRole('button', { name: 'Alle speichern' }));
+    await screen.findByText('Gespeicherte Ergebnisse: 1.');
+    const writes = global.fetch.mock.calls.filter(([path]) => path.endsWith('/results'));
+    expect(writes.map(([, options]) => JSON.parse(options.body).results.length)).toEqual([25, 1, 1]);
+    expect(JSON.parse(writes[2][1].body).results[0].matchId).toBe('m25');
+    expect(calls.filter((path) => path.endsWith('/registrations'))).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Alle speichern' })).toBeDisabled();
+  });
+
+  it('holt über die Aktion direkt an der Runde gemeldete Ergebnisse ohne zusätzliche Teilnehmerabfrage ab', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    const group = await screen.findByRole('group', { name: 'Rundenaktionen' });
+    installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13 }] }] });
+    fireEvent.click(within(group).getByRole('button', { name: 'Aktualisieren' }));
+    await waitFor(() => expect(screen.getByLabelText('Punkte Team A')).toHaveValue('7'));
+    expect(screen.getByLabelText('Punkte Team B')).toHaveValue('13');
+    expect(calls.filter((path) => path.endsWith('/rounds'))).toHaveLength(2);
+    expect(calls.filter((path) => path.endsWith('/registrations'))).toHaveLength(1);
+  });
+
+  it('verhindert gemeinsames Speichern bei unvollständigen Eingaben oder Unentschieden', async () => {
+    installBulkMock([ROUND_1]);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    const button = await screen.findByRole('button', { name: 'Alle speichern' });
+    expect(button).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Punkte Team A'), { target: { value: '7' } });
+    expect(button).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Punkte Team B'), { target: { value: '7' } });
+    expect(button).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Punkte Team B'), { target: { value: '13' } });
+    expect(button).toBeEnabled();
+  });
+
+  it.each([true, false])('bestätigt vorhandene Ergebnisse auch beim gemeinsamen Speichern (%s)', async (confirmed) => {
+    installBulkMock([{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 5 }] }]);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(confirmed);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByLabelText('Punkte Team B');
+    fireEvent.change(screen.getByLabelText('Punkte Team B'), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Alle speichern' }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('13:5'));
+    if (confirmed) await screen.findByText(/Gespeicherte Ergebnisse:/);
+    const writes = global.fetch.mock.calls.filter(([path]) => path.endsWith('/results'));
+    expect(writes).toHaveLength(confirmed ? 1 : 0);
+    if (confirmed) expect(JSON.parse(writes[0][1].body).results[0]).toMatchObject({ confirmOverwrite: true, expectedResult: { scoreA: 13, scoreB: 5, noShow: null } });
+  });
+
+  it.each([true, false])('warnt beim gemeinsamen Speichern vor zwischenzeitlichen Spielermeldungen (%s)', async (confirmed) => {
+    let attempts = 0;
+    const existing = { ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 6, scoreB: 13 }] };
+    installBulkMock([ROUND_1], (results) => ++attempts === 1
+      ? { rounds: [existing], savedMatchIds: [], conflicts: [{ matchId: 'm1', currentResult: { scoreA: 6, scoreB: 13, noShow: null } }] }
+      : { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], ...results[0] }] }], savedMatchIds: ['m1'], conflicts: [] });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(confirmed);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByLabelText('Punkte Team A');
+    fireEvent.change(screen.getByLabelText('Punkte Team A'), { target: { value: '13' } });
+    fireEvent.change(screen.getByLabelText('Punkte Team B'), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Alle speichern' }));
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.stringContaining('6:13')));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Alle speichern' })).toBeDisabled());
+    expect(attempts).toBe(confirmed ? 2 : 1);
+    if (!confirmed) expect(screen.getByLabelText('Punkte Team A')).toHaveValue('6');
+  });
+
+  it('bietet Aktionen bei jeder Runde an und speichert nur die ausgewählte Runde', async () => {
+    const past = { ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 5 }] };
+    const latest = { ...ROUND_1, id: 'r2', roundNumber: 2, matches: [{ ...ROUND_1.matches[0], id: 'm2' }] };
+    installBulkMock([past, latest]);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByText('Runde 2');
+    fireEvent.click(screen.getByText('Runde 1'));
+    const old = screen.getByText('Runde 1').closest('details');
+    fireEvent.change(within(old).getByLabelText('Punkte Team B'), { target: { value: '7' } });
+    fireEvent.click(within(old).getByRole('button', { name: 'Alle speichern' }));
+    await screen.findByText(/Gespeicherte Ergebnisse:/);
+    expect(global.fetch.mock.calls.find(([path]) => path.endsWith('/results'))[0]).toBe('/api/tournaments/t1/rounds/r1/results');
+    expect(screen.getAllByRole('group', { name: 'Rundenaktionen' })).toHaveLength(2);
+  });
+
   it.each([true, false])('überschreibt vorhandene Ergebnisse nur nach Bestätigung (%s)', async (confirmed) => {
     const calls = [];
     const existing = { ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 5 }] };
@@ -337,7 +484,7 @@ describe('TournamentPlayManagement', () => {
       rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13 }] }],
       ranking: [{ rank: 1, playerId: 'p4', firstName: 'Dirk', lastName: 'Demo', wins: 1, gameDiff: 1, pointsFor: 13, pointsAgainst: 7 }],
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Aktualisieren' })[0]);
 
     await waitFor(() => expect(screen.getByLabelText('Punkte Team A')).toHaveValue('7'));
     await waitFor(() => expect(screen.getByText('Rangliste').closest('details')).toHaveTextContent('Dirk Demo'));
@@ -357,7 +504,7 @@ describe('TournamentPlayManagement', () => {
     await screen.findByLabelText('Punkte Team A');
     await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
     fireEvent.change(screen.getByLabelText('Punkte Team A'), { target: { value: '12' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Aktualisieren' })[0]);
     expect(screen.getByLabelText('Punkte Team A')).toHaveValue('12');
     await waitFor(() => expect(calls.filter((path) => path.endsWith('/rounds'))).toHaveLength(2));
     expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(1);
@@ -371,10 +518,35 @@ describe('TournamentPlayManagement', () => {
     await screen.findByLabelText('Punkte Team A');
     fireEvent.change(screen.getByLabelText('Punkte Team A'), { target: { value: '12' } });
     installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13 }] }] });
-    fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Aktualisieren' })[0]);
 
     await waitFor(() => expect(screen.getByLabelText('Punkte Team B')).toHaveValue('13'));
     expect(screen.getByLabelText('Punkte Team A')).toHaveValue('12');
+  });
+
+  it('kennzeichnet Teammeldungen und hebt neu eingegangene Meldungen hervor', async () => {
+    const calls = [];
+    const reporter = { id: 'p4', firstName: 'Dirk', lastName: 'Demo' };
+    const second = { ...ROUND_1.matches[0], id: 'm2', scoreA: 13, scoreB: 2, reportedBy: { id: 'p1', firstName: 'Anna', lastName: 'Muster' } };
+    installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [ROUND_1.matches[0], second] }] });
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
+
+    expect(await screen.findByText('Anna Muster', { selector: 'strong' })).toBeInTheDocument();
+    expect(screen.queryByText('Neu')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13, reportedBy: reporter }, second] }] });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Aktualisieren' })[0]);
+
+    const banner = await screen.findByRole('status');
+    expect(banner).toHaveTextContent('Neue Ergebnismeldungen von Teams: 1');
+    expect(screen.getByText('Neu').closest('article')).toHaveClass('is-new-report', 'is-player-reported');
+    expect(screen.getByText('Neu').closest('article')).toHaveTextContent('Ergebnis gemeldet von Dirk Demo');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gesehen' }));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Neu')).not.toBeInTheDocument();
+    expect(screen.getByText('Dirk Demo', { selector: 'strong' }).closest('article')).toHaveClass('is-player-reported');
   });
 
   it('lädt Spielermeldungen beim Zurückkehren in den Tab', async () => {

@@ -200,5 +200,13 @@
   "Punkte−": "Punkte−",
   "Ungültige Ranglistenwerte": "Ungültige Ranglistenwerte",
   "Benachrichtigungen für neue Runden aktivieren": "Benachrichtigungen für neue Runden aktivieren",
-  "Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.": "Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung."
+  "Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.": "Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.",
+  "Rundenaktionen": "Rundenaktionen",
+  "Alle speichern": "Alle speichern",
+  "Ungültige Rundenergebnisse": "Ungültige Rundenergebnisse",
+  "Gespeicherte Ergebnisse: {{count}}.": "Gespeicherte Ergebnisse: {{count}}.",
+  "Neu": "Neu",
+  "Ergebnis gemeldet von": "Ergebnis gemeldet von",
+  "Neue Ergebnismeldungen von Teams: {{count}}": "Neue Ergebnismeldungen von Teams: {{count}}",
+  "Gesehen": "Gesehen"
 }

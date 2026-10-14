@@ -51,27 +51,22 @@ function isRoundComplete(round) {
   return round.matches.every((match) => match.scoreA != null || match.scoreB != null || match.noShow);
 }
 
-function MatchRow({ match, onSave, busy }) {
+function MatchRow({ match, draft, onChange, onSave, busy, isNewReport }) {
   const { t } = useTranslation();
-  const serverScoreA = match.scoreA ?? '';
-  const serverScoreB = match.scoreB ?? '';
-  const [scoreA, setScoreA] = useState(serverScoreA);
-  const [scoreB, setScoreB] = useState(serverScoreB);
-  const shownServerScores = useRef({ a: serverScoreA, b: serverScoreB });
-  // Neue Serverwerte (z. B. Spielermeldung) nur in Felder übernehmen, die niemand gerade bearbeitet.
-  useEffect(() => {
-    const shown = shownServerScores.current;
-    setScoreA((current) => (current === shown.a ? serverScoreA : current));
-    setScoreB((current) => (current === shown.b ? serverScoreB : current));
-    shownServerScores.current = { a: serverScoreA, b: serverScoreB };
-  }, [serverScoreA, serverScoreB]);
-
+  const scoreA = draft?.scoreA ?? String(match.scoreA ?? '');
+  const scoreB = draft?.scoreB ?? String(match.scoreB ?? '');
   const decided = match.scoreA != null || match.scoreB != null || match.noShow;
   const isDraw = scoreA !== '' && scoreB !== '' && scoreA === scoreB;
 
   return (
-    <article className="supermelee-match">
+    <article className={`supermelee-match${match.reportedBy ? ' is-player-reported' : ''}${isNewReport ? ' is-new-report' : ''}`}>
       {match.stageLabel && <div className="supermelee-match-stage" data-i18n-skip>{match.stageLabel}</div>}
+      {match.reportedBy && (
+        <p className="supermelee-report-badge">
+          {isNewReport && <span className="supermelee-report-new">{t('Neu')}</span>}
+          <span>{t('Ergebnis gemeldet von')} <strong data-i18n-skip>{playerLabel(match.reportedBy)}</strong></span>
+        </p>
+      )}
       <div className="supermelee-match-teams">
         <div className="supermelee-team" data-i18n-skip>{teamLabel(match.teamA)}</div>
         <div className="supermelee-vs">{t('gegen')}</div>
@@ -86,7 +81,8 @@ function MatchRow({ match, onSave, busy }) {
           pattern="[0-9]{0,2}"
           maxLength={2}
           value={scoreA}
-          onChange={(event) => setScoreA(sanitizeScore(event.target.value))}
+          disabled={busy}
+          onChange={(event) => onChange({ scoreA: sanitizeScore(event.target.value) })}
           aria-label={t('Punkte Team A')}
         />
         <span className="supermelee-score-sep">:</span>
@@ -97,7 +93,8 @@ function MatchRow({ match, onSave, busy }) {
           pattern="[0-9]{0,2}"
           maxLength={2}
           value={scoreB}
-          onChange={(event) => setScoreB(sanitizeScore(event.target.value))}
+          disabled={busy}
+          onChange={(event) => onChange({ scoreB: sanitizeScore(event.target.value) })}
           aria-label={t('Punkte Team B')}
         />
         <Button
@@ -106,8 +103,7 @@ function MatchRow({ match, onSave, busy }) {
           onClick={async () => {
             const keptResult = await onSave(match.id, { scoreA: Number(scoreA), scoreB: Number(scoreB) });
             if (keptResult) {
-              setScoreA(keptResult.scoreA ?? '');
-              setScoreB(keptResult.scoreB ?? '');
+              onChange(null);
             }
           }}
         >
@@ -117,6 +113,49 @@ function MatchRow({ match, onSave, busy }) {
 
       <Feedback error={isDraw ? t('Unentschieden ist nicht möglich') : ''} />
     </article>
+  );
+}
+
+function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, newReportIds = [], onReportsSeen }) {
+  const { t } = useTranslation();
+  const [drafts, setDrafts] = useState({});
+  const changes = round.matches.filter((match) => drafts[match.id]).map((match) => ({
+    matchId: match.id,
+    scoreA: drafts[match.id].scoreA ?? String(match.scoreA ?? ''),
+    scoreB: drafts[match.id].scoreB ?? String(match.scoreB ?? ''),
+  })).filter((draft) => {
+    const match = round.matches.find((entry) => entry.id === draft.matchId);
+    return draft.scoreA !== String(match.scoreA ?? '') || draft.scoreB !== String(match.scoreB ?? '');
+  });
+  const invalid = changes.some((draft) => draft.scoreA === '' || draft.scoreB === '' || draft.scoreA === draft.scoreB);
+  function changeDraft(matchId, draft) {
+    setDrafts((current) => {
+      const next = { ...current };
+      if (draft) next[matchId] = { ...current[matchId], ...draft };
+      else delete next[matchId];
+      return next;
+    });
+  }
+  const newReports = round.matches.filter((match) => match.reportedBy && newReportIds.includes(match.id)).length;
+  return (
+    <>
+      {newReports > 0 && (
+        <div className="supermelee-report-banner" role="status">
+          <span>{t('Neue Ergebnismeldungen von Teams: {{count}}', { count: newReports })}</span>
+          <Button variant="secondary" onClick={onReportsSeen}>{t('Gesehen')}</Button>
+        </div>
+      )}
+      <div className="supermelee-round-buttons" role="group" aria-label={t('Rundenaktionen')}>
+        <Button disabled={busy || refreshing || !changes.length || invalid} loading={busy} onClick={async () => {
+          const cleared = await onSaveAll(round, changes);
+          setDrafts((current) => Object.fromEntries(Object.entries(current).filter(([id]) => !cleared.includes(id))));
+        }}>{t('Alle speichern')}</Button>
+        <Button variant="secondary" disabled={busy} loading={refreshing} onClick={onRefresh}>{t('Aktualisieren')}</Button>
+      </div>
+      <div className="supermelee-match-list">
+        {round.matches.map((match) => <MatchRow key={match.id} match={match} draft={drafts[match.id]} onChange={(draft) => changeDraft(match.id, draft)} onSave={onSave} busy={busy} isNewReport={newReportIds.includes(match.id)} />)}
+      </div>
+    </>
   );
 }
 
@@ -156,12 +195,27 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     staleTime: 30_000,
   });
   const rounds = roundsQuery.data?.rounds || [];
+  // Neue Spielermeldungen nur im Browser erkennen: kein Polling, keine zusätzlichen Schreibzugriffe.
+  const knownReports = useRef({ tournamentId: null, ids: new Set() });
+  const [newReportIds, setNewReportIds] = useState([]);
+  useEffect(() => {
+    if (!roundsQuery.data) return;
+    const reported = new Set(roundsQuery.data.rounds.flatMap((round) => round.matches).filter((match) => match.reportedBy).map((match) => match.id));
+    const known = knownReports.current;
+    const firstLoad = known.tournamentId !== selectedTournamentId;
+    knownReports.current = { tournamentId: selectedTournamentId, ids: reported };
+    setNewReportIds((current) => {
+      const kept = firstLoad ? [] : current.filter((id) => reported.has(id));
+      const added = firstLoad ? [] : [...reported].filter((id) => !known.ids.has(id) && !kept.includes(id));
+      return added.length || kept.length !== current.length ? [...kept, ...added] : current;
+    });
+  }, [roundsQuery.data, selectedTournamentId]);
   const swissTeams = roundsQuery.data?.teams || [];
   const rankingQuery = useQuery({
     // Structural query keys keep the ranking cached when a refresh changes no results.
     queryKey: [...queryKey, 'ranking', roundsQuery.data?.rounds],
     queryFn: ({ signal }) => api(`/api/tournaments/${selectedTournamentId}/ranking`, { signal }),
-    enabled: Boolean(selectedTournament) && roundsQuery.isSuccess,
+    enabled: Boolean(selectedTournament) && roundsQuery.isSuccess && !busy,
     refetchOnWindowFocus: false,
     // Alte Rangliste stehen lassen, bis die neue da ist - sonst flackert die Tabelle nach jedem Ergebnis.
     placeholderData: keepPreviousData,
@@ -281,16 +335,17 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   }
 
-  function confirmResultOverwrite(result) {
+  function confirmResultOverwrite(result, match) {
     const existing = result.noShow ? t('Nicht angetreten') : `${result.scoreA}:${result.scoreB}`;
-    return window.confirm(t('Für diese Partie liegt bereits ein Ergebnis vor: {{result}}. Möchtest du es wirklich überschreiben?', { result: existing }));
+    const matchup = match ? `${teamLabel(match.teamA)} ${t('gegen')} ${teamLabel(match.teamB)}\n` : '';
+    return window.confirm(matchup + t('Für diese Partie liegt bereits ein Ergebnis vor: {{result}}. Möchtest du es wirklich überschreiben?', { result: existing }));
   }
 
   async function handleSaveResult(matchId, result) {
     const match = rounds.flatMap((round) => round.matches).find((entry) => entry.id === matchId);
     let expectedResult = { scoreA: match?.scoreA ?? null, scoreB: match?.scoreB ?? null, noShow: match?.noShow ?? null };
     let confirmOverwrite = expectedResult.scoreA != null || expectedResult.scoreB != null || Boolean(expectedResult.noShow);
-    if (confirmOverwrite && !confirmResultOverwrite(expectedResult)) return;
+    if (confirmOverwrite && !confirmResultOverwrite(expectedResult, match)) return;
     setBusy(true);
     setError('');
     setMessage('');
@@ -311,16 +366,72 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           rounds: current.rounds.map((round) => ({ ...round, matches: round.matches.map((entry) => entry.id === matchId ? { ...entry, ...expectedResult } : entry) })),
         }));
         // Abgelehnt: Die Zeile zeigt danach das tatsächlich gespeicherte Ergebnis statt der Eingabe.
-        if (!confirmResultOverwrite(expectedResult)) return expectedResult;
+        if (!confirmResultOverwrite(expectedResult, match)) return expectedResult;
         confirmOverwrite = true;
         data = await save();
       }
       queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, rounds: data.rounds }));
+      return { ...result, noShow: null };
     } catch (err) {
       setError(err.message);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleSaveAll(round, changes) {
+    const cleared = [];
+    let savedCount = 0;
+    let failed = false;
+    const pending = [];
+    for (const change of changes) {
+      const match = round.matches.find((entry) => entry.id === change.matchId);
+      const expectedResult = { scoreA: match.scoreA ?? null, scoreB: match.scoreB ?? null, noShow: match.noShow ?? null };
+      const confirmOverwrite = expectedResult.scoreA != null || expectedResult.scoreB != null || Boolean(expectedResult.noShow);
+      if (confirmOverwrite && !confirmResultOverwrite(expectedResult, match)) continue;
+      pending.push({ matchId: match.id, scoreA: Number(change.scoreA), scoreB: Number(change.scoreB), expectedResult, confirmOverwrite });
+    }
+    if (!pending.length) return cleared;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
+      const saveBatch = async (results) => {
+        const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/rounds/${round.id}/results`, {
+          method: 'PUT', body: JSON.stringify({ results }),
+        });
+        queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, rounds: data.rounds }));
+        cleared.push(...data.savedMatchIds);
+        savedCount += data.savedMatchIds.length;
+        return data;
+      };
+      for (let index = 0; index < pending.length; index += 25) {
+        const batch = pending.slice(index, index + 25);
+        const data = await saveBatch(batch);
+        const retry = [];
+        for (const conflict of data.conflicts) {
+          if (!conflict.currentResult) throw new Error(t('Spiel nicht gefunden'));
+          if (!confirmResultOverwrite(conflict.currentResult, round.matches.find((entry) => entry.id === conflict.matchId))) {
+            cleared.push(conflict.matchId);
+            continue;
+          }
+          retry.push({ ...batch.find((entry) => entry.matchId === conflict.matchId), expectedResult: conflict.currentResult, confirmOverwrite: true });
+        }
+        if (retry.length) {
+          const retried = await saveBatch(retry);
+          if (retried.conflicts.length) throw new Error(t('Für diese Partie liegt bereits ein anderes Ergebnis vor. Bitte bestätige das Überschreiben.'));
+        }
+      }
+    } catch (err) {
+      failed = true;
+      const progress = savedCount ? `${t('Gespeicherte Ergebnisse: {{count}}.', { count: savedCount })} ` : '';
+      setError(progress + err.message);
+    } finally {
+      if (savedCount && !failed) setMessage(t('Gespeicherte Ergebnisse: {{count}}.', { count: savedCount }));
+      setBusy(false);
+    }
+    return cleared;
   }
 
   if (!tournaments.length) {
@@ -470,9 +581,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       {currentRound && (
         <section className="panel supermelee-current-round">
           <div className="section-title"><h2>{t('Runde')} {currentRound.roundNumber}</h2><span className={`status ${currentRoundOpen ? 'status-running' : 'registration-confirmed'}`}>{currentRoundOpen ? t('Offen') : t('Abgeschlossen')}</span></div>
-          <div className="supermelee-match-list">
-            {currentRound.matches.map((match) => <MatchRow key={match.id} match={match} onSave={handleSaveResult} busy={busy} />)}
-          </div>
+          <RoundResults key={`${selectedTournamentId}:${currentRound.id}`} round={currentRound} onSave={handleSaveResult} onSaveAll={handleSaveAll} onRefresh={() => roundsQuery.refetch()} busy={busy} refreshing={roundsQuery.isFetching} newReportIds={newReportIds} onReportsSeen={() => setNewReportIds([])} />
           <RoundAction />
         </section>
       )}
@@ -483,9 +592,9 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
         <section className="supermelee-rounds">
           <h2>{t('Vergangene Runden')}</h2>
           {olderRoundsNewestFirst.map((round) => (
-            <details key={round.id} className="panel supermelee-round">
+            <details key={`${selectedTournamentId}:${round.id}`} className="panel supermelee-round">
               <summary className="supermelee-round-summary"><span>{t('Runde')} {round.roundNumber}</span><span className="status registration-confirmed">{t('Abgeschlossen')}</span></summary>
-              <div className="supermelee-match-list">{round.matches.map((match) => <MatchRow key={match.id} match={match} onSave={handleSaveResult} busy={busy} />)}</div>
+              <RoundResults round={round} onSave={handleSaveResult} onSaveAll={handleSaveAll} onRefresh={() => roundsQuery.refetch()} busy={busy} refreshing={roundsQuery.isFetching} newReportIds={newReportIds} onReportsSeen={() => setNewReportIds([])} />
             </details>
           ))}
         </section>

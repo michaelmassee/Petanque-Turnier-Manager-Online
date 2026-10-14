@@ -1435,5 +1435,12 @@
   "Punkte−": "Puntos−",
   "Ungültige Ranglistenwerte": "Valores de clasificación no válidos",
   "Benachrichtigungen für neue Runden aktivieren": "Activar notificaciones para nuevas rondas",
-  "Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.": "La comunicación de resultados desde la vista en directo está desactivada. Comunica tu resultado directamente a la organización del torneo."
+  "Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.": "La comunicación de resultados desde la vista en directo está desactivada. Comunica tu resultado directamente a la organización del torneo.",
+  "Rundenaktionen": "Acciones de la ronda",
+  "Alle speichern": "Guardar todo",
+  "Ungültige Rundenergebnisse": "Resultados de la ronda no válidos",
+  "Gespeicherte Ergebnisse: {{count}}.": "Resultados guardados: {{count}}.",
+  "Ergebnis gemeldet von": "Resultado comunicado por",
+  "Neue Ergebnismeldungen von Teams: {{count}}": "Nuevos resultados comunicados por equipos: {{count}}",
+  "Gesehen": "Visto"
 }

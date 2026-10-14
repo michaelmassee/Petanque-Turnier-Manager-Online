@@ -2158,6 +2158,15 @@ export default {
         return await drawSchweizerMeleeTeams(env.DB, tournament);
       }
 
+      const roundResultsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/rounds\/([^/]+)\/results$/);
+      if (roundResultsMatch && request.method === 'PUT') {
+        const tournament = await getTournamentById(env.DB, roundResultsMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await requireSession(request, env.DB);
+        assertCanManageTournament(tournament, session.user);
+        return await setTournamentRoundResults(request, env.DB, tournament, roundResultsMatch[2]);
+      }
+
       const tournamentMatchResultMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/matches\/([^/]+)\/result$/);
       if (tournamentMatchResultMatch && request.method === 'PUT') {
         const tournament = await getTournamentById(env.DB, tournamentMatchResultMatch[1]);
@@ -6288,6 +6297,7 @@ function toPublicMatch(row, playersById) {
     noShow: row.no_show,
     stageLabel: row.stage_label || null,
     court: row.court || null,
+    reportedBy: row.result_reported_by ? (playersById.get(row.result_reported_by) || { id: row.result_reported_by, firstName: '?', lastName: '' }) : null,
   };
 }
 
@@ -6570,7 +6580,7 @@ export async function setTournamentMatchResult(request, db, tournament, matchId)
   if (!noShow && scoreA === scoreB) throw new HttpError(400, 'Ungültiges Ergebnis');
   // Only replace the exact result that the organizer saw and confirmed. A player
   // or another organizer can save between the SELECT and UPDATE.
-  const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = ?, updated_at = ?
+  const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = ?, result_reported_by = NULL, updated_at = ?
       WHERE id = ? AND tournament_id = ? AND score_a IS ? AND score_b IS ? AND no_show IS ?`)
     .bind(scoreA, scoreB, noShow, new Date().toISOString(), matchId, tournament.id, expected.scoreA, expected.scoreB, expected.noShow).run();
   if (!saved.meta.changes) {
@@ -6581,6 +6591,42 @@ export async function setTournamentMatchResult(request, db, tournament, matchId)
   }
   await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
   return listTournamentRounds(db, tournament.id);
+}
+
+export async function setTournamentRoundResults(request, db, tournament, roundId) {
+  assertOnlineExecution(tournament);
+  const body = await readJson(request);
+  if (!Array.isArray(body?.results) || !body.results.length || body.results.length > 25) throw new HttpError(400, 'Ungültige Rundenergebnisse');
+  const matches = await db.prepare('SELECT id FROM tournament_matches WHERE round_id = ? AND tournament_id = ?').bind(roundId, tournament.id).all();
+  const allowed = new Set(matches.results.map((match) => match.id));
+  const seen = new Set();
+  const now = new Date().toISOString();
+  const entries = body.results.map((entry) => {
+    if (!entry || !allowed.has(entry.matchId)) throw new HttpError(404, 'Spiel nicht gefunden');
+    if (seen.has(entry.matchId)) throw new HttpError(400, 'Ungültige Rundenergebnisse');
+    seen.add(entry.matchId);
+    const scoreA = validateMatchScore(entry.scoreA);
+    const scoreB = validateMatchScore(entry.scoreB);
+    if (scoreA === scoreB) throw new HttpError(400, 'Ungültiges Ergebnis');
+    const expected = { scoreA: entry.expectedResult?.scoreA ?? null, scoreB: entry.expectedResult?.scoreB ?? null, noShow: entry.expectedResult?.noShow ?? null };
+    if (expected.scoreA !== null) expected.scoreA = validateMatchScore(expected.scoreA);
+    if (expected.scoreB !== null) expected.scoreB = validateMatchScore(expected.scoreB);
+    if (expected.noShow !== null && expected.noShow !== 'a' && expected.noShow !== 'b') throw new HttpError(400, 'Ungültige Rundenergebnisse');
+    return { ...entry, scoreA, scoreB, expected };
+  });
+  const saved = await db.batch(entries.map((entry) => db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, result_reported_by = NULL, updated_at = ?
+      WHERE id = ? AND tournament_id = ? AND round_id = ? AND score_a IS ? AND score_b IS ? AND no_show IS ?
+        AND ((score_a IS NULL AND score_b IS NULL AND no_show IS NULL) OR ? = 1)`)
+    .bind(entry.scoreA, entry.scoreB, now, entry.matchId, tournament.id, roundId, entry.expected.scoreA, entry.expected.scoreB, entry.expected.noShow, entry.confirmOverwrite === true ? 1 : 0)));
+  const savedMatchIds = entries.filter((entry, index) => saved[index].meta.changes).map((entry) => entry.matchId);
+  if (savedMatchIds.length) await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
+  const data = await loadTournamentRounds(db, tournament.id);
+  const currentMatches = new Map(data.rounds.flatMap((round) => round.matches).map((match) => [match.id, match]));
+  const conflicts = entries.filter((entry, index) => !saved[index].meta.changes).map((entry) => {
+    const match = currentMatches.get(entry.matchId);
+    return { matchId: entry.matchId, currentResult: match ? { scoreA: match.scoreA, scoreB: match.scoreB, noShow: match.noShow } : null };
+  });
+  return json({ ...data, savedMatchIds, conflicts });
 }
 
 // Eine Ergebnismeldung ist nur für die eigene, noch offene Partie der letzten Runde möglich.
@@ -6613,9 +6659,9 @@ async function reportLiveMatchResult(request, db, registration) {
   if (ownScore === opponentScore) throw new HttpError(400, 'Ungültiges Ergebnis');
   const scoreA = Number(match.in_a) === 1 ? ownScore : opponentScore;
   const scoreB = Number(match.in_a) === 1 ? opponentScore : ownScore;
-  const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, updated_at = ?
+  const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, result_reported_by = ?, updated_at = ?
       WHERE id = ? AND score_a IS NULL AND score_b IS NULL AND no_show IS NULL`)
-    .bind(scoreA, scoreB, new Date().toISOString(), match.id).run();
+    .bind(scoreA, scoreB, registration.id, new Date().toISOString(), match.id).run();
   if (!saved.meta.changes) throw new HttpError(409, 'Das Ergebnis wurde bereits gemeldet');
   await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
 }

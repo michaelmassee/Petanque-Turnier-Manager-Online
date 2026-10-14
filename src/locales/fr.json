@@ -1435,5 +1435,12 @@
   "Punkte−": "Points−",
   "Ungültige Ranglistenwerte": "Valeurs de classement invalides",
   "Benachrichtigungen für neue Runden aktivieren": "Activer les notifications pour les nouveaux tours",
-  "Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.": "La saisie des résultats via la vue en direct est désactivée. Merci de communiquer ton résultat directement à la direction du tournoi."
+  "Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.": "La saisie des résultats via la vue en direct est désactivée. Merci de communiquer ton résultat directement à la direction du tournoi.",
+  "Rundenaktionen": "Actions du tour",
+  "Alle speichern": "Tout enregistrer",
+  "Ungültige Rundenergebnisse": "Résultats du tour invalides",
+  "Gespeicherte Ergebnisse: {{count}}.": "Résultats enregistrés : {{count}}.",
+  "Ergebnis gemeldet von": "Résultat saisi par",
+  "Neue Ergebnismeldungen von Teams: {{count}}": "Nouveaux résultats saisis par les équipes : {{count}}",
+  "Gesehen": "Vu"
 }
