@@ -14,7 +14,7 @@ import { RichTextEditor } from './RichTextEditor.jsx';
 import { Button, EditDialog, Feedback, SelectField, TextField } from './ui.jsx';
 
 const TEMPLATE_LABELS = { modern: 'Modern', sporty: 'Sportlich', classic: 'Klassisch', background: 'Eigenes Hintergrundbild' };
-const FIELD_LABELS = { date: 'Datum', location: 'Ort', formation: 'Turnier', fees: 'Startgeld', capacity: 'Kapazität', deadline: 'Anmeldeschluss', status: 'Status', description: 'Beschreibung' };
+const FIELD_LABELS = { date: 'Datum', location: 'Ort', formation: 'Turnier', fees: 'Startgeld', capacity: 'Kapazität', deadline: 'Anmeldeschluss', status: 'Status', licenseRequired: 'Lizenznummer erforderlich', website: 'Website', contactName: 'Kontaktname', contactEmail: 'Kontakt-E-Mail', contactPhone: 'Kontakt-Telefon', description: 'Beschreibung' };
 const PNG_DPI = 150;
 const LOGO_MAX_PIXELS = 1200;
 // Kantenlänge des QR-Bildes: auf rund 40 mm Druckbreite gut 750 dpi.

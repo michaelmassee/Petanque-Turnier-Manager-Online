@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_FLYER_CONFIG, sanitizeFlyerConfig } from './flyer-config.js';
 
 describe('flyer configuration', () => {
+  it('remembers the new optional fields without enabling them by default', () => {
+    const fields = ['licenseRequired', 'website', 'contactName', 'contactEmail', 'contactPhone'];
+    expect(sanitizeFlyerConfig({ visibleFields: fields }).visibleFields).toEqual(fields);
+    for (const field of fields) expect(sanitizeFlyerConfig({}).visibleFields).not.toContain(field);
+  });
   it('keeps the background footer visible for older designs and accepts only an explicit hide option', () => {
     expect(sanitizeFlyerConfig({}).hideAdditionalText).toBe(false);
     expect(sanitizeFlyerConfig({ hideAdditionalText: 'true' }).hideAdditionalText).toBe(false);

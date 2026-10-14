@@ -2,7 +2,7 @@ import { parseRichText, richTextPlainText } from './rich-text.js';
 
 export const FLYER_TEMPLATES = ['modern', 'sporty', 'classic'];
 export const FLYER_FORMATS = ['a4', 'a5'];
-export const FLYER_VISIBLE_FIELDS = ['date', 'location', 'formation', 'fees', 'capacity', 'deadline', 'status', 'description'];
+export const FLYER_VISIBLE_FIELDS = ['date', 'location', 'formation', 'fees', 'capacity', 'deadline', 'status', 'licenseRequired', 'website', 'contactName', 'contactEmail', 'contactPhone', 'description'];
 
 export const DEFAULT_FLYER_CONFIG = Object.freeze({
   schemaVersion: 1,

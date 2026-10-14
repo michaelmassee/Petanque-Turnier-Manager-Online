@@ -32,6 +32,39 @@ async function buildWithFactPositions(config, options, base) {
 }
 
 describe('flyer scene', () => {
+  it('prints selected license, website and contact details in every design', async () => {
+    const fields = ['licenseRequired', 'website', 'contactName', 'contactEmail', 'contactPhone'];
+    const details = { ...tournament, licenseRequired: true, websiteUrl: 'https://club.example.test/turnier', contactName: 'Anna Schmidt', contactEmail: 'anna@example.test', contactPhone: '+49 123 456789' };
+    for (const templateId of [...FLYER_TEMPLATES, 'background']) {
+      for (const format of ['a4', 'a5']) {
+        const options = templateId === 'background' ? { background: { dataUrl: 'data:image/png;base64,x' } } : {};
+        const { scene, nodes } = await build({ templateId, format, visibleFields: fields }, options, details);
+        expect(scene.overflow).toBe(false);
+        for (const text of ['LIZENZNUMMER ERFORDERLICH', 'Ja', 'WEBSITE', details.websiteUrl, 'KONTAKTNAME', details.contactName, 'KONTAKT-E-MAIL', details.contactEmail, 'KONTAKT-TELEFON', details.contactPhone]) {
+          expect(findTextNode(nodes, text), `${templateId}/${format}: ${text}`).not.toBeNull();
+        }
+      }
+    }
+    const hidden = await build({ visibleFields: [] }, {}, details);
+    for (const text of ['LIZENZNUMMER ERFORDERLICH', details.websiteUrl, details.contactName, details.contactEmail, details.contactPhone]) {
+      expect(findTextNode(hidden.nodes, text)).toBeNull();
+    }
+  });
+
+  it('shows a missing license requirement as No and omits empty contact details', async () => {
+    const { nodes } = await build({ visibleFields: ['licenseRequired', 'website', 'contactName', 'contactEmail', 'contactPhone'] }, {},
+      { ...tournament, licenseRequired: false, websiteUrl: '', contactName: '  ', contactEmail: null });
+    expect(findTextNode(nodes, 'Nein')).not.toBeNull();
+    for (const label of ['WEBSITE', 'KONTAKTNAME', 'KONTAKT-E-MAIL', 'KONTAKT-TELEFON']) expect(findTextNode(nodes, label)).toBeNull();
+  });
+
+  it('wraps long website and email values inside their column', async () => {
+    const details = { ...tournament, websiteUrl: `https://example.test/${'lang'.repeat(35)}`, contactEmail: `${'name'.repeat(20)}@example.test` };
+    const { scene, nodes } = await build({ format: 'a5', visibleFields: ['website', 'contactEmail'] }, {}, details);
+    expect(findTextNode(nodes, details.websiteUrl).props.style.wordBreak).toBe('break-word');
+    expect(findTextNode(nodes, details.contactEmail).props.style.wordBreak).toBe('break-word');
+    expect(scene.overflow).toBe(false);
+  });
   it('hides additional text in every design while retaining the QR code and entered text', async () => {
     for (const templateId of [...FLYER_TEMPLATES, 'background']) {
       for (const format of ['a4', 'a5']) {

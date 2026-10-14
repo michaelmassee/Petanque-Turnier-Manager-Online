@@ -198,6 +198,15 @@ function collectContent(tournament, visible, language, t) {
   if (visible.has('capacity') && tournament.maxRegistrations) facts.push({ label: t('Kapazität'), values: [t('Maximal {count} Anmeldungen').replace('{count}', String(tournament.maxRegistrations))] });
   if (visible.has('deadline') && tournament.registrationDeadline) facts.push({ label: t('Anmeldeschluss'), values: [formatTournamentDateTime(tournament.registrationDeadline, language, tournament.timezone)] });
   if (visible.has('status')) facts.push({ label: t('Status'), values: [registrationStatusLabel(tournament, language)] });
+  if (visible.has('licenseRequired')) facts.push({ label: t('Lizenznummer erforderlich'), values: [tournament.licenseRequired ? t('Ja') : t('Nein')] });
+  for (const [field, value, label] of [
+    ['website', tournament.websiteUrl, t('Website')],
+    ['contactName', tournament.contactName, t('Kontaktname')],
+    ['contactEmail', tournament.contactEmail, t('Kontakt-E-Mail')],
+    ['contactPhone', tournament.contactPhone, t('Kontakt-Telefon')],
+  ]) {
+    if (visible.has(field) && String(value || '').trim()) facts.push({ label, values: [String(value).trim()], breakWords: true });
+  }
   // Die Beschreibung behält ihre Formatierungen und bekommt die volle Breite.
   if (visible.has('description') && hasRichText(tournament.description)) facts.push({ label: t('Beschreibung'), rich: tournament.description, values: [], wide: true });
   return {
@@ -209,7 +218,7 @@ function collectContent(tournament, visible, language, t) {
 function factNode(ctx, fact, colors, align) {
   const value = fact.rich
     ? richTextNode(fact.rich, { size: ctx.m.value, color: colors.value, align, lineHeight: 1.3 })
-    : stackNode(fact.values.map((line) => textNode(line, { size: ctx.m.value, color: colors.value, align, lineHeight: 1.3 })));
+    : stackNode(fact.values.map((line) => textNode(line, { size: ctx.m.value, color: colors.value, align, lineHeight: 1.3, wordBreak: fact.breakWords ? 'break-word' : undefined })));
   return stackNode([textNode(fact.label.toLocaleUpperCase(ctx.language), { size: ctx.m.label, weight: 700, color: colors.label, align, lineHeight: 1.5 }), value], { gap: 0.3 * ctx.m.s });
 }
 

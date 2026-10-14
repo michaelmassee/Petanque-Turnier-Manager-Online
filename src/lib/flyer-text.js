@@ -12,10 +12,11 @@ export function el(type, style, children) {
 }
 
 /** Einfacher Textabsatz. */
-export function textNode(text, { size, weight = 400, color, align = 'left', lineHeight = 1.25, opacity } = {}) {
+export function textNode(text, { size, weight = 400, color, align = 'left', lineHeight = 1.25, opacity, wordBreak } = {}) {
   return el('div', {
     display: 'block', fontSize: px(size), fontWeight: weight, color, textAlign: align, lineHeight,
     ...(opacity !== undefined && opacity < 1 ? { opacity } : {}),
+    ...(wordBreak ? { wordBreak } : {}),
   }, String(text ?? ''));
 }
 
