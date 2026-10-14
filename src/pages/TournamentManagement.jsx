@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
-import { isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, tournamentPayload, translatedOptions } from '../lib/domain.js';
+import { isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, registrationNotYetOpen, registrationStatusLabel, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
 import { Feedback, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
@@ -785,8 +785,8 @@ export function TournamentList({
               ) : (
                 <>
                   <span className={`status status-${tournament.status}`}>
-                    {tournament.registrationClosed && tournament.status === 'registration'
-                      ? t('Anmeldung geschlossen')
+                    {tournament.status === 'registration' && (tournament.registrationClosed || registrationNotYetOpen(tournament))
+                      ? registrationStatusLabel(tournament, language)
                       : labelFor(TOURNAMENT_STATUSES, tournament.status)}
                   </span>
                   <span className="role">{tournament.activeRegistrations}/{tournament.maxRegistrations || '∞'}</span>
