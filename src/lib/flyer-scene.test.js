@@ -32,11 +32,28 @@ async function buildWithFactPositions(config, options, base) {
 }
 
 describe('flyer scene', () => {
+  it('hides additional text in every design while retaining the QR code and entered text', async () => {
+    for (const templateId of [...FLYER_TEMPLATES, 'background']) {
+      for (const format of ['a4', 'a5']) {
+        const config = { templateId, format, additionalText: 'Zusätzlicher Hinweis für Gäste.' };
+        const options = templateId === 'background' ? { background: { dataUrl: 'data:image/png;base64,x' } } : {};
+        const shown = await build(config, options);
+        const hidden = await build({ ...config, hideAdditionalText: true }, options);
+        const restored = await build({ ...hidden.scene.design, hideAdditionalText: false }, options);
+        expect(findTextNode(shown.nodes, config.additionalText)).not.toBeNull();
+        expect(findTextNode(hidden.nodes, config.additionalText)).toBeNull();
+        expect(findTextNode(restored.nodes, config.additionalText)).not.toBeNull();
+        expect(hidden.scene.elements.find((element) => element.type === 'qr'))
+          .toEqual(shown.scene.elements.find((element) => element.type === 'qr'));
+        expect(hidden.scene.overflow).toBe(false);
+      }
+    }
+  });
   it('fills the shorter column in every template without waiting for a tall entry on the left', async () => {
     for (const templateId of [...FLYER_TEMPLATES, 'background']) {
       for (const format of ['a4', 'a5']) {
-        for (const backgroundHideFooter of templateId === 'background' ? [false, true] : [false]) {
-          const { scene, positions } = await buildWithFactPositions({ templateId, format, backgroundHideFooter, visibleFields: ['location', 'formation', 'fees', 'capacity'] },
+        for (const hideAdditionalText of templateId === 'background' ? [false, true] : [false]) {
+          const { scene, positions } = await buildWithFactPositions({ templateId, format, hideAdditionalText, visibleFields: ['location', 'formation', 'fees', 'capacity'] },
             templateId === 'background' ? { background: { dataUrl: 'data:image/png;base64,x' } } : {},
             { ...tournament, location: 'Bouleplatz Linden mit Vereinsheim und ausreichend Parkplätzen. '.repeat(3) });
           const location = positions.get('ORT');
@@ -57,7 +74,7 @@ describe('flyer scene', () => {
 
   it('places the description below both independent columns and keeps the QR card free', async () => {
     for (const format of ['a4', 'a5']) {
-      const { scene, positions } = await buildWithFactPositions({ format, backgroundHideFooter: true, visibleFields: ['location', 'formation', 'fees', 'capacity', 'description'], additionalText: 'Kaffee und Kuchen.' },
+      const { scene, positions } = await buildWithFactPositions({ format, hideAdditionalText: true, visibleFields: ['location', 'formation', 'fees', 'capacity', 'description'], additionalText: 'Kaffee und Kuchen.' },
         { background: { dataUrl: 'data:image/png;base64,x' } },
         { ...tournament, location: 'Bouleplatz Linden mit Vereinsheim. '.repeat(6), description: 'Verpflegung vor Ort.' });
       const description = positions.get('BESCHREIBUNG');
@@ -74,8 +91,8 @@ describe('flyer scene', () => {
   });
 
   it('still reports overflowing background information in both footer modes', async () => {
-    for (const backgroundHideFooter of [false, true]) {
-      const { scene } = await build({ format: 'a5', backgroundHideFooter }, { background: { dataUrl: 'data:image/png;base64,x' } },
+    for (const hideAdditionalText of [false, true]) {
+      const { scene } = await build({ format: 'a5', hideAdditionalText }, { background: { dataUrl: 'data:image/png;base64,x' } },
         { ...tournament, location: 'Sehr langer Ortsname mit weiteren Informationen. '.repeat(80) });
       expect(scene.overflow).toBe(true);
       expect(scene.bodyBottom).toBeGreaterThan(scene.bodyLimit);
@@ -90,7 +107,7 @@ describe('flyer scene', () => {
         const label = ['ORT', 'TURNIER', 'STARTGELD'].find((value) => findTextNode([node], value));
         return { width, height: ({ ORT: 170, TURNIER: 160, STARTGELD: 40 }[label] || 2) * scale, markup: label || '' };
       };
-      const scene = await buildFlyerScene(tournament, { format, backgroundHideFooter: true, visibleFields: ['location', 'formation', 'fees'] }, 'de', t,
+      const scene = await buildFlyerScene(tournament, { format, hideAdditionalText: true, visibleFields: ['location', 'formation', 'fees'] }, 'de', t,
         { typeset, background: { dataUrl: 'data:image/png;base64,x' } });
       const location = scene.elements.find((element) => element.markup === 'ORT');
       const formation = scene.elements.find((element) => element.markup === 'TURNIER');
@@ -170,16 +187,16 @@ describe('flyer scene', () => {
     expect(scene.elements.find((element) => element.role === 'background-textbox').opacity).toBe(0.5);
   });
 
-  it('expands the background information box while preserving the bottom-right QR code and additional text', async () => {
+  it('expands the background information box while preserving the bottom-right QR code and hiding additional text', async () => {
     const background = { dataUrl: 'data:image/png;base64,x' };
     for (const format of ['a4', 'a5']) {
       const normal = await build({ format }, { background });
-      const expanded = await build({ format, backgroundHideFooter: true, additionalText: 'Kaffee und Kuchen vor Ort.' }, { background });
+      const expanded = await build({ format, hideAdditionalText: true, additionalText: 'Kaffee und Kuchen vor Ort.' }, { background });
       const qr = expanded.scene.elements.find((element) => element.type === 'qr');
       expect(qr).toEqual(normal.scene.elements.find((element) => element.type === 'qr'));
       expect(expanded.scene.bodyLimit).toBeGreaterThan(normal.scene.bodyLimit + 30);
       expect(expanded.scene.overflow).toBe(false);
-      expect(findTextNode(expanded.nodes, 'Kaffee und Kuchen vor Ort.')).not.toBeNull();
+      expect(findTextNode(expanded.nodes, 'Kaffee und Kuchen vor Ort.')).toBeNull();
       expect(findTextNode(expanded.nodes, 'Powered by Petanque Turnier Manager Online')).not.toBeNull();
       const panelIndex = expanded.scene.elements.findIndex((element) => element.role === 'background-textbox');
       expect(expanded.scene.elements.indexOf(qr)).toBeGreaterThan(panelIndex);
@@ -192,7 +209,7 @@ describe('flyer scene', () => {
   });
 
   it('flows longer information beside the QR card without overlapping it', async () => {
-    const { scene } = await build({ format: 'a5', backgroundHideFooter: true, visibleFields: ['description'] },
+    const { scene } = await build({ format: 'a5', hideAdditionalText: true, visibleFields: ['description'] },
       { background: { dataUrl: 'data:image/png;base64,x' } },
       { ...tournament, description: 'Verpflegung und Getränke sind vor Ort verfügbar. '.repeat(60) });
     const qr = scene.elements.find((element) => element.type === 'qr');
@@ -204,7 +221,7 @@ describe('flyer scene', () => {
   it('does not hide the footer in built-in templates', async () => {
     for (const templateId of FLYER_TEMPLATES) {
       const normal = await build({ templateId });
-      const hidden = await build({ templateId, backgroundHideFooter: true });
+      const hidden = await build({ templateId, hideAdditionalText: true });
       expect(hidden.scene.elements).toEqual(normal.scene.elements);
     }
   });

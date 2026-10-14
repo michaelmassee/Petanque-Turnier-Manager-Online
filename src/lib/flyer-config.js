@@ -13,7 +13,7 @@ export const DEFAULT_FLYER_CONFIG = Object.freeze({
   headline: '',
   subtitle: '',
   additionalText: '',
-  backgroundHideFooter: false,
+  hideAdditionalText: false,
   // Die Beschreibung ist bewusst optional: Lange Freitexte sollen einen kompakten Flyer nicht ungefragt überfüllen.
   visibleFields: ['date', 'location', 'formation', 'fees', 'capacity', 'deadline', 'status'],
 });
@@ -58,7 +58,7 @@ export function sanitizeFlyerConfig(value) {
     headline: text(source.headline, 80),
     subtitle: text(source.subtitle, 120),
     additionalText: additionalText(source.additionalText),
-    backgroundHideFooter: source.backgroundHideFooter === true,
+    hideAdditionalText: source.hideAdditionalText === true || (source.hideAdditionalText === undefined && source.backgroundHideFooter === true),
     visibleFields: visible,
   };
 }

@@ -308,7 +308,7 @@ function metricsFor(page) {
 
 /** Zusatztext mit seinen Formatierungen (fett, kursiv, Listen …) gesetzt für die verfügbare Breite. */
 async function noteBlock(ctx, { width, color, align = 'left' }) {
-  if (!hasRichText(ctx.design.additionalText)) return null;
+  if (ctx.design.hideAdditionalText || !hasRichText(ctx.design.additionalText)) return null;
   return ctx.typeset(richTextNode(ctx.design.additionalText, { size: ctx.m.note, color, align, lineHeight: 1.4 }), width);
 }
 
@@ -580,7 +580,7 @@ async function buildBackground(elements, ctx) {
   let exclusion = null;
   const qrElements = [];
   let limit;
-  if (ctx.design.backgroundHideFooter) {
+  if (ctx.design.hideAdditionalText) {
     const card = cardSize(m.qr, s);
     const x = page.width - m.margin - card.width;
     const y = page.height - m.margin * 0.8 - card.height;
@@ -611,19 +611,7 @@ async function buildBackground(elements, ctx) {
       bullet: (cx, cy, r) => [shape(circlePath(cx, cy, r), { fill: ctx.accentText })],
       exclusion,
     });
-    let bottom = Math.max(afterDate.bottom, grid);
-    if (ctx.design.backgroundHideFooter) {
-      const noteTop = bottom + 6 * s;
-      let notes = await noteBlock(ctx, { width: contentWidth, color: palette.text });
-      if (notes && noteTop + notes.height > exclusion.y && noteTop < exclusion.bottom) {
-        notes = await noteBlock(ctx, { width: exclusion.x - m.margin - 9 * s, color: palette.text });
-      }
-      if (notes) {
-        target.push(textElement(m.margin, noteTop, notes));
-        bottom = noteTop + notes.height;
-      }
-    }
-    return bottom;
+    return Math.max(afterDate.bottom, grid);
   }, bodyTop, limit, s, exclusion ? 0 : 40);
   elements.push(...qrElements);
   return { bodyBottom, limit };

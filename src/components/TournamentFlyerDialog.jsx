@@ -311,11 +311,6 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
               {t('Transparenz der Textbox')}
               <span><input type="range" min="0" max="100" value={backgroundPanelTransparency} onChange={(event) => updateBackgroundPanelTransparency(event.target.value)} /> <output>{backgroundPanelTransparency}%</output></span>
             </label>}
-            {backgroundActive && <label className="checkbox-field">
-              <input type="checkbox" checked={config.backgroundHideFooter} onChange={(event) => update({ backgroundHideFooter: event.target.checked })} />
-              {t('Untere Box ausblenden')}
-            </label>}
-            {backgroundActive && config.backgroundHideFooter && <small className="muted">{t('Der QR-Code bleibt rechts unten. Der Zusatztext erscheint im vergrößerten Informationsbereich.')}</small>}
             <small className="muted">{t('Alle Flyer-Einstellungen und dieses Hintergrundbild werden nur auf diesem Gerät gespeichert und nie hochgeladen.')}</small>
             {backgroundNotice && <small className="muted">{backgroundNotice}</small>}
             <SelectField
@@ -342,6 +337,10 @@ export function TournamentFlyerDialog({ tournament, qrUrl, qrDesign, currentUser
               orderedListLabel={t('Nummerierte Liste')}
               headingLabel={t('Überschrift')}
             />
+            <label className="checkbox-field">
+              <input type="checkbox" checked={config.hideAdditionalText} onChange={(event) => update({ hideAdditionalText: event.target.checked })} />
+              {t('Zusatztext ausblenden')}
+            </label>
             <fieldset>
               <legend>{t('Angaben anzeigen')}</legend>
               {FLYER_VISIBLE_FIELDS.map((field) => (

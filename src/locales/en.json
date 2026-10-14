@@ -1443,8 +1443,7 @@
   "Ergebnis gemeldet von": "Result reported by",
   "Neue Ergebnismeldungen von Teams: {{count}}": "New results reported by teams: {{count}}",
   "Gesehen": "Seen",
-  "Untere Box ausblenden": "Hide bottom box",
-  "Der QR-Code bleibt rechts unten. Der Zusatztext erscheint im vergrößerten Informationsbereich.": "The QR code stays at the bottom right. Additional text appears in the expanded information area.",
+  "Zusatztext ausblenden": "Hide additional text",
   "Dieses Turnier ist mit einem Turnierdokument verbunden und wird dort gestartet.": "This tournament is connected to a tournament document and is started there.",
   "Ungültige Einstellung Spiel um Platz 3": "Invalid setting for the third-place match"
 }

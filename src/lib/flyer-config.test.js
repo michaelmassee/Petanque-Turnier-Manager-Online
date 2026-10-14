@@ -3,9 +3,16 @@ import { DEFAULT_FLYER_CONFIG, sanitizeFlyerConfig } from './flyer-config.js';
 
 describe('flyer configuration', () => {
   it('keeps the background footer visible for older designs and accepts only an explicit hide option', () => {
-    expect(sanitizeFlyerConfig({}).backgroundHideFooter).toBe(false);
-    expect(sanitizeFlyerConfig({ backgroundHideFooter: 'true' }).backgroundHideFooter).toBe(false);
-    expect(sanitizeFlyerConfig({ backgroundHideFooter: true }).backgroundHideFooter).toBe(true);
+    expect(sanitizeFlyerConfig({}).hideAdditionalText).toBe(false);
+    expect(sanitizeFlyerConfig({ hideAdditionalText: 'true' }).hideAdditionalText).toBe(false);
+    expect(sanitizeFlyerConfig({ hideAdditionalText: true }).hideAdditionalText).toBe(true);
+  });
+
+  it('loads the former background option and lets the new setting override it without deleting the text', () => {
+    expect(sanitizeFlyerConfig({ backgroundHideFooter: true }).hideAdditionalText).toBe(true);
+    const config = sanitizeFlyerConfig({ backgroundHideFooter: true, hideAdditionalText: false, additionalText: 'Kaffee und Kuchen.' });
+    expect(config.hideAdditionalText).toBe(false);
+    expect(config.additionalText).toBe('Kaffee und Kuchen.');
   });
   it('keeps only supported, bounded presentation values', () => {
     const config = sanitizeFlyerConfig({

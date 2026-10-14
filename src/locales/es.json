@@ -1443,8 +1443,7 @@
   "Ergebnis gemeldet von": "Resultado comunicado por",
   "Neue Ergebnismeldungen von Teams: {{count}}": "Nuevos resultados comunicados por equipos: {{count}}",
   "Gesehen": "Visto",
-  "Untere Box ausblenden": "Ocultar el cuadro inferior",
-  "Der QR-Code bleibt rechts unten. Der Zusatztext erscheint im vergrößerten Informationsbereich.": "El código QR permanece abajo a la derecha. El texto adicional aparece en el área de información ampliada.",
+  "Zusatztext ausblenden": "Ocultar el texto adicional",
   "Dieses Turnier ist mit einem Turnierdokument verbunden und wird dort gestartet.": "Este torneo está vinculado a un documento de torneo y se inicia allí.",
   "Ungültige Einstellung Spiel um Platz 3": "Ajuste no válido para el partido por el tercer puesto"
 }
