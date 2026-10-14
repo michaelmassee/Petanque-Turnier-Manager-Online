@@ -177,6 +177,30 @@ describe('Live-Ansicht für Spieler', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('zeigt die Bahn aus dem Turnierdokument auch in den eigenen Partien', async () => {
+    const payload = livePayload();
+    payload.live.currentMatch.court = 'A3';
+    payload.live.history[0].court = 'A3';
+    payload.live.history[1].court = '7';
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse(payload));
+    renderDetail();
+    const history = await screen.findByRole('region', { name: 'Meine Partien' });
+    expect(within(history).getByText('7')).toBeInTheDocument();
+    expect(within(history).getByText('A3')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Aktuelle Partie' })).toHaveTextContent('Bahn A3');
+  });
+
+  it('blendet Wertungsspalten aus, die das Turnierdokument nicht überträgt', async () => {
+    const payload = livePayload();
+    Object.assign(payload.tournament, { type: 'formule_x', registrationType: 'forme' });
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse(payload));
+    renderDetail();
+    const table = await screen.findByRole('table', { hidden: true });
+    fireEvent.click(screen.getByText('Rangliste anzeigen'));
+    expect(within(table).getAllByRole('columnheader').map((cell) => cell.textContent))
+      .toEqual(['Platz', 'Team', 'Siege', 'Punkte+', 'Punkte−', 'Δ']);
+  });
+
   it('zeigt keine generische Rangliste für K.O.', async () => {
     const payload = livePayload();
     payload.tournament.type = 'ko';
@@ -314,6 +338,7 @@ describe('Live-Ansicht für Spieler', () => {
   it.each([
     ['die Turnierleitung die Meldung nicht freigibt', (payload) => { payload.tournament.playerResultReportingEnabled = false; }],
     ['das Turnier beendet ist', (payload) => { payload.tournament.playerResultReportingEnabled = true; payload.tournament.status = 'finished'; }],
+    ['ein Turnierdokument das Turnier führt', (payload) => { payload.tournament.playerResultReportingEnabled = true; payload.tournament.documentBound = true; }],
   ])('blendet die Ergebnismeldung aus, wenn %s', async (_reason, changePayload) => {
     const payload = livePayload();
     changePayload(payload);
@@ -333,6 +358,7 @@ describe('Live-Ansicht für Spieler', () => {
   it.each([
     ['abgeschalteter Meldung', (payload) => { payload.tournament.playerResultReportingEnabled = false; }, true],
     ['Desktop-Durchführung', (payload) => { payload.tournament.playerResultReportingEnabled = true; payload.tournament.desktopExecution = true; }, true],
+    ['verbundenem Turnierdokument', (payload) => { payload.tournament.playerResultReportingEnabled = true; payload.tournament.documentBound = true; }, true],
     ['freigegebener Meldung', (payload) => { payload.tournament.playerResultReportingEnabled = true; }, false],
     ['beendetem Turnier', (payload) => { payload.tournament.status = 'finished'; }, false],
   ])('zeigt den Turnierleitungs-Hinweis passend bei %s', async (_reason, changePayload, shown) => {

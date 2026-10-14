@@ -1442,5 +1442,7 @@
   "Gespeicherte Ergebnisse: {{count}}.": "Saved results: {{count}}.",
   "Ergebnis gemeldet von": "Result reported by",
   "Neue Ergebnismeldungen von Teams: {{count}}": "New results reported by teams: {{count}}",
-  "Gesehen": "Seen"
+  "Gesehen": "Seen",
+  "Dieses Turnier ist mit einem Turnierdokument verbunden und wird dort gestartet.": "This tournament is connected to a tournament document and is started there.",
+  "Ungültige Einstellung Spiel um Platz 3": "Invalid setting for the third-place match"
 }

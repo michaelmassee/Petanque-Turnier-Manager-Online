@@ -1442,5 +1442,7 @@
   "Gespeicherte Ergebnisse: {{count}}.": "Resultados guardados: {{count}}.",
   "Ergebnis gemeldet von": "Resultado comunicado por",
   "Neue Ergebnismeldungen von Teams: {{count}}": "Nuevos resultados comunicados por equipos: {{count}}",
-  "Gesehen": "Visto"
+  "Gesehen": "Visto",
+  "Dieses Turnier ist mit einem Turnierdokument verbunden und wird dort gestartet.": "Este torneo está vinculado a un documento de torneo y se inicia allí.",
+  "Ungültige Einstellung Spiel um Platz 3": "Ajuste no válido para el partido por el tercer puesto"
 }

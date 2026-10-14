@@ -5,7 +5,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
-import { labelFor, formationLabel, hasOpenRegistration, registrationStatusLabel, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
+import { isDocumentBound, labelFor, formationLabel, hasOpenRegistration, registrationStatusLabel, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { AccountBadge, Button, Feedback, RequiredMark, ShareIcon } from '../components/ui.jsx';
 import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
 import { formatUserName } from '../lib/userLabel.js';
@@ -13,6 +13,9 @@ import { StandalonePageHeader } from '../components/layout.jsx';
 import { TournamentPlayerListings } from '../components/TournamentPlayerListings.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
 import { TournamentRegistrationAction } from '../components/TournamentRegistrationAction.jsx';
+import { CourtLabel } from '../components/CourtLabel.jsx';
+import { RankingTable } from '../components/RankingTable.jsx';
+import { normalizeRanking } from '../lib/live-ranking.js';
 
 export function TournamentInfo({ tournament, language, onShare, showTitle = true, shareToken = '', onNavigate }) {
   const { t } = useTranslation();
@@ -310,19 +313,27 @@ function playerLabel(player) {
   return [player.firstName, player.lastName].filter(Boolean).join(' ') || player.id;
 }
 
-export function TournamentSchedule({ tournamentId, tournament }) {
+/** Partien einer Runde, gruppiert nach Stufe (Poule, Turnierbaum-Runde, Gruppe) in der übertragenen Reihenfolge. */
+function matchesByStage(matches) {
+  const groups = new Map();
+  for (const match of matches) {
+    const stage = match.stageLabel || '';
+    if (!groups.has(stage)) groups.set(stage, []);
+    groups.get(stage).push(match);
+  }
+  return [...groups.entries()];
+}
+
+/**
+ * Öffentlicher Spielplan: aktuelle Runde und Rangliste – für online durchgeführte Turniere wie für Turniere, die ein
+ * verbundenes Turnierdokument führt (dann mit Bahn, Stufe und Rangliste aus dem Dokument).
+ */
+export function TournamentSchedule({ tournamentId, tournament, language }) {
   const { t } = useTranslation();
   const [rounds, setRounds] = useState(null);
   const [ranking, setRanking] = useState([]);
-  const isSchweizer = tournament?.type === 'schweizer';
-  const isSchweizerWithBuchholz = isSchweizer && tournament?.schweizerRankingMode !== 'ohne_buchholz';
 
   useEffect(() => {
-    if (tournament?.desktopExecution) {
-      setRounds([]);
-      setRanking([]);
-      return undefined;
-    }
     let cancelled = false;
     Promise.all([api(`/api/tournaments/${tournamentId}/rounds`), api(`/api/tournaments/${tournamentId}/ranking`)])
       .then(([roundsData, rankingData]) => {
@@ -339,11 +350,7 @@ export function TournamentSchedule({ tournamentId, tournament }) {
     return () => {
       cancelled = true;
     };
-  }, [tournamentId, tournament?.desktopExecution]);
-
-  if (tournament?.desktopExecution) {
-    return <p className="hint">{t('Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.')}</p>;
-  }
+  }, [tournamentId]);
 
   if (!rounds) {
     return <p className="muted">{t('Wird geladen…')}</p>;
@@ -354,90 +361,38 @@ export function TournamentSchedule({ tournamentId, tournament }) {
   }
 
   const currentRound = rounds[rounds.length - 1];
+  const showRanking = ranking.length > 0 && tournament?.type !== 'ko';
 
   return (
     <div className="play-schedule">
+      {tournament?.documentDataAsOf && (
+        <p className="muted">{t('Turnierdaten vom')} {formatTournamentDateTime(tournament.documentDataAsOf, language, tournament.timezone)}</p>
+      )}
       <h3>
         {t('Runde')} {currentRound.roundNumber}
       </h3>
-      {currentRound.matches.map((match) => (
-        <article className="data-row" key={match.id}>
-          <div>
-            <strong>{match.teamA.map(playerLabel).join(' + ')}</strong>
-            <span>{t('gegen')}</span>
-            <strong>{match.teamB.map(playerLabel).join(' + ')}</strong>
-          </div>
-          <div>{match.noShow ? t('Nicht angetreten') : match.scoreA != null ? `${match.scoreA}:${match.scoreB}` : t('Offen')}</div>
-        </article>
+      {matchesByStage(currentRound.matches).map(([stage, matches]) => (
+        <section key={stage || 'ohne-stufe'}>
+          {stage && <h4 data-i18n-skip>{stage}</h4>}
+          {matches.map((match) => (
+            <article className="data-row" key={match.id}>
+              <div>
+                <CourtLabel court={match.court} className="play-schedule-court" />
+                <strong>{match.teamA.map(playerLabel).join(' + ')}</strong>
+                <span>{match.teamB.length ? t('gegen') : t('Freilos')}</span>
+                <strong>{match.teamB.map(playerLabel).join(' + ')}</strong>
+              </div>
+              <div>{match.noShow ? t('Nicht angetreten') : match.scoreA != null ? `${match.scoreA}:${match.scoreB}` : t('Offen')}</div>
+            </article>
+          ))}
+        </section>
       ))}
 
-      {Boolean(ranking.length) && (
+      {showRanking && (
         <>
           <h3>{t('Rangliste')}</h3>
           <div className="table-scroll">
-            <table className="ranking-table">
-              <thead>
-                {isSchweizer ? (
-                  <>
-                    <tr>
-                      <th rowSpan={2}>{t('Platz')}</th>
-                      <th rowSpan={2}>{t('Team')}</th>
-                      <th rowSpan={2}>{t('Siege')}</th>
-                      {isSchweizerWithBuchholz && <><th rowSpan={2}>{t('BHZ')}</th><th rowSpan={2}>{t('FBHZ')}</th></>}
-                      <th colSpan={3}>{t('Punkte')}</th>
-                    </tr>
-                    <tr>
-                      <th>+</th>
-                      <th>-</th>
-                      <th>{t('Δ')}</th>
-                    </tr>
-                  </>
-                ) : (
-                  <>
-                    <tr>
-                      <th rowSpan={2}>{t('Platz')}</th>
-                      <th rowSpan={2}>{t('Spieler')}</th>
-                      <th colSpan={3}>{t('Spiele')}</th>
-                      <th colSpan={3}>{t('Punkte')}</th>
-                    </tr>
-                    <tr>
-                      <th>+</th>
-                      <th>-</th>
-                      <th>{t('Δ')}</th>
-                      <th>+</th>
-                      <th>-</th>
-                      <th>{t('Δ')}</th>
-                    </tr>
-                  </>
-                )}
-              </thead>
-              <tbody>
-                {ranking.map((entry) => (
-                  <tr key={entry.teamId || entry.playerId}>
-                    <td>{entry.rank}</td>
-                    <td data-i18n-skip>{entry.members ? entry.members.map(playerLabel).join(' + ') : playerLabel(entry)}</td>
-                    {isSchweizer ? (
-                      <>
-                        <td>{entry.wins}</td>
-                        {isSchweizerWithBuchholz && <><td>{entry.bhz}</td><td>{entry.fbhz}</td></>}
-                        <td>{entry.pointsFor}</td>
-                        <td>{entry.pointsAgainst}</td>
-                        <td>{entry.pointsDiff}</td>
-                      </>
-                    ) : (
-                      <>
-                        <td>{entry.wins}</td>
-                        <td>{entry.wins - entry.gameDiff}</td>
-                        <td>{entry.gameDiff}</td>
-                        <td>{entry.pointsFor}</td>
-                        <td>{entry.pointsAgainst}</td>
-                        <td>{entry.pointsDiff}</td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <RankingTable tournament={tournament} entries={normalizeRanking(ranking)} />
           </div>
         </>
       )}
@@ -529,7 +484,8 @@ export function TournamentDetailPage({
   // kleinen Handys höchstens vier Reiter.
   const started = tournament.status === 'running' || tournament.status === 'finished';
   const canShowPlayerListings = tournament.visibility === 'public' && !started;
-  const canShowSchedule = canShowParticipants && isOnlinePlayable(tournament) && started;
+  // Mit verbundenem Turnierdokument auch für Systeme ohne Online-Durchführung (Poule, Kaskade, …).
+  const canShowSchedule = canShowParticipants && (isOnlinePlayable(tournament) || isDocumentBound(tournament)) && started;
   const availableViews = {
     info: true,
     anmelden: canRegister,
@@ -661,7 +617,7 @@ export function TournamentDetailPage({
 
           {view === 'mitspieler' && <TournamentPlayerListings tournament={tournament} currentUser={currentUser} navigate={navigate} />}
 
-          {view === 'spielplan' && <TournamentSchedule tournamentId={tournament.id} tournament={tournament} />}
+          {view === 'spielplan' && <TournamentSchedule tournamentId={tournament.id} tournament={tournament} language={language} />}
         </div>
       </section>
     </main>

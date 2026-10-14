@@ -3717,6 +3717,16 @@ details[open] > .play-round-summary::before {
   white-space: nowrap;
 }
 
+.live-history-court {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.play-schedule-court {
+  color: #53627a;
+  font-size: 0.85rem;
+}
+
 .live-history-match {
   display: grid;
   gap: 2px;

@@ -7,6 +7,8 @@ import { REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor } from '../lib/domain.js';
 import { Button, Feedback } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
+import { CourtLabel } from '../components/CourtLabel.jsx';
+import { RankingTable } from '../components/RankingTable.jsx';
 import { isIosSafari } from '../lib/hooks.js';
 import { currentBrowserPushSubscription, ensureBrowserPushSubscription, isPushSupported } from '../lib/push.js';
 
@@ -241,11 +243,7 @@ function CurrentMatchCard({ live, participation, canReportResult, reportingDisab
       {match && (
         <>
           {match.stageLabel && <p className="live-stage" data-i18n-skip>{match.stageLabel}</p>}
-          {match.court && (
-            <p className="live-court">
-              {t('Bahn')} <strong data-i18n-skip>{match.court}</strong>
-            </p>
-          )}
+          <CourtLabel court={match.court} className="live-court" as="p" />
           {match.bye ? (
             <p className="live-versus"><strong>{t('Freilos')}</strong></p>
           ) : (
@@ -268,22 +266,6 @@ function CurrentMatchCard({ live, participation, canReportResult, reportingDisab
 function RankingCard({ live, tournament }) {
   const { t } = useTranslation();
   if (!live.ranking.length || tournament.type === 'ko') return null;
-  const swiss = tournament.type === 'schweizer' || tournament.type === 'maastrichter';
-  const formuleX = tournament.type === 'formule_x';
-  const columns = [
-    { key: 'rank', label: t('Platz') },
-    { key: 'label', label: tournament.registrationType === 'supermelee' ? t('Spieler') : t('Team') },
-    { key: 'wins', label: t('Siege') },
-    ...(swiss && tournament.schweizerRankingMode !== 'ohne_buchholz' ? [
-      { key: 'bhz', label: t('BHZ') }, { key: 'fbhz', label: t('FBHZ') },
-    ] : []),
-    ...(formuleX ? [{ key: 'wertung', label: t('Wertung') }] : []),
-    ...(!swiss ? [{ key: 'losses', label: t('Niederlagen') }] : []),
-    ...(!swiss && !formuleX ? [{ key: 'gameDiff', label: t('Spieldifferenz') }] : []),
-    { key: 'pointsFor', label: t('Punkte+') },
-    { key: 'pointsAgainst', label: t('Punkte−') },
-    { key: 'pointsDiff', label: t('Δ') },
-  ];
   return (
     <section className="panel live-card" aria-label={t('Mein Platz')}>
       <div className="live-card-head">
@@ -300,20 +282,7 @@ function RankingCard({ live, tournament }) {
       <details className="live-ranking">
         <summary>{t('Rangliste anzeigen')}</summary>
         <div className="table-scroll">
-          <table className="ranking-table">
-            <thead>
-              <tr>
-                {columns.map((column) => <th key={column.key}>{column.label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {live.ranking.map((entry) => (
-                <tr key={entry.registrationIds.join('-')} className={entry.own ? 'live-own-row' : undefined}>
-                  {columns.map((column) => <td key={column.key} data-i18n-skip={column.key === 'label' || undefined}>{entry[column.key] ?? '—'}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <RankingTable tournament={tournament} entries={live.ranking} />
         </div>
       </details>
     </section>
@@ -329,7 +298,7 @@ function HistoryCard({ live }) {
       <ul className="live-history">
         {live.history.map((entry) => (
           <li key={entry.matchId} className={`live-${entry.outcome}`}>
-            <span className="live-history-round">{t('Runde')} {entry.roundNumber}</span>
+            <span className="live-history-round">{t('Runde')} {entry.roundNumber}<CourtLabel court={entry.court} className="live-history-court" /></span>
             <span className="live-history-match">
               {entry.teammates?.length > 0 && (
                 <span className="live-history-teammates">{t('mit')} <span data-i18n-skip>{entry.teammates.join(' + ')}</span></span>
@@ -444,8 +413,8 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
       {!drawn && <RegistrationPhase registration={registration} tournament={tournament} />}
       {drawn && registration.participation === 'inactive' && <p className="hint">{t('Du bist noch nicht eingecheckt.')}</p>}
       {(drawn || tournament.status === 'running') && <CurrentMatchCard key={live.currentMatch?.matchId || 'no-current-match'} live={live} participation={registration.participation}
-        canReportResult={canReportResult && tournament.playerResultReportingEnabled && tournament.status === 'running'}
-        reportingDisabled={tournament.status === 'running' && (!tournament.playerResultReportingEnabled || tournament.desktopExecution)} path={path}
+        canReportResult={canReportResult && tournament.playerResultReportingEnabled && !tournament.documentBound && tournament.status === 'running'}
+        reportingDisabled={tournament.status === 'running' && (!tournament.playerResultReportingEnabled || tournament.documentBound || tournament.desktopExecution)} path={path}
         onResultSaved={(updated) => queryClient.setQueryData(queryKey, updated)} />}
       <RankingCard live={live} tournament={tournament} />
       <HistoryCard live={live} />

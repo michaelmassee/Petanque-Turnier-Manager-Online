@@ -203,6 +203,46 @@ export function normalizeTournamentInput(body, { legacyRegistrationTimes = false
   return tournament;
 }
 
+/**
+ * Ein Turnier ist an ein Turnierdokument gebunden (verbunden, Eckdaten aus dem Dokument oder bereits aus dem Dokument
+ * gestartet). Ab dann ist das Dokument Master: Online-Start, Auslosung und Ergebniseingabe sind gesperrt.
+ */
+export function isDocumentBound(tournament) {
+  return Number(tournament?.document_managed || 0) === 1 || Boolean(tournament?.sync_document_id)
+    || Number(tournament?.desktop_execution || 0) === 1;
+}
+
+/**
+ * Spieleinstellungen aus dem Turnierdokument (PUT /api/sync/tournaments/:id/settings). Jeder Wert ist optional; nur
+ * übergebene Werte werden geprüft und übernommen. Liefert die DB-Spalten mit ihren neuen Werten.
+ */
+export function normalizeSyncSettings(body, tournament) {
+  const columns = {};
+  if (body?.formation !== undefined) {
+    const formation = text(body.formation);
+    if (!FORMATIONS.includes(formation)) throw new HttpError(400, 'Ungültige Formation');
+    const registrationType = tournament.registration_type || 'forme';
+    if (formation === 'tete' && registrationType !== 'forme') throw new HttpError(400, 'Formation Tête ist nur mit dem Anmeldetyp Formée möglich');
+    columns.formation = formation;
+    columns.formation_other = 0;
+  }
+  if (body?.schweizerRankingMode !== undefined) {
+    const mode = text(body.schweizerRankingMode);
+    if (!['mit_buchholz', 'ohne_buchholz'].includes(mode)) throw new HttpError(400, 'Ungültiger Schweizer Ranglistenmodus');
+    columns.schweizer_ranking_mode = mode;
+  }
+  if (body?.formuleXRounds !== undefined) {
+    const rounds = Number(body.formuleXRounds);
+    if (!Number.isInteger(rounds) || rounds < 1 || rounds > 20) throw new HttpError(400, 'Ungültige Formule-X-Rundenzahl');
+    columns.formule_x_rounds = rounds;
+  }
+  if (body?.koPlatz3 !== undefined) {
+    if (typeof body.koPlatz3 !== 'boolean') throw new HttpError(400, 'Ungültige Einstellung Spiel um Platz 3');
+    columns.ko_platz3 = body.koPlatz3 ? 1 : 0;
+  }
+  return columns;
+}
+
 export function assertPartnerCountMatchesFormation(tournament, registration) {
   const formation = tournament.registration_type === 'melee' || tournament.registration_type === 'supermelee' ? 'tete' : tournament.formation;
   const hasPartner = Boolean(registration.partnerFirstName && registration.partnerLastName); const hasPartner2 = Boolean(registration.partner2FirstName && registration.partner2LastName);

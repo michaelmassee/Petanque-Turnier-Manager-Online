@@ -35,7 +35,10 @@ import {
   MAX_JSON_BODY_BYTES,
   readBodyWithLimit,
   normalizeQrDesign,
+  isDocumentBound,
+  normalizeSyncSettings,
 } from './worker-core.js';
+import { normalizeRanking } from './lib/live-ranking.js';
 import { parseStoredQrDesign } from './lib/qr-design.js';
 import { fetchCloudflareUsageDay, fetchCloudflareUsageDays, isCloudflareUsageConfigured } from './cloudflare-usage-core.js';
 import { checkRoundRequirements, getPairingStrategy, isOnlinePlayable, roundRequirementMessage } from './lib/pairing/index.js';
@@ -2623,6 +2626,14 @@ export default {
         assertCanManageTournament(tournament, auth.user);
         return await executeSyncWrite(request, env.DB, tournament, () => syncPutTournamentMetadata(request, env, tournament),
           { user: auth.user });
+      }
+
+      const syncSettingsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/settings$/);
+      if (syncSettingsMatch && request.method === 'PUT') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncSettingsMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        return await executeSyncWrite(request, env.DB, tournament, (db) => syncPutTournamentSettings(request, db, tournament));
       }
 
       const syncDecisionsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/decisions$/);
@@ -5442,6 +5453,9 @@ async function startTournament(env, existing, user, appOrigin) {
   if (!isOnlinePlayable(existing)) {
     throw new HttpError(409, 'Dieser Turniertyp unterstützt keine Online-Rundenverwaltung.');
   }
+  if (isDocumentBound(existing)) {
+    throw new HttpError(409, 'Dieses Turnier ist mit einem Turnierdokument verbunden und wird dort gestartet.');
+  }
   const updated = await performTournamentStart(env, existing);
   if (existing.status !== 'running') {
     await checkInConfirmedRegistrations(env.DB, existing.id);
@@ -5958,13 +5972,14 @@ async function syncPutTournamentMetadata(request, env, existing) {
   const statement = db.prepare(
     `UPDATE tournaments
      SET name = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?, formation = ?, registration_type = ?,
-         status = CASE WHEN status = 'running' AND ? NOT IN ('running', 'finished') THEN status ELSE ? END, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, contact_name = ?,
+         status = CASE WHEN status = 'running' AND ? NOT IN ('running', 'finished') THEN status
+                       WHEN ? = 'running' AND status <> 'running' AND desktop_execution <> 1 THEN status ELSE ? END, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, contact_name = ?,
          contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?, participants_public = ?,
          license_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, document_managed = 1, updated_at = ?
      WHERE id = ?`,
   ).bind(
     tournament.name, tournament.date, tournament.startTime, tournament.location, tournament.description,
-    tournament.type, tournament.formation, tournament.registrationType, tournament.status, tournament.status, tournament.maxRegistrations,
+    tournament.type, tournament.formation, tournament.registrationType, tournament.status, tournament.status, tournament.status, tournament.maxRegistrations,
     registrationTimes.registrationDeadline, registrationTimes.registrationOpensAt, tournament.entryFeeCents, tournament.currency, tournament.contactName, tournament.contactEmail,
     tournament.contactPhone, tournament.visibility, tournament.internalNotes, tournament.participantsPublic ? 1 : 0,
     tournament.licenseRequired ? 1 : 0, geo.latitude, geo.longitude, geo.geocodedAt, timezone, now, existing.id,
@@ -6359,7 +6374,8 @@ async function createFormeTeams(db, tournament) {
 }
 
 function assertOnlineExecution(tournament) {
-  if (Number(tournament.desktop_execution || 0) === 1) {
+  // Ab dem Verbinden ist das Turnierdokument Master, nicht erst ab seinem Start (desktop_execution).
+  if (isDocumentBound(tournament)) {
     throw new HttpError(409, 'Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.');
   }
 }
@@ -6717,7 +6733,9 @@ async function getTournamentRanking(db, tournament) {
 }
 
 async function computeTournamentRanking(db, tournament) {
-  if (Number(tournament.desktop_execution || 0) === 1) {
+  // Bei einem gebundenen Turnier gilt der Snapshot des Dokuments, auch nach einem Zurücksetzen des Starts: eine
+  // Online-Berechnung kennt die Kriterien der Desktop-Systeme (Poule, Kaskade, …) nicht.
+  if (Number(tournament.desktop_execution || 0) === 1 || (isDocumentBound(tournament) && tournament.desktop_ranking_json)) {
     return desktopRankingSnapshot(db, tournament);
   }
   const matchesResult = await db
@@ -6795,28 +6813,6 @@ async function desktopRankingSnapshot(db, tournament) {
   }));
 }
 
-// Vereinheitlicht die systemabhängigen Ranglisten-Formen (Spieler-, Team- und Snapshot-Einträge)
-// für die Live-Ansicht; systemabhängige Wertungskriterien bleiben erhalten.
-function toLiveRanking(ranking) {
-  return ranking.map((entry) => {
-    const members = entry.members || [entry];
-    return {
-      rank: entry.rank,
-      registrationIds: entry.registrationIds || members.map((member) => member.id || member.playerId),
-      label: members.map((member) => member.teamLabel || [member.firstName, member.lastName].filter(Boolean).join(' ') || '?').join(' + '),
-      wins: entry.wins ?? null,
-      losses: entry.losses ?? (entry.wins != null && entry.gameDiff != null ? entry.wins - entry.gameDiff : null),
-      gameDiff: entry.gameDiff ?? null,
-      bhz: entry.bhz ?? null,
-      fbhz: entry.fbhz ?? null,
-      wertung: entry.wertung ?? null,
-      pointsFor: entry.pointsFor ?? null,
-      pointsAgainst: entry.pointsAgainst ?? null,
-      pointsDiff: entry.pointsDiff ?? null,
-    };
-  });
-}
-
 function toLiveTournament(tournament) {
   return {
     id: tournament.id,
@@ -6829,6 +6825,7 @@ function toLiveTournament(tournament) {
     registrationType: tournament.registration_type || 'forme',
     schweizerRankingMode: tournament.schweizer_ranking_mode || 'mit_buchholz',
     desktopExecution: Number(tournament.desktop_execution || 0) === 1,
+    documentBound: isDocumentBound(tournament),
     playerResultReportingEnabled: Number(tournament.player_result_reporting_enabled || 0) === 1,
   };
 }
@@ -6859,7 +6856,7 @@ async function computeLiveSnapshot(db, tournament) {
     loadTournamentRounds(db, tournament.id),
     computeTournamentRanking(db, tournament),
   ]);
-  const content = { tournament: toLiveTournament(tournament), rounds, ranking: toLiveRanking(ranking) };
+  const content = { tournament: toLiveTournament(tournament), rounds, ranking: normalizeRanking(ranking) };
   const version = (await sha256Hex(JSON.stringify(content))).slice(0, 16);
   return { ...content, version };
 }
@@ -7163,6 +7160,23 @@ async function syncDeleteRound(db, tournament, roundNumberValue) {
       db.prepare('DELETE FROM tournament_rounds WHERE id = ?').bind(round.id),
     ] : [],
     response: { envelope: { status: 200, body: { ok: true, deleted: Boolean(round) } } },
+  };
+}
+
+/**
+ * Spieleinstellungen aus dem Turnierdokument (Formation, Schweizer Ranglistenmodus, Formule-X-Rundenzahl, Spiel um
+ * Platz 3). Das Dokument ist Master; anders als im Web-Bearbeiten gilt keine Sperre nach dem Start.
+ */
+export async function syncPutTournamentSettings(request, db, tournament) {
+  const columns = normalizeSyncSettings(await readJson(request), tournament);
+  const names = Object.keys(columns);
+  const statements = names.length === 0 ? [] : [
+    db.prepare(`UPDATE tournaments SET ${names.map((name) => `${name} = ?`).join(', ')}, updated_at = ? WHERE id = ?`)
+      .bind(...names.map((name) => columns[name]), new Date().toISOString(), tournament.id),
+  ];
+  return {
+    statements,
+    response: { envelope: { status: 200, body: { ok: true } } },
   };
 }
 
@@ -10489,6 +10503,7 @@ export function toPublicTournament(row, user) {
     runningResetAt: row.running_reset_at || null,
     documentManaged: Boolean(Number(row.document_managed || 0)),
     desktopExecution: Boolean(Number(row.desktop_execution || 0)),
+    documentDataAsOf: Number(row.document_managed || 0) === 1 ? row.last_sync_write_at || null : null,
     websiteUrl: row.website_url || null,
     websiteIsOriginalClubSite: false,
     // venue_club_logo_url wird per Trigger (Migration 0099) beim Schreiben berechnet.

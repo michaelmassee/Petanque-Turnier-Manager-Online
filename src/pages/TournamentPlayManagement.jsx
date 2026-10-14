@@ -6,7 +6,9 @@ import { TextField, Button, Feedback } from '../components/ui.jsx';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { checkRoundRequirements, getSupportedSystemLabels, isOnlinePlayable } from '../lib/pairing/index.js';
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
-import { isCalendarEntry, labelFor, translatedOptions } from '../lib/domain.js';
+import { isCalendarEntry, isDocumentBound, labelFor, translatedOptions } from '../lib/domain.js';
+import { normalizeRanking } from '../lib/live-ranking.js';
+import { RankingTable } from '../components/RankingTable.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
@@ -167,9 +169,11 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   // online spielbar (siehe isOnlinePlayable) - alle anderen Typen werden unten im
   // Leerzustand mit Grund aufgelistet, statt kommentarlos aus der Auswahl zu
   // verschwinden.
-  const tournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && !tournament.desktopExecution);
+  // Mit einem Turnierdokument verbundene Turniere führt das Dokument – schon ab dem Verbinden, nicht erst ab seinem
+  // Start.
+  const tournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && !isDocumentBound(tournament));
   const nonPlayableTournaments = allTournaments.filter((tournament) => !isOnlinePlayable(tournament));
-  const desktopExecutionTournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && tournament.desktopExecution);
+  const desktopExecutionTournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && isDocumentBound(tournament));
   const [selectedTournamentId, setSelectedTournamentId] = useState(tournaments[0]?.id || '');
   // Aus einer Push-Benachrichtigung gewähltes Turnier übernehmen, sobald es in der Liste ist.
   const focusTournamentId = focus?.tournamentId || '';
@@ -478,7 +482,6 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const currentRoundOpen = currentRound ? !isRoundComplete(currentRound) : false;
   const activeConfirmedCount = confirmedRegistrations.filter((registration) => registration.participation === 'active').length;
   const isSchweizerMelee = selectedTournament?.type === 'schweizer' && selectedTournament?.registrationType === 'melee';
-  const isSchweizerWithBuchholz = selectedTournament?.type === 'schweizer' && selectedTournament?.schweizerRankingMode !== 'ohne_buchholz';
   const requiredMeleePlayers = selectedTournament?.formation === 'triplette' ? 18 : 12;
   const canDrawMeleeTeams = isSchweizerMelee && !rounds.length && activeConfirmedCount >= requiredMeleePlayers;
   const missingMeleeDraw = isSchweizerMelee && swissTeams.length < 6;
@@ -616,73 +619,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
         <details className="panel ranking-panel">
           <summary className="play-round-summary"><span>{t('Rangliste')}</span></summary>
           <div className="table-scroll">
-            {// Spalten/Überschriften wie im Hauptprojekt: Schweizer-Rangliste (Platz, Team, Siege,
-            // BHZ/FBHZ, Punkte +/-/Delta) bzw. JGJ-/Supermêlée-Rangliste (Platz, Spieler, Spiele
-            // +/-/Delta, Punkte +/-/Delta), siehe SchweizerRanglisteSheet/JGJRanglisteSheet im Hauptprojekt.
-            null}
-            <table className="ranking-table">
-              <thead>
-                {selectedTournament?.type === 'schweizer' ? (
-                  <>
-                    <tr>
-                      <th rowSpan={2}>{t('Platz')}</th>
-                      <th rowSpan={2}>{t('Team')}</th>
-                      <th rowSpan={2}>{t('Siege')}</th>
-                      {isSchweizerWithBuchholz && <><th rowSpan={2}>{t('BHZ')}</th><th rowSpan={2}>{t('FBHZ')}</th></>}
-                      <th colSpan={3}>{t('Punkte')}</th>
-                    </tr>
-                    <tr>
-                      <th>+</th>
-                      <th>-</th>
-                      <th>{t('Δ')}</th>
-                    </tr>
-                  </>
-                ) : (
-                  <>
-                    <tr>
-                      <th rowSpan={2}>{t('Platz')}</th>
-                      <th rowSpan={2}>{t('Spieler')}</th>
-                      <th colSpan={3}>{t('Spiele')}</th>
-                      <th colSpan={3}>{t('Punkte')}</th>
-                    </tr>
-                    <tr>
-                      <th>+</th>
-                      <th>-</th>
-                      <th>{t('Δ')}</th>
-                      <th>+</th>
-                      <th>-</th>
-                      <th>{t('Δ')}</th>
-                    </tr>
-                  </>
-                )}
-              </thead>
-              <tbody>
-                {ranking.map((entry) => (
-                  <tr key={entry.teamId || entry.playerId}>
-                    <td>{entry.rank}</td>
-                    <td data-i18n-skip>{entry.members ? entry.members.map(playerLabel).join(' + ') : playerLabel(entry)}</td>
-                    {selectedTournament?.type === 'schweizer' ? (
-                      <>
-                        <td>{entry.wins}</td>
-                        {isSchweizerWithBuchholz && <><td>{entry.bhz}</td><td>{entry.fbhz}</td></>}
-                        <td>{entry.pointsFor}</td>
-                        <td>{entry.pointsAgainst}</td>
-                        <td>{entry.pointsDiff}</td>
-                      </>
-                    ) : (
-                      <>
-                        <td>{entry.wins}</td>
-                        <td>{entry.wins - entry.gameDiff}</td>
-                        <td>{entry.gameDiff}</td>
-                        <td>{entry.pointsFor}</td>
-                        <td>{entry.pointsAgainst}</td>
-                        <td>{entry.pointsDiff}</td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <RankingTable tournament={selectedTournament} entries={normalizeRanking(ranking)} />
           </div>
         </details>
       )}

@@ -23,13 +23,40 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     expect(await screen.findByText('Noch keine Runde gestartet.')).toBeInTheDocument();
   });
 
-  it('kennzeichnet im Desktop durchgeführte Turniere als nicht online geführt', () => {
-    global.fetch = vi.fn();
+  it('zeigt bei einem verbundenen Turnierdokument Bahn, Stufe und dessen Rangliste wie online', async () => {
+    global.fetch = vi.fn((path) => {
+      if (path === '/api/tournaments/t1/rounds') {
+        return Promise.resolve(jsonResponse({
+          rounds: [{
+            id: 'r1',
+            roundNumber: 1,
+            matches: [
+              { id: 'm1', court: 'A3', stageLabel: 'Poule A', teamA: [{ id: 'p1', firstName: 'Anna', lastName: 'Muster' }], teamB: [{ id: 'p2', firstName: 'Bert', lastName: 'Beispiel' }], scoreA: 13, scoreB: 7, noShow: null },
+              { id: 'm2', court: '4', stageLabel: 'Poule B', teamA: [{ id: 'p3', firstName: 'Clara', lastName: 'Klar' }], teamB: [{ id: 'p4', firstName: 'Dieter', lastName: 'Damm' }], scoreA: null, scoreB: null, noShow: null },
+            ],
+          }],
+        }));
+      }
+      if (path === '/api/tournaments/t1/ranking') {
+        return Promise.resolve(jsonResponse({ ranking: [{
+          rank: 1, registrationIds: ['p1'], members: [{ id: 'p1', firstName: 'Anna', lastName: 'Muster' }],
+          wins: 1, losses: 0, gameDiff: 1, pointsFor: 13, pointsAgainst: 7, pointsDiff: 6,
+        }] }));
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
 
-    render(<TournamentSchedule tournamentId="t1" language="de" tournament={{ desktopExecution: true }} />);
+    render(<TournamentSchedule tournamentId="t1" language="de"
+      tournament={{ type: 'jeder_gegen_jeden', desktopExecution: true, documentManaged: true, documentDataAsOf: '2026-10-14T10:00:00.000Z' }} />);
 
-    expect(screen.getByText('Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.')).toBeInTheDocument();
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(await screen.findByRole('heading', { name: 'Poule A' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Poule B' })).toBeInTheDocument();
+    expect(screen.getByText('A3')).toBeInTheDocument();
+    expect(screen.getByText(/Turnierdaten vom/)).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader').map((cell) => cell.textContent))
+      .toEqual(['Platz', 'Team', 'Siege', 'Niederlagen', 'Spieldifferenz', 'Punkte+', 'Punkte−', 'Δ']);
+    const row = screen.getAllByRole('cell', { name: 'Anna Muster' }).at(-1).closest('tr');
+    expect(row).toHaveTextContent('6');
   });
 
   it('zeigt die aktuelle Runde und die Rangliste rein lesend an', async () => {

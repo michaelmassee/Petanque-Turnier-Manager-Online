@@ -335,3 +335,8 @@ export function formatTournamentStartTime(tournament, language) {
   const anchor = new Date(`${tournament.date}T${tournament.startTime}:00Z`);
   return `${tournament.startTime} ${timezoneAbbrev(anchor, zone, DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de)}`;
 }
+
+/** Ein Turnier ist ans Turnierdokument gebunden oder wurde bereits aus ihm gestartet; das Dokument ist dann Master. */
+export function isDocumentBound(tournament) {
+  return Boolean(tournament?.documentManaged || tournament?.desktopExecution);
+}
