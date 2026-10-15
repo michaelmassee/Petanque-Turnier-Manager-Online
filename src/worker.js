@@ -49,7 +49,7 @@ import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './l
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
 import { firstFreeUsername, normalizeUsername, usernameCandidates, usernameProblem, USERNAME_CHANGE_INTERVAL_DAYS } from './lib/username.js';
 import { parseRichText, richTextDocument, richTextPlainText, serializeRichText } from './lib/rich-text.js';
-import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
+import { invalidNameBlacklistPatterns, isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, NAME_BLACKLIST_MAX_PATTERNS, nameBlacklistMatcher, normalizeNameBlacklist, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
 import { formatLocationAddress, geocodingFallbackQuery } from './location-format.js';
 import {
   ACTIVE_REGISTRATION_STATUSES, SLOT_COLUMNS, isIncompleteTeam, nextSlotUserId, normalizePlayerName, registrationConflicts,
@@ -1789,7 +1789,13 @@ export default {
 
       if (url.pathname === '/api/admin/petanque-aktuell/tournaments' && request.method === 'GET') {
         await requireAdmin(request, env.DB);
-        return json({ tournaments: await listPetanqueAktuellCandidates(env.DB) });
+        const [tournaments, blacklist] = await Promise.all([listPetanqueAktuellCandidates(env.DB), readPetanqueAktuellBlacklist(env.DB)]);
+        return json({ tournaments, blacklist });
+      }
+
+      if (url.pathname === '/api/admin/petanque-aktuell/blacklist' && request.method === 'PUT') {
+        const session = await requireAdmin(request, env.DB);
+        return await updatePetanqueAktuellBlacklist(request, env.DB, session.user);
       }
 
       if (url.pathname === '/api/admin/petanque-aktuell/import' && request.method === 'POST') {
@@ -5214,14 +5220,46 @@ async function fetchPetanqueAktuellDetails(id) {
   }
 }
 
+const PETANQUE_AKTUELL_BLACKLIST_SETTING = 'petanque_aktuell_name_blacklist';
+
+export async function readPetanqueAktuellBlacklist(db) {
+  try {
+    return normalizeNameBlacklist(JSON.parse(await readSetting(db, PETANQUE_AKTUELL_BLACKLIST_SETTING) || '[]'));
+  } catch {
+    return [];
+  }
+}
+
+// Sperrliste nach Turniernamen: gesperrte Termine erscheinen im Import nur noch als "gesperrt" und lassen sich nicht
+// importieren. Bereits importierte Termine bleiben unverändert, der tägliche Sync prüft weiter nur deren Vorhandensein.
+export async function updatePetanqueAktuellBlacklist(request, db, adminUser) {
+  const body = await readJson(request);
+  if (!Array.isArray(body.patterns)) throw new HttpError(400, 'Die Sperrliste muss als Liste übergeben werden.');
+  const patterns = normalizeNameBlacklist(body.patterns);
+  if (patterns.length > NAME_BLACKLIST_MAX_PATTERNS) throw new HttpError(400, 'Die Sperrliste enthält zu viele Muster.');
+  if (invalidNameBlacklistPatterns(patterns).length > 0) throw new HttpError(400, 'Die Sperrliste enthält ein ungültiges Muster.');
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare(`INSERT INTO app_settings (key, value, updated_at, updated_by_user_id) VALUES (?, ?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at,
+          updated_by_user_id = excluded.updated_by_user_id`)
+      .bind(PETANQUE_AKTUELL_BLACKLIST_SETTING, JSON.stringify(patterns), now, adminUser.id),
+    auditStatement(db, { actorUserId: adminUser.id, actorRole: 'admin', action: 'setting_changed',
+      target: PETANQUE_AKTUELL_BLACKLIST_SETTING, details: { patterns }, now }),
+  ]);
+  return json({ blacklist: patterns });
+}
+
 async function listPetanqueAktuellCandidates(db) {
-  const [entries, imports] = await Promise.all([
+  const [entries, imports, blacklist] = await Promise.all([
     fetchPetanqueAktuellCalendar(),
     db.prepare('SELECT external_key FROM petanque_aktuell_imports').all(),
+    readPetanqueAktuellBlacklist(db),
   ]);
   const importedKeys = new Set(imports.results.map((row) => row.external_key));
+  const blocked = nameBlacklistMatcher(blacklist);
   return entries.filter((entry) => isFuturePetanqueAktuellTournament(entry)).map((entry) => ({
-    ...mapPetanqueAktuellTournament(entry), sourceFormation: entry.formation, association: entry.association, licenseRequired: entry.licenseRequired, imported: importedKeys.has(entry.externalKey),
+    ...mapPetanqueAktuellTournament(entry), sourceFormation: entry.formation, association: entry.association, licenseRequired: entry.licenseRequired, imported: importedKeys.has(entry.externalKey), blocked: blocked(entry.name),
   })).filter((entry) => entry.name.length >= 2 && entry.location.length >= 2)
     .sort((left, right) => left.date.localeCompare(right.date) || (left.startTime || '').localeCompare(right.startTime || '') || left.name.localeCompare(right.name));
 }
@@ -5269,6 +5307,8 @@ async function importPetanqueAktuellTournaments(request, env, user) {
   if (externalKeys.length === 0 || externalKeys.length > 200) throw new HttpError(400, 'Bitte wähle mindestens einen und höchstens 200 Termine aus.');
   const selected = new Map((await fetchPetanqueAktuellCalendar()).map((entry) => [entry.externalKey, entry]));
   if (externalKeys.some((key) => !selected.has(key))) throw new HttpError(400, 'Ein ausgewählter Pétanque-Aktuell-Termin ist nicht mehr verfügbar.');
+  const blocked = nameBlacklistMatcher(await readPetanqueAktuellBlacklist(env.DB));
+  if (externalKeys.some((key) => blocked(selected.get(key).name))) throw new HttpError(400, 'Ein ausgewählter Pétanque-Aktuell-Termin steht auf der Sperrliste.');
   const now = new Date().toISOString();
   const searches = (await env.DB.prepare('SELECT * FROM saved_searches WHERE notify_enabled = 1').all()).results || [];
   const countryCode = request.headers.get('CF-IPCountry');

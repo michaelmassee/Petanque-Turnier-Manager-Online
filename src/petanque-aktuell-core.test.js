@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isFuturePetanqueAktuellTournament, mapPetanqueAktuellFormation, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
+import { compileNameBlacklistPattern, invalidNameBlacklistPatterns, isFuturePetanqueAktuellTournament, nameBlacklistMatcher, normalizeNameBlacklist, mapPetanqueAktuellFormation, mapPetanqueAktuellTournament, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
 
 const CALENDAR = `
   <table>
@@ -100,5 +100,35 @@ describe('Pétanque-Aktuell-Import', () => {
   it('akzeptiert nur künftige Termine', () => {
     expect(isFuturePetanqueAktuellTournament({ date: '2026-09-16' }, '2026-09-15')).toBe(true);
     expect(isFuturePetanqueAktuellTournament({ date: '2026-09-15' }, '2026-09-15')).toBe(false);
+  });
+
+  describe('Sperrliste nach Turniernamen', () => {
+    it('vergleicht Platzhalter-Muster mit dem ganzen Namen ohne Groß-/Kleinschreibung', () => {
+      const blocked = nameBlacklistMatcher(['*liga*', 'Ranglistenturnier ?', 'A.B (Test)']);
+      expect(blocked('Rheinland-Pfalz LIGA Spieltag 3')).toBe(true);
+      expect(blocked('Ranglistenturnier 2')).toBe(true);
+      expect(blocked('Ranglistenturnier 12')).toBe(false);
+      expect(blocked('A.B (Test)')).toBe(true);
+      expect(blocked('AxB (Test)')).toBe(false);
+      expect(blocked('Offenes Turnier')).toBe(false);
+    });
+
+    it('erlaubt reguläre Ausdrücke in Schrägstrichen, die irgendwo im Namen treffen', () => {
+      const blocked = nameBlacklistMatcher(['/meisterschaft|ligaspieltag/', '/^Jugend\\b/']);
+      expect(blocked('Deutsche Meisterschaft Doublette')).toBe(true);
+      expect(blocked('Jugend Cup')).toBe(true);
+      expect(blocked('Cup der Jugend')).toBe(false);
+    });
+
+    it('lehnt ungültige, zu lange und nur aus Platzhaltern bestehende Muster ab', () => {
+      expect(invalidNameBlacklistPatterns(['/(/', '*', '?*', 'x'.repeat(201), ' Liga ', ''])).toEqual(['/(/', '*', '?*', 'x'.repeat(201)]);
+      expect(compileNameBlacklistPattern('')).toBeNull();
+      expect(nameBlacklistMatcher(['/(/', '*'])('Beliebig')).toBe(false);
+    });
+
+    it('bereinigt die Liste um Leerzeilen und Dubletten', () => {
+      expect(normalizeNameBlacklist([' Liga ', 'Liga', '', null, 'Cup'])).toEqual(['Liga', 'Cup']);
+      expect(normalizeNameBlacklist('Liga')).toEqual([]);
+    });
   });
 });

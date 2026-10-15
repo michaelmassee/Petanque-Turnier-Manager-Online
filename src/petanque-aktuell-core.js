@@ -173,3 +173,40 @@ export function parsePetanqueAktuellDetailAddress(html) {
   const line2 = [plz, ort].filter(Boolean).join(' ');
   return [strasse, line2].filter(Boolean).join(', ') || null;
 }
+
+// Sperrliste nach Turniernamen für den Pétanque-Aktuell-Import. Ein Muster in Schrägstrichen (/…/) ist ein
+// regulärer Ausdruck, der irgendwo im Namen treffen darf; sonst gilt es als Platzhalter-Muster für den ganzen
+// Namen mit * (beliebig viele Zeichen) und ? (genau ein Zeichen). Groß-/Kleinschreibung zählt nie.
+export const NAME_BLACKLIST_MAX_PATTERNS = 200;
+export const NAME_BLACKLIST_MAX_LENGTH = 200;
+// Platzhalter und Beispiele für den Hinweistext im Import-Panel.
+export const NAME_BLACKLIST_HINT_VALUES = { any: '*', one: '?', wildcardExample: '*Liga*', regexExample: '/meisterschaft|ligaspieltag/' };
+
+export function compileNameBlacklistPattern(pattern) {
+  const value = String(pattern || '').trim();
+  if (!value || value.length > NAME_BLACKLIST_MAX_LENGTH) return null;
+  const regex = value.match(/^\/(.+)\/$/s);
+  if (regex) {
+    try { return new RegExp(regex[1], 'iu'); } catch { return null; }
+  }
+  // Nur aus Platzhaltern bestehende Muster würden jeden Termin sperren.
+  if (!/[^*?]/.test(value)) return null;
+  const source = value.replace(/[.+^${}()|[\]\\/]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp(`^${source}$`, 'iu');
+}
+
+export function normalizeNameBlacklist(patterns) {
+  return [...new Set((Array.isArray(patterns) ? patterns : []).map((pattern) => String(pattern || '').trim()).filter(Boolean))];
+}
+
+export function invalidNameBlacklistPatterns(patterns) {
+  return normalizeNameBlacklist(patterns).filter((pattern) => !compileNameBlacklistPattern(pattern));
+}
+
+export function nameBlacklistMatcher(patterns) {
+  const compiled = normalizeNameBlacklist(patterns).map(compileNameBlacklistPattern).filter(Boolean);
+  return (name) => {
+    const value = String(name || '').trim();
+    return compiled.some((regex) => regex.test(value));
+  };
+}

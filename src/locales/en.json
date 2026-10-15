@@ -1456,5 +1456,17 @@
   "Neu heute": "New today",
   "Neu in den letzten {{count}} Tagen": "New in the last {{count}} days",
   "{{added}} neu · {{total}} insgesamt": "{{added}} new · {{total}} in total",
-  "Unbekannte Statistik.": "Unknown statistic."
+  "Unbekannte Statistik.": "Unknown statistic.",
+  "Durch Sperrliste ausgeblendet": "Hidden by blocklist",
+  "Ungültige Muster: {{patterns}}": "Invalid patterns: {{patterns}}",
+  "Sperrliste gespeichert.": "Blocklist saved.",
+  "Sperrliste nach Turniernamen ({{count}} Muster, {{hidden}} Termine ausgeblendet)": "Blocklist by tournament name ({{count}} patterns, {{hidden}} events hidden)",
+  "Ein Muster pro Zeile, Groß-/Kleinschreibung egal. {{any}} steht für beliebig viele Zeichen, {{one}} für genau ein Zeichen; das Muster muss auf den ganzen Namen passen (z. B. {{wildcardExample}}). In Schrägstrichen ist es ein regulärer Ausdruck, der irgendwo im Namen treffen darf (z. B. {{regexExample}}). Bereits importierte Termine bleiben erhalten.": "One pattern per line, case-insensitive. {{any}} stands for any number of characters, {{one}} for exactly one character; the pattern must match the whole name (e.g. {{wildcardExample}}). Between slashes it is a regular expression that may match anywhere in the name (e.g. {{regexExample}}). Events that are already imported are kept.",
+  "Gesperrte Turniernamen": "Blocked tournament names",
+  "Sperrliste speichern": "Save blocklist",
+  "Gesperrt": "Blocked",
+  "Die Sperrliste muss als Liste übergeben werden.": "The blocklist must be provided as a list.",
+  "Die Sperrliste enthält zu viele Muster.": "The blocklist contains too many patterns.",
+  "Die Sperrliste enthält ein ungültiges Muster.": "The blocklist contains an invalid pattern.",
+  "Ein ausgewählter Pétanque-Aktuell-Termin steht auf der Sperrliste.": "A selected Pétanque Aktuell event is on the blocklist."
 }

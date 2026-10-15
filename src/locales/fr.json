@@ -1456,5 +1456,17 @@
   "Neu heute": "Nouveaux aujourd’hui",
   "Neu in den letzten {{count}} Tagen": "Nouveaux ces {{count}} derniers jours",
   "{{added}} neu · {{total}} insgesamt": "{{added}} nouveaux · {{total}} au total",
-  "Unbekannte Statistik.": "Statistique inconnue."
+  "Unbekannte Statistik.": "Statistique inconnue.",
+  "Durch Sperrliste ausgeblendet": "Masqués par la liste de blocage",
+  "Ungültige Muster: {{patterns}}": "Motifs invalides : {{patterns}}",
+  "Sperrliste gespeichert.": "Liste de blocage enregistrée.",
+  "Sperrliste nach Turniernamen ({{count}} Muster, {{hidden}} Termine ausgeblendet)": "Liste de blocage par nom de tournoi ({{count}} motifs, {{hidden}} dates masquées)",
+  "Ein Muster pro Zeile, Groß-/Kleinschreibung egal. {{any}} steht für beliebig viele Zeichen, {{one}} für genau ein Zeichen; das Muster muss auf den ganzen Namen passen (z. B. {{wildcardExample}}). In Schrägstrichen ist es ein regulärer Ausdruck, der irgendwo im Namen treffen darf (z. B. {{regexExample}}). Bereits importierte Termine bleiben erhalten.": "Un motif par ligne, sans distinction de casse. {{any}} représente un nombre quelconque de caractères, {{one}} exactement un caractère ; le motif doit correspondre au nom entier (p. ex. {{wildcardExample}}). Entre barres obliques, c’est une expression régulière qui peut correspondre n’importe où dans le nom (p. ex. {{regexExample}}). Les dates déjà importées sont conservées.",
+  "Gesperrte Turniernamen": "Noms de tournoi bloqués",
+  "Sperrliste speichern": "Enregistrer la liste de blocage",
+  "Gesperrt": "Bloqué",
+  "Die Sperrliste muss als Liste übergeben werden.": "La liste de blocage doit être transmise sous forme de liste.",
+  "Die Sperrliste enthält zu viele Muster.": "La liste de blocage contient trop de motifs.",
+  "Die Sperrliste enthält ein ungültiges Muster.": "La liste de blocage contient un motif invalide.",
+  "Ein ausgewählter Pétanque-Aktuell-Termin steht auf der Sperrliste.": "Une date Pétanque Aktuell sélectionnée figure sur la liste de blocage."
 }

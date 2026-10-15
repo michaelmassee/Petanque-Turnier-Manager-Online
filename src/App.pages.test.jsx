@@ -338,7 +338,7 @@ describe('Admin-Dashboard', () => {
         playerListings: 0,
       });
       if (path === '/api/admin/petanque-aktuell/tournaments') return Promise.resolve({
-        tournaments: [{ externalKey: 'imported', imported: true }, { externalKey: 'new', imported: false }],
+        tournaments: [{ externalKey: 'imported', imported: true }, { externalKey: 'new', imported: false }, { externalKey: 'blocked', imported: false, blocked: true }],
       });
       if (path === '/api/admin/settings/data-retention') return Promise.resolve({ automaticPurgeEnabled: false, dueTournaments: 0 });
       if (path.startsWith('/api/admin/visitor-stats')) return Promise.resolve({

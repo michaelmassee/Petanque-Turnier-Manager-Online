@@ -1456,5 +1456,17 @@
   "Neu heute": "Nuevos hoy",
   "Neu in den letzten {{count}} Tagen": "Nuevos en los últimos {{count}} días",
   "{{added}} neu · {{total}} insgesamt": "{{added}} nuevos · {{total}} en total",
-  "Unbekannte Statistik.": "Estadística desconocida."
+  "Unbekannte Statistik.": "Estadística desconocida.",
+  "Durch Sperrliste ausgeblendet": "Ocultos por la lista de bloqueo",
+  "Ungültige Muster: {{patterns}}": "Patrones no válidos: {{patterns}}",
+  "Sperrliste gespeichert.": "Lista de bloqueo guardada.",
+  "Sperrliste nach Turniernamen ({{count}} Muster, {{hidden}} Termine ausgeblendet)": "Lista de bloqueo por nombre de torneo ({{count}} patrones, {{hidden}} eventos ocultos)",
+  "Ein Muster pro Zeile, Groß-/Kleinschreibung egal. {{any}} steht für beliebig viele Zeichen, {{one}} für genau ein Zeichen; das Muster muss auf den ganzen Namen passen (z. B. {{wildcardExample}}). In Schrägstrichen ist es ein regulärer Ausdruck, der irgendwo im Namen treffen darf (z. B. {{regexExample}}). Bereits importierte Termine bleiben erhalten.": "Un patrón por línea, sin distinguir mayúsculas. {{any}} equivale a cualquier número de caracteres, {{one}} a exactamente un carácter; el patrón debe coincidir con el nombre completo (p. ej. {{wildcardExample}}). Entre barras es una expresión regular que puede coincidir en cualquier parte del nombre (p. ej. {{regexExample}}). Los eventos ya importados se conservan.",
+  "Gesperrte Turniernamen": "Nombres de torneo bloqueados",
+  "Sperrliste speichern": "Guardar lista de bloqueo",
+  "Gesperrt": "Bloqueado",
+  "Die Sperrliste muss als Liste übergeben werden.": "La lista de bloqueo debe enviarse como lista.",
+  "Die Sperrliste enthält zu viele Muster.": "La lista de bloqueo contiene demasiados patrones.",
+  "Die Sperrliste enthält ein ungültiges Muster.": "La lista de bloqueo contiene un patrón no válido.",
+  "Ein ausgewählter Pétanque-Aktuell-Termin steht auf der Sperrliste.": "Un evento seleccionado de Pétanque Aktuell está en la lista de bloqueo."
 }

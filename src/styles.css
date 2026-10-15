@@ -2375,10 +2375,40 @@ a.left-panel-link {
   margin-top: 12px;
 }
 
-.visitor-table summary {
+.visitor-table summary,
+.import-blacklist summary {
   cursor: pointer;
   color: #0a5fd1;
   font-weight: 700;
+}
+
+/* Importliste: Checkbox, Termin (Name und Details untereinander), Badges mit Quelle-Link. */
+.import-list .data-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.import-list .data-row > span:not(.badges) {
+  display: grid;
+  gap: 3px;
+}
+
+@media (max-width: 720px) {
+  .import-list .data-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .import-list .data-row > .badges {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}
+
+.import-blacklist {
+  margin-bottom: 16px;
+}
+
+.import-blacklist > * + * {
+  margin-top: 12px;
 }
 
 .visitor-table td:not(:first-child),

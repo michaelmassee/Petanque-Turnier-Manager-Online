@@ -1456,5 +1456,17 @@
   "Neu heute": "Nieuw vandaag",
   "Neu in den letzten {{count}} Tagen": "Nieuw in de laatste {{count}} dagen",
   "{{added}} neu · {{total}} insgesamt": "{{added}} nieuw · {{total}} in totaal",
-  "Unbekannte Statistik.": "Onbekende statistiek."
+  "Unbekannte Statistik.": "Onbekende statistiek.",
+  "Durch Sperrliste ausgeblendet": "Verborgen door blokkeerlijst",
+  "Ungültige Muster: {{patterns}}": "Ongeldige patronen: {{patterns}}",
+  "Sperrliste gespeichert.": "Blokkeerlijst opgeslagen.",
+  "Sperrliste nach Turniernamen ({{count}} Muster, {{hidden}} Termine ausgeblendet)": "Blokkeerlijst op toernooinaam ({{count}} patronen, {{hidden}} evenementen verborgen)",
+  "Ein Muster pro Zeile, Groß-/Kleinschreibung egal. {{any}} steht für beliebig viele Zeichen, {{one}} für genau ein Zeichen; das Muster muss auf den ganzen Namen passen (z. B. {{wildcardExample}}). In Schrägstrichen ist es ein regulärer Ausdruck, der irgendwo im Namen treffen darf (z. B. {{regexExample}}). Bereits importierte Termine bleiben erhalten.": "Eén patroon per regel, hoofdletterongevoelig. {{any}} staat voor willekeurig veel tekens, {{one}} voor precies één teken; het patroon moet op de hele naam passen (bijv. {{wildcardExample}}). Tussen schuine strepen is het een reguliere expressie die overal in de naam mag treffen (bijv. {{regexExample}}). Reeds geïmporteerde evenementen blijven behouden.",
+  "Gesperrte Turniernamen": "Geblokkeerde toernooinamen",
+  "Sperrliste speichern": "Blokkeerlijst opslaan",
+  "Gesperrt": "Geblokkeerd",
+  "Die Sperrliste muss als Liste übergeben werden.": "De blokkeerlijst moet als lijst worden doorgegeven.",
+  "Die Sperrliste enthält zu viele Muster.": "De blokkeerlijst bevat te veel patronen.",
+  "Die Sperrliste enthält ein ungültiges Muster.": "De blokkeerlijst bevat een ongeldig patroon.",
+  "Ein ausgewählter Pétanque-Aktuell-Termin steht auf der Sperrliste.": "Een geselecteerd Pétanque-Aktuell-evenement staat op de blokkeerlijst."
 }

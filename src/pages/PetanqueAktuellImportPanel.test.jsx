@@ -42,4 +42,40 @@ describe('Pétanque-Aktuell-Import', () => {
     const importCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/import'));
     expect(JSON.parse(importCall[1].body).externalKeys.sort()).toEqual(['imported', 'new']);
   });
+
+  it('blendet Termine der Sperrliste aus, speichert neue Muster und importiert gesperrte Termine nicht', async () => {
+    const withBlocked = [...tournaments, { externalKey: 'liga', name: 'Liga Spieltag 3', date: '2026-10-03', location: 'Mainz', websiteUrl: 'https://example.test/liga', imported: false }];
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).includes('/blacklist')) return new Response(JSON.stringify({ blacklist: JSON.parse(options.body).patterns }), { status: 200 });
+      if (String(url).includes('/import')) return new Response(JSON.stringify({ created: 1, updated: 0, failed: 0 }), { status: 201 });
+      return new Response(JSON.stringify({ tournaments: withBlocked, blacklist: ['*liga*'] }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<PetanqueAktuellImportPanel />);
+
+    await screen.findByText('Neuer Termin');
+    expect(screen.queryByText('Liga Spieltag 3')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Importstatus'), { target: { value: 'blocked' } });
+    expect((await screen.findByText('Liga Spieltag 3')).closest('label').querySelector('input')).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Gesperrte Turniernamen'), { target: { value: '*liga*\n/(/' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sperrliste speichern' }));
+    expect(await screen.findByText('Ungültige Muster: /(/')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/blacklist'))).toBe(false);
+
+    fireEvent.change(screen.getByLabelText('Gesperrte Turniernamen'), { target: { value: '/neuer/' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sperrliste speichern' }));
+    await screen.findByText('Sperrliste gespeichert.');
+    const saveCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/blacklist'));
+    expect(JSON.parse(saveCall[1].body)).toEqual({ patterns: ['/neuer/'] });
+    expect(await screen.findByText('Neuer Termin')).toBeInTheDocument();
+    expect(screen.queryByText('Liga Spieltag 3')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Importstatus'), { target: { value: 'all' } });
+    fireEvent.click(await screen.findByLabelText('Alle neuen Termine auswählen'));
+    fireEvent.click(screen.getByRole('button', { name: 'Ausgewählte Termine importieren' }));
+    await screen.findByText(/1 neu, 0 aktualisiert/);
+    const importCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/import'));
+    expect(JSON.parse(importCall[1].body).externalKeys).toEqual(['liga']);
+  });
 });

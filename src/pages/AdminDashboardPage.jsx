@@ -673,7 +673,7 @@ export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, 
         if (!cancelled) setStats(result);
         try {
           const candidates = await authenticatedApi('/api/admin/petanque-aktuell/tournaments');
-          if (!cancelled) setPendingPetanqueAktuellImports((candidates.tournaments || []).filter((tournament) => !tournament.imported).length);
+          if (!cancelled) setPendingPetanqueAktuellImports((candidates.tournaments || []).filter((tournament) => !tournament.imported && !tournament.blocked).length);
         } catch {
           if (!cancelled) setPendingPetanqueAktuellImports(undefined);
         }
