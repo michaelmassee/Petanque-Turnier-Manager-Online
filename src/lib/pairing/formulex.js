@@ -3,6 +3,7 @@
 // Runde 1, danach Paarung nach Wertungspunkten mit Swap-Rematch-Vermeidung, Freilos an
 // das schlechtest platzierte Team ohne bisheriges Freilos.
 import { pairingsPerRound } from './util.js';
+import { FIXED_TEAM_REGISTRATION_TYPES } from './melee.js';
 
 const NO_SHOW_SCORE = { winner: 13, loser: 0 };
 
@@ -28,12 +29,15 @@ export function getSiegaufschlag(roundsPlayed) {
 
 export { pairingsPerRound };
 
+export const MIN_TEAMS = 4;
+
 export function checkRequirements(confirmedCount, { registrationType, roundsPlayed = 0, formuleXRounds = 4 } = {}) {
-  if (confirmedCount < 4) {
-    return [{ type: 'minPlayers', min: 4 }];
+  if (confirmedCount < MIN_TEAMS) {
+    return [{ type: 'minPlayers', min: MIN_TEAMS }];
   }
-  if (registrationType && registrationType !== 'forme') {
-    return [{ type: 'message', text: 'Formule X ist online nur mit Anmeldeart "Formée" (feste Teams) spielbar.' }];
+  // Mêlée-Spieler werden vor der ersten Runde zu festen Teams ausgelost (siehe melee.js).
+  if (registrationType && !FIXED_TEAM_REGISTRATION_TYPES.includes(registrationType)) {
+    return [{ type: 'message', text: 'Formule X ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.' }];
   }
   if (roundsPlayed >= formuleXRounds) {
     return [{ type: 'message', text: 'Alle Runden wurden bereits gespielt.' }];

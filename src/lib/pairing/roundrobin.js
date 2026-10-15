@@ -3,6 +3,7 @@
 // über alle Runden), bei ungerader Teamzahl rotiert ein Freilos durch.
 
 import { pairingsPerRound } from './util.js';
+import { FIXED_TEAM_REGISTRATION_TYPES } from './melee.js';
 
 export { pairingsPerRound };
 
@@ -10,12 +11,15 @@ export function totalRounds(teamCount) {
   return teamCount % 2 === 1 ? teamCount : teamCount - 1;
 }
 
+export const MIN_TEAMS = 3;
+
 export function checkRequirements(confirmedCount, { registrationType, roundsPlayed = 0 } = {}) {
-  if (confirmedCount < 3) {
-    return [{ type: 'minPlayers', min: 3 }];
+  if (confirmedCount < MIN_TEAMS) {
+    return [{ type: 'minPlayers', min: MIN_TEAMS }];
   }
-  if (registrationType && registrationType !== 'forme') {
-    return [{ type: 'message', text: 'Jeder gegen Jeden ist online nur mit Anmeldeart "Formée" (feste Teams) spielbar.' }];
+  // Mêlée-Spieler werden vor der ersten Runde zu festen Teams ausgelost (siehe melee.js).
+  if (registrationType && !FIXED_TEAM_REGISTRATION_TYPES.includes(registrationType)) {
+    return [{ type: 'message', text: 'Jeder gegen Jeden ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.' }];
   }
   if (roundsPlayed >= totalRounds(confirmedCount)) {
     return [{ type: 'message', text: 'Alle Runden wurden bereits gespielt.' }];

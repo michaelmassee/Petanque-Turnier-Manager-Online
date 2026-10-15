@@ -246,8 +246,9 @@ describe('Formule X - Voraussetzungen und Rundenende', () => {
       .toBe('Für eine Runde werden mindestens 4 bestätigte Meldungen benötigt.');
     expect(roundRequirementMessage(checkRoundRequirements({ ...tournament, registrationType: 'forme' }, 4, 4)[0]))
       .toBe('Alle Runden wurden bereits gespielt.');
-    expect(roundRequirementMessage(checkRoundRequirements({ ...tournament, registrationType: 'melee' }, 4, 0)[0]))
-      .toBe('Formule X ist online nur mit Anmeldeart "Formée" (feste Teams) spielbar.');
+    expect(roundRequirementMessage(checkRoundRequirements(tournament, 3, 0)[0], { teams: true }))
+      .toBe('Für eine Runde werden mindestens 4 Teams benötigt.');
+    expect(checkRoundRequirements(tournament, 4, 0)).toEqual([]);
   });
 
   it('erfordert mindestens 4 Teams', () => {
@@ -255,9 +256,10 @@ describe('Formule X - Voraussetzungen und Rundenende', () => {
     expect(checkRequirements(4)).toEqual([]);
   });
 
-  it('weist bei anderer Anmeldeart als Formée auf die Einschränkung hin', () => {
-    expect(checkRequirements(6, { registrationType: 'melee' })).toEqual([
-      { type: 'message', text: 'Formule X ist online nur mit Anmeldeart "Formée" (feste Teams) spielbar.' },
+  it('spielt Formée und ausgeloste Mêlée-Teams, aber keine Supermêlée', () => {
+    expect(checkRequirements(6, { registrationType: 'melee' })).toEqual([]);
+    expect(checkRequirements(6, { registrationType: 'supermelee' })).toEqual([
+      { type: 'message', text: 'Formule X ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.' },
     ]);
   });
 

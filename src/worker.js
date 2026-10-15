@@ -41,7 +41,8 @@ import {
 import { normalizeRanking } from './lib/live-ranking.js';
 import { parseStoredQrDesign } from './lib/qr-design.js';
 import { fetchCloudflareUsageDay, fetchCloudflareUsageDays, isCloudflareUsageConfigured } from './cloudflare-usage-core.js';
-import { checkRoundRequirements, getPairingStrategy, isOnlinePlayable, roundRequirementMessage } from './lib/pairing/index.js';
+import { checkRoundRequirements, getPairingStrategy, isMeleeTeamTournament, isOnlinePlayable, roundRequirementMessage } from './lib/pairing/index.js';
+import { buildMeleeTeams, meleeTeamSize } from './lib/pairing/melee.js';
 import { competitionRanks, computeRanking, sameStandardRankingPlace } from './lib/pairing/ranking.js';
 import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schweizer.js';
 import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
@@ -2169,7 +2170,16 @@ export default {
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         const session = await requireSession(request, env.DB);
         assertCanManageTournament(tournament, session.user);
-        return await drawSchweizerMeleeTeams(env.DB, tournament);
+        return await drawMeleeTeams(env.DB, tournament);
+      }
+
+      const tournamentTeamsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/teams$/);
+      if (tournamentTeamsMatch && request.method === 'DELETE') {
+        const tournament = await getTournamentById(env.DB, tournamentTeamsMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await requireSession(request, env.DB);
+        assertCanManageTournament(tournament, session.user);
+        return await resetMeleeTeams(env.DB, tournament);
       }
 
       const roundResultsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/rounds\/([^/]+)\/results$/);
@@ -6433,26 +6443,45 @@ function assertOnlineExecution(tournament) {
   }
 }
 
-async function drawSchweizerMeleeTeams(db, tournament) {
+// Mêlée-Teams lassen sich nur online und bis zur ersten Runde ändern; liefert die Team-Größe.
+async function assertMeleeTeamsEditable(db, tournament) {
   assertOnlineExecution(tournament);
-  if (tournament.type !== 'schweizer' || tournament.registration_type !== 'melee') throw new HttpError(400, 'Die Team-Auslosung ist nur für Schweizer Mêlée verfügbar');
+  if (!isMeleeTeamTournament(tournament)) throw new HttpError(400, 'Die Team-Auslosung ist nur für Mêlée-Turniere mit Online-Rundenverwaltung verfügbar.');
   if (tournament.status === 'finished') throw new HttpError(409, 'Nach Turnierende können Teams nicht mehr ausgelost werden');
   const rounds = await db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?').bind(tournament.id).first();
   if (Number(rounds.count)) throw new HttpError(409, 'Nach der ersten Runde können Teams nicht mehr ausgelost werden');
-  const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active' ORDER BY registered_at").bind(tournament.id).all();
-  const size = tournament.formation === 'triplette' ? 3 : 2;
-  if (registrations.results.length < size * 6) throw new HttpError(400, 'Für eine Runde werden mindestens 6 Teams benötigt.');
-  const shuffled = [...registrations.results].sort(() => Math.random() - 0.5);
-  const teamCount = Math.floor(shuffled.length / size); const now = new Date().toISOString();
-  const statements = [db.prepare('DELETE FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id)];
-  for (let index = 0; index < teamCount; index++) {
-    const members = shuffled.slice(index * size, (index + 1) * size);
-    const seededPositions = members.map((member) => Number(member.seeding_position || 0)).filter(Boolean);
-    const seedPosition = seededPositions.length ? Math.min(...seededPositions) : 0;
-    statements.push(db.prepare('INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), tournament.id, JSON.stringify(members.map((member) => member.id)), seedPosition, now));
-  }
-  await db.batch(statements);
-  return json({ teams: await getSchweizerTeams(db, tournament), unassignedCount: shuffled.length - teamCount * size });
+  const size = meleeTeamSize(tournament.formation);
+  if (!size) throw new HttpError(400, 'Mêlée-Teams lassen sich nur für Doublette oder Triplette auslosen.');
+  return size;
+}
+
+// Mêlée-Auslosung wie die Mêlée-Übernahme im Hauptprojekt (AbstractMeleeAnmeldungUebernehmenSheet): nur aktive
+// Spieler ohne Team werden zu neuen Teams gemischt und an die bestehenden angehängt - wiederholbar für Nachzügler.
+export async function drawMeleeTeams(db, tournament) {
+  const size = await assertMeleeTeamsEditable(db, tournament);
+  const existing = await getSchweizerTeams(db, tournament);
+  const assigned = new Set(existing.flatMap((team) => team.members));
+  const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active' ORDER BY registered_at, id").bind(tournament.id).all();
+  const open = registrations.results.filter((row) => !assigned.has(row.id));
+  const teams = buildMeleeTeams(open.map((row) => ({ id: row.id, seedPosition: Number(row.seeding_position || 0) })), size);
+  if (!teams.length) throw new HttpError(400, 'Für eine Auslosung sind nicht genügend aktive Spieler ohne Team vorhanden.');
+  // Versetzte Zeitstempel halten die Reihenfolge der Teams stabil (getSchweizerTeams sortiert nach created_at).
+  const nowMs = Date.now();
+  await db.batch(teams.map((team, index) => db.prepare('INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(crypto.randomUUID(), tournament.id, JSON.stringify(team.members), team.seedPosition, new Date(nowMs + index).toISOString())));
+  return json({ teams: await getSchweizerTeams(db, tournament), drawnCount: teams.length, unassignedCount: open.length - teams.length * size });
+}
+
+// Wie das Löschen von Teams im Hauptprojekt: alle Spieler sind danach wieder ohne Team.
+export async function resetMeleeTeams(db, tournament) {
+  await assertMeleeTeamsEditable(db, tournament);
+  await db.prepare('DELETE FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).run();
+  return json({ teams: [] });
+}
+
+// Feste Teams eines Turniers: bei Mêlée die ausgelosten, sonst eine Meldung je Team (Formée).
+async function fixedTeams(db, tournament) {
+  return tournament.registration_type === 'melee' ? getSchweizerTeams(db, tournament) : createFormeTeams(db, tournament);
 }
 
 async function listTournamentRounds(db, tournamentId) {
@@ -6482,7 +6511,7 @@ async function loadTournamentRounds(db, tournamentId) {
   };
 }
 
-async function generateTournamentRound(db, tournament) {
+export async function generateTournamentRound(db, tournament) {
   if (isCalendarEntry(tournament)) {
     throw new HttpError(409, 'Kalendereinträge können nicht gestartet werden');
   }
@@ -6496,13 +6525,18 @@ async function generateTournamentRound(db, tournament) {
 
   // Auch direkte API-Aufrufe müssen die systemabhängigen Mindestanforderungen,
   // die zulässige Anmeldeart und das natürliche Rundenende einhalten.
+  // Bei Mêlée zählen die ausgelosten Teams, nicht die Einzelanmeldungen.
+  const melee = isMeleeTeamTournament(tournament);
   const [activeConfirmed, existingRounds] = await Promise.all([
-    db.prepare("SELECT COUNT(*) AS count FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active'").bind(tournament.id).first(),
+    melee
+      ? db.prepare('SELECT COUNT(*) AS count FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).first()
+      : db.prepare("SELECT COUNT(*) AS count FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active'").bind(tournament.id).first(),
     db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?').bind(tournament.id).first(),
   ]);
+  if (melee && !Number(activeConfirmed.count)) throw new HttpError(400, 'Bitte zuerst Mêlée-Teams auslosen');
   const requirement = checkRoundRequirements(tournament, Number(activeConfirmed.count), Number(existingRounds.count))[0];
   if (requirement) {
-    throw new HttpError(400, roundRequirementMessage(requirement));
+    throw new HttpError(400, roundRequirementMessage(requirement, { teams: melee }));
   }
 
   const lastRound = await db
@@ -6531,9 +6565,7 @@ async function generateTournamentRound(db, tournament) {
   let players;
   let teamsById = new Map();
   if (usesFixedTeams) {
-    let teams = isRoundRobin || isFormuleX || isKo || tournament.registration_type === 'forme'
-      ? await createFormeTeams(db, tournament)
-      : await getSchweizerTeams(db, tournament);
+    let teams = await fixedTeams(db, tournament);
     if (!teams.length) throw new HttpError(400, 'Bitte zuerst Mêlée-Teams auslosen');
     if (isKo) {
       teams = await assignKoBracketGroups(db, tournament, teams);
@@ -6785,7 +6817,7 @@ async function getTournamentRanking(db, tournament) {
   return json({ ranking: await computeTournamentRanking(db, tournament) });
 }
 
-async function computeTournamentRanking(db, tournament) {
+export async function computeTournamentRanking(db, tournament) {
   // Bei einem gebundenen Turnier gilt der Snapshot des Dokuments, auch nach einem Zurücksetzen des Starts: eine
   // Online-Berechnung kennt die Kriterien der Desktop-Systeme (Poule, Kaskade, …) nicht.
   if (Number(tournament.desktop_execution || 0) === 1 || (isDocumentBound(tournament) && tournament.desktop_ranking_json)) {
@@ -6826,7 +6858,7 @@ async function computeTournamentRanking(db, tournament) {
     return [];
   }
   if (tournament.type === 'formule_x') {
-    const teams = await createFormeTeams(db, tournament);
+    const teams = await fixedTeams(db, tournament);
     const teamsById = new Map(teams.map((team) => [team.id, team]));
     const formuleXMatches = matchesResult.results.map((row) => ({
       teamA: row.team_a_id ? [row.team_a_id] : [], teamB: row.team_b_id ? [row.team_b_id] : [], scoreA: row.score_a, scoreB: row.score_b, noShow: row.no_show,
@@ -6840,6 +6872,19 @@ async function computeTournamentRanking(db, tournament) {
     return ranking.map((entry) => ({
       ...entry, teamId: entry.teamId,
       members: (teamsById.get(entry.teamId)?.members || []).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
+    }));
+  }
+  if (tournament.registration_type === 'melee') {
+    // Jeder gegen Jeden mit Mêlée: Rangliste je ausgelostem Team statt je Spieler.
+    const teams = await getSchweizerTeams(db, tournament);
+    const teamsById = new Map(teams.map((team) => [team.id, team]));
+    const teamMatches = matchesResult.results.map((row) => ({
+      teamA: row.team_a_id ? [row.team_a_id] : [], teamB: row.team_b_id ? [row.team_b_id] : [], scoreA: row.score_a, scoreB: row.score_b, noShow: row.no_show,
+    }));
+    const playersById = await getPlayersById(db, tournament.id);
+    return competitionRanks(computeRanking(teamMatches), sameStandardRankingPlace).map(({ playerId, ...entry }) => ({
+      ...entry, teamId: playerId,
+      members: (teamsById.get(playerId)?.members || []).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
     }));
   }
   const ranking = competitionRanks(computeRanking(matches), sameStandardRankingPlace);

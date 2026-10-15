@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { TextField, Button, Feedback } from '../components/ui.jsx';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
-import { checkRoundRequirements, getSupportedSystemLabels, isOnlinePlayable } from '../lib/pairing/index.js';
+import { checkRoundRequirements, getSupportedSystemLabels, isMeleeTeamTournament, isOnlinePlayable, minimumTeams } from '../lib/pairing/index.js';
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
 import { isCalendarEntry, isDocumentBound, labelFor, translatedOptions } from '../lib/domain.js';
 import { normalizeRanking } from '../lib/live-ranking.js';
 import { RankingTable } from '../components/RankingTable.jsx';
+import { meleeTeamSize } from '../lib/pairing/melee.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
@@ -16,8 +17,9 @@ import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteLis
 // eingebacken zu sein (verschiedene Systeme/Formationen können unterschiedliche
 // Mindestanzahlen haben), 'message' ist ein fertiger, übersetzbarer Freitext für
 // alles, was sich nicht in ein generisches Muster fassen lässt.
-function requirementText(requirement, t) {
+function requirementText(requirement, t, { teams = false } = {}) {
   if (requirement.type === 'minPlayers') {
+    if (teams) return t('Es werden mindestens {{min}} Teams benötigt.', { min: requirement.min });
     return `${t('Es werden mindestens')} ${requirement.min} ${t('bestätigte Meldungen benötigt.')}`;
   }
   return t(requirement.text);
@@ -352,7 +354,20 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
       const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/teams/draw`, { method: 'POST' });
       queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, teams: data.teams || [] }));
-      setMessage(`${t('Mêlée-Teams wurden ausgelost:')} ${data.teams.length}`);
+      setMessage(t('{{drawn}} Mêlée-Teams ausgelost, insgesamt {{total}} Teams. {{open}} aktive Spieler ohne Team.', {
+        drawn: data.drawnCount, total: data.teams.length, open: data.unassignedCount,
+      }));
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+
+  async function handleResetMeleeTeams() {
+    if (!window.confirm(t('Alle ausgelosten Mêlée-Teams auflösen? Alle Spieler sind danach wieder ohne Team.'))) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
+      await authenticatedApi(`/api/tournaments/${selectedTournamentId}/teams`, { method: 'DELETE' });
+      queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, teams: [] }));
+      setMessage(t('Mêlée-Teams wurden aufgelöst.'));
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   }
 
@@ -481,10 +496,15 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const currentRound = rounds[rounds.length - 1] || null;
   const currentRoundOpen = currentRound ? !isRoundComplete(currentRound) : false;
   const activeConfirmedCount = confirmedRegistrations.filter((registration) => registration.participation === 'active').length;
-  const isSchweizerMelee = selectedTournament?.type === 'schweizer' && selectedTournament?.registrationType === 'melee';
-  const requiredMeleePlayers = selectedTournament?.formation === 'triplette' ? 18 : 12;
-  const canDrawMeleeTeams = isSchweizerMelee && !rounds.length && activeConfirmedCount >= requiredMeleePlayers;
-  const missingMeleeDraw = isSchweizerMelee && swissTeams.length < 6;
+  // Mêlée: aktive Spieler werden schrittweise zu festen Teams ausgelost (wie die Mêlée-Übernahme im Hauptprojekt).
+  const isMelee = Boolean(selectedTournament) && isMeleeTeamTournament(selectedTournament);
+  const meleeSize = meleeTeamSize(selectedTournament?.formation) || 2;
+  const assignedPlayerIds = new Set(swissTeams.flatMap((team) => team.members || []));
+  const openMeleePlayers = confirmedRegistrations.filter((registration) => registration.participation === 'active' && !assignedPlayerIds.has(registration.id)).length;
+  const requiredMeleePlayers = meleeSize * (selectedTournament ? minimumTeams(selectedTournament) : 0);
+  const canEditMeleeTeams = isMelee && !rounds.length;
+  const canDrawMeleeTeams = canEditMeleeTeams && openMeleePlayers >= meleeSize;
+  const missingMeleeDraw = isMelee && swissTeams.length === 0;
 
   // Voraussetzungen für "Neue Runde starten" proaktiv prüfen, damit der Turniersteller
   // sofort sieht, was fehlt, statt es erst nach einem Fehlschlag zu erfahren. Die
@@ -493,11 +513,11 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   // hier bleibt der Check bewusst generisch, damit künftige Online-Turniersysteme
   // keine Anpassung an dieser Stelle brauchen. Nur aktive Meldungen zählen, analog zum
   // Hauptprojekt (nur Meldungen mit Spieltag-Status "JA" gehen in die Rundenauslosung ein).
-  const strategyRequirementGaps = selectedTournament && selectedTournamentStatus === 'running'
-    ? checkRoundRequirements(selectedTournament, activeConfirmedCount, rounds.length)
+  const strategyRequirementGaps = selectedTournament && selectedTournamentStatus === 'running' && !missingMeleeDraw
+    ? checkRoundRequirements(selectedTournament, isMelee ? swissTeams.length : activeConfirmedCount, rounds.length)
     : [];
   const missingRequirements = [
-    ...strategyRequirementGaps.map((requirement) => requirementText(requirement, t)),
+    ...strategyRequirementGaps.map((requirement) => requirementText(requirement, t, { teams: isMelee })),
     ...(selectedTournamentStatus === 'running' && currentRoundOpen
       ? [t('Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen.')]
       : []),
@@ -536,9 +556,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
         />
         {selectedTournament && selectedTournamentStatus !== 'running' && (
           <div className="play-toolbar-actions">
-            {isSchweizerMelee && !rounds.length && (
-              <Button variant="secondary" disabled={busy || !selectedTournamentId || !canDrawMeleeTeams} loading={busy} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>
-            )}
+
             <Button disabled={busy || !selectedTournamentId} loading={busy} onClick={handleStartTournament}>{t('Turnier starten')}</Button>
           </div>
         )}
@@ -548,8 +566,11 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
               {t('Bestätigte Meldungen')} · {labelFor(REGISTRATION_TYPES, selectedTournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, selectedTournament.type)} · {labelFor(FORMATIONS, selectedTournament.formation)}: {confirmedRegistrations.length} ({activeConfirmedCount} {t('aktiv')})
               {selectedTournament.type === 'schweizer' && ` · ${t(selectedTournament.schweizerRankingMode === 'ohne_buchholz' ? 'Ohne Buchholz' : 'Mit Buchholz und Feinbuchholz')}`}
             </p>
-            {isSchweizerMelee && !rounds.length && (
-              <Button variant="secondary" disabled={busy || !canDrawMeleeTeams} loading={busy} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>
+            {canEditMeleeTeams && (
+              <>
+                <Button variant="secondary" disabled={busy || !canDrawMeleeTeams} loading={busy} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>
+                {swissTeams.length > 0 && <Button variant="secondary" disabled={busy} loading={busy} onClick={handleResetMeleeTeams}>{t('Auslosung zurücksetzen')}</Button>}
+              </>
             )}
           </div>
         )}
@@ -565,8 +586,12 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
       <Feedback message={message} error={error || queryError?.message} />
 
-      {isSchweizerMelee && !rounds.length && activeConfirmedCount < requiredMeleePlayers && (
-        <p className="hint">{t('Für die Mêlée-Auslosung werden mindestens')} {requiredMeleePlayers} {t('aktive bestätigte Meldungen benötigt.')}</p>
+      {canEditMeleeTeams && selectedTournamentStatus === 'running' && (
+        <p className="hint">
+          {t('Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.', {
+            teams: swissTeams.length, open: openMeleePlayers, required: requiredMeleePlayers,
+          })}
+        </p>
       )}
 
       {selectedTournamentStatus === 'running' && (

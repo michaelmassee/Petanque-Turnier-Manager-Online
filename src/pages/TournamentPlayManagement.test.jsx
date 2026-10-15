@@ -78,7 +78,11 @@ function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registratio
       return Promise.resolve(jsonResponse({ rounds: [updated] }));
     }
     if (path === '/api/tournaments/t1/teams/draw' && options.method === 'POST') {
-      return Promise.resolve(jsonResponse({ teams: Array.from({ length: 6 }, (_, index) => ({ id: `team-${index}` })) }));
+      const teams = Array.from({ length: 6 }, (_, index) => ({ id: `team-${index}`, members: [`p${index * 2}`, `p${index * 2 + 1}`] }));
+      return Promise.resolve(jsonResponse({ teams, drawnCount: 6, unassignedCount: 1 }));
+    }
+    if (path === '/api/tournaments/t1/teams' && options.method === 'DELETE') {
+      return Promise.resolve(jsonResponse({ teams: [] }));
     }
     if (/^\/api\/registrations\/.+\/participation$/.test(path) && options.method === 'PUT') {
       return Promise.resolve(jsonResponse({ registration: {} }));
@@ -205,19 +209,28 @@ describe('TournamentPlayManagement', () => {
     expect(calls).toContain('/api/tournaments/t1/rounds');
   });
 
-  it('lost vor der ersten Runde die Teams eines Schweizer-Mêlée aus', async () => {
+  it.each([['schweizer'], ['formule_x'], ['jeder_gegen_jeden'], ['ko']])('lost vor der ersten Runde die Mêlée-Teams aus (%s)', async (type) => {
     const calls = [];
-    const registrations = Array.from({ length: 12 }, (_, index) => ({ id: `p${index}`, firstName: `Spieler ${index}`, status: 'confirmed', participation: 'active' }));
+    const registrations = Array.from({ length: 13 }, (_, index) => ({ id: `p${index}`, firstName: `Spieler ${index}`, status: 'confirmed', participation: 'active' }));
     installFetchMock(calls, {
       rounds: [], registrations,
     });
-    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, type: 'schweizer', registrationType: 'melee', formation: 'doublette' }]} language="de" />);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, type, registrationType: 'melee', formation: 'doublette' }]} language="de" />);
 
+    expect(await screen.findByText('Bitte zuerst Mêlée-Teams auslosen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erste Runde starten' })).toBeDisabled();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Mêlée-Teams auslosen' })).not.toBeDisabled());
     fireEvent.click(screen.getByRole('button', { name: 'Mêlée-Teams auslosen' }));
 
-    expect(await screen.findByText('Mêlée-Teams wurden ausgelost: 6')).toBeInTheDocument();
+    expect(await screen.findByText('6 Mêlée-Teams ausgelost, insgesamt 6 Teams. 1 aktive Spieler ohne Team.')).toBeInTheDocument();
     expect(calls).toContain('/api/tournaments/t1/teams/draw');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Erste Runde starten' })).not.toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Mêlée-Teams auslosen' })).toBeDisabled();
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Auslosung zurücksetzen' }));
+    expect(await screen.findByText('Mêlée-Teams wurden aufgelöst.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erste Runde starten' })).toBeDisabled();
   });
 
   it('zeigt fehlende Voraussetzungen und deaktiviert den Button bei zu wenigen bestätigten Meldungen', async () => {

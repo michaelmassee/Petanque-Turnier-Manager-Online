@@ -85,9 +85,10 @@ describe('Jeder gegen Jeden (Round Robin)', () => {
     expect(checkRequirements(3)).toEqual([]);
   });
 
-  it('weist bei anderer Anmeldeart als Formée auf die Einschränkung hin', () => {
-    expect(checkRequirements(6, { registrationType: 'melee' })).toEqual([
-      { type: 'message', text: 'Jeder gegen Jeden ist online nur mit Anmeldeart "Formée" (feste Teams) spielbar.' },
+  it('spielt Formée und ausgeloste Mêlée-Teams, aber keine Supermêlée', () => {
+    expect(checkRequirements(6, { registrationType: 'melee' })).toEqual([]);
+    expect(checkRequirements(6, { registrationType: 'supermelee' })).toEqual([
+      { type: 'message', text: 'Jeder gegen Jeden ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.' },
     ]);
     expect(checkRequirements(6, { registrationType: 'forme' })).toEqual([]);
   });

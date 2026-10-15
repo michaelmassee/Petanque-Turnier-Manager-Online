@@ -4,6 +4,8 @@
 // (Setzliste, Winner-Advance, Spiel um Platz 3). Feste Teams (Formée), keine
 // Ergebnis-abhängige Neupaarung innerhalb eines Baums - nur Sieger rücken vor.
 
+import { FIXED_TEAM_REGISTRATION_TYPES } from './melee.js';
+
 // Größte Zweierpotenz <= n (Integer.highestOneBit, ohne Schleife/Obergrenze im Original;
 // hier über einen einfachen Verdopplungs-Loop, weil JS kein Bit-Intrinsic dafür hat).
 export function highestPowerOfTwo(n) {
@@ -79,12 +81,15 @@ export function assignGroups(orderedTeamIds, { maxGroupSize = 16, minLastGroupSi
   return result;
 }
 
+export const MIN_TEAMS = 2;
+
 export function checkRequirements(confirmedCount, { registrationType } = {}) {
-  if (confirmedCount < 2) {
-    return [{ type: 'minPlayers', min: 2 }];
+  if (confirmedCount < MIN_TEAMS) {
+    return [{ type: 'minPlayers', min: MIN_TEAMS }];
   }
-  if (registrationType && registrationType !== 'forme') {
-    return [{ type: 'message', text: 'K.O. ist online nur mit Anmeldeart "Formée" (feste Teams) spielbar.' }];
+  // Mêlée-Spieler werden vor der ersten Runde zu festen Teams ausgelost (siehe melee.js).
+  if (registrationType && !FIXED_TEAM_REGISTRATION_TYPES.includes(registrationType)) {
+    return [{ type: 'message', text: 'K.O. ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.' }];
   }
   return [];
 }

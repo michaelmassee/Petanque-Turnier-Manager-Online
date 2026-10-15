@@ -103,9 +103,10 @@ describe('K.O. - checkRequirements', () => {
     expect(checkRequirements(2)).toEqual([]);
   });
 
-  it('nur mit Anmeldeart Formée online spielbar', () => {
-    expect(checkRequirements(8, { registrationType: 'melee' })).toEqual([
-      { type: 'message', text: 'K.O. ist online nur mit Anmeldeart "Formée" (feste Teams) spielbar.' },
+  it('nur mit festen Teams (Formée oder Mêlée) online spielbar', () => {
+    expect(checkRequirements(8, { registrationType: 'melee' })).toEqual([]);
+    expect(checkRequirements(8, { registrationType: 'supermelee' })).toEqual([
+      { type: 'message', text: 'K.O. ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.' },
     ]);
     expect(checkRequirements(8, { registrationType: 'forme' })).toEqual([]);
   });

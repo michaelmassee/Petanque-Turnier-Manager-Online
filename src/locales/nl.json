@@ -1468,5 +1468,18 @@
   "Die Sperrliste muss als Liste übergeben werden.": "De blokkeerlijst moet als lijst worden doorgegeven.",
   "Die Sperrliste enthält zu viele Muster.": "De blokkeerlijst bevat te veel patronen.",
   "Die Sperrliste enthält ein ungültiges Muster.": "De blokkeerlijst bevat een ongeldig patroon.",
-  "Ein ausgewählter Pétanque-Aktuell-Termin steht auf der Sperrliste.": "Een geselecteerd Pétanque-Aktuell-evenement staat op de blokkeerlijst."
+  "Ein ausgewählter Pétanque-Aktuell-Termin steht auf der Sperrliste.": "Een geselecteerd Pétanque-Aktuell-evenement staat op de blokkeerlijst.",
+  "Formule X ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.": "Formule X kan online alleen met vaste teams (inschrijvingstype Formée of Mêlée) worden gespeeld.",
+  "Jeder gegen Jeden ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.": "Ieder tegen ieder kan online alleen met vaste teams (inschrijvingstype Formée of Mêlée) worden gespeeld.",
+  "K.O. ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.": "Knock-out kan online alleen met vaste teams (inschrijvingstype Formée of Mêlée) worden gespeeld.",
+  "Für eine Runde werden mindestens 4 Teams benötigt.": "Er zijn minstens 4 teams nodig voor een ronde.",
+  "Es werden mindestens {{min}} Teams benötigt.": "Er zijn minstens {{min}} teams nodig.",
+  "Die Team-Auslosung ist nur für Mêlée-Turniere mit Online-Rundenverwaltung verfügbar.": "Teamloting is alleen beschikbaar voor Mêlée-toernooien met online rondebeheer.",
+  "Mêlée-Teams lassen sich nur für Doublette oder Triplette auslosen.": "Mêlée-teams kunnen alleen voor doublette of triplette worden geloot.",
+  "Für eine Auslosung sind nicht genügend aktive Spieler ohne Team vorhanden.": "Er zijn niet genoeg actieve spelers zonder team voor een loting.",
+  "{{drawn}} Mêlée-Teams ausgelost, insgesamt {{total}} Teams. {{open}} aktive Spieler ohne Team.": "{{drawn}} mêlée-teams geloot, in totaal {{total}} teams. {{open}} actieve spelers zonder team.",
+  "Alle ausgelosten Mêlée-Teams auflösen? Alle Spieler sind danach wieder ohne Team.": "Alle gelote mêlée-teams ontbinden? Alle spelers zijn daarna weer zonder team.",
+  "Mêlée-Teams wurden aufgelöst.": "Mêlée-teams zijn ontbonden.",
+  "Auslosung zurücksetzen": "Loting terugzetten",
+  "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée: {{teams}} teams geloot, {{open}} actieve spelers zonder team. Voor de eerste ronde zijn minstens {{required}} spelers in teams nodig."
 }

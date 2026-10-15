@@ -1468,5 +1468,18 @@
   "Die Sperrliste muss als Liste übergeben werden.": "La lista de bloqueo debe enviarse como lista.",
   "Die Sperrliste enthält zu viele Muster.": "La lista de bloqueo contiene demasiados patrones.",
   "Die Sperrliste enthält ein ungültiges Muster.": "La lista de bloqueo contiene un patrón no válido.",
-  "Ein ausgewählter Pétanque-Aktuell-Termin steht auf der Sperrliste.": "Un evento seleccionado de Pétanque Aktuell está en la lista de bloqueo."
+  "Ein ausgewählter Pétanque-Aktuell-Termin steht auf der Sperrliste.": "Un evento seleccionado de Pétanque Aktuell está en la lista de bloqueo.",
+  "Formule X ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.": "Formule X solo se puede jugar en línea con equipos fijos (tipo de inscripción Formée o Mêlée).",
+  "Jeder gegen Jeden ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.": "Todos contra todos solo se puede jugar en línea con equipos fijos (tipo de inscripción Formée o Mêlée).",
+  "K.O. ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.": "El sistema K.O. solo se puede jugar en línea con equipos fijos (tipo de inscripción Formée o Mêlée).",
+  "Für eine Runde werden mindestens 4 Teams benötigt.": "Se necesitan al menos 4 equipos para una ronda.",
+  "Es werden mindestens {{min}} Teams benötigt.": "Se necesitan al menos {{min}} equipos.",
+  "Die Team-Auslosung ist nur für Mêlée-Turniere mit Online-Rundenverwaltung verfügbar.": "El sorteo de equipos solo está disponible para torneos Mêlée con gestión de rondas en línea.",
+  "Mêlée-Teams lassen sich nur für Doublette oder Triplette auslosen.": "Los equipos Mêlée solo se pueden sortear para doublette o triplette.",
+  "Für eine Auslosung sind nicht genügend aktive Spieler ohne Team vorhanden.": "No hay suficientes jugadores activos sin equipo para un sorteo.",
+  "{{drawn}} Mêlée-Teams ausgelost, insgesamt {{total}} Teams. {{open}} aktive Spieler ohne Team.": "{{drawn}} equipos Mêlée sorteados, {{total}} equipos en total. {{open}} jugadores activos sin equipo.",
+  "Alle ausgelosten Mêlée-Teams auflösen? Alle Spieler sind danach wieder ohne Team.": "¿Disolver todos los equipos Mêlée sorteados? Después, todos los jugadores volverán a estar sin equipo.",
+  "Mêlée-Teams wurden aufgelöst.": "Los equipos Mêlée se han disuelto.",
+  "Auslosung zurücksetzen": "Restablecer sorteo",
+  "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée: {{teams}} equipos sorteados, {{open}} jugadores activos sin equipo. Para la primera ronda se necesitan al menos {{required}} jugadores en equipos."
 }

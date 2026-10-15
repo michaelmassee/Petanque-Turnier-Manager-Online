@@ -1468,5 +1468,18 @@
   "Die Sperrliste muss als Liste übergeben werden.": "The blocklist must be provided as a list.",
   "Die Sperrliste enthält zu viele Muster.": "The blocklist contains too many patterns.",
   "Die Sperrliste enthält ein ungültiges Muster.": "The blocklist contains an invalid pattern.",
-  "Ein ausgewählter Pétanque-Aktuell-Termin steht auf der Sperrliste.": "A selected Pétanque Aktuell event is on the blocklist."
+  "Ein ausgewählter Pétanque-Aktuell-Termin steht auf der Sperrliste.": "A selected Pétanque Aktuell event is on the blocklist.",
+  "Formule X ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.": "Formule X can only be played online with fixed teams (registration type Formée or Mêlée).",
+  "Jeder gegen Jeden ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.": "Round robin can only be played online with fixed teams (registration type Formée or Mêlée).",
+  "K.O. ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.": "Knockout can only be played online with fixed teams (registration type Formée or Mêlée).",
+  "Für eine Runde werden mindestens 4 Teams benötigt.": "At least 4 teams are required for a round.",
+  "Es werden mindestens {{min}} Teams benötigt.": "At least {{min}} teams are required.",
+  "Die Team-Auslosung ist nur für Mêlée-Turniere mit Online-Rundenverwaltung verfügbar.": "Team drawing is only available for Mêlée tournaments with online round management.",
+  "Mêlée-Teams lassen sich nur für Doublette oder Triplette auslosen.": "Mêlée teams can only be drawn for Doublette or Triplette.",
+  "Für eine Auslosung sind nicht genügend aktive Spieler ohne Team vorhanden.": "There are not enough active players without a team for a draw.",
+  "{{drawn}} Mêlée-Teams ausgelost, insgesamt {{total}} Teams. {{open}} aktive Spieler ohne Team.": "{{drawn}} Mêlée teams drawn, {{total}} teams in total. {{open}} active players without a team.",
+  "Alle ausgelosten Mêlée-Teams auflösen? Alle Spieler sind danach wieder ohne Team.": "Dissolve all drawn Mêlée teams? All players will then be without a team again.",
+  "Mêlée-Teams wurden aufgelöst.": "Mêlée teams have been dissolved.",
+  "Auslosung zurücksetzen": "Reset draw",
+  "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée: {{teams}} teams drawn, {{open}} active players without a team. The first round requires at least {{required}} players in teams."
 }

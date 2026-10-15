@@ -15,8 +15,10 @@ function opponentPairs(history) {
   return new Set(history.filter((match) => match.teamA?.length && match.teamB?.length).map((match) => pairKey(match.teamA[0], match.teamB[0])));
 }
 
+export const MIN_TEAMS = 6;
+
 export function checkRequirements(confirmedCount) {
-  return confirmedCount < 6 ? [{ type: 'minPlayers', min: 6 }] : [];
+  return confirmedCount < MIN_TEAMS ? [{ type: 'minPlayers', min: MIN_TEAMS }] : [];
 }
 
 export function swissStats(teams, history, mode = 'mit_buchholz') {
