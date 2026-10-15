@@ -351,6 +351,15 @@ describe('Admin-Dashboard', () => {
         },
       });
       if (path.startsWith('/api/admin/cloudflare-usage')) return Promise.resolve({ configured: false });
+      if (path.startsWith('/api/admin/growth-stats?kind=')) {
+        const users = path.includes('kind=users');
+        return Promise.resolve({
+          kind: users ? 'users' : 'tournaments',
+          range: 30,
+          days: [{ day: '2026-10-09', added: 0, total: users ? 47 : 12 }, { day: '2026-10-10', added: users ? 2 : 3, total: users ? 49 : 15 }],
+          totals: { total: users ? 49 : 15, today: users ? 2 : 3, range: users ? 20 : 9, since: '2026-08-14' },
+        });
+      }
       throw new Error(`unerwarteter API-Aufruf: ${path}`);
     });
 
@@ -360,6 +369,9 @@ describe('Admin-Dashboard', () => {
     expect(within(screen.getByRole('button', { name: /Bouleplätze/ })).getByText('0')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /Pétanque Aktuell importieren/ })).getByText('1')).toBeInTheDocument();
     expect(await screen.findByText(/Nicht eingerichtet: Der Worker braucht die Secrets/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Registrierte Benutzer' })).toBeInTheDocument();
+    expect(await screen.findByText('2 neu · 49 insgesamt')).toBeInTheDocument();
+    expect(await screen.findByText('3 neu · 15 insgesamt')).toBeInTheDocument();
   });
 
   it('zeigt die Cloudflare-Auslastung mit Tageslimit und lädt Stundenverlauf und teuerste Abfragen des gewählten Tages', async () => {

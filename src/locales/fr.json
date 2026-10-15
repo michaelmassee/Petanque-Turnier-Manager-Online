@@ -1447,5 +1447,14 @@
   "Gesehen": "Vu",
   "Zusatztext ausblenden": "Masquer le texte supplémentaire",
   "Dieses Turnier ist mit einem Turnierdokument verbunden und wird dort gestartet.": "Ce tournoi est lié à un document de tournoi et y est démarré.",
-  "Ungültige Einstellung Spiel um Platz 3": "Paramètre invalide pour le match pour la troisième place"
+  "Ungültige Einstellung Spiel um Platz 3": "Paramètre invalide pour le match pour la troisième place",
+  "Registrierte Benutzer": "Utilisateurs inscrits",
+  "Registriert": "Inscrits",
+  "Benutzerkonten und Neuregistrierungen pro Tag (UTC). Gelöschte Konten fehlen im Verlauf.": "Comptes utilisateurs et nouvelles inscriptions par jour (UTC). Les comptes supprimés n’apparaissent pas dans l’historique.",
+  "Angelegte Turniere ohne Kalendereinträge, pro Tag (UTC). Gelöschte Turniere fehlen im Verlauf.": "Tournois créés hors entrées de calendrier, par jour (UTC). Les tournois supprimés n’apparaissent pas dans l’historique.",
+  "seit {{date}}": "depuis le {{date}}",
+  "Neu heute": "Nouveaux aujourd’hui",
+  "Neu in den letzten {{count}} Tagen": "Nouveaux ces {{count}} derniers jours",
+  "{{added}} neu · {{total}} insgesamt": "{{added}} nouveaux · {{total}} au total",
+  "Unbekannte Statistik.": "Statistique inconnue."
 }

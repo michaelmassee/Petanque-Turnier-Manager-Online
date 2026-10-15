@@ -540,6 +540,122 @@ export function CloudflareUsagePanel() {
   );
 }
 
+// Wie bei den Besuchern: bei 365 Tagen je 7 Tage zu einer Säule; Neue werden summiert, der Gesamtstand gilt am Wochenende.
+function groupGrowthDays(days, range) {
+  if (range < 365) return days.map((entry) => ({ ...entry, from: entry.day, to: entry.day }));
+  const groups = [];
+  for (let index = days.length % 7; index < days.length; index += 7) {
+    const week = days.slice(index, index + 7);
+    groups.push({ from: week[0].day, to: week.at(-1).day, added: week.reduce((sum, entry) => sum + entry.added, 0), total: week.at(-1).total });
+  }
+  return groups;
+}
+
+/** Bestand und Zuwachs (Benutzer oder Turniere) mit Verlauf pro Tag. */
+export function GrowthStatsPanel({ kind, title, description, totalLabel }) {
+  const { t, i18n } = useTranslation();
+  const language = i18n.language;
+  const [range, setRange] = useState(VISITOR_RANGES[0]);
+  const [metric, setMetric] = useState('total');
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeIndex, setActiveIndex] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    authenticatedApi(`/api/admin/growth-stats?kind=${kind}&days=${range}`)
+      .then((result) => { if (!cancelled) { setStats(result); setActiveIndex(null); } })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [kind, range]);
+
+  const bars = useMemo(() => (stats ? groupGrowthDays(stats.days, stats.range) : []), [stats]);
+  const shownBar = bars[activeIndex ?? bars.length - 1];
+  const metrics = [{ key: 'total', label: totalLabel }, { key: 'added', label: t('Neu') }];
+  const barLabel = (bar) => (bar.from === bar.to
+    ? formatDate(bar.from, language)
+    : `${formatDate(bar.from, language)} – ${formatDate(bar.to, language)}`);
+  const labelIndexes = [...new Set([0, Math.floor((bars.length - 1) / 2), bars.length - 1])];
+
+  return (
+    <div className="panel">
+      <div className="section-title">
+        <div>
+          <h2>{title}</h2>
+          <p className="muted">{description}</p>
+        </div>
+        <div className="visitor-range" role="group" aria-label={t('Zeitraum')}>
+          {VISITOR_RANGES.map((days) => (
+            <Button key={days} variant={range === days ? 'primary' : 'secondary'} aria-pressed={range === days}
+              loading={loading && range === days} onClick={() => setRange(days)}>
+              {t('{{count}} Tage', { count: days })}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <Feedback error={error} />
+      {stats && (
+        <div aria-busy={loading}>
+          <div className="visitor-totals">
+            <div className="visitor-total">
+              <span className="visitor-total-label">{totalLabel}</span>
+              <strong>{stats.totals.total}</strong>
+              {stats.totals.since && (
+                <span className="visitor-total-split">{t('seit {{date}}', { date: formatDate(stats.totals.since, language) })}</span>
+              )}
+            </div>
+            <div className="visitor-total">
+              <span className="visitor-total-label">{t('Neu heute')}</span>
+              <strong>{stats.totals.today}</strong>
+            </div>
+            <div className="visitor-total">
+              <span className="visitor-total-label">{t('Neu in den letzten {{count}} Tagen', { count: stats.range })}</span>
+              <strong>{stats.totals.range}</strong>
+            </div>
+          </div>
+          <div className="visitor-range usage-metrics" role="group" aria-label={t('Kennzahl')}>
+            {metrics.map(({ key, label }) => (
+              <Button key={key} variant={metric === key ? 'primary' : 'secondary'} aria-pressed={metric === key} onClick={() => setMetric(key)}>
+                {label}
+              </Button>
+            ))}
+          </div>
+          {shownBar && (
+            <p className="visitor-readout" aria-live="polite">
+              <strong>{barLabel(shownBar)}</strong>
+              {' '}
+              {t('{{added}} neu · {{total}} insgesamt', { added: shownBar.added, total: shownBar.total })}
+            </p>
+          )}
+          <UsageChart bars={bars.map((bar) => ({ key: bar.from, value: bar[metric] }))}
+            labelFor={(index) => formatDate(bars[index].from, language)} labelIndexes={labelIndexes} language={language}
+            activeIndex={activeIndex} onActivate={setActiveIndex}
+            ariaLabel={`${title}: ${metrics.find((entry) => entry.key === metric).label}`} />
+          <details className="visitor-table">
+            <summary>{t('Als Tabelle anzeigen')}</summary>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr><th>{stats.range < 365 ? t('Tag') : t('Woche')}</th><th>{t('Neu')}</th><th>{totalLabel}</th></tr>
+                </thead>
+                <tbody>
+                  {[...bars].reverse().map((bar) => (
+                    <tr key={bar.from}><td>{barLabel(bar)}</td><td>{bar.added}</td><td>{bar.total}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, registrationsCount }) {
   const { t } = useTranslation();
   const [stats, setStats] = useState(null);
@@ -671,6 +787,10 @@ export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, 
         </div>
       </div>
       <VisitorStatsPanel />
+      <GrowthStatsPanel kind="users" title={t('Registrierte Benutzer')} totalLabel={t('Registriert')}
+        description={t('Benutzerkonten und Neuregistrierungen pro Tag (UTC). Gelöschte Konten fehlen im Verlauf.')} />
+      <GrowthStatsPanel kind="tournaments" title={t('Turniere')} totalLabel={t('Turniere')}
+        description={t('Angelegte Turniere ohne Kalendereinträge, pro Tag (UTC). Gelöschte Turniere fehlen im Verlauf.')} />
       <CloudflareUsagePanel />
       <DataRetentionPanel />
     </section>

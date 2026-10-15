@@ -1447,5 +1447,14 @@
   "Gesehen": "Gezien",
   "Zusatztext ausblenden": "Aanvullende tekst verbergen",
   "Dieses Turnier ist mit einem Turnierdokument verbunden und wird dort gestartet.": "Dit toernooi is gekoppeld aan een toernooidocument en wordt daar gestart.",
-  "Ungültige Einstellung Spiel um Platz 3": "Ongeldige instelling voor de wedstrijd om de derde plaats"
+  "Ungültige Einstellung Spiel um Platz 3": "Ongeldige instelling voor de wedstrijd om de derde plaats",
+  "Registrierte Benutzer": "Geregistreerde gebruikers",
+  "Registriert": "Geregistreerd",
+  "Benutzerkonten und Neuregistrierungen pro Tag (UTC). Gelöschte Konten fehlen im Verlauf.": "Gebruikersaccounts en nieuwe registraties per dag (UTC). Verwijderde accounts ontbreken in het verloop.",
+  "Angelegte Turniere ohne Kalendereinträge, pro Tag (UTC). Gelöschte Turniere fehlen im Verlauf.": "Aangemaakte toernooien zonder kalenderitems, per dag (UTC). Verwijderde toernooien ontbreken in het verloop.",
+  "seit {{date}}": "sinds {{date}}",
+  "Neu heute": "Nieuw vandaag",
+  "Neu in den letzten {{count}} Tagen": "Nieuw in de laatste {{count}} dagen",
+  "{{added}} neu · {{total}} insgesamt": "{{added}} nieuw · {{total}} in totaal",
+  "Unbekannte Statistik.": "Onbekende statistiek."
 }

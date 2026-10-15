@@ -1447,5 +1447,14 @@
   "Gesehen": "Seen",
   "Zusatztext ausblenden": "Hide additional text",
   "Dieses Turnier ist mit einem Turnierdokument verbunden und wird dort gestartet.": "This tournament is connected to a tournament document and is started there.",
-  "Ungültige Einstellung Spiel um Platz 3": "Invalid setting for the third-place match"
+  "Ungültige Einstellung Spiel um Platz 3": "Invalid setting for the third-place match",
+  "Registrierte Benutzer": "Registered users",
+  "Registriert": "Registered",
+  "Benutzerkonten und Neuregistrierungen pro Tag (UTC). Gelöschte Konten fehlen im Verlauf.": "User accounts and new registrations per day (UTC). Deleted accounts are missing from the history.",
+  "Angelegte Turniere ohne Kalendereinträge, pro Tag (UTC). Gelöschte Turniere fehlen im Verlauf.": "Created tournaments excluding calendar entries, per day (UTC). Deleted tournaments are missing from the history.",
+  "seit {{date}}": "since {{date}}",
+  "Neu heute": "New today",
+  "Neu in den letzten {{count}} Tagen": "New in the last {{count}} days",
+  "{{added}} neu · {{total}} insgesamt": "{{added}} new · {{total}} in total",
+  "Unbekannte Statistik.": "Unknown statistic."
 }

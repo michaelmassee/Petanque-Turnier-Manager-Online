@@ -1985,6 +1985,11 @@ export default {
         return await getVisitorStats(env.DB, Number(url.searchParams.get('days')));
       }
 
+      if (request.method === 'GET' && url.pathname === '/api/admin/growth-stats') {
+        await requireAdmin(request, env.DB);
+        return await getGrowthStats(env.DB, url.searchParams.get('kind'), Number(url.searchParams.get('days')));
+      }
+
       if (request.method === 'GET' && url.pathname === '/api/admin/cloudflare-usage') {
         await requireAdmin(request, env.DB);
         return await getCloudflareUsage(request, env, url);
@@ -9418,6 +9423,44 @@ export async function getVisitorStats(db, requestedDays, now = new Date()) {
   });
 }
 
+// Kalendereinträge (registration_enabled = 0) zählen nicht als Turniere, der System-Benutzer für Turniermeldungen
+// nicht als Benutzer. Gelöschte Datensätze fehlen im Verlauf.
+const GROWTH_STATS_SOURCES = {
+  users: 'SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS count FROM users WHERE id != ? GROUP BY day',
+  tournaments: 'SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS count FROM tournaments WHERE registration_enabled = 1 GROUP BY day',
+};
+
+// Admin-Dashboard: neue Benutzer bzw. Turniere je UTC-Tag und der Gesamtstand am Ende jedes Tages.
+export async function getGrowthStats(db, kind, requestedDays, now = new Date()) {
+  const sql = GROWTH_STATS_SOURCES[kind];
+  if (!sql) throw new HttpError(400, 'Unbekannte Statistik.');
+  const range = VISITOR_STATS_RANGES.includes(requestedDays) ? requestedDays : VISITOR_STATS_RANGES[0];
+  const today = utcDay(now);
+  const from = utcDay(new Date(now.getTime() - (range - 1) * DAY_MS));
+  const statement = db.prepare(sql);
+  const { results } = await (kind === 'users' ? statement.bind(TOURNAMENT_REPORT_SYSTEM_USER_ID) : statement).all();
+  const created = new Map(results.map((row) => [row.day, Number(row.count)]));
+  let total = results.filter((row) => row.day < from).reduce((sum, row) => sum + Number(row.count), 0);
+  const days = [];
+  for (let index = 0; index < range; index += 1) {
+    const day = utcDay(new Date(new Date(`${from}T00:00:00Z`).getTime() + index * DAY_MS));
+    const added = created.get(day) || 0;
+    total += added;
+    days.push({ day, added, total });
+  }
+  return json({
+    kind,
+    range,
+    days,
+    totals: {
+      total,
+      today: days.at(-1).added,
+      range: days.reduce((sum, entry) => sum + entry.added, 0),
+      since: results.reduce((first, row) => (row.day && (!first || row.day < first) ? row.day : first), null),
+    },
+  });
+}
+
 const CLOUDFLARE_USAGE_CACHE_SECONDS = 300;
 
 // Admin-Dashboard: Cloudflare-Verbrauch je Tag (?days=) oder Stundenverlauf mit teuersten Abfragen (?date=).
@@ -9449,7 +9492,7 @@ export async function getCloudflareUsage(request, env, url, { now = new Date(), 
 
 async function getAdminDashboardStats(db) {
   const [users, pendingApiKeys, pendingClubEditorRequests, pendingClubs, pendingPlaces, playerListings] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS count FROM users').first(),
+    db.prepare('SELECT COUNT(*) AS count FROM users WHERE id != ?').bind(TOURNAMENT_REPORT_SYSTEM_USER_ID).first(),
     db.prepare("SELECT COUNT(*) AS count FROM api_keys WHERE status = 'pending'").first(),
     db.prepare('SELECT COUNT(*) AS count FROM club_editor_requests').first(),
     db.prepare("SELECT COUNT(*) AS count FROM clubs WHERE status = 'pending'").first(),

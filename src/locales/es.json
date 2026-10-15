@@ -1447,5 +1447,14 @@
   "Gesehen": "Visto",
   "Zusatztext ausblenden": "Ocultar el texto adicional",
   "Dieses Turnier ist mit einem Turnierdokument verbunden und wird dort gestartet.": "Este torneo está vinculado a un documento de torneo y se inicia allí.",
-  "Ungültige Einstellung Spiel um Platz 3": "Ajuste no válido para el partido por el tercer puesto"
+  "Ungültige Einstellung Spiel um Platz 3": "Ajuste no válido para el partido por el tercer puesto",
+  "Registrierte Benutzer": "Usuarios registrados",
+  "Registriert": "Registrados",
+  "Benutzerkonten und Neuregistrierungen pro Tag (UTC). Gelöschte Konten fehlen im Verlauf.": "Cuentas de usuario y nuevos registros por día (UTC). Las cuentas eliminadas no aparecen en el historial.",
+  "Angelegte Turniere ohne Kalendereinträge, pro Tag (UTC). Gelöschte Turniere fehlen im Verlauf.": "Torneos creados sin entradas de calendario, por día (UTC). Los torneos eliminados no aparecen en el historial.",
+  "seit {{date}}": "desde {{date}}",
+  "Neu heute": "Nuevos hoy",
+  "Neu in den letzten {{count}} Tagen": "Nuevos en los últimos {{count}} días",
+  "{{added}} neu · {{total}} insgesamt": "{{added}} nuevos · {{total}} en total",
+  "Unbekannte Statistik.": "Estadística desconocida."
 }
