@@ -218,6 +218,8 @@ describe('TournamentPlayManagement', () => {
     render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, type, registrationType: 'melee', formation: 'doublette' }]} language="de" />);
 
     expect(await screen.findByText('Bitte zuerst Mêlée-Teams auslosen')).toBeInTheDocument();
+    expect(screen.getByText('Neue Spieler spielen erst mit, wenn sie per „Mêlée-Teams auslosen“ einem Team zugeteilt sind.')).toBeInTheDocument();
+    expect(screen.queryByText('Neue Spieler sind sofort für die nächste Runde aktiv.')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erste Runde starten' })).toBeDisabled();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Mêlée-Teams auslosen' })).not.toBeDisabled());
     fireEvent.click(screen.getByRole('button', { name: 'Mêlée-Teams auslosen' }));
@@ -231,6 +233,14 @@ describe('TournamentPlayManagement', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Auslosung zurücksetzen' }));
     expect(await screen.findByText('Mêlée-Teams wurden aufgelöst.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erste Runde starten' })).toBeDisabled();
+  });
+
+  it('weist bei Mêlée nach der ersten Runde darauf hin, dass neue Spieler nicht mehr mitspielen', async () => {
+    installFetchMock([]);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, type: 'schweizer', registrationType: 'melee', formation: 'doublette' }]} language="de" />);
+
+    expect(await screen.findByText('Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mêlée-Teams auslosen' })).not.toBeInTheDocument();
   });
 
   it('zeigt fehlende Voraussetzungen und deaktiviert den Button bei zu wenigen bestätigten Meldungen', async () => {

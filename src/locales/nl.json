@@ -1481,5 +1481,7 @@
   "Alle ausgelosten Mêlée-Teams auflösen? Alle Spieler sind danach wieder ohne Team.": "Alle gelote mêlée-teams ontbinden? Alle spelers zijn daarna weer zonder team.",
   "Mêlée-Teams wurden aufgelöst.": "Mêlée-teams zijn ontbonden.",
   "Auslosung zurücksetzen": "Loting terugzetten",
-  "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée: {{teams}} teams geloot, {{open}} actieve spelers zonder team. Voor de eerste ronde zijn minstens {{required}} spelers in teams nodig."
+  "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée: {{teams}} teams geloot, {{open}} actieve spelers zonder team. Voor de eerste ronde zijn minstens {{required}} spelers in teams nodig.",
+  "Neue Spieler spielen erst mit, wenn sie per „Mêlée-Teams auslosen“ einem Team zugeteilt sind.": "Nieuwe spelers spelen pas mee zodra ze via „Mêlée-teams loten” aan een team zijn toegewezen.",
+  "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "De mêlée-teams liggen sinds de eerste ronde vast. Nieuwe spelers worden niet meer aan een team toegewezen en spelen niet mee."
 }

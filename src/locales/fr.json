@@ -1481,5 +1481,7 @@
   "Alle ausgelosten Mêlée-Teams auflösen? Alle Spieler sind danach wieder ohne Team.": "Dissoudre toutes les équipes de mêlée tirées ? Tous les joueurs seront ensuite à nouveau sans équipe.",
   "Mêlée-Teams wurden aufgelöst.": "Les équipes de mêlée ont été dissoutes.",
   "Auslosung zurücksetzen": "Réinitialiser le tirage",
-  "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée : {{teams}} équipes tirées, {{open}} joueurs actifs sans équipe. La première ronde nécessite au moins {{required}} joueurs en équipe."
+  "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée : {{teams}} équipes tirées, {{open}} joueurs actifs sans équipe. La première ronde nécessite au moins {{required}} joueurs en équipe.",
+  "Neue Spieler spielen erst mit, wenn sie per „Mêlée-Teams auslosen“ einem Team zugeteilt sind.": "Les nouveaux joueurs ne participent qu’une fois affectés à une équipe via « Tirer les équipes de mêlée ».",
+  "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "Les équipes de mêlée sont fixées depuis la première ronde. Les nouveaux joueurs ne sont plus affectés à une équipe et ne participent pas."
 }

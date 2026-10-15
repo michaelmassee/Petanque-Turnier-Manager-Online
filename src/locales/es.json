@@ -1481,5 +1481,7 @@
   "Alle ausgelosten Mêlée-Teams auflösen? Alle Spieler sind danach wieder ohne Team.": "¿Disolver todos los equipos Mêlée sorteados? Después, todos los jugadores volverán a estar sin equipo.",
   "Mêlée-Teams wurden aufgelöst.": "Los equipos Mêlée se han disuelto.",
   "Auslosung zurücksetzen": "Restablecer sorteo",
-  "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée: {{teams}} equipos sorteados, {{open}} jugadores activos sin equipo. Para la primera ronda se necesitan al menos {{required}} jugadores en equipos."
+  "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée: {{teams}} equipos sorteados, {{open}} jugadores activos sin equipo. Para la primera ronda se necesitan al menos {{required}} jugadores en equipos.",
+  "Neue Spieler spielen erst mit, wenn sie per „Mêlée-Teams auslosen“ einem Team zugeteilt sind.": "Los nuevos jugadores solo participan cuando se les asigna a un equipo mediante «Sortear equipos de mêlée».",
+  "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "Los equipos Mêlée son fijos desde la primera ronda. Los nuevos jugadores ya no se asignan a ningún equipo y no participan."
 }

@@ -603,7 +603,11 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
             {selectedTournament?.licenseRequired && <TextField label={t('Lizenznummer')} value={quickPlayer.licenseNr} onChange={(licenseNr) => setQuickPlayer({ ...quickPlayer, licenseNr })} required />}
             <Button type="submit" disabled={busy} loading={busy}>{t('Spieler hinzufügen')}</Button>
           </form>
-          <p className="hint">{t('Neue Spieler sind sofort für die nächste Runde aktiv.')}</p>
+          <p className="hint">
+            {!isMelee && t('Neue Spieler sind sofort für die nächste Runde aktiv.')}
+            {isMelee && canEditMeleeTeams && t('Neue Spieler spielen erst mit, wenn sie per „Mêlée-Teams auslosen“ einem Team zugeteilt sind.')}
+            {isMelee && !canEditMeleeTeams && t('Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.')}
+          </p>
           <div className="round-participant-list">
             {visibleConfirmedRegistrations.items.map((registration) => (
               <div className="round-participant-row" key={registration.id}>
