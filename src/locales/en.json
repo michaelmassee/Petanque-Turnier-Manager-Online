@@ -1174,6 +1174,8 @@
   "Dieser Personen-Platz ist nicht belegt": "This person slot is empty",
   "Dieses Konto ist bereits mit einer anderen Person dieser Anmeldung verknüpft": "This account is already linked to another person in this registration",
   "decisions muss 1 bis 200 Einträge enthalten": "decisions must contain 1 to 200 entries",
+  "links muss 1 bis 200 Einträge enthalten": "links must contain 1 to 200 entries",
+  "Jede Anmeldung und jede lokale ID darf nur einmal vorkommen": "Each registration and each local ID may appear only once",
   "note darf höchstens 500 Zeichen enthalten": "note may contain at most 500 characters",
   "teams muss ein Array sein": "teams must be an array",
   "Ein Team braucht mindestens eine Anmeldung": "A team needs at least one registration",

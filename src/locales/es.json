@@ -1174,6 +1174,8 @@
   "Dieser Personen-Platz ist nicht belegt": "Esta plaza de persona está vacía",
   "Dieses Konto ist bereits mit einer anderen Person dieser Anmeldung verknüpft": "Esta cuenta ya está vinculada a otra persona de esta inscripción",
   "decisions muss 1 bis 200 Einträge enthalten": "decisions debe contener entre 1 y 200 entradas",
+  "links muss 1 bis 200 Einträge enthalten": "links debe contener entre 1 y 200 entradas",
+  "Jede Anmeldung und jede lokale ID darf nur einmal vorkommen": "Cada inscripción y cada ID local solo puede aparecer una vez",
   "note darf höchstens 500 Zeichen enthalten": "note puede contener como máximo 500 caracteres",
   "teams muss ein Array sein": "teams debe ser un array",
   "Ein Team braucht mindestens eine Anmeldung": "Un equipo necesita al menos una inscripción",

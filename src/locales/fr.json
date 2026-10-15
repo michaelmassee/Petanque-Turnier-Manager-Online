@@ -1174,6 +1174,8 @@
   "Dieser Personen-Platz ist nicht belegt": "Cette place de personne est vide",
   "Dieses Konto ist bereits mit einer anderen Person dieser Anmeldung verknüpft": "Ce compte est déjà relié à une autre personne de cette inscription",
   "decisions muss 1 bis 200 Einträge enthalten": "decisions doit contenir de 1 à 200 entrées",
+  "links muss 1 bis 200 Einträge enthalten": "links doit contenir de 1 à 200 entrées",
+  "Jede Anmeldung und jede lokale ID darf nur einmal vorkommen": "Chaque inscription et chaque identifiant local ne peut apparaître qu’une seule fois",
   "note darf höchstens 500 Zeichen enthalten": "note peut contenir au maximum 500 caractères",
   "teams muss ein Array sein": "teams doit être un tableau",
   "Ein Team braucht mindestens eine Anmeldung": "Une équipe a besoin d’au moins une inscription",

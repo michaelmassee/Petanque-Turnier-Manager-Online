@@ -1174,6 +1174,8 @@
   "Dieser Personen-Platz ist nicht belegt": "Deze persoonsplaats is niet bezet",
   "Dieses Konto ist bereits mit einer anderen Person dieser Anmeldung verknüpft": "Dit account is al gekoppeld aan een andere persoon van deze inschrijving",
   "decisions muss 1 bis 200 Einträge enthalten": "decisions moet 1 tot 200 items bevatten",
+  "links muss 1 bis 200 Einträge enthalten": "links moet 1 tot 200 items bevatten",
+  "Jede Anmeldung und jede lokale ID darf nur einmal vorkommen": "Elke inschrijving en elke lokale ID mag maar één keer voorkomen",
   "note darf höchstens 500 Zeichen enthalten": "note mag maximaal 500 tekens bevatten",
   "teams muss ein Array sein": "teams moet een array zijn",
   "Ein Team braucht mindestens eine Anmeldung": "Een team heeft minstens één inschrijving nodig",

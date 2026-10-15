@@ -2644,6 +2644,14 @@ export default {
         return await executeSyncWrite(request, env.DB, tournament, (db) => syncPostDecisions(request, db, tournament, auth.user));
       }
 
+      const syncRegistrationLinksMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registration-links$/);
+      if (syncRegistrationLinksMatch && request.method === 'POST') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncRegistrationLinksMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        return await executeSyncWrite(request, env.DB, tournament, (db) => syncPostRegistrationLinks(request, db, tournament));
+      }
+
       const syncRegistrationClosedMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registration-closed$/);
       if (syncRegistrationClosedMatch && request.method === 'PUT') {
         const auth = await requireApiKey(request, env.DB);
@@ -8038,6 +8046,50 @@ export async function syncPostDecisions(request, db, tournament, user) {
       action: `decision_${decision}`, target: localUuid ? `local:${localUuid}` : 'tournament', details: note ? { note } : null, now });
   });
   return { statements, response: { envelope: { status: 200, body: { recorded: statements.length } } } };
+}
+
+/**
+ * Verknüpft Online-Anmeldungen mit den lokalen PTM-Online-IDs des gebundenen Dokuments (T-21), z. B. nach dem Import
+ * in die Meldeliste. Ohne diese Verknüpfung kennt der Server die lokale ID einer importierten Anmeldung erst nach
+ * einer Besetzungsänderung aus dem Dokument; löscht die Turnierleitung vorher die Zeile, könnte das Dokument die
+ * Zuordnung nicht mehr vom Server wiederherstellen. Ändert weder Anmeldedaten noch Ausführungsrevision. Eine lokale
+ * ID, die schon eine andere Anmeldung trägt, bleibt dort (wie bei upsertDocumentRegistration).
+ */
+export async function syncPostRegistrationLinks(request, db, tournament) {
+  const body = await readJson(request);
+  const links = Array.isArray(body.links) ? body.links : [];
+  if (links.length === 0 || links.length > 200) throw new HttpError(400, 'links muss 1 bis 200 Einträge enthalten');
+  const parsed = links.map((link) => ({
+    registrationId: requireUuid(link?.onlineRegistrationId, 'onlineRegistrationId'),
+    localUuid: requireUuid(link?.localRegistrationUuid, 'localRegistrationUuid'),
+  }));
+  for (const key of ['registrationId', 'localUuid']) {
+    if (new Set(parsed.map((link) => link[key])).size !== parsed.length) {
+      throw new HttpError(400, 'Jede Anmeldung und jede lokale ID darf nur einmal vorkommen');
+    }
+  }
+  const rows = (await db.prepare('SELECT id, local_registration_uuid FROM registrations WHERE tournament_id = ?')
+    .bind(tournament.id).all()).results || [];
+  const known = new Set(rows.map((row) => row.id));
+  const idProLokal = new Map(rows.filter((row) => row.local_registration_uuid)
+    .map((row) => [row.local_registration_uuid, row.id]));
+  const linked = [];
+  const unknown = [];
+  const conflicts = [];
+  for (const link of parsed) {
+    const vorhanden = idProLokal.get(link.localUuid);
+    if (!known.has(link.registrationId)) unknown.push(link.registrationId);
+    else if (vorhanden && vorhanden !== link.registrationId) conflicts.push(link.registrationId);
+    else linked.push(link);
+  }
+  const now = new Date().toISOString();
+  return {
+    statements: linked.map((link) => db.prepare(`UPDATE registrations SET local_registration_uuid = ?, updated_at = ?
+        WHERE tournament_id = ? AND id = ? AND NOT EXISTS (SELECT 1 FROM registrations other
+          WHERE other.tournament_id = ? AND other.local_registration_uuid = ? AND other.id != ?)`)
+      .bind(link.localUuid, now, tournament.id, link.registrationId, tournament.id, link.localUuid, link.registrationId)),
+    response: { envelope: { status: 200, body: { linked: linked.length, unknown, conflicts } } },
+  };
 }
 
 /**
