@@ -54,9 +54,19 @@ describe('Verbundenes Turnier: Dokument ist Master', () => {
 
     expect((await web('POST', '/api/tournaments/t1/rounds')).status).toBe(409);
     expect((await web('PUT', '/api/tournaments/t1/matches/match1/result', { scoreA: 13, scoreB: 7 })).status).toBe(409);
-    expect((await web('POST', '/api/live/registrations/r1/result', { ownScore: 13, opponentScore: 7 }, 'player-session')).status).toBe(409);
     expect(env.DB.sqlite.prepare("SELECT score_a, score_b FROM tournament_matches WHERE id = 'match1'").get())
       .toEqual({ score_a: null, score_b: null });
+  });
+
+  it('nimmt eine Spielermeldung nur als offene Meldung für das Dokument an', async () => {
+    laufendMitRunde();
+
+    expect((await web('POST', '/api/live/registrations/r1/result', { ownScore: 13, opponentScore: 7 }, 'player-session')).status).toBe(200);
+
+    expect(env.DB.sqlite.prepare("SELECT score_a, score_b FROM tournament_matches WHERE id = 'match1'").get())
+      .toEqual({ score_a: null, score_b: null });
+    expect(env.DB.sqlite.prepare('SELECT score_a, score_b, status FROM document_result_reports').all())
+      .toEqual([{ score_a: 13, score_b: 7, status: 'open' }]);
   });
 
   it('meldet die Bindung in der Live-Ansicht', async () => {

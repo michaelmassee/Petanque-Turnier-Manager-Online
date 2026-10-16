@@ -2632,6 +2632,22 @@ export default {
         });
       }
 
+      const syncResultReportsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/result-reports$/);
+      if (syncResultReportsMatch && request.method === 'GET') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncResultReportsMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        return await syncGetResultReports(env.DB, tournament);
+      }
+
+      const syncResultReportDecisionsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/result-reports\/decisions$/);
+      if (syncResultReportDecisionsMatch && request.method === 'POST') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncResultReportDecisionsMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        return await executeSyncWrite(request, env.DB, tournament, (db) => syncDecideResultReports(request, db, tournament));
+      }
+
       const syncRankingMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/ranking$/);
       if (syncRankingMatch && request.method === 'PUT') {
         const auth = await requireApiKey(request, env.DB);
@@ -4587,7 +4603,22 @@ async function respondSyncEnvelope(db, tournamentId, envelope, context, headers 
     const row = await getTournamentById(db, tournamentId);
     if (row) body.tournament = toPublicTournament(row, context.user || null);
   }
-  return json(body, envelope.status, headers);
+  return json(body, envelope.status, { ...headers, ...(await resultReportHeaders(db, tournamentId)) });
+}
+
+/**
+ * Huckepack für das Turnierdokument: Jede Sync-Antwort nennt, ob Spieler Ergebnisse melden dürfen und wie viele
+ * Meldungen offen sind. So holt PTM Meldungen ohne eigene Abfrage, sobald es ohnehin schreibt (E-27, E-28).
+ */
+async function resultReportHeaders(db, tournamentId) {
+  const row = await db.prepare(`SELECT t.player_result_reporting_enabled AS enabled,
+      (SELECT COUNT(*) FROM document_result_reports d WHERE d.tournament_id = t.id AND d.status = 'open') AS open
+      FROM tournaments t WHERE t.id = ?`).bind(tournamentId).first();
+  if (!row) return {};
+  return {
+    'X-PTM-Result-Reporting': Number(row.enabled || 0) === 1 ? '1' : '0',
+    'X-PTM-Open-Result-Reports': String(Number(row.open || 0)),
+  };
 }
 
 async function storedSyncEnvelope(db, tournamentId, requestId) {
@@ -6756,7 +6787,10 @@ async function reportLiveMatchResult(request, env, registration, reporterUserId)
   }
   if (tournament.status !== 'running') throw new HttpError(409, 'Das Turnier läuft nicht');
   if (registration.participation === 'withdrawn') throw new HttpError(403, 'Du kannst nur das Ergebnis deiner aktuellen offenen Partie melden');
-  assertOnlineExecution(tournament);
+  if (isDocumentBound(tournament)) {
+    await reportDocumentMatchResult(request, db, tournament, registration, reporterUserId);
+    return;
+  }
 
   const match = await db.prepare(`SELECT m.id,
       EXISTS (SELECT 1 FROM json_each(m.team_a_registration_ids) j WHERE j.value = ?) AS in_a
@@ -6788,6 +6822,140 @@ async function reportLiveMatchResult(request, env, registration, reporterUserId)
     // Die Meldung ist gespeichert; ein fehlender Push darf sie nicht als Fehler zurückmelden.
     console.error(`Failed to queue result push for tournament ${tournament.id}`, error);
   }
+}
+
+/**
+ * Ergebnismeldung bei einem im Turnierdokument geführten Turnier (E-27, E-28): Sie wird nicht in die Partie
+ * geschrieben, sondern als offene Meldung gespeichert, bis die Turnierleitung sie im Dokument übernimmt oder
+ * verwirft. Ohne aktuelle Dokumentbindung holt niemand die Meldung ab; dann bleibt die Meldung gesperrt.
+ */
+async function reportDocumentMatchResult(request, db, tournament, registration, reporterUserId) {
+  assertDocumentReportingPossible(tournament);
+  const match = await db.prepare(`SELECT m.team_a_registration_ids AS team_a, m.team_b_registration_ids AS team_b,
+      r.round_number, EXISTS (SELECT 1 FROM json_each(m.team_a_registration_ids) j WHERE j.value = ?) AS in_a
+      FROM tournament_matches m
+      JOIN tournament_rounds r ON r.id = m.round_id
+      WHERE m.tournament_id = ?
+        AND r.round_number = (SELECT MAX(round_number) FROM tournament_rounds WHERE tournament_id = ?)
+        AND m.score_a IS NULL AND m.score_b IS NULL AND m.no_show IS NULL
+        AND json_array_length(m.team_b_registration_ids) > 0
+        AND (EXISTS (SELECT 1 FROM json_each(m.team_a_registration_ids) j WHERE j.value = ?)
+          OR EXISTS (SELECT 1 FROM json_each(m.team_b_registration_ids) j WHERE j.value = ?))`)
+    .bind(registration.id, tournament.id, tournament.id, registration.id, registration.id).first();
+  if (!match) throw new HttpError(403, 'Du kannst nur das Ergebnis deiner aktuellen offenen Partie melden');
+
+  const body = await readJson(request);
+  const ownScore = validateMatchScore(body.ownScore);
+  const opponentScore = validateMatchScore(body.opponentScore);
+  if (ownScore === opponentScore) throw new HttpError(400, 'Ungültiges Ergebnis');
+  const inA = Number(match.in_a) === 1;
+  try {
+    await db.prepare(`INSERT INTO document_result_reports (id, tournament_id, round_number, team_a_registration_ids,
+        team_b_registration_ids, score_a, score_b, reported_by_registration_id, reported_by_user_id, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)`)
+      .bind(crypto.randomUUID(), tournament.id, match.round_number, match.team_a, match.team_b,
+        inA ? ownScore : opponentScore, inA ? opponentScore : ownScore, registration.id, reporterUserId,
+        new Date().toISOString()).run();
+  } catch (error) {
+    // Eindeutiger Index: Für diese Partie liegt bereits eine offene Meldung vor (auch bei gleichzeitiger Meldung).
+    if (/UNIQUE/i.test(String(error?.message || error))) throw new HttpError(409, 'Das Ergebnis wurde bereits gemeldet');
+    throw error;
+  }
+}
+
+function assertDocumentReportingPossible(tournament) {
+  if (!tournament.sync_document_id) {
+    throw new HttpError(409, 'Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.');
+  }
+}
+
+/**
+ * Letzte eigene Meldung der aktuellen Runde bei einem im Dokument geführten Turnier, aus Sicht der Anmeldung:
+ * offen (wartet auf die Turnierleitung) oder verworfen. Ohne Meldung oder ohne Ergebnismeldung {@code null}.
+ */
+export async function currentDocumentResultReport(db, tournament, registrationId) {
+  if (!tournament.sync_document_id || Number(tournament.player_result_reporting_enabled || 0) !== 1) return null;
+  const row = await db.prepare(`SELECT score_a, score_b, status,
+      EXISTS (SELECT 1 FROM json_each(team_a_registration_ids) j WHERE j.value = ?) AS in_a
+      FROM document_result_reports
+      WHERE tournament_id = ? AND status IN ('open', 'dismissed')
+        AND round_number = (SELECT MAX(round_number) FROM tournament_rounds WHERE tournament_id = ?)
+        AND (EXISTS (SELECT 1 FROM json_each(team_a_registration_ids) j WHERE j.value = ?)
+          OR EXISTS (SELECT 1 FROM json_each(team_b_registration_ids) j WHERE j.value = ?))
+      ORDER BY created_at DESC LIMIT 1`)
+    .bind(registrationId, tournament.id, tournament.id, registrationId, registrationId).first();
+  if (!row) return null;
+  const inA = Number(row.in_a) === 1;
+  return {
+    ownScore: inA ? row.score_a : row.score_b,
+    opponentScore: inA ? row.score_b : row.score_a,
+    status: row.status,
+  };
+}
+
+/** Offene Meldungen für das verbundene Dokument; leer, solange Spieler keine Ergebnisse melden dürfen. */
+export async function syncGetResultReports(db, tournament) {
+  const enabled = Number(tournament.player_result_reporting_enabled || 0) === 1;
+  if (!enabled) return json({ enabled, status: tournament.status, reports: [] });
+  const result = await db.prepare(`SELECT d.id, d.round_number, d.team_a_registration_ids, d.team_b_registration_ids,
+      d.score_a, d.score_b, d.created_at, r.team_name, r.first_name, r.last_name, r.partner_first_name, r.partner_last_name,
+      r.partner2_first_name, r.partner2_last_name
+      FROM document_result_reports d
+      LEFT JOIN registrations r ON r.id = d.reported_by_registration_id
+      WHERE d.tournament_id = ? AND d.status = 'open'
+      ORDER BY d.round_number, d.created_at`).bind(tournament.id).all();
+  return json({
+    enabled,
+    status: tournament.status,
+    reports: (result.results || []).map((row) => ({
+      id: row.id,
+      roundNumber: Number(row.round_number),
+      teamA: jsonArray(row.team_a_registration_ids),
+      teamB: jsonArray(row.team_b_registration_ids),
+      scoreA: Number(row.score_a),
+      scoreB: Number(row.score_b),
+      reportedBy: liveRegistrationLabel(row),
+      createdAt: row.created_at,
+    })),
+  });
+}
+
+const RESULT_REPORT_DECISIONS = ['accepted', 'dismissed'];
+
+/** Entscheidungen der Turnierleitung im Dokument über offene Meldungen (übernommen oder verworfen). */
+export async function syncDecideResultReports(request, db, tournament) {
+  const body = await readJson(request);
+  const decisions = Array.isArray(body.decisions) ? body.decisions : [];
+  if (decisions.length === 0 || decisions.length > 200) throw new HttpError(400, 'Ungültige Entscheidungen');
+  const now = new Date().toISOString();
+  const statements = decisions.map((entry) => {
+    const decision = String(entry?.decision || '');
+    if (!RESULT_REPORT_DECISIONS.includes(decision)) throw new HttpError(400, 'Ungültige Entscheidungen');
+    return db.prepare(`UPDATE document_result_reports SET status = ?, decided_at = ?
+        WHERE id = ? AND tournament_id = ? AND status = 'open'`)
+      .bind(decision, now, requireUuid(entry.id, 'id'), tournament.id);
+  });
+  return { statements, response: { envelope: { status: 200, body: { ok: true, count: statements.length } } } };
+}
+
+/**
+ * Offene Meldungen, die das Dokument erledigt hat: Partien der übertragenen Runde mit Ergebnis bzw. eine gelöschte
+ * Runde. Die Turnierleitung hat das Ergebnis dann selbst eingetragen oder die Runde neu ausgelost.
+ */
+function supersedeResultReportStatements(db, tournamentId, roundNumber, matches, now) {
+  if (!matches) {
+    return [db.prepare(`UPDATE document_result_reports SET status = 'superseded', decided_at = ?
+        WHERE tournament_id = ? AND round_number = ? AND status = 'open'`).bind(now, tournamentId, roundNumber)];
+  }
+  return matches.filter((match) => match.scoreA !== null && match.scoreB !== null).map((match) => {
+    const teamA = JSON.stringify(match.teamA);
+    const teamB = JSON.stringify(match.teamB);
+    return db.prepare(`UPDATE document_result_reports SET status = 'superseded', decided_at = ?
+        WHERE tournament_id = ? AND round_number = ? AND status = 'open'
+          AND ((team_a_registration_ids = ? AND team_b_registration_ids = ?)
+            OR (team_a_registration_ids = ? AND team_b_registration_ids = ?))`)
+      .bind(now, tournamentId, roundNumber, teamA, teamB, teamB, teamA);
+  });
 }
 
 const RESULT_REPORTED_TEXTS = {
@@ -6955,6 +7123,8 @@ function toLiveTournament(tournament) {
     desktopExecution: Number(tournament.desktop_execution || 0) === 1,
     documentBound: isDocumentBound(tournament),
     playerResultReportingEnabled: Number(tournament.player_result_reporting_enabled || 0) === 1,
+    // Meldungen aus der Live-Ansicht gehen an das verbundene Dokument und warten dort auf die Turnierleitung.
+    resultReportingViaDocument: Boolean(tournament.sync_document_id),
   };
 }
 
@@ -7034,6 +7204,8 @@ export async function buildLiveResponse(request, db, registration) {
     registrationType: tournament.registration_type || 'forme',
     incomplete: isIncompleteTeam(tournament, registration),
     meleeTeammates: await liveMeleeTeammates(db, tournament.id, registration.id),
+    // Bei Turnieren aus dem Dokument: eigene Meldung der aktuellen Runde, bis die Turnierleitung entschieden hat.
+    resultReport: await currentDocumentResultReport(db, tournament, registration.id),
   };
   // Stand der Daten aus dem Turnierdokument, damit ein Netzausfall in PTM nicht als falsche Auslosung wirkt (KP-12).
   const dataAsOf = Number(tournament.document_managed || 0) === 1 ? tournament.last_sync_write_at || null : null;
@@ -7282,6 +7454,7 @@ async function syncPutRound(request, db, tournament, roundNumberValue) {
       .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(match.teamA), JSON.stringify(match.teamB),
         match.scoreA, match.scoreB, match.matchIndex, match.stageLabel, match.court, now, now));
   }
+  statements.push(...supersedeResultReportStatements(db, tournament.id, roundNumber, matches, now));
   return {
     statements,
     response: { envelope: { status: 200, body: { roundNumber, matchCount: matches.length, created: !existing } } },
@@ -7301,6 +7474,7 @@ async function syncDeleteRound(db, tournament, roundNumberValue) {
     statements: round ? [
       db.prepare('DELETE FROM tournament_matches WHERE round_id = ?').bind(round.id),
       db.prepare('DELETE FROM tournament_rounds WHERE id = ?').bind(round.id),
+      ...supersedeResultReportStatements(db, tournament.id, roundNumber, null, new Date().toISOString()),
     ] : [],
     response: { envelope: { status: 200, body: { ok: true, deleted: Boolean(round) } } },
   };
@@ -8158,6 +8332,7 @@ async function syncTournamentState(db, tournament) {
     runningResetAt: tournament.running_reset_at || null,
     roundsOnline: Number(rounds?.count || 0),
     writeCounter: Number(tournament.sync_write_counter || 0),
+    playerResultReportingEnabled: Number(tournament.player_result_reporting_enabled || 0) === 1,
   };
 }
 

@@ -223,7 +223,18 @@ function PlayerResultReport({ path, onSaved }) {
   );
 }
 
-function CurrentMatchCard({ live, participation, canReportResult, reportingDisabled, path, onResultSaved }) {
+// Eigene Meldung bei einem Turnier aus dem Turnierdokument: wartet auf die Turnierleitung oder wurde verworfen.
+function DocumentResultReportHint({ report }) {
+  const { t } = useTranslation();
+  if (!report) return null;
+  const score = `${report.ownScore}:${report.opponentScore}`;
+  if (report.status === 'open') {
+    return <p className="hint">{t('Gemeldet: {{score}}. Die Turnierleitung bestätigt das Ergebnis.', { score })}</p>;
+  }
+  return <p className="hint">{t('Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.', { score })}</p>;
+}
+
+function CurrentMatchCard({ live, participation, canReportResult, reportingDisabled, resultReport, path, onResultSaved }) {
   const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const match = live.currentMatch;
@@ -254,6 +265,7 @@ function CurrentMatchCard({ live, participation, canReportResult, reportingDisab
             </div>
           )}
           <p className={`live-score live-${match.outcome}`}>{scoreLabel(match, t)}</p>
+          {!match.bye && match.outcome === 'open' && <DocumentResultReportHint report={resultReport} />}
           {canReportResult && !match.bye && match.outcome === 'open' && <PlayerResultReport path={path} onSaved={resultSaved} />}
           {reportingDisabled && !match.bye && match.outcome === 'open' && <p className="hint">{t('Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.')}</p>}
           <Feedback message={message} />
@@ -396,6 +408,11 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
 
   const { tournament, registration, live, dataAsOf } = data;
   const drawn = live.lastRoundNumber !== null;
+  // Bei einem Turnier aus dem Turnierdokument nur mit aktueller Bindung: dort bestätigt die Turnierleitung die Meldung.
+  const imDokumentGefuehrt = tournament.documentBound || tournament.desktopExecution;
+  const reportingOpen = tournament.status === 'running' && tournament.playerResultReportingEnabled
+    && (!imDokumentGefuehrt || tournament.resultReportingViaDocument);
+  const reportPending = registration.resultReport?.status === 'open';
   return (
     <div className="live-view">
       <header className="live-header">
@@ -413,8 +430,9 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
       {!drawn && <RegistrationPhase registration={registration} tournament={tournament} />}
       {drawn && registration.participation === 'inactive' && <p className="hint">{t('Du bist noch nicht eingecheckt.')}</p>}
       {(drawn || tournament.status === 'running') && <CurrentMatchCard key={live.currentMatch?.matchId || 'no-current-match'} live={live} participation={registration.participation}
-        canReportResult={canReportResult && tournament.playerResultReportingEnabled && !tournament.documentBound && tournament.status === 'running'}
-        reportingDisabled={tournament.status === 'running' && (!tournament.playerResultReportingEnabled || tournament.documentBound || tournament.desktopExecution)} path={path}
+        canReportResult={canReportResult && reportingOpen && !reportPending}
+        reportingDisabled={tournament.status === 'running' && !reportingOpen}
+        resultReport={registration.resultReport} path={path}
         onResultSaved={(updated) => queryClient.setQueryData(queryKey, updated)} />}
       <RankingCard live={live} tournament={tournament} />
       <HistoryCard live={live} />

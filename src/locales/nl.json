@@ -1484,5 +1484,8 @@
   "Auslosung zurücksetzen": "Loting terugzetten",
   "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée: {{teams}} teams geloot, {{open}} actieve spelers zonder team. Voor de eerste ronde zijn minstens {{required}} spelers in teams nodig.",
   "Neue Spieler spielen erst mit, wenn sie per „Mêlée-Teams auslosen“ einem Team zugeteilt sind.": "Nieuwe spelers spelen pas mee zodra ze via „Mêlée-teams loten” aan een team zijn toegewezen.",
-  "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "De mêlée-teams liggen sinds de eerste ronde vast. Nieuwe spelers worden niet meer aan een team toegewezen en spelen niet mee."
+  "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "De mêlée-teams liggen sinds de eerste ronde vast. Nieuwe spelers worden niet meer aan een team toegewezen en spelen niet mee.",
+  "Gemeldet: {{score}}. Die Turnierleitung bestätigt das Ergebnis.": "Gemeld: {{score}}. De wedstrijdleiding bevestigt de uitslag.",
+  "Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.": "De wedstrijdleiding heeft je melding {{score}} niet overgenomen. Stem de uitslag rechtstreeks af met de wedstrijdleiding.",
+  "Ungültige Entscheidungen": "Ongeldige beslissingen"
 }

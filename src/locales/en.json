@@ -1484,5 +1484,8 @@
   "Auslosung zurücksetzen": "Reset draw",
   "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée: {{teams}} teams drawn, {{open}} active players without a team. The first round requires at least {{required}} players in teams.",
   "Neue Spieler spielen erst mit, wenn sie per „Mêlée-Teams auslosen“ einem Team zugeteilt sind.": "New players only take part once they have been assigned to a team via “Draw mêlée teams”.",
-  "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "The Mêlée teams have been fixed since the first round. New players are no longer assigned to a team and do not take part."
+  "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "The Mêlée teams have been fixed since the first round. New players are no longer assigned to a team and do not take part.",
+  "Gemeldet: {{score}}. Die Turnierleitung bestätigt das Ergebnis.": "Reported: {{score}}. The tournament organizers will confirm the result.",
+  "Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.": "The tournament organizers did not accept your report {{score}}. Please clarify the result with them directly.",
+  "Ungültige Entscheidungen": "Invalid decisions"
 }

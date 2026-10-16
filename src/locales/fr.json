@@ -1484,5 +1484,8 @@
   "Auslosung zurücksetzen": "Réinitialiser le tirage",
   "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée : {{teams}} équipes tirées, {{open}} joueurs actifs sans équipe. La première ronde nécessite au moins {{required}} joueurs en équipe.",
   "Neue Spieler spielen erst mit, wenn sie per „Mêlée-Teams auslosen“ einem Team zugeteilt sind.": "Les nouveaux joueurs ne participent qu’une fois affectés à une équipe via « Tirer les équipes de mêlée ».",
-  "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "Les équipes de mêlée sont fixées depuis la première ronde. Les nouveaux joueurs ne sont plus affectés à une équipe et ne participent pas."
+  "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "Les équipes de mêlée sont fixées depuis la première ronde. Les nouveaux joueurs ne sont plus affectés à une équipe et ne participent pas.",
+  "Gemeldet: {{score}}. Die Turnierleitung bestätigt das Ergebnis.": "Déclaré : {{score}}. L'organisation du tournoi confirmera le résultat.",
+  "Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.": "L'organisation du tournoi n'a pas retenu ta déclaration {{score}}. Merci de clarifier le résultat directement avec elle.",
+  "Ungültige Entscheidungen": "Décisions non valides"
 }

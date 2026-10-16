@@ -359,6 +359,11 @@ describe('Live-Ansicht für Spieler', () => {
     ['abgeschalteter Meldung', (payload) => { payload.tournament.playerResultReportingEnabled = false; }, true],
     ['Desktop-Durchführung', (payload) => { payload.tournament.playerResultReportingEnabled = true; payload.tournament.desktopExecution = true; }, true],
     ['verbundenem Turnierdokument', (payload) => { payload.tournament.playerResultReportingEnabled = true; payload.tournament.documentBound = true; }, true],
+    ['Meldung an das verbundene Dokument', (payload) => {
+      payload.tournament.playerResultReportingEnabled = true;
+      payload.tournament.documentBound = true;
+      payload.tournament.resultReportingViaDocument = true;
+    }, false],
     ['freigegebener Meldung', (payload) => { payload.tournament.playerResultReportingEnabled = true; }, false],
     ['beendetem Turnier', (payload) => { payload.tournament.status = 'finished'; }, false],
   ])('zeigt den Turnierleitungs-Hinweis passend bei %s', async (_reason, changePayload, shown) => {
@@ -376,6 +381,29 @@ describe('Live-Ansicht für Spieler', () => {
     const hint = screen.queryByText('Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.');
     if (shown) expect(hint).toBeInTheDocument();
     else expect(hint).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['offen', 'Gemeldet: 13:7. Die Turnierleitung bestätigt das Ergebnis.', false],
+    ['verworfen', 'Deine Meldung 13:7 wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.', true],
+  ])('zeigt bei verbundenem Dokument die eigene Meldung (%s)', async (_zustand, text, formular) => {
+    const payload = livePayload();
+    payload.tournament.playerResultReportingEnabled = true;
+    payload.tournament.documentBound = true;
+    payload.tournament.resultReportingViaDocument = true;
+    payload.registration.resultReport = { ownScore: 13, opponentScore: 7, status: formular ? 'dismissed' : 'open' };
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de" canReportResult />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    const formularText = screen.queryByText('Ergebnis dieser Partie melden');
+    if (formular) expect(formularText).toBeInTheDocument();
+    else expect(formularText).not.toBeInTheDocument();
   });
 
   it('sperrt die Ergebnismeldung während des Speicherns gegen Doppelklicks', async () => {

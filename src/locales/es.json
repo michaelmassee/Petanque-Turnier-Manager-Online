@@ -1484,5 +1484,8 @@
   "Auslosung zurücksetzen": "Restablecer sorteo",
   "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée: {{teams}} equipos sorteados, {{open}} jugadores activos sin equipo. Para la primera ronda se necesitan al menos {{required}} jugadores en equipos.",
   "Neue Spieler spielen erst mit, wenn sie per „Mêlée-Teams auslosen“ einem Team zugeteilt sind.": "Los nuevos jugadores solo participan cuando se les asigna a un equipo mediante «Sortear equipos de mêlée».",
-  "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "Los equipos Mêlée son fijos desde la primera ronda. Los nuevos jugadores ya no se asignan a ningún equipo y no participan."
+  "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "Los equipos Mêlée son fijos desde la primera ronda. Los nuevos jugadores ya no se asignan a ningún equipo y no participan.",
+  "Gemeldet: {{score}}. Die Turnierleitung bestätigt das Ergebnis.": "Comunicado: {{score}}. La organización del torneo confirmará el resultado.",
+  "Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.": "La organización del torneo no aceptó tu comunicación {{score}}. Aclara el resultado directamente con la organización.",
+  "Ungültige Entscheidungen": "Decisiones no válidas"
 }
