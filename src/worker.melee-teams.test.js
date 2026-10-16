@@ -113,11 +113,14 @@ describe('Mêlée-Teams online', () => {
     expect(teams()).toHaveLength(4);
     expect(teams().flatMap((team) => team.members)).not.toContain(partner);
 
-    db.sqlite.prepare("UPDATE registrations SET status = 'cancelled' WHERE id = 'p2'").run();
+    // Ein Spieler aus einem noch bestehenden Team (die Auslosung ist zufällig): danach sind zwei Spieler frei.
+    const cancelled = teams()[0].members[0];
+    db.sqlite.prepare("UPDATE registrations SET status = 'cancelled' WHERE id = ?").run(cancelled);
     // Auslosung und Rundenstart räumen selbst auf, auch ohne vorherigen Aufruf.
     const result = await (await drawMeleeTeams(db, await turnier())).json();
     expect(result.teams.flatMap((team) => team.members)).not.toContain('p1');
-    expect(result.teams.flatMap((team) => team.members)).not.toContain('p2');
+    expect(result.teams.flatMap((team) => team.members)).not.toContain(cancelled);
+    expect(result.teams).toHaveLength(4);
     expect(result.teams.every((team) => team.members.length === 2)).toBe(true);
   });
 
