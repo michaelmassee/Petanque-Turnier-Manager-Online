@@ -5,13 +5,14 @@ import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { playerSearchTurnstileToken } from '../lib/player-search-turnstile.js';
 import { formatUserMeta, formatUserName } from '../lib/userLabel.js';
-import { Button, Feedback, TextField } from './ui.jsx';
+import { Feedback, TextField } from './ui.jsx';
 
 const MAX_MATCHES = 20;
 
 // Vorschläge wie bei den Postbox-Empfängern: Die Nutzerliste wird einmal geladen (gleicher Query-Key, also
 // gemeinsamer Cache mit der Postbox) und lokal gefiltert – keine Serversuche pro Tastendruck. Erst die Auswahl
-// lädt E-Mail und Lizenznummer, geschützt durch Turnstile und Rate-Limit. Die Namensfelder bleiben freie Eingabe.
+// lädt E-Mail und Lizenznummer, geschützt durch Turnstile und Rate-Limit. Die Namensfelder bleiben freie Eingabe;
+// eine Namensänderung hebt die Auswahl wieder auf.
 function usePlayerDirectory(currentUserId, currentUser, enabled) {
   const { data } = useQuery({
     queryKey: ['postbox-recipients', currentUserId],
@@ -121,7 +122,7 @@ export function RegistrationPlayerPicker({ tournamentId, siteKey, shareToken, se
   }
 
   const nameField = (field, label, value, required) => <TextField label={label} value={value || ''}
-    required={required} minLength={2} maxLength={100} invalid={invalid} readOnly={Boolean(selected) || busy}
+    required={required} minLength={2} maxLength={100} invalid={invalid} readOnly={busy}
     role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={visible && focusedField === field}
     aria-controls={visible ? listId : undefined}
     aria-activedescendant={visible && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
@@ -131,6 +132,8 @@ export function RegistrationPlayerPicker({ tournamentId, siteKey, shareToken, se
       if (!root.current?.contains(event.relatedTarget) && !menu.current?.contains(event.relatedTarget)) dismiss();
     }}
     onChange={(nextValue) => {
+      // Wer den Namen eines ausgewählten Spielers ändert, löst die Verknüpfung mit dessen Konto.
+      if (selected) onClear();
       onNameChange(field, nextValue); setTyped(true); setOpen(true); setActiveIndex(-1);
     }} />;
 
@@ -139,10 +142,6 @@ export function RegistrationPlayerPicker({ tournamentId, siteKey, shareToken, se
       {nameField('firstName', t('Vorname'), firstName, firstRequired)}
       {nameField('lastName', t('Nachname'), lastName, lastRequired)}
     </div>
-    {selected && <div className="row-actions">
-      <span>{t('Mit Benutzerkonto verbunden')}</span>
-      <Button variant="secondary" onClick={() => { dismiss(); onClear(); }}>{t('Auswahl aufheben')}</Button>
-    </div>}
     <div ref={challenge} />
     {busy && <p className="muted" role="status">{t('Wird geladen…')}</p>}
     <Feedback error={error} />

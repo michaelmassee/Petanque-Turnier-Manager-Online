@@ -35,7 +35,7 @@ function Harness({ enabled = true, formation = 'triplette', registrationType = '
 async function choose(section, user) {
   await user.type(within(section).getByLabelText(/^Vorname/), 'Anna');
   await user.click(await screen.findByRole('option', { name: /Anna Adler/ }));
-  await within(section).findByRole('button', { name: 'Auswahl aufheben' });
+  await waitFor(() => expect(within(section).getByLabelText(/^E-Mail/)).toHaveValue('anna@example.test'));
 }
 
 describe('Registration player selection', () => {
@@ -75,7 +75,9 @@ describe('Registration player selection', () => {
     expect(playerSearchTurnstileToken).not.toHaveBeenCalled();
     expect(screen.getByLabelText(/^E-Mail/)).toHaveValue('');
     await user.click(screen.getByRole('option', { name: /Anna Adler/ }));
-    await screen.findByRole('button', { name: 'Auswahl aufheben' });
+    await waitFor(() => expect(screen.getByLabelText(/^E-Mail/)).toHaveValue('anna@example.test'));
+    expect(screen.queryByRole('button', { name: 'Auswahl aufheben' })).toBeNull();
+    expect(screen.queryByText('Mit Benutzerkonto verbunden')).toBeNull();
     expect(screen.getByLabelText(/^Vorname/)).toHaveValue('Anna');
     expect(screen.getByLabelText(/^Nachname/)).toHaveValue('Adler');
     expect(screen.getByLabelText(/^E-Mail/)).toHaveValue('anna@example.test');
@@ -120,11 +122,11 @@ describe('Registration player selection', () => {
     render(<Harness formation="tete" />);
     await user.type(screen.getByLabelText(/^Nachname/), 'Orga');
     await user.click(await screen.findByRole('option', { name: /Olga Orga/ }));
-    await screen.findByRole('button', { name: 'Auswahl aufheben' });
+    await waitFor(() => expect(detailCalls()).toHaveLength(1));
     expect(JSON.parse(detailCalls()[0][1].body)).toMatchObject({ userId: 'me' });
   });
 
-  it('copies the chosen slot, preserves team information, sends its receipt and allows clearing it', async () => {
+  it('copies the chosen slot, preserves team information, sends its receipt and clears it when the name changes', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     const { container } = render(<Harness onSubmit={onSubmit} />);
@@ -132,15 +134,17 @@ describe('Registration player selection', () => {
     const second = [...sections].find((section) => within(section).queryByRole('heading', { name: 'Spieler 2' }));
     await choose(second, user);
     expect(within(second).getByLabelText(/^Vorname/)).toHaveValue('Anna');
-    expect(within(second).getByLabelText(/^Vorname/)).toHaveAttribute('readonly');
+    expect(within(second).getByLabelText(/^Vorname/)).not.toHaveAttribute('readonly');
+    expect(within(second).getByLabelText(/^E-Mail/)).toHaveAttribute('readonly');
     expect(screen.getByLabelText('Teamname')).toHaveValue('Team');
     fireEvent.submit(container.querySelector('form'));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       teamName: 'Team', partnerFirstName: 'Anna', partnerEmail: 'anna@example.test',
       playerSelections: { partner: { userId: 'p1', proof: 'save-proof', licenseNr: 'L-123' } },
     }));
-    await user.click(within(second).getByRole('button', { name: 'Auswahl aufheben' }));
-    expect(within(second).getByLabelText(/^Vorname/)).not.toHaveAttribute('readonly');
+    await user.type(within(second).getByLabelText(/^Vorname/), 'e');
+    expect(within(second).getByLabelText(/^Vorname/)).toHaveValue('Annae');
+    expect(within(second).getByLabelText(/^E-Mail/)).not.toHaveAttribute('readonly');
     fireEvent.submit(container.querySelector('form'));
     expect(onSubmit.mock.calls.at(-1)[0]).not.toHaveProperty('playerSelections');
   });
@@ -175,7 +179,7 @@ describe('Registration player selection', () => {
     await screen.findByRole('alert');
     expect(detailCalls()).toHaveLength(1);
     expect(screen.getByLabelText(/^Vorname/)).toHaveValue('Anna');
-    expect(screen.queryByRole('button', { name: 'Auswahl aufheben' })).toBeNull();
+    expect(screen.getByLabelText(/^E-Mail/)).toHaveValue('');
   });
 
   it('does not call the API when the security check fails', async () => {
@@ -198,7 +202,7 @@ describe('Registration player selection', () => {
     const field = screen.getByLabelText(/^Nachname/);
     expect(field).toHaveAttribute('aria-activedescendant', screen.getByRole('option').id);
     await user.keyboard('{Enter}');
-    await screen.findByRole('button', { name: 'Auswahl aufheben' });
+    await waitFor(() => expect(screen.getByLabelText(/^E-Mail/)).toHaveValue('anna@example.test'));
     expect(screen.getByLabelText(/^Vorname/)).toHaveValue('Anna');
     expect(onSubmit).not.toHaveBeenCalled();
   });
