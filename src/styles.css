@@ -4328,3 +4328,7 @@ details[open] > .play-round-summary::before {
     text-align: left;
   }
 }
+
+.registration-player-picker { margin-block: .5rem 1rem; min-width: 0; }
+.registration-player-matches { list-style: none; padding: 0; display: grid; gap: .4rem; max-height: 18rem; overflow-y: auto; }
+.registration-player-matches .button { width: 100%; text-align: left; justify-content: flex-start; white-space: normal; overflow-wrap: anywhere; }

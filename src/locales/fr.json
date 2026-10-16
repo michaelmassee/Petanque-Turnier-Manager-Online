@@ -1488,5 +1488,19 @@
   "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "Les équipes de mêlée sont fixées depuis la première ronde. Les nouveaux joueurs ne sont plus affectés à une équipe et ne participent pas.",
   "Gemeldet: {{score}}. Die Turnierleitung bestätigt das Ergebnis.": "Déclaré : {{score}}. L'organisation du tournoi confirmera le résultat.",
   "Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.": "L'organisation du tournoi n'a pas retenu ta déclaration {{score}}. Merci de clarifier le résultat directement avec elle.",
-  "Ungültige Entscheidungen": "Décisions non valides"
+  "Ungültige Entscheidungen": "Décisions non valides",
+  "Die Spielersuche ist derzeit nicht verfügbar.": "La recherche de joueurs est actuellement indisponible.",
+  "Die Spielerauswahl ist ungültig oder abgelaufen. Bitte erneut auswählen.": "La sélection du joueur est invalide ou a expiré. Veuillez sélectionner à nouveau.",
+  "Für die Spielersuche ist ein verifiziertes Benutzerkonto erforderlich.": "Un compte vérifié est nécessaire pour rechercher des joueurs.",
+  "Zu viele Spielersuchen. Bitte warte eine Minute und versuche es erneut.": "Trop de recherches de joueurs. Attends une minute et réessaie.",
+  "Bitte mindestens drei Zeichen oder eine vollständige E-Mail-Adresse eingeben.": "Saisis au moins trois caractères ou une adresse e-mail complète.",
+  "Der ausgewählte Spieler ist nicht mehr verfügbar. Bitte erneut auswählen.": "Le joueur sélectionné n’est plus disponible. Veuillez sélectionner à nouveau.",
+  "Ein Spieler kann pro Team nur einmal ausgewählt werden.": "Un joueur ne peut être sélectionné qu’une seule fois par équipe.",
+  "Auswahl aufheben": "Annuler la sélection",
+  "Registrierten Spieler suchen": "Rechercher un joueur inscrit",
+  "Name, @Benutzername, Verein oder vollständige E-Mail-Adresse": "Nom, @pseudo, club ou adresse e-mail complète",
+  "Nach der Auswahl werden E-Mail und Lizenznummer aus dem Profil übernommen.": "Après la sélection, l’adresse e-mail et le numéro de licence sont repris du profil.",
+  "Keine Spieler gefunden.": "Aucun joueur trouvé.",
+  "Bitte die Suche eingrenzen, um weitere Spieler zu finden.": "Précise la recherche pour trouver d’autres joueurs.",
+  "Suchergebnisse": "Résultats de recherche"
 }

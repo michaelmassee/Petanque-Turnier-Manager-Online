@@ -146,6 +146,7 @@ export function tournamentPayload(form) {
 
 export function registrationPayload(form, language) {
   return {
+    ...(form.playerSelections && Object.keys(form.playerSelections).length ? { playerSelections: form.playerSelections } : {}),
     firstName: form.firstName,
     lastName: form.lastName,
     playerEmail: form.playerEmail || null,

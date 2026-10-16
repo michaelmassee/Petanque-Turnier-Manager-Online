@@ -14,7 +14,7 @@ import { richTextPlainText } from '../lib/rich-text.js';
 
 const TEAM_MESSAGE_MAX_LENGTH = 500;
 
-export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false, currentUserId, clubNames }) {
+export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false, currentUserId, clubNames, turnstileSiteKey }) {
   const { t } = useTranslation();
   const selectedValue = form.tournamentId || selectedTournamentId;
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedValue);
@@ -29,6 +29,9 @@ export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournament
         currentUserId={currentUserId}
       />
       <RegistrationFields
+        playerSearchEnabled={Boolean(currentUserId)}
+        turnstileSiteKey={turnstileSiteKey}
+        tournamentId={selectedValue}
         form={form}
         setForm={setForm}
         showStatus={manageMode}
@@ -583,6 +586,7 @@ export function RegistrationsManagementPage({
   onInitialStatusFilterConsumed,
   approvalInboxActive = false,
   onExitApprovalInbox,
+  turnstileSiteKey,
   currentUserId,
   clubNames,
 }) {
@@ -846,6 +850,7 @@ export function RegistrationsManagementPage({
         onClose={closeDialog}
       >
         <RegistrationForm
+          turnstileSiteKey={turnstileSiteKey}
           form={form}
           setForm={setForm}
           onSubmit={handleAdminSubmit}

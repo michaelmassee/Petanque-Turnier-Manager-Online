@@ -401,6 +401,7 @@ export function TournamentSchedule({ tournamentId, tournament, language }) {
 }
 
 export function TournamentDetailPage({
+  turnstileSiteKey,
   route,
   tournaments,
   currentUser,
@@ -593,6 +594,8 @@ export function TournamentDetailPage({
 
           {view === 'anmelden' && (
             <PublicRegistrationPanel
+              turnstileSiteKey={turnstileSiteKey}
+              shareToken={shareToken}
               tournament={tournament}
               form={registrationForm}
               setForm={setRegistrationForm}

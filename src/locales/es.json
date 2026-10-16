@@ -1488,5 +1488,19 @@
   "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "Los equipos Mêlée son fijos desde la primera ronda. Los nuevos jugadores ya no se asignan a ningún equipo y no participan.",
   "Gemeldet: {{score}}. Die Turnierleitung bestätigt das Ergebnis.": "Comunicado: {{score}}. La organización del torneo confirmará el resultado.",
   "Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.": "La organización del torneo no aceptó tu comunicación {{score}}. Aclara el resultado directamente con la organización.",
-  "Ungültige Entscheidungen": "Decisiones no válidas"
+  "Ungültige Entscheidungen": "Decisiones no válidas",
+  "Die Spielersuche ist derzeit nicht verfügbar.": "La búsqueda de jugadores no está disponible en este momento.",
+  "Die Spielerauswahl ist ungültig oder abgelaufen. Bitte erneut auswählen.": "La selección del jugador no es válida o ha caducado. Selecciona de nuevo.",
+  "Für die Spielersuche ist ein verifiziertes Benutzerkonto erforderlich.": "Se requiere una cuenta verificada para buscar jugadores.",
+  "Zu viele Spielersuchen. Bitte warte eine Minute und versuche es erneut.": "Demasiadas búsquedas de jugadores. Espera un minuto e inténtalo de nuevo.",
+  "Bitte mindestens drei Zeichen oder eine vollständige E-Mail-Adresse eingeben.": "Introduce al menos tres caracteres o una dirección de correo completa.",
+  "Der ausgewählte Spieler ist nicht mehr verfügbar. Bitte erneut auswählen.": "El jugador seleccionado ya no está disponible. Selecciona de nuevo.",
+  "Ein Spieler kann pro Team nur einmal ausgewählt werden.": "Un jugador solo se puede seleccionar una vez por equipo.",
+  "Auswahl aufheben": "Quitar selección",
+  "Registrierten Spieler suchen": "Buscar jugador registrado",
+  "Name, @Benutzername, Verein oder vollständige E-Mail-Adresse": "Nombre, @usuario, club o dirección de correo completa",
+  "Nach der Auswahl werden E-Mail und Lizenznummer aus dem Profil übernommen.": "Tras la selección se incorporan el correo y el número de licencia del perfil.",
+  "Keine Spieler gefunden.": "No se han encontrado jugadores.",
+  "Bitte die Suche eingrenzen, um weitere Spieler zu finden.": "Acota la búsqueda para encontrar otros jugadores.",
+  "Suchergebnisse": "Resultados de búsqueda"
 }

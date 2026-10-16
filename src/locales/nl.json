@@ -1488,5 +1488,19 @@
   "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "De mêlée-teams liggen sinds de eerste ronde vast. Nieuwe spelers worden niet meer aan een team toegewezen en spelen niet mee.",
   "Gemeldet: {{score}}. Die Turnierleitung bestätigt das Ergebnis.": "Gemeld: {{score}}. De wedstrijdleiding bevestigt de uitslag.",
   "Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.": "De wedstrijdleiding heeft je melding {{score}} niet overgenomen. Stem de uitslag rechtstreeks af met de wedstrijdleiding.",
-  "Ungültige Entscheidungen": "Ongeldige beslissingen"
+  "Ungültige Entscheidungen": "Ongeldige beslissingen",
+  "Die Spielersuche ist derzeit nicht verfügbar.": "Spelers zoeken is momenteel niet beschikbaar.",
+  "Die Spielerauswahl ist ungültig oder abgelaufen. Bitte erneut auswählen.": "De spelerskeuze is ongeldig of verlopen. Selecteer opnieuw.",
+  "Für die Spielersuche ist ein verifiziertes Benutzerkonto erforderlich.": "Een geverifieerd account is nodig om spelers te zoeken.",
+  "Zu viele Spielersuchen. Bitte warte eine Minute und versuche es erneut.": "Te veel zoekopdrachten naar spelers. Wacht een minuut en probeer opnieuw.",
+  "Bitte mindestens drei Zeichen oder eine vollständige E-Mail-Adresse eingeben.": "Voer minimaal drie tekens of een volledig e-mailadres in.",
+  "Der ausgewählte Spieler ist nicht mehr verfügbar. Bitte erneut auswählen.": "De geselecteerde speler is niet meer beschikbaar. Selecteer opnieuw.",
+  "Ein Spieler kann pro Team nur einmal ausgewählt werden.": "Een speler kan per team maar één keer worden geselecteerd.",
+  "Auswahl aufheben": "Selectie opheffen",
+  "Registrierten Spieler suchen": "Geregistreerde speler zoeken",
+  "Name, @Benutzername, Verein oder vollständige E-Mail-Adresse": "Naam, @gebruikersnaam, vereniging of volledig e-mailadres",
+  "Nach der Auswahl werden E-Mail und Lizenznummer aus dem Profil übernommen.": "Na selectie worden het e-mailadres en licentienummer uit het profiel overgenomen.",
+  "Keine Spieler gefunden.": "Geen spelers gevonden.",
+  "Bitte die Suche eingrenzen, um weitere Spieler zu finden.": "Verfijn de zoekopdracht om andere spelers te vinden.",
+  "Suchergebnisse": "Zoekresultaten"
 }

@@ -4,6 +4,7 @@ import { REGISTRATION_STATUSES } from '../lib/constants.js';
 import { translatedOptions } from '../lib/domain.js';
 import { formatMoney } from '../lib/format.js';
 import { SelectField, TextField } from './ui.jsx';
+import { RegistrationPlayerPicker } from './RegistrationPlayerPicker.jsx';
 import { useClubSuggestions } from './ClubSuggestions.jsx';
 
 function ParticipantQuestions({ participant, questions, answers, onChange }) {
@@ -33,7 +34,7 @@ function RegistrationSection({ title, children, className = '' }) {
 }
 
 // clubNames: veröffentlichte Vereine als Vorschläge für die Vereinsfelder (Freitext bleibt möglich).
-export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled, feeTiers = [], registrationQuestions = [], currency = 'EUR', invalidField, clubNames = [] }) {
+export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled, feeTiers = [], registrationQuestions = [], currency = 'EUR', invalidField, clubNames = [], playerSearchEnabled = false, turnstileSiteKey, tournamentId, shareToken = '' }) {
   const { t, i18n } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
   const clubList = clubSuggestions.listId;
@@ -41,6 +42,29 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
   const allowsPartner = isDrawnTeam ? false : (formation ? formation !== 'tete' : true);
   const allowsPartner2 = isDrawnTeam ? false : formation === 'triplette';
   const showMeleeNotice = isDrawnTeam && formation && formation !== 'tete';
+  const selections = form.playerSelections || {};
+  const selectedIds = Object.values(selections).map((selection) => selection.userId);
+  function selectPlayer(slot, player) {
+    setForm((current) => {
+      const prefix = slot === 'primary' ? '' : slot;
+      const field = (suffix) => prefix ? `${prefix}${suffix}` : suffix[0].toLowerCase() + suffix.slice(1);
+      return { ...current,
+        [field('FirstName')]: player.firstName, [field('LastName')]: player.lastName,
+        [slot === 'primary' ? 'playerEmail' : field('Email')]: player.email,
+        [field('Club')]: player.club || '', [field('LicenseNr')]: player.licenseNr || '',
+        ...(slot === 'primary' ? { noEmail: false } : {}),
+        playerSelections: { ...current.playerSelections, [slot]: { userId: player.id, proof: player.proof, licenseNr: player.licenseNr } },
+      };
+    });
+  }
+  function clearPlayer(slot) {
+    setForm((current) => ({ ...current, playerSelections: Object.fromEntries(Object.entries(current.playerSelections || {}).filter(([key]) => key !== slot)) }));
+  }
+  const picker = (slot) => playerSearchEnabled && tournamentId ? <RegistrationPlayerPicker
+    key={`${tournamentId}:${slot}`} tournamentId={tournamentId} siteKey={turnstileSiteKey} shareToken={shareToken}
+    selected={selections[slot]} excludedIds={selectedIds}
+    onSelect={(player) => selectPlayer(slot, player)} onClear={() => clearPlayer(slot)} /> : null;
+
   // Ohne Ermäßigung (nur ein wählbarer Tarif) gibt es nichts auszuwählen - die Auswahl
   // entfällt und der einzige aktive Tarif wird automatisch zugeordnet, damit das Startgeld
   // trotzdem erfasst wird. Deaktivierte Tarife zählen nicht mit (für neue Meldungen ohnehin
@@ -73,17 +97,19 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
   };
 
   useEffect(() => {
-    if (!allowsPartner && (form.partnerFirstName || form.partnerLastName || form.partnerEmail || form.partnerClub || form.partnerLicenseNr || form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2Club || form.partner2LicenseNr)) {
+    if (!allowsPartner && (form.playerSelections?.partner || form.playerSelections?.partner2 || form.partnerFirstName || form.partnerLastName || form.partnerEmail || form.partnerClub || form.partnerLicenseNr || form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2Club || form.partner2LicenseNr)) {
       setForm((current) => ({
         ...current,
+        playerSelections: Object.fromEntries(Object.entries(current.playerSelections || {}).filter(([slot]) => slot === 'primary')),
         partnerFirstName: '', partnerLastName: '', partnerEmail: '', partnerClub: '', partnerLicenseNr: '',
         partner2FirstName: '', partner2LastName: '', partner2Email: '', partner2Club: '', partner2LicenseNr: '',
         feeSelections: (current.feeSelections || []).filter((selection) => selection.participant !== 'partner' && selection.participant !== 'partner2'),
         registrationAnswers: (current.registrationAnswers || []).filter((answer) => answer.participant !== 'partner' && answer.participant !== 'partner2'),
       }));
-    } else if (allowsPartner && !allowsPartner2 && (form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2Club || form.partner2LicenseNr)) {
+    } else if (allowsPartner && !allowsPartner2 && (form.playerSelections?.partner2 || form.partner2FirstName || form.partner2LastName || form.partner2Email || form.partner2Club || form.partner2LicenseNr)) {
       setForm((current) => ({
         ...current,
+        playerSelections: Object.fromEntries(Object.entries(current.playerSelections || {}).filter(([slot]) => slot !== 'partner2')),
         partner2FirstName: '', partner2LastName: '', partner2Email: '', partner2Club: '', partner2LicenseNr: '',
         feeSelections: (current.feeSelections || []).filter((selection) => selection.participant !== 'partner2'),
         registrationAnswers: (current.registrationAnswers || []).filter((answer) => answer.participant !== 'partner2'),
@@ -94,7 +120,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
 
   useEffect(() => {
     if (!licenseRequired && (form.licenseNr || form.partnerLicenseNr || form.partner2LicenseNr)) {
-      setForm((current) => ({ ...current, licenseNr: '', partnerLicenseNr: '', partner2LicenseNr: '' }));
+      setForm((current) => ({ ...current, licenseNr: current.playerSelections?.primary?.licenseNr || '', partnerLicenseNr: current.playerSelections?.partner?.licenseNr || '', partner2LicenseNr: current.playerSelections?.partner2?.licenseNr || '' }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [licenseRequired]);
@@ -127,53 +153,56 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
       )}
       {clubSuggestions.datalist}
       <RegistrationSection title={t('Spieler 1')}>
+        {picker('primary')}
         <div className="form-grid">
-          <TextField label={t('Vorname')} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />
-          <TextField label={t('Nachname')} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} invalid={invalidField === 'firstName'} />
+          <TextField label={t('Vorname')} readOnly={Boolean(selections.primary)} value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} required minLength={2} invalid={invalidField === 'firstName'} />
+          <TextField label={t('Nachname')} readOnly={Boolean(selections.primary)} value={form.lastName} onChange={(lastName) => setForm({ ...form, lastName })} required minLength={2} invalid={invalidField === 'firstName'} />
         </div>
         <ParticipantQuestions participant="primary" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('primary', questionId, checked)} />
-        {!(showStatus && form.noEmail) && <TextField label={t('E-Mail')} type="email" value={form.playerEmail || ''} onChange={(playerEmail) => setForm({ ...form, playerEmail })} required />}
+        {!(showStatus && form.noEmail) && <TextField label={t('E-Mail')} type="email" readOnly={Boolean(selections.primary)} value={form.playerEmail || ''} onChange={(playerEmail) => setForm({ ...form, playerEmail })} required />}
         <div className="form-grid">
-          <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} list={clubList} />
-          {licenseRequired && <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} required />}
+          <TextField label={t('Verein')} readOnly={Boolean(selections.primary)} value={form.club} onChange={(club) => setForm({ ...form, club })} list={clubList} />
+          {(licenseRequired || selections.primary?.licenseNr) && <TextField label={t('Lizenznummer')} readOnly={Boolean(selections.primary?.licenseNr)} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} required={licenseRequired} />}
         </div>
         {showFeeSelect && <SelectField label={t('Startgeld')} value={selectedFee('primary')} onChange={(tariffId) => setSelectedFee('primary', tariffId)} options={feeOptions('primary')} />}
       </RegistrationSection>
       {allowsPartner && (
         <RegistrationSection title={t('Spieler 2')}>
+          {picker('partner')}
           <div className="form-grid">
-            <TextField label={t('Vorname')} value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
-            <TextField label={t('Nachname')} value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
+            <TextField label={t('Vorname')} readOnly={Boolean(selections.partner)} value={form.partnerFirstName} onChange={(partnerFirstName) => setForm({ ...form, partnerFirstName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
+            <TextField label={t('Nachname')} readOnly={Boolean(selections.partner)} value={form.partnerLastName} onChange={(partnerLastName) => setForm({ ...form, partnerLastName })} required minLength={2} invalid={invalidField === 'partnerFirstName'} />
           </div>
           <ParticipantQuestions participant="partner" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner', questionId, checked)} />
           <div className="form-grid">
-            <TextField label={t('E-Mail')} type="email" value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
-            {licenseRequired && <TextField label={t('Lizenznummer')} value={form.partnerLicenseNr} onChange={(partnerLicenseNr) => setForm({ ...form, partnerLicenseNr })} required />}
+            <TextField label={t('E-Mail')} type="email" readOnly={Boolean(selections.partner)} value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
+            {(licenseRequired || selections.partner?.licenseNr) && <TextField label={t('Lizenznummer')} readOnly={Boolean(selections.partner?.licenseNr)} value={form.partnerLicenseNr} onChange={(partnerLicenseNr) => setForm({ ...form, partnerLicenseNr })} required={licenseRequired} />}
           </div>
-          <TextField label={t('Verein')} value={form.partnerClub} onChange={(partnerClub) => setForm({ ...form, partnerClub })} list={clubList} />
+          <TextField label={t('Verein')} readOnly={Boolean(selections.partner)} value={form.partnerClub} onChange={(partnerClub) => setForm({ ...form, partnerClub })} list={clubList} />
           {showFeeSelect && <SelectField label={t('Startgeld Partner')} value={selectedFee('partner')} onChange={(tariffId) => setSelectedFee('partner', tariffId)} options={feeOptions('partner')} />}
         </RegistrationSection>
       )}
       {allowsPartner2 && (
         <RegistrationSection title={t('Spieler 3')}>
+          {picker('partner2')}
           <p className="hint">{t('Ein Triplette-Team kann auch zu zweit angemeldet und vor Ort vervollständigt werden.')}</p>
           <div className="form-grid">
-            <TextField label={t('Vorname')} value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required={Boolean(form.partner2LastName)} minLength={2} invalid={invalidField === 'partner2FirstName'} />
-            <TextField label={t('Nachname')} value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} required={Boolean(form.partner2FirstName)} minLength={2} invalid={invalidField === 'partner2FirstName'} />
+            <TextField label={t('Vorname')} readOnly={Boolean(selections.partner2)} value={form.partner2FirstName} onChange={(partner2FirstName) => setForm({ ...form, partner2FirstName })} required={Boolean(form.partner2LastName)} minLength={2} invalid={invalidField === 'partner2FirstName'} />
+            <TextField label={t('Nachname')} readOnly={Boolean(selections.partner2)} value={form.partner2LastName} onChange={(partner2LastName) => setForm({ ...form, partner2LastName })} required={Boolean(form.partner2FirstName)} minLength={2} invalid={invalidField === 'partner2FirstName'} />
           </div>
           <ParticipantQuestions participant="partner2" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner2', questionId, checked)} />
           <div className="form-grid">
-            <TextField label={t('E-Mail')} type="email" value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
-            {licenseRequired && <TextField label={t('Lizenznummer')} value={form.partner2LicenseNr} onChange={(partner2LicenseNr) => setForm({ ...form, partner2LicenseNr })} required />}
+            <TextField label={t('E-Mail')} type="email" readOnly={Boolean(selections.partner2)} value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
+            {(licenseRequired || selections.partner2?.licenseNr) && <TextField label={t('Lizenznummer')} readOnly={Boolean(selections.partner2?.licenseNr)} value={form.partner2LicenseNr} onChange={(partner2LicenseNr) => setForm({ ...form, partner2LicenseNr })} required={licenseRequired} />}
           </div>
-          <TextField label={t('Verein')} value={form.partner2Club} onChange={(partner2Club) => setForm({ ...form, partner2Club })} list={clubList} />
+          <TextField label={t('Verein')} readOnly={Boolean(selections.partner2)} value={form.partner2Club} onChange={(partner2Club) => setForm({ ...form, partner2Club })} list={clubList} />
           {showFeeSelect && <SelectField label={t('Startgeld Partner 2')} value={selectedFee('partner2')} onChange={(tariffId) => setSelectedFee('partner2', tariffId)} options={feeOptions('partner2')} />}
         </RegistrationSection>
       )}
       {showStatus && (
         <RegistrationSection title={t('Organisation')}>
           <label className="checkbox-field">
-            <input type="checkbox" checked={Boolean(form.noEmail)} onChange={(event) => setForm({ ...form, noEmail: event.target.checked })} />
+            <input type="checkbox" disabled={Boolean(selections.primary)} checked={Boolean(form.noEmail)} onChange={(event) => setForm({ ...form, noEmail: event.target.checked })} />
             {t('Keine E-Mail-Adresse vorhanden')}
           </label>
           <div className="form-grid">

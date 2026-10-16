@@ -1488,5 +1488,19 @@
   "Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.": "The Mêlée teams have been fixed since the first round. New players are no longer assigned to a team and do not take part.",
   "Gemeldet: {{score}}. Die Turnierleitung bestätigt das Ergebnis.": "Reported: {{score}}. The tournament organizers will confirm the result.",
   "Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.": "The tournament organizers did not accept your report {{score}}. Please clarify the result with them directly.",
-  "Ungültige Entscheidungen": "Invalid decisions"
+  "Ungültige Entscheidungen": "Invalid decisions",
+  "Die Spielersuche ist derzeit nicht verfügbar.": "Player search is currently unavailable.",
+  "Die Spielerauswahl ist ungültig oder abgelaufen. Bitte erneut auswählen.": "The player selection is invalid or has expired. Please select again.",
+  "Für die Spielersuche ist ein verifiziertes Benutzerkonto erforderlich.": "A verified account is required to search for players.",
+  "Zu viele Spielersuchen. Bitte warte eine Minute und versuche es erneut.": "Too many player searches. Please wait one minute and try again.",
+  "Bitte mindestens drei Zeichen oder eine vollständige E-Mail-Adresse eingeben.": "Please enter at least three characters or a complete email address.",
+  "Der ausgewählte Spieler ist nicht mehr verfügbar. Bitte erneut auswählen.": "The selected player is no longer available. Please select again.",
+  "Ein Spieler kann pro Team nur einmal ausgewählt werden.": "A player can only be selected once per team.",
+  "Auswahl aufheben": "Clear selection",
+  "Registrierten Spieler suchen": "Search registered players",
+  "Name, @Benutzername, Verein oder vollständige E-Mail-Adresse": "Name, @username, club or complete email address",
+  "Nach der Auswahl werden E-Mail und Lizenznummer aus dem Profil übernommen.": "After selection, the email address and licence number are copied from the profile.",
+  "Keine Spieler gefunden.": "No players found.",
+  "Bitte die Suche eingrenzen, um weitere Spieler zu finden.": "Please narrow your search to find other players.",
+  "Suchergebnisse": "Search results"
 }

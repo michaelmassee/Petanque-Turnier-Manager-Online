@@ -91,6 +91,14 @@ Ergebnisse synchronisieren.
   Der Backfill ist idempotent und bricht den Ablauf ab, wenn danach noch Konten ohne Benutzernamen übrig sind.
   Nach dem Deploy prüfen: Zahl der Konten unverändert, `SELECT COUNT(*) FROM users WHERE username IS NULL` ergibt `0`.
 
+## Spielersuche bei der Turnieranmeldung
+
+Verifizierte Nutzer und die Turnierleitung können in den zulässigen Spielerfeldern registrierte Nutzer suchen und auswählen. Erst die Auswahl lädt E-Mail und Lizenznummer; sie verknüpft den Spieler beim Speichern mit seinem Konto. Ohne Spielerauswahl bleibt die manuelle Anmeldung verfügbar.
+
+Die beiden POST-Endpunkte `/api/tournaments/:id/registration-players/search` und `/api/tournaments/:id/registration-players/details` verlangen eine Sitzung, Turnierzugriff und jeweils einen neuen Turnstile-Token. `TURNSTILE_SITE_KEY` und das Secret `TURNSTILE_SECRET_KEY` müssen für die Umgebung eingerichtet sein; Hostname und die Aktionen `registration_player_search` beziehungsweise `registration_player_details` werden geprüft. Fehlende Konfiguration sperrt die Suche. Lokale Tests dürfen nur ausdrücklich konfigurierte Testschlüssel verwenden; es gibt keinen automatischen Sicherheits-Bypass.
+
+Die vier Rate-Limit-Bindings in `wrangler.jsonc` begrenzen Suchen auf 10 pro Konto und 60 pro IP je Minute, Profildetails auf 6 pro Konto und 30 pro IP. Dafür entstehen keine D1-Zählerabfragen. Die Begrenzung gilt je Cloudflare-Standort und ist kein globales Kontingent. Trefferlisten enthalten höchstens 20 Nutzer; private Daten sind darin nicht enthalten. Signierte Auswahlbelege sind an das anmeldende Konto und Turnier gebunden und laufen nach fünf Minuten ab. Danach muss der Spieler erneut ausgewählt werden. Eine Datenbankmigration ist nicht erforderlich.
+
 ## Geplanter Anmeldebeginn
 
 Turniere mit zukünftigem Anmeldebeginn werden durch einen SQLite-basierten Durable-Object-Alarm freigegeben, auch ohne Abonnenten. Freigabe, Postbox-Nachrichten und Abschluss der einmaligen Abos werden gemeinsam in D1 gespeichert. Push wird danach nur für Konten mit Push-Freigabe über die vorhandene Queue eingereiht.

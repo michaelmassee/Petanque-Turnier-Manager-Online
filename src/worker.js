@@ -1,3 +1,4 @@
+import { limitPlayerSearch, searchRegistrationPlayers, registrationPlayerDetails, resolveSelectedRegistrationPlayers } from './registration-player-search.js';
 import tzlookup from 'tz-lookup';
 import { sendAdminStatusEmails } from './admin-status-email.js';
 import { REGISTRATION_OPENED_EVENT, OPENING_MESSAGES, synchronizeOpeningSchedule } from './registration-opening.js';
@@ -1622,6 +1623,28 @@ export default {
       if (request.method === 'GET' && url.pathname === '/api/postbox/summary') {
         const session = await requireSession(request, env.DB);
         return json(await postboxSummary(env.DB, session.user));
+      }
+
+      const playerSearchMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registration-players\/(search|details)$/);
+      if (playerSearchMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        const details = playerSearchMatch[2] === 'details';
+        await limitPlayerSearch(env, request, session.user, details);
+        const body = await readJson(request);
+        await verifyTurnstileToken(env, body.turnstileToken, request.headers.get('CF-Connecting-IP'), {
+          required: true, action: details ? 'registration_player_details' : 'registration_player_search', hostname: url.hostname,
+        });
+        const tournament = await getTournamentById(env.DB, playerSearchMatch[1]);
+        if (!tournament || !Number(tournament.registration_enabled ?? 1)) throw new HttpError(403, 'Zugriff verweigert');
+        if (canManageTournament(tournament, session.user)) {
+          if (Number(tournament.desktop_execution || 0)) throw new HttpError(403, 'Zugriff verweigert');
+        } else {
+          const shareAccess = await hasTournamentShareAccess(env.DB, tournament, body.shareToken);
+          assertRegistrationOpen(tournament, shareAccess);
+        }
+        return json(details
+          ? await registrationPlayerDetails(env, session.user.id, tournament.id, body)
+          : await searchRegistrationPlayers(env, session.user.id, tournament.id, body.query));
       }
 
       if (request.method === 'GET' && url.pathname === '/api/postbox/recipients') {
@@ -5720,8 +5743,9 @@ async function enforceTournamentReportRateLimit(db, ip) {
     .run();
 }
 
-async function verifyTurnstileToken(env, token, ip) {
+export async function verifyTurnstileToken(env, token, ip, { required = false, action, hostname } = {}) {
   if (!env.TURNSTILE_SECRET_KEY) {
+    if (required) throw new HttpError(503, 'Die Spielersuche ist derzeit nicht verfügbar.');
     // Not configured on this environment (e.g. local dev) - skip verification rather than
     // hard-blocking the whole feature.
     return;
@@ -5745,7 +5769,7 @@ async function verifyTurnstileToken(env, token, ip) {
     console.error('Turnstile verification request failed', error);
     throw new HttpError(400, 'Sicherheitsprüfung fehlgeschlagen. Bitte erneut versuchen.');
   }
-  if (!result?.success) {
+  if (!result?.success || (action && result.action !== action) || (hostname && result.hostname !== hostname)) {
     throw new HttpError(400, 'Sicherheitsprüfung fehlgeschlagen. Bitte erneut versuchen.');
   }
 }
@@ -6218,6 +6242,13 @@ function registrationFlags(tournament, row, flagsFor) {
  * Konten zu den Slot-E-Mails einer Anmeldung (E-22): Verknüpft wird nur eine Adresse, die genau einem verifizierten
  * Konto gehört.
  */
+function assertUniqueSelectedAccountLinks(links, selections) {
+  const ids = Object.values(links).filter(Boolean);
+  if (Object.keys(selections).length && new Set(ids).size !== ids.length) {
+    throw new HttpError(400, 'Ein Spieler kann pro Team nur einmal ausgewählt werden.');
+  }
+}
+
 export async function resolveRegistrationUserIds(db, registration, { registrationId = null } = {}) {
   const emails = [registration.playerEmail, registration.partnerEmail, registration.partner2Email]
     .map((email) => String(email || '').trim().toLowerCase());
@@ -7606,6 +7637,7 @@ export async function createRegistration(request, env, tournament, {
   if (!isManager && body.personsConsentAccepted !== true) {
     throw new HttpError(400, 'Das Einverständnis der eingetragenen Personen muss bestätigt werden');
   }
+  const selectedLinks = await resolveSelectedRegistrationPlayers(env, body, session?.user, tournament.id);
   if (isManager && body.noEmail === true) {
     body.email = createPlaceholderEmail();
   }
@@ -7620,7 +7652,8 @@ export async function createRegistration(request, env, tournament, {
   const registrationAnswers = resolveRegistrationAnswers(tournament, body.registrationAnswers, registration);
   assertLicenseMatchesTournament(tournament, registration);
   await assertNoDuplicateTeamName(db, tournament.id, registration.teamName);
-  const accountLinks = await resolveRegistrationUserIds(db, registration);
+  const accountLinks = { ...await resolveRegistrationUserIds(db, registration), ...selectedLinks };
+  assertUniqueSelectedAccountLinks(accountLinks, selectedLinks);
 
   // Kapazität, VIP-Verdrängung, Warteliste und Anlage laufen in einem Batch; die Bedingungen stehen im SQL, damit
   // parallele Anmeldungen und ein gleichzeitiger Turnierstart nicht durchrutschen (T-12). pending und confirmed
@@ -7801,6 +7834,7 @@ async function throwRegistrationRejection(db, tournament, { isManager, shareAcce
 export async function updateRegistration(request, env, existing, actingUser = null) {
   const db = env.DB;
   const body = await readJson(request);
+  const selectedLinks = await resolveSelectedRegistrationPlayers(env, body, actingUser, existing.tournament_id);
   if (body.noEmail === true) {
     body.email = isPlaceholderEmail(existing.email) ? existing.email : createPlaceholderEmail();
   }
@@ -7823,11 +7857,14 @@ export async function updateRegistration(request, env, existing, actingUser = nu
     { firstName: registration.partnerFirstName, lastName: registration.partnerLastName, resolved: accountLinks.partnerUserId },
     { firstName: registration.partner2FirstName, lastName: registration.partner2LastName, resolved: accountLinks.partner2UserId },
   ];
-  const [userId, partnerUserId, partner2UserId] = uniqueAccountLinks(SLOT_COLUMNS.map((column, index) => nextSlotUserId({
+  const linkNames = ['userId', 'partnerUserId', 'partner2UserId'];
+  const resolvedLinks = SLOT_COLUMNS.map((column, index) => selectedLinks[linkNames[index]] || nextSlotUserId({
     existing: { firstName: existing[column.first], lastName: existing[column.last], userId: existing[column.userId] },
     next: nextSlots[index],
     resolvedUserId: nextSlots[index].resolved,
-  })));
+  }));
+  assertUniqueSelectedAccountLinks(Object.fromEntries(linkNames.map((name, index) => [name, resolvedLinks[index]])), selectedLinks);
+  const [userId, partnerUserId, partner2UserId] = uniqueAccountLinks(resolvedLinks);
   await db
     .prepare(
       `UPDATE registrations

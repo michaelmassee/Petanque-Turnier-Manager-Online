@@ -1350,6 +1350,7 @@ function AppContent() {
     return (
       <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
         <TournamentDetailPage
+          turnstileSiteKey={turnstileSiteKey}
           route={tournamentRoute}
           tournaments={tournaments}
           currentUser={currentUser}
@@ -1809,6 +1810,7 @@ function AppContent() {
 
             {authView === 'publicRegistration' && selectedTournament && (
               <PublicRegistrationPanel
+                turnstileSiteKey={turnstileSiteKey}
                 tournament={selectedTournament}
                 form={registrationForm}
                 setForm={setRegistrationForm}
@@ -2059,6 +2061,7 @@ function AppContent() {
           }}
         >
           <PublicRegistrationPanel
+            turnstileSiteKey={turnstileSiteKey}
             tournament={selectedTournament}
             form={registrationForm}
             setForm={setRegistrationForm}
@@ -2101,6 +2104,7 @@ function AppContent() {
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
             <RegistrationsManagement
+              turnstileSiteKey={turnstileSiteKey}
               tournaments={tournaments}
               selectedTournamentId={selectedTournamentId}
               setSelectedTournamentId={setSelectedTournamentId}
@@ -2545,7 +2549,7 @@ export function HomeTournaments({
   );
 }
 
-export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, language, embedded = false, currentUser = null, invalidField = null, saving = false, clubNames = [] }) {
+export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, onCancel, navigate, language, embedded = false, currentUser = null, invalidField = null, saving = false, clubNames = [], turnstileSiteKey, shareToken = '' }) {
   const { t } = useTranslation();
   useEffect(() => {
     if (!form.id && form.tournamentId !== tournament.id) {
@@ -2600,6 +2604,10 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             {t('Datenschutzerklärung lesen')}
           </button>
           <RegistrationFields
+            playerSearchEnabled={Boolean(currentUser?.emailVerifiedAt)}
+            turnstileSiteKey={turnstileSiteKey}
+            tournamentId={tournament.id}
+            shareToken={shareToken}
             form={form}
             setForm={setForm}
             showStatus={false}
