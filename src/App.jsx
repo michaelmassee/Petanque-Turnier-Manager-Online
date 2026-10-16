@@ -2051,6 +2051,7 @@ function AppContent() {
 
       {authView === 'publicRegistration' && selectedTournament && (
         <AuthModal
+          wide
           title={authTitle(needsSetup, authView)}
           subtitle={authSubtitle(needsSetup, authView)}
           message={message}

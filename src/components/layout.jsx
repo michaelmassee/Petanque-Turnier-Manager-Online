@@ -722,9 +722,9 @@ export function SearchMenuControl({
   );
 }
 
-export function AuthModal({ title, subtitle, message, error, onClose, children }) {
+export function AuthModal({ title, subtitle, message, error, onClose, wide, children }) {
   return (
-    <EditDialog title={title} subtitle={subtitle} message={message} error={error} onClose={onClose}>
+    <EditDialog title={title} subtitle={subtitle} message={message} error={error} onClose={onClose} wide={wide}>
       {children}
     </EditDialog>
   );

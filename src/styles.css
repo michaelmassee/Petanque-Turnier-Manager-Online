@@ -4330,5 +4330,7 @@ details[open] > .play-round-summary::before {
 }
 
 .registration-player-picker { min-width: 0; }
+/* Ohne Lizenzfeld steht der Verein allein im Raster und nutzt dann die volle Breite. */
+.registration-section .form-grid > :only-child { grid-column: 1 / -1; }
 .registration-player-matches { max-height: 18rem; }
 .registration-player-matches button { white-space: normal; overflow-wrap: anywhere; }

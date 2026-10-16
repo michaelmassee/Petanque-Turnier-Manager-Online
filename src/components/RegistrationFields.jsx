@@ -180,11 +180,11 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
         <RegistrationSection title={t('Spieler 2')}>
           {names('partner')}
           <ParticipantQuestions participant="partner" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner', questionId, checked)} />
+          <TextField label={t('E-Mail')} type="email" readOnly={Boolean(selections.partner)} value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
           <div className="form-grid">
-            <TextField label={t('E-Mail')} type="email" readOnly={Boolean(selections.partner)} value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
+            <TextField label={t('Verein')} readOnly={Boolean(selections.partner)} value={form.partnerClub} onChange={(partnerClub) => setForm({ ...form, partnerClub })} list={clubList} />
             {(licenseRequired || selections.partner?.licenseNr) && <TextField label={t('Lizenznummer')} readOnly={Boolean(selections.partner?.licenseNr)} value={form.partnerLicenseNr} onChange={(partnerLicenseNr) => setForm({ ...form, partnerLicenseNr })} required={licenseRequired} />}
           </div>
-          <TextField label={t('Verein')} readOnly={Boolean(selections.partner)} value={form.partnerClub} onChange={(partnerClub) => setForm({ ...form, partnerClub })} list={clubList} />
           {showFeeSelect && <SelectField label={t('Startgeld Partner')} value={selectedFee('partner')} onChange={(tariffId) => setSelectedFee('partner', tariffId)} options={feeOptions('partner')} />}
         </RegistrationSection>
       )}
@@ -193,11 +193,11 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
           <p className="hint">{t('Ein Triplette-Team kann auch zu zweit angemeldet und vor Ort vervollständigt werden.')}</p>
           {names('partner2')}
           <ParticipantQuestions participant="partner2" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner2', questionId, checked)} />
+          <TextField label={t('E-Mail')} type="email" readOnly={Boolean(selections.partner2)} value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
           <div className="form-grid">
-            <TextField label={t('E-Mail')} type="email" readOnly={Boolean(selections.partner2)} value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
+            <TextField label={t('Verein')} readOnly={Boolean(selections.partner2)} value={form.partner2Club} onChange={(partner2Club) => setForm({ ...form, partner2Club })} list={clubList} />
             {(licenseRequired || selections.partner2?.licenseNr) && <TextField label={t('Lizenznummer')} readOnly={Boolean(selections.partner2?.licenseNr)} value={form.partner2LicenseNr} onChange={(partner2LicenseNr) => setForm({ ...form, partner2LicenseNr })} required={licenseRequired} />}
           </div>
-          <TextField label={t('Verein')} readOnly={Boolean(selections.partner2)} value={form.partner2Club} onChange={(partner2Club) => setForm({ ...form, partner2Club })} list={clubList} />
           {showFeeSelect && <SelectField label={t('Startgeld Partner 2')} value={selectedFee('partner2')} onChange={(tariffId) => setSelectedFee('partner2', tariffId)} options={feeOptions('partner2')} />}
         </RegistrationSection>
       )}
