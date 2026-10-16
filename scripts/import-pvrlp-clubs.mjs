@@ -24,6 +24,7 @@ const EXCLUDED = new Set(['09-029', '09-074', '09-083']);
 // Geprüfte Spielorte (Nominatim/Vereinswebsite), wo die Kartenkoordinate falsch oder nur die Ortsmitte ist.
 // null = Verein ohne Platz anlegen, weil der Spielort unklar ist.
 const PLACE_FIXES = {
+  '09-001': { latitude: 49.619933, longitude: 7.8444277 },
   '09-008': { street: 'Maximilianstraße 9', latitude: 49.4810322, longitude: 7.7108561 },
   '09-046': { latitude: 49.6244275, longitude: 8.357677 },
   '09-049': { street: 'Westpfalzhalle', latitude: 49.576925, longitude: 7.6822978 },
