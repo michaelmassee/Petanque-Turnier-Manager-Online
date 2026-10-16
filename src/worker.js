@@ -1,4 +1,4 @@
-import { limitPlayerSearch, searchRegistrationPlayers, registrationPlayerDetails, resolveSelectedRegistrationPlayers } from './registration-player-search.js';
+import { limitPlayerDetails, registrationPlayerDetails, resolveSelectedRegistrationPlayers } from './registration-player-search.js';
 import tzlookup from 'tz-lookup';
 import { sendAdminStatusEmails } from './admin-status-email.js';
 import { REGISTRATION_OPENED_EVENT, OPENING_MESSAGES, synchronizeOpeningSchedule } from './registration-opening.js';
@@ -1625,16 +1625,15 @@ export default {
         return json(await postboxSummary(env.DB, session.user));
       }
 
-      const playerSearchMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registration-players\/(search|details)$/);
-      if (playerSearchMatch && request.method === 'POST') {
+      const playerDetailsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registration-players\/details$/);
+      if (playerDetailsMatch && request.method === 'POST') {
         const session = await requireSession(request, env.DB);
-        const details = playerSearchMatch[2] === 'details';
-        await limitPlayerSearch(env, request, session.user, details);
+        await limitPlayerDetails(env, request, session.user);
         const body = await readJson(request);
         await verifyTurnstileToken(env, body.turnstileToken, request.headers.get('CF-Connecting-IP'), {
-          required: true, action: details ? 'registration_player_details' : 'registration_player_search', hostname: url.hostname,
+          required: true, action: 'registration_player_details', hostname: url.hostname,
         });
-        const tournament = await getTournamentById(env.DB, playerSearchMatch[1]);
+        const tournament = await getTournamentById(env.DB, playerDetailsMatch[1]);
         if (!tournament || !Number(tournament.registration_enabled ?? 1)) throw new HttpError(403, 'Zugriff verweigert');
         if (canManageTournament(tournament, session.user)) {
           if (Number(tournament.desktop_execution || 0)) throw new HttpError(403, 'Zugriff verweigert');
@@ -1642,9 +1641,7 @@ export default {
           const shareAccess = await hasTournamentShareAccess(env.DB, tournament, body.shareToken);
           assertRegistrationOpen(tournament, shareAccess);
         }
-        return json(details
-          ? await registrationPlayerDetails(env, session.user.id, tournament.id, body)
-          : await searchRegistrationPlayers(env, session.user.id, tournament.id, body.query));
+        return json(await registrationPlayerDetails(env, session.user.id, tournament.id, body));
       }
 
       if (request.method === 'GET' && url.pathname === '/api/postbox/recipients') {

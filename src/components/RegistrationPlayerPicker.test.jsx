@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '../lib/i18next-config.js';
 import { authenticatedApi } from '../lib/api.js';
 import { playerSearchTurnstileToken } from '../lib/player-search-turnstile.js';
@@ -13,20 +14,27 @@ vi.mock('../lib/api.js', () => ({ authenticatedApi: vi.fn() }));
 vi.mock('../lib/player-search-turnstile.js', () => ({ playerSearchTurnstileToken: vi.fn() }));
 
 const player = { id: 'p1', firstName: 'Anna', lastName: 'Adler', username: 'anna', club: 'BC Linden', email: 'anna@example.test', licenseNr: 'L-123', proof: 'save-proof' };
-function Harness({ enabled = true, formation = 'triplette', registrationType = 'forme', onSubmit = vi.fn() }) {
+const recipient = { id: 'p1', firstName: 'Anna', lastName: 'Adler', username: 'anna', club: 'BC Linden', role: 'user' };
+const me = { id: 'me', firstName: 'Olga', lastName: 'Orga', username: 'olga', club: 'Club', emailVerifiedAt: '2026-01-01' };
+const recipientCalls = () => authenticatedApi.mock.calls.filter(([path]) => path === '/api/postbox/recipients');
+const detailCalls = () => authenticatedApi.mock.calls.filter(([path]) => path.endsWith('/details'));
+
+function Harness({ enabled = true, formation = 'triplette', registrationType = 'forme', onSubmit = vi.fn(), currentUser = me }) {
   const [form, setForm] = useState({ ...EMPTY_REGISTRATION_FORM, teamName: 'Team', feeSelections: [], registrationAnswers: [] });
-  return <form onSubmit={(event) => { event.preventDefault(); onSubmit(registrationPayload(form, 'de')); }}>
-    <RegistrationFields form={form} setForm={setForm} formation={formation} registrationType={registrationType}
-      licenseRequired teamNameEnabled tournamentId="t1" turnstileSiteKey="site-key" playerSearchEnabled={enabled} />
-    <button type="submit">Save</button>
-  </form>;
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  return <QueryClientProvider client={client}>
+    <form onSubmit={(event) => { event.preventDefault(); onSubmit(registrationPayload(form, 'de')); }}>
+      <RegistrationFields form={form} setForm={setForm} formation={formation} registrationType={registrationType}
+        licenseRequired teamNameEnabled tournamentId="t1" turnstileSiteKey="site-key" playerSearchEnabled={enabled}
+        currentUserId={currentUser?.id} currentUser={currentUser} />
+      <button type="submit">Save</button>
+    </form>
+  </QueryClientProvider>;
 }
 
 async function choose(section, user) {
-  await user.click(within(section).getByRole('button', { name: 'Registrierten Spieler suchen' }));
-  await user.type(within(section).getByRole('searchbox'), 'Anna');
-  await user.click(within(section).getByRole('button', { name: 'Suchen' }));
-  await user.click(await within(section).findByRole('button', { name: /Anna Adler/ }));
+  await user.type(within(section).getByLabelText(/^Vorname/), 'Anna');
+  await user.click(await screen.findByRole('option', { name: /Anna Adler/ }));
   await within(section).findByRole('button', { name: 'Auswahl aufheben' });
 }
 
@@ -34,8 +42,8 @@ describe('Registration player selection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     playerSearchTurnstileToken.mockResolvedValue('fresh-token');
-    authenticatedApi.mockImplementation(async (path) => path.endsWith('/search')
-      ? { players: [{ ...player, email: undefined, licenseNr: undefined, proof: 'search-proof' }] }
+    authenticatedApi.mockImplementation(async (path) => path === '/api/postbox/recipients'
+      ? { recipients: [recipient], tournaments: [] }
       : { player });
   });
 
@@ -44,35 +52,76 @@ describe('Registration player selection', () => {
     ['triplette', 'melee', 1], ['doublette', 'supermelee', 1],
   ])('offers only the applicable slots for %s / %s', (formation, registrationType, count) => {
     render(<Harness formation={formation} registrationType={registrationType} />);
-    expect(screen.getAllByRole('button', { name: 'Registrierten Spieler suchen' })).toHaveLength(count);
+    expect(screen.getAllByRole('combobox')).toHaveLength(count * 2);
     expect(authenticatedApi).not.toHaveBeenCalled();
     expect(playerSearchTurnstileToken).not.toHaveBeenCalled();
   });
 
   it('keeps guest entry manual and does not request any data', () => {
     render(<Harness enabled={false} />);
-    expect(screen.queryByRole('button', { name: 'Registrierten Spieler suchen' })).toBeNull();
-    expect(screen.getAllByLabelText(/^Vorname/)[0]).not.toHaveAttribute('readonly');
+    expect(screen.queryByRole('combobox')).toBeNull();
     expect(authenticatedApi).not.toHaveBeenCalled();
   });
 
-  it('searches only on explicit action and separately verifies the detail request', async () => {
+  it('filters the shared postbox directory locally and challenges only the detail request', async () => {
     const user = userEvent.setup();
     render(<Harness formation="tete" />);
-    await user.click(screen.getByRole('button', { name: 'Registrierten Spieler suchen' }));
-    await user.type(screen.getByRole('searchbox'), 'Anna');
-    expect(authenticatedApi).not.toHaveBeenCalled();
-    await user.keyboard('{Enter}');
-    await screen.findByRole('button', { name: /Anna Adler/ });
-    expect(authenticatedApi).toHaveBeenCalledTimes(1);
+    await user.type(screen.getByLabelText(/^Vorname/), 'Anna');
+    await screen.findByRole('option', { name: /Anna Adler/ });
+    await user.type(screen.getByLabelText(/^Nachname/), 'Ad');
+    expect(screen.getByRole('option', { name: /Anna Adler/ })).toBeInTheDocument();
+    expect(recipientCalls()).toHaveLength(1);
+    expect(detailCalls()).toHaveLength(0);
+    expect(playerSearchTurnstileToken).not.toHaveBeenCalled();
     expect(screen.getByLabelText(/^E-Mail/)).toHaveValue('');
-    await user.click(screen.getByRole('button', { name: /Anna Adler/ }));
+    await user.click(screen.getByRole('option', { name: /Anna Adler/ }));
     await screen.findByRole('button', { name: 'Auswahl aufheben' });
+    expect(screen.getByLabelText(/^Vorname/)).toHaveValue('Anna');
+    expect(screen.getByLabelText(/^Nachname/)).toHaveValue('Adler');
     expect(screen.getByLabelText(/^E-Mail/)).toHaveValue('anna@example.test');
     expect(screen.getByLabelText(/^Lizenznummer/)).toHaveValue('L-123');
-    expect(playerSearchTurnstileToken.mock.calls.map((call) => call[2]))
-      .toEqual(['registration_player_search', 'registration_player_details']);
-    expect(JSON.parse(authenticatedApi.mock.calls[1][1].body)).toMatchObject({ userId: 'p1', proof: 'search-proof', turnstileToken: 'fresh-token' });
+    expect(playerSearchTurnstileToken.mock.calls.map((call) => call[2])).toEqual(['registration_player_details']);
+    expect(JSON.parse(detailCalls()[0][1].body)).toEqual({ userId: 'p1', turnstileToken: 'fresh-token', shareToken: '' });
+  });
+
+  it('keeps free entry: unknown names show no list and submit without a selection', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    const { container } = render(<Harness formation="tete" onSubmit={onSubmit} />);
+    await user.type(screen.getByLabelText(/^Vorname/), 'Bernd');
+    await user.type(screen.getByLabelText(/^Nachname/), 'Neu');
+    await waitFor(() => expect(recipientCalls()).toHaveLength(1));
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(screen.queryByText('Keine Spieler gefunden.')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.submit(container.querySelector('form'));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ firstName: 'Bernd', lastName: 'Neu' }));
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('playerSelections');
+  });
+
+  it('keeps typing free when a suggestion is ignored', async () => {
+    const user = userEvent.setup();
+    render(<Harness formation="tete" />);
+    const first = screen.getByLabelText(/^Vorname/);
+    await user.type(first, 'Ann');
+    await screen.findByRole('option', { name: /Anna Adler/ });
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    await user.type(first, 'ette');
+    expect(first).toHaveValue('Annette');
+    expect(first).not.toHaveAttribute('readonly');
+    expect(detailCalls()).toHaveLength(0);
+  });
+
+  it('offers the own verified account even though the postbox list excludes it', async () => {
+    const user = userEvent.setup();
+    authenticatedApi.mockImplementation(async (path) => path === '/api/postbox/recipients'
+      ? { recipients: [recipient], tournaments: [] } : { player: { ...player, id: 'me', firstName: 'Olga', lastName: 'Orga' } });
+    render(<Harness formation="tete" />);
+    await user.type(screen.getByLabelText(/^Nachname/), 'Orga');
+    await user.click(await screen.findByRole('option', { name: /Olga Orga/ }));
+    await screen.findByRole('button', { name: 'Auswahl aufheben' });
+    expect(JSON.parse(detailCalls()[0][1].body)).toMatchObject({ userId: 'me' });
   });
 
   it('copies the chosen slot, preserves team information, sends its receipt and allows clearing it', async () => {
@@ -98,7 +147,8 @@ describe('Registration player selection', () => {
 
   it('allows adding a missing required licence and hides an already selected account from other slots', async () => {
     const user = userEvent.setup();
-    authenticatedApi.mockImplementation(async (path) => path.endsWith('/search') ? { players: [player] } : { player: { ...player, licenseNr: null } });
+    authenticatedApi.mockImplementation(async (path) => path === '/api/postbox/recipients'
+      ? { recipients: [recipient], tournaments: [] } : { player: { ...player, licenseNr: null } });
     const { container } = render(<Harness formation="doublette" />);
     const sections = [...container.querySelectorAll('.registration-section')];
     const first = sections.find((section) => within(section).queryByRole('heading', { name: 'Spieler 1' }));
@@ -108,34 +158,59 @@ describe('Registration player selection', () => {
     expect(license).not.toHaveAttribute('readonly');
     await user.type(license, 'L-456');
     expect(license).toHaveValue('L-456');
-    await user.click(within(second).getByRole('button', { name: 'Registrierten Spieler suchen' }));
-    await user.type(within(second).getByRole('searchbox'), 'Anna');
-    await user.click(within(second).getByRole('button', { name: 'Suchen' }));
-    await within(second).findByText('Keine Spieler gefunden.');
-    expect(within(second).queryByRole('button', { name: /Anna Adler/ })).toBeNull();
+    await user.type(within(second).getByLabelText(/^Vorname/), 'Anna');
+    expect(screen.queryByRole('option', { name: /Anna Adler/ })).toBeNull();
+    expect(recipientCalls()).toHaveLength(1);
   });
 
-  it('shows rate-limit errors without automatic retries and preserves form input', async () => {
+  it('shows detail errors without automatic retries and preserves form input', async () => {
     const user = userEvent.setup();
-    authenticatedApi.mockRejectedValue(new Error('Zu viele Spielersuchen. Bitte warte eine Minute und versuche es erneut.'));
+    authenticatedApi.mockImplementation(async (path) => {
+      if (path === '/api/postbox/recipients') return { recipients: [recipient], tournaments: [] };
+      throw new Error('Zu viele Spielersuchen. Bitte warte eine Minute und versuche es erneut.');
+    });
     render(<Harness formation="tete" />);
-    await user.type(screen.getByLabelText(/^Vorname/), 'Manuell');
-    await user.click(screen.getByRole('button', { name: 'Registrierten Spieler suchen' }));
-    await user.type(screen.getByRole('searchbox'), 'Anna');
-    await user.click(screen.getByRole('button', { name: 'Suchen' }));
+    await user.type(screen.getByLabelText(/^Vorname/), 'Anna');
+    await user.click(await screen.findByRole('option', { name: /Anna Adler/ }));
     await screen.findByRole('alert');
-    expect(authenticatedApi).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText(/^Vorname/)).toHaveValue('Manuell');
+    expect(detailCalls()).toHaveLength(1);
+    expect(screen.getByLabelText(/^Vorname/)).toHaveValue('Anna');
+    expect(screen.queryByRole('button', { name: 'Auswahl aufheben' })).toBeNull();
   });
 
   it('does not call the API when the security check fails', async () => {
     const user = userEvent.setup();
     playerSearchTurnstileToken.mockRejectedValue(new Error('failed'));
     render(<Harness formation="tete" />);
-    await user.click(screen.getByRole('button', { name: 'Registrierten Spieler suchen' }));
-    await user.type(screen.getByRole('searchbox'), 'Anna');
-    await user.click(screen.getByRole('button', { name: 'Suchen' }));
+    await user.type(screen.getByLabelText(/^Vorname/), 'Anna');
+    await user.click(await screen.findByRole('option', { name: /Anna Adler/ }));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Sicherheitsprüfung fehlgeschlagen.'));
-    expect(authenticatedApi).not.toHaveBeenCalled();
+    expect(detailCalls()).toHaveLength(0);
+  });
+
+  it('supports surname autocomplete and selecting a suggestion with the keyboard', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<Harness formation="tete" onSubmit={onSubmit} />);
+    await user.type(screen.getByLabelText(/^Nachname/), 'Adler');
+    await screen.findByRole('option', { name: /Anna Adler/ });
+    await user.keyboard('{ArrowDown}');
+    const field = screen.getByLabelText(/^Nachname/);
+    expect(field).toHaveAttribute('aria-activedescendant', screen.getByRole('option').id);
+    await user.keyboard('{Enter}');
+    await screen.findByRole('button', { name: 'Auswahl aufheben' });
+    expect(screen.getByLabelText(/^Vorname/)).toHaveValue('Anna');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('limits the list to 20 suggestions with a hint', async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: 25 }, (_, i) => ({ id: `m${i}`, firstName: 'Many', lastName: `Player${i}`, role: 'user' }));
+    authenticatedApi.mockImplementation(async () => ({ recipients: many, tournaments: [] }));
+    render(<Harness formation="tete" />);
+    await user.type(screen.getByLabelText(/^Vorname/), 'Many');
+    await screen.findAllByRole('option');
+    expect(screen.getAllByRole('option')).toHaveLength(20);
+    expect(screen.getByText('Bitte die Suche eingrenzen, um weitere Spieler zu finden.')).toBeInTheDocument();
   });
 });

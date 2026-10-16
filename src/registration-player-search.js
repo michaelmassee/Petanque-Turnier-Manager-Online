@@ -11,13 +11,13 @@ async function signingKey(env) {
   return crypto.subtle.importKey('raw', encoder.encode(`registration-player-selection:v1:${env.TURNSTILE_SECRET_KEY}`), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 }
 
-export async function playerSelectionProof(env, actorId, tournamentId, targetId, purpose = 'details') {
+export async function playerSelectionProof(env, actorId, tournamentId, targetId, purpose = 'save') {
   const payload = btoa(JSON.stringify({ actorId, tournamentId, targetId, purpose, expires: Date.now() + 300_000 }));
   const signature = await crypto.subtle.sign('HMAC', await signingKey(env), encoder.encode(payload));
   return `${payload}.${Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
-export async function verifyPlayerSelectionProof(env, proof, actorId, tournamentId, targetId, purpose = 'details') {
+export async function verifyPlayerSelectionProof(env, proof, actorId, tournamentId, targetId, purpose = 'save') {
   try {
     if (typeof proof !== 'string' || proof.length > 4096) throw new Error();
     const [payload, signature, extra] = proof.split('.');
@@ -36,34 +36,15 @@ export function assertPlayerSearchUser(user) {
   if (!user?.id || !user.emailVerifiedAt) throw new HttpError(403, 'Für die Spielersuche ist ein verifiziertes Benutzerkonto erforderlich.');
 }
 
-export async function limitPlayerSearch(env, request, user, details) {
+export async function limitPlayerDetails(env, request, user) {
   assertPlayerSearchUser(user);
-  const accountLimit = details ? env.PLAYER_DETAILS_ACCOUNT_LIMIT : env.PLAYER_SEARCH_ACCOUNT_LIMIT;
-  const ipLimit = details ? env.PLAYER_DETAILS_IP_LIMIT : env.PLAYER_SEARCH_IP_LIMIT;
+  const accountLimit = env.PLAYER_DETAILS_ACCOUNT_LIMIT;
+  const ipLimit = env.PLAYER_DETAILS_IP_LIMIT;
   if (!accountLimit || !ipLimit) throw new HttpError(503, 'Die Spielersuche ist derzeit nicht verfügbar.');
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   // Both counters advance even when one limit has already been reached. No D1 counters.
   const results = await Promise.all([accountLimit.limit({ key: user.id }), ipLimit.limit({ key: ip })]);
   if (results.some((result) => !result.success)) throw new HttpError(429, 'Zu viele Spielersuchen. Bitte warte eine Minute und versuche es erneut.');
-}
-
-export async function searchRegistrationPlayers(env, actorId, tournamentId, rawQuery) {
-  const query = String(rawQuery || '').trim().toLowerCase();
-  if (query.length < 3 || query.length > 100 || (query.includes('@') && !query.startsWith('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query))) {
-    throw new HttpError(400, 'Bitte mindestens drei Zeichen oder eine vollständige E-Mail-Adresse eingeben.');
-  }
-  const email = query.includes('@') && !query.startsWith('@');
-  const escaped = query.replace(/^@/, '').replace(/[\\%_]/g, '\\$&');
-  const condition = email ? 'lower(email) = ?' : `(lower(first_name || ' ' || last_name) LIKE ? ESCAPE '\\'
-    OR lower(username) LIKE ? ESCAPE '\\' OR lower(club) LIKE ? ESCAPE '\\')`;
-  const values = email ? [query] : Array(3).fill(`%${escaped}%`);
-  const rows = await env.DB.prepare(`SELECT id, first_name, last_name, username, club FROM users
-    WHERE role = 'user' AND id != 'system-tournament-reports' AND email_verified_at IS NOT NULL AND ${condition}
-    ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE, id LIMIT 20`).bind(...values).all();
-  return { players: await Promise.all((rows.results || []).map(async (row) => ({
-    id: row.id, firstName: row.first_name, lastName: row.last_name, username: row.username, club: row.club,
-    proof: await playerSelectionProof(env, actorId, tournamentId, row.id),
-  }))) };
 }
 
 async function selectedPlayer(env, id) {
@@ -73,8 +54,9 @@ async function selectedPlayer(env, id) {
   return player;
 }
 
+// Die Nutzerliste kennt jede Sitzung bereits aus der Postbox; Schutz für E-Mail/Lizenz: Turnstile + Rate-Limit.
 export async function registrationPlayerDetails(env, actorId, tournamentId, body) {
-  await verifyPlayerSelectionProof(env, body.proof, actorId, tournamentId, body.userId);
+  if (typeof body.userId !== 'string' || !body.userId) throw new HttpError(400, 'Der ausgewählte Spieler ist nicht mehr verfügbar. Bitte erneut auswählen.');
   const player = await selectedPlayer(env, body.userId);
   return { player: {
     id: player.id, firstName: player.first_name, lastName: player.last_name,

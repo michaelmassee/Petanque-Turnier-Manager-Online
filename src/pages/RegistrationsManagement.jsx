@@ -30,6 +30,7 @@ export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournament
       />
       <RegistrationFields
         playerSearchEnabled={Boolean(currentUserId)}
+        currentUserId={currentUserId}
         turnstileSiteKey={turnstileSiteKey}
         tournamentId={selectedValue}
         form={form}

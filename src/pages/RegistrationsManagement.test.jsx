@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '../lib/i18next-config.js';
 import { RegistrationForm, RegistrationsManagementPage, RegistrationsPanel, registrationsToCsv } from './RegistrationsManagement.jsx';
 import { EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
@@ -179,18 +180,20 @@ describe('Anmeldungsverwaltung: Dialog „Anmeldung erfassen“', () => {
     const setForm = vi.fn();
     const form = { ...EMPTY_REGISTRATION_FORM, tournamentId: 'a' };
     render(
-      <RegistrationForm
-        form={form}
-        setForm={setForm}
-        onSubmit={(event) => event.preventDefault()}
-        tournaments={[
-          { id: 'a', name: 'Sommer Cup', date: '2026-07-01', formation: 'tete', registrationType: 'forme', canManage: true, activeRegistrations: 4 },
-          { id: 'b', name: 'Herbst Cup', date: '2026-10-03', formation: 'tete', registrationType: 'forme', canManage: true, activeRegistrations: 1, waitlistRegistrations: 1 },
-        ]}
-        selectedTournamentId="a"
-        currentUserId="user-1"
-        manageMode
-      />,
+      <QueryClientProvider client={new QueryClient()}>
+        <RegistrationForm
+          form={form}
+          setForm={setForm}
+          onSubmit={(event) => event.preventDefault()}
+          tournaments={[
+            { id: 'a', name: 'Sommer Cup', date: '2026-07-01', formation: 'tete', registrationType: 'forme', canManage: true, activeRegistrations: 4 },
+            { id: 'b', name: 'Herbst Cup', date: '2026-10-03', formation: 'tete', registrationType: 'forme', canManage: true, activeRegistrations: 1, waitlistRegistrations: 1 },
+          ]}
+          selectedTournamentId="a"
+          currentUserId="user-1"
+          manageMode
+        />
+      </QueryClientProvider>,
     );
 
     const input = screen.getByRole('combobox', { name: 'Turnier' });

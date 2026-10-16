@@ -2605,6 +2605,8 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
           </button>
           <RegistrationFields
             playerSearchEnabled={Boolean(currentUser?.emailVerifiedAt)}
+            currentUserId={currentUser?.id}
+            currentUser={currentUser}
             turnstileSiteKey={turnstileSiteKey}
             tournamentId={tournament.id}
             shareToken={shareToken}
