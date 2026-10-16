@@ -3259,6 +3259,10 @@ a.left-panel-link {
   border-bottom: none;
 }
 
+.melee-teams .round-participant-row {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
 .play-rounds {
   display: grid;
   gap: 12px;

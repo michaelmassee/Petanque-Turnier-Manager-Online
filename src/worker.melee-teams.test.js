@@ -3,7 +3,7 @@
 // Rundenstart mit den ausgelosten Teams und Team-Rangliste.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import { computeTournamentRanking, drawMeleeTeams, generateTournamentRound, getTournamentById, resetMeleeTeams } from './worker.js';
+import { computeTournamentRanking, drawMeleeTeams, generateTournamentRound, getTournamentById, liveMeleeTeammates, releaseInvalidMeleeTeams, resetMeleeTeams } from './worker.js';
 
 describe('Mêlée-Teams online', () => {
   let db;
@@ -101,5 +101,46 @@ describe('Mêlée-Teams online', () => {
     expect(ranking).toHaveLength(3);
     expect(ranking.every((entry) => entry.teamId && entry.members.length === 2)).toBe(true);
     expect(ranking[0]).toMatchObject({ rank: 1, wins: 1 });
+  });
+
+  it('löst vor der ersten Runde das Team eines nicht mehr aktiven Spielers auf und lost dessen Partner neu aus', async () => {
+    setup('formule_x');
+    spieler(10);
+    await drawMeleeTeams(db, await turnier());
+    const partner = teams().find((team) => team.members.includes('p1')).members.find((id) => id !== 'p1');
+    db.sqlite.prepare("UPDATE registrations SET participation = 'withdrawn' WHERE id = 'p1'").run();
+    await releaseInvalidMeleeTeams(db, 't1');
+    expect(teams()).toHaveLength(4);
+    expect(teams().flatMap((team) => team.members)).not.toContain(partner);
+
+    db.sqlite.prepare("UPDATE registrations SET status = 'cancelled' WHERE id = 'p2'").run();
+    // Auslosung und Rundenstart räumen selbst auf, auch ohne vorherigen Aufruf.
+    const result = await (await drawMeleeTeams(db, await turnier())).json();
+    expect(result.teams.flatMap((team) => team.members)).not.toContain('p1');
+    expect(result.teams.flatMap((team) => team.members)).not.toContain('p2');
+    expect(result.teams.every((team) => team.members.length === 2)).toBe(true);
+  });
+
+  it('lässt die Teams ab der ersten Runde und bei Formée unverändert', async () => {
+    setup('formule_x');
+    spieler(8);
+    await drawMeleeTeams(db, await turnier());
+    await generateTournamentRound(db, await turnier());
+    db.sqlite.prepare("UPDATE registrations SET participation = 'withdrawn' WHERE id = 'p1'").run();
+    await releaseInvalidMeleeTeams(db, 't1');
+    expect(teams()).toHaveLength(4);
+
+    db.sqlite.exec("DELETE FROM tournament_matches; DELETE FROM tournament_rounds; UPDATE tournaments SET registration_type = 'forme'");
+    await releaseInvalidMeleeTeams(db, 't1');
+    expect(teams()).toHaveLength(4);
+  });
+
+  it('zeigt in der Live-Ansicht die online ausgelosten Teampartner', async () => {
+    setup('ko', 'triplette');
+    spieler(3);
+    expect(await liveMeleeTeammates(db, 't1', 'p1')).toBeNull();
+    await drawMeleeTeams(db, await turnier());
+    const partners = await liveMeleeTeammates(db, 't1', 'p1');
+    expect(partners.sort()).toEqual(['Spieler 2 Muster', 'Spieler 3 Muster']);
   });
 });

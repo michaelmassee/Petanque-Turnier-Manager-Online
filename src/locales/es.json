@@ -1479,6 +1479,7 @@
   "Für eine Auslosung sind nicht genügend aktive Spieler ohne Team vorhanden.": "No hay suficientes jugadores activos sin equipo para un sorteo.",
   "{{drawn}} Mêlée-Teams ausgelost, insgesamt {{total}} Teams. {{open}} aktive Spieler ohne Team.": "{{drawn}} equipos Mêlée sorteados, {{total}} equipos en total. {{open}} jugadores activos sin equipo.",
   "Alle ausgelosten Mêlée-Teams auflösen? Alle Spieler sind danach wieder ohne Team.": "¿Disolver todos los equipos Mêlée sorteados? Después, todos los jugadores volverán a estar sin equipo.",
+  "Ausgeloste Mêlée-Teams": "Equipos Mêlée sorteados",
   "Mêlée-Teams wurden aufgelöst.": "Los equipos Mêlée se han disuelto.",
   "Auslosung zurücksetzen": "Restablecer sorteo",
   "Mêlée: {{teams}} Teams ausgelost, {{open}} aktive Spieler ohne Team. Für die erste Runde werden mindestens {{required}} Spieler in Teams benötigt.": "Mêlée: {{teams}} equipos sorteados, {{open}} jugadores activos sin equipo. Para la primera ronda se necesitan al menos {{required}} jugadores en equipos.",

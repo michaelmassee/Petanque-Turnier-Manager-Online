@@ -241,6 +241,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const ranking = rankingQuery.data?.ranking || [];
   const confirmedRegistrations = (registrationsQuery.data?.registrations || [])
     .filter((registration) => registration.status === 'confirmed');
+  const registrationsById = new Map((registrationsQuery.data?.registrations || []).map((registration) => [registration.id, registration]));
   const visibleConfirmedRegistrations = useInfiniteList(confirmedRegistrations);
   const queryError = roundsQuery.error || rankingQuery.error || registrationsQuery.error;
 
@@ -291,6 +292,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
         ...current,
         registrations: current.registrations.map((registration) => (registration.id === registrationId ? { ...registration, participation } : registration)),
       }));
+      // Vor der ersten Runde löst der Server das Mêlée-Team eines nicht mehr aktiven Spielers auf.
+      if (canEditMeleeTeams && swissTeams.length) await queryClient.invalidateQueries({ queryKey: [...queryKey, 'rounds'] });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -592,6 +595,19 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
             teams: swissTeams.length, open: openMeleePlayers, required: requiredMeleePlayers,
           })}
         </p>
+      )}
+      {canEditMeleeTeams && selectedTournamentStatus === 'running' && swissTeams.length > 0 && (
+        <details className="panel round-participants melee-teams">
+          <summary className="play-round-summary"><span>{t('Ausgeloste Mêlée-Teams')}</span><span className="counter">{swissTeams.length}</span></summary>
+          <div className="round-participant-list">
+            {swissTeams.map((team, index) => (
+              <div className="round-participant-row" key={team.id}>
+                <span className="muted">{t('Team')} {index + 1}</span>
+                <span data-i18n-skip>{team.members.map((id) => playerLabel(registrationsById.get(id) || { id: '?' })).join(' + ')}</span>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
 
       {selectedTournamentStatus === 'running' && (

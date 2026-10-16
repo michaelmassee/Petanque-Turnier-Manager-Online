@@ -2498,7 +2498,7 @@ export default {
             }
             await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentId: registration.tournament_id, tournamentName: registration.name, status: 'cancelled', ownRegistration: true }, undefined, registration.owner_id);
           }
-          return await deleteRegistration(env.DB, registration.id);
+          return await deleteRegistration(env.DB, registration);
         }
       }
 
@@ -6459,6 +6459,7 @@ async function assertMeleeTeamsEditable(db, tournament) {
 // Spieler ohne Team werden zu neuen Teams gemischt und an die bestehenden angehängt - wiederholbar für Nachzügler.
 export async function drawMeleeTeams(db, tournament) {
   const size = await assertMeleeTeamsEditable(db, tournament);
+  await releaseInvalidMeleeTeams(db, tournament.id);
   const existing = await getSchweizerTeams(db, tournament);
   const assigned = new Set(existing.flatMap((team) => team.members));
   const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active' ORDER BY registered_at, id").bind(tournament.id).all();
@@ -6477,6 +6478,18 @@ export async function resetMeleeTeams(db, tournament) {
   await assertMeleeTeamsEditable(db, tournament);
   await db.prepare('DELETE FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).run();
   return json({ teams: [] });
+}
+
+// Verlässt ein ausgelostes Mitglied vor der ersten Runde das Feld (storniert, ausgesetzt, gelöscht, verdrängt), wird
+// sein Mêlée-Team aufgelöst; die übrigen Mitglieder sind wieder ohne Team und kommen in die nächste Auslosung.
+// Ab der ersten Runde stehen die Teams fest. Formée-Teams bleiben unberührt.
+export async function releaseInvalidMeleeTeams(db, tournamentId) {
+  await db.prepare(`DELETE FROM tournament_teams WHERE tournament_id = ?
+      AND EXISTS (SELECT 1 FROM tournaments t WHERE t.id = ? AND t.registration_type = 'melee')
+      AND NOT EXISTS (SELECT 1 FROM tournament_rounds r WHERE r.tournament_id = ?)
+      AND EXISTS (SELECT 1 FROM json_each(tournament_teams.member_registration_ids) j
+        WHERE NOT EXISTS (SELECT 1 FROM registrations g WHERE g.id = j.value AND g.status = 'confirmed' AND g.participation = 'active'))`)
+    .bind(tournamentId, tournamentId, tournamentId).run();
 }
 
 // Feste Teams eines Turniers: bei Mêlée die ausgelosten, sonst eine Meldung je Team (Formée).
@@ -6527,6 +6540,7 @@ export async function generateTournamentRound(db, tournament) {
   // die zulässige Anmeldeart und das natürliche Rundenende einhalten.
   // Bei Mêlée zählen die ausgelosten Teams, nicht die Einzelanmeldungen.
   const melee = isMeleeTeamTournament(tournament);
+  if (melee) await releaseInvalidMeleeTeams(db, tournament.id);
   const [activeConfirmed, existingRounds] = await Promise.all([
     melee
       ? db.prepare('SELECT COUNT(*) AS count FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).first()
@@ -6557,10 +6571,9 @@ export async function generateTournamentRound(db, tournament) {
   const isRoundRobin = tournament.type === 'jeder_gegen_jeden';
   const isFormuleX = tournament.type === 'formule_x';
   const isKo = tournament.type === 'ko';
-  // Jeder gegen Jeden, Formule X und K.O. nutzen dasselbe feste-Teams-Modell wie
-  // Schweizer-Formée: eine Meldung = ein Team über alle Runden (siehe
-  // lib/pairing/roundrobin.js, lib/pairing/formulex.js, lib/pairing/ko.js) -
-  // Mêlée-Durchmischung widerspräche allen dreien.
+  // Schweizer, Jeder gegen Jeden, Formule X und K.O. spielen mit festen Teams über alle
+  // Runden: bei Formée eine Meldung je Team, bei Mêlée die vor der ersten Runde
+  // ausgelosten Teams (siehe fixedTeams, lib/pairing/melee.js).
   const usesFixedTeams = isSchweizer || isRoundRobin || isFormuleX || isKo;
   let players;
   let teamsById = new Map();
@@ -7022,15 +7035,30 @@ export async function buildLiveResponse(request, db, registration) {
 }
 
 // Mitspieler aus der Mêlée-Teamzuordnung (KP-18): alle Personen desselben Teams sehen denselben Teaminhalt.
-async function liveMeleeTeammates(db, tournamentId, registrationId) {
+export async function liveMeleeTeammates(db, tournamentId, registrationId) {
   const own = await db.prepare('SELECT team_uuid FROM melee_team_assignments WHERE tournament_id = ? AND registration_id = ?')
     .bind(tournamentId, registrationId).first();
-  if (!own) return null;
+  if (!own) return onlineMeleeTeammates(db, tournamentId, registrationId);
   const result = await db.prepare(`SELECT r.first_name, r.last_name FROM melee_team_assignments a
       JOIN registrations r ON r.id = a.registration_id
       WHERE a.tournament_id = ? AND a.team_uuid = ? AND a.registration_id != ?
       ORDER BY a.position, r.last_name`).bind(tournamentId, own.team_uuid, registrationId).all();
   return (result.results || []).map((row) => [row.first_name, row.last_name].filter(Boolean).join(' '));
+}
+
+// Online ausgeloste Mêlée-Teams (drawMeleeTeams) stehen in tournament_teams statt in melee_team_assignments.
+async function onlineMeleeTeammates(db, tournamentId, registrationId) {
+  const team = await db.prepare(`SELECT tt.member_registration_ids FROM tournament_teams tt
+      JOIN tournaments t ON t.id = tt.tournament_id AND t.registration_type = 'melee'
+      WHERE tt.tournament_id = ? AND EXISTS (SELECT 1 FROM json_each(tt.member_registration_ids) j WHERE j.value = ?)`)
+    .bind(tournamentId, registrationId).first();
+  if (!team) return null;
+  const members = JSON.parse(team.member_registration_ids).filter((id) => id !== registrationId);
+  if (!members.length) return [];
+  const result = await db.prepare(`SELECT id, first_name, last_name FROM registrations WHERE id IN (${members.map(() => '?').join(', ')})`)
+    .bind(...members).all();
+  const namesById = new Map((result.results || []).map((row) => [row.id, [row.first_name, row.last_name].filter(Boolean).join(' ')]));
+  return members.map((id) => namesById.get(id)).filter(Boolean);
 }
 
 // Anmeldungen des eingeloggten Users in seinen Personen-Slots (E-21) - ab der Anmeldung bis kurz nach dem Turnier.
@@ -7296,6 +7324,7 @@ async function cancelRegistration(db, id) {
     throw new HttpError(404, 'Anmeldung nicht gefunden');
   }
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
+  await releaseInvalidMeleeTeams(db, updated.tournament_id);
   return json({ registration: toPublicRegistration(updated) });
 }
 
@@ -7638,6 +7667,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
   if (registration.isVip && Number(existing.max_registrations)) {
     await enforceVipPriorityOnUpdate(env, existing, new URL(request.url).origin);
   }
+  await releaseInvalidMeleeTeams(db, existing.tournament_id);
 
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
   await auditRegistrationEdit(env, existing, updated, actingUser);
@@ -7803,6 +7833,7 @@ function assertRegistrationOnlineEditable(registration) {
 async function setRegistrationParticipation(db, existing, participation) {
   const now = new Date().toISOString();
   await db.prepare('UPDATE registrations SET participation = ?, updated_at = ? WHERE id = ?').bind(participation, now, existing.id).run();
+  await releaseInvalidMeleeTeams(db, existing.tournament_id);
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
   return json({ registration: toManagedRegistration(updated) });
 }
@@ -7860,11 +7891,12 @@ async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
   await displaceRegistration(env, tournament, displace, appOrigin);
 }
 
-async function deleteRegistration(db, id) {
-  const result = await db.prepare('DELETE FROM registrations WHERE id = ?').bind(id).run();
+async function deleteRegistration(db, registration) {
+  const result = await db.prepare('DELETE FROM registrations WHERE id = ?').bind(registration.id).run();
   if (result.meta.changes === 0) {
     throw new HttpError(404, 'Anmeldung nicht gefunden');
   }
+  await releaseInvalidMeleeTeams(db, registration.tournament_id);
   return json({ ok: true });
 }
 
@@ -8611,6 +8643,7 @@ async function displaceRegistration(env, tournament, registrationToDisplace, app
     .prepare('UPDATE registrations SET status = ?, updated_at = ? WHERE id = ?')
     .bind(wasCancelled ? 'cancelled' : 'waitlist', now, registrationToDisplace.id)
     .run();
+  await releaseInvalidMeleeTeams(env.DB, tournament.id);
 
   try {
     await sendDisplacementEmail(env, tournament, registrationToDisplace, wasCancelled, appOrigin);

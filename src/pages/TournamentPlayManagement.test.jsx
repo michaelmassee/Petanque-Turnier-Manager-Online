@@ -226,12 +226,15 @@ describe('TournamentPlayManagement', () => {
 
     expect(await screen.findByText('6 Mêlée-Teams ausgelost, insgesamt 6 Teams. 1 aktive Spieler ohne Team.')).toBeInTheDocument();
     expect(calls).toContain('/api/tournaments/t1/teams/draw');
+    expect(screen.getByText('Ausgeloste Mêlée-Teams')).toBeInTheDocument();
+    expect(screen.getByText('Spieler 0 + Spieler 1')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Erste Runde starten' })).not.toBeDisabled());
     expect(screen.getByRole('button', { name: 'Mêlée-Teams auslosen' })).toBeDisabled();
 
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Auslosung zurücksetzen' }));
     expect(await screen.findByText('Mêlée-Teams wurden aufgelöst.')).toBeInTheDocument();
+    expect(screen.queryByText('Ausgeloste Mêlée-Teams')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erste Runde starten' })).toBeDisabled();
   });
 
