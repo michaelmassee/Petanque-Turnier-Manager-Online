@@ -1,4 +1,5 @@
 import tzlookup from 'tz-lookup';
+import { sendAdminStatusEmails } from './admin-status-email.js';
 import { REGISTRATION_OPENED_EVENT, OPENING_MESSAGES, synchronizeOpeningSchedule } from './registration-opening.js';
 export { RegistrationOpeningScheduler } from './registration-opening.js';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
@@ -1462,24 +1463,41 @@ export default {
     // Pétanque-Aktuell-Abgleich laufen weiterhin nur einmal täglich (DAILY_CRON).
     // Das Aufräumen abgelaufener Sitzungen/Tokens lief früher vor jeder API-Anfrage (rund 8
     // DELETE-Abfragen pro Aufruf). Alle Lesepfade prüfen das Ablaufdatum selbst, stündlich reicht.
+    const runJob = async (key, work) => {
+      try {
+        await work();
+        return { key, ok: true };
+      } catch (error) {
+        console.error(`Scheduled job ${key} failed`, error);
+        return { key, ok: false };
+      }
+    };
     const jobs = [
-      finishStaleTournaments(env).catch((error) => console.error('Finishing stale tournaments failed', error)),
-      cleanupExpiredSessions(env.DB).catch((error) => console.error('Cleanup cron failed', error)),
-      deletePlayerListingsOfFinishedTournaments(env.DB).catch((error) => console.error('Deleting player listings of finished tournaments failed', error)),
+      runJob('stale', () => finishStaleTournaments(env)),
+      runJob('cleanup', () => cleanupExpiredSessions(env.DB)),
+      runJob('listingsCleanup', () => deletePlayerListingsOfFinishedTournaments(env.DB)),
     ];
     // Recover pending schedule writes (including first deployment), not opening-date polling.
-    if (env.REGISTRATION_OPENING_SCHEDULER) jobs.push((async () => {
+    if (env.REGISTRATION_OPENING_SCHEDULER) jobs.push(runJob('opening', async () => {
       const change = await env.DB.prepare('SELECT dirty FROM registration_opening_schedule_changes WHERE id = 1').first();
       if (change?.dirty) await synchronizeOpeningSchedule(env);
-    })().catch((error) => console.error('Opening schedule synchronization failed', error)));
+    }));
     if (event.cron === DAILY_CRON) {
       jobs.push(
-        sendTournamentReminders(env).catch((error) => console.error('Tournament reminder cron failed', error)),
-        syncPetanqueAktuellImports(env).catch((error) => console.error('Pétanque Aktuell sync cron failed', error)),
-        purgeExpiredPersonalDataWennAktiviert(env.DB).catch((error) => console.error('Purging expired personal data failed', error)),
+        runJob('reminders', () => sendTournamentReminders(env)),
+        runJob('importSync', () => syncPetanqueAktuellImports(env)),
+        runJob('purge', () => purgeExpiredPersonalDataWennAktiviert(env.DB)),
       );
     }
-    ctx.waitUntil(Promise.all(jobs));
+    ctx.waitUntil(Promise.all(jobs).then(async (results) => {
+      if (event.cron === DAILY_CRON) {
+        try {
+          await sendAdminStatusEmails(env, results, event.scheduledTime ?? Date.now(), TOURNAMENT_REPORT_SYSTEM_USER_ID);
+        } catch (error) {
+          console.error('Daily admin status email failed', error);
+        }
+      }
+    }));
   },
 
   async queue(batch, env) {
