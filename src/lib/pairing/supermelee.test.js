@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeGameSizes, generateRound } from './supermelee.js';
+import { buildHistoryIndex, computeGameSizes, generateRound } from './supermelee.js';
 
 describe('computeGameSizes', () => {
   it('bildet bei Triplette möglichst viele 3v3-Spiele', () => {
@@ -97,5 +97,55 @@ describe('generateRound', () => {
     const exceptionTeam = exceptionMatch.teamA.length === 2 ? exceptionMatch.teamA : exceptionMatch.teamB;
     expect(exceptionTeam).not.toContain('p4');
     expect(exceptionTeam).not.toContain('p5');
+  });
+
+  // Deterministischer Zufall für reproduzierbare Läufe.
+  const seeded = (start = 1) => { let state = start; return () => { state = (state * 16807) % 2147483647; return (state - 1) / 2147483646; }; };
+  const play = (count, formation, rounds, random, players = makePlayers(count)) => {
+    const history = [];
+    for (let round = 0; round < rounds; round += 1) history.push(...generateRound(players, history, { formation, random }).matches);
+    return history;
+  };
+  const teamsOf = (history) => history.flatMap((match) => [match.teamA, match.teamB]);
+
+  it('setzt Spieler mit gleicher Setzposition > 0 nicht ins selbe Team (wie das Hauptprojekt)', () => {
+    const players = makePlayers(12).map((player, index) => ({ ...player, seedPosition: index < 6 ? (index % 3) + 1 : 0 }));
+    const seeds = Object.fromEntries(players.map((player) => [player.id, player.seedPosition]));
+    for (let run = 1; run <= 10; run += 1) {
+      for (const team of teamsOf(play(12, 'triplette', 3, seeded(run), players))) {
+        const positions = team.map((id) => seeds[id]).filter(Boolean);
+        expect(new Set(positions).size).toBe(positions.length);
+      }
+    }
+  });
+
+  it('verteilt Ausnahme-Teams in beiden Modi gleichmäßig (Spreizung höchstens 1)', () => {
+    for (const [count, formation] of [[10, 'doublette'], [9, 'doublette'], [14, 'triplette']]) {
+      for (let run = 1; run <= 10; run += 1) {
+        const { exceptionCounts } = buildHistoryIndex(play(count, formation, 4, seeded(run)), formation);
+        const values = makePlayers(count).map((player) => exceptionCounts[player.id] || 0);
+        expect(Math.max(...values) - Math.min(...values)).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('wiederholt bei 16 Spielern Doublette über 5 Runden keinen Teampartner', () => {
+    for (let run = 1; run <= 5; run += 1) {
+      const pairs = new Set();
+      for (const team of teamsOf(play(16, 'doublette', 5, seeded(run)))) {
+        const key = [...team].sort().join('|');
+        expect(pairs.has(key)).toBe(false);
+        pairs.add(key);
+      }
+    }
+  });
+
+  it('lost auch bei ausgeschöpften Partnern eine vollständige Runde (12 Spieler Triplette, 6 Runden)', () => {
+    const history = play(12, 'triplette', 6, seeded(3));
+    expect(history).toHaveLength(12);
+    for (let round = 0; round < 6; round += 1) {
+      const players = history.slice(round * 2, round * 2 + 2).flatMap((match) => [...match.teamA, ...match.teamB]);
+      expect(new Set(players).size).toBe(12);
+    }
   });
 });

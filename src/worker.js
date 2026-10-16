@@ -43,7 +43,7 @@ import { parseStoredQrDesign } from './lib/qr-design.js';
 import { fetchCloudflareUsageDay, fetchCloudflareUsageDays, isCloudflareUsageConfigured } from './cloudflare-usage-core.js';
 import { checkRoundRequirements, getPairingStrategy, isMeleeTeamTournament, isOnlinePlayable, roundRequirementMessage } from './lib/pairing/index.js';
 import { buildMeleeTeams, meleeTeamSize } from './lib/pairing/melee.js';
-import { competitionRanks, computeRanking, sameStandardRankingPlace } from './lib/pairing/ranking.js';
+import { competitionRanks, computeRanking, computeSupermeleeRanking, sameStandardRankingPlace } from './lib/pairing/ranking.js';
 import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schweizer.js';
 import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
 import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
@@ -6379,8 +6379,10 @@ function toPublicMatch(row, playersById) {
   };
 }
 
-async function getPlayersById(db, tournamentId) {
-  const result = await db.prepare('SELECT id, first_name, last_name, partner_first_name, partner_last_name, partner2_first_name, partner2_last_name, team_name FROM registrations WHERE tournament_id = ?').bind(tournamentId).all();
+// activeIds (optional) sammelt im selben Lesevorgang die bestätigten, aktiven Meldungen (Supermêlée-Fehlrunden).
+async function getPlayersById(db, tournamentId, activeIds = null) {
+  const result = await db.prepare('SELECT id, first_name, last_name, partner_first_name, partner_last_name, partner2_first_name, partner2_last_name, team_name, status, participation FROM registrations WHERE tournament_id = ?').bind(tournamentId).all();
+  if (activeIds) for (const row of result.results) if (row.status === 'confirmed' && row.participation === 'active') activeIds.push(row.id);
   return new Map(result.results.map((row) => {
     // Bei Doublette/Triplette-Registrierungen ("forme") steckt das ganze Team in einer
     // einzigen Registrierung (Partner als Felder, keine eigenen Registrierungen). Die
@@ -6586,8 +6588,9 @@ export async function generateTournamentRound(db, tournament) {
     players = teams;
     teamsById = new Map(teams.map((team) => [team.id, team]));
   } else {
-    const registrationsResult = await db.prepare("SELECT id FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active'").bind(tournament.id).all();
-    players = registrationsResult.results.map((row) => ({ id: row.id }));
+    // Setzposition: Spieler mit gleicher Setzposition > 0 kommen bei Supermêlée nicht ins selbe Team.
+    const registrationsResult = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active'").bind(tournament.id).all();
+    players = registrationsResult.results.map((row) => ({ id: row.id, seedPosition: Number(row.seeding_position || 0) }));
   }
 
   // round_number/match_index braucht nur K.O. (Winner-Advance-Rekonstruktion, siehe
@@ -6837,7 +6840,7 @@ export async function computeTournamentRanking(db, tournament) {
     return desktopRankingSnapshot(db, tournament);
   }
   const matchesResult = await db
-    .prepare('SELECT team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, no_show FROM tournament_matches WHERE tournament_id = ?')
+    .prepare('SELECT round_id, team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, no_show FROM tournament_matches WHERE tournament_id = ? ORDER BY created_at, match_index')
     .bind(tournament.id)
     .all();
   const matches = matchesResult.results.map((row) => ({
@@ -6900,8 +6903,22 @@ export async function computeTournamentRanking(db, tournament) {
       members: (teamsById.get(playerId)?.members || []).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
     }));
   }
-  const ranking = competitionRanks(computeRanking(matches), sameStandardRankingPlace);
-  const playersById = await getPlayersById(db, tournament.id);
+  // Supermêlée: Fehlrunden zählen 0:13 (Hauptprojekt-Standard). Runden und aktive Spieler stammen aus den ohnehin
+  // geladenen Partien (je Runde ein gemeinsamer created_at) und Meldungen - keine zusätzlichen D1-Lesezugriffe.
+  const activeIds = tournament.registration_type === 'supermelee' ? [] : null;
+  const playersById = await getPlayersById(db, tournament.id, activeIds);
+  let rankingStats;
+  if (activeIds) {
+    const matchesByRound = new Map();
+    matchesResult.results.forEach((row, index) => {
+      if (!matchesByRound.has(row.round_id)) matchesByRound.set(row.round_id, []);
+      matchesByRound.get(row.round_id).push(matches[index]);
+    });
+    rankingStats = computeSupermeleeRanking([...matchesByRound.values()], activeIds);
+  } else {
+    rankingStats = computeRanking(matches);
+  }
+  const ranking = competitionRanks(rankingStats, sameStandardRankingPlace);
 
   return ranking.map((entry) => ({
     ...entry,

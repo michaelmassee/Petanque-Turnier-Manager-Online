@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { competitionRanks, computeRanking, sameStandardRankingPlace } from './ranking.js';
+import { competitionRanks, computeRanking, computeSupermeleeRanking, sameStandardRankingPlace } from './ranking.js';
 
 describe('computeRanking', () => {
   it('sortiert nach Siegen, Spieldifferenz, Punktedifferenz, erzielten Punkten', () => {
@@ -40,3 +40,33 @@ describe('computeRanking', () => {
     expect(ranking.map((entry) => entry.rank)).toEqual([1, 1, 1, 4, 4, 6]);
   });
 });
+
+describe('computeSupermeleeRanking', () => {
+  it('wertet eine in einer vollständigen Runde fehlende Person mit 0:13 (Hauptprojekt-Standard)', () => {
+    const rounds = [
+      [{ teamA: ['p1', 'p2'], teamB: ['p3', 'p4'], scoreA: 13, scoreB: 7 }],
+      [{ teamA: ['p1', 'p3'], teamB: ['p2', 'p5'], scoreA: 13, scoreB: 11 }],
+    ];
+    const ranking = computeSupermeleeRanking(rounds, ['p1', 'p2', 'p3', 'p5']);
+    const byId = Object.fromEntries(ranking.map((entry) => [entry.playerId, entry]));
+    // p4 fehlt in Runde 2, p5 in Runde 1.
+    expect(byId.p4).toMatchObject({ wins: 0, gameDiff: -2, pointsFor: 7, pointsAgainst: 26 });
+    expect(byId.p5).toMatchObject({ wins: 0, gameDiff: -2, pointsFor: 11, pointsAgainst: 26 });
+    expect(byId.p1).toMatchObject({ wins: 2, gameDiff: 2 });
+  });
+
+  it('wertet eine noch offene Runde nicht als Fehlrunde und listet aktive Spieler ohne Partie', () => {
+    const rounds = [
+      [{ teamA: ['p1', 'p2'], teamB: ['p3', 'p4'], scoreA: 13, scoreB: 7 }],
+      [{ teamA: ['p1', 'p3'], teamB: ['p2', 'p4'], scoreA: null, scoreB: null }],
+    ];
+    const ranking = computeSupermeleeRanking(rounds, ['p1', 'p2', 'p3', 'p4', 'p9']);
+    expect(ranking.find((entry) => entry.playerId === 'p9')).toMatchObject({ wins: 0, gameDiff: -1, pointsAgainst: 13 });
+    expect(ranking.find((entry) => entry.playerId === 'p1')).toMatchObject({ wins: 1, gameDiff: 1, pointsAgainst: 7 });
+  });
+
+  it('führt neu aktive Spieler ohne gewertete Runde mit 0 in der Rangliste', () => {
+    expect(computeSupermeleeRanking([], ['p1'])).toEqual([{ playerId: 'p1', wins: 0, gameDiff: 0, pointsFor: 0, pointsAgainst: 0, pointsDiff: 0 }]);
+  });
+});
+
