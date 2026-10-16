@@ -1458,6 +1458,7 @@
   "{{added}} neu · {{total}} insgesamt": "{{added}} new · {{total}} in total",
   "Unbekannte Statistik.": "Unknown statistic.",
   "Durch Sperrliste ausgeblendet": "Hidden by blocklist",
+  "Alle in der Sperrliste": "All on the blocklist",
   "Ungültige Muster: {{patterns}}": "Invalid patterns: {{patterns}}",
   "Sperrliste gespeichert.": "Blocklist saved.",
   "Sperrliste nach Turniernamen ({{count}} Muster, {{hidden}} Termine ausgeblendet)": "Blocklist by tournament name ({{count}} patterns, {{hidden}} events hidden)",

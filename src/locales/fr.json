@@ -1458,6 +1458,7 @@
   "{{added}} neu · {{total}} insgesamt": "{{added}} nouveaux · {{total}} au total",
   "Unbekannte Statistik.": "Statistique inconnue.",
   "Durch Sperrliste ausgeblendet": "Masqués par la liste de blocage",
+  "Alle in der Sperrliste": "Tous ceux de la liste de blocage",
   "Ungültige Muster: {{patterns}}": "Motifs invalides : {{patterns}}",
   "Sperrliste gespeichert.": "Liste de blocage enregistrée.",
   "Sperrliste nach Turniernamen ({{count}} Muster, {{hidden}} Termine ausgeblendet)": "Liste de blocage par nom de tournoi ({{count}} motifs, {{hidden}} dates masquées)",

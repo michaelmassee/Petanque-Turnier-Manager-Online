@@ -26,6 +26,33 @@ describe('Pétanque-Aktuell-Import', () => {
     expect(screen.queryByText('Importierter Termin')).not.toBeInTheDocument();
   });
 
+  it('zeigt alle gesperrten Termine einschließlich bereits importierter ohne weitere Abfrage', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      tournaments: [
+        ...tournaments,
+        { ...tournaments[0], externalKey: 'blocked-new', name: 'Liga neu' },
+        { ...tournaments[1], externalKey: 'blocked-imported', name: 'Liga importiert' },
+      ],
+      blacklist: ['*liga*'],
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<PetanqueAktuellImportPanel />);
+
+    await screen.findByText('Liga importiert');
+    fireEvent.change(screen.getByLabelText('Importstatus'), { target: { value: 'blocked' } });
+    expect(screen.getByText('Liga neu')).toBeInTheDocument();
+    expect(screen.queryByText('Liga importiert')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Importstatus'), { target: { value: 'all-blocked' } });
+    expect(screen.getByRole('option', { name: 'Alle in der Sperrliste' }).selected).toBe(true);
+    for (const name of ['Liga neu', 'Liga importiert']) {
+      expect(screen.getByText(name).closest('label').querySelector('input')).toBeDisabled();
+    }
+    expect(screen.queryByText('Neuer Termin')).not.toBeInTheDocument();
+    expect(screen.queryByText('Importierter Termin')).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('importiert bereits importierte Termine erneut und behält sie bei "Alle neuen auswählen"', async () => {
     const fetchMock = vi.fn(async (url) => new Response(JSON.stringify(String(url).includes('/import') ? { created: 1, updated: 1, failed: 0 } : { tournaments }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);

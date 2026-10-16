@@ -11,11 +11,13 @@ const IMPORT_STATUS_OPTIONS = [
   { value: 'new', label: 'Noch nicht importiert' },
   { value: 'imported', label: 'Bereits importiert' },
   { value: 'blocked', label: 'Durch Sperrliste ausgeblendet' },
+  { value: 'all-blocked', label: 'Alle in der Sperrliste' },
 ];
 
 // Neue Termine auf der Sperrliste erscheinen nur unter "Durch Sperrliste ausgeblendet"; bereits importierte bleiben sichtbar.
 function matchesImportStatus(tournament, importStatus) {
   const hidden = tournament.blocked && !tournament.imported;
+  if (importStatus === 'all-blocked') return tournament.blocked;
   if (importStatus === 'blocked') return hidden;
   if (hidden) return false;
   return importStatus === 'all' || (importStatus === 'imported' ? tournament.imported : !tournament.imported);

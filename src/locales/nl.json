@@ -1458,6 +1458,7 @@
   "{{added}} neu · {{total}} insgesamt": "{{added}} nieuw · {{total}} in totaal",
   "Unbekannte Statistik.": "Onbekende statistiek.",
   "Durch Sperrliste ausgeblendet": "Verborgen door blokkeerlijst",
+  "Alle in der Sperrliste": "Alle op de blokkeerlijst",
   "Ungültige Muster: {{patterns}}": "Ongeldige patronen: {{patterns}}",
   "Sperrliste gespeichert.": "Blokkeerlijst opgeslagen.",
   "Sperrliste nach Turniernamen ({{count}} Muster, {{hidden}} Termine ausgeblendet)": "Blokkeerlijst op toernooinaam ({{count}} patronen, {{hidden}} evenementen verborgen)",

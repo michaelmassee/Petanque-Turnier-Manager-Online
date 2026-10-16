@@ -1458,6 +1458,7 @@
   "{{added}} neu · {{total}} insgesamt": "{{added}} nuevos · {{total}} en total",
   "Unbekannte Statistik.": "Estadística desconocida.",
   "Durch Sperrliste ausgeblendet": "Ocultos por la lista de bloqueo",
+  "Alle in der Sperrliste": "Todos los de la lista de bloqueo",
   "Ungültige Muster: {{patterns}}": "Patrones no válidos: {{patterns}}",
   "Sperrliste gespeichert.": "Lista de bloqueo guardada.",
   "Sperrliste nach Turniernamen ({{count}} Muster, {{hidden}} Termine ausgeblendet)": "Lista de bloqueo por nombre de torneo ({{count}} patrones, {{hidden}} eventos ocultos)",
