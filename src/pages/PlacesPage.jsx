@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { clubLogoImageUrl, formatLocationAddress, googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Feedback, Button, ClubBadge, DistanceBadge, SelectField, CloseButton } from '../components/ui.jsx';
+import { Feedback, Button, ClubBadge, DistanceBadge, SelectField, CloseButton, ShareIcon } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
@@ -35,6 +35,40 @@ const facilityLabels = { toilet: 'Toilette', shelter: 'Unterstand', clubhouse: '
 
 function hasClub(place) {
   return Boolean(place.clubId || place.clubName);
+}
+
+function clubKey(place) {
+  return place.clubId || String(place.clubName || '').trim().toLocaleLowerCase();
+}
+
+function SharePlaceButton({ name, placeId, organizationId }) {
+  const { t } = useTranslation();
+  const [feedback, setFeedback] = useState({ message: '', error: '' });
+
+  async function share() {
+    setFeedback({ message: '', error: '' });
+    const url = new URL('/plaetze', window.location.origin);
+    if (organizationId) url.searchParams.set('verein', organizationId);
+    else url.hash = encodeURIComponent(placeId);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: name, text: name, url: url.href });
+      } else {
+        if (!navigator.clipboard?.writeText) throw new Error();
+        await navigator.clipboard.writeText(`${name}\n${url.href}`);
+        setFeedback({ message: t('Link kopiert'), error: '' });
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        setFeedback({ message: '', error: t('Teilen wird von diesem Gerät nicht unterstützt') });
+      }
+    }
+  }
+
+  return <div>
+    <Button variant="secondary" onClick={share}><ShareIcon size={18} />{t('Teilen')}</Button>
+    <Feedback message={feedback.message} error={feedback.error} />
+  </div>;
 }
 
 function FocusOnPlace({ focus, markerRefs }) {
@@ -66,8 +100,9 @@ export function groupMapPlaces(places) {
   return [...groups.values()];
 }
 
-export function filterPlaces(places, { placeId = '', favoritesOnly = false, clubsOnly = false, indoorOnly = false } = {}) {
+export function filterPlaces(places, { placeId = '', organizationId = '', favoritesOnly = false, clubsOnly = false, indoorOnly = false } = {}) {
   return places.filter((place) => (!placeId || place.id === placeId)
+    && (!organizationId || clubKey(place) === organizationId)
     && (!favoritesOnly || place.favorited)
     && (!clubsOnly || hasClub(place))
     && (!indoorOnly || place.venueType === 'indoor'));
@@ -90,6 +125,7 @@ export function groupPlacesByOrganization(places) {
 
 function OrganizationLinks({ place, t }) {
   return <div className="place-actions">
+    <SharePlaceButton name={place.clubName} organizationId={clubKey(place)} />
     {place.clubWebsiteUrl && <a className="button button-secondary" href={place.clubWebsiteUrl} target="_blank" rel="noreferrer">{t('Website')}</a>}
     {place.clubSocialLinks?.facebook && <a className="button button-secondary" href={place.clubSocialLinks.facebook} target="_blank" rel="noreferrer">Facebook</a>}
     {place.clubSocialLinks?.instagram && <a className="button button-secondary" href={place.clubSocialLinks.instagram} target="_blank" rel="noreferrer">Instagram</a>}
@@ -118,6 +154,7 @@ function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onNav
       {place.facilities && <p>{t('Ausstattung:')} {place.facilities}</p>}
       {place.facilityCodes?.length > 0 && <p className="muted">{place.facilityCodes.map((code) => t(facilityLabels[code])).join(' · ')}</p>}
       <div className="place-actions">
+        <SharePlaceButton name={place.name} placeId={place.id} />
         <Button variant="secondary" onClick={() => onFocus(place)} disabled={place.latitude === null || place.longitude === null}>{t('Karte')}</Button>
         <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
         <Button variant={place.liked ? 'primary' : 'secondary'} onClick={() => onToggleLike(place)}>{place.liked ? '♥' : '♡'} {place.likeCount}</Button>
@@ -217,17 +254,21 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
 
   // Link aus den Turnierdetails: nur diesen Platz in Liste und Karte anzeigen.
   const [linkedPlaceId, setLinkedPlaceId] = useState(() => decodeURIComponent(window.location.hash.slice(1)));
+  const [linkedOrganizationId, setLinkedOrganizationId] = useState(() => new URLSearchParams(window.location.search).get('verein') || '');
   const linkedPlaceRef = useRef(null);
   const linkedPlaceScrolledRef = useRef(false);
 
   function clearLinkedPlaceFilter() {
     setLinkedPlaceId('');
+    setLinkedOrganizationId('');
+    const params = new URLSearchParams(window.location.search);
+    params.delete('verein');
     setFocusPlace(null);
-    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${params.size ? `?${params}` : ''}`);
   }
 
   const visiblePlaces = useMemo(() => {
-    let results = filterPlaces(places, { placeId: linkedPlaceId, favoritesOnly, clubsOnly, indoorOnly });
+    let results = filterPlaces(places, { placeId: linkedPlaceId, organizationId: linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly });
     if (searchOrigin) {
       const radius = Number(searchRadiusKm);
       results = results
@@ -237,11 +278,11 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         .sort((a, b) => a.distanceKm - b.distanceKm);
     }
     return results;
-  }, [places, linkedPlaceId, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm]);
+  }, [places, linkedPlaceId, linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm]);
 
   useEffect(() => {
     setVisibleCount(10);
-  }, [query, linkedPlaceId, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm, places]);
+  }, [query, linkedPlaceId, linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm, places]);
 
   const placeGroups = useMemo(() => groupPlacesByOrganization(visiblePlaces), [visiblePlaces]);
   const displayedPlaceGroups = useMemo(() => placeGroups.slice(0, visibleCount), [placeGroups, visibleCount]);
@@ -253,10 +294,10 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   }, [linkedPlaceId, loading, places]);
 
   useEffect(() => {
-    if (!linkedPlaceId || loading || !linkedPlaceRef.current || linkedPlaceScrolledRef.current) return;
+    if ((!linkedPlaceId && !linkedOrganizationId) || loading || !linkedPlaceRef.current || linkedPlaceScrolledRef.current) return;
     linkedPlaceScrolledRef.current = true;
     linkedPlaceRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [linkedPlaceId, loading, displayedPlaceGroups]);
+  }, [linkedPlaceId, linkedOrganizationId, loading, displayedPlaceGroups]);
 
   const mapped = useMemo(() => visiblePlaces.filter((place) => place.latitude !== null && place.longitude !== null), [visiblePlaces]);
   const center = mapped.length ? [mapped[0].latitude, mapped[0].longitude] : FALLBACK_CENTER;
@@ -332,7 +373,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
 
   const radiusLabel = labelFor(RADIUS_OPTIONS, searchRadiusKm);
   const linkedPlaceLabel = places.find((place) => place.id === linkedPlaceId)?.name || linkedPlaceId;
-  const activeFilterCount = [query, linkedPlaceId, favoritesOnly, clubsOnly, indoorOnly].filter(Boolean).length;
+  const linkedOrganizationLabel = places.find((place) => clubKey(place) === linkedOrganizationId)?.clubName || linkedOrganizationId;
+  const activeFilterCount = [query, linkedPlaceId, linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly].filter(Boolean).length;
 
   return <main className="app-shell">
     <StandalonePageHeader
@@ -405,7 +447,8 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         </div>
       </div>
 
-      {(query || linkedPlaceId || favoritesOnly || clubsOnly || indoorOnly || searchOrigin) && <div className="active-search-badges" aria-label={t('Filter aktiv')}>
+      {(query || linkedPlaceId || linkedOrganizationId || favoritesOnly || clubsOnly || indoorOnly || searchOrigin) && <div className="active-search-badges" aria-label={t('Filter aktiv')}>
+        {linkedOrganizationId && <button type="button" className="active-search-badge" onClick={clearLinkedPlaceFilter} aria-label={`${t('Entfernen')}: ${linkedOrganizationLabel}`}><span data-i18n-skip>{linkedOrganizationLabel}</span><span aria-hidden="true">×</span></button>}
         {linkedPlaceId && <button type="button" className="active-search-badge" onClick={clearLinkedPlaceFilter} aria-label={`${t('Entfernen')}: ${linkedPlaceLabel}`}><span data-i18n-skip>{linkedPlaceLabel}</span><span aria-hidden="true">×</span></button>}
         {query && <button type="button" className="active-search-badge" onClick={() => setQuery('')} aria-label={`${t('Entfernen')}: ${query}`}><span>{query}</span><span aria-hidden="true">×</span></button>}
         {favoritesOnly && <button type="button" className="active-search-badge" onClick={() => setFavoritesOnly(false)} aria-label={`${t('Entfernen')}: ${t('Nur meine Favoriten')}`}><span>{t('Nur meine Favoriten')}</span><span aria-hidden="true">×</span></button>}
@@ -433,7 +476,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       ) : (
         <div className="places-list">
           {displayedPlaceGroups.map((group) => group.clubName ? (
-            <details className="panel place-group" key={group.id} open={group.places.some((place) => place.id === linkedPlaceId) || undefined}>
+            <details className="panel place-group" key={group.id} ref={linkedOrganizationId && clubKey(group.places[0]) === linkedOrganizationId ? linkedPlaceRef : undefined} open={Boolean(linkedOrganizationId) || group.places.some((place) => place.id === linkedPlaceId) || undefined}>
               <summary className="place-group-summary">
                 <span className="place-group-badge"><ClubBadge clubName={group.clubName} clubKind={group.clubKind} /></span>
                 <span className="place-group-title">

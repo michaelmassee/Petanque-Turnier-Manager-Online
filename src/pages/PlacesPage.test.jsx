@@ -196,3 +196,92 @@ describe('Bouleplatz-Deep-Link aus Turnierdetails', () => {
     }
   });
 });
+
+
+describe('Bouleplätze und Vereine teilen', () => {
+  const originalShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+  const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+    window.history.replaceState({}, '', '/plaetze');
+    Object.defineProperty(navigator, 'share', { get: () => undefined, configurable: true });
+    Object.defineProperty(navigator, 'clipboard', { get: () => undefined, configurable: true });
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ places: [
+      place(1, { clubId: 'club-1', clubName: 'BC Linden' }),
+      place(2, { clubId: 'club-1', clubName: 'BC Linden', venueType: 'indoor' }),
+      place(3),
+    ] }), { status: 200 }))));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (originalShare) Object.defineProperty(navigator, 'share', originalShare);
+    else delete navigator.share;
+    if (originalClipboard) Object.defineProperty(navigator, 'clipboard', originalClipboard);
+    else delete navigator.clipboard;
+    vi.unstubAllGlobals();
+    window.history.replaceState({}, '', '/');
+  });
+
+  async function shareButton(target) {
+    renderPlacesPage();
+    const heading = await screen.findByRole('heading', { name: target }, { timeout: 5_000 });
+    const details = heading.closest('details');
+    // Vereinsaktionen stehen vor den Aktionen der enthaltenen Spielorte.
+    return within(details).getAllByRole('button', { name: 'Teilen', hidden: true })[0];
+  }
+
+  it.each([
+    ['Bouleplatz 1', '/plaetze#place-1'],
+    ['BC Linden', '/plaetze?verein=club-1'],
+  ])('teilt %s als Gast mit Name und direktem Link', async (name, path) => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(navigator, 'share', 'get').mockReturnValue(share);
+    fireEvent.click(await shareButton(name));
+    await vi.waitFor(() => expect(share).toHaveBeenCalledWith({ title: name, text: name, url: `${window.location.origin}${path}` }));
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it('kopiert Name und Link und zeigt die Rückmeldung am Platz', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(navigator, 'share', 'get').mockReturnValue(undefined);
+    vi.spyOn(navigator, 'clipboard', 'get').mockReturnValue({ writeText });
+    const button = await shareButton('Bouleplatz 3');
+    fireEvent.click(button);
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(`Bouleplatz 3\n${window.location.origin}/plaetze#place-3`));
+    expect(await within(button.parentElement).findByText('Link kopiert')).toBeInTheDocument();
+  });
+
+  it('bleibt beim Abbrechen des Teilen-Dialogs still', async () => {
+    const share = vi.fn().mockRejectedValue(new DOMException('Abgebrochen', 'AbortError'));
+    vi.spyOn(navigator, 'share', 'get').mockReturnValue(share);
+    fireEvent.click(await shareButton('BC Linden'));
+    await vi.waitFor(() => expect(share).toHaveBeenCalledOnce());
+    expect(screen.queryByText('Teilen wird von diesem Gerät nicht unterstützt')).not.toBeInTheDocument();
+  });
+
+  it('meldet fehlende Unterstützung direkt am Button', async () => {
+    vi.spyOn(navigator, 'share', 'get').mockReturnValue(undefined);
+    vi.spyOn(navigator, 'clipboard', 'get').mockReturnValue(undefined);
+    const button = await shareButton('BC Linden');
+    fireEvent.click(button);
+    expect(await within(button.parentElement).findByText('Teilen wird von diesem Gerät nicht unterstützt')).toBeInTheDocument();
+  });
+
+  it('öffnet einen geteilten Verein mit allen Spielorten und lässt den Filter entfernen', async () => {
+    window.history.replaceState({}, '', '/plaetze?verein=club-1');
+    renderPlacesPage();
+    const heading = await screen.findByRole('heading', { name: 'BC Linden' }, { timeout: 5_000 });
+    const details = heading.closest('details');
+    expect(details).toHaveAttribute('open');
+    expect(screen.getByRole('heading', { name: 'Bouleplatz 1' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Bouleplatz 2' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Bouleplatz 3' })).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('place-marker')).toHaveLength(2);
+    await vi.waitFor(() => expect(Element.prototype.scrollIntoView.mock.contexts).toContain(details));
+    fireEvent.click(screen.getByRole('button', { name: 'Entfernen: BC Linden' }));
+    expect(window.location.search).toBe('');
+    expect(screen.getByRole('heading', { name: 'Bouleplatz 3' })).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+});
