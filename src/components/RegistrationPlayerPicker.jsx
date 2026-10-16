@@ -39,6 +39,7 @@ export function RegistrationPlayerPicker({ tournamentId, siteKey, shareToken, se
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [menuRect, setMenuRect] = useState(null);
+  const [focusedField, setFocusedField] = useState('');
   const root = useRef(null);
   const menu = useRef(null);
   const input = useRef(null);
@@ -80,7 +81,7 @@ export function RegistrationPlayerPicker({ tournamentId, siteKey, shareToken, se
       window.removeEventListener('resize', position);
       window.removeEventListener('scroll', position, true);
     };
-  }, [visible]);
+  }, [visible, focusedField]);
 
   async function choose(player) {
     dismiss();
@@ -121,11 +122,11 @@ export function RegistrationPlayerPicker({ tournamentId, siteKey, shareToken, se
 
   const nameField = (field, label, value, required) => <TextField label={label} value={value || ''}
     required={required} minLength={2} maxLength={100} invalid={invalid} readOnly={Boolean(selected) || busy}
-    role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={visible && input.current?.dataset.nameField === field}
+    role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={visible && focusedField === field}
     aria-controls={visible ? listId : undefined}
     aria-activedescendant={visible && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
     data-name-field={field} onKeyDown={keyDown}
-    onFocus={(event) => { input.current = event.target; setWanted(true); }}
+    onFocus={(event) => { input.current = event.target; setFocusedField(field); setWanted(true); }}
     onBlur={(event) => {
       if (!root.current?.contains(event.relatedTarget) && !menu.current?.contains(event.relatedTarget)) dismiss();
     }}
