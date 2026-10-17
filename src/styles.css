@@ -1863,6 +1863,29 @@ a.left-panel-link {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* VIP gehört zur ganzen Anmeldung und bleibt rechts neben allen Spielern. */
+.data-row.participants-row-vip {
+  position: relative;
+  padding-right: 44px;
+  min-height: 52px;
+}
+
+.participants-row > .participant-vip-status {
+  position: absolute;
+  inset: 0 8px 0 auto;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.participant-vip-status > .vip-badge {
+  margin: 0;
+  color: #795600;
+  white-space: nowrap;
+  transform: rotate(90deg);
+}
+
 .participants-row > button {
   justify-self: start;
 }

@@ -242,10 +242,9 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
   }
 
   const renderParticipantRow = (participant, index) => (
-    <article className="data-row participants-row" key={`${participant.firstName}-${participant.lastName}-${index}`}>
+    <article className={`data-row participants-row${participant.isVip ? ' participants-row-vip' : ''}`} key={`${participant.firstName}-${participant.lastName}-${index}`}>
       <div data-i18n-skip>
         <strong>
-          {participant.isVip && <span className="vip-badge">{t('VIP')}</span>}
           {participant.firstName} {participant.lastName}
           {participant.accountConnected && <AccountBadge />}
         </strong>
@@ -269,6 +268,11 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
           </strong>
           <span>{participant.partner2Club}</span>
         </div>
+      )}
+      {participant.isVip && (
+        <span className="participant-vip-status">
+          <span className="vip-badge">{t('VIP')}</span>
+        </span>
       )}
       {participant.registrationId && (
         <Button variant="secondary" loading={cancellingRegistrationId === participant.registrationId} onClick={() => handleCancelOwnRegistration(participant)}>
