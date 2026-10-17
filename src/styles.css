@@ -1890,6 +1890,13 @@ a.left-panel-link {
   justify-self: start;
 }
 
+/* Gleicher Statusplatz hält die Spielerspalten aller Teams bündig. */
+@media (min-width: 561px) {
+  .data-row.participants-row {
+    padding-right: 44px;
+  }
+}
+
 @media (max-width: 560px) {
   .data-row.participants-row {
     grid-template-columns: 1fr;
