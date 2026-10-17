@@ -217,7 +217,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
               checked={form.isVip}
               onChange={(event) => setForm({ ...form, isVip: event.target.checked })}
             />
-            VIP
+            <span className="vip-badge">{t('VIP')}</span>
           </label>
         </RegistrationSection>
       )}

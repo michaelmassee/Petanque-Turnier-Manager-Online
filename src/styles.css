@@ -2738,9 +2738,23 @@ a.left-panel-link {
 }
 
 .vip-badge {
-  color: #c9971c;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border: 1px solid #c9971c;
+  border-radius: 4px;
+  background: #fff3c4;
+  color: #795600;
   margin-right: 4px;
-  font-size: 0.9em;
+  font-size: 0.8em;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.button[data-vip-toggle="true"][aria-pressed="true"] {
+  border-color: #c9971c;
+  background: #fff3c4;
+  color: #795600;
 }
 
 .account-badge {

@@ -1,4 +1,7 @@
 {
+  "VIP an": "VIP activado",
+  "VIP aus": "VIP desactivado",
+  "VIP-Status wurde aktualisiert.": "El estado VIP se ha actualizado.",
   "openingNotificationSubscribeShort": "Avisarme",
   "openingNotificationActiveShort": "Activo",
   "openingNotificationSubscribe": "Avisarme cuando se abra la inscripción",

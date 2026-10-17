@@ -1,4 +1,7 @@
 {
+  "VIP an": "VIP on",
+  "VIP aus": "VIP off",
+  "VIP-Status wurde aktualisiert.": "VIP status has been updated.",
   "openingNotificationSubscribeShort": "Remind me",
   "openingNotificationActiveShort": "Active",
   "openingNotificationSubscribe": "Notify me when registration opens",

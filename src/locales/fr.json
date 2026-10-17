@@ -1,4 +1,7 @@
 {
+  "VIP an": "VIP activé",
+  "VIP aus": "VIP désactivé",
+  "VIP-Status wurde aktualisiert.": "Le statut VIP a été mis à jour.",
   "openingNotificationSubscribeShort": "Me prévenir",
   "openingNotificationActiveShort": "Actif",
   "openingNotificationSubscribe": "Me prévenir à l’ouverture des inscriptions",

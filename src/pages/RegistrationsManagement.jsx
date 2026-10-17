@@ -266,13 +266,13 @@ function RegistrationDetails({ registration, tournament }) {
   );
 }
 
-function RegistrationRow({ registration, tournament, showConfirm = false, showReject = false, busy, busyOther, onConfirm, onReject, onEdit, onMessage, onDelete }) {
+function RegistrationRow({ registration, tournament, showConfirm = false, showReject = false, busy, busyOther, onConfirm, onReject, onEdit, onMessage, onDelete, onToggleVip }) {
   const { t } = useTranslation();
   return (
     <article className="data-row">
       <div>
         <strong data-i18n-skip>
-          {registration.isVip && <span className="vip-badge" title="VIP">★</span>}
+          {registration.isVip && <span className="vip-badge">{t('VIP')}</span>}
           {registration.firstName} {registration.lastName}
           {registration.accountConnected && <AccountBadge />}
         </strong>
@@ -313,15 +313,25 @@ function RegistrationRow({ registration, tournament, showConfirm = false, showRe
       </div>
       <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
       <div className="row-actions">
+        <Button
+          variant="secondary"
+          data-vip-toggle="true"
+          aria-pressed={Boolean(registration.isVip)}
+          loading={busy === `vip-${registration.id}`}
+          disabled={Boolean(busy || busyOther)}
+          onClick={() => onToggleVip(registration)}
+        >
+          {registration.isVip ? t('VIP an') : t('VIP aus')}
+        </Button>
         {showConfirm && (
-          <Button loading={busy === `confirm-${registration.id}`} disabled={Boolean(busyOther)} onClick={() => onConfirm(registration)}>
+          <Button loading={busy === `confirm-${registration.id}`} disabled={Boolean(busy || busyOther)} onClick={() => onConfirm(registration)}>
             {t('Bestätigen')}
           </Button>
         )}
-        {showReject && <Button variant="danger" disabled={Boolean(busyOther)} onClick={() => onReject(registration)}>{t('Ablehnen')}</Button>}
+        {showReject && <Button variant="danger" disabled={Boolean(busy || busyOther)} onClick={() => onReject(registration)}>{t('Ablehnen')}</Button>}
         <Button variant="secondary" disabled={Boolean(busy)} onClick={() => onEdit(registration)}>{t('Bearbeiten')}</Button>
         <Button variant="secondary" disabled={Boolean(busy)} onClick={() => onMessage(registration)}>{t('Nachricht an Team')}</Button>
-        <Button variant="danger" loading={busy === `delete-${registration.id}`} disabled={Boolean(busyOther)} onClick={() => onDelete(registration)}>{t('Löschen')}</Button>
+        <Button variant="danger" loading={busy === `delete-${registration.id}`} disabled={Boolean(busy || busyOther)} onClick={() => onDelete(registration)}>{t('Löschen')}</Button>
       </div>
     </article>
   );
@@ -442,6 +452,7 @@ export function RegistrationsPanel({
   onMessage,
   onConfirm,
   onConfirmAll,
+  onToggleVip,
   onReject,
   approvalInboxActive = false,
   onExitApprovalInbox,
@@ -466,8 +477,8 @@ export function RegistrationsPanel({
     .map(([value, label]) => ({ value, label }));
 
   function rowProps(registration) {
-    const busy = busyId === `confirm-${registration.id}` ? `confirm-${registration.id}` : busyId === `delete-${registration.id}` ? `delete-${registration.id}` : '';
-    return { busy, busyOther: Boolean(busyId) && !busy };
+    const busy = ['confirm', 'delete', 'vip'].some((action) => busyId === `${action}-${registration.id}`) ? busyId : '';
+    return { busy, busyOther: Boolean(busyId) && !busy, onToggleVip };
   }
 
   if (approvalInboxActive) {
@@ -735,6 +746,18 @@ export function RegistrationsManagementPage({
     } catch (err) { setError(err.message); } finally { setBusyId(''); }
   }
 
+  async function handleToggleVip(registration) {
+    setError(''); setMessage('');
+    setBusyId(`vip-${registration.id}`);
+    try {
+      const payload = registrationPayload({ ...registration, seedingPosition: registration.seedingPosition ?? '', isVip: !registration.isVip }, language);
+      await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      setMessage(t('VIP-Status wurde aktualisiert.'));
+      await load(registration.tournamentId);
+      onTournamentsChanged?.();
+    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+  }
+
   async function handleConfirm(registration) {
     setError(''); setMessage('');
     setBusyId(`confirm-${registration.id}`);
@@ -824,6 +847,7 @@ export function RegistrationsManagementPage({
         onEdit={openEdit}
         onMessage={openTeamMessage}
         onConfirm={handleConfirm}
+        onToggleVip={handleToggleVip}
         onConfirmAll={handleConfirmAll}
         onReject={(registration) => { setRejectionRegistration(registration); setRejectionReason(''); }}
         approvalInboxActive={approvalInboxActive}

@@ -453,3 +453,72 @@ describe('Anmeldungsverwaltung: Freigabe und Storno durch die Turnierleitung', (
     expect(screen.getByText(/Spieler confirmed-1/)).toBeInTheDocument();
   });
 });
+
+
+describe('Anmeldungsverwaltung: VIP-Schalter', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function setup({ isVip = false, status = 'confirmed', fail = false, approvalInboxActive = false } = {}) {
+    let registration = {
+      id: 'vip-1', tournamentId: 't1', firstName: 'Anna', lastName: 'Muster',
+      email: 'anna@example.test', playerEmail: 'anna@example.test', club: 'BC Linden',
+      status, isVip, seedingPosition: 3, feeSelections: [], registrationAnswers: [],
+    };
+    const onTournamentsChanged = vi.fn();
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
+      if (options.method === 'PUT') {
+        if (fail) return new Response(JSON.stringify({ error: 'Speichern fehlgeschlagen' }), { status: 500 });
+        registration = { ...registration, ...JSON.parse(options.body) };
+        return new Response(JSON.stringify({ registration }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ registrations: [registration] }), { status: 200 });
+    });
+    render(
+      <RegistrationsManagementPage
+        tournaments={[{ ...TOURNAMENT, registrationEnabled: true }]}
+        selectedTournamentId="t1"
+        setSelectedTournamentId={() => {}}
+        onTournamentsChanged={onTournamentsChanged}
+        language="de"
+        approvalInboxActive={approvalInboxActive}
+      />,
+    );
+    return { fetchMock, onTournamentsChanged };
+  }
+
+  it.each([
+    { isVip: false, status: 'confirmed', approvalInboxActive: false },
+    { isVip: true, status: 'confirmed', approvalInboxActive: false },
+    { isVip: false, status: 'pending', approvalInboxActive: false },
+    { isVip: false, status: 'pending', approvalInboxActive: true },
+  ])('speichert VIP von $isVip um bei $status (Freigabeeingang: $approvalInboxActive)', async (options) => {
+    const { fetchMock, onTournamentsChanged } = setup(options);
+    const before = options.isVip ? 'VIP an' : 'VIP aus';
+    const after = options.isVip ? 'VIP aus' : 'VIP an';
+    const toggle = await screen.findByRole('button', { name: before });
+    expect(toggle).toHaveAttribute('aria-pressed', String(options.isVip));
+    fireEvent.click(toggle);
+    expect(toggle).toBeDisabled();
+
+    const updatedToggle = await screen.findByRole('button', { name: after });
+    expect(updatedToggle).toHaveAttribute('aria-pressed', String(!options.isVip));
+    const update = fetchMock.mock.calls.find(([, request]) => request?.method === 'PUT');
+    expect(update[0]).toBe('/api/registrations/vip-1');
+    expect(JSON.parse(update[1].body)).toMatchObject({
+      isVip: !options.isVip, status: options.status, firstName: 'Anna', lastName: 'Muster', club: 'BC Linden', seedingPosition: 3,
+    });
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/tournaments/t1/registrations')).toHaveLength(2);
+    expect(onTournamentsChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('behält den VIP-Status bei einem fehlgeschlagenen Speichern', async () => {
+    const { fetchMock, onTournamentsChanged } = setup({ fail: true });
+    fireEvent.click(await screen.findByRole('button', { name: 'VIP aus' }));
+
+    expect(await screen.findByText('Speichern fehlgeschlagen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'VIP aus' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'VIP aus' })).toBeEnabled();
+    expect(onTournamentsChanged).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/tournaments/t1/registrations')).toHaveLength(1);
+  });
+});

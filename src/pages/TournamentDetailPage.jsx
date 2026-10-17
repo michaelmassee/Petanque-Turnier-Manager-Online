@@ -245,7 +245,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
     <article className="data-row participants-row" key={`${participant.firstName}-${participant.lastName}-${index}`}>
       <div data-i18n-skip>
         <strong>
-          {participant.isVip && <span className="vip-badge" title="VIP">★</span>}
+          {participant.isVip && <span className="vip-badge">{t('VIP')}</span>}
           {participant.firstName} {participant.lastName}
           {participant.accountConnected && <AccountBadge />}
         </strong>
