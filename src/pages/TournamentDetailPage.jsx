@@ -76,6 +76,16 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
               📄
             </a>
           )}
+          {tournament.contactEmail && (
+            <a
+              className="icon-bar-button"
+              href={`mailto:${encodeURIComponent(tournament.contactEmail)}?subject=${encodeURIComponent(tournament.name)}`}
+              title={t('E-Mail an die Turnierleitung')}
+              aria-label={t('E-Mail an die Turnierleitung')}
+            >
+              <span aria-hidden="true">✉️</span>
+            </a>
+          )}
         </div>
         {tournament.logoUrl && (
           <img
