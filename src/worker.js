@@ -5039,11 +5039,20 @@ async function resolveTournamentBoulePlace(db, placeId) {
   return place;
 }
 
+// Ein Intl.DateTimeFormat mit Zeitzone anzulegen ist teuer; die Turnierliste rechnet je Turnier bis zu
+// sechsmal um. Ohne Cache kostete GET /api/tournaments bei 68 Turnieren 25-92 ms CPU (Free-Plan: 10 ms).
+const localDateTimeFormatters = new Map();
+
 function localDateTimeParts(date, timeZone) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(date);
+  let formatter = localDateTimeFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    });
+    localDateTimeFormatters.set(timeZone, formatter);
+  }
+  const parts = formatter.formatToParts(date);
   const value = (type) => parts.find((part) => part.type === type)?.value;
   return `${value('year')}-${value('month')}-${value('day')}T${value('hour')}:${value('minute')}`;
 }
