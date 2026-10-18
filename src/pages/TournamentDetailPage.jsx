@@ -575,15 +575,9 @@ export function TournamentDetailPage({
           <p className="eyebrow">{t('Turnierdetails')}</p>
           <h1 data-i18n-skip>{tournament.name}</h1>
           <p className="tournament-detail-meta" data-i18n-skip>
-            {formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
-            {tournament.club && (
-              <>
-                <span aria-hidden="true">·</span>
-                {tournament.club}
-              </>
-            )}
-            <span aria-hidden="true">·</span>
-            {formatLocationAddress(tournament.location)}
+            <span>{formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}</span>
+            {tournament.club && <span>{tournament.club}</span>}
+            <span>{formatLocationAddress(tournament.location)}</span>
           </p>
         </header>
         <nav className="tournament-detail-tabs" aria-label={t('Turnierdetails')}>

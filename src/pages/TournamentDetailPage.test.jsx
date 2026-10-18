@@ -60,7 +60,10 @@ describe('Turnierdetail-Reiter', () => {
     renderDetail(tournamentWith({ club: 'BC Linden', location: 'Parkweg 1, Linden' }));
     const labels = Array.from(document.querySelectorAll('p > strong')).map((label) => label.textContent);
     expect(labels.slice(labels.indexOf('Datum'), labels.indexOf('Datum') + 3)).toEqual(['Datum', 'Verein', 'Ort']);
-    expect(screen.getAllByText(/BC Linden/).length).toBeGreaterThan(0);
+    const meta = Array.from(document.querySelectorAll('.tournament-detail-meta > span')).map((line) => line.textContent);
+    expect(meta).toHaveLength(3);
+    expect(meta[1]).toBe('BC Linden');
+    expect(meta[2]).toContain('Parkweg 1');
   });
 
   it('lässt die Vereinszeile ohne Verein weg', () => {

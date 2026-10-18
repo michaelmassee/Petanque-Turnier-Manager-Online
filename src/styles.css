@@ -1807,8 +1807,9 @@ a.left-panel-link {
 
 .tournament-detail-meta {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  gap: 2px;
+  overflow-wrap: anywhere;
   margin: 8px 0 0;
   color: #53627a;
   font-weight: 700;
