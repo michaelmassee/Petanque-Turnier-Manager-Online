@@ -4,7 +4,13 @@ export function isAutumnSeason(date = new Date()) {
   return month === 9 || month === 10;
 }
 
-// Root-Klasse für rein CSS-basierte Saison-Deko (z. B. an .empty-state).
+// Halloween-Badges erscheinen automatisch im Oktober.
+export function isHalloweenSeason(date = new Date()) {
+  return date.getMonth() === 9;
+}
+
+// Root-Klassen für rein CSS-basierte Saison-Deko.
 export function applySeasonClass(root = document.documentElement, date = new Date()) {
   root.classList.toggle('season-autumn', isAutumnSeason(date));
+  root.classList.toggle('season-halloween', isHalloweenSeason(date));
 }
