@@ -1769,6 +1769,29 @@ a.left-panel-link {
   margin: 0 auto;
 }
 
+.tournament-name-editor {
+  min-width: 0;
+}
+
+.tournament-name-editor summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.tournament-name-editor textarea {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.tournament-name-editor[open] summary {
+  margin-bottom: 12px;
+}
+
 .tournament-detail-heading {
   padding: 4px 4px 0;
 }

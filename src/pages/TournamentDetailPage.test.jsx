@@ -56,6 +56,18 @@ describe('Turnierdetail-Reiter', () => {
     vi.restoreAllMocks();
   });
 
+  it('zeigt den ausrichtenden Verein zwischen Datum und Ort', () => {
+    renderDetail(tournamentWith({ club: 'BC Linden', location: 'Parkweg 1, Linden' }));
+    const labels = Array.from(document.querySelectorAll('p > strong')).map((label) => label.textContent);
+    expect(labels.slice(labels.indexOf('Datum'), labels.indexOf('Datum') + 3)).toEqual(['Datum', 'Verein', 'Ort']);
+    expect(screen.getAllByText(/BC Linden/).length).toBeGreaterThan(0);
+  });
+
+  it('lässt die Vereinszeile ohne Verein weg', () => {
+    renderDetail(tournamentWith({ club: null }));
+    expect(Array.from(document.querySelectorAll('p > strong')).map((label) => label.textContent)).not.toContain('Verein');
+  });
+
   it('verlinkt den gespeicherten Bouleplatz aus einem Kalendereintrag mit dem Platzfilter', () => {
     const navigate = vi.fn();
     renderDetail(tournamentWith({ registrationEnabled: false, boulePlaceId: 'place-14' }), 'info', navigate);

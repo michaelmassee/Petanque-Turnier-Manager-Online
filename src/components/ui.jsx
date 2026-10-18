@@ -67,12 +67,12 @@ export function TextField({ label, value, onChange, type = 'text', required, inv
   );
 }
 
-export function TextArea({ label, value, onChange, minLength, maxLength, required, rows = 4 }) {
+export function TextArea({ label, value, onChange, onKeyDown, minLength, maxLength, required, rows = 4 }) {
   return (
     <label>
       {label}{maxLength ? ` (${value.length}/${maxLength})` : ''}
       {required ? <RequiredMark /> : null}
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={rows} minLength={minLength} maxLength={maxLength} required={required} />
+      <textarea value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} rows={rows} minLength={minLength} maxLength={maxLength} required={required} />
     </label>
   );
 }

@@ -93,6 +93,11 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
       <p>
         <strong>{t('Datum')}</strong>: {formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
       </p>
+      {tournament.club && (
+        <p>
+          <strong>{t('Verein')}</strong>: <span data-i18n-skip>{tournament.club}</span>
+        </p>
+      )}
       <p>
         <strong>{t('Ort')}</strong>: <span data-i18n-skip>{formatLocationAddress(tournament.location)}</span>
       </p>
@@ -561,6 +566,12 @@ export function TournamentDetailPage({
           <h1 data-i18n-skip>{tournament.name}</h1>
           <p className="tournament-detail-meta" data-i18n-skip>
             {formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}
+            {tournament.club && (
+              <>
+                <span aria-hidden="true">·</span>
+                {tournament.club}
+              </>
+            )}
             <span aria-hidden="true">·</span>
             {formatLocationAddress(tournament.location)}
           </p>

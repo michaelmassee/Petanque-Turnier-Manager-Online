@@ -5023,6 +5023,14 @@ function resolveTournamentTimezone(geo, fallback = 'Europe/Berlin') {
   }
 }
 
+// Ohne eingetragenen Verein den Verein des verknüpften Platzes übernehmen - auch wenn der Platz
+// nicht gewählt, sondern per Trigger über Adresse/Koordinaten zugeordnet wurde (Migration 0109/0114).
+async function fillTournamentClubFromPlace(db, tournamentId) {
+  await db.prepare(`UPDATE tournaments
+    SET club = (SELECT COALESCE(c.name, p.club_name) FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id AND c.status = 'published' WHERE p.id = tournaments.boule_place_id)
+    WHERE id = ? AND COALESCE(trim(club), '') = '' AND boule_place_id IS NOT NULL`).bind(tournamentId).run();
+}
+
 async function resolveTournamentBoulePlace(db, placeId) {
   const id = nullableText(placeId);
   if (!id) return null;
@@ -5107,17 +5115,18 @@ async function createTournament(request, env, user) {
   await db
     .prepare(
       `INSERT INTO tournaments (
-        id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, registration_type, status,
+        id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
         latitude, longitude, geocoded_at, timezone, boule_place_id, live_view_enabled, player_result_reporting_enabled, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       user.id,
       user.id,
       tournament.name,
+      tournament.club,
       tournament.date,
       tournament.startTime,
       tournament.location,
@@ -5164,6 +5173,8 @@ async function createTournament(request, env, user) {
   await db.prepare('UPDATE tournaments SET fee_tiers = ? WHERE id = ?').bind(JSON.stringify(tournament.feeTiers), id).run();
   await db.prepare('UPDATE tournaments SET registration_questions = ? WHERE id = ?').bind(JSON.stringify(tournament.registrationQuestions), id).run();
   await db.prepare('UPDATE tournaments SET whatsapp_group_url = ? WHERE id = ?').bind(normalizePresentationUrl(body.whatsappGroupUrl, 'whatsappGroupUrl'), id).run();
+
+  await fillTournamentClubFromPlace(db, id);
 
   const created = await getTournamentById(db, id);
   if (isPubliclyVisible(created)) {
@@ -5488,6 +5499,8 @@ async function updateTournament(request, env, existing, user) {
   const registrationQuestions = tournament.registrationQuestionsProvided ? tournament.registrationQuestions : registrationQuestionsFromRow(existing);
   await db.prepare('UPDATE tournaments SET registration_questions = ? WHERE id = ?').bind(JSON.stringify(registrationQuestions), existing.id).run();
   if (tournament.registrationQuestionsProvided) await pruneRegistrationAnswers(db, existing.id, registrationQuestions);
+
+  await fillTournamentClubFromPlace(db, existing.id);
 
   const updated = await getTournamentById(db, existing.id);
   await notifyTournamentPublicationChange(env, existing, updated);

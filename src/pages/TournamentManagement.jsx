@@ -277,6 +277,18 @@ function FormationHelpDialog({ onClose }) {
   );
 }
 
+const toSingleLine = (value) => value.replace(/[\r\n]+/g, ' ');
+
+// Spielort zur gewählten Adresse: direkt gewählter Platz, sonst gleiche Adresse oder Koordinaten.
+// Wie in der View tournament_venue_place gewinnt ein Vereinsplatz vor einem Platz ohne Verein.
+function venuePlaceFor(places, candidate) {
+  if (candidate.boulePlaceId) return places.find((place) => place.id === candidate.boulePlaceId) || null;
+  const address = String(candidate.displayName || '').trim().toLocaleLowerCase();
+  const matches = places.filter((place) => String(place.address || '').trim().toLocaleLowerCase() === address
+    || (place.latitude !== null && place.latitude !== undefined && Number(place.latitude) === Number(candidate.lat) && Number(place.longitude) === Number(candidate.lng)));
+  return matches.find((place) => place.clubName) || matches[0] || null;
+}
+
 export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, owner, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [] }) {
   const { t } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
@@ -288,59 +300,57 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
   // damals abgefragten Felder sind hier sinnvoll editierbar - alles rund um Anmeldung,
   // Turniersystem, Gebühren etc. ist für so einen Eintrag ohne Bedeutung.
   const isCalendarEntry = mode === 'edit' && form.registrationEnabled === false;
+  // Mehrzeiliges Feld nur, damit lange Namen umbrechen; der Name selbst bleibt einzeilig.
+  const nameField = (
+    <TextArea
+      label={t('Name')}
+      value={form.name}
+      onChange={(name) => setForm({ ...form, name: toSingleLine(name) })}
+      onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) event.preventDefault(); }}
+      required
+      minLength={2}
+      rows={3}
+    />
+  );
 
   return (
     <form className="form dense" onSubmit={onSubmit}>
       {showMailNotEnabledHint && (
         <p className="feedback offline">{MAIL_NOT_ENABLED_HINT_TEMPLATES[language] || MAIL_NOT_ENABLED_HINT_TEMPLATES.de}</p>
       )}
-      {isCalendarEntry && (
-        <>
-          <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} required minLength={2} list={clubSuggestions.listId} />
-          {clubSuggestions.datalist}
-        </>
-      )}
-      <TextField label={t('Name')} value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
+      {mode === 'edit' ? (
+        <details className="tournament-name-editor" onInvalidCapture={(event) => { event.currentTarget.open = true; }}>
+          <summary>{t('Name')}: <span data-i18n-skip>{form.name}</span></summary>
+          {nameField}
+        </details>
+      ) : nameField}
       <div className="form-grid">
         <TextField label={t('Datum')} type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
         <TextField label={t('Startzeit')} type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
       </div>
-      {boulePlaces.length > 0 && (
-        <SelectField
-          label={t('Bouleplatz')}
-          value={form.boulePlaceId || ''}
-          onChange={(boulePlaceId) => {
-            const place = boulePlaces.find((entry) => entry.id === boulePlaceId);
-            setForm({
-              ...form,
-              boulePlaceId,
-              location: place ? place.address : form.location,
-              latitude: place ? place.latitude : form.latitude,
-              longitude: place ? place.longitude : form.longitude,
-              locationConfirmed: place ? true : form.locationConfirmed,
-            });
-          }}
-          options={[{ value: '', label: t('Individuellen Ort verwenden') }, ...boulePlaces.map((place) => ({ value: place.id, label: `${place.clubName ? `${place.clubName}: ` : ''}${place.name} (${t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')})` }))]}
-        />
-      )}
       <LocationAutocomplete
         label={t('Ort')}
         value={form.location}
-        onChange={(location) => setForm({ ...form, location, locationConfirmed: false })}
-        onSelect={(candidate) => setForm({
-          ...form,
-          location: candidate.displayName,
-          latitude: candidate.lat,
-          longitude: candidate.lng,
-          locationConfirmed: true,
-        })}
+        places={boulePlaces}
+        onChange={(location) => setForm({ ...form, location, boulePlaceId: '', ...(form.overrideCoordinates ? {} : { latitude: '', longitude: '' }), locationConfirmed: false })}
+        onSelect={(candidate) => {
+          const place = venuePlaceFor(boulePlaces, candidate);
+          setForm({
+            ...form,
+            boulePlaceId: place?.id || '',
+            club: form.club || place?.clubName || '',
+            location: candidate.displayName,
+            latitude: candidate.lat,
+            longitude: candidate.lng,
+            locationConfirmed: true,
+          });
+        }}
         confirmed={form.locationConfirmed}
         required
         minLength={2}
-        language={language}
-        disabled={Boolean(form.boulePlaceId)}
       />
-      {form.boulePlaceId && <p className="hint">{t('Ort wird vom ausgewählten Bouleplatz übernommen.')}</p>}
+      <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} required={isCalendarEntry} minLength={2} list={clubSuggestions.listId} />
+      {clubSuggestions.datalist}
       <label className="checkbox-field">
         <input
           type="checkbox"
@@ -911,7 +921,7 @@ export function TournamentList({
   );
 }
 
-function tournamentToForm(tournament) {
+export function tournamentToForm(tournament) {
   return {
     id: tournament.id,
     ownerId: tournament.ownerId || '',
@@ -920,6 +930,7 @@ function tournamentToForm(tournament) {
     date: tournament.date || '',
     startTime: tournament.startTime || '',
     location: tournament.location || '',
+    boulePlaceId: tournament.boulePlaceId || '',
     latitude: tournament.latitude ?? '',
     longitude: tournament.longitude ?? '',
     overrideCoordinates: false,

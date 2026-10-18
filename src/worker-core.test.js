@@ -44,6 +44,10 @@ describe('Worker-Fachlogik', () => {
     expect(normalizeTournamentInput({ ...base, formation: 'triplette', registrationType: 'supermelee', type: 'rangliste', visibility: 'public', latitude: '50', longitude: '8', contactEmail: 'a@b.de' })).toMatchObject({ currency: 'EUR', waitlistEnabled: true, registrationEnabled: true, approvalRequired: false, latitude: 50, longitude: 8 });
   });
 
+  it('ersetzt Zeilenumbrüche im Turniernamen durch Leerzeichen', () => {
+    expect(normalizeTournamentInput({ ...base, name: ' Herbst-\n  Turnier\r\nLinden ' }).name).toBe('Herbst- Turnier Linden');
+  });
+
   it('nimmt keine Live-Ansicht-Option mehr entgegen', () => {
     expect(normalizeTournamentInput({ ...base, liveViewEnabled: true })).not.toHaveProperty('liveViewEnabled');
   });
