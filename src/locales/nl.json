@@ -1504,5 +1504,10 @@
   "Keine Spieler gefunden.": "Geen spelers gevonden.",
   "Bitte die Suche eingrenzen, um weitere Spieler zu finden.": "Verfijn de zoekopdracht om andere spelers te vinden.",
   "Suchergebnisse": "Zoekresultaten",
-  "E-Mail an die Turnierleitung": "E-mail aan de toernooileiding"
+  "E-Mail an die Turnierleitung": "E-mail aan de toernooileiding",
+  "Live-Ansicht freischalten": "Liveweergave vrijgeven",
+  "Ergebnismeldungen durch Spieler sind nur mit freigeschalteter Live-Ansicht möglich.": "Spelers kunnen alleen uitslagen melden als de liveweergave is vrijgegeven.",
+  "Live-Ansicht nicht aktiviert": "Liveweergave niet geactiveerd",
+  "Die Turnierleitung hat die Live-Ansicht für dieses Turnier nicht freigeschaltet. Paarungen, Ergebnisse und Rangliste erscheinen hier erst nach der Freischaltung.": "De toernooileiding heeft de liveweergave voor dit toernooi niet vrijgegeven. Indelingen, uitslagen en stand verschijnen hier pas na de vrijgave.",
+  "Die Live-Ansicht wurde für dieses Turnier nicht freigeschaltet": "De liveweergave is voor dit toernooi niet vrijgegeven"
 }

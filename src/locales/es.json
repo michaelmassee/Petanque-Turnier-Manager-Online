@@ -1504,5 +1504,10 @@
   "Keine Spieler gefunden.": "No se han encontrado jugadores.",
   "Bitte die Suche eingrenzen, um weitere Spieler zu finden.": "Acota la búsqueda para encontrar otros jugadores.",
   "Suchergebnisse": "Resultados de búsqueda",
-  "E-Mail an die Turnierleitung": "Enviar un correo a la organización del torneo"
+  "E-Mail an die Turnierleitung": "Enviar un correo a la organización del torneo",
+  "Live-Ansicht freischalten": "Activar vista en directo",
+  "Ergebnismeldungen durch Spieler sind nur mit freigeschalteter Live-Ansicht möglich.": "Los jugadores solo pueden comunicar resultados si la vista en directo está activada.",
+  "Live-Ansicht nicht aktiviert": "Vista en directo no activada",
+  "Die Turnierleitung hat die Live-Ansicht für dieses Turnier nicht freigeschaltet. Paarungen, Ergebnisse und Rangliste erscheinen hier erst nach der Freischaltung.": "La organización del torneo no ha activado la vista en directo para este torneo. Los emparejamientos, resultados y la clasificación aparecerán aquí cuando se active.",
+  "Die Live-Ansicht wurde für dieses Turnier nicht freigeschaltet": "La vista en directo no se ha activado para este torneo"
 }

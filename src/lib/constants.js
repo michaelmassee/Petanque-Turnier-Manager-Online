@@ -155,6 +155,7 @@ export const EMPTY_TOURNAMENT_FORM = {
   visibility: 'private',
   internalNotes: '',
   participantsPublic: false,
+  liveViewEnabled: false,
   playerResultReportingEnabled: false,
   licenseRequired: false,
   teamNameEnabled: false,

@@ -42,8 +42,8 @@ describe('Ergebnismeldung bei verbundenem Turnierdokument', () => {
       VALUES ('key1', 'owner', ?, 'PTM', 'approved', '2026-01-01', '2026-01-01', '2026-01-01', '2026-01-01')`,
     createHash('sha256').update(PTM_ZUGANG).digest('hex'));
     sql(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, registration_type, type, status, visibility,
-      player_result_reporting_enabled, desktop_execution, created_at, updated_at)
-      VALUES ('t1', 'owner', 'Turnier', '2099-09-28', 'Ort', 'tete', 'forme', 'schweizer', 'running', 'public', 1, 1,
+      live_view_enabled, player_result_reporting_enabled, desktop_execution, created_at, updated_at)
+      VALUES ('t1', 'owner', 'Turnier', '2099-09-28', 'Ort', 'tete', 'forme', 'schweizer', 'running', 'public', 1, 1, 1,
         '2026-01-01', '2026-01-01')`);
     sql(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email, status, participation, registered_at, created_at, updated_at, user_id)
       VALUES ('11111111-1111-4111-8111-aaaaaaaaaaaa', 't1', 'Anna', 'A', 'anna@example.test', 'confirmed', 'active', '2026-01-01', '2026-01-01', '2026-01-01', 'anna'),
@@ -74,7 +74,11 @@ describe('Ergebnismeldung bei verbundenem Turnierdokument', () => {
     sql("UPDATE tournaments SET player_result_reporting_enabled = 0 WHERE id = 't1'");
     expect((await melden('anna-session', ANNA, 13, 7)).status).toBe(403);
 
-    sql("UPDATE tournaments SET player_result_reporting_enabled = 1, sync_document_id = NULL, document_managed = 0 WHERE id = 't1'");
+    // Ohne freigeschaltete Live-Ansicht gilt auch eine gespeicherte Ergebnismeldung nicht.
+    sql("UPDATE tournaments SET player_result_reporting_enabled = 1, live_view_enabled = 0 WHERE id = 't1'");
+    expect((await melden('anna-session', ANNA, 13, 7)).status).toBe(403);
+
+    sql("UPDATE tournaments SET live_view_enabled = 1, player_result_reporting_enabled = 1, sync_document_id = NULL, document_managed = 0 WHERE id = 't1'");
     expect((await melden('anna-session', ANNA, 13, 7)).status).toBe(409);
     expect(meldungen()).toEqual([]);
   });

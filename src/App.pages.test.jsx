@@ -1286,11 +1286,18 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     }
     render(<LiveOptionHarness />);
 
+    const liveView = screen.getByRole('checkbox', { name: 'Live-Ansicht freischalten' });
     const playerResults = screen.getByRole('checkbox', { name: /Spieler dürfen Ergebnisse/ });
+    expect(liveView).not.toBeChecked();
+    expect(playerResults).toBeDisabled();
+    fireEvent.click(liveView);
     expect(playerResults).not.toBeDisabled();
     fireEvent.click(playerResults);
     expect(playerResults).toBeChecked();
-    expect(screen.queryByRole('checkbox', { name: /^Live-Ansicht für Teilnehmer/ })).not.toBeInTheDocument();
+    // Live-Ansicht wieder aus: Ergebnismeldung wird mit abgeschaltet.
+    fireEvent.click(liveView);
+    expect(playerResults).toBeDisabled();
+    expect(playerResults).not.toBeChecked();
   });
 
   it('bietet beim Bearbeiten eines Kalendereintrags Logo- und Flyer-Bildlink an', () => {

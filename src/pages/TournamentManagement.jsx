@@ -614,11 +614,22 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           <label className="checkbox-field">
             <input
               type="checkbox"
-              checked={Boolean(form.playerResultReportingEnabled)}
+              checked={Boolean(form.liveViewEnabled)}
+              onChange={(event) => setForm({ ...form, liveViewEnabled: event.target.checked,
+                ...(event.target.checked ? {} : { playerResultReportingEnabled: false }) })}
+            />
+            {t('Live-Ansicht freischalten')}
+          </label>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={Boolean(form.liveViewEnabled && form.playerResultReportingEnabled)}
+              disabled={!form.liveViewEnabled}
               onChange={(event) => setForm({ ...form, playerResultReportingEnabled: event.target.checked })}
             />
             {t('Spieler dürfen Ergebnisse ihrer laufenden Partie in der Live-Ansicht melden')}
           </label>
+          {!form.liveViewEnabled && <p className="hint">{t('Ergebnismeldungen durch Spieler sind nur mit freigeschalteter Live-Ansicht möglich.')}</p>}
         </>
       )}
       <TextField label={t('Website')} type="url" placeholder="https://…" value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} invalid={invalidField === 'websiteUrl'} />
@@ -958,6 +969,7 @@ export function tournamentToForm(tournament) {
     internalNotes: tournament.internalNotes || '',
     club: tournament.club || '',
     participantsPublic: Boolean(tournament.participantsPublic),
+    liveViewEnabled: Boolean(tournament.liveViewEnabled),
     playerResultReportingEnabled: Boolean(tournament.playerResultReportingEnabled),
     approvalRequired: Boolean(tournament.approvalRequired),
     licenseRequired: Boolean(tournament.licenseRequired),

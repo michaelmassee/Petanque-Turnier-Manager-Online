@@ -5163,7 +5163,7 @@ async function createTournament(request, env, user) {
       geo.geocodedAt,
       timezone,
       selectedPlace?.id || null,
-      1,
+      tournament.liveViewEnabled ? 1 : 0,
       tournament.playerResultReportingEnabled ? 1 : 0,
       now,
       now,
@@ -5246,7 +5246,7 @@ export async function duplicateTournament(db, existing, actingUser) {
       SELECT ?, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url,
-        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, 1, player_result_reporting_enabled, qr_design, ?, ?
+        latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, player_result_reporting_enabled, qr_design, ?, ?
       FROM tournaments WHERE id = ?`,
     )
     .bind(id, actingUser.id, name, now, now, existing.id)
@@ -5487,7 +5487,7 @@ async function updateTournament(request, env, existing, user) {
       geo.geocodedAt,
       timezone,
       selectedPlace?.id || null,
-      1,
+      tournament.liveViewEnabled ? 1 : 0,
       tournament.playerResultReportingEnabled ? 1 : 0,
       now,
       existing.id,
@@ -6841,7 +6841,7 @@ export async function setTournamentRoundResults(request, db, tournament, roundId
 async function reportLiveMatchResult(request, env, registration, reporterUserId) {
   const db = env.DB;
   const tournament = await getTournamentById(db, registration.tournament_id);
-  if (!tournament || !Number(tournament.player_result_reporting_enabled || 0)) {
+  if (!tournament || !Number(tournament.live_view_enabled || 0) || !Number(tournament.player_result_reporting_enabled || 0)) {
     throw new HttpError(403, 'Die Turnierleitung hat keine Ergebnismeldungen durch Spieler freigegeben');
   }
   if (tournament.status !== 'running') throw new HttpError(409, 'Das Turnier läuft nicht');
@@ -7181,6 +7181,7 @@ function toLiveTournament(tournament) {
     schweizerRankingMode: tournament.schweizer_ranking_mode || 'mit_buchholz',
     desktopExecution: Number(tournament.desktop_execution || 0) === 1,
     documentBound: isDocumentBound(tournament),
+    liveViewEnabled: Number(tournament.live_view_enabled || 0) === 1,
     playerResultReportingEnabled: Number(tournament.player_result_reporting_enabled || 0) === 1,
     // Meldungen aus der Live-Ansicht gehen an das verbundene Dokument und warten dort auf die Turnierleitung.
     resultReportingViaDocument: Boolean(tournament.sync_document_id),
@@ -7251,6 +7252,15 @@ function liveRegistrationLabel(registration) {
 export async function buildLiveResponse(request, db, registration) {
   const tournament = await getTournamentById(db, registration.tournament_id);
   if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+  // Ohne Freischaltung nur Turnier und eigene Anmeldung für den Hinweis, keine Runden/Rangliste berechnen.
+  if (Number(tournament.live_view_enabled || 0) !== 1) {
+    return json({
+      tournament: toLiveTournament(tournament),
+      registration: { id: registration.id, label: liveRegistrationLabel(registration), participation: registration.participation, status: registration.status },
+      dataAsOf: null,
+      live: null,
+    }, 200, { 'Cache-Control': 'private, no-cache' });
+  }
   const snapshot = await getLiveSnapshot(db, tournament, new URL(request.url).origin);
   const personal = {
     id: registration.id,
@@ -7386,6 +7396,8 @@ async function participantAccountUserIds(db, tournamentId, excludedUserId, { inc
 
 // Push-Abo aus der Live-Ansicht, an die Meldung gebunden (auch ohne Login über den persönlichen Link).
 async function saveLivePushSubscription(request, db, registration) {
+  const tournament = await db.prepare('SELECT live_view_enabled FROM tournaments WHERE id = ?').bind(registration.tournament_id).first();
+  if (Number(tournament?.live_view_enabled || 0) !== 1) throw new HttpError(409, 'Die Live-Ansicht wurde für dieses Turnier nicht freigeschaltet');
   const subscription = await readJson(request);
   const endpoint = String(subscription.endpoint || '');
   const p256dh = String(subscription.keys?.p256dh || '');
@@ -7411,6 +7423,7 @@ async function removeLivePushSubscription(request, db, registration) {
  * Fehler dürfen die Rundenerstellung nie scheitern lassen.
  */
 async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
+  if (Number(tournament.live_view_enabled || 0) !== 1) return;
   try {
     const subscriptions = await env.DB.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.language
         FROM live_push_subscriptions s JOIN registrations r ON r.id = s.registration_id
@@ -10968,6 +10981,7 @@ export function toPublicTournament(row, user) {
     registrationEnabled: Boolean(Number(row.registration_enabled ?? 1)),
     approvalRequired: Boolean(Number(row.approval_required || 0)),
     registrationClosed: Boolean(Number(row.registration_closed || 0)),
+    liveViewEnabled: Boolean(Number(row.live_view_enabled || 0)),
     playerResultReportingEnabled: Boolean(Number(row.player_result_reporting_enabled || 0)),
     startsAt: row.date ? tournamentStartUtcIso(row) : null,
     runningResetAt: row.running_reset_at || null,

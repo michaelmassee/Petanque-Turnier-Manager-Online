@@ -3892,6 +3892,36 @@ details[open] > .play-round-summary::before {
   border-color: #1677ff;
 }
 
+/* Live-Ansicht von der Turnierleitung nicht freigeschaltet: auffälliger Hinweis statt leerer Karten. */
+.live-disabled {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 18px;
+  border: 2px solid #e8a33d;
+  border-left-width: 8px;
+  border-radius: 10px;
+  background: #fff6e6;
+  color: #5c3a00;
+}
+
+.live-disabled h3 {
+  margin: 0 0 6px;
+  font-size: 1.2rem;
+  color: #8a4b00;
+}
+
+.live-disabled p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.live-disabled-icon {
+  flex: none;
+  font-size: 2rem;
+  line-height: 1;
+}
+
 .live-paused {
   justify-self: start;
   margin-left: 8px;

@@ -10,8 +10,8 @@ describe('Systemabhängige Live-Rangliste', () => {
     db.sqlite.exec(`
       INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at)
         VALUES ('u1', 'leitung@example.test', 'user', 'salt', 'hash', '2026-10-14', '2026-10-14');
-      INSERT INTO tournaments (id, owner_id, name, date, location, formation, type, registration_type, status, visibility, created_at, updated_at)
-        VALUES ('t1', 'u1', 'Turnier', '2026-10-14', 'Ort', 'tete', 'schweizer', 'forme', 'running', 'public', '2026-10-14', '2026-10-14');
+      INSERT INTO tournaments (id, owner_id, name, date, location, formation, type, registration_type, status, visibility, live_view_enabled, created_at, updated_at)
+        VALUES ('t1', 'u1', 'Turnier', '2026-10-14', 'Ort', 'tete', 'schweizer', 'forme', 'running', 'public', 1, '2026-10-14', '2026-10-14');
       INSERT INTO registrations (id, tournament_id, first_name, last_name, email, status, participation, registered_at, created_at, updated_at)
         VALUES ('p1', 't1', 'Anna', 'Test', 'anna@example.test', 'confirmed', 'active', '2026-10-14', '2026-10-14', '2026-10-14'),
         ('p2', 't1', 'Bert', 'Test', 'bert@example.test', 'confirmed', 'active', '2026-10-14', '2026-10-14', '2026-10-14');

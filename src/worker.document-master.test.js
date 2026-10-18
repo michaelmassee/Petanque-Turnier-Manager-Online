@@ -24,8 +24,8 @@ describe('Verbundenes Turnier: Dokument ist Master', () => {
       VALUES ('owner-session', 'owner', '2099-01-01T00:00:00.000Z', '2026-01-01'),
              ('player-session', 'player', '2099-01-01T00:00:00.000Z', '2026-01-01')`);
     sql(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, registration_type, type, status, visibility,
-      player_result_reporting_enabled, schweizer_ranking_mode, created_at, updated_at)
-      VALUES ('t1', 'owner', 'Turnier', '2099-09-28', 'Ort', 'tete', 'forme', 'schweizer', 'registration', 'public', 1,
+      live_view_enabled, player_result_reporting_enabled, schweizer_ranking_mode, created_at, updated_at)
+      VALUES ('t1', 'owner', 'Turnier', '2099-09-28', 'Ort', 'tete', 'forme', 'schweizer', 'registration', 'public', 1, 1,
         'ohne_buchholz', '2026-01-01', '2026-01-01')`);
     sql(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email, status, participation, registered_at, created_at, updated_at, user_id)
       VALUES ('r1', 't1', 'Anna', 'A', 'anna@example.test', 'confirmed', 'inactive', '2026-01-01', '2026-01-01', '2026-01-01', 'player'),

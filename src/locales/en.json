@@ -1504,5 +1504,10 @@
   "Keine Spieler gefunden.": "No players found.",
   "Bitte die Suche eingrenzen, um weitere Spieler zu finden.": "Please narrow your search to find other players.",
   "Suchergebnisse": "Search results",
-  "E-Mail an die Turnierleitung": "Email the tournament organizers"
+  "E-Mail an die Turnierleitung": "Email the tournament organizers",
+  "Live-Ansicht freischalten": "Enable live view",
+  "Ergebnismeldungen durch Spieler sind nur mit freigeschalteter Live-Ansicht möglich.": "Players can only report results when the live view is enabled.",
+  "Live-Ansicht nicht aktiviert": "Live view not enabled",
+  "Die Turnierleitung hat die Live-Ansicht für dieses Turnier nicht freigeschaltet. Paarungen, Ergebnisse und Rangliste erscheinen hier erst nach der Freischaltung.": "The tournament organizers have not enabled the live view for this tournament. Pairings, results and standings will appear here once it is enabled.",
+  "Die Live-Ansicht wurde für dieses Turnier nicht freigeschaltet": "The live view has not been enabled for this tournament"
 }

@@ -49,6 +49,28 @@ describe('Persönlicher Live-Link (E-21)', () => {
     expect((await antwort.json()).registration).toMatchObject({ id: ONLINE_ID, persons: ['Maria Bieder'] });
   });
 
+  it('meldet ohne Freischaltung nur den Status, ohne Runden, und nimmt kein Push-Abo an', async () => {
+    sql("UPDATE tournaments SET live_view_enabled = 0 WHERE id = 't1'");
+    const antwort = await liveAbrufen(TOKEN);
+    expect(antwort.status).toBe(200);
+    const daten = await antwort.json();
+    expect(daten.tournament).toMatchObject({ id: 't1', name: 'Turnier', liveViewEnabled: false });
+    expect(daten.registration).toMatchObject({ id: ONLINE_ID, label: expect.any(String) });
+    expect(daten.live).toBeNull();
+
+    const abo = await worker.fetch(new Request(`https://ptm.test/api/live/token/${TOKEN}/push`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: 'https://fcm.googleapis.com/x', keys: { p256dh: 'k', auth: 'a' } }),
+    }), env);
+    expect(abo.status).toBe(409);
+    expect(zeile('SELECT COUNT(*) AS anzahl FROM live_push_subscriptions').anzahl).toBe(0);
+
+    sql("UPDATE tournaments SET live_view_enabled = 1 WHERE id = 't1'");
+    const frei = await (await liveAbrufen(TOKEN)).json();
+    expect(frei.tournament.liveViewEnabled).toBe(true);
+    expect(frei.live).not.toBeNull();
+  });
+
   it('gilt nicht für unbekannte, stornierte oder abgelehnte Anmeldungen', async () => {
     expect((await liveAbrufen('b'.repeat(64))).status).toBe(404);
 

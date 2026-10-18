@@ -1504,5 +1504,10 @@
   "Keine Spieler gefunden.": "Aucun joueur trouvé.",
   "Bitte die Suche eingrenzen, um weitere Spieler zu finden.": "Précise la recherche pour trouver d’autres joueurs.",
   "Suchergebnisse": "Résultats de recherche",
-  "E-Mail an die Turnierleitung": "Envoyer un e-mail aux organisateurs du tournoi"
+  "E-Mail an die Turnierleitung": "Envoyer un e-mail aux organisateurs du tournoi",
+  "Live-Ansicht freischalten": "Activer la vue en direct",
+  "Ergebnismeldungen durch Spieler sind nur mit freigeschalteter Live-Ansicht möglich.": "Les joueurs ne peuvent déclarer des résultats que si la vue en direct est activée.",
+  "Live-Ansicht nicht aktiviert": "Vue en direct non activée",
+  "Die Turnierleitung hat die Live-Ansicht für dieses Turnier nicht freigeschaltet. Paarungen, Ergebnisse und Rangliste erscheinen hier erst nach der Freischaltung.": "L'organisation n'a pas activé la vue en direct pour ce tournoi. Les tirages, résultats et le classement apparaîtront ici après l'activation.",
+  "Die Live-Ansicht wurde für dieses Turnier nicht freigeschaltet": "La vue en direct n'a pas été activée pour ce tournoi"
 }

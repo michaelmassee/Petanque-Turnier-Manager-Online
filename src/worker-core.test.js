@@ -48,8 +48,12 @@ describe('Worker-Fachlogik', () => {
     expect(normalizeTournamentInput({ ...base, name: ' Herbst-\n  Turnier\r\nLinden ' }).name).toBe('Herbst- Turnier Linden');
   });
 
-  it('nimmt keine Live-Ansicht-Option mehr entgegen', () => {
-    expect(normalizeTournamentInput({ ...base, liveViewEnabled: true })).not.toHaveProperty('liveViewEnabled');
+  it('schaltet die Live-Ansicht nur ausdrücklich frei und koppelt die Ergebnismeldung daran', () => {
+    expect(normalizeTournamentInput(base)).toMatchObject({ liveViewEnabled: false, playerResultReportingEnabled: false });
+    expect(normalizeTournamentInput({ ...base, liveViewEnabled: true, playerResultReportingEnabled: true }))
+      .toMatchObject({ liveViewEnabled: true, playerResultReportingEnabled: true });
+    // Ohne freigeschaltete Live-Ansicht gibt es keine Ergebnismeldung durch Spieler.
+    expect(normalizeTournamentInput({ ...base, playerResultReportingEnabled: true })).toMatchObject({ playerResultReportingEnabled: false });
   });
 
   it('übernimmt die beim Anlegen aktivierte Anmeldeprüfung', () => {

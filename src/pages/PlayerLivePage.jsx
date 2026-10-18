@@ -407,6 +407,42 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
   if (!data) return <Feedback error={query.error?.message || t('Die Live-Ansicht konnte nicht geladen werden.')} />;
 
   const { tournament, registration, live, dataAsOf } = data;
+  const header = (
+    <header className="live-header">
+      <h2 data-i18n-skip>{tournament.name}</h2>
+      <p className="muted">
+        {formatDate(tournament.date, language)} {formatWeekdayShort(tournament.date, language)}
+        {tournament.location ? <> · <span data-i18n-skip>{tournament.location}</span></> : null}
+      </p>
+      <p className="live-player"><span data-i18n-skip>{registration.label}</span>{registration.participation === 'withdrawn' && <span className="live-paused">{t('Pausiert')}</span>}</p>
+    </header>
+  );
+  const refresh = (
+    <div className="live-refresh">
+      <span className="muted">
+        {t('Stand')}: {formatClock(query.dataUpdatedAt, language)}
+        {dataAsOf && <> · {t('Turnierdaten vom')} {formatClock(dataAsOf, language)}</>}
+      </span>
+      <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>
+    </div>
+  );
+  // Ohne Freischaltung durch die Turnierleitung liefert der Server keine Runden: deutlich sagen, warum hier nichts erscheint.
+  if (!tournament.liveViewEnabled || !live) {
+    return (
+      <div className="live-view">
+        {header}
+        <section className="live-disabled" role="status">
+          <span className="live-disabled-icon" aria-hidden="true">⏸</span>
+          <div>
+            <h3>{t('Live-Ansicht nicht aktiviert')}</h3>
+            <p>{t('Die Turnierleitung hat die Live-Ansicht für dieses Turnier nicht freigeschaltet. Paarungen, Ergebnisse und Rangliste erscheinen hier erst nach der Freischaltung.')}</p>
+          </div>
+        </section>
+        {query.error && <Feedback error={query.error.message} />}
+        {refresh}
+      </div>
+    );
+  }
   const drawn = live.lastRoundNumber !== null;
   // Bei einem Turnier aus dem Turnierdokument nur mit aktueller Bindung: dort bestätigt die Turnierleitung die Meldung.
   const imDokumentGefuehrt = tournament.documentBound || tournament.desktopExecution;
@@ -415,14 +451,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
   const reportPending = registration.resultReport?.status === 'open';
   return (
     <div className="live-view">
-      <header className="live-header">
-        <h2 data-i18n-skip>{tournament.name}</h2>
-        <p className="muted">
-          {formatDate(tournament.date, language)} {formatWeekdayShort(tournament.date, language)}
-          {tournament.location ? <> · <span data-i18n-skip>{tournament.location}</span></> : null}
-        </p>
-        <p className="live-player"><span data-i18n-skip>{registration.label}</span>{registration.participation === 'withdrawn' && <span className="live-paused">{t('Pausiert')}</span>}</p>
-      </header>
+      {header}
       {tournament.status === 'finished' && <p className="hint">{t('Das Turnier ist beendet.')}</p>}
       {tournament.status !== 'running' && tournament.status !== 'finished' && <p className="hint">{t('Das Turnier hat noch nicht begonnen.')}</p>}
       {query.error && <Feedback error={query.error.message} />}
@@ -437,13 +466,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
       <RankingCard live={live} tournament={tournament} />
       <HistoryCard live={live} />
       {tournament.status === 'running' && <LivePushToggle path={path} registrationId={registration.id} />}
-      <div className="live-refresh">
-        <span className="muted">
-          {t('Stand')}: {formatClock(query.dataUpdatedAt, language)}
-          {dataAsOf && <> · {t('Turnierdaten vom')} {formatClock(dataAsOf, language)}</>}
-        </span>
-        <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>
-      </div>
+      {refresh}
     </div>
   );
 }

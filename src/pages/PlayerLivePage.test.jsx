@@ -13,7 +13,7 @@ function jsonResponse(payload, status = 200) {
 
 function livePayload(overrides = {}) {
   return {
-    tournament: { id: 't1', name: 'Sommer-Supermêlée', date: '2026-09-25', location: 'Linden', status: 'running' },
+    tournament: { id: 't1', name: 'Sommer-Supermêlée', date: '2026-09-25', location: 'Linden', status: 'running', liveViewEnabled: true },
     registration: { id: 'r1', label: 'Anna Muster' },
     live: {
       lastRoundNumber: 2,
@@ -107,6 +107,20 @@ describe('Live-Ansicht für Spieler', () => {
     global.fetch = vi.fn((path) => Promise.resolve(jsonResponse(path.endsWith('/push') ? {} : path.endsWith('/public-key') ? { publicKey: 'AQID' } : livePayload())));
     return { requestPermission, pushManager };
   }
+
+  it('zeigt deutlich an, dass die Live-Ansicht nicht aktiviert ist', async () => {
+    const payload = livePayload();
+    payload.tournament.liveViewEnabled = false;
+    payload.live = null;
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(payload));
+    renderDetail();
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('Live-Ansicht nicht aktiviert');
+    expect(status).toHaveTextContent('Die Turnierleitung hat die Live-Ansicht für dieses Turnier nicht freigeschaltet.');
+    expect(screen.getByRole('heading', { name: 'Sommer-Supermêlée' })).toBeInTheDocument();
+    expect(screen.queryByText('Rangliste')).not.toBeInTheDocument();
+  });
 
   it('aktiviert Runden-Push bei vorhandener Browser-Erlaubnis ohne bestehendes Abo automatisch', async () => {
     const { requestPermission, pushManager } = installPushBrowser('granted', false);
