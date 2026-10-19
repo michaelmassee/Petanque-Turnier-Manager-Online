@@ -66,4 +66,33 @@ describe('Cache für GET /api/clubs', () => {
 
     expect(cache.delete).not.toHaveBeenCalled();
   });
+
+  describe('GET /api/places ohne Anmeldung', () => {
+    const plaetze = async (path = '/api/places', headers = {}) => (await (await worker.fetch(new Request(`https://ptm.test${path}`, { headers }), env)).json()).places;
+
+    it('kommt beim zweiten Abruf aus dem Cache', async () => {
+      expect((await plaetze()).map((place) => place.name)).toEqual(['Platz']);
+      sql("UPDATE boule_places SET name = 'Direkt geändert' WHERE id = 'p1'");
+
+      expect((await plaetze()).map((place) => place.name)).toEqual(['Platz']);
+    });
+
+    it('liest Suchanfragen und Angemeldete immer frisch', async () => {
+      await plaetze();
+      sql("UPDATE boule_places SET name = 'Direkt geändert' WHERE id = 'p1'");
+
+      expect((await plaetze('/api/places?q=Direkt')).map((place) => place.name)).toEqual(['Direkt geändert']);
+      expect((await plaetze('/api/places', { Cookie: 'ptm_session=s1' })).map((place) => place.name)).toEqual(['Direkt geändert']);
+    });
+
+    it('verwirft den Eintrag nach einem Like', async () => {
+      expect((await plaetze())[0].likeCount).toBe(0);
+      const response = await worker.fetch(new Request('https://ptm.test/api/places/p1/like', {
+        method: 'POST', headers: { Cookie: 'ptm_session=s1' },
+      }), env);
+      expect(response.ok).toBe(true);
+
+      expect((await plaetze())[0].likeCount).toBe(1);
+    });
+  });
 });

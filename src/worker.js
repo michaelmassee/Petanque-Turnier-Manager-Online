@@ -1860,7 +1860,9 @@ export default {
 
       if (request.method === 'GET' && url.pathname === '/api/places') {
         const session = await optionalSession(request, env.DB);
-        return await listBoulePlaces(env.DB, session?.user || null, url.searchParams.get('q'));
+        const query = String(url.searchParams.get('q') || '').trim();
+        if (!session && !query) return await listBoulePlacesAnonymous(env.DB, url.origin);
+        return await listBoulePlaces(env.DB, session?.user || null, query);
       }
       if (request.method === 'POST' && url.pathname === '/api/places') {
         const session = await requireSession(request, env.DB);
@@ -4369,13 +4371,19 @@ export function sortTournamentRows(rows) {
 const ANONYMOUS_TOURNAMENT_LIST_TTL_SECONDS = 60;
 
 async function listTournamentsAnonymous(db, origin) {
+  return cachedJsonResponse(new Request(`${origin}/__tournament-list/anonymous`), ANONYMOUS_TOURNAMENT_LIST_TTL_SECONDS,
+    () => listTournaments(db, null));
+}
+
+// Liefert eine JSON-Antwort aus dem Cloudflare-Cache (pro Rechenzentrum) oder baut sie mit load() und legt sie ab.
+// Der Body wird ungeparst durchgereicht; der Browser bekommt weiter no-store und sieht eigene Änderungen sofort.
+async function cachedJsonResponse(key, ttlSeconds, load) {
   const cache = edgeCache();
-  const key = new Request(`${origin}/__tournament-list/anonymous`);
   const cached = cache ? await cache.match(key) : null;
-  const body = cached ? cached.body : await (await listTournaments(db, null)).text();
+  const body = cached ? cached.body : await (await load()).text();
   if (!cached && cache) {
     await cache.put(key, new Response(body, {
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${ANONYMOUS_TOURNAMENT_LIST_TTL_SECONDS}` },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${ttlSeconds}` },
     }));
   }
   return new Response(body, {
@@ -9135,9 +9143,11 @@ function toPublicClub(row, user) {
   };
 }
 
-// GET /api/clubs lädt jeder App-Start (Filter, Vereinsvorschläge) und liest dabei alle Vereine und Plätze.
-// Darum kurz im Cloudflare-Cache (pro Rechenzentrum) halten; Schreibzugriffe auf Vereine/Plätze löschen
-// den Eintrag sofort (invalidatePublishedClubs), andere Rechenzentren sehen die Änderung spätestens nach der TTL.
+// GET /api/clubs lädt jeder App-Start (Filter, Vereinsvorschläge) und liest dabei alle Vereine und Plätze;
+// GET /api/places ohne Anmeldung und Suchbegriff (Plätze-Seite) zählt zusätzlich die Likes je Platz.
+// Darum beide kurz im Cloudflare-Cache (pro Rechenzentrum) halten; Schreibzugriffe auf Vereine/Plätze (auch
+// Likes/Favoriten) löschen die Einträge sofort (invalidatePublishedClubs), andere Rechenzentren sehen die Änderung
+// spätestens nach der TTL.
 const PUBLISHED_CLUBS_TTL_SECONDS = 300;
 const PUBLISHED_CLUBS_WRITE_PATH = /^\/api\/(?:admin\/)?(?:clubs|places|place-reports)(?:\/|$)/;
 
@@ -9145,29 +9155,26 @@ function publishedClubsCacheKey(origin) {
   return new Request(`${origin}/__published-clubs`);
 }
 
+function anonymousPlacesCacheKey(origin) {
+  return new Request(`${origin}/__places/anonymous`);
+}
+
 async function invalidatePublishedClubs(origin) {
   try {
-    await edgeCache()?.delete(publishedClubsCacheKey(origin));
+    await Promise.all([publishedClubsCacheKey(origin), anonymousPlacesCacheKey(origin)].map((key) => edgeCache()?.delete(key)));
   } catch (error) {
     console.error('Failed to invalidate published clubs cache', error);
   }
 }
 
 async function listPublishedClubs(db, origin) {
-  const cache = edgeCache();
-  const key = publishedClubsCacheKey(origin);
-  if (cache) {
-    const cached = await cache.match(key);
-    // Neu verpacken, damit der Browser die Cache-TTL nicht übernimmt und eigene Änderungen sofort sieht.
-    if (cached) return json(await cached.json());
-  }
-  const payload = await loadPublishedClubs(db);
-  if (cache) {
-    await cache.put(key, new Response(JSON.stringify(payload), {
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${PUBLISHED_CLUBS_TTL_SECONDS}` },
-    }));
-  }
-  return json(payload);
+  return cachedJsonResponse(publishedClubsCacheKey(origin), PUBLISHED_CLUBS_TTL_SECONDS,
+    async () => json(await loadPublishedClubs(db)));
+}
+
+async function listBoulePlacesAnonymous(db, origin) {
+  return cachedJsonResponse(anonymousPlacesCacheKey(origin), PUBLISHED_CLUBS_TTL_SECONDS,
+    () => listBoulePlaces(db, null, ''));
 }
 
 async function loadPublishedClubs(db) {
