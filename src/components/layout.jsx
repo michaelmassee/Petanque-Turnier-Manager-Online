@@ -15,7 +15,9 @@ import { RichText } from './RichText.jsx';
 import { richTextPlainText } from '../lib/rich-text.js';
 import { AutumnGarland, AutumnPumpkin } from './AutumnDecoration.jsx';
 import { LanguageSelect } from '../auth/AuthForms.jsx';
-import { LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT, REGISTRATION_SLOT_LINKED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT } from '../postbox-core.js';
+import { LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT, REGISTRATION_SLOT_LINKED_EVENT, RENTAL_CANCELLED_EVENT, RENTAL_DECIDED_EVENT, RENTAL_REQUESTED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT } from '../postbox-core.js';
+import { formatRentalSlot } from '../rental-core.js';
+import i18next from '../lib/i18next-config.js';
 
 async function subscribeToPush() {
   const result = await ensureBrowserPushSubscription(async () => (await authenticatedApi('/api/push/public-key')).publicKey);
@@ -227,6 +229,19 @@ function postboxMessageText(message, t) {
   }
   if (message.eventType === 'username_reported') {
     return t('Benutzername @{{username}} wurde gemeldet – bitte in der Benutzerverwaltung prüfen.', { username: data.username || '' });
+  }
+  if (message.eventType === RENTAL_REQUESTED_EVENT || message.eventType === RENTAL_CANCELLED_EVENT) {
+    const values = { title: data.offerTitle || '', name: data.requesterName || '', slot: formatRentalSlot(data, i18next.language), lanes: data.lanes ?? '' };
+    return message.eventType === RENTAL_REQUESTED_EVENT
+      ? t('{{title}}: Reservierungsanfrage von {{name}} für {{slot}} ({{lanes}} Bahn(en))', values)
+      : t('{{title}}: {{name}} hat die Reservierung für {{slot}} storniert', values);
+  }
+  if (message.eventType === RENTAL_DECIDED_EVENT) {
+    const values = { title: data.offerTitle || '', slot: formatRentalSlot(data, i18next.language) };
+    const text = data.status === 'confirmed' ? t('{{title}}: Deine Reservierung für {{slot}} wurde bestätigt', values)
+      : data.status === 'rejected' ? t('{{title}}: Deine Reservierungsanfrage für {{slot}} wurde abgelehnt', values)
+        : t('{{title}}: Deine Reservierung für {{slot}} wurde vom Verein storniert', values);
+    return data.note ? `${text}\n${t('message')}: ${data.note}` : text;
   }
   if (message.eventType === TOURNAMENT_ADMIN_ACTION_EVENT) {
     return t('tournamentAdminActionText', { name: data.tournamentName || '', actor: data.actorName || '', action: t(`adminAction_${data.action}`) });
@@ -465,6 +480,21 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
             <circle cx="12" cy="10" r="2.5" />
           </svg>
           {t('Boule-Plätze / Vereine')}
+        </button>
+        <button
+          className="left-panel-link"
+          type="button"
+          onClick={() => {
+            closeLeftPanel();
+            navigate?.('/platz-mieten');
+          }}
+        >
+          <svg className="left-panel-icon left-panel-icon-rentals" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+            <path d="M7.5 3v4M16.5 3v4M3.5 9h17" />
+            <path d="m9 14.5 2 2 4-4" />
+          </svg>
+          {t('Platz mieten')}
         </button>
         <button
           className="left-panel-link"

@@ -46,3 +46,16 @@ export const LIVE_VIEW_EVENTS = [LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_SLOT_LI
 export function liveViewPathFor(eventData) {
   return eventData?.registrationId ? `/live/${encodeURIComponent(eventData.registrationId)}` : null;
 }
+
+// Platz mieten: neue Anfrage bzw. Storno durch den Mieter (an die Vereinsverwaltung) und Entscheidung des Vereins
+// (an den Mieter, auch Storno durch den Verein).
+export const RENTAL_REQUESTED_EVENT = 'rental_requested';
+export const RENTAL_CANCELLED_EVENT = 'rental_cancelled';
+export const RENTAL_DECIDED_EVENT = 'rental_decided';
+
+// Ziel beim Klick: die Vereinsverwaltung bzw. die eigenen Reservierungen.
+export function rentalPathFor(eventType) {
+  if (eventType === RENTAL_REQUESTED_EVENT || eventType === RENTAL_CANCELLED_EVENT) return '/platz-mieten/verwalten';
+  if (eventType === RENTAL_DECIDED_EVENT) return '/platz-mieten/meine';
+  return null;
+}

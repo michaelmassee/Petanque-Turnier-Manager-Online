@@ -762,6 +762,7 @@ a.left-panel-link {
 .left-panel-icon-tournaments { background: #e7f2ff; color: #0c5ea8; }
 .left-panel-icon-places { background: #e4f7f3; color: #087a72; }
 .left-panel-icon-meetup { background: #f1ecff; color: #6b46c1; }
+.left-panel-icon-rentals { background: #eef7e6; color: #3f7a12; }
 .left-panel-icon-live { background: #fff0f1; color: #c21d32; }
 .left-panel-icon-guide { background: #fff4e5; color: #a85c00; }
 .left-panel-icon-admin { background: #eaf0ff; color: #4056a1; }
@@ -4513,3 +4514,65 @@ details[open] > .play-round-summary::before {
 .registration-section .form-grid > :only-child { grid-column: 1 / -1; }
 .registration-player-matches { max-height: 18rem; }
 .registration-player-matches button { white-space: normal; overflow-wrap: anywhere; }
+
+/* Platz mieten */
+.rental-offer-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+.rental-offer-logo { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: #eef2f7; flex-shrink: 0; }
+.rental-description { white-space: pre-line; }
+.rental-week-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+.rental-week-nav strong { text-align: center; flex: 1 1 auto; }
+.rental-calendar { margin-bottom: 12px; }
+.rental-grid {
+  display: grid;
+  grid-template-columns: 3.4rem repeat(var(--rental-days, 7), minmax(0, 1fr));
+  gap: 3px;
+}
+.rental-grid-corner, .rental-grid-head, .rental-grid-hour { font-size: 0.8rem; color: #4a5568; }
+.rental-grid-head { text-align: center; padding: 4px 2px; font-weight: 600; }
+.rental-grid-head span { display: block; text-transform: capitalize; }
+.rental-grid-hour { display: flex; align-items: center; justify-content: flex-end; padding-right: 4px; }
+.rental-slot {
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0;
+}
+.rental-slot.free { background: #dff5e9; border-color: #a6dcbd; color: #155b33; }
+.rental-slot.partial { background: #fff4d6; border-color: #f0d38a; color: #7a5800; }
+.rental-slot.full { background: #fde2e2; border-color: #f2b3b3; color: #9b1c1c; }
+.rental-slot.past { background: #f1f3f7; color: #9aa3b2; }
+.rental-slot.closed { background: repeating-linear-gradient(45deg, #f6f7fa, #f6f7fa 4px, #eceff4 4px, #eceff4 8px); }
+.rental-slot.selected { background: #087a72; border-color: #065e58; color: #ffffff; font-weight: 700; }
+button.rental-slot:disabled { opacity: 1; }
+button.rental-slot:not(:disabled):hover { outline: 2px solid #087a72; outline-offset: -1px; }
+.rental-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 0.8rem; color: #4a5568; }
+.rental-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.rental-legend i { display: inline-block; width: 14px; height: 14px; min-height: 0; }
+.rental-day-tabs { display: none; }
+.rental-request { margin-top: 12px; padding-top: 12px; border-top: 1px solid #d7deea; }
+.rental-request h3 { margin-top: 0; }
+.rental-status { font-weight: 600; }
+.rental-status-confirmed { color: #155b33; }
+.rental-status-requested { color: #7a5800; }
+.rental-status-rejected, .rental-status-cancelled { color: #9b1c1c; }
+.rental-opening { border: 1px solid #d7deea; border-radius: 8px; padding: 8px 12px 12px; }
+.rental-opening-row { display: grid; grid-template-columns: minmax(5rem, 1fr) 1fr 1fr; gap: 8px; align-items: end; }
+
+@media (max-width: 640px) {
+  .rental-day-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; margin-bottom: 8px; }
+  .rental-day-tab {
+    display: flex; flex-direction: column; align-items: center; padding: 4px 0; border: 1px solid #d7deea; border-radius: 8px;
+    background: #ffffff; color: #172033; font-size: 0.75rem; text-transform: capitalize;
+  }
+  .rental-day-tab.closed { color: #9aa3b2; }
+  .rental-day-tab.active { background: #087a72; border-color: #087a72; color: #ffffff; }
+  .rental-grid { grid-template-columns: 3.4rem minmax(0, 1fr); }
+  .rental-grid-head:not(.active), .rental-grid .rental-slot:not(.active) { display: none; }
+  .rental-grid-corner { display: none; }
+  .rental-grid-head.active { grid-column: 1 / -1; }
+  .rental-slot { min-height: 40px; font-size: 0.9rem; }
+  .rental-offer-row { grid-template-columns: auto 1fr; }
+  .rental-offer-row .row-actions { grid-column: 1 / -1; }
+}

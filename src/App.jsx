@@ -7,8 +7,8 @@ import { api, authenticatedApi, clearOfflineApiCache, setSessionExpiredHandler }
 import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { pruneExpiredFlyerDesigns } from './lib/flyer-background-storage.js';
-import { LIVE_VIEW_EVENTS, liveViewPathFor } from './postbox-core.js';
-import { usePath, matchTournamentRoute, matchLiveRoute } from './lib/routing.js';
+import { LIVE_VIEW_EVENTS, liveViewPathFor, rentalPathFor } from './postbox-core.js';
+import { usePath, matchTournamentRoute, matchLiveRoute, matchRentalRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
 import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm, clubMatchesTournament } from './lib/domain.js';
@@ -43,6 +43,7 @@ const PlaceEditByTokenPage = lazy(() => import('./pages/PlaceEditByTokenPage.jsx
 const ClubModerationPanel = lazy(() => import('./pages/ClubModerationPanel.jsx'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'));
 const PlayerLivePage = lazy(() => import('./pages/PlayerLivePage.jsx'));
+const RentalsPage = lazy(() => import('./pages/RentalsPage.jsx'));
 
 export { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 export { EditDialog, ListToolbar } from './components/ui.jsx';
@@ -73,6 +74,11 @@ function ContextualDrawerContent({ area, currentUser, canManageTournaments, acti
     {(showAllAreas || area === 'bouleplaetze') && <div className="drawer-menu-section" aria-label={t('Boule-Plätze / Vereine')}>
       <button className="drawer-link" type="button" onClick={navigate('/platz-melden')}>{t('Bouleplatz melden')}</button>
       {currentUser && <button className="drawer-link" type="button" onClick={navigate('/vereine')}>{t('Meine Vereine')}</button>}
+    </div>}
+    {(showAllAreas || area === 'platzmieten') && <div className="drawer-menu-section" aria-label={t('Platz mieten')}>
+      <button className="drawer-link" type="button" onClick={navigate('/platz-mieten')}>{t('Angebote ansehen')}</button>
+      {currentUser && <button className="drawer-link" type="button" onClick={navigate('/platz-mieten/meine')}>{t('Meine Reservierungen')}</button>}
+      {currentUser && <button className="drawer-link" type="button" onClick={navigate('/platz-mieten/verwalten')}>{t('Vermietung verwalten')}</button>}
     </div>}
     {(showAllAreas || area === 'spielerboerse') && currentUser && <div className="drawer-menu-section" aria-label={t('Boule-Treff')}>
       <button className="drawer-link" type="button" onClick={navigate('/meine-anzeigen')}>{t('Meine Mitspielgesuche')}</button>
@@ -807,9 +813,10 @@ function AppContent() {
       navigate(`/turniere/${message.eventData.tournamentId}`);
     }
     const livePath = LIVE_VIEW_EVENTS.includes(message.eventType) ? liveViewPathFor(message.eventData) : null;
-    if (livePath) {
+    const targetPath = livePath || rentalPathFor(message.eventType);
+    if (targetPath) {
       setPostboxOpen(false);
-      navigate(livePath);
+      navigate(targetPath);
     }
   }
 
@@ -1485,6 +1492,11 @@ function AppContent() {
 
   if (!needsSetup && currentUser && path === '/vereine') {
     return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><MyClubsPage language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} isAdmin={isAdmin} onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')} onLogout={handleLogout} drawerContent={drawerContent('bouleplaetze')} postboxControl={renderPostboxControl()} /></Suspense>;
+  }
+
+  const rentalRoute = matchRentalRoute(path);
+  if (!needsSetup && rentalRoute) {
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><RentalsPage route={rentalRoute} language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} isAdmin={isAdmin} onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')} onLogout={handleLogout} onLogin={loginFromDrawer} drawerContent={drawerContent('platzmieten')} postboxControl={renderPostboxControl()} /></Suspense>;
   }
 
   const liveRoute = matchLiveRoute(path);

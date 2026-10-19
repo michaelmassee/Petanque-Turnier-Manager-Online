@@ -58,3 +58,13 @@ export function matchLiveRoute(path) {
   if (segments.length === 3 && segments[1] === 't') return { token: decodeURIComponent(segments[2]) };
   return null;
 }
+
+// Bereich „Platz mieten“: Angebotsliste, eigene Reservierungen, Vereinsverwaltung und einzelnes Angebot.
+export function matchRentalRoute(path) {
+  const segments = path.split('/').filter(Boolean);
+  if (segments[0] !== 'platz-mieten' || segments.length > 2) return null;
+  if (segments.length === 1) return { view: 'list' };
+  if (segments[1] === 'meine') return { view: 'mine' };
+  if (segments[1] === 'verwalten') return { view: 'manage' };
+  return { view: 'offer', id: decodeURIComponent(segments[1]) };
+}

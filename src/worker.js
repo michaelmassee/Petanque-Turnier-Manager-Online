@@ -6,8 +6,13 @@ export { RegistrationOpeningScheduler } from './registration-opening.js';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
 import {
   isAllowedPushEndpoint, LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT,
-  REGISTRATION_SLOT_LINKED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT, unreadPostboxCount,
+  REGISTRATION_SLOT_LINKED_EVENT, RENTAL_CANCELLED_EVENT, RENTAL_DECIDED_EVENT, RENTAL_REQUESTED_EVENT,
+  TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT, unreadPostboxCount,
 } from './postbox-core.js';
+import {
+  addDays, buildAvailability, formatRentalSlot, isValidLocalDate, normalizeOfferInput, RENTAL_AVAILABILITY_DAYS,
+  validateReservationRequest,
+} from './rental-core.js';
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
 import {
@@ -584,6 +589,50 @@ const TOURNAMENT_RANKING_EMAILS = {
   },
 };
 
+// Platz mieten: Anfrage/Storno an den Verein, Entscheidung an den Mieter. Notizen gehen als messageBox mit.
+export const RENTAL_EMAILS = {
+  de: {
+    requestedSubject: (title) => `Reservierungsanfrage: ${title}`,
+    requested: ({ title, who, slot, lanes }) => `Hallo,\n\n${who} möchte „${title}“ reservieren: ${slot}, ${lanes} Bahn(en). Bitte bestätige oder lehne die Anfrage ab.`,
+    cancelledSubject: (title) => `Reservierung storniert: ${title}`,
+    cancelled: ({ title, who, slot, lanes }) => `Hallo,\n\n${who} hat die Reservierung für „${title}“ storniert: ${slot}, ${lanes} Bahn(en).`,
+    decidedSubject: (title, status) => `${({ confirmed: 'Reservierung bestätigt', rejected: 'Reservierung abgelehnt', cancelled: 'Reservierung storniert' })[status]}: ${title}`,
+    decided: ({ firstName, title, slot, lanes, status, club }) => `Hallo ${firstName},\n\n${({ confirmed: `${club} hat deine Reservierung für „${title}“ bestätigt`, rejected: `${club} hat deine Reservierungsanfrage für „${title}“ abgelehnt`, cancelled: `${club} hat deine Reservierung für „${title}“ storniert` })[status]}: ${slot}, ${lanes} Bahn(en).`,
+  },
+  nl: {
+    requestedSubject: (title) => `Reserveringsaanvraag: ${title}`,
+    requested: ({ title, who, slot, lanes }) => `Hallo,\n\n${who} wil „${title}” reserveren: ${slot}, ${lanes} baan/banen. Bevestig of weiger de aanvraag.`,
+    cancelledSubject: (title) => `Reservering geannuleerd: ${title}`,
+    cancelled: ({ title, who, slot, lanes }) => `Hallo,\n\n${who} heeft de reservering voor „${title}” geannuleerd: ${slot}, ${lanes} baan/banen.`,
+    decidedSubject: (title, status) => `${({ confirmed: 'Reservering bevestigd', rejected: 'Reservering afgewezen', cancelled: 'Reservering geannuleerd' })[status]}: ${title}`,
+    decided: ({ firstName, title, slot, lanes, status, club }) => `Hallo ${firstName},\n\n${({ confirmed: `${club} heeft je reservering voor „${title}” bevestigd`, rejected: `${club} heeft je reserveringsaanvraag voor „${title}” afgewezen`, cancelled: `${club} heeft je reservering voor „${title}” geannuleerd` })[status]}: ${slot}, ${lanes} baan/banen.`,
+  },
+  en: {
+    requestedSubject: (title) => `Reservation request: ${title}`,
+    requested: ({ title, who, slot, lanes }) => `Hello,\n\n${who} would like to reserve "${title}": ${slot}, ${lanes} lane(s). Please confirm or decline the request.`,
+    cancelledSubject: (title) => `Reservation cancelled: ${title}`,
+    cancelled: ({ title, who, slot, lanes }) => `Hello,\n\n${who} cancelled the reservation for "${title}": ${slot}, ${lanes} lane(s).`,
+    decidedSubject: (title, status) => `${({ confirmed: 'Reservation confirmed', rejected: 'Reservation declined', cancelled: 'Reservation cancelled' })[status]}: ${title}`,
+    decided: ({ firstName, title, slot, lanes, status, club }) => `Hi ${firstName},\n\n${({ confirmed: `${club} confirmed your reservation for "${title}"`, rejected: `${club} declined your reservation request for "${title}"`, cancelled: `${club} cancelled your reservation for "${title}"` })[status]}: ${slot}, ${lanes} lane(s).`,
+  },
+  es: {
+    requestedSubject: (title) => `Solicitud de reserva: ${title}`,
+    requested: ({ title, who, slot, lanes }) => `Hola:\n\n${who} quiere reservar «${title}»: ${slot}, ${lanes} pista(s). Confirma o rechaza la solicitud.`,
+    cancelledSubject: (title) => `Reserva cancelada: ${title}`,
+    cancelled: ({ title, who, slot, lanes }) => `Hola:\n\n${who} canceló la reserva de «${title}»: ${slot}, ${lanes} pista(s).`,
+    decidedSubject: (title, status) => `${({ confirmed: 'Reserva confirmada', rejected: 'Reserva rechazada', cancelled: 'Reserva cancelada' })[status]}: ${title}`,
+    decided: ({ firstName, title, slot, lanes, status, club }) => `Hola ${firstName}:\n\n${({ confirmed: `${club} confirmó tu reserva de «${title}»`, rejected: `${club} rechazó tu solicitud de reserva de «${title}»`, cancelled: `${club} canceló tu reserva de «${title}»` })[status]}: ${slot}, ${lanes} pista(s).`,
+  },
+  fr: {
+    requestedSubject: (title) => `Demande de réservation : ${title}`,
+    requested: ({ title, who, slot, lanes }) => `Bonjour,\n\n${who} souhaite réserver « ${title} » : ${slot}, ${lanes} piste(s). Merci de confirmer ou de refuser la demande.`,
+    cancelledSubject: (title) => `Réservation annulée : ${title}`,
+    cancelled: ({ title, who, slot, lanes }) => `Bonjour,\n\n${who} a annulé la réservation de « ${title} » : ${slot}, ${lanes} piste(s).`,
+    decidedSubject: (title, status) => `${({ confirmed: 'Réservation confirmée', rejected: 'Réservation refusée', cancelled: 'Réservation annulée' })[status]} : ${title}`,
+    decided: ({ firstName, title, slot, lanes, status, club }) => `Bonjour ${firstName},\n\n${({ confirmed: `${club} a confirmé votre réservation de « ${title} »`, rejected: `${club} a refusé votre demande de réservation de « ${title} »`, cancelled: `${club} a annulé votre réservation de « ${title} »` })[status]} : ${slot}, ${lanes} piste(s).`,
+  },
+};
+
 // "Nachricht an Team": Turnierleitung schreibt den Personen einer einzelnen Anmeldung.
 const TEAM_MESSAGE_EMAILS = {
   de: {
@@ -641,6 +690,9 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     adminAction: (name, action) => `${name}: ${({ binding_takeover: 'Dokumentbindung übernommen', binding_release: 'Dokumentbindung gelöst', running_reset: 'Turnierstart zurückgesetzt', tournament_deleted: 'Turnier gelöscht' })[action] || action}`,
     usernameChangedByAdmin: (username) => `Ein Admin hat deinen Benutzernamen in @${username} geändert.`,
     usernameReported: (username) => `Benutzername @${username} wurde gemeldet`,
+    rentalRequested: (title, who, slot) => `${title}: Neue Reservierungsanfrage von ${who} für ${slot}`,
+    rentalCancelled: (title, who, slot) => `${title}: ${who} hat die Reservierung für ${slot} storniert`,
+    rentalDecided: (title, slot, status) => `${title}: Deine Reservierung für ${slot} wurde ${({ confirmed: 'bestätigt', rejected: 'abgelehnt', cancelled: 'vom Verein storniert' })[status] || status}`,
   },
   nl: {
     tournamentStatus: { draft: 'Concept', registration: 'Inschrijving open', running: 'Bezig', finished: 'Afgerond' },
@@ -660,6 +712,9 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     adminAction: (name, action) => `${name}: ${({ binding_takeover: 'documentkoppeling overgenomen', binding_release: 'documentkoppeling verbroken', running_reset: 'toernooistart teruggezet', tournament_deleted: 'toernooi verwijderd' })[action] || action}`,
     usernameChangedByAdmin: (username) => `Een beheerder heeft je gebruikersnaam gewijzigd in @${username}.`,
     usernameReported: (username) => `Gebruikersnaam @${username} is gemeld`,
+    rentalRequested: (title, who, slot) => `${title}: nieuwe reserveringsaanvraag van ${who} voor ${slot}`,
+    rentalCancelled: (title, who, slot) => `${title}: ${who} heeft de reservering voor ${slot} geannuleerd`,
+    rentalDecided: (title, slot, status) => `${title}: je reservering voor ${slot} is ${({ confirmed: 'bevestigd', rejected: 'afgewezen', cancelled: 'door de club geannuleerd' })[status] || status}`,
   },
   en: {
     tournamentStatus: { draft: 'Draft', registration: 'Registration open', running: 'Running', finished: 'Finished' },
@@ -679,6 +734,9 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     adminAction: (name, action) => `${name}: ${({ binding_takeover: 'document binding taken over', binding_release: 'document binding released', running_reset: 'tournament start reset', tournament_deleted: 'tournament deleted' })[action] || action}`,
     usernameChangedByAdmin: (username) => `An admin changed your username to @${username}.`,
     usernameReported: (username) => `Username @${username} was reported`,
+    rentalRequested: (title, who, slot) => `${title}: new reservation request from ${who} for ${slot}`,
+    rentalCancelled: (title, who, slot) => `${title}: ${who} cancelled the reservation for ${slot}`,
+    rentalDecided: (title, slot, status) => `${title}: your reservation for ${slot} was ${({ confirmed: 'confirmed', rejected: 'declined', cancelled: 'cancelled by the club' })[status] || status}`,
   },
   es: {
     tournamentStatus: { draft: 'Borrador', registration: 'Inscripción abierta', running: 'En curso', finished: 'Finalizado' },
@@ -698,6 +756,9 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     adminAction: (name, action) => `${name}: ${({ binding_takeover: 'vinculación del documento asumida', binding_release: 'vinculación del documento eliminada', running_reset: 'inicio del torneo revertido', tournament_deleted: 'torneo eliminado' })[action] || action}`,
     usernameChangedByAdmin: (username) => `Un administrador ha cambiado tu nombre de usuario a @${username}.`,
     usernameReported: (username) => `Se ha denunciado el nombre de usuario @${username}`,
+    rentalRequested: (title, who, slot) => `${title}: nueva solicitud de reserva de ${who} para ${slot}`,
+    rentalCancelled: (title, who, slot) => `${title}: ${who} canceló la reserva para ${slot}`,
+    rentalDecided: (title, slot, status) => `${title}: tu reserva para ${slot} ha sido ${({ confirmed: 'confirmada', rejected: 'rechazada', cancelled: 'cancelada por el club' })[status] || status}`,
   },
   fr: {
     tournamentStatus: { draft: 'Brouillon', registration: 'Inscriptions ouvertes', running: 'En cours', finished: 'Terminé' },
@@ -717,6 +778,9 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     adminAction: (name, action) => `${name} : ${({ binding_takeover: 'liaison du document reprise', binding_release: 'liaison du document supprimée', running_reset: 'démarrage du tournoi annulé', tournament_deleted: 'tournoi supprimé' })[action] || action}`,
     usernameChangedByAdmin: (username) => `Un administrateur a changé ton nom d’utilisateur en @${username}.`,
     usernameReported: (username) => `Le nom d’utilisateur @${username} a été signalé`,
+    rentalRequested: (title, who, slot) => `${title} : nouvelle demande de réservation de ${who} pour ${slot}`,
+    rentalCancelled: (title, who, slot) => `${title} : ${who} a annulé la réservation pour ${slot}`,
+    rentalDecided: (title, slot, status) => `${title} : votre réservation pour ${slot} a été ${({ confirmed: 'confirmée', rejected: 'refusée', cancelled: 'annulée par le club' })[status] || status}`,
   },
 };
 
@@ -753,6 +817,9 @@ function buildSystemNotificationPushBody(eventType, eventData, language) {
   if (eventType === TOURNAMENT_ADMIN_ACTION_EVENT) return texts.adminAction(data.tournamentName || '', data.action);
   if (eventType === 'username_changed_by_admin') return texts.usernameChangedByAdmin(data.newUsername || '');
   if (eventType === 'username_reported') return texts.usernameReported(data.username || '');
+  if (eventType === RENTAL_REQUESTED_EVENT) return texts.rentalRequested(data.offerTitle || '', data.requesterName || '', formatRentalSlot(data, language));
+  if (eventType === RENTAL_CANCELLED_EVENT) return texts.rentalCancelled(data.offerTitle || '', data.requesterName || '', formatRentalSlot(data, language));
+  if (eventType === RENTAL_DECIDED_EVENT) return texts.rentalDecided(data.offerTitle || '', formatRentalSlot(data, language), data.status);
   return null;
 }
 
@@ -781,14 +848,14 @@ const EMAIL_LAYOUT_LABELS = {
 };
 
 const EMAIL_ACTION_LABELS = {
-  de: { tournament: 'Turnier ansehen', ranking: 'Rangliste ansehen', directions: 'Anfahrt planen', live: 'Live-Ansicht öffnen', cancel: 'Anmeldung stornieren', whatsapp: 'WhatsApp-Gruppe öffnen', confirm: 'Bestätigen', edit: 'Bouleplatz bearbeiten', reset: 'Passwort zurücksetzen', contact: 'Nachricht an Turnierleitung' },
-  nl: { tournament: 'Toernooi bekijken', ranking: 'Rangschikking bekijken', directions: 'Route plannen', live: 'Liveweergave openen', cancel: 'Inschrijving afmelden', whatsapp: 'WhatsApp-groep openen', confirm: 'Bevestigen', edit: 'Baan bewerken', reset: 'Wachtwoord opnieuw instellen', contact: 'Bericht aan de toernooiorganisatie' },
-  en: { tournament: 'View tournament', ranking: 'View standings', directions: 'Plan directions', live: 'Open live view', cancel: 'Withdraw registration', whatsapp: 'Open WhatsApp group', confirm: 'Confirm', edit: 'Edit boules court', reset: 'Reset password', contact: 'Message the tournament organizers' },
-  es: { tournament: 'Ver torneo', ranking: 'Ver clasificación', directions: 'Planificar ruta', live: 'Abrir vista en directo', cancel: 'Cancelar inscripción', whatsapp: 'Abrir grupo de WhatsApp', confirm: 'Confirmar', edit: 'Editar pista', reset: 'Restablecer contraseña', contact: 'Mensaje a la organización del torneo' },
-  fr: { tournament: 'Voir le tournoi', ranking: 'Voir le classement', directions: 'Préparer l’itinéraire', live: 'Ouvrir la vue en direct', cancel: 'Annuler l’inscription', whatsapp: 'Ouvrir le groupe WhatsApp', confirm: 'Confirmer', edit: 'Modifier le terrain', reset: 'Réinitialiser le mot de passe', contact: 'Contacter l’organisation du tournoi' },
+  de: { tournament: 'Turnier ansehen', ranking: 'Rangliste ansehen', directions: 'Anfahrt planen', live: 'Live-Ansicht öffnen', cancel: 'Anmeldung stornieren', whatsapp: 'WhatsApp-Gruppe öffnen', confirm: 'Bestätigen', edit: 'Bouleplatz bearbeiten', reset: 'Passwort zurücksetzen', contact: 'Nachricht an Turnierleitung', rentals: 'Meine Reservierungen', rentalRequests: 'Anfragen verwalten' },
+  nl: { tournament: 'Toernooi bekijken', ranking: 'Rangschikking bekijken', directions: 'Route plannen', live: 'Liveweergave openen', cancel: 'Inschrijving afmelden', whatsapp: 'WhatsApp-groep openen', confirm: 'Bevestigen', edit: 'Baan bewerken', reset: 'Wachtwoord opnieuw instellen', contact: 'Bericht aan de toernooiorganisatie', rentals: 'Mijn reserveringen', rentalRequests: 'Aanvragen beheren' },
+  en: { tournament: 'View tournament', ranking: 'View standings', directions: 'Plan directions', live: 'Open live view', cancel: 'Withdraw registration', whatsapp: 'Open WhatsApp group', confirm: 'Confirm', edit: 'Edit boules court', reset: 'Reset password', contact: 'Message the tournament organizers', rentals: 'My reservations', rentalRequests: 'Manage requests' },
+  es: { tournament: 'Ver torneo', ranking: 'Ver clasificación', directions: 'Planificar ruta', live: 'Abrir vista en directo', cancel: 'Cancelar inscripción', whatsapp: 'Abrir grupo de WhatsApp', confirm: 'Confirmar', edit: 'Editar pista', reset: 'Restablecer contraseña', contact: 'Mensaje a la organización del torneo', rentals: 'Mis reservas', rentalRequests: 'Gestionar solicitudes' },
+  fr: { tournament: 'Voir le tournoi', ranking: 'Voir le classement', directions: 'Préparer l’itinéraire', live: 'Ouvrir la vue en direct', cancel: 'Annuler l’inscription', whatsapp: 'Ouvrir le groupe WhatsApp', confirm: 'Confirmer', edit: 'Modifier le terrain', reset: 'Réinitialiser le mot de passe', contact: 'Contacter l’organisation du tournoi', rentals: 'Mes réservations', rentalRequests: 'Gérer les demandes' },
 };
 
-const EMAIL_ACTION_ICONS = { tournament: '▣', ranking: '≡', directions: '⌖', live: '▶', cancel: '×', whatsapp: '◉', confirm: '✓', edit: '✎', reset: '↻', contact: '✉', desktop: '↗', legal: '§', privacy: '◌' };
+const EMAIL_ACTION_ICONS = { tournament: '▣', ranking: '≡', directions: '⌖', live: '▶', cancel: '×', whatsapp: '◉', confirm: '✓', edit: '✎', reset: '↻', contact: '✉', rentals: '◷', rentalRequests: '☰', desktop: '↗', legal: '§', privacy: '◌' };
 
 export function emailAction(kind, url, language, tone = null) {
   if (!url) return null;
@@ -1986,6 +2053,55 @@ export default {
         const session = await requireSession(request, env.DB);
         return await toggleBoulePlaceFavorite(env.DB, placeFavoriteMatch[1], session.user.id);
       }
+      if (request.method === 'GET' && url.pathname === '/api/rentals') {
+        return await listRentalOffers(env.DB, url.origin);
+      }
+      if (request.method === 'GET' && url.pathname === '/api/rentals/reservations/mine') {
+        const session = await requireSession(request, env.DB);
+        return await listMyRentalReservations(env.DB, session.user);
+      }
+      if (request.method === 'GET' && url.pathname === '/api/rentals/manage') {
+        const session = await requireSession(request, env.DB);
+        return await listRentalManagement(env.DB, String(url.searchParams.get('club') || ''), session.user);
+      }
+      if (request.method === 'POST' && url.pathname === '/api/rentals/offers') {
+        const session = await requireSession(request, env.DB);
+        return await createRentalOffer(request, env.DB, session.user);
+      }
+      const rentalOfferWriteMatch = url.pathname.match(/^\/api\/rentals\/offers\/([^/]+)$/);
+      if (rentalOfferWriteMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        return await updateRentalOffer(request, env.DB, rentalOfferWriteMatch[1], session.user);
+      }
+      if (rentalOfferWriteMatch && request.method === 'DELETE') {
+        const session = await requireSession(request, env.DB);
+        return await deleteRentalOffer(env.DB, rentalOfferWriteMatch[1], session.user);
+      }
+      const rentalCancelMatch = url.pathname.match(/^\/api\/rentals\/reservations\/([^/]+)\/cancel$/);
+      if (rentalCancelMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        return await cancelRentalReservation(env, rentalCancelMatch[1], session.user, url.origin);
+      }
+      const rentalDecisionMatch = url.pathname.match(/^\/api\/rentals\/reservations\/([^/]+)\/decision$/);
+      if (rentalDecisionMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        return await decideRentalReservation(request, env, rentalDecisionMatch[1], session.user, url.origin);
+      }
+      const rentalOfferMatch = url.pathname.match(/^\/api\/rentals\/([^/]+)$/);
+      if (rentalOfferMatch && request.method === 'GET') {
+        const session = await optionalSession(request, env.DB);
+        return await getRentalOffer(env.DB, rentalOfferMatch[1], session?.user || null);
+      }
+      const rentalAvailabilityMatch = url.pathname.match(/^\/api\/rentals\/([^/]+)\/availability$/);
+      if (rentalAvailabilityMatch && request.method === 'GET') {
+        const session = await optionalSession(request, env.DB);
+        return await getRentalAvailability(env.DB, rentalAvailabilityMatch[1], url.searchParams.get('from'), session?.user || null);
+      }
+      const rentalReserveMatch = url.pathname.match(/^\/api\/rentals\/([^/]+)\/reservations$/);
+      if (rentalReserveMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        return await createRentalReservation(request, env, rentalReserveMatch[1], session.user, url.origin);
+      }
       if (request.method === 'GET' && url.pathname === '/api/player-listings') {
         const session = await optionalSession(request, env.DB);
         return await listPlayerListings(env.DB, session?.user || null, url.searchParams);
@@ -2826,6 +2942,9 @@ export default {
     }
     if (request.method !== 'GET' && response.ok && PUBLISHED_CLUBS_WRITE_PATH.test(url.pathname)) {
       await invalidatePublishedClubs(url.origin);
+    }
+    if (request.method !== 'GET' && response.ok && RENTAL_OFFERS_WRITE_PATH.test(url.pathname)) {
+      await invalidateRentalOffers(url.origin);
     }
     return withRefreshedSessionCookie(request, response, url);
   },
@@ -9295,7 +9414,8 @@ function anonymousPlacesCacheKey(origin) {
 
 async function invalidatePublishedClubs(origin) {
   try {
-    await Promise.all([publishedClubsCacheKey(origin), anonymousPlacesCacheKey(origin)].map((key) => edgeCache()?.delete(key)));
+    // Die Angebotsliste zeigt Vereins- und Platznamen und blendet nicht freigegebene aus.
+    await Promise.all([publishedClubsCacheKey(origin), anonymousPlacesCacheKey(origin), rentalOffersCacheKey(origin)].map((key) => edgeCache()?.delete(key)));
   } catch (error) {
     console.error('Failed to invalidate published clubs cache', error);
   }
@@ -9393,6 +9513,391 @@ async function assertClubEditor(db, clubId, user) {
   if (!club) throw new HttpError(404, 'Verein nicht gefunden');
   if (!clubCanEdit(club, user)) throw new HttpError(403, 'Keine Bearbeitungsrechte für diesen Verein');
   return club;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Platz mieten: Vereine bieten Hallen/Plätze stundenweise an, angemeldete Benutzer fragen an, der Verein entscheidet.
+// Eigener Präfix /api/rentals, damit Buchungen nicht den Vereins-/Platz-Cache (PUBLISHED_CLUBS_WRITE_PATH) leeren.
+// Die öffentliche Angebotsliste liegt wie die Vereine 300 s im Edge-Cache; Angebotsänderungen löschen ihn.
+const RENTAL_OFFERS_WRITE_PATH = /^\/api\/rentals\/offers(?:\/|$)/;
+// Schutz vor Spam an den Verein: offene, künftige Anfragen je Benutzer und Angebot.
+const RENTAL_MAX_OPEN_REQUESTS = 5;
+
+function rentalOffersCacheKey(origin) {
+  return new Request(`${origin}/__rentals`);
+}
+
+async function invalidateRentalOffers(origin) {
+  try {
+    await edgeCache()?.delete(rentalOffersCacheKey(origin));
+  } catch (error) {
+    console.error('Failed to invalidate rental offers cache', error);
+  }
+}
+
+// Aktuelle Ortszeit des Platzes als { date, hour }; MEZ-Zonen ohne Intl (siehe EU_CENTRAL_TIME_ZONES).
+function rentalLocalNow(timeZone, now = Date.now()) {
+  if (EU_CENTRAL_TIME_ZONES.has(timeZone)) {
+    const local = new Date(now + euCentralOffsetMinutes(now) * 60000).toISOString();
+    return { date: local.slice(0, 10), hour: Number(local.slice(11, 13)) };
+  }
+  const local = localDateTimeParts(new Date(now), timeZone);
+  return { date: local.slice(0, 10), hour: Number(local.slice(11, 13)) };
+}
+
+function rentalHourUtc(date, hour, timeZone) {
+  return hour >= 24
+    ? zonedDateTimeToUtcIso(`${addDays(date, 1)}T00:00`, timeZone)
+    : zonedDateTimeToUtcIso(`${date}T${String(hour).padStart(2, '0')}:00`, timeZone);
+}
+
+function rentalPersonName(row, prefix = '') {
+  const name = `${row[`${prefix}first_name`] || ''} ${row[`${prefix}last_name`] || ''}`.trim();
+  return name || (row[`${prefix}username`] ? `@${row[`${prefix}username`]}` : '');
+}
+
+const RENTAL_OFFER_SELECT = `SELECT o.*, p.name AS place_name, p.address AS place_address, p.venue_type, p.latitude, p.longitude,
+    p.status AS place_status, c.name AS club_name, c.logo_url AS club_logo_url, c.status AS club_status
+  FROM rental_offers o JOIN boule_places p ON p.id = o.boule_place_id JOIN clubs c ON c.id = o.club_id`;
+
+function rentalOfferIsPublic(row) {
+  return row.status === 'active' && row.club_status === 'published' && row.place_status === 'published';
+}
+
+function toRentalOffer(row, openingHours = null) {
+  return {
+    id: row.id, clubId: row.club_id, clubName: row.club_name, hasClubLogo: Boolean(row.club_logo_url), placeId: row.boule_place_id,
+    placeName: row.place_name, address: formatLocationAddress(row.place_address), venueType: row.venue_type || 'outdoor',
+    latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
+    longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
+    title: row.title, description: row.description || null, laneCount: Number(row.lane_count),
+    priceMinor: row.price_minor === null ? null : Number(row.price_minor), currency: row.currency, priceNote: row.price_note || null,
+    minHours: Number(row.min_hours), maxHours: Number(row.max_hours), bookingHorizonDays: Number(row.booking_horizon_days),
+    timezone: row.timezone, status: row.status,
+    ...(openingHours ? { openingHours } : {}),
+  };
+}
+
+function toOpeningHours(rows) {
+  return rows.map((row) => ({ weekday: Number(row.weekday), openHour: Number(row.open_hour), closeHour: Number(row.close_hour) }));
+}
+
+function toRentalReservation(row, { withRenter = false } = {}) {
+  return {
+    id: row.id, offerId: row.offer_id, date: row.local_date, startHour: Number(row.start_hour), hours: Number(row.hours),
+    lanes: Number(row.lanes), startUtc: row.start_utc, endUtc: row.end_utc, status: row.status, note: row.note || null,
+    decisionNote: row.decision_note || null, decidedAt: row.decided_at || null, createdAt: row.created_at,
+    ...(row.offer_title ? { offerTitle: row.offer_title, placeName: row.place_name, clubName: row.club_name, timezone: row.timezone } : {}),
+    ...(withRenter ? { renterName: rentalPersonName(row, 'renter_'), renterEmail: row.renter_email || null, renterPhone: row.renter_phone || null } : {}),
+  };
+}
+
+async function loadRentalOffer(db, id) {
+  const row = await db.prepare(`${RENTAL_OFFER_SELECT} WHERE o.id = ?`).bind(id).first();
+  if (!row) throw new HttpError(404, 'Angebot nicht gefunden');
+  return row;
+}
+
+async function loadOpeningHours(db, offerId) {
+  const rows = await db.prepare('SELECT weekday, open_hour, close_hour FROM rental_opening_hours WHERE offer_id = ? ORDER BY weekday').bind(offerId).all();
+  return toOpeningHours(rows.results || []);
+}
+
+async function canManageRentalClub(db, clubId, user) {
+  if (!user) return false;
+  try {
+    await assertClubEditor(db, clubId, user);
+    return true;
+  } catch (error) {
+    if (error instanceof HttpError) return false;
+    throw error;
+  }
+}
+
+async function listRentalOffers(db, origin) {
+  return cachedJsonResponse(rentalOffersCacheKey(origin), PUBLISHED_CLUBS_TTL_SECONDS, async () => {
+    const rows = await db.prepare(`${RENTAL_OFFER_SELECT}
+      WHERE o.status = 'active' AND c.status = 'published' AND p.status = 'published'
+      ORDER BY c.name COLLATE NOCASE, o.title COLLATE NOCASE`).all();
+    return json({ offers: (rows.results || []).map((row) => toRentalOffer(row)) });
+  });
+}
+
+async function getRentalOffer(db, id, user) {
+  const row = await loadRentalOffer(db, id);
+  const canManage = await canManageRentalClub(db, row.club_id, user);
+  if (!rentalOfferIsPublic(row) && !canManage) throw new HttpError(404, 'Angebot nicht gefunden');
+  return json({ offer: { ...toRentalOffer(row, await loadOpeningHours(db, id)), canManage } });
+}
+
+async function activeRentalReservations(db, offerId, from, to) {
+  const rows = await db.prepare(`SELECT local_date, start_hour, hours, lanes FROM rental_reservations
+    WHERE offer_id = ? AND local_date BETWEEN ? AND ? AND status IN ('requested', 'confirmed')`).bind(offerId, from, to).all();
+  return (rows.results || []).map((row) => ({ localDate: row.local_date, startHour: Number(row.start_hour), hours: Number(row.hours), lanes: Number(row.lanes) }));
+}
+
+async function getRentalAvailability(db, id, fromParam, user) {
+  const row = await loadRentalOffer(db, id);
+  if (!rentalOfferIsPublic(row) && !(await canManageRentalClub(db, row.club_id, user))) throw new HttpError(404, 'Angebot nicht gefunden');
+  const offer = toRentalOffer(row);
+  const now = rentalLocalNow(offer.timezone);
+  const from = fromParam && isValidLocalDate(fromParam) ? fromParam : now.date;
+  const to = addDays(from, RENTAL_AVAILABILITY_DAYS - 1);
+  const [openingHours, reservations] = await Promise.all([loadOpeningHours(db, id), activeRentalReservations(db, id, from, to)]);
+  return json({ from, today: now.date, days: buildAvailability({ offer, openingHours, from, reservations, now }) });
+}
+
+async function rentalClubManagers(db, clubId) {
+  const rows = await db.prepare(`SELECT u.id, u.email, u.first_name, u.language FROM users u
+    WHERE u.id = (SELECT owner_id FROM clubs WHERE id = ?1) OR u.id IN (SELECT user_id FROM club_editors WHERE club_id = ?1)`).bind(clubId).all();
+  return rows.results || [];
+}
+
+// Postfach + Push an alle Verwalter des Vereins und eine Mail an den Owner (Vereinskontakt).
+// Über die Mail-Queue, damit die Anfrage nicht auf den Mailserver wartet; ohne Queue (Tests) direkt.
+async function deliverRentalEmail(env, payload) {
+  if (env.MAIL_QUEUE) await enqueueTransactionalEmail(env, payload);
+  else await sendTransactionalEmail(env, payload);
+}
+
+async function notifyRentalClub(env, { offer, reservation, renter, eventType, origin }) {
+  const eventData = {
+    offerId: offer.id, offerTitle: offer.title, reservationId: reservation.id, clubId: offer.club_id,
+    date: reservation.local_date, startHour: Number(reservation.start_hour), hours: Number(reservation.hours), lanes: Number(reservation.lanes),
+    requesterName: rentalPersonName(renter),
+  };
+  const managers = await rentalClubManagers(env.DB, offer.club_id);
+  for (const manager of managers) {
+    if (manager.id === renter.id) continue;
+    try {
+      await createPostboxMessage(env, { recipientId: manager.id, kind: 'system', eventType, eventData, pushTitle: 'Neue Statusmeldung', pushActor: offer.title });
+    } catch (error) {
+      console.error('Rental postbox message failed', error);
+    }
+  }
+  const club = await env.DB.prepare('SELECT owner_id, contact_email FROM clubs WHERE id = ?').bind(offer.club_id).first();
+  const owner = managers.find((manager) => manager.id === club?.owner_id);
+  const to = club?.contact_email || owner?.email;
+  if (!to || owner?.id === renter.id) return;
+  const language = owner?.language || 'de';
+  const templates = RENTAL_EMAILS[language] || RENTAL_EMAILS.de;
+  const values = { title: offer.title, who: eventData.requesterName, slot: formatRentalSlot(eventData, language), lanes: eventData.lanes };
+  const requested = eventType === RENTAL_REQUESTED_EVENT;
+  try {
+    await deliverRentalEmail(env, {
+      to,
+      subject: requested ? templates.requestedSubject(offer.title) : templates.cancelledSubject(offer.title),
+      text: requested ? templates.requested(values) : templates.cancelled(values),
+      messageBox: requested && reservation.note ? reservation.note : null,
+      actions: [emailAction('rentalRequests', `${origin}/platz-mieten/verwalten`, language)],
+      language,
+      logFallback: `Rental ${eventType} email for ${to} (reservation ${reservation.id})`,
+      failureContext: `rental ${eventType} ${reservation.id}`,
+      allowLogFallback: true,
+    });
+  } catch (error) {
+    console.error('Rental club email failed', error);
+  }
+}
+
+async function notifyRentalRenter(env, { offer, reservation, manager, origin }) {
+  const renter = await env.DB.prepare('SELECT id, email, first_name, last_name, username, language FROM users WHERE id = ?').bind(reservation.user_id).first();
+  if (!renter) return;
+  const eventData = {
+    offerId: offer.id, offerTitle: offer.title, reservationId: reservation.id, status: reservation.status,
+    date: reservation.local_date, startHour: Number(reservation.start_hour), hours: Number(reservation.hours), lanes: Number(reservation.lanes),
+    note: reservation.decision_note || null,
+  };
+  try {
+    await createPostboxMessage(env, { recipientId: renter.id, kind: 'system', eventType: RENTAL_DECIDED_EVENT, eventData, pushTitle: 'Neue Statusmeldung', pushActor: offer.title });
+  } catch (error) {
+    console.error('Rental postbox message failed', error);
+  }
+  const language = renter.language || 'de';
+  const templates = RENTAL_EMAILS[language] || RENTAL_EMAILS.de;
+  try {
+    await deliverRentalEmail(env, {
+      to: renter.email,
+      subject: templates.decidedSubject(offer.title, reservation.status),
+      text: templates.decided({ firstName: renter.first_name || '', title: offer.title, slot: formatRentalSlot(eventData, language), lanes: eventData.lanes, status: reservation.status, club: offer.club_name }),
+      messageBox: reservation.decision_note || null,
+      actions: [emailAction('rentals', `${origin}/platz-mieten/meine`, language)],
+      language,
+      logFallback: `Rental decision email for ${renter.email} (reservation ${reservation.id})`,
+      failureContext: `rental decision ${reservation.id}`,
+      allowLogFallback: true,
+    });
+  } catch (error) {
+    console.error('Rental renter email failed', error);
+  }
+}
+
+async function createRentalReservation(request, env, offerId, user, origin) {
+  const row = await loadRentalOffer(env.DB, offerId);
+  if (!rentalOfferIsPublic(row)) throw new HttpError(404, 'Angebot nicht gefunden');
+  const offer = toRentalOffer(row);
+  const openingHours = await loadOpeningHours(env.DB, offerId);
+  const now = rentalLocalNow(offer.timezone);
+  const input = validateReservationRequest({ offer, openingHours, body: await readJson(request), now });
+  const nowIso = new Date().toISOString();
+  const open = await env.DB.prepare(`SELECT COUNT(*) AS count FROM rental_reservations
+    WHERE offer_id = ? AND user_id = ? AND status = 'requested' AND end_utc > ?`).bind(offerId, user.id, nowIso).first();
+  if (Number(open?.count || 0) >= RENTAL_MAX_OPEN_REQUESTS) {
+    throw new HttpError(409, 'Du hast für dieses Angebot schon zu viele offene Anfragen');
+  }
+  const startUtc = rentalHourUtc(input.date, input.startHour, offer.timezone);
+  const endUtc = rentalHourUtc(input.date, input.startHour + input.hours, offer.timezone);
+  const id = crypto.randomUUID();
+  const hours = Array.from({ length: input.hours }, (_, index) => input.startHour + index);
+  // Atomar: nur einfügen, wenn in jeder gebuchten Stunde noch genug Bahnen frei sind (D1 serialisiert Schreibzugriffe).
+  const result = await env.DB.prepare(`WITH hrs(hour) AS (VALUES ${hours.map(() => '(?)').join(', ')})
+    INSERT INTO rental_reservations (id, offer_id, user_id, local_date, start_hour, hours, lanes, start_utc, end_utc, status, note, created_at, updated_at)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?, ?, ?
+    WHERE NOT EXISTS (
+      SELECT 1 FROM hrs WHERE ? + (
+        SELECT COALESCE(SUM(r.lanes), 0) FROM rental_reservations r
+        WHERE r.offer_id = ? AND r.local_date = ? AND r.status IN ('requested', 'confirmed')
+          AND r.start_hour <= hrs.hour AND r.start_hour + r.hours > hrs.hour
+      ) > (SELECT lane_count FROM rental_offers WHERE id = ?)
+    )`).bind(
+    ...hours,
+    id, offerId, user.id, input.date, input.startHour, input.hours, input.lanes, startUtc, endUtc, input.note, nowIso, nowIso,
+    input.lanes, offerId, input.date, offerId,
+  ).run();
+  if (!result.meta?.changes) throw new HttpError(409, 'Für diesen Zeitraum sind nicht mehr genug Bahnen frei');
+  const reservation = await env.DB.prepare('SELECT * FROM rental_reservations WHERE id = ?').bind(id).first();
+  await notifyRentalClub(env, { offer: row, reservation, renter: user, eventType: RENTAL_REQUESTED_EVENT, origin });
+  return json({ reservation: toRentalReservation(reservation) }, 201);
+}
+
+const RENTAL_RESERVATION_SELECT = `SELECT r.*, o.title AS offer_title, o.club_id, o.timezone, p.name AS place_name, c.name AS club_name,
+    u.first_name AS renter_first_name, u.last_name AS renter_last_name, u.username AS renter_username, u.email AS renter_email, u.phone AS renter_phone
+  FROM rental_reservations r JOIN rental_offers o ON o.id = r.offer_id JOIN boule_places p ON p.id = o.boule_place_id
+  JOIN clubs c ON c.id = o.club_id JOIN users u ON u.id = r.user_id`;
+
+async function listMyRentalReservations(db, user) {
+  const rows = await db.prepare(`${RENTAL_RESERVATION_SELECT} WHERE r.user_id = ? ORDER BY r.start_utc DESC LIMIT 100`).bind(user.id).all();
+  return json({ reservations: (rows.results || []).map((row) => toRentalReservation(row)) });
+}
+
+async function cancelRentalReservation(env, reservationId, user, origin) {
+  const reservation = await env.DB.prepare('SELECT * FROM rental_reservations WHERE id = ?').bind(reservationId).first();
+  if (!reservation || reservation.user_id !== user.id) throw new HttpError(404, 'Reservierung nicht gefunden');
+  const now = new Date().toISOString();
+  if (reservation.start_utc <= now) throw new HttpError(409, 'Die Reservierung hat bereits begonnen');
+  const result = await env.DB.prepare(`UPDATE rental_reservations SET status = 'cancelled', updated_at = ?
+    WHERE id = ? AND status IN ('requested', 'confirmed')`).bind(now, reservationId).run();
+  if (!result.meta?.changes) throw new HttpError(409, 'Die Reservierung ist nicht mehr aktiv');
+  const offer = await loadRentalOffer(env.DB, reservation.offer_id);
+  await notifyRentalClub(env, { offer, reservation, renter: user, eventType: RENTAL_CANCELLED_EVENT, origin });
+  return json({ reservation: toRentalReservation({ ...reservation, status: 'cancelled', updated_at: now }) });
+}
+
+// Übergänge durch den Verein: offene Anfrage bestätigen/ablehnen, bestätigte (künftige) Reservierung stornieren.
+const RENTAL_DECISIONS = {
+  confirm: { from: 'requested', to: 'confirmed' },
+  reject: { from: 'requested', to: 'rejected' },
+  cancel: { from: 'confirmed', to: 'cancelled' },
+};
+
+async function decideRentalReservation(request, env, reservationId, user, origin) {
+  const body = await readJson(request);
+  const decision = RENTAL_DECISIONS[body.decision];
+  if (!decision) throw new HttpError(400, 'Ungültige Entscheidung', { field: 'decision' });
+  const reservation = await env.DB.prepare('SELECT * FROM rental_reservations WHERE id = ?').bind(reservationId).first();
+  if (!reservation) throw new HttpError(404, 'Reservierung nicht gefunden');
+  const offer = await loadRentalOffer(env.DB, reservation.offer_id);
+  await assertClubEditor(env.DB, offer.club_id, user);
+  const note = String(body.note ?? '').trim().slice(0, 500) || null;
+  const now = new Date().toISOString();
+  if (decision.to === 'cancelled' && reservation.end_utc <= now) throw new HttpError(409, 'Die Reservierung ist bereits vorbei');
+  const result = await env.DB.prepare(`UPDATE rental_reservations SET status = ?, decision_note = ?, decided_by = ?, decided_at = ?, updated_at = ?
+    WHERE id = ? AND status = ?`).bind(decision.to, note, user.id, now, now, reservationId, decision.from).run();
+  if (!result.meta?.changes) throw new HttpError(409, 'Die Reservierung wurde bereits bearbeitet');
+  const updated = { ...reservation, status: decision.to, decision_note: note, decided_by: user.id, decided_at: now, updated_at: now };
+  await notifyRentalRenter(env, { offer, reservation: updated, manager: user, origin });
+  return json({ reservation: toRentalReservation(updated) });
+}
+
+async function listRentalManagement(db, clubId, user) {
+  if (!clubId) throw new HttpError(400, 'Verein fehlt', { field: 'club' });
+  await assertClubEditor(db, clubId, user);
+  const now = new Date().toISOString();
+  const [offers, hours, places, reservations] = await Promise.all([
+    db.prepare(`${RENTAL_OFFER_SELECT} WHERE o.club_id = ? ORDER BY o.title COLLATE NOCASE`).bind(clubId).all(),
+    db.prepare('SELECT h.* FROM rental_opening_hours h JOIN rental_offers o ON o.id = h.offer_id WHERE o.club_id = ? ORDER BY h.weekday').bind(clubId).all(),
+    db.prepare("SELECT id, name, court_count, venue_type, status FROM boule_places WHERE club_id = ? AND status != 'rejected' ORDER BY name COLLATE NOCASE").bind(clubId).all(),
+    db.prepare(`${RENTAL_RESERVATION_SELECT} WHERE o.club_id = ? AND r.end_utc > ? AND r.status IN ('requested', 'confirmed')
+      ORDER BY r.start_utc LIMIT 300`).bind(clubId, now).all(),
+  ]);
+  const hoursByOffer = new Map();
+  for (const row of hours.results || []) hoursByOffer.set(row.offer_id, [...(hoursByOffer.get(row.offer_id) || []), row]);
+  return json({
+    offers: (offers.results || []).map((row) => toRentalOffer(row, toOpeningHours(hoursByOffer.get(row.id) || []))),
+    places: (places.results || []).map((row) => ({ id: row.id, name: row.name, courtCount: Number(row.court_count || 0), venueType: row.venue_type || 'outdoor', status: row.status })),
+    reservations: (reservations.results || []).map((row) => toRentalReservation(row, { withRenter: true })),
+  });
+}
+
+async function rentalPlaceForClub(db, clubId, placeId) {
+  const place = await db.prepare('SELECT id, latitude, longitude FROM boule_places WHERE id = ? AND club_id = ?').bind(placeId, clubId).first();
+  if (!place) throw new HttpError(400, 'Der Platz gehört nicht zu diesem Verein', { field: 'placeId' });
+  return place;
+}
+
+function openingHourStatements(db, offerId, openingHours) {
+  return [
+    db.prepare('DELETE FROM rental_opening_hours WHERE offer_id = ?').bind(offerId),
+    ...openingHours.map((entry) => db.prepare('INSERT INTO rental_opening_hours (offer_id, weekday, open_hour, close_hour) VALUES (?, ?, ?, ?)')
+      .bind(offerId, entry.weekday, entry.openHour, entry.closeHour)),
+  ];
+}
+
+async function createRentalOffer(request, db, user) {
+  const body = await readJson(request);
+  const clubId = String(body.clubId || '');
+  await assertClubEditor(db, clubId, user);
+  const input = normalizeOfferInput(body);
+  const place = await rentalPlaceForClub(db, clubId, input.placeId);
+  const timezone = resolveTournamentTimezone({ latitude: Number(place.latitude ?? NaN), longitude: Number(place.longitude ?? NaN) });
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare(`INSERT INTO rental_offers (id, club_id, boule_place_id, title, description, lane_count, price_minor, currency, price_note,
+        min_hours, max_hours, booking_horizon_days, timezone, status, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(id, clubId, place.id, input.title, input.description, input.laneCount,
+      input.priceMinor, input.currency, input.priceNote, input.minHours, input.maxHours, input.bookingHorizonDays, timezone, input.status, user.id, now, now),
+    ...openingHourStatements(db, id, input.openingHours),
+  ]);
+  return json({ offer: toRentalOffer(await loadRentalOffer(db, id), await loadOpeningHours(db, id)) }, 201);
+}
+
+async function updateRentalOffer(request, db, id, user) {
+  const existing = await loadRentalOffer(db, id);
+  await assertClubEditor(db, existing.club_id, user);
+  const input = normalizeOfferInput(await readJson(request));
+  const place = await rentalPlaceForClub(db, existing.club_id, input.placeId);
+  const timezone = resolveTournamentTimezone({ latitude: Number(place.latitude ?? NaN), longitude: Number(place.longitude ?? NaN) });
+  await db.batch([
+    db.prepare(`UPDATE rental_offers SET boule_place_id = ?, title = ?, description = ?, lane_count = ?, price_minor = ?, currency = ?, price_note = ?,
+        min_hours = ?, max_hours = ?, booking_horizon_days = ?, timezone = ?, status = ?, updated_at = ? WHERE id = ?`)
+      .bind(place.id, input.title, input.description, input.laneCount, input.priceMinor, input.currency, input.priceNote, input.minHours,
+        input.maxHours, input.bookingHorizonDays, timezone, input.status, new Date().toISOString(), id),
+    ...openingHourStatements(db, id, input.openingHours),
+  ]);
+  return json({ offer: toRentalOffer(await loadRentalOffer(db, id), await loadOpeningHours(db, id)) });
+}
+
+async function deleteRentalOffer(db, id, user) {
+  const existing = await loadRentalOffer(db, id);
+  await assertClubEditor(db, existing.club_id, user);
+  const upcoming = await db.prepare(`SELECT COUNT(*) AS count FROM rental_reservations
+    WHERE offer_id = ? AND status IN ('requested', 'confirmed') AND end_utc > ?`).bind(id, new Date().toISOString()).first();
+  if (Number(upcoming?.count || 0) > 0) {
+    throw new HttpError(409, 'Es gibt noch offene oder bestätigte Reservierungen. Deaktiviere das Angebot stattdessen.');
+  }
+  await db.prepare('DELETE FROM rental_offers WHERE id = ?').bind(id).run();
+  return json({ ok: true });
 }
 
 async function assertClubOwner(db, clubId, user) {
