@@ -313,11 +313,12 @@ export function registrationStatusLabel(tournament, language) {
   const isFull = Boolean(tournament.maxRegistrations) && tournament.activeRegistrations >= tournament.maxRegistrations;
   const registrationOpen = tournament.status === 'registration' && !deadlinePassed;
 
-  if (!registrationOpen || isFull) {
-    if (isFull && tournament.waitlistRegistrations > 0) {
-      return i18next.t('Anmeldung Warteliste möglich', { lng: language });
-    }
+  if (!registrationOpen) {
     return i18next.t('Anmeldung nicht mehr möglich', { lng: language });
+  }
+  // Voll, aber mit Warteliste: Anmeldung geht weiter (wie hasOpenRegistration), auch wenn noch niemand wartet.
+  if (isFull) {
+    return i18next.t(tournament.waitlistEnabled ? 'Warteliste' : 'Anmeldung nicht mehr möglich', { lng: language });
   }
 
   if (!tournament.maxRegistrations) {

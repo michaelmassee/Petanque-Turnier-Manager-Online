@@ -142,6 +142,15 @@ describe('Turnier-Payload', () => {
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: true }, 'en')).toBe('Running');
   });
 
+  it('zeigt bei vollem Turnier mit aktiver Warteliste die Wartelisten-Anmeldung, auch ohne Wartende', () => {
+    const full = { status: 'registration', registrationEnabled: true, maxRegistrations: 20, activeRegistrations: 20, waitlistRegistrations: 0, waitlistEnabled: true, registrationDeadline: '2099-01-01T00:00:00.000Z' };
+    expect(registrationStatusLabel(full, 'de')).toBe('Warteliste');
+    expect(registrationStatusLabel(full, 'en')).toBe('Waitlist');
+    expect(registrationStatusLabel({ ...full, waitlistEnabled: false }, 'de')).toBe('Anmeldung nicht mehr möglich');
+    expect(registrationStatusLabel({ ...full, waitlistRegistrations: 3, registrationDeadline: '2000-01-01T00:00:00.000Z' }, 'de')).toBe('Anmeldung nicht mehr möglich');
+    expect(registrationStatusLabel({ ...full, activeRegistrations: 18 }, 'de')).toBe('2 von 20 Plätzen frei');
+  });
+
   it('erkennt nur verfügbare öffentliche Online-Anmeldungen', () => {
     const tournament = { visibility: 'public', registrationEnabled: true, status: 'registration', maxRegistrations: 16, activeRegistrations: 15, waitlistEnabled: false };
     expect(hasOnlineRegistrationAvailable(tournament)).toBe(true);
