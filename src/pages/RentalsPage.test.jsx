@@ -58,6 +58,12 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(screen.queryByText(/Boulehalle:/)).not.toBeInTheDocument();
   });
 
+  it('zeigt „Preis auf Anfrage“, wenn kein Preis hinterlegt ist', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, priceMinor: null } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
+    expect(await screen.findByText('Preis auf Anfrage')).toBeInTheDocument();
+  });
+
   it('bittet Gäste ums Anmelden statt das Formular zu zeigen', async () => {
     mockOffer();
     const onLogin = vi.fn();

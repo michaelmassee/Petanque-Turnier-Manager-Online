@@ -22,7 +22,7 @@ export function formatReservationSlot(reservation, language) {
 
 function OfferPrice({ offer, language }) {
   const { t } = useTranslation();
-  if (offer.priceMinor === null || offer.priceMinor === undefined) return null;
+  if (offer.priceMinor === null || offer.priceMinor === undefined) return <span>{t('Preis auf Anfrage')}</span>;
   return <span data-i18n-skip>{offer.priceMinor === 0 ? t('kostenlos') : formatMoney(offer.priceMinor, offer.currency, language)}{offer.priceNote ? ` ${offer.priceNote}` : ''}</span>;
 }
 
