@@ -21,6 +21,9 @@ export function unreadPostboxCount(row) {
   return Number(row?.count || 0);
 }
 
+// Turnier-Broadcast der Turnierleitung: die Endrangliste ist veröffentlicht.
+export const TOURNAMENT_RANKING_PUBLISHED_EVENT = 'tournament_ranking_published';
+
 // Postfach-Ereignis nach dem Check-in: die Live-Ansicht der Meldung ist verfügbar.
 export const LIVE_VIEW_AVAILABLE_EVENT = 'live_view_available';
 

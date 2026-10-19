@@ -41,3 +41,20 @@ export function rankingColumnKeys(tournament, entries) {
   ];
   return keys.filter((key) => !OPTIONAL_COLUMNS.has(key) || entries.some((entry) => entry[key] != null));
 }
+
+/** Spaltenüberschrift der Rangliste (Tabelle und PDF); t ist die i18next-Übersetzungsfunktion. */
+export function rankingColumnLabel(key, tournament, t) {
+  switch (key) {
+    case 'rank': return t('Platz');
+    case 'label': return tournament?.registrationType === 'supermelee' ? t('Spieler') : t('Team');
+    case 'wins': return t('Siege');
+    case 'bhz': return t('BHZ');
+    case 'fbhz': return t('FBHZ');
+    case 'wertung': return t('Wertung');
+    case 'losses': return t('Niederlagen');
+    case 'gameDiff': return t('Spieldifferenz');
+    case 'pointsFor': return t('Punkte+');
+    case 'pointsAgainst': return t('Punkte−');
+    default: return t('Δ');
+  }
+}

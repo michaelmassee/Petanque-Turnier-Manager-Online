@@ -6,7 +6,7 @@ export { RegistrationOpeningScheduler } from './registration-opening.js';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
 import {
   isAllowedPushEndpoint, LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT,
-  REGISTRATION_SLOT_LINKED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT, unreadPostboxCount,
+  REGISTRATION_SLOT_LINKED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT, unreadPostboxCount,
 } from './postbox-core.js';
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
@@ -555,6 +555,35 @@ const TOURNAMENT_BROADCAST_EMAILS = {
   },
 };
 
+// Endrangliste veröffentlicht: kurze Mail mit Link, die Rangliste selbst steht auf der Turnierseite.
+const TOURNAMENT_RANKING_EMAILS = {
+  de: {
+    subject: (name) => `Endrangliste: ${name}`,
+    text: (firstName, name, link) =>
+      `Hallo ${firstName},\n\ndie Turnierleitung hat die Endrangliste von "${name}" veröffentlicht. Danke fürs Mitspielen!\n\nZur Rangliste (auch als PDF):\n${link}`,
+  },
+  nl: {
+    subject: (name) => `Eindrangschikking: ${name}`,
+    text: (firstName, name, link) =>
+      `Hallo ${firstName},\n\nde toernooiorganisatie heeft de eindrangschikking van "${name}" gepubliceerd. Bedankt voor het meespelen!\n\nNaar de rangschikking (ook als pdf):\n${link}`,
+  },
+  en: {
+    subject: (name) => `Final standings: ${name}`,
+    text: (firstName, name, link) =>
+      `Hi ${firstName},\n\nthe tournament organizers have published the final standings of "${name}". Thanks for playing!\n\nView the standings (also as PDF):\n${link}`,
+  },
+  es: {
+    subject: (name) => `Clasificación final: ${name}`,
+    text: (firstName, name, link) =>
+      `Hola ${firstName},\n\nla organización ha publicado la clasificación final de "${name}". ¡Gracias por participar!\n\nVer la clasificación (también en PDF):\n${link}`,
+  },
+  fr: {
+    subject: (name) => `Classement final : ${name}`,
+    text: (firstName, name, link) =>
+      `Bonjour ${firstName},\n\nl’organisation a publié le classement final de « ${name} ». Merci d’avoir joué !\n\nVoir le classement (aussi en PDF) :\n${link}`,
+  },
+};
+
 // "Nachricht an Team": Turnierleitung schreibt den Personen einer einzelnen Anmeldung.
 const TEAM_MESSAGE_EMAILS = {
   de: {
@@ -752,14 +781,14 @@ const EMAIL_LAYOUT_LABELS = {
 };
 
 const EMAIL_ACTION_LABELS = {
-  de: { tournament: 'Turnier ansehen', directions: 'Anfahrt planen', live: 'Live-Ansicht öffnen', cancel: 'Anmeldung stornieren', whatsapp: 'WhatsApp-Gruppe öffnen', confirm: 'Bestätigen', edit: 'Bouleplatz bearbeiten', reset: 'Passwort zurücksetzen', contact: 'Nachricht an Turnierleitung' },
-  nl: { tournament: 'Toernooi bekijken', directions: 'Route plannen', live: 'Liveweergave openen', cancel: 'Inschrijving afmelden', whatsapp: 'WhatsApp-groep openen', confirm: 'Bevestigen', edit: 'Baan bewerken', reset: 'Wachtwoord opnieuw instellen', contact: 'Bericht aan de toernooiorganisatie' },
-  en: { tournament: 'View tournament', directions: 'Plan directions', live: 'Open live view', cancel: 'Withdraw registration', whatsapp: 'Open WhatsApp group', confirm: 'Confirm', edit: 'Edit boules court', reset: 'Reset password', contact: 'Message the tournament organizers' },
-  es: { tournament: 'Ver torneo', directions: 'Planificar ruta', live: 'Abrir vista en directo', cancel: 'Cancelar inscripción', whatsapp: 'Abrir grupo de WhatsApp', confirm: 'Confirmar', edit: 'Editar pista', reset: 'Restablecer contraseña', contact: 'Mensaje a la organización del torneo' },
-  fr: { tournament: 'Voir le tournoi', directions: 'Préparer l’itinéraire', live: 'Ouvrir la vue en direct', cancel: 'Annuler l’inscription', whatsapp: 'Ouvrir le groupe WhatsApp', confirm: 'Confirmer', edit: 'Modifier le terrain', reset: 'Réinitialiser le mot de passe', contact: 'Contacter l’organisation du tournoi' },
+  de: { tournament: 'Turnier ansehen', ranking: 'Rangliste ansehen', directions: 'Anfahrt planen', live: 'Live-Ansicht öffnen', cancel: 'Anmeldung stornieren', whatsapp: 'WhatsApp-Gruppe öffnen', confirm: 'Bestätigen', edit: 'Bouleplatz bearbeiten', reset: 'Passwort zurücksetzen', contact: 'Nachricht an Turnierleitung' },
+  nl: { tournament: 'Toernooi bekijken', ranking: 'Rangschikking bekijken', directions: 'Route plannen', live: 'Liveweergave openen', cancel: 'Inschrijving afmelden', whatsapp: 'WhatsApp-groep openen', confirm: 'Bevestigen', edit: 'Baan bewerken', reset: 'Wachtwoord opnieuw instellen', contact: 'Bericht aan de toernooiorganisatie' },
+  en: { tournament: 'View tournament', ranking: 'View standings', directions: 'Plan directions', live: 'Open live view', cancel: 'Withdraw registration', whatsapp: 'Open WhatsApp group', confirm: 'Confirm', edit: 'Edit boules court', reset: 'Reset password', contact: 'Message the tournament organizers' },
+  es: { tournament: 'Ver torneo', ranking: 'Ver clasificación', directions: 'Planificar ruta', live: 'Abrir vista en directo', cancel: 'Cancelar inscripción', whatsapp: 'Abrir grupo de WhatsApp', confirm: 'Confirmar', edit: 'Editar pista', reset: 'Restablecer contraseña', contact: 'Mensaje a la organización del torneo' },
+  fr: { tournament: 'Voir le tournoi', ranking: 'Voir le classement', directions: 'Préparer l’itinéraire', live: 'Ouvrir la vue en direct', cancel: 'Annuler l’inscription', whatsapp: 'Ouvrir le groupe WhatsApp', confirm: 'Confirmer', edit: 'Modifier le terrain', reset: 'Réinitialiser le mot de passe', contact: 'Contacter l’organisation du tournoi' },
 };
 
-const EMAIL_ACTION_ICONS = { tournament: '▣', directions: '⌖', live: '▶', cancel: '×', whatsapp: '◉', confirm: '✓', edit: '✎', reset: '↻', contact: '✉', desktop: '↗', legal: '§', privacy: '◌' };
+const EMAIL_ACTION_ICONS = { tournament: '▣', ranking: '≡', directions: '⌖', live: '▶', cancel: '×', whatsapp: '◉', confirm: '✓', edit: '✎', reset: '↻', contact: '✉', desktop: '↗', legal: '§', privacy: '◌' };
 
 export function emailAction(kind, url, language, tone = null) {
   if (!url) return null;
@@ -2251,10 +2280,23 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         const session = await optionalSession(request, env.DB);
-        if (!canViewParticipants(tournament, session?.user || null)) {
+        const shareAccess = await hasTournamentShareAccess(env.DB, tournament, url.searchParams.get('share'));
+        if (!canViewParticipants(tournament, session?.user || null) && !canViewPublishedRanking(tournament, session?.user || null, shareAccess)) {
           throw new HttpError(403, 'Zugriff verweigert');
         }
-        return await getTournamentRanking(env.DB, tournament);
+        // Die Spielverwaltung sieht auch nach dem Veröffentlichen den aktuellen Stand (Korrekturen, erneutes Veröffentlichen).
+        const live = url.searchParams.get('live') === '1' && canManageTournament(tournament, session?.user || null);
+        return await getTournamentRanking(env.DB, tournament, { live });
+      }
+
+      const rankingPublishMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/ranking\/publish$/);
+      if (rankingPublishMatch && request.method === 'POST') {
+        // Nur mit Login: Postfach-Eintrag und Mails tragen die Turnierleitung als Absender.
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, rankingPublishMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        assertCanManageTournament(tournament, session.user);
+        return await publishFinalRanking(request, env, tournament, session.user, url.origin);
       }
 
       if (url.pathname === '/api/live/me' && request.method === 'GET') {
@@ -3685,6 +3727,22 @@ async function createPostboxMessage(env, { senderId = null, recipientId, kind, b
   return message;
 }
 
+// Mail-Empfänger aller Meldungen mit den angegebenen Status, je Adresse nur einmal und ohne den Absender.
+async function tournamentEmailRecipients(db, tournamentId, statusesSql, senderEmail) {
+  const registrations = await db.prepare(
+    `SELECT * FROM registrations WHERE tournament_id = ? AND status IN ${statusesSql}`,
+  ).bind(tournamentId).all();
+  const uniqueRecipients = new Map();
+  for (const registration of registrations.results || []) {
+    for (const recipient of buildTeamRecipients(registration)) {
+      const email = String(recipient.email || '').trim().toLowerCase();
+      if (!email || email === String(senderEmail || '').toLowerCase() || uniqueRecipients.has(email)) continue;
+      uniqueRecipients.set(email, { email: recipient.email, firstName: recipient.firstName, language: registration.language });
+    }
+  }
+  return uniqueRecipients;
+}
+
 export async function createBroadcastPostboxMessage(env, { sender, tournament, body }) {
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
@@ -3701,18 +3759,7 @@ export async function createBroadcastPostboxMessage(env, { sender, tournament, b
   ).bind(id).first();
   const message = toPostboxMessage(row, sender.id);
 
-  const registrations = await env.DB.prepare(
-    `SELECT * FROM registrations WHERE tournament_id = ? AND status IN ${BROADCAST_REGISTRATION_STATUSES_SQL}`,
-  ).bind(tournament.id).all();
-
-  const uniqueRecipients = new Map();
-  for (const registration of registrations.results || []) {
-    for (const recipient of buildTeamRecipients(registration)) {
-      const email = String(recipient.email || '').trim().toLowerCase();
-      if (!email || email === sender.email.toLowerCase() || uniqueRecipients.has(email)) continue;
-      uniqueRecipients.set(email, { email: recipient.email, firstName: recipient.firstName, language: registration.language });
-    }
-  }
+  const uniqueRecipients = await tournamentEmailRecipients(env.DB, tournament.id, BROADCAST_REGISTRATION_STATUSES_SQL, sender.email);
 
   const accountUsers = await participantAccountUserIds(env.DB, tournament.id, sender.id, { includeWaitlist: true });
   for (const accountUser of accountUsers.results || []) {
@@ -7136,8 +7183,93 @@ async function queueResultReportedPush(env, origin, tournament, registration, re
   }));
 }
 
-async function getTournamentRanking(db, tournament) {
+async function getTournamentRanking(db, tournament, { live = false } = {}) {
+  const snapshot = live ? null : await publishedFinalRanking(db, tournament);
+  if (snapshot) return json({ ranking: snapshot.ranking, publishedAt: snapshot.publishedAt });
   return json({ ranking: await computeTournamentRanking(db, tournament) });
+}
+
+// Veröffentlichte Endrangliste: gilt nur, solange das Turnier abgeschlossen ist (wird es wieder geöffnet, zählt
+// die Live-Berechnung).
+async function publishedFinalRanking(db, tournament) {
+  if (!tournament.final_ranking_published_at || tournament.status !== 'finished') return null;
+  const row = await db.prepare('SELECT ranking_json, published_at, mailed_at FROM tournament_final_rankings WHERE tournament_id = ?')
+    .bind(tournament.id).first();
+  if (!row) return null;
+  return { ranking: jsonArray(row.ranking_json), publishedAt: row.published_at, mailedAt: row.mailed_at || null };
+}
+
+function canViewPublishedRanking(tournament, user, shareAccess) {
+  return Boolean(tournament.final_ranking_published_at) && tournament.status === 'finished'
+    && (canViewTournament(tournament, user) || shareAccess);
+}
+
+/**
+ * Turnierleitung: Endrangliste eines online durchgeführten Turniers einfrieren und auf der Turnierseite öffentlich
+ * machen. Mit notify bekommen alle bestätigten Teilnehmer einen Postfach-Eintrag, Push und eine kleine Mail mit
+ * Link (kein Anhang: das PDF erzeugt der Browser). Ein zweiter Versand braucht resend, damit ein Doppelklick
+ * nicht alle Teilnehmer erneut anschreibt.
+ */
+async function publishFinalRanking(request, env, tournament, user, origin) {
+  const body = await readJson(request);
+  if (tournament.status !== 'finished') throw new HttpError(409, 'Die Rangliste kann erst nach Turnierende veröffentlicht werden');
+  if (tournament.type === 'ko' || isDocumentBound(tournament) || !isOnlinePlayable(tournament)) {
+    throw new HttpError(409, 'Für dieses Turnier gibt es keine veröffentlichbare Rangliste');
+  }
+  const previous = await env.DB.prepare('SELECT mailed_at FROM tournament_final_rankings WHERE tournament_id = ?').bind(tournament.id).first();
+  if (body.notify === true && previous?.mailed_at && body.resend !== true) {
+    throw new HttpError(409, 'Die Rangliste wurde bereits an die Teilnehmer gesendet', { code: 'ranking_already_mailed', mailedAt: previous.mailed_at });
+  }
+  const ranking = await computeTournamentRanking(env.DB, tournament);
+  if (!ranking.length) throw new HttpError(409, 'Es gibt noch keine Rangliste');
+
+  const now = new Date().toISOString();
+  const mailedAt = body.notify === true ? now : previous?.mailed_at || null;
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO tournament_final_rankings (tournament_id, ranking_json, published_at, mailed_at) VALUES (?, ?, ?, ?)
+        ON CONFLICT(tournament_id) DO UPDATE SET ranking_json = excluded.ranking_json, published_at = excluded.published_at,
+          mailed_at = excluded.mailed_at`).bind(tournament.id, JSON.stringify(ranking), now, mailedAt),
+    env.DB.prepare('UPDATE tournaments SET final_ranking_published_at = ? WHERE id = ?').bind(now, tournament.id),
+  ]);
+  if (body.notify === true) await notifyFinalRanking(env, tournament, user, origin);
+  return json({ ranking, publishedAt: now, mailedAt });
+}
+
+async function notifyFinalRanking(env, tournament, sender, origin) {
+  const id = crypto.randomUUID();
+  // Ein Eintrag für alle Teilnehmer (wie der Broadcast), übersetzt wird er im Postfach über event_type.
+  await env.DB.prepare(`INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, event_type, event_data, created_at, broadcast_tournament_id)
+      VALUES (?, ?, ?, 'system', ?, ?, ?, ?)`)
+    .bind(id, sender.id, sender.id, TOURNAMENT_RANKING_PUBLISHED_EVENT, JSON.stringify({ tournamentId: tournament.id, tournamentName: tournament.name }),
+      new Date().toISOString(), tournament.id).run();
+  const accountUsers = await participantAccountUserIds(env.DB, tournament.id, sender.id);
+  for (const accountUser of accountUsers.results || []) {
+    await enqueuePushNotification(env, { userId: accountUser.id, payload: { title: 'Neue Statusmeldung', actor: tournament.name, messageId: id } });
+  }
+
+  if (!(await canSendTournamentMail(env.DB, tournament))) return;
+  const share = tournament.visibility === 'private'
+    ? await env.DB.prepare('SELECT token FROM tournament_share_links WHERE tournament_id = ?').bind(tournament.id).first()
+    : null;
+  const link = `${origin}/turniere/${encodeURIComponent(tournament.id)}/rangliste${share?.token ? `?share=${encodeURIComponent(share.token)}` : ''}`;
+  const recipients = await tournamentEmailRecipients(env.DB, tournament.id, "('confirmed')", sender.email);
+  for (const recipient of recipients.values()) {
+    const templates = TOURNAMENT_RANKING_EMAILS[recipient.language] || TOURNAMENT_RANKING_EMAILS.de;
+    try {
+      await enqueueTransactionalEmail(env, {
+        to: recipient.email,
+        subject: templates.subject(tournament.name),
+        text: templates.text(recipient.firstName, tournament.name, link),
+        actions: [emailAction('ranking', link, recipient.language)],
+        language: recipient.language,
+        logFallback: `Final ranking email for ${recipient.email} (tournament ${tournament.id})`,
+        failureContext: `final ranking for tournament ${tournament.id}`,
+        allowLogFallback: true,
+      });
+    } catch (error) {
+      console.error('Final ranking email dispatch failed', error);
+    }
+  }
 }
 
 export async function computeTournamentRanking(db, tournament) {
@@ -11064,6 +11196,8 @@ export function toPublicTournament(row, user) {
     playerResultReportingEnabled: Boolean(Number(row.player_result_reporting_enabled || 0)),
     startsAt: row.date ? tournamentStartUtcIso(row) : null,
     runningResetAt: row.running_reset_at || null,
+    // Veröffentlichte Endrangliste (Snapshot) gilt nur, solange das Turnier abgeschlossen ist.
+    rankingPublishedAt: row.status === 'finished' ? row.final_ranking_published_at || null : null,
     documentManaged: Boolean(Number(row.document_managed || 0)),
     desktopExecution: Boolean(Number(row.desktop_execution || 0)),
     documentDataAsOf: Number(row.document_managed || 0) === 1 ? row.last_sync_write_at || null : null,

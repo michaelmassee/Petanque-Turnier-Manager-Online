@@ -1,21 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { rankingColumnKeys } from '../lib/live-ranking.js';
-
-function columnLabel(key, tournament, t) {
-  switch (key) {
-    case 'rank': return t('Platz');
-    case 'label': return tournament?.registrationType === 'supermelee' ? t('Spieler') : t('Team');
-    case 'wins': return t('Siege');
-    case 'bhz': return t('BHZ');
-    case 'fbhz': return t('FBHZ');
-    case 'wertung': return t('Wertung');
-    case 'losses': return t('Niederlagen');
-    case 'gameDiff': return t('Spieldifferenz');
-    case 'pointsFor': return t('Punkte+');
-    case 'pointsAgainst': return t('Punkte−');
-    default: return t('Δ');
-  }
-}
+import { rankingColumnKeys, rankingColumnLabel } from '../lib/live-ranking.js';
 
 /**
  * Rangliste mit den Spalten des Turniersystems – dieselbe Darstellung in Live-Ansicht, öffentlichem Spielplan und
@@ -30,7 +14,7 @@ export function RankingTable({ tournament, entries }) {
     <table className="ranking-table">
       <thead>
         <tr>
-          {columns.map((key) => <th key={key}>{columnLabel(key, tournament, t)}</th>)}
+          {columns.map((key) => <th key={key}>{rankingColumnLabel(key, tournament, t)}</th>)}
         </tr>
       </thead>
       <tbody>

@@ -105,6 +105,31 @@ describe('Turnierdetail-Reiter', () => {
     expect(tabs).not.toContain('Mitspieler');
   });
 
+  it('zeigt die veröffentlichte Endrangliste im eigenen Reiter, auch ohne „Teilnehmer öffentlich“', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({
+      ranking: [{ rank: 1, teamId: 'a', wins: 1, pointsFor: 13, pointsAgainst: 7, members: [{ id: 'p1', firstName: 'Anna', lastName: 'Test' }] }],
+      publishedAt: '2099-06-01T18:00:00.000Z',
+    })));
+
+    renderDetail(tournamentWith({ status: 'finished', participantsPublic: false, rankingPublishedAt: '2099-06-01T18:00:00.000Z', club: 'BC Linden' }), 'rangliste');
+
+    expect(tabNames()).toContain('Rangliste');
+    expect(await screen.findByText('Anna Test')).toBeInTheDocument();
+    expect(document.querySelector('.final-ranking-header img[src="/icons/logo.png"]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'PDF herunterladen' })).toBeEnabled();
+    expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/ranking', expect.anything());
+  });
+
+  it('erkennt die Ranglisten-Route und blendet den Reiter ohne Veröffentlichung aus', () => {
+    expect(matchTournamentRoute('/turniere/t1/rangliste')).toEqual({ id: 't1', view: 'rangliste' });
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ rounds: [], ranking: [] })));
+
+    renderDetail(tournamentWith({ status: 'finished' }), 'rangliste');
+
+    expect(tabNames()).not.toContain('Rangliste');
+    expect(screen.getByRole('button', { name: 'Info' })).toHaveAttribute('aria-current', 'page');
+  });
+
   it('zeigt die Mitspielgesuche im eigenen Reiter', async () => {
     global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ listings: [] })));
 

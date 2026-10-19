@@ -15,7 +15,7 @@ import { RichText } from './RichText.jsx';
 import { richTextPlainText } from '../lib/rich-text.js';
 import { AutumnGarland, AutumnPumpkin } from './AutumnDecoration.jsx';
 import { LanguageSelect } from '../auth/AuthForms.jsx';
-import { LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT, REGISTRATION_SLOT_LINKED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT } from '../postbox-core.js';
+import { LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT, REGISTRATION_SLOT_LINKED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT } from '../postbox-core.js';
 
 async function subscribeToPush() {
   const result = await ensureBrowserPushSubscription(async () => (await authenticatedApi('/api/push/public-key')).publicKey);
@@ -211,6 +211,9 @@ function postboxMessageText(message, t) {
   }
   if (message.eventType === LIVE_VIEW_AVAILABLE_EVENT) {
     return t('liveViewAvailableText', { name: data.tournamentName || '' });
+  }
+  if (message.eventType === TOURNAMENT_RANKING_PUBLISHED_EVENT) {
+    return t('{{name}}: Die Endrangliste ist veröffentlicht.', { name: data.tournamentName || '' });
   }
   if (message.eventType === REGISTRATION_SLOT_LINKED_EVENT) {
     return t('registrationSlotLinkedText', { name: data.tournamentName || '' });

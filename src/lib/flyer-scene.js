@@ -651,7 +651,11 @@ export async function buildFlyerScene(tournament, config, language, t, { typeset
   return { page, design: { ...design, templateId }, elements, overflow: bodyBottom > limit, bodyBottom, bodyLimit: limit };
 }
 
+/** Turniername als Dateinamen-Teil (Flyer, Ranglisten-PDF). */
+export function fileNameSlug(name) {
+  return String(name || 'turnier').replace(/ß/g, 'ss').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'turnier';
+}
+
 export function flyerFileName(tournament, format, extension) {
-  const slug = String(tournament.name || 'turnier').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'turnier';
-  return `${slug}-${tournament.date || 'flyer'}-${format}.${extension}`;
+  return `${fileNameSlug(tournament.name)}-${tournament.date || 'flyer'}-${format}.${extension}`;
 }

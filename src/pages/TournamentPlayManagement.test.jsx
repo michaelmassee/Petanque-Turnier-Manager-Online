@@ -55,7 +55,7 @@ function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registratio
     if (path === '/api/tournaments/t1/rounds' && (!options.method || options.method === 'GET')) {
       return Promise.resolve(jsonResponse({ rounds }));
     }
-    if (path === '/api/tournaments/t1/ranking') {
+    if (path === '/api/tournaments/t1/ranking?live=1') {
       return Promise.resolve(jsonResponse({ ranking }));
     }
     if (path === '/api/tournaments/t1/registrations' && (!options.method || options.method === 'GET')) {
@@ -138,7 +138,7 @@ describe('TournamentPlayManagement', () => {
     expect((await screen.findAllByText('Anna Muster')).length).toBeGreaterThan(0);
 
     await waitFor(() => expect(calls).toContain('/api/tournaments/t1/rounds'));
-    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking?live=1'));
   });
 
   it('klappt die Teilnehmerverwaltung standardmäßig ein', async () => {
@@ -184,7 +184,7 @@ describe('TournamentPlayManagement', () => {
       calls.push(path);
       if (path === '/api/tournaments/t1/start' && options.method === 'POST') return Promise.resolve(errorResponse('Das Turnier läuft bereits.'));
       if (path === '/api/tournaments/t1/rounds') return Promise.resolve(jsonResponse({ rounds: [] }));
-      if (path === '/api/tournaments/t1/ranking') return Promise.resolve(jsonResponse({ ranking: [] }));
+      if (path === '/api/tournaments/t1/ranking?live=1') return Promise.resolve(jsonResponse({ ranking: [] }));
       if (path === '/api/tournaments/t1/registrations') return Promise.resolve(jsonResponse({ registrations: CONFIRMED_REGISTRATIONS }));
       return Promise.resolve(jsonResponse({}));
     });
@@ -324,14 +324,14 @@ describe('TournamentPlayManagement', () => {
     const calls = installBulkMock([{ ...ROUND_1, matches }]);
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
     await screen.findByRole('button', { name: 'Alle speichern' });
-    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(1));
+    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking?live=1'))).toHaveLength(1));
     fireEvent.change(screen.getAllByLabelText('Punkte Team A')[0], { target: { value: '13' } });
     fireEvent.change(screen.getAllByLabelText('Punkte Team B')[0], { target: { value: '7' } });
     fireEvent.change(screen.getAllByLabelText('Punkte Team A')[2], { target: { value: '6' } });
     fireEvent.change(screen.getAllByLabelText('Punkte Team B')[2], { target: { value: '13' } });
     fireEvent.click(screen.getByRole('button', { name: 'Alle speichern' }));
     await screen.findByText(/Gespeicherte Ergebnisse:/);
-    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(2));
+    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking?live=1'))).toHaveLength(2));
     const writes = global.fetch.mock.calls.filter(([path]) => path.endsWith('/results'));
     expect(writes).toHaveLength(1);
     expect(JSON.parse(writes[0][1].body).results.map((entry) => entry.matchId)).toEqual(['m1', 'm3']);
@@ -355,7 +355,7 @@ describe('TournamentPlayManagement', () => {
       ? Promise.resolve(errorResponse('Speichern fehlgeschlagen', 500)) : original(path, options));
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
     await screen.findByRole('button', { name: 'Alle speichern' });
-    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(1));
+    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking?live=1'))).toHaveLength(1));
     screen.getAllByLabelText('Punkte Team A').forEach((input) => fireEvent.change(input, { target: { value: '13' } }));
     screen.getAllByLabelText('Punkte Team B').forEach((input) => fireEvent.change(input, { target: { value: '7' } }));
     fireEvent.click(screen.getByRole('button', { name: 'Alle speichern' }));
@@ -363,7 +363,7 @@ describe('TournamentPlayManagement', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Gespeicherte Ergebnisse: 25.');
     expect(screen.getByRole('button', { name: 'Alle speichern' })).toBeEnabled();
     expect(screen.getAllByLabelText('Punkte Team B')[25]).toHaveValue('7');
-    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(2));
+    await waitFor(() => expect(calls.filter((path) => path.endsWith('/ranking?live=1'))).toHaveLength(2));
     fireEvent.click(screen.getByRole('button', { name: 'Alle speichern' }));
     await screen.findByText('Gespeicherte Ergebnisse: 1.');
     const writes = global.fetch.mock.calls.filter(([path]) => path.endsWith('/results'));
@@ -503,7 +503,7 @@ describe('TournamentPlayManagement', () => {
     installFetchMock(calls);
     render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
     await screen.findByLabelText('Punkte Team A');
-    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking?live=1'));
     expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeDisabled();
 
     installFetchMock(calls, {
@@ -518,7 +518,7 @@ describe('TournamentPlayManagement', () => {
     expect(screen.getByRole('button', { name: 'Ergebnis ändern' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeEnabled();
     expect(screen.getByText('Rangliste').closest('details')).toHaveTextContent('Dirk Demo');
-    expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(2);
+    expect(calls.filter((path) => path.endsWith('/ranking?live=1'))).toHaveLength(2);
     expect(calls.filter((path) => path.endsWith('/registrations'))).toHaveLength(1);
 
   });
@@ -528,12 +528,12 @@ describe('TournamentPlayManagement', () => {
     installFetchMock(calls);
     render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
     await screen.findByLabelText('Punkte Team A');
-    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking?live=1'));
     fireEvent.change(screen.getByLabelText('Punkte Team A'), { target: { value: '12' } });
     fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
     expect(screen.getByLabelText('Punkte Team A')).toHaveValue('12');
     await waitFor(() => expect(calls.filter((path) => path.endsWith('/rounds'))).toHaveLength(2));
-    expect(calls.filter((path) => path.endsWith('/ranking'))).toHaveLength(1);
+    expect(calls.filter((path) => path.endsWith('/ranking?live=1'))).toHaveLength(1);
     expect(calls.filter((path) => path.endsWith('/registrations'))).toHaveLength(1);
   });
 
@@ -621,7 +621,7 @@ describe('TournamentPlayManagement', () => {
     installFetchMock(calls);
     render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
     await screen.findByLabelText('Punkte Team A');
-    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking?live=1'));
     installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 6 }] }] });
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.now() + 31_000);
@@ -638,7 +638,7 @@ describe('TournamentPlayManagement', () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     const view = render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
     await screen.findByLabelText('Punkte Team A');
-    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking'));
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking?live=1'));
     const count = calls.length;
     await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
     expect(calls).toHaveLength(count);

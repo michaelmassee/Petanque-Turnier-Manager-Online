@@ -9,6 +9,7 @@ import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from
 import { isCalendarEntry, isDocumentBound, labelFor, translatedOptions } from '../lib/domain.js';
 import { normalizeRanking } from '../lib/live-ranking.js';
 import { RankingTable } from '../components/RankingTable.jsx';
+import { formatTournamentDateTime } from '../lib/format.js';
 import { meleeTeamSize } from '../lib/pairing/melee.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
@@ -163,6 +164,63 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, n
   );
 }
 
+/**
+ * Endrangliste nach Turnierende einfrieren und öffentlich machen, auf Wunsch mit Mail-Link, Postfach und Push an alle
+ * bestätigten Teilnehmer. Ein erneuter Versand muss ausdrücklich bestätigt werden.
+ */
+export function FinalRankingPublisher({ tournament, onPublished }) {
+  const { t, i18n } = useTranslation();
+  const [notify, setNotify] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  if (tournament.type === 'ko' || isDocumentBound(tournament)) return null;
+  if (tournament.status !== 'finished') {
+    return <p className="muted">{t('Nach Turnierende kannst du hier die Endrangliste veröffentlichen.')}</p>;
+  }
+
+  async function publish(resend = false) {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      await authenticatedApi(`/api/tournaments/${tournament.id}/ranking/publish`, { method: 'POST', body: JSON.stringify({ notify, resend }) });
+      setMessage(notify ? t('Endrangliste veröffentlicht und an die Teilnehmer gesendet.') : t('Endrangliste veröffentlicht.'));
+      await onPublished?.();
+    } catch (requestError) {
+      if (requestError.payload?.details?.code === 'ranking_already_mailed') {
+        if (window.confirm(t('Die Endrangliste wurde bereits an die Teilnehmer gesendet. Noch einmal senden?'))) await publish(true);
+        return;
+      }
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="final-ranking-publish">
+      {tournament.rankingPublishedAt && (
+        <p className="muted">
+          {t('Veröffentlicht am')} {formatTournamentDateTime(tournament.rankingPublishedAt, i18n.language, tournament.timezone)}
+          {' · '}
+          <a href={`/turniere/${encodeURIComponent(tournament.id)}/rangliste`}>{t('Endrangliste ansehen')}</a>
+        </p>
+      )}
+      <label className="checkbox-field">
+        <input type="checkbox" checked={notify} onChange={(event) => setNotify(event.target.checked)} />
+        {t('An alle bestätigten Teilnehmer senden (E-Mail, Postfach, Push)')}
+      </label>
+      <Feedback message={message} />
+      <Feedback error={error} />
+      <Button disabled={busy} loading={busy} onClick={() => publish()}>
+        {tournament.rankingPublishedAt ? t('Endrangliste erneut veröffentlichen') : t('Endrangliste veröffentlichen')}
+      </Button>
+    </div>
+  );
+}
+
 export default function TournamentPlayManagement({ tournaments: managedTournaments, currentUserId, focus = null }) {
   const { t, i18n } = useTranslation();
   // Kalendereinträge sind reine Termine ohne Teilnehmer und tauchen hier gar nicht auf.
@@ -226,7 +284,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const rankingQuery = useQuery({
     // Structural query keys keep the ranking cached when a refresh changes no results.
     queryKey: [...queryKey, 'ranking', roundsQuery.data?.rounds],
-    queryFn: ({ signal }) => api(`/api/tournaments/${selectedTournamentId}/ranking`, { signal }),
+    // live=1: auch nach dem Veröffentlichen der Endrangliste den aktuellen Stand zeigen (Korrekturen sichtbar).
+    queryFn: ({ signal }) => authenticatedApi(`/api/tournaments/${selectedTournamentId}/ranking?live=1`, { signal }),
     enabled: Boolean(selectedTournament) && roundsQuery.isSuccess && !busy,
     refetchOnWindowFocus: false,
     // Alte Rangliste stehen lassen, bis die neue da ist - sonst flackert die Tabelle nach jedem Ergebnis.
@@ -666,6 +725,10 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           <div className="table-scroll">
             <RankingTable tournament={selectedTournament} entries={normalizeRanking(ranking)} />
           </div>
+          <FinalRankingPublisher
+            tournament={selectedTournament}
+            onPublished={() => queryClient.invalidateQueries({ queryKey: ['tournaments'] })}
+          />
         </details>
       )}
     </div>

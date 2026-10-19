@@ -15,6 +15,7 @@ import { PublicRegistrationPanel } from '../App.jsx';
 import { TournamentRegistrationAction } from '../components/TournamentRegistrationAction.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
+import { FinalRankingView } from '../components/FinalRankingView.jsx';
 import { normalizeRanking } from '../lib/live-ranking.js';
 
 export function TournamentInfo({ tournament, language, onShare, showTitle = true, shareToken = '', onNavigate }) {
@@ -512,6 +513,8 @@ export function TournamentDetailPage({
     teilnehmer: canShowParticipants,
     mitspieler: canShowPlayerListings,
     spielplan: canShowSchedule,
+    // Veröffentlichte Endrangliste: öffentlich, auch ohne „Teilnehmer öffentlich“.
+    rangliste: Boolean(tournament.rankingPublishedAt),
   };
   // Alte Links (z. B. /mitspieler nach dem Start) landen auf Info statt auf einer leeren Seite.
   const view = availableViews[route.view] ? route.view : 'info';
@@ -587,6 +590,7 @@ export function TournamentDetailPage({
             ['teilnehmer', t('Teilnehmer')],
             ['mitspieler', t('Mitspieler')],
             ['spielplan', t('Spielplan')],
+            ['rangliste', t('Rangliste')],
           ].filter(([key]) => availableViews[key]).map(([key, label]) => (
             <button
               key={key}
@@ -640,6 +644,8 @@ export function TournamentDetailPage({
           {view === 'mitspieler' && <TournamentPlayerListings tournament={tournament} currentUser={currentUser} navigate={navigate} />}
 
           {view === 'spielplan' && <TournamentSchedule tournamentId={tournament.id} tournament={tournament} language={language} />}
+
+          {view === 'rangliste' && <FinalRankingView tournament={tournament} language={language} shareToken={shareToken} />}
         </div>
       </section>
     </main>

@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { tournamentImageUrl } from '../lib/domain.js';
+import { blobToDataUrl, dataUrlToBytes, loadImage, loadLogo, saveBlob } from '../lib/image-data.js';
 import { DEFAULT_FLYER_CONFIG, FLYER_TEMPLATES, FLYER_VISIBLE_FIELDS, sanitizeFlyerConfig } from '../lib/flyer-config.js';
-import { FLYER_FONT_URLS } from '../lib/flyer-font-urls.js';
 import { renderFlyerPdf, renderFlyerSvg } from '../lib/flyer-render.js';
 import { buildFlyerScene, flyerFileName } from '../lib/flyer-scene.js';
-import { createFlyerTypesetter } from '../lib/flyer-text.js';
-import satoriLayoutWasmUrl from 'satori/layout.wasm?url';
+import { typesetFlyerText } from '../lib/flyer-typesetter.js';
 import { loadFlyerLocalDesign, removeFlyerBackground, saveFlyerBackground, saveFlyerBackgroundPanelTransparency, saveFlyerLocalConfig, setFlyerBackgroundActive } from '../lib/flyer-background-storage.js';
 import { DEFAULT_QR_DESIGN, sanitizeQrDesign } from '../lib/qr-design.js';
 import { loadQrLogo, toQrOptions } from '../lib/qr-style.js';
@@ -16,7 +15,6 @@ import { Button, EditDialog, Feedback, SelectField, TextField } from './ui.jsx';
 const TEMPLATE_LABELS = { modern: 'Modern', sporty: 'Sportlich', classic: 'Klassisch', background: 'Eigenes Hintergrundbild' };
 const FIELD_LABELS = { date: 'Datum', location: 'Ort', formation: 'Turnier', fees: 'Startgeld', capacity: 'Kapazität', deadline: 'Anmeldeschluss', status: 'Status', licenseRequired: 'Lizenznummer erforderlich', website: 'Website', contactName: 'Kontaktname', contactEmail: 'Kontakt-E-Mail', contactPhone: 'Kontakt-Telefon', description: 'Beschreibung' };
 const PNG_DPI = 150;
-const LOGO_MAX_PIXELS = 1200;
 // Kantenlänge des QR-Bildes: auf rund 40 mm Druckbreite gut 750 dpi.
 const QR_PIXELS = 1200;
 const BACKGROUND_MAX_BYTES = 15 * 1024 * 1024;
@@ -25,43 +23,6 @@ const IMAGE_ACCEPT = ['image', String.fromCharCode(42)].join('/');
 // Kurz warten, bis die Eingabe ruht, bevor der Flyer neu gesetzt wird.
 const PREVIEW_DELAY_MS = 150;
 
-// Modulweit, damit geladene Teilschriften und gesetzte Textblöcke beim nächsten Öffnen erhalten bleiben.
-const typesetFlyerText = createFlyerTypesetter(async (subset, weight, style) => {
-  const key = `${subset}-${weight}-${style}`;
-  const response = await fetch(FLYER_FONT_URLS[key]);
-  if (!response.ok) throw new Error(`font ${key}: ${response.status}`);
-  return response.arrayBuffer();
-}, async () => {
-  // Der Standard-Build von satori dekodiert sein eingebettetes WASM mit Node-Buffer; im Browser daher die
-  // Standalone-Variante mit layout.wasm als eigenem Asset (script-src erlaubt dafür 'wasm-unsafe-eval').
-  const [{ default: satori, init }, response] = await Promise.all([import('satori/standalone'), fetch(satoriLayoutWasmUrl)]);
-  if (!response.ok) throw new Error(`satori layout.wasm: ${response.status}`);
-  await init(await response.arrayBuffer());
-  return satori;
-});
-
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
-    image.src = src;
-  });
-}
-
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-function dataUrlToBytes(dataUrl) {
-  const binary = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
 
 function blobFromCanvas(canvas, type, quality) {
   return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('canvas'))), type, quality));
@@ -90,24 +51,6 @@ async function prepareBackground(blob) {
 }
 
 /**
- * Lädt das Logo über den Bild-Proxy und normalisiert es zu PNG: Das SVG braucht eine Data-URL
- * (als <img> lädt es keine externen Bilder), das PDF kann nur PNG/JPEG einbetten.
- */
-async function loadLogo(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`logo: ${response.status}`);
-  const image = await loadImage(await blobToDataUrl(await response.blob()));
-  if (!image.naturalWidth || !image.naturalHeight) return null;
-  const scale = Math.min(1, LOGO_MAX_PIXELS / Math.max(image.naturalWidth, image.naturalHeight));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(image.naturalWidth * scale);
-  canvas.height = Math.round(image.naturalHeight * scale);
-  canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-  const dataUrl = canvas.toDataURL('image/png');
-  return { width: image.naturalWidth, height: image.naturalHeight, dataUrl, png: dataUrlToBytes(dataUrl) };
-}
-
-/**
  * Derselbe QR-Code wie im QR-Dialog: gespeichertes Design des Turniers, immer mit PTM-Logo.
  * Als PNG-Data-URL, damit SVG (als <img>) und PDF ihn ohne Nachladen einbetten können.
  */
@@ -133,17 +76,6 @@ async function svgToPng(svgUrl, page) {
   canvas.height = Math.round(page.height * pixelsPerMm);
   canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
   return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('png'))), 'image/png'));
-}
-
-function saveBlob(blob, name) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /** Flyer-Editor: Gespeichert wird nur die Gestaltung, PNG/PDF entstehen lokal und werden nur heruntergeladen. */

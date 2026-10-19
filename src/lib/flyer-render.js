@@ -62,21 +62,26 @@ export async function renderFlyerPdf(svg, page, { title } = {}) {
   const [{ jsPDF }, { svg2pdf }] = await Promise.all([import('jspdf'), import('svg2pdf.js')]);
   const pdf = new jsPDF({ unit: 'mm', format: [page.width, page.height], orientation: 'portrait', compress: true });
   if (title) pdf.setProperties({ title });
-  const element = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
-  // svg2pdf liest berechnete Styles; dafür muss das SVG kurz (unsichtbar) im Dokument hängen.
-  const host = document.createElement('div');
-  host.style.position = 'fixed';
-  host.style.left = '-10000px';
-  host.style.top = '0';
-  host.style.width = '0';
-  host.style.height = '0';
-  host.style.overflow = 'hidden';
-  host.append(document.importNode(element, true));
-  document.body.append(host);
-  try {
-    await svg2pdf(host.firstElementChild, pdf, { x: 0, y: 0, width: page.width, height: page.height });
-  } finally {
-    host.remove();
+  // Mehrseitige Dokumente (Ranglisten-PDF) übergeben ein SVG je Seite.
+  const pages = Array.isArray(svg) ? svg : [svg];
+  for (const [index, pageSvg] of pages.entries()) {
+    if (index > 0) pdf.addPage([page.width, page.height], 'portrait');
+    const element = new DOMParser().parseFromString(pageSvg, 'image/svg+xml').documentElement;
+    // svg2pdf liest berechnete Styles; dafür muss das SVG kurz (unsichtbar) im Dokument hängen.
+    const host = document.createElement('div');
+    host.style.position = 'fixed';
+    host.style.left = '-10000px';
+    host.style.top = '0';
+    host.style.width = '0';
+    host.style.height = '0';
+    host.style.overflow = 'hidden';
+    host.append(document.importNode(element, true));
+    document.body.append(host);
+    try {
+      await svg2pdf(host.firstElementChild, pdf, { x: 0, y: 0, width: page.width, height: page.height });
+    } finally {
+      host.remove();
+    }
   }
   return pdf.output('arraybuffer');
 }

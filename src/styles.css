@@ -3396,8 +3396,82 @@ a.left-panel-link {
   z-index: 1;
 }
 
-.ranking-table thead tr:last-child th {
-  top: 32px;
+/* Veröffentlichte Endrangliste: Kopf mit Vereinslogo links, PTM-Logo rechts */
+.final-ranking {
+  display: grid;
+  gap: 16px;
+}
+
+.final-ranking-header {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.final-ranking-header h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.final-ranking-header p {
+  margin: 4px 0 0;
+}
+
+.final-ranking-logo {
+  display: block;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+
+.final-ranking-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.final-ranking-publish {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e5e9f0;
+}
+
+.final-ranking-publish p {
+  margin: 0;
+}
+
+@media (max-width: 560px) {
+  .final-ranking-header {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 8px;
+  }
+
+  .final-ranking-logo {
+    width: 44px;
+    height: 44px;
+  }
+
+  .final-ranking-actions .button,
+  .final-ranking-publish .button {
+    width: 100%;
+  }
+}
+
+@media print {
+  .topbar,
+  .tournament-detail-heading,
+  .tournament-detail-tabs,
+  .final-ranking-actions {
+    display: none !important;
+  }
+
+  .final-ranking .table-scroll {
+    max-height: none;
+    overflow: visible;
+  }
 }
 
 @media (max-width: 560px) {
@@ -3413,10 +3487,6 @@ a.left-panel-link {
   .ranking-table td {
     padding: 5px 6px;
     font-size: 0.78rem;
-  }
-
-  .ranking-table thead tr:last-child th {
-    top: 26px;
   }
 
   .ranking-table td[data-i18n-skip] {
@@ -3860,10 +3930,6 @@ details[open] > .play-round-summary::before {
 }
 
 /* Einzeilige Kopfzeile: die allgemeine Regel versetzt die letzte Kopfzeile um 32px (zweizeilige Tabellen). */
-.live-ranking .ranking-table thead tr:last-child th {
-  top: 0;
-}
-
 .ranking-table tbody tr.live-own-row {
   background: #ecf4ff;
   font-weight: 700;
