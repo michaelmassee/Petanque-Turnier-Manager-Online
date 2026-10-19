@@ -4576,3 +4576,10 @@ button.rental-slot:not(:disabled):hover { outline: 2px solid #087a72; outline-of
   .rental-offer-row { grid-template-columns: auto 1fr; }
   .rental-offer-row .row-actions { grid-column: 1 / -1; }
 }
+.rental-manage-club { display: grid; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e2e7f0; }
+.rental-manage-section + .rental-manage-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e7f0; }
+.rental-manage-section .section-title { margin-bottom: 12px; }
+.rental-section-heading { display: flex; align-items: center; gap: 10px; }
+.rental-section-heading h3 { margin: 0; }
+.rental-section-heading .counter { min-width: 28px; padding: 3px 8px; font-size: 0.85rem; }
+.rental-manage-section > p.muted, .rental-manage-section > p.hint { margin: 0; }

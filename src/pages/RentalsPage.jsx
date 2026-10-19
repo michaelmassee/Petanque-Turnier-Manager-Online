@@ -461,47 +461,56 @@ export function RentalManagement({ language, navigate }) {
   );
 
   return (
-    <div className="panel">
-      <div className="section-title">
-        <h2>{t('Vermietung verwalten')}</h2>
-      </div>
+    <div className="panel rental-manage">
       <Feedback message={message} />
       <Feedback error={error} />
       {clubs && clubs.length > 1 && (
-        <SelectField label={t('Verein')} value={clubId} onChange={setClubId} options={clubs.map((club) => ({ value: club.id, label: club.name }))} />
+        <div className="rental-manage-club">
+          <SelectField label={t('Verein')} value={clubId} onChange={setClubId} options={clubs.map((club) => ({ value: club.id, label: club.name }))} />
+        </div>
       )}
       {!data && !error && <p className="muted">{t('Wird geladen…')}</p>}
       {data && <>
-        <h3>{t('Offene Anfragen')} <span className="counter">{requests.length}</span></h3>
-        {requests.length === 0 ? <p className="muted">{t('Keine offenen Anfragen.')}</p> : (
-          <div className="user-list">{requests.map((reservation) => reservationRow(reservation, ['confirm', 'reject']))}</div>
-        )}
-        <h3>{t('Bestätigte Reservierungen')} <span className="counter">{confirmed.length}</span></h3>
-        {confirmed.length === 0 ? <p className="muted">{t('Keine kommenden Reservierungen.')}</p> : (
-          <div className="user-list">{confirmed.map((reservation) => reservationRow(reservation, ['cancel']))}</div>
-        )}
-        <div className="section-title">
-          <h3>{t('Angebote')}</h3>
-          <Button disabled={!data.places.length} onClick={() => openOffer()}>{t('Neues Angebot')}</Button>
-        </div>
-        {!data.places.length && <p className="hint">{t('Dein Verein hat noch keinen Spielort. Lege ihn unter „Meine Vereine“ an.')}</p>}
-        {data.offers.length === 0 && data.places.length > 0 && <p className="muted">{t('Noch keine Angebote.')}</p>}
-        <div className="user-list">
-          {data.offers.map((offer) => (
-            <article className="data-row" key={offer.id}>
-              <div>
-                <strong data-i18n-skip>{offer.title}</strong>
-                <OfferSummary offer={offer} language={language} />
-                <span>{offer.status === 'active' ? t('Aktiv (öffentlich buchbar)') : t('Pausiert')}</span>
-              </div>
-              <div className="row-actions">
-                <Button variant="secondary" onClick={() => navigate(`/platz-mieten/${encodeURIComponent(offer.id)}`)}>{t('Kalender')}</Button>
-                <Button variant="secondary" disabled={deletingId === offer.id} onClick={() => openOffer(offer)}>{t('Bearbeiten')}</Button>
-                <Button variant="danger" loading={deletingId === offer.id} onClick={() => removeOffer(offer)}>{t('Löschen')}</Button>
-              </div>
-            </article>
-          ))}
-        </div>
+        <section className="rental-manage-section">
+          <div className="section-title">
+            <div className="rental-section-heading"><h3>{t('Offene Anfragen')}</h3><span className="counter">{requests.length}</span></div>
+          </div>
+          {requests.length === 0 ? <p className="muted">{t('Keine offenen Anfragen.')}</p> : (
+            <div className="user-list">{requests.map((reservation) => reservationRow(reservation, ['confirm', 'reject']))}</div>
+          )}
+        </section>
+        <section className="rental-manage-section">
+          <div className="section-title">
+            <div className="rental-section-heading"><h3>{t('Bestätigte Reservierungen')}</h3><span className="counter">{confirmed.length}</span></div>
+          </div>
+          {confirmed.length === 0 ? <p className="muted">{t('Keine kommenden Reservierungen.')}</p> : (
+            <div className="user-list">{confirmed.map((reservation) => reservationRow(reservation, ['cancel']))}</div>
+          )}
+        </section>
+        <section className="rental-manage-section">
+          <div className="section-title">
+            <div className="rental-section-heading"><h3>{t('Angebote')}</h3><span className="counter">{data.offers.length}</span></div>
+            <Button disabled={!data.places.length} onClick={() => openOffer()}>{t('Neues Angebot')}</Button>
+          </div>
+          {!data.places.length && <p className="hint">{t('Dein Verein hat noch keinen Spielort. Lege ihn unter „Meine Vereine“ an.')}</p>}
+          {data.offers.length === 0 && data.places.length > 0 && <p className="muted">{t('Noch keine Angebote.')}</p>}
+          <div className="user-list">
+            {data.offers.map((offer) => (
+              <article className="data-row" key={offer.id}>
+                <div>
+                  <strong data-i18n-skip>{offer.title}</strong>
+                  <OfferSummary offer={offer} language={language} />
+                  <span>{offer.status === 'active' ? t('Aktiv (öffentlich buchbar)') : t('Pausiert')}</span>
+                </div>
+                <div className="row-actions">
+                  <Button variant="secondary" onClick={() => navigate(`/platz-mieten/${encodeURIComponent(offer.id)}`)}>{t('Kalender')}</Button>
+                  <Button variant="secondary" disabled={deletingId === offer.id} onClick={() => openOffer(offer)}>{t('Bearbeiten')}</Button>
+                  <Button variant="danger" loading={deletingId === offer.id} onClick={() => removeOffer(offer)}>{t('Löschen')}</Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
       </>}
 
       <EditDialog open={Boolean(dialog)} wide title={dialog === 'new' ? t('Neues Angebot') : t('Angebot bearbeiten')} error={dialogError} onClose={() => setDialog(null)}>
