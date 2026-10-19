@@ -120,6 +120,24 @@ describe('Turnierdetail-Reiter', () => {
     expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/ranking', expect.anything());
   });
 
+  it('ersetzt nach dem Veröffentlichen den Spielplan durch die Rangliste (höchstens vier Reiter)', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ ranking: [], publishedAt: '2099-06-01T18:00:00.000Z' })));
+
+    renderDetail(tournamentWith({ status: 'finished', rankingPublishedAt: '2099-06-01T18:00:00.000Z' }), 'spielplan');
+
+    expect(tabNames()).toEqual(['Info', 'Teilnehmer', 'Rangliste']);
+    expect(screen.getByRole('button', { name: 'Rangliste' })).toHaveAttribute('aria-current', 'page');
+    await screen.findByRole('button', { name: 'PDF herunterladen' });
+  });
+
+  it('zeigt nach Turnierende ohne veröffentlichte Rangliste weiter den Spielplan', () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ rounds: [], ranking: [] })));
+
+    renderDetail(tournamentWith({ status: 'finished' }));
+
+    expect(tabNames()).toEqual(['Info', 'Teilnehmer', 'Spielplan']);
+  });
+
   it('erkennt die Ranglisten-Route und blendet den Reiter ohne Veröffentlichung aus', () => {
     expect(matchTournamentRoute('/turniere/t1/rangliste')).toEqual({ id: 't1', view: 'rangliste' });
     global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ rounds: [], ranking: [] })));

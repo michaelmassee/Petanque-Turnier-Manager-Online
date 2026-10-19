@@ -501,12 +501,13 @@ export function TournamentDetailPage({
 
   const canRegister = (tournament.visibility === 'public' || Boolean(shareToken)) && tournament.registrationEnabled !== false && hasOpenRegistration(tournament);
   const canShowParticipants = (tournament.participantsPublic || tournament.canManage) && tournament.registrationEnabled !== false;
-  // Vor dem Start interessieren Mitspielgesuche, danach der Spielplan – so bleiben es auf
-  // kleinen Handys höchstens vier Reiter.
+  // Der letzte Reiter wechselt mit dem Status – vor dem Start Mitspielgesuche, während des Turniers der Spielplan,
+  // nach dem Veröffentlichen die Endrangliste –, so bleiben es auf kleinen Handys höchstens vier Reiter.
   const started = tournament.status === 'running' || tournament.status === 'finished';
   const canShowPlayerListings = tournament.visibility === 'public' && !started;
   // Mit verbundenem Turnierdokument auch für Systeme ohne Online-Durchführung (Poule, Kaskade, …).
-  const canShowSchedule = canShowParticipants && (isOnlinePlayable(tournament) || isDocumentBound(tournament)) && started;
+  const rankingPublished = Boolean(tournament.rankingPublishedAt);
+  const canShowSchedule = canShowParticipants && (isOnlinePlayable(tournament) || isDocumentBound(tournament)) && started && !rankingPublished;
   const availableViews = {
     info: true,
     anmelden: canRegister,
@@ -514,10 +515,12 @@ export function TournamentDetailPage({
     mitspieler: canShowPlayerListings,
     spielplan: canShowSchedule,
     // Veröffentlichte Endrangliste: öffentlich, auch ohne „Teilnehmer öffentlich“.
-    rangliste: Boolean(tournament.rankingPublishedAt),
+    rangliste: rankingPublished,
   };
-  // Alte Links (z. B. /mitspieler nach dem Start) landen auf Info statt auf einer leeren Seite.
-  const view = availableViews[route.view] ? route.view : 'info';
+  // Alte Links (z. B. /mitspieler nach dem Start) landen auf Info statt auf einer leeren Seite; ein Spielplan-Link
+  // nach dem Veröffentlichen direkt auf der Endrangliste.
+  const requestedView = route.view === 'spielplan' && rankingPublished ? 'rangliste' : route.view;
+  const view = availableViews[requestedView] ? requestedView : 'info';
   // Wer über den Anmelde-/QR-Link kommt, obwohl gerade keine Anmeldung möglich ist, landet auf Info – mit Grund.
   const registrationUnavailable = route.view === 'anmelden' && view !== 'anmelden';
 

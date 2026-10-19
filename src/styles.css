@@ -1825,7 +1825,8 @@ a.left-panel-link {
 }
 
 .tournament-detail-tab {
-  flex: 1 1 0;
+  /* Breite nach Inhalt, Rest gleichmäßig verteilt: gleich breite Reiter brachen „Teilnehmer“ auf dem Handy um. */
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 40px;
   padding: 6px 8px;
@@ -1848,6 +1849,20 @@ a.left-panel-link {
   .tournament-detail-tab {
     padding: 6px 4px;
     font-size: 14px;
+  }
+}
+
+/* Sehr schmale Handys: vier Reiter mit langen Begriffen (z. B. „Participants“, „Partenaires“) bleiben einzeilig. */
+@media (max-width: 400px) {
+  .tournament-detail-tab {
+    padding: 6px 2px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 340px) {
+  .tournament-detail-tab {
+    font-size: 12px;
   }
 }
 
