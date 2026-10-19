@@ -4346,10 +4346,20 @@ export async function deleteUser(db, id, currentUserId, deleteTournaments) {
 
 // Turnierlisten in JS sortieren statt per ORDER BY: D1 zählt die Zeilen des temporären Sortier-B-Trees zusätzlich als
 // gelesene Zeilen, das verdoppelte die Lesekosten der meistaufgerufenen Abfrage (D1-Tageslimit für gelesene Zeilen).
+// Kein localeCompare: der erste Aufruf legt je Isolate einen ICU-Collator an (~8 ms CPU). Datum und Startzeit sind
+// ISO-Text und lassen sich direkt vergleichen; der Name nur nach Kleinschreibung ohne Akzente.
+function plainCompare(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function tournamentNameSortKey(name) {
+  return name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 export function sortTournamentRows(rows) {
-  return rows.sort((left, right) => left.date.localeCompare(right.date)
-    || (left.start_time || '').localeCompare(right.start_time || '')
-    || left.name.localeCompare(right.name));
+  return rows.sort((left, right) => plainCompare(left.date, right.date)
+    || plainCompare(left.start_time || '', right.start_time || '')
+    || plainCompare(tournamentNameSortKey(left.name), tournamentNameSortKey(right.name)));
 }
 
 async function listTournaments(db, user) {
@@ -5057,12 +5067,42 @@ function localDateTimeParts(date, timeZone) {
   return `${value('year')}-${value('month')}-${value('day')}T${value('hour')}:${value('minute')}`;
 }
 
+// Selbst mit Cache kostet das erste Intl.DateTimeFormat mit Zeitzone je Isolate ~15 ms CPU (ICU lädt die
+// Zeitzonendaten), bei wenig Traffic also fast jeden Aufruf der Turnierliste. Für die MEZ-Zonen, in denen nahezu alle
+// Turniere liegen, gilt seit 1996 einheitlich die EU-Regel: MESZ vom letzten Märzsonntag bis zum letzten Oktobersonntag,
+// jeweils 01:00 UTC. Andere Zonen und Jahre laufen weiter über Intl.
+const EU_CENTRAL_TIME_ZONES = new Set([
+  'Europe/Amsterdam', 'Europe/Andorra', 'Europe/Belgrade', 'Europe/Berlin', 'Europe/Bratislava', 'Europe/Brussels',
+  'Europe/Budapest', 'Europe/Busingen', 'Europe/Copenhagen', 'Europe/Gibraltar', 'Europe/Ljubljana', 'Europe/Luxembourg',
+  'Europe/Madrid', 'Europe/Malta', 'Europe/Monaco', 'Europe/Oslo', 'Europe/Paris', 'Europe/Podgorica', 'Europe/Prague',
+  'Europe/Rome', 'Europe/San_Marino', 'Europe/Sarajevo', 'Europe/Skopje', 'Europe/Stockholm', 'Europe/Tirane',
+  'Europe/Vaduz', 'Europe/Vatican', 'Europe/Vienna', 'Europe/Warsaw', 'Europe/Zagreb', 'Europe/Zurich',
+]);
+
+function lastSundayOneAmUtc(year, monthIndex) {
+  const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0, 1));
+  return lastDay.getTime() - lastDay.getUTCDay() * 86400000;
+}
+
+function euCentralOffsetMinutes(instantMillis) {
+  const year = new Date(instantMillis).getUTCFullYear();
+  return instantMillis >= lastSundayOneAmUtc(year, 2) && instantMillis < lastSundayOneAmUtc(year, 9) ? 120 : 60;
+}
+
 export function zonedDateTimeToUtcIso(value, timeZone) {
   if (!value) return null;
   const [datePart, timePart] = value.split('T');
   const [year, month, day] = datePart.split('-').map(Number);
   const [hour, minute] = timePart.split(':').map(Number);
   const naiveMillis = Date.UTC(year, month - 1, day, hour, minute);
+  if (EU_CENTRAL_TIME_ZONES.has(timeZone) && year >= 1996 && year <= 2099) {
+    // Wie unten: früheste passende Ortszeit; fällt sie in die Lücke der Sommerzeitumstellung, passt keine.
+    const match = [120, 60].find((offset) => euCentralOffsetMinutes(naiveMillis - offset * 60000) === offset);
+    if (match === undefined) {
+      throw new HttpError(400, 'Die eingegebene Ortszeit existiert wegen der Sommerzeitumstellung nicht.');
+    }
+    return new Date(naiveMillis - match * 60000).toISOString();
+  }
   const offsets = new Set([-86400000, 0, 86400000].map((delta) => {
     const instant = new Date(naiveMillis + delta);
     const rendered = localDateTimeParts(instant, timeZone);

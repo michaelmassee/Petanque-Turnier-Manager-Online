@@ -12,4 +12,9 @@ describe('sortTournamentRows', () => {
     ];
     expect(sortTournamentRows(rows).map((row) => row.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
   });
+
+  it('sortiert Namen ohne Rücksicht auf Groß-/Kleinschreibung und Akzente', () => {
+    const rows = ['Zeller Cup', 'Élan', 'apfel', 'Ärger'].map((name) => ({ id: name, date: '2026-10-12', start_time: null, name }));
+    expect(sortTournamentRows(rows).map((row) => row.id)).toEqual(['apfel', 'Ärger', 'Élan', 'Zeller Cup']);
+  });
 });
