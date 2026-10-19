@@ -223,6 +223,7 @@ export function normalizeSyncSettings(body, tournament) {
     if (!FORMATIONS.includes(formation)) throw new HttpError(400, 'Ungültige Formation');
     const registrationType = tournament.registration_type || 'forme';
     if (formation === 'tete' && registrationType !== 'forme') throw new HttpError(400, 'Formation Tête ist nur mit dem Anmeldetyp Formée möglich');
+    assertFormationChangeAllowed(tournament, formation, false);
     columns.formation = formation;
     columns.formation_other = 0;
   }
@@ -241,6 +242,22 @@ export function normalizeSyncSettings(body, tournament) {
     columns.ko_platz3 = body.koPlatz3 ? 1 : 0;
   }
   return columns;
+}
+
+/**
+ * Liegen Anmeldungen vor (aktiv oder Warteliste), bleibt die Formation fest – im Web wie aus dem Turnierdokument.
+ * Sonst passten die vorhandenen Anmeldungen nicht mehr zur Teamgröße.
+ */
+export function assertFormationChangeAllowed(existing, formation, formationOther) {
+  const changed = formation !== existing.formation
+    || Boolean(formationOther) !== Boolean(Number(existing.formation_other || 0));
+  if (!changed) return;
+  const registrations = Number(existing.active_registrations || 0) + Number(existing.waitlist_registrations || 0);
+  if (registrations > 0) {
+    throw new HttpError(409, 'Die Formation kann nicht mehr geändert werden, weil bereits Anmeldungen vorliegen.', {
+      code: 'formation_locked',
+    });
+  }
 }
 
 export function assertPartnerCountMatchesFormation(tournament, registration) {

@@ -1512,5 +1512,6 @@
   "Ergebnismeldungen durch Spieler sind nur mit freigeschalteter Live-Ansicht möglich.": "Players can only report results when the live view is enabled.",
   "Live-Ansicht nicht aktiviert": "Live view not enabled",
   "Die Turnierleitung hat die Live-Ansicht für dieses Turnier nicht freigeschaltet. Paarungen, Ergebnisse und Rangliste erscheinen hier erst nach der Freischaltung.": "The tournament organizers have not enabled the live view for this tournament. Pairings, results and standings will appear here once it is enabled.",
-  "Die Live-Ansicht wurde für dieses Turnier nicht freigeschaltet": "The live view has not been enabled for this tournament"
+  "Die Live-Ansicht wurde für dieses Turnier nicht freigeschaltet": "The live view has not been enabled for this tournament",
+  "Die Formation kann nicht mehr geändert werden, weil bereits Anmeldungen vorliegen.": "The formation can no longer be changed because registrations already exist."
 }

@@ -39,6 +39,7 @@ import {
   normalizeQrDesign,
   isDocumentBound,
   normalizeSyncSettings,
+  assertFormationChangeAllowed,
 } from './worker-core.js';
 import { normalizeRanking } from './lib/live-ranking.js';
 import { parseStoredQrDesign } from './lib/qr-design.js';
@@ -5511,6 +5512,7 @@ async function updateTournament(request, env, existing, user) {
   if (selectedPlace) body = { ...body, location: selectedPlace.address, latitude: selectedPlace.latitude, longitude: selectedPlace.longitude };
   const tournament = normalizeCoreTournamentInput(body);
   await assertDraftTransitionAllowed(db, existing, tournament.status);
+  assertFormationChangeAllowed(existing, tournament.formation, tournament.formationOther);
   if (existing.type === 'schweizer' && existing.status === 'running'
     && tournament.schweizerRankingMode !== (existing.schweizer_ranking_mode || 'mit_buchholz')) {
     throw new HttpError(409, 'Der Schweizer Ranglistenmodus kann nach Turnierstart nicht geändert werden');

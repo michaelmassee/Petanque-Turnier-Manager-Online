@@ -14,7 +14,7 @@ import { AdminDashboardPage, CloudflareUsagePanel } from './pages/AdminDashboard
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
 import { RichText } from './components/RichText.jsx';
 import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
-import { clubLogoImageUrl, clubMatchesTournament, formatLocationAddress, hasOnlineRegistrationAvailable, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
+import { clubLogoImageUrl, clubMatchesTournament, formatLocationAddress, hasOnlineRegistrationAvailable, hasRegistrations, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
 
 describe('Turnier-Payload', () => {
   it('behält den Verein eines bearbeiteten Kalendereintrags bei', () => {
@@ -72,6 +72,45 @@ describe('Turnier-Payload', () => {
     const ownerEntry = screen.getByText('Lea Leitung').closest('li');
     expect(within(ownerEntry).getByText('Owner')).toBeInTheDocument();
     vi.restoreAllMocks();
+  });
+
+  it('sperrt die Formation, sobald Anmeldungen vorliegen', () => {
+    render(
+      <TournamentForm
+        form={{ ...EMPTY_TOURNAMENT_FORM, id: 't1', registrationEnabled: true, formation: 'doublette' }}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        onCancel={() => {}}
+        mode="edit"
+        language="de"
+        formationLocked
+      />,
+    );
+
+    expect(screen.getByLabelText(/^Formation/)).toBeDisabled();
+    expect(screen.getByText('Die Formation kann nicht mehr geändert werden, weil bereits Anmeldungen vorliegen.')).toBeInTheDocument();
+  });
+
+  it('zählt aktive Anmeldungen und Wartelistenplätze als vorhandene Anmeldungen', () => {
+    expect(hasRegistrations({ activeRegistrations: 0, waitlistRegistrations: 0 })).toBe(false);
+    expect(hasRegistrations({ activeRegistrations: 1, waitlistRegistrations: 0 })).toBe(true);
+    expect(hasRegistrations({ activeRegistrations: 0, waitlistRegistrations: 2 })).toBe(true);
+    expect(hasRegistrations(undefined)).toBe(false);
+  });
+
+  it('lässt die Formation ohne Anmeldungen änderbar', () => {
+    render(
+      <TournamentForm
+        form={{ ...EMPTY_TOURNAMENT_FORM, id: 't1', registrationEnabled: true, formation: 'doublette' }}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        onCancel={() => {}}
+        mode="edit"
+        language="de"
+      />,
+    );
+
+    expect(screen.getByLabelText(/^Formation/)).toBeEnabled();
   });
 
   it('erfasst Teilnehmerfragen in einer mehrzeiligen Textbox', () => {

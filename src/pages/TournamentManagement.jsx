@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
-import { isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, registrationNotYetOpen, registrationStatusLabel, tournamentPayload, translatedOptions } from '../lib/domain.js';
+import { hasRegistrations, isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, registrationNotYetOpen, registrationStatusLabel, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
 import { Feedback, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
@@ -289,7 +289,7 @@ function venuePlaceFor(places, candidate) {
   return matches.find((place) => place.clubName) || matches[0] || null;
 }
 
-export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, owner, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [] }) {
+export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, owner, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [], formationLocked = false }) {
   const { t } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
   const [showFormationHelp, setShowFormationHelp] = useState(false);
@@ -378,12 +378,16 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         </div>
       )}
       {isCalendarEntry ? (
-        <SelectField
-          label={t('Formation')}
-          value={form.formation}
-          onChange={(formation) => setForm({ ...form, formation })}
-          options={translatedOptions(FORMATIONS)}
-        />
+        <>
+          <SelectField
+            label={t('Formation')}
+            value={form.formation}
+            onChange={(formation) => setForm({ ...form, formation })}
+            options={translatedOptions(FORMATIONS)}
+            disabled={formationLocked}
+          />
+          {formationLocked && <p className="hint">{t('Die Formation kann nicht mehr geändert werden, weil bereits Anmeldungen vorliegen.')}</p>}
+        </>
       ) : (
         <>
           <div className="form-section-header">
@@ -402,6 +406,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
                 registrationType: formation === 'tete' ? 'forme' : form.registrationType,
               })}
               options={translatedOptions(form.registrationType === 'supermelee' ? FORMATIONS.filter((option) => option.value !== 'tete' && option.value !== 'andere') : FORMATIONS)}
+              disabled={formationLocked}
             />
             <SelectField
               label={t('Anmeldetyp')}
@@ -423,6 +428,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               disabled={form.registrationType === 'supermelee'}
             />
           </div>
+          {formationLocked && <p className="hint">{t('Die Formation kann nicht mehr geändert werden, weil bereits Anmeldungen vorliegen.')}</p>}
           {form.type === 'schweizer' && (
             <SelectField
               label={t('Schweizer Ranglistenmodus')}
@@ -1226,6 +1232,8 @@ export function TournamentManagementPage({
     }
   }
 
+  const editedTournament = tournaments.find((item) => item.id === form.id);
+
   return (
     <>
       {!dialogOpen && (
@@ -1278,7 +1286,7 @@ export function TournamentManagementPage({
           onCancel={closeDialog}
           mode={mode}
           isAdmin={isAdmin}
-          owner={tournaments.find((item) => item.id === form.id)?.owner}
+          owner={editedTournament?.owner}
           editorCandidates={userCandidates.filter((recipient) => recipient.id !== form.ownerId)}
           ownerCandidates={userCandidates}
           onOwnerChanged={handleOwnerChanged}
@@ -1288,6 +1296,7 @@ export function TournamentManagementPage({
           saving={saving}
           invalidField={invalidField}
           clubNames={clubNames}
+          formationLocked={mode === 'edit' && hasRegistrations(editedTournament)}
         />
       </EditDialog>
 

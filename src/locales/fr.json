@@ -1512,5 +1512,6 @@
   "Ergebnismeldungen durch Spieler sind nur mit freigeschalteter Live-Ansicht möglich.": "Les joueurs ne peuvent déclarer des résultats que si la vue en direct est activée.",
   "Live-Ansicht nicht aktiviert": "Vue en direct non activée",
   "Die Turnierleitung hat die Live-Ansicht für dieses Turnier nicht freigeschaltet. Paarungen, Ergebnisse und Rangliste erscheinen hier erst nach der Freischaltung.": "L'organisation n'a pas activé la vue en direct pour ce tournoi. Les tirages, résultats et le classement apparaîtront ici après l'activation.",
-  "Die Live-Ansicht wurde für dieses Turnier nicht freigeschaltet": "La vue en direct n'a pas été activée pour ce tournoi"
+  "Die Live-Ansicht wurde für dieses Turnier nicht freigeschaltet": "La vue en direct n'a pas été activée pour ce tournoi",
+  "Die Formation kann nicht mehr geändert werden, weil bereits Anmeldungen vorliegen.": "La formation ne peut plus être modifiée, car des inscriptions existent déjà."
 }

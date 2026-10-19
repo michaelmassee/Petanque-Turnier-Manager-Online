@@ -95,12 +95,27 @@ describe('Verbundenes Turnier: Dokument ist Master', () => {
 
     it('überschreibt die Online-Werte, auch nach dem Start', async () => {
       sql("UPDATE tournaments SET status = 'running', desktop_execution = 1 WHERE id = 't1'");
+      sql("DELETE FROM registrations WHERE tournament_id = 't1'");
 
       const response = await settings({ formation: 'triplette', schweizerRankingMode: 'mit_buchholz', formuleXRounds: 6, koPlatz3: false });
 
       expect(response.status).toBe(200);
       expect(turnier()).toMatchObject({ formation: 'triplette', formation_other: 0, schweizer_ranking_mode: 'mit_buchholz',
         formule_x_rounds: 6, ko_platz3: 0 });
+    });
+
+    it('lehnt eine Formationsänderung ab, sobald Anmeldungen vorliegen', async () => {
+      await expect(settings({ formation: 'triplette' })).rejects.toMatchObject({
+        status: 409, details: { code: 'formation_locked' },
+      });
+      expect(turnier().formation).toBe('tete');
+    });
+
+    it('übernimmt die unveränderte Formation trotz Anmeldungen', async () => {
+      const response = await settings({ formation: 'tete', formuleXRounds: 5 });
+
+      expect(response.status).toBe(200);
+      expect(turnier()).toMatchObject({ formation: 'tete', formule_x_rounds: 5 });
     });
 
     it('übernimmt nur die übergebenen Werte', async () => {

@@ -255,6 +255,11 @@ export function hasOpenRegistration(tournament) {
   return tournament.activeRegistrations < tournament.maxRegistrations || Boolean(tournament.waitlistEnabled);
 }
 
+/** Aktive Anmeldungen oder Wartelistenplätze vorhanden – dann bleibt die Formation fest. */
+export function hasRegistrations(tournament) {
+  return Number(tournament?.activeRegistrations || 0) + Number(tournament?.waitlistRegistrations || 0) > 0;
+}
+
 /** Kalendereintrag = reiner Termin ohne Anmeldeverfahren; nie online durchführbar, kein Broadcast. */
 export function isCalendarEntry(tournament) {
   return tournament.registrationEnabled === false;
