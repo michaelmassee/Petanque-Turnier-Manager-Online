@@ -1531,5 +1531,9 @@
   "Für dieses Turnier gibt es keine veröffentlichbare Rangliste": "Ce tournoi n’a pas de classement publiable",
   "Es gibt noch keine Rangliste": "Il n’y a pas encore de classement",
   "Die Rangliste wurde bereits an die Teilnehmer gesendet": "Le classement a déjà été envoyé aux participants",
-  "{{name}}: Die Endrangliste ist veröffentlicht.": "{{name}} : le classement final a été publié."
+  "{{name}}: Die Endrangliste ist veröffentlicht.": "{{name}} : le classement final a été publié.",
+  "In der aktuellen Runde fehlen noch Ergebnisse. Diese Spiele zählen nicht für die Rangliste. Turnier trotzdem abschließen?": "Des résultats manquent encore dans la manche en cours. Ces parties ne compteront pas pour le classement. Terminer quand même le tournoi ?",
+  "Turnier abschließen? Danach können keine weiteren Runden gestartet werden.": "Terminer le tournoi ? Aucune autre manche ne pourra ensuite être lancée.",
+  "Turnier abgeschlossen. Im Bereich „Rangliste“ kannst du jetzt die Endrangliste veröffentlichen.": "Tournoi terminé. Tu peux maintenant publier le classement final dans la section « Classement ».",
+  "Turnier abschließen": "Terminer le tournoi"
 }

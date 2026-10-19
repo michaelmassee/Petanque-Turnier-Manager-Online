@@ -1531,5 +1531,9 @@
   "Für dieses Turnier gibt es keine veröffentlichbare Rangliste": "Este torneo no tiene una clasificación que se pueda publicar",
   "Es gibt noch keine Rangliste": "Todavía no hay clasificación",
   "Die Rangliste wurde bereits an die Teilnehmer gesendet": "La clasificación ya se envió a los participantes",
-  "{{name}}: Die Endrangliste ist veröffentlicht.": "{{name}}: se ha publicado la clasificación final."
+  "{{name}}: Die Endrangliste ist veröffentlicht.": "{{name}}: se ha publicado la clasificación final.",
+  "In der aktuellen Runde fehlen noch Ergebnisse. Diese Spiele zählen nicht für die Rangliste. Turnier trotzdem abschließen?": "Aún faltan resultados en la ronda actual. Estas partidas no contarán para la clasificación. ¿Finalizar el torneo de todos modos?",
+  "Turnier abschließen? Danach können keine weiteren Runden gestartet werden.": "¿Finalizar el torneo? Después no se podrán iniciar más rondas.",
+  "Turnier abgeschlossen. Im Bereich „Rangliste“ kannst du jetzt die Endrangliste veröffentlichen.": "Torneo finalizado. Ahora puedes publicar la clasificación final en la sección «Clasificación».",
+  "Turnier abschließen": "Finalizar torneo"
 }

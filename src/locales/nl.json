@@ -1531,5 +1531,9 @@
   "Für dieses Turnier gibt es keine veröffentlichbare Rangliste": "Voor dit toernooi is er geen rangschikking om te publiceren",
   "Es gibt noch keine Rangliste": "Er is nog geen rangschikking",
   "Die Rangliste wurde bereits an die Teilnehmer gesendet": "De rangschikking is al naar de deelnemers gestuurd",
-  "{{name}}: Die Endrangliste ist veröffentlicht.": "{{name}}: de eindrangschikking is gepubliceerd."
+  "{{name}}: Die Endrangliste ist veröffentlicht.": "{{name}}: de eindrangschikking is gepubliceerd.",
+  "In der aktuellen Runde fehlen noch Ergebnisse. Diese Spiele zählen nicht für die Rangliste. Turnier trotzdem abschließen?": "In de huidige ronde ontbreken nog uitslagen. Deze partijen tellen niet mee voor de rangschikking. Toernooi toch afsluiten?",
+  "Turnier abschließen? Danach können keine weiteren Runden gestartet werden.": "Toernooi afsluiten? Daarna kunnen geen rondes meer worden gestart.",
+  "Turnier abgeschlossen. Im Bereich „Rangliste“ kannst du jetzt die Endrangliste veröffentlichen.": "Toernooi afgesloten. In het gedeelte ‘Ranglijst’ kun je nu de eindrangschikking publiceren.",
+  "Turnier abschließen": "Toernooi afsluiten"
 }

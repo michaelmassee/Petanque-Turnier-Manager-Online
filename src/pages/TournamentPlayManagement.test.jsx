@@ -127,6 +127,46 @@ describe('TournamentPlayManagement', () => {
     localStorage.clear();
   });
 
+  it('bietet „Turnier abschließen“ direkt nach „Nächste Runde starten“ an, auch bei offenen Ergebnissen', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, visibility: 'public' }]} language="de" />);
+
+    await screen.findByRole('button', { name: 'Turnier abschließen' });
+    // RoundAction wird bei jedem Rendern neu eingehängt: erst nach dem Laden aller Daten frisch abfragen.
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/registrations'));
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking?live=1'));
+    const finish = screen.getByRole('button', { name: 'Turnier abschließen' });
+    const next = screen.getByRole('button', { name: 'Nächste Runde starten' });
+    expect(next).toBeDisabled();
+    expect(finish).toBeEnabled();
+    expect(next.compareDocumentPosition(finish) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(finish);
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('In der aktuellen Runde fehlen noch Ergebnisse'));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/publication', expect.objectContaining({
+      method: 'PUT', body: JSON.stringify({ status: 'finished', visibility: 'public' }),
+    })));
+    expect(await screen.findByText(/Turnier abgeschlossen\./)).toBeInTheDocument();
+  });
+
+  it('schließt ohne Bestätigung nicht ab', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+
+    await screen.findByRole('button', { name: 'Turnier abschließen' });
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking?live=1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Turnier abschließen' }));
+
+    expect(confirm).toHaveBeenCalled();
+
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/tournaments/t1/publication', expect.anything());
+  });
+
   it('lädt die aktuelle Runde und die Rangliste für das ausgewählte Turnier', async () => {
     const calls = [];
     installFetchMock(calls, { ranking: [{ rank: 1, playerId: 'p1', firstName: 'Anna', lastName: 'Muster', wins: 1, gameDiff: 1, pointsFor: 13, pointsAgainst: 7 }] });

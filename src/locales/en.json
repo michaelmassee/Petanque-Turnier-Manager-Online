@@ -1531,5 +1531,9 @@
   "Für dieses Turnier gibt es keine veröffentlichbare Rangliste": "There are no standings to publish for this tournament",
   "Es gibt noch keine Rangliste": "There are no standings yet",
   "Die Rangliste wurde bereits an die Teilnehmer gesendet": "The standings have already been sent to the participants",
-  "{{name}}: Die Endrangliste ist veröffentlicht.": "{{name}}: the final standings have been published."
+  "{{name}}: Die Endrangliste ist veröffentlicht.": "{{name}}: the final standings have been published.",
+  "In der aktuellen Runde fehlen noch Ergebnisse. Diese Spiele zählen nicht für die Rangliste. Turnier trotzdem abschließen?": "Results are still missing in the current round. These games will not count towards the standings. Finish the tournament anyway?",
+  "Turnier abschließen? Danach können keine weiteren Runden gestartet werden.": "Finish the tournament? No further rounds can be started afterwards.",
+  "Turnier abgeschlossen. Im Bereich „Rangliste“ kannst du jetzt die Endrangliste veröffentlichen.": "Tournament finished. You can now publish the final standings in the “Ranking” section.",
+  "Turnier abschließen": "Finish tournament"
 }

@@ -245,6 +245,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [finishing, setFinishing] = useState(false);
   const [quickPlayer, setQuickPlayer] = useState({ firstName: '', lastName: '', licenseNr: '' });
   // Der `tournaments`-Prop kommt vom Elternteil und wird nicht sofort neu geladen,
   // nachdem hier der Status auf "Läuft" gesetzt wurde - deshalb lokal vormerken,
@@ -407,6 +408,29 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       setError(err.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Abschließen ist auch mit offener aktueller Runde möglich (z. B. Zeitlimit); deren Spiele ohne Ergebnis zählen
+  // nicht für die Rangliste. Nutzt denselben Statuswechsel wie die Turnierverwaltung (inkl. Statusmeldungen).
+  async function handleFinishTournament() {
+    const question = currentRoundOpen
+      ? t('In der aktuellen Runde fehlen noch Ergebnisse. Diese Spiele zählen nicht für die Rangliste. Turnier trotzdem abschließen?')
+      : t('Turnier abschließen? Danach können keine weiteren Runden gestartet werden.');
+    if (!window.confirm(question)) return;
+    setFinishing(true);
+    setError('');
+    setMessage('');
+    try {
+      await authenticatedApi(`/api/tournaments/${selectedTournamentId}/publication`, {
+        method: 'PUT', body: JSON.stringify({ status: 'finished', visibility: selectedTournament.visibility }),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+      setMessage(t('Turnier abgeschlossen. Im Bereich „Rangliste“ kannst du jetzt die Endrangliste veröffentlichen.'));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setFinishing(false);
     }
   }
 
@@ -599,9 +623,14 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
             {missingRequirements.map((requirement) => <p className="hint" key={requirement}>{requirement}</p>)}
           </div>
         )}
-        <Button disabled={busy || !selectedTournamentId || !canGenerateRound} loading={busy} onClick={handleNewRound}>
+        <Button disabled={busy || finishing || !selectedTournamentId || !canGenerateRound} loading={busy} onClick={handleNewRound}>
           {currentRound ? t('Nächste Runde starten') : t('Erste Runde starten')}
         </Button>
+        {currentRound && (
+          <Button variant="secondary" disabled={busy || finishing} loading={finishing} onClick={handleFinishTournament}>
+            {t('Turnier abschließen')}
+          </Button>
+        )}
       </div>
     );
   }
@@ -720,7 +749,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       )}
 
       {Boolean(ranking.length) && (
-        <details className="panel ranking-panel">
+        <details className="panel ranking-panel" open={selectedTournamentStatus === 'finished' && !selectedTournament?.rankingPublishedAt}>
           <summary className="play-round-summary"><span>{t('Rangliste')}</span></summary>
           <div className="table-scroll">
             <RankingTable tournament={selectedTournament} entries={normalizeRanking(ranking)} />
