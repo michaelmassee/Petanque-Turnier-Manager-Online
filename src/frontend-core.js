@@ -3,7 +3,7 @@ export function filterTournaments(tournaments, query, statusFilter) {
   return tournaments.filter((tournament) => (!statusFilter || tournament.status === statusFilter) && (!normalizedQuery || [tournament.name, tournament.location].some((value) => (value || '').toLowerCase().includes(normalizedQuery))));
 }
 
-export function filterRegistrations(registrations, query, statusFilter, { organizerMessageFilter = '', questionFilter = '', feeFilter = '' } = {}) {
+export function filterRegistrations(registrations, query, statusFilter, { organizerMessageFilter = '', questionFilter = '', feeFilter = '', vipFilter = '' } = {}) {
   const normalizedQuery = (query || '').trim().toLowerCase();
   return registrations.filter((registration) => {
     const matchesStatus = !statusFilter || registration.status === statusFilter;
@@ -14,7 +14,10 @@ export function filterRegistrations(registrations, query, statusFilter, { organi
       (organizerMessageFilter === 'without_message' && !hasMessage);
     const matchesQuestion = !questionFilter || (registration.registrationAnswers || []).some((answer) => answer.questionId === questionFilter && answer.checked);
     const matchesFee = !feeFilter || (registration.feeSelections || []).some((selection) => selection.tariffId === feeFilter);
-    return matchesStatus && matchesQuery && matchesMessage && matchesQuestion && matchesFee;
+    const matchesVip = !vipFilter ||
+      (vipFilter === 'vip' && Boolean(registration.isVip)) ||
+      (vipFilter === 'not_vip' && !registration.isVip);
+    return matchesStatus && matchesQuery && matchesMessage && matchesQuestion && matchesFee && matchesVip;
   });
 }
 

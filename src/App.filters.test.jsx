@@ -60,6 +60,14 @@ describe('filterRegistrations', () => {
     expect(filterRegistrations([...detailedRegistrations, { id: 'r3', firstName: null, lastName: '', teamName: null, status: 'pending', registrationAnswers: [{ questionId: 'meal', checked: false }]}], '', '', { questionFilter: 'meal' })).toEqual([detailedRegistrations[0]]);
     expect(filterRegistrations([...detailedRegistrations, { id: 'r3', firstName: null, lastName: '', teamName: null, status: 'pending' }], 'unbekannt', '', { organizerMessageFilter: 'unknown', questionFilter: 'unknown', feeFilter: 'unknown' })).toEqual([]);
   });
+
+  it('filtert nach VIP', () => {
+    const vipRegistrations = [{ ...registrations[0], isVip: true }, { ...registrations[1], isVip: false }, { ...registrations[1], id: 'r3' }];
+
+    expect(filterRegistrations(vipRegistrations, '', '', { vipFilter: 'vip' })).toEqual([vipRegistrations[0]]);
+    expect(filterRegistrations(vipRegistrations, '', '', { vipFilter: 'not_vip' })).toEqual([vipRegistrations[1], vipRegistrations[2]]);
+    expect(filterRegistrations(vipRegistrations, '', '', { vipFilter: 'unknown' })).toEqual([]);
+  });
 });
 
 describe('filterUsers', () => {

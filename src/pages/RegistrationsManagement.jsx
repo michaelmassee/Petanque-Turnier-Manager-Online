@@ -447,6 +447,8 @@ export function RegistrationsPanel({
   onQuestionFilterChange,
   feeFilter = '',
   onFeeFilterChange,
+  vipFilter = '',
+  onVipFilterChange,
   onResetFilters,
   onEdit,
   onMessage,
@@ -466,7 +468,7 @@ export function RegistrationsPanel({
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [csvNamesOnly, setCsvNamesOnly] = useState(false);
   const [csvConfirmedOnly, setCsvConfirmedOnly] = useState(false);
-  const filtered = Boolean(query.trim()) || Boolean(statusFilter) || Boolean(organizerMessageFilter) || Boolean(questionFilter) || Boolean(feeFilter);
+  const filtered = Boolean(query.trim()) || Boolean(statusFilter) || Boolean(organizerMessageFilter) || Boolean(questionFilter) || Boolean(feeFilter) || Boolean(vipFilter);
   const pendingRegistrations = filteredRegistrations.filter((registration) => registration.status === 'pending');
   const otherRegistrations = filteredRegistrations.filter((registration) => registration.status !== 'pending');
   const visiblePendingRegistrations = useInfiniteList(pendingRegistrations);
@@ -544,6 +546,7 @@ export function RegistrationsPanel({
           { label: t('Nachricht an Turnierleitung'), value: organizerMessageFilter, onChange: onOrganizerMessageFilterChange, options: [{ value: '', label: t('Alle Nachrichten') }, { value: 'with_message', label: t('Mit Nachricht') }, { value: 'without_message', label: t('Ohne Nachricht') }] },
           { label: t('Frage beantwortet'), value: questionFilter, onChange: onQuestionFilterChange, options: [{ value: '', label: t('Alle Fragen') }, ...questionOptions] },
           { label: t('Tarif ausgewählt'), value: feeFilter, onChange: onFeeFilterChange, options: [{ value: '', label: t('Alle Tarife') }, ...feeOptions] },
+          { label: t('VIP'), value: vipFilter, onChange: onVipFilterChange, options: [{ value: '', label: t('Alle Meldungen') }, { value: 'vip', label: t('Nur VIP') }, { value: 'not_vip', label: t('Ohne VIP') }] },
         ]}
         onReset={onResetFilters}
         resetDisabled={!filtered}
@@ -611,6 +614,7 @@ export function RegistrationsManagementPage({
   const [organizerMessageFilter, setOrganizerMessageFilter] = useState('');
   const [questionFilter, setQuestionFilter] = useState('');
   const [feeFilter, setFeeFilter] = useState('');
+  const [vipFilter, setVipFilter] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_REGISTRATION_FORM);
   const [invalidField, setInvalidField] = useState(null);
@@ -657,8 +661,8 @@ export function RegistrationsManagementPage({
   }, [tournament?.id, manageMode]);
 
   const filteredRegistrations = useMemo(
-    () => filterRegistrations(registrations, query, statusFilter, { organizerMessageFilter, questionFilter, feeFilter }),
-    [registrations, query, statusFilter, organizerMessageFilter, questionFilter, feeFilter],
+    () => filterRegistrations(registrations, query, statusFilter, { organizerMessageFilter, questionFilter, feeFilter, vipFilter }),
+    [registrations, query, statusFilter, organizerMessageFilter, questionFilter, feeFilter, vipFilter],
   );
 
   function handleTournamentChange(tournamentId) {
@@ -668,6 +672,7 @@ export function RegistrationsManagementPage({
     setOrganizerMessageFilter('');
     setQuestionFilter('');
     setFeeFilter('');
+    setVipFilter('');
   }
 
   useEffect(() => {
@@ -843,7 +848,9 @@ export function RegistrationsManagementPage({
         onQuestionFilterChange={setQuestionFilter}
         feeFilter={feeFilter}
         onFeeFilterChange={setFeeFilter}
-        onResetFilters={() => { setQuery(''); setStatusFilter(''); setOrganizerMessageFilter(''); setQuestionFilter(''); setFeeFilter(''); }}
+        vipFilter={vipFilter}
+        onVipFilterChange={setVipFilter}
+        onResetFilters={() => { setQuery(''); setStatusFilter(''); setOrganizerMessageFilter(''); setQuestionFilter(''); setFeeFilter(''); setVipFilter(''); }}
         onEdit={openEdit}
         onMessage={openTeamMessage}
         onConfirm={handleConfirm}

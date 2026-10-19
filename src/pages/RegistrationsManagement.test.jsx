@@ -258,6 +258,39 @@ describe('Anmeldungsverwaltung: Anmeldedetails', () => {
     expect(screen.getByRole('heading', { name: 'Teilnehmerfragen' }).parentElement).toHaveTextContent(/Vegetarisches Essen\?: Hauptspieler/);
   });
 
+  it('bietet einen VIP-Filter an', () => {
+    const noop = () => {};
+    const onVipFilterChange = vi.fn();
+    render(
+      <RegistrationsPanel
+        tournament={TOURNAMENT}
+        registrations={[REGISTRATION_WITH_FEES]}
+        filteredRegistrations={[REGISTRATION_WITH_FEES]}
+        tournaments={[TOURNAMENT]}
+        onTournamentChange={noop}
+        onCreate={noop}
+        query=""
+        onQueryChange={noop}
+        statusFilter=""
+        onStatusFilterChange={noop}
+        vipFilter="vip"
+        onVipFilterChange={onVipFilterChange}
+        onResetFilters={noop}
+        onEdit={noop}
+        onConfirm={noop}
+        onConfirmAll={noop}
+        onDelete={noop}
+        busyId=""
+      />,
+    );
+
+    const select = screen.getByLabelText('VIP');
+    expect(select).toHaveValue('vip');
+    expect(screen.getByRole('button', { name: /Filter zurücksetzen/ })).toBeEnabled();
+    fireEvent.change(select, { target: { value: 'not_vip' } });
+    expect(onVipFilterChange).toHaveBeenCalledWith('not_vip');
+  });
+
   it('zeigt keinen Details-Schalter ohne Zusatzangaben', () => {
     renderPanel([{ id: 'r2', firstName: 'Ben', lastName: 'Gast', status: 'confirmed' }]);
 
