@@ -115,7 +115,19 @@ describe('Platz mieten', () => {
     env.DB.sqlite.exec("UPDATE clubs SET status = 'pending' WHERE id = 'c1'");
     expect((await (await call('GET', '/api/rentals')).json()).offers).toEqual([]);
     const manage = await (await call('GET', '/api/rentals/manage?club=c1', { headers: VEREIN })).json();
+    expect(manage.clubStatus).toBe('pending');
     expect(manage.offers).toEqual([expect.objectContaining({ id: offer.id, status: 'active', isPublic: false })]);
+    const created = await call('POST', '/api/rentals/offers', { headers: VEREIN, body: offerBody });
+    expect(created.status).toBe(409);
+    const updated = await call('PUT', `/api/rentals/offers/${offer.id}`, { headers: VEREIN, body: offerBody });
+    expect(updated.status).toBe(409);
+  });
+
+  it('lehnt Angebote an nicht freigegebenen Spielorten ab', async () => {
+    env.DB.sqlite.exec("UPDATE boule_places SET status = 'pending' WHERE id = 'p1'");
+    const created = await call('POST', '/api/rentals/offers', { headers: VEREIN, body: offerBody });
+    expect(created.status).toBe(400);
+    expect((await (await call('GET', '/api/rentals/manage?club=c1', { headers: VEREIN })).json()).places).toEqual([]);
   });
 
   it('schickt die Mails über die Queue an den Verein und an den Mieter', async () => {

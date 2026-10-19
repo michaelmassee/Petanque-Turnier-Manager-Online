@@ -9821,27 +9821,34 @@ async function decideRentalReservation(request, env, reservationId, user, origin
 
 async function listRentalManagement(db, clubId, user) {
   if (!clubId) throw new HttpError(400, 'Verein fehlt', { field: 'club' });
-  await assertClubEditor(db, clubId, user);
+  const club = await assertClubEditor(db, clubId, user);
   const now = new Date().toISOString();
   const [offers, hours, places, reservations] = await Promise.all([
     db.prepare(`${RENTAL_OFFER_SELECT} WHERE o.club_id = ? ORDER BY o.title COLLATE NOCASE`).bind(clubId).all(),
     db.prepare('SELECT h.* FROM rental_opening_hours h JOIN rental_offers o ON o.id = h.offer_id WHERE o.club_id = ? ORDER BY h.weekday').bind(clubId).all(),
-    db.prepare("SELECT id, name, court_count, venue_type, status FROM boule_places WHERE club_id = ? AND status != 'rejected' ORDER BY name COLLATE NOCASE").bind(clubId).all(),
+    db.prepare("SELECT id, name, court_count, venue_type, status FROM boule_places WHERE club_id = ? AND status = 'published' ORDER BY name COLLATE NOCASE").bind(clubId).all(),
     db.prepare(`${RENTAL_RESERVATION_SELECT} WHERE o.club_id = ? AND r.end_utc > ? AND r.status IN ('requested', 'confirmed')
       ORDER BY r.start_utc LIMIT 300`).bind(clubId, now).all(),
   ]);
   const hoursByOffer = new Map();
   for (const row of hours.results || []) hoursByOffer.set(row.offer_id, [...(hoursByOffer.get(row.offer_id) || []), row]);
   return json({
+    clubStatus: club.status,
     offers: (offers.results || []).map((row) => toRentalOffer(row, toOpeningHours(hoursByOffer.get(row.id) || []))),
     places: (places.results || []).map((row) => ({ id: row.id, name: row.name, courtCount: Number(row.court_count || 0), venueType: row.venue_type || 'outdoor', status: row.status })),
     reservations: (reservations.results || []).map((row) => toRentalReservation(row, { withRenter: true })),
   });
 }
 
+// Vermieten darf nur ein freigegebener Verein an einem freigegebenen Spielort, sonst wäre das Angebot öffentlich unsichtbar.
+function assertRentalClubPublished(club) {
+  if (club.status !== 'published') throw new HttpError(409, 'Angebote sind erst möglich, wenn der Verein freigegeben ist');
+}
+
 async function rentalPlaceForClub(db, clubId, placeId) {
-  const place = await db.prepare('SELECT id, latitude, longitude FROM boule_places WHERE id = ? AND club_id = ?').bind(placeId, clubId).first();
+  const place = await db.prepare('SELECT id, latitude, longitude, status FROM boule_places WHERE id = ? AND club_id = ?').bind(placeId, clubId).first();
   if (!place) throw new HttpError(400, 'Der Platz gehört nicht zu diesem Verein', { field: 'placeId' });
+  if (place.status !== 'published') throw new HttpError(400, 'Der Spielort ist noch nicht freigegeben', { field: 'placeId' });
   return place;
 }
 
@@ -9856,7 +9863,7 @@ function openingHourStatements(db, offerId, openingHours) {
 async function createRentalOffer(request, db, user) {
   const body = await readJson(request);
   const clubId = String(body.clubId || '');
-  await assertClubEditor(db, clubId, user);
+  assertRentalClubPublished(await assertClubEditor(db, clubId, user));
   const input = normalizeOfferInput(body);
   const place = await rentalPlaceForClub(db, clubId, input.placeId);
   const timezone = resolveTournamentTimezone({ latitude: Number(place.latitude ?? NaN), longitude: Number(place.longitude ?? NaN) });
@@ -9874,7 +9881,7 @@ async function createRentalOffer(request, db, user) {
 
 async function updateRentalOffer(request, db, id, user) {
   const existing = await loadRentalOffer(db, id);
-  await assertClubEditor(db, existing.club_id, user);
+  assertRentalClubPublished(await assertClubEditor(db, existing.club_id, user));
   const input = normalizeOfferInput(await readJson(request));
   const place = await rentalPlaceForClub(db, existing.club_id, input.placeId);
   const timezone = resolveTournamentTimezone({ latitude: Number(place.latitude ?? NaN), longitude: Number(place.longitude ?? NaN) });

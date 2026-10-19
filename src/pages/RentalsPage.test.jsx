@@ -73,6 +73,7 @@ describe('Platz mieten: Vereinsverwaltung', () => {
   afterEach(() => vi.clearAllMocks());
 
   const MANAGE = {
+    clubStatus: 'published',
     offers: [OFFER],
     places: [{ id: 'p1', name: 'Halle Nord', courtCount: 6, venueType: 'indoor', status: 'published' }],
     reservations: [{ id: 'r1', offerId: 'o1', date: '2026-10-24', startHour: 9, hours: 2, lanes: 2, status: 'requested', renterName: 'Max Mieter', renterEmail: 'max@example.test', note: 'Training' }],
@@ -138,5 +139,17 @@ describe('Platz mieten: Vereinsverwaltung', () => {
       clubId: 'c1', placeId: 'p1', title: 'Halle abends', laneCount: 6, priceMinor: 750,
       openingHours: [{ weekday: 1, openHour: 10, closeHour: 20 }],
     });
+  });
+
+  it('sperrt neue Angebote, solange der Verein nicht freigegeben ist', async () => {
+    authenticatedApi.mockImplementation(async (path) => {
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true }] };
+      return { ...MANAGE, clubStatus: 'pending' };
+    });
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+
+    expect(await screen.findByText(/Dein Verein ist noch nicht freigegeben/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Neues Angebot' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
   });
 });

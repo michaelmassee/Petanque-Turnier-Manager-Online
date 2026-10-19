@@ -1637,5 +1637,8 @@
   "Alle Mietangebote": "All rental offers",
   "Platz mieten Übersicht": "Court rental overview",
   "gefundene Mietangebote – zur Liste springen": "rental offers found – jump to list",
-  "Aktiv – öffentlich sichtbar, sobald Verein und Spielort freigegeben sind": "Active – publicly visible once the club and venue are approved"
+  "Aktiv – öffentlich sichtbar, sobald Verein und Spielort freigegeben sind": "Active – publicly visible once the club and venue are approved",
+  "Dein Verein ist noch nicht freigegeben. Angebote kannst du anlegen, sobald ein Admin ihn freigegeben hat.": "Your club has not been approved yet. You can create offers once an admin has approved it.",
+  "Angebote sind erst möglich, wenn der Verein freigegeben ist": "Offers are only possible once the club has been approved",
+  "Der Spielort ist noch nicht freigegeben": "The venue has not been approved yet"
 }

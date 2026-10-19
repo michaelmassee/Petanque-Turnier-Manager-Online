@@ -1637,5 +1637,8 @@
   "Alle Mietangebote": "Toutes les offres de location",
   "Platz mieten Übersicht": "Aperçu de la location de terrains",
   "gefundene Mietangebote – zur Liste springen": "offres de location trouvées – aller à la liste",
-  "Aktiv – öffentlich sichtbar, sobald Verein und Spielort freigegeben sind": "Active – visible publiquement dès que le club et le lieu sont validés"
+  "Aktiv – öffentlich sichtbar, sobald Verein und Spielort freigegeben sind": "Active – visible publiquement dès que le club et le lieu sont validés",
+  "Dein Verein ist noch nicht freigegeben. Angebote kannst du anlegen, sobald ein Admin ihn freigegeben hat.": "Ton club n’a pas encore été validé. Tu pourras créer des offres dès qu’un administrateur l’aura validé.",
+  "Angebote sind erst möglich, wenn der Verein freigegeben ist": "Les offres ne sont possibles qu’une fois le club validé",
+  "Der Spielort ist noch nicht freigegeben": "Le lieu n’a pas encore été validé"
 }
