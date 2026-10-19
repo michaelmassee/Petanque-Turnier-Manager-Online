@@ -2795,6 +2795,23 @@ a.left-panel-link {
   color: #4a5160;
 }
 
+/* Status-Badge der Turnierkarte: freie Plätze grün, Warteliste orange, Anmeldung öffnet erst blau, keine Anmeldung
+   möglich rot. */
+.status-waitlist {
+  background: #fff1df;
+  color: #a35200;
+}
+
+.status-upcoming {
+  background: #ecf4ff;
+  color: #0a5fd1;
+}
+
+.status-closed {
+  background: #ffecec;
+  color: #9d2424;
+}
+
 .tournament-card.calendar-entry {
   border-style: dashed;
   background: #f7f8fa;

@@ -14,7 +14,7 @@ import { AdminDashboardPage, CloudflareUsagePanel } from './pages/AdminDashboard
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
 import { RichText } from './components/RichText.jsx';
 import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
-import { clubLogoImageUrl, clubMatchesTournament, formatLocationAddress, hasOnlineRegistrationAvailable, hasRegistrations, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
+import { clubLogoImageUrl, clubMatchesTournament, formatLocationAddress, hasOnlineRegistrationAvailable, hasRegistrations, registrationStatusClass, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
 
 describe('Turnier-Payload', () => {
   it('behält den Verein eines bearbeiteten Kalendereintrags bei', () => {
@@ -142,10 +142,15 @@ describe('Turnier-Payload', () => {
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: true }, 'en')).toBe('Running');
   });
 
-  it('zeigt bei vollem Turnier mit aktiver Warteliste die Wartelisten-Anmeldung, auch ohne Wartende', () => {
+  it('zeigt bei vollem Turnier mit aktiver Warteliste die Wartelisten-Anmeldung in Orange, auch ohne Wartende', () => {
     const full = { status: 'registration', registrationEnabled: true, maxRegistrations: 20, activeRegistrations: 20, waitlistRegistrations: 0, waitlistEnabled: true, registrationDeadline: '2099-01-01T00:00:00.000Z' };
-    expect(registrationStatusLabel(full, 'de')).toBe('Warteliste');
-    expect(registrationStatusLabel(full, 'en')).toBe('Waitlist');
+    expect(registrationStatusLabel(full, 'de')).toBe('Anmeldung Warteliste möglich');
+    expect(registrationStatusClass(full)).toBe('status-waitlist');
+    expect(registrationStatusClass({ ...full, activeRegistrations: 18 })).toBe('status-registration');
+    expect(registrationStatusClass({ ...full, waitlistEnabled: false })).toBe('status-closed');
+    expect(registrationStatusClass({ ...full, registrationOpensAt: '2099-01-01T00:00:00.000Z' })).toBe('status-upcoming');
+    expect(registrationStatusClass({ ...full, registrationEnabled: false })).toBe('status-calendar');
+    expect(registrationStatusClass({ ...full, status: 'finished' })).toBe('status-finished');
     expect(registrationStatusLabel({ ...full, waitlistEnabled: false }, 'de')).toBe('Anmeldung nicht mehr möglich');
     expect(registrationStatusLabel({ ...full, waitlistRegistrations: 3, registrationDeadline: '2000-01-01T00:00:00.000Z' }, 'de')).toBe('Anmeldung nicht mehr möglich');
     expect(registrationStatusLabel({ ...full, activeRegistrations: 18 }, 'de')).toBe('2 von 20 Plätzen frei');

@@ -288,38 +288,47 @@ export const REGISTERED_COUNT_TEMPLATES = {
   fr: (count) => `${count} inscrits`,
 };
 
+/**
+ * Anmeldezustand für das Status-Badge der Turnierkarte: calendar, running, closed (von Hand geschlossen), started
+ * (Turnierbeginn erreicht), upcoming (Anmeldung öffnet erst), unavailable (Frist vorbei oder voll ohne Warteliste),
+ * waitlist (voll, Anmeldung auf die Warteliste), open; sonst der Turnierstatus selbst.
+ */
+export function registrationStatusKind(tournament) {
+  if (isCalendarEntry(tournament)) return 'calendar';
+  if (tournament.status === 'running') return 'running';
+  if (tournament.status !== 'registration') return tournament.status;
+  if (tournament.registrationClosed) return 'closed';
+  if (tournament.startsAt && new Date(tournament.startsAt).getTime() <= Date.now()) return 'started';
+  if (registrationNotYetOpen(tournament)) return 'upcoming';
+  if (tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now()) return 'unavailable';
+  const isFull = Boolean(tournament.maxRegistrations) && tournament.activeRegistrations >= tournament.maxRegistrations;
+  // Voll, aber mit Warteliste: Anmeldung geht weiter (wie hasOpenRegistration), auch wenn noch niemand wartet.
+  if (isFull) return tournament.waitlistEnabled ? 'waitlist' : 'unavailable';
+  return 'open';
+}
+
+const STATUS_BADGE_CLASSES = {
+  calendar: 'status-calendar', running: 'status-running', closed: 'status-closed', started: 'status-closed',
+  unavailable: 'status-closed', upcoming: 'status-upcoming', waitlist: 'status-waitlist', open: 'status-registration',
+};
+
+/** CSS-Klasse des Status-Badges: freie Plätze grün, Warteliste orange, keine Anmeldung mehr möglich rot. */
+export function registrationStatusClass(tournament) {
+  const kind = registrationStatusKind(tournament);
+  return STATUS_BADGE_CLASSES[kind] || `status-${kind}`;
+}
+
 export function registrationStatusLabel(tournament, language) {
-  if (isCalendarEntry(tournament)) {
-    return i18next.t('Kalendereintrag', { lng: language });
-  }
-
-  if (tournament.status === 'running') {
-    return i18next.t('Läuft', { lng: language });
-  }
-
-  if (tournament.status === 'registration' && tournament.registrationClosed) {
-    return i18next.t('Anmeldung geschlossen', { lng: language });
-  }
-
-  if (tournament.status === 'registration' && tournament.startsAt && new Date(tournament.startsAt).getTime() <= Date.now()) {
-    return i18next.t('Die Anmeldung ist mit Turnierbeginn geschlossen', { lng: language });
-  }
-
-  if (tournament.status === 'registration' && registrationNotYetOpen(tournament)) {
+  const kind = registrationStatusKind(tournament);
+  if (kind === 'calendar') return i18next.t('Kalendereintrag', { lng: language });
+  if (kind === 'running') return i18next.t('Läuft', { lng: language });
+  if (kind === 'closed') return i18next.t('Anmeldung geschlossen', { lng: language });
+  if (kind === 'started') return i18next.t('Die Anmeldung ist mit Turnierbeginn geschlossen', { lng: language });
+  if (kind === 'upcoming') {
     return `${i18next.t('Anmeldung ab', { lng: language })} ${formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}`;
   }
-
-  const deadlinePassed = tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now();
-  const isFull = Boolean(tournament.maxRegistrations) && tournament.activeRegistrations >= tournament.maxRegistrations;
-  const registrationOpen = tournament.status === 'registration' && !deadlinePassed;
-
-  if (!registrationOpen) {
-    return i18next.t('Anmeldung nicht mehr möglich', { lng: language });
-  }
-  // Voll, aber mit Warteliste: Anmeldung geht weiter (wie hasOpenRegistration), auch wenn noch niemand wartet.
-  if (isFull) {
-    return i18next.t(tournament.waitlistEnabled ? 'Warteliste' : 'Anmeldung nicht mehr möglich', { lng: language });
-  }
+  if (kind === 'waitlist') return i18next.t('Anmeldung Warteliste möglich', { lng: language });
+  if (kind !== 'open') return i18next.t('Anmeldung nicht mehr möglich', { lng: language });
 
   if (!tournament.maxRegistrations) {
     return (REGISTERED_COUNT_TEMPLATES[language] || REGISTERED_COUNT_TEMPLATES.de)(tournament.activeRegistrations || 0);
