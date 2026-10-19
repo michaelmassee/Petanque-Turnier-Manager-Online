@@ -562,7 +562,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
                 <div>
                   <strong data-i18n-skip>{offer.title}</strong>
                   <OfferSummary offer={offer} />
-                  <span>{offer.status === 'active' ? t('Aktiv (öffentlich buchbar)') : t('Pausiert')}</span>
+                  <span>{offer.status !== 'active' ? t('Pausiert') : offer.isPublic ? t('Aktiv (öffentlich buchbar)') : t('Aktiv – öffentlich sichtbar, sobald Verein und Spielort freigegeben sind')}</span>
                 </div>
                 <div className="row-actions">
                   <Button variant="secondary" onClick={() => navigate(`/platz-mieten/${encodeURIComponent(offer.id)}`)}>{t('Kalender')}</Button>

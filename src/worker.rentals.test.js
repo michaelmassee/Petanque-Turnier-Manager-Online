@@ -110,6 +110,14 @@ describe('Platz mieten', () => {
     expect((await call('DELETE', `/api/rentals/offers/${offer.id}`, { headers: VEREIN })).status).toBe(409);
   });
 
+  it('blendet Angebote nicht freigegebener Vereine öffentlich aus und kennzeichnet sie in der Verwaltung', async () => {
+    const offer = await createOffer();
+    env.DB.sqlite.exec("UPDATE clubs SET status = 'pending' WHERE id = 'c1'");
+    expect((await (await call('GET', '/api/rentals')).json()).offers).toEqual([]);
+    const manage = await (await call('GET', '/api/rentals/manage?club=c1', { headers: VEREIN })).json();
+    expect(manage.offers).toEqual([expect.objectContaining({ id: offer.id, status: 'active', isPublic: false })]);
+  });
+
   it('schickt die Mails über die Queue an den Verein und an den Mieter', async () => {
     const send = vi.fn(async () => {});
     env.MAIL_QUEUE = { send };

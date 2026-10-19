@@ -9573,7 +9573,7 @@ function toRentalOffer(row, openingHours = null) {
     title: row.title, description: row.description || null, laneCount: Number(row.lane_count),
     priceMinor: row.price_minor === null ? null : Number(row.price_minor), currency: row.currency, priceNote: row.price_note || null,
     minHours: Number(row.min_hours), maxHours: Number(row.max_hours), bookingHorizonDays: Number(row.booking_horizon_days),
-    timezone: row.timezone, status: row.status,
+    timezone: row.timezone, status: row.status, isPublic: rentalOfferIsPublic(row),
     ...(openingHours ? { openingHours } : {}),
   };
 }
