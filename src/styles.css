@@ -1750,6 +1750,12 @@ a.left-panel-link {
   gap: 10px;
 }
 
+/* Neben dem Anmelden-Button wird das Status-Badge so hoch wie der Button; Text dann mittig statt oben. */
+.tournament-card-meta .status {
+  display: flex;
+  align-items: center;
+}
+
 .empty-state {
   display: grid;
   gap: 10px;
