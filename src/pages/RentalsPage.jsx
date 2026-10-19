@@ -376,6 +376,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
   const { t } = useTranslation();
   const [clubs, setClubs] = useState(null);
   const [clubId, setClubId] = useState('');
+  const [hasUnpublishedClub, setHasUnpublishedClub] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -389,7 +390,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
   const [deciding, setDeciding] = useState(false);
   const isAdmin = currentUser?.role === 'admin';
   const clubEntries = useMemo(() => (clubs || []).map((club) => {
-    const meta = [club.status === 'published' ? '' : t('nicht freigegeben'), club.placeCount !== undefined ? t('Spielorte: {{places}}', { places: club.placeCount }) : ''].filter(Boolean).join(' · ');
+    const meta = club.placeCount !== undefined ? t('Spielorte: {{places}}', { places: club.placeCount }) : '';
     return {
       id: club.id, value: club.id, label: club.name, meta: meta || undefined, searchText: club.name.toLowerCase(),
       group: club.own ? t('Meine Vereine') : t('Alle Vereine'), favoritable: true,
@@ -402,9 +403,12 @@ export function RentalManagement({ language, navigate, currentUser }) {
       authenticatedApi('/api/clubs/mine'),
       isAdmin ? authenticatedApi('/api/admin/clubs') : Promise.resolve({ clubs: [] }),
     ]).then(([mine, all]) => {
-      const own = (mine.clubs || []).filter((club) => club.canEdit).map((club) => ({ ...club, own: true }));
+      // Vermieten dürfen nur freigegebene Vereine, nicht freigegebene erscheinen deshalb gar nicht erst in der Auswahl.
+      const editable = (mine.clubs || []).filter((club) => club.canEdit);
+      setHasUnpublishedClub(editable.some((club) => club.status !== 'published'));
+      const own = editable.filter((club) => club.status === 'published').map((club) => ({ ...club, own: true }));
       const ownIds = new Set(own.map((club) => club.id));
-      const others = (all.clubs || []).filter((club) => !ownIds.has(club.id))
+      const others = (all.clubs || []).filter((club) => club.status === 'published' && !ownIds.has(club.id))
         .sort((left, right) => left.name.localeCompare(right.name, language));
       const list = [...own, ...others];
       setClubs(list);
@@ -488,7 +492,9 @@ export function RentalManagement({ language, navigate, currentUser }) {
     return (
       <div className="panel">
         <h2>{t('Vermietung verwalten')}</h2>
-        <p className="hint">{t('Vermieten können Vereine, die du verwaltest. Lege zuerst unter „Meine Vereine“ einen Verein mit Spielort an.')}</p>
+        <p className="hint">{hasUnpublishedClub
+          ? t('Dein Verein ist noch nicht freigegeben. Angebote kannst du anlegen, sobald ein Admin ihn freigegeben hat.')
+          : t('Vermieten können Vereine, die du verwaltest. Lege zuerst unter „Meine Vereine“ einen Verein mit Spielort an.')}</p>
         <Button onClick={() => navigate('/vereine')}>{t('Meine Vereine')}</Button>
       </div>
     );

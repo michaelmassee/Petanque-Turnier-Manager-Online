@@ -82,7 +82,7 @@ describe('Platz mieten: Vereinsverwaltung', () => {
   function mockManagement(onWrite = async () => ({})) {
     authenticatedApi.mockImplementation(async (path, options) => {
       if (options?.method) return onWrite(path, options);
-      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true }] };
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
       return MANAGE;
     });
   }
@@ -106,8 +106,8 @@ describe('Platz mieten: Vereinsverwaltung', () => {
 
   it('bietet Admins alle Vereine an, die eigenen zuerst', async () => {
     authenticatedApi.mockImplementation(async (path) => {
-      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true }] };
-      if (path === '/api/admin/clubs') return { clubs: [{ id: 'c1', name: 'BC Test', status: 'published', placeCount: 1 }, { id: 'c2', name: 'Anderer Club', status: 'pending', placeCount: 2 }] };
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
+      if (path === '/api/admin/clubs') return { clubs: [{ id: 'c1', name: 'BC Test', status: 'published', placeCount: 1 }, { id: 'c2', name: 'Anderer Club', status: 'published', placeCount: 2 }, { id: 'c3', name: 'Anderer Neuling', status: 'pending', placeCount: 1 }] };
       return MANAGE;
     });
     render(<RentalManagement language="de" navigate={vi.fn()} currentUser={{ id: 'admin', role: 'admin' }} />);
@@ -116,7 +116,9 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     await waitFor(() => expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/manage?club=c1'));
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'Anderer' } });
-    fireEvent.click(await screen.findByRole('option', { name: /Anderer Club/ }));
+    expect(await screen.findByRole('option', { name: /Anderer Club/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Anderer Neuling/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: /Anderer Club/ }));
     await waitFor(() => expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/manage?club=c2'));
   });
 
@@ -143,7 +145,7 @@ describe('Platz mieten: Vereinsverwaltung', () => {
 
   it('sperrt Angebote, wenn der Verein keinen Spielort hat', async () => {
     authenticatedApi.mockImplementation(async (path) => {
-      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true }] };
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
       return { ...MANAGE, places: [] };
     });
     render(<RentalManagement language="de" navigate={vi.fn()} />);
@@ -155,7 +157,7 @@ describe('Platz mieten: Vereinsverwaltung', () => {
 
   it('sperrt neue Angebote, solange der Verein nicht freigegeben ist', async () => {
     authenticatedApi.mockImplementation(async (path) => {
-      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true }] };
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
       return { ...MANAGE, clubStatus: 'pending' };
     });
     render(<RentalManagement language="de" navigate={vi.fn()} />);
