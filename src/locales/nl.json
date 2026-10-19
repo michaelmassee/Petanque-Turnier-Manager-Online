@@ -1547,7 +1547,6 @@
   "ausgebucht": "volgeboekt",
   "Deine Auswahl": "Jouw keuze",
   "kostenlos": "gratis",
-  "Hallen und Plätze mieten": "Hallen en banen huren",
   "Vereine vermieten hier Bahnen stundenweise. Wähle ein Angebot und frage deinen Wunschtermin im Kalender an; der Verein bestätigt die Reservierung.": "Clubs verhuren hier banen per uur. Kies een aanbod en vraag je gewenste tijd aan in de kalender; de club bevestigt de reservering.",
   "Spielort": "Speellocatie",
   "Alle": "Alle",
@@ -1632,5 +1631,10 @@
   "So weit im Voraus kann noch nicht reserviert werden": "Zo ver vooruit kan nog niet gereserveerd worden",
   "nicht freigegeben": "niet vrijgegeven",
   "Spielorte: {{places}}": "Speellocaties: {{places}}",
-  "Keine Vereine gefunden.": "Geen clubs gevonden."
+  "Keine Vereine gefunden.": "Geen clubs gevonden.",
+  "Nur Bouleplätze": "Alleen buitenbanen",
+  "Mietangebote": "Verhuuraanbiedingen",
+  "Alle Mietangebote": "Alle verhuuraanbiedingen",
+  "Platz mieten Übersicht": "Overzicht baanverhuur",
+  "gefundene Mietangebote – zur Liste springen": "verhuuraanbiedingen gevonden – naar de lijst"
 }

@@ -1547,7 +1547,6 @@
   "ausgebucht": "fully booked",
   "Deine Auswahl": "Your selection",
   "kostenlos": "free of charge",
-  "Hallen und Plätze mieten": "Rent halls and courts",
   "Vereine vermieten hier Bahnen stundenweise. Wähle ein Angebot und frage deinen Wunschtermin im Kalender an; der Verein bestätigt die Reservierung.": "Clubs rent out lanes by the hour here. Choose an offer and request your preferred time in the calendar; the club confirms the reservation.",
   "Spielort": "Venue",
   "Alle": "All",
@@ -1632,5 +1631,10 @@
   "So weit im Voraus kann noch nicht reserviert werden": "You cannot reserve that far in advance yet",
   "nicht freigegeben": "not approved",
   "Spielorte: {{places}}": "Venues: {{places}}",
-  "Keine Vereine gefunden.": "No clubs found."
+  "Keine Vereine gefunden.": "No clubs found.",
+  "Nur Bouleplätze": "Outdoor courts only",
+  "Mietangebote": "Rental offers",
+  "Alle Mietangebote": "All rental offers",
+  "Platz mieten Übersicht": "Court rental overview",
+  "gefundene Mietangebote – zur Liste springen": "rental offers found – jump to list"
 }

@@ -1547,7 +1547,6 @@
   "ausgebucht": "complet",
   "Deine Auswahl": "Votre sélection",
   "kostenlos": "gratuit",
-  "Hallen und Plätze mieten": "Louer des salles et des terrains",
   "Vereine vermieten hier Bahnen stundenweise. Wähle ein Angebot und frage deinen Wunschtermin im Kalender an; der Verein bestätigt die Reservierung.": "Les clubs louent ici des pistes à l’heure. Choisissez une offre et demandez votre créneau dans le calendrier ; le club confirme la réservation.",
   "Spielort": "Lieu de jeu",
   "Alle": "Tous",
@@ -1632,5 +1631,10 @@
   "So weit im Voraus kann noch nicht reserviert werden": "On ne peut pas encore réserver aussi longtemps à l’avance",
   "nicht freigegeben": "non validé",
   "Spielorte: {{places}}": "Lieux de jeu : {{places}}",
-  "Keine Vereine gefunden.": "Aucun club trouvé."
+  "Keine Vereine gefunden.": "Aucun club trouvé.",
+  "Nur Bouleplätze": "Terrains extérieurs uniquement",
+  "Mietangebote": "Offres de location",
+  "Alle Mietangebote": "Toutes les offres de location",
+  "Platz mieten Übersicht": "Aperçu de la location de terrains",
+  "gefundene Mietangebote – zur Liste springen": "offres de location trouvées – aller à la liste"
 }

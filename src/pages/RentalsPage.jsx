@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { clubLogoImageUrl } from '../lib/domain.js';
@@ -42,43 +42,77 @@ function RentalOfferList({ language, navigate }) {
   const [offers, setOffers] = useState(null);
   const [error, setError] = useState('');
   const [venueFilter, setVenueFilter] = useState('');
+  const resultsRef = useRef(null);
 
   useEffect(() => {
     api('/api/rentals').then((data) => setOffers(data.offers || [])).catch((requestError) => setError(requestError.message));
   }, []);
 
-  const visible = (offers || []).filter((offer) => !venueFilter || offer.venueType === venueFilter);
+  const allOffers = offers || [];
+  const visible = allOffers.filter((offer) => !venueFilter || offer.venueType === venueFilter);
+  const indoorCount = allOffers.filter((offer) => offer.venueType === 'indoor').length;
+  const outdoorCount = allOffers.filter((offer) => offer.venueType === 'outdoor').length;
+  const toggleVenue = (venueType) => setVenueFilter((current) => (current === venueType ? '' : venueType));
+  const venueFilterLabel = venueFilter === 'indoor' ? t('Nur Boulehallen') : t('Nur Bouleplätze');
   return (
-    <div className="panel">
-      <div className="section-title">
-        <h2>{t('Hallen und Plätze mieten')}</h2>
+    <>
+      <div className="home-finder">
+        <div className="home-finder-copy">
+          <p className="eyebrow">Pétanque Turnier Manager Online</p>
+          <h2>{t('Platz mieten')}</h2>
+          <p className="subtitle">{t('Vereine vermieten hier Bahnen stundenweise. Wähle ein Angebot und frage deinen Wunschtermin im Kalender an; der Verein bestätigt die Reservierung.')}</p>
+        </div>
+        <div className="home-finder-stats" aria-label={t('Platz mieten Übersicht')}>
+          <button
+            type="button"
+            onClick={() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            aria-label={`${visible.length} ${t('gefundene Mietangebote – zur Liste springen')}`}
+          >
+            <strong>{visible.length}</strong>
+            <span>{t('Mietangebote')}</span>
+          </button>
+          <button type="button" aria-pressed={venueFilter === 'indoor'} onClick={() => toggleVenue('indoor')}>
+            <strong>{indoorCount}</strong>
+            <span>{t('Nur Boulehallen')}</span>
+          </button>
+          <button type="button" aria-pressed={venueFilter === 'outdoor'} onClick={() => toggleVenue('outdoor')}>
+            <strong>{outdoorCount}</strong>
+            <span>{t('Nur Bouleplätze')}</span>
+          </button>
+        </div>
+      </div>
+
+      {venueFilter && <div className="active-search-badges" aria-label={t('Filter aktiv')}>
+        <button type="button" className="active-search-badge" onClick={() => setVenueFilter('')} aria-label={`${t('Entfernen')}: ${venueFilterLabel}`}><span>{venueFilterLabel}</span><span aria-hidden="true">×</span></button>
+      </div>}
+
+      <Feedback error={error} />
+      <div className="section-title home-results-title" ref={resultsRef}>
+        <p className="eyebrow">{t('Alle Mietangebote')}</p>
         {offers && <span className="counter">{visible.length}</span>}
       </div>
-      <p className="hint">{t('Vereine vermieten hier Bahnen stundenweise. Wähle ein Angebot und frage deinen Wunschtermin im Kalender an; der Verein bestätigt die Reservierung.')}</p>
-      <Feedback error={error} />
-      <SelectField label={t('Spielort')} value={venueFilter} onChange={setVenueFilter} options={[
-        { value: '', label: t('Alle') }, { value: 'indoor', label: t('Boulehalle') }, { value: 'outdoor', label: t('Bouleplatz') },
-      ]} />
       {!offers && !error && <p className="muted">{t('Wird geladen…')}</p>}
-      {offers && visible.length === 0 && <p className="muted">{t('Zurzeit gibt es keine Mietangebote.')}</p>}
-      <div className="user-list">
-        {visible.map((offer) => (
-          <article className="data-row rental-offer-row" key={offer.id}>
-            {offer.hasClubLogo
-              ? <img className="rental-offer-logo" src={clubLogoImageUrl(offer.placeId)} alt="" loading="lazy" />
-              : <span className="rental-offer-logo" aria-hidden="true" />}
-            <div className="rental-offer-info">
-              <strong data-i18n-skip>{offer.title}</strong>
-              <OfferSummary offer={offer} />
-              <OfferPrice offer={offer} language={language} />
-            </div>
-            <div className="row-actions">
-              <Button onClick={() => navigate(`/platz-mieten/${encodeURIComponent(offer.id)}`)}>{t('Termine ansehen')}</Button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
+      {offers && visible.length === 0 && <div className="empty-state"><strong>{t('Zurzeit gibt es keine Mietangebote.')}</strong></div>}
+      {visible.length > 0 && <div className="panel">
+        <div className="user-list">
+          {visible.map((offer) => (
+            <article className="data-row rental-offer-row" key={offer.id}>
+              {offer.hasClubLogo
+                ? <img className="rental-offer-logo" src={clubLogoImageUrl(offer.placeId)} alt="" loading="lazy" />
+                : <span className="rental-offer-logo" aria-hidden="true" />}
+              <div className="rental-offer-info">
+                <strong data-i18n-skip>{offer.title}</strong>
+                <OfferSummary offer={offer} />
+                <OfferPrice offer={offer} language={language} />
+              </div>
+              <div className="row-actions">
+                <Button onClick={() => navigate(`/platz-mieten/${encodeURIComponent(offer.id)}`)}>{t('Termine ansehen')}</Button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>}
+    </>
   );
 }
 
@@ -589,7 +623,7 @@ export function RentalsPage({ route, language, setLanguage, menuOpen, setMenuOpe
         drawerContent={drawerContent}
         postboxControl={postboxControl}
       />
-      <section className="single-column">
+      <section className={route.view === 'list' ? 'home-tournaments' : 'single-column'}>
         {needsLogin ? (
           <div className="panel">
             <p className="hint">{t('Bitte melde dich an.')}</p>

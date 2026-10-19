@@ -1374,6 +1374,11 @@ a.left-panel-link {
   box-shadow: none;
 }
 
+.home-finder-stats button[aria-pressed="true"] {
+  background: #eef6ff;
+  border-color: #1677ff;
+}
+
 .home-finder-stats strong {
   color: #172033;
   font-size: 1.2rem;

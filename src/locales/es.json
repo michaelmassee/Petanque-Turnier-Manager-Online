@@ -1547,7 +1547,6 @@
   "ausgebucht": "completo",
   "Deine Auswahl": "Tu selección",
   "kostenlos": "gratis",
-  "Hallen und Plätze mieten": "Alquilar pabellones y pistas",
   "Vereine vermieten hier Bahnen stundenweise. Wähle ein Angebot und frage deinen Wunschtermin im Kalender an; der Verein bestätigt die Reservierung.": "Los clubes alquilan aquí pistas por horas. Elige una oferta y solicita tu horario en el calendario; el club confirma la reserva.",
   "Spielort": "Lugar de juego",
   "Alle": "Todos",
@@ -1632,5 +1631,10 @@
   "So weit im Voraus kann noch nicht reserviert werden": "Todavía no se puede reservar con tanta antelación",
   "nicht freigegeben": "no aprobado",
   "Spielorte: {{places}}": "Lugares de juego: {{places}}",
-  "Keine Vereine gefunden.": "No se encontraron clubes."
+  "Keine Vereine gefunden.": "No se encontraron clubes.",
+  "Nur Bouleplätze": "Solo pistas al aire libre",
+  "Mietangebote": "Ofertas de alquiler",
+  "Alle Mietangebote": "Todas las ofertas de alquiler",
+  "Platz mieten Übersicht": "Resumen de alquiler de pistas",
+  "gefundene Mietangebote – zur Liste springen": "ofertas de alquiler encontradas – ir a la lista"
 }
