@@ -95,6 +95,22 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     expect(await screen.findByText('Der Mieter wurde benachrichtigt.')).toBeInTheDocument();
   });
 
+  it('bietet Admins alle Vereine an, die eigenen zuerst', async () => {
+    authenticatedApi.mockImplementation(async (path) => {
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true }] };
+      if (path === '/api/admin/clubs') return { clubs: [{ id: 'c1', name: 'BC Test', status: 'published', placeCount: 1 }, { id: 'c2', name: 'Anderer Club', status: 'pending', placeCount: 2 }] };
+      return MANAGE;
+    });
+    render(<RentalManagement language="de" navigate={vi.fn()} currentUser={{ id: 'admin', role: 'admin' }} />);
+
+    const input = await screen.findByRole('combobox', { name: 'Verein' });
+    await waitFor(() => expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/manage?club=c1'));
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'Anderer' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Anderer Club/ }));
+    await waitFor(() => expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/manage?club=c2'));
+  });
+
   it('legt ein Angebot mit Öffnungszeiten an', async () => {
     const onWrite = vi.fn(async () => ({}));
     mockManagement(onWrite);

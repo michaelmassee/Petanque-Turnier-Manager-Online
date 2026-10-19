@@ -1629,5 +1629,8 @@
   "So viele Bahnen gibt es nicht": "Il n’y a pas autant de pistes",
   "Der Zeitraum liegt außerhalb der Öffnungszeiten": "Le créneau est en dehors des horaires d’ouverture",
   "Der Zeitraum liegt in der Vergangenheit": "Le créneau est dans le passé",
-  "So weit im Voraus kann noch nicht reserviert werden": "On ne peut pas encore réserver aussi longtemps à l’avance"
+  "So weit im Voraus kann noch nicht reserviert werden": "On ne peut pas encore réserver aussi longtemps à l’avance",
+  "nicht freigegeben": "non validé",
+  "Spielorte: {{places}}": "Lieux de jeu : {{places}}",
+  "Keine Vereine gefunden.": "Aucun club trouvé."
 }

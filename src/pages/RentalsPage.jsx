@@ -7,6 +7,7 @@ import { addDays } from '../rental-core.js';
 import { Button, EditDialog, Feedback, SelectField, TextArea, TextField } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { RentalCalendar } from '../components/RentalCalendar.jsx';
+import { ComboboxPicker } from '../components/ComboboxPicker.jsx';
 
 const hourLabel = (hour) => `${String(hour).padStart(2, '0')}:00`;
 // Montag zuerst; 0 = Sonntag wie im Worker.
@@ -336,7 +337,7 @@ function OfferFields({ form, setForm, places, language }) {
 
 const DECISION_LABELS = { confirm: 'Bestätigen', reject: 'Ablehnen', cancel: 'Stornieren' };
 
-export function RentalManagement({ language, navigate }) {
+export function RentalManagement({ language, navigate, currentUser }) {
   const { t } = useTranslation();
   const [clubs, setClubs] = useState(null);
   const [clubId, setClubId] = useState('');
@@ -351,14 +352,30 @@ export function RentalManagement({ language, navigate }) {
   const [decision, setDecision] = useState(null);
   const [decisionNote, setDecisionNote] = useState('');
   const [deciding, setDeciding] = useState(false);
+  const isAdmin = currentUser?.role === 'admin';
+  const clubEntries = useMemo(() => (clubs || []).map((club) => {
+    const meta = [club.status === 'published' ? '' : t('nicht freigegeben'), club.placeCount !== undefined ? t('Spielorte: {{places}}', { places: club.placeCount }) : ''].filter(Boolean).join(' · ');
+    return {
+      id: club.id, value: club.id, label: club.name, meta: meta || undefined, searchText: club.name.toLowerCase(),
+      group: club.own ? t('Meine Vereine') : t('Alle Vereine'), favoritable: true,
+    };
+  }), [clubs, t]);
 
   useEffect(() => {
-    authenticatedApi('/api/clubs/mine').then((result) => {
-      const editable = (result.clubs || []).filter((club) => club.canEdit);
-      setClubs(editable);
-      setClubId((current) => current || editable[0]?.id || '');
+    // Admins verwalten alle Vereine (z. B. für Support); die eigenen stehen oben.
+    Promise.all([
+      authenticatedApi('/api/clubs/mine'),
+      isAdmin ? authenticatedApi('/api/admin/clubs') : Promise.resolve({ clubs: [] }),
+    ]).then(([mine, all]) => {
+      const own = (mine.clubs || []).filter((club) => club.canEdit).map((club) => ({ ...club, own: true }));
+      const ownIds = new Set(own.map((club) => club.id));
+      const others = (all.clubs || []).filter((club) => !ownIds.has(club.id))
+        .sort((left, right) => left.name.localeCompare(right.name, language));
+      const list = [...own, ...others];
+      setClubs(list);
+      setClubId((current) => current || list[0]?.id || '');
     }).catch((requestError) => setError(requestError.message));
-  }, []);
+  }, [isAdmin]);
 
   async function load(id = clubId) {
     if (!id) return;
@@ -466,7 +483,17 @@ export function RentalManagement({ language, navigate }) {
       <Feedback error={error} />
       {clubs && clubs.length > 1 && (
         <div className="rental-manage-club">
-          <SelectField label={t('Verein')} value={clubId} onChange={setClubId} options={clubs.map((club) => ({ value: club.id, label: club.name }))} />
+          <ComboboxPicker
+            label={t('Verein')}
+            entries={clubEntries}
+            value={clubId}
+            onChange={(value) => { if (value) setClubId(value); }}
+            placeholder={t('Verein suchen…')}
+            emptyText={t('Keine Vereine gefunden.')}
+            storageScope="rental-clubs"
+            currentUserId={currentUser?.id}
+            recordRecentOnSelect
+          />
         </div>
       )}
       {!data && !error && <p className="muted">{t('Wird geladen…')}</p>}
@@ -572,7 +599,7 @@ export function RentalsPage({ route, language, setLanguage, menuOpen, setMenuOpe
         ) : route.view === 'mine' ? (
           <MyRentalReservations language={language} navigate={navigate} />
         ) : route.view === 'manage' ? (
-          <RentalManagement language={language} navigate={navigate} />
+          <RentalManagement language={language} navigate={navigate} currentUser={currentUser} />
         ) : (
           <RentalOfferList language={language} navigate={navigate} />
         )}

@@ -126,6 +126,22 @@ describe('Platz mieten', () => {
     }));
   });
 
+  it('lässt Admins die Vermietung jedes Vereins verwalten', async () => {
+    sql(`INSERT INTO users (id, email, first_name, last_name, role, password_salt, password_hash, created_at, updated_at)
+      VALUES ('u4', 'admin@example.test', 'Ada', 'Admin', 'admin', 'salt', 'hash', '2026-10-01', '2026-10-01')`);
+    sql("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ('s4', 'u4', '2099-01-01T00:00:00.000Z', '2026-10-01')");
+    const ADMIN = { Cookie: 'ptm_session=s4' };
+    const created = await call('POST', '/api/rentals/offers', { body: offerBody, headers: ADMIN });
+    expect(created.status).toBe(201);
+    const offer = (await created.json()).offer;
+    const reservation = (await (await reserve(offer.id, {})).json()).reservation;
+
+    expect((await call('GET', '/api/rentals/manage?club=c1', { headers: ADMIN })).status).toBe(200);
+    expect((await (await call('GET', `/api/rentals/${offer.id}`, { headers: ADMIN })).json()).offer.canManage).toBe(true);
+    const decided = await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: ADMIN });
+    expect((await decided.json()).reservation.status).toBe('confirmed');
+  });
+
   it('begrenzt offene Anfragen je Benutzer und Angebot', async () => {
     const offer = await createOffer();
     for (const startHour of [10, 11, 12, 13, 14]) {

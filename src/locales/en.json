@@ -1629,5 +1629,8 @@
   "So viele Bahnen gibt es nicht": "There are not that many lanes",
   "Der Zeitraum liegt außerhalb der Öffnungszeiten": "The time is outside the opening hours",
   "Der Zeitraum liegt in der Vergangenheit": "The time is in the past",
-  "So weit im Voraus kann noch nicht reserviert werden": "You cannot reserve that far in advance yet"
+  "So weit im Voraus kann noch nicht reserviert werden": "You cannot reserve that far in advance yet",
+  "nicht freigegeben": "not approved",
+  "Spielorte: {{places}}": "Venues: {{places}}",
+  "Keine Vereine gefunden.": "No clubs found."
 }
