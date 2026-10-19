@@ -50,6 +50,14 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(await screen.findByText(/Anfrage gesendet/)).toBeInTheDocument();
   });
 
+  it('nennt Spielort und Verein nur einmal, wenn sie gleich heißen, ohne Spielort-Präfix', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, placeName: 'BC Test' } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
+    expect(await screen.findByText('BC Test · 4 Bahn(en)')).toBeInTheDocument();
+    expect(screen.getByText('Berlin')).toHaveClass('rental-offer-address');
+    expect(screen.queryByText(/Boulehalle:/)).not.toBeInTheDocument();
+  });
+
   it('bittet Gäste ums Anmelden statt das Formular zu zeigen', async () => {
     mockOffer();
     const onLogin = vi.fn();

@@ -26,14 +26,15 @@ function OfferPrice({ offer, language }) {
   return <span data-i18n-skip>{offer.priceMinor === 0 ? t('kostenlos') : formatMoney(offer.priceMinor, offer.currency, language)}{offer.priceNote ? ` ${offer.priceNote}` : ''}</span>;
 }
 
-function OfferSummary({ offer, language }) {
+// Spielort und Verein heißen oft gleich; dann nur einmal nennen. Die Adresse steht in einer eigenen Zeile.
+function OfferSummary({ offer }) {
   const { t } = useTranslation();
-  return (
-    <span data-i18n-skip>
-      {t(offer.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}: {offer.placeName} · {offer.clubName} · {t('{{lanes}} Bahn(en)', { lanes: offer.laneCount })}
-      {offer.address ? ` · ${offer.address}` : ''}
-    </span>
-  );
+  const names = [offer.placeName, offer.clubName].filter(Boolean)
+    .filter((name, index, all) => all.findIndex((other) => other.trim().toLowerCase() === name.trim().toLowerCase()) === index);
+  return <>
+    <span data-i18n-skip>{[...names, t('{{lanes}} Bahn(en)', { lanes: offer.laneCount })].join(' · ')}</span>
+    {offer.address && <span className="rental-offer-address" data-i18n-skip>{offer.address}</span>}
+  </>;
 }
 
 function RentalOfferList({ language, navigate }) {
@@ -66,9 +67,9 @@ function RentalOfferList({ language, navigate }) {
             {offer.hasClubLogo
               ? <img className="rental-offer-logo" src={clubLogoImageUrl(offer.placeId)} alt="" loading="lazy" />
               : <span className="rental-offer-logo" aria-hidden="true" />}
-            <div>
+            <div className="rental-offer-info">
               <strong data-i18n-skip>{offer.title}</strong>
-              <OfferSummary offer={offer} language={language} />
+              <OfferSummary offer={offer} />
               <OfferPrice offer={offer} language={language} />
             </div>
             <div className="row-actions">
@@ -162,7 +163,7 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
         <h2 data-i18n-skip>{offer.title}</h2>
         {offer.canManage && <Button variant="secondary" onClick={() => navigate('/platz-mieten/verwalten')}>{t('Vermietung verwalten')}</Button>}
       </div>
-      <p><OfferSummary offer={offer} language={language} /></p>
+      <div className="rental-offer-meta"><OfferSummary offer={offer} /></div>
       <p><OfferPrice offer={offer} language={language} /></p>
       {offer.description && <p className="rental-description" data-i18n-skip>{offer.description}</p>}
       <p className="hint">
@@ -526,7 +527,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
               <article className="data-row" key={offer.id}>
                 <div>
                   <strong data-i18n-skip>{offer.title}</strong>
-                  <OfferSummary offer={offer} language={language} />
+                  <OfferSummary offer={offer} />
                   <span>{offer.status === 'active' ? t('Aktiv (öffentlich buchbar)') : t('Pausiert')}</span>
                 </div>
                 <div className="row-actions">

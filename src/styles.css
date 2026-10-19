@@ -4583,3 +4583,6 @@ button.rental-slot:not(:disabled):hover { outline: 2px solid #087a72; outline-of
 .rental-section-heading h3 { margin: 0; }
 .rental-section-heading .counter { min-width: 28px; padding: 3px 8px; font-size: 0.85rem; }
 .rental-manage-section > p.muted, .rental-manage-section > p.hint { margin: 0; }
+.rental-offer-meta { display: grid; gap: 2px; margin: 0 0 12px; }
+.rental-offer-address { color: #53627a; }
+.rental-offer-info { display: grid; gap: 3px; min-width: 0; }
