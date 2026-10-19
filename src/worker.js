@@ -1809,7 +1809,8 @@ export default {
       if (url.pathname === '/api/tournaments') {
         if (request.method === 'GET') {
           const session = await optionalSession(request, env.DB);
-          return await listTournaments(env.DB, session?.user || null);
+          if (!session) return await listTournamentsAnonymous(env.DB, url.origin);
+          return await listTournaments(env.DB, session.user);
         }
 
         if (request.method === 'POST') {
@@ -4360,6 +4361,26 @@ export function sortTournamentRows(rows) {
   return rows.sort((left, right) => plainCompare(left.date, right.date)
     || plainCompare(left.start_time || '', right.start_time || '')
     || plainCompare(tournamentNameSortKey(left.name), tournamentNameSortKey(right.name)));
+}
+
+// Ohne Anmeldung sehen alle dieselbe Liste. Sie kostet in Prod trotz warmem Isolate 6-24 ms CPU (Free-Plan: 10 ms),
+// daher kurz im Cloudflare-Cache (pro Rechenzentrum). Änderungen erscheinen für Anonyme bis zu 60 s verzögert;
+// Angemeldete lesen immer frisch.
+const ANONYMOUS_TOURNAMENT_LIST_TTL_SECONDS = 60;
+
+async function listTournamentsAnonymous(db, origin) {
+  const cache = edgeCache();
+  const key = new Request(`${origin}/__tournament-list/anonymous`);
+  const cached = cache ? await cache.match(key) : null;
+  const body = cached ? cached.body : await (await listTournaments(db, null)).text();
+  if (!cached && cache) {
+    await cache.put(key, new Response(body, {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${ANONYMOUS_TOURNAMENT_LIST_TTL_SECONDS}` },
+    }));
+  }
+  return new Response(body, {
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...SECURITY_HEADERS },
+  });
 }
 
 async function listTournaments(db, user) {
