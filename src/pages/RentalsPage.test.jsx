@@ -141,6 +141,18 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     });
   });
 
+  it('sperrt Angebote, wenn der Verein keinen Spielort hat', async () => {
+    authenticatedApi.mockImplementation(async (path) => {
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true }] };
+      return { ...MANAGE, places: [] };
+    });
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+
+    expect(await screen.findByText(/Dein Verein hat noch keinen Spielort/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Neues Angebot' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
+  });
+
   it('sperrt neue Angebote, solange der Verein nicht freigegeben ist', async () => {
     authenticatedApi.mockImplementation(async (path) => {
       if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true }] };

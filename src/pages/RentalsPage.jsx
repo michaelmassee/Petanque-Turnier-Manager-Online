@@ -495,6 +495,8 @@ export function RentalManagement({ language, navigate, currentUser }) {
   }
 
   const clubPublished = data?.clubStatus === 'published';
+  // Angebote brauchen einen freigegebenen Verein mit mindestens einem freigegebenen Spielort.
+  const canEditOffers = clubPublished && Boolean(data?.places.length);
   const offerTitle = (offerId) => data?.offers.find((offer) => offer.id === offerId)?.title || '';
   const requests = (data?.reservations || []).filter((reservation) => reservation.status === 'requested');
   const confirmed = (data?.reservations || []).filter((reservation) => reservation.status === 'confirmed');
@@ -553,7 +555,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
         <section className="rental-manage-section">
           <div className="section-title">
             <div className="rental-section-heading"><h3>{t('Angebote')}</h3><span className="counter">{data.offers.length}</span></div>
-            <Button disabled={!clubPublished || !data.places.length} onClick={() => openOffer()}>{t('Neues Angebot')}</Button>
+            <Button disabled={!canEditOffers} onClick={() => openOffer()}>{t('Neues Angebot')}</Button>
           </div>
           {!clubPublished && <p className="hint">{t('Dein Verein ist noch nicht freigegeben. Angebote kannst du anlegen, sobald ein Admin ihn freigegeben hat.')}</p>}
           {clubPublished && !data.places.length && <p className="hint">{t('Dein Verein hat noch keinen Spielort. Lege ihn unter „Meine Vereine“ an.')}</p>}
@@ -568,7 +570,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
                 </div>
                 <div className="row-actions">
                   <Button variant="secondary" onClick={() => navigate(`/platz-mieten/${encodeURIComponent(offer.id)}`)}>{t('Kalender')}</Button>
-                  <Button variant="secondary" disabled={!clubPublished || deletingId === offer.id} onClick={() => openOffer(offer)}>{t('Bearbeiten')}</Button>
+                  <Button variant="secondary" disabled={!canEditOffers || deletingId === offer.id} onClick={() => openOffer(offer)}>{t('Bearbeiten')}</Button>
                   <Button variant="danger" loading={deletingId === offer.id} onClick={() => removeOffer(offer)}>{t('Löschen')}</Button>
                 </div>
               </article>
