@@ -338,6 +338,15 @@ export function registrationStatusLabel(tournament, language) {
   return (SLOTS_FREE_TEMPLATES[language] || SLOTS_FREE_TEMPLATES.de)(free, tournament.maxRegistrations);
 }
 
+/** Grund zu „Anmeldung nicht mehr möglich“: Anmeldeschluss vorbei oder ausgebucht ohne Warteliste; sonst ''. */
+export function registrationStatusReason(tournament, language) {
+  if (registrationStatusKind(tournament) !== 'unavailable') return '';
+  if (tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now()) {
+    return i18next.t('Anmeldeschluss abgelaufen', { lng: language });
+  }
+  return i18next.t('ausgebucht', { lng: language });
+}
+
 export const API_KEY_STATUS_LABELS = {
   pending: 'Ausstehend',
   approved: 'Freigeschaltet',

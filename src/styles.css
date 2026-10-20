@@ -2818,6 +2818,18 @@ a.left-panel-link {
   color: #9d2424;
 }
 
+/* Grund zu „Anmeldung nicht mehr möglich“ (Anmeldeschluss/ausgebucht) als kleine zweite Zeile im Badge. */
+.status:has(.status-reason) {
+  border-radius: 12px;
+}
+
+.status-reason {
+  display: block;
+  font-size: 0.72em;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
 .tournament-card.calendar-entry {
   border-style: dashed;
   background: #f7f8fa;

@@ -14,7 +14,7 @@ import { AdminDashboardPage, CloudflareUsagePanel } from './pages/AdminDashboard
 import { TournamentInfo } from './pages/TournamentDetailPage.jsx';
 import { RichText } from './components/RichText.jsx';
 import { TournamentReportPage } from './pages/TournamentReportPage.jsx';
-import { clubLogoImageUrl, clubMatchesTournament, formatLocationAddress, hasOnlineRegistrationAvailable, hasRegistrations, registrationStatusClass, registrationStatusLabel, tournamentPayload } from './lib/domain.js';
+import { clubLogoImageUrl, clubMatchesTournament, formatLocationAddress, hasOnlineRegistrationAvailable, hasRegistrations, registrationStatusClass, registrationStatusLabel, registrationStatusReason, tournamentPayload } from './lib/domain.js';
 
 describe('Turnier-Payload', () => {
   it('behält den Verein eines bearbeiteten Kalendereintrags bei', () => {
@@ -154,6 +154,15 @@ describe('Turnier-Payload', () => {
     expect(registrationStatusLabel({ ...full, waitlistEnabled: false }, 'de')).toBe('Anmeldung nicht mehr möglich');
     expect(registrationStatusLabel({ ...full, waitlistRegistrations: 3, registrationDeadline: '2000-01-01T00:00:00.000Z' }, 'de')).toBe('Anmeldung nicht mehr möglich');
     expect(registrationStatusLabel({ ...full, activeRegistrations: 18 }, 'de')).toBe('2 von 20 Plätzen frei');
+  });
+
+  it('nennt beim roten Badge den Grund: Anmeldeschluss abgelaufen oder ausgebucht', () => {
+    const full = { status: 'registration', registrationEnabled: true, maxRegistrations: 20, activeRegistrations: 20, waitlistEnabled: false, registrationDeadline: '2099-01-01T00:00:00.000Z' };
+    expect(registrationStatusReason(full, 'de')).toBe('ausgebucht');
+    expect(registrationStatusReason({ ...full, activeRegistrations: 5, registrationDeadline: '2000-01-01T00:00:00.000Z' }, 'de')).toBe('Anmeldeschluss abgelaufen');
+    expect(registrationStatusReason({ ...full, registrationDeadline: '2000-01-01T00:00:00.000Z' }, 'en')).toBe('Registration deadline passed');
+    expect(registrationStatusReason({ ...full, waitlistEnabled: true }, 'de')).toBe('');
+    expect(registrationStatusReason({ ...full, activeRegistrations: 18 }, 'de')).toBe('');
   });
 
   it('erkennt nur verfügbare öffentliche Online-Anmeldungen', () => {
@@ -794,7 +803,7 @@ describe('Öffentliche Turnierdetailseite', () => {
       />,
     );
 
-    expect(screen.getByText('Anmeldung nicht mehr möglich')).toBeInTheDocument();
+    expect(screen.getByText('Anmeldung nicht mehr möglich (ausgebucht)')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Anmeldung senden' })).not.toBeInTheDocument();
   });
 

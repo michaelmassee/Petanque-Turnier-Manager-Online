@@ -11,7 +11,7 @@ import { LIVE_VIEW_EVENTS, liveViewPathFor, rentalPathFor } from './postbox-core
 import { usePath, matchTournamentRoute, matchLiveRoute, matchRentalRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
-import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusClass, registrationStatusLabel, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm, clubMatchesTournament } from './lib/domain.js';
+import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusClass, registrationStatusLabel, registrationStatusReason, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm, clubMatchesTournament } from './lib/domain.js';
 import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback, EditDialog, DistanceBadge } from './components/ui.jsx';
 import { LazyFallback } from './components/LazyFallback.jsx';
 import { UsernameField } from './components/UsernameField.jsx';
@@ -2345,6 +2345,7 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language, cu
   const { t } = useTranslation();
   const [logoBroken, setLogoBroken] = useState(false);
   const hasLogo = Boolean(tournament.logoUrl) && !logoBroken;
+  const statusReason = registrationStatusReason(tournament, language);
 
   return (
     <article className={`tournament-card${isCalendarEntry(tournament) ? ' calendar-entry' : ''}`}>
@@ -2387,7 +2388,10 @@ function TournamentCard({ tournament, onOpenTournament, onRegister, language, cu
         </span>
       </button>
       <div className="tournament-card-meta">
-        <span className={`status ${registrationStatusClass(tournament)}`}>{registrationStatusLabel(tournament, language)}</span>
+        <span className={`status ${registrationStatusClass(tournament)}`}>
+          {registrationStatusLabel(tournament, language)}
+          {statusReason && <small className="status-reason">{statusReason}</small>}
+        </span>
         <TournamentRegistrationAction tournament={tournament} currentUser={currentUser} onRegister={onRegister} />
       </div>
     </article>
@@ -2606,7 +2610,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             <p className="hint">
               {(REGISTRATION_OPENS_TEMPLATES[language] || REGISTRATION_OPENS_TEMPLATES.de)(formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone))}
             </p>
-          ) : <p className="hint">{tournament.status === 'running' ? t('Anmeldung geschlossen – Turnier läuft') : registrationStatusLabel(tournament, language)}</p>}
+          ) : <p className="hint">{tournament.status === 'running' ? t('Anmeldung geschlossen – Turnier läuft') : registrationStatusLabel(tournament, language)}{registrationStatusReason(tournament, language) && ` (${registrationStatusReason(tournament, language)})`}</p>}
           <div className="row-actions stretch">
             <Button variant="secondary" onClick={onCancel}>{t('Abbrechen')}</Button>
           </div>

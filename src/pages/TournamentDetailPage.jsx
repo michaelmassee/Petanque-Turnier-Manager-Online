@@ -5,7 +5,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
-import { isDocumentBound, labelFor, formationLabel, hasOpenRegistration, registrationStatusLabel, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
+import { isDocumentBound, labelFor, formationLabel, hasOpenRegistration, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { AccountBadge, Button, Feedback, RequiredMark, ShareIcon } from '../components/ui.jsx';
 import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
 import { formatUserName } from '../lib/userLabel.js';
@@ -624,7 +624,7 @@ export function TournamentDetailPage({
             <p className="feedback offline registration-unavailable">
               {tournament.registrationEnabled === false
                 ? t('Für dieses Turnier gibt es keine Online-Anmeldung.')
-                : `${t('Eine Online-Anmeldung ist derzeit nicht möglich:')} ${registrationStatusLabel(tournament, language)}`}
+                : `${t('Eine Online-Anmeldung ist derzeit nicht möglich:')} ${registrationStatusLabel(tournament, language)}${registrationStatusReason(tournament, language) ? ` (${registrationStatusReason(tournament, language)})` : ''}`}
             </p>
           )}
           {view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} showTitle={false} shareToken={shareToken} onNavigate={navigate} />}
