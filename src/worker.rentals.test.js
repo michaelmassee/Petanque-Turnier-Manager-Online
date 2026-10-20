@@ -99,6 +99,101 @@ describe('Platz mieten', () => {
     expect(postbox().filter((row) => row.recipient_id === 'u1').map((row) => row.event_type)).toEqual(['rental_requested', 'rental_requested', 'rental_requested']);
   });
 
+  it('teilt die Kapazität eines Spielorts zwischen Angeboten und gibt sie nach Storno frei', async () => {
+    const first = (await (await call('POST', '/api/rentals/offers', { body: { ...offerBody, laneCount: 8 }, headers: VEREIN })).json()).offer;
+    const second = await createOffer();
+    const reserved = (await (await reserve(first.id, { lanes: 6 })).json()).reservation;
+    const availability = await (await call('GET', `/api/rentals/${second.id}/availability?from=2026-10-24`)).json();
+    expect(availability.days[0].slots.find((slot) => slot.hour === 10).free).toBe(2);
+    expect((await reserve(second.id, { lanes: 3 }, ANDERER)).status).toBe(409);
+    expect((await reserve(second.id, { lanes: 2 }, ANDERER)).status).toBe(201);
+    expect((await reserve(first.id, { lanes: 1 })).status).toBe(409);
+    expect((await call('POST', `/api/rentals/reservations/${reserved.id}/cancel`, { headers: MIETER })).status).toBe(200);
+    expect((await reserve(second.id, { lanes: 2 })).status).toBe(201);
+    // Eigene Angebotsgrenze bleibt trotz weiterer freier Bahnen am Spielort erhalten.
+    expect((await reserve(second.id, { lanes: 1 })).status).toBe(409);
+    expect((await reserve(first.id, { lanes: 8, startHour: 12, hours: 1 })).status).toBe(201);
+  });
+
+  it('teilt bei unbekannter Gesamtzahl die größte angebotene Bahnanzahl', async () => {
+    sql("UPDATE boule_places SET court_count = 0 WHERE id = 'p1'");
+    const first = await createOffer();
+    const second = await createOffer();
+    expect((await reserve(first.id, { lanes: 4 })).status).toBe(201);
+    expect((await reserve(second.id, { lanes: 1 }, ANDERER)).status).toBe(409);
+    const availability = await (await call('GET', `/api/rentals/${second.id}/availability?from=2026-10-24`)).json();
+    expect(availability.days[0].slots.find((slot) => slot.hour === 10).free).toBe(0);
+  });
+
+  it('bestätigt keine bereits überbuchten Altanfragen', async () => {
+    const offer = await createOffer();
+    const reservation = (await (await reserve(offer.id, { lanes: 4 })).json()).reservation;
+    // Altbestand aus der Zeit vor der spielortübergreifenden Prüfung.
+    sql(`INSERT INTO rental_reservations SELECT 'legacy', offer_id, 'u3', local_date, start_hour, hours, lanes,
+      start_utc, end_utc, status, note, decision_note, decided_by, decided_at, created_at, updated_at
+      FROM rental_reservations WHERE id = ?`, reservation.id);
+    const result = await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
+    expect(result.status).toBe(409);
+    expect(env.DB.sqlite.prepare('SELECT status FROM rental_reservations WHERE id = ?').get(reservation.id).status).toBe('requested');
+  });
+
+  it('lehnt mehr angebotene Bahnen als am Spielort vorhanden ab', async () => {
+    expect((await call('POST', '/api/rentals/offers', { body: { ...offerBody, laneCount: 9 }, headers: VEREIN })).status).toBe(400);
+    const offer = await createOffer();
+    expect((await call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, laneCount: 9 }, headers: VEREIN })).status).toBe(400);
+  });
+
+  it.each(['requested', 'confirmed'])('schützt Reservierungen (%s) vor weniger Bahnen und geänderten Öffnungszeiten', async (status) => {
+    const offer = await createOffer();
+    const reservation = (await (await reserve(offer.id, { lanes: 2 })).json()).reservation;
+    if (status === 'confirmed') await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
+    const update = (patch) => call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, ...patch }, headers: VEREIN });
+    for (const patch of [
+      { laneCount: 1 },
+      { openingHours: [{ weekday: 1, openHour: 10, closeHour: 20 }] },
+      { openingHours: [{ weekday: 6, openHour: 11, closeHour: 13 }] },
+    ]) expect((await update(patch)).status).toBe(409);
+    const detail = await (await call('GET', `/api/rentals/${offer.id}`)).json();
+    expect(detail.offer.laneCount).toBe(4);
+    expect(detail.offer.openingHours).toEqual(offer.openingHours);
+    // Mindest-/Höchstdauer gelten nur für neue Buchungen und bleiben änderbar.
+    expect((await update({ minHours: 3, maxHours: 4 })).status).toBe(200);
+    expect((await update({ minHours: 1, maxHours: 1 })).status).toBe(200);
+    // Unkritische Bearbeitung, Pausieren und ausreichende Kapazitätsreduktion bleiben möglich.
+    expect((await update({ title: 'Neuer Titel', status: 'inactive', laneCount: 2 })).status).toBe(200);
+  });
+
+  it('prüft die gemeinsame Spitzenbelegung beim Reduzieren der Bahnanzahl', async () => {
+    const offer = await createOffer();
+    await reserve(offer.id, { lanes: 2 });
+    await reserve(offer.id, { lanes: 2 }, ANDERER);
+    const result = await call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, laneCount: 3 }, headers: VEREIN });
+    expect(result.status).toBe(409);
+  });
+
+  it('verhindert einen Spielortwechsel bei bestehenden Reservierungen', async () => {
+    sql(`INSERT INTO boule_places (id, club_id, name, address, latitude, longitude, venue_type, court_count, status, created_at, updated_at)
+      VALUES ('p2', 'c1', 'Andere Halle', 'Berlin', 52.5, 13.4, 'indoor', 8, 'published', '2026-10-01', '2026-10-01')`);
+    const offer = await createOffer();
+    const reservation = (await (await reserve(offer.id, {})).json()).reservation;
+    const update = () => call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, placeId: 'p2' }, headers: VEREIN });
+    expect((await update()).status).toBe(409);
+    await call('POST', `/api/rentals/reservations/${reservation.id}/cancel`, { headers: MIETER });
+    expect((await update()).status).toBe(200);
+  });
+
+  it('rollt Angebotsänderungen bei einer zwischenzeitlich eingegangenen Anfrage vollständig zurück', async () => {
+    const offer = await createOffer();
+    env.DB.vorBatch((sqlite) => {
+      sqlite.prepare(`INSERT INTO rental_reservations
+        (id, offer_id, user_id, local_date, start_hour, hours, lanes, start_utc, end_utc, status, created_at, updated_at)
+        VALUES ('race', ?, 'u2', '2026-10-24', 10, 2, 4, '2026-10-24T08:00:00.000Z', '2026-10-24T10:00:00.000Z', 'requested', '2026-10-19', '2026-10-19')`).run(offer.id);
+    });
+    const result = await call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, title: 'Darf nicht bleiben', laneCount: 1 }, headers: VEREIN });
+    expect(result.status).toBe(409);
+    expect(env.DB.sqlite.prepare('SELECT title, lane_count FROM rental_offers WHERE id = ?').get(offer.id)).toEqual({ title: offerBody.title, lane_count: 4 });
+  });
+
   it('gibt Kapazität nach Ablehnung und Storno frei und benachrichtigt den Mieter', async () => {
     const offer = await createOffer();
     const first = (await (await reserve(offer.id, { lanes: 4 })).json()).reservation;

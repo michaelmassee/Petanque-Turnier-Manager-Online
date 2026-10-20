@@ -132,8 +132,9 @@ export function occupiedLanes(reservations) {
  * Verfügbarkeit ab from für days Tage: je Tag die Stunden innerhalb der Öffnungszeiten mit freien Bahnen.
  * Vergangene Stunden und Tage jenseits des Buchungshorizonts sind als nicht buchbar markiert.
  */
-export function buildAvailability({ offer, openingHours, from, days = RENTAL_AVAILABILITY_DAYS, reservations, now }) {
-  const occupied = occupiedLanes(reservations);
+export function buildAvailability({ offer, openingHours, from, days = RENTAL_AVAILABILITY_DAYS, reservations, venueLaneCount = offer.laneCount, now }) {
+  const occupied = occupiedLanes(reservations.filter((reservation) => !reservation.offerId || reservation.offerId === offer.id));
+  const venueOccupied = occupiedLanes(reservations);
   const byWeekday = new Map(openingHours.map((entry) => [entry.weekday, entry]));
   return Array.from({ length: days }, (_, index) => {
     const date = addDays(from, index);
@@ -142,7 +143,9 @@ export function buildAvailability({ offer, openingHours, from, days = RENTAL_AVA
     const slots = [];
     for (let hour = opening?.openHour ?? 0; opening && hour < opening.closeHour; hour += 1) {
       const past = date < now.date || (date === now.date && hour <= now.hour);
-      slots.push({ hour, free: Math.max(0, offer.laneCount - (occupied.get(`${date}|${hour}`) || 0)), bookable: !past && !beyondHorizon });
+      const key = `${date}|${hour}`;
+      const free = Math.max(0, Math.min(offer.laneCount - (occupied.get(key) || 0), venueLaneCount - (venueOccupied.get(key) || 0)));
+      slots.push({ hour, free, bookable: !past && !beyondHorizon });
     }
     return { date, weekday: weekdayOf(date), slots };
   });

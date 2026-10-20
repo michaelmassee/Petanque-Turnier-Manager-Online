@@ -7337,6 +7337,13 @@ async function publishFinalRanking(request, env, tournament, user, origin) {
   if (tournament.type === 'ko' || isDocumentBound(tournament) || !isOnlinePlayable(tournament)) {
     throw new HttpError(409, 'Für dieses Turnier gibt es keine veröffentlichbare Rangliste');
   }
+  // Eine private Freigabe wird nicht stillschweigend aktiviert. Ohne nutzbaren Link darf kein Versand starten.
+  const share = body.notify === true && tournament.visibility === 'private'
+    ? await env.DB.prepare('SELECT token FROM tournament_share_links WHERE tournament_id = ?').bind(tournament.id).first()
+    : null;
+  if (body.notify === true && tournament.visibility === 'private' && !share?.token) {
+    throw new HttpError(409, 'Aktiviere zuerst den Freigabelink des privaten Turniers, bevor du die Endrangliste an die Teilnehmer sendest.');
+  }
   const previous = await env.DB.prepare('SELECT mailed_at FROM tournament_final_rankings WHERE tournament_id = ?').bind(tournament.id).first();
   if (body.notify === true && previous?.mailed_at && body.resend !== true) {
     throw new HttpError(409, 'Die Rangliste wurde bereits an die Teilnehmer gesendet', { code: 'ranking_already_mailed', mailedAt: previous.mailed_at });
@@ -7352,11 +7359,11 @@ async function publishFinalRanking(request, env, tournament, user, origin) {
           mailed_at = excluded.mailed_at`).bind(tournament.id, JSON.stringify(ranking), now, mailedAt),
     env.DB.prepare('UPDATE tournaments SET final_ranking_published_at = ? WHERE id = ?').bind(now, tournament.id),
   ]);
-  if (body.notify === true) await notifyFinalRanking(env, tournament, user, origin);
+  if (body.notify === true) await notifyFinalRanking(env, tournament, user, origin, share?.token);
   return json({ ranking, publishedAt: now, mailedAt });
 }
 
-async function notifyFinalRanking(env, tournament, sender, origin) {
+async function notifyFinalRanking(env, tournament, sender, origin, shareToken = null) {
   const id = crypto.randomUUID();
   // Ein Eintrag für alle Teilnehmer (wie der Broadcast), übersetzt wird er im Postfach über event_type.
   await env.DB.prepare(`INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, event_type, event_data, created_at, broadcast_tournament_id)
@@ -7369,10 +7376,7 @@ async function notifyFinalRanking(env, tournament, sender, origin) {
   }
 
   if (!(await canSendTournamentMail(env.DB, tournament))) return;
-  const share = tournament.visibility === 'private'
-    ? await env.DB.prepare('SELECT token FROM tournament_share_links WHERE tournament_id = ?').bind(tournament.id).first()
-    : null;
-  const link = `${origin}/turniere/${encodeURIComponent(tournament.id)}/rangliste${share?.token ? `?share=${encodeURIComponent(share.token)}` : ''}`;
+  const link = `${origin}/turniere/${encodeURIComponent(tournament.id)}/rangliste${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`;
   const recipients = await tournamentEmailRecipients(env.DB, tournament.id, "('confirmed')", sender.email);
   for (const recipient of recipients.values()) {
     const templates = TOURNAMENT_RANKING_EMAILS[recipient.language] || TOURNAMENT_RANKING_EMAILS.de;
@@ -9561,7 +9565,7 @@ function rentalPersonName(row, prefix = '') {
 }
 
 const RENTAL_OFFER_SELECT = `SELECT o.*, p.name AS place_name, p.address AS place_address, p.venue_type, p.latitude, p.longitude,
-    p.status AS place_status, c.name AS club_name, c.logo_url AS club_logo_url, c.status AS club_status
+    p.status AS place_status, p.court_count AS place_court_count, c.name AS club_name, c.logo_url AS club_logo_url, c.status AS club_status
   FROM rental_offers o JOIN boule_places p ON p.id = o.boule_place_id JOIN clubs c ON c.id = o.club_id`;
 
 function rentalOfferIsPublic(row) {
@@ -9634,10 +9638,11 @@ async function getRentalOffer(db, id, user) {
   return json({ offer: { ...toRentalOffer(row, await loadOpeningHours(db, id)), canManage } });
 }
 
-async function activeRentalReservations(db, offerId, from, to) {
-  const rows = await db.prepare(`SELECT local_date, start_hour, hours, lanes FROM rental_reservations
-    WHERE offer_id = ? AND local_date BETWEEN ? AND ? AND status IN ('requested', 'confirmed')`).bind(offerId, from, to).all();
-  return (rows.results || []).map((row) => ({ localDate: row.local_date, startHour: Number(row.start_hour), hours: Number(row.hours), lanes: Number(row.lanes) }));
+async function activeRentalReservations(db, placeId, from, to) {
+  const rows = await db.prepare(`SELECT r.offer_id, r.local_date, r.start_hour, r.hours, r.lanes
+    FROM rental_offers o JOIN rental_reservations r ON r.offer_id = o.id
+    WHERE o.boule_place_id = ? AND r.local_date BETWEEN ? AND ? AND r.status IN ('requested', 'confirmed')`).bind(placeId, from, to).all();
+  return (rows.results || []).map((row) => ({ offerId: row.offer_id, localDate: row.local_date, startHour: Number(row.start_hour), hours: Number(row.hours), lanes: Number(row.lanes) }));
 }
 
 async function getRentalAvailability(db, id, fromParam, user) {
@@ -9647,8 +9652,12 @@ async function getRentalAvailability(db, id, fromParam, user) {
   const now = rentalLocalNow(offer.timezone);
   const from = fromParam && isValidLocalDate(fromParam) ? fromParam : now.date;
   const to = addDays(from, RENTAL_AVAILABILITY_DAYS - 1);
-  const [openingHours, reservations] = await Promise.all([loadOpeningHours(db, id), activeRentalReservations(db, id, from, to)]);
-  return json({ from, today: now.date, days: buildAvailability({ offer, openingHours, from, reservations, now }) });
+  const [openingHours, reservations, venueLaneCount] = await Promise.all([
+    loadOpeningHours(db, id), activeRentalReservations(db, row.boule_place_id, from, to),
+    Number(row.place_court_count) > 0 ? Number(row.place_court_count)
+      : db.prepare('SELECT MAX(lane_count) AS capacity FROM rental_offers WHERE boule_place_id = ?').bind(row.boule_place_id).first('capacity'),
+  ]);
+  return json({ from, today: now.date, days: buildAvailability({ offer, openingHours, from, reservations, venueLaneCount: Number(venueLaneCount), now }) });
 }
 
 async function rentalClubManagers(db, clubId) {
@@ -9786,6 +9795,41 @@ async function notifyRentalRenter(env, { offer, reservation, manager, origin }) 
   }
 }
 
+// Dieselbe atomare Prüfung bei Anlage und Zusage: Angebotslimit und gemeinsame Kapazität des Spielorts.
+// Ohne hinterlegte Gesamtzahl begrenzt das größte Angebot des Spielorts dessen gemeinsam genutzte Bahnen.
+function rentalCapacityGuard(offer, reservation, excludedId = '') {
+  const hours = Array.from({ length: reservation.hours }, (_, index) => reservation.startHour + index);
+  return {
+    cte: `WITH requested(offer_id, local_date, lanes, excluded_id, place_id, timezone) AS (VALUES (?, ?, ?, ?, ?, ?)),
+      current_offer AS (
+        SELECT o.*, COALESCE(NULLIF(p.court_count, 0), (
+          SELECT MAX(capacity.lane_count) FROM rental_offers capacity WHERE capacity.boule_place_id = p.id
+        )) AS venue_capacity
+        FROM rental_offers o JOIN boule_places p ON p.id = o.boule_place_id JOIN requested q ON q.offer_id = o.id
+          AND q.place_id = o.boule_place_id AND q.timezone = o.timezone
+      ), hrs(hour) AS (VALUES ${hours.map(() => '(?)').join(', ')})`,
+    condition: `EXISTS (
+      SELECT 1 FROM current_offer o, requested q, rental_opening_hours opening
+      WHERE opening.offer_id = o.id AND opening.weekday = CAST(strftime('%w', q.local_date) AS INTEGER)
+        AND (SELECT MIN(hour) FROM hrs) >= opening.open_hour AND (SELECT MAX(hour) FROM hrs) < opening.close_hour
+        AND (SELECT COUNT(*) FROM hrs) BETWEEN o.min_hours AND o.max_hours
+    ) AND NOT EXISTS (
+      SELECT 1 FROM hrs, current_offer o, requested q
+      WHERE q.lanes + (
+        SELECT COALESCE(SUM(r.lanes), 0) FROM rental_reservations r
+        WHERE r.offer_id = o.id AND r.local_date = q.local_date AND r.status IN ('requested', 'confirmed')
+          AND r.id <> q.excluded_id AND r.start_hour <= hrs.hour AND r.start_hour + r.hours > hrs.hour
+      ) > o.lane_count
+      OR q.lanes + (
+        SELECT COALESCE(SUM(r.lanes), 0) FROM rental_offers other JOIN rental_reservations r ON r.offer_id = other.id
+        WHERE other.boule_place_id = o.boule_place_id AND r.local_date = q.local_date AND r.status IN ('requested', 'confirmed')
+          AND r.id <> q.excluded_id AND r.start_hour <= hrs.hour AND r.start_hour + r.hours > hrs.hour
+      ) > o.venue_capacity
+    )`,
+    params: [offer.id, reservation.date, reservation.lanes, excludedId, offer.boule_place_id, offer.timezone, ...hours],
+  };
+}
+
 async function createRentalReservation(request, env, offerId, user, origin) {
   const row = await loadRentalOffer(env.DB, offerId);
   if (!rentalOfferIsPublic(row)) throw new HttpError(404, 'Angebot nicht gefunden');
@@ -9802,21 +9846,14 @@ async function createRentalReservation(request, env, offerId, user, origin) {
   const startUtc = rentalHourUtc(input.date, input.startHour, offer.timezone);
   const endUtc = rentalHourUtc(input.date, input.startHour + input.hours, offer.timezone);
   const id = crypto.randomUUID();
-  const hours = Array.from({ length: input.hours }, (_, index) => input.startHour + index);
+  const guard = rentalCapacityGuard(row, input);
   // Atomar: nur einfügen, wenn in jeder gebuchten Stunde noch genug Bahnen frei sind (D1 serialisiert Schreibzugriffe).
-  const result = await env.DB.prepare(`WITH hrs(hour) AS (VALUES ${hours.map(() => '(?)').join(', ')})
+  const result = await env.DB.prepare(`${guard.cte}
     INSERT INTO rental_reservations (id, offer_id, user_id, local_date, start_hour, hours, lanes, start_utc, end_utc, status, note, created_at, updated_at)
     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?, ?, ?
-    WHERE NOT EXISTS (
-      SELECT 1 FROM hrs WHERE ? + (
-        SELECT COALESCE(SUM(r.lanes), 0) FROM rental_reservations r
-        WHERE r.offer_id = ? AND r.local_date = ? AND r.status IN ('requested', 'confirmed')
-          AND r.start_hour <= hrs.hour AND r.start_hour + r.hours > hrs.hour
-      ) > (SELECT lane_count FROM rental_offers WHERE id = ?)
-    )`).bind(
-    ...hours,
+    WHERE ${guard.condition}`).bind(
+    ...guard.params,
     id, offerId, user.id, input.date, input.startHour, input.hours, input.lanes, startUtc, endUtc, input.note, nowIso, nowIso,
-    input.lanes, offerId, input.date, offerId,
   ).run();
   if (!result.meta?.changes) throw new HttpError(409, 'Für diesen Zeitraum sind nicht mehr genug Bahnen frei');
   const reservation = await env.DB.prepare('SELECT * FROM rental_reservations WHERE id = ?').bind(id).first();
@@ -9865,8 +9902,18 @@ async function decideRentalReservation(request, env, reservationId, user, origin
   const note = String(body.note ?? '').trim().slice(0, 500) || null;
   const now = new Date().toISOString();
   if (decision.to === 'cancelled' && reservation.end_utc <= now) throw new HttpError(409, 'Die Reservierung ist bereits vorbei');
-  const result = await env.DB.prepare(`UPDATE rental_reservations SET status = ?, decision_note = ?, decided_by = ?, decided_at = ?, updated_at = ?
-    WHERE id = ? AND status = ?`).bind(decision.to, note, user.id, now, now, reservationId, decision.from).run();
+  const guard = decision.to === 'confirmed' ? rentalCapacityGuard(offer, {
+    date: reservation.local_date, startHour: Number(reservation.start_hour), hours: Number(reservation.hours), lanes: Number(reservation.lanes),
+  }, reservation.id) : null;
+  const result = await env.DB.prepare(`${guard?.cte || ''}
+    UPDATE rental_reservations SET status = ?, decision_note = ?, decided_by = ?, decided_at = ?, updated_at = ?
+    WHERE id = ? AND status = ? ${guard ? `AND (${guard.condition})` : ''}`)
+    .bind(...(guard?.params || []), decision.to, note, user.id, now, now, reservationId, decision.from).run();
+  if (!result.meta?.changes && guard) {
+    // Aktueller Stand statt des vorab geladenen: nur wenn die Anfrage noch offen ist, lag es an der Kapazität.
+    const current = await env.DB.prepare('SELECT status FROM rental_reservations WHERE id = ?').bind(reservationId).first('status');
+    if (current === decision.from) throw new HttpError(409, 'Für diesen Zeitraum sind nicht mehr genug Bahnen frei');
+  }
   if (!result.meta?.changes) throw new HttpError(409, 'Die Reservierung wurde bereits bearbeitet');
   const updated = { ...reservation, status: decision.to, decision_note: note, decided_by: user.id, decided_at: now, updated_at: now };
   await notifyRentalRenter(env, { offer, reservation: updated, manager: user, origin });
@@ -9900,7 +9947,7 @@ function assertRentalClubPublished(club) {
 }
 
 async function rentalPlaceForClub(db, clubId, placeId) {
-  const place = await db.prepare('SELECT id, latitude, longitude, status FROM boule_places WHERE id = ? AND club_id = ?').bind(placeId, clubId).first();
+  const place = await db.prepare('SELECT id, latitude, longitude, status, court_count FROM boule_places WHERE id = ? AND club_id = ?').bind(placeId, clubId).first();
   if (!place) throw new HttpError(400, 'Der Platz gehört nicht zu diesem Verein', { field: 'placeId' });
   if (place.status !== 'published') throw new HttpError(400, 'Der Spielort ist noch nicht freigegeben', { field: 'placeId' });
   return place;
@@ -9908,8 +9955,10 @@ async function rentalPlaceForClub(db, clubId, placeId) {
 
 function openingHourStatements(db, offerId, openingHours) {
   return [
-    db.prepare('DELETE FROM rental_opening_hours WHERE offer_id = ?').bind(offerId),
-    ...openingHours.map((entry) => db.prepare('INSERT INTO rental_opening_hours (offer_id, weekday, open_hour, close_hour) VALUES (?, ?, ?, ?)')
+    db.prepare(`DELETE FROM rental_opening_hours WHERE offer_id = ? AND weekday NOT IN (${openingHours.map(() => '?').join(', ')})`)
+      .bind(offerId, ...openingHours.map((entry) => entry.weekday)),
+    ...openingHours.map((entry) => db.prepare(`INSERT INTO rental_opening_hours (offer_id, weekday, open_hour, close_hour) VALUES (?, ?, ?, ?)
+      ON CONFLICT(offer_id, weekday) DO UPDATE SET open_hour = excluded.open_hour, close_hour = excluded.close_hour`)
       .bind(offerId, entry.weekday, entry.openHour, entry.closeHour)),
   ];
 }
@@ -9921,12 +9970,19 @@ function rentalOfferInput(body) {
   return { ...input, description: normalizeRichText(input.description, 'Ungültige Beschreibung') };
 }
 
+function assertRentalLaneCount(place, input) {
+  if (Number(place.court_count) > 0 && input.laneCount > Number(place.court_count)) {
+    throw new HttpError(400, 'Das Angebot hat mehr Bahnen als der Spielort', { field: 'laneCount' });
+  }
+}
+
 async function createRentalOffer(request, db, user) {
   const body = await readJson(request);
   const clubId = String(body.clubId || '');
   assertRentalClubPublished(await assertClubEditor(db, clubId, user));
   const input = rentalOfferInput(body);
   const place = await rentalPlaceForClub(db, clubId, input.placeId);
+  assertRentalLaneCount(place, input);
   const timezone = resolveTournamentTimezone({ latitude: Number(place.latitude ?? NaN), longitude: Number(place.longitude ?? NaN) });
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -9945,14 +10001,22 @@ async function updateRentalOffer(request, db, id, user) {
   assertRentalClubPublished(await assertClubEditor(db, existing.club_id, user));
   const input = rentalOfferInput(await readJson(request));
   const place = await rentalPlaceForClub(db, existing.club_id, input.placeId);
+  assertRentalLaneCount(place, input);
   const timezone = resolveTournamentTimezone({ latitude: Number(place.latitude ?? NaN), longitude: Number(place.longitude ?? NaN) });
-  await db.batch([
-    db.prepare(`UPDATE rental_offers SET boule_place_id = ?, title = ?, description = ?, lane_count = ?, price_minor = ?, currency = ?, price_note = ?,
-        min_hours = ?, max_hours = ?, booking_horizon_days = ?, timezone = ?, status = ?, updated_at = ? WHERE id = ?`)
-      .bind(place.id, input.title, input.description, input.laneCount, input.priceMinor, input.currency, input.priceNote, input.minHours,
-        input.maxHours, input.bookingHorizonDays, timezone, input.status, new Date().toISOString(), id),
-    ...openingHourStatements(db, id, input.openingHours),
-  ]);
+  try {
+    await db.batch([
+      db.prepare(`UPDATE rental_offers SET boule_place_id = ?, title = ?, description = ?, lane_count = ?, price_minor = ?, currency = ?, price_note = ?,
+          min_hours = ?, max_hours = ?, booking_horizon_days = ?, timezone = ?, status = ?, updated_at = ? WHERE id = ?`)
+        .bind(place.id, input.title, input.description, input.laneCount, input.priceMinor, input.currency, input.priceNote, input.minHours,
+          input.maxHours, input.bookingHorizonDays, timezone, input.status, new Date().toISOString(), id),
+      ...openingHourStatements(db, id, input.openingHours),
+    ]);
+  } catch (error) {
+    if (String(error.message).includes('rental_reservations_conflict')) {
+      throw new HttpError(409, 'Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.');
+    }
+    throw error;
+  }
   return json({ offer: toRentalOffer(await loadRentalOffer(db, id), await loadOpeningHours(db, id)) });
 }
 

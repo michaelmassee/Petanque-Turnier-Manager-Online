@@ -89,9 +89,48 @@ describe('Endrangliste veröffentlichen', () => {
 
   it('hängt bei privaten Turnieren den Freigabe-Link an', async () => {
     sql("UPDATE tournaments SET visibility = 'private' WHERE id = 't1'");
-    sql("INSERT INTO tournament_share_links (tournament_id, token_hash, token, created_at, updated_at) VALUES ('t1', 'hash', 'geheim', '2026-10-14', '2026-10-14')");
+    const share = await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/share-link', { method: 'POST', headers: LEITUNG }), env);
+    expect(share.status).toBe(200);
+    const token = env.DB.sqlite.prepare("SELECT token FROM tournament_share_links WHERE tournament_id = 't1'").get().token;
     await publish({ notify: true });
-    expect(mails()[0].actions[0].url).toBe('https://ptm.test/turniere/t1/rangliste?share=geheim');
+    expect(mails()[0].actions[0].url).toBe(`https://ptm.test/turniere/t1/rangliste?share=${token}`);
+    expect((await ranking(`?share=${token}`)).status).toBe(200);
+    expect((await worker.fetch(new Request(`https://ptm.test/api/tournaments/t1?share=${token}`), env)).status).toBe(200);
+    expect((await ranking()).status).toBe(403);
+  });
+
+  it('stoppt den privaten Versand ohne nutzbaren Freigabelink vor Veröffentlichung und Benachrichtigungen', async () => {
+    sql("UPDATE tournaments SET visibility = 'private' WHERE id = 't1'");
+    const result = await publish({ notify: true });
+    expect(result.status).toBe(409);
+    expect((await result.json()).error).toContain('Freigabelink');
+    expect(send).not.toHaveBeenCalled();
+    expect(env.DB.sqlite.prepare('SELECT * FROM tournament_final_rankings').all()).toEqual([]);
+    expect(env.DB.sqlite.prepare('SELECT * FROM postbox_messages').all()).toEqual([]);
+    expect((await publish({ notify: false })).status).toBe(200);
+  });
+
+  it('verwendet nach Wiederaufnahme und erneutem Abschluss keine alte Veröffentlichung', async () => {
+    await publish({ notify: true });
+    const start = await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/start', { method: 'POST', headers: LEITUNG }), env);
+    expect(start.status).toBe(200);
+    expect(env.DB.sqlite.prepare("SELECT final_ranking_published_at FROM tournaments WHERE id = 't1'").get().final_ranking_published_at).toBeNull();
+    sql("UPDATE tournament_matches SET score_a = 2, score_b = 13 WHERE id = 'm1'");
+    const finish = await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/publication', {
+      method: 'PUT', headers: { ...LEITUNG, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'finished', visibility: 'public' }),
+    }), env);
+    expect(finish.status).toBe(200);
+    expect((await finish.json()).tournament.rankingPublishedAt).toBeNull();
+    expect((await ranking()).status).toBe(403);
+    expect((await (await ranking('?live=1', LEITUNG)).json()).ranking[0].teamId).toBe('b');
+    // Erneut veröffentlichen geht ohne Rückfrage; ein zweiter Versand an die Teilnehmer muss bestätigt werden.
+    const repeated = await publish({ notify: true });
+    expect(repeated.status).toBe(409);
+    expect(await repeated.json()).toMatchObject({ details: { code: 'ranking_already_mailed' } });
+    const published = await publish({ notify: true, resend: true });
+    expect(published.status).toBe(200);
+    expect((await (await ranking()).json()).ranking[0].teamId).toBe('b');
   });
 
   it('erlaubt das Veröffentlichen nur der Turnierleitung und erst nach Turnierende', async () => {

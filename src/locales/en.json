@@ -1646,5 +1646,8 @@
   "Dein Verein ist noch nicht freigegeben. Angebote kannst du anlegen, sobald ein Admin ihn freigegeben hat.": "Your club has not been approved yet. You can create offers once an admin has approved it.",
   "Angebote sind erst möglich, wenn der Verein freigegeben ist": "Offers are only possible once the club has been approved",
   "Der Spielort ist noch nicht freigegeben": "The venue has not been approved yet",
-  "Preis auf Anfrage": "Price on request"
+  "Preis auf Anfrage": "Price on request",
+  "Aktiviere zuerst den Freigabelink des privaten Turniers, bevor du die Endrangliste an die Teilnehmer sendest.": "Enable the private tournament’s share link before sending the final standings to participants.",
+  "Das Angebot hat mehr Bahnen als der Spielort": "The offer has more lanes than the venue",
+  "Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.": "This change conflicts with existing reservations. Cancel or resolve them first."
 }

@@ -5,7 +5,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
-import { isDocumentBound, labelFor, formationLabel, hasOpenRegistration, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
+import { isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
 import { AccountBadge, Button, Feedback, RequiredMark, ShareIcon } from '../components/ui.jsx';
 import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
 import { formatUserName } from '../lib/userLabel.js';
@@ -516,7 +516,11 @@ export function TournamentDetailPage({
   // Der letzte Reiter wechselt mit dem Status – vor dem Start Mitspielgesuche, während des Turniers der Spielplan,
   // nach dem Veröffentlichen die Endrangliste –, so bleiben es auf kleinen Handys höchstens vier Reiter.
   const started = tournament.status === 'running' || tournament.status === 'finished';
-  const canShowPlayerListings = tournament.visibility === 'public' && !started;
+  // Mitspieler suchen lohnt nur, solange man noch mitspielen kann: bei Online-Anmeldung, solange sie möglich ist;
+  // bei Kalendereinträgen (Anmeldung außerhalb) bis zum Turniertag.
+  const registrationKind = registrationStatusKind(tournament);
+  const canShowPlayerListings = tournament.visibility === 'public'
+    && (['open', 'waitlist', 'upcoming'].includes(registrationKind) || (registrationKind === 'calendar' && !started && isUpcoming(tournament)));
   // Mit verbundenem Turnierdokument auch für Systeme ohne Online-Durchführung (Poule, Kaskade, …).
   const rankingPublished = Boolean(tournament.rankingPublishedAt);
   const canShowSchedule = canShowParticipants && (isOnlinePlayable(tournament) || isDocumentBound(tournament)) && started && !rankingPublished;

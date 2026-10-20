@@ -157,6 +157,32 @@ describe('Turnierdetail-Reiter', () => {
     expect(screen.getByRole('button', { name: 'Mitspieler' })).toHaveAttribute('aria-current', 'page');
   });
 
+  it.each([
+    { registrationClosed: true },
+    { registrationDeadline: '2000-01-01T12:00:00Z' },
+    { maxRegistrations: 8, activeRegistrations: 8, waitlistEnabled: false },
+    { startsAt: '2000-01-01T12:00:00Z' },
+    { registrationEnabled: false, date: '2000-01-01' },
+  ])('blendet Mitspielgesuche bei unmöglicher Anmeldung aus (%j)', (state) => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ listings: [] })));
+    renderDetail(tournamentWith(state), 'mitspieler');
+    expect(tabNames()).not.toContain('Mitspieler');
+    expect(screen.queryByText('Mitspielgesuche zu diesem Turnier')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Info' })).toHaveAttribute('aria-current', 'page');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { maxRegistrations: 8, activeRegistrations: 8, waitlistEnabled: true },
+    { registrationOpensAt: '2099-01-01T12:00:00Z' },
+    { registrationEnabled: false },
+  ])('erhält Mitspielgesuche bei Warteliste, künftigem Anmeldebeginn oder künftigem Kalendereintrag (%j)', async (state) => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ listings: [] })));
+    renderDetail(tournamentWith(state), 'mitspieler');
+    expect(await screen.findByText('Mitspielgesuche zu diesem Turnier')).toBeInTheDocument();
+    expect(tabNames()).toContain('Mitspieler');
+  });
+
   it('fällt bei einem nicht mehr verfügbaren Reiter auf Info zurück', () => {
     global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ rounds: [], ranking: [] })));
 

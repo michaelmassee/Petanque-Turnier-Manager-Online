@@ -1646,5 +1646,8 @@
   "Dein Verein ist noch nicht freigegeben. Angebote kannst du anlegen, sobald ein Admin ihn freigegeben hat.": "Je vereniging is nog niet goedgekeurd. Je kunt aanbiedingen maken zodra een beheerder haar heeft goedgekeurd.",
   "Angebote sind erst möglich, wenn der Verein freigegeben ist": "Aanbiedingen zijn pas mogelijk als de vereniging is goedgekeurd",
   "Der Spielort ist noch nicht freigegeben": "De speellocatie is nog niet goedgekeurd",
-  "Preis auf Anfrage": "Prijs op aanvraag"
+  "Preis auf Anfrage": "Prijs op aanvraag",
+  "Aktiviere zuerst den Freigabelink des privaten Turniers, bevor du die Endrangliste an die Teilnehmer sendest.": "Activeer eerst de deellink van het privétoernooi voordat je de eindrangschikking naar de deelnemers stuurt.",
+  "Das Angebot hat mehr Bahnen als der Spielort": "Het aanbod heeft meer banen dan de locatie",
+  "Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.": "Deze wijziging is in strijd met bestaande reserveringen. Annuleer of regel deze eerst."
 }

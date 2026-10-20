@@ -1646,5 +1646,8 @@
   "Dein Verein ist noch nicht freigegeben. Angebote kannst du anlegen, sobald ein Admin ihn freigegeben hat.": "Ton club n’a pas encore été validé. Tu pourras créer des offres dès qu’un administrateur l’aura validé.",
   "Angebote sind erst möglich, wenn der Verein freigegeben ist": "Les offres ne sont possibles qu’une fois le club validé",
   "Der Spielort ist noch nicht freigegeben": "Le lieu n’a pas encore été validé",
-  "Preis auf Anfrage": "Prix sur demande"
+  "Preis auf Anfrage": "Prix sur demande",
+  "Aktiviere zuerst den Freigabelink des privaten Turniers, bevor du die Endrangliste an die Teilnehmer sendest.": "Activez d’abord le lien de partage du tournoi privé avant d’envoyer le classement final aux participants.",
+  "Das Angebot hat mehr Bahnen als der Spielort": "L’offre comporte plus de pistes que le lieu",
+  "Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.": "Cette modification est incompatible avec des réservations existantes. Annulez-les ou réglez-les d’abord."
 }
