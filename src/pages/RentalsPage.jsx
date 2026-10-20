@@ -9,7 +9,7 @@ import { StandalonePageHeader } from '../components/layout.jsx';
 import { RentalCalendar } from '../components/RentalCalendar.jsx';
 import { RentalMonthPicker } from '../components/RentalMonthPicker.jsx';
 import { ComboboxPicker } from '../components/ComboboxPicker.jsx';
-import { RichText } from '../components/RichText.jsx';
+import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 
 const hourLabel = (hour) => `${String(hour).padStart(2, '0')}:00`;
@@ -30,12 +30,19 @@ function OfferPrice({ offer, language }) {
 }
 
 // Spielort und Verein heißen oft gleich; dann nur einmal nennen. Die Adresse steht in einer eigenen Zeile.
-function OfferSummary({ offer }) {
+// Wie beim Turnier: Der Spielort führt zur Karte unter „Plätze & Vereine“, gefiltert auf genau diesen Platz.
+// Nur bei öffentlichen Angeboten, denn nicht freigegebene Spielorte zeigt die Platzseite nicht.
+function OfferSummary({ offer, navigate }) {
   const { t } = useTranslation();
-  const names = [offer.placeName, offer.clubName].filter(Boolean)
-    .filter((name, index, all) => all.findIndex((other) => other.trim().toLowerCase() === name.trim().toLowerCase()) === index);
+  const placePath = `/plaetze#${encodeURIComponent(offer.placeId || '')}`;
+  const showClub = offer.clubName && offer.clubName.trim().toLowerCase() !== (offer.placeName || '').trim().toLowerCase();
+  const place = offer.placeName && (offer.isPublic && offer.placeId
+    ? <a href={placePath} onClick={(event) => handleOwnLinkClick(event, placePath, navigate)}>{offer.placeName}</a>
+    : offer.placeName);
   return <>
-    <span data-i18n-skip>{[...names, t('{{lanes}} Bahn(en)', { lanes: offer.laneCount })].join(' · ')}</span>
+    <span data-i18n-skip>
+      {place}{place && ' · '}{showClub && `${offer.clubName} · `}{t('{{lanes}} Bahn(en)', { lanes: offer.laneCount })}
+    </span>
     {offer.address && <span className="rental-offer-address" data-i18n-skip>{offer.address}</span>}
   </>;
 }
@@ -109,7 +116,7 @@ function RentalOfferList({ language, navigate }) {
                 : <span className="rental-offer-logo" aria-hidden="true" />}
               <div className="rental-offer-info">
                 <strong data-i18n-skip>{offer.title}</strong>
-                <OfferSummary offer={offer} />
+                <OfferSummary offer={offer} navigate={navigate} />
                 <OfferPrice offer={offer} language={language} />
               </div>
               <div className="row-actions">
@@ -208,7 +215,7 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
           {offer.canManage && <Button variant="secondary" onClick={() => navigate('/platz-mieten/verwalten')}>{t('Vermietung verwalten')}</Button>}
         </div>
       </div>
-      <div className="rental-offer-meta"><OfferSummary offer={offer} /></div>
+      <div className="rental-offer-meta"><OfferSummary offer={offer} navigate={navigate} /></div>
       <p><OfferPrice offer={offer} language={language} /></p>
       {offer.description && <RichText value={offer.description} onNavigate={navigate} />}
       <p className="hint">
@@ -613,7 +620,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
               <article className="data-row" key={offer.id}>
                 <div>
                   <strong data-i18n-skip>{offer.title}</strong>
-                  <OfferSummary offer={offer} />
+                  <OfferSummary offer={offer} navigate={navigate} />
                   <span>{offer.status !== 'active' ? t('Pausiert') : offer.isPublic ? t('Aktiv (öffentlich buchbar)') : t('Aktiv – öffentlich sichtbar, sobald Verein und Spielort freigegeben sind')}</span>
                 </div>
                 <div className="row-actions">

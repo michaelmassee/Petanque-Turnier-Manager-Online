@@ -136,7 +136,7 @@ describe('Platz mieten: Angebot und Kalender', () => {
   it('nennt Spielort und Verein nur einmal, wenn sie gleich heißen, ohne Spielort-Präfix', async () => {
     api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, placeName: 'BC Test' } }));
     render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
-    expect(await screen.findByText('BC Test · 4 Bahn(en)')).toBeInTheDocument();
+    expect((await screen.findByText('BC Test')).closest('span')).toHaveTextContent(/^BC Test · 4 Bahn\(en\)$/);
     expect(screen.getByText('Berlin')).toHaveClass('rental-offer-address');
     expect(screen.queryByText(/Boulehalle:/)).not.toBeInTheDocument();
   });
@@ -179,6 +179,23 @@ describe('Platz mieten: Angebot und Kalender', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Samstag, 24. Oktober 2026: teilweise belegt' }));
     await waitFor(() => expect(api).toHaveBeenCalledWith('/api/rentals/o1/availability?from=2026-10-24'));
     expect(screen.queryByText('Oktober 2026')).not.toBeInTheDocument();
+  });
+
+  it('öffnet über den Spielort die Karte unter Plätze & Vereine, gefiltert auf diesen Platz', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, isPublic: true } }));
+    const navigate = vi.fn();
+    render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={navigate} onLogin={vi.fn()} />);
+    const link = await screen.findByRole('link', { name: 'Halle Nord' });
+    expect(link).toHaveAttribute('href', '/plaetze#p1');
+    fireEvent.click(link);
+    expect(navigate).toHaveBeenCalledWith('/plaetze#p1');
+  });
+
+  it('verlinkt den Spielort nicht, solange das Angebot nicht öffentlich ist', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, isPublic: false } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
+    expect(await screen.findByText(/Halle Nord/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Halle Nord' })).not.toBeInTheDocument();
   });
 
   it('bittet Gäste ums Anmelden statt das Formular zu zeigen', async () => {
