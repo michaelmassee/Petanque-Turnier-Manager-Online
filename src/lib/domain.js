@@ -235,6 +235,10 @@ export function registrationNotYetOpen(tournament) {
   return Boolean(tournament.registrationOpeningPending) || (Boolean(tournament.registrationOpensAt) && new Date(tournament.registrationOpensAt).getTime() > Date.now());
 }
 
+export function registrationDeadlinePassed(tournament) {
+  return Boolean(tournament.registrationDeadline) && new Date(tournament.registrationDeadline).getTime() < Date.now();
+}
+
 export function hasOpenRegistration(tournament) {
   if (tournament.status !== 'registration') {
     return false;
@@ -246,7 +250,7 @@ export function hasOpenRegistration(tournament) {
   if (tournament.startsAt && new Date(tournament.startsAt).getTime() <= Date.now()) {
     return false;
   }
-  if (tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now()) {
+  if (registrationDeadlinePassed(tournament)) {
     return false;
   }
   if (!tournament.maxRegistrations) {
@@ -300,7 +304,7 @@ export function registrationStatusKind(tournament) {
   if (tournament.registrationClosed) return 'closed';
   if (tournament.startsAt && new Date(tournament.startsAt).getTime() <= Date.now()) return 'started';
   if (registrationNotYetOpen(tournament)) return 'upcoming';
-  if (tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now()) return 'unavailable';
+  if (registrationDeadlinePassed(tournament)) return 'unavailable';
   const isFull = Boolean(tournament.maxRegistrations) && tournament.activeRegistrations >= tournament.maxRegistrations;
   // Voll, aber mit Warteliste: Anmeldung geht weiter (wie hasOpenRegistration), auch wenn noch niemand wartet.
   if (isFull) return tournament.waitlistEnabled ? 'waitlist' : 'unavailable';
@@ -341,7 +345,7 @@ export function registrationStatusLabel(tournament, language) {
 /** Grund zu „Anmeldung nicht mehr möglich“: Anmeldeschluss vorbei oder ausgebucht ohne Warteliste; sonst ''. */
 export function registrationStatusReason(tournament, language) {
   if (registrationStatusKind(tournament) !== 'unavailable') return '';
-  if (tournament.registrationDeadline && new Date(tournament.registrationDeadline).getTime() < Date.now()) {
+  if (registrationDeadlinePassed(tournament)) {
     return i18next.t('Anmeldeschluss abgelaufen', { lng: language });
   }
   return i18next.t('ausgebucht', { lng: language });

@@ -1,4 +1,10 @@
 {
+  "Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Cierra las nuevas inscripciones, incluida la lista de espera. La visibilidad del torneo no cambia. Las inscripciones existentes en la lista de espera se conservan.",
+  "Neue Anmeldungen einschließlich Warteliste sind geschlossen. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Las nuevas inscripciones, incluida la lista de espera, están cerradas. La visibilidad del torneo no cambia. Las inscripciones existentes en la lista de espera se conservan.",
+  "Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "El plazo de inscripción ha vencido. Debe modificarse para permitir nuevas inscripciones.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "Se ha levantado el bloqueo manual de inscripciones. El plazo de inscripción ha vencido. Debe modificarse para permitir nuevas inscripciones.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.": "Se ha levantado el bloqueo manual de inscripciones. El torneo ya ha comenzado, por lo que ya no se admiten nuevas inscripciones.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.": "Se ha levantado el bloqueo manual de inscripciones. El plazo, la apertura de inscripciones y el límite de participantes siguen vigentes.",
   "VIP an": "VIP activado",
   "VIP aus": "VIP desactivado",
   "VIP-Status wurde aktualisiert.": "El estado VIP se ha actualizado.",

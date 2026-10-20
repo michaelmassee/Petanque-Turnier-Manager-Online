@@ -1,4 +1,10 @@
 {
+  "Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Sluit nieuwe inschrijvingen, inclusief de wachtlijst. De zichtbaarheid van het toernooi blijft ongewijzigd. Bestaande plaatsen op de wachtlijst blijven behouden.",
+  "Neue Anmeldungen einschließlich Warteliste sind geschlossen. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Nieuwe inschrijvingen, inclusief de wachtlijst, zijn gesloten. De zichtbaarheid van het toernooi blijft ongewijzigd. Bestaande plaatsen op de wachtlijst blijven behouden.",
+  "Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "De inschrijftermijn is verstreken. Deze moet worden aangepast om nieuwe inschrijvingen toe te staan.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "De handmatige inschrijfblokkade is opgeheven. De inschrijftermijn is verstreken. Deze moet worden aangepast om nieuwe inschrijvingen toe te staan.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.": "De handmatige inschrijfblokkade is opgeheven. Het toernooi is al begonnen, nieuwe inschrijvingen zijn niet meer mogelijk.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.": "De handmatige inschrijfblokkade is opgeheven. De inschrijftermijn, de opening van de inschrijving en de deelnemerslimiet blijven gelden.",
   "VIP an": "VIP aan",
   "VIP aus": "VIP uit",
   "VIP-Status wurde aktualisiert.": "VIP-status is bijgewerkt.",

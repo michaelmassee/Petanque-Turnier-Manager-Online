@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
-import { hasRegistrations, isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, registrationNotYetOpen, registrationStatusLabel, tournamentPayload, translatedOptions } from '../lib/domain.js';
+import { hasRegistrations, isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, registrationDeadlinePassed, registrationStatusClass, registrationStatusKind, registrationStatusLabel, registrationStatusReason, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
 import { Feedback, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
@@ -811,11 +811,14 @@ export function TournamentList({
                 </span>
               ) : (
                 <>
-                  <span className={`status status-${tournament.status}`}>
-                    {tournament.status === 'registration' && (tournament.registrationClosed || registrationNotYetOpen(tournament))
+                  <span className={`status ${registrationStatusClass(tournament)}`}>
+                    {tournament.status === 'registration' || tournament.status === 'running'
                       ? registrationStatusLabel(tournament, language)
                       : labelFor(TOURNAMENT_STATUSES, tournament.status)}
                   </span>
+                  {registrationStatusReason(tournament, language) && (
+                    <small className="muted">{registrationStatusReason(tournament, language)}</small>
+                  )}
                   <span className="role">{tournament.activeRegistrations}/{tournament.maxRegistrations || '∞'}</span>
                   {tournament.waitlistRegistrations > 0 && <span className="role role-user">{tournament.waitlistRegistrations} {t('Warteliste')}</span>}
                 </>
@@ -893,6 +896,8 @@ export function TournamentList({
                   <Button
                     variant="secondary"
                     loading={busyId === `registration-closed-${tournament.id}`}
+                    aria-describedby={`registration-closure-hint-${tournament.id}`}
+                    title={tournament.registrationClosed ? undefined : t('Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.')}
                     disabled={Boolean(busyId) && busyId !== `registration-closed-${tournament.id}`}
                     onClick={() => onToggleRegistrationClosed(tournament)}
                   >
@@ -915,6 +920,21 @@ export function TournamentList({
                 >
                   {t('Löschen')}
                 </Button>
+                {tournament.status === 'registration' && tournament.registrationEnabled !== false && (
+                  // Sichtbar nur, wenn der Hinweis einen Zustand erklärt; sonst nur Beschreibung des Buttons (hält die Liste am Handy kurz).
+                  <small
+                    className="muted tournament-registration-hint"
+                    id={`registration-closure-hint-${tournament.id}`}
+                    hidden={!tournament.registrationClosed && !registrationDeadlinePassed(tournament)}
+                  >
+                    {tournament.registrationClosed
+                      ? t('Neue Anmeldungen einschließlich Warteliste sind geschlossen. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.')
+                      : t('Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.')}
+                    {registrationDeadlinePassed(tournament) && (
+                      <> {t('Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.')}</>
+                    )}
+                  </small>
+                )}
               </div>
             )}
           </article>
@@ -1195,7 +1215,15 @@ export function TournamentManagementPage({
         method: 'PUT',
         body: JSON.stringify({ closed }),
       });
-      setMessage(closed ? t('Anmeldung wurde geschlossen.') : t('Anmeldung wurde geöffnet.'));
+      // Details zur Sperre stehen im Hinweis der Zeile; die Meldung nennt nur, was danach tatsächlich gilt.
+      const reopenedKind = registrationStatusKind({ ...tournament, registrationClosed: false });
+      setMessage(closed
+        ? t('Anmeldung wurde geschlossen.')
+        : reopenedKind === 'started'
+          ? t('Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.')
+          : registrationDeadlinePassed(tournament)
+            ? t('Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.')
+            : t('Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.'));
       await onTournamentsChanged?.();
     } catch (requestError) {
       setError(requestError.message);

@@ -1,4 +1,10 @@
 {
+  "Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Closes new registrations, including the waiting list. Tournament visibility remains unchanged. Existing waiting list entries are retained.",
+  "Neue Anmeldungen einschließlich Warteliste sind geschlossen. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "New registrations, including the waiting list, are closed. Tournament visibility remains unchanged. Existing waiting list entries are retained.",
+  "Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "The registration deadline has passed. It must be adjusted to allow new registrations.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "The manual registration block has been lifted. The registration deadline has passed. It must be adjusted to allow new registrations.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.": "The manual registration block has been lifted. The tournament has already started, so new registrations are no longer possible.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.": "The manual registration block has been lifted. The registration deadline, opening time and participant limit still apply.",
   "VIP an": "VIP on",
   "VIP aus": "VIP off",
   "VIP-Status wurde aktualisiert.": "VIP status has been updated.",

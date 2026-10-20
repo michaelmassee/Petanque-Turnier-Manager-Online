@@ -1,4 +1,10 @@
 {
+  "Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.",
+  "Neue Anmeldungen einschließlich Warteliste sind geschlossen. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Neue Anmeldungen einschließlich Warteliste sind geschlossen. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.",
+  "Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.": "Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.",
+  "Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.": "Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.",
   "VIP an": "VIP an",
   "VIP aus": "VIP aus",
   "VIP-Status wurde aktualisiert.": "VIP-Status wurde aktualisiert.",
