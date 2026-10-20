@@ -2,6 +2,7 @@
 // Stunden innerhalb eines Tages; Datum/Stunde sind Ortszeit des Platzes, Wochentag 0 = Sonntag (Date#getUTCDay).
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
+import { richTextPlainText } from './lib/rich-text.js';
 
 export const RENTAL_STATUSES = ['requested', 'confirmed', 'rejected', 'cancelled'];
 export const RENTAL_ACTIVE_STATUSES = ['requested', 'confirmed'];
@@ -15,6 +16,13 @@ function text(value, field, { required = false } = {}) {
   const result = String(value ?? '').trim();
   if (required && !result) throw new HttpError(400, 'Pflichtfeld fehlt', { field });
   if (result.length > TEXT_LIMITS[field]) throw new HttpError(400, 'Text zu lang', { field });
+  return result || null;
+}
+
+// Beschreibung ist Rich Text wie bei Turnieren und Plätzen; das Limit zählt nur den sichtbaren Text.
+function description(value) {
+  const result = String(value ?? '').trim();
+  if (richTextPlainText(result).length > TEXT_LIMITS.description) throw new HttpError(400, 'Text zu lang', { field: 'description' });
   return result || null;
 }
 
@@ -70,7 +78,7 @@ export function normalizeOfferInput(body) {
   return {
     placeId: String(body?.placeId || '').trim(),
     title: text(body?.title, 'title', { required: true }),
-    description: text(body?.description, 'description'),
+    description: description(body?.description),
     laneCount: integer(body?.laneCount, 'laneCount', 1, RENTAL_MAX_LANES),
     priceMinor,
     currency,

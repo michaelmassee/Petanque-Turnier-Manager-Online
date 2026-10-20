@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { api, authenticatedApi } from '../lib/api.js';
-import { RentalManagement, RentalOfferView } from './RentalsPage.jsx';
+import { MyRentalReservations, RentalManagement, RentalOfferView, RentalsPage } from './RentalsPage.jsx';
 
 vi.mock('../lib/api.js', async (importOriginal) => ({ ...(await importOriginal()), api: vi.fn(), authenticatedApi: vi.fn() }));
 
 const OFFER = {
   id: 'o1', clubId: 'c1', clubName: 'BC Test', placeId: 'p1', placeName: 'Halle Nord', venueType: 'indoor', address: 'Berlin',
   title: 'Boulehalle', laneCount: 4, priceMinor: 1000, currency: 'EUR', priceNote: 'pro Bahn und Stunde',
-  minHours: 1, maxHours: 3, bookingHorizonDays: 30, timezone: 'Europe/Berlin', status: 'active', canManage: false,
+  minHours: 1, maxHours: 3, bookingHorizonDays: 30, timezone: 'Europe/Berlin', status: 'active', isPublic: true, canManage: false,
   openingHours: [{ weekday: 6, openHour: 9, closeHour: 13 }],
 };
 const slots = (frees) => frees.map((free, index) => ({ hour: 9 + index, free, bookable: true }));
@@ -19,6 +19,89 @@ const AVAILABILITY = {
     return { date, weekday: (1 + index) % 7, slots: index === 5 ? slots([4, 2, 0, 4]) : [] };
   }),
 };
+
+describe('Mietangebote teilen', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  function renderOffer(offer = OFFER) {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer }));
+    return render(<RentalOfferView id={offer.id} language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
+  }
+
+  it('teilt aus der Liste den Namen und direkten Kalenderlink ohne zusätzliche Abfrage', async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { share });
+    api.mockResolvedValue({ offers: [OFFER] });
+    render(<RentalsPage route={{ view: 'list' }} language="de" navigate={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Teilen' }));
+    expect(share).toHaveBeenCalledWith({ title: OFFER.title, text: OFFER.title, url: `${window.location.origin}/platz-mieten/o1` });
+    expect(api).toHaveBeenCalledTimes(1);
+  });
+
+  it('kopiert Name und URL, wenn Geräte-Teilen fehlt', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    renderOffer({ ...OFFER, id: 'offer /1' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Teilen' }));
+    expect(writeText).toHaveBeenCalledWith(`${OFFER.title}\n${window.location.origin}/platz-mieten/offer%20%2F1`);
+    expect(await screen.findByText('Link kopiert')).toBeInTheDocument();
+  });
+
+  it('zeigt einen abgebrochenen Teilen-Dialog ohne Fehlermeldung', async () => {
+    const share = vi.fn().mockRejectedValue(new DOMException('Abgebrochen', 'AbortError'));
+    vi.stubGlobal('navigator', { share });
+    renderOffer();
+    fireEvent.click(await screen.findByRole('button', { name: 'Teilen' }));
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    expect(screen.queryByText('Teilen wird von diesem Gerät nicht unterstützt')).not.toBeInTheDocument();
+    expect(screen.queryByText('Link kopiert')).not.toBeInTheDocument();
+  });
+
+  it('meldet Fehler beim Kopieren', async () => {
+    vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockRejectedValue(new Error()) } });
+    renderOffer();
+    fireEvent.click(await screen.findByRole('button', { name: 'Teilen' }));
+    expect(await screen.findByText('Teilen wird von diesem Gerät nicht unterstützt')).toBeInTheDocument();
+  });
+
+  it('bietet bei nicht öffentlichen Angeboten keinen Teilen-Button an', async () => {
+    renderOffer({ ...OFFER, isPublic: false, canManage: true });
+    await screen.findByRole('heading', { name: OFFER.title });
+    expect(screen.queryByRole('button', { name: 'Teilen' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Reservierung aus der Zusagemail', () => {
+  afterEach(() => {
+    window.history.replaceState({}, '', '/');
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  it('fokussiert Stornieren, ohne beim Öffnen der Mail automatisch abzusagen', async () => {
+    window.history.replaceState({}, '', '/platz-mieten/meine#stornieren-r1');
+    const reservation = { id: 'r1', offerId: 'o1', offerTitle: 'Boulehalle', date: '2099-10-24', startHour: 10, hours: 2, lanes: 2, status: 'confirmed', startUtc: '2099-10-24T08:00:00.000Z' };
+    authenticatedApi.mockResolvedValue({ reservations: [reservation] });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<MyRentalReservations language="de" navigate={vi.fn()} />);
+    const button = await screen.findByRole('button', { name: 'Stornieren' });
+    await waitFor(() => expect(button).toHaveFocus());
+    expect(confirm).not.toHaveBeenCalled();
+    expect(authenticatedApi).toHaveBeenCalledTimes(1);
+    fireEvent.click(button);
+    expect(confirm).toHaveBeenCalledWith('Reservierung wirklich stornieren?');
+    expect(authenticatedApi).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => expect(button).toBeEnabled());
+    confirm.mockReturnValue(true);
+    fireEvent.click(button);
+    await waitFor(() => expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/reservations/r1/cancel', { method: 'POST' }));
+    expect(await screen.findByText('Reservierung storniert.')).toBeInTheDocument();
+  });
+});
 
 describe('Platz mieten: Angebot und Kalender', () => {
   afterEach(() => vi.clearAllMocks());
@@ -64,6 +147,13 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(await screen.findByText('Preis auf Anfrage')).toBeInTheDocument();
   });
 
+  it('zeigt die Beschreibung formatiert als Rich Text', async () => {
+    const description = `ptm-richtext:v1:${JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Mit Bar', marks: [{ type: 'bold' }] }] }] })}`;
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, description } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
+    expect((await screen.findByText('Mit Bar')).closest('strong')).not.toBeNull();
+  });
+
   it('bittet Gäste ums Anmelden statt das Formular zu zeigen', async () => {
     mockOffer();
     const onLogin = vi.fn();
@@ -92,6 +182,18 @@ describe('Platz mieten: Vereinsverwaltung', () => {
       return MANAGE;
     });
   }
+
+  it('bietet Teilen in der Verwaltung nur für öffentliche Angebote an', async () => {
+    authenticatedApi.mockImplementation(async (path) => {
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
+      return { ...MANAGE, offers: [OFFER, { ...OFFER, id: 'paused', title: 'Pausiertes Angebot', status: 'paused', isPublic: false }] };
+    });
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+    const publicRow = (await screen.findByText(OFFER.title)).closest('article');
+    expect(within(publicRow).getByRole('button', { name: 'Teilen' })).toBeInTheDocument();
+    const pausedRow = screen.getByText('Pausiertes Angebot').closest('article');
+    expect(within(pausedRow).queryByRole('button', { name: 'Teilen' })).not.toBeInTheDocument();
+  });
 
   it('bestätigt eine offene Anfrage mit Nachricht', async () => {
     const onWrite = vi.fn(async () => ({}));
@@ -126,6 +228,13 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     expect(screen.queryByRole('option', { name: /Anderer Neuling/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('option', { name: /Anderer Club/ }));
     await waitFor(() => expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/manage?club=c2'));
+  });
+
+  it('bietet im Angebotsformular den Rich-Text-Editor für die Beschreibung an', async () => {
+    mockManagement(vi.fn(async () => ({})));
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Neues Angebot' }));
+    expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Fett' })).toBeInTheDocument();
   });
 
   it('legt ein Angebot mit Öffnungszeiten an', async () => {

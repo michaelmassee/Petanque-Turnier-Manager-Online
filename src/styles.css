@@ -383,6 +383,11 @@ textarea:focus {
   justify-self: start;
 }
 
+/* Ältere Beschreibungen ohne Rich-Text-Format: Zeilenumbrüche aus dem früheren Textfeld bleiben sichtbar. */
+.rich-text-plain {
+  white-space: pre-line;
+}
+
 /* Teilnehmerfragen werden in einer Textbox erfasst; Zeilenumbrüche bleiben sichtbar. */
 .registration-question-label {
   white-space: pre-line;
@@ -4588,7 +4593,6 @@ details[open] > .play-round-summary::before {
 /* Platz mieten */
 .rental-offer-row { grid-template-columns: auto minmax(0, 1fr) auto; }
 .rental-offer-logo { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: #eef2f7; flex-shrink: 0; }
-.rental-description { white-space: pre-line; }
 .rental-week-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
 .rental-week-nav strong { text-align: center; flex: 1 1 auto; }
 .rental-calendar { margin-bottom: 12px; }

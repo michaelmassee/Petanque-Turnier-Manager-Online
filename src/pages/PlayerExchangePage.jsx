@@ -9,7 +9,7 @@ import { api } from '../lib/api.js';
 import { distanceKm, formatLocationAddress, labelFor, translatedOptions } from '../lib/domain.js';
 import { formatDate } from '../lib/format.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Feedback, Button, SelectField, DistanceBadge, ShareIcon, CloseButton } from '../components/ui.jsx';
+import { Feedback, Button, SelectField, DistanceBadge, ShareLinkButton, CloseButton } from '../components/ui.jsx';
 import { PlayerListingContactDialog } from '../components/PlayerListingContactDialog.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
@@ -170,27 +170,6 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
   useEffect(() => {
     if (highlightedId) document.getElementById(`player-listing-${highlightedId}`)?.scrollIntoView({ block: 'center' });
   }, [highlightedId]);
-
-  // Teilen einer Anzeige: Link auf /spielerboerse?anzeige=<id>, Überschrift
-  // als Titel und Text. Rückmeldung erscheint in der jeweiligen Karte.
-  const [shareFeedback, setShareFeedback] = useState({ id: null, message: '', error: '' });
-  async function shareListing(listing) {
-    setShareFeedback({ id: listing.id, message: '', error: '' });
-    const url = `${window.location.origin}/spielerboerse?${new URLSearchParams({ anzeige: listing.id })}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: listing.title, text: listing.title, url });
-        return;
-      }
-      if (!navigator.clipboard?.writeText) throw new Error(t('Teilen wird von diesem Gerät nicht unterstützt'));
-      await navigator.clipboard.writeText(`${listing.title}\n${url}`);
-      setShareFeedback({ id: listing.id, message: t('Link kopiert'), error: '' });
-    } catch (shareError) {
-      if (shareError.name !== 'AbortError') {
-        setShareFeedback({ id: listing.id, message: '', error: shareError.message || t('Teilen wird von diesem Gerät nicht unterstützt') });
-      }
-    }
-  }
 
   const displayedListings = visibleListings.slice(0, visibleCount);
 
@@ -376,14 +355,9 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
                   {currentUser && (
                     <Button onClick={() => setContactListing(listing)} disabled={listing.userId === currentUser.id}>{t('Nachricht senden')}</Button>
                   )}
-                  <Button variant="secondary" onClick={() => shareListing(listing)}><ShareIcon size={18} />{t('Teilen')}</Button>
+                  {/* Teilen einer Anzeige: Link auf /spielerboerse?anzeige=<id>, Überschrift als Titel und Text. */}
+                  <ShareLinkButton title={listing.title} url={`${window.location.origin}/spielerboerse?${new URLSearchParams({ anzeige: listing.id })}`} />
                 </div>
-                {shareFeedback.id === listing.id && (
-                  <>
-                    <Feedback message={shareFeedback.message} />
-                    <Feedback error={shareFeedback.error} />
-                  </>
-                )}
               </article>
             ))}
           </div>

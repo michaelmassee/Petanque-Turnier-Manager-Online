@@ -4,10 +4,12 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { clubLogoImageUrl } from '../lib/domain.js';
 import { amountToMinorUnits, currencyOptions, formatDate, formatMoney, formatWeekdayShort, minorUnitsToAmount } from '../lib/format.js';
 import { addDays } from '../rental-core.js';
-import { Button, EditDialog, Feedback, SelectField, TextArea, TextField } from '../components/ui.jsx';
+import { Button, EditDialog, Feedback, SelectField, ShareLinkButton, TextArea, TextField } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { RentalCalendar } from '../components/RentalCalendar.jsx';
 import { ComboboxPicker } from '../components/ComboboxPicker.jsx';
+import { RichText } from '../components/RichText.jsx';
+import { RichTextEditor } from '../components/RichTextEditor.jsx';
 
 const hourLabel = (hour) => `${String(hour).padStart(2, '0')}:00`;
 // Montag zuerst; 0 = Sonntag wie im Worker.
@@ -35,6 +37,10 @@ function OfferSummary({ offer }) {
     <span data-i18n-skip>{[...names, t('{{lanes}} Bahn(en)', { lanes: offer.laneCount })].join(' · ')}</span>
     {offer.address && <span className="rental-offer-address" data-i18n-skip>{offer.address}</span>}
   </>;
+}
+
+function ShareRentalOfferButton({ offer }) {
+  return <ShareLinkButton title={offer.title} url={new URL(`/platz-mieten/${encodeURIComponent(offer.id)}`, window.location.origin).href} />;
 }
 
 function RentalOfferList({ language, navigate }) {
@@ -106,6 +112,7 @@ function RentalOfferList({ language, navigate }) {
                 <OfferPrice offer={offer} language={language} />
               </div>
               <div className="row-actions">
+                <ShareRentalOfferButton offer={offer} />
                 <Button onClick={() => navigate(`/platz-mieten/${encodeURIComponent(offer.id)}`)}>{t('Termine ansehen')}</Button>
               </div>
             </article>
@@ -195,11 +202,14 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
     <div className="panel rental-offer">
       <div className="section-title">
         <h2 data-i18n-skip>{offer.title}</h2>
-        {offer.canManage && <Button variant="secondary" onClick={() => navigate('/platz-mieten/verwalten')}>{t('Vermietung verwalten')}</Button>}
+        <div className="row-actions">
+          {offer.isPublic && <ShareRentalOfferButton offer={offer} />}
+          {offer.canManage && <Button variant="secondary" onClick={() => navigate('/platz-mieten/verwalten')}>{t('Vermietung verwalten')}</Button>}
+        </div>
       </div>
       <div className="rental-offer-meta"><OfferSummary offer={offer} /></div>
       <p><OfferPrice offer={offer} language={language} /></p>
-      {offer.description && <p className="rental-description" data-i18n-skip>{offer.description}</p>}
+      {offer.description && <RichText value={offer.description} onNavigate={navigate} />}
       <p className="hint">
         {t('Buchbar in vollen Stunden, {{min}} bis {{max}} Stunden am Stück, bis {{days}} Tage im Voraus.', { min: offer.minHours, max: offer.maxHours, days: offer.bookingHorizonDays })}
       </p>
@@ -245,6 +255,18 @@ export function MyRentalReservations({ language, navigate }) {
   const [message, setMessage] = useState('');
   const [cancellingId, setCancellingId] = useState(null);
 
+  useEffect(() => {
+    if (!reservations) return;
+    const focusReservation = () => {
+      const target = document.getElementById(window.location.hash.slice(1));
+      target?.scrollIntoView?.({ block: 'center' });
+      target?.focus?.({ preventScroll: true });
+    };
+    focusReservation();
+    window.addEventListener('hashchange', focusReservation);
+    return () => window.removeEventListener('hashchange', focusReservation);
+  }, [reservations]);
+
   async function load() {
     const data = await authenticatedApi('/api/rentals/reservations/mine');
     setReservations(data.reservations || []);
@@ -280,7 +302,7 @@ export function MyRentalReservations({ language, navigate }) {
       {reservations?.length === 0 && <p className="muted">{t('Du hast noch keine Reservierungen.')}</p>}
       <div className="user-list">
         {(reservations || []).map((reservation) => (
-          <article className="data-row" key={reservation.id}>
+          <article className="data-row" key={reservation.id} id={`reservierung-${encodeURIComponent(reservation.id)}`} tabIndex={-1}>
             <div>
               <strong data-i18n-skip>{reservation.offerTitle} · {formatReservationSlot(reservation, language)}</strong>
               <span data-i18n-skip>{reservation.placeName} · {reservation.clubName} · {t('{{lanes}} Bahn(en)', { lanes: reservation.lanes })}</span>
@@ -290,7 +312,7 @@ export function MyRentalReservations({ language, navigate }) {
             <div className="row-actions">
               <Button variant="secondary" onClick={() => navigate(`/platz-mieten/${encodeURIComponent(reservation.offerId)}`)}>{t('Angebot')}</Button>
               {['requested', 'confirmed'].includes(reservation.status) && reservation.startUtc > now && (
-                <Button variant="danger" loading={cancellingId === reservation.id} onClick={() => cancel(reservation)}>{t('Stornieren')}</Button>
+                <Button id={`stornieren-${encodeURIComponent(reservation.id)}`} variant="danger" loading={cancellingId === reservation.id} onClick={() => cancel(reservation)}>{t('Stornieren')}</Button>
               )}
             </div>
           </article>
@@ -341,7 +363,18 @@ function OfferFields({ form, setForm, places, language }) {
   return <>
     <SelectField label={t('Spielort')} value={form.placeId} onChange={set('placeId')} required options={places.map((place) => ({ value: place.id, label: `${t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}: ${place.name}` }))} />
     <TextField label={t('Titel')} value={form.title} onChange={set('title')} required maxLength={120} placeholder={t('z. B. Boulehalle – Bahnen stundenweise')} />
-    <TextArea label={t('Beschreibung')} value={form.description} onChange={set('description')} maxLength={2000} rows={3} />
+    <RichTextEditor
+      label={t('Beschreibung')}
+      value={form.description}
+      onChange={set('description')}
+      boldLabel={t('Fett')}
+      italicLabel={t('Kursiv')}
+      underlineLabel={t('Unterstrichen')}
+      strikeLabel={t('Durchgestrichen')}
+      bulletListLabel={t('Aufzählung')}
+      orderedListLabel={t('Nummerierte Liste')}
+      headingLabel={t('Überschrift')}
+    />
     <div className="form-grid">
       <TextField label={t('Anzahl Bahnen')} type="number" min={1} max={200} value={form.laneCount} onChange={set('laneCount')} required />
       <SelectField label={t('Status')} value={form.status} onChange={set('status')} options={[{ value: 'active', label: t('Aktiv (öffentlich buchbar)') }, { value: 'inactive', label: t('Pausiert') }]} />
@@ -575,6 +608,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
                   <span>{offer.status !== 'active' ? t('Pausiert') : offer.isPublic ? t('Aktiv (öffentlich buchbar)') : t('Aktiv – öffentlich sichtbar, sobald Verein und Spielort freigegeben sind')}</span>
                 </div>
                 <div className="row-actions">
+                  {offer.isPublic && <ShareRentalOfferButton offer={offer} />}
                   <Button variant="secondary" onClick={() => navigate(`/platz-mieten/${encodeURIComponent(offer.id)}`)}>{t('Kalender')}</Button>
                   <Button variant="secondary" disabled={!canEditOffers || deletingId === offer.id} onClick={() => openOffer(offer)}>{t('Bearbeiten')}</Button>
                   <Button variant="danger" loading={deletingId === offer.id} onClick={() => removeOffer(offer)}>{t('Löschen')}</Button>

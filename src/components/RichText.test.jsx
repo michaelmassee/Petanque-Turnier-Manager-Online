@@ -52,3 +52,10 @@ describe('RichText verlinkt Adressen', () => {
     expect(onNavigate).not.toHaveBeenCalled();
   });
 });
+
+describe('RichText mit altem Klartext', () => {
+  it('behält Zeilenumbrüche aus dem früheren Textfeld bei', () => {
+    render(<RichText value={'Zeile eins\nZeile zwei'} onNavigate={vi.fn()} />);
+    expect(screen.getByText(/Zeile eins/).closest('p')).toHaveClass('rich-text-plain');
+  });
+});

@@ -848,20 +848,20 @@ const EMAIL_LAYOUT_LABELS = {
 };
 
 const EMAIL_ACTION_LABELS = {
-  de: { tournament: 'Turnier ansehen', ranking: 'Rangliste ansehen', directions: 'Anfahrt planen', live: 'Live-Ansicht öffnen', cancel: 'Anmeldung stornieren', whatsapp: 'WhatsApp-Gruppe öffnen', confirm: 'Bestätigen', edit: 'Bouleplatz bearbeiten', reset: 'Passwort zurücksetzen', contact: 'Nachricht an Turnierleitung', rentals: 'Meine Reservierungen', rentalRequests: 'Anfragen verwalten' },
-  nl: { tournament: 'Toernooi bekijken', ranking: 'Rangschikking bekijken', directions: 'Route plannen', live: 'Liveweergave openen', cancel: 'Inschrijving afmelden', whatsapp: 'WhatsApp-groep openen', confirm: 'Bevestigen', edit: 'Baan bewerken', reset: 'Wachtwoord opnieuw instellen', contact: 'Bericht aan de toernooiorganisatie', rentals: 'Mijn reserveringen', rentalRequests: 'Aanvragen beheren' },
-  en: { tournament: 'View tournament', ranking: 'View standings', directions: 'Plan directions', live: 'Open live view', cancel: 'Withdraw registration', whatsapp: 'Open WhatsApp group', confirm: 'Confirm', edit: 'Edit boules court', reset: 'Reset password', contact: 'Message the tournament organizers', rentals: 'My reservations', rentalRequests: 'Manage requests' },
-  es: { tournament: 'Ver torneo', ranking: 'Ver clasificación', directions: 'Planificar ruta', live: 'Abrir vista en directo', cancel: 'Cancelar inscripción', whatsapp: 'Abrir grupo de WhatsApp', confirm: 'Confirmar', edit: 'Editar pista', reset: 'Restablecer contraseña', contact: 'Mensaje a la organización del torneo', rentals: 'Mis reservas', rentalRequests: 'Gestionar solicitudes' },
-  fr: { tournament: 'Voir le tournoi', ranking: 'Voir le classement', directions: 'Préparer l’itinéraire', live: 'Ouvrir la vue en direct', cancel: 'Annuler l’inscription', whatsapp: 'Ouvrir le groupe WhatsApp', confirm: 'Confirmer', edit: 'Modifier le terrain', reset: 'Réinitialiser le mot de passe', contact: 'Contacter l’organisation du tournoi', rentals: 'Mes réservations', rentalRequests: 'Gérer les demandes' },
+  de: { tournament: 'Turnier ansehen', ranking: 'Rangliste ansehen', directions: 'Anfahrt planen', live: 'Live-Ansicht öffnen', cancel: 'Anmeldung stornieren', whatsapp: 'WhatsApp-Gruppe öffnen', confirm: 'Bestätigen', edit: 'Bouleplatz bearbeiten', reset: 'Passwort zurücksetzen', contact: 'Nachricht an Turnierleitung', rentals: 'Meine Reservierungen', rentalRequests: 'Anfragen verwalten', rentalCancel: 'Reservierung stornieren', rentalOffer: 'Angebot ansehen' },
+  nl: { tournament: 'Toernooi bekijken', ranking: 'Rangschikking bekijken', directions: 'Route plannen', live: 'Liveweergave openen', cancel: 'Inschrijving afmelden', whatsapp: 'WhatsApp-groep openen', confirm: 'Bevestigen', edit: 'Baan bewerken', reset: 'Wachtwoord opnieuw instellen', contact: 'Bericht aan de toernooiorganisatie', rentals: 'Mijn reserveringen', rentalRequests: 'Aanvragen beheren', rentalCancel: 'Reservering annuleren', rentalOffer: 'Aanbod bekijken' },
+  en: { tournament: 'View tournament', ranking: 'View standings', directions: 'Plan directions', live: 'Open live view', cancel: 'Withdraw registration', whatsapp: 'Open WhatsApp group', confirm: 'Confirm', edit: 'Edit boules court', reset: 'Reset password', contact: 'Message the tournament organizers', rentals: 'My reservations', rentalRequests: 'Manage requests', rentalCancel: 'Cancel reservation', rentalOffer: 'View offer' },
+  es: { tournament: 'Ver torneo', ranking: 'Ver clasificación', directions: 'Planificar ruta', live: 'Abrir vista en directo', cancel: 'Cancelar inscripción', whatsapp: 'Abrir grupo de WhatsApp', confirm: 'Confirmar', edit: 'Editar pista', reset: 'Restablecer contraseña', contact: 'Mensaje a la organización del torneo', rentals: 'Mis reservas', rentalRequests: 'Gestionar solicitudes', rentalCancel: 'Cancelar reserva', rentalOffer: 'Ver oferta' },
+  fr: { tournament: 'Voir le tournoi', ranking: 'Voir le classement', directions: 'Préparer l’itinéraire', live: 'Ouvrir la vue en direct', cancel: 'Annuler l’inscription', whatsapp: 'Ouvrir le groupe WhatsApp', confirm: 'Confirmer', edit: 'Modifier le terrain', reset: 'Réinitialiser le mot de passe', contact: 'Contacter l’organisation du tournoi', rentals: 'Mes réservations', rentalRequests: 'Gérer les demandes', rentalCancel: 'Annuler la réservation', rentalOffer: 'Voir l’offre' },
 };
 
-const EMAIL_ACTION_ICONS = { tournament: '▣', ranking: '≡', directions: '⌖', live: '▶', cancel: '×', whatsapp: '◉', confirm: '✓', edit: '✎', reset: '↻', contact: '✉', rentals: '◷', rentalRequests: '☰', desktop: '↗', legal: '§', privacy: '◌' };
+const EMAIL_ACTION_ICONS = { tournament: '▣', ranking: '≡', directions: '⌖', live: '▶', cancel: '×', whatsapp: '◉', confirm: '✓', edit: '✎', reset: '↻', contact: '✉', rentals: '◷', rentalRequests: '☰', rentalCancel: '×', rentalOffer: '▣', desktop: '↗', legal: '§', privacy: '◌' };
 
 export function emailAction(kind, url, language, tone = null) {
   if (!url) return null;
   const labels = EMAIL_ACTION_LABELS[language] || EMAIL_ACTION_LABELS.de;
   const layout = EMAIL_LAYOUT_LABELS[language] || EMAIL_LAYOUT_LABELS.de;
-  return { url, label: labels[kind] || layout[kind] || layout.openLink, icon: EMAIL_ACTION_ICONS[kind] || '↗', tone: tone || (kind === 'cancel' ? 'danger' : 'primary') };
+  return { url, label: labels[kind] || layout[kind] || layout.openLink, icon: EMAIL_ACTION_ICONS[kind] || '↗', tone: tone || (['cancel', 'rentalCancel'].includes(kind) ? 'danger' : 'primary') };
 }
 
 function escapeEmailHtml(value) {
@@ -9084,7 +9084,7 @@ function isGoogleMailRecipient(to) {
 
 // messageBox: optionale Nutzernachricht (Klartext oder Rich Text), im HTML-Teil formatiert in einer eigenen Box,
 // im Klartext-Teil als Klartext angehängt.
-async function sendTransactionalEmail(env, { to, subject, text, messageBox = null, textAfterMessageBox = '', actions = [], language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
+async function sendTransactionalEmail(env, { to, subject, text, messageBox = null, textAfterMessageBox = '', actions = [], plainTextActions = false, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
   const stratoAvailable = stratoConfigured(env);
   const resendAvailable = Boolean(env.RESEND_API_KEY && env.MAIL_FROM);
 
@@ -9096,7 +9096,9 @@ async function sendTransactionalEmail(env, { to, subject, text, messageBox = nul
     throw new HttpError(503, 'E-Mail-Versand ist nicht konfiguriert.');
   }
 
-  const contactLinks = [...new Map(actions.filter((action) => action?.url.startsWith('mailto:')).map((action) => [action.url, action])).values()]
+  // Die HTML-Mail zeigt Aktionen als Buttons; in den Reintext kommen sonst nur mailto-Links, mit plainTextActions alle.
+  const textActions = plainTextActions ? actions.filter(Boolean) : actions.filter((action) => action?.url.startsWith('mailto:'));
+  const contactLinks = [...new Map(textActions.map((action) => [action.url, action])).values()]
     .map((action) => `\n\n${action.label}:\n${action.url}`).join('');
   const body = appendEmailFooter((messageBox ? `${text}\n\n${richTextPlainText(messageBox)}${textAfterMessageBox}` : text + textAfterMessageBox) + contactLinks, language);
   const html = renderTransactionalEmailHtml(subject, text, language, messageBox, textAfterMessageBox, actions);
@@ -9702,6 +9704,41 @@ async function notifyRentalClub(env, { offer, reservation, renter, eventType, or
   }
 }
 
+// UTC-Zeitpunkte stammen aus der Buchung und berücksichtigen die Zeitzone des Spielorts bereits.
+// Wie beim Turnier: eine Base64-kodierte termin.ics über denselben Mail-/Queue-Versand. Storniert der Verein,
+// geht dieselbe UID mit METHOD:CANCEL raus, damit Kalender den zuvor übernommenen Termin entfernen.
+export function buildRentalIcs(offer, reservation, origin, { cancelled = false } = {}) {
+  const escape = (value) => icsEscapeText(String(value || '').replace(/\r\n|\r/g, '\n'));
+  const compactUtc = (value) => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const link = `${origin}/platz-mieten/meine#reservierung-${encodeURIComponent(reservation.id)}`;
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Petanque Turnier Manager Online//DE',
+    'CALSCALE:GREGORIAN', `METHOD:${cancelled ? 'CANCEL' : 'PUBLISH'}`, 'BEGIN:VEVENT',
+    `UID:rental-${escape(reservation.id)}@ptmonline.org`,
+    `SEQUENCE:${cancelled ? 1 : 0}`,
+    `DTSTAMP:${compactUtc(new Date())}`,
+    `DTSTART:${compactUtc(reservation.start_utc)}`,
+    `DTEND:${compactUtc(reservation.end_utc)}`,
+    `SUMMARY:${escape(offer.title)}`,
+    `LOCATION:${escape([offer.place_name, formatLocationAddress(offer.place_address)].filter(Boolean).join(', '))}`,
+    `DESCRIPTION:${escape([offer.club_name, reservation.decision_note, link].filter(Boolean).join('\n'))}`,
+    `URL:${link}`, `STATUS:${cancelled ? 'CANCELLED' : 'CONFIRMED'}`, 'END:VEVENT', 'END:VCALENDAR',
+  ];
+  // RFC 5545: maximal 75 UTF-8-Oktette je Zeile; Fortsetzungen beginnen mit einem Leerzeichen.
+  const encoder = new TextEncoder();
+  return lines.map((line) => {
+    let folded = '';
+    let length = 0;
+    for (const character of line) {
+      const size = encoder.encode(character).length;
+      if (length + size > 75) { folded += '\r\n '; length = 1; }
+      folded += character;
+      length += size;
+    }
+    return folded;
+  }).join('\r\n') + '\r\n';
+}
+
 async function notifyRentalRenter(env, { offer, reservation, manager, origin }) {
   const renter = await env.DB.prepare('SELECT id, email, first_name, last_name, username, language FROM users WHERE id = ?').bind(reservation.user_id).first();
   if (!renter) return;
@@ -9717,13 +9754,28 @@ async function notifyRentalRenter(env, { offer, reservation, manager, origin }) 
   }
   const language = renter.language || 'de';
   const templates = RENTAL_EMAILS[language] || RENTAL_EMAILS.de;
+  const reservationLink = `${origin}/platz-mieten/meine#reservierung-${encodeURIComponent(reservation.id)}`;
+  const actions = [
+    emailAction('rentals', reservationLink, language),
+    emailAction('rentalOffer', `${origin}/platz-mieten/${encodeURIComponent(offer.id)}`, language, 'secondary'),
+    emailAction('directions', buildDirectionsLink(formatLocationAddress(offer.place_address)), language, 'secondary'),
+  ].filter(Boolean);
+  if (reservation.status === 'confirmed' && reservation.start_utc > new Date().toISOString()) {
+    actions.push(emailAction('rentalCancel', `${origin}/platz-mieten/meine#stornieren-${encodeURIComponent(reservation.id)}`, language));
+  }
   try {
     await deliverRentalEmail(env, {
       to: renter.email,
       subject: templates.decidedSubject(offer.title, reservation.status),
       text: templates.decided({ firstName: renter.first_name || '', title: offer.title, slot: formatRentalSlot(eventData, language), lanes: eventData.lanes, status: reservation.status, club: offer.club_name }),
       messageBox: reservation.decision_note || null,
-      actions: [emailAction('rentals', `${origin}/platz-mieten/meine`, language)],
+      textAfterMessageBox: `\n\n${[offer.place_name, formatLocationAddress(offer.place_address)].filter(Boolean).join(' · ')}`,
+      actions,
+      plainTextActions: true,
+      // Bestätigt: Termin zum Übernehmen; storniert (nur aus „bestätigt“ möglich): Absage für denselben Termin.
+      ...(['confirmed', 'cancelled'].includes(reservation.status)
+        ? { attachments: [{ filename: 'termin.ics', content: base64Encode(buildRentalIcs(offer, reservation, origin, { cancelled: reservation.status === 'cancelled' })) }] }
+        : {}),
       language,
       logFallback: `Rental decision email for ${renter.email} (reservation ${reservation.id})`,
       failureContext: `rental decision ${reservation.id}`,
@@ -9862,11 +9914,18 @@ function openingHourStatements(db, offerId, openingHours) {
   ];
 }
 
+
+// Rich-Text-Struktur prüft wie bei Turnier- und Platzbeschreibungen der Worker; Länge und übrige Felder rental-core.
+function rentalOfferInput(body) {
+  const input = normalizeOfferInput(body);
+  return { ...input, description: normalizeRichText(input.description, 'Ungültige Beschreibung') };
+}
+
 async function createRentalOffer(request, db, user) {
   const body = await readJson(request);
   const clubId = String(body.clubId || '');
   assertRentalClubPublished(await assertClubEditor(db, clubId, user));
-  const input = normalizeOfferInput(body);
+  const input = rentalOfferInput(body);
   const place = await rentalPlaceForClub(db, clubId, input.placeId);
   const timezone = resolveTournamentTimezone({ latitude: Number(place.latitude ?? NaN), longitude: Number(place.longitude ?? NaN) });
   const id = crypto.randomUUID();
@@ -9884,7 +9943,7 @@ async function createRentalOffer(request, db, user) {
 async function updateRentalOffer(request, db, id, user) {
   const existing = await loadRentalOffer(db, id);
   assertRentalClubPublished(await assertClubEditor(db, existing.club_id, user));
-  const input = normalizeOfferInput(await readJson(request));
+  const input = rentalOfferInput(await readJson(request));
   const place = await rentalPlaceForClub(db, existing.club_id, input.placeId);
   const timezone = resolveTournamentTimezone({ latitude: Number(place.latitude ?? NaN), longitude: Number(place.longitude ?? NaN) });
   await db.batch([

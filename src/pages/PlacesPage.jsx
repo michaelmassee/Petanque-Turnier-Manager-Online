@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { clubLogoImageUrl, formatLocationAddress, googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Feedback, Button, ClubBadge, DistanceBadge, SelectField, CloseButton, ShareIcon } from '../components/ui.jsx';
+import { Feedback, Button, ClubBadge, DistanceBadge, SelectField, CloseButton, ShareLinkButton } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
@@ -42,33 +42,10 @@ function clubKey(place) {
 }
 
 function SharePlaceButton({ name, placeId, organizationId }) {
-  const { t } = useTranslation();
-  const [feedback, setFeedback] = useState({ message: '', error: '' });
-
-  async function share() {
-    setFeedback({ message: '', error: '' });
-    const url = new URL('/plaetze', window.location.origin);
-    if (organizationId) url.searchParams.set('verein', organizationId);
-    else url.hash = encodeURIComponent(placeId);
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: name, text: name, url: url.href });
-      } else {
-        if (!navigator.clipboard?.writeText) throw new Error();
-        await navigator.clipboard.writeText(`${name}\n${url.href}`);
-        setFeedback({ message: t('Link kopiert'), error: '' });
-      }
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        setFeedback({ message: '', error: t('Teilen wird von diesem Gerät nicht unterstützt') });
-      }
-    }
-  }
-
-  return <div>
-    <Button variant="secondary" onClick={share}><ShareIcon size={18} />{t('Teilen')}</Button>
-    <Feedback message={feedback.message} error={feedback.error} />
-  </div>;
+  const url = new URL('/plaetze', window.location.origin);
+  if (organizationId) url.searchParams.set('verein', organizationId);
+  else url.hash = encodeURIComponent(placeId);
+  return <ShareLinkButton title={name} url={url.href} />;
 }
 
 function FocusOnPlace({ focus, markerRefs }) {

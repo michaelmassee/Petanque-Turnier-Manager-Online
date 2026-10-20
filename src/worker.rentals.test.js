@@ -2,7 +2,7 @@
 // Platz mieten: Verein bietet Bahnen stundenweise an, Benutzer fragen an, der Verein bestätigt oder lehnt ab.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import worker from './worker.js';
+import worker, { buildRentalIcs, renderTransactionalEmailHtml } from './worker.js';
 
 describe('Platz mieten', () => {
   let env;
@@ -22,6 +22,17 @@ describe('Platz mieten', () => {
   const reserve = (offerId, body, headers = MIETER) => call('POST', `/api/rentals/${offerId}/reservations`, {
     body: { date: '2026-10-24', startHour: 10, hours: 2, lanes: 2, ...body }, headers,
   });
+  // Schickt eine Queue-Nachricht wie der Consumer über Resend und liefert die tatsächlich versendete Mail.
+  const sendQueued = async (payload) => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 'mail-1' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await worker.queue({ messages: [{ body: payload, ack: vi.fn(), retry: vi.fn() }] }, { RESEND_API_KEY: 'test-key', MAIL_FROM: 'noreply@example.test' });
+      return JSON.parse(fetchMock.mock.calls[0][1].body);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  };
   const postbox = () => env.DB.sqlite.prepare('SELECT recipient_id, event_type FROM postbox_messages ORDER BY created_at').all();
 
   beforeEach(() => {
@@ -59,6 +70,15 @@ describe('Platz mieten', () => {
     expect((await (await call('GET', '/api/rentals')).json()).offers).toEqual([]);
     expect((await call('GET', `/api/rentals/${offer.id}`)).status).toBe(404);
     expect((await call('GET', `/api/rentals/${offer.id}`, { headers: VEREIN })).status).toBe(200);
+  });
+
+  it('speichert die Beschreibung als Rich Text und lehnt ungültigen Rich Text ab', async () => {
+    const description = `ptm-richtext:v1:${JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Halle mit Bar', marks: [{ type: 'bold' }] }] }] })}`;
+    const response = await call('POST', '/api/rentals/offers', { body: { ...offerBody, description }, headers: VEREIN });
+    expect(response.status).toBe(201);
+    expect((await response.json()).offer.description).toBe(description);
+    const invalid = await call('POST', '/api/rentals/offers', { body: { ...offerBody, description: 'ptm-richtext:v1:{"type":"doc","content":[{"type":"script"}]}' }, headers: VEREIN });
+    expect(invalid.status).toBe(400);
   });
 
   it('nimmt Anfragen bis zur Bahnanzahl an und benachrichtigt den Verein', async () => {
@@ -144,6 +164,77 @@ describe('Platz mieten', () => {
       to: 'mieter@example.test', subject: 'Reservierung bestätigt: Boulehalle',
       text: expect.stringContaining('24.10.2026 10:00–12:00, 2 Bahn(en)'),
     }));
+    const mail = send.mock.lastCall[0];
+    expect(mail.actions).toEqual([
+      expect.objectContaining({ label: 'Meine Reservierungen', url: `https://ptm.test/platz-mieten/meine#reservierung-${reservation.id}` }),
+      expect.objectContaining({ label: 'Angebot ansehen', url: `https://ptm.test/platz-mieten/${offer.id}` }),
+      expect.objectContaining({ label: 'Anfahrt planen' }),
+      expect.objectContaining({ label: 'Reservierung stornieren', tone: 'danger', url: `https://ptm.test/platz-mieten/meine#stornieren-${reservation.id}` }),
+    ]);
+    const html = renderTransactionalEmailHtml(mail.subject, mail.text, mail.language, mail.messageBox, mail.textAfterMessageBox, mail.actions);
+    // Im HTML nur die Buttons, ohne zusätzliche „Beschriftung:“-Zeile darüber; ausgeschrieben nur im Reintext.
+    const sent = await sendQueued(mail);
+    for (const action of mail.actions) {
+      expect(html).toContain(`>${action.label}</a>`);
+      expect(html).not.toContain(`${action.label}:`);
+      expect(sent.text).toContain(`${action.label}:\n${action.url}`);
+    }
+    expect(mail.attachments).toHaveLength(1);
+    expect(mail.attachments[0].filename).toBe('termin.ics');
+    const ics = Buffer.from(mail.attachments[0].content, 'base64').toString('utf8').replace(/\r\n /g, '');
+    expect(ics).toContain(`UID:rental-${reservation.id}@ptmonline.org`);
+    expect(ics).toContain('DTSTART:20261024T080000Z\r\nDTEND:20261024T100000Z');
+    expect(ics).toContain('LOCATION:Halle Nord\\, Berlin');
+    expect(ics).toContain('SUMMARY:Boulehalle');
+
+    await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'cancel' }, headers: VEREIN });
+    const cancellation = send.mock.lastCall[0];
+    // Absage für denselben Termin, damit Kalender ihn entfernen.
+    expect(cancellation.attachments).toHaveLength(1);
+    const cancelIcs = Buffer.from(cancellation.attachments[0].content, 'base64').toString('utf8').replace(/\r\n /g, '');
+    expect(cancelIcs).toContain(`UID:rental-${reservation.id}@ptmonline.org`);
+    expect(cancelIcs).toContain('METHOD:CANCEL');
+    expect(cancelIcs).toContain('STATUS:CANCELLED');
+    expect(cancelIcs).toContain('SEQUENCE:1');
+    expect(ics).toContain('METHOD:PUBLISH');
+    expect(ics).toContain('SEQUENCE:0');
+    expect(cancellation.actions.some((action) => action.label === 'Reservierung stornieren')).toBe(false);
+  });
+
+  it.each([
+    ['nl', 'Reservering annuleren'], ['en', 'Cancel reservation'],
+    ['es', 'Cancelar reserva'], ['fr', 'Annuler la réservation'],
+  ])('übersetzt die Zusagebuttons in die Sprache des Mieters (%s)', async (language, label) => {
+    env.MAIL_QUEUE = { send: vi.fn(async () => {}) };
+    sql('UPDATE users SET language = ? WHERE id = ?', language, 'u2');
+    const offer = await createOffer();
+    const reservation = (await (await reserve(offer.id, {})).json()).reservation;
+    await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
+    expect(env.MAIL_QUEUE.send.mock.lastCall[0].actions).toContainEqual(expect.objectContaining({ label, tone: 'danger' }));
+  });
+
+  it('hängt bei einer Ablehnung keinen Termin und keinen Stornolink an', async () => {
+    env.MAIL_QUEUE = { send: vi.fn(async () => {}) };
+    const offer = await createOffer();
+    const reservation = (await (await reserve(offer.id, {})).json()).reservation;
+    await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'reject' }, headers: VEREIN });
+    const mail = env.MAIL_QUEUE.send.mock.lastCall[0];
+    expect(mail.attachments).toBeUndefined();
+    expect(mail.actions).toHaveLength(3);
+  });
+
+  it('erhält UTC-Zeiten über Mitternacht und faltet und escaped Kalendertexte korrekt', () => {
+    const ics = buildRentalIcs({ title: 'Boule; ' + 'ä'.repeat(80), place_name: 'Halle', place_address: 'Straße 1', club_name: 'BC Test' }, {
+      id: 'r1', start_utc: '2026-10-25T22:00:00.000Z', end_utc: '2026-10-25T23:00:00.000Z',
+      decision_note: 'Mitbringen: Kugeln, Tuch\r\nEND:VEVENT',
+    }, 'https://ptm.test');
+    for (const line of ics.split('\r\n')) expect(Buffer.byteLength(line)).toBeLessThanOrEqual(75);
+    const unfolded = ics.replace(/\r\n /g, '');
+    expect(unfolded).toContain('DTSTART:20261025T220000Z\r\nDTEND:20261025T230000Z');
+    expect(unfolded).toContain('SUMMARY:Boule\\; ' + 'ä'.repeat(80));
+    expect(unfolded).toContain('Kugeln\\, Tuch\\nEND:VEVENT');
+    expect(unfolded.match(/\r\nEND:VEVENT/g)).toHaveLength(1);
+    expect(unfolded).toContain('DTSTAMP:20261019T080000Z');
   });
 
   it('lässt Admins die Vermietung jedes Vereins verwalten', async () => {

@@ -144,6 +144,34 @@ export function Feedback({ message, error }) {
   );
 }
 
+// Teilt Titel und Link über das Teilen-Menü des Geräts, sonst per Zwischenablage; Rückmeldung direkt am Button.
+export function ShareLinkButton({ title, url }) {
+  const { t } = useTranslation();
+  const [feedback, setFeedback] = useState({ message: '', error: '' });
+
+  async function share() {
+    setFeedback({ message: '', error: '' });
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text: title, url });
+      } else {
+        if (!navigator.clipboard?.writeText) throw new Error();
+        await navigator.clipboard.writeText(`${title}\n${url}`);
+        setFeedback({ message: t('Link kopiert'), error: '' });
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        setFeedback({ message: '', error: t('Teilen wird von diesem Gerät nicht unterstützt') });
+      }
+    }
+  }
+
+  return <div>
+    <Button variant="secondary" onClick={share}><ShareIcon size={18} />{t('Teilen')}</Button>
+    <Feedback message={feedback.message} error={feedback.error} />
+  </div>;
+}
+
 export function DistanceBadge({ distanceKm }) {
   const { t } = useTranslation();
 

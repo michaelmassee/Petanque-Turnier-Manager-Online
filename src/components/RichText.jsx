@@ -73,7 +73,7 @@ function RichTextNode({ node, onNavigate }) {
 
 export function RichText({ value, onNavigate }) {
   const document = parseRichText(value);
-  if (!document) return <p data-i18n-skip><LinkifiedText text={value} onNavigate={onNavigate} /></p>;
+  if (!document) return <p className="rich-text-plain" data-i18n-skip><LinkifiedText text={value} onNavigate={onNavigate} /></p>;
 
   return (
     <div className="rich-text" data-i18n-skip>

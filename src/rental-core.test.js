@@ -23,6 +23,13 @@ describe('Platz mieten: Eingaben', () => {
     expect(() => normalizeOfferInput({ ...base, currency: 'XYZ' })).toThrow();
   });
 
+  it('zählt beim Längenlimit der Rich-Text-Beschreibung nur den sichtbaren Text', () => {
+    const base = { title: 'Halle', laneCount: 6, openingHours };
+    const richText = (text) => `ptm-richtext:v1:${JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text, marks: [{ type: 'bold' }] }] }] })}`;
+    expect(normalizeOfferInput({ ...base, description: richText('x'.repeat(2000)) }).description).toBe(richText('x'.repeat(2000)));
+    expect(() => normalizeOfferInput({ ...base, description: richText('x'.repeat(2001)) })).toThrow();
+  });
+
   it('akzeptiert eine Anfrage innerhalb der Öffnungszeiten', () => {
     expect(request({ date: '2026-10-24', startHour: 10, hours: 3, lanes: 4, note: ' Training ' }))
       .toEqual({ date: '2026-10-24', startHour: 10, hours: 3, lanes: 4, note: 'Training' });
