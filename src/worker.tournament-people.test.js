@@ -75,11 +75,32 @@ describe('Öffentliche Meldeliste', () => {
         '2026-09-01', '2026-09-01', '2026-09-01', 1, 'de')`).run();
 
     const anonymous = await (await listPublicParticipants(db, 't1')).json();
-    expect(anonymous).toEqual({ participants: [], ownUnconfirmed: [] });
+    expect(anonymous).toEqual({ participants: [], waitlist: [], ownUnconfirmed: [] });
 
     const mine = await (await listPublicParticipants(db, 't1', { id: 'u1', email: 'maria@example.test' })).json();
     expect(mine.participants).toEqual([]);
     expect(mine.ownUnconfirmed).toEqual([expect.objectContaining({ registrationId: 'pending', status: 'pending' })]);
+  });
+
+  it('zeigt die Warteliste öffentlich in Meldereihenfolge, die Storno-ID nur dem eigenen Konto', async () => {
+    const db = d1MitSchema();
+    db.sqlite.exec(`INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at)
+      VALUES ('u1', 'wanda@example.test', 'user', 'salt', 'hash', '2026-09-01', '2026-09-01');
+      INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at)
+      VALUES ('t1', 'u1', 'Turnier', '2099-09-28', 'Ort', 'doublette', 'registration', 'public', '2026-09-01', '2026-09-01');
+      INSERT INTO registrations (id, tournament_id, first_name, last_name, email, user_id, status,
+        participation, registered_at, created_at, updated_at, execution_revision, language)
+      VALUES ('w2', 't1', 'Zweite', 'Warte', 'z@example.test', NULL, 'waitlist', 'inactive', '2026-09-03', '2026-09-03', '2026-09-03', 1, 'de'),
+             ('w1', 't1', 'Wanda', 'Warte', 'wanda@example.test', 'u1', 'waitlist', 'inactive', '2026-09-02', '2026-09-02', '2026-09-02', 1, 'de');`);
+
+    const anonymous = await (await listPublicParticipants(db, 't1')).json();
+    expect(anonymous.participants).toEqual([]);
+    expect(anonymous.ownUnconfirmed).toEqual([]);
+    expect(anonymous.waitlist.map((entry) => [entry.firstName, entry.registrationId])).toEqual([['Wanda', null], ['Zweite', null]]);
+
+    const mine = await (await listPublicParticipants(db, 't1', { id: 'u1', email: 'wanda@example.test' })).json();
+    expect(mine.waitlist.map((entry) => entry.registrationId)).toEqual(['w1', null]);
+    expect(mine.ownUnconfirmed).toEqual([]);
   });
 
   it('gibt dem anmeldenden Konto und verknüpften Teammitgliedern die Storno-ID', async () => {

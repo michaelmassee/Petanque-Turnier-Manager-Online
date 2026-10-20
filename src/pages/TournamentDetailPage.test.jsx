@@ -222,14 +222,42 @@ describe('Öffentliche Meldeliste', () => {
     expect(screen.getByText(/Cleo/).closest('strong').querySelector('.account-badge')).not.toBeNull();
   });
 
-  it.each([
-    ['pending', 'Deine Anmeldung wartet noch auf die Bestätigung der Turnierleitung und ist nur für dich sichtbar.'],
-    ['waitlist', 'Deine Anmeldung steht auf der Warteliste und ist nur für dich sichtbar.'],
-  ])('zeigt die eigene %s-Anmeldung mit Hinweis und bietet die Abmeldung an', async (status, hint) => {
+  it('zeigt die Warteliste als eigenen Abschnitt und zählt sie in der Zusammenfassung', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({
+      participants: [{ registrationId: null, firstName: 'Anna', lastName: 'Bestätigt' }],
+      waitlist: [{ registrationId: null, firstName: 'Wanda', lastName: 'Warte' }],
+      ownUnconfirmed: [],
+    }));
+
+    renderDetail(tournamentWith({}), 'teilnehmer');
+
+    expect(await screen.findByText('Wanda Warte')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Warteliste' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Zusammenfassung')).toHaveTextContent('1 Angemeldet1 Warteliste');
+  });
+
+  it('bietet dem eigenen Wartelisten-Team die Abmeldung an', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (path) => {
       if (String(path).endsWith('/participants')) return jsonResponse({
-        participants: [], ownUnconfirmed: [{ registrationId: 'r1', firstName: 'Anna', lastName: 'Wartet', status }],
+        participants: [], waitlist: [{ registrationId: 'r1', firstName: 'Wanda', lastName: 'Warte' }], ownUnconfirmed: [],
+      });
+      if (String(path) === '/api/registrations/r1/cancel') return jsonResponse({ registration: { id: 'r1', status: 'cancelled' } });
+      throw new Error(`Unerwartete Anfrage: ${path}`);
+    });
+
+    renderDetail(tournamentWith({}), 'teilnehmer');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Absagen' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/registrations/r1/cancel', expect.objectContaining({ method: 'POST' })));
+  });
+
+  it('zeigt die eigene offene Anmeldung mit Hinweis und bietet die Abmeldung an', async () => {
+    const hint = 'Deine Anmeldung wartet noch auf die Bestätigung der Turnierleitung und ist nur für dich sichtbar.';
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (path) => {
+      if (String(path).endsWith('/participants')) return jsonResponse({
+        participants: [], ownUnconfirmed: [{ registrationId: 'r1', firstName: 'Anna', lastName: 'Wartet', status: 'pending' }],
       });
       if (String(path) === '/api/registrations/r1/cancel') return jsonResponse({ registration: { id: 'r1', status: 'cancelled' } });
       throw new Error(`Unerwartete Anfrage: ${path}`);

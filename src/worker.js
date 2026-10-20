@@ -6665,11 +6665,12 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
   };
 
   const confirmed = result.results.filter((row) => row.status === 'confirmed');
-  // Offene und Wartelisten-Meldungen gehören nicht in die öffentliche Meldeliste. Nur die
-  // angemeldete Person darf ihre eigene Meldung sehen, damit sie deren Zustand nachvollziehen
-  // und sie bei Bedarf absagen kann.
+  // Die Warteliste ist wie die Meldeliste öffentlich, in Meldereihenfolge (= Nachrückreihenfolge).
+  const waitlist = result.results.filter((row) => row.status === 'waitlist');
+  // Offene Meldungen gehören nicht in die öffentliche Meldeliste. Nur die angemeldete Person darf
+  // ihre eigene Meldung sehen, damit sie deren Zustand nachvollziehen und sie bei Bedarf absagen kann.
   const ownUnconfirmed = result.results
-    .filter((row) => row.status !== 'confirmed' && (
+    .filter((row) => row.status === 'pending' && (
       registrationBelongsToUser(row, currentUser?.id)
       || registrationBelongsToEmail(row, currentUser?.email)
     ))
@@ -6677,6 +6678,7 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
 
   return json({
     participants: confirmed.map(toParticipant),
+    waitlist: waitlist.map(toParticipant),
     ownUnconfirmed,
   });
 }

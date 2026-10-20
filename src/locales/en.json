@@ -128,7 +128,6 @@
   "Eine Anmeldung kann nur über die Ablehnen-Funktion abgelehnt werden": "A registration can only be rejected using the Reject action",
   "Deine Anmeldung": "Your registration",
   "Deine Anmeldung wartet noch auf die Bestätigung der Turnierleitung und ist nur für dich sichtbar.": "Your registration is awaiting confirmation by the tournament organizer and is visible only to you.",
-  "Deine Anmeldung steht auf der Warteliste und ist nur für dich sichtbar.": "Your registration is on the waiting list and is visible only to you.",
   "Anmeldungen müssen als nicht-leeres Array übergeben werden": "Registrations must be provided as a non-empty array",
   "Anmeldungen müssen vom Turnierersteller bestätigt werden.": "Registrations must be approved by the tournament creator.",
   "Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen": "Review registrations before the tournament organizer confirms them",
