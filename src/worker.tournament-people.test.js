@@ -75,7 +75,7 @@ describe('Öffentliche Meldeliste', () => {
         '2026-09-01', '2026-09-01', '2026-09-01', 1, 'de')`).run();
 
     const anonymous = await (await listPublicParticipants(db, 't1')).json();
-    expect(anonymous).toEqual({ participants: [], waitlist: [], ownUnconfirmed: [] });
+    expect(anonymous).toEqual({ participants: [], waitlist: [], ownUnconfirmed: [], pendingCount: 1 });
 
     const mine = await (await listPublicParticipants(db, 't1', { id: 'u1', email: 'maria@example.test' })).json();
     expect(mine.participants).toEqual([]);

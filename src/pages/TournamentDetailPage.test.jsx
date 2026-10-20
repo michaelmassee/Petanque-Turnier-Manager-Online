@@ -253,13 +253,14 @@ describe('Öffentliche Meldeliste', () => {
       participants: [{ registrationId: null, firstName: 'Anna', lastName: 'Bestätigt' }],
       waitlist: [{ registrationId: null, firstName: 'Wanda', lastName: 'Warte' }],
       ownUnconfirmed: [],
+      pendingCount: 2,
     }));
 
     renderDetail(tournamentWith({}), 'teilnehmer');
 
     expect(await screen.findByText('Wanda Warte')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Warteliste' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Zusammenfassung')).toHaveTextContent('1 Angemeldet1 Warteliste');
+    expect(screen.getByLabelText('Zusammenfassung')).toHaveTextContent('2 Offen1 Bestätigt1 Warteliste');
   });
 
   it('bietet dem eigenen Wartelisten-Team die Abmeldung an', async () => {

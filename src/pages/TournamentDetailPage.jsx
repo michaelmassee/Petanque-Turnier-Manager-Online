@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
+import { FORMATIONS, REGISTRATION_STATUSES, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
 import { api, authenticatedApi } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
@@ -191,6 +191,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
   const [participants, setParticipants] = useState(null);
   const [waitlist, setWaitlist] = useState([]);
   const [ownUnconfirmed, setOwnUnconfirmed] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [forbidden, setForbidden] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [cancellingRegistrationId, setCancellingRegistrationId] = useState('');
@@ -204,6 +205,7 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
           setParticipants(data.participants);
           setWaitlist(data.waitlist || []);
           setOwnUnconfirmed(data.ownUnconfirmed || []);
+          setPendingCount(data.pendingCount || 0);
         }
       })
       .catch(() => {
@@ -327,14 +329,15 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
         </>
       )}
       <div className="registration-summary" aria-label={t('Zusammenfassung')}>
-        <span className="registration-summary-item">
-          <strong>{participants.length}</strong> {t('Angemeldet')}
-        </span>
-        {waitlist.length > 0 && (
-          <span className="registration-summary-item">
-            <strong>{waitlist.length}</strong> {t('Warteliste')}
+        {[
+          ['pending', pendingCount],
+          ['confirmed', participants.length],
+          ['waitlist', waitlist.length],
+        ].map(([status, count]) => (
+          <span key={status} className={`status registration-${status} registration-summary-item`}>
+            <strong>{count}</strong> {labelFor(REGISTRATION_STATUSES, status)}
           </span>
-        )}
+        ))}
       </div>
     </>
   );

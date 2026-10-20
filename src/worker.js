@@ -6695,6 +6695,8 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
     participants: confirmed.map(toParticipant),
     waitlist: waitlist.map(toParticipant),
     ownUnconfirmed,
+    // Nur die Anzahl offener Meldungen ist öffentlich (Zusammenfassung), nie Namen.
+    pendingCount: result.results.filter((row) => row.status === 'pending').length,
   });
 }
 
