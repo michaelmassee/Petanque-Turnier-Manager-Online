@@ -1913,6 +1913,18 @@ a.left-panel-link {
   margin-top: 12px;
 }
 
+/* Zebra wie in der Rangliste: jede zweite Anmeldung hinterlegt, damit lange Meldelisten lesbar bleiben.
+   nth-of-type, weil in der Verwaltung Überschrift und Buttons als div zwischen den Zeilen stehen. */
+.participants-list > article.data-row:nth-of-type(odd),
+.registration-list > article.data-row:nth-of-type(odd) {
+  background: #fff;
+}
+
+.participants-list > article.data-row:nth-of-type(even),
+.registration-list > article.data-row:nth-of-type(even) {
+  background: #f3f6fa;
+}
+
 /* Doppelte Klasse: die spätere allgemeine .data-row-Regel (minmax/auto/auto)
  * würde das Zwei-Spalten-Raster sonst überschreiben. */
 .data-row.participants-row {

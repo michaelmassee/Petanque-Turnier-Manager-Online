@@ -493,7 +493,7 @@ export function RegistrationsPanel({
         <Feedback message={message} />
         <Feedback error={error} />
         {pendingRegistrations.length === 0 ? <p className="muted">{t('Keine offenen Anmeldungen.')}</p> : (
-          <section className="user-list" aria-label={t('Offene Anmeldungen')}>
+          <section className="user-list registration-list" aria-label={t('Offene Anmeldungen')}>
             <div className="section-title"><h3>{t('Offene Anmeldungen')}</h3><span className="counter">{pendingRegistrations.length}</span><Button loading={busyId === 'confirmAll'} disabled={Boolean(busyId) && busyId !== 'confirmAll'} onClick={onConfirmAll}>{t('Alle bestätigen')}</Button></div>
             {visiblePendingRegistrations.items.map((registration) => <RegistrationRow key={registration.id} registration={registration} tournament={tournament} showConfirm showReject onConfirm={onConfirm} onReject={onReject} onEdit={onEdit} onMessage={onMessage} onDelete={onDelete} {...rowProps(registration)} />)}
             <InfiniteListLoadMore hasMore={visiblePendingRegistrations.hasMore} onLoadMore={visiblePendingRegistrations.loadMore} label={t('Weitere Einträge laden')} />
@@ -552,7 +552,7 @@ export function RegistrationsPanel({
         resetDisabled={!filtered}
       />
       {pendingRegistrations.length > 0 && (
-        <section className="user-list" aria-label={t('Offene Anmeldungen')}>
+        <section className="user-list registration-list" aria-label={t('Offene Anmeldungen')}>
           <div className="section-title">
             <h3>{t('Offene Anmeldungen')}</h3>
             <span className="counter">{pendingRegistrations.length}</span>
@@ -565,7 +565,7 @@ export function RegistrationsPanel({
         </section>
       )}
       {(otherRegistrations.length > 0 || (filteredRegistrations.length === 0 && pendingRegistrations.length === 0)) && (
-        <section className="user-list" aria-label={t('Weitere Anmeldungen')}>
+        <section className="user-list registration-list" aria-label={t('Weitere Anmeldungen')}>
           {pendingRegistrations.length > 0 && <div className="section-title"><h3>{t('Weitere Anmeldungen')}</h3><span className="counter">{otherRegistrations.length}</span></div>}
           {visibleOtherRegistrations.items.map((registration) => (
             <RegistrationRow key={registration.id} registration={registration} tournament={tournament} onEdit={onEdit} onMessage={onMessage} onDelete={onDelete} {...rowProps(registration)} />
