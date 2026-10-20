@@ -1762,6 +1762,11 @@ a.left-panel-link {
   align-items: center;
 }
 
+/* Ohne Anmelden-Button (keine Anmeldung mehr möglich) nimmt das Badge im Handy-Raster die ganze Zeile ein. */
+.tournament-card-meta .status:only-child {
+  grid-column: 1 / -1;
+}
+
 .empty-state {
   display: grid;
   gap: 10px;

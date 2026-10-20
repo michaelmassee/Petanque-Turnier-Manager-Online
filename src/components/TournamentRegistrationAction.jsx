@@ -13,8 +13,10 @@ export function TournamentRegistrationAction({ tournament, currentUser, onRegist
   const upcoming = tournament.visibility === 'public' && tournament.status === 'registration'
     && !tournament.registrationClosed && registrationNotYetOpen(tournament);
   if (currentUser && upcoming) return <OpeningSubscriptionControl tournament={tournament} userId={currentUser.id} />;
-  return <Button variant="secondary" onClick={() => onRegister(tournament)}
-    disabled={tournament.visibility !== 'public' || !hasOpenRegistration(tournament)}>{t('Anmelden (Turnier)')}</Button>;
+  const available = tournament.visibility === 'public' && hasOpenRegistration(tournament);
+  // Keine Anmeldung mehr möglich: kein toter Knopf, das Status-Badge nennt den Grund. Öffnet sie erst, bleibt er sichtbar.
+  if (!available && !upcoming) return null;
+  return <Button variant="secondary" onClick={() => onRegister(tournament)} disabled={!available}>{t('Anmelden (Turnier)')}</Button>;
 }
 
 function OpeningSubscriptionControl({ tournament, userId }) {

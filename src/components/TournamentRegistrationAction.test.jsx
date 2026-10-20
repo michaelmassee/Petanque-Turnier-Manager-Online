@@ -23,6 +23,17 @@ describe('Anmelde-Öffnungsbenachrichtigung', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('blendet den Anmeldebutton aus, wenn keine Anmeldung mehr möglich ist', () => {
+    const closed = { ...tournament, registrationOpeningPending: false, registrationOpensAt: null };
+    setup(<>
+      <TournamentRegistrationAction tournament={{ ...closed, registrationDeadline: '2000-01-01T00:00:00.000Z' }} onRegister={() => {}} />
+      <TournamentRegistrationAction tournament={{ ...closed, maxRegistrations: 2, activeRegistrations: 2, waitlistEnabled: false }} onRegister={() => {}} />
+      <TournamentRegistrationAction tournament={{ ...closed, registrationClosed: true }} onRegister={() => {}} />
+      <TournamentRegistrationAction tournament={{ ...closed, status: 'running' }} onRegister={() => {}} />
+    </>);
+    expect(screen.queryByRole('button', { name: 'Anmelden' })).not.toBeInTheDocument();
+  });
+
   it('aktiviert und deaktiviert das Abo und zeigt den gespeicherten Zustand', async () => {
     const requests = [];
     vi.stubGlobal('fetch', vi.fn(async (url, options) => {
