@@ -4616,7 +4616,7 @@ details[open] > .play-round-summary::before {
 .rental-slot.rental-month-day { min-height: 40px; font-size: 0.95rem; cursor: pointer; }
 .rental-month-day:disabled { cursor: default; }
 .rental-month-day.today { font-weight: 700; text-decoration: underline; }
-.rental-month-day.current { box-shadow: inset 0 0 0 2px #087a72; }
+.rental-month-day.current { box-shadow: inset 0 0 0 3px #1d4ed8; }
 .rental-calendar { margin-bottom: 12px; }
 .rental-grid {
   display: grid;
@@ -4635,14 +4635,14 @@ details[open] > .play-round-summary::before {
   font-variant-numeric: tabular-nums;
   padding: 0;
 }
-.rental-slot.free { background: #dff5e9; border-color: #a6dcbd; color: #155b33; }
-.rental-slot.partial { background: #fff4d6; border-color: #f0d38a; color: #7a5800; }
-.rental-slot.full { background: #fde2e2; border-color: #f2b3b3; color: #9b1c1c; }
+.rental-slot.free { background: #15803d; border-color: #116932; color: #ffffff; }
+.rental-slot.partial { background: #f59e0b; border-color: #d48806; color: #3a2600; }
+.rental-slot.full { background: #c62828; border-color: #a31f1f; color: #ffffff; }
 .rental-slot.past { background: #f1f3f7; color: #9aa3b2; }
 .rental-slot.closed { background: repeating-linear-gradient(45deg, #f6f7fa, #f6f7fa 4px, #eceff4 4px, #eceff4 8px); }
-.rental-slot.selected { background: #087a72; border-color: #065e58; color: #ffffff; font-weight: 700; }
+.rental-slot.selected { background: #1d4ed8; border-color: #1e3a8a; color: #ffffff; font-weight: 700; }
 button.rental-slot:disabled { opacity: 1; }
-button.rental-slot:not(:disabled):hover { outline: 2px solid #087a72; outline-offset: -1px; }
+button.rental-slot:not(:disabled):hover { outline: 2px solid #172033; outline-offset: -1px; }
 .rental-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 0.8rem; color: #4a5568; }
 .rental-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .rental-legend i { display: inline-block; width: 14px; height: 14px; min-height: 0; }
