@@ -8,7 +8,7 @@ import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { pruneExpiredFlyerDesigns } from './lib/flyer-background-storage.js';
 import { LIVE_VIEW_EVENTS, liveViewPathFor, rentalPathFor } from './postbox-core.js';
-import { usePath, matchTournamentRoute, matchLiveRoute, matchRentalRoute } from './lib/routing.js';
+import { usePath, areaForPath, matchTournamentRoute, matchLiveRoute, matchRentalRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
 import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusClass, registrationStatusLabel, registrationStatusReason, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm, clubMatchesTournament } from './lib/domain.js';
@@ -56,7 +56,7 @@ export default function App() {
   );
 }
 
-function ContextualDrawerContent({ area, currentUser, canManageTournaments, activeTab, onSelectTab, onNavigate, onOpenProfile, onLogout, onLogin }) {
+export function ContextualDrawerContent({ area, currentUser, canManageTournaments, activeTab, onSelectTab, onNavigate, onOpenProfile, onLogout, onLogin }) {
   const { t } = useTranslation();
   const closeThen = (action) => () => action();
   const navigate = (path) => closeThen(() => onNavigate(path));
@@ -82,6 +82,9 @@ function ContextualDrawerContent({ area, currentUser, canManageTournaments, acti
     </div>}
     {(showAllAreas || area === 'spielerboerse') && currentUser && <div className="drawer-menu-section" aria-label={t('Boule-Treff')}>
       <button className="drawer-link" type="button" onClick={navigate('/meine-anzeigen')}>{t('Meine Mitspielgesuche')}</button>
+    </div>}
+    {(showAllAreas || area === 'live') && currentUser && <div className="drawer-menu-section" aria-label={t('Live')}>
+      <button className="drawer-link" type="button" onClick={navigate('/live')}>{t('Meine Turniere')}</button>
     </div>}
     <div className="drawer-menu-section drawer-menu-section-account">
       {currentUser ? (
@@ -1330,6 +1333,13 @@ function AppContent() {
     setAuthView('login');
   }
 
+  // Seiten ohne eigenen Bereich (Profil, Admin-Tabs, Impressum, Datenschutz) behalten das Menü des zuletzt besuchten Bereichs.
+  const routeArea = path === '/' ? drawerAreaForTab(activeTab) : areaForPath(path);
+  const [lastArea, setLastArea] = useState('turniere');
+  useEffect(() => {
+    if (routeArea) setLastArea(routeArea);
+  }, [routeArea]);
+
   function drawerContent(area) {
     return <ContextualDrawerContent
       area={area}
@@ -1398,6 +1408,7 @@ function AppContent() {
           isAdmin={isAdmin}
           onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
           onLogout={handleLogout}
+          drawerContent={drawerContent(lastArea)}
         />
       </Suspense>
     );
@@ -1416,6 +1427,7 @@ function AppContent() {
           isAdmin={isAdmin}
           onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
           onLogout={handleLogout}
+          drawerContent={drawerContent(lastArea)}
         />
       </Suspense>
     );
@@ -1526,6 +1538,7 @@ function AppContent() {
           isAdmin={isAdmin}
           onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
           onLogout={handleLogout}
+          drawerContent={drawerContent(lastArea)}
         />
         <section className="single-column">
           <div className="panel">
@@ -1864,12 +1877,6 @@ function AppContent() {
               ? t('Turnierverwaltung')
               : homeHeading;
 
-  const activeTabArea =
-    activeTab === 'clubs'
-      ? 'bouleplaetze'
-      : (activeTab === 'home' || activeTab === 'tournaments' || activeTab === 'registrations' || activeTab === 'play' || activeTab === 'petanque-aktuell-import')
-        ? 'turniere'
-        : null;
 
   return (
     <main className="app-shell">
@@ -1955,7 +1962,7 @@ function AppContent() {
         ) : null}
         postboxControl={renderPostboxControl()}
       >
-        {drawerContent(activeTabArea)}
+        {drawerContent(routeArea || lastArea)}
       </AppHeader>
 
       {/* While a dialog is open it shows the shared message itself – don't duplicate it behind the backdrop. */}
@@ -2313,6 +2320,15 @@ const TOURNAMENT_INFO_CARD_CONTENT = [
   { text: 'Du möchtest trainieren, suchst Spielpartner oder planst ein Turnier? Erstelle mit wenigen Klicks ein Gesuch und finde Menschen in deiner Nähe, die deine Begeisterung für Pétanque teilen.' },
   { text: 'Du möchtest noch mehr aus deinem Turnier machen? Mit PTM Desktop planst und leitest du professionelle Turniere auf Mac, Linux oder Windows – kostenlos, leistungsstark und genau für Pétanque gemacht.', href: 'https://michaelmassee.github.io/Petanque-Turnier-Manager/' },
 ];
+
+const TOURNAMENT_AREA_TABS = new Set(['home', 'tournaments', 'registrations', 'play', 'petanque-aktuell-import']);
+
+// Menübereich eines Startseiten-Tabs; null für Tabs ohne eigenen Bereich (Profil, Admin), die den Bereich
+// übernehmen, aus dem man kommt – sonst fehlte dort z. B. der Weg zurück zur Turnierverwaltung.
+export function drawerAreaForTab(tab) {
+  if (tab === 'clubs') return 'bouleplaetze';
+  return TOURNAMENT_AREA_TABS.has(tab) ? 'turniere' : null;
+}
 
 export function nextTournamentInfoCardIndex(storage) {
   try {

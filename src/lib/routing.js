@@ -68,3 +68,18 @@ export function matchRentalRoute(path) {
   if (segments[1] === 'verwalten') return { view: 'manage' };
   return { view: 'offer', id: decodeURIComponent(segments[1]) };
 }
+
+const PATH_AREAS = {
+  '/turnier-melden': 'turniere',
+  '/plaetze': 'bouleplaetze', '/platz-melden': 'bouleplaetze', '/platz-bearbeiten': 'bouleplaetze', '/vereine': 'bouleplaetze',
+  '/spielerboerse': 'spielerboerse', '/meine-anzeigen': 'spielerboerse',
+};
+
+// Menübereich einer Seite; null für Seiten ohne eigenen Bereich (Startseite mit Tabs, Impressum, Datenschutz),
+// die den Bereich übernehmen, aus dem man kommt.
+export function areaForPath(path) {
+  if (matchTournamentRoute(path)) return 'turniere';
+  if (matchRentalRoute(path)) return 'platzmieten';
+  if (matchLiveRoute(path)) return 'live';
+  return PATH_AREAS[path] || null;
+}

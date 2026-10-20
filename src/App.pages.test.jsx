@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import i18next from './lib/i18next-config.js';
-import { EditDialog, HomeTournaments, nextTournamentInfoCardIndex, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
+import { ContextualDrawerContent, drawerAreaForTab, EditDialog, HomeTournaments, nextTournamentInfoCardIndex, ProfilePanel, PublicRegistrationPanel } from './App.jsx';
 import { ClubBadge, DistanceBadge } from './components/ui.jsx';
 import { AppHeader, SavedSearchesControl, SearchMenuControl } from './components/layout.jsx';
 import { EMPTY_REGISTRATION_FORM, EMPTY_TOURNAMENT_FORM } from './lib/constants.js';
@@ -929,6 +929,30 @@ describe('Öffentliche Turnierdetailseite', () => {
 });
 
 describe('Mein Profil', () => {
+  it.each(['home', 'tournaments', 'registrations', 'play', 'petanque-aktuell-import'])('ordnet den Tab %s dem Bereich Turniere zu', (tab) => {
+    expect(drawerAreaForTab(tab)).toBe('turniere');
+  });
+
+  it.each(['profile', 'admin-dashboard', 'users', 'apikeys'])('lässt den Tab %s ohne eigenen Bereich, damit er den Bereich der Herkunft behält', (tab) => {
+    expect(drawerAreaForTab(tab)).toBeNull();
+  });
+
+  it('ordnet die Vereinsmoderation dem Bereich Boule-Plätze zu', () => {
+    expect(drawerAreaForTab('clubs')).toBe('bouleplaetze');
+  });
+
+  it.each([
+    ['turniere', 'Turnierverwaltung'],
+    ['bouleplaetze', 'Meine Vereine'],
+    ['platzmieten', 'Vermietung verwalten'],
+    ['spielerboerse', 'Meine Mitspielgesuche'],
+    ['live', 'Meine Turniere'],
+  ])('zeigt im Menü des Bereichs %s die Bereichseinträge und das Konto', (area, entry) => {
+    render(<ContextualDrawerContent area={area} currentUser={{ id: 'u1' }} canManageTournaments activeTab="home" onSelectTab={() => {}} onNavigate={() => {}} onOpenProfile={() => {}} onLogout={() => {}} onLogin={() => {}} />);
+    expect(screen.getByRole('button', { name: entry })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mein Profil' })).toBeInTheDocument();
+  });
+
   it('rendert das Profilformular für einen angemeldeten Benutzer', () => {
     render(
       <ProfilePanel

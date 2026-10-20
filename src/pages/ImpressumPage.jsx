@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { StandalonePageHeader } from '../components/layout.jsx';
 
-export function ImpressumPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, isAdmin, onSelectAdminDashboard, onLogout }) {
+export function ImpressumPage({ language, setLanguage, menuOpen, setMenuOpen, navigate, currentUser, isAdmin, onSelectAdminDashboard, onLogout, drawerContent }) {
   const { t } = useTranslation();
   return (
     <main className="app-shell">
@@ -16,6 +16,7 @@ export function ImpressumPage({ language, setLanguage, menuOpen, setMenuOpen, na
         isAdmin={isAdmin}
         onSelectAdminDashboard={onSelectAdminDashboard}
         onLogout={onLogout}
+        drawerContent={drawerContent}
       />
 
       <section className="single-column legal-page">

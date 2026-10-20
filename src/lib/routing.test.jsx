@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { matchRentalRoute, matchTournamentRoute, usePath } from './routing.js';
+import { areaForPath, matchRentalRoute, matchTournamentRoute, usePath } from './routing.js';
 
 function NavigationHarness() {
   const [path, navigate] = usePath();
@@ -36,5 +36,18 @@ describe('matchRentalRoute', () => {
     expect(matchRentalRoute('/platz-mieten/o%201')).toEqual({ view: 'offer', id: 'o 1' });
     expect(matchRentalRoute('/platz-mieten/a/b')).toBeNull();
     expect(matchRentalRoute('/plaetze')).toBeNull();
+  });
+});
+
+describe('areaForPath', () => {
+  it.each([
+    ['/turniere/t1', 'turniere'], ['/turniere/t1/rangliste', 'turniere'], ['/turnier-melden', 'turniere'],
+    ['/plaetze', 'bouleplaetze'], ['/platz-melden', 'bouleplaetze'], ['/platz-bearbeiten', 'bouleplaetze'], ['/vereine', 'bouleplaetze'],
+    ['/platz-mieten', 'platzmieten'], ['/platz-mieten/verwalten', 'platzmieten'],
+    ['/live', 'live'], ['/live/r1', 'live'],
+    ['/spielerboerse', 'spielerboerse'], ['/meine-anzeigen', 'spielerboerse'],
+    ['/', null], ['/impressum', null], ['/datenschutz', null],
+  ])('ordnet %s dem Bereich %s zu', (path, area) => {
+    expect(areaForPath(path)).toBe(area);
   });
 });
