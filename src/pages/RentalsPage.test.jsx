@@ -154,6 +154,33 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect((await screen.findByText('Mit Bar')).closest('strong')).not.toBeNull();
   });
 
+  it('springt über den Monatskalender zu einem Tag und sperrt nicht buchbare Tage', async () => {
+    const MONTH = {
+      month: '2026-10', today: '2026-10-19', lastDate: '2026-11-18',
+      days: Array.from({ length: 31 }, (_, index) => {
+        const date = `2026-10-${String(index + 1).padStart(2, '0')}`;
+        const status = index < 18 ? 'unavailable' : { 19: 'closed', 23: 'partial', 30: 'full' }[index] || 'free';
+        return { date, status };
+      }),
+    };
+    api.mockImplementation(async (path) => {
+      if (path.includes('month=')) return MONTH;
+      return path.includes('/availability') ? AVAILABILITY : { offer: OFFER };
+    });
+    render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Datum wählen: / }));
+    expect(await screen.findByText('Oktober 2026')).toBeInTheDocument();
+    expect(api).toHaveBeenCalledWith('/api/rentals/o1/availability?month=2026-10');
+    expect(screen.getByRole('button', { name: 'Vorheriger Monat' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Montag, 12. Oktober 2026: nicht buchbar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Dienstag, 20. Oktober 2026: geschlossen' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Samstag, 24. Oktober 2026: teilweise belegt' }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/api/rentals/o1/availability?from=2026-10-24'));
+    expect(screen.queryByText('Oktober 2026')).not.toBeInTheDocument();
+  });
+
   it('bittet Gäste ums Anmelden statt das Formular zu zeigen', async () => {
     mockOffer();
     const onLogin = vi.fn();

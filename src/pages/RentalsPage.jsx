@@ -7,6 +7,7 @@ import { addDays } from '../rental-core.js';
 import { Button, EditDialog, Feedback, SelectField, ShareLinkButton, TextArea, TextField } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { RentalCalendar } from '../components/RentalCalendar.jsx';
+import { RentalMonthPicker } from '../components/RentalMonthPicker.jsx';
 import { ComboboxPicker } from '../components/ComboboxPicker.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
@@ -215,7 +216,15 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
       </p>
       <div className="rental-week-nav">
         <Button variant="secondary" disabled={availability.from <= availability.today} onClick={() => setFrom(addDays(availability.from, -7) < availability.today ? availability.today : addDays(availability.from, -7))}>{t('Vorherige Woche')}</Button>
-        <strong>{formatDate(availability.days[0].date, language)} – {formatDate(availability.days.at(-1).date, language)}</strong>
+        <RentalMonthPicker
+          offerId={id}
+          language={language}
+          today={availability.today}
+          lastDate={lastDate}
+          selectedDate={availability.from}
+          rangeLabel={`${formatDate(availability.days[0].date, language)} – ${formatDate(availability.days.at(-1).date, language)}`}
+          onSelect={(date) => { setSelection(null); setFrom(date); }}
+        />
         <Button variant="secondary" disabled={addDays(availability.from, 7) > lastDate} onClick={() => setFrom(addDays(availability.from, 7))}>{t('Nächste Woche')}</Button>
       </div>
       <RentalCalendar days={availability.days} laneCount={offer.laneCount} selection={selection} onSelect={select} language={language} />

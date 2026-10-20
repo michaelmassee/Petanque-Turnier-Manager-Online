@@ -81,6 +81,29 @@ describe('Platz mieten', () => {
     expect(invalid.status).toBe(400);
   });
 
+  it('liefert mit month den Tagesstatus für den Monatskalender', async () => {
+    const offer = await createOffer();
+    // Samstag 24.10.: 9–13 Uhr geöffnet, eine Reservierung belegt 10–12 Uhr zwei von vier Bahnen.
+    await reserve(offer.id, { lanes: 2 });
+    const response = await call('GET', `/api/rentals/${offer.id}/availability?month=2026-10`);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data).toMatchObject({ month: '2026-10', today: '2026-10-19', lastDate: '2026-11-18' });
+    expect(data.days).toHaveLength(31);
+    const status = Object.fromEntries(data.days.map((entry) => [entry.date, entry.status]));
+    expect(status['2026-10-12']).toBe('unavailable');
+    expect(status['2026-10-20']).toBe('closed');
+    expect(status['2026-10-24']).toBe('partial');
+    expect(status['2026-10-26']).toBe('free');
+    const later = await (await call('GET', `/api/rentals/${offer.id}/availability?month=2026-12`)).json();
+    expect(later.days.find((entry) => entry.date === '2026-12-05').status).toBe('unavailable');
+    expect((await call('GET', `/api/rentals/${offer.id}/availability?month=2026-13`)).status).toBe(400);
+    // Ohne month bleibt die Wochenantwort mit Stunden unverändert.
+    const week = await (await call('GET', `/api/rentals/${offer.id}/availability?from=2026-10-24`)).json();
+    expect(week.days).toHaveLength(7);
+    expect(week.days[0].slots.length).toBeGreaterThan(0);
+  });
+
   it('nimmt Anfragen bis zur Bahnanzahl an und benachrichtigt den Verein', async () => {
     const offer = await createOffer();
     expect((await reserve(offer.id, {}, {})).status).toBe(401);

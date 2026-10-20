@@ -1649,5 +1649,11 @@
   "Preis auf Anfrage": "Prix sur demande",
   "Aktiviere zuerst den Freigabelink des privaten Turniers, bevor du die Endrangliste an die Teilnehmer sendest.": "Activez d’abord le lien de partage du tournoi privé avant d’envoyer le classement final aux participants.",
   "Das Angebot hat mehr Bahnen als der Spielort": "L’offre comporte plus de pistes que le lieu",
-  "Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.": "Cette modification est incompatible avec des réservations existantes. Annulez-les ou réglez-les d’abord."
+  "Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.": "Cette modification est incompatible avec des réservations existantes. Annulez-les ou réglez-les d’abord.",
+  "Datum wählen": "Choisir une date",
+  "Vorheriger Monat": "Mois précédent",
+  "Nächster Monat": "Mois suivant",
+  "nicht buchbar": "non réservable",
+  "geschlossen": "fermé",
+  "Ungültiger Monat": "Mois invalide"
 }

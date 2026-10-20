@@ -10,7 +10,7 @@ import {
   TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT, unreadPostboxCount,
 } from './postbox-core.js';
 import {
-  addDays, buildAvailability, formatRentalSlot, isValidLocalDate, normalizeOfferInput, RENTAL_AVAILABILITY_DAYS,
+  addDays, buildAvailability, dayAvailabilityStatus, formatRentalSlot, isValidLocalDate, monthRange, normalizeOfferInput, RENTAL_AVAILABILITY_DAYS,
   validateReservationRequest,
 } from './rental-core.js';
 import { CURRENCY_CODES } from './currencies.js';
@@ -2095,7 +2095,7 @@ export default {
       const rentalAvailabilityMatch = url.pathname.match(/^\/api\/rentals\/([^/]+)\/availability$/);
       if (rentalAvailabilityMatch && request.method === 'GET') {
         const session = await optionalSession(request, env.DB);
-        return await getRentalAvailability(env.DB, rentalAvailabilityMatch[1], url.searchParams.get('from'), session?.user || null);
+        return await getRentalAvailability(env.DB, rentalAvailabilityMatch[1], url.searchParams.get('from'), session?.user || null, url.searchParams.get('month'));
       }
       const rentalReserveMatch = url.pathname.match(/^\/api\/rentals\/([^/]+)\/reservations$/);
       if (rentalReserveMatch && request.method === 'POST') {
@@ -9645,19 +9645,30 @@ async function activeRentalReservations(db, placeId, from, to) {
   return (rows.results || []).map((row) => ({ offerId: row.offer_id, localDate: row.local_date, startHour: Number(row.start_hour), hours: Number(row.hours), lanes: Number(row.lanes) }));
 }
 
-async function getRentalAvailability(db, id, fromParam, user) {
+// Wochenraster (from, 7 Tage, mit Stunden) oder mit month=YYYY-MM nur der Tagesstatus für den Monatskalender.
+async function getRentalAvailability(db, id, fromParam, user, monthParam = null) {
   const row = await loadRentalOffer(db, id);
   if (!rentalOfferIsPublic(row) && !(await canManageRentalClub(db, row.club_id, user))) throw new HttpError(404, 'Angebot nicht gefunden');
   const offer = toRentalOffer(row);
   const now = rentalLocalNow(offer.timezone);
-  const from = fromParam && isValidLocalDate(fromParam) ? fromParam : now.date;
-  const to = addDays(from, RENTAL_AVAILABILITY_DAYS - 1);
+  const month = monthParam ? monthRange(monthParam) : null;
+  if (monthParam && !month) throw new HttpError(400, 'Ungültiger Monat', { field: 'month' });
+  const from = month?.from || (fromParam && isValidLocalDate(fromParam) ? fromParam : now.date);
+  const days = month?.days || RENTAL_AVAILABILITY_DAYS;
+  const to = addDays(from, days - 1);
   const [openingHours, reservations, venueLaneCount] = await Promise.all([
     loadOpeningHours(db, id), activeRentalReservations(db, row.boule_place_id, from, to),
     Number(row.place_court_count) > 0 ? Number(row.place_court_count)
       : db.prepare('SELECT MAX(lane_count) AS capacity FROM rental_offers WHERE boule_place_id = ?').bind(row.boule_place_id).first('capacity'),
   ]);
-  return json({ from, today: now.date, days: buildAvailability({ offer, openingHours, from, reservations, venueLaneCount: Number(venueLaneCount), now }) });
+  const availability = buildAvailability({ offer, openingHours, from, days, reservations, venueLaneCount: Number(venueLaneCount), now });
+  if (month) {
+    return json({
+      month: monthParam, today: now.date, lastDate: addDays(now.date, offer.bookingHorizonDays),
+      days: availability.map((day) => ({ date: day.date, status: dayAvailabilityStatus(day, offer.laneCount) })),
+    });
+  }
+  return json({ from, today: now.date, days: availability });
 }
 
 async function rentalClubManagers(db, clubId) {

@@ -1649,5 +1649,11 @@
   "Preis auf Anfrage": "Price on request",
   "Aktiviere zuerst den Freigabelink des privaten Turniers, bevor du die Endrangliste an die Teilnehmer sendest.": "Enable the private tournament’s share link before sending the final standings to participants.",
   "Das Angebot hat mehr Bahnen als der Spielort": "The offer has more lanes than the venue",
-  "Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.": "This change conflicts with existing reservations. Cancel or resolve them first."
+  "Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.": "This change conflicts with existing reservations. Cancel or resolve them first.",
+  "Datum wählen": "Choose date",
+  "Vorheriger Monat": "Previous month",
+  "Nächster Monat": "Next month",
+  "nicht buchbar": "not bookable",
+  "geschlossen": "closed",
+  "Ungültiger Monat": "Invalid month"
 }

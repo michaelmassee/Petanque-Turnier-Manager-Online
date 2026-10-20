@@ -1649,5 +1649,11 @@
   "Preis auf Anfrage": "Precio a consultar",
   "Aktiviere zuerst den Freigabelink des privaten Turniers, bevor du die Endrangliste an die Teilnehmer sendest.": "Activa primero el enlace para compartir el torneo privado antes de enviar la clasificación final a los participantes.",
   "Das Angebot hat mehr Bahnen als der Spielort": "La oferta tiene más pistas que el recinto",
-  "Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.": "El cambio entra en conflicto con las reservas existentes. Cancélalas o resuélvelas primero."
+  "Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.": "El cambio entra en conflicto con las reservas existentes. Cancélalas o resuélvelas primero.",
+  "Datum wählen": "Elegir fecha",
+  "Vorheriger Monat": "Mes anterior",
+  "Nächster Monat": "Mes siguiente",
+  "nicht buchbar": "no reservable",
+  "geschlossen": "cerrado",
+  "Ungültiger Monat": "Mes no válido"
 }

@@ -151,6 +151,26 @@ export function buildAvailability({ offer, openingHours, from, days = RENTAL_AVA
   });
 }
 
+/**
+ * Tagesstatus für den Monatskalender aus einem Tag von buildAvailability: closed (nicht geöffnet), unavailable
+ * (nichts mehr buchbar: vorbei oder jenseits des Horizonts), full, free (alle buchbaren Stunden komplett frei), partial.
+ */
+export function dayAvailabilityStatus(day, laneCount) {
+  if (!day.slots.length) return 'closed';
+  const bookable = day.slots.filter((slot) => slot.bookable);
+  if (!bookable.length) return 'unavailable';
+  if (bookable.every((slot) => slot.free === 0)) return 'full';
+  return bookable.every((slot) => slot.free >= laneCount) ? 'free' : 'partial';
+}
+
+/** Erster Tag und Länge eines Monats (YYYY-MM); null bei ungültiger Angabe. */
+export function monthRange(month) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month || ''))) return null;
+  const from = `${month}-01`;
+  const [year, monthNumber] = month.split('-').map(Number);
+  return { from, days: new Date(Date.UTC(year, monthNumber, 0)).getUTCDate() };
+}
+
 const SLOT_DATE_FORMATS = {
   de: ([year, month, day]) => `${day}.${month}.${year}`,
   nl: ([year, month, day]) => `${day}-${month}-${year}`,

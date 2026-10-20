@@ -4594,7 +4594,29 @@ details[open] > .play-round-summary::before {
 .rental-offer-row { grid-template-columns: auto minmax(0, 1fr) auto; }
 .rental-offer-logo { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: #eef2f7; flex-shrink: 0; }
 .rental-week-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
-.rental-week-nav strong { text-align: center; flex: 1 1 auto; }
+.rental-month-toggle {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex: 1 1 auto; min-height: 40px;
+  padding: 6px 12px; border: 1px solid #d7deea; border-radius: 8px; background: #ffffff; color: #172033; cursor: pointer;
+}
+.rental-month-toggle:hover, .rental-month-toggle[aria-expanded="true"] { border-color: #087a72; color: #087a72; }
+/* Eigene volle Zeile unter den Wochenbuttons; der Kalender selbst bleibt kompakt und zentriert. */
+.rental-month-picker { flex: 1 0 100%; order: 1; display: flex; justify-content: center; }
+.rental-month-panel {
+  width: 100%; max-width: 24rem; padding: 12px; border: 1px solid #d7deea; border-radius: 12px;
+  background: #ffffff; box-shadow: 0 8px 24px rgb(23 32 51 / 10%);
+}
+.rental-month-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.rental-month-head strong { text-transform: capitalize; }
+.rental-month-nav {
+  width: 40px; height: 40px; border: 1px solid #d7deea; border-radius: 8px; background: #ffffff; font-size: 1.3rem; cursor: pointer;
+}
+.rental-month-nav:disabled { color: #c3c9d4; cursor: default; }
+.rental-month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.rental-month-weekday { text-align: center; font-size: 0.75rem; color: #4a5568; text-transform: capitalize; }
+.rental-slot.rental-month-day { min-height: 40px; font-size: 0.95rem; cursor: pointer; }
+.rental-month-day:disabled { cursor: default; }
+.rental-month-day.today { font-weight: 700; text-decoration: underline; }
+.rental-month-day.current { box-shadow: inset 0 0 0 2px #087a72; }
 .rental-calendar { margin-bottom: 12px; }
 .rental-grid {
   display: grid;

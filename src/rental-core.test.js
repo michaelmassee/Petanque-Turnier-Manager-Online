@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAvailability, formatRentalSlot, normalizeOfferInput, normalizeOpeningHours, validateReservationRequest } from './rental-core.js';
+import { buildAvailability, dayAvailabilityStatus, formatRentalSlot, monthRange, normalizeOfferInput, normalizeOpeningHours, validateReservationRequest } from './rental-core.js';
 
 const offer = { laneCount: 4, minHours: 1, maxHours: 3, bookingHorizonDays: 30 };
 // 2026-10-19 ist ein Montag (Wochentag 1).
@@ -68,5 +68,27 @@ describe('Platz mieten: Verfügbarkeit', () => {
   it('formatiert den Zeitraum je Sprache', () => {
     expect(formatRentalSlot({ date: '2026-10-24', startHour: 9, hours: 2 }, 'de')).toBe('24.10.2026 09:00–11:00');
     expect(formatRentalSlot({ date: '2026-10-24', startHour: 22, hours: 2 }, 'en')).toBe('2026-10-24 22:00–24:00');
+  });
+});
+
+describe('Platz mieten: Monatskalender', () => {
+  const day = (slots) => ({ date: '2026-10-24', slots });
+  it.each([
+    [[], 'closed'],
+    [[{ hour: 9, free: 4, bookable: false }], 'unavailable'],
+    [[{ hour: 9, free: 0, bookable: true }, { hour: 10, free: 0, bookable: true }], 'full'],
+    [[{ hour: 9, free: 4, bookable: true }, { hour: 10, free: 4, bookable: true }], 'free'],
+    [[{ hour: 9, free: 0, bookable: false }, { hour: 10, free: 4, bookable: true }], 'free'],
+    [[{ hour: 9, free: 2, bookable: true }, { hour: 10, free: 4, bookable: true }], 'partial'],
+    [[{ hour: 9, free: 0, bookable: true }, { hour: 10, free: 4, bookable: true }], 'partial'],
+  ])('bewertet Slots %j als %s', (slots, status) => {
+    expect(dayAvailabilityStatus(day(slots), 4)).toBe(status);
+  });
+
+  it('liefert Monatsanfang und -länge, auch im Schaltjahr', () => {
+    expect(monthRange('2026-10')).toEqual({ from: '2026-10-01', days: 31 });
+    expect(monthRange('2028-02')).toEqual({ from: '2028-02-01', days: 29 });
+    expect(monthRange('2026-13')).toBeNull();
+    expect(monthRange('2026-1')).toBeNull();
   });
 });

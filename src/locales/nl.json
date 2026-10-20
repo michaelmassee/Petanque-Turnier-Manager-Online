@@ -1649,5 +1649,11 @@
   "Preis auf Anfrage": "Prijs op aanvraag",
   "Aktiviere zuerst den Freigabelink des privaten Turniers, bevor du die Endrangliste an die Teilnehmer sendest.": "Activeer eerst de deellink van het privétoernooi voordat je de eindrangschikking naar de deelnemers stuurt.",
   "Das Angebot hat mehr Bahnen als der Spielort": "Het aanbod heeft meer banen dan de locatie",
-  "Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.": "Deze wijziging is in strijd met bestaande reserveringen. Annuleer of regel deze eerst."
+  "Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.": "Deze wijziging is in strijd met bestaande reserveringen. Annuleer of regel deze eerst.",
+  "Datum wählen": "Datum kiezen",
+  "Vorheriger Monat": "Vorige maand",
+  "Nächster Monat": "Volgende maand",
+  "nicht buchbar": "niet boekbaar",
+  "geschlossen": "gesloten",
+  "Ungültiger Monat": "Ongeldige maand"
 }

@@ -56,6 +56,17 @@ export function formatDateLong(value, language = 'de') {
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
+// Monat und Jahr ("November 2026") aus YYYY-MM, z. B. als Kopf eines Monatskalenders.
+export function formatMonthYear(month, language = 'de') {
+  if (!month) {
+    return '';
+  }
+  const [year, monthNumber] = month.split('-').map(Number);
+  return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, {
+    month: 'long', year: 'numeric', timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, monthNumber - 1, 1)));
+}
+
 // Wochentag in Kurzform ("Sa", "Sat", "za" …) in der Anzeigesprache; das Datum ist ein reiner
 // Kalendertag, daher wie formatDate in UTC ausgewertet.
 export function formatWeekdayShort(value, language = 'de') {
