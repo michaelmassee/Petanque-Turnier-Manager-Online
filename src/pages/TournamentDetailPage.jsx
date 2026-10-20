@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FORMATIONS, REGISTRATION_STATUSES, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
 import { api, authenticatedApi } from '../lib/api.js';
@@ -6,7 +6,8 @@ import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
 import { isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
-import { AccountBadge, Button, Feedback, RequiredMark, ShareIcon } from '../components/ui.jsx';
+import { AccountBadge, Button, ClockIcon, Feedback, NumberIcon, RequiredMark, SearchIcon, ShareIcon, SortAlphaIcon, StarIcon } from '../components/ui.jsx';
+import { loadParticipantListPrefs, nextVipFilter, saveParticipantListPrefs } from '../lib/participantListPrefs.js';
 import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
 import { formatUserName } from '../lib/userLabel.js';
 import { StandalonePageHeader } from '../components/layout.jsx';
@@ -186,8 +187,30 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
   );
 }
 
-function TournamentParticipants({ tournamentId, onMessage, onError }) {
+const foldText = (value) => String(value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+function participantSearchText(participant) {
+  return foldText([
+    participant.teamName,
+    participant.firstName, participant.lastName, participant.club,
+    participant.partnerFirstName, participant.partnerLastName, participant.partnerClub,
+    participant.partner2FirstName, participant.partner2LastName, participant.partner2Club,
+  ].filter(Boolean).join(' '));
+}
+
+function compareByLastName(a, b) {
+  const options = { sensitivity: 'base' };
+  return String(a.lastName || '').localeCompare(String(b.lastName || ''), 'de', options)
+    || String(a.firstName || '').localeCompare(String(b.firstName || ''), 'de', options)
+    || a.number - b.number;
+}
+
+function TournamentParticipants({ tournamentId, language, timeZone, onMessage, onError }) {
   const { t } = useTranslation();
+  const [prefs, setPrefs] = useState(loadParticipantListPrefs);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const searchInputRef = useRef(null);
   const [participants, setParticipants] = useState(null);
   const [waitlist, setWaitlist] = useState([]);
   const [ownUnconfirmed, setOwnUnconfirmed] = useState([]);
@@ -217,6 +240,23 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
       cancelled = true;
     };
   }, [tournamentId, reloadKey]);
+
+  useEffect(() => {
+    if (filterOpen) searchInputRef.current?.focus();
+  }, [filterOpen]);
+
+  function updatePrefs(changes) {
+    setPrefs((current) => {
+      const next = { ...current, ...changes };
+      saveParticipantListPrefs(next);
+      return next;
+    });
+  }
+
+  function toggleFilter() {
+    setFilterOpen((open) => !open);
+    setQuery('');
+  }
 
   async function handleCancelOwnRegistration(participant) {
     const label = [participant.firstName, participant.lastName].filter(Boolean).join(' ');
@@ -261,8 +301,25 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
     );
   }
 
+  // Lfd.-Nr. = Position in der Meldereihenfolge (API sortiert nach registered_at), unabhängig von Filter und Sortierung.
+  const numberedParticipants = participants.map((participant, index) => ({ ...participant, number: index + 1 }));
+  const numberedWaitlist = waitlist.map((participant, index) => ({ ...participant, number: index + 1 }));
+  const hasVip = [...participants, ...waitlist].some((participant) => participant.isVip);
+  const vipFilter = hasVip ? prefs.vip : 'all';
+  const foldedQuery = foldText(query.trim());
+  const visibleEntries = (list) => {
+    const filtered = list.filter((participant) => (vipFilter === 'all' || (vipFilter === 'only') === Boolean(participant.isVip))
+      && (!foldedQuery || participantSearchText(participant).includes(foldedQuery)));
+    return prefs.sortByLastName ? [...filtered].sort(compareByLastName) : filtered;
+  };
+  const visibleParticipants = visibleEntries(numberedParticipants);
+  const visibleWaitlist = visibleEntries(numberedWaitlist);
+  const filtering = vipFilter !== 'all' || Boolean(foldedQuery);
+  const vipLabels = { all: t('VIP: alle'), only: t('Nur VIP'), without: t('Ohne VIP') };
+
   const renderParticipantRow = (participant, index) => (
-    <article className={`data-row participants-row${participant.isVip ? ' participants-row-vip' : ''}`} key={`${participant.firstName}-${participant.lastName}-${index}`}>
+    <article className={`data-row participants-row${participant.isVip ? ' participants-row-vip' : ''}${prefs.numbers && participant.number ? ' participants-row-numbered' : ''}`} key={`${participant.firstName}-${participant.lastName}-${index}`}>
+      {prefs.numbers && participant.number && <span className="participant-number" aria-label={`${t('Lfd.-Nr.')} ${participant.number}`}>{participant.number}</span>}
       <div data-i18n-skip>
         <strong>
           {participant.firstName} {participant.lastName}
@@ -270,6 +327,9 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
         </strong>
         <span>{participant.club}</span>
         {participant.overCapacity && <small className="muted">{t('Nachmeldung der Turnierleitung')}</small>}
+        {prefs.registeredAt && participant.registeredAt && (
+          <small className="muted participant-registered-at">{t('Gemeldet am')} {formatTournamentDateTime(participant.registeredAt, language, timeZone)}</small>
+        )}
       </div>
       {(participant.partnerFirstName || participant.partnerLastName) && (
         <div data-i18n-skip>
@@ -302,16 +362,43 @@ function TournamentParticipants({ tournamentId, onMessage, onError }) {
     </article>
   );
 
+  const toolbarButton = (label, pressed, onClick, icon) => (
+    <button type="button" className="participants-toolbar-button" aria-pressed={pressed} aria-label={label} title={label} onClick={onClick}>
+      {icon}<span>{label}</span>
+    </button>
+  );
+
   return (
     <>
-      <div className="participants-list">
-        {participants.map(renderParticipantRow)}
-      </div>
-      {waitlist.length > 0 && (
+      {(participants.length > 0 || waitlist.length > 0) && (
+        <>
+          <div className="participants-toolbar" role="toolbar" aria-label={t('Ansicht der Meldeliste')}>
+            {toolbarButton(t('Lfd.-Nr.'), prefs.numbers, () => updatePrefs({ numbers: !prefs.numbers }), <NumberIcon />)}
+            {hasVip && toolbarButton(vipLabels[vipFilter], vipFilter !== 'all', () => updatePrefs({ vip: nextVipFilter(vipFilter) }), <StarIcon crossed={vipFilter === 'without'} />)}
+            {toolbarButton(t('Meldezeit'), prefs.registeredAt, () => updatePrefs({ registeredAt: !prefs.registeredAt }), <ClockIcon />)}
+            {toolbarButton(t('Filter'), filterOpen, toggleFilter, <SearchIcon />)}
+            {toolbarButton(t('Nach Nachname sortieren'), prefs.sortByLastName, () => updatePrefs({ sortByLastName: !prefs.sortByLastName }), <SortAlphaIcon />)}
+          </div>
+          {filterOpen && (
+            <label className="participants-search">
+              {t('Meldeliste durchsuchen')}
+              <input ref={searchInputRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} />
+            </label>
+          )}
+        </>
+      )}
+      {filtering && !visibleParticipants.length && !visibleWaitlist.length ? (
+        <p className="muted">{t('Keine Anmeldungen passen zum Filter.')}</p>
+      ) : (
+        <div className="participants-list">
+          {visibleParticipants.map(renderParticipantRow)}
+        </div>
+      )}
+      {visibleWaitlist.length > 0 && (
         <>
           <h3>{t('Warteliste')}</h3>
           <div className="participants-list">
-            {waitlist.map(renderParticipantRow)}
+            {visibleWaitlist.map(renderParticipantRow)}
           </div>
         </>
       )}
@@ -659,7 +746,7 @@ export function TournamentDetailPage({
               <p className="hint">
                 {t('Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.')}
               </p>
-              <TournamentParticipants tournamentId={tournament.id} onMessage={setMessage} onError={setError} />
+              <TournamentParticipants tournamentId={tournament.id} language={language} timeZone={tournament.timezone} onMessage={setMessage} onError={setError} />
             </>
           )}
 

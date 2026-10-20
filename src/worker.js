@@ -6645,7 +6645,7 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
       `SELECT id, email, first_name, last_name, club, team_name,
          partner_first_name, partner_last_name, partner_club,
          partner2_first_name, partner2_last_name, partner2_club, is_vip, status,
-         over_capacity, user_id, partner_user_id, partner2_user_id, registrant_user_id
+         over_capacity, user_id, partner_user_id, partner2_user_id, registrant_user_id, registered_at
        FROM registrations
        WHERE tournament_id = ? AND status IN ('pending', 'confirmed', 'waitlist')
        ORDER BY registered_at ASC`,
@@ -6670,6 +6670,8 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
       partner2LastName: row.partner2_last_name,
       partner2Club: row.partner2_club,
       isVip: Boolean(row.is_vip),
+      // Meldezeitpunkt; die Meldereihenfolge ist ohnehin öffentlich.
+      registeredAt: row.registered_at,
       // Von der Turnierleitung über die Kapazität hinaus nachgemeldet (T-24); öffentlich als solche erkennbar.
       overCapacity: Boolean(Number(row.over_capacity || 0)),
       // Nur ob die Person mit einem Konto verknüpft ist (👤), nie welches Konto.

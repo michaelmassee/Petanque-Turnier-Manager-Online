@@ -81,7 +81,7 @@ export function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, 
             {t('Diese Website verwendet ein technisch notwendiges Session-Cookie (ptm_session), um dich nach der Anmeldung für bis zu 14 Tage eingeloggt zu halten. Das Cookie ist HttpOnly, Secure und SameSite=Lax gesetzt und wird ausschließlich für den Login-Status verwendet. Da dieses Cookie technisch notwendig ist, ist gemäß § 25 Abs. 2 TTDSG keine Einwilligung erforderlich.')}
           </p>
           <p>
-            {t('Zusätzlich speichern wir deine gewählte Sprache in deinem Browser (localStorage), um sie bei deinem nächsten Besuch beizubehalten. Diese Daten verlassen dein Gerät nicht.')}
+            {t('Zusätzlich speichern wir deine gewählte Sprache und die Anzeigeeinstellungen der Meldeliste (z. B. Sortierung und laufende Nummer) in deinem Browser (localStorage), um sie bei deinem nächsten Besuch beizubehalten. Diese Daten verlassen dein Gerät nicht.')}
           </p>
           <p>{t('Wir setzen keine Analyse-, Marketing- oder Tracking-Cookies ein.')}</p>
           <p>
@@ -110,7 +110,7 @@ export function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, 
           </p>
 
           <h2>{t('11. Stand')}</h2>
-          <p>{t('Diese Datenschutzerklärung wurde zuletzt am 10. Oktober 2026 aktualisiert.')}</p>
+          <p>{t('Diese Datenschutzerklärung wurde zuletzt am 20. Oktober 2026 aktualisiert.')}</p>
         </div>
       </section>
     </main>

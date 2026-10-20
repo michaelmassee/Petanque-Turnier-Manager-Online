@@ -59,7 +59,7 @@ describe('Öffentliche Meldeliste', () => {
         '2026-09-01', '2026-09-01', '2026-09-01', 1, 'de')`).run();
 
     const { participants: [participant] } = await (await listPublicParticipants(db, 't1', null)).json();
-    expect(participant).toMatchObject({ accountConnected: true, partnerAccountConnected: false, partner2AccountConnected: false });
+    expect(participant).toMatchObject({ accountConnected: true, partnerAccountConnected: false, partner2AccountConnected: false, registeredAt: '2026-09-01' });
     expect(JSON.stringify(participant)).not.toContain('u1');
   });
 

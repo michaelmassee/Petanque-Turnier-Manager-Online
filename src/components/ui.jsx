@@ -17,6 +17,47 @@ export function DownloadIcon({ size = 18 }) {
   );
 }
 
+export function NumberIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M10 3 9.2 8H5v2h3.9l-.6 4H4v2h3.9L7 21h2l.8-5h4L13 21h2l.8-5H20v-2h-3.9l.6-4H21V8h-4l.8-5h-2L15 8h-4l.8-5h-1.8zm.6 7h4l-.6 4h-4l.6-4z" />
+    </svg>
+  );
+}
+
+export function StarIcon({ size = 18, crossed = false }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" opacity={crossed ? 0.4 : 1} />
+      {crossed && <path d="M3.4 2 22 20.6 20.6 22 2 3.4z" />}
+    </svg>
+  );
+}
+
+export function ClockIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z" />
+    </svg>
+  );
+}
+
+export function SearchIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16a6.47 6.47 0 0 0 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z" />
+    </svg>
+  );
+}
+
+export function SortAlphaIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M17 4h2v12h3l-4 4-4-4h3V4zM6.6 4h1.8L12 14h-2l-.8-2.3H5.8L5 14H3L6.6 4zm-.2 6h2.2L7.5 6.8 6.4 10zM3.5 16H11v1.6L6 22h5v2H3.3v-1.6L8.6 18H3.5v-2z" transform="translate(0 -2)" />
+    </svg>
+  );
+}
+
 export function RequiredMark() {
   return <span className="required-mark" aria-hidden="true"> *</span>;
 }

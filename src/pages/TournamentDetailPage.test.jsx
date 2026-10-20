@@ -323,3 +323,121 @@ describe('Öffentliche Meldeliste', () => {
     expect(screen.queryByRole('button', { name: 'Absagen' })).not.toBeInTheDocument();
   });
 });
+
+describe('Ansichtsschalter der öffentlichen Meldeliste', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  const LIST = {
+    participants: [
+      { firstName: 'Zoe', lastName: 'Zander', club: 'BC Nord', isVip: true, registeredAt: '2026-09-01T08:05:00.000Z' },
+      { firstName: 'Anna', lastName: 'Ahrens', club: 'BC Süd', partnerFirstName: 'Paul', partnerLastName: 'Partner', partnerClub: 'Café Boule', registeredAt: '2026-09-02T10:30:00.000Z' },
+      { firstName: 'Mia', lastName: 'Müller', club: 'BC Nord', registeredAt: '2026-09-03T12:00:00.000Z' },
+    ],
+    waitlist: [{ firstName: 'Wanda', lastName: 'Warte', registeredAt: '2026-09-04T09:00:00.000Z' }],
+    ownUnconfirmed: [],
+  };
+
+  function renderList(list = LIST) {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(list));
+    return renderDetail(tournamentWith({ timezone: 'Europe/Berlin' }), 'teilnehmer');
+  }
+
+  const names = () => Array.from(document.querySelectorAll('.participants-row strong')).map((node) => node.textContent.trim());
+  const numbers = () => Array.from(document.querySelectorAll('.participant-number')).map((node) => node.textContent);
+  const toolbarButton = (name) => screen.getByRole('button', { name });
+
+  it('zeigt die laufende Nummer der Meldereihenfolge erst nach dem Einschalten und behält sie beim Sortieren', async () => {
+    renderList();
+    await screen.findByText('Zoe Zander');
+    expect(numbers()).toEqual([]);
+    expect(toolbarButton('Lfd.-Nr.')).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(toolbarButton('Lfd.-Nr.'));
+    expect(numbers()).toEqual(['1', '2', '3', '1']);
+
+    fireEvent.click(toolbarButton('Nach Nachname sortieren'));
+    expect(names().filter((name) => name !== 'Paul Partner')).toEqual(['Anna Ahrens', 'Mia Müller', 'Zoe Zander', 'Wanda Warte']);
+    expect(numbers()).toEqual(['2', '3', '1', '1']);
+  });
+
+  it('schaltet den VIP-Filter reihum: alle, nur VIP, ohne VIP', async () => {
+    renderList();
+    await screen.findByText('Zoe Zander');
+
+    fireEvent.click(toolbarButton('VIP: alle'));
+    expect(names()).toEqual(['Zoe Zander']);
+    expect(screen.queryByRole('heading', { name: 'Warteliste' })).toBeNull();
+
+    fireEvent.click(toolbarButton('Nur VIP'));
+    expect(names()).not.toContain('Zoe Zander');
+    expect(names()).toContain('Wanda Warte');
+
+    fireEvent.click(toolbarButton('Ohne VIP'));
+    expect(names()).toHaveLength(5);
+    expect(toolbarButton('VIP: alle')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('blendet den VIP-Schalter aus, wenn niemand VIP ist', async () => {
+    renderList({ ...LIST, participants: LIST.participants.map((participant) => ({ ...participant, isVip: false })) });
+    await screen.findByText('Zoe Zander');
+    expect(screen.queryByRole('button', { name: 'VIP: alle' })).toBeNull();
+  });
+
+  it('zeigt Datum und Uhrzeit der Meldung erst nach dem Einschalten', async () => {
+    renderList();
+    await screen.findByText('Zoe Zander');
+    expect(document.querySelector('.participant-registered-at')).toBeNull();
+
+    fireEvent.click(toolbarButton('Meldezeit'));
+    const times = document.querySelectorAll('.participant-registered-at');
+    expect(times).toHaveLength(4);
+    expect(times[0]).toHaveTextContent(/Gemeldet am 01\.09\.2026, 10:05/);
+  });
+
+  it('filtert über das Suchfeld nach Partnern und Vereinen, ohne Groß-/Kleinschreibung und Akzente', async () => {
+    renderList();
+    await screen.findByText('Zoe Zander');
+    expect(screen.queryByRole('searchbox')).toBeNull();
+
+    fireEvent.click(toolbarButton('Filter'));
+    const search = screen.getByRole('searchbox', { name: 'Meldeliste durchsuchen' });
+    expect(search).toHaveFocus();
+
+    fireEvent.change(search, { target: { value: 'cafe' } });
+    expect(names()).toEqual(['Anna Ahrens', 'Paul Partner']);
+
+    fireEvent.change(search, { target: { value: 'gibt es nicht' } });
+    expect(screen.getByText('Keine Anmeldungen passen zum Filter.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Zusammenfassung')).toHaveTextContent('3 Bestätigt');
+
+    fireEvent.click(toolbarButton('Filter'));
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(names()).toHaveLength(5);
+  });
+
+  it('merkt sich die Einstellungen im Browser und übersteht einen gesperrten Speicher', async () => {
+    const first = renderList();
+    await screen.findByText('Zoe Zander');
+    fireEvent.click(toolbarButton('Lfd.-Nr.'));
+    fireEvent.click(toolbarButton('VIP: alle'));
+    first.unmount();
+    vi.restoreAllMocks();
+
+    const second = renderList();
+    await screen.findByText('Zoe Zander');
+    expect(numbers()).toEqual(['1']);
+    expect(toolbarButton('Nur VIP')).toHaveAttribute('aria-pressed', 'true');
+    second.unmount();
+    vi.restoreAllMocks();
+
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    renderList();
+    await screen.findByText('Zoe Zander');
+    fireEvent.click(toolbarButton('Lfd.-Nr.'));
+    expect(numbers()).toEqual(['1', '2', '3', '1']);
+  });
+});

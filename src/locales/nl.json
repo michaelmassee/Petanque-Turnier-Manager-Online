@@ -257,7 +257,7 @@
   "Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.": "De deelnemerslijst is voor dit toernooi niet openbaar.",
   "Die Turnier-Informationen müssen mindestens 2 Zeichen enthalten": "De toernooi-informatie moet minimaal 2 tekens bevatten",
   "Die Uhrzeiten gelten als Ortszeit am Turnierstandort und werden automatisch der passenden Zeitzone zugeordnet.": "De tijden gelden als lokale tijd op de toernooilocatie en worden automatisch aan de juiste tijdzone toegewezen.",
-  "Diese Datenschutzerklärung wurde zuletzt am 10. Oktober 2026 aktualisiert.": "Dit privacybeleid is voor het laatst bijgewerkt op 10 oktober 2026.",
+  "Diese Datenschutzerklärung wurde zuletzt am 20. Oktober 2026 aktualisiert.": "Deze privacyverklaring is voor het laatst bijgewerkt op 20 oktober 2026.",
   "Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.": "Deze deelnemerslijst is openbaar zichtbaar en kan zonder aanmelding worden bekeken. Wie hier niet vermeld wil worden, neemt contact op met de organisator van dit toernooi.",
   "Diese Website verwendet ein technisch notwendiges Session-Cookie (ptm_session), um dich nach der Anmeldung für bis zu 14 Tage eingeloggt zu halten. Das Cookie ist HttpOnly, Secure und SameSite=Lax gesetzt und wird ausschließlich für den Login-Status verwendet. Da dieses Cookie technisch notwendig ist, ist gemäß § 25 Abs. 2 TTDSG keine Einwilligung erforderlich.": "Deze website gebruikt een technisch noodzakelijk sessiecookie (ptm_session) om je na het inloggen tot 14 dagen ingelogd te houden. Het cookie is HttpOnly, Secure en SameSite=Lax ingesteld en wordt uitsluitend gebruikt voor de inlogstatus. Omdat dit cookie technisch noodzakelijk is, is conform § 25 lid 2 TTDSG (Duitse telecommunicatie- en telemediagegevensbeschermingswet) geen toestemming vereist.",
   "Diese Website wird über Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, USA) als Hosting- und Content-Delivery-Anbieter bereitgestellt. Cloudflare verarbeitet dabei technisch notwendige Daten wie IP-Adresse, Datum und Uhrzeit der Anfrage sowie Browser-Informationen (Server-Logfiles), um die Website sicher und zuverlässig auszuliefern (Art. 6 Abs. 1 lit. f DSGVO).": "Deze website wordt gehost via Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, VS) als hosting- en content-delivery-provider. Cloudflare verwerkt daarbij technisch noodzakelijke gegevens zoals IP-adres, datum en tijdstip van het verzoek en browserinformatie (serverlogbestanden), om de website veilig en betrouwbaar te leveren (art. 6 lid 1 sub f AVG).",
@@ -706,7 +706,7 @@
   "Zur Startseite": "Naar startpagina",
   "Zurück zur Anmeldung": "Terug naar aanmelden",
   "Zurücksetzen": "Resetten",
-  "Zusätzlich speichern wir deine gewählte Sprache in deinem Browser (localStorage), um sie bei deinem nächsten Besuch beizubehalten. Diese Daten verlassen dein Gerät nicht.": "Daarnaast slaan we je gekozen taal op in je browser (localStorage), zodat deze bij je volgende bezoek behouden blijft. Deze gegevens verlaten je apparaat niet.",
+  "Zusätzlich speichern wir deine gewählte Sprache und die Anzeigeeinstellungen der Meldeliste (z. B. Sortierung und laufende Nummer) in deinem Browser (localStorage), um sie bei deinem nächsten Besuch beizubehalten. Diese Daten verlassen dein Gerät nicht.": "Daarnaast slaan we je gekozen taal en de weergave-instellingen van de deelnemerslijst (bijv. sortering en volgnummer) op in je browser (localStorage), zodat ze bij je volgende bezoek behouden blijven. Deze gegevens verlaten je apparaat niet.",
   "Zustimmung zur Datenschutzerklärung ist erforderlich": "Toestemming voor het privacybeleid is vereist",
   "(ich selbst)": "(ikzelf)",
   "? Hilfe": "? Hulp",
@@ -1659,5 +1659,13 @@
   "Nachricht an Vermieter": "Bericht aan verhuurder",
   "Nachricht gesendet. Die Antwort des Vereins findest du in deiner Postbox.": "Bericht verzonden. Het antwoord van de club vind je in je postbus.",
   "Du verwaltest dieses Angebot selbst": "Je beheert dit aanbod zelf",
-  "Du hast dem Verein gerade schon mehrere Nachrichten geschickt. Bitte versuche es später erneut.": "Je hebt de club net al meerdere berichten gestuurd. Probeer het later opnieuw."
+  "Du hast dem Verein gerade schon mehrere Nachrichten geschickt. Bitte versuche es später erneut.": "Je hebt de club net al meerdere berichten gestuurd. Probeer het later opnieuw.",
+  "Lfd.-Nr.": "Nr.",
+  "VIP: alle": "VIP: alle",
+  "Meldezeit": "Inschrijftijd",
+  "Gemeldet am": "Ingeschreven op",
+  "Nach Nachname sortieren": "Sorteren op achternaam",
+  "Meldeliste durchsuchen": "Deelnemerslijst doorzoeken",
+  "Ansicht der Meldeliste": "Weergave deelnemerslijst",
+  "Keine Anmeldungen passen zum Filter.": "Geen inschrijvingen komen overeen met het filter."
 }

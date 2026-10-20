@@ -1985,6 +1985,86 @@ a.left-panel-link {
   min-width: 0;
 }
 
+/* Ansichtsschalter der öffentlichen Meldeliste (Lfd.-Nr., VIP, Meldezeit, Filter, Sortierung). */
+.participants-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.participants-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  min-width: 40px;
+  padding: 6px 12px;
+  border: 1px solid #c7d0df;
+  border-radius: 999px;
+  background: #fff;
+  color: #31415c;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.participants-toolbar-button:hover:not(:disabled) {
+  background: #f4f6fa;
+  color: #31415c;
+}
+
+.participants-toolbar-button[aria-pressed="true"] {
+  border-color: #1677ff;
+  background: #e8f1ff;
+  color: #0b4db3;
+}
+
+.participants-toolbar-button:focus-visible {
+  outline: 3px solid rgb(22 119 255 / 28%);
+  outline-offset: 2px;
+}
+
+.participants-toolbar-button svg {
+  flex: 0 0 auto;
+}
+
+.participants-search {
+  margin-top: 10px;
+}
+
+/* Lfd.-Nr. links in fester Spalte, analog zum VIP-Platz rechts; das Spielerraster bleibt unverändert. */
+.data-row.participants-row-numbered {
+  position: relative;
+  padding-left: 44px;
+}
+
+.participants-row > .participant-number {
+  position: absolute;
+  inset: 0 auto 0 8px;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #53627a;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .participants-toolbar-button {
+    padding: 6px 10px;
+  }
+
+  .participants-toolbar-button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
