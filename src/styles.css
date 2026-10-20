@@ -2823,9 +2823,17 @@ a.left-panel-link {
   border-radius: 12px;
 }
 
+/* In der Karte ist das Badge ein Flex-Container; der Grund gehört dort unter den Text, nicht daneben. */
+.tournament-card-meta .status:has(.status-reason) {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
 .status-reason {
   display: block;
-  font-size: 0.72em;
+  color: inherit;
+  font-size: 0.8em;
   font-weight: 600;
   opacity: 0.85;
 }
