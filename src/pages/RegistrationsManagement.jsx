@@ -576,12 +576,11 @@ export function RegistrationsPanel({
       )}
       {registrations.length > 0 && (
         <div className="registration-summary" aria-label={t('Zusammenfassung')}>
-          <span className="registration-summary-item">
-            <strong>{registrations.filter((registration) => registration.status === 'confirmed').length}</strong> {t('Angemeldet')}
-          </span>
-          <span className="registration-summary-item">
-            <strong>{registrations.filter((registration) => registration.status === 'waitlist').length}</strong> {labelFor(REGISTRATION_STATUSES, 'waitlist')}
-          </span>
+          {['pending', 'confirmed', 'waitlist'].map((status) => (
+            <span key={status} className={`status registration-${status} registration-summary-item`}>
+              <strong>{registrations.filter((registration) => registration.status === status).length}</strong> {labelFor(REGISTRATION_STATUSES, status)}
+            </span>
+          ))}
           <span className="registration-summary-item registration-summary-total">
             <strong>{registrations.length}</strong> {t('Gesamt')}
           </span>

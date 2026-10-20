@@ -2656,6 +2656,7 @@ a.left-panel-link {
 .registration-summary {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px 20px;
   margin-top: 20px;
   padding-top: 16px;
@@ -2670,6 +2671,11 @@ a.left-panel-link {
 .registration-summary-item strong {
   color: #1c2534;
   margin-right: 4px;
+}
+
+.registration-summary-item.status,
+.registration-summary-item.status strong {
+  color: inherit;
 }
 
 .registration-summary-total {
