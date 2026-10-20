@@ -104,6 +104,36 @@ describe('Platz mieten', () => {
     expect(week.days[0].slots.length).toBeGreaterThan(0);
   });
 
+  it('schickt eine Nachricht an den Vermieter in die Postbox und per E-Mail', async () => {
+    const send = vi.fn(async () => {});
+    env.MAIL_QUEUE = { send };
+    const offer = await createOffer();
+    const message = (body, headers = MIETER) => call('POST', `/api/rentals/${offer.id}/messages`, { body: { body }, headers });
+    expect((await message('Hallo')).status).toBe(201);
+    const stored = env.DB.sqlite.prepare("SELECT sender_id, recipient_id, kind, body FROM postbox_messages WHERE kind = 'direct'").all();
+    expect(stored).toEqual([{ sender_id: 'u2', recipient_id: 'u1', kind: 'direct', body: '„Boulehalle“\n\nHallo' }]);
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({
+      to: 'verein@example.test', subject: 'Nachricht zu „Boulehalle“', messageBox: 'Hallo',
+      text: expect.stringContaining('Max Mieter hat dir über PTM Online eine Nachricht'),
+    }));
+    // Ohne Anmeldung, an sich selbst, leer oder bei nicht öffentlichem Angebot nicht möglich.
+    expect((await call('POST', `/api/rentals/${offer.id}/messages`, { body: { body: 'Hallo' } })).status).toBe(401);
+    expect((await message('Hallo', VEREIN)).status).toBe(409);
+    expect((await message('  ')).status).toBe(400);
+    sql("UPDATE rental_offers SET status = 'inactive' WHERE id = ?", offer.id);
+    expect((await message('Hallo')).status).toBe(404);
+  });
+
+  it('begrenzt Nachrichten an den Vermieter je Stunde', async () => {
+    env.MAIL_QUEUE = { send: vi.fn(async () => {}) };
+    const offer = await createOffer();
+    for (let index = 0; index < 5; index += 1) {
+      expect((await call('POST', `/api/rentals/${offer.id}/messages`, { body: { body: `Nachricht ${index}` }, headers: MIETER })).status).toBe(201);
+    }
+    expect((await call('POST', `/api/rentals/${offer.id}/messages`, { body: { body: 'zu viel' }, headers: MIETER })).status).toBe(429);
+    expect(env.MAIL_QUEUE.send).toHaveBeenCalledTimes(5);
+  });
+
   it('nimmt Anfragen bis zur Bahnanzahl an und benachrichtigt den Verein', async () => {
     const offer = await createOffer();
     expect((await reserve(offer.id, {}, {})).status).toBe(401);

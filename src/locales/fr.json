@@ -1655,5 +1655,9 @@
   "Nächster Monat": "Mois suivant",
   "nicht buchbar": "non réservable",
   "geschlossen": "fermé",
-  "Ungültiger Monat": "Mois invalide"
+  "Ungültiger Monat": "Mois invalide",
+  "Nachricht an Vermieter": "Message au loueur",
+  "Nachricht gesendet. Die Antwort des Vereins findest du in deiner Postbox.": "Message envoyé. Vous trouverez la réponse du club dans votre boîte de réception.",
+  "Du verwaltest dieses Angebot selbst": "Vous gérez vous-même cette offre",
+  "Du hast dem Verein gerade schon mehrere Nachrichten geschickt. Bitte versuche es später erneut.": "Vous venez d’envoyer plusieurs messages au club. Veuillez réessayer plus tard."
 }

@@ -1655,5 +1655,9 @@
   "Nächster Monat": "Mes siguiente",
   "nicht buchbar": "no reservable",
   "geschlossen": "cerrado",
-  "Ungültiger Monat": "Mes no válido"
+  "Ungültiger Monat": "Mes no válido",
+  "Nachricht an Vermieter": "Mensaje al arrendador",
+  "Nachricht gesendet. Die Antwort des Vereins findest du in deiner Postbox.": "Mensaje enviado. Encontrarás la respuesta del club en tu buzón.",
+  "Du verwaltest dieses Angebot selbst": "Tú mismo gestionas esta oferta",
+  "Du hast dem Verein gerade schon mehrere Nachrichten geschickt. Bitte versuche es später erneut.": "Acabas de enviar varios mensajes al club. Inténtalo de nuevo más tarde."
 }

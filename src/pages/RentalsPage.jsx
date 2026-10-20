@@ -47,6 +47,49 @@ function OfferSummary({ offer, navigate }) {
   </>;
 }
 
+// „Nachricht an Vermieter“ (nur angemeldet): landet in der Postbox der Vereinsverwalter und als E-Mail beim Verein.
+function RentalContactDialog({ offer, onClose }) {
+  const { t } = useTranslation();
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const [sent, setSent] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    setError('');
+    setSending(true);
+    try {
+      await authenticatedApi(`/api/rentals/${encodeURIComponent(offer.id)}/messages`, { method: 'POST', body: JSON.stringify({ body }) });
+      setSent(true);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <EditDialog open title={`${t('Nachricht an')} ${offer.clubName || ''}`} error={error} onClose={onClose}>
+      {sent ? (
+        <>
+          <Feedback message={t('Nachricht gesendet. Die Antwort des Vereins findest du in deiner Postbox.')} />
+          <div className="dialog-actions"><Button onClick={onClose}>{t('Schließen')}</Button></div>
+        </>
+      ) : (
+        <form className="form" onSubmit={submit}>
+          <p className="hint" data-i18n-skip>{offer.title}</p>
+          <TextArea label={t('Nachricht')} value={body} onChange={setBody} maxLength={500} rows={5} />
+          <div className="dialog-actions">
+            <Button variant="secondary" onClick={onClose}>{t('Abbrechen')}</Button>
+            <Button type="submit" disabled={!body.trim()} loading={sending}>{t('Senden')}</Button>
+          </div>
+        </form>
+      )}
+    </EditDialog>
+  );
+}
+
 function ShareRentalOfferButton({ offer }) {
   return <ShareLinkButton title={offer.title} url={new URL(`/platz-mieten/${encodeURIComponent(offer.id)}`, window.location.origin).href} />;
 }
@@ -143,6 +186,7 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [contactOpen, setContactOpen] = useState(false);
 
   useEffect(() => {
     api(`/api/rentals/${encodeURIComponent(id)}`).then((data) => setOffer(data.offer)).catch((requestError) => setLoadError(requestError.message));
@@ -212,9 +256,11 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
         <h2 data-i18n-skip>{offer.title}</h2>
         <div className="row-actions">
           {offer.isPublic && <ShareRentalOfferButton offer={offer} />}
+          {currentUser && offer.isPublic && !offer.canManage && <Button variant="secondary" onClick={() => setContactOpen(true)}>{t('Nachricht an Vermieter')}</Button>}
           {offer.canManage && <Button variant="secondary" onClick={() => navigate('/platz-mieten/verwalten')}>{t('Vermietung verwalten')}</Button>}
         </div>
       </div>
+      {contactOpen && <RentalContactDialog offer={offer} onClose={() => setContactOpen(false)} />}
       <div className="rental-offer-meta"><OfferSummary offer={offer} navigate={navigate} /></div>
       <p><OfferPrice offer={offer} language={language} /></p>
       {offer.description && <RichText value={offer.description} onNavigate={navigate} />}

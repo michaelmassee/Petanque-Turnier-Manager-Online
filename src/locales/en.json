@@ -1655,5 +1655,9 @@
   "Nächster Monat": "Next month",
   "nicht buchbar": "not bookable",
   "geschlossen": "closed",
-  "Ungültiger Monat": "Invalid month"
+  "Ungültiger Monat": "Invalid month",
+  "Nachricht an Vermieter": "Message the landlord",
+  "Nachricht gesendet. Die Antwort des Vereins findest du in deiner Postbox.": "Message sent. You will find the club's reply in your postbox.",
+  "Du verwaltest dieses Angebot selbst": "You manage this offer yourself",
+  "Du hast dem Verein gerade schon mehrere Nachrichten geschickt. Bitte versuche es später erneut.": "You have just sent the club several messages. Please try again later."
 }

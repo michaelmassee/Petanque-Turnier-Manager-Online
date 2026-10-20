@@ -1655,5 +1655,9 @@
   "Nächster Monat": "Volgende maand",
   "nicht buchbar": "niet boekbaar",
   "geschlossen": "gesloten",
-  "Ungültiger Monat": "Ongeldige maand"
+  "Ungültiger Monat": "Ongeldige maand",
+  "Nachricht an Vermieter": "Bericht aan verhuurder",
+  "Nachricht gesendet. Die Antwort des Vereins findest du in deiner Postbox.": "Bericht verzonden. Het antwoord van de club vind je in je postbus.",
+  "Du verwaltest dieses Angebot selbst": "Je beheert dit aanbod zelf",
+  "Du hast dem Verein gerade schon mehrere Nachrichten geschickt. Bitte versuche es später erneut.": "Je hebt de club net al meerdere berichten gestuurd. Probeer het later opnieuw."
 }

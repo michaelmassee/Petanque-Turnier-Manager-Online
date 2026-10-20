@@ -592,6 +592,8 @@ const TOURNAMENT_RANKING_EMAILS = {
 // Platz mieten: Anfrage/Storno an den Verein, Entscheidung an den Mieter. Notizen gehen als messageBox mit.
 export const RENTAL_EMAILS = {
   de: {
+    messageSubject: (title) => `Nachricht zu „${title}“`,
+    message: ({ title, who }) => `Hallo,\n\n${who} hat dir über PTM Online eine Nachricht zu deinem Mietangebot „${title}“ geschickt. Antworten kannst du in der Postbox auf ptmonline.org.`,
     requestedSubject: (title) => `Reservierungsanfrage: ${title}`,
     requested: ({ title, who, slot, lanes }) => `Hallo,\n\n${who} möchte „${title}“ reservieren: ${slot}, ${lanes} Bahn(en). Bitte bestätige oder lehne die Anfrage ab.`,
     cancelledSubject: (title) => `Reservierung storniert: ${title}`,
@@ -600,6 +602,8 @@ export const RENTAL_EMAILS = {
     decided: ({ firstName, title, slot, lanes, status, club }) => `Hallo ${firstName},\n\n${({ confirmed: `${club} hat deine Reservierung für „${title}“ bestätigt`, rejected: `${club} hat deine Reservierungsanfrage für „${title}“ abgelehnt`, cancelled: `${club} hat deine Reservierung für „${title}“ storniert` })[status]}: ${slot}, ${lanes} Bahn(en).`,
   },
   nl: {
+    messageSubject: (title) => `Bericht over „${title}”`,
+    message: ({ title, who }) => `Hallo,\n\n${who} heeft je via PTM Online een bericht gestuurd over je verhuuraanbod „${title}”. Je kunt antwoorden in de postbus op ptmonline.org.`,
     requestedSubject: (title) => `Reserveringsaanvraag: ${title}`,
     requested: ({ title, who, slot, lanes }) => `Hallo,\n\n${who} wil „${title}” reserveren: ${slot}, ${lanes} baan/banen. Bevestig of weiger de aanvraag.`,
     cancelledSubject: (title) => `Reservering geannuleerd: ${title}`,
@@ -608,6 +612,8 @@ export const RENTAL_EMAILS = {
     decided: ({ firstName, title, slot, lanes, status, club }) => `Hallo ${firstName},\n\n${({ confirmed: `${club} heeft je reservering voor „${title}” bevestigd`, rejected: `${club} heeft je reserveringsaanvraag voor „${title}” afgewezen`, cancelled: `${club} heeft je reservering voor „${title}” geannuleerd` })[status]}: ${slot}, ${lanes} baan/banen.`,
   },
   en: {
+    messageSubject: (title) => `Message about "${title}"`,
+    message: ({ title, who }) => `Hello,\n\n${who} sent you a message via PTM Online about your rental offer "${title}". You can reply in the postbox on ptmonline.org.`,
     requestedSubject: (title) => `Reservation request: ${title}`,
     requested: ({ title, who, slot, lanes }) => `Hello,\n\n${who} would like to reserve "${title}": ${slot}, ${lanes} lane(s). Please confirm or decline the request.`,
     cancelledSubject: (title) => `Reservation cancelled: ${title}`,
@@ -616,6 +622,8 @@ export const RENTAL_EMAILS = {
     decided: ({ firstName, title, slot, lanes, status, club }) => `Hi ${firstName},\n\n${({ confirmed: `${club} confirmed your reservation for "${title}"`, rejected: `${club} declined your reservation request for "${title}"`, cancelled: `${club} cancelled your reservation for "${title}"` })[status]}: ${slot}, ${lanes} lane(s).`,
   },
   es: {
+    messageSubject: (title) => `Mensaje sobre «${title}»`,
+    message: ({ title, who }) => `Hola:\n\n${who} te ha enviado un mensaje a través de PTM Online sobre tu oferta de alquiler «${title}». Puedes responder en el buzón de ptmonline.org.`,
     requestedSubject: (title) => `Solicitud de reserva: ${title}`,
     requested: ({ title, who, slot, lanes }) => `Hola:\n\n${who} quiere reservar «${title}»: ${slot}, ${lanes} pista(s). Confirma o rechaza la solicitud.`,
     cancelledSubject: (title) => `Reserva cancelada: ${title}`,
@@ -624,6 +632,8 @@ export const RENTAL_EMAILS = {
     decided: ({ firstName, title, slot, lanes, status, club }) => `Hola ${firstName}:\n\n${({ confirmed: `${club} confirmó tu reserva de «${title}»`, rejected: `${club} rechazó tu solicitud de reserva de «${title}»`, cancelled: `${club} canceló tu reserva de «${title}»` })[status]}: ${slot}, ${lanes} pista(s).`,
   },
   fr: {
+    messageSubject: (title) => `Message concernant « ${title} »`,
+    message: ({ title, who }) => `Bonjour,\n\n${who} vous a envoyé un message via PTM Online au sujet de votre offre de location « ${title} ». Vous pouvez répondre dans la boîte de réception sur ptmonline.org.`,
     requestedSubject: (title) => `Demande de réservation : ${title}`,
     requested: ({ title, who, slot, lanes }) => `Bonjour,\n\n${who} souhaite réserver « ${title} » : ${slot}, ${lanes} piste(s). Merci de confirmer ou de refuser la demande.`,
     cancelledSubject: (title) => `Réservation annulée : ${title}`,
@@ -2096,6 +2106,11 @@ export default {
       if (rentalAvailabilityMatch && request.method === 'GET') {
         const session = await optionalSession(request, env.DB);
         return await getRentalAvailability(env.DB, rentalAvailabilityMatch[1], url.searchParams.get('from'), session?.user || null, url.searchParams.get('month'));
+      }
+      const rentalMessageMatch = url.pathname.match(/^\/api\/rentals\/([^/]+)\/messages$/);
+      if (rentalMessageMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        return await sendRentalMessage(request, env, rentalMessageMatch[1], session.user, url.origin);
       }
       const rentalReserveMatch = url.pathname.match(/^\/api\/rentals\/([^/]+)\/reservations$/);
       if (rentalReserveMatch && request.method === 'POST') {
@@ -9839,6 +9854,56 @@ function rentalCapacityGuard(offer, reservation, excludedId = '') {
     )`,
     params: [offer.id, reservation.date, reservation.lanes, excludedId, offer.boule_place_id, offer.timezone, ...hours],
   };
+}
+
+// Je Absender höchstens so viele Nachrichten pro Stunde an einen Verein: jede löst auch eine E-Mail aus.
+const RENTAL_MESSAGES_PER_HOUR = 5;
+
+// „Nachricht an Vermieter“: direkte Postbox-Nachricht an alle Verwalter des Vereins (dort beantwortbar) plus eine
+// E-Mail an die Kontaktadresse des Vereins bzw. den Inhaber. Nur Klartext, damit der Angebotsbezug davorstehen kann.
+async function sendRentalMessage(request, env, offerId, sender, origin) {
+  const row = await loadRentalOffer(env.DB, offerId);
+  if (!rentalOfferIsPublic(row)) throw new HttpError(404, 'Angebot nicht gefunden');
+  const text = richTextPlainText(postboxMessageBody((await readJson(request)).body)).trim();
+  // Nach ID sortiert, damit die Begrenzung immer am selben Verwalter gezählt wird.
+  const managers = (await rentalClubManagers(env.DB, row.club_id)).filter((manager) => manager.id !== sender.id)
+    .sort((left, right) => left.id.localeCompare(right.id));
+  if (!managers.length) throw new HttpError(409, 'Du verwaltest dieses Angebot selbst');
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const recent = await env.DB.prepare('SELECT COUNT(*) AS count FROM postbox_messages WHERE sender_id = ? AND recipient_id = ? AND created_at > ?')
+    .bind(sender.id, managers[0].id, since).first('count');
+  if (Number(recent) >= RENTAL_MESSAGES_PER_HOUR) throw new HttpError(429, 'Du hast dem Verein gerade schon mehrere Nachrichten geschickt. Bitte versuche es später erneut.');
+
+  const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || (sender.username ? `@${sender.username}` : '');
+  const body = `„${row.title}“\n\n${text}`;
+  for (const manager of managers) {
+    await createPostboxMessage(env, { senderId: sender.id, recipientId: manager.id, kind: 'direct', body, pushTitle: 'Neue Nachricht', pushActor: senderName });
+  }
+
+  const club = await env.DB.prepare('SELECT owner_id, contact_email FROM clubs WHERE id = ?').bind(row.club_id).first();
+  const owner = managers.find((manager) => manager.id === club?.owner_id);
+  const to = club?.contact_email || owner?.email;
+  if (to) {
+    const language = owner?.language || 'de';
+    const templates = RENTAL_EMAILS[language] || RENTAL_EMAILS.de;
+    try {
+      await deliverRentalEmail(env, {
+        to,
+        subject: templates.messageSubject(row.title),
+        text: templates.message({ title: row.title, who: senderName }),
+        messageBox: text,
+        actions: [emailAction('rentalOffer', `${origin}/platz-mieten/${encodeURIComponent(row.id)}`, language)],
+        plainTextActions: true,
+        language,
+        logFallback: `Rental message email for ${to} (offer ${row.id})`,
+        failureContext: `rental message ${row.id}`,
+        allowLogFallback: true,
+      });
+    } catch (error) {
+      console.error('Rental message email failed', error);
+    }
+  }
+  return json({ ok: true }, 201);
 }
 
 async function createRentalReservation(request, env, offerId, user, origin) {

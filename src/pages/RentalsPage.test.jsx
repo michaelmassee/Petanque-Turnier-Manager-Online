@@ -198,6 +198,30 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(screen.queryByRole('link', { name: 'Halle Nord' })).not.toBeInTheDocument();
   });
 
+  it('schickt angemeldet eine Nachricht an den Vermieter', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, isPublic: true } }));
+    authenticatedApi.mockResolvedValue({ ok: true });
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Nachricht an Vermieter' }));
+    const dialog = screen.getByRole('dialog');
+    const send = within(dialog).getByRole('button', { name: 'Senden' });
+    expect(send).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'Habt ihr Flutlicht?' } });
+    fireEvent.click(send);
+    expect(await screen.findByText(/Nachricht gesendet/)).toBeInTheDocument();
+    expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/o1/messages', { method: 'POST', body: JSON.stringify({ body: 'Habt ihr Flutlicht?' }) });
+  });
+
+  it.each([
+    ['Gäste', null, {}],
+    ['Vereinsverwalter', { id: 'u1' }, { canManage: true }],
+  ])('bietet %s keine Nachricht an den Vermieter an', async (_label, currentUser, patch) => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, isPublic: true, ...patch } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={currentUser} navigate={vi.fn()} onLogin={vi.fn()} />);
+    expect(await screen.findByText('Boulehalle')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nachricht an Vermieter' })).not.toBeInTheDocument();
+  });
+
   it('bittet Gäste ums Anmelden statt das Formular zu zeigen', async () => {
     mockOffer();
     const onLogin = vi.fn();
