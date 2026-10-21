@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import worker from './worker.js';
+import worker, { tournamentIcsFileNameHeader } from './worker.js';
 
 describe('Kalendereintrag zum Turnier (calendar.ics)', () => {
   let env;
@@ -22,14 +22,20 @@ describe('Kalendereintrag zum Turnier (calendar.ics)', () => {
 
     expect(antwort.status).toBe(200);
     expect(antwort.headers.get('Content-Type')).toBe('text/calendar; charset=utf-8');
-    expect(antwort.headers.get('Content-Disposition')).toBe('inline; filename="turnier.ics"');
+    expect(antwort.headers.get('Content-Disposition'))
+      .toBe(`inline; filename="Herbstturnier 2099-11-14.ics"; filename*=UTF-8''Herbstturnier%202099-11-14.ics`);
     expect(text).toContain('SUMMARY:Herbstturnier');
     expect(text).toContain('DTSTART;TZID=Europe/Lisbon:20991114T100000');
     expect(text).toContain('DTEND;TZID=Europe/Lisbon:20991114T140000');
   });
 
   it('bietet die Datei mit download=1 als Download an', async () => {
-    expect((await abrufen('?download=1')).headers.get('Content-Disposition')).toBe('attachment; filename="turnier.ics"');
+    expect((await abrufen('?download=1')).headers.get('Content-Disposition')).toMatch(/^attachment; filename="Herbstturnier 2099-11-14\.ics"/);
+  });
+
+  it('benennt die Datei nach dem Turnier, mit Umlauten und ASCII-Ersatz', () => {
+    expect(tournamentIcsFileNameHeader({ name: 'Maultaschen/Turnier: Größe "Ü"', date: '2099-11-01' }))
+      .toBe(`filename="Maultaschen Turnier Groesse Ue 2099-11-01.ics"; filename*=UTF-8''${encodeURIComponent('Maultaschen Turnier Größe Ü 2099-11-01.ics')}`);
   });
 
   it('gibt private Turniere ohne Freigabe nicht heraus', async () => {

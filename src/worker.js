@@ -1090,6 +1090,17 @@ function buildTournamentIcs(tournament, appOrigin) {
   return lines.join('\r\n');
 }
 
+// Dateiname des Kalendereintrags: Turniername und Datum, z. B. "Herbstturnier 2026-11-14.ics". filename* trägt den
+// Namen mit Umlauten (RFC 6266), filename ist der ASCII-Ersatz für ältere Clients.
+export function tournamentIcsFileNameHeader(tournament) {
+  const name = String(tournament.name || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const fileName = `${name || 'Turnier'} ${tournament.date}.ics`;
+  const umlauts = { ä: 'ae', ö: 'oe', ü: 'ue', Ä: 'Ae', Ö: 'Oe', Ü: 'Ue', ß: 'ss' };
+  const asciiName = fileName.replace(/[äöüÄÖÜß]/g, (char) => umlauts[char]).normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9 ._-]/g, '_');
+  return `filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+}
+
 function base64Encode(text) {
   const bytes = new TextEncoder().encode(text);
   let binary = '';
@@ -2549,7 +2560,7 @@ export default {
         return new Response(buildTournamentIcs(tournament, url.origin), {
           headers: {
             'Content-Type': 'text/calendar; charset=utf-8',
-            'Content-Disposition': `${disposition}; filename="turnier.ics"`,
+            'Content-Disposition': `${disposition}; ${tournamentIcsFileNameHeader(tournament)}`,
             'Cache-Control': 'no-store',
           },
         });

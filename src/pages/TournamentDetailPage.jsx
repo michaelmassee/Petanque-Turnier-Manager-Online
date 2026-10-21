@@ -59,7 +59,7 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
           <a
             className="icon-bar-button"
             href={calendarLink.href}
-            {...(calendarLink.download ? { download: 'turnier.ics' } : {})}
+            {...(calendarLink.download ? { download: '' } : {})}
             {...(calendarLink.external ? { target: '_blank', rel: 'noreferrer' } : {})}
             title={t('Kalendereintrag erstellen')}
             aria-label={t('Kalendereintrag erstellen')}
