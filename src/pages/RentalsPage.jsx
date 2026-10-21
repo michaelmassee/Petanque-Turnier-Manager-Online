@@ -246,7 +246,11 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
         <div className="row-actions">
           {offer.isPublic && <ShareRentalOfferButton offer={offer} />}
           {offer.isPublic && !offer.canManage && <RentalContactLink offer={offer} />}
-          {offer.canManage && <Button variant="secondary" onClick={() => navigate('/platz-mieten/verwalten')}>{t('Vermietung verwalten')}</Button>}
+          {offer.canManage && (
+            <Button variant="secondary" onClick={() => navigate(`/platz-mieten/verwalten?verein=${encodeURIComponent(offer.clubId)}&angebot=${encodeURIComponent(offer.id)}`)}>
+              {t('Angebot bearbeiten')}
+            </Button>
+          )}
         </div>
       </div>
       <div className="rental-offer-meta"><OfferSummary offer={offer} navigate={navigate} /></div>
@@ -494,7 +498,12 @@ const DECISION_LABELS = { confirm: 'Bestätigen', reject: 'Ablehnen', cancel: 'S
 export function RentalManagement({ language, navigate, currentUser }) {
   const { t } = useTranslation();
   const [clubs, setClubs] = useState(null);
-  const [clubId, setClubId] = useState('');
+  // „Angebot bearbeiten“ auf der Angebotsseite: Verein vorwählen und das Angebot direkt im Dialog öffnen.
+  const [pendingEdit, setPendingEdit] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('angebot') ? { offerId: params.get('angebot'), clubId: params.get('verein') || '' } : null;
+  });
+  const [clubId, setClubId] = useState(pendingEdit?.clubId || '');
   const [hasUnpublishedClub, setHasUnpublishedClub] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -540,6 +549,14 @@ export function RentalManagement({ language, navigate, currentUser }) {
     setData(await authenticatedApi(`/api/rentals/manage?club=${encodeURIComponent(id)}`));
   }
   useEffect(() => { setData(null); load(clubId).catch((requestError) => setError(requestError.message)); }, [clubId]);
+
+  useEffect(() => {
+    if (!pendingEdit || !data) return;
+    setPendingEdit(null);
+    window.history.replaceState(window.history.state, '', window.location.pathname);
+    const offer = data.offers.find((entry) => entry.id === pendingEdit.offerId);
+    if (offer) openOffer(offer);
+  }, [data]);
 
   function openOffer(offer = null) {
     setDialogError('');

@@ -174,6 +174,14 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(within(form).getByRole('heading')).toHaveTextContent(/· Kompletter Platz$/);
   });
 
+  it('führt Vereinsverwalter von der Angebotsseite direkt zum Bearbeiten dieses Angebots', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, canManage: true } }));
+    const navigate = vi.fn();
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u1' }} navigate={navigate} onLogin={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Angebot bearbeiten' }));
+    expect(navigate).toHaveBeenCalledWith('/platz-mieten/verwalten?verein=c1&angebot=o1');
+  });
+
   it('nennt Spielort und Verein nur einmal, wenn sie gleich heißen, ohne Spielort-Präfix', async () => {
     api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, placeName: 'BC Test' } }));
     render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
@@ -393,6 +401,18 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     });
     render(<RentalManagement language="de" navigate={vi.fn()} />);
     expect(await screen.findByText(/Max Mieter · Komplette Halle/)).toBeInTheDocument();
+  });
+
+  it('öffnet ein über die Adresse übergebenes Angebot direkt im Bearbeiten-Dialog', async () => {
+    window.history.pushState({}, '', '/platz-mieten/verwalten?verein=c1&angebot=o1');
+    mockManagement();
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Angebot bearbeiten' })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/Titel/)).toHaveValue('Boulehalle');
+    expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/manage?club=c1');
+    expect(window.location.search).toBe('');
   });
 
   it('sperrt Angebote, wenn der Verein keinen Spielort hat', async () => {
