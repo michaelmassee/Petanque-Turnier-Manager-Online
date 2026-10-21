@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import worker, { tournamentIcsFileNameHeader } from './worker.js';
+import worker, { tournamentIcsFileNameHeader, tournamentIcsFileNames } from './worker.js';
 
 describe('Kalendereintrag zum Turnier (calendar.ics)', () => {
   let env;
@@ -31,6 +31,14 @@ describe('Kalendereintrag zum Turnier (calendar.ics)', () => {
 
   it('bietet die Datei mit download=1 als Download an', async () => {
     expect((await abrufen('?download=1')).headers.get('Content-Disposition')).toMatch(/^attachment; filename="Herbstturnier 2099-11-14\.ics"/);
+  });
+
+  it.each([
+    ['Tournoi d’été à Nîmes', 'Tournoi d_ete a Nimes 2099-11-01.ics'],
+    ['Турнир Москва', '2099-11-01.ics'],
+    ['Τουρνουά', '2099-11-01.ics'],
+  ])('benennt %s international korrekt', (name, ascii) => {
+    expect(tournamentIcsFileNames({ name, date: '2099-11-01' })).toEqual({ fileName: `${name} 2099-11-01.ics`, asciiFileName: ascii });
   });
 
   it('benennt die Datei nach dem Turnier, mit Umlauten und ASCII-Ersatz', () => {

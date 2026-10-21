@@ -1090,15 +1090,23 @@ function buildTournamentIcs(tournament, appOrigin) {
   return lines.join('\r\n');
 }
 
-// Dateiname des Kalendereintrags: Turniername und Datum, z. B. "Herbstturnier 2026-11-14.ics". filename* trägt den
-// Namen mit Umlauten (RFC 6266), filename ist der ASCII-Ersatz für ältere Clients.
-export function tournamentIcsFileNameHeader(tournament) {
+// Dateiname des Kalendereintrags: Turniername und Datum, z. B. "Herbstturnier 2026-11-14.ics". Der Name bleibt in
+// jeder Schrift erhalten (filename*, UTF-8 nach RFC 6266); der ASCII-Ersatz für ältere Clients und Mail-Anhänge
+// schreibt Umlaute aus, entfernt Akzente und fällt bei nicht-lateinischen Namen auf das Datum allein zurück.
+export function tournamentIcsFileNames(tournament) {
   const name = String(tournament.name || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
-  const fileName = `${name || 'Turnier'} ${tournament.date}.ics`;
   const umlauts = { ä: 'ae', ö: 'oe', ü: 'ue', Ä: 'Ae', Ö: 'Oe', Ü: 'Ue', ß: 'ss' };
-  const asciiName = fileName.replace(/[äöüÄÖÜß]/g, (char) => umlauts[char]).normalize('NFKD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^A-Za-z0-9 ._-]/g, '_');
-  return `filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+  const asciiTitle = name.replace(/[äöüÄÖÜß]/g, (char) => umlauts[char]).normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9 ._-]+/g, '_').replace(/^[\s_.-]+|[\s_.-]+$/g, '');
+  return {
+    fileName: name ? `${name} ${tournament.date}.ics` : `${tournament.date}.ics`,
+    asciiFileName: /[A-Za-z0-9]/.test(asciiTitle) ? `${asciiTitle} ${tournament.date}.ics` : `${tournament.date}.ics`,
+  };
+}
+
+export function tournamentIcsFileNameHeader(tournament) {
+  const { fileName, asciiFileName } = tournamentIcsFileNames(tournament);
+  return `filename="${asciiFileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
 
 function base64Encode(text) {
@@ -1182,7 +1190,7 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
       text: maybePromotedIntro(templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock, liveLink), language, promoted) + directionsBlock + whatsappBlock,
       actions: tournamentEmailActions(tournament, appOrigin, language, [emailAction('cancel', cancelLink, language), emailAction('live', liveLink, language), whatsappEmailAction(whatsappBlock, language)]),
       language,
-      attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
+      attachments: [{ filename: tournamentIcsFileNames(tournament).asciiFileName, content: base64Encode(ics) }],
       logFallback: `Registration confirmation email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `registration confirmation for registration ${registration.id}`,
       allowLogFallback: true,
@@ -1570,7 +1578,7 @@ async function sendTournamentReminders(env) {
               text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink) + directionsBlock + whatsappBlock,
               actions: tournamentEmailActions(tournament, APP_ORIGIN, language, [emailAction('cancel', cancelLink, language), whatsappEmailAction(whatsappBlock, language)]),
               language,
-              attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
+              attachments: [{ filename: tournamentIcsFileNames(tournament).asciiFileName, content: base64Encode(ics) }],
               logFallback: `Tournament reminder email for registration ${registration.id} (tournament ${tournament.id})`,
               failureContext: `tournament reminder for registration ${registration.id}`,
               allowLogFallback: true,
