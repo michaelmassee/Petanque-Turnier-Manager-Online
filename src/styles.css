@@ -4725,13 +4725,13 @@ details[open] > .play-round-summary::before {
   transition: transform 120ms ease, filter 120ms ease;
 }
 /* Dezente 135°-Verläufe wie bei Turnierkarte/Startseite; Schrift hat an beiden Verlaufsenden WCAG-AA-Kontrast. */
-.rental-slot.free { background: linear-gradient(135deg, #168741, #15803d); border-color: #116932; color: #ffffff; }
-.rental-slot.partial { background: linear-gradient(135deg, #fbbf24, #f59e0b); border-color: #d48806; color: #3a2600; }
-.rental-slot.full { background: linear-gradient(135deg, #d32f2f, #c62828); border-color: #a31f1f; color: #ffffff; }
+.rental-slot.free { background: linear-gradient(135deg, #168741, #0b5a29); border-color: #116932; color: #ffffff; }
+.rental-slot.partial { background: linear-gradient(135deg, #fcd34d, #f08c00); border-color: #d48806; color: #3a2600; }
+.rental-slot.full { background: linear-gradient(135deg, #d32f2f, #991b1b); border-color: #a31f1f; color: #ffffff; }
 .rental-slot.past { background: linear-gradient(135deg, #f4f6fa, #eceff4); border-color: #e2e7f0; color: #6b7487; box-shadow: none; }
 .rental-slot.closed { background: repeating-linear-gradient(45deg, #f6f7fa, #f6f7fa 4px, #eceff4 4px, #eceff4 8px); box-shadow: none; }
 .rental-slot.selected {
-  background: linear-gradient(135deg, #1468e8, #0a5fd1); border-color: #0a4fb0; color: #ffffff; font-weight: 700;
+  background: linear-gradient(135deg, #1468e8, #0846a3); border-color: #0a4fb0; color: #ffffff; font-weight: 700;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 20%), 0 0 0 2px rgb(22 119 255 / 25%);
 }
 button.rental-slot:disabled { opacity: 1; }
@@ -4762,7 +4762,7 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
     background: #ffffff; color: #172033; font-size: 0.75rem; text-transform: capitalize;
   }
   .rental-day-tab.closed { color: #9aa3b2; }
-  .rental-day-tab.active { background: linear-gradient(135deg, #1468e8, #0a5fd1); border-color: #0a4fb0; color: #ffffff; }
+  .rental-day-tab.active { background: linear-gradient(135deg, #1468e8, #0846a3); border-color: #0a4fb0; color: #ffffff; }
   .rental-grid { grid-template-columns: 3.4rem minmax(0, 1fr); }
   .rental-grid-head:not(.active), .rental-grid .rental-slot:not(.active) { display: none; }
   .rental-grid-corner { display: none; }
