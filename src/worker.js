@@ -32,6 +32,7 @@ import {
   registrationBelongsToEmail,
   registrationBelongsToUser,
   buildLiveRoundPush,
+  buildLiveAnnouncementPush,
   chunk,
   LIVE_PUSH_CHUNK_SIZE,
   isTournamentStale,
@@ -2677,6 +2678,17 @@ export default {
         }
         assertCanManageTournament(tournament, session.user);
         return await updateTournamentPresentation(request, env, tournament, session.user);
+      }
+
+      const announcementMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/announcement$/);
+      if (announcementMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, announcementMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        assertCanManageTournament(tournament, session.user);
+        return await updateTournamentAnnouncement(request, env, tournament, url.origin);
       }
 
       const publicationMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/publication$/);
@@ -6456,6 +6468,32 @@ async function updateTournamentPresentation(request, env, existing, user) {
   return json({ tournament: toPublicTournament(updated, user) });
 }
 
+const ANNOUNCEMENT_MAX_LENGTH = 300;
+
+// Sichtbare Ankündigung: bis die Turnierleitung sie löscht oder das Turnier abgeschlossen ist.
+export function tournamentAnnouncement(row) {
+  if (!row?.announcement || row.status === 'finished') return null;
+  return { text: row.announcement, at: row.announcement_at || null };
+}
+
+/**
+ * Ankündigung setzen oder mit leerem Text löschen. Es gibt immer nur eine aktuelle Ankündigung; eine neue ersetzt die
+ * alte und geht als Live-Push an alle mit Live-Push-Abo. Gilt auch für Turniere aus dem Turnierdokument.
+ */
+async function updateTournamentAnnouncement(request, env, tournament, appOrigin) {
+  if (tournament.status === 'finished') throw new HttpError(409, 'Das Turnier ist bereits abgeschlossen');
+  const body = await readJson(request);
+  const text = String(body.text ?? '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').trim();
+  if (text.length > ANNOUNCEMENT_MAX_LENGTH) {
+    throw new HttpError(400, 'Die Ankündigung darf maximal 300 Zeichen enthalten.', { field: 'announcement' });
+  }
+  const now = new Date().toISOString();
+  await env.DB.prepare('UPDATE tournaments SET announcement = ?, announcement_at = ?, updated_at = ? WHERE id = ?')
+    .bind(text || null, text ? now : null, now, tournament.id).run();
+  if (text) await notifyLivePushForAnnouncement(env, tournament, text, appOrigin);
+  return json({ announcement: tournamentAnnouncement({ ...tournament, announcement: text || null, announcement_at: text ? now : null }) });
+}
+
 /** PTM Calc is the exclusive writer for the metadata of a linked tournament. */
 async function syncPutTournamentMetadata(request, env, existing) {
   const db = env.DB;
@@ -7707,6 +7745,7 @@ export async function buildLiveResponse(request, db, registration) {
     return json({
       tournament: toLiveTournament(tournament),
       registration: { id: registration.id, label: liveRegistrationLabel(registration), participation: registration.participation, status: registration.status },
+      announcement: tournamentAnnouncement(tournament),
       dataAsOf: null,
       live: null,
     }, 200, { 'Cache-Control': 'private, no-cache' });
@@ -7728,7 +7767,9 @@ export async function buildLiveResponse(request, db, registration) {
   };
   // Stand der Daten aus dem Turnierdokument, damit ein Netzausfall in PTM nicht als falsche Auslosung wirkt (KP-12).
   const dataAsOf = Number(tournament.document_managed || 0) === 1 ? tournament.last_sync_write_at || null : null;
-  const personalVersion = (await sha256Hex(JSON.stringify([personal, dataAsOf, tournament.status]))).slice(0, 12);
+  // Die Ankündigung kommt frisch aus der Turnierzeile; sie fließt ins ETag ein, damit ein Handy sie beim nächsten Abruf bekommt.
+  const announcement = tournamentAnnouncement(tournament);
+  const personalVersion = (await sha256Hex(JSON.stringify([personal, dataAsOf, tournament.status, announcement]))).slice(0, 12);
   const etag = `"${snapshot.version}-${personalVersion}"`;
   const cacheHeaders = { 'Cache-Control': 'private, no-cache', ETag: etag };
   if (request.headers.get('If-None-Match') === etag) {
@@ -7737,6 +7778,7 @@ export async function buildLiveResponse(request, db, registration) {
   return json({
     tournament: { ...snapshot.tournament, status: tournament.status },
     registration: personal,
+    announcement,
     dataAsOf,
     live: buildPlayerLiveView({ registrationId: registration.id, rounds: snapshot.rounds, ranking: snapshot.ranking }),
   }, 200, cacheHeaders);
@@ -7902,6 +7944,28 @@ async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
     }
   } catch (error) {
     console.error(`Failed to queue live push for tournament ${tournament.id} round ${roundNumber}`, error);
+  }
+}
+
+// Ankündigung an alle bestätigten Meldungen mit Live-Push-Abo; Fehler lassen das Speichern nie scheitern.
+async function notifyLivePushForAnnouncement(env, tournament, text, appOrigin) {
+  try {
+    const subscriptions = await env.DB.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.language
+        FROM live_push_subscriptions s JOIN registrations r ON r.id = s.registration_id
+        WHERE r.tournament_id = ? AND r.status = 'confirmed'`).bind(tournament.id).all();
+    const items = (subscriptions.results || []).map((subscription) => ({
+      endpoint: subscription.endpoint,
+      p256dh: subscription.p256dh,
+      auth: subscription.auth,
+      payload: buildLiveAnnouncementPush({ tournamentName: tournament.name, text, language: subscription.language,
+        url: `${appOrigin}/live/${encodeURIComponent(subscription.registration_id)}` }),
+    }));
+    const messages = chunk(items, LIVE_PUSH_CHUNK_SIZE).map((part) => ({ body: { kind: 'live_push', items: part } }));
+    for (const batch of chunk(messages, 100)) {
+      await env.MAIL_QUEUE.sendBatch(batch);
+    }
+  } catch (error) {
+    console.error(`Failed to queue live announcement push for tournament ${tournament.id}`, error);
   }
 }
 
@@ -12095,6 +12159,7 @@ export function toPublicTournament(row, user) {
     // Der Gruppenlink geht nur per Mail an Gemeldete, öffentlich würde jeder beitreten können.
     whatsappGroupUrl: canManageTournament(row, user) ? row.whatsapp_group_url || null : undefined,
     paymentInfo: row.payment_info || null,
+    announcement: tournamentAnnouncement(row),
     activeRegistrations: Number(row.active_registrations || 0),
     waitlistRegistrations: Number(row.waitlist_registrations || 0),
     canManage: canManageTournament(row, user),

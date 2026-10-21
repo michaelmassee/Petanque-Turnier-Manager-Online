@@ -1692,5 +1692,13 @@
   "Optional": "Facultatif",
   "Pflichtangabe": "Obligatoire",
   "Telefonnummer für Rückfragen der Turnierleitung": "Téléphone pour les questions de l’organisation",
-  "Eine Telefonnummer ist erforderlich": "Un numéro de téléphone est requis"
+  "Eine Telefonnummer ist erforderlich": "Un numéro de téléphone est requis",
+  "Ankündigung der Turnierleitung": "Annonce de l’organisation",
+  "Ankündigung": "Annonce",
+  "Mitteilung an alle Teilnehmer": "Message à tous les participants",
+  "Erscheint in der Live-Ansicht und auf der Turnierseite, bis du sie löschst oder das Turnier abschließt. Spieler mit Live-Benachrichtigung erhalten sie sofort als Push.": "Affichée dans la vue en direct et sur la page du tournoi jusqu’à ce que tu la supprimes ou clôtures le tournoi. Les joueurs avec notifications en direct la reçoivent immédiatement par push.",
+  "Ankündigung gesendet.": "Annonce envoyée.",
+  "Ankündigung gelöscht.": "Annonce supprimée.",
+  "Das Turnier ist bereits abgeschlossen": "Le tournoi est déjà terminé",
+  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "L’annonce peut contenir au maximum 300 caractères."
 }

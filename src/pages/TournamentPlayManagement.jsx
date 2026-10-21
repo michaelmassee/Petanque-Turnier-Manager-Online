@@ -7,6 +7,7 @@ import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { checkRoundRequirements, getSupportedSystemLabels, isMeleeTeamTournament, isOnlinePlayable, minimumTeams } from '../lib/pairing/index.js';
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
 import { isCalendarEntry, isDocumentBound, labelFor, translatedOptions } from '../lib/domain.js';
+import { AnnouncementEditor } from '../components/TournamentAnnouncement.jsx';
 import { normalizeRanking } from '../lib/live-ranking.js';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { formatTournamentDateTime } from '../lib/format.js';
@@ -676,6 +677,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       )}
 
       <Feedback message={message} error={error || queryError?.message} />
+
+      {selectedTournament && selectedTournamentStatus === 'running' && <AnnouncementEditor tournament={selectedTournament} />}
 
       {canEditMeleeTeams && selectedTournamentStatus === 'running' && (
         <p className="hint">

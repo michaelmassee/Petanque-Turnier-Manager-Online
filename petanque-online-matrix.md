@@ -32,7 +32,7 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 | Schweizer, Formule X, Zufall, Supermêlée in drei Varianten | ✅ | ✅ (Schweizer, Formule X, Supermêlée, JgJ, KO) |
 | Wertungen BHP, FBHP, DP, SEP, direkter Vergleich, Freilos-Wertung frei einstellbar | ✅ | ⚠️ prüfen in `src/lib/pairing/ranking.js` |
 | **Spielfeldpläne** (Bahnen, Nummerierung, Terrain-Typen, Gruppen, Bahnen sperren), Bahnzuteilung | ✅ | ❌ (Bahnen nur bei der Vermietung) |
-| Ankündigung („Mittagspause bis 13 Uhr“) an alle Live-Link-Nutzer | ✅ | ❌ (Rundmail und Postbox vorhanden, aber kein Live-Banner) |
+| Ankündigung („Mittagspause bis 13 Uhr“) an alle Live-Link-Nutzer | ✅ | ✅ seit 21.10.2026: Banner in Live-Teamsicht und auf der Turnierseite, Live-Push an Abonnenten, bis Löschen oder Turnierende |
 | Druck-Dokumente: Check-In-Liste, Starterliste, Excel-Export, QR-Karten je Team, QR-Code Anmeldung, Zuschauer-Live-Link, Foto-Hinweis | ✅ | ⚠️ (CSV-Export, Ranglisten-PDF, QR-Code; keine Team-Karten, kein Zuschauer-Link) |
 | **Turnierserien-Auswertung** über mehrere Turniere als PDF | ✅ | ❌ |
 | Live-Ansicht für Spieler, Ergebnis selbst melden, Push | ⚠️ | ✅ |
@@ -49,7 +49,7 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 
 **P2 – Turniertag**
 6. Check-In am Spieltag mit Startnummern und druckbarer Check-In-Liste (PDF analog `src/lib/ranking-pdf.js`).
-7. Ankündigungs-Banner in der Live-Ansicht (`src/pages/PlayerLivePage.jsx`) plus Push.
+7. ~~Ankündigungs-Banner in der Live-Ansicht~~ (umgesetzt 21.10.2026) (`src/pages/PlayerLivePage.jsx`) plus Push.
 8. Spielfeldplan und Bahnzuteilung bei der Auslosung.
 9. Zuschauer-Live-Link (öffentlich, nur lesend) und QR-Karten je Team.
 

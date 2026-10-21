@@ -1692,5 +1692,13 @@
   "Optional": "Optional",
   "Pflichtangabe": "Required",
   "Telefonnummer für Rückfragen der Turnierleitung": "Phone number for questions from the organizers",
-  "Eine Telefonnummer ist erforderlich": "A phone number is required"
+  "Eine Telefonnummer ist erforderlich": "A phone number is required",
+  "Ankündigung der Turnierleitung": "Announcement from the organizers",
+  "Ankündigung": "Announcement",
+  "Mitteilung an alle Teilnehmer": "Message to all participants",
+  "Erscheint in der Live-Ansicht und auf der Turnierseite, bis du sie löschst oder das Turnier abschließt. Spieler mit Live-Benachrichtigung erhalten sie sofort als Push.": "Shown in the live view and on the tournament page until you delete it or finish the tournament. Players with live notifications get it immediately as a push message.",
+  "Ankündigung gesendet.": "Announcement sent.",
+  "Ankündigung gelöscht.": "Announcement deleted.",
+  "Das Turnier ist bereits abgeschlossen": "The tournament has already finished",
+  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "The announcement may contain at most 300 characters."
 }

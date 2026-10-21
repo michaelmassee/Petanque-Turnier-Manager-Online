@@ -721,9 +721,8 @@ describe('TournamentPlayManagement', () => {
     await screen.findByText('Anna Muster + Bert Beispiel + Clara Test');
 
     fireEvent.click(screen.getByText('Teilnehmer'));
-    const [firstName, lastName] = screen.getAllByRole('textbox');
-    fireEvent.change(firstName, { target: { value: 'Gina' } });
-    fireEvent.change(lastName, { target: { value: 'Neu' } });
+    fireEvent.change(screen.getByRole('textbox', { name: /Vorname/ }), { target: { value: 'Gina' } });
+    fireEvent.change(screen.getByRole('textbox', { name: /Nachname/ }), { target: { value: 'Neu' } });
     fireEvent.click(screen.getByRole('button', { name: 'Spieler hinzufügen' }));
 
     await screen.findByText('Spieler hinzugefügt: Gina Neu');

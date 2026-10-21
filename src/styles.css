@@ -4147,6 +4147,53 @@ details[open] > .play-round-summary::before {
 }
 
 /* Live-Ansicht von der Turnierleitung nicht freigeschaltet: auffälliger Hinweis statt leerer Karten. */
+.announcement-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border: 2px solid #1677ff;
+  border-left-width: 8px;
+  border-radius: 10px;
+  background: #eaf3ff;
+  color: #10325c;
+}
+
+.announcement-banner-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.announcement-banner p {
+  margin: 0;
+}
+
+.announcement-banner-title {
+  font-weight: 800;
+}
+
+/* Frei formuliert: Zeilenumbrüche erhalten, lange Wörter/Links auf dem Handy umbrechen. */
+.announcement-banner-text {
+  margin-top: 4px !important;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  font-size: 1.05rem;
+}
+
+.announcement-editor {
+  margin-bottom: 14px;
+}
+
+.announcement-editor summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.announcement-editor[open] summary {
+  margin-bottom: 10px;
+}
+
 .live-disabled {
   display: flex;
   gap: 14px;

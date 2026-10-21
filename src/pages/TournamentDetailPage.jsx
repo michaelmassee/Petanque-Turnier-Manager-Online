@@ -15,6 +15,7 @@ import { TournamentPlayerListings } from '../components/TournamentPlayerListings
 import { PublicRegistrationPanel } from '../App.jsx';
 import { TournamentRegistrationAction } from '../components/TournamentRegistrationAction.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
+import { AnnouncementBanner, AnnouncementEditor } from '../components/TournamentAnnouncement.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
 import { normalizeRanking } from '../lib/live-ranking.js';
@@ -570,6 +571,8 @@ export function TournamentDetailPage({
   const shareSuffix = shareToken ? `?share=${encodeURIComponent(shareToken)}` : '';
   const detailPath = (view) => `/turniere/${route.id}/${view}${shareSuffix}`;
   const { tournament, notFound } = useRoutedTournament(route.id, tournaments, shareToken);
+  // Gesendete/gelöschte Ankündigung sofort zeigen, ohne die Turnierliste neu zu laden.
+  const [announcementUpdate, setAnnouncementUpdate] = useState({ tournamentId: null, announcement: null });
 
   if (notFound) {
     return (
@@ -710,6 +713,13 @@ export function TournamentDetailPage({
             <span>{formatLocationAddress(tournament.location)}</span>
           </p>
         </header>
+        <AnnouncementBanner
+          announcement={announcementUpdate.tournamentId === tournament.id ? announcementUpdate.announcement : tournament.announcement}
+          language={language}
+        />
+        {tournament.canManage && tournament.status !== 'finished' && tournament.registrationEnabled !== false && (
+          <AnnouncementEditor tournament={tournament} onChange={(announcement) => setAnnouncementUpdate({ tournamentId: tournament.id, announcement })} />
+        )}
         <nav className="tournament-detail-tabs" aria-label={t('Turnierdetails')}>
           {[
             ['info', t('Info')],

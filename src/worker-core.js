@@ -596,6 +596,18 @@ export function buildLiveRoundPush({ tournamentName, match, language, url }) {
   };
 }
 
+const LIVE_ANNOUNCEMENT_PUSH_TITLES = { de: 'Ankündigung', nl: 'Mededeling', en: 'Announcement', es: 'Aviso', fr: 'Annonce' };
+
+// Ankündigung der Turnierleitung als Live-Push; gleiches Tag, damit eine neue Ankündigung die alte ersetzt.
+export function buildLiveAnnouncementPush({ tournamentName, text, language, url }) {
+  return {
+    title: `${tournamentName}: ${LIVE_ANNOUNCEMENT_PUSH_TITLES[language] || LIVE_ANNOUNCEMENT_PUSH_TITLES.de}`,
+    body: text,
+    url,
+    tag: 'live-announcement',
+  };
+}
+
 export function chunk(items, size) {
   const chunks = [];
   for (let index = 0; index < items.length; index += size) chunks.push(items.slice(index, index + size));

@@ -1692,5 +1692,13 @@
   "Optional": "Opcional",
   "Pflichtangabe": "Obligatorio",
   "Telefonnummer für Rückfragen der Turnierleitung": "Teléfono para consultas de la organización",
-  "Eine Telefonnummer ist erforderlich": "Se requiere un número de teléfono"
+  "Eine Telefonnummer ist erforderlich": "Se requiere un número de teléfono",
+  "Ankündigung der Turnierleitung": "Aviso de la organización",
+  "Ankündigung": "Aviso",
+  "Mitteilung an alle Teilnehmer": "Mensaje para todos los participantes",
+  "Erscheint in der Live-Ansicht und auf der Turnierseite, bis du sie löschst oder das Turnier abschließt. Spieler mit Live-Benachrichtigung erhalten sie sofort als Push.": "Aparece en la vista en directo y en la página del torneo hasta que lo borres o cierres el torneo. Los jugadores con notificaciones en directo lo reciben al instante como notificación push.",
+  "Ankündigung gesendet.": "Aviso enviado.",
+  "Ankündigung gelöscht.": "Aviso eliminado.",
+  "Das Turnier ist bereits abgeschlossen": "El torneo ya ha finalizado",
+  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "El aviso puede tener como máximo 300 caracteres."
 }

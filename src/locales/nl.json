@@ -1692,5 +1692,13 @@
   "Optional": "Optioneel",
   "Pflichtangabe": "Verplicht",
   "Telefonnummer für Rückfragen der Turnierleitung": "Telefoonnummer voor vragen van de toernooiorganisatie",
-  "Eine Telefonnummer ist erforderlich": "Een telefoonnummer is verplicht"
+  "Eine Telefonnummer ist erforderlich": "Een telefoonnummer is verplicht",
+  "Ankündigung der Turnierleitung": "Mededeling van de toernooiorganisatie",
+  "Ankündigung": "Mededeling",
+  "Mitteilung an alle Teilnehmer": "Bericht aan alle deelnemers",
+  "Erscheint in der Live-Ansicht und auf der Turnierseite, bis du sie löschst oder das Turnier abschließt. Spieler mit Live-Benachrichtigung erhalten sie sofort als Push.": "Verschijnt in de liveweergave en op de toernooipagina tot je hem verwijdert of het toernooi afsluit. Spelers met livemeldingen krijgen hem meteen als pushbericht.",
+  "Ankündigung gesendet.": "Mededeling verzonden.",
+  "Ankündigung gelöscht.": "Mededeling verwijderd.",
+  "Das Turnier ist bereits abgeschlossen": "Het toernooi is al afgesloten",
+  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "De mededeling mag maximaal 300 tekens bevatten."
 }
