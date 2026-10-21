@@ -1416,6 +1416,15 @@ export function tournamentStartUtcIso(tournament) {
   }
 }
 
+// Automatischer Anmeldeschluss (E-02): zum angesetzten Beginn. Ohne Startzeit ist der Beginn unbekannt,
+// dann bleibt die Anmeldung bis zum Ende des Turniertags offen statt schon um 00:00 Uhr zu schließen.
+export function registrationClosesAtUtcIso(tournament) {
+  if (tournament.start_time) return tournamentStartUtcIso(tournament);
+  const [year, month, day] = String(tournament.date).split('-').map(Number);
+  const nextDay = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+  return tournamentStartUtcIso({ ...tournament, date: nextDay, start_time: '00:00' });
+}
+
 /**
  * Nach 48 Stunden ab Turnierbeginn läuft kein Turnier mehr: vergessene "Läuft"-Turniere werden
  * automatisch abgeschlossen, damit sie nicht dauerhaft im Bereich "Live" stehen. Die
@@ -8405,7 +8414,7 @@ export async function createRegistration(request, env, tournament, {
 
 function assertRegistrationOpen(tournament, shareAccess) {
   const openStatus = coreRegistrationOpenStatus({ ...tournament, visibility: shareAccess ? 'public' : tournament.visibility },
-    new Date(), tournamentStartUtcIso(tournament));
+    new Date(), registrationClosesAtUtcIso(tournament));
   if (openStatus !== 'open') {
     throw new HttpError(403, REGISTRATION_CLOSED_MESSAGES[openStatus],
       openStatus === 'running' ? { code: 'tournament_running' } : undefined);
@@ -12170,7 +12179,7 @@ export function toPublicTournament(row, user) {
     registrationClosed: Boolean(Number(row.registration_closed || 0)),
     liveViewEnabled: Boolean(Number(row.live_view_enabled || 0)),
     playerResultReportingEnabled: Boolean(Number(row.player_result_reporting_enabled || 0)),
-    startsAt: row.date ? tournamentStartUtcIso(row) : null,
+    registrationClosesAt: row.date ? registrationClosesAtUtcIso(row) : null,
     runningResetAt: row.running_reset_at || null,
     // Veröffentlichte Endrangliste (Snapshot) gilt nur, solange das Turnier abgeschlossen ist.
     rankingPublishedAt: row.status === 'finished' ? row.final_ranking_published_at || null : null,

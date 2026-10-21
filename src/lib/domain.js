@@ -298,7 +298,7 @@ export function hasOpenRegistration(tournament) {
     return false;
   }
   // Spätestens zum angesetzten Turnierbeginn schließt die Online-Anmeldung automatisch.
-  if (tournament.startsAt && new Date(tournament.startsAt).getTime() <= Date.now()) {
+  if (tournament.registrationClosesAt && new Date(tournament.registrationClosesAt).getTime() <= Date.now()) {
     return false;
   }
   if (registrationDeadlinePassed(tournament)) {
@@ -353,7 +353,7 @@ export function registrationStatusKind(tournament) {
   if (tournament.status === 'running') return 'running';
   if (tournament.status !== 'registration') return tournament.status;
   if (tournament.registrationClosed) return 'closed';
-  if (tournament.startsAt && new Date(tournament.startsAt).getTime() <= Date.now()) return 'started';
+  if (tournament.registrationClosesAt && new Date(tournament.registrationClosesAt).getTime() <= Date.now()) return 'started';
   if (registrationNotYetOpen(tournament)) return 'upcoming';
   if (registrationDeadlinePassed(tournament)) return 'unavailable';
   const isFull = Boolean(tournament.maxRegistrations) && tournament.activeRegistrations >= tournament.maxRegistrations;

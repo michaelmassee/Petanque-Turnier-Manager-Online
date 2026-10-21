@@ -60,7 +60,7 @@ describe('Turnierverwaltung: Anmeldestatus', () => {
     [{ registrationDeadline: '2020-01-01T00:00:00.000Z' }, 'Anmeldung nicht mehr möglich', 'status-closed', 'Anmeldeschluss abgelaufen'],
     [{ activeRegistrations: 16, waitlistEnabled: true }, 'Anmeldung Warteliste möglich', 'status-waitlist', null],
     [{ activeRegistrations: 16, waitlistEnabled: false }, 'Anmeldung nicht mehr möglich', 'status-closed', 'ausgebucht'],
-    [{ startsAt: '2020-01-01T00:00:00.000Z' }, 'Die Anmeldung ist mit Turnierbeginn geschlossen', 'status-closed', null],
+    [{ registrationClosesAt: '2020-01-01T00:00:00.000Z' }, 'Die Anmeldung ist mit Turnierbeginn geschlossen', 'status-closed', null],
   ])('zeigt den effektiven Anmeldestatus für %j', (overrides, label, badgeClass, reason) => {
     const row = renderStatus(overrides);
     expect(row.getByText(label)).toHaveClass(badgeClass);
@@ -99,7 +99,7 @@ describe('Turnierverwaltung: Anmeldestatus', () => {
   it.each([
     [{ registrationClosed: false }, 'Anmeldung schließen', 'Anmeldung wurde geschlossen.'],
     [{ registrationClosed: true, registrationDeadline: '2020-01-01T00:00:00.000Z' }, 'Anmeldung öffnen', 'Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen.'],
-    [{ registrationClosed: true, startsAt: '2020-01-01T00:00:00.000Z' }, 'Anmeldung öffnen', 'Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen'],
+    [{ registrationClosed: true, registrationClosesAt: '2020-01-01T00:00:00.000Z' }, 'Anmeldung öffnen', 'Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen'],
     [{ registrationClosed: true }, 'Anmeldung öffnen', 'Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.'],
   ])('meldet die tatsächliche Wirkung nach %j', async (overrides, buttonLabel, message) => {
     const { registrationClosed } = overrides;

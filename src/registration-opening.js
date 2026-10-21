@@ -1,5 +1,5 @@
 import { registrationOpenStatus } from './worker-core.js';
-import { tournamentStartUtcIso } from './worker.js';
+import { registrationClosesAtUtcIso } from './worker.js';
 
 export const REGISTRATION_OPENED_EVENT = 'tournament_registration_opened';
 export const OPENING_MESSAGES = {
@@ -19,7 +19,7 @@ export async function releaseRegistrationOpenings(env, now = new Date()) {
   // Keep each alarm below D1 Free's query/parameter limits. The next due
   // timestamp schedules an immediate continuation if more work remains.
   if (due.length) {
-    const eligible = due.filter((row) => registrationOpenStatus({ ...row, registration_opening_pending: 0 }, now, tournamentStartUtcIso(row)) === 'open');
+    const eligible = due.filter((row) => registrationOpenStatus({ ...row, registration_opening_pending: 0 }, now, registrationClosesAtUtcIso(row)) === 'open');
     // Guard the snapshot's start date/time as well as the current opening state.
     const eligibility = eligible.length ? eligible.map(() => '(t.id = ? AND t.date IS ? AND t.start_time IS ? AND t.timezone IS ?)').join(' OR ') : '0';
     const eligibilityBinds = eligible.flatMap((row) => [row.id, row.date, row.start_time, row.timezone]);

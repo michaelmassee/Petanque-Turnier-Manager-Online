@@ -161,7 +161,7 @@ describe('Turnierdetail-Reiter', () => {
     { registrationClosed: true },
     { registrationDeadline: '2000-01-01T12:00:00Z' },
     { maxRegistrations: 8, activeRegistrations: 8, waitlistEnabled: false },
-    { startsAt: '2000-01-01T12:00:00Z' },
+    { registrationClosesAt: '2000-01-01T12:00:00Z' },
     { registrationEnabled: false, date: '2000-01-01' },
   ])('blendet Mitspielgesuche bei unmöglicher Anmeldung aus (%j)', (state) => {
     global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ listings: [] })));
