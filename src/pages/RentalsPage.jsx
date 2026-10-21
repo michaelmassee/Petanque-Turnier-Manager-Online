@@ -47,7 +47,8 @@ function OfferSummary({ offer, navigate }) {
   </>;
 }
 
-// „Nachricht an Vermieter“ (nur angemeldet): landet in der Postbox der Vereinsverwalter und als E-Mail beim Verein.
+// „Nachricht an Vermieter“ ohne Kontakt-E-Mail des Vereins (nur angemeldet): landet in der Postbox der Vereinsverwalter
+// und als E-Mail beim Verein. Mit Kontakt-E-Mail öffnet der Button stattdessen das E-Mail-Programm (RentalContactButton).
 function RentalContactDialog({ offer, onClose }) {
   const { t } = useTranslation();
   const [body, setBody] = useState('');
@@ -88,6 +89,18 @@ function RentalContactDialog({ offer, onClose }) {
       )}
     </EditDialog>
   );
+}
+
+function RentalContactButton({ offer, currentUser, onOpenDialog }) {
+  const { t } = useTranslation();
+  if (offer.clubContactEmail) {
+    return (
+      <a className="button button-secondary" href={`mailto:${encodeURIComponent(offer.clubContactEmail)}?subject=${encodeURIComponent(offer.title)}`}>
+        {t('Nachricht an Vermieter')}
+      </a>
+    );
+  }
+  return currentUser ? <Button variant="secondary" onClick={onOpenDialog}>{t('Nachricht an Vermieter')}</Button> : null;
 }
 
 function ShareRentalOfferButton({ offer }) {
@@ -256,7 +269,7 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
         <h2 data-i18n-skip>{offer.title}</h2>
         <div className="row-actions">
           {offer.isPublic && <ShareRentalOfferButton offer={offer} />}
-          {currentUser && offer.isPublic && !offer.canManage && <Button variant="secondary" onClick={() => setContactOpen(true)}>{t('Nachricht an Vermieter')}</Button>}
+          {offer.isPublic && !offer.canManage && <RentalContactButton offer={offer} currentUser={currentUser} onOpenDialog={() => setContactOpen(true)} />}
           {offer.canManage && <Button variant="secondary" onClick={() => navigate('/platz-mieten/verwalten')}>{t('Vermietung verwalten')}</Button>}
         </div>
       </div>

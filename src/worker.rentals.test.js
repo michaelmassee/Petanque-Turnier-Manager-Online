@@ -65,6 +65,10 @@ describe('Platz mieten', () => {
     expect(list.offers.map((entry) => entry.title)).toEqual(['Boulehalle']);
     const detail = await (await call('GET', `/api/rentals/${offer.id}`)).json();
     expect(detail.offer.canManage).toBe(false);
+    // Nur die öffentliche Kontakt-E-Mail des Vereins, nie die Konto-E-Mail des Verwalters.
+    expect(detail.offer.clubContactEmail).toBeNull();
+    sql("UPDATE clubs SET contact_email = 'info@bc-test.de' WHERE id = 'c1'");
+    expect((await (await call('GET', `/api/rentals/${offer.id}`)).json()).offer.clubContactEmail).toBe('info@bc-test.de');
 
     await call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, status: 'inactive' }, headers: VEREIN });
     expect((await (await call('GET', '/api/rentals')).json()).offers).toEqual([]);

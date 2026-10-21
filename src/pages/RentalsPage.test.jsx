@@ -212,6 +212,14 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/o1/messages', { method: 'POST', body: JSON.stringify({ body: 'Habt ihr Flutlicht?' }) });
   });
 
+  it('öffnet mit Kontakt-E-Mail des Vereins das E-Mail-Programm, auch für Gäste', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, isPublic: true, clubContactEmail: 'info@bc-test.de' } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
+    const link = await screen.findByRole('link', { name: 'Nachricht an Vermieter' });
+    expect(link).toHaveAttribute('href', `mailto:info%40bc-test.de?subject=${encodeURIComponent(OFFER.title)}`);
+    expect(screen.queryByRole('button', { name: 'Nachricht an Vermieter' })).not.toBeInTheDocument();
+  });
+
   it.each([
     ['Gäste', null, {}],
     ['Vereinsverwalter', { id: 'u1' }, { canManage: true }],

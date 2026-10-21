@@ -9584,7 +9584,8 @@ function rentalPersonName(row, prefix = '') {
 }
 
 const RENTAL_OFFER_SELECT = `SELECT o.*, p.name AS place_name, p.address AS place_address, p.venue_type, p.latitude, p.longitude,
-    p.status AS place_status, p.court_count AS place_court_count, c.name AS club_name, c.logo_url AS club_logo_url, c.status AS club_status
+    p.status AS place_status, p.court_count AS place_court_count, c.name AS club_name, c.logo_url AS club_logo_url, c.status AS club_status,
+    c.contact_email AS club_contact_email
   FROM rental_offers o JOIN boule_places p ON p.id = o.boule_place_id JOIN clubs c ON c.id = o.club_id`;
 
 function rentalOfferIsPublic(row) {
@@ -9593,7 +9594,7 @@ function rentalOfferIsPublic(row) {
 
 function toRentalOffer(row, openingHours = null) {
   return {
-    id: row.id, clubId: row.club_id, clubName: row.club_name, hasClubLogo: Boolean(row.club_logo_url), placeId: row.boule_place_id,
+    id: row.id, clubId: row.club_id, clubName: row.club_name, clubContactEmail: row.club_contact_email || null, hasClubLogo: Boolean(row.club_logo_url), placeId: row.boule_place_id,
     placeName: row.place_name, address: formatLocationAddress(row.place_address), venueType: row.venue_type || 'outdoor',
     latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
     longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
