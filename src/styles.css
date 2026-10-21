@@ -1793,27 +1793,42 @@ a.left-panel-link {
   margin: 0 auto;
 }
 
-.tournament-name-editor {
-  min-width: 0;
+.name-field {
+  position: relative;
+  margin-top: 7px;
 }
 
-.tournament-name-editor summary {
-  cursor: pointer;
+.name-field input,
+.name-field textarea {
+  padding-right: 44px;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.name-field textarea {
+  field-sizing: content;
+  min-height: 44px;
+  resize: none;
   overflow-wrap: anywhere;
-  padding: 12px;
-  border: 1px solid #d7deea;
-  border-radius: 8px;
-  font-size: 1rem;
-  line-height: 1.5;
 }
 
-.tournament-name-editor textarea {
-  font-size: 1rem;
-  line-height: 1.5;
+.name-field-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: #1677ff;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 6px 8px;
+  cursor: pointer;
 }
 
-.tournament-name-editor[open] summary {
-  margin-bottom: 12px;
+.name-field.expanded .name-field-toggle {
+  top: 6px;
+  transform: none;
 }
 
 .tournament-detail-heading {

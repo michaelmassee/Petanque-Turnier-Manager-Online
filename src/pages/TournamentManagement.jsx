@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
 import { hasRegistrations, isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, registrationDeadlinePassed, registrationStatusClass, registrationStatusKind, registrationStatusLabel, registrationStatusReason, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
-import { Feedback, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
+import { Feedback, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog, RequiredMark } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { authenticatedApi } from '../lib/api.js';
@@ -279,6 +279,65 @@ function FormationHelpDialog({ onClose }) {
 
 const toSingleLine = (value) => value.replace(/[\r\n]+/g, ' ');
 
+// Turniername: einzeilig; passt er nicht ins Feld, lässt er sich zum Lesen/Bearbeiten aufklappen.
+// Auch aufgeklappt bleibt der Wert einzeilig, die textarea bricht nur sichtbar um.
+function TournamentNameField({ value, onChange }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
+  const inputRef = useRef(null);
+  const textareaRef = useRef(null);
+  const focusAfterToggle = useRef(false);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return undefined;
+    const measure = () => setOverflowing(input.scrollWidth > input.clientWidth);
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [value, expanded]);
+
+  useEffect(() => {
+    if (!focusAfterToggle.current) return;
+    focusAfterToggle.current = false;
+    const field = expanded ? textareaRef.current : inputRef.current;
+    field?.focus();
+    field?.setSelectionRange?.(field.value.length, field.value.length);
+  }, [expanded]);
+
+  const fieldProps = {
+    value,
+    onChange: (event) => onChange(toSingleLine(event.target.value)),
+    onKeyDown: (event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) event.preventDefault(); },
+    minLength: 2,
+  };
+
+  return (
+    <label>
+      {t('Name')}
+      <RequiredMark />
+      <div className={`name-field${expanded ? ' expanded' : ''}`}>
+        {expanded
+          ? <textarea ref={textareaRef} rows={Math.max(2, Math.ceil(value.length / 40))} required {...fieldProps} />
+          : <input ref={inputRef} type="text" required {...fieldProps} />}
+        {(expanded || overflowing) && (
+          <button
+            className="name-field-toggle"
+            type="button"
+            aria-expanded={expanded}
+            aria-label={expanded ? t('Einzeilig anzeigen') : t('Ganzen Namen anzeigen')}
+            title={expanded ? t('Einzeilig anzeigen') : t('Ganzen Namen anzeigen')}
+            onClick={() => { focusAfterToggle.current = true; setExpanded((open) => !open); }}
+          >
+            {expanded ? '⤡' : '⤢'}
+          </button>
+        )}
+      </div>
+    </label>
+  );
+}
+
 // Spielort zur gewählten Adresse: direkt gewählter Platz, sonst gleiche Adresse oder Koordinaten.
 // Wie in der View tournament_venue_place gewinnt ein Vereinsplatz vor einem Platz ohne Verein.
 function venuePlaceFor(places, candidate) {
@@ -300,30 +359,13 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
   // damals abgefragten Felder sind hier sinnvoll editierbar - alles rund um Anmeldung,
   // Turniersystem, Gebühren etc. ist für so einen Eintrag ohne Bedeutung.
   const isCalendarEntry = mode === 'edit' && form.registrationEnabled === false;
-  // Mehrzeiliges Feld nur, damit lange Namen umbrechen; der Name selbst bleibt einzeilig.
-  const nameField = (
-    <TextArea
-      label={t('Name')}
-      value={form.name}
-      onChange={(name) => setForm({ ...form, name: toSingleLine(name) })}
-      onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) event.preventDefault(); }}
-      required
-      minLength={2}
-      rows={3}
-    />
-  );
 
   return (
     <form className="form dense" onSubmit={onSubmit}>
       {showMailNotEnabledHint && (
         <p className="feedback offline">{MAIL_NOT_ENABLED_HINT_TEMPLATES[language] || MAIL_NOT_ENABLED_HINT_TEMPLATES.de}</p>
       )}
-      {mode === 'edit' ? (
-        <details className="tournament-name-editor" onInvalidCapture={(event) => { event.currentTarget.open = true; }}>
-          <summary>{t('Name')}: <span data-i18n-skip>{form.name}</span></summary>
-          {nameField}
-        </details>
-      ) : nameField}
+      <TournamentNameField value={form.name} onChange={(name) => setForm({ ...form, name })} />
       <div className="form-grid">
         <TextField label={t('Datum')} type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} required />
         <TextField label={t('Startzeit')} type="time" value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />

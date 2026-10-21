@@ -1700,5 +1700,7 @@
   "Ankündigung gesendet.": "Annonce envoyée.",
   "Ankündigung gelöscht.": "Annonce supprimée.",
   "Das Turnier ist bereits abgeschlossen": "Le tournoi est déjà terminé",
-  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "L’annonce peut contenir au maximum 300 caractères."
+  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "L’annonce peut contenir au maximum 300 caractères.",
+  "Ganzen Namen anzeigen": "Afficher le nom complet",
+  "Einzeilig anzeigen": "Afficher sur une ligne"
 }
