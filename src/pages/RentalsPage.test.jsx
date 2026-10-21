@@ -198,20 +198,6 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(screen.queryByRole('link', { name: 'Halle Nord' })).not.toBeInTheDocument();
   });
 
-  it('schickt angemeldet eine Nachricht an den Vermieter', async () => {
-    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, isPublic: true } }));
-    authenticatedApi.mockResolvedValue({ ok: true });
-    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Nachricht an Vermieter' }));
-    const dialog = screen.getByRole('dialog');
-    const send = within(dialog).getByRole('button', { name: 'Senden' });
-    expect(send).toBeDisabled();
-    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'Habt ihr Flutlicht?' } });
-    fireEvent.click(send);
-    expect(await screen.findByText(/Nachricht gesendet/)).toBeInTheDocument();
-    expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/o1/messages', { method: 'POST', body: JSON.stringify({ body: 'Habt ihr Flutlicht?' }) });
-  });
-
   it('öffnet mit Kontakt-E-Mail des Vereins das E-Mail-Programm, auch für Gäste', async () => {
     api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, isPublic: true, clubContactEmail: 'info@bc-test.de' } }));
     render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
@@ -221,13 +207,13 @@ describe('Platz mieten: Angebot und Kalender', () => {
   });
 
   it.each([
-    ['Gäste', null, {}],
-    ['Vereinsverwalter', { id: 'u1' }, { canManage: true }],
+    ['ohne Kontakt-E-Mail des Vereins', { id: 'u2' }, {}],
+    ['Vereinsverwaltern', { id: 'u1' }, { canManage: true, clubContactEmail: 'info@bc-test.de' }],
   ])('bietet %s keine Nachricht an den Vermieter an', async (_label, currentUser, patch) => {
     api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, isPublic: true, ...patch } }));
     render(<RentalOfferView id="o1" language="de" currentUser={currentUser} navigate={vi.fn()} onLogin={vi.fn()} />);
     expect(await screen.findByText('Boulehalle')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Nachricht an Vermieter' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Nachricht an Vermieter' })).not.toBeInTheDocument();
   });
 
   it('bittet Gäste ums Anmelden statt das Formular zu zeigen', async () => {
@@ -246,6 +232,7 @@ describe('Platz mieten: Vereinsverwaltung', () => {
 
   const MANAGE = {
     clubStatus: 'published',
+    clubHasContactEmail: true,
     offers: [OFFER],
     places: [{ id: 'p1', name: 'Halle Nord', courtCount: 6, venueType: 'indoor', status: 'published' }],
     reservations: [{ id: 'r1', offerId: 'o1', date: '2026-10-24', startHour: 9, hours: 2, lanes: 2, status: 'requested', renterName: 'Max Mieter', renterEmail: 'max@example.test', note: 'Training' }],
@@ -342,6 +329,18 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     render(<RentalManagement language="de" navigate={vi.fn()} />);
 
     expect(await screen.findByText(/Dein Verein hat noch keinen Spielort/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Neues Angebot' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
+  });
+
+  it('sperrt Angebote, wenn der Verein keine Kontakt-E-Mail hat', async () => {
+    authenticatedApi.mockImplementation(async (path) => {
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
+      return { ...MANAGE, clubHasContactEmail: false };
+    });
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+
+    expect(await screen.findByText(/Für Platzmiete braucht dein Verein eine Kontakt-E-Mail/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Neues Angebot' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
   });

@@ -47,60 +47,15 @@ function OfferSummary({ offer, navigate }) {
   </>;
 }
 
-// „Nachricht an Vermieter“ ohne Kontakt-E-Mail des Vereins (nur angemeldet): landet in der Postbox der Vereinsverwalter
-// und als E-Mail beim Verein. Mit Kontakt-E-Mail öffnet der Button stattdessen das E-Mail-Programm (RentalContactButton).
-function RentalContactDialog({ offer, onClose }) {
+// „Nachricht an Vermieter“ öffnet das E-Mail-Programm mit der öffentlichen Kontakt-E-Mail des Vereins (für Angebote Pflicht).
+function RentalContactLink({ offer }) {
   const { t } = useTranslation();
-  const [body, setBody] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState('');
-  const [sent, setSent] = useState(false);
-
-  async function submit(event) {
-    event.preventDefault();
-    setError('');
-    setSending(true);
-    try {
-      await authenticatedApi(`/api/rentals/${encodeURIComponent(offer.id)}/messages`, { method: 'POST', body: JSON.stringify({ body }) });
-      setSent(true);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setSending(false);
-    }
-  }
-
+  if (!offer.clubContactEmail) return null;
   return (
-    <EditDialog open title={`${t('Nachricht an')} ${offer.clubName || ''}`} error={error} onClose={onClose}>
-      {sent ? (
-        <>
-          <Feedback message={t('Nachricht gesendet. Die Antwort des Vereins findest du in deiner Postbox.')} />
-          <div className="dialog-actions"><Button onClick={onClose}>{t('Schließen')}</Button></div>
-        </>
-      ) : (
-        <form className="form" onSubmit={submit}>
-          <p className="hint" data-i18n-skip>{offer.title}</p>
-          <TextArea label={t('Nachricht')} value={body} onChange={setBody} maxLength={500} rows={5} />
-          <div className="dialog-actions">
-            <Button variant="secondary" onClick={onClose}>{t('Abbrechen')}</Button>
-            <Button type="submit" disabled={!body.trim()} loading={sending}>{t('Senden')}</Button>
-          </div>
-        </form>
-      )}
-    </EditDialog>
+    <a className="button button-secondary" href={`mailto:${encodeURIComponent(offer.clubContactEmail)}?subject=${encodeURIComponent(offer.title)}`}>
+      {t('Nachricht an Vermieter')}
+    </a>
   );
-}
-
-function RentalContactButton({ offer, currentUser, onOpenDialog }) {
-  const { t } = useTranslation();
-  if (offer.clubContactEmail) {
-    return (
-      <a className="button button-secondary" href={`mailto:${encodeURIComponent(offer.clubContactEmail)}?subject=${encodeURIComponent(offer.title)}`}>
-        {t('Nachricht an Vermieter')}
-      </a>
-    );
-  }
-  return currentUser ? <Button variant="secondary" onClick={onOpenDialog}>{t('Nachricht an Vermieter')}</Button> : null;
 }
 
 function ShareRentalOfferButton({ offer }) {
@@ -199,7 +154,6 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [contactOpen, setContactOpen] = useState(false);
 
   useEffect(() => {
     api(`/api/rentals/${encodeURIComponent(id)}`).then((data) => setOffer(data.offer)).catch((requestError) => setLoadError(requestError.message));
@@ -269,11 +223,10 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
         <h2 data-i18n-skip>{offer.title}</h2>
         <div className="row-actions">
           {offer.isPublic && <ShareRentalOfferButton offer={offer} />}
-          {offer.isPublic && !offer.canManage && <RentalContactButton offer={offer} currentUser={currentUser} onOpenDialog={() => setContactOpen(true)} />}
+          {offer.isPublic && !offer.canManage && <RentalContactLink offer={offer} />}
           {offer.canManage && <Button variant="secondary" onClick={() => navigate('/platz-mieten/verwalten')}>{t('Vermietung verwalten')}</Button>}
         </div>
       </div>
-      {contactOpen && <RentalContactDialog offer={offer} onClose={() => setContactOpen(false)} />}
       <div className="rental-offer-meta"><OfferSummary offer={offer} navigate={navigate} /></div>
       <p><OfferPrice offer={offer} language={language} /></p>
       {offer.description && <RichText value={offer.description} onNavigate={navigate} />}
@@ -609,8 +562,8 @@ export function RentalManagement({ language, navigate, currentUser }) {
   }
 
   const clubPublished = data?.clubStatus === 'published';
-  // Angebote brauchen einen freigegebenen Verein mit mindestens einem freigegebenen Spielort.
-  const canEditOffers = clubPublished && Boolean(data?.places.length);
+  // Angebote brauchen einen freigegebenen Verein mit Kontakt-E-Mail und mindestens einem freigegebenen Spielort.
+  const canEditOffers = clubPublished && Boolean(data?.clubHasContactEmail) && Boolean(data?.places.length);
   const offerTitle = (offerId) => data?.offers.find((offer) => offer.id === offerId)?.title || '';
   const requests = (data?.reservations || []).filter((reservation) => reservation.status === 'requested');
   const confirmed = (data?.reservations || []).filter((reservation) => reservation.status === 'confirmed');
@@ -672,6 +625,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
             <Button disabled={!canEditOffers} onClick={() => openOffer()}>{t('Neues Angebot')}</Button>
           </div>
           {!clubPublished && <p className="hint">{t('Dein Verein ist noch nicht freigegeben. Angebote kannst du anlegen, sobald ein Admin ihn freigegeben hat.')}</p>}
+          {clubPublished && !data.clubHasContactEmail && <p className="hint">{t('Für Platzmiete braucht dein Verein eine Kontakt-E-Mail. Trage sie unter „Meine Vereine“ ein.')}</p>}
           {clubPublished && !data.places.length && <p className="hint">{t('Dein Verein hat noch keinen Spielort. Lege ihn unter „Meine Vereine“ an.')}</p>}
           {data.offers.length === 0 && data.places.length > 0 && <p className="muted">{t('Noch keine Angebote.')}</p>}
           <div className="user-list">

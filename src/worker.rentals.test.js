@@ -47,7 +47,7 @@ describe('Platz mieten', () => {
                ('u3', 'anders@example.test', 'Anna', 'Anders', 'user', 'salt', 'hash', '2026-10-01', '2026-10-01');
       INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ('s1', 'u1', '2099-01-01T00:00:00.000Z', '2026-10-01'),
         ('s2', 'u2', '2099-01-01T00:00:00.000Z', '2026-10-01'), ('s3', 'u3', '2099-01-01T00:00:00.000Z', '2026-10-01');
-      INSERT INTO clubs (id, name, status, owner_id, created_at, updated_at) VALUES ('c1', 'BC Test', 'published', 'u1', '2026-10-01', '2026-10-01');
+      INSERT INTO clubs (id, name, status, owner_id, contact_email, created_at, updated_at) VALUES ('c1', 'BC Test', 'published', 'u1', 'info@bc-test.de', '2026-10-01', '2026-10-01');
       INSERT INTO boule_places (id, club_id, name, address, latitude, longitude, court_count, status, created_at, updated_at)
         VALUES ('p1', 'c1', 'Halle Nord', 'Berlin', 52.5, 13.4, 8, 'published', '2026-10-01', '2026-10-01');
     `);
@@ -65,10 +65,8 @@ describe('Platz mieten', () => {
     expect(list.offers.map((entry) => entry.title)).toEqual(['Boulehalle']);
     const detail = await (await call('GET', `/api/rentals/${offer.id}`)).json();
     expect(detail.offer.canManage).toBe(false);
-    // Nur die öffentliche Kontakt-E-Mail des Vereins, nie die Konto-E-Mail des Verwalters.
-    expect(detail.offer.clubContactEmail).toBeNull();
-    sql("UPDATE clubs SET contact_email = 'info@bc-test.de' WHERE id = 'c1'");
-    expect((await (await call('GET', `/api/rentals/${offer.id}`)).json()).offer.clubContactEmail).toBe('info@bc-test.de');
+    // Für „Nachricht an Vermieter“ (mailto): die öffentliche Kontakt-E-Mail des Vereins, nie die Konto-E-Mail des Verwalters.
+    expect(detail.offer.clubContactEmail).toBe('info@bc-test.de');
 
     await call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, status: 'inactive' }, headers: VEREIN });
     expect((await (await call('GET', '/api/rentals')).json()).offers).toEqual([]);
@@ -108,34 +106,24 @@ describe('Platz mieten', () => {
     expect(week.days[0].slots.length).toBeGreaterThan(0);
   });
 
-  it('schickt eine Nachricht an den Vermieter in die Postbox und per E-Mail', async () => {
-    const send = vi.fn(async () => {});
-    env.MAIL_QUEUE = { send };
-    const offer = await createOffer();
-    const message = (body, headers = MIETER) => call('POST', `/api/rentals/${offer.id}/messages`, { body: { body }, headers });
-    expect((await message('Hallo')).status).toBe(201);
-    const stored = env.DB.sqlite.prepare("SELECT sender_id, recipient_id, kind, body FROM postbox_messages WHERE kind = 'direct'").all();
-    expect(stored).toEqual([{ sender_id: 'u2', recipient_id: 'u1', kind: 'direct', body: '„Boulehalle“\n\nHallo' }]);
-    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({
-      to: 'verein@example.test', subject: 'Nachricht zu „Boulehalle“', messageBox: 'Hallo',
-      text: expect.stringContaining('Max Mieter hat dir über PTM Online eine Nachricht'),
-    }));
-    // Ohne Anmeldung, an sich selbst, leer oder bei nicht öffentlichem Angebot nicht möglich.
-    expect((await call('POST', `/api/rentals/${offer.id}/messages`, { body: { body: 'Hallo' } })).status).toBe(401);
-    expect((await message('Hallo', VEREIN)).status).toBe(409);
-    expect((await message('  ')).status).toBe(400);
-    sql("UPDATE rental_offers SET status = 'inactive' WHERE id = ?", offer.id);
-    expect((await message('Hallo')).status).toBe(404);
-  });
+  it('verlangt für Platzmiete eine Kontakt-E-Mail des Vereins', async () => {
+    await createOffer();
+    const clubBody = { name: 'BC Test', contactEmail: '' };
+    const removed = await call('PUT', '/api/clubs/c1', { body: clubBody, headers: VEREIN });
+    expect(removed.status).toBe(400);
+    expect((await removed.json()).error).toBe('Der Verein vermietet Plätze und braucht deshalb eine Kontakt-E-Mail');
+    sql(`INSERT INTO users (id, email, first_name, last_name, role, password_salt, password_hash, created_at, updated_at)
+      VALUES ('u4', 'admin@example.test', 'Ada', 'Admin', 'admin', 'salt', 'hash', '2026-10-01', '2026-10-01')`);
+    sql("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ('s4', 'u4', '2099-01-01T00:00:00.000Z', '2026-10-01')");
+    expect((await call('PUT', '/api/admin/clubs/c1', { body: clubBody, headers: { Cookie: 'ptm_session=s4' } })).status).toBe(400);
 
-  it('begrenzt Nachrichten an den Vermieter je Stunde', async () => {
-    env.MAIL_QUEUE = { send: vi.fn(async () => {}) };
-    const offer = await createOffer();
-    for (let index = 0; index < 5; index += 1) {
-      expect((await call('POST', `/api/rentals/${offer.id}/messages`, { body: { body: `Nachricht ${index}` }, headers: MIETER })).status).toBe(201);
-    }
-    expect((await call('POST', `/api/rentals/${offer.id}/messages`, { body: { body: 'zu viel' }, headers: MIETER })).status).toBe(429);
-    expect(env.MAIL_QUEUE.send).toHaveBeenCalledTimes(5);
+    sql('DELETE FROM rental_offers');
+    expect((await call('PUT', '/api/clubs/c1', { body: clubBody, headers: VEREIN })).status).toBe(200);
+    const manage = await (await call('GET', '/api/rentals/manage?club=c1', { headers: VEREIN })).json();
+    expect(manage.clubHasContactEmail).toBe(false);
+    const created = await call('POST', '/api/rentals/offers', { body: offerBody, headers: VEREIN });
+    expect(created.status).toBe(409);
+    expect((await created.json()).error).toBe('Für Platzmiete braucht der Verein eine Kontakt-E-Mail');
   });
 
   it('nimmt Anfragen bis zur Bahnanzahl an und benachrichtigt den Verein', async () => {
@@ -308,7 +296,7 @@ describe('Platz mieten', () => {
     const offer = await createOffer();
     const reservation = (await (await reserve(offer.id, { note: 'Bitte Licht an' })).json()).reservation;
     expect(send).toHaveBeenLastCalledWith(expect.objectContaining({
-      to: 'verein@example.test', subject: 'Reservierungsanfrage: Boulehalle', messageBox: 'Bitte Licht an',
+      to: 'info@bc-test.de', subject: 'Reservierungsanfrage: Boulehalle', messageBox: 'Bitte Licht an',
       actions: [expect.objectContaining({ url: 'https://ptm.test/platz-mieten/verwalten' })],
     }));
     await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
