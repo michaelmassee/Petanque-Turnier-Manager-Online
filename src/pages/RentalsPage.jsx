@@ -621,8 +621,8 @@ export function RentalManagement({ language, navigate, currentUser }) {
   }
 
   const clubPublished = data?.clubStatus === 'published';
-  // Angebote brauchen einen freigegebenen Verein mit Kontakt-E-Mail und mindestens einem freigegebenen Spielort.
-  const canEditOffers = clubPublished && Boolean(data?.clubContactEmail) && Boolean(data?.places.length);
+  // Angebote brauchen einen freigegebenen Verein mit mindestens einem freigegebenen Spielort.
+  const canEditOffers = clubPublished && Boolean(data?.places.length);
   const offerTitle = (offerId) => data?.offers.find((offer) => offer.id === offerId)?.title || '';
   const requests = (data?.reservations || []).filter((reservation) => reservation.status === 'requested');
   const confirmed = (data?.reservations || []).filter((reservation) => reservation.status === 'confirmed');
@@ -684,7 +684,6 @@ export function RentalManagement({ language, navigate, currentUser }) {
             <Button disabled={!canEditOffers} onClick={() => openOffer()}>{t('Neues Angebot')}</Button>
           </div>
           {!clubPublished && <p className="hint">{t('Dein Verein ist noch nicht freigegeben. Angebote kannst du anlegen, sobald ein Admin ihn freigegeben hat.')}</p>}
-          {clubPublished && !data.clubContactEmail && <p className="hint">{t('Für Platzmiete braucht dein Verein eine Kontakt-E-Mail. Trage sie unter „Meine Vereine“ ein.')}</p>}
           {clubPublished && !data.places.length && <p className="hint">{t('Dein Verein hat noch keinen Spielort. Lege ihn unter „Meine Vereine“ an.')}</p>}
           {data.offers.length === 0 && data.places.length > 0 && <p className="muted">{t('Noch keine Angebote.')}</p>}
           <div className="user-list">

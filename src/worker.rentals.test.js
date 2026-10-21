@@ -109,24 +109,14 @@ describe('Platz mieten', () => {
     expect(week.days[0].slots.length).toBeGreaterThan(0);
   });
 
-  it('verlangt für Platzmiete eine Kontakt-E-Mail des Vereins', async () => {
+  it('braucht keine Kontakt-E-Mail des Vereins, nur eine je Angebot', async () => {
     await createOffer();
-    const clubBody = { name: 'BC Test', contactEmail: '' };
-    const removed = await call('PUT', '/api/clubs/c1', { body: clubBody, headers: VEREIN });
-    expect(removed.status).toBe(400);
-    expect((await removed.json()).error).toBe('Der Verein vermietet Plätze und braucht deshalb eine Kontakt-E-Mail');
-    sql(`INSERT INTO users (id, email, first_name, last_name, role, password_salt, password_hash, created_at, updated_at)
-      VALUES ('u4', 'admin@example.test', 'Ada', 'Admin', 'admin', 'salt', 'hash', '2026-10-01', '2026-10-01')`);
-    sql("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ('s4', 'u4', '2099-01-01T00:00:00.000Z', '2026-10-01')");
-    expect((await call('PUT', '/api/admin/clubs/c1', { body: clubBody, headers: { Cookie: 'ptm_session=s4' } })).status).toBe(400);
-
-    sql('DELETE FROM rental_offers');
-    expect((await call('PUT', '/api/clubs/c1', { body: clubBody, headers: VEREIN })).status).toBe(200);
+    // Der Verein darf seine Kontakt-E-Mail auch mit Mietangeboten entfernen; die Angebote haben ihre eigene.
+    expect((await call('PUT', '/api/clubs/c1', { body: { name: 'BC Test', contactEmail: '' }, headers: VEREIN })).status).toBe(200);
     const manage = await (await call('GET', '/api/rentals/manage?club=c1', { headers: VEREIN })).json();
     expect(manage.clubContactEmail).toBeNull();
-    const created = await call('POST', '/api/rentals/offers', { body: offerBody, headers: VEREIN });
-    expect(created.status).toBe(409);
-    expect((await created.json()).error).toBe('Für Platzmiete braucht der Verein eine Kontakt-E-Mail');
+    expect(manage.offers[0].contactEmail).toBe('halle@bc-test.de');
+    expect((await call('POST', '/api/rentals/offers', { body: offerBody, headers: VEREIN })).status).toBe(201);
   });
 
   it('nimmt Anfragen bis zur Bahnanzahl an und benachrichtigt den Verein', async () => {

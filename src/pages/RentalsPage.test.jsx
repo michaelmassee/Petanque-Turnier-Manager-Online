@@ -407,16 +407,15 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
   });
 
-  it('sperrt Angebote, wenn der Verein keine Kontakt-E-Mail hat', async () => {
+  it('lässt die Kontakt-E-Mail eines neuen Angebots leer, wenn der Verein keine hat', async () => {
     authenticatedApi.mockImplementation(async (path) => {
       if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
       return { ...MANAGE, clubContactEmail: null };
     });
     render(<RentalManagement language="de" navigate={vi.fn()} />);
 
-    expect(await screen.findByText(/Für Platzmiete braucht dein Verein eine Kontakt-E-Mail/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Neues Angebot' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
+    fireEvent.click(await screen.findByRole('button', { name: 'Neues Angebot' }));
+    expect(within(screen.getByRole('dialog')).getByLabelText(/Kontakt-E-Mail/)).toHaveValue('');
   });
 
   it('sperrt neue Angebote, solange der Verein nicht freigegeben ist', async () => {

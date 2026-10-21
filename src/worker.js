@@ -9574,8 +9574,7 @@ function rentalPersonName(row, prefix = '') {
 }
 
 const RENTAL_OFFER_SELECT = `SELECT o.*, p.name AS place_name, p.address AS place_address, p.venue_type, p.latitude, p.longitude,
-    p.status AS place_status, p.court_count AS place_court_count, c.name AS club_name, c.logo_url AS club_logo_url, c.status AS club_status,
-    c.contact_email AS club_contact_email
+    p.status AS place_status, p.court_count AS place_court_count, c.name AS club_name, c.logo_url AS club_logo_url, c.status AS club_status
   FROM rental_offers o JOIN boule_places p ON p.id = o.boule_place_id JOIN clubs c ON c.id = o.club_id`;
 
 function rentalOfferIsPublic(row) {
@@ -9584,7 +9583,7 @@ function rentalOfferIsPublic(row) {
 
 function toRentalOffer(row, openingHours = null) {
   return {
-    id: row.id, clubId: row.club_id, clubName: row.club_name, contactEmail: row.contact_email || row.club_contact_email || null, hasClubLogo: Boolean(row.club_logo_url), placeId: row.boule_place_id,
+    id: row.id, clubId: row.club_id, clubName: row.club_name, contactEmail: row.contact_email || null, hasClubLogo: Boolean(row.club_logo_url), placeId: row.boule_place_id,
     placeName: row.place_name, address: formatLocationAddress(row.place_address), venueType: row.venue_type || 'outdoor',
     latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
     longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
@@ -9712,10 +9711,10 @@ async function notifyRentalClub(env, { offer, reservation, renter, eventType, or
       console.error('Rental postbox message failed', error);
     }
   }
-  const club = await env.DB.prepare('SELECT owner_id, contact_email FROM clubs WHERE id = ?').bind(offer.club_id).first();
+  const club = await env.DB.prepare('SELECT owner_id FROM clubs WHERE id = ?').bind(offer.club_id).first();
   const owner = managers.find((manager) => manager.id === club?.owner_id);
   // Mails gehen an die Kontakt-E-Mail des Angebots (Pflicht, vorbelegt mit der des Vereins), nie an Verwalter-Konten.
-  const to = offer.contact_email || club?.contact_email;
+  const to = offer.contact_email;
   if (!to || owner?.id === renter.id) return;
   const language = owner?.language || 'de';
   const templates = RENTAL_EMAILS[language] || RENTAL_EMAILS.de;
@@ -9976,15 +9975,6 @@ async function listRentalManagement(db, clubId, user) {
 // Vermieten darf nur ein freigegebener Verein an einem freigegebenen Spielort, sonst wäre das Angebot öffentlich unsichtbar.
 function assertRentalClubPublished(club) {
   if (club.status !== 'published') throw new HttpError(409, 'Angebote sind erst möglich, wenn der Verein freigegeben ist');
-  // Anfragen und Rückfragen der Mieter laufen über die öffentliche Kontakt-E-Mail des Vereins.
-  if (!isEmail(club.contact_email || '')) throw new HttpError(409, 'Für Platzmiete braucht der Verein eine Kontakt-E-Mail');
-}
-
-// Solange ein Verein Plätze vermietet, darf seine Kontakt-E-Mail nicht entfernt werden.
-async function assertRentalContactKept(db, clubId, contactEmail) {
-  if (contactEmail) return;
-  const offers = await db.prepare('SELECT COUNT(*) AS count FROM rental_offers WHERE club_id = ?').bind(clubId).first('count');
-  if (Number(offers) > 0) throw new HttpError(400, 'Der Verein vermietet Plätze und braucht deshalb eine Kontakt-E-Mail', { field: 'contactEmail' });
 }
 
 async function rentalPlaceForClub(db, clubId, placeId) {
@@ -10087,7 +10077,6 @@ async function assertClubOwner(db, clubId, user) {
 
 export async function updateClub(request, db, id, user) {
   const club = await assertClubEditor(db, id, user); const input = clubInput(await readJson(request), club.owner_id); const now = new Date().toISOString();
-  await assertRentalContactKept(db, id, input.contactEmail);
   // Bereits freigegebene Vereine bleiben bei Bearbeitung freigegeben, statt erneut zur Moderation zu müssen.
   const status = club.status === 'published' ? 'published' : 'pending';
   await db.batch([
@@ -10583,7 +10572,6 @@ export async function updateClubAsAdmin(request, db, id) {
   const club = await db.prepare('SELECT id, owner_id FROM clubs WHERE id = ?').bind(id).first();
   if (!club) throw new HttpError(404, 'Verein nicht gefunden');
   const input = clubInput(await readJson(request), club.owner_id);
-  await assertRentalContactKept(db, id, input.contactEmail);
   await db.batch([
     db.prepare('UPDATE clubs SET name = ?, description = ?, website_url = ?, logo_url = ?, contact_name = ?, contact_email = ?, contact_phone = ?, updated_at = ? WHERE id = ?')
       .bind(input.name, input.description, input.websiteUrl, input.logoUrl, input.contactName, input.contactEmail, input.contactPhone, new Date().toISOString(), id),
