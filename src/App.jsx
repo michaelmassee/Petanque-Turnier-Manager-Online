@@ -45,6 +45,10 @@ const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'));
 const PlayerLivePage = lazy(() => import('./pages/PlayerLivePage.jsx'));
 const RentalsPage = lazy(() => import('./pages/RentalsPage.jsx'));
 
+// Postbox-Badge und offene Postbox fragen alle 2 Minuten nach (wie die Live-Ansicht; halbiert die Last auf dem
+// Free-Plan, Entscheidung vom 2026-10-21). Beim Zurückkehren zur App lädt react-query ohnehin sofort neu.
+const POSTBOX_REFRESH_MS = 120_000;
+
 export { filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
 export { EditDialog, ListToolbar } from './components/ui.jsx';
 
@@ -261,14 +265,14 @@ function AppContent() {
     queryKey: ['postbox-summary', currentUser?.id],
     queryFn: () => authenticatedApi('/api/postbox/summary'),
     enabled: Boolean(currentUser) && !postboxOpen,
-    refetchInterval: 60_000,
+    refetchInterval: POSTBOX_REFRESH_MS,
     refetchIntervalInBackground: false,
   });
   const postboxQuery = useQuery({
     queryKey: ['postbox', currentUser?.id],
     queryFn: () => authenticatedApi('/api/postbox'),
     enabled: Boolean(currentUser) && postboxOpen,
-    refetchInterval: 60_000,
+    refetchInterval: POSTBOX_REFRESH_MS,
     refetchIntervalInBackground: false,
   });
   const postboxRecipientsQuery = useQuery({
