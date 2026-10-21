@@ -4684,25 +4684,26 @@ details[open] > .play-round-summary::before {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex: 1 1 auto; min-height: 40px;
   padding: 6px 12px; border: 1px solid #d7deea; border-radius: 8px; background: #ffffff; color: #172033; cursor: pointer;
 }
-.rental-month-toggle:hover, .rental-month-toggle[aria-expanded="true"] { border-color: #087a72; color: #087a72; }
+.rental-month-toggle:hover, .rental-month-toggle[aria-expanded="true"] { border-color: #1677ff; background: #ecf4ff; color: #0a5fd1; }
 /* Eigene volle Zeile unter den Wochenbuttons; der Kalender selbst bleibt kompakt und zentriert. */
 .rental-month-picker { flex: 1 0 100%; order: 1; display: flex; justify-content: center; }
 .rental-month-panel {
   width: 100%; max-width: 24rem; padding: 12px; border: 1px solid #d7deea; border-radius: 12px;
-  background: #ffffff; box-shadow: 0 8px 24px rgb(23 32 51 / 10%);
+  background: linear-gradient(135deg, #f7fbff, #ffffff); box-shadow: 0 12px 30px rgb(22 119 255 / 14%);
 }
 .rental-month-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .rental-month-head strong { text-transform: capitalize; }
 .rental-month-nav {
   width: 40px; height: 40px; border: 1px solid #d7deea; border-radius: 8px; background: #ffffff; font-size: 1.3rem; cursor: pointer;
 }
+.rental-month-nav:not(:disabled):hover { border-color: #1677ff; background: #ecf4ff; color: #0a5fd1; }
 .rental-month-nav:disabled { color: #c3c9d4; cursor: default; }
 .rental-month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .rental-month-weekday { text-align: center; font-size: 0.75rem; color: #4a5568; text-transform: capitalize; }
 .rental-slot.rental-month-day { min-height: 40px; font-size: 0.95rem; cursor: pointer; }
 .rental-month-day:disabled { cursor: default; }
 .rental-month-day.today { font-weight: 700; text-decoration: underline; }
-.rental-month-day.current { box-shadow: inset 0 0 0 3px #1d4ed8; }
+.rental-month-day.current { box-shadow: inset 0 0 0 3px #0a5fd1, 0 0 0 2px rgb(22 119 255 / 25%); }
 .rental-calendar { margin-bottom: 12px; }
 .rental-grid {
   display: grid;
@@ -4716,29 +4717,41 @@ details[open] > .play-round-summary::before {
 .rental-slot {
   min-height: 34px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 20%);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   padding: 0;
+  transition: transform 120ms ease, filter 120ms ease;
 }
-.rental-slot.free { background: #15803d; border-color: #116932; color: #ffffff; }
-.rental-slot.partial { background: #f59e0b; border-color: #d48806; color: #3a2600; }
-.rental-slot.full { background: #c62828; border-color: #a31f1f; color: #ffffff; }
-.rental-slot.past { background: #f1f3f7; color: #9aa3b2; }
-.rental-slot.closed { background: repeating-linear-gradient(45deg, #f6f7fa, #f6f7fa 4px, #eceff4 4px, #eceff4 8px); }
-.rental-slot.selected { background: #1d4ed8; border-color: #1e3a8a; color: #ffffff; font-weight: 700; }
+/* Dezente 135°-Verläufe wie bei Turnierkarte/Startseite; Schrift hat an beiden Verlaufsenden WCAG-AA-Kontrast. */
+.rental-slot.free { background: linear-gradient(135deg, #168741, #15803d); border-color: #116932; color: #ffffff; }
+.rental-slot.partial { background: linear-gradient(135deg, #fbbf24, #f59e0b); border-color: #d48806; color: #3a2600; }
+.rental-slot.full { background: linear-gradient(135deg, #d32f2f, #c62828); border-color: #a31f1f; color: #ffffff; }
+.rental-slot.past { background: linear-gradient(135deg, #f4f6fa, #eceff4); border-color: #e2e7f0; color: #6b7487; box-shadow: none; }
+.rental-slot.closed { background: repeating-linear-gradient(45deg, #f6f7fa, #f6f7fa 4px, #eceff4 4px, #eceff4 8px); box-shadow: none; }
+.rental-slot.selected {
+  background: linear-gradient(135deg, #1468e8, #0a5fd1); border-color: #0a4fb0; color: #ffffff; font-weight: 700;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 20%), 0 0 0 2px rgb(22 119 255 / 25%);
+}
 button.rental-slot:disabled { opacity: 1; }
-button.rental-slot:not(:disabled):hover { outline: 2px solid #172033; outline-offset: -1px; }
+button.rental-slot:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.06); }
+button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) {
+  .rental-slot { transition: none; }
+  button.rental-slot:not(:disabled):hover { transform: none; }
+}
 .rental-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 0.8rem; color: #4a5568; }
 .rental-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.rental-legend i { display: inline-block; width: 14px; height: 14px; min-height: 0; }
+.rental-legend i { display: inline-block; width: 14px; height: 14px; min-height: 0; border-radius: 4px; }
 .rental-day-tabs { display: none; }
 .rental-request { margin-top: 12px; padding-top: 12px; border-top: 1px solid #d7deea; }
 .rental-request h3 { margin-top: 0; }
-.rental-status { font-weight: 600; }
-.rental-status-confirmed { color: #155b33; }
-.rental-status-requested { color: #7a5800; }
-.rental-status-rejected, .rental-status-cancelled { color: #9b1c1c; }
+/* Status-Badge in den Farben der übrigen Status-Badges (.status-*). */
+.rental-status { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #eceef2; color: #4a5160; font-weight: 600; }
+.rental-status-confirmed { background: #eaf8ef; color: #206f3b; }
+.rental-status-requested { background: #fff0d6; color: #8b5200; }
+.rental-status-rejected, .rental-status-cancelled { background: #ffecec; color: #9d2424; }
 .rental-opening { border: 1px solid #d7deea; border-radius: 8px; padding: 8px 12px 12px; }
 .rental-opening-row { display: grid; grid-template-columns: minmax(5rem, 1fr) 1fr 1fr; gap: 8px; align-items: end; }
 
@@ -4749,7 +4762,7 @@ button.rental-slot:not(:disabled):hover { outline: 2px solid #172033; outline-of
     background: #ffffff; color: #172033; font-size: 0.75rem; text-transform: capitalize;
   }
   .rental-day-tab.closed { color: #9aa3b2; }
-  .rental-day-tab.active { background: #087a72; border-color: #087a72; color: #ffffff; }
+  .rental-day-tab.active { background: linear-gradient(135deg, #1468e8, #0a5fd1); border-color: #0a4fb0; color: #ffffff; }
   .rental-grid { grid-template-columns: 3.4rem minmax(0, 1fr); }
   .rental-grid-head:not(.active), .rental-grid .rental-slot:not(.active) { display: none; }
   .rental-grid-corner { display: none; }
