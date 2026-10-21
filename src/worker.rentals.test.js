@@ -144,6 +144,36 @@ describe('Platz mieten', () => {
     expect(postbox().filter((row) => row.recipient_id === 'u1').map((row) => row.event_type)).toEqual(['rental_requested', 'rental_requested', 'rental_requested']);
   });
 
+  it('vermietet komplett: belegt alle Bahnen und nennt in der Mail die komplette Halle', async () => {
+    const send = vi.fn(async () => {});
+    env.MAIL_QUEUE = { send };
+    sql("UPDATE boule_places SET venue_type = 'indoor' WHERE id = 'p1'");
+    const created = await call('POST', '/api/rentals/offers', {
+      body: { ...offerBody, rentalMode: 'both', wholePriceMinor: 3500, wholePriceNote: 'pro Stunde' }, headers: VEREIN,
+    });
+    const offer = (await created.json()).offer;
+    expect(offer).toMatchObject({ rentalMode: 'both', wholePriceMinor: 3500, wholePriceNote: 'pro Stunde', venueType: 'indoor' });
+
+    const booked = await reserve(offer.id, { whole: true, lanes: 1 });
+    expect(booked.status).toBe(201);
+    expect((await booked.json()).reservation).toMatchObject({ whole: true, lanes: 4 });
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ to: 'info@bc-test.de', text: expect.stringContaining('10:00–12:00, komplette Halle') }));
+    expect((await reserve(offer.id, { lanes: 1 }, ANDERER)).status).toBe(409);
+    // Komplett geht nur, wenn alle Bahnen frei sind.
+    expect((await reserve(offer.id, { startHour: 12, hours: 1, lanes: 1 }, ANDERER)).status).toBe(201);
+    expect((await reserve(offer.id, { startHour: 12, hours: 1, whole: true })).status).toBe(409);
+
+    const mine = await (await call('GET', '/api/rentals/reservations/mine', { headers: MIETER })).json();
+    expect(mine.reservations[0]).toMatchObject({ whole: true, venueType: 'indoor' });
+
+    // Nur-komplett-Angebote: einzelne Bahnen sind nicht buchbar, Tage ohne komplett freie Stunde gelten als ausgebucht.
+    await call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, rentalMode: 'whole' }, headers: VEREIN });
+    expect((await reserve(offer.id, { startHour: 9, hours: 1, lanes: 1 })).status).toBe(400);
+    sql("UPDATE rental_opening_hours SET open_hour = 10, close_hour = 13 WHERE offer_id = ? AND weekday = 6", offer.id);
+    const month = await (await call('GET', `/api/rentals/${offer.id}/availability?month=2026-10`)).json();
+    expect(month.days.find((entry) => entry.date === '2026-10-24').status).toBe('full');
+  });
+
   it('teilt die Kapazität eines Spielorts zwischen Angeboten und gibt sie nach Storno frei', async () => {
     const first = (await (await call('POST', '/api/rentals/offers', { body: { ...offerBody, laneCount: 8 }, headers: VEREIN })).json()).offer;
     const second = await createOffer();
@@ -175,7 +205,7 @@ describe('Platz mieten', () => {
     const reservation = (await (await reserve(offer.id, { lanes: 4 })).json()).reservation;
     // Altbestand aus der Zeit vor der spielortübergreifenden Prüfung.
     sql(`INSERT INTO rental_reservations SELECT 'legacy', offer_id, 'u3', local_date, start_hour, hours, lanes,
-      start_utc, end_utc, status, note, decision_note, decided_by, decided_at, created_at, updated_at
+      start_utc, end_utc, status, note, decision_note, decided_by, decided_at, created_at, updated_at, whole
       FROM rental_reservations WHERE id = ?`, reservation.id);
     const result = await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
     expect(result.status).toBe(409);

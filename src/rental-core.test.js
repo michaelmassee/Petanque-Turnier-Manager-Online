@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAvailability, dayAvailabilityStatus, formatRentalSlot, monthRange, normalizeOfferInput, normalizeOpeningHours, validateReservationRequest } from './rental-core.js';
+import { buildAvailability, dayAvailabilityStatus, formatRentalSlot, monthRange, normalizeOfferInput, normalizeOpeningHours, rentalMinLanes, validateReservationRequest } from './rental-core.js';
 
 const offer = { laneCount: 4, minHours: 1, maxHours: 3, bookingHorizonDays: 30 };
 // 2026-10-19 ist ein Montag (Wochentag 1).
@@ -23,6 +23,26 @@ describe('Platz mieten: Eingaben', () => {
     expect(() => normalizeOfferInput({ ...base, currency: 'XYZ' })).toThrow();
   });
 
+  it('prüft Vermietungsart und Komplettpreis', () => {
+    const base = { title: 'Halle', laneCount: 6, openingHours };
+    expect(normalizeOfferInput(base)).toMatchObject({ rentalMode: 'lanes', wholePriceMinor: null, wholePriceNote: null });
+    expect(normalizeOfferInput({ ...base, rentalMode: 'both', wholePriceMinor: 9000, wholePriceNote: ' pro Stunde ' }))
+      .toMatchObject({ rentalMode: 'both', wholePriceMinor: 9000, wholePriceNote: 'pro Stunde' });
+    expect(() => normalizeOfferInput({ ...base, rentalMode: 'halle' })).toThrow('Vermietungsart');
+    expect(() => normalizeOfferInput({ ...base, wholePriceMinor: -1 })).toThrow();
+  });
+
+  it('bucht komplett immer alle Bahnen und nur, wenn das Angebot es erlaubt', () => {
+    const whole = (rentalMode, body) => validateReservationRequest({ offer: { ...offer, rentalMode }, openingHours, body: { date: '2026-10-24', startHour: 10, hours: 1, ...body }, now });
+    expect(whole('both', { whole: true, lanes: 1 })).toMatchObject({ whole: true, lanes: 4 });
+    expect(whole('both', { lanes: 2 })).toMatchObject({ whole: false, lanes: 2 });
+    expect(whole('whole', { whole: true })).toMatchObject({ whole: true, lanes: 4 });
+    expect(() => whole('lanes', { whole: true })).toThrow('nur einzelne Bahnen');
+    expect(() => whole('whole', { lanes: 4 })).toThrow('nur komplett');
+    expect(rentalMinLanes({ laneCount: 4, rentalMode: 'whole' })).toBe(4);
+    expect(rentalMinLanes({ laneCount: 4, rentalMode: 'both' })).toBe(1);
+  });
+
   it('zählt beim Längenlimit der Rich-Text-Beschreibung nur den sichtbaren Text', () => {
     const base = { title: 'Halle', laneCount: 6, openingHours };
     const richText = (text) => `ptm-richtext:v1:${JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text, marks: [{ type: 'bold' }] }] }] })}`;
@@ -32,7 +52,7 @@ describe('Platz mieten: Eingaben', () => {
 
   it('akzeptiert eine Anfrage innerhalb der Öffnungszeiten', () => {
     expect(request({ date: '2026-10-24', startHour: 10, hours: 3, lanes: 4, note: ' Training ' }))
-      .toEqual({ date: '2026-10-24', startHour: 10, hours: 3, lanes: 4, note: 'Training' });
+      .toEqual({ date: '2026-10-24', startHour: 10, hours: 3, lanes: 4, whole: false, note: 'Training' });
   });
 
   it('lehnt Anfragen außerhalb von Öffnungszeit, Dauer, Bahnen, Vergangenheit und Horizont ab', () => {
@@ -83,6 +103,11 @@ describe('Platz mieten: Monatskalender', () => {
     [[{ hour: 9, free: 0, bookable: true }, { hour: 10, free: 4, bookable: true }], 'partial'],
   ])('bewertet Slots %j als %s', (slots, status) => {
     expect(dayAvailabilityStatus(day(slots), 4)).toBe(status);
+  });
+
+  it('wertet bei Nur-komplett-Angeboten Tage ohne komplett freie Stunde als ausgebucht', () => {
+    expect(dayAvailabilityStatus(day([{ hour: 9, free: 2, bookable: true }, { hour: 10, free: 3, bookable: true }]), 4, 4)).toBe('full');
+    expect(dayAvailabilityStatus(day([{ hour: 9, free: 2, bookable: true }, { hour: 10, free: 4, bookable: true }]), 4, 4)).toBe('partial');
   });
 
   it('liefert Monatsanfang und -länge, auch im Schaltjahr', () => {

@@ -8,10 +8,10 @@ function isSelected(selection, date, hour) {
   return Boolean(selection) && selection.date === date && hour >= selection.startHour && hour < selection.startHour + selection.hours;
 }
 
-function slotClass(slot, laneCount, selected) {
+function slotClass(slot, laneCount, minLanes, selected) {
   if (selected) return 'rental-slot selected';
   if (!slot.bookable) return 'rental-slot past';
-  if (slot.free === 0) return 'rental-slot full';
+  if (slot.free < minLanes) return 'rental-slot full';
   return slot.free < laneCount ? 'rental-slot partial' : 'rental-slot free';
 }
 
@@ -20,8 +20,9 @@ function slotClass(slot, laneCount, selected) {
  * die Tagesleiste – so bleibt die Seite ohne horizontales Scrollen.
  * @param days Verfügbarkeit aus GET /api/rentals/:id/availability
  * @param onSelect (date, hour) => void; ohne onSelect ist das Raster nur zur Ansicht
+ * @param minLanes so viele Bahnen müssen frei sein, damit eine Stunde wählbar ist (Nur-komplett-Angebote: alle)
  */
-export function RentalCalendar({ days, laneCount, selection, onSelect, language }) {
+export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSelect, language }) {
   const { t } = useTranslation();
   const firstOpenDay = Math.max(0, days.findIndex((day) => day.slots.some((slot) => slot.bookable)));
   const [activeDay, setActiveDay] = useState(firstOpenDay);
@@ -62,12 +63,12 @@ export function RentalCalendar({ days, laneCount, selection, onSelect, language 
             if (!slot) return <div key={`${day.date}-${hour}`} className={`rental-slot closed${columnClass}`} aria-hidden="true" />;
             const selected = isSelected(selection, day.date, hour);
             const label = `${formatDate(day.date, language)} ${hourLabel(hour)}: ${t('{{free}} von {{total}} Bahnen frei', { free: slot.free, total: laneCount })}`;
-            const disabled = !onSelect || !slot.bookable || slot.free === 0;
+            const disabled = !onSelect || !slot.bookable || slot.free < minLanes;
             return (
               <button
                 key={`${day.date}-${hour}`}
                 type="button"
-                className={`${slotClass(slot, laneCount, selected)}${columnClass}`}
+                className={`${slotClass(slot, laneCount, minLanes, selected)}${columnClass}`}
                 disabled={disabled}
                 aria-pressed={selected}
                 aria-label={label}

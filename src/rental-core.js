@@ -9,7 +9,9 @@ export const RENTAL_ACTIVE_STATUSES = ['requested', 'confirmed'];
 export const RENTAL_MAX_LANES = 200;
 export const RENTAL_MAX_HORIZON_DAYS = 365;
 export const RENTAL_AVAILABILITY_DAYS = 7;
-const TEXT_LIMITS = { title: 120, description: 2000, priceNote: 120, note: 500 };
+// Vermietungsart: einzelne Bahnen, nur komplett (ganze Halle bzw. ganzer Platz = alle Bahnen des Angebots) oder beides.
+export const RENTAL_MODES = ['lanes', 'whole', 'both'];
+const TEXT_LIMITS = { title: 120, description: 2000, priceNote: 120, wholePriceNote: 120, note: 500 };
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function text(value, field, { required = false } = {}) {
@@ -30,6 +32,16 @@ function integer(value, field, min, max) {
   const result = Number(value);
   if (!Number.isInteger(result) || result < min || result > max) throw new HttpError(400, 'Ungültiger Wert', { field });
   return result;
+}
+
+// Leer = Preis auf Anfrage.
+function price(value, field) {
+  return value === null || value === undefined || value === '' ? null : integer(value, field, 0, 100000000);
+}
+
+/** Mindestens so viele Bahnen müssen in einer Stunde frei sein, damit sie für das Angebot buchbar ist. */
+export function rentalMinLanes(offer) {
+  return offer.rentalMode === 'whole' ? offer.laneCount : 1;
 }
 
 export function isValidLocalDate(value) {
@@ -70,8 +82,8 @@ export function normalizeOpeningHours(value) {
 export function normalizeOfferInput(body) {
   const currency = String(body?.currency || 'EUR').trim().toUpperCase();
   if (!CURRENCY_CODES.includes(currency)) throw new HttpError(400, 'Ungültige Währung', { field: 'currency' });
-  const priceMinor = body?.priceMinor === null || body?.priceMinor === undefined || body?.priceMinor === ''
-    ? null : integer(body.priceMinor, 'priceMinor', 0, 100000000);
+  const rentalMode = body?.rentalMode ?? 'lanes';
+  if (!RENTAL_MODES.includes(rentalMode)) throw new HttpError(400, 'Ungültige Vermietungsart', { field: 'rentalMode' });
   const minHours = integer(body?.minHours ?? 1, 'minHours', 1, 24);
   const maxHours = integer(body?.maxHours ?? 4, 'maxHours', 1, 24);
   if (maxHours < minHours) throw new HttpError(400, 'Höchstdauer ist kleiner als die Mindestdauer', { field: 'maxHours' });
@@ -80,9 +92,12 @@ export function normalizeOfferInput(body) {
     title: text(body?.title, 'title', { required: true }),
     description: description(body?.description),
     laneCount: integer(body?.laneCount, 'laneCount', 1, RENTAL_MAX_LANES),
-    priceMinor,
+    rentalMode,
+    priceMinor: price(body?.priceMinor, 'priceMinor'),
     currency,
     priceNote: text(body?.priceNote, 'priceNote'),
+    wholePriceMinor: price(body?.wholePriceMinor, 'wholePriceMinor'),
+    wholePriceNote: text(body?.wholePriceNote, 'wholePriceNote'),
     minHours,
     maxHours,
     bookingHorizonDays: integer(body?.bookingHorizonDays ?? 60, 'bookingHorizonDays', 1, RENTAL_MAX_HORIZON_DAYS),
@@ -100,7 +115,11 @@ export function validateReservationRequest({ offer, openingHours, body, now }) {
   if (!isValidLocalDate(date)) throw new HttpError(400, 'Ungültiges Datum', { field: 'date' });
   const startHour = integer(body?.startHour, 'startHour', 0, 23);
   const hours = integer(body?.hours, 'hours', 1, 24);
-  const lanes = integer(body?.lanes, 'lanes', 1, RENTAL_MAX_LANES);
+  // Eine Komplettbuchung belegt immer alle Bahnen des Angebots.
+  const whole = body?.whole === true;
+  if (whole && offer.rentalMode === 'lanes') throw new HttpError(400, 'Dieses Angebot vermietet nur einzelne Bahnen', { field: 'whole' });
+  if (!whole && offer.rentalMode === 'whole') throw new HttpError(400, 'Dieses Angebot wird nur komplett vermietet', { field: 'whole' });
+  const lanes = whole ? offer.laneCount : integer(body?.lanes, 'lanes', 1, RENTAL_MAX_LANES);
   if (hours < offer.minHours || hours > offer.maxHours) throw new HttpError(400, 'Die Dauer liegt außerhalb der erlaubten Spanne', { field: 'hours' });
   if (lanes > offer.laneCount) throw new HttpError(400, 'So viele Bahnen gibt es nicht', { field: 'lanes' });
   const opening = openingHours.find((entry) => entry.weekday === weekdayOf(date));
@@ -113,7 +132,7 @@ export function validateReservationRequest({ offer, openingHours, body, now }) {
   if (daysBetween(now.date, date) > offer.bookingHorizonDays) {
     throw new HttpError(400, 'So weit im Voraus kann noch nicht reserviert werden', { field: 'date' });
   }
-  return { date, startHour, hours, lanes, note: text(body?.note, 'note') };
+  return { date, startHour, hours, lanes, whole, note: text(body?.note, 'note') };
 }
 
 /** Belegte Bahnen je Datum und Stunde aus aktiven Reservierungen ({ localDate, startHour, hours, lanes }). */
@@ -153,13 +172,14 @@ export function buildAvailability({ offer, openingHours, from, days = RENTAL_AVA
 
 /**
  * Tagesstatus für den Monatskalender aus einem Tag von buildAvailability: closed (nicht geöffnet), unavailable
- * (nichts mehr buchbar: vorbei oder jenseits des Horizonts), full, free (alle buchbaren Stunden komplett frei), partial.
+ * (nichts mehr buchbar: vorbei oder jenseits des Horizonts), full (keine Stunde mit minLanes freien
+ * Bahnen, bei Nur-komplett-Angeboten = alle Bahnen), free (alle buchbaren Stunden komplett frei), partial.
  */
-export function dayAvailabilityStatus(day, laneCount) {
+export function dayAvailabilityStatus(day, laneCount, minLanes = 1) {
   if (!day.slots.length) return 'closed';
   const bookable = day.slots.filter((slot) => slot.bookable);
   if (!bookable.length) return 'unavailable';
-  if (bookable.every((slot) => slot.free === 0)) return 'full';
+  if (bookable.every((slot) => slot.free < minLanes)) return 'full';
   return bookable.every((slot) => slot.free >= laneCount) ? 'free' : 'partial';
 }
 

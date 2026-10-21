@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { clubLogoImageUrl } from '../lib/domain.js';
 import { amountToMinorUnits, currencyOptions, formatDate, formatMoney, formatWeekdayShort, minorUnitsToAmount } from '../lib/format.js';
-import { addDays } from '../rental-core.js';
+import { addDays, rentalMinLanes } from '../rental-core.js';
 import { Button, EditDialog, Feedback, SelectField, ShareLinkButton, TextArea, TextField } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { RentalCalendar } from '../components/RentalCalendar.jsx';
@@ -23,10 +23,27 @@ export function formatReservationSlot(reservation, language) {
   return `${formatWeekdayShort(reservation.date, language)} ${formatDate(reservation.date, language)}, ${hourLabel(reservation.startHour)}–${hourLabel(reservation.startHour + reservation.hours)}`;
 }
 
+// Komplettmiete heißt je nach Spielort „Komplette Halle“ oder „Kompletter Platz“.
+function wholeLabel(t, venueType) {
+  return venueType === 'indoor' ? t('Komplette Halle') : t('Kompletter Platz');
+}
+
+function reservationScope(t, reservation) {
+  return reservation.whole ? wholeLabel(t, reservation.venueType) : t('{{lanes}} Bahn(en)', { lanes: reservation.lanes });
+}
+
+function formatPrice(t, priceMinor, currency, note, language) {
+  if (priceMinor === null || priceMinor === undefined) return t('Preis auf Anfrage');
+  return `${priceMinor === 0 ? t('kostenlos') : formatMoney(priceMinor, currency, language)}${note ? ` ${note}` : ''}`;
+}
+
+// Bahnenpreis, Komplettpreis oder beide – je nach Vermietungsart des Angebots.
 function OfferPrice({ offer, language }) {
   const { t } = useTranslation();
-  if (offer.priceMinor === null || offer.priceMinor === undefined) return <span>{t('Preis auf Anfrage')}</span>;
-  return <span data-i18n-skip>{offer.priceMinor === 0 ? t('kostenlos') : formatMoney(offer.priceMinor, offer.currency, language)}{offer.priceNote ? ` ${offer.priceNote}` : ''}</span>;
+  const lanes = formatPrice(t, offer.priceMinor, offer.currency, offer.priceNote, language);
+  if (offer.rentalMode !== 'whole' && offer.rentalMode !== 'both') return <span data-i18n-skip>{lanes}</span>;
+  const whole = `${wholeLabel(t, offer.venueType)}: ${formatPrice(t, offer.wholePriceMinor, offer.currency, offer.wholePriceNote, language)}`;
+  return <span data-i18n-skip>{offer.rentalMode === 'both' ? `${t('Einzelne Bahnen')}: ${lanes} · ${whole}` : whole}</span>;
 }
 
 // Spielort und Verein heißen oft gleich; dann nur einmal nennen. Die Adresse steht in einer eigenen Zeile.
@@ -150,6 +167,7 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
   const [loadError, setLoadError] = useState('');
   const [selection, setSelection] = useState(null);
   const [lanes, setLanes] = useState('1');
+  const [whole, setWhole] = useState(false);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -167,17 +185,19 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
   useEffect(() => { loadAvailability(from).catch((requestError) => setLoadError(requestError.message)); }, [id, from]);
 
   const day = availability?.days.find((entry) => entry.date === selection?.date);
-  // Längste Dauer ab der gewählten Stunde: bis Ladenschluss, Höchstdauer oder zur ersten ausgebuchten Stunde.
+  const minLanes = offer ? rentalMinLanes(offer) : 1;
+  // Längste Dauer ab der gewählten Stunde: bis Ladenschluss, Höchstdauer oder zur ersten ausgebuchten Stunde
+  // (bei Nur-komplett-Angeboten: zur ersten Stunde, in der nicht alle Bahnen frei sind).
   const maxHours = useMemo(() => {
     if (!day || !offer) return 0;
     let hours = 0;
     while (hours < offer.maxHours) {
       const slot = day.slots.find((entry) => entry.hour === selection.startHour + hours);
-      if (!slot || !slot.bookable || slot.free === 0) break;
+      if (!slot || !slot.bookable || slot.free < minLanes) break;
       hours += 1;
     }
     return hours;
-  }, [day, offer, selection?.startHour]);
+  }, [day, offer, minLanes, selection?.startHour]);
   const freeLanes = day && selection
     ? Math.min(...day.slots.filter((slot) => slot.hour >= selection.startHour && slot.hour < selection.startHour + selection.hours).map((slot) => slot.free))
     : 0;
@@ -187,6 +207,7 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
     setError('');
     setSelection({ date, startHour: hour, hours: offer.minHours });
     setLanes('1');
+    setWhole(offer.rentalMode === 'whole');
   }
 
   async function submit(event) {
@@ -196,7 +217,7 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
     setMessage('');
     try {
       await authenticatedApi(`/api/rentals/${encodeURIComponent(id)}/reservations`, {
-        method: 'POST', body: JSON.stringify({ ...selection, lanes: Number(lanes), note }),
+        method: 'POST', body: JSON.stringify(whole ? { ...selection, whole: true, note } : { ...selection, lanes: Number(lanes), note }),
       });
       setMessage(t('Anfrage gesendet. Der Verein bestätigt die Reservierung; du bekommst eine Nachricht.'));
       setSelection(null);
@@ -216,6 +237,7 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
   const durationOptions = Array.from({ length: Math.max(0, maxHours - offer.minHours + 1) }, (_, index) => offer.minHours + index)
     .map((hours) => ({ value: String(hours), label: t('{{hours}} Std.', { hours }) }));
   const tooShort = selection && maxHours < offer.minHours;
+  const wholeFree = freeLanes >= offer.laneCount;
 
   return (
     <div className="panel rental-offer">
@@ -246,23 +268,32 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
         />
         <Button variant="secondary" disabled={addDays(availability.from, 7) > lastDate} onClick={() => setFrom(addDays(availability.from, 7))}>{t('Nächste Woche')}</Button>
       </div>
-      <RentalCalendar days={availability.days} laneCount={offer.laneCount} selection={selection} onSelect={select} language={language} />
+      <RentalCalendar days={availability.days} laneCount={offer.laneCount} minLanes={minLanes} selection={selection} onSelect={select} language={language} />
       <Feedback message={message} />
       {selection && (
         currentUser ? (
           <form className="form rental-request" onSubmit={submit}>
-            <h3>{formatReservationSlot(selection, language)}</h3>
+            <h3>{formatReservationSlot(selection, language)}{whole ? ` · ${wholeLabel(t, offer.venueType)}` : ''}</h3>
             {tooShort ? <p className="hint">{t('Ab dieser Uhrzeit ist die Mindestdauer nicht frei. Bitte wähle eine andere Startzeit.')}</p> : <>
               <div className="form-grid">
                 <SelectField label={t('Dauer')} value={String(selection.hours)} onChange={(hours) => { setSelection({ ...selection, hours: Number(hours) }); setLanes('1'); }} options={durationOptions} />
-                <SelectField label={t('Bahnen')} value={lanes} onChange={setLanes} options={Array.from({ length: freeLanes }, (_, index) => ({ value: String(index + 1), label: String(index + 1) }))} />
+                {offer.rentalMode === 'both' && (
+                  <SelectField
+                    label={t('Umfang')}
+                    value={whole ? 'whole' : 'lanes'}
+                    onChange={(value) => setWhole(value === 'whole')}
+                    options={[{ value: 'lanes', label: t('Einzelne Bahnen') }, { value: 'whole', label: wholeLabel(t, offer.venueType) }]}
+                  />
+                )}
+                {!whole && <SelectField label={t('Bahnen')} value={lanes} onChange={setLanes} options={Array.from({ length: freeLanes }, (_, index) => ({ value: String(index + 1), label: String(index + 1) }))} />}
               </div>
+              {whole && !wholeFree && <p className="hint">{t('In diesem Zeitraum sind nicht alle Bahnen frei.')}</p>}
               <TextArea label={t('Nachricht an den Verein')} value={note} onChange={setNote} maxLength={500} rows={3} />
             </>}
             <Feedback error={error} />
             <div className="dialog-actions">
               <Button variant="secondary" onClick={() => setSelection(null)}>{t('Abbrechen')}</Button>
-              <Button type="submit" disabled={tooShort || freeLanes < 1} loading={busy}>{t('Reservierung anfragen')}</Button>
+              <Button type="submit" disabled={tooShort || freeLanes < 1 || (whole && !wholeFree)} loading={busy}>{t('Reservierung anfragen')}</Button>
             </div>
           </form>
         ) : (
@@ -333,7 +364,7 @@ export function MyRentalReservations({ language, navigate }) {
           <article className="data-row" key={reservation.id} id={`reservierung-${encodeURIComponent(reservation.id)}`} tabIndex={-1}>
             <div>
               <strong data-i18n-skip>{reservation.offerTitle} · {formatReservationSlot(reservation, language)}</strong>
-              <span data-i18n-skip>{reservation.placeName} · {reservation.clubName} · {t('{{lanes}} Bahn(en)', { lanes: reservation.lanes })}</span>
+              <span data-i18n-skip>{reservation.placeName} · {reservation.clubName} · {reservationScope(t, reservation)}</span>
               <span className={`rental-status rental-status-${reservation.status}`}>{t(RESERVATION_STATUS_LABELS[reservation.status])}</span>
               {reservation.decisionNote && <span data-i18n-skip>{t('Nachricht vom Verein')}: {reservation.decisionNote}</span>}
             </div>
@@ -354,10 +385,20 @@ const DEFAULT_OPENING = { enabled: false, openHour: '10', closeHour: '20' };
 
 function emptyOfferForm(places) {
   return {
-    placeId: places[0]?.id || '', title: '', description: '', laneCount: String(places[0]?.courtCount || 4), price: '', currency: 'EUR', priceNote: '',
+    placeId: places[0]?.id || '', title: '', description: '', laneCount: String(places[0]?.courtCount || 4), rentalMode: 'lanes', price: '', currency: 'EUR', priceNote: '',
+    wholePrice: '', wholePriceNote: '',
     minHours: '1', maxHours: '4', bookingHorizonDays: '60', status: 'active',
     opening: Object.fromEntries(WEEKDAYS.map((weekday) => [weekday, { ...DEFAULT_OPENING }])),
   };
+}
+
+function priceToForm(priceMinor, currency) {
+  if (priceMinor === null || priceMinor === undefined) return '';
+  return priceMinor === 0 ? '0' : minorUnitsToAmount(priceMinor, currency);
+}
+
+function priceFromForm(value, currency) {
+  return value.trim() === '' ? null : amountToMinorUnits(value, currency);
 }
 
 function offerToForm(offer, places) {
@@ -367,16 +408,17 @@ function offerToForm(offer, places) {
   }
   return {
     ...form, placeId: offer.placeId, title: offer.title, description: offer.description || '', laneCount: String(offer.laneCount),
-    price: offer.priceMinor === null ? '' : offer.priceMinor === 0 ? '0' : minorUnitsToAmount(offer.priceMinor, offer.currency), currency: offer.currency,
-    priceNote: offer.priceNote || '', minHours: String(offer.minHours), maxHours: String(offer.maxHours),
+    rentalMode: offer.rentalMode || 'lanes', price: priceToForm(offer.priceMinor, offer.currency), currency: offer.currency, priceNote: offer.priceNote || '',
+    wholePrice: priceToForm(offer.wholePriceMinor, offer.currency), wholePriceNote: offer.wholePriceNote || '', minHours: String(offer.minHours), maxHours: String(offer.maxHours),
     bookingHorizonDays: String(offer.bookingHorizonDays), status: offer.status,
   };
 }
 
 function offerPayload(form, clubId) {
   return {
-    clubId, placeId: form.placeId, title: form.title, description: form.description, laneCount: Number(form.laneCount),
-    priceMinor: form.price.trim() === '' ? null : amountToMinorUnits(form.price, form.currency), currency: form.currency, priceNote: form.priceNote,
+    clubId, placeId: form.placeId, title: form.title, description: form.description, laneCount: Number(form.laneCount), rentalMode: form.rentalMode,
+    priceMinor: priceFromForm(form.price, form.currency), currency: form.currency, priceNote: form.priceNote,
+    wholePriceMinor: priceFromForm(form.wholePrice, form.currency), wholePriceNote: form.wholePriceNote,
     minHours: Number(form.minHours), maxHours: Number(form.maxHours), bookingHorizonDays: Number(form.bookingHorizonDays), status: form.status,
     openingHours: WEEKDAYS.filter((weekday) => form.opening[weekday].enabled)
       .map((weekday) => ({ weekday, openHour: Number(form.opening[weekday].openHour), closeHour: Number(form.opening[weekday].closeHour) })),
@@ -388,6 +430,7 @@ function OfferFields({ form, setForm, places, language }) {
   const set = (field) => (value) => setForm({ ...form, [field]: value });
   const hourOptions = (from, to) => Array.from({ length: to - from + 1 }, (_, index) => ({ value: String(from + index), label: hourLabel(from + index) }));
   const setOpening = (weekday, patch) => setForm({ ...form, opening: { ...form.opening, [weekday]: { ...form.opening[weekday], ...patch } } });
+  const whole = wholeLabel(t, places.find((place) => place.id === form.placeId)?.venueType);
   return <>
     <SelectField label={t('Spielort')} value={form.placeId} onChange={set('placeId')} required options={places.map((place) => ({ value: place.id, label: `${t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}: ${place.name}` }))} />
     <TextField label={t('Titel')} value={form.title} onChange={set('title')} required maxLength={120} placeholder={t('z. B. Boulehalle – Bahnen stundenweise')} />
@@ -406,10 +449,23 @@ function OfferFields({ form, setForm, places, language }) {
     <div className="form-grid">
       <TextField label={t('Anzahl Bahnen')} type="number" min={1} max={200} value={form.laneCount} onChange={set('laneCount')} required />
       <SelectField label={t('Status')} value={form.status} onChange={set('status')} options={[{ value: 'active', label: t('Aktiv (öffentlich buchbar)') }, { value: 'inactive', label: t('Pausiert') }]} />
-      <TextField label={t('Preis')} inputMode="decimal" value={form.price} onChange={set('price')} placeholder={t('leer = auf Anfrage')} />
+      <SelectField
+        label={t('Vermietung')}
+        value={form.rentalMode}
+        onChange={set('rentalMode')}
+        options={[
+          { value: 'lanes', label: t('Einzelne Bahnen') },
+          { value: 'whole', label: t('Nur komplett ({{scope}})', { scope: whole }) },
+          { value: 'both', label: t('Einzelne Bahnen oder komplett') },
+        ]}
+      />
       <SelectField label={t('Währung')} value={form.currency} onChange={set('currency')} options={currencyOptions(language)} />
+      {form.rentalMode !== 'whole' && <TextField label={t('Preis')} inputMode="decimal" value={form.price} onChange={set('price')} placeholder={t('leer = auf Anfrage')} />}
+      {form.rentalMode !== 'whole' && <TextField label={t('Preis-Hinweis')} value={form.priceNote} onChange={set('priceNote')} maxLength={120} placeholder={t('z. B. pro Bahn und Stunde')} />}
+      {form.rentalMode !== 'lanes' && <TextField label={t('Preis komplett')} inputMode="decimal" value={form.wholePrice} onChange={set('wholePrice')} placeholder={t('leer = auf Anfrage')} />}
+      {form.rentalMode !== 'lanes' && <TextField label={t('Preis-Hinweis komplett')} value={form.wholePriceNote} onChange={set('wholePriceNote')} maxLength={120} placeholder={t('z. B. pro Stunde')} />}
     </div>
-    <TextField label={t('Preis-Hinweis')} value={form.priceNote} onChange={set('priceNote')} maxLength={120} placeholder={t('z. B. pro Bahn und Stunde')} />
+    {form.rentalMode !== 'lanes' && <p className="hint">{t('Komplett bedeutet: alle Bahnen dieses Angebots auf einmal.')}</p>}
     <div className="form-grid">
       <TextField label={t('Mindestdauer (Stunden)')} type="number" min={1} max={24} value={form.minHours} onChange={set('minHours')} required />
       <TextField label={t('Höchstdauer (Stunden)')} type="number" min={1} max={24} value={form.maxHours} onChange={set('maxHours')} required />
@@ -571,7 +627,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
     <article className="data-row" key={reservation.id}>
       <div>
         <strong data-i18n-skip>{offerTitle(reservation.offerId)} · {formatReservationSlot(reservation, language)}</strong>
-        <span data-i18n-skip>{reservation.renterName} · {t('{{lanes}} Bahn(en)', { lanes: reservation.lanes })}{reservation.renterEmail ? ` · ${reservation.renterEmail}` : ''}{reservation.renterPhone ? ` · ${reservation.renterPhone}` : ''}</span>
+        <span data-i18n-skip>{reservation.renterName} · {reservationScope(t, reservation)}{reservation.renterEmail ? ` · ${reservation.renterEmail}` : ''}{reservation.renterPhone ? ` · ${reservation.renterPhone}` : ''}</span>
         {reservation.note && <span data-i18n-skip>„{reservation.note}“</span>}
       </div>
       <div className="row-actions">

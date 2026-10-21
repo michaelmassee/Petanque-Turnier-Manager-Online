@@ -133,6 +133,47 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(await screen.findByText(/Anfrage gesendet/)).toBeInTheDocument();
   });
 
+  it('bietet bei „Einzelne Bahnen oder komplett“ die komplette Halle an, wenn alle Bahnen frei sind', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY
+      : { offer: { ...OFFER, rentalMode: 'both', wholePriceMinor: 3500, wholePriceNote: 'pro Stunde' } }));
+    authenticatedApi.mockResolvedValue({ reservation: {} });
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+
+    expect(await screen.findByText(/Einzelne Bahnen: 10,00 €.*pro Bahn und Stunde · Komplette Halle: 35,00 €.*pro Stunde/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /10:00: 2 von 4 Bahnen frei/ }));
+    let form = screen.getByRole('button', { name: 'Reservierung anfragen' }).closest('form');
+    fireEvent.change(within(form).getByLabelText('Umfang'), { target: { value: 'whole' } });
+    expect(within(form).queryByLabelText('Bahnen')).not.toBeInTheDocument();
+    expect(within(form).getByText('In diesem Zeitraum sind nicht alle Bahnen frei.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reservierung anfragen' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /09:00: 4 von 4 Bahnen frei/ }));
+    form = screen.getByRole('button', { name: 'Reservierung anfragen' }).closest('form');
+    expect(within(form).getByLabelText('Umfang')).toHaveValue('lanes');
+    fireEvent.change(within(form).getByLabelText('Umfang'), { target: { value: 'whole' } });
+    expect(within(form).getByRole('heading')).toHaveTextContent(/· Komplette Halle$/);
+    fireEvent.click(screen.getByRole('button', { name: 'Reservierung anfragen' }));
+    await waitFor(() => expect(authenticatedApi).toHaveBeenCalled());
+    expect(JSON.parse(authenticatedApi.mock.calls[0][1].body)).toEqual({ date: '2026-10-24', startHour: 9, hours: 1, whole: true, note: '' });
+  });
+
+  it('lässt bei Nur-komplett-Angeboten nur Stunden mit allen Bahnen frei wählen', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY
+      : { offer: { ...OFFER, venueType: 'outdoor', rentalMode: 'whole', wholePriceMinor: null } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+
+    expect(await screen.findByText('Kompletter Platz: Preis auf Anfrage')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /10:00: 2 von 4 Bahnen frei/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /10:00: 2 von 4 Bahnen frei/ })).toHaveClass('full');
+    fireEvent.click(screen.getByRole('button', { name: /09:00: 4 von 4 Bahnen frei/ }));
+    const form = screen.getByRole('button', { name: 'Reservierung anfragen' }).closest('form');
+    expect(within(form).queryByLabelText('Umfang')).not.toBeInTheDocument();
+    expect(within(form).queryByLabelText('Bahnen')).not.toBeInTheDocument();
+    // Um 10:00 sind nicht mehr alle Bahnen frei, also nur eine Stunde am Stück.
+    expect(within(form).getByLabelText('Dauer').querySelectorAll('option')).toHaveLength(1);
+    expect(within(form).getByRole('heading')).toHaveTextContent(/· Kompletter Platz$/);
+  });
+
   it('nennt Spielort und Verein nur einmal, wenn sie gleich heißen, ohne Spielort-Präfix', async () => {
     api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, placeName: 'BC Test' } }));
     render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
@@ -319,6 +360,35 @@ describe('Platz mieten: Vereinsverwaltung', () => {
       clubId: 'c1', placeId: 'p1', title: 'Halle abends', laneCount: 6, priceMinor: 750,
       openingHours: [{ weekday: 1, openHour: 10, closeHour: 20 }],
     });
+  });
+
+  it('legt ein Angebot an, das einzelne Bahnen oder die komplette Halle vermietet', async () => {
+    const onWrite = vi.fn(async () => ({}));
+    mockManagement(onWrite);
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Neues Angebot' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryByLabelText('Preis komplett')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('option', { name: 'Nur komplett (Komplette Halle)' })).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText('Vermietung'), { target: { value: 'both' } });
+    fireEvent.change(within(dialog).getByLabelText(/Titel/), { target: { value: 'Halle' } });
+    fireEvent.change(within(dialog).getByLabelText('Preis komplett'), { target: { value: '35' } });
+    fireEvent.change(within(dialog).getByLabelText('Preis-Hinweis komplett'), { target: { value: 'pro Stunde' } });
+    fireEvent.click(within(dialog).getAllByRole('checkbox')[0]);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(onWrite).toHaveBeenCalled());
+    expect(JSON.parse(onWrite.mock.calls[0][1].body)).toMatchObject({ rentalMode: 'both', priceMinor: null, wholePriceMinor: 3500, wholePriceNote: 'pro Stunde' });
+  });
+
+  it('zeigt Komplettbuchungen in den Anfragen als komplette Halle', async () => {
+    authenticatedApi.mockImplementation(async (path) => {
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
+      return { ...MANAGE, reservations: [{ ...MANAGE.reservations[0], lanes: 4, whole: true, venueType: 'indoor' }] };
+    });
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+    expect(await screen.findByText(/Max Mieter · Komplette Halle/)).toBeInTheDocument();
   });
 
   it('sperrt Angebote, wenn der Verein keinen Spielort hat', async () => {

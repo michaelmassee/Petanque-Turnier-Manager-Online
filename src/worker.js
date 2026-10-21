@@ -10,7 +10,7 @@ import {
   TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT, unreadPostboxCount,
 } from './postbox-core.js';
 import {
-  addDays, buildAvailability, dayAvailabilityStatus, formatRentalSlot, isValidLocalDate, monthRange, normalizeOfferInput, RENTAL_AVAILABILITY_DAYS,
+  addDays, buildAvailability, dayAvailabilityStatus, formatRentalSlot, isValidLocalDate, monthRange, normalizeOfferInput, RENTAL_AVAILABILITY_DAYS, rentalMinLanes,
   validateReservationRequest,
 } from './rental-core.js';
 import { CURRENCY_CODES } from './currencies.js';
@@ -592,44 +592,49 @@ const TOURNAMENT_RANKING_EMAILS = {
 // Platz mieten: Anfrage/Storno an den Verein, Entscheidung an den Mieter. Notizen gehen als messageBox mit.
 export const RENTAL_EMAILS = {
   de: {
+    scope: ({ lanes, whole, indoor }) => (whole ? (indoor ? 'komplette Halle' : 'kompletter Platz') : `${lanes} Bahn(en)`),
     requestedSubject: (title) => `Reservierungsanfrage: ${title}`,
-    requested: ({ title, who, slot, lanes }) => `Hallo,\n\n${who} möchte „${title}“ reservieren: ${slot}, ${lanes} Bahn(en). Bitte bestätige oder lehne die Anfrage ab.`,
+    requested: ({ title, who, slot, scope }) => `Hallo,\n\n${who} möchte „${title}“ reservieren: ${slot}, ${scope}. Bitte bestätige oder lehne die Anfrage ab.`,
     cancelledSubject: (title) => `Reservierung storniert: ${title}`,
-    cancelled: ({ title, who, slot, lanes }) => `Hallo,\n\n${who} hat die Reservierung für „${title}“ storniert: ${slot}, ${lanes} Bahn(en).`,
+    cancelled: ({ title, who, slot, scope }) => `Hallo,\n\n${who} hat die Reservierung für „${title}“ storniert: ${slot}, ${scope}.`,
     decidedSubject: (title, status) => `${({ confirmed: 'Reservierung bestätigt', rejected: 'Reservierung abgelehnt', cancelled: 'Reservierung storniert' })[status]}: ${title}`,
-    decided: ({ firstName, title, slot, lanes, status, club }) => `Hallo ${firstName},\n\n${({ confirmed: `${club} hat deine Reservierung für „${title}“ bestätigt`, rejected: `${club} hat deine Reservierungsanfrage für „${title}“ abgelehnt`, cancelled: `${club} hat deine Reservierung für „${title}“ storniert` })[status]}: ${slot}, ${lanes} Bahn(en).`,
+    decided: ({ firstName, title, slot, scope, status, club }) => `Hallo ${firstName},\n\n${({ confirmed: `${club} hat deine Reservierung für „${title}“ bestätigt`, rejected: `${club} hat deine Reservierungsanfrage für „${title}“ abgelehnt`, cancelled: `${club} hat deine Reservierung für „${title}“ storniert` })[status]}: ${slot}, ${scope}.`,
   },
   nl: {
+    scope: ({ lanes, whole, indoor }) => (whole ? (indoor ? 'de hele hal' : 'het hele terrein') : `${lanes} baan/banen`),
     requestedSubject: (title) => `Reserveringsaanvraag: ${title}`,
-    requested: ({ title, who, slot, lanes }) => `Hallo,\n\n${who} wil „${title}” reserveren: ${slot}, ${lanes} baan/banen. Bevestig of weiger de aanvraag.`,
+    requested: ({ title, who, slot, scope }) => `Hallo,\n\n${who} wil „${title}” reserveren: ${slot}, ${scope}. Bevestig of weiger de aanvraag.`,
     cancelledSubject: (title) => `Reservering geannuleerd: ${title}`,
-    cancelled: ({ title, who, slot, lanes }) => `Hallo,\n\n${who} heeft de reservering voor „${title}” geannuleerd: ${slot}, ${lanes} baan/banen.`,
+    cancelled: ({ title, who, slot, scope }) => `Hallo,\n\n${who} heeft de reservering voor „${title}” geannuleerd: ${slot}, ${scope}.`,
     decidedSubject: (title, status) => `${({ confirmed: 'Reservering bevestigd', rejected: 'Reservering afgewezen', cancelled: 'Reservering geannuleerd' })[status]}: ${title}`,
-    decided: ({ firstName, title, slot, lanes, status, club }) => `Hallo ${firstName},\n\n${({ confirmed: `${club} heeft je reservering voor „${title}” bevestigd`, rejected: `${club} heeft je reserveringsaanvraag voor „${title}” afgewezen`, cancelled: `${club} heeft je reservering voor „${title}” geannuleerd` })[status]}: ${slot}, ${lanes} baan/banen.`,
+    decided: ({ firstName, title, slot, scope, status, club }) => `Hallo ${firstName},\n\n${({ confirmed: `${club} heeft je reservering voor „${title}” bevestigd`, rejected: `${club} heeft je reserveringsaanvraag voor „${title}” afgewezen`, cancelled: `${club} heeft je reservering voor „${title}” geannuleerd` })[status]}: ${slot}, ${scope}.`,
   },
   en: {
+    scope: ({ lanes, whole, indoor }) => (whole ? (indoor ? 'the entire hall' : 'the entire court') : `${lanes} lane(s)`),
     requestedSubject: (title) => `Reservation request: ${title}`,
-    requested: ({ title, who, slot, lanes }) => `Hello,\n\n${who} would like to reserve "${title}": ${slot}, ${lanes} lane(s). Please confirm or decline the request.`,
+    requested: ({ title, who, slot, scope }) => `Hello,\n\n${who} would like to reserve "${title}": ${slot}, ${scope}. Please confirm or decline the request.`,
     cancelledSubject: (title) => `Reservation cancelled: ${title}`,
-    cancelled: ({ title, who, slot, lanes }) => `Hello,\n\n${who} cancelled the reservation for "${title}": ${slot}, ${lanes} lane(s).`,
+    cancelled: ({ title, who, slot, scope }) => `Hello,\n\n${who} cancelled the reservation for "${title}": ${slot}, ${scope}.`,
     decidedSubject: (title, status) => `${({ confirmed: 'Reservation confirmed', rejected: 'Reservation declined', cancelled: 'Reservation cancelled' })[status]}: ${title}`,
-    decided: ({ firstName, title, slot, lanes, status, club }) => `Hi ${firstName},\n\n${({ confirmed: `${club} confirmed your reservation for "${title}"`, rejected: `${club} declined your reservation request for "${title}"`, cancelled: `${club} cancelled your reservation for "${title}"` })[status]}: ${slot}, ${lanes} lane(s).`,
+    decided: ({ firstName, title, slot, scope, status, club }) => `Hi ${firstName},\n\n${({ confirmed: `${club} confirmed your reservation for "${title}"`, rejected: `${club} declined your reservation request for "${title}"`, cancelled: `${club} cancelled your reservation for "${title}"` })[status]}: ${slot}, ${scope}.`,
   },
   es: {
+    scope: ({ lanes, whole, indoor }) => (whole ? (indoor ? 'el pabellón completo' : 'el terreno completo') : `${lanes} pista(s)`),
     requestedSubject: (title) => `Solicitud de reserva: ${title}`,
-    requested: ({ title, who, slot, lanes }) => `Hola:\n\n${who} quiere reservar «${title}»: ${slot}, ${lanes} pista(s). Confirma o rechaza la solicitud.`,
+    requested: ({ title, who, slot, scope }) => `Hola:\n\n${who} quiere reservar «${title}»: ${slot}, ${scope}. Confirma o rechaza la solicitud.`,
     cancelledSubject: (title) => `Reserva cancelada: ${title}`,
-    cancelled: ({ title, who, slot, lanes }) => `Hola:\n\n${who} canceló la reserva de «${title}»: ${slot}, ${lanes} pista(s).`,
+    cancelled: ({ title, who, slot, scope }) => `Hola:\n\n${who} canceló la reserva de «${title}»: ${slot}, ${scope}.`,
     decidedSubject: (title, status) => `${({ confirmed: 'Reserva confirmada', rejected: 'Reserva rechazada', cancelled: 'Reserva cancelada' })[status]}: ${title}`,
-    decided: ({ firstName, title, slot, lanes, status, club }) => `Hola ${firstName}:\n\n${({ confirmed: `${club} confirmó tu reserva de «${title}»`, rejected: `${club} rechazó tu solicitud de reserva de «${title}»`, cancelled: `${club} canceló tu reserva de «${title}»` })[status]}: ${slot}, ${lanes} pista(s).`,
+    decided: ({ firstName, title, slot, scope, status, club }) => `Hola ${firstName}:\n\n${({ confirmed: `${club} confirmó tu reserva de «${title}»`, rejected: `${club} rechazó tu solicitud de reserva de «${title}»`, cancelled: `${club} canceló tu reserva de «${title}»` })[status]}: ${slot}, ${scope}.`,
   },
   fr: {
+    scope: ({ lanes, whole, indoor }) => (whole ? (indoor ? 'le boulodrome couvert entier' : 'le terrain entier') : `${lanes} piste(s)`),
     requestedSubject: (title) => `Demande de réservation : ${title}`,
-    requested: ({ title, who, slot, lanes }) => `Bonjour,\n\n${who} souhaite réserver « ${title} » : ${slot}, ${lanes} piste(s). Merci de confirmer ou de refuser la demande.`,
+    requested: ({ title, who, slot, scope }) => `Bonjour,\n\n${who} souhaite réserver « ${title} » : ${slot}, ${scope}. Merci de confirmer ou de refuser la demande.`,
     cancelledSubject: (title) => `Réservation annulée : ${title}`,
-    cancelled: ({ title, who, slot, lanes }) => `Bonjour,\n\n${who} a annulé la réservation de « ${title} » : ${slot}, ${lanes} piste(s).`,
+    cancelled: ({ title, who, slot, scope }) => `Bonjour,\n\n${who} a annulé la réservation de « ${title} » : ${slot}, ${scope}.`,
     decidedSubject: (title, status) => `${({ confirmed: 'Réservation confirmée', rejected: 'Réservation refusée', cancelled: 'Réservation annulée' })[status]} : ${title}`,
-    decided: ({ firstName, title, slot, lanes, status, club }) => `Bonjour ${firstName},\n\n${({ confirmed: `${club} a confirmé votre réservation de « ${title} »`, rejected: `${club} a refusé votre demande de réservation de « ${title} »`, cancelled: `${club} a annulé votre réservation de « ${title} »` })[status]} : ${slot}, ${lanes} piste(s).`,
+    decided: ({ firstName, title, slot, scope, status, club }) => `Bonjour ${firstName},\n\n${({ confirmed: `${club} a confirmé votre réservation de « ${title} »`, rejected: `${club} a refusé votre demande de réservation de « ${title} »`, cancelled: `${club} a annulé votre réservation de « ${title} »` })[status]} : ${slot}, ${scope}.`,
   },
 };
 
@@ -9584,7 +9589,10 @@ function toRentalOffer(row, openingHours = null) {
     latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
     longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
     title: row.title, description: row.description || null, laneCount: Number(row.lane_count),
+    rentalMode: row.rental_mode || 'lanes',
     priceMinor: row.price_minor === null ? null : Number(row.price_minor), currency: row.currency, priceNote: row.price_note || null,
+    wholePriceMinor: row.whole_price_minor === null || row.whole_price_minor === undefined ? null : Number(row.whole_price_minor),
+    wholePriceNote: row.whole_price_note || null,
     minHours: Number(row.min_hours), maxHours: Number(row.max_hours), bookingHorizonDays: Number(row.booking_horizon_days),
     timezone: row.timezone, status: row.status, isPublic: rentalOfferIsPublic(row),
     ...(openingHours ? { openingHours } : {}),
@@ -9598,9 +9606,9 @@ function toOpeningHours(rows) {
 function toRentalReservation(row, { withRenter = false } = {}) {
   return {
     id: row.id, offerId: row.offer_id, date: row.local_date, startHour: Number(row.start_hour), hours: Number(row.hours),
-    lanes: Number(row.lanes), startUtc: row.start_utc, endUtc: row.end_utc, status: row.status, note: row.note || null,
+    lanes: Number(row.lanes), whole: Boolean(Number(row.whole)), startUtc: row.start_utc, endUtc: row.end_utc, status: row.status, note: row.note || null,
     decisionNote: row.decision_note || null, decidedAt: row.decided_at || null, createdAt: row.created_at,
-    ...(row.offer_title ? { offerTitle: row.offer_title, placeName: row.place_name, clubName: row.club_name, timezone: row.timezone } : {}),
+    ...(row.offer_title ? { offerTitle: row.offer_title, placeName: row.place_name, venueType: row.venue_type || 'outdoor', clubName: row.club_name, timezone: row.timezone } : {}),
     ...(withRenter ? { renterName: rentalPersonName(row, 'renter_'), renterEmail: row.renter_email || null, renterPhone: row.renter_phone || null } : {}),
   };
 }
@@ -9670,7 +9678,7 @@ async function getRentalAvailability(db, id, fromParam, user, monthParam = null)
   if (month) {
     return json({
       month: monthParam, today: now.date, lastDate: addDays(now.date, offer.bookingHorizonDays),
-      days: availability.map((day) => ({ date: day.date, status: dayAvailabilityStatus(day, offer.laneCount) })),
+      days: availability.map((day) => ({ date: day.date, status: dayAvailabilityStatus(day, offer.laneCount, rentalMinLanes(offer)) })),
     });
   }
   return json({ from, today: now.date, days: availability });
@@ -9711,7 +9719,7 @@ async function notifyRentalClub(env, { offer, reservation, renter, eventType, or
   if (!to || owner?.id === renter.id) return;
   const language = owner?.language || 'de';
   const templates = RENTAL_EMAILS[language] || RENTAL_EMAILS.de;
-  const values = { title: offer.title, who: eventData.requesterName, slot: formatRentalSlot(eventData, language), lanes: eventData.lanes };
+  const values = { title: offer.title, who: eventData.requesterName, slot: formatRentalSlot(eventData, language), scope: rentalEmailScope(templates, offer, reservation) };
   const requested = eventType === RENTAL_REQUESTED_EVENT;
   try {
     await deliverRentalEmail(env, {
@@ -9733,6 +9741,11 @@ async function notifyRentalClub(env, { offer, reservation, renter, eventType, or
 // UTC-Zeitpunkte stammen aus der Buchung und berücksichtigen die Zeitzone des Spielorts bereits.
 // Wie beim Turnier: eine Base64-kodierte termin.ics über denselben Mail-/Queue-Versand. Storniert der Verein,
 // geht dieselbe UID mit METHOD:CANCEL raus, damit Kalender den zuvor übernommenen Termin entfernen.
+// „3 Bahn(en)“ bzw. „komplette Halle“/„kompletter Platz“ je nach Buchung und Spielort.
+function rentalEmailScope(templates, offer, reservation) {
+  return templates.scope({ lanes: Number(reservation.lanes), whole: Boolean(Number(reservation.whole)), indoor: offer.venue_type === 'indoor' });
+}
+
 export function buildRentalIcs(offer, reservation, origin, { cancelled = false } = {}) {
   const escape = (value) => icsEscapeText(String(value || '').replace(/\r\n|\r/g, '\n'));
   const compactUtc = (value) => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
@@ -9793,7 +9806,7 @@ async function notifyRentalRenter(env, { offer, reservation, manager, origin }) 
     await deliverRentalEmail(env, {
       to: renter.email,
       subject: templates.decidedSubject(offer.title, reservation.status),
-      text: templates.decided({ firstName: renter.first_name || '', title: offer.title, slot: formatRentalSlot(eventData, language), lanes: eventData.lanes, status: reservation.status, club: offer.club_name }),
+      text: templates.decided({ firstName: renter.first_name || '', title: offer.title, slot: formatRentalSlot(eventData, language), scope: rentalEmailScope(templates, offer, reservation), status: reservation.status, club: offer.club_name }),
       messageBox: reservation.decision_note || null,
       textAfterMessageBox: `\n\n${[offer.place_name, formatLocationAddress(offer.place_address)].filter(Boolean).join(' · ')}`,
       actions,
@@ -9867,11 +9880,11 @@ async function createRentalReservation(request, env, offerId, user, origin) {
   const guard = rentalCapacityGuard(row, input);
   // Atomar: nur einfügen, wenn in jeder gebuchten Stunde noch genug Bahnen frei sind (D1 serialisiert Schreibzugriffe).
   const result = await env.DB.prepare(`${guard.cte}
-    INSERT INTO rental_reservations (id, offer_id, user_id, local_date, start_hour, hours, lanes, start_utc, end_utc, status, note, created_at, updated_at)
-    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?, ?, ?
+    INSERT INTO rental_reservations (id, offer_id, user_id, local_date, start_hour, hours, lanes, whole, start_utc, end_utc, status, note, created_at, updated_at)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?, ?, ?
     WHERE ${guard.condition}`).bind(
     ...guard.params,
-    id, offerId, user.id, input.date, input.startHour, input.hours, input.lanes, startUtc, endUtc, input.note, nowIso, nowIso,
+    id, offerId, user.id, input.date, input.startHour, input.hours, input.lanes, input.whole ? 1 : 0, startUtc, endUtc, input.note, nowIso, nowIso,
   ).run();
   if (!result.meta?.changes) throw new HttpError(409, 'Für diesen Zeitraum sind nicht mehr genug Bahnen frei');
   const reservation = await env.DB.prepare('SELECT * FROM rental_reservations WHERE id = ?').bind(id).first();
@@ -9879,7 +9892,7 @@ async function createRentalReservation(request, env, offerId, user, origin) {
   return json({ reservation: toRentalReservation(reservation) }, 201);
 }
 
-const RENTAL_RESERVATION_SELECT = `SELECT r.*, o.title AS offer_title, o.club_id, o.timezone, p.name AS place_name, c.name AS club_name,
+const RENTAL_RESERVATION_SELECT = `SELECT r.*, o.title AS offer_title, o.club_id, o.timezone, p.name AS place_name, p.venue_type, c.name AS club_name,
     u.first_name AS renter_first_name, u.last_name AS renter_last_name, u.username AS renter_username, u.email AS renter_email, u.phone AS renter_phone
   FROM rental_reservations r JOIN rental_offers o ON o.id = r.offer_id JOIN boule_places p ON p.id = o.boule_place_id
   JOIN clubs c ON c.id = o.club_id JOIN users u ON u.id = r.user_id`;
@@ -10015,10 +10028,11 @@ async function createRentalOffer(request, db, user) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await db.batch([
-    db.prepare(`INSERT INTO rental_offers (id, club_id, boule_place_id, title, description, lane_count, price_minor, currency, price_note,
-        min_hours, max_hours, booking_horizon_days, timezone, status, created_by, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(id, clubId, place.id, input.title, input.description, input.laneCount,
-      input.priceMinor, input.currency, input.priceNote, input.minHours, input.maxHours, input.bookingHorizonDays, timezone, input.status, user.id, now, now),
+    db.prepare(`INSERT INTO rental_offers (id, club_id, boule_place_id, title, description, lane_count, rental_mode, price_minor, currency, price_note,
+        whole_price_minor, whole_price_note, min_hours, max_hours, booking_horizon_days, timezone, status, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(id, clubId, place.id, input.title, input.description, input.laneCount,
+      input.rentalMode, input.priceMinor, input.currency, input.priceNote, input.wholePriceMinor, input.wholePriceNote, input.minHours, input.maxHours,
+      input.bookingHorizonDays, timezone, input.status, user.id, now, now),
     ...openingHourStatements(db, id, input.openingHours),
   ]);
   return json({ offer: toRentalOffer(await loadRentalOffer(db, id), await loadOpeningHours(db, id)) }, 201);
@@ -10033,10 +10047,12 @@ async function updateRentalOffer(request, db, id, user) {
   const timezone = resolveTournamentTimezone({ latitude: Number(place.latitude ?? NaN), longitude: Number(place.longitude ?? NaN) });
   try {
     await db.batch([
-      db.prepare(`UPDATE rental_offers SET boule_place_id = ?, title = ?, description = ?, lane_count = ?, price_minor = ?, currency = ?, price_note = ?,
-          min_hours = ?, max_hours = ?, booking_horizon_days = ?, timezone = ?, status = ?, updated_at = ? WHERE id = ?`)
-        .bind(place.id, input.title, input.description, input.laneCount, input.priceMinor, input.currency, input.priceNote, input.minHours,
-          input.maxHours, input.bookingHorizonDays, timezone, input.status, new Date().toISOString(), id),
+      db.prepare(`UPDATE rental_offers SET boule_place_id = ?, title = ?, description = ?, lane_count = ?, rental_mode = ?, price_minor = ?, currency = ?,
+          price_note = ?, whole_price_minor = ?, whole_price_note = ?, min_hours = ?, max_hours = ?, booking_horizon_days = ?, timezone = ?, status = ?,
+          updated_at = ? WHERE id = ?`)
+        .bind(place.id, input.title, input.description, input.laneCount, input.rentalMode, input.priceMinor, input.currency, input.priceNote,
+          input.wholePriceMinor, input.wholePriceNote, input.minHours, input.maxHours, input.bookingHorizonDays, timezone, input.status,
+          new Date().toISOString(), id),
       ...openingHourStatements(db, id, input.openingHours),
     ]);
   } catch (error) {
