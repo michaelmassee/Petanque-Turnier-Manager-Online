@@ -102,7 +102,7 @@ function RentalOfferList({ language, navigate }) {
         <div className="home-finder-copy">
           <p className="eyebrow">Pétanque Turnier Manager Online</p>
           <h2>{t('Platz mieten')}</h2>
-          <p className="subtitle">{t('Vereine vermieten hier Bahnen stundenweise. Wähle ein Angebot und frage deinen Wunschtermin im Kalender an; der Verein bestätigt die Reservierung.')}</p>
+          <p className="subtitle">{t('Vereine vermieten hier stundenweise einzelne Bahnen oder die komplette Halle bzw. den kompletten Platz. Wähle ein Angebot und frage deinen Wunschtermin im Kalender an; der Verein bestätigt die Reservierung.')}</p>
         </div>
         <div className="home-finder-stats" aria-label={t('Platz mieten Übersicht')}>
           <button
