@@ -10,7 +10,7 @@ import { StandalonePageHeader } from '../components/layout.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
 import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
-import { isIosSafari } from '../lib/hooks.js';
+import { isIosSafari, useLivePushRefresh } from '../lib/hooks.js';
 import { currentBrowserPushSubscription, ensureBrowserPushSubscription, isPushSupported } from '../lib/push.js';
 
 // 120 Sekunden reichen (halbiert die Last auf dem Free-Plan, Entscheidung vom 2026-10-21): Beim Zurückkehren zur App
@@ -373,6 +373,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
   });
   const data = query.data;
   const notFound = query.error?.status === 404;
+  useLivePushRefresh(data?.tournament?.id, () => query.refetch());
   useEffect(() => {
     if (!token) return;
     if (data) rememberTeam(token, data);

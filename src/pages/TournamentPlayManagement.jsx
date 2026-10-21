@@ -678,7 +678,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
       <Feedback message={message} error={error || queryError?.message} />
 
-      {selectedTournament && selectedTournamentStatus === 'running' && <AnnouncementEditor tournament={selectedTournament} />}
+      {selectedTournament && selectedTournamentStatus !== 'finished' && <AnnouncementEditor tournament={selectedTournament} />}
 
       {canEditMeleeTeams && selectedTournamentStatus === 'running' && (
         <p className="hint">

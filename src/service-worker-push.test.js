@@ -67,3 +67,18 @@ describe('Service Worker: Push „Ergebnis gemeldet“', () => {
     expect(clients.openWindow).toHaveBeenCalledWith(resultPayload.url);
   });
 });
+
+describe('Service Worker: Live-Push (neue Runde, Ankündigung)', () => {
+  it('zeigt die Meldung an und lässt offene Live-Ansicht und Spielplan sofort nachladen', async () => {
+    const client = { postMessage: vi.fn() };
+    const { self, dispatch } = loadServiceWorker([client]);
+
+    await dispatch('push', { data: { json: () => ({
+      title: 'Herbstturnier: Ankündigung', body: 'Mittagspause', tag: 'live-announcement',
+      url: 'https://ptm.test/live/r1', eventType: 'live_update', tournamentId: 't1',
+    }) } });
+
+    expect(self.registration.showNotification).toHaveBeenCalledWith('Herbstturnier: Ankündigung', expect.objectContaining({ tag: 'live-announcement' }));
+    expect(client.postMessage).toHaveBeenCalledWith({ type: 'live-update', tournamentId: 't1' });
+  });
+});

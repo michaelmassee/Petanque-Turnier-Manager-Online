@@ -7959,7 +7959,7 @@ async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
         p256dh: subscription.p256dh,
         auth: subscription.auth,
         // Der Link selbst ist nur gehasht gespeichert: Die App findet den auf dem Gerät gemerkten Link über die Meldungs-ID.
-        payload: buildLiveRoundPush({ tournamentName: tournament.name, match, language: subscription.language,
+        payload: buildLiveRoundPush({ tournamentName: tournament.name, match, language: subscription.language, tournamentId: tournament.id,
           url: `${appOrigin}/live/${encodeURIComponent(subscription.registration_id)}` }),
       });
     }
@@ -7983,7 +7983,7 @@ async function notifyLivePushForAnnouncement(env, tournament, text, appOrigin) {
       endpoint: subscription.endpoint,
       p256dh: subscription.p256dh,
       auth: subscription.auth,
-      payload: buildLiveAnnouncementPush({ tournamentName: tournament.name, text, language: subscription.language,
+      payload: buildLiveAnnouncementPush({ tournamentName: tournament.name, text, language: subscription.language, tournamentId: tournament.id,
         url: `${appOrigin}/live/${encodeURIComponent(subscription.registration_id)}` }),
     }));
     const messages = chunk(items, LIVE_PUSH_CHUNK_SIZE).map((part) => ({ body: { kind: 'live_push', items: part } }));

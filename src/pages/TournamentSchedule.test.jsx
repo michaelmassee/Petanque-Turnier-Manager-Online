@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from 'vitest';
-import { render as renderBase, screen } from '@testing-library/react';
+import { render as renderBase, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { normalizeRanking } from '../lib/live-ranking.js';
 import { TournamentSchedule } from './TournamentDetailPage.jsx';
@@ -113,6 +113,24 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     expect(screen.getByText('13:11')).toBeInTheDocument();
     expect(screen.getByText('Offen')).toBeInTheDocument();
     expect(screen.getByText('Nicht angetreten')).toBeInTheDocument();
+  });
+
+  it('lädt sofort neu, wenn der Service Worker einen Live-Push für dieses Turnier meldet', async () => {
+    mockSchedule({});
+    const serviceWorker = new EventTarget();
+    Object.defineProperty(navigator, 'serviceWorker', { value: serviceWorker, configurable: true });
+    try {
+      render(<TournamentSchedule tournamentId="t1" language="de" />);
+      await screen.findByText('Noch keine Runde gestartet.');
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      serviceWorker.dispatchEvent(Object.assign(new Event('message'), { data: { type: 'live-update', tournamentId: 'anderes' } }));
+      serviceWorker.dispatchEvent(Object.assign(new Event('message'), { data: { type: 'live-update', tournamentId: 't1' } }));
+
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    } finally {
+      delete navigator.serviceWorker;
+    }
   });
 
   it('meldet die aktuelle Ankündigung an die Turnierseite weiter', async () => {

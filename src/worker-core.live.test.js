@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPlayerLiveView, parseSyncRanking, parseSyncRoundMatches, parseSyncRoundNumber, registrationBelongsToEmail, registrationBelongsToUser, isTournamentStale, dateDaysAgo, buildLiveRoundPush, chunk } from './worker-core.js';
+import { buildPlayerLiveView, parseSyncRanking, parseSyncRoundMatches, parseSyncRoundNumber, registrationBelongsToEmail, registrationBelongsToUser, isTournamentStale, dateDaysAgo, buildLiveRoundPush, buildLiveAnnouncementPush, chunk } from './worker-core.js';
 
 const player = (id, firstName, lastName = 'X', teamLabel) => ({ id, firstName, lastName, teamLabel: teamLabel || `${firstName} ${lastName}` });
 const anna = player('r1', 'Anna');
@@ -169,6 +169,14 @@ describe('Push bei neuer Runde', () => {
       title: 'Sommerturnier: Runde 3', body: 'Bahn 7 · gegen Dieter Test', url: '/live/t/x', tag: 'live-round-3',
     });
     expect(buildLiveRoundPush({ tournamentName: 'T', match, language: 'fr', url: '/' }).body).toBe('Terrain 7 · contre Dieter Test');
+  });
+
+  it('trägt mit Turnier-ID das Nachlade-Signal für offene Fenster (live_update)', () => {
+    const match = { roundNumber: 2, court: null, bye: true };
+    expect(buildLiveRoundPush({ tournamentName: 'T', match, language: 'de', url: '/', tournamentId: 't1' }))
+      .toMatchObject({ eventType: 'live_update', tournamentId: 't1', tag: 'live-round-2' });
+    expect(buildLiveAnnouncementPush({ tournamentName: 'T', text: 'Pause', language: 'de', url: '/', tournamentId: 't1' }))
+      .toEqual({ title: 'T: Ankündigung', body: 'Pause', url: '/', tag: 'live-announcement', eventType: 'live_update', tournamentId: 't1' });
   });
 
   it('lässt die Bahn weg, wenn keine vorhanden ist, und meldet Freilose', () => {

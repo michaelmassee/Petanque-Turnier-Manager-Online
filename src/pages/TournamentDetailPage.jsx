@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { FORMATIONS, REGISTRATION_STATUSES, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
 import { api, authenticatedApi } from '../lib/api.js';
-import { useRoutedTournament } from '../lib/hooks.js';
+import { useLivePushRefresh, useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { DISPLAY_LOCALES, REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
 import { isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl, calendarEventLink } from '../lib/domain.js';
@@ -16,7 +16,7 @@ import { TournamentPlayerListings } from '../components/TournamentPlayerListings
 import { PublicRegistrationPanel } from '../App.jsx';
 import { TournamentRegistrationAction } from '../components/TournamentRegistrationAction.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
-import { AnnouncementBanner, AnnouncementEditor } from '../components/TournamentAnnouncement.jsx';
+import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
 
@@ -488,6 +488,7 @@ export function TournamentSchedule({ tournamentId, tournament, language, onAnnou
     staleTime: 0,
     retry: false,
   });
+  useLivePushRefresh(tournamentId, () => query.refetch());
   const announcement = query.data?.announcement;
   useEffect(() => {
     if (query.data) onAnnouncement?.(announcement || null);
@@ -753,9 +754,6 @@ export function TournamentDetailPage({
           announcement={announcementUpdate.tournamentId === tournament.id ? announcementUpdate.announcement : tournament.announcement}
           language={language}
         />
-        {tournament.canManage && tournament.status !== 'finished' && tournament.registrationEnabled !== false && (
-          <AnnouncementEditor tournament={tournament} onChange={(announcement) => setAnnouncementUpdate({ tournamentId: tournament.id, announcement })} />
-        )}
         <nav className="tournament-detail-tabs" aria-label={t('Turnierdetails')}>
           {[
             ['info', t('Info')],

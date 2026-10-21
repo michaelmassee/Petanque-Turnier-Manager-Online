@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 
 export function useInstallPrompt() {
@@ -101,4 +101,22 @@ export function useRoutedTournament(id, tournaments, shareToken = '') {
   }, [id, existing, shareToken]);
 
   return { tournament: existing || fetched, notFound: notFound && !existing };
+}
+
+/**
+ * Lädt sofort neu, wenn ein Live-Push (neue Runde, Ankündigung) für dieses Turnier eintrifft, statt bis zum
+ * nächsten Abruf zu warten. Der Service Worker reicht ihn als Nachricht "live-update" an offene Fenster weiter.
+ */
+export function useLivePushRefresh(tournamentId, refresh) {
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  useEffect(() => {
+    const serviceWorker = typeof navigator === 'undefined' ? null : navigator.serviceWorker;
+    if (!tournamentId || typeof serviceWorker?.addEventListener !== 'function') return undefined;
+    const onMessage = (event) => {
+      if (event.data?.type === 'live-update' && event.data.tournamentId === tournamentId) refreshRef.current?.();
+    };
+    serviceWorker.addEventListener('message', onMessage);
+    return () => serviceWorker.removeEventListener('message', onMessage);
+  }, [tournamentId]);
 }

@@ -100,6 +100,8 @@ self.addEventListener('push', (event) => {
   const messageType = {
     tournament_registration_opened: 'tournament-registration-opened',
     tournament_result_reported: 'tournament-result-reported',
+    // Neue Runde oder Ankündigung: offene Live-Ansicht und offener Spielplan laden sofort neu.
+    live_update: 'live-update',
   }[payload.eventType];
   const refresh = messageType && payload.tournamentId
     ? clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {

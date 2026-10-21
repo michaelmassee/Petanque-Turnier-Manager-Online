@@ -32,7 +32,7 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 | Schweizer, Formule X, Zufall, Supermêlée in drei Varianten | ✅ | ✅ (Schweizer, Formule X, Supermêlée, JgJ, KO) |
 | Wertungen BHP, FBHP, DP, SEP, direkter Vergleich, Freilos-Wertung frei einstellbar | ✅ | ⚠️ prüfen in `src/lib/pairing/ranking.js` |
 | **Spielfeldpläne** (Bahnen, Nummerierung, Terrain-Typen, Gruppen, Bahnen sperren), Bahnzuteilung | ✅ | ❌ (Bahnen nur bei der Vermietung) |
-| Ankündigung („Mittagspause bis 13 Uhr“) an alle Live-Link-Nutzer | ✅ | ✅ seit 21.10.2026: Banner in Live-Teamsicht und auf der Turnierseite, Live-Push an Abonnenten, bis Löschen oder Turnierende |
+| Ankündigung („Mittagspause bis 13 Uhr“) an alle Live-Link-Nutzer | ✅ | ✅ seit 21.10.2026: Banner in Live-Teamsicht und auf der Turnierseite, Live-Push an Abonnenten, bis Löschen oder Turnierende; gepflegt unter „Turnier starten“ |
 | Druck-Dokumente: Check-In-Liste, Starterliste, Excel-Export, QR-Karten je Team, QR-Code Anmeldung, Zuschauer-Live-Link, Foto-Hinweis | ✅ | ⚠️ (CSV-Export, Ranglisten-PDF, QR-Code; keine Team-Karten, kein Zuschauer-Link) |
 | **Turnierserien-Auswertung** über mehrere Turniere als PDF | ✅ | ❌ |
 | Live-Ansicht für Spieler, Ergebnis selbst melden, Push | ⚠️ | ✅ |

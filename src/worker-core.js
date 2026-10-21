@@ -583,7 +583,13 @@ export const LIVE_ROUND_PUSH_TEXTS = {
 // muss im kostenlosen Workers-Tarif unter 50 externen Anfragen und ~10 ms CPU bleiben.
 export const LIVE_PUSH_CHUNK_SIZE = 5;
 
-export function buildLiveRoundPush({ tournamentName, match, language, url }) {
+// Mit tournamentId lädt eine offene Live-Ansicht bzw. ein offener Spielplan nach dem Push sofort neu
+// (Service Worker → Nachricht "live-update" an die Fenster).
+function livePushRefreshFields(tournamentId) {
+  return tournamentId ? { eventType: 'live_update', tournamentId } : {};
+}
+
+export function buildLiveRoundPush({ tournamentName, match, language, url, tournamentId }) {
   const texts = LIVE_ROUND_PUSH_TEXTS[language] || LIVE_ROUND_PUSH_TEXTS.de;
   const parts = [];
   if (match.court) parts.push(`${texts.court} ${match.court}`);
@@ -593,18 +599,20 @@ export function buildLiveRoundPush({ tournamentName, match, language, url }) {
     body: parts.join(' · '),
     url,
     tag: `live-round-${match.roundNumber}`,
+    ...livePushRefreshFields(tournamentId),
   };
 }
 
 const LIVE_ANNOUNCEMENT_PUSH_TITLES = { de: 'Ankündigung', nl: 'Mededeling', en: 'Announcement', es: 'Aviso', fr: 'Annonce' };
 
 // Ankündigung der Turnierleitung als Live-Push; gleiches Tag, damit eine neue Ankündigung die alte ersetzt.
-export function buildLiveAnnouncementPush({ tournamentName, text, language, url }) {
+export function buildLiveAnnouncementPush({ tournamentName, text, language, url, tournamentId }) {
   return {
     title: `${tournamentName}: ${LIVE_ANNOUNCEMENT_PUSH_TITLES[language] || LIVE_ANNOUNCEMENT_PUSH_TITLES.de}`,
     body: text,
     url,
     tag: 'live-announcement',
+    ...livePushRefreshFields(tournamentId),
   };
 }
 
