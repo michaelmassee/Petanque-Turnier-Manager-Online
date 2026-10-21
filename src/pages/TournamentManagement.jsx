@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
@@ -279,61 +279,50 @@ function FormationHelpDialog({ onClose }) {
 
 const toSingleLine = (value) => value.replace(/[\r\n]+/g, ' ');
 
-// Turniername: einzeilig; passt er nicht ins Feld, lässt er sich zum Lesen/Bearbeiten aufklappen.
-// Auch aufgeklappt bleibt der Wert einzeilig, die textarea bricht nur sichtbar um.
+// Turniername: am PC immer einzeilig. Auf dem Handy bricht ein langer Name auf höchstens zwei Zeilen
+// um (Breakpoint wie in styles.css). Der Wert selbst bleibt einzeilig, Enter fügt nichts ein.
+const NAME_FIELD_WRAP_QUERY = '(max-width: 560px)';
+
 function TournamentNameField({ value, onChange }) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
-  const [overflowing, setOverflowing] = useState(false);
-  const inputRef = useRef(null);
-  const textareaRef = useRef(null);
-  const focusAfterToggle = useRef(false);
+  const fieldRef = useRef(null);
+  const [rows, setRows] = useState(1);
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 0 : window.innerWidth));
 
   useEffect(() => {
-    const input = inputRef.current;
-    if (!input) return undefined;
-    const measure = () => setOverflowing(input.scrollWidth > input.clientWidth);
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [value, expanded]);
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
-  useEffect(() => {
-    if (!focusAfterToggle.current) return;
-    focusAfterToggle.current = false;
-    const field = expanded ? textareaRef.current : inputRef.current;
-    field?.focus();
-    field?.setSelectionRange?.(field.value.length, field.value.length);
-  }, [expanded]);
-
-  const fieldProps = {
-    value,
-    onChange: (event) => onChange(toSingleLine(event.target.value)),
-    onKeyDown: (event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) event.preventDefault(); },
-    minLength: 2,
-  };
+  useLayoutEffect(() => {
+    const field = fieldRef.current;
+    if (!field || !window.matchMedia?.(NAME_FIELD_WRAP_QUERY).matches) {
+      setRows(1);
+      return;
+    }
+    // Einzeilig messen: läuft der Text über, braucht er die zweite Zeile.
+    // rows direkt zurücksetzen: Bleibt der State gleich, rendert React nicht neu.
+    field.rows = 1;
+    const nextRows = field.scrollHeight > field.clientHeight + 1 ? 2 : 1;
+    field.rows = nextRows;
+    setRows(nextRows);
+  }, [value, viewportWidth]);
 
   return (
     <label>
       {t('Name')}
       <RequiredMark />
-      <div className={`name-field${expanded ? ' expanded' : ''}`}>
-        {expanded
-          ? <textarea ref={textareaRef} rows={Math.max(2, Math.ceil(value.length / 40))} required {...fieldProps} />
-          : <input ref={inputRef} type="text" required {...fieldProps} />}
-        {(expanded || overflowing) && (
-          <button
-            className="name-field-toggle"
-            type="button"
-            aria-expanded={expanded}
-            aria-label={expanded ? t('Einzeilig anzeigen') : t('Ganzen Namen anzeigen')}
-            title={expanded ? t('Einzeilig anzeigen') : t('Ganzen Namen anzeigen')}
-            onClick={() => { focusAfterToggle.current = true; setExpanded((open) => !open); }}
-          >
-            {expanded ? '⤡' : '⤢'}
-          </button>
-        )}
-      </div>
+      <textarea
+        ref={fieldRef}
+        className="tournament-name-field"
+        rows={rows}
+        value={value}
+        onChange={(event) => onChange(toSingleLine(event.target.value))}
+        onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) event.preventDefault(); }}
+        required
+        minLength={2}
+      />
     </label>
   );
 }

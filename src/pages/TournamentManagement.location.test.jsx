@@ -92,38 +92,32 @@ describe('Ausrichtender Verein', () => {
 });
 
 describe('Turniername', () => {
-  it('ist ein einzeiliges Feld und bleibt einzeilig, auch bei eingefügten Zeilenumbrüchen und Enter', () => {
+  it('bleibt einzeilig, auch bei eingefügten Zeilenumbrüchen und Enter', () => {
     const changed = renderForm('create', { ...EMPTY_TOURNAMENT_FORM });
     const field = screen.getByRole('textbox', { name: /^Name/ });
-    expect(field.tagName).toBe('INPUT');
+    expect(field).toHaveAttribute('rows', '1');
+    fireEvent.change(field, { target: { value: 'Herbst-\nTurnier\r\nLinden' } });
+    expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Herbst- Turnier Linden' }));
     const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
     field.dispatchEvent(enter);
     expect(enter.defaultPrevented).toBe(true);
-    expect(changed).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: 'Ganzen Namen anzeigen' })).not.toBeInTheDocument();
   });
 
-  it('lässt einen zu langen Namen aufklappen und wieder einklappen, der Wert bleibt einzeilig', () => {
-    // jsdom rechnet kein Layout: Überlänge über scrollWidth > clientWidth simulieren.
-    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(500);
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
+  it.each([
+    ['Handy, langer Name', true, 60, '2'],
+    ['Handy, kurzer Name', true, 20, '1'],
+    ['PC, langer Name', false, 60, '1'],
+  ])('zeigt den Namen ohne Aufklappen: %s', (_label, mobile, scrollHeight, rows) => {
+    vi.stubGlobal('matchMedia', (query) => ({ matches: mobile && query === '(max-width: 560px)' }));
+    // jsdom rechnet kein Layout: einzeilige Höhe 46 px, Überlauf über scrollHeight simulieren.
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(scrollHeight);
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(20);
     try {
-      const changed = renderForm('edit', { ...tournamentToForm(tournament), name: 'Großer Preis der Stadt Linden – Supermêlée' });
-      const toggle = screen.getByRole('button', { name: 'Ganzen Namen anzeigen' });
-      expect(toggle).toHaveAttribute('aria-expanded', 'false');
-
-      fireEvent.click(toggle);
-
-      const area = screen.getByRole('textbox', { name: /^Name/ });
-      expect(area.tagName).toBe('TEXTAREA');
-      expect(area).toHaveFocus();
-      expect(screen.getByRole('button', { name: 'Einzeilig anzeigen' })).toHaveAttribute('aria-expanded', 'true');
-      fireEvent.change(area, { target: { value: 'Herbst-\nTurnier\r\nLinden' } });
-      expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Herbst- Turnier Linden' }));
-
-      fireEvent.click(screen.getByRole('button', { name: 'Einzeilig anzeigen' }));
-      expect(screen.getByRole('textbox', { name: /^Name/ }).tagName).toBe('INPUT');
+      renderForm('edit', { ...tournamentToForm(tournament), name: 'Großer Preis der Stadt Linden – Supermêlée' });
+      expect(screen.getByRole('textbox', { name: /^Name/ })).toHaveAttribute('rows', rows);
+      expect(screen.queryByRole('button', { name: /Namen/ })).not.toBeInTheDocument();
     } finally {
+      vi.unstubAllGlobals();
       vi.restoreAllMocks();
     }
   });

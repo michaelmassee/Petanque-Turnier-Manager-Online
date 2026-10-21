@@ -1793,42 +1793,21 @@ a.left-panel-link {
   margin: 0 auto;
 }
 
-.name-field {
-  position: relative;
-  margin-top: 7px;
-}
-
-.name-field input,
-.name-field textarea {
-  padding-right: 44px;
+.tournament-name-field {
+  min-height: 44px;
   font-size: 1rem;
   line-height: 1.5;
-}
-
-.name-field textarea {
-  field-sizing: content;
-  min-height: 44px;
   resize: none;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: pre;
 }
 
-.name-field-toggle {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  transform: translateY(-50%);
-  border: 0;
-  background: transparent;
-  color: #1677ff;
-  font-size: 1.1rem;
-  line-height: 1;
-  padding: 6px 8px;
-  cursor: pointer;
-}
-
-.name-field.expanded .name-field-toggle {
-  top: 6px;
-  transform: none;
+@media (max-width: 560px) {
+  .tournament-name-field {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    overflow-y: auto;
+  }
 }
 
 .tournament-detail-heading {
