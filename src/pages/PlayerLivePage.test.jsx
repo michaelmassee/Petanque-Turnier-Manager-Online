@@ -334,12 +334,19 @@ describe('Live-Ansicht für Spieler', () => {
     );
 
     await screen.findByLabelText('Eigene Punkte');
-    fireEvent.change(screen.getByLabelText('Eigene Punkte'), { target: { value: '13' } });
+    // Nur 0–13 als positive ganze Zahl: Minus, Komma und Werte über 13 werden beim Tippen bereinigt.
+    fireEvent.change(screen.getByLabelText('Eigene Punkte'), { target: { value: '-5' } });
+    expect(screen.getByLabelText('Eigene Punkte')).toHaveValue('5');
+    fireEvent.change(screen.getByLabelText('Eigene Punkte'), { target: { value: '20' } });
+    expect(screen.getByLabelText('Eigene Punkte')).toHaveValue('13');
+    fireEvent.change(screen.getByLabelText('Gegnerische Punkte'), { target: { value: '7,5' } });
+    expect(screen.getByLabelText('Gegnerische Punkte')).toHaveValue('13');
     fireEvent.change(screen.getByLabelText('Gegnerische Punkte'), { target: { value: '7' } });
     fireEvent.click(screen.getByRole('button', { name: 'Ergebnis melden' }));
 
     expect(await screen.findByText('Ergebnis gemeldet.')).toHaveAttribute('role', 'status');
     expect(global.fetch).toHaveBeenLastCalledWith('/api/live/registrations/r1/result', expect.objectContaining({ method: 'POST' }));
+    expect(JSON.parse(global.fetch.mock.calls.at(-1)[1].body)).toEqual({ ownScore: 13, opponentScore: 7 });
 
     const nextRound = livePayload();
     nextRound.tournament.playerResultReportingEnabled = true;
@@ -468,7 +475,7 @@ describe('Live-Ansicht für Spieler', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ergebnis melden' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Das Ergebnis wurde inzwischen geändert.');
-    expect(ownScore).toHaveValue(13);
+    expect(ownScore).toHaveValue('13');
     expect(screen.getByRole('button', { name: 'Ergebnis melden' })).not.toBeDisabled();
   });
 

@@ -421,3 +421,12 @@ export function formatTournamentStartTime(tournament, language) {
 export function isDocumentBound(tournament) {
   return Boolean(tournament?.documentManaged || tournament?.desktopExecution);
 }
+
+// Punkteingabe einer Partie: nur Ziffern, höchstens 13 (Pétanque endet bei 13 Punkten).
+export function sanitizeScore(value) {
+  const digitsOnly = String(value).replace(/\D/g, '').slice(0, 2);
+  if (digitsOnly === '') {
+    return '';
+  }
+  return String(Math.min(Number(digitsOnly), 13));
+}

@@ -127,6 +127,17 @@ describe('TournamentPlayManagement', () => {
     localStorage.clear();
   });
 
+  it('zeigt die Ankündigung erst, wenn das Turnier gestartet ist', async () => {
+    installFetchMock([]);
+    const { unmount } = render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, status: 'registration' }]} language="de" />);
+    expect(await screen.findByRole('button', { name: 'Turnier starten' })).toBeInTheDocument();
+    expect(screen.queryByText('Ankündigung', { exact: false })).not.toBeInTheDocument();
+    unmount();
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    expect(await screen.findByText('Ankündigung', { exact: false })).toBeInTheDocument();
+  });
+
   it('bietet „Turnier abschließen“ direkt nach „Nächste Runde starten“ an, auch bei offenen Ergebnissen', async () => {
     const calls = [];
     installFetchMock(calls);

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { formatDate, formatWeekdayShort, DISPLAY_LOCALES } from '../lib/format.js';
 import { REGISTRATION_STATUSES } from '../lib/constants.js';
-import { labelFor } from '../lib/domain.js';
+import { labelFor, sanitizeScore } from '../lib/domain.js';
 import { Button, Feedback } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
@@ -214,9 +214,9 @@ function PlayerResultReport({ path, onSaved }) {
     <form className="live-result-report" onSubmit={submit}>
       <p className="hint">{t('Ergebnis dieser Partie melden')}</p>
       <div className="play-result-row">
-        <input className="score-input" type="number" inputMode="numeric" min="0" max="13" value={scoreA} onChange={(event) => setScoreA(event.target.value)} aria-label={t('Eigene Punkte')} />
+        <input className="score-input" type="text" inputMode="numeric" pattern="[0-9]{0,2}" maxLength={2} value={scoreA} onChange={(event) => setScoreA(sanitizeScore(event.target.value))} aria-label={t('Eigene Punkte')} />
         <span className="play-score-sep">:</span>
-        <input className="score-input" type="number" inputMode="numeric" min="0" max="13" value={scoreB} onChange={(event) => setScoreB(event.target.value)} aria-label={t('Gegnerische Punkte')} />
+        <input className="score-input" type="text" inputMode="numeric" pattern="[0-9]{0,2}" maxLength={2} value={scoreB} onChange={(event) => setScoreB(sanitizeScore(event.target.value))} aria-label={t('Gegnerische Punkte')} />
         <Button type="submit" disabled={invalid || busy} loading={busy}>{t('Ergebnis melden')}</Button>
       </div>
       <Feedback error={error || (scoreA !== '' && scoreB !== '' && Number(scoreA) === Number(scoreB) ? t('Unentschieden ist nicht möglich') : '')} />

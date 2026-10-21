@@ -6,7 +6,7 @@ import { TextField, Button, Feedback } from '../components/ui.jsx';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { checkRoundRequirements, getSupportedSystemLabels, isMeleeTeamTournament, isOnlinePlayable, minimumTeams } from '../lib/pairing/index.js';
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
-import { isCalendarEntry, isDocumentBound, labelFor, translatedOptions } from '../lib/domain.js';
+import { isCalendarEntry, isDocumentBound, labelFor, sanitizeScore, translatedOptions } from '../lib/domain.js';
 import { AnnouncementEditor } from '../components/TournamentAnnouncement.jsx';
 import { normalizeRanking } from '../lib/live-ranking.js';
 import { RankingTable } from '../components/RankingTable.jsx';
@@ -43,14 +43,6 @@ function playerLabel(player) {
 
 function teamLabel(team) {
   return team.map(playerLabel).join(' + ');
-}
-
-function sanitizeScore(value) {
-  const digitsOnly = value.replace(/\D/g, '').slice(0, 2);
-  if (digitsOnly === '') {
-    return '';
-  }
-  return String(Math.min(Number(digitsOnly), 13));
 }
 
 function isRoundComplete(round) {
@@ -678,7 +670,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
       <Feedback message={message} error={error || queryError?.message} />
 
-      {selectedTournament && selectedTournamentStatus !== 'finished' && <AnnouncementEditor tournament={selectedTournament} />}
+      {/* Ankündigungen erst ab Turnierstart: vorher ist die Seite nur zum Auswählen und Starten da. */}
+      {selectedTournament && selectedTournamentStatus === 'running' && <AnnouncementEditor tournament={selectedTournament} />}
 
       {canEditMeleeTeams && selectedTournamentStatus === 'running' && (
         <p className="hint">
