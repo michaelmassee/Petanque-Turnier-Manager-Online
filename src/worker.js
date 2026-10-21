@@ -9584,7 +9584,7 @@ function rentalOfferIsPublic(row) {
 
 function toRentalOffer(row, openingHours = null) {
   return {
-    id: row.id, clubId: row.club_id, clubName: row.club_name, clubContactEmail: row.club_contact_email || null, hasClubLogo: Boolean(row.club_logo_url), placeId: row.boule_place_id,
+    id: row.id, clubId: row.club_id, clubName: row.club_name, contactEmail: row.contact_email || row.club_contact_email || null, hasClubLogo: Boolean(row.club_logo_url), placeId: row.boule_place_id,
     placeName: row.place_name, address: formatLocationAddress(row.place_address), venueType: row.venue_type || 'outdoor',
     latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
     longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
@@ -9714,8 +9714,8 @@ async function notifyRentalClub(env, { offer, reservation, renter, eventType, or
   }
   const club = await env.DB.prepare('SELECT owner_id, contact_email FROM clubs WHERE id = ?').bind(offer.club_id).first();
   const owner = managers.find((manager) => manager.id === club?.owner_id);
-  // Mails gehen nur an die öffentliche Kontakt-E-Mail des Vereins (für Angebote Pflicht), nie an Verwalter-Konten.
-  const to = club?.contact_email;
+  // Mails gehen an die Kontakt-E-Mail des Angebots (Pflicht, vorbelegt mit der des Vereins), nie an Verwalter-Konten.
+  const to = offer.contact_email || club?.contact_email;
   if (!to || owner?.id === renter.id) return;
   const language = owner?.language || 'de';
   const templates = RENTAL_EMAILS[language] || RENTAL_EMAILS.de;
@@ -9966,7 +9966,7 @@ async function listRentalManagement(db, clubId, user) {
   for (const row of hours.results || []) hoursByOffer.set(row.offer_id, [...(hoursByOffer.get(row.offer_id) || []), row]);
   return json({
     clubStatus: club.status,
-    clubHasContactEmail: isEmail(club.contact_email || ''),
+    clubContactEmail: isEmail(club.contact_email || '') ? club.contact_email : null,
     offers: (offers.results || []).map((row) => toRentalOffer(row, toOpeningHours(hoursByOffer.get(row.id) || []))),
     places: (places.results || []).map((row) => ({ id: row.id, name: row.name, courtCount: Number(row.court_count || 0), venueType: row.venue_type || 'outdoor', status: row.status })),
     reservations: (reservations.results || []).map((row) => toRentalReservation(row, { withRenter: true })),
@@ -10008,7 +10008,9 @@ function openingHourStatements(db, offerId, openingHours) {
 // Rich-Text-Struktur prüft wie bei Turnier- und Platzbeschreibungen der Worker; Länge und übrige Felder rental-core.
 function rentalOfferInput(body) {
   const input = normalizeOfferInput(body);
-  return { ...input, description: normalizeRichText(input.description, 'Ungültige Beschreibung') };
+  const contactEmail = String(body?.contactEmail || '').trim().toLowerCase();
+  if (!isEmail(contactEmail)) throw new HttpError(400, 'Eine gültige Kontakt-E-Mail ist erforderlich', { field: 'contactEmail' });
+  return { ...input, contactEmail, description: normalizeRichText(input.description, 'Ungültige Beschreibung') };
 }
 
 function assertRentalLaneCount(place, input) {
@@ -10029,10 +10031,10 @@ async function createRentalOffer(request, db, user) {
   const now = new Date().toISOString();
   await db.batch([
     db.prepare(`INSERT INTO rental_offers (id, club_id, boule_place_id, title, description, lane_count, rental_mode, price_minor, currency, price_note,
-        whole_price_minor, whole_price_note, min_hours, max_hours, booking_horizon_days, timezone, status, created_by, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(id, clubId, place.id, input.title, input.description, input.laneCount,
+        whole_price_minor, whole_price_note, min_hours, max_hours, booking_horizon_days, timezone, status, contact_email, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(id, clubId, place.id, input.title, input.description, input.laneCount,
       input.rentalMode, input.priceMinor, input.currency, input.priceNote, input.wholePriceMinor, input.wholePriceNote, input.minHours, input.maxHours,
-      input.bookingHorizonDays, timezone, input.status, user.id, now, now),
+      input.bookingHorizonDays, timezone, input.status, input.contactEmail, user.id, now, now),
     ...openingHourStatements(db, id, input.openingHours),
   ]);
   return json({ offer: toRentalOffer(await loadRentalOffer(db, id), await loadOpeningHours(db, id)) }, 201);
@@ -10049,10 +10051,10 @@ async function updateRentalOffer(request, db, id, user) {
     await db.batch([
       db.prepare(`UPDATE rental_offers SET boule_place_id = ?, title = ?, description = ?, lane_count = ?, rental_mode = ?, price_minor = ?, currency = ?,
           price_note = ?, whole_price_minor = ?, whole_price_note = ?, min_hours = ?, max_hours = ?, booking_horizon_days = ?, timezone = ?, status = ?,
-          updated_at = ? WHERE id = ?`)
+          contact_email = ?, updated_at = ? WHERE id = ?`)
         .bind(place.id, input.title, input.description, input.laneCount, input.rentalMode, input.priceMinor, input.currency, input.priceNote,
           input.wholePriceMinor, input.wholePriceNote, input.minHours, input.maxHours, input.bookingHorizonDays, timezone, input.status,
-          new Date().toISOString(), id),
+          input.contactEmail, new Date().toISOString(), id),
       ...openingHourStatements(db, id, input.openingHours),
     ]);
   } catch (error) {

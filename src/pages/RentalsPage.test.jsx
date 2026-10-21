@@ -239,8 +239,8 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(screen.queryByRole('link', { name: 'Halle Nord' })).not.toBeInTheDocument();
   });
 
-  it('öffnet mit Kontakt-E-Mail des Vereins das E-Mail-Programm, auch für Gäste', async () => {
-    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, isPublic: true, clubContactEmail: 'info@bc-test.de' } }));
+  it('öffnet mit der Kontakt-E-Mail des Angebots das E-Mail-Programm, auch für Gäste', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, isPublic: true, contactEmail: 'info@bc-test.de' } }));
     render(<RentalOfferView id="o1" language="de" currentUser={null} navigate={vi.fn()} onLogin={vi.fn()} />);
     const link = await screen.findByRole('link', { name: 'Nachricht an Vermieter' });
     expect(link).toHaveAttribute('href', `mailto:info%40bc-test.de?subject=${encodeURIComponent(OFFER.title)}`);
@@ -248,8 +248,8 @@ describe('Platz mieten: Angebot und Kalender', () => {
   });
 
   it.each([
-    ['ohne Kontakt-E-Mail des Vereins', { id: 'u2' }, {}],
-    ['Vereinsverwaltern', { id: 'u1' }, { canManage: true, clubContactEmail: 'info@bc-test.de' }],
+    ['ohne Kontakt-E-Mail', { id: 'u2' }, {}],
+    ['Vereinsverwaltern', { id: 'u1' }, { canManage: true, contactEmail: 'info@bc-test.de' }],
   ])('bietet %s keine Nachricht an den Vermieter an', async (_label, currentUser, patch) => {
     api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, isPublic: true, ...patch } }));
     render(<RentalOfferView id="o1" language="de" currentUser={currentUser} navigate={vi.fn()} onLogin={vi.fn()} />);
@@ -273,7 +273,7 @@ describe('Platz mieten: Vereinsverwaltung', () => {
 
   const MANAGE = {
     clubStatus: 'published',
-    clubHasContactEmail: true,
+    clubContactEmail: 'info@bc-test.de',
     offers: [OFFER],
     places: [{ id: 'p1', name: 'Halle Nord', courtCount: 6, venueType: 'indoor', status: 'published' }],
     reservations: [{ id: 'r1', offerId: 'o1', date: '2026-10-24', startHour: 9, hours: 2, lanes: 2, status: 'requested', renterName: 'Max Mieter', renterEmail: 'max@example.test', note: 'Training' }],
@@ -357,7 +357,7 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     await waitFor(() => expect(onWrite).toHaveBeenCalled());
     expect(onWrite.mock.calls[0][0]).toBe('/api/rentals/offers');
     expect(JSON.parse(onWrite.mock.calls[0][1].body)).toMatchObject({
-      clubId: 'c1', placeId: 'p1', title: 'Halle abends', laneCount: 6, priceMinor: 750,
+      clubId: 'c1', placeId: 'p1', title: 'Halle abends', contactEmail: 'info@bc-test.de', laneCount: 6, priceMinor: 750,
       openingHours: [{ weekday: 1, openHour: 10, closeHour: 20 }],
     });
   });
@@ -373,13 +373,17 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     expect(within(dialog).getByRole('option', { name: 'Nur komplett (Komplette Halle)' })).toBeInTheDocument();
     fireEvent.change(within(dialog).getByLabelText('Vermietung'), { target: { value: 'both' } });
     fireEvent.change(within(dialog).getByLabelText(/Titel/), { target: { value: 'Halle' } });
+    // Vorbelegt mit der Kontakt-E-Mail des Vereins, je Angebot änderbar.
+    expect(within(dialog).getByLabelText(/Kontakt-E-Mail/)).toHaveValue('info@bc-test.de');
+    expect(within(dialog).getByLabelText(/Kontakt-E-Mail/)).toBeRequired();
+    fireEvent.change(within(dialog).getByLabelText(/Kontakt-E-Mail/), { target: { value: 'halle@bc-test.de' } });
     fireEvent.change(within(dialog).getByLabelText('Preis komplett'), { target: { value: '35' } });
     fireEvent.change(within(dialog).getByLabelText('Preis-Hinweis komplett'), { target: { value: 'pro Stunde' } });
     fireEvent.click(within(dialog).getAllByRole('checkbox')[0]);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(onWrite).toHaveBeenCalled());
-    expect(JSON.parse(onWrite.mock.calls[0][1].body)).toMatchObject({ rentalMode: 'both', priceMinor: null, wholePriceMinor: 3500, wholePriceNote: 'pro Stunde' });
+    expect(JSON.parse(onWrite.mock.calls[0][1].body)).toMatchObject({ rentalMode: 'both', contactEmail: 'halle@bc-test.de', priceMinor: null, wholePriceMinor: 3500, wholePriceNote: 'pro Stunde' });
   });
 
   it('zeigt Komplettbuchungen in den Anfragen als komplette Halle', async () => {
@@ -406,7 +410,7 @@ describe('Platz mieten: Vereinsverwaltung', () => {
   it('sperrt Angebote, wenn der Verein keine Kontakt-E-Mail hat', async () => {
     authenticatedApi.mockImplementation(async (path) => {
       if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
-      return { ...MANAGE, clubHasContactEmail: false };
+      return { ...MANAGE, clubContactEmail: null };
     });
     render(<RentalManagement language="de" navigate={vi.fn()} />);
 

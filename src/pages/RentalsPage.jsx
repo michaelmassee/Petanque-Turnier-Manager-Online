@@ -64,12 +64,12 @@ function OfferSummary({ offer, navigate }) {
   </>;
 }
 
-// „Nachricht an Vermieter“ öffnet das E-Mail-Programm mit der öffentlichen Kontakt-E-Mail des Vereins (für Angebote Pflicht).
+// „Nachricht an Vermieter“ öffnet das E-Mail-Programm mit der Kontakt-E-Mail des Angebots (Pflicht, vorbelegt mit der des Vereins).
 function RentalContactLink({ offer }) {
   const { t } = useTranslation();
-  if (!offer.clubContactEmail) return null;
+  if (!offer.contactEmail) return null;
   return (
-    <a className="button button-secondary" href={`mailto:${encodeURIComponent(offer.clubContactEmail)}?subject=${encodeURIComponent(offer.title)}`}>
+    <a className="button button-secondary" href={`mailto:${encodeURIComponent(offer.contactEmail)}?subject=${encodeURIComponent(offer.title)}`}>
       {t('Nachricht an Vermieter')}
     </a>
   );
@@ -383,9 +383,9 @@ export function MyRentalReservations({ language, navigate }) {
 
 const DEFAULT_OPENING = { enabled: false, openHour: '10', closeHour: '20' };
 
-function emptyOfferForm(places) {
+function emptyOfferForm(places, contactEmail = '') {
   return {
-    placeId: places[0]?.id || '', title: '', description: '', laneCount: String(places[0]?.courtCount || 4), rentalMode: 'lanes', price: '', currency: 'EUR', priceNote: '',
+    placeId: places[0]?.id || '', title: '', description: '', contactEmail: contactEmail || '', laneCount: String(places[0]?.courtCount || 4), rentalMode: 'lanes', price: '', currency: 'EUR', priceNote: '',
     wholePrice: '', wholePriceNote: '',
     minHours: '1', maxHours: '4', bookingHorizonDays: '60', status: 'active',
     opening: Object.fromEntries(WEEKDAYS.map((weekday) => [weekday, { ...DEFAULT_OPENING }])),
@@ -407,7 +407,7 @@ function offerToForm(offer, places) {
     form.opening[entry.weekday] = { enabled: true, openHour: String(entry.openHour), closeHour: String(entry.closeHour) };
   }
   return {
-    ...form, placeId: offer.placeId, title: offer.title, description: offer.description || '', laneCount: String(offer.laneCount),
+    ...form, placeId: offer.placeId, title: offer.title, description: offer.description || '', contactEmail: offer.contactEmail || '', laneCount: String(offer.laneCount),
     rentalMode: offer.rentalMode || 'lanes', price: priceToForm(offer.priceMinor, offer.currency), currency: offer.currency, priceNote: offer.priceNote || '',
     wholePrice: priceToForm(offer.wholePriceMinor, offer.currency), wholePriceNote: offer.wholePriceNote || '', minHours: String(offer.minHours), maxHours: String(offer.maxHours),
     bookingHorizonDays: String(offer.bookingHorizonDays), status: offer.status,
@@ -416,7 +416,7 @@ function offerToForm(offer, places) {
 
 function offerPayload(form, clubId) {
   return {
-    clubId, placeId: form.placeId, title: form.title, description: form.description, laneCount: Number(form.laneCount), rentalMode: form.rentalMode,
+    clubId, placeId: form.placeId, title: form.title, description: form.description, contactEmail: form.contactEmail, laneCount: Number(form.laneCount), rentalMode: form.rentalMode,
     priceMinor: priceFromForm(form.price, form.currency), currency: form.currency, priceNote: form.priceNote,
     wholePriceMinor: priceFromForm(form.wholePrice, form.currency), wholePriceNote: form.wholePriceNote,
     minHours: Number(form.minHours), maxHours: Number(form.maxHours), bookingHorizonDays: Number(form.bookingHorizonDays), status: form.status,
@@ -434,6 +434,8 @@ function OfferFields({ form, setForm, places, language }) {
   return <>
     <SelectField label={t('Spielort')} value={form.placeId} onChange={set('placeId')} required options={places.map((place) => ({ value: place.id, label: `${t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}: ${place.name}` }))} />
     <TextField label={t('Titel')} value={form.title} onChange={set('title')} required maxLength={120} placeholder={t('z. B. Boulehalle – Bahnen stundenweise')} />
+    <TextField label={t('Kontakt-E-Mail')} type="email" value={form.contactEmail} onChange={set('contactEmail')} required />
+    <p className="hint">{t('An diese Adresse gehen Anfragen und Nachrichten zu diesem Angebot.')}</p>
     <RichTextEditor
       label={t('Beschreibung')}
       value={form.description}
@@ -542,7 +544,8 @@ export function RentalManagement({ language, navigate, currentUser }) {
   function openOffer(offer = null) {
     setDialogError('');
     setDialog(offer || 'new');
-    setForm(offer ? offerToForm(offer, data.places) : emptyOfferForm(data.places));
+    // Die Kontakt-E-Mail eines neuen Angebots ist mit der des Vereins vorbelegt und kann abweichen.
+    setForm(offer ? offerToForm(offer, data.places) : emptyOfferForm(data.places, data.clubContactEmail));
   }
 
   async function saveOffer(event) {
@@ -619,7 +622,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
 
   const clubPublished = data?.clubStatus === 'published';
   // Angebote brauchen einen freigegebenen Verein mit Kontakt-E-Mail und mindestens einem freigegebenen Spielort.
-  const canEditOffers = clubPublished && Boolean(data?.clubHasContactEmail) && Boolean(data?.places.length);
+  const canEditOffers = clubPublished && Boolean(data?.clubContactEmail) && Boolean(data?.places.length);
   const offerTitle = (offerId) => data?.offers.find((offer) => offer.id === offerId)?.title || '';
   const requests = (data?.reservations || []).filter((reservation) => reservation.status === 'requested');
   const confirmed = (data?.reservations || []).filter((reservation) => reservation.status === 'confirmed');
@@ -681,7 +684,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
             <Button disabled={!canEditOffers} onClick={() => openOffer()}>{t('Neues Angebot')}</Button>
           </div>
           {!clubPublished && <p className="hint">{t('Dein Verein ist noch nicht freigegeben. Angebote kannst du anlegen, sobald ein Admin ihn freigegeben hat.')}</p>}
-          {clubPublished && !data.clubHasContactEmail && <p className="hint">{t('Für Platzmiete braucht dein Verein eine Kontakt-E-Mail. Trage sie unter „Meine Vereine“ ein.')}</p>}
+          {clubPublished && !data.clubContactEmail && <p className="hint">{t('Für Platzmiete braucht dein Verein eine Kontakt-E-Mail. Trage sie unter „Meine Vereine“ ein.')}</p>}
           {clubPublished && !data.places.length && <p className="hint">{t('Dein Verein hat noch keinen Spielort. Lege ihn unter „Meine Vereine“ an.')}</p>}
           {data.offers.length === 0 && data.places.length > 0 && <p className="muted">{t('Noch keine Angebote.')}</p>}
           <div className="user-list">

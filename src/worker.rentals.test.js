@@ -14,7 +14,7 @@ describe('Platz mieten', () => {
     method, headers: { ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined,
   }), env);
   const offerBody = {
-    clubId: 'c1', placeId: 'p1', title: 'Boulehalle', laneCount: 4, priceMinor: 1000, currency: 'EUR', priceNote: 'pro Bahn und Stunde',
+    clubId: 'c1', placeId: 'p1', title: 'Boulehalle', contactEmail: 'halle@bc-test.de', laneCount: 4, priceMinor: 1000, currency: 'EUR', priceNote: 'pro Bahn und Stunde',
     minHours: 1, maxHours: 3, bookingHorizonDays: 30,
     openingHours: [{ weekday: 1, openHour: 10, closeHour: 20 }, { weekday: 6, openHour: 9, closeHour: 13 }],
   };
@@ -65,8 +65,11 @@ describe('Platz mieten', () => {
     expect(list.offers.map((entry) => entry.title)).toEqual(['Boulehalle']);
     const detail = await (await call('GET', `/api/rentals/${offer.id}`)).json();
     expect(detail.offer.canManage).toBe(false);
-    // Für „Nachricht an Vermieter“ (mailto): die öffentliche Kontakt-E-Mail des Vereins, nie die Konto-E-Mail des Verwalters.
-    expect(detail.offer.clubContactEmail).toBe('info@bc-test.de');
+    // Für „Nachricht an Vermieter“ (mailto): die Kontakt-E-Mail des Angebots, nie die Konto-E-Mail des Verwalters.
+    expect(detail.offer.contactEmail).toBe('halle@bc-test.de');
+    const invalid = await call('POST', '/api/rentals/offers', { body: { ...offerBody, contactEmail: 'keine-mail' }, headers: VEREIN });
+    expect(invalid.status).toBe(400);
+    expect((await invalid.json()).error).toBe('Eine gültige Kontakt-E-Mail ist erforderlich');
 
     await call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, status: 'inactive' }, headers: VEREIN });
     expect((await (await call('GET', '/api/rentals')).json()).offers).toEqual([]);
@@ -120,7 +123,7 @@ describe('Platz mieten', () => {
     sql('DELETE FROM rental_offers');
     expect((await call('PUT', '/api/clubs/c1', { body: clubBody, headers: VEREIN })).status).toBe(200);
     const manage = await (await call('GET', '/api/rentals/manage?club=c1', { headers: VEREIN })).json();
-    expect(manage.clubHasContactEmail).toBe(false);
+    expect(manage.clubContactEmail).toBeNull();
     const created = await call('POST', '/api/rentals/offers', { body: offerBody, headers: VEREIN });
     expect(created.status).toBe(409);
     expect((await created.json()).error).toBe('Für Platzmiete braucht der Verein eine Kontakt-E-Mail');
@@ -157,7 +160,7 @@ describe('Platz mieten', () => {
     const booked = await reserve(offer.id, { whole: true, lanes: 1 });
     expect(booked.status).toBe(201);
     expect((await booked.json()).reservation).toMatchObject({ whole: true, lanes: 4 });
-    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ to: 'info@bc-test.de', text: expect.stringContaining('10:00–12:00, komplette Halle') }));
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ to: 'halle@bc-test.de', text: expect.stringContaining('10:00–12:00, komplette Halle') }));
     expect((await reserve(offer.id, { lanes: 1 }, ANDERER)).status).toBe(409);
     // Komplett geht nur, wenn alle Bahnen frei sind.
     expect((await reserve(offer.id, { startHour: 12, hours: 1, lanes: 1 }, ANDERER)).status).toBe(201);
@@ -326,7 +329,7 @@ describe('Platz mieten', () => {
     const offer = await createOffer();
     const reservation = (await (await reserve(offer.id, { note: 'Bitte Licht an' })).json()).reservation;
     expect(send).toHaveBeenLastCalledWith(expect.objectContaining({
-      to: 'info@bc-test.de', subject: 'Reservierungsanfrage: Boulehalle', messageBox: 'Bitte Licht an',
+      to: 'halle@bc-test.de', subject: 'Reservierungsanfrage: Boulehalle', messageBox: 'Bitte Licht an',
       actions: [expect.objectContaining({ url: 'https://ptm.test/platz-mieten/verwalten' })],
     }));
     await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
