@@ -159,6 +159,35 @@ function RentalOfferList({ language, navigate }) {
   );
 }
 
+// Dauerwahl direkt an der angeklickten Startstunde; schließt bei Wahl, Escape oder Klick daneben.
+function DurationPopover({ options, tooShort, onChoose, onClose }) {
+  const { t } = useTranslation();
+  const ref = useRef(null);
+  useEffect(() => {
+    const closeOutside = (event) => { if (!ref.current?.contains(event.target)) onClose(); };
+    const closeOnEscape = (event) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    ref.current?.querySelector('button')?.focus();
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, []);
+  return (
+    <div className="rental-duration-popover" role="dialog" aria-label={t('Dauer wählen')} ref={ref}>
+      <strong>{t('Dauer')}</strong>
+      {tooShort ? <p className="hint">{t('Ab dieser Uhrzeit ist die Mindestdauer nicht frei. Bitte wähle eine andere Startzeit.')}</p> : (
+        <div className="rental-duration-options">
+          {options.map((option) => (
+            <button key={option.value} type="button" className="rental-duration-option" onClick={() => onChoose(Number(option.value))}>{option.label}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function RentalOfferView({ id, language, currentUser, navigate, onLogin }) {
   const { t } = useTranslation();
   const [offer, setOffer] = useState(null);
@@ -168,6 +197,9 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
   const [selection, setSelection] = useState(null);
   const [lanes, setLanes] = useState('1');
   const [whole, setWhole] = useState(false);
+  const [durationOpen, setDurationOpen] = useState(false);
+  const [revealForm, setRevealForm] = useState(false);
+  const formRef = useRef(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -208,7 +240,22 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
     setSelection({ date, startHour: hour, hours: offer.minHours });
     setLanes('1');
     setWhole(offer.rentalMode === 'whole');
+    setDurationOpen(Boolean(currentUser));
   }
+
+  function chooseDuration(hours) {
+    setSelection((current) => ({ ...current, hours }));
+    setLanes('1');
+    setDurationOpen(false);
+    setRevealForm(true);
+  }
+
+  // Nach der Dauerwahl das Formular ins Bild holen; es steht unter dem oft langen Stundenraster.
+  useEffect(() => {
+    if (!revealForm) return;
+    setRevealForm(false);
+    formRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [revealForm]);
 
   async function submit(event) {
     event.preventDefault();
@@ -272,11 +319,21 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
         />
         <Button variant="secondary" disabled={addDays(availability.from, 7) > lastDate} onClick={() => setFrom(addDays(availability.from, 7))}>{t('Nächste Woche')}</Button>
       </div>
-      <RentalCalendar days={availability.days} laneCount={offer.laneCount} minLanes={minLanes} selection={selection} onSelect={select} language={language} />
+      <RentalCalendar
+        days={availability.days}
+        laneCount={offer.laneCount}
+        minLanes={minLanes}
+        selection={selection}
+        onSelect={select}
+        language={language}
+        popover={durationOpen && selection
+          ? <DurationPopover options={durationOptions} tooShort={tooShort} onChoose={chooseDuration} onClose={() => setDurationOpen(false)} />
+          : null}
+      />
       <Feedback message={message} />
       {selection && (
         currentUser ? (
-          <form className="form rental-request" onSubmit={submit}>
+          <form className="form rental-request" onSubmit={submit} ref={formRef}>
             <h3>{formatReservationSlot(selection, language)}{whole ? ` · ${wholeLabel(t, offer.venueType)}` : ''}</h3>
             {tooShort ? <p className="hint">{t('Ab dieser Uhrzeit ist die Mindestdauer nicht frei. Bitte wähle eine andere Startzeit.')}</p> : <>
               <div className="form-grid">

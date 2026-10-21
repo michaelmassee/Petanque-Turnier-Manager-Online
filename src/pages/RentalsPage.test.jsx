@@ -133,6 +133,38 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(await screen.findByText(/Anfrage gesendet/)).toBeInTheDocument();
   });
 
+  it('fragt beim Klick auf eine Stunde in einem kleinen Popup nach der Dauer', async () => {
+    mockOffer();
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /09:00: 4 von 4 Bahnen frei/ }));
+    const popover = screen.getByRole('dialog', { name: 'Dauer wählen' });
+    // Ab 09:00 sind zwei Stunden am Stück frei (11:00 ist ausgebucht).
+    expect(within(popover).getAllByRole('button').map((button) => button.textContent)).toEqual(['1 Std.', '2 Std.']);
+    expect(within(popover).getByRole('button', { name: '1 Std.' })).toHaveFocus();
+    fireEvent.click(within(popover).getByRole('button', { name: '2 Std.' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Dauer wählen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /10:00: 2 von 4 Bahnen frei/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('Dauer')).toHaveValue('2');
+
+    // Escape und ein Klick daneben schließen das Popup ohne Änderung.
+    fireEvent.click(screen.getByRole('button', { name: /12:00: 4 von 4 Bahnen frei/ }));
+    expect(screen.getByRole('dialog', { name: 'Dauer wählen' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Dauer wählen' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /09:00: 4 von 4 Bahnen frei/ }));
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('dialog', { name: 'Dauer wählen' })).not.toBeInTheDocument();
+  });
+
+  it('zeigt im Dauer-Popup einen Hinweis, wenn ab der Stunde nicht einmal die Mindestdauer frei ist', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, minHours: 2 } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: /12:00: 4 von 4 Bahnen frei/ }));
+    expect(within(screen.getByRole('dialog', { name: 'Dauer wählen' })).getByText(/Mindestdauer nicht frei/)).toBeInTheDocument();
+  });
+
   it('bietet bei „Einzelne Bahnen oder komplett“ die komplette Halle an, wenn alle Bahnen frei sind', async () => {
     api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY
       : { offer: { ...OFFER, rentalMode: 'both', wholePriceMinor: 3500, wholePriceNote: 'pro Stunde' } }));

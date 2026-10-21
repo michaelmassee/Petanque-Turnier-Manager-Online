@@ -4741,6 +4741,23 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
   .rental-slot { transition: none; }
   button.rental-slot:not(:disabled):hover { transform: none; }
 }
+.rental-slot-anchor { position: relative; display: grid; }
+/* Dauerwahl direkt an der angeklickten Startstunde, im Stil der Monatsübersicht. */
+.rental-duration-popover {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; display: grid; gap: 8px; width: max-content; min-width: 11rem;
+  max-width: min(24rem, calc(100vw - 32px)); padding: 10px 12px;
+  border: 1px solid #d7deea; border-radius: 12px; background: linear-gradient(135deg, #f7fbff, #ffffff);
+  box-shadow: 0 12px 30px rgb(22 119 255 / 18%); font-size: 0.9rem; text-align: left;
+}
+.rental-slot-anchor.align-end .rental-duration-popover { left: auto; right: 0; }
+.rental-duration-popover .hint { margin: 0; }
+.rental-duration-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.rental-duration-option {
+  min-height: 36px; padding: 4px 12px; border: 1px solid #d7deea; border-radius: 999px; background: #ffffff; color: #172033;
+  font-weight: 600; cursor: pointer;
+}
+.rental-duration-option:hover { border-color: #1677ff; background: #ecf4ff; color: #0a5fd1; }
+.rental-duration-option:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); outline-offset: 1px; }
 .rental-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 0.8rem; color: #4a5568; }
 .rental-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .rental-legend i { display: inline-block; width: 14px; height: 14px; min-height: 0; border-radius: 4px; }
@@ -4764,10 +4781,12 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
   .rental-day-tab.closed { color: #9aa3b2; }
   .rental-day-tab.active { background: linear-gradient(135deg, #1468e8, #0846a3); border-color: #0a4fb0; color: #ffffff; }
   .rental-grid { grid-template-columns: 3.4rem minmax(0, 1fr); }
-  .rental-grid-head:not(.active), .rental-grid .rental-slot:not(.active) { display: none; }
+  .rental-grid-head:not(.active), .rental-grid .rental-slot:not(.active), .rental-grid .rental-slot-anchor:not(.active) { display: none; }
   .rental-grid-corner { display: none; }
   .rental-grid-head.active { grid-column: 1 / -1; }
   .rental-slot { min-height: 40px; font-size: 0.9rem; }
+  /* Am Handy ist nur eine Tagesspalte sichtbar: Popup genau so breit wie sie, ohne über den Rand zu ragen. */
+  .rental-duration-popover { right: 0; width: auto; max-width: none; }
   .rental-offer-row { grid-template-columns: auto 1fr; }
   .rental-offer-row .row-actions { grid-column: 1 / -1; }
 }

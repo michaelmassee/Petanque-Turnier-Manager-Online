@@ -21,8 +21,9 @@ function slotClass(slot, laneCount, minLanes, selected) {
  * @param days Verfügbarkeit aus GET /api/rentals/:id/availability
  * @param onSelect (date, hour) => void; ohne onSelect ist das Raster nur zur Ansicht
  * @param minLanes so viele Bahnen müssen frei sein, damit eine Stunde wählbar ist (Nur-komplett-Angebote: alle)
+ * @param popover Inhalt, der direkt an der Startstunde der Auswahl aufklappt (z. B. die Dauerwahl)
  */
-export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSelect, language }) {
+export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSelect, language, popover = null }) {
   const { t } = useTranslation();
   const firstOpenDay = Math.max(0, days.findIndex((day) => day.slots.some((slot) => slot.bookable)));
   const [activeDay, setActiveDay] = useState(firstOpenDay);
@@ -64,7 +65,7 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
             const selected = isSelected(selection, day.date, hour);
             const label = `${formatDate(day.date, language)} ${hourLabel(hour)}: ${t('{{free}} von {{total}} Bahnen frei', { free: slot.free, total: laneCount })}`;
             const disabled = !onSelect || !slot.bookable || slot.free < minLanes;
-            return (
+            const button = (
               <button
                 key={`${day.date}-${hour}`}
                 type="button"
@@ -77,6 +78,15 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
               >
                 {slot.bookable ? `${slot.free}/${laneCount}` : '–'}
               </button>
+            );
+            if (!popover || selection?.date !== day.date || selection?.startHour !== hour) return button;
+            // In den letzten Spalten klappt das Popup nach links auf, damit es nicht über den Rand ragt.
+            const alignEnd = index >= days.length - 2 ? ' align-end' : '';
+            return (
+              <div key={`${day.date}-${hour}`} className={`rental-slot-anchor${alignEnd}${columnClass}`}>
+                {button}
+                {popover}
+              </div>
             );
           }),
         ])}
