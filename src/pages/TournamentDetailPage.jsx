@@ -157,6 +157,12 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
           {!(tournament.feeTiers || []).length && Boolean(tournament.entryFeeCents) && (
             <p><strong>{t('Startgeld')}</strong>: {formatMoney(tournament.entryFeeCents, tournament.currency, language)}</p>
           )}
+          {tournament.paymentInfo && (
+            <div className="payment-info">
+              <strong>{t('Zahlungshinweise')}</strong>:
+              <p className="payment-info-text" data-i18n-skip>{tournament.paymentInfo}</p>
+            </div>
+          )}
           {tournament.registrationOpensAt && (
             <p>
               <strong>{t('Anmeldung möglich ab')}</strong>: {formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}

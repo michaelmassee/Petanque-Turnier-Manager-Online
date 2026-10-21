@@ -1906,6 +1906,17 @@ a.left-panel-link {
   margin: 0;
 }
 
+/* Zahlungshinweise sind frei formuliert: Zeilenumbrüche erhalten, lange IBANs/Links auf dem Handy umbrechen. */
+.payment-info {
+  margin: 0 0 1em;
+}
+
+.payment-info-text {
+  margin: 4px 0 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
 .tournament-info-logo {
   max-width: 44px;
   max-height: 44px;

@@ -1684,5 +1684,8 @@
   "Keine Anmeldungen passen zum Filter.": "No registrations match the filter.",
   "Automatisch von der Warteliste nachrücken": "Automatically move up from the waitlist",
   "Wird ein Platz frei, rückt der Erste der Warteliste bis zum Turnierstart automatisch nach; das Team wird per E-Mail und Postbox informiert.": "When a spot opens up, the first entry on the waitlist moves up automatically until the tournament starts; the team is notified by email and postbox.",
-  "Von der Warteliste nachgerückt": "Moved up from the waitlist"
+  "Von der Warteliste nachgerückt": "Moved up from the waitlist",
+  "Zahlungshinweise": "Payment information",
+  "Zum Beispiel IBAN, PayPal-Link oder „Bar am Turniertag“. Erscheint auf der Turnierseite und in den Bestätigungs- und Erinnerungsmails.": "For example IBAN, PayPal link or “cash on tournament day”. Shown on the tournament page and in confirmation and reminder emails.",
+  "Die Zahlungshinweise dürfen maximal 1000 Zeichen enthalten.": "Payment information may contain at most 1000 characters."
 }

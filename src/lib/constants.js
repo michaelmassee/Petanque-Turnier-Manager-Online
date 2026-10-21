@@ -170,6 +170,7 @@ export const EMPTY_TOURNAMENT_FORM = {
   logoUrl: '',
   flyerUrl: '',
   whatsappGroupUrl: '',
+  paymentInfo: '',
 };
 
 export const EMPTY_TOURNAMENT_REPORT_FORM = {

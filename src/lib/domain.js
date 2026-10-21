@@ -190,6 +190,7 @@ export function tournamentPayload(form) {
     logoUrl: form.logoUrl || null,
     flyerUrl: form.flyerUrl || null,
     whatsappGroupUrl: form.whatsappGroupUrl || null,
+    paymentInfo: form.paymentInfo || null,
   };
 }
 

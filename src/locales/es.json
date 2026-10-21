@@ -1684,5 +1684,8 @@
   "Keine Anmeldungen passen zum Filter.": "Ninguna inscripción coincide con el filtro.",
   "Automatisch von der Warteliste nachrücken": "Pasar automáticamente desde la lista de espera",
   "Wird ein Platz frei, rückt der Erste der Warteliste bis zum Turnierstart automatisch nach; das Team wird per E-Mail und Postbox informiert.": "Si se libera una plaza, el primero de la lista de espera pasa automáticamente hasta el inicio del torneo; el equipo recibe aviso por correo y buzón.",
-  "Von der Warteliste nachgerückt": "Ha pasado de la lista de espera"
+  "Von der Warteliste nachgerückt": "Ha pasado de la lista de espera",
+  "Zahlungshinweise": "Indicaciones de pago",
+  "Zum Beispiel IBAN, PayPal-Link oder „Bar am Turniertag“. Erscheint auf der Turnierseite und in den Bestätigungs- und Erinnerungsmails.": "Por ejemplo IBAN, Bizum, enlace de PayPal o «en efectivo el día del torneo». Se muestra en la página del torneo y en los correos de confirmación y recordatorio.",
+  "Die Zahlungshinweise dürfen maximal 1000 Zeichen enthalten.": "Las indicaciones de pago pueden tener como máximo 1000 caracteres."
 }

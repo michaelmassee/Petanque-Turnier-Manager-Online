@@ -1684,5 +1684,8 @@
   "Keine Anmeldungen passen zum Filter.": "Aucune inscription ne correspond au filtre.",
   "Automatisch von der Warteliste nachrücken": "Repêcher automatiquement depuis la liste d’attente",
   "Wird ein Platz frei, rückt der Erste der Warteliste bis zum Turnierstart automatisch nach; das Team wird per E-Mail und Postbox informiert.": "Si une place se libère, le premier de la liste d’attente est repêché automatiquement jusqu’au début du tournoi ; l’équipe est prévenue par e-mail et messagerie.",
-  "Von der Warteliste nachgerückt": "Repêché depuis la liste d’attente"
+  "Von der Warteliste nachgerückt": "Repêché depuis la liste d’attente",
+  "Zahlungshinweise": "Informations de paiement",
+  "Zum Beispiel IBAN, PayPal-Link oder „Bar am Turniertag“. Erscheint auf der Turnierseite und in den Bestätigungs- und Erinnerungsmails.": "Par exemple IBAN, lien PayPal ou « en espèces le jour du tournoi ». Affiché sur la page du tournoi et dans les e-mails de confirmation et de rappel.",
+  "Die Zahlungshinweise dürfen maximal 1000 Zeichen enthalten.": "Les informations de paiement peuvent contenir au maximum 1000 caractères."
 }

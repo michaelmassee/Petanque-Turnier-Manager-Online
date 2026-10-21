@@ -1684,5 +1684,8 @@
   "Keine Anmeldungen passen zum Filter.": "Geen inschrijvingen komen overeen met het filter.",
   "Automatisch von der Warteliste nachrücken": "Automatisch doorschuiven vanaf de wachtlijst",
   "Wird ein Platz frei, rückt der Erste der Warteliste bis zum Turnierstart automatisch nach; das Team wird per E-Mail und Postbox informiert.": "Komt er een plaats vrij, dan schuift de eerste op de wachtlijst tot de start van het toernooi automatisch door; het team krijgt bericht per e-mail en postvak.",
-  "Von der Warteliste nachgerückt": "Van de wachtlijst doorgeschoven"
+  "Von der Warteliste nachgerückt": "Van de wachtlijst doorgeschoven",
+  "Zahlungshinweise": "Betalingsinformatie",
+  "Zum Beispiel IBAN, PayPal-Link oder „Bar am Turniertag“. Erscheint auf der Turnierseite und in den Bestätigungs- und Erinnerungsmails.": "Bijvoorbeeld IBAN, Tikkie- of PayPal-link of „contant op de toernooidag”. Verschijnt op de toernooipagina en in de bevestigings- en herinneringsmails.",
+  "Die Zahlungshinweise dürfen maximal 1000 Zeichen enthalten.": "De betalingsinformatie mag maximaal 1000 tekens bevatten."
 }

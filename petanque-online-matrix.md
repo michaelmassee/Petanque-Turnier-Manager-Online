@@ -9,7 +9,7 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 | Bereich | petanque-online.de | PTM Online |
 |---|---|---|
 | **Kalender** Liste, Status-Badges („x von y frei“, „Anmeldung ab …“, Warteliste, ausgebucht) | ✅ | ✅ |
-| Filter nach Bundesland bzw. Landesverband plus SEO-Seiten je Bundesland | ✅ | ❌ (Feld `region` per Migration 0006 entfernt) |
+| Filter nach Bundesland bzw. Landesverband plus SEO-Seiten je Bundesland | ✅ | ➖ bewusst nicht: PTM Online ist international, Umkreissuche statt länderspezifischer Regionen (Entscheidung 21.10.2026) |
 | Umkreissuche, Monat/Formation/System-Filter, gespeicherte Suchen | ❌ bzw. einfach | ✅ |
 | „In meinen Kalender“ (ICS) auf der Detailseite | ✅ | ✅ seit 21.10.2026: 📅 „Kalendereintrag erstellen“ (iOS öffnet Kalender, Android Google Calendar, PC ICS-Download), auch bei Kalendereinträgen |
 | **Ausschreibung** Anmeldestart/-schluss mit Uhrzeit, Kontingent, Warteliste | ✅ | ✅ |
@@ -20,7 +20,7 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 | Telefon Pflicht/optional, Lizenz nicht/optional/Pflicht | ✅ | ⚠️ (Lizenz nur Pflicht ja/nein) |
 | Mail an Veranstalter bei jeder An- und Abmeldung | ✅ | ⚠️ (Postbox-Aufgaben statt Mail) |
 | Erinnerungsmail mit frei wählbarem Datum und Uhrzeit | ✅ | ⚠️ (fester täglicher Cron) |
-| Bankverbindung des Vereins in den Mails (Startgeld überweisen) | ✅ | ❌ |
+| Bankverbindung des Vereins in den Mails (Startgeld überweisen) | ✅ | ✅ seit 21.10.2026 als freies Feld „Zahlungshinweise“ am Turnier (international: IBAN, PayPal, Twint, Bizum, bar …), auf der Turnierseite und in Bestätigungs-, Eingangs- und Erinnerungsmail |
 | Spielort-GPS aus den Vereinsdaten, Navigation in der Mail | ✅ | ✅ |
 | Zusatzfragen, ermäßigte Tarife, Flyer-Generator, eigener QR-Code, Mehrsprachigkeit, PWA, Push | ❌ | ✅ |
 | **Verein** Club Master und Club Manager per Mail einladen | ✅ | ✅ (Vereinsbearbeiter) |
@@ -42,8 +42,8 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 
 **P1 – Anmeldung (gehört zum Kern, überschaubarer Aufwand)**
 1. ~~Automatisches Nachrücken aus der Warteliste~~ (umgesetzt 21.10.2026) mit Mail an den Nachrücker, Modus automatisch/manuell, max. Anzahl Nachrücker, Warteliste wahlweise öffentlich. Betroffen: `src/registration-core.js`, Abmelde-Pfade in `src/worker.js` (cancel-by-token, Absagen), `src/pages/TournamentManagement.jsx`, neue Migration mit ADD COLUMN (kein Table-Rebuild!).
-2. Bundesland- bzw. Landesverbands-Filter im Kalender. Abgeleitet aus den Turnierkoordinaten oder dem Verein beim Speichern berechnen, nicht beim Lesen (Workers-CPU, D1-Reads). Filter in `src/App.jsx` und Edge-Cache-Key der Turnierliste beachten.
-3. Bankverbindung beim Verein bzw. Turnier und Anzeige in der Bestätigungsmail (`sendTransactionalEmail`-Templates).
+2. ~~Bundesland- bzw. Landesverbands-Filter im Kalender~~ – verworfen (21.10.2026): PTM Online ist international; die Umkreissuche deckt die regionale Suche länderunabhängig ab.
+3. ~~Bankverbindung beim Verein bzw. Turnier~~ (umgesetzt 21.10.2026 als freie „Zahlungshinweise“) und Anzeige in der Bestätigungsmail (`sendTransactionalEmail`-Templates).
 4. Telefon- und Lizenzabfrage dreistufig (nicht/optional/Pflicht) und Mail an den Veranstalter bei An- und Abmeldung als Opt-in.
 5. ~~„In meinen Kalender“-Button~~ (umgesetzt 21.10.2026) (ICS-Download) auf `src/pages/TournamentDetailPage.jsx`. Den vorhandenen ICS-Generator aus dem Mailversand wiederverwenden.
 

@@ -511,6 +511,8 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               </div>
             ))}
           </div>
+          <TextArea label={t('Zahlungshinweise')} value={form.paymentInfo || ''} maxLength={1000} onChange={(paymentInfo) => setForm({ ...form, paymentInfo })} />
+          <p className="hint">{t('Zum Beispiel IBAN, PayPal-Link oder „Bar am Turniertag“. Erscheint auf der Turnierseite und in den Bestätigungs- und Erinnerungsmails.')}</p>
           <div className="form form-section">
             <div className="section-title">
               <h3>{t('Zusätzliche Teilnehmerfragen')}</h3>
@@ -1017,6 +1019,7 @@ export function tournamentToForm(tournament) {
     logoUrl: tournament.logoUrl || '',
     flyerUrl: tournament.flyerUrl || '',
     whatsappGroupUrl: tournament.whatsappGroupUrl || '',
+    paymentInfo: tournament.paymentInfo || '',
   };
 }
 
@@ -1115,6 +1118,7 @@ export function TournamentManagementPage({
             logoUrl: form.logoUrl,
             flyerUrl: form.flyerUrl,
             whatsappGroupUrl: form.whatsappGroupUrl,
+            paymentInfo: form.paymentInfo || '',
           }),
         });
       } else {

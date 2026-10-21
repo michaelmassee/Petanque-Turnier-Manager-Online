@@ -396,6 +396,21 @@ export function buildDirectionsLink(location) {
   return destination ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}` : '';
 }
 
+const PAYMENT_INFO_EMAIL_LABELS = {
+  de: 'Zahlungshinweise der Turnierleitung:',
+  nl: 'Betalingsinformatie van de toernooiorganisatie:',
+  en: 'Payment information from the organizers:',
+  es: 'Indicaciones de pago de la organización:',
+  fr: 'Informations de paiement de l’organisation :',
+};
+
+// Zahlungshinweise stehen frei formuliert am Turnier (IBAN, PayPal, Twint, bar vor Ort …) und werden unverändert zitiert.
+export function paymentInfoEmailBlock(tournament, language) {
+  const paymentInfo = String(tournament?.payment_info ?? tournament?.paymentInfo ?? '').trim();
+  if (!paymentInfo) return '';
+  return `\n\n${PAYMENT_INFO_EMAIL_LABELS[language] || PAYMENT_INFO_EMAIL_LABELS.de}\n${paymentInfo}`;
+}
+
 export function directionsEmailBlock(tournament, language) {
   const directionsLink = buildDirectionsLink(tournament?.location);
   if (!directionsLink) return '';
@@ -1187,7 +1202,7 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: promoted ? promotedTemplates.subject(tournament.name) : templates.subject(tournament.name),
-      text: maybePromotedIntro(templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock, liveLink), language, promoted) + directionsBlock + whatsappBlock,
+      text: maybePromotedIntro(templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock, liveLink), language, promoted) + paymentInfoEmailBlock(tournament, language) + directionsBlock + whatsappBlock,
       actions: tournamentEmailActions(tournament, appOrigin, language, [emailAction('cancel', cancelLink, language), emailAction('live', liveLink, language), whatsappEmailAction(whatsappBlock, language)]),
       language,
       attachments: [{ filename: tournamentIcsFileNames(tournament).asciiFileName, content: base64Encode(ics) }],
@@ -1299,7 +1314,7 @@ async function sendRegistrationReceivedEmail(env, tournament, registration, appO
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: promoted ? promotedTemplates.subject(tournament.name) : templates.subject(tournament.name),
-      text: maybePromotedIntro(templates.text(recipient.firstName, tournament.name, link, cancelLink, participantsBlock), language, promoted) + directionsBlock + whatsappBlock,
+      text: maybePromotedIntro(templates.text(recipient.firstName, tournament.name, link, cancelLink, participantsBlock), language, promoted) + paymentInfoEmailBlock(tournament, language) + directionsBlock + whatsappBlock,
       actions: tournamentEmailActions(tournament, appOrigin, language, [emailAction('cancel', cancelLink, language), whatsappEmailAction(whatsappBlock, language)]),
       language,
       logFallback: `Registration received email for ${recipient.email} (tournament ${tournament.id})`,
@@ -1575,7 +1590,7 @@ async function sendTournamentReminders(env) {
             await enqueueTransactionalEmail(env, {
               to: recipient.email,
               subject: templates.subject(tournament.name),
-              text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink) + directionsBlock + whatsappBlock,
+              text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink) + paymentInfoEmailBlock(tournament, language) + directionsBlock + whatsappBlock,
               actions: tournamentEmailActions(tournament, APP_ORIGIN, language, [emailAction('cancel', cancelLink, language), whatsappEmailAction(whatsappBlock, language)]),
               language,
               attachments: [{ filename: tournamentIcsFileNames(tournament).asciiFileName, content: base64Encode(ics) }],
@@ -5419,6 +5434,7 @@ async function createTournament(request, env, user) {
     websiteUrl: normalizePresentationUrl(body.websiteUrl, 'websiteUrl'),
     logoUrl: normalizePresentationUrl(body.logoUrl, 'logoUrl'),
     flyerUrl: normalizePresentationUrl(body.flyerUrl, 'flyerUrl'),
+    paymentInfo: normalizePaymentInfo(body.paymentInfo),
   };
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -5431,9 +5447,9 @@ async function createTournament(request, env, user) {
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, live_view_enabled, player_result_reporting_enabled, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -5473,6 +5489,7 @@ async function createTournament(request, env, user) {
       presentation.websiteUrl,
       presentation.logoUrl,
       presentation.flyerUrl,
+      presentation.paymentInfo,
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
@@ -5555,12 +5572,12 @@ export async function duplicateTournament(db, existing, actingUser) {
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, player_result_reporting_enabled, qr_design, created_at, updated_at
       )
       SELECT ?, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, player_result_reporting_enabled, qr_design, ?, ?
       FROM tournaments WHERE id = ?`,
     )
@@ -6033,6 +6050,16 @@ export async function setRegistrationClosed(request, db, tournament, user) {
   return json({ tournament: toPublicTournament(await getTournamentById(db, tournament.id), user) });
 }
 
+const PAYMENT_INFO_MAX_LENGTH = 1000;
+
+function normalizePaymentInfo(value) {
+  const normalized = String(value ?? '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').trim();
+  if (normalized.length > PAYMENT_INFO_MAX_LENGTH) {
+    throw new HttpError(400, 'Die Zahlungshinweise dürfen maximal 1000 Zeichen enthalten.', { field: 'paymentInfo' });
+  }
+  return normalized || null;
+}
+
 function normalizePresentationUrl(value, field) {
   const trimmed = String(value || '').trim();
   if (!trimmed) {
@@ -6403,7 +6430,7 @@ function isPrivateIpLiteral(hostname) {
 }
 
 /**
- * Website/Logo/Flyer/WhatsApp group are presentation-only extras, not part of the tournament document's core
+ * Website/Logo/Flyer/WhatsApp group/payment information are presentation-only extras, not part of the tournament document's core
  * data, so this bypasses the document_managed lock enforced by updateTournament.
  */
 async function updateTournamentPresentation(request, env, existing, user) {
@@ -6413,11 +6440,13 @@ async function updateTournamentPresentation(request, env, existing, user) {
   const logoUrl = normalizePresentationUrl(body.logoUrl, 'logoUrl');
   const flyerUrl = normalizePresentationUrl(body.flyerUrl, 'flyerUrl');
   const whatsappGroupUrl = normalizePresentationUrl(body.whatsappGroupUrl, 'whatsappGroupUrl');
+  // Ältere Clients schicken keine Zahlungshinweise mit; dann bleiben die gespeicherten erhalten.
+  const paymentInfo = body.paymentInfo === undefined ? existing.payment_info ?? null : normalizePaymentInfo(body.paymentInfo);
   const now = new Date().toISOString();
 
   await db
-    .prepare('UPDATE tournaments SET website_url = ?, logo_url = ?, flyer_url = ?, whatsapp_group_url = ?, updated_at = ? WHERE id = ?')
-    .bind(websiteUrl, logoUrl, flyerUrl, whatsappGroupUrl, now, existing.id)
+    .prepare('UPDATE tournaments SET website_url = ?, logo_url = ?, flyer_url = ?, whatsapp_group_url = ?, payment_info = ?, updated_at = ? WHERE id = ?')
+    .bind(websiteUrl, logoUrl, flyerUrl, whatsappGroupUrl, paymentInfo, now, existing.id)
     .run();
 
   const updated = await getTournamentById(db, existing.id);
@@ -9120,7 +9149,7 @@ async function syncPostResults(request, env, tournamentId) {
     const placeholders = statusChangeIds.map(() => '?').join(', ');
     const previousRows = await db
       .prepare(
-        `SELECT r.*, t.name, t.owner_id, t.date, t.start_time, t.location, t.timezone, t.contact_email, t.waitlist_enabled FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
+        `SELECT r.*, t.name, t.owner_id, t.date, t.start_time, t.location, t.timezone, t.contact_email, t.waitlist_enabled, t.payment_info FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
          WHERE r.tournament_id = ? AND r.id IN (${placeholders})`,
       )
       .bind(tournamentId, ...statusChangeIds)
@@ -10947,7 +10976,7 @@ export async function getRegistrationWithTournament(db, id) {
       `SELECT registrations.*, tournaments.owner_id, tournaments.visibility, tournaments.status AS tournament_status, tournaments.document_managed, tournaments.desktop_execution, tournaments.formation,
               tournaments.registration_type, tournaments.license_required, tournaments.max_registrations, tournaments.waitlist_enabled, tournaments.entry_fee_cents, tournaments.fee_tiers, tournaments.registration_questions,
               tournaments.name, tournaments.date, tournaments.start_time, tournaments.location,
-              tournaments.registration_deadline, tournaments.sync_document_id, tournaments.timezone, tournaments.contact_email,
+              tournaments.registration_deadline, tournaments.sync_document_id, tournaments.timezone, tournaments.contact_email, tournaments.payment_info,
               ${TOURNAMENT_EDITORS_JSON_SUBQUERY}
        FROM registrations
        JOIN tournaments ON tournaments.id = registrations.tournament_id
@@ -12037,6 +12066,7 @@ export function toPublicTournament(row, user) {
     flyerUrl: row.flyer_url || null,
     // Der Gruppenlink geht nur per Mail an Gemeldete, öffentlich würde jeder beitreten können.
     whatsappGroupUrl: canManageTournament(row, user) ? row.whatsapp_group_url || null : undefined,
+    paymentInfo: row.payment_info || null,
     activeRegistrations: Number(row.active_registrations || 0),
     waitlistRegistrations: Number(row.waitlist_registrations || 0),
     canManage: canManageTournament(row, user),
