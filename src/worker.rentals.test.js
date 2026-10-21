@@ -418,9 +418,10 @@ describe('Platz mieten', () => {
 
   it('begrenzt offene Anfragen je Benutzer und Angebot', async () => {
     const offer = await createOffer();
-    for (const startHour of [10, 11, 12, 13, 14]) {
+    // Montag 10–20 Uhr: zehn Anfragen sind erlaubt, die elfte nicht.
+    for (let startHour = 10; startHour < 20; startHour += 1) {
       expect((await reserve(offer.id, { date: '2026-10-26', startHour, hours: 1, lanes: 1 })).status).toBe(201);
     }
-    expect((await reserve(offer.id, { date: '2026-10-26', startHour: 15, hours: 1, lanes: 1 })).status).toBe(409);
+    expect((await reserve(offer.id, { date: '2026-11-02', startHour: 10, hours: 1, lanes: 1 })).status).toBe(409);
   });
 });

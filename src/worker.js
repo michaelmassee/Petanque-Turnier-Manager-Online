@@ -9538,7 +9538,7 @@ async function assertClubEditor(db, clubId, user) {
 // Die öffentliche Angebotsliste liegt wie die Vereine 300 s im Edge-Cache; Angebotsänderungen löschen ihn.
 const RENTAL_OFFERS_WRITE_PATH = /^\/api\/rentals\/offers(?:\/|$)/;
 // Schutz vor Spam an den Verein: offene, künftige Anfragen je Benutzer und Angebot.
-const RENTAL_MAX_OPEN_REQUESTS = 5;
+const RENTAL_MAX_OPEN_REQUESTS = 10;
 
 function rentalOffersCacheKey(origin) {
   return new Request(`${origin}/__rentals`);
