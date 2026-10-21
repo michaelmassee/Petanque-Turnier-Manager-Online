@@ -16,7 +16,6 @@ import { TournamentPlayerListings } from '../components/TournamentPlayerListings
 import { PublicRegistrationPanel } from '../App.jsx';
 import { TournamentRegistrationAction } from '../components/TournamentRegistrationAction.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
-import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
 
@@ -478,11 +477,11 @@ function formatClock(timestamp, language) {
   return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, { hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
 }
 
-export function TournamentSchedule({ tournamentId, tournament, language, onAnnouncement }) {
+export function TournamentSchedule({ tournamentId, tournament, language, shareToken = '', onAnnouncement }) {
   const { t } = useTranslation();
   const query = useQuery({
-    queryKey: ['schedule', tournamentId],
-    queryFn: () => api(`/api/tournaments/${tournamentId}/schedule`),
+    queryKey: ['schedule', tournamentId, shareToken],
+    queryFn: () => api(`/api/tournaments/${tournamentId}/schedule${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`),
     refetchInterval: (current) => (current.state.data?.status === 'finished' ? false : SCHEDULE_REFRESH_MS),
     refetchIntervalInBackground: false,
     staleTime: 0,
@@ -608,8 +607,6 @@ export function TournamentDetailPage({
   const shareSuffix = shareToken ? `?share=${encodeURIComponent(shareToken)}` : '';
   const detailPath = (view) => `/turniere/${route.id}/${view}${shareSuffix}`;
   const { tournament, notFound } = useRoutedTournament(route.id, tournaments, shareToken);
-  // Gesendete/gelöschte Ankündigung sofort zeigen, ohne die Turnierliste neu zu laden.
-  const [announcementUpdate, setAnnouncementUpdate] = useState({ tournamentId: null, announcement: null });
 
   if (notFound) {
     return (
@@ -661,8 +658,8 @@ export function TournamentDetailPage({
 
   const canRegister = (tournament.visibility === 'public' || Boolean(shareToken)) && tournament.registrationEnabled !== false && hasOpenRegistration(tournament);
   const canShowParticipants = (tournament.participantsPublic || tournament.canManage) && tournament.registrationEnabled !== false;
-  // Der letzte Reiter wechselt mit dem Status – vor dem Start Mitspielgesuche, während des Turniers der Spielplan,
-  // nach dem Veröffentlichen die Endrangliste –, so bleiben es auf kleinen Handys höchstens vier Reiter.
+  // Der letzte Reiter wechselt mit dem Status – vor dem Start Mitspielgesuche, nach dem Veröffentlichen die
+  // Endrangliste. Spielplan und Ankündigungen stehen auf der eigenen Turnierseite (/turnierseite/<id>).
   const started = tournament.status === 'running' || tournament.status === 'finished';
   // Mitspieler suchen lohnt nur, solange man noch mitspielen kann: bei Online-Anmeldung, solange sie möglich ist;
   // bei Kalendereinträgen (Anmeldung außerhalb) bis zum Turniertag.
@@ -671,20 +668,16 @@ export function TournamentDetailPage({
     && (['open', 'waitlist', 'upcoming'].includes(registrationKind) || (registrationKind === 'calendar' && !started && isUpcoming(tournament)));
   // Mit verbundenem Turnierdokument auch für Systeme ohne Online-Durchführung (Poule, Kaskade, …).
   const rankingPublished = Boolean(tournament.rankingPublishedAt);
-  const canShowSchedule = canShowParticipants && (isOnlinePlayable(tournament) || isDocumentBound(tournament)) && started && !rankingPublished;
   const availableViews = {
     info: true,
     anmelden: canRegister,
     teilnehmer: canShowParticipants,
     mitspieler: canShowPlayerListings,
-    spielplan: canShowSchedule,
     // Veröffentlichte Endrangliste: öffentlich, auch ohne „Teilnehmer öffentlich“.
     rangliste: rankingPublished,
   };
-  // Alte Links (z. B. /mitspieler nach dem Start) landen auf Info statt auf einer leeren Seite; ein Spielplan-Link
-  // nach dem Veröffentlichen direkt auf der Endrangliste.
-  const requestedView = route.view === 'spielplan' && rankingPublished ? 'rangliste' : route.view;
-  const view = availableViews[requestedView] ? requestedView : 'info';
+  // Alte Links (z. B. /mitspieler nach dem Start) landen auf Info statt auf einer leeren Seite.
+  const view = availableViews[route.view] ? route.view : 'info';
   // Wer über den Anmelde-/QR-Link kommt, obwohl gerade keine Anmeldung möglich ist, landet auf Info – mit Grund.
   const registrationUnavailable = route.view === 'anmelden' && view !== 'anmelden';
 
@@ -750,17 +743,12 @@ export function TournamentDetailPage({
             <span>{formatLocationAddress(tournament.location)}</span>
           </p>
         </header>
-        <AnnouncementBanner
-          announcement={announcementUpdate.tournamentId === tournament.id ? announcementUpdate.announcement : tournament.announcement}
-          language={language}
-        />
         <nav className="tournament-detail-tabs" aria-label={t('Turnierdetails')}>
           {[
             ['info', t('Info')],
             ['anmelden', t('Anmeldung')],
             ['teilnehmer', t('Teilnehmer')],
             ['mitspieler', t('Mitspieler')],
-            ['spielplan', t('Spielplan')],
             ['rangliste', t('Rangliste')],
           ].filter(([key]) => availableViews[key]).map(([key, label]) => (
             <button
@@ -813,8 +801,6 @@ export function TournamentDetailPage({
           )}
 
           {view === 'mitspieler' && <TournamentPlayerListings tournament={tournament} currentUser={currentUser} navigate={navigate} />}
-
-          {view === 'spielplan' && <TournamentSchedule tournamentId={tournament.id} tournament={tournament} language={language} onAnnouncement={(announcement) => setAnnouncementUpdate({ tournamentId: tournament.id, announcement })} />}
 
           {view === 'rangliste' && <FinalRankingView tournament={tournament} language={language} shareToken={shareToken} />}
         </div>

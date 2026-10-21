@@ -2433,7 +2433,12 @@ export default {
         const tournament = await getTournamentById(env.DB, tournamentScheduleMatch[1]);
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         const session = await optionalSession(request, env.DB);
-        if (!canViewParticipants(tournament, session?.user || null)) throw new HttpError(403, 'Zugriff verweigert');
+        // Private Turniere stehen nur nicht in der öffentlichen Liste: Mit dem Freigabe-Token der Turnierleitung
+        // ist der Spielplan sichtbar, sofern die Teilnehmerliste veröffentlicht ist.
+        const shareAccess = await hasTournamentShareAccess(env.DB, tournament, url.searchParams.get('share'));
+        if (!canViewParticipants(tournament, session?.user || null) && !(shareAccess && Number(tournament.participants_public))) {
+          throw new HttpError(403, 'Zugriff verweigert');
+        }
         return await buildScheduleResponse(request, env.DB, tournament);
       }
 

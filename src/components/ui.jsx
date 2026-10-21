@@ -186,18 +186,32 @@ export function Feedback({ message, error }) {
 }
 
 // Teilt Titel und Link über das Teilen-Menü des Geräts, sonst per Zwischenablage; Rückmeldung direkt am Button.
-export function ShareLinkButton({ title, url }) {
+// resolveUrl ermittelt den Link erst beim Klick (z. B. Freigabe-Link eines privaten Turniers).
+export function ShareLinkButton({ title, url, resolveUrl }) {
   const { t } = useTranslation();
   const [feedback, setFeedback] = useState({ message: '', error: '' });
+  const [resolving, setResolving] = useState(false);
 
   async function share() {
     setFeedback({ message: '', error: '' });
+    let target = url;
+    if (resolveUrl) {
+      setResolving(true);
+      try {
+        target = await resolveUrl();
+      } catch (error) {
+        setFeedback({ message: '', error: error.message });
+        return;
+      } finally {
+        setResolving(false);
+      }
+    }
     try {
       if (navigator.share) {
-        await navigator.share({ title, text: title, url });
+        await navigator.share({ title, text: title, url: target });
       } else {
         if (!navigator.clipboard?.writeText) throw new Error();
-        await navigator.clipboard.writeText(`${title}\n${url}`);
+        await navigator.clipboard.writeText(`${title}\n${target}`);
         setFeedback({ message: t('Link kopiert'), error: '' });
       }
     } catch (error) {
@@ -208,7 +222,7 @@ export function ShareLinkButton({ title, url }) {
   }
 
   return <div>
-    <Button variant="secondary" onClick={share}><ShareIcon size={18} />{t('Teilen')}</Button>
+    <Button variant="secondary" loading={resolving} onClick={share}><ShareIcon size={18} />{t('Teilen')}</Button>
     <Feedback message={feedback.message} error={feedback.error} />
   </div>;
 }

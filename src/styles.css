@@ -1784,6 +1784,17 @@ a.left-panel-link {
   font-size: 1.05rem;
 }
 
+/* Turnierseite im Vollformat: ganze Fensterbreite, z. B. für einen Bildschirm vor Ort. */
+.tournament-board-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.tournament-board-share p {
+  margin: 0 0 10px;
+}
+
 .tournament-detail-page {
   display: grid;
   /* minmax(0, …): breite Ranglisten scrollen in .table-scroll, statt die Seite auf dem Handy zu verbreitern. */

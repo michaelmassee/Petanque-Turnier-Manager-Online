@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
-import { TextField, Button, Feedback } from '../components/ui.jsx';
+import { TextField, Button, Feedback, ShareLinkButton } from '../components/ui.jsx';
+import { tournamentBoardPath } from '../lib/routing.js';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { checkRoundRequirements, getSupportedSystemLabels, isMeleeTeamTournament, isOnlinePlayable, minimumTeams } from '../lib/pairing/index.js';
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
@@ -43,6 +44,30 @@ function playerLabel(player) {
 
 function teamLabel(team) {
   return team.map(playerLabel).join(' + ');
+}
+
+// Link zur Turnierseite (Spielplan, Rangliste, Ankündigungen) zum Teilen mit Spielern und Zuschauern. „Privat“
+// heißt nur: nicht in der öffentlichen Turnierliste. Geteilt wird dann mit dem Freigabe-Token des Turniers.
+function TournamentBoardShare({ tournament }) {
+  const { t } = useTranslation();
+  const path = tournamentBoardPath(tournament.id);
+  const boardUrl = new URL(path, window.location.origin);
+  async function resolveShareUrl() {
+    const { shareUrl } = await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' });
+    boardUrl.searchParams.set('share', new URL(shareUrl).searchParams.get('share'));
+    return boardUrl.href;
+  }
+  return (
+    <div className="panel tournament-board-share">
+      <p>
+        <strong>{t('Turnierseite')}</strong>: {t('Spielplan, Rangliste und Ankündigungen für alle.')}
+        {' '}<a href={path} target="_blank" rel="noreferrer">{t('Öffnen')}</a>
+      </p>
+      {tournament.participantsPublic
+        ? <ShareLinkButton title={tournament.name} url={boardUrl.href} resolveUrl={tournament.visibility === 'private' ? resolveShareUrl : undefined} />
+        : <p className="hint">{t('Spielplan und Rangliste sind auf der Turnierseite erst für alle sichtbar, wenn die Teilnehmerliste veröffentlicht wird.')}</p>}
+    </div>
+  );
 }
 
 function isRoundComplete(round) {
@@ -670,6 +695,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
       <Feedback message={message} error={error || queryError?.message} />
 
+      {selectedTournament && <TournamentBoardShare tournament={selectedTournament} />}
       {/* Ankündigungen erst ab Turnierstart: vorher ist die Seite nur zum Auswählen und Starten da. */}
       {selectedTournament && selectedTournamentStatus === 'running' && <AnnouncementEditor tournament={selectedTournament} />}
 

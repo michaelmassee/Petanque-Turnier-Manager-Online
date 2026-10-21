@@ -95,14 +95,13 @@ describe('Turnierdetail-Reiter', () => {
     expect(tabs).not.toContain('Spielplan');
   });
 
-  it('zeigt nach dem Turnierstart Spielplan statt Mitspieler', () => {
+  it('zeigt nach dem Turnierstart weder Spielplan noch Mitspieler (Spielplan steht auf der Turnierseite)', () => {
     global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ rounds: [], ranking: [] })));
 
-    renderDetail(tournamentWith({ status: 'running' }));
+    renderDetail(tournamentWith({ status: 'running', announcement: { text: 'Mittagspause', at: '2099-06-01T11:00:00.000Z' } }));
 
-    const tabs = tabNames();
-    expect(tabs).toContain('Spielplan');
-    expect(tabs).not.toContain('Mitspieler');
+    expect(tabNames()).toEqual(['Info', 'Teilnehmer']);
+    expect(screen.queryByText('Mittagspause')).not.toBeInTheDocument();
   });
 
   it('zeigt die veröffentlichte Endrangliste im eigenen Reiter, auch ohne „Teilnehmer öffentlich“', async () => {
@@ -120,22 +119,14 @@ describe('Turnierdetail-Reiter', () => {
     expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/ranking', expect.anything());
   });
 
-  it('ersetzt nach dem Veröffentlichen den Spielplan durch die Rangliste (höchstens vier Reiter)', async () => {
+  it('zeigt nach dem Veröffentlichen die Rangliste als Reiter', async () => {
     global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ ranking: [], publishedAt: '2099-06-01T18:00:00.000Z' })));
 
-    renderDetail(tournamentWith({ status: 'finished', rankingPublishedAt: '2099-06-01T18:00:00.000Z' }), 'spielplan');
+    renderDetail(tournamentWith({ status: 'finished', rankingPublishedAt: '2099-06-01T18:00:00.000Z' }), 'rangliste');
 
     expect(tabNames()).toEqual(['Info', 'Teilnehmer', 'Rangliste']);
     expect(screen.getByRole('button', { name: 'Rangliste' })).toHaveAttribute('aria-current', 'page');
     await screen.findByRole('button', { name: 'PDF herunterladen' });
-  });
-
-  it('zeigt nach Turnierende ohne veröffentlichte Rangliste weiter den Spielplan', () => {
-    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ rounds: [], ranking: [] })));
-
-    renderDetail(tournamentWith({ status: 'finished' }));
-
-    expect(tabNames()).toEqual(['Info', 'Teilnehmer', 'Spielplan']);
   });
 
   it('erkennt die Ranglisten-Route und blendet den Reiter ohne Veröffentlichung aus', () => {

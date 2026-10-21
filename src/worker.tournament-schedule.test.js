@@ -2,7 +2,7 @@
 // Öffentlicher Spielplan der Turnierseite: ganzes Turnier zum aktuellen Stand in einem Abruf, mit ETag.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import worker from './worker.js';
+import worker, { createTournamentShareLink } from './worker.js';
 
 describe('Spielplan-Endpunkt (/schedule)', () => {
   let env;
@@ -33,6 +33,19 @@ describe('Spielplan-Endpunkt (/schedule)', () => {
     const neu = await abrufen(etag);
     expect(neu.status).toBe(200);
     expect((await neu.json()).announcement).toEqual({ text: 'Mittagspause', at: '2026-10-21T11:00:00.000Z' });
+  });
+
+  it('gibt den Spielplan eines privaten Turniers mit gültigem Freigabe-Token heraus', async () => {
+    sql("UPDATE tournaments SET visibility = 'private' WHERE id = 't1'");
+    const created = await createTournamentShareLink(env.DB, 't1', 'https://ptm.test');
+    const token = new URL((await created.json()).shareUrl).searchParams.get('share');
+    const mitToken = (value) => worker.fetch(new Request(`https://ptm.test/api/tournaments/t1/schedule?share=${value}`), env);
+
+    expect((await abrufen()).status).toBe(403);
+    expect((await mitToken('falsch')).status).toBe(403);
+    expect((await mitToken(token)).status).toBe(200);
+    sql("UPDATE tournaments SET participants_public = 0 WHERE id = 't1'");
+    expect((await mitToken(token)).status).toBe(403);
   });
 
   it('gibt den Spielplan nicht heraus, wenn die Teilnehmerliste nicht öffentlich ist', async () => {

@@ -8,7 +8,7 @@ import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { pruneExpiredFlyerDesigns } from './lib/flyer-background-storage.js';
 import { LIVE_VIEW_EVENTS, liveViewPathFor, rentalPathFor } from './postbox-core.js';
-import { usePath, areaForPath, matchTournamentRoute, matchLiveRoute, matchRentalRoute } from './lib/routing.js';
+import { usePath, areaForPath, matchTournamentRoute, matchTournamentBoardRoute, tournamentBoardPath, matchLiveRoute, matchRentalRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, MAIL_NOT_ENABLED_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
 import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusClass, registrationStatusLabel, registrationStatusReason, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm, clubMatchesTournament } from './lib/domain.js';
@@ -27,6 +27,7 @@ const ImpressumPage = lazy(() => import('./pages/ImpressumPage.jsx'));
 const DatenschutzPage = lazy(() => import('./pages/DatenschutzPage.jsx'));
 const TournamentReportPage = lazy(() => import('./pages/TournamentReportPage.jsx'));
 const TournamentDetailPage = lazy(() => import('./pages/TournamentDetailPage.jsx'));
+const TournamentBoardPage = lazy(() => import('./pages/TournamentBoardPage.jsx'));
 const TournamentManagement = lazy(() => import('./pages/TournamentManagement.jsx'));
 const RegistrationsManagement = lazy(() => import('./pages/RegistrationsManagement.jsx'));
 const UserManagementPanel = lazy(() => import('./pages/UserManagementPanel.jsx'));
@@ -1363,6 +1364,30 @@ function AppContent() {
 
   if (loading) {
     return <AuthShell title="Pétanque Turnier Manager Online" subtitle={t('App wird geladen.')} language={language} setLanguage={setLanguage} />;
+  }
+
+  const tournamentBoardRoute = matchTournamentBoardRoute(path);
+  if (!needsSetup && tournamentBoardRoute) {
+    if (tournamentBoardRoute.legacy) window.history.replaceState({}, '', `${tournamentBoardPath(tournamentBoardRoute.id)}${window.location.search}`);
+    return (
+      <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
+        <TournamentBoardPage
+          tournamentId={tournamentBoardRoute.id}
+          tournaments={tournaments}
+          currentUser={currentUser}
+          language={language}
+          setLanguage={setLanguage}
+          navigate={navigate}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          isAdmin={isAdmin}
+          onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
+          onLogout={handleLogout}
+          drawerContent={drawerContent('turniere')}
+          postboxControl={renderPostboxControl()}
+        />
+      </Suspense>
+    );
   }
 
   const tournamentRoute = matchTournamentRoute(path);

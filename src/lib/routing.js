@@ -20,7 +20,7 @@ export function usePath() {
     }
     // The route matcher receives only a pathname. Query parameters such as a
     // private tournament share token stay in the address bar, but must not
-    // become part of the final route segment (e.g. "spielplan?share=…").
+    // become part of the final route segment (e.g. "teilnehmer?share=…").
     setPath(target.pathname);
     window.scrollTo(0, 0);
   }
@@ -41,7 +41,7 @@ export function matchTournamentRoute(path) {
 
   const id = decodeURIComponent(segments[1]);
   const sub = segments[2] || 'info';
-  if (!['info', 'anmelden', 'teilnehmer', 'mitspieler', 'spielplan', 'rangliste'].includes(sub)) {
+  if (!['info', 'anmelden', 'teilnehmer', 'mitspieler', 'rangliste'].includes(sub)) {
     return null;
   }
 
@@ -75,10 +75,23 @@ const PATH_AREAS = {
   '/spielerboerse': 'spielerboerse', '/meine-anzeigen': 'spielerboerse',
 };
 
+// Turnierseite im Vollformat (Ankündigung, Spielplan, Rangliste). Der frühere Reiter /turniere/<id>/spielplan
+// führt ebenfalls hierher, damit geteilte alte Links weiter funktionieren.
+export function tournamentBoardPath(tournamentId) {
+  return `/turnierseite/${encodeURIComponent(tournamentId)}`;
+}
+
+export function matchTournamentBoardRoute(path) {
+  const segments = path.split('/').filter(Boolean);
+  if (segments[0] === 'turnierseite' && segments.length === 2) return { id: decodeURIComponent(segments[1]), legacy: false };
+  if (segments[0] === 'turniere' && segments.length === 3 && segments[2] === 'spielplan') return { id: decodeURIComponent(segments[1]), legacy: true };
+  return null;
+}
+
 // Menübereich einer Seite; null für Seiten ohne eigenen Bereich (Startseite mit Tabs, Impressum, Datenschutz),
 // die den Bereich übernehmen, aus dem man kommt.
 export function areaForPath(path) {
-  if (matchTournamentRoute(path)) return 'turniere';
+  if (matchTournamentRoute(path) || matchTournamentBoardRoute(path)) return 'turniere';
   if (matchRentalRoute(path)) return 'platzmieten';
   if (matchLiveRoute(path)) return 'live';
   return PATH_AREAS[path] || null;

@@ -131,11 +131,48 @@ describe('TournamentPlayManagement', () => {
     installFetchMock([]);
     const { unmount } = render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, status: 'registration' }]} language="de" />);
     expect(await screen.findByRole('button', { name: 'Turnier starten' })).toBeInTheDocument();
-    expect(screen.queryByText('Ankündigung', { exact: false })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Mitteilung an alle Teilnehmer/)).not.toBeInTheDocument();
     unmount();
 
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
-    expect(await screen.findByText('Ankündigung', { exact: false })).toBeInTheDocument();
+    expect(await screen.findByLabelText(/Mitteilung an alle Teilnehmer/)).toBeInTheDocument();
+  });
+
+  it('bietet nach der Auswahl die Turnierseite zum Teilen an, direkt vor der Ankündigung', async () => {
+    installFetchMock([]);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, visibility: 'public', participantsPublic: true }]} language="de" />);
+
+    const open = await screen.findByRole('link', { name: 'Öffnen' });
+    expect(open).toHaveAttribute('href', '/turnierseite/t1');
+    const share = within(open.closest('.tournament-board-share')).getByRole('button', { name: /Teilen/ });
+    const editor = screen.getByLabelText(/Mitteilung an alle Teilnehmer/).closest('.announcement-editor');
+    expect(share.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('teilt bei einem privaten Turnier die Turnierseite mit dem Freigabe-Token', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    const fetchMock = global.fetch;
+    global.fetch = vi.fn((path, options = {}) => (path === '/api/tournaments/t1/share-link' && options.method === 'POST'
+      ? Promise.resolve(jsonResponse({ shareUrl: 'https://ptm.test/turniere/t1/info?share=geheim' }))
+      : fetchMock(path, options)));
+    const share = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    try {
+      render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, visibility: 'private', participantsPublic: true }]} language="de" />);
+      fireEvent.click(await within(await screen.findByText('Turnierseite').then((el) => el.closest('.tournament-board-share'))).findByRole('button', { name: /Teilen/ }));
+      await waitFor(() => expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: `${window.location.origin}/turnierseite/t1?share=geheim` })));
+    } finally {
+      delete navigator.share;
+    }
+  });
+
+  it('weist darauf hin, wenn die Teilnehmerliste nicht veröffentlicht ist', async () => {
+    installFetchMock([]);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, participantsPublic: false }]} language="de" />);
+
+    expect(await screen.findByText(/wenn die Teilnehmerliste veröffentlicht wird/)).toBeInTheDocument();
+    expect(within(document.querySelector('.tournament-board-share')).queryByRole('button', { name: /Teilen/ })).not.toBeInTheDocument();
   });
 
   it('bietet „Turnier abschließen“ direkt nach „Nächste Runde starten“ an, auch bei offenen Ergebnissen', async () => {

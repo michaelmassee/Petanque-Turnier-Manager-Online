@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { areaForPath, matchRentalRoute, matchTournamentRoute, usePath } from './routing.js';
+import { areaForPath, matchRentalRoute, matchTournamentBoardRoute, matchTournamentRoute, tournamentBoardPath, usePath } from './routing.js';
 
 function NavigationHarness() {
   const [path, navigate] = usePath();
-  const target = '/turniere/t1/spielplan?share=private-token';
+  const target = '/turniere/t1/teilnehmer?share=private-token';
 
   return (
     <>
-      <button type="button" onClick={() => navigate(target)}>Zum Spielplan</button>
+      <button type="button" onClick={() => navigate(target)}>Zu den Teilnehmern</button>
       <output data-testid="path">{path}</output>
     </>
   );
@@ -19,12 +19,23 @@ describe('usePath', () => {
     window.history.replaceState({}, '', '/turniere/t1/info?share=private-token');
     render(<NavigationHarness />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Zum Spielplan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zu den Teilnehmern' }));
 
-    expect(window.location.pathname).toBe('/turniere/t1/spielplan');
+    expect(window.location.pathname).toBe('/turniere/t1/teilnehmer');
     expect(window.location.search).toBe('?share=private-token');
-    expect(screen.getByTestId('path')).toHaveTextContent('/turniere/t1/spielplan');
-    expect(matchTournamentRoute(screen.getByTestId('path').textContent)).toMatchObject({ id: 't1', view: 'spielplan' });
+    expect(screen.getByTestId('path')).toHaveTextContent('/turniere/t1/teilnehmer');
+    expect(matchTournamentRoute(screen.getByTestId('path').textContent)).toMatchObject({ id: 't1', view: 'teilnehmer' });
+  });
+});
+
+describe('matchTournamentBoardRoute', () => {
+  it('erkennt die Turnierseite und leitet den früheren Spielplan-Reiter dorthin um', () => {
+    expect(tournamentBoardPath('t 1')).toBe('/turnierseite/t%201');
+    expect(matchTournamentBoardRoute('/turnierseite/t%201')).toEqual({ id: 't 1', legacy: false });
+    expect(matchTournamentBoardRoute('/turniere/t1/spielplan')).toEqual({ id: 't1', legacy: true });
+    expect(matchTournamentRoute('/turniere/t1/spielplan')).toBeNull();
+    expect(matchTournamentBoardRoute('/turniere/t1/info')).toBeNull();
+    expect(areaForPath('/turnierseite/t1')).toBe('turniere');
   });
 });
 
