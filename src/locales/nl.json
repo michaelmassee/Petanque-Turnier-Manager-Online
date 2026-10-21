@@ -1687,5 +1687,10 @@
   "Von der Warteliste nachgerückt": "Van de wachtlijst doorgeschoven",
   "Zahlungshinweise": "Betalingsinformatie",
   "Zum Beispiel IBAN, PayPal-Link oder „Bar am Turniertag“. Erscheint auf der Turnierseite und in den Bestätigungs- und Erinnerungsmails.": "Bijvoorbeeld IBAN, Tikkie- of PayPal-link of „contant op de toernooidag”. Verschijnt op de toernooipagina en in de bevestigings- en herinneringsmails.",
-  "Die Zahlungshinweise dürfen maximal 1000 Zeichen enthalten.": "De betalingsinformatie mag maximaal 1000 tekens bevatten."
+  "Die Zahlungshinweise dürfen maximal 1000 Zeichen enthalten.": "De betalingsinformatie mag maximaal 1000 tekens bevatten.",
+  "Telefonnummer bei der Anmeldung": "Telefoonnummer bij inschrijving",
+  "Optional": "Optioneel",
+  "Pflichtangabe": "Verplicht",
+  "Telefonnummer für Rückfragen der Turnierleitung": "Telefoonnummer voor vragen van de toernooiorganisatie",
+  "Eine Telefonnummer ist erforderlich": "Een telefoonnummer is verplicht"
 }

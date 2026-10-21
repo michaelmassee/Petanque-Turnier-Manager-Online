@@ -1529,7 +1529,7 @@ export async function purgeExpiredPersonalData(db, now = new Date()) {
     const statements = [
       db.prepare(`UPDATE registrations SET email = 'ohne-email-' || lower(hex(randomblob(16))) || '@ohne-email.invalid',
           player_email = NULL, partner_email = NULL, partner2_email = NULL, fee_selections = '[]', registration_answers = '[]',
-          organizer_message = NULL WHERE tournament_id = ?`).bind(tournament.id),
+          organizer_message = NULL, phone = NULL WHERE tournament_id = ?`).bind(tournament.id),
       ...audits.map((row) => {
         let details = null;
         try { details = row.details_json ? JSON.parse(row.details_json) : null; } catch { details = null; }
@@ -5447,9 +5447,9 @@ async function createTournament(request, env, user) {
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url, payment_info,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, phone_required, website_url, logo_url, flyer_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, live_view_enabled, player_result_reporting_enabled, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -5486,6 +5486,7 @@ async function createTournament(request, env, user) {
       tournament.waitlistAutoPromote ? 1 : 0,
       tournament.registrationEnabled ? 1 : 0,
       tournament.approvalRequired ? 1 : 0,
+      tournament.phoneRequired ? 1 : 0,
       presentation.websiteUrl,
       presentation.logoUrl,
       presentation.flyerUrl,
@@ -5572,12 +5573,12 @@ export async function duplicateTournament(db, existing, actingUser) {
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url, payment_info,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, phone_required, website_url, logo_url, flyer_url, whatsapp_group_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, player_result_reporting_enabled, qr_design, created_at, updated_at
       )
       SELECT ?, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url, payment_info,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, phone_required, website_url, logo_url, flyer_url, whatsapp_group_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, player_result_reporting_enabled, qr_design, ?, ?
       FROM tournaments WHERE id = ?`,
     )
@@ -5781,7 +5782,7 @@ async function updateTournament(request, env, existing, user) {
        SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, schweizer_ranking_mode = ?, formule_x_rounds = ?, ko_platz3 = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
-           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, waitlist_auto_promote = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, boule_place_id = ?, live_view_enabled = ?, player_result_reporting_enabled = ?, updated_at = ?
+           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, waitlist_auto_promote = ?, registration_enabled = ?, approval_required = ?, phone_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, boule_place_id = ?, live_view_enabled = ?, player_result_reporting_enabled = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -5816,6 +5817,7 @@ async function updateTournament(request, env, existing, user) {
       tournament.waitlistAutoPromoteProvided ? (tournament.waitlistAutoPromote ? 1 : 0) : Number(existing.waitlist_auto_promote ?? 1),
       tournament.registrationEnabled ? 1 : 0,
       tournament.approvalRequired ? 1 : 0,
+      tournament.phoneRequiredProvided ? (tournament.phoneRequired ? 1 : 0) : Number(existing.phone_required || 0),
       geo.latitude,
       geo.longitude,
       geo.geocodedAt,
@@ -8198,6 +8200,7 @@ export async function createRegistration(request, env, tournament, {
   const feeSelections = resolveFeeSelections(tournament, body.feeSelections, registration);
   const registrationAnswers = resolveRegistrationAnswers(tournament, body.registrationAnswers, registration);
   assertLicenseMatchesTournament(tournament, registration);
+  assertPhoneMatchesTournament(tournament, registration, { isManager: isManager || syncBootstrap });
   await assertNoDuplicateTeamName(db, tournament.id, registration.teamName);
   const accountLinks = { ...await resolveRegistrationUserIds(db, registration), ...selectedLinks };
   assertUniqueSelectedAccountLinks(accountLinks, selectedLinks);
@@ -8350,6 +8353,7 @@ function registrationRecord(id, tournamentId, registration, {
     seeding_position: registration.seedingPosition,
     is_vip: registration.isVip ? 1 : 0,
     organizer_message: organizerMessage,
+    phone: registration.phone ?? null,
     fee_selections: JSON.stringify(feeSelections),
     registration_answers: JSON.stringify(registrationAnswers),
     language,
@@ -8419,7 +8423,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
            partner_first_name = ?, partner_last_name = ?, partner_email = ?, partner_club = ?, partner_license_nr = ?,
            partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?, partner2_club = ?, partner2_license_nr = ?,
            team_name = ?, seeding_position = ?, status = ?, is_vip = ?, fee_selections = ?, registration_answers = ?, confirmed_at = ?, updated_at = ?,
-           user_id = ?, partner_user_id = ?, partner2_user_id = ?, rejection_reason = ?, rejected_at = ?, rejected_by = ?
+           user_id = ?, partner_user_id = ?, partner2_user_id = ?, rejection_reason = ?, rejected_at = ?, rejected_by = ?, phone = ?
        WHERE id = ?`,
     )
     .bind(
@@ -8453,6 +8457,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
       keepsRejection ? existing.rejection_reason : null,
       keepsRejection ? existing.rejected_at : null,
       keepsRejection ? existing.rejected_by : null,
+      registration.phone === undefined ? existing.phone ?? null : registration.phone,
       existing.id,
     )
     .run();
@@ -11677,6 +11682,8 @@ function normalizeRegistrationInput(body, { requireStatus, allowPlaceholder = fa
     status: text(body.status || 'pending'),
     isVip: Boolean(body.isVip),
     organizerMessage: nullableText(body.organizerMessage),
+    // Eine Kontaktnummer pro Anmeldung; undefined = nicht mitgeschickt (ältere Clients, Dokument-Abgleich).
+    phone: body.phone === undefined ? undefined : normalizePhone(body.phone),
   };
 
   if (registration.firstName.length < 2 || registration.lastName.length < 2) {
@@ -11720,6 +11727,13 @@ function assertLicenseMatchesTournament(tournament, registration) {
   }
   if (registration.partner2FirstName && !registration.partner2LicenseNr) {
     throw new HttpError(400, 'Lizenznummer für Partner 2 ist erforderlich');
+  }
+}
+
+// Telefon ist pro Turnier optional oder Pflicht. Die Turnierleitung darf auch ohne Nummer erfassen.
+function assertPhoneMatchesTournament(tournament, registration, { isManager = false } = {}) {
+  if (!isManager && Number(tournament.phone_required || 0) && !registration.phone) {
+    throw new HttpError(400, 'Eine Telefonnummer ist erforderlich', { field: 'phone' });
   }
 }
 
@@ -12047,6 +12061,7 @@ export function toPublicTournament(row, user) {
     teamNameEnabled: Boolean(Number(row.team_name_enabled || 0)),
     waitlistEnabled: Boolean(Number(row.waitlist_enabled ?? 1)),
     waitlistAutoPromote: Boolean(Number(row.waitlist_auto_promote ?? 1)),
+    phoneRequired: Boolean(Number(row.phone_required || 0)),
     registrationEnabled: Boolean(Number(row.registration_enabled ?? 1)),
     approvalRequired: Boolean(Number(row.approval_required || 0)),
     registrationClosed: Boolean(Number(row.registration_closed || 0)),
@@ -12126,6 +12141,7 @@ function toManagedRegistration(row) {
     partnerAccountConnected: Boolean(row.partner_user_id),
     partner2AccountConnected: Boolean(row.partner2_user_id),
     organizerMessage: row.organizer_message || null,
+    phone: row.phone || null,
     rejectionReason: row.rejection_reason || null,
     rejectedAt: row.rejected_at || null,
     registrationAnswers: registrationAnswersFromRow(row),

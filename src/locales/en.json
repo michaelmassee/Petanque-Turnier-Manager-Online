@@ -1687,5 +1687,10 @@
   "Von der Warteliste nachgerückt": "Moved up from the waitlist",
   "Zahlungshinweise": "Payment information",
   "Zum Beispiel IBAN, PayPal-Link oder „Bar am Turniertag“. Erscheint auf der Turnierseite und in den Bestätigungs- und Erinnerungsmails.": "For example IBAN, PayPal link or “cash on tournament day”. Shown on the tournament page and in confirmation and reminder emails.",
-  "Die Zahlungshinweise dürfen maximal 1000 Zeichen enthalten.": "Payment information may contain at most 1000 characters."
+  "Die Zahlungshinweise dürfen maximal 1000 Zeichen enthalten.": "Payment information may contain at most 1000 characters.",
+  "Telefonnummer bei der Anmeldung": "Phone number at registration",
+  "Optional": "Optional",
+  "Pflichtangabe": "Required",
+  "Telefonnummer für Rückfragen der Turnierleitung": "Phone number for questions from the organizers",
+  "Eine Telefonnummer ist erforderlich": "A phone number is required"
 }

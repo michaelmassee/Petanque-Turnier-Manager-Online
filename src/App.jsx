@@ -2608,6 +2608,10 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
     if (!form.licenseNr && currentUser.licenseNr) {
       updates.licenseNr = currentUser.licenseNr;
     }
+    // Handynummer aus dem Profil als Kontaktnummer der Anmeldung vorbelegen.
+    if (!form.phone && currentUser.phone) {
+      updates.phone = currentUser.phone;
+    }
     if (Object.keys(updates).length > 0) {
       setForm((current) => ({ ...current, ...updates }));
     }
@@ -2649,6 +2653,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             formation={tournament.formation}
             registrationType={tournament.registrationType}
             licenseRequired={tournament.licenseRequired}
+            phoneRequired={tournament.phoneRequired}
             teamNameEnabled={tournament.teamNameEnabled}
             feeTiers={tournament.feeTiers}
             registrationQuestions={tournament.registrationQuestions}

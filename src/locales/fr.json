@@ -1687,5 +1687,10 @@
   "Von der Warteliste nachgerückt": "Repêché depuis la liste d’attente",
   "Zahlungshinweise": "Informations de paiement",
   "Zum Beispiel IBAN, PayPal-Link oder „Bar am Turniertag“. Erscheint auf der Turnierseite und in den Bestätigungs- und Erinnerungsmails.": "Par exemple IBAN, lien PayPal ou « en espèces le jour du tournoi ». Affiché sur la page du tournoi et dans les e-mails de confirmation et de rappel.",
-  "Die Zahlungshinweise dürfen maximal 1000 Zeichen enthalten.": "Les informations de paiement peuvent contenir au maximum 1000 caractères."
+  "Die Zahlungshinweise dürfen maximal 1000 Zeichen enthalten.": "Les informations de paiement peuvent contenir au maximum 1000 caractères.",
+  "Telefonnummer bei der Anmeldung": "Téléphone à l’inscription",
+  "Optional": "Facultatif",
+  "Pflichtangabe": "Obligatoire",
+  "Telefonnummer für Rückfragen der Turnierleitung": "Téléphone pour les questions de l’organisation",
+  "Eine Telefonnummer ist erforderlich": "Un numéro de téléphone est requis"
 }

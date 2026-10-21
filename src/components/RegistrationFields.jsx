@@ -34,7 +34,7 @@ function RegistrationSection({ title, children, className = '' }) {
 }
 
 // clubNames: veröffentlichte Vereine als Vorschläge für die Vereinsfelder (Freitext bleibt möglich).
-export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, teamNameEnabled, feeTiers = [], registrationQuestions = [], currency = 'EUR', invalidField, clubNames = [], playerSearchEnabled = false, turnstileSiteKey, tournamentId, shareToken = '', currentUserId, currentUser }) {
+export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, phoneRequired = false, teamNameEnabled, feeTiers = [], registrationQuestions = [], currency = 'EUR', invalidField, clubNames = [], playerSearchEnabled = false, turnstileSiteKey, tournamentId, shareToken = '', currentUserId, currentUser }) {
   const { t, i18n } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
   const clubList = clubSuggestions.listId;
@@ -170,6 +170,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
         {names('primary')}
         <ParticipantQuestions participant="primary" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('primary', questionId, checked)} />
         {!(showStatus && form.noEmail) && <TextField label={t('E-Mail')} type="email" readOnly={Boolean(selections.primary)} value={form.playerEmail || ''} onChange={(playerEmail) => setForm({ ...form, playerEmail })} required />}
+        <TextField label={t('Telefonnummer für Rückfragen der Turnierleitung')} type="tel" autoComplete="tel" value={form.phone || ''} onChange={(phone) => setForm({ ...form, phone })} required={phoneRequired} invalid={invalidField === 'phone'} />
         <div className="form-grid">
           <TextField label={t('Verein')} readOnly={Boolean(selections.primary)} value={form.club} onChange={(club) => setForm({ ...form, club })} list={clubList} />
           {(licenseRequired || selections.primary?.licenseNr) && <TextField label={t('Lizenznummer')} readOnly={Boolean(selections.primary?.licenseNr)} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} required={licenseRequired} />}
