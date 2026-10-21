@@ -2412,6 +2412,17 @@ export default {
         }
       }
 
+      // Öffentlicher Spielplan (Turnierseite, Tab „Spielplan“): alle Runden und die Rangliste aus dem kurz
+      // zwischengespeicherten Live-Snapshot; die Seite fragt alle 2 Minuten nach und bekommt meist nur ein 304.
+      const tournamentScheduleMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/schedule$/);
+      if (tournamentScheduleMatch && request.method === 'GET') {
+        const tournament = await getTournamentById(env.DB, tournamentScheduleMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await optionalSession(request, env.DB);
+        if (!canViewParticipants(tournament, session?.user || null)) throw new HttpError(403, 'Zugriff verweigert');
+        return await buildScheduleResponse(request, env.DB, tournament);
+      }
+
       const tournamentTeamDrawMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/teams\/draw$/);
       if (tournamentTeamDrawMatch && request.method === 'POST') {
         const tournament = await getTournamentById(env.DB, tournamentTeamDrawMatch[1]);
@@ -7721,6 +7732,21 @@ async function getLiveSnapshot(db, tournament, origin) {
     }));
   }
   return snapshot;
+}
+
+// Spielplan für alle: dieselbe Turnier-Sicht wie die Live-Ansicht, ohne persönliche Daten. Ankündigung, Status und
+// Dokumentstand kommen frisch aus der Turnierzeile und fließen ins ETag ein.
+export async function buildScheduleResponse(request, db, tournament) {
+  const snapshot = await getLiveSnapshot(db, tournament, new URL(request.url).origin);
+  const dataAsOf = Number(tournament.document_managed || 0) === 1 ? tournament.last_sync_write_at || null : null;
+  const announcement = tournamentAnnouncement(tournament);
+  const extraVersion = (await sha256Hex(JSON.stringify([tournament.status, dataAsOf, announcement]))).slice(0, 12);
+  const etag = `"${snapshot.version}-${extraVersion}"`;
+  const cacheHeaders = { 'Cache-Control': 'private, no-cache', ETag: etag };
+  if (request.headers.get('If-None-Match') === etag) {
+    return new Response(null, { status: 304, headers: { ...SECURITY_HEADERS, ...cacheHeaders } });
+  }
+  return json({ status: tournament.status, rounds: snapshot.rounds, ranking: snapshot.ranking, dataAsOf, announcement }, 200, cacheHeaders);
 }
 
 function liveRegistrationLabel(registration) {

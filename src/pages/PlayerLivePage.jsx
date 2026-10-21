@@ -13,9 +13,9 @@ import { RankingTable } from '../components/RankingTable.jsx';
 import { isIosSafari } from '../lib/hooks.js';
 import { currentBrowserPushSubscription, ensureBrowserPushSubscription, isPushSupported } from '../lib/push.js';
 
-// 60 Sekunden reichen: Beim Zurückkehren zur App wird sofort neu geladen (staleTime 0), und eine
-// neue Runde kündigt zusätzlich der Push an.
-const LIVE_REFRESH_MS = 60_000;
+// 120 Sekunden reichen (halbiert die Last auf dem Free-Plan, Entscheidung vom 2026-10-21): Beim Zurückkehren zur App
+// wird sofort neu geladen (staleTime 0), und neue Runden sowie Ankündigungen kündigt zusätzlich der Push an.
+const LIVE_REFRESH_MS = 120_000;
 
 function pushFlagKey(registrationId) {
   return `ptm_live_push_${registrationId}`;

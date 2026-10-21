@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { FORMATIONS, REGISTRATION_STATUSES, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
 import { api, authenticatedApi } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
-import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
+import { DISPLAY_LOCALES, REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
 import { isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl, calendarEventLink } from '../lib/domain.js';
 import { AccountBadge, Button, ClockIcon, Feedback, NumberIcon, RequiredMark, SearchIcon, ShareIcon, SortAlphaIcon, StarIcon } from '../components/ui.jsx';
 import { loadParticipantListPrefs, nextVipFilter, saveParticipantListPrefs } from '../lib/participantListPrefs.js';
@@ -18,7 +19,6 @@ import { CourtLabel } from '../components/CourtLabel.jsx';
 import { AnnouncementBanner, AnnouncementEditor } from '../components/TournamentAnnouncement.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
-import { normalizeRanking } from '../lib/live-ranking.js';
 
 export function TournamentInfo({ tournament, language, onShare, showTitle = true, shareToken = '', onNavigate }) {
   const { t } = useTranslation();
@@ -469,76 +469,112 @@ function matchesByStage(matches) {
  * Öffentlicher Spielplan: aktuelle Runde und Rangliste – für online durchgeführte Turniere wie für Turniere, die ein
  * verbundenes Turnierdokument führt (dann mit Bahn, Stufe und Rangliste aus dem Dokument).
  */
-export function TournamentSchedule({ tournamentId, tournament, language }) {
+// Ganzes Turnier zum aktuellen Stand für alle (die Live-Ansicht zeigt nur das eigene Team). Lädt alle 2 Minuten neu,
+// solange das Turnier läuft; unverändert antwortet der Server mit 304.
+const SCHEDULE_REFRESH_MS = 120_000;
+
+function formatClock(timestamp, language) {
+  if (!timestamp) return '';
+  return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, { hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
+}
+
+export function TournamentSchedule({ tournamentId, tournament, language, onAnnouncement }) {
   const { t } = useTranslation();
-  const [rounds, setRounds] = useState(null);
-  const [ranking, setRanking] = useState([]);
-
+  const query = useQuery({
+    queryKey: ['schedule', tournamentId],
+    queryFn: () => api(`/api/tournaments/${tournamentId}/schedule`),
+    refetchInterval: (current) => (current.state.data?.status === 'finished' ? false : SCHEDULE_REFRESH_MS),
+    refetchIntervalInBackground: false,
+    staleTime: 0,
+    retry: false,
+  });
+  const announcement = query.data?.announcement;
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([api(`/api/tournaments/${tournamentId}/rounds`), api(`/api/tournaments/${tournamentId}/ranking`)])
-      .then(([roundsData, rankingData]) => {
-        if (!cancelled) {
-          setRounds(roundsData.rounds);
-          setRanking(rankingData.ranking);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRounds([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [tournamentId]);
+    if (query.data) onAnnouncement?.(announcement || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [announcement?.text, announcement?.at, Boolean(query.data)]);
 
-  if (!rounds) {
+  if (query.isPending) {
     return <p className="muted">{t('Wird geladen…')}</p>;
   }
+  const rounds = query.data?.rounds || [];
+  const ranking = query.data?.ranking || [];
+  const dataAsOf = query.data?.dataAsOf || null;
+  const refresh = (
+    <div className="live-refresh">
+      <span className="muted">
+        {t('Stand')}: {formatClock(query.dataUpdatedAt, language)}
+        {dataAsOf && <> · {t('Turnierdaten vom')} {formatTournamentDateTime(dataAsOf, language, tournament?.timezone)}</>}
+      </span>
+      <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>
+    </div>
+  );
 
   if (!rounds.length) {
-    return <p className="muted">{t('Noch keine Runde gestartet.')}</p>;
+    return (
+      <div className="play-schedule">
+        <Feedback error={query.error?.message} />
+        <p className="muted">{t('Noch keine Runde gestartet.')}</p>
+        {refresh}
+      </div>
+    );
   }
 
   const currentRound = rounds[rounds.length - 1];
+  const olderRoundsNewestFirst = rounds.slice(0, -1).reverse();
   const showRanking = ranking.length > 0 && tournament?.type !== 'ko';
 
   return (
     <div className="play-schedule">
-      {tournament?.documentDataAsOf && (
-        <p className="muted">{t('Turnierdaten vom')} {formatTournamentDateTime(tournament.documentDataAsOf, language, tournament.timezone)}</p>
-      )}
+      <Feedback error={query.error?.message} />
       <h3>
         {t('Runde')} {currentRound.roundNumber}
       </h3>
-      {matchesByStage(currentRound.matches).map(([stage, matches]) => (
-        <section key={stage || 'ohne-stufe'}>
-          {stage && <h4 data-i18n-skip>{stage}</h4>}
-          {matches.map((match) => (
-            <article className="data-row" key={match.id}>
-              <div>
-                <CourtLabel court={match.court} className="play-schedule-court" />
-                <strong>{match.teamA.map(playerLabel).join(' + ')}</strong>
-                <span>{match.teamB.length ? t('gegen') : t('Freilos')}</span>
-                <strong>{match.teamB.map(playerLabel).join(' + ')}</strong>
-              </div>
-              <div>{match.noShow ? t('Nicht angetreten') : match.scoreA != null ? `${match.scoreA}:${match.scoreB}` : t('Offen')}</div>
-            </article>
-          ))}
-        </section>
-      ))}
+      <ScheduleRoundMatches round={currentRound} />
 
       {showRanking && (
         <>
           <h3>{t('Rangliste')}</h3>
           <div className="table-scroll">
-            <RankingTable tournament={tournament} entries={normalizeRanking(ranking)} />
+            <RankingTable tournament={tournament} entries={ranking} />
           </div>
         </>
       )}
+
+      {olderRoundsNewestFirst.length > 0 && (
+        <>
+          <h3>{t('Vergangene Runden')}</h3>
+          {olderRoundsNewestFirst.map((round) => (
+            <details key={round.id} className="panel play-round">
+              <summary>{t('Runde')} {round.roundNumber}</summary>
+              <ScheduleRoundMatches round={round} />
+            </details>
+          ))}
+        </>
+      )}
+      {refresh}
     </div>
   );
+}
+
+function ScheduleRoundMatches({ round }) {
+  const { t } = useTranslation();
+  return matchesByStage(round.matches).map(([stage, matches]) => (
+    <section key={stage || 'ohne-stufe'}>
+      {stage && <h4 data-i18n-skip>{stage}</h4>}
+      {matches.map((match) => (
+        <article className="data-row" key={match.id}>
+          <div>
+            <CourtLabel court={match.court} className="play-schedule-court" />
+            <strong>{match.teamA.map(playerLabel).join(' + ')}</strong>
+            <span>{match.teamB.length ? t('gegen') : t('Freilos')}</span>
+            <strong>{match.teamB.map(playerLabel).join(' + ')}</strong>
+          </div>
+          <div>{match.noShow ? t('Nicht angetreten') : match.scoreA != null ? `${match.scoreA}:${match.scoreB}` : t('Offen')}</div>
+        </article>
+      ))}
+    </section>
+  ));
 }
 
 export function TournamentDetailPage({
@@ -780,7 +816,7 @@ export function TournamentDetailPage({
 
           {view === 'mitspieler' && <TournamentPlayerListings tournament={tournament} currentUser={currentUser} navigate={navigate} />}
 
-          {view === 'spielplan' && <TournamentSchedule tournamentId={tournament.id} tournament={tournament} language={language} />}
+          {view === 'spielplan' && <TournamentSchedule tournamentId={tournament.id} tournament={tournament} language={language} onAnnouncement={(announcement) => setAnnouncementUpdate({ tournamentId: tournament.id, announcement })} />}
 
           {view === 'rangliste' && <FinalRankingView tournament={tournament} language={language} shareToken={shareToken} />}
         </div>
