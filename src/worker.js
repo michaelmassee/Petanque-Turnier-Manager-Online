@@ -2559,6 +2559,7 @@ export default {
           throw new HttpError(403, 'Zugriff verweigert');
         }
         const result = await cancelRegistration(env.DB, registration.id);
+        await notifyOrganizerOfCancellation(env, registration, session.user.id);
         try {
           await sendCancellationEmail(env, { ...registration, id: registration.tournament_id }, registration, APP_ORIGIN);
         } catch (error) {
@@ -8040,6 +8041,17 @@ async function cancelRegistration(db, id) {
   return json({ registration: toPublicRegistration(updated) });
 }
 
+// Abmeldung eines Teams: Die Turnierleitung erfährt es nur über die Postbox (keine Mail), wie bei neuen Anmeldungen.
+// Storniert die Turnierleitung selbst, bekommt sie keine Nachricht über ihre eigene Aktion.
+async function notifyOrganizerOfCancellation(env, registration, actorUserId = null) {
+  if (registration.status === 'cancelled' || registration.status === 'rejected') return;
+  if (actorUserId && actorUserId === registration.owner_id) return;
+  await createSystemNotification(env, registration.owner_id, 'registration_status_changed', {
+    tournamentId: registration.tournament_id, tournamentName: registration.name, status: 'cancelled',
+    participant: `${registration.first_name} ${registration.last_name}`,
+  });
+}
+
 // Status, die einen Platz belegen (siehe createRegistration): Verlässt eine Meldung sie, kann nachgerückt werden.
 const CAPACITY_STATUSES = ['pending', 'confirmed'];
 
@@ -8135,6 +8147,7 @@ async function cancelRegistrationByToken(request, env) {
   assertRegistrationOnlineEditable(registration);
 
   const result = await cancelRegistration(env.DB, registration.id);
+  await notifyOrganizerOfCancellation(env, registration);
   try {
     await sendCancellationEmail(env, { ...registration, id: registration.tournament_id }, registration, APP_ORIGIN);
   } catch (error) {

@@ -18,7 +18,7 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 | **Automatisches Nachrücken** bei Abmeldung, manuelle Reihenfolge, Warteliste öffentlich | ✅ | ✅ seit 21.10.2026: Option „Automatisch von der Warteliste nachrücken“ (Standard an), bis Turnierstart, Team per Mail + Postbox; keine manuelle Reihenfolge (Meldereihenfolge) |
 | Double-Opt-In per Mail bei Gastanmeldung, E-Mail nur einmal je Turnier | ✅ | ⚠️ prüfen (`createRegistration` mit `optionalSession`) |
 | Telefon Pflicht/optional, Lizenz nicht/optional/Pflicht | ✅ | ✅ Telefon seit 21.10.2026: eine Kontaktnummer pro Anmeldung, optional (Standard) oder Pflicht, aus dem Profil vorbelegt, nur für die Turnierleitung sichtbar. Lizenz bewusst weiter Ja/Nein (Standard Nein) |
-| Mail an Veranstalter bei jeder An- und Abmeldung | ✅ | ⚠️ (Postbox-Aufgaben statt Mail) |
+| Mail an Veranstalter bei jeder An- und Abmeldung | ✅ | ✅ bewusst nur Postbox (Entscheidung 21.10.2026): Anmeldung und seit 21.10.2026 auch jede Abmeldung durch das Team (Link oder „Absagen“) |
 | Erinnerungsmail mit frei wählbarem Datum und Uhrzeit | ✅ | ⚠️ (fester täglicher Cron) |
 | Bankverbindung des Vereins in den Mails (Startgeld überweisen) | ✅ | ✅ seit 21.10.2026 als freies Feld „Zahlungshinweise“ am Turnier (international: IBAN, PayPal, Twint, Bizum, bar …), auf der Turnierseite und in Bestätigungs-, Eingangs- und Erinnerungsmail |
 | Spielort-GPS aus den Vereinsdaten, Navigation in der Mail | ✅ | ✅ |
@@ -44,7 +44,7 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 1. ~~Automatisches Nachrücken aus der Warteliste~~ (umgesetzt 21.10.2026) mit Mail an den Nachrücker, Modus automatisch/manuell, max. Anzahl Nachrücker, Warteliste wahlweise öffentlich. Betroffen: `src/registration-core.js`, Abmelde-Pfade in `src/worker.js` (cancel-by-token, Absagen), `src/pages/TournamentManagement.jsx`, neue Migration mit ADD COLUMN (kein Table-Rebuild!).
 2. ~~Bundesland- bzw. Landesverbands-Filter im Kalender~~ – verworfen (21.10.2026): PTM Online ist international; die Umkreissuche deckt die regionale Suche länderunabhängig ab.
 3. ~~Bankverbindung beim Verein bzw. Turnier~~ (umgesetzt 21.10.2026 als freie „Zahlungshinweise“) und Anzeige in der Bestätigungsmail (`sendTransactionalEmail`-Templates).
-4. ~~Telefon- und Lizenzabfrage dreistufig~~ – Telefon umgesetzt (optional/Pflicht, 21.10.2026), Lizenz bleibt Ja/Nein; Mail an Veranstalter bei An-/Abmeldung offen.
+4. ~~Telefon- und Lizenzabfrage dreistufig~~ – Telefon umgesetzt (optional/Pflicht, 21.10.2026), Lizenz bleibt Ja/Nein; An-/Abmeldung meldet die Postbox der Turnierleitung (ohne Mail).
 5. ~~„In meinen Kalender“-Button~~ (umgesetzt 21.10.2026) (ICS-Download) auf `src/pages/TournamentDetailPage.jsx`. Den vorhandenen ICS-Generator aus dem Mailversand wiederverwenden.
 
 **P2 – Turniertag**
