@@ -109,8 +109,8 @@ function insertPlace({ clubId, clubName, name, entry, venueType = 'outdoor', des
   // Vereinsplätze nur anlegen, wenn der Verein in diesem Lauf wirklich neu entstanden ist (kein verwaister Platz).
   const clubCondition = clubId ? `EXISTS (SELECT 1 FROM clubs WHERE id = ${quote(clubId)})` : '1';
   statements.push(
-    `INSERT INTO boule_places (id, club_id, club_name, name, address, latitude, longitude, venue_type, court_count, description, accessible, facility_codes, status, reported_by_user_id, created_at, updated_at) `
-    + `SELECT ${quote(place.id)}, ${quote(clubId)}, ${quote(clubName)}, ${quote(name)}, ${quote(place.address)}, ${place.latitude ?? 'NULL'}, ${place.longitude ?? 'NULL'}, ${quote(venueType)}, 0, ${quote(description)}, 0, '[]', 'pending', ${clubId ? 'NULL' : quote(owner.id)}, ${quote(now)}, ${quote(now)} `
+    `INSERT INTO boule_places (id, club_id, club_name, name, address, latitude, longitude, venue_type, court_count, description, accessible, facility_codes, status, reported_by_user_id, address_unverified, created_at, updated_at) `
+    + `SELECT ${quote(place.id)}, ${quote(clubId)}, ${quote(clubName)}, ${quote(name)}, ${quote(place.address)}, ${place.latitude ?? 'NULL'}, ${place.longitude ?? 'NULL'}, ${quote(venueType)}, 0, ${quote(description)}, 0, '[]', 'pending', ${clubId ? 'NULL' : quote(owner.id)}, 1, ${quote(now)}, ${quote(now)} `
     + `WHERE ${clubCondition} AND NOT EXISTS (SELECT 1 FROM boule_places WHERE lower(trim(name)) = lower(trim(${quote(name)})) AND lower(trim(address)) = lower(trim(${quote(place.address)})) AND venue_type = ${quote(venueType)});`,
   );
   placeCount += 1;

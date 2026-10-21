@@ -285,3 +285,28 @@ describe('Bouleplätze und Vereine teilen', () => {
     expect(fetch).toHaveBeenCalledOnce();
   });
 });
+
+describe('Ungeprüfte Platzadresse', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('kennzeichnet die Adresse und schickt angemeldet eine Korrektur', async () => {
+    const fetchMock = vi.fn((url) => Promise.resolve(new Response(JSON.stringify(String(url).includes('address-correction')
+      ? { ok: true }
+      : { places: [place(1, { addressUnverified: true }), place(2)] }), { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<PlacesPage language="de" setLanguage={() => {}} menuOpen={false} setMenuOpen={() => {}} navigate={() => {}} currentUser={{ id: 'u1' }} isAdmin={false} />);
+
+    const details = (await screen.findByRole('heading', { name: 'Bouleplatz 1' }, { timeout: 5_000 })).closest('details');
+    expect(within(details).getByText(/Adresse ungeprüft:/)).toBeInTheDocument();
+    expect(within(screen.getByRole('heading', { name: 'Bouleplatz 2' }).closest('details')).queryByText(/Adresse ungeprüft/)).not.toBeInTheDocument();
+
+    fireEvent.click(within(details).getByRole('button', { name: 'Korrektur melden', hidden: true }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Wo liegt der Spielort tatsächlich/ }), { target: { value: 'Limesstraße' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Senden' }));
+
+    expect(await screen.findByText('Danke! Deine Korrektur ist an die Verantwortlichen des Spielorts gegangen.')).toBeInTheDocument();
+    const [url, options] = fetchMock.mock.calls.find(([path]) => String(path).includes('address-correction'));
+    expect(url).toBe('/api/places/place-1/address-correction');
+    expect(JSON.parse(options.body)).toEqual({ body: 'Limesstraße' });
+  });
+});

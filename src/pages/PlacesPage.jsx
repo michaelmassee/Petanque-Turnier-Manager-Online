@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { clubLogoImageUrl, formatLocationAddress, googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Feedback, Button, ClubBadge, DistanceBadge, SelectField, CloseButton, ShareLinkButton } from '../components/ui.jsx';
+import { Feedback, Button, ClubBadge, DistanceBadge, SelectField, CloseButton, ShareLinkButton, EditDialog, TextArea } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
@@ -111,7 +111,53 @@ function OrganizationLinks({ place, t }) {
   </div>;
 }
 
-function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onNavigate, heading = 'h2', forceOpen = false, detailRef }) {
+// Adresse aus einer Verbandsliste übernommen, aber noch von niemandem bestätigt: kann die Postanschrift des Vereins sein.
+function AddressCorrectionDialog({ place, onClose }) {
+  const { t } = useTranslation();
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  async function send(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    setBusy(true);
+    try {
+      await authenticatedApi(`/api/places/${place.id}/address-correction`, { method: 'POST', body: JSON.stringify({ body: text.trim() }) });
+      setText('');
+      setMessage(t('Danke! Deine Korrektur ist an die Verantwortlichen des Spielorts gegangen.'));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <EditDialog title={t('Korrektur melden')} subtitle={place.name} error={error} message={message} onClose={onClose}>
+      <form className="form" onSubmit={send}>
+        <p className="muted" data-i18n-skip>{formatLocationAddress(place.address)}</p>
+        <TextArea label={t('Wo liegt der Spielort tatsächlich?')} value={text} maxLength={500} required onChange={setText} />
+        <div className="dialog-actions">
+          <Button variant="secondary" onClick={onClose}>{t('Schließen')}</Button>
+          <Button type="submit" disabled={!text.trim()} loading={busy}>{t('Senden')}</Button>
+        </div>
+      </form>
+    </EditDialog>
+  );
+}
+
+function AddressUnverifiedHint({ place, t, onReportAddress }) {
+  if (!place.addressUnverified) return null;
+  return <p className="hint place-address-unverified">
+    ⚠ {t('Adresse ungeprüft: aus der Vereinsliste des Landesverbands übernommen, möglicherweise die Postanschrift des Vereins.')}
+    {onReportAddress && <> <button className="link-button" type="button" onClick={() => onReportAddress(place)}>{t('Korrektur melden')}</button></>}
+  </p>;
+}
+
+function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onReportAddress, onNavigate, heading = 'h2', forceOpen = false, detailRef }) {
   const Heading = heading;
   return <details className="panel place-card place-card-details" open={forceOpen || undefined} ref={detailRef}>
     <summary className="place-card-summary">
@@ -127,6 +173,7 @@ function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onNav
     </summary>
     <div className="place-card-content">
       <p className="muted" data-i18n-skip>{formatLocationAddress(place.address)}</p>
+      <AddressUnverifiedHint place={place} t={t} onReportAddress={onReportAddress} />
       {place.description && <RichText value={place.description} onNavigate={onNavigate} />}
       {place.facilities && <p>{t('Ausstattung:')} {place.facilities}</p>}
       {place.facilityCodes?.length > 0 && <p className="muted">{place.facilityCodes.map((code) => t(facilityLabels[code])).join(' · ')}</p>}
@@ -177,6 +224,7 @@ function PlacesMap({ places, center, maptilerApiKey, focus }) {
               </>
             ) : <strong data-i18n-skip>{place.name}</strong>}
             <span data-i18n-skip className="map-popup-address">{formatLocationAddress(place.address)}</span>
+            {place.addressUnverified && <span className="map-popup-address muted">⚠ {t('Adresse ungeprüft')}</span>}
             <a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
           </Popup>
         </Marker>
@@ -201,6 +249,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   const resultsRef = useRef(null);
   const mapSectionRef = useRef(null);
   const [focusPlace, setFocusPlace] = useState(null);
+  const [correctionPlace, setCorrectionPlace] = useState(null);
 
   function handleFocusPlace(place, scrollToMap = true) {
     if (place.latitude === null || place.longitude === null) return;
@@ -293,6 +342,11 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       const data = await authenticatedApi(`/api/places/${place.id}/favorite`, { method: 'POST' });
       setPlaces((current) => current.map((entry) => entry.id === place.id ? { ...entry, favorited: data.favorited } : entry));
     } catch (err) { setError(err.message); }
+  }
+
+  function reportAddress(place) {
+    if (!currentUser) { navigate('/'); return; }
+    setCorrectionPlace(place);
   }
 
   function handleUseMyLocation() {
@@ -474,16 +528,17 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
                 {group.clubDescription && <RichText value={group.clubDescription} onNavigate={navigate} />}
                 <div className="place-group-places">
                   {group.places.map((place) => (
-                    <PlaceDetails onNavigate={navigate} place={place} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} heading="h3" forceOpen={place.id === linkedPlaceId} detailRef={place.id === linkedPlaceId ? linkedPlaceRef : undefined} key={place.id} />
+                    <PlaceDetails onNavigate={navigate} place={place} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} onReportAddress={reportAddress} heading="h3" forceOpen={place.id === linkedPlaceId} detailRef={place.id === linkedPlaceId ? linkedPlaceRef : undefined} key={place.id} />
                   ))}
                 </div>
               </div>
             </details>
           ) : (
-            <PlaceDetails onNavigate={navigate} place={group.places[0]} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} forceOpen={group.places[0].id === linkedPlaceId} detailRef={group.places[0].id === linkedPlaceId ? linkedPlaceRef : undefined} key={group.id} />
+            <PlaceDetails onNavigate={navigate} place={group.places[0]} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} onReportAddress={reportAddress} forceOpen={group.places[0].id === linkedPlaceId} detailRef={group.places[0].id === linkedPlaceId ? linkedPlaceRef : undefined} key={group.id} />
           ))}
         </div>
       )}
+      {correctionPlace && <AddressCorrectionDialog place={correctionPlace} onClose={() => setCorrectionPlace(null)} />}
       <InfiniteListLoadMore
         hasMore={placeGroups.length > visibleCount}
         onLoadMore={() => setVisibleCount((count) => count + 10)}

@@ -2113,6 +2113,11 @@ export default {
         const session = await requireSession(request, env.DB);
         return await deleteBoulePlace(env.DB, placeMatch[1], session.user);
       }
+      const placeCorrectionMatch = url.pathname.match(/^\/api\/places\/([^/]+)\/address-correction$/);
+      if (placeCorrectionMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        return await sendPlaceAddressCorrection(request, env, placeCorrectionMatch[1], session.user);
+      }
       const placeLikeMatch = url.pathname.match(/^\/api\/places\/([^/]+)\/like$/);
       if (placeLikeMatch && request.method === 'POST') {
         const session = await requireSession(request, env.DB);
@@ -9701,6 +9706,7 @@ function toPublicBoulePlace(row, user) {
     courtCount: Number(row.court_count || 0), description: row.description || null, accessible: Boolean(Number(row.accessible)),
     facilities: row.facilities || null, facilityCodes: rowFacilityCodes(row), status: row.status, likeCount: Number(row.like_count || 0), liked: Boolean(Number(row.liked || 0)),
     favorited: Boolean(Number(row.favorited || 0)),
+    addressUnverified: Boolean(Number(row.address_unverified || 0)),
     canEdit,
   };
 }
@@ -10458,7 +10464,7 @@ async function createIndependentBoulePlace(request, db, user, countryCode) {
 }
 
 async function assertBoulePlaceEditor(db, id, user) {
-  const place = await db.prepare('SELECT club_id, reported_by_user_id, venue_type FROM boule_places WHERE id = ?').bind(id).first();
+  const place = await db.prepare('SELECT club_id, reported_by_user_id, venue_type, address FROM boule_places WHERE id = ?').bind(id).first();
   if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
   let club = null;
   if (place.club_id) {
@@ -10470,8 +10476,13 @@ async function assertBoulePlaceEditor(db, id, user) {
 }
 
 async function updateBoulePlace(request, db, id, user, countryCode) {
-  const { club, venue_type: currentVenueType } = await assertBoulePlaceEditor(db, id, user);
-  const input = await placeInput(await readJson(request), countryCode);
+  const current = await assertBoulePlaceEditor(db, id, user);
+  const { club, venue_type: currentVenueType } = current;
+  const body = await readJson(request);
+  const input = await placeInput(body, countryCode);
+  // Ungeprüfte Importadresse: gilt als geprüft, sobald die Adresse geändert oder ausdrücklich bestätigt wird.
+  // Koordinaten zählen nicht, placeInput geokodiert sie bei jedem Speichern neu.
+  const addressChecked = body.addressVerified === true || input.address !== String(current.address || '').trim();
   // Plätze eines bereits freigegebenen Vereins bleiben bei Bearbeitung freigegeben, statt erneut zur Moderation zu müssen.
   const status = club ? (club.status === 'published' ? 'published' : 'pending') : 'published';
   if (club && input.venueType !== currentVenueType) {
@@ -10479,7 +10490,38 @@ async function updateBoulePlace(request, db, id, user, countryCode) {
     if (conflict) throw new HttpError(409, 'Diese Organisation hat bereits einen Spielort dieses Typs');
   }
   await assertNoDuplicateBoulePlace(db, input, id);
-  await db.prepare('UPDATE boule_places SET name = ?, address = ?, latitude = ?, longitude = ?, venue_type = ?, court_count = ?, description = ?, accessible = ?, facilities = ?, facility_codes = ?, status = ?, updated_at = ? WHERE id = ?').bind(input.name, input.address, input.latitude, input.longitude, input.venueType, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, JSON.stringify(input.facilityCodes), status, new Date().toISOString(), id).run(); return json({ ok: true });
+  await db.prepare('UPDATE boule_places SET name = ?, address = ?, latitude = ?, longitude = ?, venue_type = ?, court_count = ?, description = ?, accessible = ?, facilities = ?, facility_codes = ?, status = ?, address_unverified = CASE WHEN ? THEN 0 ELSE address_unverified END, updated_at = ? WHERE id = ?').bind(input.name, input.address, input.latitude, input.longitude, input.venueType, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, JSON.stringify(input.facilityCodes), status, addressChecked ? 1 : 0, new Date().toISOString(), id).run(); return json({ ok: true });
+}
+
+/**
+ * „Korrektur melden“ bei ungeprüfter Adresse: Die Meldung geht als Postbox-Nachricht an die Verantwortlichen des
+ * Spielorts (Vereinsinhaber, sonst Melder des Platzes, sonst Admins), damit sie direkt antworten können.
+ * Ort, Adresse und Link stehen sprachneutral unter dem Text.
+ */
+export async function sendPlaceAddressCorrection(request, env, id, sender) {
+  const body = await readJson(request);
+  const text = postboxMessageBody(body.body);
+  const place = await env.DB.prepare(`SELECT p.id, p.name, p.address, p.reported_by_user_id, c.owner_id AS club_owner_id
+      FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
+      WHERE p.id = ? AND p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')`).bind(id).first();
+  if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
+  let recipientIds = [place.club_owner_id || place.reported_by_user_id].filter(Boolean);
+  if (recipientIds.length === 0) {
+    const admins = await env.DB.prepare("SELECT id FROM users WHERE role = 'admin'").all();
+    recipientIds = (admins.results || []).map((row) => row.id);
+  }
+  recipientIds = recipientIds.filter((recipientId) => recipientId !== sender.id);
+  if (recipientIds.length === 0) throw new HttpError(409, 'Du bist selbst für diesen Spielort verantwortlich und kannst die Adresse direkt bearbeiten');
+  const document = richTextDocument(text);
+  const postboxBody = serializeRichText({
+    ...document,
+    content: [...document.content, { type: 'paragraph', content: [{ type: 'text', text: `📍 ${place.name} · ${place.address}: ${APP_ORIGIN}/plaetze#${place.id}` }] }],
+  });
+  const senderName = `${sender.firstName} ${sender.lastName}`.trim();
+  for (const recipientId of recipientIds) {
+    await createPostboxMessage(env, { senderId: sender.id, recipientId, kind: 'direct', body: postboxBody, pushTitle: 'Neue Nachricht', pushActor: senderName });
+  }
+  return json({ ok: true }, 201);
 }
 
 async function deleteBoulePlace(db, id, user) {

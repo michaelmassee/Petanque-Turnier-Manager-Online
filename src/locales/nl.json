@@ -1700,5 +1700,12 @@
   "Ankündigung gesendet.": "Mededeling verzonden.",
   "Ankündigung gelöscht.": "Mededeling verwijderd.",
   "Das Turnier ist bereits abgeschlossen": "Het toernooi is al afgesloten",
-  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "De mededeling mag maximaal 300 tekens bevatten."
+  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "De mededeling mag maximaal 300 tekens bevatten.",
+  "Adresse geprüft: Sie gehört zum Spielort, nicht zu einer Postanschrift.": "Adres gecontroleerd: het hoort bij de speellocatie, niet bij een postadres.",
+  "Danke! Deine Korrektur ist an die Verantwortlichen des Spielorts gegangen.": "Bedankt! Je correctie is naar de verantwoordelijken van de speellocatie gestuurd.",
+  "Korrektur melden": "Correctie melden",
+  "Wo liegt der Spielort tatsächlich?": "Waar ligt de speellocatie werkelijk?",
+  "Adresse ungeprüft: aus der Vereinsliste des Landesverbands übernommen, möglicherweise die Postanschrift des Vereins.": "Adres niet gecontroleerd: overgenomen uit de clublijst van de regionale bond, mogelijk het postadres van de club.",
+  "Adresse ungeprüft": "Adres niet gecontroleerd",
+  "Du bist selbst für diesen Spielort verantwortlich und kannst die Adresse direkt bearbeiten": "Je bent zelf verantwoordelijk voor deze speellocatie en kunt het adres direct bewerken"
 }

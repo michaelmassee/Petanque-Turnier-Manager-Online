@@ -152,8 +152,8 @@ for (const member of members) {
   const { latitude, longitude } = fix ?? coordinates(entry.location);
   // Platz nur anlegen, wenn der Verein in diesem Lauf wirklich neu entstanden ist (kein verwaister Platz).
   statements.push(
-    'INSERT INTO boule_places (id, club_id, club_name, name, address, latitude, longitude, venue_type, court_count, description, accessible, facility_codes, status, reported_by_user_id, created_at, updated_at) '
-    + `SELECT ${quote(crypto.randomUUID())}, ${quote(clubId)}, NULL, ${quote(member.name)}, ${quote(address)}, ${latitude ?? 'NULL'}, ${longitude ?? 'NULL'}, 'outdoor', 0, ${quote(placeDescription(entry))}, 0, '[]', 'pending', NULL, ${quote(now)}, ${quote(now)} `
+    'INSERT INTO boule_places (id, club_id, club_name, name, address, latitude, longitude, venue_type, court_count, description, accessible, facility_codes, status, reported_by_user_id, address_unverified, created_at, updated_at) '
+    + `SELECT ${quote(crypto.randomUUID())}, ${quote(clubId)}, NULL, ${quote(member.name)}, ${quote(address)}, ${latitude ?? 'NULL'}, ${longitude ?? 'NULL'}, 'outdoor', 0, ${quote(placeDescription(entry))}, 0, '[]', 'pending', NULL, 1, ${quote(now)}, ${quote(now)} `
     + `WHERE EXISTS (SELECT 1 FROM clubs WHERE id = ${quote(clubId)}) AND NOT EXISTS (SELECT 1 FROM boule_places WHERE lower(trim(name)) = lower(trim(${quote(member.name)})) AND lower(trim(address)) = lower(trim(${quote(address)})) AND venue_type = 'outdoor');`,
   );
   placeCount += 1;

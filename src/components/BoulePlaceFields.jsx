@@ -31,6 +31,12 @@ export function BoulePlaceFields({ form, setForm, language }) {
         minLength={5}
         language={language}
       />
+      {form.addressUnverified && (
+        <label className="checkbox-row">
+          <input type="checkbox" checked={Boolean(form.addressVerified)} onChange={(event) => setForm({ ...form, addressVerified: event.target.checked })} />
+          <span>{t('Adresse geprüft: Sie gehört zum Spielort, nicht zu einer Postanschrift.')}</span>
+        </label>
+      )}
       <TextField label={t('Platzanzahl')} type="number" min={0} value={form.courtCount} onChange={(courtCount) => setForm({ ...form, courtCount })} />
       <RichTextEditor
         label={t('Beschreibung')}

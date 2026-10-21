@@ -1700,5 +1700,12 @@
   "Ankündigung gesendet.": "Announcement sent.",
   "Ankündigung gelöscht.": "Announcement deleted.",
   "Das Turnier ist bereits abgeschlossen": "The tournament has already finished",
-  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "The announcement may contain at most 300 characters."
+  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "The announcement may contain at most 300 characters.",
+  "Adresse geprüft: Sie gehört zum Spielort, nicht zu einer Postanschrift.": "Address checked: it belongs to the venue, not to a postal address.",
+  "Danke! Deine Korrektur ist an die Verantwortlichen des Spielorts gegangen.": "Thank you! Your correction has been sent to the people responsible for the venue.",
+  "Korrektur melden": "Report a correction",
+  "Wo liegt der Spielort tatsächlich?": "Where is the venue actually located?",
+  "Adresse ungeprüft: aus der Vereinsliste des Landesverbands übernommen, möglicherweise die Postanschrift des Vereins.": "Address not checked: taken from the regional federation's club list, possibly the club's postal address.",
+  "Adresse ungeprüft": "Address not checked",
+  "Du bist selbst für diesen Spielort verantwortlich und kannst die Adresse direkt bearbeiten": "You are responsible for this venue yourself and can edit the address directly"
 }

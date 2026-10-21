@@ -1700,5 +1700,12 @@
   "Ankündigung gesendet.": "Annonce envoyée.",
   "Ankündigung gelöscht.": "Annonce supprimée.",
   "Das Turnier ist bereits abgeschlossen": "Le tournoi est déjà terminé",
-  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "L’annonce peut contenir au maximum 300 caractères."
+  "Die Ankündigung darf maximal 300 Zeichen enthalten.": "L’annonce peut contenir au maximum 300 caractères.",
+  "Adresse geprüft: Sie gehört zum Spielort, nicht zu einer Postanschrift.": "Adresse vérifiée : elle correspond au terrain, pas à une adresse postale.",
+  "Danke! Deine Korrektur ist an die Verantwortlichen des Spielorts gegangen.": "Merci ! Ta correction a été envoyée aux responsables du terrain.",
+  "Korrektur melden": "Signaler une correction",
+  "Wo liegt der Spielort tatsächlich?": "Où se trouve réellement le terrain ?",
+  "Adresse ungeprüft: aus der Vereinsliste des Landesverbands übernommen, möglicherweise die Postanschrift des Vereins.": "Adresse non vérifiée : reprise de la liste des clubs de la fédération régionale, peut-être l'adresse postale du club.",
+  "Adresse ungeprüft": "Adresse non vérifiée",
+  "Du bist selbst für diesen Spielort verantwortlich und kannst die Adresse direkt bearbeiten": "Tu es toi-même responsable de ce terrain et peux modifier l'adresse directement"
 }
