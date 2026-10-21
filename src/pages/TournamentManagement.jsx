@@ -604,6 +604,16 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           <label className="checkbox-field">
             <input
               type="checkbox"
+              checked={form.waitlistEnabled && form.waitlistAutoPromote}
+              disabled={!form.waitlistEnabled}
+              onChange={(event) => setForm({ ...form, waitlistAutoPromote: event.target.checked })}
+            />
+            {t('Automatisch von der Warteliste nachrücken')}
+          </label>
+          {form.waitlistEnabled && <p className="hint">{t('Wird ein Platz frei, rückt der Erste der Warteliste bis zum Turnierstart automatisch nach; das Team wird per E-Mail und Postbox informiert.')}</p>}
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
               checked={form.approvalRequired}
               onChange={(event) => setForm({ ...form, approvalRequired: event.target.checked })}
             />
@@ -1001,6 +1011,7 @@ export function tournamentToForm(tournament) {
     licenseRequired: Boolean(tournament.licenseRequired),
     teamNameEnabled: Boolean(tournament.teamNameEnabled),
     waitlistEnabled: tournament.waitlistEnabled === undefined ? true : Boolean(tournament.waitlistEnabled),
+    waitlistAutoPromote: tournament.waitlistAutoPromote === undefined ? true : Boolean(tournament.waitlistAutoPromote),
     registrationEnabled: tournament.registrationEnabled === undefined ? true : Boolean(tournament.registrationEnabled),
     websiteUrl: tournament.websiteUrl || '',
     logoUrl: tournament.logoUrl || '',

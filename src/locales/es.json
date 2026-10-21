@@ -1681,5 +1681,8 @@
   "Nach Nachname sortieren": "Ordenar por apellido",
   "Meldeliste durchsuchen": "Buscar en la lista de inscritos",
   "Ansicht der Meldeliste": "Vista de la lista de inscritos",
-  "Keine Anmeldungen passen zum Filter.": "Ninguna inscripción coincide con el filtro."
+  "Keine Anmeldungen passen zum Filter.": "Ninguna inscripción coincide con el filtro.",
+  "Automatisch von der Warteliste nachrücken": "Pasar automáticamente desde la lista de espera",
+  "Wird ein Platz frei, rückt der Erste der Warteliste bis zum Turnierstart automatisch nach; das Team wird per E-Mail und Postbox informiert.": "Si se libera una plaza, el primero de la lista de espera pasa automáticamente hasta el inicio del torneo; el equipo recibe aviso por correo y buzón.",
+  "Von der Warteliste nachgerückt": "Ha pasado de la lista de espera"
 }

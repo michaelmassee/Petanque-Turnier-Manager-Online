@@ -160,6 +160,7 @@ export const EMPTY_TOURNAMENT_FORM = {
   licenseRequired: false,
   teamNameEnabled: false,
   waitlistEnabled: true,
+  waitlistAutoPromote: true,
   registrationEnabled: true,
   approvalRequired: false,
   schweizerRankingMode: 'mit_buchholz',

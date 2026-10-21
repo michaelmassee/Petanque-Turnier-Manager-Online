@@ -1681,5 +1681,8 @@
   "Nach Nachname sortieren": "Sorteren op achternaam",
   "Meldeliste durchsuchen": "Deelnemerslijst doorzoeken",
   "Ansicht der Meldeliste": "Weergave deelnemerslijst",
-  "Keine Anmeldungen passen zum Filter.": "Geen inschrijvingen komen overeen met het filter."
+  "Keine Anmeldungen passen zum Filter.": "Geen inschrijvingen komen overeen met het filter.",
+  "Automatisch von der Warteliste nachrücken": "Automatisch doorschuiven vanaf de wachtlijst",
+  "Wird ein Platz frei, rückt der Erste der Warteliste bis zum Turnierstart automatisch nach; das Team wird per E-Mail und Postbox informiert.": "Komt er een plaats vrij, dan schuift de eerste op de wachtlijst tot de start van het toernooi automatisch door; het team krijgt bericht per e-mail en postvak.",
+  "Von der Warteliste nachgerückt": "Van de wachtlijst doorgeschoven"
 }

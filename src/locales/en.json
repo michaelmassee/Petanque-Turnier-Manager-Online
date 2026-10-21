@@ -1681,5 +1681,8 @@
   "Nach Nachname sortieren": "Sort by last name",
   "Meldeliste durchsuchen": "Search entry list",
   "Ansicht der Meldeliste": "Entry list view",
-  "Keine Anmeldungen passen zum Filter.": "No registrations match the filter."
+  "Keine Anmeldungen passen zum Filter.": "No registrations match the filter.",
+  "Automatisch von der Warteliste nachrücken": "Automatically move up from the waitlist",
+  "Wird ein Platz frei, rückt der Erste der Warteliste bis zum Turnierstart automatisch nach; das Team wird per E-Mail und Postbox informiert.": "When a spot opens up, the first entry on the waitlist moves up automatically until the tournament starts; the team is notified by email and postbox.",
+  "Von der Warteliste nachgerückt": "Moved up from the waitlist"
 }

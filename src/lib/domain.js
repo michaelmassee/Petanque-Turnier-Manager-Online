@@ -136,6 +136,7 @@ export function tournamentPayload(form) {
     licenseRequired: Boolean(form.licenseRequired),
     teamNameEnabled: Boolean(form.teamNameEnabled),
     waitlistEnabled: Boolean(form.waitlistEnabled),
+    waitlistAutoPromote: form.waitlistAutoPromote === undefined ? true : Boolean(form.waitlistAutoPromote),
     registrationEnabled: form.registrationEnabled === undefined ? true : Boolean(form.registrationEnabled),
     approvalRequired: Boolean(form.approvalRequired),
     websiteUrl: form.websiteUrl || null,

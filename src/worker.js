@@ -296,6 +296,23 @@ const REGISTRATION_REJECTION_EMAILS = {
   fr: { subject: (name) => `Inscription refusée : ${name}`, text: (firstName, name, link, reason) => `Bonjour ${firstName},\n\nton inscription à « ${name} » a été refusée.${reason ? `\n\nMotif de l’organisateur :\n${reason}` : ''}\n\nToutes les informations sur le tournoi :\n${link}` },
 };
 
+// Automatisch von der Warteliste nachgerückt: Betreff und Einleitungssatz ersetzen bzw. ergänzen die Bestätigung
+// (ohne Freigabe) oder die Eingangsbestätigung (mit Freigabe), der Rest der Mail bleibt gleich.
+export const WAITLIST_PROMOTED_EMAILS = {
+  de: { subject: (name) => `Von der Warteliste nachgerückt: ${name}`, intro: 'Es ist ein Platz frei geworden – ihr seid von der Warteliste nachgerückt.' },
+  nl: { subject: (name) => `Van de wachtlijst doorgeschoven: ${name}`, intro: 'Er is een plaats vrijgekomen – jullie zijn van de wachtlijst doorgeschoven.' },
+  en: { subject: (name) => `Moved up from the waitlist: ${name}`, intro: 'A spot has opened up – you have moved up from the waitlist.' },
+  es: { subject: (name) => `Has pasado de la lista de espera: ${name}`, intro: 'Se ha liberado una plaza: habéis pasado de la lista de espera.' },
+  fr: { subject: (name) => `Repêchés de la liste d’attente : ${name}`, intro: 'Une place s’est libérée – vous passez de la liste d’attente aux inscrits.' },
+};
+
+// Setzt den Nachrück-Hinweis direkt hinter die Anrede ("Hallo X,").
+function maybePromotedIntro(text, language, promoted) {
+  if (!promoted) return text;
+  const intro = (WAITLIST_PROMOTED_EMAILS[language] || WAITLIST_PROMOTED_EMAILS.de).intro;
+  return text.replace('\n\n', `\n\n${intro}\n\n`);
+}
+
 export const REGISTRATION_CONFIRMATION_EMAILS = {
   de: {
     subject: (name) => `Anmeldung bestätigt: ${name}`,
@@ -1130,10 +1147,11 @@ export function buildCancelLink(appOrigin, token) {
   return `${appOrigin}/?cancel_token=${encodeURIComponent(token)}`;
 }
 
-async function sendRegistrationConfirmationEmail(env, tournament, registration, appOrigin) {
+async function sendRegistrationConfirmationEmail(env, tournament, registration, appOrigin, { promoted = false } = {}) {
   if (!(await canSendTournamentMail(env.DB, tournament))) return;
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_CONFIRMATION_EMAILS[language] || REGISTRATION_CONFIRMATION_EMAILS.de;
+  const promotedTemplates = WAITLIST_PROMOTED_EMAILS[language] || WAITLIST_PROMOTED_EMAILS.de;
   const dateTimeLabel = formatTournamentDateTime(tournament, language);
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
   const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
@@ -1147,8 +1165,8 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
-      subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock, liveLink) + directionsBlock + whatsappBlock,
+      subject: promoted ? promotedTemplates.subject(tournament.name) : templates.subject(tournament.name),
+      text: maybePromotedIntro(templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock, liveLink), language, promoted) + directionsBlock + whatsappBlock,
       actions: tournamentEmailActions(tournament, appOrigin, language, [emailAction('cancel', cancelLink, language), emailAction('live', liveLink, language), whatsappEmailAction(whatsappBlock, language)]),
       language,
       attachments: [{ filename: 'termin.ics', content: base64Encode(ics) }],
@@ -1245,10 +1263,11 @@ export async function sendTeamMessage(env, registration, sender, rawBody, appOri
   return json({ emailed: emailRecipients.length, postbox: accountIds.length });
 }
 
-async function sendRegistrationReceivedEmail(env, tournament, registration, appOrigin) {
+async function sendRegistrationReceivedEmail(env, tournament, registration, appOrigin, { promoted = false } = {}) {
   if (!(await canSendTournamentMail(env.DB, tournament))) return;
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_RECEIVED_EMAILS[language] || REGISTRATION_RECEIVED_EMAILS.de;
+  const promotedTemplates = WAITLIST_PROMOTED_EMAILS[language] || WAITLIST_PROMOTED_EMAILS.de;
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
   const cancelLink = buildCancelLink(appOrigin, registration.cancel_token);
   const participantsBlock = buildRegistrationParticipantsBlock(registration, language);
@@ -1258,8 +1277,8 @@ async function sendRegistrationReceivedEmail(env, tournament, registration, appO
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
-      subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, link, cancelLink, participantsBlock) + directionsBlock + whatsappBlock,
+      subject: promoted ? promotedTemplates.subject(tournament.name) : templates.subject(tournament.name),
+      text: maybePromotedIntro(templates.text(recipient.firstName, tournament.name, link, cancelLink, participantsBlock), language, promoted) + directionsBlock + whatsappBlock,
       actions: tournamentEmailActions(tournament, appOrigin, language, [emailAction('cancel', cancelLink, language), whatsappEmailAction(whatsappBlock, language)]),
       language,
       logFallback: `Registration received email for ${recipient.email} (tournament ${tournament.id})`,
@@ -2509,6 +2528,7 @@ export default {
         } catch (error) {
           console.error(`Failed to send cancellation email for registration ${registration.id}`, error);
         }
+        if (freesCapacity(registration.status, 'cancelled')) await promoteWaitlistSafely(env, registration.tournament_id, APP_ORIGIN);
         return result;
       }
 
@@ -2703,7 +2723,9 @@ export default {
             }
             await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentId: registration.tournament_id, tournamentName: registration.name, status: 'cancelled', ownRegistration: true }, undefined, registration.owner_id);
           }
-          return await deleteRegistration(env.DB, registration);
+          const deleted = await deleteRegistration(env.DB, registration);
+          if (freesCapacity(registration.status, 'cancelled')) await promoteWaitlistSafely(env, registration.tournament_id, new URL(request.url).origin);
+          return deleted;
         }
       }
 
@@ -5367,9 +5389,9 @@ async function createTournament(request, env, user) {
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url,
         latitude, longitude, geocoded_at, timezone, boule_place_id, live_view_enabled, player_result_reporting_enabled, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -5403,6 +5425,7 @@ async function createTournament(request, env, user) {
       tournament.licenseRequired ? 1 : 0,
       tournament.teamNameEnabled ? 1 : 0,
       tournament.waitlistEnabled ? 1 : 0,
+      tournament.waitlistAutoPromote ? 1 : 0,
       tournament.registrationEnabled ? 1 : 0,
       tournament.approvalRequired ? 1 : 0,
       presentation.websiteUrl,
@@ -5490,12 +5513,12 @@ export async function duplicateTournament(db, existing, actingUser) {
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, player_result_reporting_enabled, qr_design, created_at, updated_at
       )
       SELECT ?, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
-        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url,
+        visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, website_url, logo_url, flyer_url, whatsapp_group_url,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, player_result_reporting_enabled, qr_design, ?, ?
       FROM tournaments WHERE id = ?`,
     )
@@ -5699,7 +5722,7 @@ async function updateTournament(request, env, existing, user) {
        SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, schweizer_ranking_mode = ?, formule_x_rounds = ?, ko_platz3 = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
-           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, boule_place_id = ?, live_view_enabled = ?, player_result_reporting_enabled = ?, updated_at = ?
+           participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, waitlist_auto_promote = ?, registration_enabled = ?, approval_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, boule_place_id = ?, live_view_enabled = ?, player_result_reporting_enabled = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -5731,6 +5754,7 @@ async function updateTournament(request, env, existing, user) {
       tournament.licenseRequired ? 1 : 0,
       tournament.teamNameEnabled ? 1 : 0,
       tournament.waitlistEnabled ? 1 : 0,
+      tournament.waitlistAutoPromoteProvided ? (tournament.waitlistAutoPromote ? 1 : 0) : Number(existing.waitlist_auto_promote ?? 1),
       tournament.registrationEnabled ? 1 : 0,
       tournament.approvalRequired ? 1 : 0,
       geo.latitude,
@@ -5755,7 +5779,13 @@ async function updateTournament(request, env, existing, user) {
 
   const updated = await getTournamentById(db, existing.id);
   await notifyTournamentPublicationChange(env, existing, updated);
-  return json({ tournament: toPublicTournament(updated, user) });
+  // Mehr Plätze oder Nachrücken neu eingeschaltet: freie Plätze sofort aus der Warteliste füllen.
+  const capacityGrew = Number(existing.max_registrations || 0) > 0
+    && Number(updated.max_registrations || 0) > Number(existing.max_registrations);
+  const autoPromoteEnabled = Number(existing.waitlist_auto_promote ?? 1) === 0 && Number(updated.waitlist_auto_promote) === 1;
+  if (capacityGrew || autoPromoteEnabled) await promoteWaitlistSafely(env, existing.id, new URL(request.url).origin);
+  const current = capacityGrew || autoPromoteEnabled ? await getTournamentById(db, existing.id) : updated;
+  return json({ tournament: toPublicTournament(current, user) });
 }
 
 /** Veröffentlichung (gespeicherte Suchen) und Statuswechsel (Postfach) nach einer Turnieränderung melden. */
@@ -7937,6 +7967,82 @@ async function cancelRegistration(db, id) {
   return json({ registration: toPublicRegistration(updated) });
 }
 
+// Status, die einen Platz belegen (siehe createRegistration): Verlässt eine Meldung sie, kann nachgerückt werden.
+const CAPACITY_STATUSES = ['pending', 'confirmed'];
+
+function freesCapacity(previousStatus, nextStatus) {
+  return CAPACITY_STATUSES.includes(previousStatus) && !CAPACITY_STATUSES.includes(nextStatus);
+}
+
+/**
+ * Automatisches Nachrücken (Entscheidung vom 2026-10-21): Freie Plätze werden in Meldereihenfolge mit der Warteliste
+ * aufgefüllt, solange das Turnier nicht läuft und die Option aktiv ist. Mit Freigabe rückt die Meldung auf „offen“,
+ * sonst auf „bestätigt“. Ein einziges UPDATE prüft Kapazität und Turnierzustand, damit parallele Stornierungen nicht
+ * überbuchen. Danach wird das ganze Team per Mail und Postbox informiert, die Turnierleitung per Postbox.
+ */
+export async function promoteWaitlist(env, tournamentId, appOrigin = APP_ORIGIN) {
+  const db = env.DB;
+  const now = new Date().toISOString();
+  const result = await db.prepare(`UPDATE registrations
+      SET status = (SELECT CASE WHEN COALESCE(t.approval_required, 0) = 1 THEN 'pending' ELSE 'confirmed' END
+                    FROM tournaments t WHERE t.id = registrations.tournament_id),
+          confirmed_at = (SELECT CASE WHEN COALESCE(t.approval_required, 0) = 1 THEN NULL ELSE ? END
+                          FROM tournaments t WHERE t.id = registrations.tournament_id),
+          updated_at = ?
+      WHERE id IN (
+        SELECT r.id FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
+        WHERE r.tournament_id = ? AND r.status = 'waitlist'
+          AND COALESCE(t.waitlist_auto_promote, 1) = 1 AND COALESCE(t.max_registrations, 0) > 0
+          AND t.status NOT IN ('draft', 'running', 'finished') AND COALESCE(t.desktop_execution, 0) = 0
+        ORDER BY r.registered_at ASC
+        LIMIT MAX(0, (SELECT max_registrations FROM tournaments WHERE id = ?)
+          - (SELECT COUNT(*) FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed'))))
+      RETURNING *`)
+    .bind(now, now, tournamentId, tournamentId, tournamentId)
+    .all();
+  const promoted = result.results || [];
+  if (promoted.length === 0) return [];
+
+  const tournament = await getTournamentById(db, tournamentId);
+  await db.batch(promoted.map((registration) => auditStatement(db, { tournamentId, registrationId: registration.id,
+    actorRole: 'system', action: 'waitlist_promoted', target: 'registration', details: { status: registration.status }, now })));
+  for (const registration of promoted) {
+    const eventData = { tournamentId, tournamentName: tournament.name, status: registration.status, promoted: true };
+    await createSystemNotification(env, tournament.owner_id, 'registration_status_changed',
+      { ...eventData, participant: `${registration.first_name} ${registration.last_name}` });
+    // Postbox für jedes verknüpfte Konto des Teams; Slot-E-Mails ohne Verknüpfung über das passende Konto.
+    const accountIds = new Set([registration.user_id, registration.partner_user_id, registration.partner2_user_id,
+      registration.registrant_user_id].filter(Boolean));
+    for (const recipient of buildTeamRecipients(registration)) {
+      const user = await db.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').bind(recipient.email).first();
+      if (user) accountIds.add(user.id);
+    }
+    accountIds.delete(tournament.owner_id);
+    for (const userId of accountIds) {
+      await createSystemNotification(env, userId, 'registration_status_changed', { ...eventData, ownRegistration: true });
+    }
+    try {
+      if (registration.status === 'confirmed') {
+        await sendRegistrationConfirmationEmail(env, tournament, registration, appOrigin, { promoted: true });
+      } else {
+        await sendRegistrationReceivedEmail(env, tournament, registration, appOrigin, { promoted: true });
+      }
+    } catch (error) {
+      console.error(`Failed to send waitlist promotion email for registration ${registration.id}`, error);
+    }
+  }
+  return promoted;
+}
+
+// Nachrücken darf die auslösende Aktion (Storno, Bearbeitung) nie scheitern lassen.
+async function promoteWaitlistSafely(env, tournamentId, appOrigin) {
+  try {
+    await promoteWaitlist(env, tournamentId, appOrigin);
+  } catch (error) {
+    console.error(`Waitlist promotion failed for tournament ${tournamentId}`, error);
+  }
+}
+
 async function cancelRegistrationByToken(request, env) {
   const body = await readJson(request);
   const token = typeof body.token === 'string' ? body.token.trim() : '';
@@ -7961,6 +8067,7 @@ async function cancelRegistrationByToken(request, env) {
   } catch (error) {
     console.error(`Failed to send cancellation email for registration ${registration.id}`, error);
   }
+  if (freesCapacity(registration.status, 'cancelled')) await promoteWaitlistSafely(env, registration.tournament_id, APP_ORIGIN);
   return result;
 }
 
@@ -8296,6 +8403,11 @@ export async function updateRegistration(request, env, existing, actingUser = nu
         console.error(`Failed to send registration confirmation email for registration ${updated.id}`, error);
       }
     }
+    // Setzt die Turnierleitung selbst jemanden auf die Warteliste, rückt nicht automatisch nach – sonst käme bei
+    // passender Meldereihenfolge genau diese Meldung sofort zurück.
+    if (freesCapacity(existing.status, updated.status) && updated.status !== 'waitlist') {
+      await promoteWaitlistSafely(env, existing.tournament_id, new URL(request.url).origin);
+    }
   }
   return json({ registration: toManagedRegistration(updated) });
 }
@@ -8331,6 +8443,7 @@ export async function rejectRegistration(request, env, existing, actingUser) {
   } catch (error) {
     console.error(`Failed to send registration rejection email for registration ${updated.id}`, error);
   }
+  await promoteWaitlistSafely(env, existing.tournament_id, new URL(request.url).origin);
   return json({ registration: toManagedRegistration(updated) });
 }
 
@@ -11862,6 +11975,7 @@ export function toPublicTournament(row, user) {
     licenseRequired: Boolean(Number(row.license_required || 0)),
     teamNameEnabled: Boolean(Number(row.team_name_enabled || 0)),
     waitlistEnabled: Boolean(Number(row.waitlist_enabled ?? 1)),
+    waitlistAutoPromote: Boolean(Number(row.waitlist_auto_promote ?? 1)),
     registrationEnabled: Boolean(Number(row.registration_enabled ?? 1)),
     approvalRequired: Boolean(Number(row.approval_required || 0)),
     registrationClosed: Boolean(Number(row.registration_closed || 0)),

@@ -1681,5 +1681,8 @@
   "Nach Nachname sortieren": "Trier par nom",
   "Meldeliste durchsuchen": "Rechercher dans la liste des inscrits",
   "Ansicht der Meldeliste": "Affichage de la liste des inscrits",
-  "Keine Anmeldungen passen zum Filter.": "Aucune inscription ne correspond au filtre."
+  "Keine Anmeldungen passen zum Filter.": "Aucune inscription ne correspond au filtre.",
+  "Automatisch von der Warteliste nachrücken": "Repêcher automatiquement depuis la liste d’attente",
+  "Wird ein Platz frei, rückt der Erste der Warteliste bis zum Turnierstart automatisch nach; das Team wird per E-Mail und Postbox informiert.": "Si une place se libère, le premier de la liste d’attente est repêché automatiquement jusqu’au début du tournoi ; l’équipe est prévenue par e-mail et messagerie.",
+  "Von der Warteliste nachgerückt": "Repêché depuis la liste d’attente"
 }
