@@ -1070,8 +1070,10 @@ function buildTournamentIcs(tournament, appOrigin) {
   if (tournament.start_time) {
     const start = new Date(`${tournament.date}T${tournament.start_time}:00`);
     const end = new Date(start.getTime() + 4 * 60 * 60 * 1000);
-    lines.push(`DTSTART;TZID=Europe/Berlin:${icsCompactDateTime(start)}`);
-    lines.push(`DTEND;TZID=Europe/Berlin:${icsCompactDateTime(end)}`);
+    // Ortszeit am Turnierstandort (wie die Anzeige auf der Turnierseite).
+    const timezone = tournament.timezone || 'Europe/Berlin';
+    lines.push(`DTSTART;TZID=${timezone}:${icsCompactDateTime(start)}`);
+    lines.push(`DTEND;TZID=${timezone}:${icsCompactDateTime(end)}`);
   } else {
     const start = new Date(`${tournament.date}T00:00:00`);
     const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
@@ -2530,6 +2532,27 @@ export default {
         }
         if (freesCapacity(registration.status, 'cancelled')) await promoteWaitlistSafely(env, registration.tournament_id, APP_ORIGIN);
         return result;
+      }
+
+      // Kalendereintrag zum Turnier (Turnierseite „Kalendereintrag erstellen“): inline öffnet iOS direkt den Kalender,
+      // mit ?download=1 lädt der Browser die Datei herunter. Sichtbarkeit wie GET /api/tournaments/:id.
+      const tournamentIcsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/calendar\.ics$/);
+      if (tournamentIcsMatch && request.method === 'GET') {
+        const tournament = await getTournamentById(env.DB, tournamentIcsMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await optionalSession(request, env.DB);
+        const shareAccess = await hasTournamentShareAccess(env.DB, tournament, url.searchParams.get('share'));
+        if (!canViewTournament(tournament, session?.user || null) && !shareAccess) {
+          throw new HttpError(403, 'Zugriff verweigert');
+        }
+        const disposition = url.searchParams.get('download') === '1' ? 'attachment' : 'inline';
+        return new Response(buildTournamentIcs(tournament, url.origin), {
+          headers: {
+            'Content-Type': 'text/calendar; charset=utf-8',
+            'Content-Disposition': `${disposition}; filename="turnier.ics"`,
+            'Cache-Control': 'no-store',
+          },
+        });
       }
 
       const tournamentMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)$/);

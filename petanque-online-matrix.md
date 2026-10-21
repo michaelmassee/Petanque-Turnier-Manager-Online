@@ -11,7 +11,7 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 | **Kalender** Liste, Status-Badges („x von y frei“, „Anmeldung ab …“, Warteliste, ausgebucht) | ✅ | ✅ |
 | Filter nach Bundesland bzw. Landesverband plus SEO-Seiten je Bundesland | ✅ | ❌ (Feld `region` per Migration 0006 entfernt) |
 | Umkreissuche, Monat/Formation/System-Filter, gespeicherte Suchen | ❌ bzw. einfach | ✅ |
-| „In meinen Kalender“ (ICS) auf der Detailseite | ✅ | ⚠️ nur als ICS-Anhang der Bestätigungsmail |
+| „In meinen Kalender“ (ICS) auf der Detailseite | ✅ | ✅ seit 21.10.2026: 📅 „Kalendereintrag erstellen“ (iOS öffnet Kalender, Android Google Calendar, PC ICS-Download), auch bei Kalendereinträgen |
 | **Ausschreibung** Anmeldestart/-schluss mit Uhrzeit, Kontingent, Warteliste | ✅ | ✅ |
 | Anmeldemodus „Mit Auswahl“: alles erst „Eingegangen“, Auswahl nach Schluss | ✅ | ⚠️ (Approval und VIP vorhanden, aber nicht als eigener Modus) |
 | Max. Nachrücker-Teams (begrenzte Warteliste) | ✅ | ❌ (Warteliste nur an/aus) |
@@ -45,7 +45,7 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 2. Bundesland- bzw. Landesverbands-Filter im Kalender. Abgeleitet aus den Turnierkoordinaten oder dem Verein beim Speichern berechnen, nicht beim Lesen (Workers-CPU, D1-Reads). Filter in `src/App.jsx` und Edge-Cache-Key der Turnierliste beachten.
 3. Bankverbindung beim Verein bzw. Turnier und Anzeige in der Bestätigungsmail (`sendTransactionalEmail`-Templates).
 4. Telefon- und Lizenzabfrage dreistufig (nicht/optional/Pflicht) und Mail an den Veranstalter bei An- und Abmeldung als Opt-in.
-5. „In meinen Kalender“-Button (ICS-Download) auf `src/pages/TournamentDetailPage.jsx`. Den vorhandenen ICS-Generator aus dem Mailversand wiederverwenden.
+5. ~~„In meinen Kalender“-Button~~ (umgesetzt 21.10.2026) (ICS-Download) auf `src/pages/TournamentDetailPage.jsx`. Den vorhandenen ICS-Generator aus dem Mailversand wiederverwenden.
 
 **P2 – Turniertag**
 6. Check-In am Spieltag mit Startnummern und druckbarer Check-In-Liste (PDF analog `src/lib/ranking-pdf.js`).

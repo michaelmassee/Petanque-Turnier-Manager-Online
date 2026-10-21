@@ -5,7 +5,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
-import { isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl } from '../lib/domain.js';
+import { isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl, calendarEventLink } from '../lib/domain.js';
 import { AccountBadge, Button, ClockIcon, Feedback, NumberIcon, RequiredMark, SearchIcon, ShareIcon, SortAlphaIcon, StarIcon } from '../components/ui.jsx';
 import { loadParticipantListPrefs, nextVipFilter, saveParticipantListPrefs } from '../lib/participantListPrefs.js';
 import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
@@ -23,6 +23,8 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
   const { t } = useTranslation();
   const isCalendarEntry = tournament.registrationEnabled === false;
   const mapsUrl = googleMapsUrl(tournament);
+  const calendarLink = calendarEventLink(tournament, { shareToken, origin: window.location.origin,
+    userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints });
   const placePath = `/plaetze#${encodeURIComponent(tournament.boulePlaceId || '')}`;
   const viewerTimeZone = detectViewerTimeZone();
   const tournamentTimeZone = tournament.timezone || 'UTC';
@@ -53,6 +55,16 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
             aria-label={t('Spielort in Google Maps öffnen')}
           >
             📍
+          </a>
+          <a
+            className="icon-bar-button"
+            href={calendarLink.href}
+            {...(calendarLink.download ? { download: 'turnier.ics' } : {})}
+            {...(calendarLink.external ? { target: '_blank', rel: 'noreferrer' } : {})}
+            title={t('Kalendereintrag erstellen')}
+            aria-label={t('Kalendereintrag erstellen')}
+          >
+            <span aria-hidden="true">📅</span>
           </a>
           {tournament.websiteUrl && (
             <a

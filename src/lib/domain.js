@@ -1,7 +1,8 @@
 import { ROLES, FORMATIONS } from './constants.js';
 import { formatTournamentDateTime, timezoneAbbrev, detectViewerTimeZone, amountToMinorUnits, DISPLAY_LOCALES } from './format.js';
 import i18next from './i18next-config.js';
-export { formatLocationAddress } from '../location-format.js';
+import { formatLocationAddress } from '../location-format.js';
+export { formatLocationAddress };
 
 export function authTitle(needsSetup, authView) {
   if (needsSetup) {
@@ -83,6 +84,52 @@ export function googleMapsUrl(tournament) {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${tournament.latitude},${tournament.longitude}`)}`;
   }
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tournament.location || tournament.address || '')}`;
+}
+
+function calendarPlatform({ userAgent = '', maxTouchPoints = 0 } = {}) {
+  if (/iPad|iPhone|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && maxTouchPoints > 1)) return 'ios';
+  if (/Android/.test(userAgent)) return 'android';
+  return 'desktop';
+}
+
+function compactDate(isoDate) {
+  return isoDate.replaceAll('-', '');
+}
+
+// Kalendereintrag als Google-Calendar-Vorlage: Ortszeit des Turniers (ctz), 4 Stunden Dauer bzw. ganztägig wie im ICS.
+function googleCalendarUrl(tournament, detailsUrl) {
+  let dates;
+  if (tournament.startTime) {
+    const [hours, minutes] = tournament.startTime.split(':').map(Number);
+    const start = new Date(`${tournament.date}T00:00:00Z`);
+    start.setUTCHours(hours, minutes);
+    const end = new Date(start.getTime() + 4 * 60 * 60 * 1000);
+    const stamp = (date) => date.toISOString().slice(0, 19).replace(/[-:]/g, '');
+    dates = `${stamp(start)}/${stamp(end)}`;
+  } else {
+    const next = new Date(`${tournament.date}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    dates = `${compactDate(tournament.date)}/${compactDate(next.toISOString().slice(0, 10))}`;
+  }
+  const params = new URLSearchParams({ action: 'TEMPLATE', text: tournament.name, dates,
+    location: formatLocationAddress(tournament.location), details: detailsUrl });
+  if (tournament.startTime) params.set('ctz', tournament.timezone || 'Europe/Berlin');
+  return `https://calendar.google.com/calendar/render?${params}`;
+}
+
+/**
+ * „Kalendereintrag erstellen“: iOS öffnet die ICS-Datei direkt im Kalender, Android die Google-Calendar-Vorlage
+ * (Chrome würde eine ICS-Datei dort nur herunterladen), am PC wird die ICS-Datei heruntergeladen.
+ */
+export function calendarEventLink(tournament, { shareToken = '', origin = '', userAgent = '', maxTouchPoints = 0 } = {}) {
+  const platform = calendarPlatform({ userAgent, maxTouchPoints });
+  const share = shareToken ? `share=${encodeURIComponent(shareToken)}` : '';
+  if (platform === 'android') {
+    const detailsUrl = `${origin}/turniere/${tournament.id}/info${share ? `?${share}` : ''}`;
+    return { href: googleCalendarUrl(tournament, detailsUrl), download: false, external: true };
+  }
+  const params = [share, platform === 'desktop' ? 'download=1' : ''].filter(Boolean).join('&');
+  return { href: `/api/tournaments/${tournament.id}/calendar.ics${params ? `?${params}` : ''}`, download: platform === 'desktop', external: false };
 }
 
 export function tournamentImageUrl(tournamentId, field, shareToken = '') {
