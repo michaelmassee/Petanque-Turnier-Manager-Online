@@ -351,7 +351,7 @@ function RelinkAccounts({ registration, busyId, onRelink }) {
   return (
     <section className="relink-accounts" aria-label={t('Konto neu zuordnen')}>
       <h3>{t('Konto neu zuordnen')}</h3>
-      <p className="hint">{t('Eine korrigierte E-Mail ändert ein bereits verknüpftes Konto nicht. Speichere zuerst die Korrektur und ordne dann das Konto der gespeicherten E-Mail ausdrücklich neu zu.')}</p>
+      <p className="hint">{t('👤 zeigt, wer mit einem Benutzerkonto verknüpft ist. Änderst du die E-Mail einer verknüpften Person, bleibt ihr bisheriges Konto verknüpft – so landet die Anmeldung nicht durch einen Tippfehler bei einer fremden Person. Konto wechseln: E-Mail korrigieren und speichern, dann hier „Konto neu zuordnen“ klicken. Gibt es zu der E-Mail kein bestätigtes Konto, wird die Verknüpfung entfernt.')}</p>
       {slots.map((entry) => (
         <div className="row-actions" key={entry.slot}>
           <span data-i18n-skip>{entry.name.filter(Boolean).join(' ')} · {entry.email}{entry.linked ? ' 👤' : ''}</span>

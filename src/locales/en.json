@@ -1174,7 +1174,7 @@
   "mögliche Dublette": "possible duplicate",
   "Team unvollständig": "Team incomplete",
   "Konto neu zuordnen": "Reassign account",
-  "Eine korrigierte E-Mail ändert ein bereits verknüpftes Konto nicht. Speichere zuerst die Korrektur und ordne dann das Konto der gespeicherten E-Mail ausdrücklich neu zu.": "A corrected email does not change an already linked account. Save the correction first, then explicitly reassign the account of the saved email.",
+  "👤 zeigt, wer mit einem Benutzerkonto verknüpft ist. Änderst du die E-Mail einer verknüpften Person, bleibt ihr bisheriges Konto verknüpft – so landet die Anmeldung nicht durch einen Tippfehler bei einer fremden Person. Konto wechseln: E-Mail korrigieren und speichern, dann hier „Konto neu zuordnen“ klicken. Gibt es zu der E-Mail kein bestätigtes Konto, wird die Verknüpfung entfernt.": "👤 shows who is linked to a user account. If you change the email of a linked person, their previous account stays linked – so a typo can't hand the registration to someone else. To switch accounts: correct the email and save, then click “Reassign account” here. If there is no confirmed account for that email, the link is removed.",
   "Das Konto wurde neu zugeordnet.": "The account has been reassigned.",
   "Zur gespeicherten E-Mail gibt es kein eindeutiges bestätigtes Konto; die Verknüpfung wurde gelöst.": "There is no unique confirmed account for the saved email; the link has been removed.",
   "Anmeldungen: {count}": "Registrations: {count}",

@@ -1174,7 +1174,7 @@
   "mögliche Dublette": "doublon possible",
   "Team unvollständig": "Équipe incomplète",
   "Konto neu zuordnen": "Réattribuer le compte",
-  "Eine korrigierte E-Mail ändert ein bereits verknüpftes Konto nicht. Speichere zuerst die Korrektur und ordne dann das Konto der gespeicherten E-Mail ausdrücklich neu zu.": "Un e-mail corrigé ne modifie pas un compte déjà relié. Enregistre d’abord la correction, puis réattribue explicitement le compte de l’e-mail enregistré.",
+  "👤 zeigt, wer mit einem Benutzerkonto verknüpft ist. Änderst du die E-Mail einer verknüpften Person, bleibt ihr bisheriges Konto verknüpft – so landet die Anmeldung nicht durch einen Tippfehler bei einer fremden Person. Konto wechseln: E-Mail korrigieren und speichern, dann hier „Konto neu zuordnen“ klicken. Gibt es zu der E-Mail kein bestätigtes Konto, wird die Verknüpfung entfernt.": "👤 indique qui est relié à un compte utilisateur. Si tu modifies l’e-mail d’une personne reliée, son compte actuel reste relié – ainsi, une faute de frappe ne peut pas attribuer l’inscription à quelqu’un d’autre. Pour changer de compte : corrige l’e-mail et enregistre, puis clique ici sur « Réattribuer le compte ». S’il n’existe aucun compte confirmé pour cet e-mail, le lien est supprimé.",
   "Das Konto wurde neu zugeordnet.": "Le compte a été réattribué.",
   "Zur gespeicherten E-Mail gibt es kein eindeutiges bestätigtes Konto; die Verknüpfung wurde gelöst.": "Aucun compte confirmé unique ne correspond à l’e-mail enregistré ; la liaison a été supprimée.",
   "Anmeldungen: {count}": "Inscriptions : {count}",

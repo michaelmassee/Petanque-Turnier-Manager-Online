@@ -1174,7 +1174,7 @@
   "mögliche Dublette": "mogelijk duplicaat",
   "Team unvollständig": "Team onvolledig",
   "Konto neu zuordnen": "Account opnieuw toewijzen",
-  "Eine korrigierte E-Mail ändert ein bereits verknüpftes Konto nicht. Speichere zuerst die Korrektur und ordne dann das Konto der gespeicherten E-Mail ausdrücklich neu zu.": "Een gecorrigeerd e-mailadres wijzigt een reeds gekoppeld account niet. Sla eerst de correctie op en wijs daarna het account van het opgeslagen e-mailadres uitdrukkelijk opnieuw toe.",
+  "👤 zeigt, wer mit einem Benutzerkonto verknüpft ist. Änderst du die E-Mail einer verknüpften Person, bleibt ihr bisheriges Konto verknüpft – so landet die Anmeldung nicht durch einen Tippfehler bei einer fremden Person. Konto wechseln: E-Mail korrigieren und speichern, dann hier „Konto neu zuordnen“ klicken. Gibt es zu der E-Mail kein bestätigtes Konto, wird die Verknüpfung entfernt.": "👤 laat zien wie aan een gebruikersaccount gekoppeld is. Wijzig je het e-mailadres van een gekoppelde persoon, dan blijft het bestaande account gekoppeld – zo komt de inschrijving niet door een typefout bij iemand anders terecht. Account wisselen: e-mailadres corrigeren en opslaan, daarna hier op „Account opnieuw toewijzen” klikken. Is er bij dat e-mailadres geen bevestigd account, dan wordt de koppeling verwijderd.",
   "Das Konto wurde neu zugeordnet.": "Het account is opnieuw toegewezen.",
   "Zur gespeicherten E-Mail gibt es kein eindeutiges bestätigtes Konto; die Verknüpfung wurde gelöst.": "Bij het opgeslagen e-mailadres hoort geen eenduidig bevestigd account; de koppeling is verwijderd.",
   "Anmeldungen: {count}": "Inschrijvingen: {count}",
