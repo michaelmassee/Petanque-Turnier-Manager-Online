@@ -1723,5 +1723,10 @@
   "Ganzer Tag": "Día completo",
   "Anzahl Personen": "Número de personas",
   "{{persons}} Person(en)": "{{persons}} persona(s)",
-  "Telefonnummer erforderlich": "Número de teléfono obligatorio"
+  "Telefonnummer erforderlich": "Número de teléfono obligatorio",
+  "{{count}} angefragt": "{{count}} solicitada(s)",
+  "angefragt, noch nicht bestätigt": "solicitado, aún sin confirmar",
+  "Bestätigt von {{name}} am {{date}}": "Confirmada por {{name}} el {{date}}",
+  "Belegung dieser Woche": "Reservas de esta semana",
+  "Keine Reservierungen in dieser Woche.": "No hay reservas esta semana."
 }

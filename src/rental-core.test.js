@@ -82,11 +82,23 @@ describe('Platz mieten: Verfügbarkeit', () => {
     });
     expect(days).toHaveLength(7);
     const monday = days[0].slots;
-    expect(monday[0]).toEqual({ hour: 10, free: 4, bookable: false });
-    expect(monday.find((slot) => slot.hour === 12)).toEqual({ hour: 12, free: 1, bookable: true });
+    expect(monday[0]).toEqual({ hour: 10, free: 4, requested: 0, bookable: false });
+    expect(monday.find((slot) => slot.hour === 12)).toEqual({ hour: 12, free: 1, requested: 0, bookable: true });
     expect(monday.find((slot) => slot.hour === 13).free).toBe(0);
     expect(days[1].slots).toEqual([]);
     expect(days[5].slots.map((slot) => slot.hour)).toEqual([9, 10, 11, 12]);
+  });
+
+  it('weist aus, wie viele belegte Bahnen nur angefragt und noch nicht bestätigt sind', () => {
+    const slotAt = (reservations, hour) => buildAvailability({ offer, openingHours, from: '2026-10-24', days: 1, now, reservations })[0].slots
+      .find((slot) => slot.hour === hour);
+    const reservation = (status, lanes, extra = {}) => ({ localDate: '2026-10-24', startHour: 10, hours: 1, lanes, status, ...extra });
+    expect(slotAt([reservation('requested', 2)], 10)).toMatchObject({ free: 2, requested: 2 });
+    expect(slotAt([reservation('confirmed', 2)], 10)).toMatchObject({ free: 2, requested: 0 });
+    expect(slotAt([reservation('confirmed', 2), reservation('requested', 1)], 10)).toMatchObject({ free: 1, requested: 1 });
+    // Anfragen anderer Angebote am Spielort zählen mit, aber nie mehr als im Angebot belegt ist.
+    expect(slotAt([reservation('requested', 6, { offerId: 'anderes' })], 10)).toMatchObject({ free: 0, requested: 4 });
+    expect(slotAt([reservation('requested', 2)], 11)).toMatchObject({ free: 4, requested: 0 });
   });
 
   it('formatiert den Zeitraum je Sprache', () => {

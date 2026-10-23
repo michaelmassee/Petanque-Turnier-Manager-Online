@@ -8,11 +8,19 @@ function isSelected(selection, date, hour) {
   return Boolean(selection) && selection.date === date && hour >= selection.startHour && hour < selection.startHour + selection.hours;
 }
 
+// Farbe nach Belegung; requested markiert zusätzlich, dass ein Teil davon nur angefragt, noch nicht bestätigt ist.
 function slotClass(slot, laneCount, minLanes, selected) {
   if (selected) return 'rental-slot selected';
   if (!slot.bookable) return 'rental-slot past';
-  if (slot.free < minLanes) return 'rental-slot full';
-  return slot.free < laneCount ? 'rental-slot partial' : 'rental-slot free';
+  const requested = slot.requested > 0 ? ' requested' : '';
+  if (slot.free < minLanes) return `rental-slot full${requested}`;
+  return slot.free < laneCount ? `rental-slot partial${requested}` : 'rental-slot free';
+}
+
+// Nur für Verwalter (bookings kommt nur bei ihnen vom Server): wer in dieser Stunde belegt.
+function slotRenters(bookings, date, hour) {
+  return bookings.filter((booking) => booking.date === date && hour >= booking.startHour && hour < booking.startHour + booking.hours)
+    .map((booking) => booking.renterName).filter(Boolean);
 }
 
 /**
@@ -22,8 +30,9 @@ function slotClass(slot, laneCount, minLanes, selected) {
  * @param onSelect (date, hour) => void; ohne onSelect ist das Raster nur zur Ansicht
  * @param minLanes so viele Bahnen müssen frei sein, damit eine Stunde wählbar ist (Nur-komplett-Angebote: alle)
  * @param popover Inhalt, der direkt an der Startstunde der Auswahl aufklappt (z. B. die Dauerwahl)
+ * @param bookings nur für Verwalter: Buchungen des Angebots mit Mieternamen (Tooltip der belegten Stunden)
  */
-export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSelect, language, popover = null }) {
+export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSelect, language, popover = null, bookings = [] }) {
   const { t } = useTranslation();
   const firstOpenDay = Math.max(0, days.findIndex((day) => day.slots.some((slot) => slot.bookable)));
   const [activeDay, setActiveDay] = useState(firstOpenDay);
@@ -63,7 +72,10 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
             const columnClass = index === activeDay ? ' active' : '';
             if (!slot) return <div key={`${day.date}-${hour}`} className={`rental-slot closed${columnClass}`} aria-hidden="true" />;
             const selected = isSelected(selection, day.date, hour);
-            const label = `${formatDate(day.date, language)} ${hourLabel(hour)}: ${t('{{free}} von {{total}} Bahnen frei', { free: slot.free, total: laneCount })}`;
+            const renters = slotRenters(bookings, day.date, hour);
+            const label = `${formatDate(day.date, language)} ${hourLabel(hour)}: ${t('{{free}} von {{total}} Bahnen frei', { free: slot.free, total: laneCount })}`
+              + (slot.requested > 0 ? `, ${t('{{count}} angefragt', { count: slot.requested })}` : '')
+              + (renters.length ? ` – ${renters.join(', ')}` : '');
             const disabled = !onSelect || !slot.bookable || slot.free < minLanes;
             const button = (
               <button
@@ -95,6 +107,7 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
         <span><i className="rental-slot free" />{t('frei')}</span>
         <span><i className="rental-slot partial" />{t('teilweise belegt')}</span>
         <span><i className="rental-slot full" />{t('ausgebucht')}</span>
+        <span><i className="rental-slot partial requested" />{t('angefragt, noch nicht bestätigt')}</span>
         <span><i className="rental-slot selected" />{t('Deine Auswahl')}</span>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { clubLogoImageUrl } from '../lib/domain.js';
-import { amountToMinorUnits, currencyOptions, formatDate, formatMoney, formatWeekdayShort, minorUnitsToAmount } from '../lib/format.js';
+import { amountToMinorUnits, currencyOptions, formatDate, formatMoney, formatTournamentDateTime, formatWeekdayShort, minorUnitsToAmount } from '../lib/format.js';
 import { addDays, rentalMinLanes } from '../rental-core.js';
 import { Button, EditDialog, Feedback, SelectField, ShareLinkButton, TextArea, TextField } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
@@ -22,6 +22,38 @@ const RESERVATION_STATUS_LABELS = { requested: 'Angefragt', confirmed: 'Bestäti
 
 export function formatReservationSlot(reservation, language) {
   return `${formatWeekdayShort(reservation.date, language)} ${formatDate(reservation.date, language)}, ${hourLabel(reservation.startHour)}–${hourLabel(reservation.startHour + reservation.hours)}`;
+}
+
+// Wer eine Reservierung bestätigt hat (nur Verwalter sehen das), damit mehrere Verwalter nicht nachfragen müssen.
+function confirmedByLine(t, reservation, language, timeZone) {
+  if (reservation.status !== 'confirmed' || !reservation.decidedByName) return null;
+  return t('Bestätigt von {{name}} am {{date}}', { name: reservation.decidedByName, date: formatTournamentDateTime(reservation.decidedAt, language, timeZone) });
+}
+
+// Belegung der angezeigten Woche mit Mietern – liefert der Server nur Verwaltern des Angebots (Datenschutz).
+function RentalBookingList({ bookings, offer, language }) {
+  const { t } = useTranslation();
+  return (
+    <section className="rental-bookings">
+      <h3>{t('Belegung dieser Woche')}</h3>
+      {bookings.length === 0 ? <p className="muted">{t('Keine Reservierungen in dieser Woche.')}</p> : (
+        <div className="user-list">
+          {bookings.map((booking) => (
+            <article className="data-row" key={booking.id}>
+              <div>
+                <strong data-i18n-skip>{formatReservationSlot(booking, language)} · {booking.renterName}</strong>
+                <span>
+                  <span data-i18n-skip>{reservationScope(t, { ...booking, venueType: offer.venueType })}</span>
+                  {' · '}{t(RESERVATION_STATUS_LABELS[booking.status])}
+                </span>
+                {confirmedByLine(t, booking, language, offer.timezone) && <span data-i18n-skip>{confirmedByLine(t, booking, language, offer.timezone)}</span>}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
 // Komplettmiete heißt je nach Spielort „Komplette Halle“ oder „Kompletter Platz“.
@@ -351,7 +383,9 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
           ? <DurationPopover options={durationOptions} tooShort={tooShort} fullDay={fullDay} onChoose={chooseDuration}
             onChooseFullDay={() => chooseDuration(fullDay.hours, fullDay.startHour)} onClose={() => setDurationOpen(false)} />
           : null}
+        bookings={availability.bookings}
       />
+      {offer.canManage && availability.bookings && <RentalBookingList bookings={availability.bookings} offer={offer} language={language} />}
       <Feedback message={message} />
       {selection && (
         currentUser ? (
@@ -743,6 +777,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
         <strong data-i18n-skip>{offerTitle(reservation.offerId)} · {formatReservationSlot(reservation, language)}</strong>
         <span data-i18n-skip>{reservation.renterName} · {reservationScope(t, reservation)}{reservation.renterEmail ? ` · ${reservation.renterEmail}` : ''}{reservation.renterPhone ? ` · ${reservation.renterPhone}` : ''}</span>
         {reservation.note && <span data-i18n-skip>„{reservation.note}“</span>}
+        {confirmedByLine(t, reservation, language, reservation.timezone) && <span data-i18n-skip>{confirmedByLine(t, reservation, language, reservation.timezone)}</span>}
       </div>
       <div className="row-actions">
         {actions.map((kind) => (

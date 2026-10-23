@@ -1723,5 +1723,10 @@
   "Ganzer Tag": "Journée entière",
   "Anzahl Personen": "Nombre de personnes",
   "{{persons}} Person(en)": "{{persons}} personne(s)",
-  "Telefonnummer erforderlich": "Numéro de téléphone obligatoire"
+  "Telefonnummer erforderlich": "Numéro de téléphone obligatoire",
+  "{{count}} angefragt": "{{count}} demandée(s)",
+  "angefragt, noch nicht bestätigt": "demandé, pas encore confirmé",
+  "Bestätigt von {{name}} am {{date}}": "Confirmée par {{name}} le {{date}}",
+  "Belegung dieser Woche": "Réservations de la semaine",
+  "Keine Reservierungen in dieser Woche.": "Aucune réservation cette semaine."
 }

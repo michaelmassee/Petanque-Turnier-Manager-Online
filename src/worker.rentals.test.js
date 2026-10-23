@@ -131,9 +131,11 @@ describe('Platz mieten', () => {
 
     const availability = await (await call('GET', `/api/rentals/${offer.id}/availability?from=2026-10-24`)).json();
     expect(availability.days[0].slots.slice(0, 4)).toEqual([
-      { hour: 9, free: 4, bookable: true }, { hour: 10, free: 2, bookable: true },
-      { hour: 11, free: 0, bookable: true }, { hour: 12, free: 0, bookable: true },
+      { hour: 9, free: 4, requested: 0, bookable: true }, { hour: 10, free: 2, requested: 2, bookable: true },
+      { hour: 11, free: 0, requested: 4, bookable: true }, { hour: 12, free: 0, requested: 4, bookable: true },
     ]);
+    // Öffentlich nur Zahlen, keine Mieter (Datenschutz).
+    expect(availability.bookings).toBeUndefined();
     expect(postbox().filter((row) => row.recipient_id === 'u1').map((row) => row.event_type)).toEqual(['rental_requested', 'rental_requested', 'rental_requested']);
   });
 
@@ -464,5 +466,35 @@ describe('Platz mieten', () => {
     expect((await removed.json()).editors).toEqual([]);
     expect((await call('PUT', `/api/rentals/offers/${offer.id}`, { body: offerBody, headers: ANDERER })).status).toBe(403);
     expect((await (await call('GET', '/api/rentals/manage/clubs', { headers: ANDERER })).json()).clubs).toEqual([]);
+  });
+
+  it('zeigt Mieter und Bestätiger im Kalender nur Verwaltern des Angebots', async () => {
+    const offer = await createOffer();
+    const anderes = (await (await call('POST', '/api/rentals/offers', { body: { ...offerBody, title: 'Außenplatz' }, headers: VEREIN })).json()).offer;
+    const reservation = (await (await reserve(offer.id, {})).json()).reservation;
+    await reserve(anderes.id, { startHour: 12, hours: 1 }, ANDERER);
+    await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
+    const path = `/api/rentals/${offer.id}/availability?from=2026-10-24`;
+
+    // Anonym, Mieter selbst und fremde Benutzer: keine Namen.
+    for (const headers of [{}, MIETER, ANDERER]) {
+      const body = await (await call('GET', path, { headers })).json();
+      expect(body.bookings).toBeUndefined();
+      expect(JSON.stringify(body)).not.toContain('Mieter');
+    }
+    const forClub = await (await call('GET', path, { headers: VEREIN })).json();
+    // Nur Buchungen dieses Angebots, nicht die anderer Angebote am selben Spielort.
+    expect(forClub.bookings).toEqual([expect.objectContaining({
+      id: reservation.id, date: '2026-10-24', startHour: 10, hours: 2, lanes: 2, status: 'confirmed', renterName: 'Max Mieter', decidedByName: 'Vera Verein',
+    })]);
+    expect(forClub.bookings[0]).not.toHaveProperty('renterEmail');
+    // Der Monatskalender bleibt ohne Namen.
+    expect((await (await call('GET', `/api/rentals/${offer.id}/availability?month=2026-10`, { headers: VEREIN })).json()).bookings).toBeUndefined();
+
+    // Angebotsverwalter sehen die Namen ebenfalls, in der Verwaltungsliste mit Bestätiger.
+    await call('POST', `/api/rentals/offers/${offer.id}/editors`, { body: { userId: 'u3' }, headers: VEREIN });
+    expect((await (await call('GET', path, { headers: ANDERER })).json()).bookings).toHaveLength(1);
+    const manage = await (await call('GET', '/api/rentals/manage?club=c1', { headers: VEREIN })).json();
+    expect(manage.reservations.find((entry) => entry.id === reservation.id)).toMatchObject({ decidedByName: 'Vera Verein' });
   });
 });

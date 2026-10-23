@@ -9932,7 +9932,10 @@ function toRentalReservation(row, { withRenter = false } = {}) {
     lanes: Number(row.lanes), whole: Boolean(Number(row.whole)), persons: row.persons === null || row.persons === undefined ? null : Number(row.persons), startUtc: row.start_utc, endUtc: row.end_utc, status: row.status, note: row.note || null,
     decisionNote: row.decision_note || null, decidedAt: row.decided_at || null, createdAt: row.created_at,
     ...(row.offer_title ? { offerTitle: row.offer_title, placeName: row.place_name, venueType: row.venue_type || 'outdoor', clubName: row.club_name, timezone: row.timezone } : {}),
-    ...(withRenter ? { renterName: rentalPersonName(row, 'renter_'), renterEmail: row.renter_email || null, renterPhone: row.renter_phone || null } : {}),
+    ...(withRenter ? {
+      renterName: rentalPersonName(row, 'renter_'), renterEmail: row.renter_email || null, renterPhone: row.renter_phone || null,
+      decidedByName: rentalPersonName(row, 'decider_') || null,
+    } : {}),
   };
 }
 
@@ -9990,16 +9993,19 @@ async function getRentalOffer(db, id, user) {
 }
 
 async function activeRentalReservations(db, placeId, from, to) {
-  const rows = await db.prepare(`SELECT r.offer_id, r.local_date, r.start_hour, r.hours, r.lanes
+  const rows = await db.prepare(`SELECT r.offer_id, r.local_date, r.start_hour, r.hours, r.lanes, r.status
     FROM rental_offers o JOIN rental_reservations r ON r.offer_id = o.id
     WHERE o.boule_place_id = ? AND r.local_date BETWEEN ? AND ? AND r.status IN ('requested', 'confirmed')`).bind(placeId, from, to).all();
-  return (rows.results || []).map((row) => ({ offerId: row.offer_id, localDate: row.local_date, startHour: Number(row.start_hour), hours: Number(row.hours), lanes: Number(row.lanes) }));
+  return (rows.results || []).map((row) => ({
+    offerId: row.offer_id, localDate: row.local_date, startHour: Number(row.start_hour), hours: Number(row.hours), lanes: Number(row.lanes), status: row.status,
+  }));
 }
 
 // Wochenraster (from, 7 Tage, mit Stunden) oder mit month=YYYY-MM nur der Tagesstatus für den Monatskalender.
 async function getRentalAvailability(db, id, fromParam, user, monthParam = null) {
   const row = await loadRentalOffer(db, id);
-  if (!rentalOfferIsPublic(row) && !(await rentalOfferAccess(db, row, user)).canManage) throw new HttpError(404, 'Angebot nicht gefunden');
+  const { canManage } = await rentalOfferAccess(db, row, user);
+  if (!rentalOfferIsPublic(row) && !canManage) throw new HttpError(404, 'Angebot nicht gefunden');
   const offer = toRentalOffer(row);
   const now = rentalLocalNow(offer.timezone);
   const month = monthParam ? monthRange(monthParam) : null;
@@ -10019,7 +10025,17 @@ async function getRentalAvailability(db, id, fromParam, user, monthParam = null)
       days: availability.map((day) => ({ date: day.date, status: dayAvailabilityStatus(day, offer.laneCount, rentalMinLanes(offer)) })),
     });
   }
-  return json({ from, today: now.date, days: availability });
+  if (!canManage) return json({ from, today: now.date, days: availability });
+  // Datenschutz: Mieternamen nur für Verwalter dieses Angebots und nur dessen eigene Buchungen.
+  const bookings = await db.prepare(`${RENTAL_RESERVATION_SELECT}
+    WHERE r.offer_id = ? AND r.local_date BETWEEN ? AND ? AND r.status IN ('requested', 'confirmed') ORDER BY r.start_utc`).bind(id, from, to).all();
+  return json({
+    from, today: now.date, days: availability,
+    bookings: (bookings.results || []).map((booking) => {
+      const { id: bookingId, date, startHour, hours, lanes, whole, persons, status, renterName, decidedByName, decidedAt } = toRentalReservation(booking, { withRenter: true });
+      return { id: bookingId, date, startHour, hours, lanes, whole, persons, status, renterName, decidedByName, decidedAt };
+    }),
+  });
 }
 
 async function rentalOfferManagers(db, offer) {
@@ -10232,9 +10248,10 @@ async function createRentalReservation(request, env, offerId, user, origin) {
 }
 
 const RENTAL_RESERVATION_SELECT = `SELECT r.*, o.title AS offer_title, o.club_id, o.timezone, p.name AS place_name, p.venue_type, c.name AS club_name,
-    u.first_name AS renter_first_name, u.last_name AS renter_last_name, u.username AS renter_username, u.email AS renter_email, u.phone AS renter_phone
+    u.first_name AS renter_first_name, u.last_name AS renter_last_name, u.username AS renter_username, u.email AS renter_email, u.phone AS renter_phone,
+    d.first_name AS decider_first_name, d.last_name AS decider_last_name, d.username AS decider_username
   FROM rental_reservations r JOIN rental_offers o ON o.id = r.offer_id JOIN boule_places p ON p.id = o.boule_place_id
-  JOIN clubs c ON c.id = o.club_id JOIN users u ON u.id = r.user_id`;
+  JOIN clubs c ON c.id = o.club_id JOIN users u ON u.id = r.user_id LEFT JOIN users d ON d.id = r.decided_by`;
 
 async function listMyRentalReservations(db, user) {
   const rows = await db.prepare(`${RENTAL_RESERVATION_SELECT} WHERE r.user_id = ? ORDER BY r.start_utc DESC LIMIT 100`).bind(user.id).all();

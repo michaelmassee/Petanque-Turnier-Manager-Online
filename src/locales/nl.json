@@ -1723,5 +1723,10 @@
   "Ganzer Tag": "Hele dag",
   "Anzahl Personen": "Aantal personen",
   "{{persons}} Person(en)": "{{persons}} persoon/personen",
-  "Telefonnummer erforderlich": "Telefoonnummer verplicht"
+  "Telefonnummer erforderlich": "Telefoonnummer verplicht",
+  "{{count}} angefragt": "{{count}} aangevraagd",
+  "angefragt, noch nicht bestätigt": "aangevraagd, nog niet bevestigd",
+  "Bestätigt von {{name}} am {{date}}": "Bevestigd door {{name}} op {{date}}",
+  "Belegung dieser Woche": "Bezetting deze week",
+  "Keine Reservierungen in dieser Woche.": "Geen reserveringen deze week."
 }

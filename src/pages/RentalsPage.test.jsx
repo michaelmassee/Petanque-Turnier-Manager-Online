@@ -185,6 +185,42 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(within(screen.getByRole('dialog', { name: 'Dauer wählen' })).queryByRole('button', { name: /Ganzer Tag/ })).not.toBeInTheDocument();
   });
 
+  it('kennzeichnet nur angefragte Belegung und zeigt Gästen keine Mieter', async () => {
+    const withRequests = { ...AVAILABILITY, days: AVAILABILITY.days.map((day) => (day.slots.length
+      ? { ...day, slots: [{ hour: 9, free: 4, requested: 0, bookable: true }, { hour: 10, free: 2, requested: 2, bookable: true }, { hour: 11, free: 0, requested: 0, bookable: true }] } : day)) };
+    api.mockImplementation(async (path) => (path.includes('/availability') ? withRequests : { offer: OFFER }));
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+
+    const requested = await screen.findByRole('button', { name: /10:00: 2 von 4 Bahnen frei, 2 angefragt$/ });
+    expect(requested).toHaveClass('partial', 'requested');
+    expect(screen.getByRole('button', { name: /11:00: 0 von 4 Bahnen frei$/ })).not.toHaveClass('requested');
+    expect(screen.getByText('angefragt, noch nicht bestätigt')).toBeInTheDocument();
+    expect(screen.queryByText('Belegung dieser Woche')).not.toBeInTheDocument();
+  });
+
+  it('zeigt Verwaltern die Belegung der Woche mit Mietern und Bestätiger', async () => {
+    const bookings = [
+      { id: 'r1', date: '2026-10-24', startHour: 10, hours: 1, lanes: 2, whole: false, persons: 4, status: 'confirmed', renterName: 'Max Mieter', decidedByName: 'Vera Verein', decidedAt: '2026-10-20T08:00:00.000Z' },
+      { id: 'r2', date: '2026-10-24', startHour: 11, hours: 1, lanes: 4, whole: true, persons: null, status: 'requested', renterName: 'Anna Anders', decidedByName: null, decidedAt: null },
+    ];
+    api.mockImplementation(async (path) => (path.includes('/availability') ? { ...AVAILABILITY, bookings } : { offer: { ...OFFER, canManage: true } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u1' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+
+    const list = (await screen.findByRole('heading', { name: 'Belegung dieser Woche' })).closest('section');
+    expect(within(list).getByText(/Sa 24\.10\.2026, 10:00–11:00 · Max Mieter/)).toBeInTheDocument();
+    expect(within(list).getByText(/2 Bahn\(en\) · 4 Person\(en\)/)).toBeInTheDocument();
+    expect(within(list).getByText(/^Bestätigt von Vera Verein am /)).toBeInTheDocument();
+    expect(within(list).getByText(/Anna Anders/)).toBeInTheDocument();
+    expect(within(list).getByText(/Angefragt/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /10:00: 2 von 4 Bahnen frei – Max Mieter$/ })).toBeInTheDocument();
+  });
+
+  it('meldet Verwaltern eine Woche ohne Reservierungen', async () => {
+    api.mockImplementation(async (path) => (path.includes('/availability') ? { ...AVAILABILITY, bookings: [] } : { offer: { ...OFFER, canManage: true } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u1' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+    expect(await screen.findByText('Keine Reservierungen in dieser Woche.')).toBeInTheDocument();
+  });
+
   it('zeigt im Dauer-Popup einen Hinweis, wenn ab der Stunde nicht einmal die Mindestdauer frei ist', async () => {
     api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, minHours: 2 } }));
     render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);
@@ -345,7 +381,10 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     clubContactEmail: 'info@bc-test.de',
     offers: [OFFER],
     places: [{ id: 'p1', name: 'Halle Nord', courtCount: 6, venueType: 'indoor', status: 'published' }],
-    reservations: [{ id: 'r1', offerId: 'o1', date: '2026-10-24', startHour: 9, hours: 2, lanes: 2, status: 'requested', renterName: 'Max Mieter', renterEmail: 'max@example.test', note: 'Training' }],
+    reservations: [
+      { id: 'r1', offerId: 'o1', date: '2026-10-24', startHour: 9, hours: 2, lanes: 2, status: 'requested', renterName: 'Max Mieter', renterEmail: 'max@example.test', note: 'Training' },
+      { id: 'r2', offerId: 'o1', date: '2026-10-24', startHour: 12, hours: 1, lanes: 1, status: 'confirmed', renterName: 'Anna Anders', decidedByName: 'Vera Verein', decidedAt: '2026-10-20T08:00:00.000Z', timezone: 'Europe/Berlin' },
+    ],
   };
 
   function mockManagement(onWrite = async () => ({})) {
@@ -374,6 +413,8 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     render(<RentalManagement language="de" navigate={vi.fn()} />);
 
     expect(await screen.findByText(/Max Mieter/)).toBeInTheDocument();
+    // Bei bestätigten Reservierungen sehen alle Verwalter, wer bestätigt hat.
+    expect(screen.getByText(/^Bestätigt von Vera Verein am /).closest('article')).toHaveTextContent('Anna Anders');
     fireEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
     const dialog = screen.getByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText(/Nachricht an den Mieter/), { target: { value: 'Bis Samstag' } });

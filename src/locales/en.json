@@ -1723,5 +1723,10 @@
   "Ganzer Tag": "Whole day",
   "Anzahl Personen": "Number of people",
   "{{persons}} Person(en)": "{{persons}} person(s)",
-  "Telefonnummer erforderlich": "Phone number required"
+  "Telefonnummer erforderlich": "Phone number required",
+  "{{count}} angefragt": "{{count}} requested",
+  "angefragt, noch nicht bestätigt": "requested, not yet confirmed",
+  "Bestätigt von {{name}} am {{date}}": "Confirmed by {{name}} on {{date}}",
+  "Belegung dieser Woche": "Bookings this week",
+  "Keine Reservierungen in dieser Woche.": "No reservations this week."
 }
