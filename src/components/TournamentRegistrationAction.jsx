@@ -7,11 +7,21 @@ import { Button, Feedback } from './ui.jsx';
 
 const openingRefreshTimes = new WeakMap();
 
+function registrationUpcoming(tournament) {
+  return tournament.registrationEnabled !== false && tournament.visibility === 'public' && tournament.status === 'registration'
+    && !tournament.registrationClosed && registrationNotYetOpen(tournament);
+}
+
+/** Kleine Glocke hinter „Anmeldung möglich ab“ in den Turnierdetails: Erinnerung, sobald die Anmeldung öffnet. */
+export function RegistrationOpeningReminder({ tournament, currentUser }) {
+  if (!currentUser || !registrationUpcoming(tournament)) return null;
+  return <OpeningSubscriptionControl tournament={tournament} userId={currentUser.id} compact />;
+}
+
 export function TournamentRegistrationAction({ tournament, currentUser, onRegister }) {
   const { t } = useTranslation();
   if (tournament.registrationEnabled === false) return null;
-  const upcoming = tournament.visibility === 'public' && tournament.status === 'registration'
-    && !tournament.registrationClosed && registrationNotYetOpen(tournament);
+  const upcoming = registrationUpcoming(tournament);
   if (currentUser && upcoming) return <OpeningSubscriptionControl tournament={tournament} userId={currentUser.id} />;
   const available = tournament.visibility === 'public' && hasOpenRegistration(tournament);
   // Keine Anmeldung mehr möglich: kein toter Knopf, das Status-Badge nennt den Grund. Öffnet sie erst, bleibt er sichtbar.
@@ -19,7 +29,7 @@ export function TournamentRegistrationAction({ tournament, currentUser, onRegist
   return <Button variant="secondary" onClick={() => onRegister(tournament)} disabled={!available}>{t('Anmelden (Turnier)')}</Button>;
 }
 
-function OpeningSubscriptionControl({ tournament, userId }) {
+function OpeningSubscriptionControl({ tournament, userId, compact = false }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const key = ['registration-opening-subscriptions', userId];
@@ -58,8 +68,8 @@ function OpeningSubscriptionControl({ tournament, userId }) {
     finally { setSaving(false); }
   }
 
-  return <div>
-    <Button variant="secondary" onClick={toggle} loading={saving} aria-pressed={active}
+  return <div className={compact ? 'opening-reminder-compact' : undefined}>
+    <Button variant="secondary" className={compact ? 'button button-secondary opening-reminder-icon' : undefined} onClick={toggle} loading={saving} aria-pressed={active}
       disabled={subscriptions.isLoading || Boolean(subscriptions.error) || (!active && waitingForRelease)}
       aria-label={description}
       title={active ? t('openingNotificationDeactivate') : description}>
@@ -68,7 +78,7 @@ function OpeningSubscriptionControl({ tournament, userId }) {
         <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z" />
         <path d="M10 21h4" />
       </svg>
-      {active ? t('openingNotificationActiveShort') : waitingForRelease ? t('registrationOpeningInProgress') : t('openingNotificationSubscribeShort')}
+      {!compact && (active ? t('openingNotificationActiveShort') : waitingForRelease ? t('registrationOpeningInProgress') : t('openingNotificationSubscribeShort'))}
     </Button>
     <Feedback error={error || subscriptions.error?.message} />
   </div>;

@@ -4866,3 +4866,11 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
 .rental-offer-meta { display: grid; gap: 2px; margin: 0 0 12px; }
 .rental-offer-address { color: #53627a; }
 .rental-offer-info { display: grid; gap: 3px; min-width: 0; }
+
+/* Turnierdetails: Zeile wie ein Absatz, mit kleiner Erinnerungsglocke hinter „Anmeldung möglich ab“. */
+.tournament-info-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0 0 1em; }
+.opening-reminder-compact { display: inline-flex; flex-direction: column; }
+.opening-reminder-compact .feedback { margin: 4px 0 0; }
+.button.opening-reminder-icon { min-height: 32px; width: 32px; padding: 0; border-radius: 50%; }
+.button.opening-reminder-icon[aria-pressed="true"] { color: #0a5fd1; border-color: #1677ff; background: #ecf4ff; }
+.button.opening-reminder-icon[aria-busy="true"] svg { display: none; }

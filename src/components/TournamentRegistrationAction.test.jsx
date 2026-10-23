@@ -96,4 +96,18 @@ describe('Anmelde-Öffnungsbenachrichtigung', () => {
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Benachrichtigung aktiv' })).toHaveLength(2));
     expect(fetch).toHaveBeenCalledOnce();
   });
+
+  it('zeigt die Erinnerung in den Turnierdetails als kleine Glocke hinter „Anmeldung möglich ab“', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url, options) => response(String(url).includes('/api/me/') ? { tournamentIds: [] } : { active: options.method === 'PUT' })));
+    setup(<TournamentDetailPage route={{ id: 't1', view: 'info' }} tournaments={[tournament]} currentUser={{ id: 'u1' }} language="de"
+      setLanguage={() => {}} navigate={() => {}} menuOpen={false} setMenuOpen={() => {}} setError={() => {}} setMessage={() => {}} />);
+    const button = await screen.findByRole('button', { name: 'Benachrichtigen, wenn Anmeldung öffnet' });
+    expect(button.closest('.tournament-info-row')).toHaveTextContent('Anmeldung möglich ab');
+    // Nur das Icon, ohne Text; unten steht kein zweiter Knopf mehr.
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(button).toHaveTextContent('');
+    fireEvent.click(button);
+    expect(await screen.findByRole('button', { name: 'Benachrichtigung aktiv' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('button', { name: /Benachrichtigung|Benachrichtigen/ })).toHaveLength(1);
+  });
 });

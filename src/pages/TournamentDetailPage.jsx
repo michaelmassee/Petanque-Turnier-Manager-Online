@@ -14,12 +14,12 @@ import { formatUserName } from '../lib/userLabel.js';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { TournamentPlayerListings } from '../components/TournamentPlayerListings.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
-import { TournamentRegistrationAction } from '../components/TournamentRegistrationAction.jsx';
+import { RegistrationOpeningReminder, TournamentRegistrationAction } from '../components/TournamentRegistrationAction.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
 
-export function TournamentInfo({ tournament, language, onShare, showTitle = true, shareToken = '', onNavigate }) {
+export function TournamentInfo({ tournament, language, onShare, showTitle = true, shareToken = '', onNavigate, currentUser = null }) {
   const { t } = useTranslation();
   const isCalendarEntry = tournament.registrationEnabled === false;
   const mapsUrl = googleMapsUrl(tournament);
@@ -164,9 +164,10 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
             </div>
           )}
           {tournament.registrationOpensAt && (
-            <p>
-              <strong>{t('Anmeldung möglich ab')}</strong>: {formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}
-            </p>
+            <div className="tournament-info-row">
+              <span><strong>{t('Anmeldung möglich ab')}</strong>: {formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}</span>
+              <RegistrationOpeningReminder tournament={tournament} currentUser={currentUser} />
+            </div>
           )}
           {tournament.registrationDeadline && (
             <p>
@@ -771,8 +772,9 @@ export function TournamentDetailPage({
                 : `${t('Eine Online-Anmeldung ist derzeit nicht möglich:')} ${registrationStatusLabel(tournament, language)}${registrationStatusReason(tournament, language) ? ` (${registrationStatusReason(tournament, language)})` : ''}`}
             </p>
           )}
-          {view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} showTitle={false} shareToken={shareToken} onNavigate={navigate} />}
-          {view === 'info' && tournament.registrationOpeningPending && <TournamentRegistrationAction tournament={tournament} currentUser={currentUser} onRegister={() => navigate(detailPath('anmelden'))} />}
+          {view === 'info' && <TournamentInfo tournament={tournament} language={language} onShare={handleShare} showTitle={false} shareToken={shareToken} onNavigate={navigate} currentUser={currentUser} />}
+          {/* Angemeldete erreichen die Erinnerung als Glocke hinter „Anmeldung möglich ab“, hier nur noch der Anmelden-Knopf. */}
+          {view === 'info' && tournament.registrationOpeningPending && !currentUser && <TournamentRegistrationAction tournament={tournament} currentUser={currentUser} onRegister={() => navigate(detailPath('anmelden'))} />}
 
           {view === 'anmelden' && (
             <PublicRegistrationPanel
