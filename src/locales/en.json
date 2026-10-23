@@ -1720,5 +1720,7 @@
   "Nur Vereinsverwalter dürfen Verwalter vergeben": "Only club managers can assign managers",
   "Dieser Benutzer verwaltet bereits den Verein": "This user already manages the club",
   "Dieser Benutzer verwaltet dieses Angebot bereits": "This user already manages this offer",
-  "Ganzer Tag": "Whole day"
+  "Ganzer Tag": "Whole day",
+  "Anzahl Personen": "Number of people",
+  "{{persons}} Person(en)": "{{persons}} person(s)"
 }

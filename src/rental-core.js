@@ -7,6 +7,7 @@ import { richTextPlainText } from './lib/rich-text.js';
 export const RENTAL_STATUSES = ['requested', 'confirmed', 'rejected', 'cancelled'];
 export const RENTAL_ACTIVE_STATUSES = ['requested', 'confirmed'];
 export const RENTAL_MAX_LANES = 200;
+export const RENTAL_MAX_PERSONS = 500;
 export const RENTAL_MAX_HORIZON_DAYS = 365;
 export const RENTAL_AVAILABILITY_DAYS = 7;
 // Vermietungsart: einzelne Bahnen, nur komplett (ganze Halle bzw. ganzer Platz = alle Bahnen des Angebots) oder beides.
@@ -122,6 +123,7 @@ export function validateReservationRequest({ offer, openingHours, body, now }) {
   const lanes = whole ? offer.laneCount : integer(body?.lanes, 'lanes', 1, RENTAL_MAX_LANES);
   if (hours < offer.minHours || hours > offer.maxHours) throw new HttpError(400, 'Die Dauer liegt außerhalb der erlaubten Spanne', { field: 'hours' });
   if (lanes > offer.laneCount) throw new HttpError(400, 'So viele Bahnen gibt es nicht', { field: 'lanes' });
+  const persons = integer(body?.persons, 'persons', 1, RENTAL_MAX_PERSONS);
   const opening = openingHours.find((entry) => entry.weekday === weekdayOf(date));
   if (!opening || startHour < opening.openHour || startHour + hours > opening.closeHour) {
     throw new HttpError(400, 'Der Zeitraum liegt außerhalb der Öffnungszeiten', { field: 'startHour' });
@@ -132,7 +134,7 @@ export function validateReservationRequest({ offer, openingHours, body, now }) {
   if (daysBetween(now.date, date) > offer.bookingHorizonDays) {
     throw new HttpError(400, 'So weit im Voraus kann noch nicht reserviert werden', { field: 'date' });
   }
-  return { date, startHour, hours, lanes, whole, note: text(body?.note, 'note') };
+  return { date, startHour, hours, lanes, whole, persons, note: text(body?.note, 'note') };
 }
 
 /** Belegte Bahnen je Datum und Stunde aus aktiven Reservierungen ({ localDate, startHour, hours, lanes }). */

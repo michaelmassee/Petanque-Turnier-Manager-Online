@@ -20,7 +20,7 @@ describe('Platz mieten', () => {
   };
   const createOffer = async () => (await (await call('POST', '/api/rentals/offers', { body: offerBody, headers: VEREIN })).json()).offer;
   const reserve = (offerId, body, headers = MIETER) => call('POST', `/api/rentals/${offerId}/reservations`, {
-    body: { date: '2026-10-24', startHour: 10, hours: 2, lanes: 2, ...body }, headers,
+    body: { date: '2026-10-24', startHour: 10, hours: 2, lanes: 2, persons: 4, ...body }, headers,
   });
   // Schickt eine Queue-Nachricht wie der Consumer über Resend und liefert die tatsächlich versendete Mail.
   const sendQueued = async (payload) => {
@@ -198,7 +198,7 @@ describe('Platz mieten', () => {
     const reservation = (await (await reserve(offer.id, { lanes: 4 })).json()).reservation;
     // Altbestand aus der Zeit vor der spielortübergreifenden Prüfung.
     sql(`INSERT INTO rental_reservations SELECT 'legacy', offer_id, 'u3', local_date, start_hour, hours, lanes,
-      start_utc, end_utc, status, note, decision_note, decided_by, decided_at, created_at, updated_at, whole
+      start_utc, end_utc, status, note, decision_note, decided_by, decided_at, created_at, updated_at, whole, persons
       FROM rental_reservations WHERE id = ?`, reservation.id);
     const result = await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
     expect(result.status).toBe(409);
@@ -289,7 +289,7 @@ describe('Platz mieten', () => {
     expect((await call('GET', '/api/rentals/manage?club=c1', { headers: MIETER })).status).toBe(403);
     const manage = await (await call('GET', '/api/rentals/manage?club=c1', { headers: VEREIN })).json();
     expect(manage.places).toEqual([expect.objectContaining({ id: 'p1', courtCount: 8 })]);
-    expect(manage.reservations).toEqual([expect.objectContaining({ renterName: 'Max Mieter', renterEmail: 'mieter@example.test', note: 'Vereinstraining', status: 'requested' })]);
+    expect(manage.reservations).toEqual([expect.objectContaining({ renterName: 'Max Mieter', renterEmail: 'mieter@example.test', note: 'Vereinstraining', persons: 4, status: 'requested' })]);
     expect((await call('DELETE', `/api/rentals/offers/${offer.id}`, { headers: VEREIN })).status).toBe(409);
   });
 
@@ -320,12 +320,13 @@ describe('Platz mieten', () => {
     const reservation = (await (await reserve(offer.id, { note: 'Bitte Licht an' })).json()).reservation;
     expect(send).toHaveBeenLastCalledWith(expect.objectContaining({
       to: 'halle@bc-test.de', subject: 'Reservierungsanfrage: Boulehalle', messageBox: 'Bitte Licht an',
+      text: expect.stringContaining('24.10.2026 10:00–12:00, 2 Bahn(en), 4 Person(en)'),
       actions: [expect.objectContaining({ url: 'https://ptm.test/platz-mieten/verwalten' })],
     }));
     await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
     expect(send).toHaveBeenLastCalledWith(expect.objectContaining({
       to: 'mieter@example.test', subject: 'Reservierung bestätigt: Boulehalle',
-      text: expect.stringContaining('24.10.2026 10:00–12:00, 2 Bahn(en)'),
+      text: expect.stringContaining('24.10.2026 10:00–12:00, 2 Bahn(en), 4 Person(en)'),
     }));
     const mail = send.mock.lastCall[0];
     expect(mail.actions).toEqual([

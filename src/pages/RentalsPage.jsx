@@ -29,8 +29,10 @@ function wholeLabel(t, venueType) {
   return venueType === 'indoor' ? t('Komplette Halle') : t('Kompletter Platz');
 }
 
+// Ältere Reservierungen haben noch keine Personenzahl.
 function reservationScope(t, reservation) {
-  return reservation.whole ? wholeLabel(t, reservation.venueType) : t('{{lanes}} Bahn(en)', { lanes: reservation.lanes });
+  const scope = reservation.whole ? wholeLabel(t, reservation.venueType) : t('{{lanes}} Bahn(en)', { lanes: reservation.lanes });
+  return reservation.persons ? `${scope} · ${t('{{persons}} Person(en)', { persons: reservation.persons })}` : scope;
 }
 
 function formatPrice(t, priceMinor, currency, note, language) {
@@ -210,6 +212,7 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
   const [revealForm, setRevealForm] = useState(false);
   const formRef = useRef(null);
   const [note, setNote] = useState('');
+  const [persons, setPersons] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -281,11 +284,12 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
     setMessage('');
     try {
       await authenticatedApi(`/api/rentals/${encodeURIComponent(id)}/reservations`, {
-        method: 'POST', body: JSON.stringify(whole ? { ...selection, whole: true, note } : { ...selection, lanes: Number(lanes), note }),
+        method: 'POST', body: JSON.stringify({ ...selection, ...(whole ? { whole: true } : { lanes: Number(lanes) }), persons: Number(persons), note }),
       });
       setMessage(t('Anfrage gesendet. Der Verein bestätigt die Reservierung; du bekommst eine Nachricht.'));
       setSelection(null);
       setNote('');
+      setPersons('');
       await loadAvailability(from);
     } catch (requestError) {
       setError(requestError.message);
@@ -365,6 +369,7 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
                   />
                 )}
                 {!whole && <SelectField label={t('Bahnen')} value={lanes} onChange={setLanes} options={Array.from({ length: freeLanes }, (_, index) => ({ value: String(index + 1), label: String(index + 1) }))} />}
+                <TextField label={t('Anzahl Personen')} type="number" min={1} max={500} step={1} inputMode="numeric" value={persons} onChange={setPersons} required />
               </div>
               {whole && !wholeFree && <p className="hint">{t('In diesem Zeitraum sind nicht alle Bahnen frei.')}</p>}
               <TextArea label={t('Nachricht an den Verein')} value={note} onChange={setNote} maxLength={500} rows={3} />

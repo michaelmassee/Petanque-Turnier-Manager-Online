@@ -1720,5 +1720,7 @@
   "Nur Vereinsverwalter dürfen Verwalter vergeben": "Solo los gestores del club pueden asignar gestores",
   "Dieser Benutzer verwaltet bereits den Verein": "Este usuario ya gestiona el club",
   "Dieser Benutzer verwaltet dieses Angebot bereits": "Este usuario ya gestiona esta oferta",
-  "Ganzer Tag": "Día completo"
+  "Ganzer Tag": "Día completo",
+  "Anzahl Personen": "Número de personas",
+  "{{persons}} Person(en)": "{{persons}} persona(s)"
 }

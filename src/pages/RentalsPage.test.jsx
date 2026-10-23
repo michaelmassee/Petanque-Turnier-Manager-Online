@@ -125,11 +125,12 @@ describe('Platz mieten: Angebot und Kalender', () => {
     fireEvent.change(within(form).getByLabelText('Dauer'), { target: { value: '2' } });
     expect(within(form).getByLabelText('Bahnen').querySelectorAll('option')).toHaveLength(2);
     fireEvent.change(within(form).getByLabelText('Bahnen'), { target: { value: '2' } });
+    fireEvent.change(within(form).getByLabelText(/Anzahl Personen/), { target: { value: '4' } });
     fireEvent.click(screen.getByRole('button', { name: 'Reservierung anfragen' }));
 
     await waitFor(() => expect(authenticatedApi).toHaveBeenCalled());
     expect(authenticatedApi.mock.calls[0][0]).toBe('/api/rentals/o1/reservations');
-    expect(JSON.parse(authenticatedApi.mock.calls[0][1].body)).toEqual({ date: '2026-10-24', startHour: 9, hours: 2, lanes: 2, note: '' });
+    expect(JSON.parse(authenticatedApi.mock.calls[0][1].body)).toEqual({ date: '2026-10-24', startHour: 9, hours: 2, lanes: 2, persons: 4, note: '' });
     expect(await screen.findByText(/Anfrage gesendet/)).toBeInTheDocument();
   });
 
@@ -210,9 +211,10 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(within(form).getByLabelText('Umfang')).toHaveValue('lanes');
     fireEvent.change(within(form).getByLabelText('Umfang'), { target: { value: 'whole' } });
     expect(within(form).getByRole('heading')).toHaveTextContent(/· Komplette Halle$/);
+    fireEvent.change(within(form).getByLabelText(/Anzahl Personen/), { target: { value: '12' } });
     fireEvent.click(screen.getByRole('button', { name: 'Reservierung anfragen' }));
     await waitFor(() => expect(authenticatedApi).toHaveBeenCalled());
-    expect(JSON.parse(authenticatedApi.mock.calls[0][1].body)).toEqual({ date: '2026-10-24', startHour: 9, hours: 1, whole: true, note: '' });
+    expect(JSON.parse(authenticatedApi.mock.calls[0][1].body)).toEqual({ date: '2026-10-24', startHour: 9, hours: 1, whole: true, persons: 12, note: '' });
   });
 
   it('lässt bei Nur-komplett-Angeboten nur Stunden mit allen Bahnen frei wählen', async () => {

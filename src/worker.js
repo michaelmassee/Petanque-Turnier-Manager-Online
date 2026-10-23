@@ -625,7 +625,7 @@ const TOURNAMENT_RANKING_EMAILS = {
 // Platz mieten: Anfrage/Storno an den Verein, Entscheidung an den Mieter. Notizen gehen als messageBox mit.
 export const RENTAL_EMAILS = {
   de: {
-    scope: ({ lanes, whole, indoor }) => (whole ? (indoor ? 'komplette Halle' : 'kompletter Platz') : `${lanes} Bahn(en)`),
+    scope: ({ lanes, whole, indoor, persons }) => `${(whole ? (indoor ? 'komplette Halle' : 'kompletter Platz') : `${lanes} Bahn(en)`)}${persons ? `, ${persons} Person(en)` : ''}`,
     requestedSubject: (title) => `Reservierungsanfrage: ${title}`,
     requested: ({ title, who, slot, scope }) => `Hallo,\n\n${who} möchte „${title}“ reservieren: ${slot}, ${scope}. Bitte bestätige oder lehne die Anfrage ab.`,
     cancelledSubject: (title) => `Reservierung storniert: ${title}`,
@@ -634,7 +634,7 @@ export const RENTAL_EMAILS = {
     decided: ({ firstName, title, slot, scope, status, club }) => `Hallo ${firstName},\n\n${({ confirmed: `${club} hat deine Reservierung für „${title}“ bestätigt`, rejected: `${club} hat deine Reservierungsanfrage für „${title}“ abgelehnt`, cancelled: `${club} hat deine Reservierung für „${title}“ storniert` })[status]}: ${slot}, ${scope}.`,
   },
   nl: {
-    scope: ({ lanes, whole, indoor }) => (whole ? (indoor ? 'de hele hal' : 'het hele terrein') : `${lanes} baan/banen`),
+    scope: ({ lanes, whole, indoor, persons }) => `${(whole ? (indoor ? 'de hele hal' : 'het hele terrein') : `${lanes} baan/banen`)}${persons ? `, ${persons} persoon/personen` : ''}`,
     requestedSubject: (title) => `Reserveringsaanvraag: ${title}`,
     requested: ({ title, who, slot, scope }) => `Hallo,\n\n${who} wil „${title}” reserveren: ${slot}, ${scope}. Bevestig of weiger de aanvraag.`,
     cancelledSubject: (title) => `Reservering geannuleerd: ${title}`,
@@ -643,7 +643,7 @@ export const RENTAL_EMAILS = {
     decided: ({ firstName, title, slot, scope, status, club }) => `Hallo ${firstName},\n\n${({ confirmed: `${club} heeft je reservering voor „${title}” bevestigd`, rejected: `${club} heeft je reserveringsaanvraag voor „${title}” afgewezen`, cancelled: `${club} heeft je reservering voor „${title}” geannuleerd` })[status]}: ${slot}, ${scope}.`,
   },
   en: {
-    scope: ({ lanes, whole, indoor }) => (whole ? (indoor ? 'the entire hall' : 'the entire court') : `${lanes} lane(s)`),
+    scope: ({ lanes, whole, indoor, persons }) => `${(whole ? (indoor ? 'the entire hall' : 'the entire court') : `${lanes} lane(s)`)}${persons ? `, ${persons} person(s)` : ''}`,
     requestedSubject: (title) => `Reservation request: ${title}`,
     requested: ({ title, who, slot, scope }) => `Hello,\n\n${who} would like to reserve "${title}": ${slot}, ${scope}. Please confirm or decline the request.`,
     cancelledSubject: (title) => `Reservation cancelled: ${title}`,
@@ -652,7 +652,7 @@ export const RENTAL_EMAILS = {
     decided: ({ firstName, title, slot, scope, status, club }) => `Hi ${firstName},\n\n${({ confirmed: `${club} confirmed your reservation for "${title}"`, rejected: `${club} declined your reservation request for "${title}"`, cancelled: `${club} cancelled your reservation for "${title}"` })[status]}: ${slot}, ${scope}.`,
   },
   es: {
-    scope: ({ lanes, whole, indoor }) => (whole ? (indoor ? 'el pabellón completo' : 'el terreno completo') : `${lanes} pista(s)`),
+    scope: ({ lanes, whole, indoor, persons }) => `${(whole ? (indoor ? 'el pabellón completo' : 'el terreno completo') : `${lanes} pista(s)`)}${persons ? `, ${persons} persona(s)` : ''}`,
     requestedSubject: (title) => `Solicitud de reserva: ${title}`,
     requested: ({ title, who, slot, scope }) => `Hola:\n\n${who} quiere reservar «${title}»: ${slot}, ${scope}. Confirma o rechaza la solicitud.`,
     cancelledSubject: (title) => `Reserva cancelada: ${title}`,
@@ -661,7 +661,7 @@ export const RENTAL_EMAILS = {
     decided: ({ firstName, title, slot, scope, status, club }) => `Hola ${firstName}:\n\n${({ confirmed: `${club} confirmó tu reserva de «${title}»`, rejected: `${club} rechazó tu solicitud de reserva de «${title}»`, cancelled: `${club} canceló tu reserva de «${title}»` })[status]}: ${slot}, ${scope}.`,
   },
   fr: {
-    scope: ({ lanes, whole, indoor }) => (whole ? (indoor ? 'le boulodrome couvert entier' : 'le terrain entier') : `${lanes} piste(s)`),
+    scope: ({ lanes, whole, indoor, persons }) => `${(whole ? (indoor ? 'le boulodrome couvert entier' : 'le terrain entier') : `${lanes} piste(s)`)}${persons ? `, ${persons} personne(s)` : ''}`,
     requestedSubject: (title) => `Demande de réservation : ${title}`,
     requested: ({ title, who, slot, scope }) => `Bonjour,\n\n${who} souhaite réserver « ${title} » : ${slot}, ${scope}. Merci de confirmer ou de refuser la demande.`,
     cancelledSubject: (title) => `Réservation annulée : ${title}`,
@@ -9929,7 +9929,7 @@ function toOpeningHours(rows) {
 function toRentalReservation(row, { withRenter = false } = {}) {
   return {
     id: row.id, offerId: row.offer_id, date: row.local_date, startHour: Number(row.start_hour), hours: Number(row.hours),
-    lanes: Number(row.lanes), whole: Boolean(Number(row.whole)), startUtc: row.start_utc, endUtc: row.end_utc, status: row.status, note: row.note || null,
+    lanes: Number(row.lanes), whole: Boolean(Number(row.whole)), persons: row.persons === null || row.persons === undefined ? null : Number(row.persons), startUtc: row.start_utc, endUtc: row.end_utc, status: row.status, note: row.note || null,
     decisionNote: row.decision_note || null, decidedAt: row.decided_at || null, createdAt: row.created_at,
     ...(row.offer_title ? { offerTitle: row.offer_title, placeName: row.place_name, venueType: row.venue_type || 'outdoor', clubName: row.club_name, timezone: row.timezone } : {}),
     ...(withRenter ? { renterName: rentalPersonName(row, 'renter_'), renterEmail: row.renter_email || null, renterPhone: row.renter_phone || null } : {}),
@@ -10082,7 +10082,7 @@ async function notifyRentalClub(env, { offer, reservation, renter, eventType, or
 // geht dieselbe UID mit METHOD:CANCEL raus, damit Kalender den zuvor übernommenen Termin entfernen.
 // „3 Bahn(en)“ bzw. „komplette Halle“/„kompletter Platz“ je nach Buchung und Spielort.
 function rentalEmailScope(templates, offer, reservation) {
-  return templates.scope({ lanes: Number(reservation.lanes), whole: Boolean(Number(reservation.whole)), indoor: offer.venue_type === 'indoor' });
+  return templates.scope({ lanes: Number(reservation.lanes), whole: Boolean(Number(reservation.whole)), indoor: offer.venue_type === 'indoor', persons: Number(reservation.persons) || null });
 }
 
 export function buildRentalIcs(offer, reservation, origin, { cancelled = false } = {}) {
@@ -10219,11 +10219,11 @@ async function createRentalReservation(request, env, offerId, user, origin) {
   const guard = rentalCapacityGuard(row, input);
   // Atomar: nur einfügen, wenn in jeder gebuchten Stunde noch genug Bahnen frei sind (D1 serialisiert Schreibzugriffe).
   const result = await env.DB.prepare(`${guard.cte}
-    INSERT INTO rental_reservations (id, offer_id, user_id, local_date, start_hour, hours, lanes, whole, start_utc, end_utc, status, note, created_at, updated_at)
-    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?, ?, ?
+    INSERT INTO rental_reservations (id, offer_id, user_id, local_date, start_hour, hours, lanes, whole, persons, start_utc, end_utc, status, note, created_at, updated_at)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?, ?, ?
     WHERE ${guard.condition}`).bind(
     ...guard.params,
-    id, offerId, user.id, input.date, input.startHour, input.hours, input.lanes, input.whole ? 1 : 0, startUtc, endUtc, input.note, nowIso, nowIso,
+    id, offerId, user.id, input.date, input.startHour, input.hours, input.lanes, input.whole ? 1 : 0, input.persons, startUtc, endUtc, input.note, nowIso, nowIso,
   ).run();
   if (!result.meta?.changes) throw new HttpError(409, 'Für diesen Zeitraum sind nicht mehr genug Bahnen frei');
   const reservation = await env.DB.prepare('SELECT * FROM rental_reservations WHERE id = ?').bind(id).first();

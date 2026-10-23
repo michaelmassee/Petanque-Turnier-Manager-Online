@@ -5,7 +5,7 @@ const offer = { laneCount: 4, minHours: 1, maxHours: 3, bookingHorizonDays: 30 }
 // 2026-10-19 ist ein Montag (Wochentag 1).
 const openingHours = [{ weekday: 1, openHour: 10, closeHour: 20 }, { weekday: 6, openHour: 9, closeHour: 13 }];
 const now = { date: '2026-10-19', hour: 11 };
-const request = (body) => validateReservationRequest({ offer, openingHours, body: { lanes: 1, hours: 1, ...body }, now });
+const request = (body) => validateReservationRequest({ offer, openingHours, body: { lanes: 1, hours: 1, persons: 2, ...body }, now });
 
 describe('Platz mieten: Eingaben', () => {
   it('verlangt eindeutige, sinnvolle Öffnungszeiten', () => {
@@ -33,7 +33,7 @@ describe('Platz mieten: Eingaben', () => {
   });
 
   it('bucht komplett immer alle Bahnen und nur, wenn das Angebot es erlaubt', () => {
-    const whole = (rentalMode, body) => validateReservationRequest({ offer: { ...offer, rentalMode }, openingHours, body: { date: '2026-10-24', startHour: 10, hours: 1, ...body }, now });
+    const whole = (rentalMode, body) => validateReservationRequest({ offer: { ...offer, rentalMode }, openingHours, body: { date: '2026-10-24', startHour: 10, hours: 1, persons: 2, ...body }, now });
     expect(whole('both', { whole: true, lanes: 1 })).toMatchObject({ whole: true, lanes: 4 });
     expect(whole('both', { lanes: 2 })).toMatchObject({ whole: false, lanes: 2 });
     expect(whole('whole', { whole: true })).toMatchObject({ whole: true, lanes: 4 });
@@ -52,7 +52,7 @@ describe('Platz mieten: Eingaben', () => {
 
   it('akzeptiert eine Anfrage innerhalb der Öffnungszeiten', () => {
     expect(request({ date: '2026-10-24', startHour: 10, hours: 3, lanes: 4, note: ' Training ' }))
-      .toEqual({ date: '2026-10-24', startHour: 10, hours: 3, lanes: 4, whole: false, note: 'Training' });
+      .toEqual({ date: '2026-10-24', startHour: 10, hours: 3, lanes: 4, whole: false, persons: 2, note: 'Training' });
   });
 
   it('lehnt Anfragen außerhalb von Öffnungszeit, Dauer, Bahnen, Vergangenheit und Horizont ab', () => {
@@ -64,6 +64,10 @@ describe('Platz mieten: Eingaben', () => {
     expect(request({ date: '2026-10-19', startHour: 12 }).startHour).toBe(12);
     expect(() => request({ date: '2026-12-21', startHour: 10 })).toThrow('Voraus');
     expect(() => request({ date: '2026-02-30', startHour: 10 })).toThrow('Datum');
+    // Anzahl Personen ist Pflicht: ganze Zahl von 1 bis 500.
+    for (const persons of [undefined, 0, 1.5, 501]) {
+      expect(() => request({ date: '2026-10-24', startHour: 10, persons })).toThrow(expect.objectContaining({ details: { field: 'persons' } }));
+    }
   });
 });
 
