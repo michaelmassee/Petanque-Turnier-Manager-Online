@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as push from '../lib/push.js';
 import { PostboxControl } from './layout.jsx';
 import { serializeRichText } from '../lib/rich-text.js';
 import '../lib/i18next-config.js';
@@ -94,5 +95,24 @@ describe('Links in Postbox-Nachrichten', () => {
     expect(external).toHaveAttribute('rel', 'noopener noreferrer');
     expect(fireEvent.click(external)).toBe(true);
     expect(onNavigate).not.toHaveBeenCalled();
+  });
+});
+
+describe('Push-Status in der Postbox', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('zeigt aktiven Push nur als kleines Glocken-Icon in der Kopfzeile', async () => {
+    vi.spyOn(push, 'currentBrowserPushSubscription').mockResolvedValue({ endpoint: 'https://push.example' });
+    renderPostbox();
+    const icon = await screen.findByRole('img', { name: 'Push-Benachrichtigungen sind aktiviert.' });
+    expect(icon.closest('.section-title')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Push-Benachrichtigungen aktivieren' })).toBeNull();
+  });
+
+  it('bietet ohne aktiven Push den Aktivieren-Button an', async () => {
+    vi.spyOn(push, 'currentBrowserPushSubscription').mockResolvedValue(null);
+    renderPostbox();
+    expect(await screen.findByRole('button', { name: 'Push-Benachrichtigungen aktivieren' })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Push-Benachrichtigungen sind aktiviert.' })).toBeNull();
   });
 });

@@ -105,13 +105,25 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
         <>
           <div className="search-menu-backdrop" onClick={onClose} />
           <section className="postbox-panel" aria-label={text('inbox')}>
-            <div className="section-title"><h2>{text('inbox')}</h2><CloseButton onClick={onClose} /></div>
-            <div>
-              {pushActive
-                ? <p className="hint">{text('enabled')}</p>
-                : <Button variant="secondary" onClick={enablePush}>{text('enable')}</Button>}
-              {pushState && !pushActive && <p className="hint">{text(pushState)}{pushErrorDetail ? ` (${pushErrorDetail})` : ''}</p>}
+            <div className="section-title">
+              <div className="postbox-title">
+                <h2>{text('inbox')}</h2>
+                {pushActive && (
+                  <svg className="postbox-push-active" role="img" aria-label={text('enabled')} viewBox="0 0 24 24" focusable="false">
+                    <title>{text('enabled')}</title>
+                    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z" />
+                    <path d="M10 21h4" />
+                  </svg>
+                )}
+              </div>
+              <CloseButton onClick={onClose} />
             </div>
+            {!pushActive && (
+              <div>
+                <Button variant="secondary" onClick={enablePush}>{text('enable')}</Button>
+                {pushState && <p className="hint">{text(pushState)}{pushErrorDetail ? ` (${pushErrorDetail})` : ''}</p>}
+              </div>
+            )}
             <form className="form postbox-compose" onSubmit={onSubmit}>
               <RecipientPicker
                 label={text('recipient')}
