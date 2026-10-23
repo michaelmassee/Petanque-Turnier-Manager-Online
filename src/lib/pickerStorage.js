@@ -1,9 +1,11 @@
 // Favoriten und zuletzt verwendete Einträge der Auswahl-Comboboxen, pro Nutzer und Bereich im localStorage.
-// Bereiche: postbox (Empfänger, Schlüssel unverändert seit Einführung) und tournaments (Turnierauswahl bei
-// Meldungen und „Turnier starten“, gemeinsam genutzt).
+// Bereiche: postbox (Empfänger, Schlüssel unverändert seit Einführung), tournaments (Turnierauswahl bei
+// Meldungen und „Turnier starten“, gemeinsam genutzt) und rental-clubs (Vereinsauswahl „Vermietung verwalten“).
+// Ein Bereich ohne Eintrag hier speichert nichts – Stern und „Zuletzt verwendet“ bleiben dann wirkungslos.
 const KEY_PREFIXES = {
   postbox: { favorites: 'ptm_postbox_favorites_', recents: 'ptm_postbox_recents_' },
   tournaments: { favorites: 'ptm_tournament_favorites_', recents: 'ptm_tournament_recents_' },
+  'rental-clubs': { favorites: 'ptm_rental_club_favorites_', recents: 'ptm_rental_club_recents_' },
 };
 const MAX_RECENTS = 5;
 
