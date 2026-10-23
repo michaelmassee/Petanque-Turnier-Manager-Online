@@ -161,7 +161,8 @@ function RentalOfferList({ language, navigate }) {
 }
 
 // Dauerwahl direkt an der angeklickten Startstunde; schließt bei Wahl, Escape oder Klick daneben.
-function DurationPopover({ options, tooShort, onChoose, onClose }) {
+// „Ganzer Tag“ bucht unabhängig von der angeklickten Stunde die komplette Öffnungszeit des Tages.
+function DurationPopover({ options, tooShort, fullDay, onChoose, onChooseFullDay, onClose }) {
   const { t } = useTranslation();
   const ref = useRef(null);
   useEffect(() => {
@@ -178,6 +179,13 @@ function DurationPopover({ options, tooShort, onChoose, onClose }) {
   return (
     <div className="rental-duration-popover" role="dialog" aria-label={t('Dauer wählen')} ref={ref}>
       <strong>{t('Dauer')}</strong>
+      {fullDay && (
+        <div className="rental-duration-options">
+          <button type="button" className="rental-duration-option rental-duration-full-day" onClick={onChooseFullDay}>
+            {t('Ganzer Tag')} <span data-i18n-skip>({hourLabel(fullDay.startHour)}–{hourLabel(fullDay.startHour + fullDay.hours)})</span>
+          </button>
+        </div>
+      )}
       {tooShort ? <p className="hint">{t('Ab dieser Uhrzeit ist die Mindestdauer nicht frei. Bitte wähle eine andere Startzeit.')}</p> : (
         <div className="rental-duration-options">
           {options.map((option) => (
@@ -231,6 +239,14 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
     }
     return hours;
   }, [day, offer, minLanes, selection?.startHour]);
+  // Ganzer Tag = komplette Öffnungszeit, sofern sie innerhalb von Mindest-/Höchstdauer liegt und durchgehend frei ist.
+  const fullDay = useMemo(() => {
+    if (!day?.slots.length || !offer) return null;
+    const hours = day.slots.length;
+    if (hours < offer.minHours || hours > offer.maxHours) return null;
+    if (day.slots.some((slot) => !slot.bookable || slot.free < minLanes)) return null;
+    return { startHour: day.slots[0].hour, hours };
+  }, [day, offer, minLanes]);
   const freeLanes = day && selection
     ? Math.min(...day.slots.filter((slot) => slot.hour >= selection.startHour && slot.hour < selection.startHour + selection.hours).map((slot) => slot.free))
     : 0;
@@ -244,8 +260,8 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
     setDurationOpen(Boolean(currentUser));
   }
 
-  function chooseDuration(hours) {
-    setSelection((current) => ({ ...current, hours }));
+  function chooseDuration(hours, startHour) {
+    setSelection((current) => ({ ...current, startHour: startHour ?? current.startHour, hours }));
     setLanes('1');
     setDurationOpen(false);
     setRevealForm(true);
@@ -328,7 +344,8 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
         onSelect={select}
         language={language}
         popover={durationOpen && selection
-          ? <DurationPopover options={durationOptions} tooShort={tooShort} onChoose={chooseDuration} onClose={() => setDurationOpen(false)} />
+          ? <DurationPopover options={durationOptions} tooShort={tooShort} fullDay={fullDay} onChoose={chooseDuration}
+            onChooseFullDay={() => chooseDuration(fullDay.hours, fullDay.startHour)} onClose={() => setDurationOpen(false)} />
           : null}
       />
       <Feedback message={message} />

@@ -158,6 +158,32 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(screen.queryByRole('dialog', { name: 'Dauer wählen' })).not.toBeInTheDocument();
   });
 
+  it('bietet im Dauer-Popup „Ganzer Tag“ für die komplette Öffnungszeit an, wenn sie durchgehend frei ist', async () => {
+    const freeDay = { ...AVAILABILITY, days: AVAILABILITY.days.map((day) => (day.slots.length ? { ...day, slots: slots([4, 4, 4, 4]) } : day)) };
+    api.mockImplementation(async (path) => (path.includes('/availability') ? freeDay : { offer: { ...OFFER, maxHours: 4 } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+
+    // Auch von einer späteren Startstunde aus bucht „Ganzer Tag“ ab Öffnung bis Schluss.
+    fireEvent.click(await screen.findByRole('button', { name: /11:00: 4 von 4 Bahnen frei/ }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Dauer wählen' })).getByRole('button', { name: 'Ganzer Tag (09:00–13:00)' }));
+    expect(screen.getByRole('heading', { name: 'Sa 24.10.2026, 09:00–13:00' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Dauer')).toHaveValue('4');
+  });
+
+  it('bietet „Ganzer Tag“ nicht an, wenn die Öffnungszeit die Höchstdauer übersteigt oder belegt ist', async () => {
+    const freeDay = { ...AVAILABILITY, days: AVAILABILITY.days.map((day) => (day.slots.length ? { ...day, slots: slots([4, 4, 4, 4]) } : day)) };
+    api.mockImplementation(async (path) => (path.includes('/availability') ? freeDay : { offer: OFFER }));
+    const { unmount } = render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: /09:00: 4 von 4 Bahnen frei/ }));
+    expect(within(screen.getByRole('dialog', { name: 'Dauer wählen' })).queryByRole('button', { name: /Ganzer Tag/ })).not.toBeInTheDocument();
+    unmount();
+
+    api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, maxHours: 4 } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: /09:00: 4 von 4 Bahnen frei/ }));
+    expect(within(screen.getByRole('dialog', { name: 'Dauer wählen' })).queryByRole('button', { name: /Ganzer Tag/ })).not.toBeInTheDocument();
+  });
+
   it('zeigt im Dauer-Popup einen Hinweis, wenn ab der Stunde nicht einmal die Mindestdauer frei ist', async () => {
     api.mockImplementation(async (path) => (path.includes('/availability') ? AVAILABILITY : { offer: { ...OFFER, minHours: 2 } }));
     render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u2' }} navigate={vi.fn()} onLogin={vi.fn()} />);

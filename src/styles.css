@@ -4823,6 +4823,7 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
 }
 .rental-duration-option:hover { border-color: #1677ff; background: #ecf4ff; color: #0a5fd1; }
 .rental-duration-option:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); outline-offset: 1px; }
+.rental-duration-full-day { font-weight: 700; margin-bottom: 4px; }
 .rental-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 0.8rem; color: #4a5568; }
 .rental-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .rental-legend i { display: inline-block; width: 14px; height: 14px; min-height: 0; border-radius: 4px; }
