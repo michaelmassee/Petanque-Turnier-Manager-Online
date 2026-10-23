@@ -40,4 +40,24 @@ describe('Postbox-Polling', () => {
     expect(await screen.findByText('Hallo Postbox')).toBeInTheDocument();
     expect(aufgerufen('/api/postbox/recipients')).toBe(true);
   });
+
+  it('lädt die Turnierliste neu, sobald neue Postfach-Meldungen eintreffen', async () => {
+    let unreadCount = 0;
+    const baseFetch = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation((path) => (path === '/api/postbox/summary'
+      ? Promise.resolve(jsonResponse({ unreadCount, todos: [] })) : baseFetch(path)));
+    const tournamentLoads = () => global.fetch.mock.calls.filter(([requestPath]) => requestPath === '/api/tournaments').length;
+    render(<App />);
+    await screen.findByLabelText('Postbox');
+    await waitFor(() => expect(aufgerufen('/api/postbox/summary')).toBe(true));
+    const before = tournamentLoads();
+
+    // Gleichbleibende Zahl: kein zusätzliches Laden der Turnierliste.
+    await queryClient.refetchQueries({ queryKey: ['postbox-summary'] });
+    expect(tournamentLoads()).toBe(before);
+
+    unreadCount = 1;
+    await queryClient.refetchQueries({ queryKey: ['postbox-summary'] });
+    await waitFor(() => expect(tournamentLoads()).toBe(before + 1));
+  });
 });

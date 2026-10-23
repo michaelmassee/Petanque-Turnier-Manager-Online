@@ -516,16 +516,31 @@ function AppContent() {
     });
   }, [tournamentsQuery.data]);
 
+  // Neue Postfach-Meldungen betreffen oft ein gerade veröffentlichtes oder geändertes Turnier (z. B. gespeicherte
+  // Suche): dann die Turnierliste neu laden, sonst zeigt eine lange offene App es nicht. Nur bei steigender Zahl
+  // ungelesener Meldungen, nicht bei jedem Poll (D1-Leselimit).
+  const lastUnreadCountRef = useRef(null);
+  function refreshTournamentsOnNewMessages(unreadCount) {
+    const previous = lastUnreadCountRef.current;
+    lastUnreadCountRef.current = unreadCount;
+    if (previous !== null && unreadCount > previous) queryClient.invalidateQueries({ queryKey: ['tournaments'] }, { cancelRefetch: false });
+  }
+
   useEffect(() => {
     if (!postboxSummaryQuery.data) return;
     const { unreadCount, todos } = postboxSummaryQuery.data;
+    refreshTournamentsOnNewMessages(unreadCount);
     setPostbox((previous) => ({ ...previous, unreadCount, todos }));
   }, [postboxSummaryQuery.data]);
 
   useEffect(() => {
     if (!postboxQuery.data) return;
+    refreshTournamentsOnNewMessages(postboxQuery.data.unreadCount);
     setPostbox(postboxQuery.data);
   }, [postboxQuery.data]);
+
+  // Benutzerwechsel: Zählerstand des vorherigen Kontos nicht vergleichen.
+  useEffect(() => { lastUnreadCountRef.current = null; }, [currentUser?.id]);
 
   useEffect(() => {
     if (!postboxRecipientsQuery.data) return;
