@@ -1734,5 +1734,10 @@
   "Der Schalter steuert Postfach- und Push-Nachrichten je Person für dieses Angebot.": "El interruptor controla los mensajes del buzón y las notificaciones push de cada persona para esta oferta.",
   "Vereinsbearbeiter": "Editor del club",
   "Bitte wähle Ja oder Nein für Nachrichten": "Elige Sí o No para los mensajes",
-  "Verwalter nicht gefunden": "Gestor no encontrado"
+  "Verwalter nicht gefunden": "Gestor no encontrado",
+  "Turnier-Limit filtern": "Filtrar límite de torneos",
+  "Alle Turnier-Limits": "Todos los límites de torneos",
+  "Unbegrenzt": "Sin límite",
+  "E-Mail-Versand filtern": "Filtrar envío de correos",
+  "Alle Versandstatus": "Todos los estados de envío"
 }

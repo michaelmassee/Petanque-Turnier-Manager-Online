@@ -1734,5 +1734,10 @@
   "Der Schalter steuert Postfach- und Push-Nachrichten je Person für dieses Angebot.": "Le bouton contrôle les messages de la boîte de réception et les notifications push pour chaque personne pour cette offre.",
   "Vereinsbearbeiter": "Gestionnaire du club",
   "Bitte wähle Ja oder Nein für Nachrichten": "Veuillez choisir Oui ou Non pour les messages",
-  "Verwalter nicht gefunden": "Gestionnaire introuvable"
+  "Verwalter nicht gefunden": "Gestionnaire introuvable",
+  "Turnier-Limit filtern": "Filtrer la limite de tournois",
+  "Alle Turnier-Limits": "Toutes les limites de tournois",
+  "Unbegrenzt": "Illimité",
+  "E-Mail-Versand filtern": "Filtrer l’envoi d’e-mails",
+  "Alle Versandstatus": "Tous les états d’envoi"
 }

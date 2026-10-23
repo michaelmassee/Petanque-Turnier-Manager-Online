@@ -1072,6 +1072,52 @@ describe('Benutzer-Seite: Liste + Dialog', () => {
 
     expect(screen.getByRole('button', { name: 'Filter zurücksetzen' })).toBeEnabled();
   });
+
+  it('filtert lokal nach Turnier-Limit und E-Mail-Versand und setzt beide zusammen zurück', async () => {
+    const api = vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation(async (path) => path === '/api/users' ? { users: [
+      { id: 'admin', firstName: 'Ada', lastName: 'Admin', email: 'ada@example.test', role: 'admin', tournamentLimit: 5, mailEnabled: false },
+      { id: 'blocked', firstName: 'Bert', lastName: 'Gesperrt', email: 'bert@example.test', role: 'user', tournamentLimit: 0, mailEnabled: false },
+      { id: 'default', firstName: 'Clara', lastName: 'Standard', email: 'clara@example.test', role: 'user', tournamentLimit: null, mailEnabled: true },
+      { id: 'custom', firstName: 'Dora', lastName: 'Mehr', email: 'dora@example.test', role: 'user', tournamentLimit: 10, mailEnabled: true },
+    ] } : { reports: [] });
+    render(<UserManagementPanel currentUser={{ id: 'admin' }} tournaments={[]} />);
+    await screen.findByText('Dora Mehr');
+    const callsBefore = api.mock.calls.length;
+    const limit = screen.getByLabelText('Turnier-Limit filtern');
+    const mail = screen.getByLabelText('E-Mail-Versand filtern');
+    expect([...limit.options].map((option) => option.value)).toEqual(['', '0', '5', '10', 'unlimited']);
+
+    fireEvent.change(limit, { target: { value: '0' } });
+    expect(screen.getByText('Bert Gesperrt')).toBeInTheDocument();
+    expect(screen.queryByText('Clara Standard')).not.toBeInTheDocument();
+    fireEvent.change(mail, { target: { value: 'enabled' } });
+    expect(screen.getByText('Keine Benutzer gefunden.')).toBeInTheDocument();
+    fireEvent.change(limit, { target: { value: 'unlimited' } });
+    expect(screen.getByText('Ada Admin')).toBeInTheDocument();
+    expect(screen.queryByText('Bert Gesperrt')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(limit).toHaveValue('');
+    expect(mail).toHaveValue('');
+    expect(screen.getByText('Clara Standard')).toBeInTheDocument();
+    expect(screen.getByText('Dora Mehr')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filter zurücksetzen' })).toBeDisabled();
+    expect(api).toHaveBeenCalledTimes(callsBefore);
+  });
+
+  it.each([
+    ['Turnier-Limit filtern', '5'], ['E-Mail-Versand filtern', 'enabled'],
+  ])('lässt %s zurücksetzen, auch wenn alle Benutzer übrig bleiben', async (label, value) => {
+    vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation(async (path) => path === '/api/users' ? {
+      users: [{ id: 'u1', firstName: 'Clara', lastName: 'Standard', email: 'clara@example.test', role: 'user', tournamentLimit: 5, mailEnabled: true }],
+    } : { reports: [] });
+    render(<UserManagementPanel currentUser={{ id: 'admin' }} tournaments={[]} />);
+    await screen.findByText('Clara Standard');
+    fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    expect(screen.getByText('Clara Standard')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filter zurücksetzen' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(screen.getByLabelText(label)).toHaveValue('');
+  });
 });
 
 describe('Vereinsmoderation', () => {

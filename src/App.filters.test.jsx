@@ -92,6 +92,31 @@ describe('filterUsers', () => {
   it('filtert nach erzwungenem Passwortwechsel', () => {
     expect(filterUsers(users, '', '', 'password_change_required')).toEqual([users[1]]);
   });
+
+  const configuredUsers = [
+    { ...users[0], tournamentLimit: 0, mailEnabled: false },
+    { ...users[1], tournamentLimit: 0, mailEnabled: false },
+    { id: 'default', role: 'user', firstName: 'Standard' },
+    { id: 'custom', role: 'user', firstName: 'Mehr', tournamentLimit: 10, mailEnabled: true, emailVerifiedAt: '2026-10-23' },
+    { id: 'legacy', role: 'user', firstName: 'Altbestand', tournamentLimit: null, mailEnabled: null },
+  ];
+
+  it.each([
+    ['0', ['u2']], ['5', ['default', 'legacy']], ['10', ['custom']], ['unlimited', ['u1']], ['99', []],
+  ])('filtert nach effektivem Turnier-Limit %s, einschließlich Null und unbegrenzten Admins', (tournamentLimitFilter, ids) => {
+    expect(filterUsers(configuredUsers, '', '', '', { tournamentLimitFilter }).map((user) => user.id)).toEqual(ids);
+  });
+
+  it.each([
+    ['enabled', ['u1', 'default', 'custom', 'legacy']], ['disabled', ['u2']],
+  ])('filtert E-Mail-Versand %s nach den effektiven Rechten', (mailFilter, ids) => {
+    expect(filterUsers(configuredUsers, '', '', '', { mailFilter }).map((user) => user.id)).toEqual(ids);
+  });
+
+  it('kombiniert beide neuen Filter mit Suche, Rolle und Kontostatus', () => {
+    expect(filterUsers(configuredUsers, 'Mehr', 'user', 'verified', { tournamentLimitFilter: '10', mailFilter: 'enabled' })).toEqual([configuredUsers[3]]);
+    expect(filterUsers(configuredUsers, '', '', '', { tournamentLimitFilter: '10', mailFilter: 'disabled' })).toEqual([]);
+  });
 });
 
 const apiKeys = [

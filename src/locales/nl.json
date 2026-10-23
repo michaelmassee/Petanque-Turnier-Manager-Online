@@ -1734,5 +1734,10 @@
   "Der Schalter steuert Postfach- und Push-Nachrichten je Person für dieses Angebot.": "De schakelaar regelt inbox- en pushberichten per persoon voor dit aanbod.",
   "Vereinsbearbeiter": "Verenigingsbeheerder",
   "Bitte wähle Ja oder Nein für Nachrichten": "Kies Ja of Nee voor berichten",
-  "Verwalter nicht gefunden": "Beheerder niet gevonden"
+  "Verwalter nicht gefunden": "Beheerder niet gevonden",
+  "Turnier-Limit filtern": "Toernooilimiet filteren",
+  "Alle Turnier-Limits": "Alle toernooilimieten",
+  "Unbegrenzt": "Onbeperkt",
+  "E-Mail-Versand filtern": "E-mailverzending filteren",
+  "Alle Versandstatus": "Alle verzendstatussen"
 }

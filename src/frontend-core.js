@@ -1,3 +1,5 @@
+import { DEFAULT_TOURNAMENT_LIMIT } from './lib/constants.js';
+
 export function filterTournaments(tournaments, query, statusFilter) {
   const normalizedQuery = (query || '').trim().toLowerCase();
   return tournaments.filter((tournament) => (!statusFilter || tournament.status === statusFilter) && (!normalizedQuery || [tournament.name, tournament.location].some((value) => (value || '').toLowerCase().includes(normalizedQuery))));
@@ -21,7 +23,7 @@ export function filterRegistrations(registrations, query, statusFilter, { organi
   });
 }
 
-export function filterUsers(users, query, roleFilter, statusFilter) {
+export function filterUsers(users, query, roleFilter, statusFilter, { tournamentLimitFilter = '', mailFilter = '' } = {}) {
   const normalizedQuery = (query || '').trim().toLowerCase();
   return users.filter((user) => {
     const matchesQuery = !normalizedQuery || [user.firstName, user.lastName, user.email, user.phone, user.username, user.username && `@${user.username}`, user.club].some((value) => (value || '').toLowerCase().includes(normalizedQuery));
@@ -30,7 +32,12 @@ export function filterUsers(users, query, roleFilter, statusFilter) {
       (statusFilter === 'verified' && Boolean(user.emailVerifiedAt)) ||
       (statusFilter === 'unverified' && !user.emailVerifiedAt) ||
       (statusFilter === 'password_change_required' && Boolean(user.passwordChangeRequired));
-    return matchesQuery && matchesRole && matchesStatus;
+    const matchesLimit = !tournamentLimitFilter || (tournamentLimitFilter === 'unlimited'
+      ? user.role === 'admin'
+      : user.role !== 'admin' && String(user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT) === tournamentLimitFilter);
+    const mailEnabled = user.role === 'admin' || (user.mailEnabled ?? true);
+    const matchesMail = !mailFilter || (mailFilter === 'enabled' && mailEnabled) || (mailFilter === 'disabled' && !mailEnabled);
+    return matchesQuery && matchesRole && matchesStatus && matchesLimit && matchesMail;
   });
 }
 

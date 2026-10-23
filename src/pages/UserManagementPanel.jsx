@@ -17,6 +17,12 @@ const USER_STATUS_FILTERS = [
   { value: 'password_change_required', label: 'Passwortwechsel nötig' },
 ];
 
+const USER_MAIL_FILTERS = [
+  { value: '', label: 'Alle Versandstatus' },
+  { value: 'enabled', label: 'E-Mail-Versand freigeschaltet' },
+  { value: 'disabled', label: 'E-Mail-Versand gesperrt' },
+];
+
 function userToForm(user) {
   return {
     id: user.id,
@@ -45,6 +51,8 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [tournamentLimitFilter, setTournamentLimitFilter] = useState('');
+  const [mailFilter, setMailFilter] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_USER_FORM);
   const [mode, setMode] = useState('create');
@@ -60,7 +68,9 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
   }
   useEffect(() => { load(); }, []);
 
-  const filtered = useMemo(() => filterUsers(users, query, roleFilter, statusFilter), [users, query, roleFilter, statusFilter]);
+  const filtered = useMemo(() => filterUsers(users, query, roleFilter, statusFilter, { tournamentLimitFilter, mailFilter }), [users, query, roleFilter, statusFilter, tournamentLimitFilter, mailFilter]);
+  const tournamentLimits = useMemo(() => [...new Set(users.filter((user) => user.role !== 'admin')
+    .map((user) => user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT))].sort((left, right) => left - right), [users]);
   const stats = useMemo(() => ({
     total: users.length,
     admins: users.filter((user) => user.role === 'admin').length,
@@ -69,13 +79,15 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
   }), [users]);
 
   const roleOptions = [{ value: '', label: t('Alle Rollen') }, ...translatedOptions(ROLES)];
-  const isFiltered = Boolean(query.trim()) || Boolean(roleFilter) || Boolean(statusFilter);
+  const isFiltered = Boolean(query.trim()) || Boolean(roleFilter) || Boolean(statusFilter) || Boolean(tournamentLimitFilter) || Boolean(mailFilter);
   const visibleUsers = useInfiniteList(filtered);
 
   function resetFilters() {
     setQuery('');
     setRoleFilter('');
     setStatusFilter('');
+    setTournamentLimitFilter('');
+    setMailFilter('');
   }
 
   function openCreate() {
@@ -183,6 +195,12 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
           filters={[
             { label: t('Rolle filtern'), value: roleFilter, onChange: setRoleFilter, options: roleOptions },
             { label: t('Status filtern'), value: statusFilter, onChange: setStatusFilter, options: translatedOptions(USER_STATUS_FILTERS) },
+            { label: t('Turnier-Limit filtern'), value: tournamentLimitFilter, onChange: setTournamentLimitFilter, options: [
+              { value: '', label: t('Alle Turnier-Limits') },
+              ...tournamentLimits.map((limit) => ({ value: String(limit), label: String(limit) })),
+              { value: 'unlimited', label: t('Unbegrenzt') },
+            ] },
+            { label: t('E-Mail-Versand filtern'), value: mailFilter, onChange: setMailFilter, options: translatedOptions(USER_MAIL_FILTERS) },
           ]}
           onReset={resetFilters}
           resetDisabled={!isFiltered}

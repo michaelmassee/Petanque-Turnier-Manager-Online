@@ -1734,5 +1734,10 @@
   "Der Schalter steuert Postfach- und Push-Nachrichten je Person für dieses Angebot.": "The switch controls inbox and push notifications for each person for this offer.",
   "Vereinsbearbeiter": "Club editor",
   "Bitte wähle Ja oder Nein für Nachrichten": "Please choose Yes or No for messages",
-  "Verwalter nicht gefunden": "Manager not found"
+  "Verwalter nicht gefunden": "Manager not found",
+  "Turnier-Limit filtern": "Filter tournament limit",
+  "Alle Turnier-Limits": "All tournament limits",
+  "Unbegrenzt": "Unlimited",
+  "E-Mail-Versand filtern": "Filter email sending",
+  "Alle Versandstatus": "All sending statuses"
 }
