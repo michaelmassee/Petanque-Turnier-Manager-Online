@@ -1728,5 +1728,11 @@
   "angefragt, noch nicht bestätigt": "solicitado, aún sin confirmar",
   "Bestätigt von {{name}} am {{date}}": "Confirmada por {{name}} el {{date}}",
   "Belegung dieser Woche": "Reservas de esta semana",
-  "Keine Reservierungen in dieser Woche.": "No hay reservas esta semana."
+  "Keine Reservierungen in dieser Woche.": "No hay reservas esta semana.",
+  "Nachrichten für {{name}}": "Mensajes para {{name}}",
+  "Nachrichten erhalten": "Recibir mensajes",
+  "Der Schalter steuert Postfach- und Push-Nachrichten je Person für dieses Angebot.": "El interruptor controla los mensajes del buzón y las notificaciones push de cada persona para esta oferta.",
+  "Vereinsbearbeiter": "Editor del club",
+  "Bitte wähle Ja oder Nein für Nachrichten": "Elige Sí o No para los mensajes",
+  "Verwalter nicht gefunden": "Gestor no encontrado"
 }

@@ -440,7 +440,9 @@ describe('Platz mieten', () => {
     expect((await call('POST', editors, { body: { userId: 'u1' }, headers: VEREIN })).status).toBe(400);
     const added = await call('POST', editors, { body: { userId: 'u3' }, headers: VEREIN });
     expect(added.status).toBe(201);
-    expect((await added.json()).editors).toEqual([{ id: 'u3', firstName: 'Anna', lastName: 'Anders', username: null }]);
+    const people = await added.json();
+    expect(people.owner).toEqual({ id: 'u1', firstName: 'Vera', lastName: 'Verein', username: null, notificationsEnabled: true });
+    expect(people.editors).toEqual([{ id: 'u3', firstName: 'Anna', lastName: 'Anders', username: null, notificationsEnabled: true, inherited: false }]);
     expect((await call('POST', editors, { body: { userId: 'u3' }, headers: VEREIN })).status).toBe(409);
 
     // Der Angebotsverwalter sieht den Verein in seiner Auswahl, aber nur sein Angebot und dessen Anfragen.
@@ -466,6 +468,72 @@ describe('Platz mieten', () => {
     expect((await removed.json()).editors).toEqual([]);
     expect((await call('PUT', `/api/rentals/offers/${offer.id}`, { body: offerBody, headers: ANDERER })).status).toBe(403);
     expect((await (await call('GET', '/api/rentals/manage/clubs', { headers: ANDERER })).json()).clubs).toEqual([]);
+  });
+
+  it('steuert Postfach-Nachrichten je Owner, Vereinsbearbeiter und Angebotsverwalter unabhängig', async () => {
+    const offer = await createOffer();
+    const editors = `/api/rentals/offers/${offer.id}/editors`;
+    sql("INSERT INTO club_editors (club_id, user_id, approved_at) VALUES ('c1', 'u2', '2026-10-01')");
+    expect((await call('POST', editors, { body: { userId: 'u3' }, headers: VEREIN })).status).toBe(201);
+    sql("INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at) VALUES ('u4', 'guest@example.test', 'user', 'salt', 'hash', '2026-10-01', '2026-10-01')");
+    sql("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ('s4', 'u4', '2099-01-01', '2026-10-01')");
+    const renter = { Cookie: 'ptm_session=s4' };
+    const details = async () => (await call('GET', editors, { headers: VEREIN })).json();
+    const toggle = (userId, enabled, headers = VEREIN) => call('PUT', `${editors}/${userId}`, { body: { notificationsEnabled: enabled }, headers });
+    const people = await details();
+    expect(people.owner).toMatchObject({ id: 'u1', notificationsEnabled: true });
+    expect(people.editors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'u2', notificationsEnabled: true, inherited: true }),
+      expect.objectContaining({ id: 'u3', notificationsEnabled: true, inherited: false }),
+    ]));
+    expect(people.editors).toHaveLength(2);
+    expect((await reserve(offer.id, { hours: 1, lanes: 1 }, renter)).status).toBe(201);
+    expect(postbox().map((message) => message.recipient_id).sort()).toEqual(['u1', 'u2', 'u3']);
+    sql('DELETE FROM postbox_messages');
+
+    expect((await toggle('u1', false)).status).toBe(200);
+    expect((await toggle('u3', false)).status).toBe(200);
+    expect((await details()).owner.notificationsEnabled).toBe(false);
+    expect((await details()).editors.find((person) => person.id === 'u3').notificationsEnabled).toBe(false);
+    const reservation = (await (await reserve(offer.id, { startHour: 11, hours: 1, lanes: 1 }, renter)).json()).reservation;
+    expect(postbox().map((message) => message.recipient_id)).toEqual(['u2']);
+    sql('DELETE FROM postbox_messages');
+    expect((await call('POST', `/api/rentals/reservations/${reservation.id}/cancel`, { headers: renter })).status).toBe(200);
+    expect(postbox().map((message) => message.recipient_id)).toEqual(['u2']);
+    sql('DELETE FROM postbox_messages');
+
+    expect((await toggle('u1', true)).status).toBe(200);
+    expect((await toggle('u2', false)).status).toBe(200);
+    expect((await reserve(offer.id, { startHour: 12, hours: 1, lanes: 1 }, renter)).status).toBe(201);
+    expect(postbox().map((message) => message.recipient_id)).toEqual(['u1']);
+    // Nachrichteneinstellungen ändern keine Bearbeitungsrechte.
+    expect((await call('GET', '/api/rentals/manage?club=c1', { headers: ANDERER })).status).toBe(200);
+    // Nach Entfernen und erneuter Vergabe gilt wieder der Standard Ja.
+    await call('DELETE', `${editors}/u3`, { headers: VEREIN });
+    const readded = await (await call('POST', editors, { body: { userId: 'u3' }, headers: VEREIN })).json();
+    expect(readded.editors.find((person) => person.id === 'u3').notificationsEnabled).toBe(true);
+  });
+
+  it('schützt Nachrichtenschalter vor fremden Zugriffen und ungültigen Werten', async () => {
+    const offer = await createOffer();
+    const other = await createOffer();
+    const editors = `/api/rentals/offers/${offer.id}/editors`;
+    await call('POST', editors, { body: { userId: 'u3' }, headers: VEREIN });
+    const put = (path, headers, body = { notificationsEnabled: false }) => call('PUT', path, { headers, body });
+    expect((await put(`${editors}/u1`, {})).status).toBe(401);
+    expect((await put(`${editors}/u1`, MIETER)).status).toBe(403);
+    expect((await put(`${editors}/u3`, ANDERER)).status).toBe(403);
+    expect((await put(`${editors}/u2`, VEREIN)).status).toBe(404);
+    for (const notificationsEnabled of ['false', 0, null]) {
+      expect((await put(`${editors}/u1`, VEREIN, { notificationsEnabled })).status).toBe(400);
+    }
+    expect((await put(`${editors}/u1`, VEREIN, {})).status).toBe(400);
+    expect((await put(`${editors}/u1`, VEREIN)).status).toBe(200);
+    const otherPeople = await (await call('GET', `/api/rentals/offers/${other.id}/editors`, { headers: VEREIN })).json();
+    expect(otherPeople.owner.notificationsEnabled).toBe(true);
+    const publicOffer = await (await call('GET', `/api/rentals/${offer.id}`)).json();
+    expect(publicOffer.offer).not.toHaveProperty('owner');
+    expect(publicOffer.offer).not.toHaveProperty('notificationsEnabled');
   });
 
   it('kennzeichnet vollständig bestätigte Angebote trotz fremder Anfragen als bestätigt', async () => {

@@ -1728,5 +1728,11 @@
   "angefragt, noch nicht bestätigt": "demandé, pas encore confirmé",
   "Bestätigt von {{name}} am {{date}}": "Confirmée par {{name}} le {{date}}",
   "Belegung dieser Woche": "Réservations de la semaine",
-  "Keine Reservierungen in dieser Woche.": "Aucune réservation cette semaine."
+  "Keine Reservierungen in dieser Woche.": "Aucune réservation cette semaine.",
+  "Nachrichten für {{name}}": "Messages pour {{name}}",
+  "Nachrichten erhalten": "Recevoir des messages",
+  "Der Schalter steuert Postfach- und Push-Nachrichten je Person für dieses Angebot.": "Le bouton contrôle les messages de la boîte de réception et les notifications push pour chaque personne pour cette offre.",
+  "Vereinsbearbeiter": "Gestionnaire du club",
+  "Bitte wähle Ja oder Nein für Nachrichten": "Veuillez choisir Oui ou Non pour les messages",
+  "Verwalter nicht gefunden": "Gestionnaire introuvable"
 }

@@ -865,6 +865,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
             {editingExistingOffer && (
               <EditorsPanel
                 endpoint={`/api/rentals/offers/${dialog.id}/editors`}
+                notifications
                 candidates={editorCandidates || []}
                 currentUserId={currentUser?.id}
                 emptyText={t('Noch keine weiteren Verwalter für dieses Angebot.')}

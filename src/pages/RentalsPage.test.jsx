@@ -630,6 +630,85 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     expect(await within(dialog).findByText('Anna Anders')).toBeInTheDocument();
   });
 
+  it('zeigt den Owner zuerst und speichert Nachrichtenschalter für jede Person einzeln', async () => {
+    let people = {
+      owner: { id: 'u1', firstName: 'Vera', lastName: 'Verein', notificationsEnabled: true },
+      editors: [
+        { id: 'u2', firstName: 'Max', lastName: 'Mieter', inherited: true, notificationsEnabled: true },
+        { id: 'u3', firstName: 'Anna', lastName: 'Anders', inherited: false, notificationsEnabled: true },
+      ],
+    };
+    const writes = vi.fn((path, options) => {
+      const userId = path.split('/').at(-1);
+      const { notificationsEnabled } = JSON.parse(options.body);
+      people = { owner: { ...people.owner, ...(userId === 'u1' ? { notificationsEnabled } : {}) },
+        editors: people.editors.map((person) => person.id === userId ? { ...person, notificationsEnabled } : person) };
+      return people;
+    });
+    authenticatedApi.mockImplementation(async (path, options) => {
+      if (options?.method) return writes(path, options);
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
+      if (path === '/api/rentals/manage/clubs') return { clubs: [] };
+      if (path === '/api/postbox/recipients') return { recipients: [people.owner, ...people.editors] };
+      if (path === '/api/rentals/offers/o1/editors') return people;
+      return MANAGE;
+    });
+    const view = render(<RentalManagement language="de" currentUser={{ id: 'u1' }} navigate={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const dialog = screen.getByRole('dialog');
+    const ownerRow = (await within(dialog).findByText('Vera Verein')).closest('li');
+    expect(dialog.querySelector('.editor-list li')).toBe(ownerRow);
+    expect(within(ownerRow).getByText('Owner')).toBeInTheDocument();
+    expect(within(ownerRow).queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
+    const inheritedRow = within(dialog).getByText('Max Mieter').closest('li');
+    expect(within(inheritedRow).getByText('Vereinsbearbeiter')).toBeInTheDocument();
+    expect(within(inheritedRow).queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
+    const ownerSwitch = within(ownerRow).getByRole('switch');
+    const inheritedSwitch = within(inheritedRow).getByRole('switch');
+    const editorSwitch = within(dialog).getByRole('switch', { name: 'Nachrichten für Anna Anders' });
+    expect(ownerSwitch).toBeChecked();
+    expect(inheritedSwitch).toBeChecked();
+    expect(editorSwitch).toBeChecked();
+    expect(within(dialog).queryByLabelText(/Benutzer hinzufügen/)).not.toBeInTheDocument();
+    fireEvent.click(editorSwitch);
+    await waitFor(() => expect(editorSwitch).not.toBeChecked());
+    expect(ownerSwitch).toBeChecked();
+    expect(inheritedSwitch).toBeChecked();
+    fireEvent.click(ownerSwitch);
+    await waitFor(() => expect(ownerSwitch).not.toBeChecked());
+    expect(inheritedSwitch).toBeChecked();
+    expect(writes).toHaveBeenCalledWith('/api/rentals/offers/o1/editors/u1', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ notificationsEnabled: false }) }));
+    view.unmount();
+
+    render(<RentalManagement language="de" currentUser={{ id: 'u1' }} navigate={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const savedOwnerSwitch = await screen.findByRole('switch', { name: 'Nachrichten für Vera Verein' });
+    expect(savedOwnerSwitch).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Nachrichten für Anna Anders' })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Nachrichten für Max Mieter' })).toBeChecked();
+    fireEvent.click(savedOwnerSwitch);
+    await waitFor(() => expect(savedOwnerSwitch).toBeChecked());
+    expect(screen.getByRole('switch', { name: 'Nachrichten für Anna Anders' })).not.toBeChecked();
+  });
+
+  it('behält bei Speicherfehlern die Nachrichteneinstellung und zeigt den Fehler an', async () => {
+    authenticatedApi.mockImplementation(async (path, options) => {
+      if (options?.method) throw new Error('Speichern fehlgeschlagen');
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
+      if (path === '/api/rentals/manage/clubs') return { clubs: [] };
+      if (path === '/api/postbox/recipients') return { recipients: [] };
+      if (path === '/api/rentals/offers/o1/editors') return { owner: { id: 'u1', firstName: 'Vera', lastName: 'Verein', notificationsEnabled: true }, editors: [] };
+      return MANAGE;
+    });
+    render(<RentalManagement language="de" currentUser={{ id: 'u1' }} navigate={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const toggle = await screen.findByRole('switch', { name: 'Nachrichten für Vera Verein' });
+    fireEvent.click(toggle);
+    expect(await screen.findByText('Speichern fehlgeschlagen')).toBeInTheDocument();
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeEnabled();
+  });
+
   it('zeigt Angebotsverwaltern nur ihre Angebote, ohne neue Angebote und Verwaltervergabe', async () => {
     authenticatedApi.mockImplementation(async (path) => {
       if (path === '/api/clubs/mine') return { clubs: [] };

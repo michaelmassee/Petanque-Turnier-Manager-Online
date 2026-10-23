@@ -2158,6 +2158,9 @@ a.left-panel-link {
   justify-self: end;
 }
 
+.editor-actions-with-notifications { flex-wrap: wrap; justify-content: flex-end; }
+.editor-notifications { margin: 0; white-space: nowrap; }
+
 .form-section-header {
   display: flex;
   align-items: center;

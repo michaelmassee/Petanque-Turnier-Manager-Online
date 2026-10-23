@@ -2150,6 +2150,7 @@ export default {
         const [, offerId, editorId] = rentalOfferEditorsMatch;
         if (!editorId && request.method === 'GET') return await listRentalOfferEditors(env.DB, offerId, session.user);
         if (!editorId && request.method === 'POST') return await addRentalOfferEditor(request, env.DB, offerId, session.user);
+        if (editorId && request.method === 'PUT') return await updateRentalOfferNotifications(request, env.DB, offerId, editorId, session.user);
         if (editorId && request.method === 'DELETE') return await removeRentalOfferEditor(env.DB, offerId, editorId, session.user);
       }
       if (request.method === 'POST' && url.pathname === '/api/rentals/offers') {
@@ -10040,7 +10041,8 @@ async function getRentalAvailability(db, id, fromParam, user, monthParam = null)
 }
 
 async function rentalOfferManagers(db, offer) {
-  const rows = await db.prepare(`SELECT u.id, u.email, u.first_name, u.language FROM users u
+  const rows = await db.prepare(`SELECT u.id, u.email, u.first_name, u.language, COALESCE(n.enabled, 1) AS notifications_enabled FROM users u
+    LEFT JOIN rental_offer_notification_preferences n ON n.user_id = u.id AND n.offer_id = ?2
     WHERE u.id = (SELECT owner_id FROM clubs WHERE id = ?1) OR u.id IN (SELECT user_id FROM club_editors WHERE club_id = ?1)
       OR u.id IN (SELECT user_id FROM rental_offer_editors WHERE offer_id = ?2)`).bind(offer.club_id, offer.id).all();
   return rows.results || [];
@@ -10061,7 +10063,7 @@ async function notifyRentalClub(env, { offer, reservation, renter, eventType, or
   };
   const managers = await rentalOfferManagers(env.DB, offer);
   for (const manager of managers) {
-    if (manager.id === renter.id) continue;
+    if (manager.id === renter.id || Number(manager.notifications_enabled) === 0) continue;
     try {
       await createPostboxMessage(env, { recipientId: manager.id, kind: 'system', eventType, eventData, pushTitle: 'Neue Statusmeldung', pushActor: offer.title });
     } catch (error) {
@@ -10447,9 +10449,21 @@ async function listRentalEditorClubs(db, user) {
 }
 
 async function rentalOfferEditorsResponse(db, offerId, status = 200) {
-  const rows = await db.prepare(`SELECT u.id, u.first_name, u.last_name, u.username FROM rental_offer_editors e JOIN users u ON u.id = e.user_id
-    WHERE e.offer_id = ? ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE`).bind(offerId).all();
-  return json({ editors: (rows.results || []).map((row) => ({ id: row.id, firstName: row.first_name, lastName: row.last_name, username: row.username })) }, status);
+  const rows = await db.prepare(`SELECT u.id, u.first_name, u.last_name, u.username,
+      c.owner_id = u.id AS is_owner,
+      EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = u.id) AS inherited,
+      COALESCE(n.enabled, 1) AS notifications_enabled
+    FROM rental_offers o JOIN clubs c ON c.id = o.club_id JOIN users u ON (
+      u.id = c.owner_id OR u.id IN (SELECT user_id FROM club_editors WHERE club_id = c.id)
+      OR u.id IN (SELECT user_id FROM rental_offer_editors WHERE offer_id = o.id))
+    LEFT JOIN rental_offer_notification_preferences n ON n.offer_id = o.id AND n.user_id = u.id
+    WHERE o.id = ? ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE`).bind(offerId).all();
+  const person = (row) => ({ id: row.id, firstName: row.first_name, lastName: row.last_name, username: row.username, notificationsEnabled: Boolean(Number(row.notifications_enabled)) });
+  const owner = (rows.results || []).find((row) => Number(row.is_owner));
+  return json({
+    owner: owner ? person(owner) : null,
+    editors: (rows.results || []).filter((row) => !Number(row.is_owner)).map((row) => ({ ...person(row), inherited: Boolean(Number(row.inherited)) })),
+  }, status);
 }
 
 async function listRentalOfferEditors(db, offerId, user) {
@@ -10478,7 +10492,30 @@ async function addRentalOfferEditor(request, db, offerId, actingUser) {
 
 async function removeRentalOfferEditor(db, offerId, userId, actingUser) {
   await assertRentalOfferEditorsManager(db, offerId, actingUser);
-  await db.prepare('DELETE FROM rental_offer_editors WHERE offer_id = ? AND user_id = ?').bind(offerId, userId).run();
+  await db.batch([
+    db.prepare('DELETE FROM rental_offer_editors WHERE offer_id = ? AND user_id = ?').bind(offerId, userId),
+    // Ein später erneut zugeordneter Verwalter beginnt wieder mit dem Standard Ja.
+    db.prepare(`DELETE FROM rental_offer_notification_preferences WHERE offer_id = ?1 AND user_id = ?2
+      AND NOT EXISTS(SELECT 1 FROM rental_offers o JOIN clubs c ON c.id = o.club_id WHERE o.id = ?1 AND (c.owner_id = ?2
+        OR ?2 IN (SELECT user_id FROM club_editors WHERE club_id = c.id)))`).bind(offerId, userId),
+  ]);
+  return rentalOfferEditorsResponse(db, offerId);
+}
+
+async function updateRentalOfferNotifications(request, db, offerId, userId, actingUser) {
+  const offer = await assertRentalOfferEditorsManager(db, offerId, actingUser);
+  const body = await readJson(request);
+  if (typeof body.notificationsEnabled !== 'boolean') throw new HttpError(400, 'Bitte wähle Ja oder Nein für Nachrichten');
+  const manager = await db.prepare(`SELECT 1 FROM clubs WHERE id = ?1 AND (owner_id = ?2
+    OR ?2 IN (SELECT user_id FROM club_editors WHERE club_id = ?1)
+    OR ?2 IN (SELECT user_id FROM rental_offer_editors WHERE offer_id = ?3))`).bind(offer.club_id, userId, offerId).first();
+  if (!manager) throw new HttpError(404, 'Verwalter nicht gefunden');
+  if (body.notificationsEnabled) {
+    await db.prepare('DELETE FROM rental_offer_notification_preferences WHERE offer_id = ? AND user_id = ?').bind(offerId, userId).run();
+  } else {
+    await db.prepare(`INSERT INTO rental_offer_notification_preferences (offer_id, user_id, enabled) VALUES (?, ?, 0)
+      ON CONFLICT(offer_id, user_id) DO UPDATE SET enabled = 0`).bind(offerId, userId).run();
+  }
   return rentalOfferEditorsResponse(db, offerId);
 }
 

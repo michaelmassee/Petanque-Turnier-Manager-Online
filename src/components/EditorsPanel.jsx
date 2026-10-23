@@ -7,28 +7,33 @@ import { UsernameReportButton } from './UsernameReportDialog.jsx';
 
 /**
  * Zusätzliche Bearbeiter/Verwalter für Turniere und Mietangebote: endpoint liefert per GET/POST { editors },
- * DELETE ${endpoint}/:userId entfernt einen. Der Owner (Turnier) steht nur in der eigenen Zeile, nie als Bearbeiter.
+ * DELETE ${endpoint}/:userId entfernt einen. Der Owner steht nur in der eigenen Zeile, nie als Bearbeiter.
+ * Mietangebote liefern zusätzlich owner, geerbte Vereinsbearbeiter und persönliche Nachrichteneinstellungen.
  */
-export function EditorsPanel({ endpoint, candidates = [], ownerId, owner, currentUserId, emptyText, hint }) {
+export function EditorsPanel({ endpoint, candidates = [], ownerId, owner, currentUserId, emptyText, hint, notifications = false }) {
   const { t } = useTranslation();
-  const [editors, setEditors] = useState(null);
+  const [data, setData] = useState(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState('');
   const [busy, setBusy] = useState(false);
   const [panelError, setPanelError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    setEditors(null);
+    setData(null);
+    setPanelError('');
+    setSelectedCandidateId('');
     authenticatedApi(endpoint)
-      .then((data) => { if (!cancelled) setEditors(data.editors); })
+      .then((result) => { if (!cancelled) setData(result); })
       .catch((err) => { if (!cancelled) setPanelError(err.message); });
     return () => { cancelled = true; };
   }, [endpoint]);
 
   // Schutz für noch nicht migrierte/inkonsistente Bestände: Der Owner steht
   // ausschließlich in der eigenen Owner-Zeile, nie nochmals als Bearbeiter.
-  const additionalEditors = (editors || []).filter((editor) => editor.id !== ownerId);
-  const availableCandidates = candidates.filter((candidate) => candidate.id !== ownerId && !additionalEditors.some((editor) => editor.id === candidate.id));
+  const panelOwner = owner || data?.owner;
+  const panelOwnerId = ownerId || panelOwner?.id;
+  const additionalEditors = (data?.editors || []).filter((editor) => editor.id !== panelOwnerId);
+  const availableCandidates = candidates.filter((candidate) => candidate.id !== panelOwnerId && !additionalEditors.some((editor) => editor.id === candidate.id));
 
   async function handleAdd(event) {
     event.preventDefault();
@@ -36,8 +41,8 @@ export function EditorsPanel({ endpoint, candidates = [], ownerId, owner, curren
     setBusy(true);
     setPanelError('');
     try {
-      const data = await authenticatedApi(endpoint, { method: 'POST', body: JSON.stringify({ userId: selectedCandidateId }) });
-      setEditors(data.editors);
+      const result = await authenticatedApi(endpoint, { method: 'POST', body: JSON.stringify({ userId: selectedCandidateId }) });
+      setData(result);
       setSelectedCandidateId('');
     } catch (err) {
       setPanelError(err.message);
@@ -50,13 +55,37 @@ export function EditorsPanel({ endpoint, candidates = [], ownerId, owner, curren
     setBusy(true);
     setPanelError('');
     try {
-      const data = await authenticatedApi(`${endpoint}/${editorId}`, { method: 'DELETE' });
-      setEditors(data.editors);
+      const result = await authenticatedApi(`${endpoint}/${editorId}`, { method: 'DELETE' });
+      setData(result);
     } catch (err) {
       setPanelError(err.message);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleNotifications(userId, notificationsEnabled) {
+    setBusy(true);
+    setPanelError('');
+    try {
+      setData(await authenticatedApi(`${endpoint}/${userId}`, { method: 'PUT', body: JSON.stringify({ notificationsEnabled }) }));
+    } catch (err) {
+      setPanelError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function notificationSwitch(person) {
+    const enabled = person.notificationsEnabled !== false;
+    return (
+      <label className="checkbox-field editor-notifications">
+        <input type="checkbox" role="switch" checked={enabled} disabled={busy}
+          aria-label={t('Nachrichten für {{name}}', { name: formatUserLabel(person) })}
+          onChange={(event) => handleNotifications(person.id, event.target.checked)} />
+        {t('Nachrichten erhalten')}: {enabled ? t('Ja') : t('Nein')}
+      </label>
+    );
   }
 
   return (
@@ -65,19 +94,23 @@ export function EditorsPanel({ endpoint, candidates = [], ownerId, owner, curren
         <span>{t('Bearbeitungsrechte verwalten')}</span>
       </div>
       {hint && <p className="hint">{hint}</p>}
+      {notifications && <p className="hint">{t('Der Schalter steuert Postfach- und Push-Nachrichten je Person für dieses Angebot.')}</p>}
       <Feedback error={panelError} />
-      {editors === null ? (
+      {data === null ? (
         <p className="muted">{t('Lädt …')}</p>
       ) : (
         <>
-          {owner && (
+          {panelOwner && (
             <ul className="editor-list">
               <li>
                 <span data-i18n-skip>
-                  {formatUserName(owner)}
-                  {owner.username && <span className="user-handle"> @{owner.username}</span>}
+                  {formatUserName(panelOwner)}
+                  {panelOwner.username && <span className="user-handle"> @{panelOwner.username}</span>}
                 </span>
-                <span className="role">{t('Owner')}</span>
+                <span className={`editor-actions${notifications ? ' editor-actions-with-notifications' : ''}`}>
+                  <span className="role">{t('Owner')}</span>
+                  {notifications && notificationSwitch(panelOwner)}
+                </span>
               </li>
             </ul>
           )}
@@ -90,9 +123,11 @@ export function EditorsPanel({ endpoint, candidates = [], ownerId, owner, curren
                       {formatUserName(editor)}
                       {editor.username && <span className="user-handle"> @{editor.username}</span>}
                     </span>
-                    <span className="editor-actions">
+                    <span className={`editor-actions${notifications ? ' editor-actions-with-notifications' : ''}`}>
+                      {editor.inherited && <span className="role">{t('Vereinsbearbeiter')}</span>}
+                      {notifications && notificationSwitch(editor)}
                       <UsernameReportButton user={editor} currentUserId={currentUserId} />
-                      <Button variant="secondary" type="button" disabled={busy} loading={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
+                      {!editor.inherited && <Button variant="secondary" type="button" disabled={busy} loading={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>}
                     </span>
                   </li>
               ))}

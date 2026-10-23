@@ -1728,5 +1728,11 @@
   "angefragt, noch nicht bestätigt": "aangevraagd, nog niet bevestigd",
   "Bestätigt von {{name}} am {{date}}": "Bevestigd door {{name}} op {{date}}",
   "Belegung dieser Woche": "Bezetting deze week",
-  "Keine Reservierungen in dieser Woche.": "Geen reserveringen deze week."
+  "Keine Reservierungen in dieser Woche.": "Geen reserveringen deze week.",
+  "Nachrichten für {{name}}": "Berichten voor {{name}}",
+  "Nachrichten erhalten": "Berichten ontvangen",
+  "Der Schalter steuert Postfach- und Push-Nachrichten je Person für dieses Angebot.": "De schakelaar regelt inbox- en pushberichten per persoon voor dit aanbod.",
+  "Vereinsbearbeiter": "Verenigingsbeheerder",
+  "Bitte wähle Ja oder Nein für Nachrichten": "Kies Ja of Nee voor berichten",
+  "Verwalter nicht gefunden": "Beheerder niet gevonden"
 }
