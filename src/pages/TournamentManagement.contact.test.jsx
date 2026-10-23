@@ -25,4 +25,14 @@ describe('Neues Turnier: Kontakt aus dem Profil', () => {
 
     expect(screen.getByLabelText(/^Kontakt-Telefon/)).toHaveValue('');
   });
+
+  it('fragt die Telefonnummer der Anmeldenden per Checkbox als Pflicht ab', () => {
+    renderPage({ id: 'u1', firstName: 'Anna', lastName: 'Schmidt', email: 'anna@example.test', phone: null, role: 'user' });
+    fireEvent.click(screen.getByRole('button', { name: 'Neues Turnier' }));
+
+    const checkbox = screen.getByRole('checkbox', { name: 'Telefonnummer erforderlich' });
+    expect(checkbox).not.toBeChecked();
+    fireEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+  });
 });

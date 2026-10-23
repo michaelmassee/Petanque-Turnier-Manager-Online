@@ -1722,5 +1722,6 @@
   "Dieser Benutzer verwaltet dieses Angebot bereits": "Deze gebruiker beheert dit aanbod al",
   "Ganzer Tag": "Hele dag",
   "Anzahl Personen": "Aantal personen",
-  "{{persons}} Person(en)": "{{persons}} persoon/personen"
+  "{{persons}} Person(en)": "{{persons}} persoon/personen",
+  "Telefonnummer erforderlich": "Telefoonnummer verplicht"
 }

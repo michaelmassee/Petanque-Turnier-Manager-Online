@@ -1722,5 +1722,6 @@
   "Dieser Benutzer verwaltet dieses Angebot bereits": "Cet utilisateur gère déjà cette offre",
   "Ganzer Tag": "Journée entière",
   "Anzahl Personen": "Nombre de personnes",
-  "{{persons}} Person(en)": "{{persons}} personne(s)"
+  "{{persons}} Person(en)": "{{persons}} personne(s)",
+  "Telefonnummer erforderlich": "Numéro de téléphone obligatoire"
 }

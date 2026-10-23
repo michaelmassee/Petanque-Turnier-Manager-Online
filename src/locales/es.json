@@ -1722,5 +1722,6 @@
   "Dieser Benutzer verwaltet dieses Angebot bereits": "Este usuario ya gestiona esta oferta",
   "Ganzer Tag": "Día completo",
   "Anzahl Personen": "Número de personas",
-  "{{persons}} Person(en)": "{{persons}} persona(s)"
+  "{{persons}} Person(en)": "{{persons}} persona(s)",
+  "Telefonnummer erforderlich": "Número de teléfono obligatorio"
 }

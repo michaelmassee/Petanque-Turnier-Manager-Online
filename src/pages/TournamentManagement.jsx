@@ -510,12 +510,14 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             />
             {t('Lizenznummer erforderlich')}
           </label>
-          <SelectField
-            label={t('Telefonnummer bei der Anmeldung')}
-            value={form.phoneRequired ? 'required' : 'optional'}
-            onChange={(value) => setForm({ ...form, phoneRequired: value === 'required' })}
-            options={[{ value: 'optional', label: t('Optional') }, { value: 'required', label: t('Pflichtangabe') }]}
-          />
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={form.phoneRequired}
+              onChange={(event) => setForm({ ...form, phoneRequired: event.target.checked })}
+            />
+            {t('Telefonnummer erforderlich')}
+          </label>
           <label className="checkbox-field">
             <input
               type="checkbox"

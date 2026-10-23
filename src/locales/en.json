@@ -1722,5 +1722,6 @@
   "Dieser Benutzer verwaltet dieses Angebot bereits": "This user already manages this offer",
   "Ganzer Tag": "Whole day",
   "Anzahl Personen": "Number of people",
-  "{{persons}} Person(en)": "{{persons}} person(s)"
+  "{{persons}} Person(en)": "{{persons}} person(s)",
+  "Telefonnummer erforderlich": "Phone number required"
 }
