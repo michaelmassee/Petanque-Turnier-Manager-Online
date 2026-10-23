@@ -158,9 +158,11 @@ export function occupiedLanes(reservations, status = null) {
  * Vergangene Stunden und Tage jenseits des Buchungshorizonts sind als nicht buchbar markiert.
  */
 export function buildAvailability({ offer, openingHours, from, days = RENTAL_AVAILABILITY_DAYS, reservations, venueLaneCount = offer.laneCount, now }) {
-  const occupied = occupiedLanes(reservations.filter((reservation) => !reservation.offerId || reservation.offerId === offer.id));
+  const offerReservations = reservations.filter((reservation) => !reservation.offerId || reservation.offerId === offer.id);
+  const occupied = occupiedLanes(offerReservations);
   const venueOccupied = occupiedLanes(reservations);
-  const venueRequested = occupiedLanes(reservations, 'requested');
+  const confirmed = occupiedLanes(offerReservations.filter((reservation) => reservation.status !== 'requested'));
+  const venueConfirmed = occupiedLanes(reservations.filter((reservation) => reservation.status !== 'requested'));
   const byWeekday = new Map(openingHours.map((entry) => [entry.weekday, entry]));
   return Array.from({ length: days }, (_, index) => {
     const date = addDays(from, index);
@@ -171,8 +173,10 @@ export function buildAvailability({ offer, openingHours, from, days = RENTAL_AVA
       const past = date < now.date || (date === now.date && hour <= now.hour);
       const key = `${date}|${hour}`;
       const free = Math.max(0, Math.min(offer.laneCount - (occupied.get(key) || 0), venueLaneCount - (venueOccupied.get(key) || 0)));
-      // requested: davon nur angefragt, noch nicht bestätigt (öffentlich als Zahl, ohne Personenbezug).
-      const requested = Math.min(venueRequested.get(key) || 0, offer.laneCount - free);
+      // Nur der zusätzliche Kapazitätsverbrauch durch Anfragen zählt als angefragt.
+      // Fremde Anfragen in freien Spielortbahnen ändern bestätigte Angebotsbelegung nicht.
+      const freeWithoutRequests = Math.max(0, Math.min(offer.laneCount - (confirmed.get(key) || 0), venueLaneCount - (venueConfirmed.get(key) || 0)));
+      const requested = Math.max(0, freeWithoutRequests - free);
       slots.push({ hour, free, requested, bookable: !past && !beyondHorizon });
     }
     return { date, weekday: weekdayOf(date), slots };

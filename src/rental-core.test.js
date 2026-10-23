@@ -101,6 +101,22 @@ describe('Platz mieten: Verfügbarkeit', () => {
     expect(slotAt([reservation('requested', 2)], 11)).toMatchObject({ free: 4, requested: 0 });
   });
 
+  it.each([
+    [4, 2, 0, 0],
+    [2, 2, 2, 0],
+    [2, 6, 0, 2],
+  ])('zählt fremde Anfragen nur bei Kapazitätswirkung (bestätigt: %i, fremd angefragt: %i)', (confirmed, otherRequested, free, requested) => {
+    const reservation = { localDate: '2026-10-24', startHour: 10, hours: 1 };
+    const days = buildAvailability({
+      offer: { ...offer, id: 'a' }, openingHours, from: '2026-10-24', days: 1, now, venueLaneCount: 8,
+      reservations: [
+        { ...reservation, offerId: 'a', status: 'confirmed', lanes: confirmed },
+        { ...reservation, offerId: 'b', status: 'requested', lanes: otherRequested },
+      ],
+    });
+    expect(days[0].slots.find((slot) => slot.hour === 10)).toMatchObject({ free, requested });
+  });
+
   it('formatiert den Zeitraum je Sprache', () => {
     expect(formatRentalSlot({ date: '2026-10-24', startHour: 9, hours: 2 }, 'de')).toBe('24.10.2026 09:00–11:00');
     expect(formatRentalSlot({ date: '2026-10-24', startHour: 22, hours: 2 }, 'en')).toBe('2026-10-24 22:00–24:00');

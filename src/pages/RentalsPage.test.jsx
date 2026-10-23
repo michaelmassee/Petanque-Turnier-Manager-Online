@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { api, authenticatedApi } from '../lib/api.js';
 import { MyRentalReservations, RentalManagement, RentalOfferView, RentalsPage } from './RentalsPage.jsx';
 
@@ -213,6 +213,62 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(within(list).getByText(/Anna Anders/)).toBeInTheDocument();
     expect(within(list).getByText(/Angefragt/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /10:00: 2 von 4 Bahnen frei – Max Mieter$/ })).toBeInTheDocument();
+  });
+
+  it.each([null, { id: 'u2' }])('entfernt Mieternamen bei Abmeldung oder Kontowechsel (%j)', async (nextUser) => {
+    let manager = true;
+    const bookings = [{ id: 'r1', date: '2026-10-24', startHour: 10, hours: 1, lanes: 2, status: 'confirmed', renterName: 'Max Mieter' }];
+    api.mockImplementation(async (path) => (path.includes('/availability')
+      ? { ...AVAILABILITY, ...(manager ? { bookings } : {}) }
+      : { offer: { ...OFFER, canManage: manager } }));
+    const props = { id: 'o1', language: 'de', navigate: vi.fn(), onLogin: vi.fn() };
+    const view = render(<RentalOfferView {...props} currentUser={{ id: 'u1' }} />);
+    await screen.findByRole('button', { name: /10:00:.*Max Mieter/ });
+
+    manager = false;
+    view.rerender(<RentalOfferView {...props} currentUser={nextUser} />);
+    await screen.findByRole('button', { name: /10:00: 2 von 4 Bahnen frei$/ });
+    expect(screen.queryByRole('heading', { name: 'Belegung dieser Woche' })).not.toBeInTheDocument();
+    expect(document.querySelector('[title*="Max Mieter"], [aria-label*="Max Mieter"]')).toBeNull();
+  });
+
+  it('ignoriert verspätete private Kalenderantworten nach der Abmeldung', async () => {
+    let manager = true;
+    let finishOldRequest;
+    const bookings = [{ id: 'r1', date: '2026-10-24', startHour: 10, hours: 1, lanes: 2, status: 'confirmed', renterName: 'Max Mieter' }];
+    api.mockImplementation(async (path) => {
+      if (!path.includes('/availability')) return { offer: { ...OFFER, canManage: manager } };
+      if (path.endsWith('?from=2026-10-26')) return new Promise((resolve) => { finishOldRequest = resolve; });
+      return { ...AVAILABILITY, ...(manager ? { bookings } : {}) };
+    });
+    const props = { id: 'o1', language: 'de', navigate: vi.fn(), onLogin: vi.fn() };
+    const view = render(<RentalOfferView {...props} currentUser={{ id: 'u1' }} />);
+    await screen.findByRole('button', { name: /10:00:.*Max Mieter/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Nächste Woche' }));
+    await waitFor(() => expect(finishOldRequest).toBeTypeOf('function'));
+
+    manager = false;
+    view.rerender(<RentalOfferView {...props} currentUser={null} />);
+    await screen.findByRole('button', { name: /10:00: 2 von 4 Bahnen frei$/ });
+    await act(async () => finishOldRequest({ ...AVAILABILITY, from: '2026-10-26', bookings }));
+    expect(document.querySelector('[title*="Max Mieter"], [aria-label*="Max Mieter"]')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Belegung dieser Woche' })).not.toBeInTheDocument();
+  });
+
+  it('lädt nach der Anmeldung als Verwalter die privaten Kalenderdaten neu', async () => {
+    let manager = false;
+    const bookings = [{ id: 'r1', date: '2026-10-24', startHour: 10, hours: 1, lanes: 2, status: 'confirmed', renterName: 'Max Mieter' }];
+    api.mockImplementation(async (path) => (path.includes('/availability')
+      ? { ...AVAILABILITY, ...(manager ? { bookings } : {}) }
+      : { offer: { ...OFFER, canManage: manager } }));
+    const props = { id: 'o1', language: 'de', navigate: vi.fn(), onLogin: vi.fn() };
+    const view = render(<RentalOfferView {...props} currentUser={null} />);
+    await screen.findByRole('button', { name: /10:00: 2 von 4 Bahnen frei$/ });
+
+    manager = true;
+    view.rerender(<RentalOfferView {...props} currentUser={{ id: 'u1' }} />);
+    expect(await screen.findByRole('button', { name: /10:00:.*Max Mieter/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Belegung dieser Woche' })).toBeInTheDocument();
   });
 
   it('meldet Verwaltern eine Woche ohne Reservierungen', async () => {

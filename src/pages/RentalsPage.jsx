@@ -231,7 +231,13 @@ function DurationPopover({ options, tooShort, fullDay, onChoose, onChooseFullDay
   );
 }
 
-export function RentalOfferView({ id, language, currentUser, navigate, onLogin }) {
+export function RentalOfferView(props) {
+  // Personenbezogene Kalenderdaten gehören zu Angebot und Sitzung. Beim Wechsel
+  // sofort verwerfen; verspätete Antworten dürfen nur die alte Instanz erreichen.
+  return <RentalOfferContent key={JSON.stringify([props.id, props.currentUser?.id ?? null])} {...props} />;
+}
+
+function RentalOfferContent({ id, language, currentUser, navigate, onLogin }) {
   const { t } = useTranslation();
   const [offer, setOffer] = useState(null);
   const [availability, setAvailability] = useState(null);
@@ -383,7 +389,7 @@ export function RentalOfferView({ id, language, currentUser, navigate, onLogin }
           ? <DurationPopover options={durationOptions} tooShort={tooShort} fullDay={fullDay} onChoose={chooseDuration}
             onChooseFullDay={() => chooseDuration(fullDay.hours, fullDay.startHour)} onClose={() => setDurationOpen(false)} />
           : null}
-        bookings={availability.bookings}
+        bookings={offer.canManage ? availability.bookings : undefined}
       />
       {offer.canManage && availability.bookings && <RentalBookingList bookings={availability.bookings} offer={offer} language={language} />}
       <Feedback message={message} />

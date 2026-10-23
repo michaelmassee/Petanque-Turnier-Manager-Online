@@ -468,6 +468,18 @@ describe('Platz mieten', () => {
     expect((await (await call('GET', '/api/rentals/manage/clubs', { headers: ANDERER })).json()).clubs).toEqual([]);
   });
 
+  it('kennzeichnet vollständig bestätigte Angebote trotz fremder Anfragen als bestätigt', async () => {
+    const offer = await createOffer();
+    const other = (await (await call('POST', '/api/rentals/offers', { body: { ...offerBody, title: 'Zweites Angebot' }, headers: VEREIN })).json()).offer;
+    const reservation = (await (await reserve(offer.id, { lanes: 4 })).json()).reservation;
+    expect((await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN })).status).toBe(200);
+    expect((await reserve(other.id, { lanes: 2 })).status).toBe(201);
+
+    const availability = async (id) => (await (await call('GET', `/api/rentals/${id}/availability?from=2026-10-24`)).json()).days[0].slots.find((slot) => slot.hour === 10);
+    expect(await availability(offer.id)).toMatchObject({ free: 0, requested: 0 });
+    expect(await availability(other.id)).toMatchObject({ free: 2, requested: 2 });
+  });
+
   it('zeigt Mieter und Bestätiger im Kalender nur Verwaltern des Angebots', async () => {
     const offer = await createOffer();
     const anderes = (await (await call('POST', '/api/rentals/offers', { body: { ...offerBody, title: 'Außenplatz' }, headers: VEREIN })).json()).offer;
