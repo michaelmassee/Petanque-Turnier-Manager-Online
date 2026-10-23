@@ -1628,7 +1628,7 @@ const PWA_INSTALL_PATHS = ['/manifest.webmanifest', '/service-worker.js'];
 export default {
   async scheduled(event, env, ctx) {
     // Stündlich: vergessene Turniere 48 Stunden nach Beginn abschließen. Erinnerungen und der
-    // Pétanque-Aktuell-Abgleich laufen weiterhin nur einmal täglich (DAILY_CRON).
+    // Pétanque-Aktuell-Abgleich und die Bereinigung alter Vermietungen laufen nur täglich (DAILY_CRON).
     // Das Aufräumen abgelaufener Sitzungen/Tokens lief früher vor jeder API-Anfrage (rund 8
     // DELETE-Abfragen pro Aufruf). Alle Lesepfade prüfen das Ablaufdatum selbst, stündlich reicht.
     const runJob = async (key, work) => {
@@ -1652,6 +1652,7 @@ export default {
     }));
     if (event.cron === DAILY_CRON) {
       jobs.push(
+        runJob('rentalsCleanup', () => cleanupExpiredRentalReservations(env.DB, event.scheduledTime ?? Date.now())),
         runJob('reminders', () => sendTournamentReminders(env)),
         runJob('importSync', () => syncPetanqueAktuellImports(env)),
         runJob('purge', () => purgeExpiredPersonalDataWennAktiviert(env.DB)),
@@ -11536,6 +11537,12 @@ async function createSession(db, userId) {
     .run();
 
   return { id, expiresAt };
+}
+
+// Ein indizierter Löschlauf im bestehenden Tages-Cron, keine Abfrage pro Angebot oder API-Aufruf.
+// UTC-Ende des reservierten Zeitraums gilt unabhängig von Status und Spielort-Zeitzone.
+async function cleanupExpiredRentalReservations(db, scheduledTime) {
+  await db.prepare('DELETE FROM rental_reservations WHERE end_utc <= ?').bind(new Date(scheduledTime).toISOString()).run();
 }
 
 async function cleanupExpiredSessions(db) {
