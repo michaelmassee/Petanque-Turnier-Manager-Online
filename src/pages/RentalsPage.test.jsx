@@ -528,6 +528,31 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     });
   });
 
+  it('legt regelmäßige Belegungen an und entfernt sie wieder', async () => {
+    const onWrite = vi.fn(async () => ({}));
+    mockManagement(onWrite);
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Neues Angebot' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/Titel/), { target: { value: 'Halle' } });
+    fireEvent.click(within(dialog).getAllByRole('checkbox')[0]);
+    fireEvent.click(within(dialog).getByRole('button', { name: '+ Belegung hinzufügen' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '+ Belegung hinzufügen' }));
+    expect(within(dialog).getAllByLabelText('Wochentag')).toHaveLength(2);
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Entfernen' })[1]);
+    fireEvent.change(within(dialog).getByLabelText('Wochentag'), { target: { value: '3' } });
+    fireEvent.change(within(dialog).getByLabelText('Bahnen'), { target: { value: '4' } });
+    fireEvent.change(within(dialog).getByLabelText('Bezeichnung'), { target: { value: 'Vereinstraining' } });
+    fireEvent.change(within(dialog).getByLabelText('gültig bis'), { target: { value: '2027-03-31' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(onWrite).toHaveBeenCalled());
+    expect(JSON.parse(onWrite.mock.calls[0][1].body).blocks).toEqual([
+      { weekday: 3, startHour: 18, endHour: 20, lanes: 4, label: 'Vereinstraining', validFrom: null, validTo: '2027-03-31' },
+    ]);
+  });
+
   it('legt ein Angebot an, das einzelne Bahnen oder die komplette Halle vermietet', async () => {
     const onWrite = vi.fn(async () => ({}));
     mockManagement(onWrite);

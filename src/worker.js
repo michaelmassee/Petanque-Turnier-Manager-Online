@@ -10,8 +10,8 @@ import {
   TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT, unreadPostboxCount,
 } from './postbox-core.js';
 import {
-  addDays, buildAvailability, dayAvailabilityStatus, formatRentalSlot, isValidLocalDate, monthRange, normalizeOfferInput, RENTAL_AVAILABILITY_DAYS, rentalMinLanes,
-  validateReservationRequest,
+  addDays, buildAvailability, dayAvailabilityStatus, formatRentalSlot, isValidLocalDate, monthRange, normalizeOfferInput, RENTAL_AVAILABILITY_DAYS, rentalBlocksConflict,
+  rentalMinLanes, validateReservationRequest,
 } from './rental-core.js';
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
@@ -9907,7 +9907,7 @@ function rentalOfferIsPublic(row) {
   return row.status === 'active' && row.club_status === 'published' && row.place_status === 'published';
 }
 
-function toRentalOffer(row, openingHours = null) {
+function toRentalOffer(row, openingHours = null, blocks = null) {
   return {
     id: row.id, clubId: row.club_id, clubName: row.club_name, contactEmail: row.contact_email || null, hasClubLogo: Boolean(row.club_logo_url), placeId: row.boule_place_id,
     placeName: row.place_name, address: formatLocationAddress(row.place_address), venueType: row.venue_type || 'outdoor',
@@ -9921,11 +9921,22 @@ function toRentalOffer(row, openingHours = null) {
     minHours: Number(row.min_hours), maxHours: Number(row.max_hours), bookingHorizonDays: Number(row.booking_horizon_days),
     timezone: row.timezone, status: row.status, isPublic: rentalOfferIsPublic(row),
     ...(openingHours ? { openingHours } : {}),
+    ...(blocks ? { blocks } : {}),
   };
 }
 
 function toOpeningHours(rows) {
   return rows.map((row) => ({ weekday: Number(row.weekday), openHour: Number(row.open_hour), closeHour: Number(row.close_hour) }));
+}
+
+// Mit lane_count (Join auf das Angebot) zusätzlich offerId und laneCount für die Spielort-Verfügbarkeit.
+function toRentalBlocks(rows) {
+  return rows.map((row) => ({
+    weekday: Number(row.weekday), startHour: Number(row.start_hour), endHour: Number(row.end_hour),
+    lanes: row.lanes === null || row.lanes === undefined ? null : Number(row.lanes), label: row.label || null,
+    validFrom: row.valid_from || null, validTo: row.valid_to || null,
+    ...(row.lane_count !== undefined ? { offerId: row.offer_id, laneCount: Number(row.lane_count) } : {}),
+  }));
 }
 
 function toRentalReservation(row, { withRenter = false } = {}) {
@@ -9950,6 +9961,11 @@ async function loadRentalOffer(db, id) {
 async function loadOpeningHours(db, offerId) {
   const rows = await db.prepare('SELECT weekday, open_hour, close_hour FROM rental_opening_hours WHERE offer_id = ? ORDER BY weekday').bind(offerId).all();
   return toOpeningHours(rows.results || []);
+}
+
+async function loadRentalBlocks(db, offerId) {
+  const rows = await db.prepare('SELECT * FROM rental_blocks WHERE offer_id = ? ORDER BY weekday, start_hour').bind(offerId).all();
+  return toRentalBlocks(rows.results || []);
 }
 
 async function canManageRentalClub(db, clubId, user) {
@@ -10015,12 +10031,14 @@ async function getRentalAvailability(db, id, fromParam, user, monthParam = null)
   const from = month?.from || (fromParam && isValidLocalDate(fromParam) ? fromParam : now.date);
   const days = month?.days || RENTAL_AVAILABILITY_DAYS;
   const to = addDays(from, days - 1);
-  const [openingHours, reservations, venueLaneCount] = await Promise.all([
+  const [openingHours, reservations, blocks, venueLaneCount] = await Promise.all([
     loadOpeningHours(db, id), activeRentalReservations(db, row.boule_place_id, from, to),
+    db.prepare(`SELECT b.*, o.lane_count FROM rental_blocks b JOIN rental_offers o ON o.id = b.offer_id
+      WHERE o.boule_place_id = ?`).bind(row.boule_place_id).all().then((result) => toRentalBlocks(result.results || [])),
     Number(row.place_court_count) > 0 ? Number(row.place_court_count)
       : db.prepare('SELECT MAX(lane_count) AS capacity FROM rental_offers WHERE boule_place_id = ?').bind(row.boule_place_id).first('capacity'),
   ]);
-  const availability = buildAvailability({ offer, openingHours, from, days, reservations, venueLaneCount: Number(venueLaneCount), now });
+  const availability = buildAvailability({ offer, openingHours, from, days, reservations, blocks, venueLaneCount: Number(venueLaneCount), now });
   if (month) {
     return json({
       month: monthParam, today: now.date, lastDate: addDays(now.date, offer.bookingHorizonDays),
@@ -10183,8 +10201,14 @@ async function notifyRentalRenter(env, { offer, reservation, manager, origin }) 
   }
 }
 
-// Dieselbe atomare Prüfung bei Anlage und Zusage: Angebotslimit und gemeinsame Kapazität des Spielorts.
-// Ohne hinterlegte Gesamtzahl begrenzt das größte Angebot des Spielorts dessen gemeinsam genutzte Bahnen.
+// Regelmäßige Belegung b gilt am angefragten Tag q.local_date in der Stunde hrs.hour.
+const RENTAL_BLOCK_MATCH = `b.weekday = CAST(strftime('%w', q.local_date) AS INTEGER)
+          AND (b.valid_from IS NULL OR b.valid_from <= q.local_date) AND (b.valid_to IS NULL OR b.valid_to >= q.local_date)
+          AND b.start_hour <= hrs.hour AND b.end_hour > hrs.hour`;
+
+// Dieselbe atomare Prüfung bei Anlage und Zusage: Angebotslimit und gemeinsame Kapazität des Spielorts, jeweils
+// abzüglich regelmäßiger Belegungen. Ohne hinterlegte Gesamtzahl begrenzt das größte Angebot des Spielorts dessen
+// gemeinsam genutzte Bahnen.
 function rentalCapacityGuard(offer, reservation, excludedId = '') {
   const hours = Array.from({ length: reservation.hours }, (_, index) => reservation.startHour + index);
   return {
@@ -10207,11 +10231,16 @@ function rentalCapacityGuard(offer, reservation, excludedId = '') {
         SELECT COALESCE(SUM(r.lanes), 0) FROM rental_reservations r
         WHERE r.offer_id = o.id AND r.local_date = q.local_date AND r.status IN ('requested', 'confirmed')
           AND r.id <> q.excluded_id AND r.start_hour <= hrs.hour AND r.start_hour + r.hours > hrs.hour
+      ) + (
+        SELECT COALESCE(SUM(COALESCE(b.lanes, o.lane_count)), 0) FROM rental_blocks b WHERE b.offer_id = o.id AND ${RENTAL_BLOCK_MATCH}
       ) > o.lane_count
       OR q.lanes + (
         SELECT COALESCE(SUM(r.lanes), 0) FROM rental_offers other JOIN rental_reservations r ON r.offer_id = other.id
         WHERE other.boule_place_id = o.boule_place_id AND r.local_date = q.local_date AND r.status IN ('requested', 'confirmed')
           AND r.id <> q.excluded_id AND r.start_hour <= hrs.hour AND r.start_hour + r.hours > hrs.hour
+      ) + (
+        SELECT COALESCE(SUM(COALESCE(b.lanes, other.lane_count)), 0) FROM rental_offers other JOIN rental_blocks b ON b.offer_id = other.id
+        WHERE other.boule_place_id = o.boule_place_id AND ${RENTAL_BLOCK_MATCH}
       ) > o.venue_capacity
     )`,
     params: [offer.id, reservation.date, reservation.lanes, excludedId, offer.boule_place_id, offer.timezone, ...hours],
@@ -10325,20 +10354,23 @@ async function listRentalManagement(db, clubId, user) {
   const offerScope = clubManager ? '' : ' AND o.id IN (SELECT offer_id FROM rental_offer_editors WHERE user_id = ?)';
   const scopeParams = clubManager ? [] : [user.id];
   const now = new Date().toISOString();
-  const [offers, hours, places, reservations] = await Promise.all([
+  const [offers, hours, blocks, places, reservations] = await Promise.all([
     db.prepare(`${RENTAL_OFFER_SELECT} WHERE o.club_id = ?${offerScope} ORDER BY o.title COLLATE NOCASE`).bind(clubId, ...scopeParams).all(),
     db.prepare(`SELECT h.* FROM rental_opening_hours h JOIN rental_offers o ON o.id = h.offer_id WHERE o.club_id = ?${offerScope} ORDER BY h.weekday`).bind(clubId, ...scopeParams).all(),
+    db.prepare(`SELECT b.* FROM rental_blocks b JOIN rental_offers o ON o.id = b.offer_id WHERE o.club_id = ?${offerScope} ORDER BY b.weekday, b.start_hour`).bind(clubId, ...scopeParams).all(),
     db.prepare("SELECT id, name, court_count, venue_type, status FROM boule_places WHERE club_id = ? AND status = 'published' ORDER BY name COLLATE NOCASE").bind(clubId).all(),
     db.prepare(`${RENTAL_RESERVATION_SELECT} WHERE o.club_id = ?${offerScope} AND r.end_utc > ? AND r.status IN ('requested', 'confirmed')
       ORDER BY r.start_utc LIMIT 300`).bind(clubId, ...scopeParams, now).all(),
   ]);
   const hoursByOffer = new Map();
   for (const row of hours.results || []) hoursByOffer.set(row.offer_id, [...(hoursByOffer.get(row.offer_id) || []), row]);
+  const blocksByOffer = new Map();
+  for (const row of blocks.results || []) blocksByOffer.set(row.offer_id, [...(blocksByOffer.get(row.offer_id) || []), row]);
   return json({
     clubStatus: club.status,
     canManageClub: clubManager,
     clubContactEmail: isEmail(club.contact_email || '') ? club.contact_email : null,
-    offers: (offers.results || []).map((row) => toRentalOffer(row, toOpeningHours(hoursByOffer.get(row.id) || []))),
+    offers: (offers.results || []).map((row) => toRentalOffer(row, toOpeningHours(hoursByOffer.get(row.id) || []), toRentalBlocks(blocksByOffer.get(row.id) || []))),
     places: (places.results || []).map((row) => ({ id: row.id, name: row.name, courtCount: Number(row.court_count || 0), venueType: row.venue_type || 'outdoor', status: row.status })),
     reservations: (reservations.results || []).map((row) => toRentalReservation(row, { withRenter: true })),
   });
@@ -10354,6 +10386,36 @@ async function rentalPlaceForClub(db, clubId, placeId) {
   if (!place) throw new HttpError(400, 'Der Platz gehört nicht zu diesem Verein', { field: 'placeId' });
   if (place.status !== 'published') throw new HttpError(400, 'Der Spielort ist noch nicht freigegeben', { field: 'placeId' });
   return place;
+}
+
+function rentalBlockStatements(db, offerId, blocks) {
+  return [
+    db.prepare('DELETE FROM rental_blocks WHERE offer_id = ?').bind(offerId),
+    ...blocks.map((block) => db.prepare(`INSERT INTO rental_blocks (id, offer_id, weekday, start_hour, end_hour, lanes, label, valid_from, valid_to)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(crypto.randomUUID(), offerId, block.weekday, block.startHour, block.endHour, block.lanes, block.label,
+      block.validFrom, block.validTo)),
+  ];
+}
+
+// Vorabprüfung beim Speichern: neue Belegungen dürfen künftige aktive Reservierungen am Spielort nicht überbuchen.
+// Nicht atomar wie rentalCapacityGuard; ein Rennen mit einer gleichzeitigen Anfrage fängt die Zusage durch den Verein ab.
+async function assertRentalBlocksFit(db, offerId, place, input) {
+  if (!input.blocks.length) return;
+  const [reservations, otherBlocks, otherCapacity] = await Promise.all([
+    db.prepare(`SELECT r.offer_id, r.local_date, r.start_hour, r.hours, r.lanes FROM rental_offers o JOIN rental_reservations r ON r.offer_id = o.id
+      WHERE o.boule_place_id = ? AND r.status IN ('requested', 'confirmed') AND r.end_utc > ?`).bind(place.id, new Date().toISOString()).all(),
+    db.prepare(`SELECT b.*, o.lane_count FROM rental_blocks b JOIN rental_offers o ON o.id = b.offer_id
+      WHERE o.boule_place_id = ? AND o.id <> ?`).bind(place.id, offerId).all(),
+    db.prepare('SELECT MAX(lane_count) AS capacity FROM rental_offers WHERE boule_place_id = ? AND id <> ?').bind(place.id, offerId).first('capacity'),
+  ]);
+  const conflict = rentalBlocksConflict({
+    offerId, laneCount: input.laneCount, blocks: input.blocks, otherBlocks: toRentalBlocks(otherBlocks.results || []),
+    reservations: (reservations.results || []).map((row) => ({
+      offerId: row.offer_id, localDate: row.local_date, startHour: Number(row.start_hour), hours: Number(row.hours), lanes: Number(row.lanes),
+    })),
+    venueLaneCount: Number(place.court_count) > 0 ? Number(place.court_count) : Math.max(input.laneCount, Number(otherCapacity || 0)),
+  });
+  if (conflict) throw new HttpError(409, 'Die Änderung widerspricht bestehenden Reservierungen. Storniere oder kläre diese zuerst.');
 }
 
 function openingHourStatements(db, offerId, openingHours) {
@@ -10390,6 +10452,7 @@ async function createRentalOffer(request, db, user) {
   assertRentalLaneCount(place, input);
   const timezone = resolveTournamentTimezone({ latitude: Number(place.latitude ?? NaN), longitude: Number(place.longitude ?? NaN) });
   const id = crypto.randomUUID();
+  await assertRentalBlocksFit(db, id, place, input);
   const now = new Date().toISOString();
   await db.batch([
     db.prepare(`INSERT INTO rental_offers (id, club_id, boule_place_id, title, description, lane_count, rental_mode, price_minor, currency, price_note,
@@ -10398,8 +10461,9 @@ async function createRentalOffer(request, db, user) {
       input.rentalMode, input.priceMinor, input.currency, input.priceNote, input.wholePriceMinor, input.wholePriceNote, input.minHours, input.maxHours,
       input.bookingHorizonDays, timezone, input.status, input.contactEmail, user.id, now, now),
     ...openingHourStatements(db, id, input.openingHours),
+    ...rentalBlockStatements(db, id, input.blocks),
   ]);
-  return json({ offer: toRentalOffer(await loadRentalOffer(db, id), await loadOpeningHours(db, id)) }, 201);
+  return json({ offer: toRentalOffer(await loadRentalOffer(db, id), await loadOpeningHours(db, id), await loadRentalBlocks(db, id)) }, 201);
 }
 
 async function updateRentalOffer(request, db, id, user) {
@@ -10409,6 +10473,7 @@ async function updateRentalOffer(request, db, id, user) {
   const input = rentalOfferInput(await readJson(request));
   const place = await rentalPlaceForClub(db, existing.club_id, input.placeId);
   assertRentalLaneCount(place, input);
+  await assertRentalBlocksFit(db, id, place, input);
   const timezone = resolveTournamentTimezone({ latitude: Number(place.latitude ?? NaN), longitude: Number(place.longitude ?? NaN) });
   try {
     await db.batch([
@@ -10419,6 +10484,7 @@ async function updateRentalOffer(request, db, id, user) {
           input.wholePriceMinor, input.wholePriceNote, input.minHours, input.maxHours, input.bookingHorizonDays, timezone, input.status,
           input.contactEmail, new Date().toISOString(), id),
       ...openingHourStatements(db, id, input.openingHours),
+      ...rentalBlockStatements(db, id, input.blocks),
     ]);
   } catch (error) {
     if (String(error.message).includes('rental_reservations_conflict')) {
@@ -10426,7 +10492,7 @@ async function updateRentalOffer(request, db, id, user) {
     }
     throw error;
   }
-  return json({ offer: toRentalOffer(await loadRentalOffer(db, id), await loadOpeningHours(db, id)) });
+  return json({ offer: toRentalOffer(await loadRentalOffer(db, id), await loadOpeningHours(db, id), await loadRentalBlocks(db, id)) });
 }
 
 async function deleteRentalOffer(db, id, user) {

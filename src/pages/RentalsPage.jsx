@@ -506,6 +506,7 @@ export function MyRentalReservations({ language, navigate }) {
 }
 
 const DEFAULT_OPENING = { enabled: false, openHour: '10', closeHour: '20' };
+const DEFAULT_BLOCK = { weekday: '1', startHour: '18', endHour: '20', lanes: '', label: '', validFrom: '', validTo: '' };
 
 function emptyOfferForm(places, contactEmail = '') {
   return {
@@ -513,6 +514,7 @@ function emptyOfferForm(places, contactEmail = '') {
     wholePrice: '', wholePriceNote: '',
     minHours: '1', maxHours: '4', bookingHorizonDays: '60', status: 'active',
     opening: Object.fromEntries(WEEKDAYS.map((weekday) => [weekday, { ...DEFAULT_OPENING }])),
+    blocks: [],
   };
 }
 
@@ -535,6 +537,10 @@ function offerToForm(offer, places) {
     rentalMode: offer.rentalMode || 'lanes', price: priceToForm(offer.priceMinor, offer.currency), currency: offer.currency, priceNote: offer.priceNote || '',
     wholePrice: priceToForm(offer.wholePriceMinor, offer.currency), wholePriceNote: offer.wholePriceNote || '', minHours: String(offer.minHours), maxHours: String(offer.maxHours),
     bookingHorizonDays: String(offer.bookingHorizonDays), status: offer.status,
+    blocks: (offer.blocks || []).map((block) => ({
+      weekday: String(block.weekday), startHour: String(block.startHour), endHour: String(block.endHour), lanes: block.lanes === null ? '' : String(block.lanes),
+      label: block.label || '', validFrom: block.validFrom || '', validTo: block.validTo || '',
+    })),
   };
 }
 
@@ -546,6 +552,11 @@ function offerPayload(form, clubId) {
     minHours: Number(form.minHours), maxHours: Number(form.maxHours), bookingHorizonDays: Number(form.bookingHorizonDays), status: form.status,
     openingHours: WEEKDAYS.filter((weekday) => form.opening[weekday].enabled)
       .map((weekday) => ({ weekday, openHour: Number(form.opening[weekday].openHour), closeHour: Number(form.opening[weekday].closeHour) })),
+    // Bahnen leer = alle Bahnen des Angebots.
+    blocks: form.blocks.map((block) => ({
+      weekday: Number(block.weekday), startHour: Number(block.startHour), endHour: Number(block.endHour), lanes: block.lanes.trim() === '' ? null : Number(block.lanes),
+      label: block.label, validFrom: block.validFrom || null, validTo: block.validTo || null,
+    })),
   };
 }
 
@@ -554,6 +565,8 @@ function OfferFields({ form, setForm, places, language }) {
   const set = (field) => (value) => setForm({ ...form, [field]: value });
   const hourOptions = (from, to) => Array.from({ length: to - from + 1 }, (_, index) => ({ value: String(from + index), label: hourLabel(from + index) }));
   const setOpening = (weekday, patch) => setForm({ ...form, opening: { ...form.opening, [weekday]: { ...form.opening[weekday], ...patch } } });
+  const setBlock = (index, patch) => setForm({ ...form, blocks: form.blocks.map((block, position) => (position === index ? { ...block, ...patch } : block)) });
+  const weekdayOptions = WEEKDAYS.map((weekday) => ({ value: String(weekday), label: weekdayName(weekday, language) }));
   const whole = wholeLabel(t, places.find((place) => place.id === form.placeId)?.venueType);
   return <>
     <SelectField label={t('Spielort')} value={form.placeId} onChange={set('placeId')} required options={places.map((place) => ({ value: place.id, label: `${t(place.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')}: ${place.name}` }))} />
@@ -609,6 +622,23 @@ function OfferFields({ form, setForm, places, language }) {
           <SelectField label={t('bis')} value={form.opening[weekday].closeHour} disabled={!form.opening[weekday].enabled} onChange={(closeHour) => setOpening(weekday, { closeHour })} options={hourOptions(1, 24)} />
         </div>
       ))}
+    </fieldset>
+    <fieldset className="rental-blocks">
+      <legend>{t('Regelmäßige Belegungen')}</legend>
+      <p className="hint">{t('Z. B. Vereinstraining: Diese Bahnen sind jede Woche im angegebenen Zeitraum nicht mietbar. Die Bezeichnung sehen auch Mieter.')}</p>
+      {form.blocks.map((block, index) => (
+        <div className="rental-block-row" key={index}>
+          <SelectField label={t('Wochentag')} value={block.weekday} onChange={(weekday) => setBlock(index, { weekday })} options={weekdayOptions} />
+          <SelectField label={t('von')} value={block.startHour} onChange={(startHour) => setBlock(index, { startHour })} options={hourOptions(0, 23)} />
+          <SelectField label={t('bis')} value={block.endHour} onChange={(endHour) => setBlock(index, { endHour })} options={hourOptions(1, 24)} />
+          <TextField label={t('Bahnen')} type="number" min={1} max={200} value={block.lanes} onChange={(lanes) => setBlock(index, { lanes })} placeholder={t('alle')} />
+          <TextField label={t('Bezeichnung')} value={block.label} onChange={(label) => setBlock(index, { label })} maxLength={60} placeholder={t('z. B. Vereinstraining')} />
+          <TextField label={t('gültig ab')} type="date" value={block.validFrom} onChange={(validFrom) => setBlock(index, { validFrom })} />
+          <TextField label={t('gültig bis')} type="date" value={block.validTo} onChange={(validTo) => setBlock(index, { validTo })} />
+          <Button variant="secondary" onClick={() => setForm({ ...form, blocks: form.blocks.filter((_, position) => position !== index) })}>{t('Entfernen')}</Button>
+        </div>
+      ))}
+      <Button variant="secondary" onClick={() => setForm({ ...form, blocks: [...form.blocks, { ...DEFAULT_BLOCK }] })}>{t('+ Belegung hinzufügen')}</Button>
     </fieldset>
   </>;
 }

@@ -1739,5 +1739,17 @@
   "Alle Turnier-Limits": "All tournament limits",
   "Unbegrenzt": "Unlimited",
   "E-Mail-Versand filtern": "Filter email sending",
-  "Alle Versandstatus": "All sending statuses"
+  "Alle Versandstatus": "All sending statuses",
+  "Regelmäßige Belegungen": "Recurring bookings",
+  "Z. B. Vereinstraining: Diese Bahnen sind jede Woche im angegebenen Zeitraum nicht mietbar. Die Bezeichnung sehen auch Mieter.": "E.g. club training: these lanes cannot be rented every week during the given time. Renters also see the label.",
+  "Wochentag": "Weekday",
+  "alle": "all",
+  "z. B. Vereinstraining": "e.g. club training",
+  "gültig ab": "valid from",
+  "gültig bis": "valid until",
+  "+ Belegung hinzufügen": "+ Add booking",
+  "regelmäßig belegt": "regularly booked",
+  "{{count}} regelmäßig belegt": "{{count}} regularly booked",
+  "Ungültige regelmäßige Belegung": "Invalid recurring booking",
+  "Zu viele regelmäßige Belegungen": "Too many recurring bookings"
 }

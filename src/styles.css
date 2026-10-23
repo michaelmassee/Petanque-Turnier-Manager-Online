@@ -4805,6 +4805,13 @@ details[open] > .play-round-summary::before {
 }
 .rental-slot.partial.requested { --rental-slot-fill: linear-gradient(135deg, #fcd34d, #f08c00); }
 .rental-slot.full.requested { --rental-slot-fill: linear-gradient(135deg, #d32f2f, #991b1b); }
+/* Regelmäßige Belegung des Vereins: dunkler Streifen links, kombinierbar mit jeder Füllung und mit „angefragt“. */
+.rental-slot.blocked { box-shadow: inset 5px 0 0 #3b1f73, inset 0 1px 0 rgb(255 255 255 / 20%); }
+.rental-slot { min-width: 0; }
+.rental-slot-note {
+  display: block; max-width: 100%; padding: 0 4px 0 8px; overflow: hidden; font-size: 0.68rem; line-height: 1.2;
+  text-overflow: ellipsis; white-space: nowrap;
+}
 .rental-slot.past { background: linear-gradient(135deg, #f4f6fa, #eceff4); border-color: #e2e7f0; color: #6b7487; box-shadow: none; }
 .rental-slot.closed { background: repeating-linear-gradient(45deg, #f6f7fa, #f6f7fa 4px, #eceff4 4px, #eceff4 8px); box-shadow: none; }
 .rental-slot.selected {
@@ -4849,6 +4856,13 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
 .rental-status-rejected, .rental-status-cancelled { background: #ffecec; color: #9d2424; }
 .rental-opening { border: 1px solid #d7deea; border-radius: 8px; padding: 8px 12px 12px; }
 .rental-opening-row { display: grid; grid-template-columns: minmax(5rem, 1fr) 1fr 1fr; gap: 8px; align-items: end; }
+.rental-blocks { display: grid; gap: 10px; border: 1px solid #d7deea; border-radius: 8px; padding: 8px 12px 12px; }
+.rental-blocks .hint { margin: 0; }
+.rental-blocks > button { justify-self: start; }
+.rental-block-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 8px; align-items: end;
+  padding-bottom: 10px; border-bottom: 1px solid #e2e7f0;
+}
 
 @media (max-width: 640px) {
   .rental-day-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; margin-bottom: 8px; }

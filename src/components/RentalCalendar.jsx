@@ -9,12 +9,13 @@ function isSelected(selection, date, hour) {
 }
 
 // Farbe nach Belegung; requested markiert zusätzlich, dass ein Teil davon nur angefragt, noch nicht bestätigt ist.
+// blocked markiert regelmäßige Belegungen des Vereins (z. B. Training).
 function slotClass(slot, laneCount, minLanes, selected) {
   if (selected) return 'rental-slot selected';
   if (!slot.bookable) return 'rental-slot past';
-  const requested = slot.requested > 0 ? ' requested' : '';
-  if (slot.free < minLanes) return `rental-slot full${requested}`;
-  return slot.free < laneCount ? `rental-slot partial${requested}` : 'rental-slot free';
+  const marks = `${slot.requested > 0 ? ' requested' : ''}${slot.blocked > 0 ? ' blocked' : ''}`;
+  if (slot.free < minLanes) return `rental-slot full${marks}`;
+  return slot.free < laneCount ? `rental-slot partial${marks}` : 'rental-slot free';
 }
 
 // Nur für Verwalter (bookings kommt nur bei ihnen vom Server): wer in dieser Stunde belegt.
@@ -75,6 +76,7 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
             const renters = slotRenters(bookings, day.date, hour);
             const label = `${formatDate(day.date, language)} ${hourLabel(hour)}: ${t('{{free}} von {{total}} Bahnen frei', { free: slot.free, total: laneCount })}`
               + (slot.requested > 0 ? `, ${t('{{count}} angefragt', { count: slot.requested })}` : '')
+              + (slot.blocked > 0 ? `, ${t('{{count}} regelmäßig belegt', { count: slot.blocked })}${slot.blockLabels?.length ? ` (${slot.blockLabels.join(', ')})` : ''}` : '')
               + (renters.length ? ` – ${renters.join(', ')}` : '');
             const disabled = !onSelect || !slot.bookable || slot.free < minLanes;
             const button = (
@@ -89,6 +91,8 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
                 onClick={() => onSelect?.(day.date, hour)}
               >
                 {slot.bookable ? `${slot.free}/${laneCount}` : '–'}
+                {/* Am Handy gibt es keinen Tooltip: Bezeichnung der Belegung klein im Feld (aria-label enthält sie schon). */}
+                {slot.bookable && slot.blockLabels?.length ? <small className="rental-slot-note" aria-hidden="true">{slot.blockLabels.join(', ')}</small> : null}
               </button>
             );
             if (!popover || selection?.date !== day.date || selection?.startHour !== hour) return button;
@@ -108,6 +112,7 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
         <span><i className="rental-slot partial" />{t('teilweise belegt')}</span>
         <span><i className="rental-slot full" />{t('ausgebucht')}</span>
         <span><i className="rental-slot partial requested" />{t('angefragt, noch nicht bestätigt')}</span>
+        <span><i className="rental-slot partial blocked" />{t('regelmäßig belegt')}</span>
         <span><i className="rental-slot selected" />{t('Deine Auswahl')}</span>
       </div>
     </div>

@@ -10,9 +10,10 @@ export const RENTAL_MAX_LANES = 200;
 export const RENTAL_MAX_PERSONS = 500;
 export const RENTAL_MAX_HORIZON_DAYS = 365;
 export const RENTAL_AVAILABILITY_DAYS = 7;
+export const RENTAL_MAX_BLOCKS = 50;
 // Vermietungsart: einzelne Bahnen, nur komplett (ganze Halle bzw. ganzer Platz = alle Bahnen des Angebots) oder beides.
 export const RENTAL_MODES = ['lanes', 'whole', 'both'];
-const TEXT_LIMITS = { title: 120, description: 2000, priceNote: 120, wholePriceNote: 120, note: 500 };
+const TEXT_LIMITS = { title: 120, description: 2000, priceNote: 120, wholePriceNote: 120, note: 500, blockLabel: 60 };
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function text(value, field, { required = false } = {}) {
@@ -80,6 +81,53 @@ export function normalizeOpeningHours(value) {
   return result.sort((left, right) => left.weekday - right.weekday);
 }
 
+function localDate(value, field) {
+  const result = String(value ?? '').trim();
+  if (!result) return null;
+  if (!isValidLocalDate(result)) throw new HttpError(400, 'Ungültiges Datum', { field });
+  return result;
+}
+
+/**
+ * Regelmäßige Belegungen (z. B. wöchentliches Vereinstraining): an einem Wochentag von–bis lanes Bahnen
+ * (null = alle des Angebots) nicht mietbar, optional nur von validFrom bis validTo. Leere Liste ist erlaubt.
+ */
+export function normalizeRentalBlocks(value, laneCount) {
+  const entries = Array.isArray(value) ? value : [];
+  if (entries.length > RENTAL_MAX_BLOCKS) throw new HttpError(400, 'Zu viele regelmäßige Belegungen', { field: 'blocks' });
+  return entries.map((entry) => {
+    const weekday = integer(entry?.weekday, 'blocks', 0, 6);
+    const startHour = integer(entry?.startHour, 'blocks', 0, 23);
+    const endHour = integer(entry?.endHour, 'blocks', 1, 24);
+    if (endHour <= startHour) throw new HttpError(400, 'Ungültige regelmäßige Belegung', { field: 'blocks' });
+    const lanes = entry?.lanes === null || entry?.lanes === undefined || entry?.lanes === '' ? null : integer(entry.lanes, 'blocks', 1, laneCount);
+    const validFrom = localDate(entry?.validFrom, 'blocks');
+    const validTo = localDate(entry?.validTo, 'blocks');
+    if (validFrom && validTo && validTo < validFrom) throw new HttpError(400, 'Ungültige regelmäßige Belegung', { field: 'blocks' });
+    return { weekday, startHour, endHour, lanes, label: text(entry?.label, 'blockLabel'), validFrom, validTo };
+  }).sort((left, right) => left.weekday - right.weekday || left.startHour - right.startHour);
+}
+
+/**
+ * Regelmäßige Belegungen ({ offerId, weekday, startHour, endHour, lanes, label, validFrom, validTo }) als bestätigte
+ * Pseudo-Reservierungen je Tag ab from für days Tage; lanes null = laneCountByOffer.get(offerId).
+ */
+export function expandRentalBlocks(blocks, from, days, laneCountByOffer) {
+  const result = [];
+  for (let index = 0; index < days; index += 1) {
+    const date = addDays(from, index);
+    const weekday = weekdayOf(date);
+    for (const block of blocks) {
+      if (block.weekday !== weekday || (block.validFrom && date < block.validFrom) || (block.validTo && date > block.validTo)) continue;
+      result.push({
+        offerId: block.offerId, localDate: date, startHour: block.startHour, hours: block.endHour - block.startHour,
+        lanes: block.lanes ?? laneCountByOffer.get(block.offerId) ?? 0, status: 'confirmed', label: block.label || null,
+      });
+    }
+  }
+  return result;
+}
+
 export function normalizeOfferInput(body) {
   const currency = String(body?.currency || 'EUR').trim().toUpperCase();
   if (!CURRENCY_CODES.includes(currency)) throw new HttpError(400, 'Ungültige Währung', { field: 'currency' });
@@ -88,11 +136,12 @@ export function normalizeOfferInput(body) {
   const minHours = integer(body?.minHours ?? 1, 'minHours', 1, 24);
   const maxHours = integer(body?.maxHours ?? 4, 'maxHours', 1, 24);
   if (maxHours < minHours) throw new HttpError(400, 'Höchstdauer ist kleiner als die Mindestdauer', { field: 'maxHours' });
+  const laneCount = integer(body?.laneCount, 'laneCount', 1, RENTAL_MAX_LANES);
   return {
     placeId: String(body?.placeId || '').trim(),
     title: text(body?.title, 'title', { required: true }),
     description: description(body?.description),
-    laneCount: integer(body?.laneCount, 'laneCount', 1, RENTAL_MAX_LANES),
+    laneCount,
     rentalMode,
     priceMinor: price(body?.priceMinor, 'priceMinor'),
     currency,
@@ -104,6 +153,7 @@ export function normalizeOfferInput(body) {
     bookingHorizonDays: integer(body?.bookingHorizonDays ?? 60, 'bookingHorizonDays', 1, RENTAL_MAX_HORIZON_DAYS),
     status: body?.status === 'inactive' ? 'inactive' : 'active',
     openingHours: normalizeOpeningHours(body?.openingHours),
+    blocks: normalizeRentalBlocks(body?.blocks, laneCount),
   };
 }
 
@@ -156,8 +206,15 @@ export function occupiedLanes(reservations, status = null) {
 /**
  * Verfügbarkeit ab from für days Tage: je Tag die Stunden innerhalb der Öffnungszeiten mit freien Bahnen.
  * Vergangene Stunden und Tage jenseits des Buchungshorizonts sind als nicht buchbar markiert.
+ * blocks: regelmäßige Belegungen aller Angebote des Spielorts (mit offerId und laneCount des Angebots); sie zählen
+ * wie bestätigte Reservierungen, blocked/blockLabels je Stunde betreffen nur Belegungen dieses Angebots.
  */
-export function buildAvailability({ offer, openingHours, from, days = RENTAL_AVAILABILITY_DAYS, reservations, venueLaneCount = offer.laneCount, now }) {
+export function buildAvailability({ offer, openingHours, from, days = RENTAL_AVAILABILITY_DAYS, reservations, blocks = [], venueLaneCount = offer.laneCount, now }) {
+  const laneCountByOffer = new Map([[offer.id, offer.laneCount], ...blocks.map((block) => [block.offerId, block.laneCount ?? offer.laneCount])]);
+  const blockReservations = expandRentalBlocks(blocks.map((block) => ({ offerId: offer.id, ...block })), from, days, laneCountByOffer);
+  const ownBlocks = blockReservations.filter((block) => block.offerId === offer.id);
+  const blocked = occupiedLanes(ownBlocks);
+  reservations = [...reservations, ...blockReservations];
   const offerReservations = reservations.filter((reservation) => !reservation.offerId || reservation.offerId === offer.id);
   const occupied = occupiedLanes(offerReservations);
   const venueOccupied = occupiedLanes(reservations);
@@ -177,10 +234,31 @@ export function buildAvailability({ offer, openingHours, from, days = RENTAL_AVA
       // Fremde Anfragen in freien Spielortbahnen ändern bestätigte Angebotsbelegung nicht.
       const freeWithoutRequests = Math.max(0, Math.min(offer.laneCount - (confirmed.get(key) || 0), venueLaneCount - (venueConfirmed.get(key) || 0)));
       const requested = Math.max(0, freeWithoutRequests - free);
-      slots.push({ hour, free, requested, bookable: !past && !beyondHorizon });
+      // Nur Stunden mit eigener Belegung tragen blocked/blockLabels, das hält das Wochenraster klein.
+      const blockedLanes = blocked.get(key) || 0;
+      const blockLabels = blockedLanes ? [...new Set(ownBlocks.filter((block) => block.localDate === date && block.label
+        && hour >= block.startHour && hour < block.startHour + block.hours).map((block) => block.label))] : [];
+      slots.push({ hour, free, requested, ...(blockedLanes ? { blocked: blockedLanes, blockLabels } : {}), bookable: !past && !beyondHorizon });
     }
     return { date, weekday: weekdayOf(date), slots };
   });
+}
+
+/**
+ * Würden die Belegungen blocks des Angebots offerId bestehende aktive Reservierungen am Spielort ({ offerId, localDate,
+ * startHour, hours, lanes }) überbuchen? otherBlocks: Belegungen der übrigen Angebote am Spielort (mit offerId, laneCount).
+ * Geprüft werden nur Stunden mit eigener Belegung und Reservierung, damit Altlasten das Speichern nicht blockieren.
+ */
+export function rentalBlocksConflict({ offerId, laneCount, blocks, otherBlocks = [], reservations, venueLaneCount = laneCount }) {
+  const dates = [...new Set(reservations.map((reservation) => reservation.localDate))];
+  const laneCountByOffer = new Map([...otherBlocks.map((block) => [block.offerId, block.laneCount]), [offerId, laneCount]]);
+  const expand = (list) => dates.flatMap((date) => expandRentalBlocks(list, date, 1, laneCountByOffer));
+  const ownBlocks = expand(blocks.map((block) => ({ ...block, offerId })));
+  const reserved = occupiedLanes(reservations);
+  const offerOccupied = occupiedLanes([...reservations.filter((reservation) => reservation.offerId === offerId), ...ownBlocks]);
+  const venueOccupied = occupiedLanes([...reservations, ...ownBlocks, ...expand(otherBlocks)]);
+  return [...occupiedLanes(ownBlocks).keys()].some((key) => reserved.has(key)
+    && ((offerOccupied.get(key) || 0) > laneCount || (venueOccupied.get(key) || 0) > venueLaneCount));
 }
 
 /**

@@ -185,6 +185,43 @@ describe('Platz mieten', () => {
     expect((await reserve(first.id, { lanes: 8, startHour: 12, hours: 1 })).status).toBe(201);
   });
 
+  it('hält regelmäßige Belegungen frei, zeigt ihre Bezeichnung und schützt bestehende Reservierungen', async () => {
+    // Samstag 24.10.2026: 10–12 Uhr belegt der Verein 3 der 4 Bahnen.
+    const block = { weekday: 6, startHour: 10, endHour: 12, lanes: 3, label: 'Vereinstraining' };
+    const offer = (await (await call('POST', '/api/rentals/offers', { body: { ...offerBody, blocks: [block] }, headers: VEREIN })).json()).offer;
+    expect(offer.blocks).toEqual([{ ...block, validFrom: null, validTo: null }]);
+    const manage = await (await call('GET', '/api/rentals/manage?club=c1', { headers: VEREIN })).json();
+    expect(manage.offers[0].blocks).toHaveLength(1);
+    expect((await (await call('GET', `/api/rentals/${offer.id}`)).json()).offer.blocks).toBeUndefined();
+
+    const availability = await (await call('GET', `/api/rentals/${offer.id}/availability?from=2026-10-24`)).json();
+    expect(availability.days[0].slots.find((slot) => slot.hour === 10)).toEqual({ hour: 10, free: 1, requested: 0, blocked: 3, blockLabels: ['Vereinstraining'], bookable: true });
+    expect(availability.days[0].slots.find((slot) => slot.hour === 12)).toEqual({ hour: 12, free: 4, requested: 0, bookable: true });
+    expect((await reserve(offer.id, { lanes: 2 })).status).toBe(409);
+    expect((await reserve(offer.id, { lanes: 1 })).status).toBe(201);
+    // Eine Woche später gilt die Belegung nicht mehr.
+    const later = { ...block, validTo: '2026-10-30' };
+    expect((await call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, blocks: [later] }, headers: VEREIN })).status).toBe(200);
+    expect((await reserve(offer.id, { date: '2026-10-31', lanes: 4 }, ANDERER)).status).toBe(201);
+
+    // Alle Bahnen belegen würde die bestehende Reservierung überbuchen.
+    const conflict = await call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, blocks: [{ ...block, lanes: null }] }, headers: VEREIN });
+    expect(conflict.status).toBe(409);
+    expect(env.DB.sqlite.prepare('SELECT lanes, valid_to FROM rental_blocks WHERE offer_id = ?').all(offer.id)).toEqual([{ lanes: 3, valid_to: '2026-10-30' }]);
+  });
+
+  it('zählt Belegungen anderer Angebote gegen den Spielort und prüft sie bei der Zusage', async () => {
+    const first = (await (await call('POST', '/api/rentals/offers', { body: { ...offerBody, laneCount: 8 }, headers: VEREIN })).json()).offer;
+    const second = await createOffer();
+    const request = (await (await reserve(second.id, { lanes: 2 })).json()).reservation;
+    // Nachträglich (z. B. Rennen mit der Anfrage) belegt das große Angebot 7 der 8 Spielortbahnen.
+    sql("INSERT INTO rental_blocks (id, offer_id, weekday, start_hour, end_hour, lanes) VALUES ('b1', ?, 6, 10, 12, 7)", first.id);
+    const availability = await (await call('GET', `/api/rentals/${second.id}/availability?from=2026-10-24`)).json();
+    expect(availability.days[0].slots.find((slot) => slot.hour === 10)).toMatchObject({ free: 0 });
+    expect((await call('POST', `/api/rentals/reservations/${request.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN })).status).toBe(409);
+    expect((await reserve(second.id, { lanes: 1 }, ANDERER)).status).toBe(409);
+  });
+
   it('teilt bei unbekannter Gesamtzahl die größte angebotene Bahnanzahl', async () => {
     sql("UPDATE boule_places SET court_count = 0 WHERE id = 'p1'");
     const first = await createOffer();

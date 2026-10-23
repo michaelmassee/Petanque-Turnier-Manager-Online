@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildAvailability, dayAvailabilityStatus, formatRentalSlot, monthRange, normalizeOfferInput, normalizeOpeningHours, rentalMinLanes, validateReservationRequest } from './rental-core.js';
+import {
+  buildAvailability, dayAvailabilityStatus, formatRentalSlot, monthRange, normalizeOfferInput, normalizeOpeningHours, normalizeRentalBlocks, rentalMinLanes,
+  RENTAL_MAX_BLOCKS, validateReservationRequest,
+} from './rental-core.js';
 
 const offer = { laneCount: 4, minHours: 1, maxHours: 3, bookingHorizonDays: 30 };
 // 2026-10-19 ist ein Montag (Wochentag 1).
@@ -13,6 +16,24 @@ describe('Platz mieten: Eingaben', () => {
     expect(() => normalizeOpeningHours([])).toThrow();
     expect(() => normalizeOpeningHours([{ weekday: 1, openHour: 12, closeHour: 12 }])).toThrow();
     expect(() => normalizeOpeningHours([{ weekday: 1, openHour: 9, closeHour: 10 }, { weekday: 1, openHour: 11, closeHour: 12 }])).toThrow();
+  });
+
+  it('prüft regelmäßige Belegungen', () => {
+    const block = { weekday: 3, startHour: 18, endHour: 21, lanes: 4, label: ' Vereinstraining ' };
+    expect(normalizeRentalBlocks([], 6)).toEqual([]);
+    expect(normalizeRentalBlocks([{ ...block, weekday: 5, lanes: '' }, block], 6)).toEqual([
+      { weekday: 3, startHour: 18, endHour: 21, lanes: 4, label: 'Vereinstraining', validFrom: null, validTo: null },
+      { weekday: 5, startHour: 18, endHour: 21, lanes: null, label: 'Vereinstraining', validFrom: null, validTo: null },
+    ]);
+    expect(normalizeRentalBlocks([{ ...block, validFrom: '2026-10-01', validTo: '2027-03-31' }], 6)[0]).toMatchObject({ validFrom: '2026-10-01', validTo: '2027-03-31' });
+    expect(() => normalizeRentalBlocks([{ ...block, endHour: 18 }], 6)).toThrow();
+    expect(() => normalizeRentalBlocks([{ ...block, lanes: 7 }], 6)).toThrow();
+    expect(() => normalizeRentalBlocks([{ ...block, validFrom: '2027-01-01', validTo: '2026-12-31' }], 6)).toThrow();
+    expect(() => normalizeRentalBlocks([{ ...block, validFrom: '2026-02-30' }], 6)).toThrow();
+    expect(() => normalizeRentalBlocks([{ ...block, label: 'x'.repeat(61) }], 6)).toThrow();
+    expect(() => normalizeRentalBlocks(Array.from({ length: RENTAL_MAX_BLOCKS + 1 }, () => block), 6)).toThrow();
+    expect(normalizeOfferInput({ title: 'Halle', laneCount: 6, openingHours, blocks: [block] }).blocks).toHaveLength(1);
+    expect(() => normalizeOfferInput({ title: 'Halle', laneCount: 3, openingHours, blocks: [block] })).toThrow();
   });
 
   it('prüft Angebotsdaten', () => {
@@ -115,6 +136,28 @@ describe('Platz mieten: Verfügbarkeit', () => {
       ],
     });
     expect(days[0].slots.find((slot) => slot.hour === 10)).toMatchObject({ free, requested });
+  });
+
+  it('zieht regelmäßige Belegungen im Gültigkeitszeitraum ab und weist sie aus', () => {
+    // Montags 12–14 Uhr: 3 Bahnen Training, ab 2026-10-26 außerdem 15–16 Uhr komplett.
+    const blocks = [
+      { weekday: 1, startHour: 12, endHour: 14, lanes: 3, label: 'Training' },
+      { weekday: 1, startHour: 15, endHour: 16, lanes: null, label: null, validFrom: '2026-10-26' },
+    ];
+    const days = buildAvailability({ offer, openingHours, from: '2026-10-19', days: 8, now, reservations: [], blocks });
+    const slot = (day, hour) => days[day].slots.find((entry) => entry.hour === hour);
+    expect(slot(0, 12)).toEqual({ hour: 12, free: 1, requested: 0, blocked: 3, blockLabels: ['Training'], bookable: true });
+    expect(slot(0, 14)).toEqual({ hour: 14, free: 4, requested: 0, bookable: true });
+    expect(slot(0, 15)).toMatchObject({ free: 4 });
+    expect(slot(7, 15)).toMatchObject({ free: 0, blocked: 4, blockLabels: [] });
+  });
+
+  it('zählt Belegungen anderer Angebote nur gegen die Spielortkapazität', () => {
+    const days = buildAvailability({
+      offer: { ...offer, id: 'a' }, openingHours, from: '2026-10-19', days: 1, now, venueLaneCount: 6, reservations: [],
+      blocks: [{ offerId: 'b', laneCount: 5, weekday: 1, startHour: 12, endHour: 13, lanes: null, label: 'Liga' }],
+    });
+    expect(days[0].slots.find((entry) => entry.hour === 12)).toEqual({ hour: 12, free: 1, requested: 0, bookable: true });
   });
 
   it('formatiert den Zeitraum je Sprache', () => {

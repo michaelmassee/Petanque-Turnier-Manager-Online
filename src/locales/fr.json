@@ -1739,5 +1739,17 @@
   "Alle Turnier-Limits": "Toutes les limites de tournois",
   "Unbegrenzt": "Illimité",
   "E-Mail-Versand filtern": "Filtrer l’envoi d’e-mails",
-  "Alle Versandstatus": "Tous les états d’envoi"
+  "Alle Versandstatus": "Tous les états d’envoi",
+  "Regelmäßige Belegungen": "Occupations régulières",
+  "Z. B. Vereinstraining: Diese Bahnen sind jede Woche im angegebenen Zeitraum nicht mietbar. Die Bezeichnung sehen auch Mieter.": "P. ex. entraînement du club : ces pistes ne sont pas louables chaque semaine pendant la période indiquée. Les locataires voient aussi l'intitulé.",
+  "Wochentag": "Jour de la semaine",
+  "alle": "toutes",
+  "z. B. Vereinstraining": "p. ex. entraînement du club",
+  "gültig ab": "valable à partir du",
+  "gültig bis": "valable jusqu'au",
+  "+ Belegung hinzufügen": "+ Ajouter une occupation",
+  "regelmäßig belegt": "occupé régulièrement",
+  "{{count}} regelmäßig belegt": "{{count}} occupées régulièrement",
+  "Ungültige regelmäßige Belegung": "Occupation régulière invalide",
+  "Zu viele regelmäßige Belegungen": "Trop d’occupations régulières"
 }
