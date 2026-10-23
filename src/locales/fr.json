@@ -1713,5 +1713,11 @@
   "Öffnen": "Ouvrir",
   "Spielplan und Rangliste sind auf der Turnierseite erst für alle sichtbar, wenn die Teilnehmerliste veröffentlicht wird.": "Le programme et le classement de la page du tournoi ne sont visibles par tous que lorsque la liste des participants est publiée.",
   "Für dieses Turnier gibt es keinen öffentlichen Spielplan.": "Il n'y a pas de programme public pour ce tournoi.",
-  "Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.": "Le tournoi n'a pas encore commencé. Le programme et le classement apparaîtront ici après le début."
+  "Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.": "Le tournoi n'a pas encore commencé. Le programme et le classement apparaîtront ici après le début.",
+  "Noch keine weiteren Verwalter für dieses Angebot.": "Pas encore d’autres gestionnaires pour cette offre.",
+  "Verwalter bearbeiten dieses Angebot und entscheiden über seine Anfragen. Owner und Bearbeiter des Vereins haben ohnehin Zugriff.": "Les gestionnaires modifient cette offre et statuent sur ses demandes. Le propriétaire et les éditeurs du club y ont toujours accès.",
+  "Keine Bearbeitungsrechte für dieses Angebot": "Aucun droit de modification pour cette offre",
+  "Nur Vereinsverwalter dürfen Verwalter vergeben": "Seuls les gestionnaires du club peuvent attribuer des gestionnaires",
+  "Dieser Benutzer verwaltet bereits den Verein": "Cet utilisateur gère déjà le club",
+  "Dieser Benutzer verwaltet dieses Angebot bereits": "Cet utilisateur gère déjà cette offre"
 }

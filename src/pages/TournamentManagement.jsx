@@ -10,11 +10,11 @@ import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { authenticatedApi } from '../lib/api.js';
 import { formatUserLabel, formatUserName } from '../lib/userLabel.js';
-import { UsernameReportButton } from '../components/UsernameReportDialog.jsx';
 import { useClubSuggestions } from '../components/ClubSuggestions.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { TournamentQrDialog } from '../components/TournamentQrDialog.jsx';
 import { TournamentFlyerDialog } from '../components/TournamentFlyerDialog.jsx';
+import { EditorsPanel } from '../components/EditorsPanel.jsx';
 
 /**
  * Lösch-Rückfrage; bei einem mit einem Turnierdokument verbundenen Turnier mit deutlicher Warnung, weil Spieler
@@ -44,114 +44,6 @@ function isDocumentManagedConflict(error) {
 function deleteTournamentRequest(tournamentId, confirmDocumentManaged) {
   const query = confirmDocumentManaged ? '?confirmDocumentManaged=true' : '';
   return authenticatedApi(`/api/tournaments/${tournamentId}${query}`, { method: 'DELETE' });
-}
-
-function TournamentEditorsPanel({ tournamentId, candidates = [], ownerId, owner, currentUserId }) {
-  const { t } = useTranslation();
-  const [editors, setEditors] = useState(null);
-  const [selectedCandidateId, setSelectedCandidateId] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [panelError, setPanelError] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    setEditors(null);
-    authenticatedApi(`/api/tournaments/${tournamentId}/editors`)
-      .then((data) => { if (!cancelled) setEditors(data.editors); })
-      .catch((err) => { if (!cancelled) setPanelError(err.message); });
-    return () => { cancelled = true; };
-  }, [tournamentId]);
-
-  // Schutz für noch nicht migrierte/inkonsistente Bestände: Der Owner steht
-  // ausschließlich in der eigenen Owner-Zeile, nie nochmals als Bearbeiter.
-  const additionalEditors = (editors || []).filter((editor) => editor.id !== ownerId);
-  const availableCandidates = candidates.filter((candidate) => candidate.id !== ownerId && !additionalEditors.some((editor) => editor.id === candidate.id));
-
-  async function handleAdd(event) {
-    event.preventDefault();
-    if (!selectedCandidateId) return;
-    setBusy(true);
-    setPanelError('');
-    try {
-      const data = await authenticatedApi(`/api/tournaments/${tournamentId}/editors`, { method: 'POST', body: JSON.stringify({ userId: selectedCandidateId }) });
-      setEditors(data.editors);
-      setSelectedCandidateId('');
-    } catch (err) {
-      setPanelError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleRemove(editorId) {
-    setBusy(true);
-    setPanelError('');
-    try {
-      const data = await authenticatedApi(`/api/tournaments/${tournamentId}/editors/${editorId}`, { method: 'DELETE' });
-      setEditors(data.editors);
-    } catch (err) {
-      setPanelError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="form-section">
-      <div className="form-section-header">
-        <span>{t('Bearbeitungsrechte verwalten')}</span>
-      </div>
-      <Feedback error={panelError} />
-      {editors === null ? (
-        <p className="muted">{t('Lädt …')}</p>
-      ) : (
-        <>
-          {owner && (
-            <ul className="editor-list">
-              <li>
-                <span data-i18n-skip>
-                  {formatUserName(owner)}
-                  {owner.username && <span className="user-handle"> @{owner.username}</span>}
-                </span>
-                <span className="role">{t('Owner')}</span>
-              </li>
-            </ul>
-          )}
-          {additionalEditors.length === 0 && <p className="muted">{t('Noch keine weiteren Bearbeiter für dieses Turnier.')}</p>}
-          {additionalEditors.length > 0 && (
-            <ul className="editor-list">
-              {additionalEditors.map((editor) => (
-                  <li key={editor.id}>
-                    <span data-i18n-skip>
-                      {formatUserName(editor)}
-                      {editor.username && <span className="user-handle"> @{editor.username}</span>}
-                    </span>
-                    <span className="editor-actions">
-                      <UsernameReportButton user={editor} currentUserId={currentUserId} />
-                      <Button variant="secondary" type="button" disabled={busy} loading={busy} onClick={() => handleRemove(editor.id)}>{t('Entfernen')}</Button>
-                    </span>
-                  </li>
-              ))}
-            </ul>
-          )}
-          {availableCandidates.length > 0 && (
-            <div className="inline-form">
-              <SelectField
-                label={t('Benutzer hinzufügen')}
-                value={selectedCandidateId}
-                onChange={setSelectedCandidateId}
-                options={[
-                  { value: '', label: t('Bitte wählen') },
-                  ...availableCandidates.map((candidate) => ({ value: candidate.id, label: formatUserLabel(candidate) })),
-                ]}
-              />
-              <Button type="button" disabled={busy || !selectedCandidateId} loading={busy} onClick={handleAdd}>{t('Hinzufügen')}</Button>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
 }
 
 function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], onOwnerChanged }) {
@@ -695,7 +587,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
       {canManageOwner && (
         <TournamentOwnerPanel tournamentId={form.id} ownerId={form.ownerId} candidates={ownerCandidates} onOwnerChanged={(tournament) => { onOwnerChanged(tournament); setForm({ ...form, ownerId: tournament.ownerId }); }} />
       )}
-      {canManageEditors && <TournamentEditorsPanel tournamentId={form.id} candidates={editorCandidates} ownerId={form.ownerId} owner={owner} currentUserId={currentUser?.id} />}
+      {canManageEditors && <EditorsPanel endpoint={`/api/tournaments/${form.id}/editors`} candidates={editorCandidates} ownerId={form.ownerId} owner={owner} currentUserId={currentUser?.id} emptyText={t('Noch keine weiteren Bearbeiter für dieses Turnier.')} />}
       <div className="dialog-actions">
         <Button variant="secondary" type="button" onClick={onCancel}>{t('Abbrechen')}</Button>
         <Button type="submit" loading={saving}>{mode === 'edit' ? t('Turnier speichern') : t('Turnier anlegen')}</Button>

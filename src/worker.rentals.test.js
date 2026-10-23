@@ -424,4 +424,44 @@ describe('Platz mieten', () => {
     }
     expect((await reserve(offer.id, { date: '2026-11-02', startHour: 10, hours: 1, lanes: 1 })).status).toBe(409);
   });
+
+  it('lässt Vereinsverwalter Verwalter für einzelne Angebote vergeben wie bei Turnieren', async () => {
+    const offer = await createOffer();
+    const zweites = (await (await call('POST', '/api/rentals/offers', { body: { ...offerBody, title: 'Außenplatz' }, headers: VEREIN })).json()).offer;
+    const editors = `/api/rentals/offers/${offer.id}/editors`;
+    expect((await call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, title: 'Halle neu' }, headers: ANDERER })).status).toBe(403);
+    expect((await call('GET', '/api/rentals/manage?club=c1', { headers: ANDERER })).status).toBe(403);
+
+    // Nur Vereinsverwalter vergeben Verwalter; wer den Verein schon verwaltet, braucht keinen Eintrag.
+    expect((await call('POST', editors, { body: { userId: 'u3' }, headers: MIETER })).status).toBe(403);
+    expect((await call('POST', editors, { body: { userId: 'u1' }, headers: VEREIN })).status).toBe(400);
+    const added = await call('POST', editors, { body: { userId: 'u3' }, headers: VEREIN });
+    expect(added.status).toBe(201);
+    expect((await added.json()).editors).toEqual([{ id: 'u3', firstName: 'Anna', lastName: 'Anders', username: null }]);
+    expect((await call('POST', editors, { body: { userId: 'u3' }, headers: VEREIN })).status).toBe(409);
+
+    // Der Angebotsverwalter sieht den Verein in seiner Auswahl, aber nur sein Angebot und dessen Anfragen.
+    expect((await (await call('GET', '/api/rentals/manage/clubs', { headers: ANDERER })).json()).clubs).toEqual([{ id: 'c1', name: 'BC Test', status: 'published' }]);
+    const reservation = (await (await reserve(offer.id, {})).json()).reservation;
+    await reserve(zweites.id, { startHour: 14 });
+    const manage = await (await call('GET', '/api/rentals/manage?club=c1', { headers: ANDERER })).json();
+    expect(manage.canManageClub).toBe(false);
+    expect(manage.offers.map((entry) => entry.id)).toEqual([offer.id]);
+    expect(manage.reservations.map((entry) => entry.id)).toEqual([reservation.id]);
+    expect((await (await call('GET', '/api/rentals/manage?club=c1', { headers: VEREIN })).json()).canManageClub).toBe(true);
+    expect(postbox().filter((message) => message.recipient_id === 'u3')).toHaveLength(1);
+
+    expect((await (await call('GET', `/api/rentals/${offer.id}`, { headers: ANDERER })).json()).offer.canManage).toBe(true);
+    expect((await call('PUT', `/api/rentals/offers/${offer.id}`, { body: { ...offerBody, title: 'Halle neu' }, headers: ANDERER })).status).toBe(200);
+    expect((await call('PUT', `/api/rentals/offers/${zweites.id}`, { body: offerBody, headers: ANDERER })).status).toBe(403);
+    expect((await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: ANDERER })).status).toBe(200);
+    // Weitere Verwalter vergeben darf er nicht, die Liste aber sehen.
+    expect((await call('GET', editors, { headers: ANDERER })).status).toBe(200);
+    expect((await call('DELETE', `${editors}/u3`, { headers: ANDERER })).status).toBe(403);
+
+    const removed = await call('DELETE', `${editors}/u3`, { headers: VEREIN });
+    expect((await removed.json()).editors).toEqual([]);
+    expect((await call('PUT', `/api/rentals/offers/${offer.id}`, { body: offerBody, headers: ANDERER })).status).toBe(403);
+    expect((await (await call('GET', '/api/rentals/manage/clubs', { headers: ANDERER })).json()).clubs).toEqual([]);
+  });
 });

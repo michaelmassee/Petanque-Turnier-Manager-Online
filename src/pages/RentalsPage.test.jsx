@@ -313,6 +313,7 @@ describe('Platz mieten: Vereinsverwaltung', () => {
 
   const MANAGE = {
     clubStatus: 'published',
+    canManageClub: true,
     clubContactEmail: 'info@bc-test.de',
     offers: [OFFER],
     places: [{ id: 'p1', name: 'Halle Nord', courtCount: 6, venueType: 'indoor', status: 'published' }],
@@ -480,5 +481,41 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     expect(await screen.findByText(/Dein Verein ist noch nicht freigegeben/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Neues Angebot' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
+  });
+
+  it('vergibt beim Bearbeiten eines Angebots zusätzliche Verwalter', async () => {
+    const onWrite = vi.fn(async () => ({ editors: [{ id: 'u3', firstName: 'Anna', lastName: 'Anders' }] }));
+    authenticatedApi.mockImplementation(async (path, options) => {
+      if (options?.method) return onWrite(path, options);
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
+      if (path === '/api/rentals/manage/clubs') return { clubs: [] };
+      if (path === '/api/postbox/recipients') return { recipients: [{ id: 'u3', firstName: 'Anna', lastName: 'Anders' }] };
+      if (path === '/api/rentals/offers/o1/editors') return { editors: [] };
+      return MANAGE;
+    });
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByText('Noch keine weiteren Verwalter für dieses Angebot.')).toBeInTheDocument();
+    fireEvent.change(await within(dialog).findByLabelText(/Benutzer hinzufügen/), { target: { value: 'u3' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Hinzufügen' }));
+
+    await waitFor(() => expect(onWrite).toHaveBeenCalledWith('/api/rentals/offers/o1/editors', expect.objectContaining({ method: 'POST', body: JSON.stringify({ userId: 'u3' }) })));
+    expect(await within(dialog).findByText('Anna Anders')).toBeInTheDocument();
+  });
+
+  it('zeigt Angebotsverwaltern nur ihre Angebote, ohne neue Angebote und Verwaltervergabe', async () => {
+    authenticatedApi.mockImplementation(async (path) => {
+      if (path === '/api/clubs/mine') return { clubs: [] };
+      if (path === '/api/rentals/manage/clubs') return { clubs: [{ id: 'c1', name: 'BC Test', status: 'published' }] };
+      return { ...MANAGE, canManageClub: false };
+    });
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/manage?club=c1');
+    expect(screen.queryByRole('button', { name: 'Neues Angebot' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).queryByText('Bearbeitungsrechte verwalten')).not.toBeInTheDocument();
   });
 });

@@ -11,6 +11,7 @@ import { RentalMonthPicker } from '../components/RentalMonthPicker.jsx';
 import { ComboboxPicker } from '../components/ComboboxPicker.jsx';
 import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
+import { EditorsPanel } from '../components/EditorsPanel.jsx';
 
 const hourLabel = (hour) => `${String(hour).padStart(2, '0')}:00`;
 // Montag zuerst; 0 = Sonntag wie im Worker.
@@ -574,6 +575,15 @@ export function RentalManagement({ language, navigate, currentUser }) {
   const [decisionNote, setDecisionNote] = useState('');
   const [deciding, setDeciding] = useState(false);
   const isAdmin = currentUser?.role === 'admin';
+  const canManageClub = Boolean(data?.canManageClub);
+  // Kandidaten für Angebotsverwalter wie bei Turnieren: alle Benutzer, erst beim Bearbeiten eines Angebots geladen.
+  const [editorCandidates, setEditorCandidates] = useState(null);
+  const editingExistingOffer = canManageClub && Boolean(dialog) && dialog !== 'new';
+  useEffect(() => {
+    if (!editingExistingOffer || editorCandidates) return;
+    authenticatedApi('/api/postbox/recipients').then((result) => setEditorCandidates(result.recipients || []))
+      .catch((requestError) => setDialogError(requestError.message));
+  }, [editingExistingOffer]);
   const clubEntries = useMemo(() => (clubs || []).map((club) => {
     const meta = club.placeCount !== undefined ? t('Spielorte: {{places}}', { places: club.placeCount }) : '';
     return {
@@ -587,11 +597,15 @@ export function RentalManagement({ language, navigate, currentUser }) {
     Promise.all([
       authenticatedApi('/api/clubs/mine'),
       isAdmin ? authenticatedApi('/api/admin/clubs') : Promise.resolve({ clubs: [] }),
-    ]).then(([mine, all]) => {
+      authenticatedApi('/api/rentals/manage/clubs'),
+    ]).then(([mine, all, offerClubs]) => {
       // Vermieten dürfen nur freigegebene Vereine, nicht freigegebene erscheinen deshalb gar nicht erst in der Auswahl.
       const editable = (mine.clubs || []).filter((club) => club.canEdit);
       setHasUnpublishedClub(editable.some((club) => club.status !== 'published'));
-      const own = editable.filter((club) => club.status === 'published').map((club) => ({ ...club, own: true }));
+      // Dazu Vereine, in denen man nur einzelne Angebote verwaltet (wie Bearbeiter eines Turniers).
+      const editableIds = new Set(editable.map((club) => club.id));
+      const own = [...editable, ...(offerClubs.clubs || []).filter((club) => !editableIds.has(club.id))]
+        .filter((club) => club.status === 'published').map((club) => ({ ...club, own: true }));
       const ownIds = new Set(own.map((club) => club.id));
       const others = (all.clubs || []).filter((club) => club.status === 'published' && !ownIds.has(club.id))
         .sort((left, right) => left.name.localeCompare(right.name, language));
@@ -697,6 +711,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
   const clubPublished = data?.clubStatus === 'published';
   // Angebote brauchen einen freigegebenen Verein mit mindestens einem freigegebenen Spielort.
   const canEditOffers = clubPublished && Boolean(data?.places.length);
+  const canCreateOffers = canEditOffers && canManageClub;
   const offerTitle = (offerId) => data?.offers.find((offer) => offer.id === offerId)?.title || '';
   const requests = (data?.reservations || []).filter((reservation) => reservation.status === 'requested');
   const confirmed = (data?.reservations || []).filter((reservation) => reservation.status === 'confirmed');
@@ -755,7 +770,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
         <section className="rental-manage-section">
           <div className="section-title">
             <div className="rental-section-heading"><h3>{t('Angebote')}</h3><span className="counter">{data.offers.length}</span></div>
-            <Button disabled={!canEditOffers} onClick={() => openOffer()}>{t('Neues Angebot')}</Button>
+            {canManageClub && <Button disabled={!canCreateOffers} onClick={() => openOffer()}>{t('Neues Angebot')}</Button>}
           </div>
           {!clubPublished && <p className="hint">{t('Dein Verein ist noch nicht freigegeben. Angebote kannst du anlegen, sobald ein Admin ihn freigegeben hat.')}</p>}
           {clubPublished && !data.places.length && <p className="hint">{t('Dein Verein hat noch keinen Spielort. Lege ihn unter „Meine Vereine“ an.')}</p>}
@@ -784,6 +799,15 @@ export function RentalManagement({ language, navigate, currentUser }) {
         {form && (
           <form className="form" onSubmit={saveOffer}>
             <OfferFields form={form} setForm={setForm} places={data?.places || []} language={language} />
+            {editingExistingOffer && (
+              <EditorsPanel
+                endpoint={`/api/rentals/offers/${dialog.id}/editors`}
+                candidates={editorCandidates || []}
+                currentUserId={currentUser?.id}
+                emptyText={t('Noch keine weiteren Verwalter für dieses Angebot.')}
+                hint={t('Verwalter bearbeiten dieses Angebot und entscheiden über seine Anfragen. Owner und Bearbeiter des Vereins haben ohnehin Zugriff.')}
+              />
+            )}
             <div className="dialog-actions">
               <Button variant="secondary" onClick={() => setDialog(null)}>{t('Abbrechen')}</Button>
               <Button type="submit" loading={saving}>{t('Speichern')}</Button>

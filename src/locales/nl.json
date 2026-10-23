@@ -1713,5 +1713,11 @@
   "Öffnen": "Openen",
   "Spielplan und Rangliste sind auf der Turnierseite erst für alle sichtbar, wenn die Teilnehmerliste veröffentlicht wird.": "Speelschema en ranglijst zijn op de toernooipagina pas voor iedereen zichtbaar als de deelnemerslijst gepubliceerd wordt.",
   "Für dieses Turnier gibt es keinen öffentlichen Spielplan.": "Voor dit toernooi is er geen openbaar speelschema.",
-  "Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.": "Het toernooi is nog niet begonnen. Speelschema en ranglijst verschijnen hier na de start."
+  "Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.": "Het toernooi is nog niet begonnen. Speelschema en ranglijst verschijnen hier na de start.",
+  "Noch keine weiteren Verwalter für dieses Angebot.": "Nog geen extra beheerders voor dit aanbod.",
+  "Verwalter bearbeiten dieses Angebot und entscheiden über seine Anfragen. Owner und Bearbeiter des Vereins haben ohnehin Zugriff.": "Beheerders bewerken dit aanbod en beslissen over de aanvragen. Eigenaar en bewerkers van de vereniging hebben altijd toegang.",
+  "Keine Bearbeitungsrechte für dieses Angebot": "Geen bewerkingsrechten voor dit aanbod",
+  "Nur Vereinsverwalter dürfen Verwalter vergeben": "Alleen beheerders van de vereniging kunnen beheerders toewijzen",
+  "Dieser Benutzer verwaltet bereits den Verein": "Deze gebruiker beheert de vereniging al",
+  "Dieser Benutzer verwaltet dieses Angebot bereits": "Deze gebruiker beheert dit aanbod al"
 }

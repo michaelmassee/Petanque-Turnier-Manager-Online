@@ -2139,6 +2139,18 @@ export default {
         const session = await requireSession(request, env.DB);
         return await listRentalManagement(env.DB, String(url.searchParams.get('club') || ''), session.user);
       }
+      if (request.method === 'GET' && url.pathname === '/api/rentals/manage/clubs') {
+        const session = await requireSession(request, env.DB);
+        return await listRentalEditorClubs(env.DB, session.user);
+      }
+      const rentalOfferEditorsMatch = url.pathname.match(/^\/api\/rentals\/offers\/([^/]+)\/editors(?:\/([^/]+))?$/);
+      if (rentalOfferEditorsMatch) {
+        const session = await requireSession(request, env.DB);
+        const [, offerId, editorId] = rentalOfferEditorsMatch;
+        if (!editorId && request.method === 'GET') return await listRentalOfferEditors(env.DB, offerId, session.user);
+        if (!editorId && request.method === 'POST') return await addRentalOfferEditor(request, env.DB, offerId, session.user);
+        if (editorId && request.method === 'DELETE') return await removeRentalOfferEditor(env.DB, offerId, editorId, session.user);
+      }
       if (request.method === 'POST' && url.pathname === '/api/rentals/offers') {
         const session = await requireSession(request, env.DB);
         return await createRentalOffer(request, env.DB, session.user);
@@ -9946,6 +9958,21 @@ async function canManageRentalClub(db, clubId, user) {
   }
 }
 
+// Wie bei Turnieren: Vereinsverwalter (Owner, Bearbeiter) und Admins verwalten jedes Angebot des Vereins und vergeben
+// Verwalter; zusätzliche Verwalter eines Angebots bearbeiten nur dieses, entscheiden über dessen Anfragen und löschen es.
+async function rentalOfferAccess(db, row, user) {
+  if (!user) return { canManage: false, canManageEditors: false };
+  if (await canManageRentalClub(db, row.club_id, user)) return { canManage: true, canManageEditors: true };
+  const editor = await db.prepare('SELECT 1 FROM rental_offer_editors WHERE offer_id = ? AND user_id = ?').bind(row.id, user.id).first();
+  return { canManage: Boolean(editor), canManageEditors: false };
+}
+
+async function assertRentalOfferManager(db, row, user) {
+  const access = await rentalOfferAccess(db, row, user);
+  if (!access.canManage) throw new HttpError(403, 'Keine Bearbeitungsrechte für dieses Angebot');
+  return access;
+}
+
 async function listRentalOffers(db, origin) {
   return cachedJsonResponse(rentalOffersCacheKey(origin), PUBLISHED_CLUBS_TTL_SECONDS, async () => {
     const rows = await db.prepare(`${RENTAL_OFFER_SELECT}
@@ -9957,7 +9984,7 @@ async function listRentalOffers(db, origin) {
 
 async function getRentalOffer(db, id, user) {
   const row = await loadRentalOffer(db, id);
-  const canManage = await canManageRentalClub(db, row.club_id, user);
+  const { canManage } = await rentalOfferAccess(db, row, user);
   if (!rentalOfferIsPublic(row) && !canManage) throw new HttpError(404, 'Angebot nicht gefunden');
   return json({ offer: { ...toRentalOffer(row, await loadOpeningHours(db, id)), canManage } });
 }
@@ -9972,7 +9999,7 @@ async function activeRentalReservations(db, placeId, from, to) {
 // Wochenraster (from, 7 Tage, mit Stunden) oder mit month=YYYY-MM nur der Tagesstatus für den Monatskalender.
 async function getRentalAvailability(db, id, fromParam, user, monthParam = null) {
   const row = await loadRentalOffer(db, id);
-  if (!rentalOfferIsPublic(row) && !(await canManageRentalClub(db, row.club_id, user))) throw new HttpError(404, 'Angebot nicht gefunden');
+  if (!rentalOfferIsPublic(row) && !(await rentalOfferAccess(db, row, user)).canManage) throw new HttpError(404, 'Angebot nicht gefunden');
   const offer = toRentalOffer(row);
   const now = rentalLocalNow(offer.timezone);
   const month = monthParam ? monthRange(monthParam) : null;
@@ -9995,13 +10022,14 @@ async function getRentalAvailability(db, id, fromParam, user, monthParam = null)
   return json({ from, today: now.date, days: availability });
 }
 
-async function rentalClubManagers(db, clubId) {
+async function rentalOfferManagers(db, offer) {
   const rows = await db.prepare(`SELECT u.id, u.email, u.first_name, u.language FROM users u
-    WHERE u.id = (SELECT owner_id FROM clubs WHERE id = ?1) OR u.id IN (SELECT user_id FROM club_editors WHERE club_id = ?1)`).bind(clubId).all();
+    WHERE u.id = (SELECT owner_id FROM clubs WHERE id = ?1) OR u.id IN (SELECT user_id FROM club_editors WHERE club_id = ?1)
+      OR u.id IN (SELECT user_id FROM rental_offer_editors WHERE offer_id = ?2)`).bind(offer.club_id, offer.id).all();
   return rows.results || [];
 }
 
-// Postfach + Push an alle Verwalter des Vereins und eine Mail an den Owner (Vereinskontakt).
+// Postfach + Push an alle Verwalter des Vereins und des Angebots und eine Mail an die Kontakt-E-Mail des Angebots.
 // Über die Mail-Queue, damit die Anfrage nicht auf den Mailserver wartet; ohne Queue (Tests) direkt.
 async function deliverRentalEmail(env, payload) {
   if (env.MAIL_QUEUE) await enqueueTransactionalEmail(env, payload);
@@ -10014,7 +10042,7 @@ async function notifyRentalClub(env, { offer, reservation, renter, eventType, or
     date: reservation.local_date, startHour: Number(reservation.start_hour), hours: Number(reservation.hours), lanes: Number(reservation.lanes),
     requesterName: rentalPersonName(renter),
   };
-  const managers = await rentalClubManagers(env.DB, offer.club_id);
+  const managers = await rentalOfferManagers(env.DB, offer);
   for (const manager of managers) {
     if (manager.id === renter.id) continue;
     try {
@@ -10240,7 +10268,7 @@ async function decideRentalReservation(request, env, reservationId, user, origin
   const reservation = await env.DB.prepare('SELECT * FROM rental_reservations WHERE id = ?').bind(reservationId).first();
   if (!reservation) throw new HttpError(404, 'Reservierung nicht gefunden');
   const offer = await loadRentalOffer(env.DB, reservation.offer_id);
-  await assertClubEditor(env.DB, offer.club_id, user);
+  await assertRentalOfferManager(env.DB, offer, user);
   const note = String(body.note ?? '').trim().slice(0, 500) || null;
   const now = new Date().toISOString();
   if (decision.to === 'cancelled' && reservation.end_utc <= now) throw new HttpError(409, 'Die Reservierung ist bereits vorbei');
@@ -10262,21 +10290,33 @@ async function decideRentalReservation(request, env, reservationId, user, origin
   return json({ reservation: toRentalReservation(updated) });
 }
 
+// Vereinsverwalter sehen alle Angebote des Vereins, Angebotsverwalter nur die ihnen zugeordneten (offerScope).
 async function listRentalManagement(db, clubId, user) {
   if (!clubId) throw new HttpError(400, 'Verein fehlt', { field: 'club' });
-  const club = await assertClubEditor(db, clubId, user);
+  const clubManager = await canManageRentalClub(db, clubId, user);
+  const club = clubManager
+    ? await db.prepare('SELECT * FROM clubs WHERE id = ?').bind(clubId).first()
+    : await db.prepare(`SELECT c.* FROM clubs c WHERE c.id = ? AND EXISTS (
+        SELECT 1 FROM rental_offers o JOIN rental_offer_editors e ON e.offer_id = o.id WHERE o.club_id = c.id AND e.user_id = ?)`).bind(clubId, user.id).first();
+  if (!club) {
+    await assertClubEditor(db, clubId, user);
+    throw new HttpError(403, 'Keine Bearbeitungsrechte für diesen Verein');
+  }
+  const offerScope = clubManager ? '' : ' AND o.id IN (SELECT offer_id FROM rental_offer_editors WHERE user_id = ?)';
+  const scopeParams = clubManager ? [] : [user.id];
   const now = new Date().toISOString();
   const [offers, hours, places, reservations] = await Promise.all([
-    db.prepare(`${RENTAL_OFFER_SELECT} WHERE o.club_id = ? ORDER BY o.title COLLATE NOCASE`).bind(clubId).all(),
-    db.prepare('SELECT h.* FROM rental_opening_hours h JOIN rental_offers o ON o.id = h.offer_id WHERE o.club_id = ? ORDER BY h.weekday').bind(clubId).all(),
+    db.prepare(`${RENTAL_OFFER_SELECT} WHERE o.club_id = ?${offerScope} ORDER BY o.title COLLATE NOCASE`).bind(clubId, ...scopeParams).all(),
+    db.prepare(`SELECT h.* FROM rental_opening_hours h JOIN rental_offers o ON o.id = h.offer_id WHERE o.club_id = ?${offerScope} ORDER BY h.weekday`).bind(clubId, ...scopeParams).all(),
     db.prepare("SELECT id, name, court_count, venue_type, status FROM boule_places WHERE club_id = ? AND status = 'published' ORDER BY name COLLATE NOCASE").bind(clubId).all(),
-    db.prepare(`${RENTAL_RESERVATION_SELECT} WHERE o.club_id = ? AND r.end_utc > ? AND r.status IN ('requested', 'confirmed')
-      ORDER BY r.start_utc LIMIT 300`).bind(clubId, now).all(),
+    db.prepare(`${RENTAL_RESERVATION_SELECT} WHERE o.club_id = ?${offerScope} AND r.end_utc > ? AND r.status IN ('requested', 'confirmed')
+      ORDER BY r.start_utc LIMIT 300`).bind(clubId, ...scopeParams, now).all(),
   ]);
   const hoursByOffer = new Map();
   for (const row of hours.results || []) hoursByOffer.set(row.offer_id, [...(hoursByOffer.get(row.offer_id) || []), row]);
   return json({
     clubStatus: club.status,
+    canManageClub: clubManager,
     clubContactEmail: isEmail(club.contact_email || '') ? club.contact_email : null,
     offers: (offers.results || []).map((row) => toRentalOffer(row, toOpeningHours(hoursByOffer.get(row.id) || []))),
     places: (places.results || []).map((row) => ({ id: row.id, name: row.name, courtCount: Number(row.court_count || 0), venueType: row.venue_type || 'outdoor', status: row.status })),
@@ -10344,7 +10384,8 @@ async function createRentalOffer(request, db, user) {
 
 async function updateRentalOffer(request, db, id, user) {
   const existing = await loadRentalOffer(db, id);
-  assertRentalClubPublished(await assertClubEditor(db, existing.club_id, user));
+  await assertRentalOfferManager(db, existing, user);
+  assertRentalClubPublished({ status: existing.club_status });
   const input = rentalOfferInput(await readJson(request));
   const place = await rentalPlaceForClub(db, existing.club_id, input.placeId);
   assertRentalLaneCount(place, input);
@@ -10370,7 +10411,7 @@ async function updateRentalOffer(request, db, id, user) {
 
 async function deleteRentalOffer(db, id, user) {
   const existing = await loadRentalOffer(db, id);
-  await assertClubEditor(db, existing.club_id, user);
+  await assertRentalOfferManager(db, existing, user);
   const upcoming = await db.prepare(`SELECT COUNT(*) AS count FROM rental_reservations
     WHERE offer_id = ? AND status IN ('requested', 'confirmed') AND end_utc > ?`).bind(id, new Date().toISOString()).first();
   if (Number(upcoming?.count || 0) > 0) {
@@ -10378,6 +10419,49 @@ async function deleteRentalOffer(db, id, user) {
   }
   await db.prepare('DELETE FROM rental_offers WHERE id = ?').bind(id).run();
   return json({ ok: true });
+}
+
+async function listRentalEditorClubs(db, user) {
+  const rows = await db.prepare(`SELECT DISTINCT c.id, c.name, c.status FROM clubs c
+    JOIN rental_offers o ON o.club_id = c.id JOIN rental_offer_editors e ON e.offer_id = o.id
+    WHERE e.user_id = ? ORDER BY c.name COLLATE NOCASE`).bind(user.id).all();
+  return json({ clubs: (rows.results || []).map((row) => ({ id: row.id, name: row.name, status: row.status })) });
+}
+
+async function rentalOfferEditorsResponse(db, offerId, status = 200) {
+  const rows = await db.prepare(`SELECT u.id, u.first_name, u.last_name, u.username FROM rental_offer_editors e JOIN users u ON u.id = e.user_id
+    WHERE e.offer_id = ? ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE`).bind(offerId).all();
+  return json({ editors: (rows.results || []).map((row) => ({ id: row.id, firstName: row.first_name, lastName: row.last_name, username: row.username })) }, status);
+}
+
+async function listRentalOfferEditors(db, offerId, user) {
+  await assertRentalOfferManager(db, await loadRentalOffer(db, offerId), user);
+  return rentalOfferEditorsResponse(db, offerId);
+}
+
+async function assertRentalOfferEditorsManager(db, offerId, user) {
+  const offer = await loadRentalOffer(db, offerId);
+  if (!(await rentalOfferAccess(db, offer, user)).canManageEditors) throw new HttpError(403, 'Nur Vereinsverwalter dürfen Verwalter vergeben');
+  return offer;
+}
+
+async function addRentalOfferEditor(request, db, offerId, actingUser) {
+  const offer = await assertRentalOfferEditorsManager(db, offerId, actingUser);
+  const userId = String((await readJson(request)).userId || '').trim();
+  if (!userId) throw new HttpError(400, 'Bitte wähle einen Benutzer aus');
+  const targetUser = await db.prepare('SELECT id, role FROM users WHERE id = ?').bind(userId).first();
+  if (!targetUser || targetUser.role !== 'user') throw new HttpError(404, 'Benutzer nicht gefunden');
+  if (await canManageRentalClub(db, offer.club_id, targetUser)) throw new HttpError(400, 'Dieser Benutzer verwaltet bereits den Verein');
+  const result = await db.prepare(`INSERT OR IGNORE INTO rental_offer_editors (id, offer_id, user_id, granted_by, created_at) VALUES (?, ?, ?, ?, ?)`)
+    .bind(crypto.randomUUID(), offerId, userId, actingUser.id, new Date().toISOString()).run();
+  if (!result.meta?.changes) throw new HttpError(409, 'Dieser Benutzer verwaltet dieses Angebot bereits');
+  return rentalOfferEditorsResponse(db, offerId, 201);
+}
+
+async function removeRentalOfferEditor(db, offerId, userId, actingUser) {
+  await assertRentalOfferEditorsManager(db, offerId, actingUser);
+  await db.prepare('DELETE FROM rental_offer_editors WHERE offer_id = ? AND user_id = ?').bind(offerId, userId).run();
+  return rentalOfferEditorsResponse(db, offerId);
 }
 
 async function assertClubOwner(db, clubId, user) {

@@ -1713,5 +1713,11 @@
   "Öffnen": "Open",
   "Spielplan und Rangliste sind auf der Turnierseite erst für alle sichtbar, wenn die Teilnehmerliste veröffentlicht wird.": "The schedule and standings on the tournament page are only visible to everyone once the participant list is published.",
   "Für dieses Turnier gibt es keinen öffentlichen Spielplan.": "There is no public schedule for this tournament.",
-  "Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.": "The tournament has not started yet. The schedule and standings will appear here once it starts."
+  "Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.": "The tournament has not started yet. The schedule and standings will appear here once it starts.",
+  "Noch keine weiteren Verwalter für dieses Angebot.": "No additional managers for this offer yet.",
+  "Verwalter bearbeiten dieses Angebot und entscheiden über seine Anfragen. Owner und Bearbeiter des Vereins haben ohnehin Zugriff.": "Managers edit this offer and decide on its requests. The club’s owner and editors always have access.",
+  "Keine Bearbeitungsrechte für dieses Angebot": "No editing permission for this offer",
+  "Nur Vereinsverwalter dürfen Verwalter vergeben": "Only club managers can assign managers",
+  "Dieser Benutzer verwaltet bereits den Verein": "This user already manages the club",
+  "Dieser Benutzer verwaltet dieses Angebot bereits": "This user already manages this offer"
 }
