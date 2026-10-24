@@ -1,4 +1,5 @@
 {
+  "Nachricht an Admin": "Message Admin",
   "Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Closes new registrations, including the waiting list. Tournament visibility remains unchanged. Existing waiting list entries are retained.",
   "Neue Anmeldungen einschließlich Warteliste sind geschlossen. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "New registrations, including the waiting list, are closed. Tournament visibility remains unchanged. Existing waiting list entries are retained.",
   "Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "The registration deadline has passed. It must be adjusted to allow new registrations.",

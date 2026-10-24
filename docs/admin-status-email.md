@@ -33,13 +33,25 @@ Adminnachrichten der letzten sieben Tage für den nächsten Bericht.
 
 ## Einzelmails für Nachrichten an Admins
 
+Die Postbox bietet den gemeinsamen Empfänger **Admin** mit dem Hinweis „Nachricht
+an Admin“. Eine Nachricht an diese Auswahl erreicht alle aktuellen
+Administratorkonten, einschließlich eines gegebenenfalls selbst als Admin
+angemeldeten Absenders. Jedes Konto bekommt eine eigene Postbox-Nachricht mit
+unabhängigem Lesestatus, eine Mail an seine bestätigte Adresse und einen Eintrag
+im eigenen Nachtbericht. Beim Absender erscheint die Nachricht einmal als
+„Du → Admin“. Alle Nachrichtenkopien werden zusammen mit den Berichtskopien in
+einem Datenbank-Batch gespeichert; vor dessen Erfolg werden keine Mails eingereiht.
+Die gemeinsame Auswahl wird ohne zusätzliche Empfängerabfrage in der Oberfläche
+angezeigt. Erst beim Senden werden die aktuellen Admins einmal ermittelt.
+
 Admins sind in der Postbox-Empfängerauswahl und über die bestehende exakte
 E-Mail-Suche erreichbar. Eine direkte Nachricht an einen Admin wird
 zusätzlich an die bestätigte E-Mail-Adresse des angeschriebenen Admins eingereiht.
 Die Mail enthält Absender und Nachricht mit Rich-Text-Formatierung sowie einen
 Link zur App; geantwortet wird über die Postbox. Die Kontosprache und der bestehende
 HTML-/Klartextversand inklusive Footer gelten auch hier. Der Turnier-Mail-Schalter
-beeinflusst diese Mails nicht. Andere Admins erhalten keine Kopie.
+beeinflusst diese Mails nicht. Bei einer individuellen Empfängerauswahl erhalten
+andere Admins keine Kopie.
 Das gilt auch für Adresskorrekturen, die an zuständige Admins gehen. Bei
 Teaminformationen entfällt die zusätzliche Adminmail, wenn dieselbe Adresse bereits
 die Teammail erhält.

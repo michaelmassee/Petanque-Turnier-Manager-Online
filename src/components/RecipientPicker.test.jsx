@@ -2,10 +2,24 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '../lib/i18next-config.js';
 import { RecipientPicker } from './RecipientPicker.jsx';
+import { POSTBOX_ADMIN_RECIPIENT_ID } from '../postbox-core.js';
 
 describe('RecipientPicker', () => {
   afterEach(() => {
     localStorage.clear();
+  });
+
+  it('bietet Admin als gemeinsamen Empfänger mit kurzem Hinweis an', () => {
+    const onChange = vi.fn();
+    render(<RecipientPicker label="Empfänger" recipients={[]} value="" onChange={onChange} currentUserId="user-1" />);
+    const input = screen.getByRole('combobox');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'Admin' } });
+    const option = screen.getByRole('option', { name: /Nachricht an Admin/ });
+    expect(option.querySelector('.recipient-picker-label')).toHaveTextContent(/^Admin$/);
+    fireEvent.click(option);
+    expect(onChange).toHaveBeenCalledWith(POSTBOX_ADMIN_RECIPIENT_ID);
+    expect(input).toHaveValue('Admin');
   });
 
   it('zeigt beim Turnier-Broadcast Datum und pluralisierte Meldungsanzahl und behält den Auswahlwert', () => {

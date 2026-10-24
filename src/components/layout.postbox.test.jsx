@@ -4,6 +4,7 @@ import * as push from '../lib/push.js';
 import { PostboxControl } from './layout.jsx';
 import { serializeRichText } from '../lib/rich-text.js';
 import '../lib/i18next-config.js';
+import { POSTBOX_ADMIN_GROUP_EVENT } from '../postbox-core.js';
 
 const richBody = (text) => serializeRichText({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text, marks: [{ type: 'bold' }] }] }] });
 
@@ -16,6 +17,15 @@ function renderPostbox(props = {}) {
 }
 
 describe('Postbox-Nachricht mit Editor', () => {
+  it('zeigt den gemeinsamen Empfänger bei gesendeten und empfangenen Adminnachrichten', () => {
+    renderPostbox({ messages: [
+      { id: 'sent', kind: 'direct', eventType: POSTBOX_ADMIN_GROUP_EVENT, body: 'Frage', recipientName: 'Anna Admin', createdAt: '2026-10-24T10:00:00Z', mine: true },
+      { id: 'received', kind: 'direct', eventType: POSTBOX_ADMIN_GROUP_EVENT, body: 'Zweite Frage', senderName: 'Patrick Müller', createdAt: '2026-10-24T10:00:00Z', mine: false },
+    ] });
+    expect(screen.getByRole('button', { name: 'Du → Admin' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Patrick Müller → Admin' })).toBeInTheDocument();
+    expect(screen.queryByText('Anna Admin')).toBeNull();
+  });
   it('zählt nur sichtbare Zeichen und sperrt das Senden über 500 Zeichen', () => {
     const { rerender } = renderPostbox({ body: richBody('Hallo') });
     expect(screen.getAllByText('Nachricht (5/500)').length).toBeGreaterThan(0);

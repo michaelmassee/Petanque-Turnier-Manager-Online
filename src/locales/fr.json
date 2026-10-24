@@ -1,4 +1,5 @@
 {
+  "Nachricht an Admin": "Message à Admin",
   "Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Ferme les nouvelles inscriptions, y compris la liste d’attente. La visibilité du tournoi reste inchangée. Les inscriptions existantes sur la liste d’attente sont conservées.",
   "Neue Anmeldungen einschließlich Warteliste sind geschlossen. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Les nouvelles inscriptions, y compris la liste d’attente, sont fermées. La visibilité du tournoi reste inchangée. Les inscriptions existantes sur la liste d’attente sont conservées.",
   "Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "La date limite d’inscription est dépassée. Elle doit être modifiée pour permettre de nouvelles inscriptions.",

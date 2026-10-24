@@ -2,8 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildAdminPostboxEmail } from './admin-postbox-email.js';
 import { collectAdminStatus, sendAdminStatusEmails } from './admin-status-email.js';
-import { listPostboxRecipients, lookupPostboxRecipientByEmail, renderTransactionalEmailHtml, sendPlaceAddressCorrection, sendPostboxMessage, sendTeamMessage } from './worker.js';
+import worker, { listPostboxRecipients, lookupPostboxRecipientByEmail, renderTransactionalEmailHtml, sendPlaceAddressCorrection, sendPostboxMessage, sendTeamMessage } from './worker.js';
 import { d1MitSchema, migrationSql } from './test-support/d1.js';
+import { POSTBOX_ADMIN_GROUP_EVENT, POSTBOX_ADMIN_RECIPIENT_ID } from './postbox-core.js';
 
 const sender = { id: 'patrick', firstName: 'Patrick', lastName: 'Müller', username: 'patrick.mueller', role: 'user' };
 const from = '2026-10-24T01:00:00.000Z';
@@ -25,9 +26,18 @@ describe('Nachrichten an Administratoren', () => {
     sql(`INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, created_at)
       VALUES (?, 'patrick', ?, ?, ?, ?)`, id, recipient, kind, body, at);
   }
-  const send = (recipientId, body = richBody) => sendPostboxMessage(new Request('https://ptmonline.org/api/postbox/messages', {
+  const send = (recipientId, body = richBody, author = sender) => sendPostboxMessage(new Request('https://ptmonline.org/api/postbox/messages', {
     method: 'POST', body: JSON.stringify({ recipientId, body }),
-  }), env, sender);
+  }), env, author);
+
+  async function inbox(userId) {
+    sql(`INSERT OR IGNORE INTO sessions (id, user_id, expires_at, created_at) VALUES (?, ?, '2099-01-01T00:00:00.000Z', ?)`, userId, userId, from);
+    const response = await worker.fetch(new Request('https://ptmonline.org/api/postbox', {
+      headers: { Cookie: `ptm_session=${userId}` },
+    }), env);
+    expect(response.status).toBe(200);
+    return response.json();
+  }
 
   beforeEach(() => {
     env = { DB: d1MitSchema(), MAIL_QUEUE: { send: vi.fn().mockResolvedValue(undefined) } };
@@ -37,6 +47,76 @@ describe('Nachrichten an Administratoren', () => {
     user('normal', 'user');
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it('verteilt Admin-Gruppennachrichten an alle Admins per Postbox, Mail und Nachtbericht', async () => {
+    const response = await send(POSTBOX_ADMIN_RECIPIENT_ID);
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ recipientCount: 2, message: { mine: true, eventType: POSTBOX_ADMIN_GROUP_EVENT } });
+    expect(rows('SELECT recipient_id, body FROM postbox_messages ORDER BY recipient_id')).toEqual([
+      { recipient_id: 'admin', body: richBody }, { recipient_id: 'other', body: richBody },
+    ]);
+    const mails = env.MAIL_QUEUE.send.mock.calls.map(([mail]) => mail);
+    expect(mails.map((mail) => [mail.to, mail.language])).toEqual([['admin@example.test', 'en'], ['other@example.test', 'de']]);
+    expect(rows('SELECT recipient_id FROM admin_postbox_messages ORDER BY recipient_id')).toEqual([{ recipient_id: 'admin' }, { recipient_id: 'other' }]);
+    env.MAIL_QUEUE.send.mockClear();
+    await sendAdminStatusEmails(env, [], Date.now() + 3600000, systemId);
+    const reports = env.MAIL_QUEUE.send.mock.calls.map(([mail]) => mail);
+    expect(reports).toHaveLength(2);
+    expect(reports.every((report) => report.text.includes('Hallo <Admin>'))).toBe(true);
+  });
+
+  it('zeigt dem Absender nur einen Eintrag und lässt jeden Admin seine Kopie unabhängig lesen', async () => {
+    await send(POSTBOX_ADMIN_RECIPIENT_ID);
+    expect((await inbox('patrick')).messages).toHaveLength(1);
+    const adminInbox = await inbox('admin');
+    expect(adminInbox.messages).toHaveLength(1);
+    expect(adminInbox.unreadCount).toBe(1);
+    const read = await worker.fetch(new Request('https://ptmonline.org/api/postbox/read-all', {
+      method: 'POST', headers: { Cookie: 'ptm_session=admin' },
+    }), env);
+    expect(read.status).toBe(200);
+    expect((await inbox('admin')).unreadCount).toBe(0);
+    expect((await inbox('other')).unreadCount).toBe(1);
+    expect((await inbox('normal')).messages).toEqual([]);
+  });
+
+  it('erreicht bei einem Admin als Absender auch dessen eigenes Konto genau einmal', async () => {
+    await send(POSTBOX_ADMIN_RECIPIENT_ID, 'Adminfrage', { id: 'other', firstName: 'Olga', lastName: 'Admin', role: 'admin' });
+    expect(env.MAIL_QUEUE.send.mock.calls.map(([mail]) => mail.to)).toEqual(['admin@example.test', 'other@example.test']);
+    expect(rows('SELECT recipient_id FROM admin_postbox_messages ORDER BY recipient_id')).toEqual([{ recipient_id: 'admin' }, { recipient_id: 'other' }]);
+    const ownInbox = await inbox('other');
+    expect(ownInbox.messages).toHaveLength(1);
+    expect(ownInbox.messages[0]).toMatchObject({ mine: true, eventType: POSTBOX_ADMIN_GROUP_EVENT });
+    expect(ownInbox.unreadCount).toBe(0);
+    expect((await inbox('admin')).messages).toHaveLength(1);
+  });
+
+  it('speichert keine Teilzustellung, wenn eine der Admin-Berichtskopien fehlschlägt', async () => {
+    env.DB.sqlite.exec(`CREATE TRIGGER block_second_admin BEFORE INSERT ON admin_postbox_messages
+      WHEN NEW.recipient_id = 'other' BEGIN SELECT RAISE(ABORT, 'archive unavailable'); END`);
+    await expect(send(POSTBOX_ADMIN_RECIPIENT_ID)).rejects.toThrow('archive unavailable');
+    expect(rows('SELECT * FROM postbox_messages')).toEqual([]);
+    expect(rows('SELECT * FROM admin_postbox_messages')).toEqual([]);
+    expect(env.MAIL_QUEUE.send).not.toHaveBeenCalled();
+  });
+
+  it('behält beim Gruppenversand trotz Mail-Queue-Fehlern beide Postbox-Nachrichten', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    env.MAIL_QUEUE.send.mockRejectedValueOnce(new Error('Queue unavailable'));
+    expect((await send(POSTBOX_ADMIN_RECIPIENT_ID)).status).toBe(201);
+    expect(env.MAIL_QUEUE.send).toHaveBeenCalledTimes(2);
+    expect(rows('SELECT * FROM admin_postbox_messages')).toHaveLength(2);
+  });
+
+  it('erreicht unbestätigte Admins in der Postbox und meldet fehlende Admins als Fehler', async () => {
+    sql("UPDATE users SET email_verified_at = NULL WHERE id = 'admin'");
+    await send(POSTBOX_ADMIN_RECIPIENT_ID);
+    expect(rows('SELECT id FROM postbox_messages')).toHaveLength(2);
+    expect(env.MAIL_QUEUE.send.mock.calls.map(([mail]) => mail.to)).toEqual(['other@example.test']);
+    sql("UPDATE users SET role = 'user' WHERE role = 'admin'");
+    await expect(send(POSTBOX_ADMIN_RECIPIENT_ID)).rejects.toMatchObject({ status: 409, message: 'Kein Admin-Konto vorhanden' });
+    expect(rows('SELECT id FROM postbox_messages')).toHaveLength(2);
+  });
 
   it('macht Admins als Empfänger auswählbar und per E-Mail auffindbar, ohne Adressen offenzulegen', async () => {
     const { recipients } = await (await listPostboxRecipients(env.DB, sender.id)).json();

@@ -15,7 +15,7 @@ import { RichText } from './RichText.jsx';
 import { richTextPlainText } from '../lib/rich-text.js';
 import { AutumnGarland, AutumnPumpkin } from './AutumnDecoration.jsx';
 import { LanguageSelect } from '../auth/AuthForms.jsx';
-import { LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT, REGISTRATION_SLOT_LINKED_EVENT, RENTAL_CANCELLED_EVENT, RENTAL_DECIDED_EVENT, RENTAL_REQUESTED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT } from '../postbox-core.js';
+import { LIVE_VIEW_AVAILABLE_EVENT, POSTBOX_ADMIN_GROUP_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT, REGISTRATION_SLOT_LINKED_EVENT, RENTAL_CANCELLED_EVENT, RENTAL_DECIDED_EVENT, RENTAL_REQUESTED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT } from '../postbox-core.js';
 import { formatRentalSlot } from '../rental-core.js';
 import i18next from '../lib/i18next-config.js';
 
@@ -187,6 +187,9 @@ function UserHandle({ username }) {
 
 function postboxMessageHeading(message, t) {
   if (message.kind === 'system') return t('status');
+  if (message.eventType === POSTBOX_ADMIN_GROUP_EVENT) {
+    return message.mine ? `${t('you')} → ${t('Admin')}` : <>{message.senderName}<UserHandle username={message.senderUsername} /> → {t('Admin')}</>;
+  }
   if (message.broadcastTournamentName) {
     const target = t('allParticipantsOf').replace('{name}', message.broadcastTournamentName);
     return message.mine ? `${t('you')} → ${target}` : <>{message.senderName}<UserHandle username={message.senderUsername} /> → {target}</>;

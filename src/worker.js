@@ -7,6 +7,7 @@ export { RegistrationOpeningScheduler } from './registration-opening.js';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
 import {
   isAllowedPushEndpoint, LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT,
+  POSTBOX_ADMIN_GROUP_EVENT, POSTBOX_ADMIN_RECIPIENT_ID,
   REGISTRATION_SLOT_LINKED_EVENT, RENTAL_CANCELLED_EVENT, RENTAL_DECIDED_EVENT, RENTAL_REQUESTED_EVENT,
   TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT, unreadPostboxCount,
 } from './postbox-core.js';
@@ -3892,7 +3893,8 @@ async function getPostbox(db, user) {
      LEFT JOIN users s ON s.id = m.sender_id
      LEFT JOIN users r ON r.id = m.recipient_id
      LEFT JOIN tournaments t ON t.id = m.broadcast_tournament_id
-     WHERE m.recipient_id = ?1 OR m.sender_id = ?1
+     WHERE m.recipient_id = ?1
+        OR (m.sender_id = ?1 AND (m.event_type IS NOT '${POSTBOX_ADMIN_GROUP_EVENT}' OR json_extract(m.event_data, '$.senderCopy') = 1))
         OR (m.broadcast_tournament_id IS NOT NULL AND m.broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
      ORDER BY m.created_at DESC LIMIT 25`,
   ).bind(user.id).all();
@@ -3926,6 +3928,29 @@ export async function sendPostboxMessage(request, env, sender) {
   const recipientRaw = String(body.recipientId || '').trim();
   if (!recipientRaw) throw new HttpError(400, 'Bitte wähle einen Empfänger');
   const text = postboxMessageBody(body.body);
+
+  if (recipientRaw === POSTBOX_ADMIN_RECIPIENT_ID) {
+    const { results: admins } = await env.DB.prepare(`SELECT id, role, email, email_verified_at, language FROM users
+      WHERE role = 'admin' AND id != ? ORDER BY id`).bind(TOURNAMENT_REPORT_SYSTEM_USER_ID).all();
+    if (!admins.length) throw new HttpError(409, 'Kein Admin-Konto vorhanden');
+    const createdAt = new Date().toISOString();
+    const senderCopyRecipientId = admins.find((admin) => admin.id === sender.id)?.id || admins[0].id;
+    const messages = admins.map((recipient) => ({
+      id: crypto.randomUUID(), createdAt, senderId: sender.id, recipientId: recipient.id,
+      kind: 'direct', body: text, eventType: POSTBOX_ADMIN_GROUP_EVENT,
+      eventData: { senderCopy: recipient.id === senderCopyRecipientId },
+      readAt: recipient.id === sender.id ? createdAt : null,
+      recipient, sender, pushActor: [sender.firstName, sender.lastName].filter(Boolean).join(' '),
+    }));
+    // Alle Postbox- und Berichtskopien gemeinsam speichern, bevor Benachrichtigungen versendet werden.
+    await env.DB.batch(messages.map((message) => postboxInsertStatement(env.DB, message)));
+    let senderMessage;
+    for (const message of messages) {
+      const delivered = await finishPostboxMessage(env, message);
+      if (message.eventData.senderCopy) senderMessage = { ...delivered, mine: true };
+    }
+    return json({ message: senderMessage, recipientCount: messages.length }, 201);
+  }
 
   if (recipientRaw.startsWith('tournament:')) {
     const tournamentId = recipientRaw.slice('tournament:'.length);
@@ -3973,11 +3998,18 @@ async function listPostboxTodos(db, user) {
   return todos;
 }
 
-async function createPostboxMessage(env, { senderId = null, recipientId, kind, body = null, eventType = null, eventData = null, pushTitle = 'Neue Nachricht', pushActor = '', recipient = null, sender = null, emailedAddresses = [] }) {
-  const id = crypto.randomUUID();
-  const createdAt = new Date().toISOString();
-  await env.DB.prepare('INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, event_type, event_data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(id, senderId, recipientId, kind, body, eventType, eventData ? JSON.stringify(eventData) : null, createdAt).run();
+function postboxInsertStatement(db, { id, senderId = null, recipientId, kind, body = null, eventType = null, eventData = null, createdAt, readAt = null }) {
+  return db.prepare('INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, event_type, event_data, created_at, read_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, senderId, recipientId, kind, body, eventType, eventData ? JSON.stringify(eventData) : null, createdAt, readAt);
+}
+
+async function createPostboxMessage(env, options) {
+  const message = { ...options, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+  await postboxInsertStatement(env.DB, message).run();
+  return finishPostboxMessage(env, message);
+}
+
+async function finishPostboxMessage(env, { id, senderId = null, recipientId, kind, body = null, eventType = null, eventData = null, pushTitle = 'Neue Nachricht', pushActor = '', recipient = null, sender = null, emailedAddresses = [] }) {
   await env.DB.prepare(
     `DELETE FROM postbox_messages WHERE recipient_id = ? AND id NOT IN (
        SELECT id FROM postbox_messages WHERE recipient_id = ? ORDER BY created_at DESC LIMIT 25
@@ -3985,7 +4017,7 @@ async function createPostboxMessage(env, { senderId = null, recipientId, kind, b
   ).bind(recipientId, recipientId).run();
   const row = await env.DB.prepare('SELECT * FROM postbox_messages WHERE id = ?').bind(id).first();
   const message = toPostboxMessage(row, recipientId);
-  if (kind === 'direct' && senderId && senderId !== recipientId) {
+  if (kind === 'direct' && senderId && (senderId !== recipientId || eventType === POSTBOX_ADMIN_GROUP_EVENT)) {
     try {
       // Andere Direktnachrichten (z. B. Adresskorrekturen) verwenden denselben Versandweg.
       // Der indexierte Archivzugriff liefert ausschließlich Nachrichten an Admins.
@@ -4008,7 +4040,7 @@ async function createPostboxMessage(env, { senderId = null, recipientId, kind, b
       const recipient = await env.DB.prepare('SELECT language FROM users WHERE id = ?').bind(recipientId).first();
       pushBody = buildSystemNotificationPushBody(eventType, eventData, recipient?.language || 'de');
     }
-    await sendPushNotifications(env, recipientId, { title: pushTitle, actor: pushActor, body: pushBody, messageId: id });
+    if (senderId !== recipientId) await sendPushNotifications(env, recipientId, { title: pushTitle, actor: pushActor, body: pushBody, messageId: id });
   } catch (error) {
     console.error('Postbox push dispatch failed', error);
   }

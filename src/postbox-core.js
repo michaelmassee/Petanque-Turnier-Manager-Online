@@ -7,6 +7,9 @@ const PUSH_ENDPOINT_HOSTS = new Set([
   'web.push.apple.com',
 ]);
 
+export const POSTBOX_ADMIN_RECIPIENT_ID = 'group:admins';
+export const POSTBOX_ADMIN_GROUP_EVENT = 'admin_group_message';
+
 export function isAllowedPushEndpoint(endpoint) {
   try {
     const url = new URL(endpoint);

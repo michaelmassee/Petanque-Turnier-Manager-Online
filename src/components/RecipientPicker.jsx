@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { formatDate } from '../lib/format.js';
 import { formatUserMeta, formatUserName } from '../lib/userLabel.js';
 import { ComboboxPicker } from './ComboboxPicker.jsx';
+import { POSTBOX_ADMIN_RECIPIENT_ID } from '../postbox-core.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Stabiler Default: ein neues [] pro Render würde die Einträge neu berechnen und die Auswahl zurücksetzen.
@@ -67,6 +68,12 @@ export function RecipientPicker({ label, recipients, recipientTournaments = NO_T
   const { setQuery, emailMatches, queryIsEmail, emailLookupPending, matchesQuery } = useEmailLookup(onLookupEmail);
 
   const entries = useMemo(() => {
+    const adminEntry = {
+      id: POSTBOX_ADMIN_RECIPIENT_ID, value: POSTBOX_ADMIN_RECIPIENT_ID,
+      label: t('Admin'), selectedLabel: t('Admin'), meta: t('Nachricht an Admin'),
+      searchText: `${t('Admin')} ${t('Nachricht an Admin')}`.toLowerCase(),
+      group: t('allRecipientsSection'), favoritable: true,
+    };
     const tournamentEntries = recipientTournaments.map((tournament) => {
       // Nur der Turniername: die Gruppe „Turnier-Broadcasts“ sagt bereits, dass alle Teilnehmer erreicht werden.
       const entryLabel = tournament.name;
@@ -86,7 +93,7 @@ export function RecipientPicker({ label, recipients, recipientTournaments = NO_T
     const knownIds = new Set(recipients.map((recipient) => recipient.id));
     const recipientEntries = [...recipients, ...emailMatches.filter((recipient) => !knownIds.has(recipient.id))]
       .map((recipient) => recipientEntry(recipient, t('allRecipientsSection')));
-    return [...tournamentEntries, ...recipientEntries];
+    return [adminEntry, ...tournamentEntries, ...recipientEntries];
   }, [recipients, emailMatches, recipientTournaments, t, i18n.language]);
 
   return (
