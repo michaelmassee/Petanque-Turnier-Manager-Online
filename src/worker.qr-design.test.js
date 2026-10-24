@@ -121,6 +121,7 @@ describe('QR-Code-Design pro Turnier', () => {
       expect(erster).toMatch(/^https:\/\/ptmonline\.org\/q\/[A-Za-z0-9_-]{22}$/);
       expect(await qrUrl()).toBe(erster);
       expect((await teilen()).shareUrl).toBe(erster);
+      expect(await teilen()).not.toHaveProperty('shareToken');
     });
 
     it('bleibt gleich bei Sichtbarkeitswechsel und Deaktivieren/Reaktivieren der Freigabe', async () => {
@@ -150,6 +151,8 @@ describe('QR-Code-Design pro Turnier', () => {
       const aktiv = await ziel();
       expect(aktiv.pathname).toBe('/turniere/t1/anmelden');
       expect(await hasTournamentShareAccess(env.DB, await getTournamentById(env.DB, 't1'), aktiv.searchParams.get('share'))).toBe(true);
+      // Derselbe Schlüssel kommt auch direkt mit, für Links auf Turnierseite und Bildschirm-Anzeige.
+      expect((await teilen()).shareToken).toBe(aktiv.searchParams.get('share'));
 
       await deaktivieren();
       expect((await ziel()).searchParams.has('share')).toBe(false);

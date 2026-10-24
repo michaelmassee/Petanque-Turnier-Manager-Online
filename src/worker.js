@@ -2762,9 +2762,13 @@ export default {
         if (request.method === 'POST') {
           // Geteilt wird immer der feste Link /q/<qr_token> (derselbe wie im QR-Code). Er bleibt gleich, egal ob
           // privat/öffentlich oder Freigabe deaktiviert und wieder aktiviert; bei privaten Turnieren aktiviert
-          // Teilen den Freigabe-Link, auf den der feste Link weiterleitet.
-          if (tournament.visibility === 'private') await createTournamentShareLink(env.DB, tournament.id, url.origin);
-          return json({ shareUrl: qrLinkUrl(url, await ensureTournamentQrToken(env.DB, tournament.id)) });
+          // Teilen den Freigabe-Link, auf den der feste Link weiterleitet. Dessen Schlüssel (shareToken) braucht die App
+          // für Links direkt auf die Turnierseite bzw. deren Bildschirm-Anzeige.
+          const shareUrl = qrLinkUrl(url, await ensureTournamentQrToken(env.DB, tournament.id));
+          if (tournament.visibility !== 'private') return json({ shareUrl });
+          await createTournamentShareLink(env.DB, tournament.id, url.origin);
+          const link = await env.DB.prepare('SELECT token FROM tournament_share_links WHERE tournament_id = ?').bind(tournament.id).first();
+          return json({ shareUrl, shareToken: link.token });
         }
         if (request.method === 'DELETE') return await deleteTournamentShareLink(env.DB, tournament.id);
       }

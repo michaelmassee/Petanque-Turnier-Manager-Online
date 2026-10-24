@@ -1764,5 +1764,6 @@
   "Anzeige für Bildschirm": "Display for screen",
   "Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.": "Without menu, e.g. for a second screen on site; updates itself.",
   "Vollbild": "Full screen",
-  "Turnierverlauf": "Tournament progress"
+  "Turnierverlauf": "Tournament progress",
+  "Privates Turnier: Turnierseite und Anzeige enthalten den Freigabe-Schlüssel, damit sie auch ohne Anmeldung funktionieren, z. B. auf einem Rechner vor Ort. Wer den Link hat, sieht Spielplan und Rangliste. Deaktivierst du den Freigabe-Link, funktionieren diese Links nicht mehr.": "Private tournament: the tournament page and display contain the share key so they work without signing in, e.g. on a computer on site. Anyone with the link can see the schedule and standings. If you disable the share link, these links stop working."
 }

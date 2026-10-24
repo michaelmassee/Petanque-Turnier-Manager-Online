@@ -47,15 +47,44 @@ function teamLabel(team) {
 }
 
 // Link zur Turnierseite (Spielplan, Rangliste, Ankündigungen) zum Teilen mit Spielern und Zuschauern. „Privat“
-// heißt nur: nicht in der öffentlichen Turnierliste. Geteilt wird dann mit dem Freigabe-Token des Turniers.
+// heißt nur: nicht in der öffentlichen Turnierliste. Geteilt wird dann mit dem Freigabe-Token des Turniers, damit
+// die Seite auch ohne Anmeldung funktioniert – auch die Bildschirm-Anzeige, z. B. auf einem Rechner vor Ort.
 function TournamentBoardShare({ tournament }) {
   const { t } = useTranslation();
+  const [displayBusy, setDisplayBusy] = useState(false);
+  const [displayError, setDisplayError] = useState('');
   const path = tournamentBoardPath(tournament.id);
-  const boardUrl = new URL(path, window.location.origin);
-  async function resolveShareUrl() {
-    const { shareUrl } = await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' });
-    boardUrl.searchParams.set('share', new URL(shareUrl).searchParams.get('share'));
-    return boardUrl.href;
+  const displayPath = tournamentDisplayPath(tournament.id);
+  // Ohne veröffentlichte Teilnehmerliste zeigt die Turnierseite Fremden ohnehin keinen Spielplan; dann reicht die Anmeldung.
+  const withShareToken = tournament.visibility === 'private' && tournament.participantsPublic;
+  async function resolveShareToken() {
+    const { shareToken } = await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' });
+    return shareToken;
+  }
+  function urlWithShare(targetPath, shareToken) {
+    const url = new URL(targetPath, window.location.origin);
+    url.searchParams.set('share', shareToken);
+    return url.href;
+  }
+  async function openDisplay() {
+    // Fenster sofort im Klick öffnen, sonst blockt der Popup-Blocker; die Adresse folgt, sobald der Schlüssel da ist.
+    const displayWindow = window.open('', '_blank');
+    setDisplayError('');
+    setDisplayBusy(true);
+    try {
+      const url = urlWithShare(displayPath, await resolveShareToken());
+      if (displayWindow) {
+        displayWindow.opener = null;
+        displayWindow.location.href = url;
+      } else {
+        window.location.href = url;
+      }
+    } catch (err) {
+      displayWindow?.close();
+      setDisplayError(err.message);
+    } finally {
+      setDisplayBusy(false);
+    }
   }
   return (
     <div className="panel tournament-board-share">
@@ -64,11 +93,19 @@ function TournamentBoardShare({ tournament }) {
         {' '}<a href={path} target="_blank" rel="noreferrer">{t('Öffnen')}</a>
       </p>
       <p>
-        <a href={tournamentDisplayPath(tournament.id)} target="_blank" rel="noreferrer">{t('Anzeige für Bildschirm')}</a>
+        {withShareToken
+          ? <Button variant="secondary" loading={displayBusy} onClick={openDisplay}>{t('Anzeige für Bildschirm')}</Button>
+          : <a href={displayPath} target="_blank" rel="noreferrer">{t('Anzeige für Bildschirm')}</a>}
         {' '}<span className="muted">{t('Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.')}</span>
       </p>
+      {withShareToken && (
+        <p className="hint">
+          {t('Privates Turnier: Turnierseite und Anzeige enthalten den Freigabe-Schlüssel, damit sie auch ohne Anmeldung funktionieren, z. B. auf einem Rechner vor Ort. Wer den Link hat, sieht Spielplan und Rangliste. Deaktivierst du den Freigabe-Link, funktionieren diese Links nicht mehr.')}
+        </p>
+      )}
+      <Feedback error={displayError} />
       {tournament.participantsPublic
-        ? <ShareLinkButton title={tournament.name} url={boardUrl.href} resolveUrl={tournament.visibility === 'private' ? resolveShareUrl : undefined} />
+        ? <ShareLinkButton title={tournament.name} url={new URL(path, window.location.origin).href} resolveUrl={withShareToken ? async () => urlWithShare(path, await resolveShareToken()) : undefined} />
         : <p className="hint">{t('Spielplan und Rangliste sind auf der Turnierseite erst für alle sichtbar, wenn die Teilnehmerliste veröffentlicht wird.')}</p>}
     </div>
   );

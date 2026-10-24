@@ -1764,5 +1764,6 @@
   "Anzeige für Bildschirm": "Affichage pour écran",
   "Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.": "Sans menu, p. ex. pour un second écran sur place ; se met à jour automatiquement.",
   "Vollbild": "Plein écran",
-  "Turnierverlauf": "Déroulement du tournoi"
+  "Turnierverlauf": "Déroulement du tournoi",
+  "Privates Turnier: Turnierseite und Anzeige enthalten den Freigabe-Schlüssel, damit sie auch ohne Anmeldung funktionieren, z. B. auf einem Rechner vor Ort. Wer den Link hat, sieht Spielplan und Rangliste. Deaktivierst du den Freigabe-Link, funktionieren diese Links nicht mehr.": "Tournoi privé : la page du tournoi et l'affichage contiennent la clé de partage pour fonctionner sans connexion, p. ex. sur un ordinateur sur place. Toute personne disposant du lien voit le programme et le classement. Si tu désactives le lien de partage, ces liens ne fonctionnent plus."
 }

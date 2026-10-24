@@ -162,7 +162,7 @@ describe('TournamentPlayManagement', () => {
     installFetchMock(calls);
     const fetchMock = global.fetch;
     global.fetch = vi.fn((path, options = {}) => (path === '/api/tournaments/t1/share-link' && options.method === 'POST'
-      ? Promise.resolve(jsonResponse({ shareUrl: 'https://ptm.test/turniere/t1/info?share=geheim' }))
+      ? Promise.resolve(jsonResponse({ shareUrl: 'https://ptm.test/q/festerQrSchluessel1234', shareToken: 'geheim' }))
       : fetchMock(path, options)));
     const share = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'share', { value: share, configurable: true });
@@ -173,6 +173,25 @@ describe('TournamentPlayManagement', () => {
     } finally {
       delete navigator.share;
     }
+  });
+
+  it('öffnet bei einem privaten Turnier die Bildschirm-Anzeige mit dem Freigabe-Token', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    const fetchMock = global.fetch;
+    global.fetch = vi.fn((path, options = {}) => (path === '/api/tournaments/t1/share-link' && options.method === 'POST'
+      ? Promise.resolve(jsonResponse({ shareUrl: 'https://ptm.test/q/festerQrSchluessel1234', shareToken: 'geheim' }))
+      : fetchMock(path, options)));
+    const displayWindow = { opener: 'app', location: { href: '' }, close: vi.fn() };
+    vi.spyOn(window, 'open').mockReturnValue(displayWindow);
+
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, visibility: 'private', participantsPublic: true }]} language="de" />);
+    expect(await screen.findByText(/Wer den Link hat, sieht Spielplan und Rangliste/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Anzeige für Bildschirm' }));
+
+    await waitFor(() => expect(displayWindow.location.href).toBe(`${window.location.origin}/turnierseite/t1/anzeige?share=geheim`));
+    expect(window.open).toHaveBeenCalledWith('', '_blank');
+    expect(displayWindow.opener).toBeNull();
   });
 
   it('weist darauf hin, wenn die Teilnehmerliste nicht veröffentlicht ist', async () => {

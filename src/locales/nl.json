@@ -1764,5 +1764,6 @@
   "Anzeige für Bildschirm": "Weergave voor scherm",
   "Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.": "Zonder menu, bijv. voor een tweede scherm ter plaatse; ververst zichzelf.",
   "Vollbild": "Volledig scherm",
-  "Turnierverlauf": "Toernooiverloop"
+  "Turnierverlauf": "Toernooiverloop",
+  "Privates Turnier: Turnierseite und Anzeige enthalten den Freigabe-Schlüssel, damit sie auch ohne Anmeldung funktionieren, z. B. auf einem Rechner vor Ort. Wer den Link hat, sieht Spielplan und Rangliste. Deaktivierst du den Freigabe-Link, funktionieren diese Links nicht mehr.": "Privétoernooi: de toernooipagina en de weergave bevatten de deelsleutel, zodat ze zonder inloggen werken, bijv. op een computer ter plaatse. Iedereen met de link ziet speelschema en ranglijst. Als je de deellink uitschakelt, werken deze links niet meer."
 }
