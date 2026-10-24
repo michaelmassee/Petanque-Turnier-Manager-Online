@@ -76,4 +76,13 @@ describe('Ungeprüfte Platzadresse', () => {
     expect((await anfrage('/api/places/p1/address-correction', { method: 'POST', body: { body: 'x' } })).status).toBe(401);
     expect((await anfrage('/api/places/p1/address-correction', { method: 'POST', session: 'raffi-session', body: { body: '' } })).status).toBe(400);
   });
+
+  it('kennzeichnet für Angemeldete Vereine eines Admins, damit sie die Übernahme anfragen können', async () => {
+    const plaetze = async (session) => Object.fromEntries((await (await anfrage('/api/places', { session })).json()).places
+      .map((entry) => [entry.id, entry.clubOwnedByAdmin]));
+
+    expect(await plaetze('raffi-session')).toEqual({ p1: true, p2: false, p3: true });
+    sql("UPDATE users SET role = 'user' WHERE id = 'admin'");
+    expect(await plaetze('raffi-session')).toEqual({ p1: false, p2: false, p3: false });
+  });
 });

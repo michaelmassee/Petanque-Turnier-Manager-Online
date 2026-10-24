@@ -19,6 +19,7 @@ import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
 import {
   assertPartnerCountMatchesFormation as assertCorePartnerCountMatchesFormation,
+  assertTournamentSystemAllowed,
   isNewlyPublicTournament,
   isTournamentRoundNumberConflict,
   normalizePlayerListingPosition,
@@ -5538,6 +5539,7 @@ async function createTournament(request, env, user) {
   const selectedPlace = await resolveTournamentBoulePlace(db, body.boulePlaceId);
   if (selectedPlace) body = { ...body, location: selectedPlace.address, latitude: selectedPlace.latitude, longitude: selectedPlace.longitude };
   const tournament = normalizeCoreTournamentInput(body);
+  assertTournamentSystemAllowed(tournament);
 
   if (user.role !== 'admin' && tournament.registrationEnabled !== false) {
     const limit = user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT;
@@ -5883,6 +5885,7 @@ async function updateTournament(request, env, existing, user) {
   const tournament = normalizeCoreTournamentInput(body);
   await assertDraftTransitionAllowed(db, existing, tournament.status);
   assertFormationChangeAllowed(existing, tournament.formation, tournament.formationOther);
+  assertTournamentSystemAllowed(tournament, existing);
   if (existing.type === 'schweizer' && existing.status === 'running'
     && tournament.schweizerRankingMode !== (existing.schweizer_ranking_mode || 'mit_buchholz')) {
     throw new HttpError(409, 'Der Schweizer Ranglistenmodus kann nach Turnierstart nicht geändert werden');
@@ -9772,7 +9775,8 @@ function rowMemberOf(value) {
   } catch { return []; }
 }
 
-function toPublicBoulePlace(row, user) {
+// adminIds: Vereine, deren Owner ein Admin ist (z. B. aus Verbandsimporten), können angemeldete Nutzer zur Übernahme anfragen.
+function toPublicBoulePlace(row, user, adminIds = null) {
   const canEdit = row.club_id ? clubCanEdit(row, user) : Boolean(user?.role === 'admin' || (row.reported_by_user_id && row.reported_by_user_id === user?.id));
   return {
     id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubKind: row.club_kind || 'club', clubDescription: row.club_description || null, clubLogoUrl: row.club_logo_url || null, clubWebsiteUrl: row.club_website_url || null, clubSocialLinks: rowSocialLinks(row.club_social_links), venueType: row.venue_type || 'outdoor', name: row.name, address: formatLocationAddress(row.address),
@@ -9781,6 +9785,7 @@ function toPublicBoulePlace(row, user) {
     facilities: row.facilities || null, facilityCodes: rowFacilityCodes(row), status: row.status, likeCount: Number(row.like_count || 0), liked: Boolean(Number(row.liked || 0)),
     favorited: Boolean(Number(row.favorited || 0)),
     addressUnverified: Boolean(Number(row.address_unverified || 0)),
+    clubOwnedByAdmin: Boolean(row.club_id && adminIds?.has(row.owner_id)),
     canEdit,
   };
 }
@@ -9847,7 +9852,7 @@ async function loadPublishedClubs(db) {
 
 async function listBoulePlaces(db, user, query) {
   const term = String(query || '').trim();
-  const rows = await db.prepare(
+  const placesQuery = db.prepare(
     `SELECT p.*, c.name AS club_display_name, c.kind AS club_kind, c.description AS club_description, c.logo_url AS club_logo_url, c.website_url AS club_website_url, c.social_links AS club_social_links, c.owner_id,
        EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?1) AS editor_user_id,
        (SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id) AS like_count,
@@ -9856,8 +9861,13 @@ async function listBoulePlaces(db, user, query) {
      FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
      WHERE p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')
        AND (?2 = '' OR p.name LIKE '%' || ?2 || '%' COLLATE NOCASE OR c.name LIKE '%' || ?2 || '%' COLLATE NOCASE OR p.club_name LIKE '%' || ?2 || '%' COLLATE NOCASE OR p.address LIKE '%' || ?2 || '%' COLLATE NOCASE)
-     ORDER BY COALESCE(c.name, p.club_name) COLLATE NOCASE, p.name COLLATE NOCASE`).bind(user?.id || '', term).all();
-  return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, user)) });
+     ORDER BY COALESCE(c.name, p.club_name) COLLATE NOCASE, p.name COLLATE NOCASE`).bind(user?.id || '', term);
+  // Nur für Angemeldete: Die wenigen Admin-IDs im selben Batch statt eines Lesezugriffs pro Zeile.
+  const [rows, admins] = user
+    ? await db.batch([placesQuery, db.prepare("SELECT id FROM users WHERE role = 'admin'")])
+    : [await placesQuery.all(), null];
+  const adminIds = admins ? new Set((admins.results || []).map((admin) => admin.id)) : null;
+  return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, user, adminIds)) });
 }
 
 async function getClub(db, id, user) {

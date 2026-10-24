@@ -224,11 +224,14 @@ export function ComboboxPicker({
                           type="button"
                           role="option"
                           aria-selected={index === activeIndex}
-                          className={`recipient-picker-option${index === activeIndex ? ' active' : ''}`}
+                          className={`recipient-picker-option${index === activeIndex ? ' active' : ''}${entry.unavailable ? ' is-unavailable' : ''}`}
                           onMouseEnter={() => setActiveIndex(index)}
                           onClick={() => handleSelect(entry)}
                         >
-                          <span className="recipient-picker-label">{entry.label}</span>
+                          <span className="recipient-picker-label">
+                            {entry.unavailable && <span className="unavailable-mark" aria-hidden="true">✕ </span>}
+                            {entry.label}
+                          </span>
                           {entry.meta ? <small className="recipient-picker-meta">{entry.meta}</small> : null}
                         </button>
                         {entry.favoritable && (

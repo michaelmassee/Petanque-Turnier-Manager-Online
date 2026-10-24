@@ -5,15 +5,18 @@ import { ComboboxPicker } from './ComboboxPicker.jsx';
 
 // Turnierauswahl für Turnierleiter (Meldungen, Turnier starten): wie die Postbox-Empfänger mit Datum und Anzahl
 // der Meldungen in der zweiten Zeile, Favoriten und zuletzt verwendet (gemeinsam für beide Seiten).
-export function TournamentPicker({ label, tournaments, value, onChange, currentUserId, required }) {
+// isUnavailable: Turniere, die auswählbar bleiben, aber rot als „nicht online durchführbar“ markiert werden.
+export function TournamentPicker({ label, tournaments, value, onChange, currentUserId, required, isUnavailable }) {
   const { t, i18n } = useTranslation();
 
   const entries = useMemo(() => tournaments.map((tournament) => {
     const date = formatDate(tournament.date, i18n.language);
     // Wie beim Turnier-Broadcast: offene, bestätigte und Wartelisten-Meldungen.
     const count = Number(tournament.activeRegistrations || 0) + Number(tournament.waitlistRegistrations || 0);
-    const meta = `${date} · ${t('registrationCount', { count })}`;
+    const unavailable = Boolean(isUnavailable?.(tournament));
+    const meta = unavailable ? `${t('Nicht online durchführbar')} · ${date}` : `${date} · ${t('registrationCount', { count })}`;
     return {
+      unavailable,
       id: tournament.id,
       value: tournament.id,
       label: tournament.name,
@@ -23,7 +26,7 @@ export function TournamentPicker({ label, tournaments, value, onChange, currentU
       group: t('Alle Turniere'),
       favoritable: true,
     };
-  }), [tournaments, t, i18n.language]);
+  }), [tournaments, isUnavailable, t, i18n.language]);
 
   return (
     <ComboboxPicker

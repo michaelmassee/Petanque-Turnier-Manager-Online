@@ -34,6 +34,12 @@ export function getSupportedSystemLabels() {
   return Object.values(PAIRING_STRATEGIES).map((strategy) => strategy.label);
 }
 
+// Baut "Schweizer-System und Supermêlée" (bzw. bei mehr Systemen mit Kommas + finalem "und") – Intl.ListFormat
+// übernimmt dabei die sprachabhängige Aufzählungsform (z. B. "and" statt "und" auf Englisch).
+export function supportedSystemsList(locale) {
+  return new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(getSupportedSystemLabels());
+}
+
 // Mêlée-Turniere werden in jedem Online-System mit fest ausgelosten Teams gespielt (Supermêlée hat ein eigenes System).
 export function isMeleeTeamTournament(tournament) {
   return (tournament.registrationType ?? tournament.registration_type) === 'melee' && isOnlinePlayable(tournament);

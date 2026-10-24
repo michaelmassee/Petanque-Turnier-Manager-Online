@@ -5,7 +5,9 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { TextField, Button, Feedback, ShareLinkButton } from '../components/ui.jsx';
 import { tournamentBoardPath, tournamentDisplayPath } from '../lib/routing.js';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
-import { checkRoundRequirements, getSupportedSystemLabels, isMeleeTeamTournament, isOnlinePlayable, minimumTeams } from '../lib/pairing/index.js';
+import { registrationUnit } from '../registration-core.js';
+import { NotOnlinePlayableNotice } from '../components/NotOnlinePlayableNotice.jsx';
+import { checkRoundRequirements, isMeleeTeamTournament, isOnlinePlayable, minimumTeams } from '../lib/pairing/index.js';
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
 import { isCalendarEntry, isDocumentBound, labelFor, sanitizeScore, translatedOptions } from '../lib/domain.js';
 import { AnnouncementEditor } from '../components/TournamentAnnouncement.jsx';
@@ -28,14 +30,27 @@ function requirementText(requirement, t, { teams = false } = {}) {
   return t(requirement.text);
 }
 
-// Baut "Schweizer-System und Supermêlée" (bzw. bei künftig mehr Systemen automatisch
-// mit Kommas + finalem "und") aus PAIRING_STRATEGIES statt die Namen an jeder
-// Hinweistext-Stelle hart zu verdrahten - Intl.ListFormat übernimmt dabei auch die
-// sprachabhängige Aufzählungsform (z. B. "and" statt "und" auf Englisch).
-function supportedSystemsList(locale) {
-  const formatter = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' });
-  return formatter.format(getSupportedSystemLabels());
+const isNotOnlinePlayable = (tournament) => !isOnlinePlayable(tournament);
+
+const EMPTY_QUICK_PLAYER = {
+  firstName: '', lastName: '', licenseNr: '',
+  partnerFirstName: '', partnerLastName: '', partnerLicenseNr: '',
+  partner2FirstName: '', partner2LastName: '', partner2LicenseNr: '',
+};
+
+// Personen einer Nachmeldung nach der Anmeldeeinheit (registrationUnit): einzeln bei Tête, Mêlée und Supermêlée, sonst
+// ein Team – Doublette mit Partner, Triplette mit Partner und optional Partner 2 (Team mit 2 Personen ist zulässig).
+function quickPlayerSlots(tournament) {
+  const unit = registrationUnit(tournament);
+  if (unit.kind === 'single') return [{ prefix: '', label: null, required: true }];
+  return [
+    { prefix: '', label: 'Spieler', required: true },
+    { prefix: 'partner', label: 'Partner', required: true },
+    ...(unit.max >= 3 ? [{ prefix: 'partner2', label: 'Partner 2', required: false }] : []),
+  ];
 }
+
+const quickPlayerKey = (prefix, field) => (prefix ? `${prefix}${field[0].toUpperCase()}${field.slice(1)}` : field);
 
 function playerLabel(player) {
   if (player.teamLabel) return player.teamLabel;
@@ -284,16 +299,15 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const { t, i18n } = useTranslation();
   // Kalendereinträge sind reine Termine ohne Teilnehmer und tauchen hier gar nicht auf.
   const allTournaments = managedTournaments.filter((tournament) => !isCalendarEntry(tournament));
-  // Nur Turniere mit implementiertem Paarungssystem (Schweizer, Supermêlée) sind
-  // online spielbar (siehe isOnlinePlayable) - alle anderen Typen werden unten im
-  // Leerzustand mit Grund aufgelistet, statt kommentarlos aus der Auswahl zu
-  // verschwinden.
+  // Nur Turniere mit implementiertem Paarungssystem sind online spielbar (siehe isOnlinePlayable). Die übrigen stehen
+  // trotzdem in der Auswahl – rot als „nicht online durchführbar“ markiert, mit Grund statt Start-Button.
   // Mit einem Turnierdokument verbundene Turniere führt das Dokument – schon ab dem Verbinden, nicht erst ab seinem
   // Start.
   const tournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && !isDocumentBound(tournament));
   const nonPlayableTournaments = allTournaments.filter((tournament) => !isOnlinePlayable(tournament));
   const desktopExecutionTournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && isDocumentBound(tournament));
-  const [selectedTournamentId, setSelectedTournamentId] = useState(tournaments[0]?.id || '');
+  const pickerTournaments = [...tournaments, ...nonPlayableTournaments];
+  const [selectedTournamentId, setSelectedTournamentId] = useState((tournaments[0] || nonPlayableTournaments[0])?.id || '');
   // Aus einer Push-Benachrichtigung gewähltes Turnier übernehmen, sobald es in der Liste ist.
   const focusTournamentId = focus?.tournamentId || '';
   const focusAvailable = tournaments.some((tournament) => tournament.id === focusTournamentId);
@@ -305,13 +319,16 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [finishing, setFinishing] = useState(false);
-  const [quickPlayer, setQuickPlayer] = useState({ firstName: '', lastName: '', licenseNr: '' });
+  const [quickPlayer, setQuickPlayer] = useState(EMPTY_QUICK_PLAYER);
   // Der `tournaments`-Prop kommt vom Elternteil und wird nicht sofort neu geladen,
   // nachdem hier der Status auf "Läuft" gesetzt wurde - deshalb lokal vormerken,
   // welche Turniere in dieser Sitzung bereits gestartet wurden.
   const [startedTournamentIds, setStartedTournamentIds] = useState(() => new Set());
 
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
+  const selectedNonPlayable = nonPlayableTournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
+  const quickSlots = selectedTournament ? quickPlayerSlots(selectedTournament) : [];
+  const isTeamQuickAdd = quickSlots.length > 1;
   const selectedTournamentStatus = selectedTournament
     ? (startedTournamentIds.has(selectedTournament.id) ? 'running' : selectedTournament.status)
     : null;
@@ -433,6 +450,14 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           firstName: quickPlayer.firstName,
           lastName: quickPlayer.lastName,
           licenseNr: quickPlayer.licenseNr || null,
+          ...(isTeamQuickAdd ? {
+            partnerFirstName: quickPlayer.partnerFirstName,
+            partnerLastName: quickPlayer.partnerLastName,
+            partnerLicenseNr: quickPlayer.partnerLicenseNr || null,
+            partner2FirstName: quickPlayer.partner2FirstName || null,
+            partner2LastName: quickPlayer.partner2LastName || null,
+            partner2LicenseNr: quickPlayer.partner2LicenseNr || null,
+          } : {}),
           noEmail: true,
           confirmImmediately: true,
           language: i18n.language,
@@ -444,8 +469,12 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           registrationAnswers: [],
         }),
       });
-      setQuickPlayer({ firstName: '', lastName: '', licenseNr: '' });
-      setMessage(`${t('Spieler hinzugefügt:')} ${result.registration.firstName} ${result.registration.lastName}`);
+      setQuickPlayer(EMPTY_QUICK_PLAYER);
+      const added = result.registration;
+      setMessage(isTeamQuickAdd
+        ? `${t('Team hinzugefügt:')} ${[[added.firstName, added.lastName], [added.partnerFirstName, added.partnerLastName], [added.partner2FirstName, added.partner2LastName]]
+          .filter(([first]) => first).map((name) => name.join(' ')).join(' + ')}`
+        : `${t('Spieler hinzugefügt:')} ${added.firstName} ${added.lastName}`);
       await loadData(selectedTournamentId);
     } catch (err) {
       setError(err.message);
@@ -615,24 +644,12 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     return cleared;
   }
 
-  if (!tournaments.length) {
+  if (!pickerTournaments.length) {
     return (
       <div className="panel">
         <p className="muted">{t('Keine Turniere mit Online-Durchführung verfügbar.')}</p>
         {desktopExecutionTournaments.length > 0 && (
           <p className="hint">{t('Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.')}</p>
-        )}
-        {nonPlayableTournaments.length > 0 && (
-          <div className="hint">
-            <p>{t('Folgende Turniere unterstützen keine Online-Rundenverwaltung, da ihr Turniertyp dafür nicht implementiert ist.')} {t('Unterstützt werden nur:')} {supportedSystemsList(i18n.language)}.</p>
-            <ul>
-              {nonPlayableTournaments.map((tournament) => (
-                <li key={tournament.id} data-i18n-skip>
-                  {tournament.name} ({labelFor(TOURNAMENT_TYPES, tournament.type)})
-                </li>
-              ))}
-            </ul>
-          </div>
         )}
       </div>
     );
@@ -699,7 +716,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       <div className="panel play-toolbar">
         <TournamentPicker
           label={t('Turnier')}
-          tournaments={tournaments}
+          tournaments={pickerTournaments}
+          isUnavailable={isNotOnlinePlayable}
           value={selectedTournamentId}
           onChange={setSelectedTournamentId}
           currentUserId={currentUserId}
@@ -726,12 +744,14 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
         )}
       </div>
 
-      {nonPlayableTournaments.length > 0 && (
-        <p className="hint">
-          {t('Nicht in der Auswahl:')} {nonPlayableTournaments.map((tournament) => `${tournament.name} (${labelFor(TOURNAMENT_TYPES, tournament.type)})`).join(', ')}
-          {' – '}
-          {t('diese Turniertypen unterstützen keine Online-Rundenverwaltung.')} {t('Unterstützt werden nur:')} {supportedSystemsList(i18n.language)}.
-        </p>
+      {selectedNonPlayable && (
+        <NotOnlinePlayableNotice
+          title={t('{{name}} kann nicht online durchgeführt werden.', { name: selectedNonPlayable.name })}
+          system={labelFor(TOURNAMENT_TYPES, selectedNonPlayable.type)}
+        />
+      )}
+      {!tournaments.length && desktopExecutionTournaments.length > 0 && (
+        <p className="hint">{t('Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.')}</p>
       )}
 
       <Feedback message={message} error={error || queryError?.message} />
@@ -764,11 +784,22 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       {selectedTournamentStatus === 'running' && (
         <details className="panel round-participants">
           <summary className="play-round-summary"><span>{t('Teilnehmer')}</span><span className="counter">{activeConfirmedCount}</span></summary>
-          <form className="quick-player-form" onSubmit={handleQuickPlayerSubmit}>
-            <TextField label={t('Vorname')} value={quickPlayer.firstName} onChange={(firstName) => setQuickPlayer({ ...quickPlayer, firstName })} required minLength={2} />
-            <TextField label={t('Nachname')} value={quickPlayer.lastName} onChange={(lastName) => setQuickPlayer({ ...quickPlayer, lastName })} required minLength={2} />
-            {selectedTournament?.licenseRequired && <TextField label={t('Lizenznummer')} value={quickPlayer.licenseNr} onChange={(licenseNr) => setQuickPlayer({ ...quickPlayer, licenseNr })} required />}
-            <Button type="submit" disabled={busy} loading={busy}>{t('Spieler hinzufügen')}</Button>
+          <form className={`quick-player-form${isTeamQuickAdd ? ' is-team' : ''}`} onSubmit={handleQuickPlayerSubmit}>
+            {quickSlots.map(({ prefix, label, required }) => {
+              const value = (field) => quickPlayer[quickPlayerKey(prefix, field)];
+              const set = (field) => (next) => setQuickPlayer({ ...quickPlayer, [quickPlayerKey(prefix, field)]: next });
+              // Partner 2 ist optional; wer dort etwas einträgt, muss den Namen aber vollständig angeben.
+              const needed = required || Boolean(value('firstName') || value('lastName'));
+              const caption = (field) => (label ? `${t(label)}: ${t(field)}` : t(field));
+              return (
+                <div className="quick-player-person" key={prefix || 'player'}>
+                  <TextField label={caption('Vorname')} value={value('firstName')} onChange={set('firstName')} required={needed} minLength={2} />
+                  <TextField label={caption('Nachname')} value={value('lastName')} onChange={set('lastName')} required={needed} minLength={2} />
+                  {selectedTournament?.licenseRequired && <TextField label={caption('Lizenznummer')} value={value('licenseNr')} onChange={set('licenseNr')} required={needed} />}
+                </div>
+              );
+            })}
+            <Button type="submit" disabled={busy} loading={busy}>{t(isTeamQuickAdd ? 'Team hinzufügen' : 'Spieler hinzufügen')}</Button>
           </form>
           <p className="hint">
             {!isMelee && t('Neue Spieler sind sofort für die nächste Runde aktiv.')}

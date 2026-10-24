@@ -12,6 +12,8 @@ import { authenticatedApi } from '../lib/api.js';
 import { formatUserLabel, formatUserName } from '../lib/userLabel.js';
 import { useClubSuggestions } from '../components/ClubSuggestions.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
+import { isOnlinePlayable } from '../lib/pairing/index.js';
+import { NotOnlinePlayableNotice } from '../components/NotOnlinePlayableNotice.jsx';
 import { TournamentQrDialog } from '../components/TournamentQrDialog.jsx';
 import { TournamentFlyerDialog } from '../components/TournamentFlyerDialog.jsx';
 import { EditorsPanel } from '../components/EditorsPanel.jsx';
@@ -325,6 +327,8 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               {t('? Hilfe')}
             </button>
           </div>
+          {/* Rangliste nur mit Supermêlée, Trip-Tête nur als Triplette (Hauptprojekt). Den gespeicherten Wert eines älteren
+              Turniers trotzdem anbieten, damit die Auswahl nicht ins Leere zeigt. */}
           <div className="form-grid-3">
             <SelectField
               label={t('Formation')}
@@ -334,7 +338,8 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
                 formation,
                 registrationType: formation === 'tete' ? 'forme' : form.registrationType,
               })}
-              options={translatedOptions(form.registrationType === 'supermelee' ? FORMATIONS.filter((option) => option.value !== 'tete' && option.value !== 'andere') : FORMATIONS)}
+              options={translatedOptions(FORMATIONS.filter((option) => (form.type === 'trip_tete' && option.value !== form.formation ? option.value === 'triplette'
+                : form.registrationType !== 'supermelee' || (option.value !== 'tete' && option.value !== 'andere'))))}
               disabled={formationLocked}
             />
             <SelectField
@@ -343,7 +348,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               onChange={(registrationType) => setForm({
                 ...form,
                 registrationType,
-                type: registrationType === 'supermelee' ? 'rangliste' : form.type,
+                type: registrationType === 'supermelee' ? 'rangliste' : (form.type === 'rangliste' ? EMPTY_TOURNAMENT_FORM.type : form.type),
                 formation: registrationType === 'supermelee' && form.formation === 'tete' ? 'doublette' : form.formation,
               })}
               options={translatedOptions(form.formation === 'tete' ? REGISTRATION_TYPES.filter((option) => option.value === 'forme') : REGISTRATION_TYPES)}
@@ -352,12 +357,16 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             <SelectField
               label={t('Turniersystem')}
               value={form.registrationType === 'supermelee' ? 'rangliste' : form.type}
-              onChange={(type) => setForm({ ...form, type })}
-              options={translatedOptions(TOURNAMENT_TYPES)}
+              onChange={(type) => setForm({ ...form, type, formation: type === 'trip_tete' && !formationLocked ? 'triplette' : form.formation })}
+              options={translatedOptions(TOURNAMENT_TYPES.filter((option) => option.value === form.type || (option.value !== 'rangliste'
+                && !(option.value === 'trip_tete' && formationLocked && form.formation !== 'triplette'))))}
               disabled={form.registrationType === 'supermelee'}
             />
           </div>
           {formationLocked && <p className="hint">{t('Die Formation kann nicht mehr geändert werden, weil bereits Anmeldungen vorliegen.')}</p>}
+          {!isOnlinePlayable(form) && !isDocumentBound(form) && (
+            <NotOnlinePlayableNotice title={t('Nicht online durchführbar')} system={labelFor(TOURNAMENT_TYPES, form.type)} />
+          )}
           {form.type === 'schweizer' && (
             <SelectField
               label={t('Schweizer Ranglistenmodus')}
@@ -732,6 +741,9 @@ export function TournamentList({
             <button className="row-main" type="button" onClick={() => onSelect(tournament.id)}>
               <strong data-i18n-skip>{tournament.name}</strong>
               {tournament.registrationEnabled === false && <span className="role">{t('Kalendereintrag')}</span>}
+              {tournament.registrationEnabled !== false && !isOnlinePlayable(tournament) && !isDocumentBound(tournament) && (
+                <span className="role role-danger"><span aria-hidden="true">✕ </span>{t('Nicht online durchführbar')}</span>
+              )}
               <span>{formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)} · <span data-i18n-skip>{formatLocationAddress(tournament.location)}</span></span>
               {tournament.registrationEnabled !== false && (
                 <small>{formationLabel(tournament)} · {labelFor(REGISTRATION_TYPES, tournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, tournament.type)}</small>

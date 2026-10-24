@@ -310,3 +310,48 @@ describe('Ungeprüfte Platzadresse', () => {
     expect(JSON.parse(options.body)).toEqual({ body: 'Limesstraße' });
   });
 });
+
+describe('Übernahme eines Admin-Vereins anfragen', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const clubPlace = (overrides) => place(1, { clubId: 'club-1', clubName: 'BC Linden', clubOwnedByAdmin: true, canEdit: false, ...overrides });
+  function renderWith(places, { currentUser = { id: 'u1' }, isAdmin = false } = {}) {
+    const fetchMock = vi.fn((url) => Promise.resolve(new Response(JSON.stringify(String(url).includes('/api/postbox/messages')
+      ? { message: {}, recipientCount: 2 }
+      : { places }), { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<PlacesPage language="de" setLanguage={() => {}} menuOpen={false} setMenuOpen={() => {}} navigate={() => {}} currentUser={currentUser} isAdmin={isAdmin} />);
+    return fetchMock;
+  }
+
+  it('schickt die Anfrage als Nachricht an alle Admins', async () => {
+    const fetchMock = renderWith([clubPlace()]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Verein übernehmen?', hidden: true }, { timeout: 5_000 }));
+
+    const text = screen.getByRole('textbox', { name: /Nachricht an Admin/ });
+    expect(text).toHaveValue('Ich bin für den Verein „BC Linden“ zuständig und möchte ihn übernehmen.');
+    fireEvent.change(text, { target: { value: 'Ich bin Vorsitzender von BC Linden.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Senden' }));
+
+    expect(await screen.findByText('Deine Anfrage ist an alle Admins gegangen. Die Antwort bekommst du in deiner Postbox.')).toBeInTheDocument();
+    const [, options] = fetchMock.mock.calls.find(([path]) => path === '/api/postbox/messages');
+    expect(JSON.parse(options.body)).toEqual({ recipientId: 'group:admins', body: 'Ich bin Vorsitzender von BC Linden.' });
+  });
+
+  it('bietet die Übernahme nur angemeldeten Nicht-Admins bei Admin-Vereinen an, die sie nicht schon bearbeiten', async () => {
+    renderWith([clubPlace({ clubOwnedByAdmin: false })]);
+    await screen.findByRole('heading', { name: 'BC Linden' }, { timeout: 5_000 });
+    expect(screen.queryByRole('button', { name: 'Verein übernehmen?', hidden: true })).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ['ohne Anmeldung', { currentUser: null }, {}],
+    ['für Admins', { isAdmin: true }, {}],
+    ['für Bearbeiter des Vereins', {}, { canEdit: true }],
+  ])('zeigt keine Übernahme %s', async (_label, options, overrides) => {
+    renderWith([clubPlace(overrides)], options);
+    await screen.findByRole('heading', { name: 'BC Linden' }, { timeout: 5_000 });
+    expect(screen.queryByRole('button', { name: 'Verein übernehmen?', hidden: true })).not.toBeInTheDocument();
+  });
+});

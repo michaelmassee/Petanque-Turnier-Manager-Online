@@ -488,6 +488,44 @@ textarea:focus {
   color: #9d2424;
 }
 
+/* Statischer, unübersehbarer Hinweis: Turniersystem ohne Online-Durchführung. */
+.notice-danger {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #f0b4b4;
+  border-left: 6px solid #c62828;
+  border-radius: 6px;
+  background: #ffecec;
+  color: #7f1d1d;
+  padding: 12px 14px;
+}
+
+.notice-danger strong {
+  color: #b71c1c;
+  font-size: 1.05rem;
+}
+
+.notice-danger p {
+  margin: 0;
+}
+
+.notice-danger a {
+  color: #9d2424;
+  font-weight: 700;
+}
+
+.recipient-picker-option.is-unavailable .unavailable-mark,
+.recipient-picker-option.is-unavailable .recipient-picker-meta {
+  color: #c62828;
+  font-weight: 700;
+}
+
+.role.role-danger {
+  background: #ffecec;
+  color: #b71c1c;
+  font-weight: 700;
+}
+
 .feedback.success {
   background: #eaf8ef;
   color: #206f3b;
@@ -3578,9 +3616,23 @@ a.left-panel-link {
 
 .quick-player-form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 10px;
+}
+
+/* Teams: jede Person in einer eigenen Zeile, der Button darunter. */
+.quick-player-form.is-team {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
+}
+
+.quick-player-person {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  align-items: end;
+  gap: 10px;
+  width: 100%;
 }
 
 .quick-player-form label {

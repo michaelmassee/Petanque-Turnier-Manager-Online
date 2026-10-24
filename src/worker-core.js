@@ -255,6 +255,24 @@ export function assertFormationChangeAllowed(existing, formation, formationOther
   }
 }
 
+/**
+ * Rangliste ohne Supermêlée ergibt kein Turniersystem, Trip-Tête braucht Triplette-Teams (Hauptprojekt:
+ * TripTeteAufstellung – zwei spielen Doublette, der dritte Tête). Geprüft beim Anlegen und wenn System, Anmeldetyp oder
+ * Formation geändert werden: Ältere Turniere mit anderer Kombination bleiben so bearbeitbar. Kalendereinträge haben
+ * keine Durchführung und bleiben frei.
+ */
+export function assertTournamentSystemAllowed(tournament, existing = null) {
+  if (tournament.registrationEnabled === false) return;
+  if (existing && existing.type === tournament.type && (existing.registration_type || 'forme') === tournament.registrationType
+    && existing.formation === tournament.formation && Boolean(Number(existing.formation_other || 0)) === tournament.formationOther) return;
+  if (tournament.type === 'rangliste' && tournament.registrationType !== 'supermelee') {
+    throw new HttpError(400, 'Das Turniersystem Rangliste ist nur mit dem Anmeldetyp Supermêlée möglich');
+  }
+  if (tournament.type === 'trip_tete' && (tournament.formation !== 'triplette' || tournament.formationOther)) {
+    throw new HttpError(400, 'Trip-Tête ist nur mit der Formation Triplette möglich');
+  }
+}
+
 export function assertPartnerCountMatchesFormation(tournament, registration) {
   const formation = tournament.registration_type === 'melee' || tournament.registration_type === 'supermelee' ? 'tete' : tournament.formation;
   const hasPartner = Boolean(registration.partnerFirstName && registration.partnerLastName); const hasPartner2 = Boolean(registration.partner2FirstName && registration.partner2LastName);

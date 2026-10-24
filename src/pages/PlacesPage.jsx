@@ -13,6 +13,7 @@ import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
+import { POSTBOX_ADMIN_RECIPIENT_ID } from '../postbox-core.js';
 import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx';
 
 const FALLBACK_CENTER = [51.1, 10.4];
@@ -100,8 +101,9 @@ export function groupPlacesByOrganization(places) {
   return [...groups.values()];
 }
 
-function OrganizationLinks({ place, t }) {
+function OrganizationLinks({ place, t, onRequestTakeover }) {
   return <div className="place-actions">
+    {onRequestTakeover && <Button variant="secondary" onClick={() => onRequestTakeover(place)}>{t('Verein übernehmen?')}</Button>}
     <SharePlaceButton name={place.clubName} organizationId={clubKey(place)} />
     {place.clubWebsiteUrl && <a className="button button-secondary" href={place.clubWebsiteUrl} target="_blank" rel="noreferrer">{t('Website')}</a>}
     {place.clubSocialLinks?.facebook && <a className="button button-secondary" href={place.clubSocialLinks.facebook} target="_blank" rel="noreferrer">Facebook</a>}
@@ -109,6 +111,44 @@ function OrganizationLinks({ place, t }) {
     {place.clubSocialLinks?.x && <a className="button button-secondary" href={place.clubSocialLinks.x} target="_blank" rel="noreferrer">X</a>}
     {place.clubSocialLinks?.youtube && <a className="button button-secondary" href={place.clubSocialLinks.youtube} target="_blank" rel="noreferrer">YouTube</a>}
   </div>;
+}
+
+// Vereine, die einem Admin gehören (z. B. aus Verbandsimporten), überträgt ein Admin im Moderationsbereich. Die Anfrage
+// geht als Postfach-Nachricht an alle Admins (Empfänger „Admin“); die Antwort kommt ebenfalls über die Postbox.
+function ClubTakeoverDialog({ place, onClose }) {
+  const { t } = useTranslation();
+  const [text, setText] = useState(() => t('Ich bin für den Verein „{{name}}“ zuständig und möchte ihn übernehmen.', { name: place.clubName }));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  async function send(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    setBusy(true);
+    try {
+      await authenticatedApi('/api/postbox/messages', { method: 'POST', body: JSON.stringify({ recipientId: POSTBOX_ADMIN_RECIPIENT_ID, body: text.trim() }) });
+      setMessage(t('Deine Anfrage ist an alle Admins gegangen. Die Antwort bekommst du in deiner Postbox.'));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <EditDialog title={t('Verein übernehmen')} subtitle={place.clubName} error={error} message={message} onClose={onClose}>
+      <form className="form" onSubmit={send}>
+        <p className="muted">{t('Dieser Verein wird derzeit von den Admins verwaltet. Schreib ihnen, warum du ihn übernehmen möchtest, z. B. deine Funktion im Verein.')}</p>
+        <TextArea label={t('Nachricht an Admin')} value={text} maxLength={500} required onChange={setText} />
+        <div className="dialog-actions">
+          <Button variant="secondary" onClick={onClose}>{t('Schließen')}</Button>
+          <Button type="submit" disabled={!text.trim() || Boolean(message)} loading={busy}>{t('Senden')}</Button>
+        </div>
+      </form>
+    </EditDialog>
+  );
 }
 
 // Adresse aus einer Verbandsliste übernommen, aber noch von niemandem bestätigt: kann die Postanschrift des Vereins sein.
@@ -250,6 +290,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   const mapSectionRef = useRef(null);
   const [focusPlace, setFocusPlace] = useState(null);
   const [correctionPlace, setCorrectionPlace] = useState(null);
+  const [takeoverPlace, setTakeoverPlace] = useState(null);
 
   function handleFocusPlace(place, scrollToMap = true) {
     if (place.latitude === null || place.longitude === null) return;
@@ -524,7 +565,11 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
                 <span className="place-group-count">{group.places.length} {t(group.places.length === 1 ? 'Bouleplatz' : 'Bouleplätze')}</span>
               </summary>
               <div className="place-group-content">
-                <OrganizationLinks place={group.places[0]} t={t} />
+                <OrganizationLinks
+                  place={group.places[0]}
+                  t={t}
+                  onRequestTakeover={currentUser && !isAdmin && group.places[0].clubOwnedByAdmin && !group.places[0].canEdit ? setTakeoverPlace : null}
+                />
                 {group.clubDescription && <RichText value={group.clubDescription} onNavigate={navigate} />}
                 <div className="place-group-places">
                   {group.places.map((place) => (
@@ -539,6 +584,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         </div>
       )}
       {correctionPlace && <AddressCorrectionDialog place={correctionPlace} onClose={() => setCorrectionPlace(null)} />}
+      {takeoverPlace && <ClubTakeoverDialog place={takeoverPlace} onClose={() => setTakeoverPlace(null)} />}
       <InfiniteListLoadMore
         hasMore={placeGroups.length > visibleCount}
         onLoadMore={() => setVisibleCount((count) => count + 10)}

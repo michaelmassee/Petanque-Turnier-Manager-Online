@@ -3,6 +3,9 @@ export const ROLES = [
   { value: 'user', label: 'User' },
 ];
 
+// Projektseite der Desktop-Variante (LibreOffice), die auch die online nicht unterstützten Turniersysteme kann.
+export const PTM_DESKTOP_URL = 'https://michaelmassee.github.io/Petanque-Turnier-Manager/';
+
 export const TOURNAMENT_TYPES = [
   { value: 'formule_x', label: 'Formule X' },
   { value: 'jeder_gegen_jeden', label: 'Jeder gegen Jeden' },

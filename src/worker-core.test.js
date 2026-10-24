@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertPartnerCountMatchesFormation, isNewlyPublicTournament, isTournamentRoundNumberConflict, readBodyWithLimit, normalizePlayerListingPosition, initialParticipation, isCalendarEntry, normalizeTournamentInput, parseParticipation, playerListingMatchesPosition, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
+import { assertPartnerCountMatchesFormation, assertTournamentSystemAllowed, isNewlyPublicTournament, isTournamentRoundNumberConflict, readBodyWithLimit, normalizePlayerListingPosition, initialParticipation, isCalendarEntry, normalizeTournamentInput, parseParticipation, playerListingMatchesPosition, registrationOpenStatus, tournamentMatchesSavedSearch, validateMatchScore, workerDistanceKm } from './worker-core.js';
 
 const base = { name: 'Testturnier', date: '2026-06-01', location: 'Musterstadt' };
 
@@ -229,5 +229,22 @@ describe('readBodyWithLimit', () => {
   it('liefert für fehlenden Body ein leeres Array', async () => {
     const bytes = await readBodyWithLimit(new Response(null), 10);
     expect(bytes.byteLength).toBe(0);
+  });
+
+  it('erlaubt Rangliste nur mit Supermêlée und Trip-Tête nur als Triplette, ältere Turniere bleiben bearbeitbar', () => {
+    const input = (overrides) => normalizeTournamentInput({ ...base, ...overrides });
+    expect(() => assertTournamentSystemAllowed(input({ type: 'rangliste', registrationType: 'forme' })))
+      .toThrow('Das Turniersystem Rangliste ist nur mit dem Anmeldetyp Supermêlée möglich');
+    expect(() => assertTournamentSystemAllowed(input({ type: 'rangliste', registrationType: 'supermelee', formation: 'doublette' }))).not.toThrow();
+    expect(() => assertTournamentSystemAllowed(input({ type: 'trip_tete', formation: 'doublette' })))
+      .toThrow('Trip-Tête ist nur mit der Formation Triplette möglich');
+    expect(() => assertTournamentSystemAllowed(input({ type: 'trip_tete', formation: 'andere' }))).toThrow('Trip-Tête');
+    expect(() => assertTournamentSystemAllowed(input({ type: 'trip_tete', formation: 'triplette' }))).not.toThrow();
+    // Kalendereinträge werden nicht durchgeführt.
+    expect(() => assertTournamentSystemAllowed(input({ type: 'rangliste', registrationEnabled: false }))).not.toThrow();
+
+    const legacy = { type: 'rangliste', registration_type: 'forme', formation: 'doublette', formation_other: 0 };
+    expect(() => assertTournamentSystemAllowed(input({ type: 'rangliste', registrationType: 'forme', formation: 'doublette', name: 'Neuer Name' }), legacy)).not.toThrow();
+    expect(() => assertTournamentSystemAllowed(input({ type: 'rangliste', registrationType: 'forme', formation: 'triplette' }), legacy)).toThrow('Rangliste');
   });
 });

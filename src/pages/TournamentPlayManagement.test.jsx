@@ -109,22 +109,48 @@ describe('TournamentPlayManagement', () => {
     expect(screen.queryByText('Clubabend Supermêlée')).not.toBeInTheDocument();
   });
 
-  it('bietet in der Turnierauswahl auch über Favoriten und Verlauf nur online startbare Turniere an', async () => {
+  it('zeigt nicht online durchführbare Turniere rot markiert in der Auswahl, Desktop-Turniere gar nicht', async () => {
     installFetchMock([]);
     const desktop = { ...TOURNAMENT, id: 't2', name: 'Desktop-Turnier', desktopExecution: true };
     const liga = { ...TOURNAMENT, id: 't3', name: 'Liga ohne Online-Durchführung', registrationType: 'forme', type: 'liga' };
-    // Favoriten und Verlauf stammen ggf. von der Meldungsseite und enthalten dort erlaubte, hier aber nicht startbare Turniere.
-    localStorage.setItem('ptm_tournament_favorites_user-1', JSON.stringify(['t2', 't3']));
-    localStorage.setItem('ptm_tournament_recents_user-1', JSON.stringify(['t3', 't2']));
+    // Favoriten und Verlauf stammen ggf. von der Meldungsseite; das Desktop-Turnier darf auch darüber nicht auftauchen.
+    localStorage.setItem('ptm_tournament_favorites_user-1', JSON.stringify(['t2']));
+    localStorage.setItem('ptm_tournament_recents_user-1', JSON.stringify(['t2']));
 
-    render(<TournamentPlayManagement tournaments={[TOURNAMENT, desktop, liga]} currentUserId="user-1" language="de" />);
+    render(<TournamentPlayManagement tournaments={[liga, TOURNAMENT, desktop]} currentUserId="user-1" language="de" />);
+    // Vorausgewählt ist das erste durchführbare Turnier, nicht das gesperrte.
+    expect(await screen.findByText('Turnierseite')).toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
     fireEvent.focus(screen.getByRole('combobox'));
 
-    const options = screen.getAllByRole('option').map((option) => option.textContent);
-    expect(options).toHaveLength(1);
-    expect(options[0]).toContain('Clubabend Supermêlée');
+    const options = screen.getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual([
+      expect.stringContaining('Clubabend Supermêlée'),
+      expect.stringContaining('Liga ohne Online-Durchführung'),
+    ]);
+    expect(options[1]).toHaveClass('is-unavailable');
+    expect(options[1]).toHaveTextContent('Nicht online durchführbar');
+    expect(options[0]).not.toHaveClass('is-unavailable');
     expect(screen.queryByText('Favoriten')).not.toBeInTheDocument();
     localStorage.clear();
+  });
+
+  it('zeigt für ein nicht online durchführbares Turnier einen roten Hinweis mit PTM Desktop statt „Turnier starten“', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    const liga = { ...TOURNAMENT, id: 't3', name: 'Ligaspieltag', registrationType: 'forme', type: 'liga' };
+
+    render(<TournamentPlayManagement tournaments={[liga]} language="de" />);
+
+    const notice = await screen.findByRole('note');
+    expect(notice).toHaveClass('notice-danger');
+    expect(notice).toHaveTextContent('Ligaspieltag kann nicht online durchgeführt werden.');
+    expect(notice).toHaveTextContent('Turniersystem Liga');
+    expect(notice).toHaveTextContent('PTM Desktop unterstützt dieses Turniersystem');
+    expect(within(notice).getByRole('link', { name: 'PTM Desktop entdecken' })).toHaveAttribute('href', expect.stringContaining('Petanque-Turnier-Manager'));
+    expect(screen.queryByRole('button', { name: 'Turnier starten' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Turnierseite')).not.toBeInTheDocument();
+    expect(calls.some((path) => String(path).includes('/api/tournaments/t3/'))).toBe(false);
   });
 
   it('verlinkt die reine Anzeige der Turnierseite für einen zweiten Bildschirm', async () => {
@@ -803,5 +829,41 @@ describe('TournamentPlayManagement', () => {
     await screen.findByText('Spieler hinzugefügt: Gina Neu');
     const addCall = global.fetch.mock.calls.find(([path, options]) => path === '/api/tournaments/t1/registrations' && options.method === 'POST');
     expect(JSON.parse(addCall[1].body)).toMatchObject({ firstName: 'Gina', lastName: 'Neu', noEmail: true, confirmImmediately: true });
+    expect(JSON.parse(addCall[1].body)).not.toHaveProperty('partnerFirstName');
+  });
+
+  it('meldet bei Doublette ein ganzes Team nach, nicht nur einen Spieler', async () => {
+    installFetchMock([]);
+    const doublette = { ...TOURNAMENT, name: 'Doublette formée', registrationType: 'forme', type: 'schweizer', formation: 'doublette' };
+
+    render(<TournamentPlayManagement tournaments={[doublette]} language="de" />);
+    await screen.findByText('Anna Muster + Bert Beispiel + Clara Test');
+    fireEvent.click(screen.getByText('Teilnehmer'));
+
+    expect(screen.queryByRole('textbox', { name: 'Partner 2: Vorname' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Spieler: Vorname' }), { target: { value: 'Gina' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Spieler: Nachname' }), { target: { value: 'Neu' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Partner: Vorname' }), { target: { value: 'Hans' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Partner: Nachname' }), { target: { value: 'Mit' } });
+    expect(screen.getByRole('textbox', { name: 'Partner: Vorname' })).toBeRequired();
+    fireEvent.click(screen.getByRole('button', { name: 'Team hinzufügen' }));
+
+    await screen.findByText(/^Team hinzugefügt:/);
+    const addCall = global.fetch.mock.calls.find(([path, options]) => path === '/api/tournaments/t1/registrations' && options.method === 'POST');
+    expect(JSON.parse(addCall[1].body)).toMatchObject({ firstName: 'Gina', lastName: 'Neu', partnerFirstName: 'Hans', partnerLastName: 'Mit', partner2FirstName: null });
+  });
+
+  it('bietet bei Triplette Partner 2 optional an, verlangt aber den vollständigen Namen, sobald etwas eingetragen ist', async () => {
+    installFetchMock([]);
+    const triplette = { ...TOURNAMENT, name: 'Triplette formée', registrationType: 'forme', type: 'schweizer', formation: 'triplette' };
+
+    render(<TournamentPlayManagement tournaments={[triplette]} language="de" />);
+    await screen.findByText('Anna Muster + Bert Beispiel + Clara Test');
+    fireEvent.click(screen.getByText('Teilnehmer'));
+
+    const partner2First = screen.getByRole('textbox', { name: 'Partner 2: Vorname' });
+    expect(partner2First).not.toBeRequired();
+    fireEvent.change(partner2First, { target: { value: 'Ida' } });
+    expect(screen.getByRole('textbox', { name: 'Partner 2: Nachname' })).toBeRequired();
   });
 });
