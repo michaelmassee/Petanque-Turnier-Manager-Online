@@ -14,12 +14,12 @@ function tournamentWith(overrides) {
   };
 }
 
-function renderBoard(tournament) {
+function renderBoard(tournament, { display = false } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <TournamentBoardPage tournamentId={tournament.id} tournaments={[tournament]} currentUser={null} language="de"
-        setLanguage={() => {}} navigate={() => {}} menuOpen={false} setMenuOpen={() => {}} />
+        setLanguage={() => {}} navigate={() => {}} menuOpen={false} setMenuOpen={() => {}} display={display} />
     </QueryClientProvider>,
   );
 }
@@ -39,6 +39,21 @@ describe('Turnierseite im Vollformat', () => {
     expect(await screen.findByText('Mittagspause bis 13 Uhr')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/schedule', expect.anything());
     expect(screen.queryByRole('navigation', { name: 'Turnierdetails' })).not.toBeInTheDocument();
+  });
+
+  it('zeigt als reine Anzeige für einen zweiten Bildschirm weder Menü noch Bedienelemente', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({
+      status: 'running', rounds: [], ranking: [], dataAsOf: null, announcement: { text: 'Mittagspause bis 13 Uhr', at: '2099-06-01T11:00:00.000Z' },
+    })));
+
+    const { container } = renderBoard(tournamentWith({}), { display: true });
+
+    expect(screen.getByRole('heading', { name: 'Herbstturnier' })).toBeInTheDocument();
+    expect(await screen.findByText('Mittagspause bis 13 Uhr')).toBeInTheDocument();
+    expect(container.querySelector('.topbar')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Bereiche öffnen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Turnierdetails' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Aktualisieren' })).not.toBeInTheDocument();
   });
 
   it('reicht bei privaten Turnieren den Freigabe-Token an den Spielplan weiter', async () => {

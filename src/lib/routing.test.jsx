@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { areaForPath, matchRentalRoute, matchTournamentBoardRoute, matchTournamentRoute, tournamentBoardPath, usePath } from './routing.js';
+import { areaForPath, matchRentalRoute, matchTournamentBoardRoute, matchTournamentRoute, tournamentBoardPath, tournamentDisplayPath, usePath } from './routing.js';
 
 function NavigationHarness() {
   const [path, navigate] = usePath();
@@ -36,6 +36,12 @@ describe('matchTournamentBoardRoute', () => {
     expect(matchTournamentRoute('/turniere/t1/spielplan')).toBeNull();
     expect(matchTournamentBoardRoute('/turniere/t1/info')).toBeNull();
     expect(areaForPath('/turnierseite/t1')).toBe('turniere');
+  });
+
+  it('erkennt die reine Anzeige der Turnierseite', () => {
+    expect(tournamentDisplayPath('t 1')).toBe('/turnierseite/t%201/anzeige');
+    expect(matchTournamentBoardRoute('/turnierseite/t%201/anzeige')).toEqual({ id: 't 1', legacy: false, display: true });
+    expect(matchTournamentBoardRoute('/turnierseite/t1/sonstwas')).toBeNull();
   });
 });
 

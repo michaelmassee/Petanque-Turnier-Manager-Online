@@ -1813,6 +1813,79 @@ a.left-panel-link {
   margin: 0 0 10px;
 }
 
+/* Reine Anzeige (/turnierseite/<id>/anzeige) für einen zweiten Bildschirm: ohne Menü, etwas größere Schrift für Fernsicht. */
+.tournament-display {
+  font-size: 1.1rem;
+}
+
+.tournament-display .tournament-board-page {
+  position: relative;
+}
+
+.display-fullscreen {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.play-schedule.is-display {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+.display-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.display-current-round,
+.display-history-round {
+  display: grid;
+  gap: 8px;
+}
+
+.display-columns h2,
+.display-history h2 {
+  margin: 0 0 8px;
+}
+
+.display-ranking {
+  overflow-x: auto;
+}
+
+.display-history {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+  gap: 16px;
+}
+
+.display-history h2 {
+  grid-column: 1 / -1;
+}
+
+.display-history h3 {
+  margin: 0;
+}
+
+@media (min-width: 1100px) {
+  .display-columns {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .tournament-display {
+    font-size: 1rem;
+  }
+
+  .display-fullscreen {
+    display: none;
+  }
+}
+
 .tournament-detail-page {
   display: grid;
   /* minmax(0, …): breite Ranglisten scrollen in .table-scroll, statt die Seite auf dem Handy zu verbreitern. */

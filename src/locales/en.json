@@ -1760,5 +1760,9 @@
   "regelmäßig belegt": "regularly booked",
   "{{count}} regelmäßig belegt": "{{count}} regularly booked",
   "Ungültige regelmäßige Belegung": "Invalid recurring booking",
-  "Zu viele regelmäßige Belegungen": "Too many recurring bookings"
+  "Zu viele regelmäßige Belegungen": "Too many recurring bookings",
+  "Anzeige für Bildschirm": "Display for screen",
+  "Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.": "Without menu, e.g. for a second screen on site; updates itself.",
+  "Vollbild": "Full screen",
+  "Turnierverlauf": "Tournament progress"
 }

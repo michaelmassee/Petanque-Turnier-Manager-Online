@@ -81,9 +81,15 @@ export function tournamentBoardPath(tournamentId) {
   return `/turnierseite/${encodeURIComponent(tournamentId)}`;
 }
 
+// Reine Anzeige der Turnierseite ohne Menü, z. B. für einen zweiten Bildschirm vor Ort.
+export function tournamentDisplayPath(tournamentId) {
+  return `${tournamentBoardPath(tournamentId)}/anzeige`;
+}
+
 export function matchTournamentBoardRoute(path) {
   const segments = path.split('/').filter(Boolean);
   if (segments[0] === 'turnierseite' && segments.length === 2) return { id: decodeURIComponent(segments[1]), legacy: false };
+  if (segments[0] === 'turnierseite' && segments.length === 3 && segments[2] === 'anzeige') return { id: decodeURIComponent(segments[1]), legacy: false, display: true };
   if (segments[0] === 'turniere' && segments.length === 3 && segments[2] === 'spielplan') return { id: decodeURIComponent(segments[1]), legacy: true };
   return null;
 }

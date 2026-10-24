@@ -1760,5 +1760,9 @@
   "regelmäßig belegt": "occupé régulièrement",
   "{{count}} regelmäßig belegt": "{{count}} occupées régulièrement",
   "Ungültige regelmäßige Belegung": "Occupation régulière invalide",
-  "Zu viele regelmäßige Belegungen": "Trop d’occupations régulières"
+  "Zu viele regelmäßige Belegungen": "Trop d’occupations régulières",
+  "Anzeige für Bildschirm": "Affichage pour écran",
+  "Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.": "Sans menu, p. ex. pour un second écran sur place ; se met à jour automatiquement.",
+  "Vollbild": "Plein écran",
+  "Turnierverlauf": "Déroulement du tournoi"
 }

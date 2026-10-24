@@ -127,6 +127,14 @@ describe('TournamentPlayManagement', () => {
     localStorage.clear();
   });
 
+  it('verlinkt die reine Anzeige der Turnierseite für einen zweiten Bildschirm', async () => {
+    installFetchMock([]);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    const link = await screen.findByRole('link', { name: 'Anzeige für Bildschirm' });
+    expect(link).toHaveAttribute('href', `/turnierseite/${TOURNAMENT.id}/anzeige`);
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
   it('zeigt die Ankündigung schon vor dem Turnierstart', async () => {
     installFetchMock([]);
     const { unmount } = render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, status: 'registration' }]} language="de" />);

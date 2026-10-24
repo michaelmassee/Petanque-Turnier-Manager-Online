@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { TextField, Button, Feedback, ShareLinkButton } from '../components/ui.jsx';
-import { tournamentBoardPath } from '../lib/routing.js';
+import { tournamentBoardPath, tournamentDisplayPath } from '../lib/routing.js';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { checkRoundRequirements, getSupportedSystemLabels, isMeleeTeamTournament, isOnlinePlayable, minimumTeams } from '../lib/pairing/index.js';
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
@@ -62,6 +62,10 @@ function TournamentBoardShare({ tournament }) {
       <p>
         <strong>{t('Turnierseite')}</strong>: {t('Spielplan, Rangliste und Ankündigungen für alle.')}
         {' '}<a href={path} target="_blank" rel="noreferrer">{t('Öffnen')}</a>
+      </p>
+      <p>
+        <a href={tournamentDisplayPath(tournament.id)} target="_blank" rel="noreferrer">{t('Anzeige für Bildschirm')}</a>
+        {' '}<span className="muted">{t('Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.')}</span>
       </p>
       {tournament.participantsPublic
         ? <ShareLinkButton title={tournament.name} url={boardUrl.href} resolveUrl={tournament.visibility === 'private' ? resolveShareUrl : undefined} />

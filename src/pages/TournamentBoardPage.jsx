@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
@@ -9,13 +9,33 @@ import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
 import { TournamentSchedule } from './TournamentDetailPage.jsx';
 
+// Vollbild-Schalter für die reine Anzeige; verschwindet im Vollbild und in Browsern ohne Fullscreen-API.
+function FullscreenButton() {
+  const { t } = useTranslation();
+  const supported = typeof document !== 'undefined' && Boolean(document.fullscreenEnabled);
+  const [active, setActive] = useState(() => supported && Boolean(document.fullscreenElement));
+  useEffect(() => {
+    if (!supported) return undefined;
+    const update = () => setActive(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', update);
+    return () => document.removeEventListener('fullscreenchange', update);
+  }, [supported]);
+  if (!supported || active) return null;
+  return (
+    <button className="button button-secondary display-fullscreen" type="button" onClick={() => document.documentElement.requestFullscreen().catch(() => {})}>
+      {t('Vollbild')}
+    </button>
+  );
+}
+
 /**
  * Turnierseite im Vollformat: Ankündigung, Spielplan und Rangliste eines Turniers auf einer eigenen Seite ohne Reiter,
  * z. B. zum Teilen in der Gruppe oder für einen Bildschirm vor Ort. Die Turnierleitung teilt sie unter „Turnier starten“.
+ * Mit display (/turnierseite/<id>/anzeige) ohne Menü und Bedienelemente als reine Anzeige für einen zweiten Bildschirm.
  */
 export default function TournamentBoardPage({
   tournamentId, tournaments, currentUser, language, setLanguage, navigate, menuOpen, setMenuOpen,
-  isAdmin, onSelectAdminDashboard, onLogout, drawerContent, postboxControl,
+  isAdmin, onSelectAdminDashboard, onLogout, drawerContent, postboxControl, display = false,
 }) {
   const { t } = useTranslation();
   // Private Turniere (nicht in der öffentlichen Liste) teilt die Turnierleitung mit ihrem Freigabe-Token.
@@ -24,7 +44,7 @@ export default function TournamentBoardPage({
   // Aktuelle Ankündigung aus dem Spielplan-Abruf (alle 2 Minuten bzw. sofort nach einem Live-Push).
   const [announcementUpdate, setAnnouncementUpdate] = useState({ tournamentId: null, announcement: null });
 
-  const header = (heading) => (
+  const header = (heading) => (display ? null : (
     <StandalonePageHeader
       heading={heading}
       language={language}
@@ -39,22 +59,23 @@ export default function TournamentBoardPage({
       drawerContent={drawerContent}
       postboxControl={postboxControl}
     />
-  );
+  ));
+  const shellClass = display ? 'app-shell tournament-display' : 'app-shell';
 
   if (notFound) {
     return (
-      <main className="app-shell">
+      <main className={shellClass}>
         {header(t('Turnier nicht gefunden'))}
         <section className="home-tournaments">
           <p className="muted">{t('Dieses Turnier existiert nicht oder ist nicht öffentlich sichtbar.')}</p>
-          <button className="link-button" type="button" onClick={() => navigate('/')}>{t('Zur Startseite')}</button>
+          {!display && <button className="link-button" type="button" onClick={() => navigate('/')}>{t('Zur Startseite')}</button>}
         </section>
       </main>
     );
   }
 
   if (!tournament) {
-    return <main className="app-shell">{header(t('Turnier wird geladen…'))}</main>;
+    return <main className={shellClass}>{display ? <p className="muted">{t('Turnier wird geladen…')}</p> : header(t('Turnier wird geladen…'))}</main>;
   }
 
   const started = tournament.status === 'running' || tournament.status === 'finished';
@@ -78,12 +99,13 @@ export default function TournamentBoardPage({
         language={language}
         shareToken={shareToken}
         onAnnouncement={(next) => setAnnouncementUpdate({ tournamentId: tournament.id, announcement: next })}
+        display={display}
       />
     );
   }
 
   return (
-    <main className="app-shell">
+    <main className={shellClass}>
       {header(t('Turnierseite'))}
       <section className="tournament-board-page">
         <header className="tournament-detail-heading">
@@ -93,8 +115,9 @@ export default function TournamentBoardPage({
             {tournament.club && <span>{tournament.club}</span>}
             <span>{formatLocationAddress(tournament.location)}</span>
           </p>
-          <button className="link-button" type="button" onClick={() => navigate(`/turniere/${encodeURIComponent(tournament.id)}/info${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`)}>{t('Turnierdetails')}</button>
+          {!display && <button className="link-button" type="button" onClick={() => navigate(`/turniere/${encodeURIComponent(tournament.id)}/info${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`)}>{t('Turnierdetails')}</button>}
         </header>
+        {display && <FullscreenButton />}
         <AnnouncementBanner announcement={announcement} language={language} />
         {content}
       </section>

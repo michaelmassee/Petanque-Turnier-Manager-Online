@@ -1388,6 +1388,7 @@ function AppContent() {
       <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
         <TournamentBoardPage
           tournamentId={tournamentBoardRoute.id}
+          display={Boolean(tournamentBoardRoute.display)}
           tournaments={tournaments}
           currentUser={currentUser}
           language={language}

@@ -1760,5 +1760,9 @@
   "regelmäßig belegt": "ocupado regularmente",
   "{{count}} regelmäßig belegt": "{{count}} ocupadas regularmente",
   "Ungültige regelmäßige Belegung": "Ocupación regular no válida",
-  "Zu viele regelmäßige Belegungen": "Demasiadas ocupaciones regulares"
+  "Zu viele regelmäßige Belegungen": "Demasiadas ocupaciones regulares",
+  "Anzeige für Bildschirm": "Vista para pantalla",
+  "Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.": "Sin menú, p. ej. para una segunda pantalla en el lugar; se actualiza sola.",
+  "Vollbild": "Pantalla completa",
+  "Turnierverlauf": "Desarrollo del torneo"
 }

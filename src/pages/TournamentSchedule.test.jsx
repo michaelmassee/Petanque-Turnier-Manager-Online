@@ -89,6 +89,27 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     expect(screen.getByText(/Stand:/)).toBeInTheDocument();
   });
 
+  it('zeigt als reine Anzeige aktuelle Runde, Rangliste und Turnierverlauf ohne Bedienelemente', async () => {
+    mockSchedule({
+      rounds: [
+        { id: 'r1', roundNumber: 1, matches: [{ id: 'm1', teamA: [anna], teamB: [clara], scoreA: 13, scoreB: 11, noShow: null }] },
+        { id: 'r2', roundNumber: 2, matches: [{ id: 'm2', teamA: [anna], teamB: [bert], scoreA: null, scoreB: null, noShow: null }] },
+      ],
+      ranking: [{ rank: 1, playerId: 'p1', firstName: 'Anna', lastName: 'Muster', wins: 1, gameDiff: 1, pointsFor: 13, pointsAgainst: 11 }],
+    });
+
+    render(<TournamentSchedule tournamentId="t1" language="de" display />);
+
+    expect(await screen.findByRole('heading', { name: 'Runde 2' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Rangliste' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Turnierverlauf' })).toBeInTheDocument();
+    // Turnierverlauf offen statt eingeklappt, damit ihn alle vor dem Bildschirm sehen.
+    expect(screen.getByText('13:11')).toBeVisible();
+    expect(document.querySelector('details')).toBeNull();
+    expect(screen.queryAllByRole('button')).toEqual([]);
+    expect(screen.getByText(/Stand:/)).toBeInTheDocument();
+  });
+
   it('zeigt die aktuelle Runde oben, vergangene Runden eingeklappt, und kennzeichnet offene sowie nicht angetretene Partien', async () => {
     mockSchedule({
       rounds: [

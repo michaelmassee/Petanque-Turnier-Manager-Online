@@ -478,7 +478,8 @@ function formatClock(timestamp, language) {
   return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, { hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
 }
 
-export function TournamentSchedule({ tournamentId, tournament, language, shareToken = '', onAnnouncement }) {
+// display: reine Anzeige für einen Bildschirm vor Ort – ohne Bedienelemente, aktualisiert sich über Polling und Live-Push.
+export function TournamentSchedule({ tournamentId, tournament, language, shareToken = '', onAnnouncement, display = false }) {
   const { t } = useTranslation();
   const query = useQuery({
     queryKey: ['schedule', tournamentId, shareToken],
@@ -507,7 +508,7 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
         {t('Stand')}: {formatClock(query.dataUpdatedAt, language)}
         {dataAsOf && <> · {t('Turnierdaten vom')} {formatTournamentDateTime(dataAsOf, language, tournament?.timezone)}</>}
       </span>
-      <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>
+      {!display && <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>}
     </div>
   );
 
@@ -524,6 +525,38 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
   const currentRound = rounds[rounds.length - 1];
   const olderRoundsNewestFirst = rounds.slice(0, -1).reverse();
   const showRanking = ranking.length > 0 && tournament?.type !== 'ko';
+
+  if (display) {
+    return (
+      <div className="play-schedule is-display">
+        <Feedback error={query.error?.message} />
+        <div className="display-columns">
+          <section className="display-current-round">
+            <h2>{t('Runde')} {currentRound.roundNumber}</h2>
+            <ScheduleRoundMatches round={currentRound} />
+          </section>
+          {showRanking && (
+            <section className="display-ranking">
+              <h2>{t('Rangliste')}</h2>
+              <RankingTable tournament={tournament} entries={ranking} />
+            </section>
+          )}
+        </div>
+        {olderRoundsNewestFirst.length > 0 && (
+          <section className="display-history">
+            <h2>{t('Turnierverlauf')}</h2>
+            {olderRoundsNewestFirst.map((round) => (
+              <div key={round.id} className="display-history-round">
+                <h3>{t('Runde')} {round.roundNumber}</h3>
+                <ScheduleRoundMatches round={round} />
+              </div>
+            ))}
+          </section>
+        )}
+        {refresh}
+      </div>
+    );
+  }
 
   return (
     <div className="play-schedule">

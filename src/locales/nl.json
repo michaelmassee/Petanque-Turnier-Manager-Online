@@ -1760,5 +1760,9 @@
   "regelmäßig belegt": "vast bezet",
   "{{count}} regelmäßig belegt": "{{count}} vast bezet",
   "Ungültige regelmäßige Belegung": "Ongeldige vaste bezetting",
-  "Zu viele regelmäßige Belegungen": "Te veel vaste bezettingen"
+  "Zu viele regelmäßige Belegungen": "Te veel vaste bezettingen",
+  "Anzeige für Bildschirm": "Weergave voor scherm",
+  "Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.": "Zonder menu, bijv. voor een tweede scherm ter plaatse; ververst zichzelf.",
+  "Vollbild": "Volledig scherm",
+  "Turnierverlauf": "Toernooiverloop"
 }
