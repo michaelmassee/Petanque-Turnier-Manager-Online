@@ -325,33 +325,6 @@ export function ClubModerationPanel({ language, section = 'clubs', currentUserId
 
           {!showingClubs && <div className="panel user-list-panel">
             <div className="section-title">
-              <h2>{t('Alle Bouleplätze')}</h2>
-              <span className="counter">{filteredAllPlaces.length}</span>
-            </div>
-            <div className="user-list">
-              {filteredAllPlaces.length === 0 && <p className="muted">{t('Keine Bouleplätze vorhanden.')}</p>}
-              {visibleAllPlaces.items.map((place) => (
-                <article className="data-row" key={place.id}>
-                  <div>
-                    <strong data-i18n-skip>{place.name}</strong>
-                    <span data-i18n-skip className={place.status === 'published' ? 'status registration-confirmed' : place.status === 'rejected' ? 'status registration-cancelled' : 'status registration-pending'}>
-                      {statusLabel(place.status, t)} · {formatLocationAddress(place.address)}
-                    </span>
-                    <small>{place.clubName || t('Keinem Verein zugeordnet')}</small>
-                  </div>
-                  <div className="row-actions">
-                    <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openEditPlace(place)}>{t('Bearbeiten')}</Button>
-                    <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openPlaceClubDialog(place)}>{t('Verein zuordnen')}</Button>
-                    <Button variant="danger" loading={busyId === `place-delete-${place.id}`} disabled={Boolean(busyId)} onClick={() => deletePlace(place)}>{t('Löschen')}</Button>
-                  </div>
-                </article>
-              ))}
-              <InfiniteListLoadMore hasMore={visibleAllPlaces.hasMore} onLoadMore={visibleAllPlaces.loadMore} label={t('Weitere Einträge laden')} />
-            </div>
-          </div>}
-
-          {!showingClubs && <div className="panel user-list-panel">
-            <div className="section-title">
               <h2>{t('Offene Bouleplätze')}</h2>
               <span className="counter">{filteredPlaces.length}</span>
             </div>
@@ -398,6 +371,33 @@ export function ClubModerationPanel({ language, section = 'clubs', currentUserId
                 </article>
               ))}
               <InfiniteListLoadMore hasMore={visiblePlaceReports.hasMore} onLoadMore={visiblePlaceReports.loadMore} label={t('Weitere Einträge laden')} />
+            </div>
+          </div>}
+
+          {!showingClubs && <div className="panel user-list-panel">
+            <div className="section-title">
+              <h2>{t('Alle Bouleplätze')}</h2>
+              <span className="counter">{filteredAllPlaces.length}</span>
+            </div>
+            <div className="user-list">
+              {filteredAllPlaces.length === 0 && <p className="muted">{t('Keine Bouleplätze vorhanden.')}</p>}
+              {visibleAllPlaces.items.map((place) => (
+                <article className="data-row" key={place.id}>
+                  <div>
+                    <strong data-i18n-skip>{place.name}</strong>
+                    <span data-i18n-skip className={place.status === 'published' ? 'status registration-confirmed' : place.status === 'rejected' ? 'status registration-cancelled' : 'status registration-pending'}>
+                      {statusLabel(place.status, t)} · {formatLocationAddress(place.address)}
+                    </span>
+                    <small>{place.clubName || t('Keinem Verein zugeordnet')}</small>
+                  </div>
+                  <div className="row-actions">
+                    <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openEditPlace(place)}>{t('Bearbeiten')}</Button>
+                    <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => openPlaceClubDialog(place)}>{t('Verein zuordnen')}</Button>
+                    <Button variant="danger" loading={busyId === `place-delete-${place.id}`} disabled={Boolean(busyId)} onClick={() => deletePlace(place)}>{t('Löschen')}</Button>
+                  </div>
+                </article>
+              ))}
+              <InfiniteListLoadMore hasMore={visibleAllPlaces.hasMore} onLoadMore={visibleAllPlaces.loadMore} label={t('Weitere Einträge laden')} />
             </div>
           </div>}
 

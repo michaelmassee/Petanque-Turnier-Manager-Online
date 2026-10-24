@@ -1909,7 +1909,9 @@ function AppContent() {
       : activeTab === 'users'
       ? t('Benutzerverwaltung')
       : activeTab === 'clubs'
-      ? t('Vereine & Bouleplätze')
+      ? t('Vereine')
+      : activeTab === 'places'
+      ? t('Bouleplätze')
       : activeTab === 'apikeys'
         ? t('Alle API-Schlüssel')
         : activeTab === 'petanque-aktuell-import'

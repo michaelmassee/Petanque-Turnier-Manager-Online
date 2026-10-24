@@ -1207,6 +1207,24 @@ describe('Vereinsmoderation', () => {
     expect(authenticatedApi).toHaveBeenCalledWith('/api/admin/places/place-1/club', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ clubId: 'club-1' }) }));
   });
 
+  it('zeigt offene Bouleplätze vor der Liste aller Bouleplätze', async () => {
+    vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation((path) => {
+      if (path === '/api/admin/club-editor-requests') return Promise.resolve({ requests: [] });
+      if (path === '/api/admin/pending-places') return Promise.resolve({ places: [] });
+      if (path === '/api/admin/place-reports') return Promise.resolve({ places: [] });
+      if (path === '/api/admin/places') return Promise.resolve({ places: [] });
+      if (path === '/api/admin/clubs') return Promise.resolve({ clubs: [] });
+      if (path === '/api/users') return Promise.resolve({ users: [] });
+      throw new Error(`unerwarteter API-Aufruf: ${path}`);
+    });
+
+    render(<ClubModerationPanel language="de" section="places" />);
+
+    await screen.findByText('Keine offenen Bouleplätze.');
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
+      .toEqual(['Bouleplätze', 'Offene Bouleplätze', 'Gemeldete Bouleplätze (ohne Verein)', 'Alle Bouleplätze']);
+  });
+
   it('zeigt die Bouleplätze eines Vereins direkt in der Vereinsverwaltung', async () => {
     const club = { id: 'club-1', name: 'BC Linden', status: 'published', ownerName: 'Anna Admin', ownerEmail: 'anna@example.com', placeCount: 1, editorCount: 1 };
     const place = { id: 'place-1', name: 'Boulepark', address: 'Parkweg 1, Linden', venueType: 'outdoor', status: 'published', clubId: 'club-1', clubName: 'BC Linden' };
