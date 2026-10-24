@@ -5,7 +5,7 @@ import { DEFAULT_TOURNAMENT_LIMIT, ROLES, EMPTY_USER_FORM } from '../lib/constan
 import { PASSWORD_STRENGTH_HINT, PASSWORD_STRENGTH_ERROR, isPasswordStrong } from '../lib/format.js';
 import { roleName, translatedOptions } from '../lib/domain.js';
 import { filterUsers } from '../frontend-core.js';
-import { Feedback, SelectField, TextField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
+import { Feedback, IntegerField, SelectField, TextField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { UsernameField } from '../components/UsernameField.jsx';
 import { UsernameReportsPanel } from './UsernameReportsPanel.jsx';
@@ -339,9 +339,8 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwo
         />
         <span>{t('Passwortänderung beim nächsten Login erzwingen')}</span>
       </label>
-      <TextField
+      <IntegerField
         label={t('Turnier-Limit')}
-        type="number"
         min={0}
         value={form.tournamentLimit}
         onChange={(value) => setForm({ ...form, tournamentLimit: value === '' ? '' : Number(value) })}

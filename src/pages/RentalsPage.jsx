@@ -4,7 +4,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { clubLogoImageUrl } from '../lib/domain.js';
 import { amountToMinorUnits, currencyOptions, formatDate, formatMoney, formatTournamentDateTime, formatWeekdayShort, minorUnitsToAmount } from '../lib/format.js';
 import { addDays, rentalMinLanes } from '../rental-core.js';
-import { Button, EditDialog, Feedback, SelectField, ShareLinkButton, TextArea, TextField } from '../components/ui.jsx';
+import { Button, EditDialog, Feedback, IntegerField, SelectField, ShareLinkButton, TextArea, TextField } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { RentalCalendar } from '../components/RentalCalendar.jsx';
 import { RentalMonthPicker } from '../components/RentalMonthPicker.jsx';
@@ -422,7 +422,7 @@ function RentalOfferContent({ id, language, currentUser, navigate, onLogin }) {
                   />
                 )}
                 {!whole && <SelectField label={t('Bahnen')} value={lanes} onChange={setLanes} options={Array.from({ length: freeLanes }, (_, index) => ({ value: String(index + 1), label: String(index + 1) }))} />}
-                <TextField label={t('Anzahl Personen')} type="number" min={1} max={500} step={1} inputMode="numeric" value={persons} onChange={setPersons} required />
+                <IntegerField label={t('Anzahl Personen')} min={1} max={500} value={persons} onChange={setPersons} required />
               </div>
               {whole && !wholeFree && <p className="hint">{t('In diesem Zeitraum sind nicht alle Bahnen frei.')}</p>}
               <TextArea label={t('Nachricht an den Verein')} value={note} onChange={setNote} maxLength={500} rows={3} />
@@ -599,7 +599,7 @@ function OfferFields({ form, setForm, places, language }) {
       headingLabel={t('Überschrift')}
     />
     <div className="form-grid">
-      <TextField label={t('Anzahl Bahnen')} type="number" min={1} max={200} value={form.laneCount} onChange={set('laneCount')} required />
+      <IntegerField label={t('Anzahl Bahnen')} min={1} max={200} value={form.laneCount} onChange={set('laneCount')} required />
       <SelectField label={t('Status')} value={form.status} onChange={set('status')} options={[{ value: 'active', label: t('Aktiv (öffentlich buchbar)') }, { value: 'inactive', label: t('Pausiert') }]} />
       <SelectField
         label={t('Vermietung')}
@@ -619,9 +619,9 @@ function OfferFields({ form, setForm, places, language }) {
     </div>
     {form.rentalMode !== 'lanes' && <p className="hint">{t('Komplett bedeutet: alle Bahnen dieses Angebots auf einmal.')}</p>}
     <div className="form-grid">
-      <TextField label={t('Mindestdauer (Stunden)')} type="number" min={1} max={24} value={form.minHours} onChange={set('minHours')} required />
-      <TextField label={t('Höchstdauer (Stunden)')} type="number" min={1} max={24} value={form.maxHours} onChange={set('maxHours')} required />
-      <TextField label={t('Buchbar im Voraus (Tage)')} type="number" min={1} max={365} value={form.bookingHorizonDays} onChange={set('bookingHorizonDays')} required />
+      <IntegerField label={t('Mindestdauer (Stunden)')} min={1} max={24} value={form.minHours} onChange={set('minHours')} required />
+      <IntegerField label={t('Höchstdauer (Stunden)')} min={1} max={24} value={form.maxHours} onChange={set('maxHours')} required />
+      <IntegerField label={t('Buchbar im Voraus (Tage)')} min={1} max={365} value={form.bookingHorizonDays} onChange={set('bookingHorizonDays')} required />
     </div>
     <fieldset className="rental-opening">
       <legend>{t('Öffnungszeiten')}</legend>
@@ -644,7 +644,7 @@ function OfferFields({ form, setForm, places, language }) {
           <SelectField label={t('Wochentag')} value={block.weekday} onChange={(weekday) => setBlock(index, { weekday })} options={weekdayOptions} />
           <SelectField label={t('von')} value={block.startHour} onChange={(startHour) => setBlock(index, { startHour })} options={hourOptions(0, 23)} />
           <SelectField label={t('bis')} value={block.endHour} onChange={(endHour) => setBlock(index, { endHour })} options={hourOptions(1, 24)} />
-          <TextField label={t('Bahnen')} type="number" min={1} max={200} value={block.lanes} onChange={(lanes) => setBlock(index, { lanes })} placeholder={t('alle')} />
+          <IntegerField label={t('Bahnen')} min={1} max={200} value={block.lanes} onChange={(lanes) => setBlock(index, { lanes })} placeholder={t('alle')} />
           <TextField label={t('Bezeichnung')} value={block.label} onChange={(label) => setBlock(index, { label })} maxLength={60} placeholder={t('z. B. Vereinstraining')} />
           <TextField label={t('gültig ab')} type="date" value={block.validFrom} onChange={(validFrom) => setBlock(index, { validFrom })} />
           <TextField label={t('gültig bis')} type="date" value={block.validTo} onChange={(validTo) => setBlock(index, { validTo })} />

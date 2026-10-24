@@ -810,6 +810,8 @@
   "Hinzufügen": "Añadir",
   "Bearbeiter:": "Editores:",
   "Benutzer hinzufügen": "Añadir usuario",
+"Bitte eine ganze Zahl von {{min}} bis {{max}} eingeben.": "Introduce un número entero de {{min}} a {{max}}.",
+"Bitte eine ganze Zahl ab {{min}} eingeben.": "Introduce un número entero de al menos {{min}}.",
 "E-Mail-Versand nicht freigeschaltet": "Envío de correos no habilitado",
 "Statusmeldungen zu diesem Turnier (z. B. neue Anmeldungen und Stornierungen) landen nur in deinem internen Postfach und werden nicht per E-Mail verschickt.": "Los avisos de estado de este torneo (p. ej., nuevas inscripciones y cancelaciones) solo llegan a tu buzón interno y no se envían por correo electrónico.",
 "Auch Teilnehmer erhalten keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails, bis ein Admin den E-Mail-Versand freischaltet. Anmeldungen und Stornierungen funktionieren normal.": "Los participantes tampoco reciben correos de confirmación, recordatorio o difusión hasta que un administrador habilite el envío de correos. Las inscripciones y cancelaciones funcionan con normalidad.",

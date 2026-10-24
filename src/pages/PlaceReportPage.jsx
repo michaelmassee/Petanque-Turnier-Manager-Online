@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EMPTY_PLACE_REPORT_FORM } from '../lib/constants.js';
 import { api } from '../lib/api.js';
-import { RequiredMark, TextField, TextArea, Button, Feedback } from '../components/ui.jsx';
+import { IntegerField, RequiredMark, TextField, TextArea, Button, Feedback } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 
@@ -40,7 +40,7 @@ function PlaceReportForm({ form, setForm, onSubmit, navigate, language, turnstil
         language={language}
       />
       <TextField label={t('Verein')} value={form.clubName} onChange={(clubName) => setForm({ ...form, clubName })} placeholder={t('Optional, falls vorhanden')} />
-      <TextField label={t('Platzanzahl')} type="number" min={0} value={form.courtCount} onChange={(courtCount) => setForm({ ...form, courtCount })} />
+      <IntegerField label={t('Platzanzahl')} min={0} value={form.courtCount} onChange={(courtCount) => setForm({ ...form, courtCount })} />
       <TextArea label={t('Weitere Infos')} value={form.description} onChange={(description) => setForm({ ...form, description })} />
       <TextField label={t('Ausstattung')} value={form.facilities} onChange={(facilities) => setForm({ ...form, facilities })} />
       <label className="checkbox-field">

@@ -810,6 +810,8 @@
   "Hinzufügen": "Toevoegen",
   "Bearbeiter:": "Bewerkers:",
   "Benutzer hinzufügen": "Gebruiker toevoegen",
+"Bitte eine ganze Zahl von {{min}} bis {{max}} eingeben.": "Voer een geheel getal in van {{min}} tot {{max}}.",
+"Bitte eine ganze Zahl ab {{min}} eingeben.": "Voer een geheel getal van minstens {{min}} in.",
 "E-Mail-Versand nicht freigeschaltet": "E-mailverzending niet vrijgegeven",
 "Statusmeldungen zu diesem Turnier (z. B. neue Anmeldungen und Stornierungen) landen nur in deinem internen Postfach und werden nicht per E-Mail verschickt.": "Statusmeldingen voor dit toernooi (bijv. nieuwe aanmeldingen en afmeldingen) komen alleen in je interne postvak terecht en worden niet per e-mail verstuurd.",
 "Auch Teilnehmer erhalten keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails, bis ein Admin den E-Mail-Versand freischaltet. Anmeldungen und Stornierungen funktionieren normal.": "Ook deelnemers ontvangen geen bevestigings-, herinnerings- of broadcastmails totdat een beheerder het versturen van e-mails vrijgeeft. Aanmelden en afmelden werken normaal.",

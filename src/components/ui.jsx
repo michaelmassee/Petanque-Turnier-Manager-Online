@@ -108,6 +108,42 @@ export function TextField({ label, value, onChange, type = 'text', required, inv
   );
 }
 
+// Ganzzahl-Eingabe statt type="number": das ließe „e“, „+“, „-“ und Dezimalpunkt zu. Nur Ziffern, am Handy die
+// Zifferntastatur; min/max prüft der Browser beim Absenden wie bei type="number" (setCustomValidity).
+export function IntegerField({ value, onChange, min, max, ...props }) {
+  const { t } = useTranslation();
+  const inputRef = useRef(null);
+  const text = value === null || value === undefined ? '' : String(value);
+  const hasMax = max !== undefined && max !== null;
+  const hasMin = min !== undefined && min !== null;
+  // Eingefügter Text kann länger sein als maxLength erlaubt: auf die Stellen des Maximums kürzen.
+  const maxLength = hasMax ? String(max).length : undefined;
+
+  useEffect(() => {
+    const number = Number(text);
+    const outOfRange = text !== '' && ((hasMin && number < Number(min)) || (hasMax && number > Number(max)));
+    let message = '';
+    if (outOfRange) {
+      message = hasMax
+        ? t('Bitte eine ganze Zahl von {{min}} bis {{max}} eingeben.', { min: hasMin ? min : 0, max })
+        : t('Bitte eine ganze Zahl ab {{min}} eingeben.', { min });
+    }
+    inputRef.current?.setCustomValidity(message);
+  }, [text, min, max, hasMin, hasMax, t]);
+
+  return (
+    <TextField
+      ref={inputRef}
+      inputMode="numeric"
+      pattern="[0-9]+"
+      maxLength={maxLength}
+      value={text}
+      onChange={(next) => onChange(next.replace(/\D/g, '').slice(0, maxLength))}
+      {...props}
+    />
+  );
+}
+
 export function TextArea({ label, value, onChange, onKeyDown, minLength, maxLength, required, rows = 4 }) {
   return (
     <label>

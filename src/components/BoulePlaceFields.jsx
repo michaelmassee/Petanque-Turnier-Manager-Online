@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { TextField, SelectField } from './ui.jsx';
+import { IntegerField, TextField, SelectField } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 import { RichTextEditor } from './RichTextEditor.jsx';
 
@@ -37,7 +37,7 @@ export function BoulePlaceFields({ form, setForm, language }) {
           <span>{t('Adresse geprüft: Sie gehört zum Spielort, nicht zu einer Postanschrift.')}</span>
         </label>
       )}
-      <TextField label={t('Platzanzahl')} type="number" min={0} value={form.courtCount} onChange={(courtCount) => setForm({ ...form, courtCount })} />
+      <IntegerField label={t('Platzanzahl')} min={0} value={form.courtCount} onChange={(courtCount) => setForm({ ...form, courtCount })} />
       <RichTextEditor
         label={t('Beschreibung')}
         value={form.description}

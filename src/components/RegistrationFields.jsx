@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { REGISTRATION_STATUSES } from '../lib/constants.js';
 import { translatedOptions } from '../lib/domain.js';
 import { formatMoney } from '../lib/format.js';
-import { SelectField, TextField } from './ui.jsx';
+import { IntegerField, SelectField, TextField } from './ui.jsx';
 import { RegistrationPlayerPicker } from './RegistrationPlayerPicker.jsx';
 import { useClubSuggestions } from './ClubSuggestions.jsx';
 
@@ -209,7 +209,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
             {t('Keine E-Mail-Adresse vorhanden')}
           </label>
           <div className="form-grid">
-            <TextField label={t('Setzposition')} type="number" min="0" value={form.seedingPosition} onChange={(seedingPosition) => setForm({ ...form, seedingPosition })} />
+            <IntegerField label={t('Setzposition')} min={0} value={form.seedingPosition} onChange={(seedingPosition) => setForm({ ...form, seedingPosition })} />
             <SelectField label={t('Status')} value={form.status} onChange={(status) => setForm({ ...form, status })} options={translatedOptions(REGISTRATION_STATUSES.filter((option) => option.value !== 'rejected' || form.status === 'rejected'))} />
           </div>
           <label className="checkbox-field">

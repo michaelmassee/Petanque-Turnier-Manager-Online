@@ -5,7 +5,7 @@ import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES
 import { currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
 import { hasRegistrations, isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, registrationDeadlinePassed, registrationStatusClass, registrationStatusKind, registrationStatusLabel, registrationStatusReason, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
-import { Feedback, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog, RequiredMark } from '../components/ui.jsx';
+import { Feedback, IntegerField, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog, RequiredMark } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { authenticatedApi } from '../lib/api.js';
@@ -371,11 +371,10 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             />
           )}
           {form.type === 'formule_x' && (
-            <TextField
+            <IntegerField
               label={t('Anzahl Runden')}
-              type="number"
-              min="1"
-              max="20"
+              min={1}
+              max={20}
               value={form.formuleXRounds || 4}
               onChange={(formuleXRounds) => setForm({ ...form, formuleXRounds })}
             />
@@ -404,7 +403,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
       {!isCalendarEntry && (
         <>
           <div className="form-grid">
-            <TextField label={t('Max. Meldungen')} type="number" min="0" value={form.maxRegistrations} onChange={(maxRegistrations) => setForm({ ...form, maxRegistrations })} />
+            <IntegerField label={t('Max. Meldungen')} min={0} value={form.maxRegistrations} onChange={(maxRegistrations) => setForm({ ...form, maxRegistrations })} />
           </div>
           <div className="form-grid">
             <TextField label={t('Startgeld')} inputMode="decimal" value={form.entryFeeAmount} onChange={(entryFeeAmount) => setForm({ ...form, entryFeeAmount })} />
