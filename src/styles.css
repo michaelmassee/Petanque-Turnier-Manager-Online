@@ -867,9 +867,10 @@ a.left-panel-link {
 .postbox-badge { position: absolute; top: -7px; right: -7px; min-width: 19px; padding: 2px 5px; border-radius: 999px; background: #c21d32; color: #fff; font-size: .68rem; font-weight: 800; }
 .postbox-panel { position: absolute; z-index: 12; top: calc(100% + 8px); right: 0; display: grid; gap: 14px; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 110px); overflow: auto; padding: 18px; border: 1px solid #d7deea; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgb(23 32 51 / 16%); }
 .postbox-panel h2, .postbox-panel h3 { margin: 0; }
+.postbox-panel .section-title { margin-bottom: 0; }
 .postbox-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .postbox-push-active { flex: none; width: 18px; height: 18px; fill: #1a7f4b; stroke: #1a7f4b; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.postbox-compose { gap: 8px; }
+.postbox-compose { gap: 8px; margin-top: 0; }
 .postbox-section { display: grid; gap: 8px; }
 .postbox-todo { display: block; width: 100%; margin: 0; padding: 9px; border: none; border-radius: 6px; background: #fff8e8; color: inherit; text-align: left; cursor: pointer; }
 .postbox-todo:hover { background: #ffefc4; }
