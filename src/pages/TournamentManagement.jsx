@@ -15,6 +15,7 @@ import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteLis
 import { TournamentQrDialog } from '../components/TournamentQrDialog.jsx';
 import { TournamentFlyerDialog } from '../components/TournamentFlyerDialog.jsx';
 import { EditorsPanel } from '../components/EditorsPanel.jsx';
+import { UserPicker, rememberPickedUser } from '../components/UserPicker.jsx';
 
 /**
  * Lösch-Rückfrage; bei einem mit einem Turnierdokument verbundenen Turnier mit deutlicher Warnung, weil Spieler
@@ -46,14 +47,14 @@ function deleteTournamentRequest(tournamentId, confirmDocumentManaged) {
   return authenticatedApi(`/api/tournaments/${tournamentId}${query}`, { method: 'DELETE' });
 }
 
-function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], onOwnerChanged }) {
+function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], currentUserId, onOwnerChanged }) {
   const { t } = useTranslation();
   const [selectedOwnerId, setSelectedOwnerId] = useState('');
   const [busy, setBusy] = useState(false);
   const [panelError, setPanelError] = useState('');
 
   const owner = candidates.find((candidate) => candidate.id === ownerId);
-  const otherCandidates = candidates.filter((candidate) => candidate.id !== ownerId);
+  const ownerExcludeIds = useMemo(() => [ownerId], [ownerId]);
 
   async function handleChangeOwner(event) {
     event.preventDefault();
@@ -63,6 +64,7 @@ function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], onOwnerC
     try {
       const data = await authenticatedApi(`/api/tournaments/${tournamentId}/owner`, { method: 'PUT', body: JSON.stringify({ userId: selectedOwnerId }) });
       onOwnerChanged(data.tournament);
+      rememberPickedUser(currentUserId, selectedOwnerId);
       setSelectedOwnerId('');
     } catch (err) {
       setPanelError(err.message);
@@ -80,16 +82,15 @@ function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], onOwnerC
       <p className="muted">
         {t('Aktueller Owner:')} <span data-i18n-skip>{owner ? formatUserLabel(owner) : t('Unbekannter Benutzer')}</span>
       </p>
-      {otherCandidates.length > 0 && (
+      {candidates.some((candidate) => candidate.id !== ownerId) && (
         <div className="inline-form">
-          <SelectField
+          <UserPicker
             label={t('Owner wechseln')}
+            users={candidates}
+            excludeIds={ownerExcludeIds}
             value={selectedOwnerId}
             onChange={setSelectedOwnerId}
-            options={[
-              { value: '', label: t('Bitte wählen') },
-              ...otherCandidates.map((candidate) => ({ value: candidate.id, label: formatUserLabel(candidate) })),
-            ]}
+            currentUserId={currentUserId}
           />
           <Button type="button" disabled={busy || !selectedOwnerId} loading={busy} onClick={handleChangeOwner}>{t('Übernehmen')}</Button>
         </div>
@@ -587,7 +588,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
       <TextField label={t('WhatsApp-Gruppe (Einladungslink)')} type="url" placeholder="https://chat.whatsapp.com/…" value={form.whatsappGroupUrl} onChange={(whatsappGroupUrl) => setForm({ ...form, whatsappGroupUrl })} invalid={invalidField === 'whatsappGroupUrl'} />
       <p className="hint">{t('Der Link wird in jede E-Mail an die Gemeldeten und ihre Teammitglieder eingefügt und nicht öffentlich angezeigt.')}</p>
       {canManageOwner && (
-        <TournamentOwnerPanel tournamentId={form.id} ownerId={form.ownerId} candidates={ownerCandidates} onOwnerChanged={(tournament) => { onOwnerChanged(tournament); setForm({ ...form, ownerId: tournament.ownerId }); }} />
+        <TournamentOwnerPanel tournamentId={form.id} ownerId={form.ownerId} candidates={ownerCandidates} currentUserId={currentUser?.id} onOwnerChanged={(tournament) => { onOwnerChanged(tournament); setForm({ ...form, ownerId: tournament.ownerId }); }} />
       )}
       {canManageEditors && <EditorsPanel endpoint={`/api/tournaments/${form.id}/editors`} candidates={editorCandidates} ownerId={form.ownerId} owner={owner} currentUserId={currentUser?.id} emptyText={t('Noch keine weiteren Bearbeiter für dieses Turnier.')} />}
       <div className="dialog-actions">

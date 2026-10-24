@@ -8,51 +8,28 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Stabiler Default: ein neues [] pro Render würde die Einträge neu berechnen und die Auswahl zurücksetzen.
 const NO_TOURNAMENTS = [];
 
-function recipientEntry(recipient, group) {
+// withEmail: E-Mail anzeigen und durchsuchbar machen (nur Admin-Listen, die sie ohnehin liefern).
+export function recipientEntry(recipient, group, { withEmail = false } = {}) {
   const name = formatUserName(recipient);
-  const meta = formatUserMeta(recipient);
+  const meta = [formatUserMeta(recipient), withEmail ? recipient.email || '' : ''].filter(Boolean).join(' · ');
   return {
     id: recipient.id,
     value: recipient.id,
-    label: name,
+    label: name || recipient.email || '',
     meta,
     searchText: `${name} ${meta} ${recipient.username || ''}`.toLowerCase(),
-    selectedLabel: recipient.username ? `${name} (@${recipient.username})` : name,
+    selectedLabel: (recipient.username ? `${name} (@${recipient.username})` : name) || recipient.email || '',
     group,
     favoritable: true,
   };
 }
 
-// Postbox-Empfänger: Turnier-Broadcasts und Nutzer. onLookupEmail(email) → Empfänger oder null: findet Nutzer
-// über die exakte E-Mail, ohne sie anzuzeigen.
-export function RecipientPicker({ label, recipients, recipientTournaments = NO_TOURNAMENTS, value, onChange, currentUserId, required, onLookupEmail }) {
-  const { t, i18n } = useTranslation();
+// Exakte E-Mail-Suche für Nutzer-Pickers: onLookupEmail(email) → Nutzer oder null. Findet Nutzer über die
+// vollständige E-Mail, ohne sie anzuzeigen; Treffer bleiben für die Sitzung des Pickers in emailMatches.
+export function useEmailLookup(onLookupEmail) {
   const [query, setQuery] = useState('');
   const [emailMatches, setEmailMatches] = useState([]);
   const [emailLookupPending, setEmailLookupPending] = useState(false);
-
-  const entries = useMemo(() => {
-    const tournamentEntries = recipientTournaments.map((tournament) => {
-      // Nur der Turniername: die Gruppe „Turnier-Broadcasts“ sagt bereits, dass alle Teilnehmer erreicht werden.
-      const entryLabel = tournament.name;
-      // Zweite Zeile wie beim Benutzernamen: Datum und Anzahl der Meldungen.
-      const meta = `${formatDate(tournament.date, i18n.language)} · ${t('registrationCount', { count: tournament.registrationCount || 0 })}`;
-      return {
-        id: `tournament:${tournament.id}`,
-        value: `tournament:${tournament.id}`,
-        label: entryLabel,
-        meta,
-        searchText: `${entryLabel} ${meta}`.toLowerCase(),
-        // Kurzform fürs Eingabefeld nach der Auswahl, damit es am Handy nicht abgeschnitten wird.
-        selectedLabel: `${tournament.name} · ${formatDate(tournament.date, i18n.language)}`,
-        group: t('allTournamentsSection'),
-      };
-    });
-    const knownIds = new Set(recipients.map((recipient) => recipient.id));
-    const recipientEntries = [...recipients, ...emailMatches.filter((recipient) => !knownIds.has(recipient.id))]
-      .map((recipient) => recipientEntry(recipient, t('allRecipientsSection')));
-    return [...tournamentEntries, ...recipientEntries];
-  }, [recipients, emailMatches, recipientTournaments, t, i18n.language]);
 
   const trimmedQuery = query.trim().toLowerCase();
   const queryIsEmail = Boolean(onLookupEmail) && EMAIL_PATTERN.test(trimmedQuery);
@@ -79,6 +56,38 @@ export function RecipientPicker({ label, recipients, recipientTournaments = NO_T
     (entry, normalizedQuery) => emailMatches.some((recipient) => recipient.id === entry.id && recipient.matchedEmail === normalizedQuery),
     [emailMatches],
   );
+
+  return { setQuery, emailMatches, queryIsEmail, emailLookupPending, matchesQuery };
+}
+
+// Postbox-Empfänger: Turnier-Broadcasts und Nutzer. onLookupEmail(email) → Empfänger oder null: findet Nutzer
+// über die exakte E-Mail, ohne sie anzuzeigen.
+export function RecipientPicker({ label, recipients, recipientTournaments = NO_TOURNAMENTS, value, onChange, currentUserId, required, onLookupEmail }) {
+  const { t, i18n } = useTranslation();
+  const { setQuery, emailMatches, queryIsEmail, emailLookupPending, matchesQuery } = useEmailLookup(onLookupEmail);
+
+  const entries = useMemo(() => {
+    const tournamentEntries = recipientTournaments.map((tournament) => {
+      // Nur der Turniername: die Gruppe „Turnier-Broadcasts“ sagt bereits, dass alle Teilnehmer erreicht werden.
+      const entryLabel = tournament.name;
+      // Zweite Zeile wie beim Benutzernamen: Datum und Anzahl der Meldungen.
+      const meta = `${formatDate(tournament.date, i18n.language)} · ${t('registrationCount', { count: tournament.registrationCount || 0 })}`;
+      return {
+        id: `tournament:${tournament.id}`,
+        value: `tournament:${tournament.id}`,
+        label: entryLabel,
+        meta,
+        searchText: `${entryLabel} ${meta}`.toLowerCase(),
+        // Kurzform fürs Eingabefeld nach der Auswahl, damit es am Handy nicht abgeschnitten wird.
+        selectedLabel: `${tournament.name} · ${formatDate(tournament.date, i18n.language)}`,
+        group: t('allTournamentsSection'),
+      };
+    });
+    const knownIds = new Set(recipients.map((recipient) => recipient.id));
+    const recipientEntries = [...recipients, ...emailMatches.filter((recipient) => !knownIds.has(recipient.id))]
+      .map((recipient) => recipientEntry(recipient, t('allRecipientsSection')));
+    return [...tournamentEntries, ...recipientEntries];
+  }, [recipients, emailMatches, recipientTournaments, t, i18n.language]);
 
   return (
     <ComboboxPicker

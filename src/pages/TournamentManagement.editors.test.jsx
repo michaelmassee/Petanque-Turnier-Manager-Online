@@ -1,7 +1,7 @@
 // Kandidaten für Bearbeitungsrechte: Die Nutzerliste liest die ganze users-Tabelle und wird deshalb erst geladen,
 // wenn Owner oder Admin ein Turnier bearbeiten – nicht beim App-Start und nicht für reine Bearbeiter.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '../lib/i18next-config.js';
 import { TournamentManagementPage } from './TournamentManagement.jsx';
@@ -40,8 +40,10 @@ describe('Bearbeitungsrechte: Kandidatenliste', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
 
-    const select = await screen.findByLabelText('Benutzer hinzufügen');
-    await waitFor(() => expect(within(select).getByRole('option', { name: 'Ed Editor (@ed)' })).toBeInTheDocument());
+    const picker = await screen.findByRole('combobox', { name: 'Benutzer hinzufügen' });
+    fireEvent.focus(picker);
+    expect(await screen.findByRole('option', { name: /Ed Editor/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Ed Editor/ })).toHaveTextContent('@ed');
     expect(recipientsLoaded()).toBe(true);
   });
 

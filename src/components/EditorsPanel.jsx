@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Feedback, SelectField } from './ui.jsx';
+import { Button, Feedback } from './ui.jsx';
 import { authenticatedApi } from '../lib/api.js';
 import { formatUserLabel, formatUserName } from '../lib/userLabel.js';
 import { UsernameReportButton } from './UsernameReportDialog.jsx';
+import { UserPicker, rememberPickedUser } from './UserPicker.jsx';
 
 /**
  * Zusätzliche Bearbeiter/Verwalter für Turniere und Mietangebote: endpoint liefert per GET/POST { editors },
@@ -33,7 +34,11 @@ export function EditorsPanel({ endpoint, candidates = [], ownerId, owner, curren
   const panelOwner = owner || data?.owner;
   const panelOwnerId = ownerId || panelOwner?.id;
   const additionalEditors = (data?.editors || []).filter((editor) => editor.id !== panelOwnerId);
-  const availableCandidates = candidates.filter((candidate) => candidate.id !== panelOwnerId && !additionalEditors.some((editor) => editor.id === candidate.id));
+  const excludedIds = useMemo(
+    () => [panelOwnerId, ...(data?.editors || []).map((editor) => editor.id)].filter(Boolean),
+    [panelOwnerId, data],
+  );
+  const hasAvailableCandidates = candidates.some((candidate) => !excludedIds.includes(candidate.id));
 
   async function handleAdd(event) {
     event.preventDefault();
@@ -43,6 +48,7 @@ export function EditorsPanel({ endpoint, candidates = [], ownerId, owner, curren
     try {
       const result = await authenticatedApi(endpoint, { method: 'POST', body: JSON.stringify({ userId: selectedCandidateId }) });
       setData(result);
+      rememberPickedUser(currentUserId, selectedCandidateId);
       setSelectedCandidateId('');
     } catch (err) {
       setPanelError(err.message);
@@ -133,16 +139,15 @@ export function EditorsPanel({ endpoint, candidates = [], ownerId, owner, curren
               ))}
             </ul>
           )}
-          {availableCandidates.length > 0 && (
+          {hasAvailableCandidates && (
             <div className="inline-form">
-              <SelectField
+              <UserPicker
                 label={t('Benutzer hinzufügen')}
+                users={candidates}
+                excludeIds={excludedIds}
                 value={selectedCandidateId}
                 onChange={setSelectedCandidateId}
-                options={[
-                  { value: '', label: t('Bitte wählen') },
-                  ...availableCandidates.map((candidate) => ({ value: candidate.id, label: formatUserLabel(candidate) })),
-                ]}
+                currentUserId={currentUserId}
               />
               <Button type="button" disabled={busy || !selectedCandidateId} loading={busy} onClick={handleAdd}>{t('Hinzufügen')}</Button>
             </div>

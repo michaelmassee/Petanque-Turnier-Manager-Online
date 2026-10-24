@@ -648,7 +648,10 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     const dialog = screen.getByRole('dialog');
     expect(await within(dialog).findByText('Noch keine weiteren Verwalter für dieses Angebot.')).toBeInTheDocument();
-    fireEvent.change(await within(dialog).findByLabelText(/Benutzer hinzufügen/), { target: { value: 'u3' } });
+    const picker = await within(dialog).findByRole('combobox', { name: /Benutzer hinzufügen/ });
+    fireEvent.focus(picker);
+    fireEvent.change(picker, { target: { value: 'Anna' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Anna Anders/ }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Hinzufügen' }));
 
     await waitFor(() => expect(onWrite).toHaveBeenCalledWith('/api/rentals/offers/o1/editors', expect.objectContaining({ method: 'POST', body: JSON.stringify({ userId: 'u3' }) })));

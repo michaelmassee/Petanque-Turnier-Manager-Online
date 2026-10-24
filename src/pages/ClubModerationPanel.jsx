@@ -6,7 +6,7 @@ import { Feedback, Button, EditDialog, ListToolbar, SelectField, TextArea, TextF
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { BoulePlaceFields } from '../components/BoulePlaceFields.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
-import { formatUserLabel } from '../lib/userLabel.js';
+import { UserPicker, rememberPickedUser } from '../components/UserPicker.jsx';
 
 const EMPTY_PLACE_FORM = { name: '', address: '', latitude: null, longitude: null, locationConfirmed: false, venueType: 'outdoor', courtCount: '', description: '', accessible: false, facilities: '', facilityCodes: [] };
 const EMPTY_CLUB_FORM = { name: '', description: '', websiteUrl: '', logoUrl: '', contactName: '', contactEmail: '', contactPhone: '' };
@@ -32,7 +32,7 @@ function statusLabel(status, t) {
   return t('In Prüfung');
 }
 
-export function ClubModerationPanel({ language, section = 'clubs' }) {
+export function ClubModerationPanel({ language, section = 'clubs', currentUserId }) {
   const { t } = useTranslation();
   const [requests, setRequests] = useState([]);
   const [places, setPlaces] = useState([]);
@@ -95,6 +95,7 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
     setOwnerSaving(true); setOwnerError('');
     try {
       await authenticatedApi(`/api/admin/clubs/${ownerDialogClub.id}/owner`, { method: 'PUT', body: JSON.stringify({ userId: selectedOwnerId }) });
+      rememberPickedUser(currentUserId, selectedOwnerId);
       setOwnerDialogClub(null);
       setMessage(t('Owner geändert.'));
       await load();
@@ -528,14 +529,15 @@ export function ClubModerationPanel({ language, section = 'clubs' }) {
             <p className="muted">
               {t('Aktueller Owner:')} <span data-i18n-skip>{ownerDialogClub.ownerName} ({ownerDialogClub.ownerEmail})</span>
             </p>
-            <SelectField
+            <UserPicker
               label={t('Owner wechseln')}
+              users={users}
+              excludeIds={[ownerDialogClub.ownerId]}
               value={selectedOwnerId}
               onChange={setSelectedOwnerId}
-              options={[
-                { value: '', label: t('Bitte wählen') },
-                ...users.filter((u) => u.id !== ownerDialogClub.ownerId).map((u) => ({ value: u.id, label: `${formatUserLabel(u, { withClub: false }) || u.email} · ${u.email}` })),
-              ]}
+              currentUserId={currentUserId}
+              withEmail
+              emailLookup={false}
             />
             <div className="dialog-actions">
               <Button variant="secondary" type="button" onClick={() => setOwnerDialogClub(null)}>{t('Abbrechen')}</Button>
