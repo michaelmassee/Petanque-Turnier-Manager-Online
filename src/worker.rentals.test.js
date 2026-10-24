@@ -355,6 +355,15 @@ describe('Platz mieten', () => {
     expect(mine.reservations[0]).not.toHaveProperty('internalNote');
     const publicCalendar = await (await call('GET', `/api/rentals/${offer.id}/availability?from=2026-10-24`, { headers: MIETER })).json();
     expect(JSON.stringify(publicCalendar)).not.toContain('Schlüssel');
+    const strangerCalendar = await call('GET', `/api/rentals/${offer.id}/availability?from=2026-10-24`, { headers: ANDERER });
+    expect(await strangerCalendar.text()).not.toContain('Schlüssel');
+    const anonymousCalendar = await call('GET', `/api/rentals/${offer.id}/availability?from=2026-10-24`);
+    expect(await anonymousCalendar.text()).not.toContain('Schlüssel');
+    // Wer Verwalter dieses Angebots wird, sieht die Notiz im Kalender; Antworten werden nie gecacht.
+    await call('POST', `/api/rentals/offers/${offer.id}/editors`, { body: { userId: 'u3' }, headers: VEREIN });
+    const editorCalendar = await call('GET', `/api/rentals/${offer.id}/availability?from=2026-10-24`, { headers: ANDERER });
+    expect(editorCalendar.headers.get('Cache-Control')).toBe('no-store');
+    expect((await editorCalendar.json()).bookings[0].internalNote).toBe(note);
 
     // Auch nach der Entscheidung änderbar; leer entfernt die Notiz.
     await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
