@@ -696,8 +696,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       <Feedback message={message} error={error || queryError?.message} />
 
       {selectedTournament && <TournamentBoardShare tournament={selectedTournament} />}
-      {/* Ankündigungen erst ab Turnierstart: vorher ist die Seite nur zum Auswählen und Starten da. */}
-      {selectedTournament && selectedTournamentStatus === 'running' && <AnnouncementEditor tournament={selectedTournament} />}
+      {/* Ankündigungen schon vor dem Turnierstart, damit der Veranstalter vorab informieren kann. */}
+      {selectedTournament && selectedTournamentStatus !== 'finished' && <AnnouncementEditor tournament={selectedTournament} />}
 
       {canEditMeleeTeams && selectedTournamentStatus === 'running' && (
         <p className="hint">

@@ -127,11 +127,11 @@ describe('TournamentPlayManagement', () => {
     localStorage.clear();
   });
 
-  it('zeigt die Ankündigung erst, wenn das Turnier gestartet ist', async () => {
+  it('zeigt die Ankündigung schon vor dem Turnierstart', async () => {
     installFetchMock([]);
     const { unmount } = render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, status: 'registration' }]} language="de" />);
     expect(await screen.findByRole('button', { name: 'Turnier starten' })).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Mitteilung an alle Teilnehmer/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Mitteilung an alle Teilnehmer/)).toBeInTheDocument();
     unmount();
 
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
