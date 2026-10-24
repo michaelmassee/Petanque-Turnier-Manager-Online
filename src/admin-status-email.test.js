@@ -111,7 +111,7 @@ describe('Tägliche Administrator-Statusmail', () => {
     const batch = vi.spyOn(env.DB, 'batch');
     await send();
     expect(batch).toHaveBeenCalledTimes(1);
-    expect(batch.mock.calls[0][0]).toHaveLength(7);
+    expect(batch.mock.calls[0][0]).toHaveLength(8);
   });
 
   it('übernimmt D1-Lesekosten aus vorhandenen Abfragemetadaten ohne weitere Abfrage', async () => {
@@ -120,9 +120,9 @@ describe('Tägliche Administrator-Statusmail', () => {
       .map((result, index) => ({ ...result, meta: { ...result.meta, rows_read: index + 1 } })));
     const prepare = vi.spyOn(env.DB, 'prepare');
     const stats = await collectAdminStatus(env.DB, from, until, systemId);
-    expect(stats.statisticsRowsRead).toBe(28);
-    expect(prepare).toHaveBeenCalledTimes(7);
-    expect(buildAdminStatusEmail(stats, [], from, until).text).toContain('D1-Lesezeilen der 7 Statistikabfragen: 28');
+    expect(stats.statisticsRowsRead).toBe(36);
+    expect(prepare).toHaveBeenCalledTimes(8);
+    expect(buildAdminStatusEmail(stats, [], from, until).text).toContain('D1-Lesezeilen der 8 Statistikabfragen: 36');
   });
 
   it.each(['de', 'en', 'fr', 'nl', 'es', 'unknown'])('rendert leere Bestände vollständig in %s', async (language) => {

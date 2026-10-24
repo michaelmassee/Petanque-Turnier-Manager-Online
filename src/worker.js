@@ -1,6 +1,7 @@
 import { limitPlayerDetails, registrationPlayerDetails, resolveSelectedRegistrationPlayers } from './registration-player-search.js';
 import tzlookup from 'tz-lookup';
 import { sendAdminStatusEmails } from './admin-status-email.js';
+import { buildAdminPostboxEmail } from './admin-postbox-email.js';
 import { REGISTRATION_OPENED_EVENT, OPENING_MESSAGES, synchronizeOpeningSchedule } from './registration-opening.js';
 export { RegistrationOpeningScheduler } from './registration-opening.js';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
@@ -1272,7 +1273,8 @@ export async function sendTeamMessage(env, registration, sender, rawBody, appOri
     content: [...document.content, { type: 'paragraph', content: [{ type: 'text', text: `${tournament.name}: ${link}` }] }],
   });
   for (const recipientId of accountIds) {
-    await createPostboxMessage(env, { senderId: sender.id, recipientId, kind: 'direct', body: postboxBody, pushTitle: 'Neue Nachricht', pushActor: senderName });
+    await createPostboxMessage(env, { senderId: sender.id, recipientId, kind: 'direct', body: postboxBody, pushTitle: 'Neue Nachricht', pushActor: senderName,
+      emailedAddresses: emailRecipients.map((recipient) => recipient.email.toLowerCase()) });
   }
 
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
@@ -3758,7 +3760,7 @@ async function listUsers(db) {
 
 export async function listPostboxRecipients(db, userId) {
   const result = await db.prepare(
-    "SELECT id, first_name, last_name, username, club, role FROM users WHERE id != ? AND id != ? AND role = 'user' ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE",
+    "SELECT id, first_name, last_name, username, club, role FROM users WHERE id != ? AND id != ? AND role IN ('user', 'admin') ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE",
   ).bind(userId, TOURNAMENT_REPORT_SYSTEM_USER_ID).all();
   const tournaments = await db.prepare(
     `SELECT t.id, t.name, t.date, COUNT(r.id) AS registration_count
@@ -3788,7 +3790,7 @@ export async function lookupPostboxRecipientByEmail(db, userId, email) {
   const normalized = String(email || '').trim().toLowerCase();
   if (!isEmail(normalized)) throw new HttpError(400, 'Eine gültige E-Mail ist erforderlich');
   const user = await db
-    .prepare("SELECT id, first_name, last_name, username, club, role FROM users WHERE email = ? AND id != ? AND id != ? AND role = 'user'")
+    .prepare("SELECT id, first_name, last_name, username, club, role FROM users WHERE email = ? AND id != ? AND id != ? AND role IN ('user', 'admin')")
     .bind(normalized, userId, TOURNAMENT_REPORT_SYSTEM_USER_ID)
     .first();
   if (!user) throw new HttpError(404, 'Kein Benutzer mit dieser E-Mail-Adresse gefunden');
@@ -3919,7 +3921,7 @@ export function postboxMessageBody(value) {
   return text;
 }
 
-async function sendPostboxMessage(request, env, sender) {
+export async function sendPostboxMessage(request, env, sender) {
   const body = await readJson(request);
   const recipientRaw = String(body.recipientId || '').trim();
   if (!recipientRaw) throw new HttpError(400, 'Bitte wähle einen Empfänger');
@@ -3936,12 +3938,12 @@ async function sendPostboxMessage(request, env, sender) {
   }
 
   if (recipientRaw === sender.id) throw new HttpError(400, 'Bitte wähle einen anderen Empfänger');
-  const recipient = await env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(recipientRaw).first();
+  const recipient = await env.DB.prepare('SELECT id, role, email, email_verified_at, language FROM users WHERE id = ?').bind(recipientRaw).first();
   if (!recipient) throw new HttpError(404, 'Empfänger nicht gefunden');
-  if (recipient.role !== 'user' || recipient.id === TOURNAMENT_REPORT_SYSTEM_USER_ID) {
+  if (!ROLES.includes(recipient.role) || recipient.id === TOURNAMENT_REPORT_SYSTEM_USER_ID) {
     throw new HttpError(403, 'An diesen Empfänger kann keine Nachricht gesendet werden');
   }
-  const message = await createPostboxMessage(env, { senderId: sender.id, recipientId: recipientRaw, kind: 'direct', body: text, pushTitle: 'Neue Nachricht', pushActor: `${sender.firstName} ${sender.lastName}` });
+  const message = await createPostboxMessage(env, { senderId: sender.id, recipientId: recipientRaw, kind: 'direct', body: text, pushTitle: 'Neue Nachricht', pushActor: `${sender.firstName} ${sender.lastName}`, recipient, sender });
   return json({ message }, 201);
 }
 
@@ -3971,7 +3973,7 @@ async function listPostboxTodos(db, user) {
   return todos;
 }
 
-async function createPostboxMessage(env, { senderId = null, recipientId, kind, body = null, eventType = null, eventData = null, pushTitle = 'Neue Nachricht', pushActor = '' }) {
+async function createPostboxMessage(env, { senderId = null, recipientId, kind, body = null, eventType = null, eventData = null, pushTitle = 'Neue Nachricht', pushActor = '', recipient = null, sender = null, emailedAddresses = [] }) {
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   await env.DB.prepare('INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, event_type, event_data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
@@ -3983,6 +3985,23 @@ async function createPostboxMessage(env, { senderId = null, recipientId, kind, b
   ).bind(recipientId, recipientId).run();
   const row = await env.DB.prepare('SELECT * FROM postbox_messages WHERE id = ?').bind(id).first();
   const message = toPostboxMessage(row, recipientId);
+  if (kind === 'direct' && senderId && senderId !== recipientId) {
+    try {
+      // Andere Direktnachrichten (z. B. Adresskorrekturen) verwenden denselben Versandweg.
+      // Der indexierte Archivzugriff liefert ausschließlich Nachrichten an Admins.
+      const admin = recipient || await env.DB.prepare(`SELECT r.id, r.role, r.email, r.email_verified_at, r.language,
+        s.first_name AS sender_first_name, s.last_name AS sender_last_name, s.username AS sender_username
+        FROM admin_postbox_messages m JOIN users r ON r.id = m.recipient_id JOIN users s ON s.id = m.sender_id
+        WHERE m.message_id = ?`).bind(id).first();
+      if (admin?.role === 'admin' && admin.email_verified_at && !emailedAddresses.includes(admin.email.toLowerCase())) {
+        const author = sender || { firstName: admin.sender_first_name, lastName: admin.sender_last_name, username: admin.sender_username };
+        await enqueueTransactionalEmail(env, buildAdminPostboxEmail(admin, author, body));
+      }
+    } catch (error) {
+      // Die Postbox-Nachricht und ihre Berichtskopie bleiben erhalten; kein erneutes Senden durch einen API-Fehler.
+      console.error('Admin postbox email enqueue failed', error);
+    }
+  }
   try {
     let pushBody = null;
     if (kind === 'system' && eventType) {
