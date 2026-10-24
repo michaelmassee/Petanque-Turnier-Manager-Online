@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
-import { MAIL_NOT_ENABLED_HINT_TEMPLATES, currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
+import { currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
 import { hasRegistrations, isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, registrationDeadlinePassed, registrationStatusClass, registrationStatusKind, registrationStatusLabel, registrationStatusReason, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
 import { Feedback, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog, RequiredMark } from '../components/ui.jsx';
@@ -234,7 +234,8 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
   const { t } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
   const [showFormationHelp, setShowFormationHelp] = useState(false);
-  const showMailNotEnabledHint = !isAdmin && currentUser && currentUser.mailEnabled === false;
+  // Mails zum Turnier hängen an der Freischaltung des Owners: Hinweis beim Anlegen und für den Owner beim Bearbeiten.
+  const showMailNotEnabledHint = !isAdmin && currentUser?.mailEnabled === false && (mode !== 'edit' || form.ownerId === currentUser.id);
   const canManageEditors = mode === 'edit' && form.id && Boolean(currentUser) && (isAdmin || form.ownerId === currentUser.id);
   const canManageOwner = mode === 'edit' && form.id && isAdmin;
   // Kalendereintrag = per "Turnier melden" eingereicht (registrationEnabled=false), nur die
@@ -245,7 +246,11 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
   return (
     <form className="form dense" onSubmit={onSubmit}>
       {showMailNotEnabledHint && (
-        <p className="feedback offline">{MAIL_NOT_ENABLED_HINT_TEMPLATES[language] || MAIL_NOT_ENABLED_HINT_TEMPLATES.de}</p>
+        <div className="mail-disabled-notice" role="note">
+          <strong>{t('E-Mail-Versand nicht freigeschaltet')}</strong>
+          <p>{t('Statusmeldungen zu diesem Turnier (z. B. neue Anmeldungen und Stornierungen) landen nur in deinem internen Postfach und werden nicht per E-Mail verschickt.')}</p>
+          <p>{t('Auch Teilnehmer erhalten keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails, bis ein Admin den E-Mail-Versand freischaltet. Anmeldungen und Stornierungen funktionieren normal.')}</p>
+        </div>
       )}
       <TournamentNameField value={form.name} onChange={(name) => setForm({ ...form, name })} />
       <div className="form-grid">

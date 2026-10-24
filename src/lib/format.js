@@ -10,14 +10,6 @@ export const TIMEZONE_HINT_TEMPLATES = {
   fr: (timeZone) => `Remarque : la date, l'heure de début et les horaires d'inscription de ce tournoi sont dans le fuseau horaire du lieu : ${timeZone}. Votre fuseau horaire est différent.`,
 };
 
-export const MAIL_NOT_ENABLED_HINT_TEMPLATES = {
-  de: 'Hinweis: Der E-Mail-Versand für deine Turniere ist noch nicht von einem Admin freigeschaltet. Anmeldungen und Stornierungen funktionieren normal, es werden aber keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails verschickt, bis die Freischaltung erfolgt ist.',
-  nl: "Let op: het versturen van e-mails voor jouw toernooien is nog niet door een beheerder vrijgegeven. Aanmelden en afmelden werken normaal, maar er worden geen bevestigings-, herinnerings- of broadcastmails verstuurd totdat dit is vrijgegeven.",
-  en: 'Note: email sending for your tournaments has not yet been approved by an admin. Registrations and cancellations work normally, but no confirmation, reminder or broadcast emails will be sent until this is approved.',
-  es: 'Aviso: el envío de correos para tus torneos aún no ha sido aprobado por un administrador. Las inscripciones y cancelaciones funcionan con normalidad, pero no se enviará ningún correo de confirmación, recordatorio o difusión hasta que se apruebe.',
-  fr: "Remarque : l'envoi d'e-mails pour vos tournois n'a pas encore été validé par un administrateur. Les inscriptions et annulations fonctionnent normalement, mais aucun e-mail de confirmation, de rappel ou de diffusion ne sera envoyé tant que la validation n'a pas eu lieu.",
-};
-
 export const REGISTRATION_OPENS_TEMPLATES = {
   de: (dateTime) => `Die Anmeldung für dieses Turnier ist ab ${dateTime} möglich.`,
   nl: (dateTime) => `Inschrijving voor dit toernooi is mogelijk vanaf ${dateTime}.`,

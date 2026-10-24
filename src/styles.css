@@ -498,6 +498,22 @@ textarea:focus {
   color: #8a5a00;
 }
 
+/* Deutlicher Warnkasten im Turnierformular: ohne Mail-Freischaltung gehen Statusmeldungen nur ins Postfach. */
+.mail-disabled-notice {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 12px 14px 12px 44px;
+  border: 2px solid #e0a100;
+  border-radius: 8px;
+  background: #fff4e0 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a5a00' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'/%3E%3Cpath d='M12 9v4M12 17h.01'/%3E%3C/svg%3E") no-repeat 14px 14px / 20px 20px;
+  color: #6b4500;
+  overflow-wrap: anywhere;
+}
+
+.mail-disabled-notice strong { font-size: 1.05rem; }
+.mail-disabled-notice p { margin: 0; }
+
 .field-invalid {
   border: 2px solid #c62828 !important;
   background: #fff0f0;
