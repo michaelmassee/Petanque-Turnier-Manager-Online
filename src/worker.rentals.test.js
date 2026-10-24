@@ -237,7 +237,7 @@ describe('Platz mieten', () => {
     const reservation = (await (await reserve(offer.id, { lanes: 4 })).json()).reservation;
     // Altbestand aus der Zeit vor der spielortübergreifenden Prüfung.
     sql(`INSERT INTO rental_reservations SELECT 'legacy', offer_id, 'u3', local_date, start_hour, hours, lanes,
-      start_utc, end_utc, status, note, decision_note, decided_by, decided_at, created_at, updated_at, whole, persons
+      start_utc, end_utc, status, note, decision_note, decided_by, decided_at, created_at, updated_at, whole, persons, internal_note
       FROM rental_reservations WHERE id = ?`, reservation.id);
     const result = await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
     expect(result.status).toBe(409);
@@ -330,6 +330,35 @@ describe('Platz mieten', () => {
     expect(manage.places).toEqual([expect.objectContaining({ id: 'p1', courtCount: 8 })]);
     expect(manage.reservations).toEqual([expect.objectContaining({ renterName: 'Max Mieter', renterEmail: 'mieter@example.test', note: 'Vereinstraining', persons: 4, status: 'requested' })]);
     expect((await call('DELETE', `/api/rentals/offers/${offer.id}`, { headers: VEREIN })).status).toBe(409);
+  });
+
+  it('lässt Verwalter jederzeit eine interne Notiz je Reservierung pflegen, die der Mieter nie sieht', async () => {
+    const offer = await createOffer();
+    const reservation = (await (await reserve(offer.id, {})).json()).reservation;
+    const note = 'ptm-richtext:v1:{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Schlüssel bei Vera"}]}]}';
+    const setNote = (internalNote, headers = VEREIN) => call('PUT', `/api/rentals/reservations/${reservation.id}/internal-note`, { body: { internalNote }, headers });
+
+    expect((await setNote(note, MIETER)).status).toBe(403);
+    expect((await setNote(note, ANDERER)).status).toBe(403);
+    expect((await call('PUT', '/api/rentals/reservations/unbekannt/internal-note', { body: { internalNote: note }, headers: VEREIN })).status).toBe(404);
+    expect((await setNote('ptm-richtext:v1:{"type":"kaputt"}')).status).toBe(400);
+    const saved = await setNote(note);
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toEqual({ internalNote: note });
+
+    const manage = await (await call('GET', '/api/rentals/manage?club=c1', { headers: VEREIN })).json();
+    expect(manage.reservations[0].internalNote).toBe(note);
+    const calendar = await (await call('GET', `/api/rentals/${offer.id}/availability?from=2026-10-24`, { headers: VEREIN })).json();
+    expect(calendar.bookings[0].internalNote).toBe(note);
+    // Mieter sehen die Notiz weder in „Meine Reservierungen“ noch im Kalender.
+    const mine = await (await call('GET', '/api/rentals/reservations/mine', { headers: MIETER })).json();
+    expect(mine.reservations[0]).not.toHaveProperty('internalNote');
+    const publicCalendar = await (await call('GET', `/api/rentals/${offer.id}/availability?from=2026-10-24`, { headers: MIETER })).json();
+    expect(JSON.stringify(publicCalendar)).not.toContain('Schlüssel');
+
+    // Auch nach der Entscheidung änderbar; leer entfernt die Notiz.
+    await call('POST', `/api/rentals/reservations/${reservation.id}/decision`, { body: { decision: 'confirm' }, headers: VEREIN });
+    expect(await (await setNote('')).json()).toEqual({ internalNote: null });
   });
 
   it('blendet Angebote nicht freigegebener Vereine öffentlich aus und kennzeichnet sie in der Verwaltung', async () => {

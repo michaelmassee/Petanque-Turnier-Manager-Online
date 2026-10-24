@@ -482,6 +482,37 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     expect(await screen.findByText('Der Mieter wurde benachrichtigt.')).toBeInTheDocument();
   });
 
+  it('zeigt und speichert die interne Notiz je Reservierung, auch bei bestätigten', async () => {
+    const note = 'ptm-richtext:v1:{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Schlüssel bei Vera"}]}]}';
+    const onWrite = vi.fn(async () => ({ internalNote: note }));
+    mockManagement(onWrite);
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+
+    const confirmedRow = (await screen.findByText(/Anna Anders/)).closest('article');
+    expect(within(confirmedRow).queryByText('Schlüssel bei Vera')).not.toBeInTheDocument();
+    fireEvent.click(within(confirmedRow).getByRole('button', { name: 'Interne Notiz' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Nur für Verwalter dieses Angebots sichtbar, nicht für den Mieter.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(onWrite).toHaveBeenCalledWith('/api/rentals/reservations/r2/internal-note', expect.objectContaining({ method: 'PUT' })));
+    expect(await screen.findByText('Interne Notiz gespeichert.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(within(confirmedRow).getByText('Schlüssel bei Vera')).toBeInTheDocument();
+  });
+
+  it('meldet Fehler beim Speichern der internen Notiz im Dialog', async () => {
+    mockManagement(vi.fn(async () => { throw new Error('Ungültige interne Notiz'); }));
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Interne Notiz' }))[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    expect(await within(dialog).findByText('Ungültige interne Notiz')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('bietet Admins alle Vereine an, die eigenen zuerst', async () => {
     authenticatedApi.mockImplementation(async (path) => {
       if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };

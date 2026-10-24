@@ -2176,6 +2176,11 @@ export default {
         const session = await requireSession(request, env.DB);
         return await decideRentalReservation(request, env, rentalDecisionMatch[1], session.user, url.origin);
       }
+      const rentalInternalNoteMatch = url.pathname.match(/^\/api\/rentals\/reservations\/([^/]+)\/internal-note$/);
+      if (rentalInternalNoteMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        return await updateRentalInternalNote(request, env.DB, rentalInternalNoteMatch[1], session.user);
+      }
       const rentalOfferMatch = url.pathname.match(/^\/api\/rentals\/([^/]+)$/);
       if (rentalOfferMatch && request.method === 'GET') {
         const session = await optionalSession(request, env.DB);
@@ -9947,7 +9952,7 @@ function toRentalReservation(row, { withRenter = false } = {}) {
     ...(row.offer_title ? { offerTitle: row.offer_title, placeName: row.place_name, venueType: row.venue_type || 'outdoor', clubName: row.club_name, timezone: row.timezone } : {}),
     ...(withRenter ? {
       renterName: rentalPersonName(row, 'renter_'), renterEmail: row.renter_email || null, renterPhone: row.renter_phone || null,
-      decidedByName: rentalPersonName(row, 'decider_') || null,
+      decidedByName: rentalPersonName(row, 'decider_') || null, internalNote: row.internal_note || null,
     } : {}),
   };
 }
@@ -10052,8 +10057,8 @@ async function getRentalAvailability(db, id, fromParam, user, monthParam = null)
   return json({
     from, today: now.date, days: availability,
     bookings: (bookings.results || []).map((booking) => {
-      const { id: bookingId, date, startHour, hours, lanes, whole, persons, status, renterName, decidedByName, decidedAt } = toRentalReservation(booking, { withRenter: true });
-      return { id: bookingId, date, startHour, hours, lanes, whole, persons, status, renterName, decidedByName, decidedAt };
+      const { id: bookingId, date, startHour, hours, lanes, whole, persons, status, renterName, decidedByName, decidedAt, internalNote } = toRentalReservation(booking, { withRenter: true });
+      return { id: bookingId, date, startHour, hours, lanes, whole, persons, status, renterName, decidedByName, decidedAt, internalNote };
     }),
   });
 }
@@ -10337,6 +10342,17 @@ async function decideRentalReservation(request, env, reservationId, user, origin
   const updated = { ...reservation, status: decision.to, decision_note: note, decided_by: user.id, decided_at: now, updated_at: now };
   await notifyRentalRenter(env, { offer, reservation: updated, manager: user, origin });
   return json({ reservation: toRentalReservation(updated) });
+}
+
+// Interne Notiz der Verwalter: unabhängig vom Status jederzeit änderbar, dem Mieter nie sichtbar.
+async function updateRentalInternalNote(request, db, reservationId, user) {
+  const body = await readJson(request);
+  const reservation = await db.prepare('SELECT id, offer_id FROM rental_reservations WHERE id = ?').bind(reservationId).first();
+  if (!reservation) throw new HttpError(404, 'Reservierung nicht gefunden');
+  await assertRentalOfferManager(db, await loadRentalOffer(db, reservation.offer_id), user);
+  const internalNote = normalizeRichText(body.internalNote, 'Ungültige interne Notiz');
+  await db.prepare('UPDATE rental_reservations SET internal_note = ?, updated_at = ? WHERE id = ?').bind(internalNote, new Date().toISOString(), reservationId).run();
+  return json({ internalNote });
 }
 
 // Vereinsverwalter sehen alle Angebote des Vereins, Angebotsverwalter nur die ihnen zugeordneten (offerScope).

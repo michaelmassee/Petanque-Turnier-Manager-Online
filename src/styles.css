@@ -4901,4 +4901,6 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
 .button.opening-reminder-icon[aria-pressed="true"] { color: #0a5fd1; border-color: #1677ff; background: #ecf4ff; }
 .button.opening-reminder-icon[aria-busy="true"] svg { display: none; }
 .rental-bookings { margin-top: 16px; }
+.rental-internal-note { display: grid; gap: 2px; margin-top: 6px; padding: 6px 10px; border-left: 3px solid #c7d0df; background: #f6f8fb; border-radius: 4px; overflow-wrap: anywhere; }
+.rental-internal-note .rich-text, .rental-internal-note .rich-text-plain { margin: 0; }
 .rental-bookings h3 { margin-bottom: 8px; }

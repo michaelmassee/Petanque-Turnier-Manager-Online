@@ -31,7 +31,19 @@ function confirmedByLine(t, reservation, language, timeZone) {
 }
 
 // Belegung der angezeigten Woche mit Mietern – liefert der Server nur Verwaltern des Angebots (Datenschutz).
-function RentalBookingList({ bookings, offer, language }) {
+// Interne Notiz der Verwalter; die API liefert sie nur an Verwalter des Angebots.
+function RentalInternalNote({ note, navigate }) {
+  const { t } = useTranslation();
+  if (!note) return null;
+  return (
+    <div className="rental-internal-note">
+      <small className="muted">{t('Interne Notiz')}</small>
+      <RichText value={note} onNavigate={navigate} />
+    </div>
+  );
+}
+
+function RentalBookingList({ bookings, offer, language, navigate }) {
   const { t } = useTranslation();
   return (
     <section className="rental-bookings">
@@ -47,6 +59,7 @@ function RentalBookingList({ bookings, offer, language }) {
                   {' · '}{t(RESERVATION_STATUS_LABELS[booking.status])}
                 </span>
                 {confirmedByLine(t, booking, language, offer.timezone) && <span data-i18n-skip>{confirmedByLine(t, booking, language, offer.timezone)}</span>}
+                <RentalInternalNote note={booking.internalNote} navigate={navigate} />
               </div>
             </article>
           ))}
@@ -391,7 +404,7 @@ function RentalOfferContent({ id, language, currentUser, navigate, onLogin }) {
           : null}
         bookings={offer.canManage ? availability.bookings : undefined}
       />
-      {offer.canManage && availability.bookings && <RentalBookingList bookings={availability.bookings} offer={offer} language={language} />}
+      {offer.canManage && availability.bookings && <RentalBookingList bookings={availability.bookings} offer={offer} language={language} navigate={navigate} />}
       <Feedback message={message} />
       {selection && (
         currentUser ? (
@@ -666,6 +679,9 @@ export function RentalManagement({ language, navigate, currentUser }) {
   const [decision, setDecision] = useState(null);
   const [decisionNote, setDecisionNote] = useState('');
   const [deciding, setDeciding] = useState(false);
+  const [noteReservation, setNoteReservation] = useState(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
   const isAdmin = currentUser?.role === 'admin';
   const canManageClub = Boolean(data?.canManageClub);
   // Kandidaten für Angebotsverwalter wie bei Turnieren: alle Benutzer, erst beim Bearbeiten eines Angebots geladen.
@@ -782,6 +798,34 @@ export function RentalManagement({ language, navigate, currentUser }) {
     }
   }
 
+  function openInternalNote(reservation) {
+    setDialogError('');
+    setNoteDraft(reservation.internalNote || '');
+    setNoteReservation(reservation);
+  }
+
+  async function saveInternalNote(event) {
+    event.preventDefault();
+    setNoteSaving(true);
+    setDialogError('');
+    setMessage('');
+    try {
+      const { internalNote } = await authenticatedApi(`/api/rentals/reservations/${noteReservation.id}/internal-note`, {
+        method: 'PUT', body: JSON.stringify({ internalNote: noteDraft }),
+      });
+      setData((current) => ({
+        ...current,
+        reservations: current.reservations.map((reservation) => (reservation.id === noteReservation.id ? { ...reservation, internalNote } : reservation)),
+      }));
+      setNoteReservation(null);
+      setMessage(t('Interne Notiz gespeichert.'));
+    } catch (requestError) {
+      setDialogError(requestError.message);
+    } finally {
+      setNoteSaving(false);
+    }
+  }
+
   function openDecision(reservation, kind) {
     setDialogError('');
     setDecisionNote('');
@@ -814,8 +858,10 @@ export function RentalManagement({ language, navigate, currentUser }) {
         <span data-i18n-skip>{reservation.renterName} · {reservationScope(t, reservation)}{reservation.renterEmail ? ` · ${reservation.renterEmail}` : ''}{reservation.renterPhone ? ` · ${reservation.renterPhone}` : ''}</span>
         {reservation.note && <span data-i18n-skip>„{reservation.note}“</span>}
         {confirmedByLine(t, reservation, language, reservation.timezone) && <span data-i18n-skip>{confirmedByLine(t, reservation, language, reservation.timezone)}</span>}
+        <RentalInternalNote note={reservation.internalNote} navigate={navigate} />
       </div>
       <div className="row-actions">
+        <Button variant="secondary" onClick={() => openInternalNote(reservation)}>{t('Interne Notiz')}</Button>
         {actions.map((kind) => (
           <Button key={kind} variant={kind === 'confirm' ? 'primary' : 'danger'} onClick={() => openDecision(reservation, kind)}>{t(DECISION_LABELS[kind])}</Button>
         ))}
@@ -905,6 +951,30 @@ export function RentalManagement({ language, navigate, currentUser }) {
             <div className="dialog-actions">
               <Button variant="secondary" onClick={() => setDialog(null)}>{t('Abbrechen')}</Button>
               <Button type="submit" loading={saving}>{t('Speichern')}</Button>
+            </div>
+          </form>
+        )}
+      </EditDialog>
+
+      <EditDialog open={Boolean(noteReservation)} title={t('Interne Notiz')} subtitle={noteReservation ? `${offerTitle(noteReservation.offerId)} · ${formatReservationSlot(noteReservation, language)} · ${noteReservation.renterName}` : ''} error={dialogError} onClose={() => setNoteReservation(null)}>
+        {noteReservation && (
+          <form className="form" onSubmit={saveInternalNote}>
+            <p className="hint">{t('Nur für Verwalter dieses Angebots sichtbar, nicht für den Mieter.')}</p>
+            <RichTextEditor
+              label={t('Interne Notiz')}
+              value={noteDraft}
+              onChange={setNoteDraft}
+              boldLabel={t('Fett')}
+              italicLabel={t('Kursiv')}
+              underlineLabel={t('Unterstrichen')}
+              strikeLabel={t('Durchgestrichen')}
+              bulletListLabel={t('Aufzählung')}
+              orderedListLabel={t('Nummerierte Liste')}
+              headingLabel={t('Überschrift')}
+            />
+            <div className="dialog-actions">
+              <Button variant="secondary" onClick={() => setNoteReservation(null)}>{t('Abbrechen')}</Button>
+              <Button type="submit" loading={noteSaving}>{t('Speichern')}</Button>
             </div>
           </form>
         )}
