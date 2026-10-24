@@ -157,7 +157,6 @@ export function tournamentPayload(form) {
     formation: form.formation,
     registrationType: form.registrationType,
     schweizerRankingMode: form.schweizerRankingMode || 'mit_buchholz',
-    formuleXRounds: Number(form.formuleXRounds || 4),
     koPlatz3: form.koPlatz3 === undefined ? true : Boolean(form.koPlatz3),
     status: form.status,
     maxRegistrations: Number(form.maxRegistrations || 0),

@@ -370,15 +370,6 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               disabled={form.status === 'running' || form.status === 'finished'}
             />
           )}
-          {form.type === 'formule_x' && (
-            <IntegerField
-              label={t('Anzahl Runden')}
-              min={1}
-              max={20}
-              value={form.formuleXRounds || 4}
-              onChange={(formuleXRounds) => setForm({ ...form, formuleXRounds })}
-            />
-          )}
           {form.type === 'ko' && (
             <label className="checkbox-field">
               <input
@@ -925,7 +916,6 @@ export function tournamentToForm(tournament) {
     formation: tournament.formationOther ? 'andere' : (tournament.formation || 'doublette'),
     registrationType: tournament.registrationType || 'forme',
     schweizerRankingMode: tournament.schweizerRankingMode || 'mit_buchholz',
-    formuleXRounds: tournament.formuleXRounds || 4,
     koPlatz3: tournament.koPlatz3 === undefined ? true : Boolean(tournament.koPlatz3),
     status: tournament.status || 'draft',
     maxRegistrations: tournament.maxRegistrations || 0,

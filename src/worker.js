@@ -5508,10 +5508,10 @@ async function createTournament(request, env, user) {
     .prepare(
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
-        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
+        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, phone_required, website_url, logo_url, flyer_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, live_view_enabled, player_result_reporting_enabled, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -5534,7 +5534,6 @@ async function createTournament(request, env, user) {
       tournament.entryFeeCents,
       tournament.currency,
       tournament.schweizerRankingMode,
-      tournament.formuleXRounds,
       tournament.koPlatz3 ? 1 : 0,
       tournament.contactName,
       tournament.contactEmail,
@@ -5634,12 +5633,12 @@ export async function duplicateTournament(db, existing, actingUser) {
     .prepare(
       `INSERT INTO tournaments (
         id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
-        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
+        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, phone_required, website_url, logo_url, flyer_url, whatsapp_group_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, player_result_reporting_enabled, qr_design, created_at, updated_at
       )
       SELECT ?, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
-        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, formule_x_rounds, ko_platz3, contact_name, contact_email, contact_phone,
+        max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, phone_required, website_url, logo_url, flyer_url, whatsapp_group_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, player_result_reporting_enabled, qr_design, ?, ?
       FROM tournaments WHERE id = ?`,
@@ -5842,7 +5841,7 @@ async function updateTournament(request, env, existing, user) {
     .prepare(
       `UPDATE tournaments
        SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
-           formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, schweizer_ranking_mode = ?, formule_x_rounds = ?, ko_platz3 = ?,
+           formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, schweizer_ranking_mode = ?, ko_platz3 = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
            participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, waitlist_auto_promote = ?, registration_enabled = ?, approval_required = ?, phone_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, boule_place_id = ?, live_view_enabled = ?, player_result_reporting_enabled = ?, updated_at = ?
        WHERE id = ?`,
@@ -5865,7 +5864,6 @@ async function updateTournament(request, env, existing, user) {
       tournament.entryFeeCents,
       tournament.currency,
       tournament.schweizerRankingMode,
-      tournament.formuleXRounds,
       tournament.koPlatz3 ? 1 : 0,
       tournament.contactName,
       tournament.contactEmail,
@@ -7155,11 +7153,9 @@ export async function generateTournamentRound(db, tournament) {
   try {
     const strategyOptions = isSchweizer
       ? { mode: tournament.schweizer_ranking_mode }
-      : isFormuleX
-        ? { formuleXRounds: tournament.formule_x_rounds }
-        : isKo
-          ? { platz3: !!tournament.ko_platz3 }
-          : { formation: tournament.formation };
+      : isKo
+        ? { platz3: !!tournament.ko_platz3 }
+        : { formation: tournament.formation };
     ({ matches } = strategy.generateRound(players, history, strategyOptions));
   } catch (error) {
     // generateRound prüft die Mindestvoraussetzungen (u.a. mind. 4 bestätigte
@@ -8131,8 +8127,7 @@ async function syncDeleteRound(db, tournament, roundNumberValue) {
 }
 
 /**
- * Spieleinstellungen aus dem Turnierdokument (Formation, Schweizer Ranglistenmodus, Formule-X-Rundenzahl, Spiel um
- * Platz 3). Das Dokument ist Master; anders als im Web-Bearbeiten gilt keine Sperre nach dem Start.
+ * Spieleinstellungen aus dem Turnierdokument (Formation, Schweizer Ranglistenmodus, Spiel um Platz 3). Das Dokument ist Master; anders als im Web-Bearbeiten gilt keine Sperre nach dem Start.
  */
 export async function syncPutTournamentSettings(request, db, tournament) {
   const columns = normalizeSyncSettings(await readJson(request), tournament);
@@ -12425,7 +12420,6 @@ export function toPublicTournament(row, user) {
     club: row.club || null,
     registrationType: row.registration_type || 'forme',
     schweizerRankingMode: row.schweizer_ranking_mode || 'mit_buchholz',
-    formuleXRounds: Number(row.formule_x_rounds || 4),
     koPlatz3: row.ko_platz3 === undefined ? true : Boolean(Number(row.ko_platz3)),
     status: row.status,
     maxRegistrations: Number(row.max_registrations || 0),

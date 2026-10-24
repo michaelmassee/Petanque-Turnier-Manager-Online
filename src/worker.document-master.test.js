@@ -97,11 +97,11 @@ describe('Verbundenes Turnier: Dokument ist Master', () => {
       sql("UPDATE tournaments SET status = 'running', desktop_execution = 1 WHERE id = 't1'");
       sql("DELETE FROM registrations WHERE tournament_id = 't1'");
 
-      const response = await settings({ formation: 'triplette', schweizerRankingMode: 'mit_buchholz', formuleXRounds: 6, koPlatz3: false });
+      const response = await settings({ formation: 'triplette', schweizerRankingMode: 'mit_buchholz', koPlatz3: false });
 
       expect(response.status).toBe(200);
       expect(turnier()).toMatchObject({ formation: 'triplette', formation_other: 0, schweizer_ranking_mode: 'mit_buchholz',
-        formule_x_rounds: 6, ko_platz3: 0 });
+        ko_platz3: 0 });
     });
 
     it('lehnt eine Formationsänderung ab, sobald Anmeldungen vorliegen', async () => {
@@ -112,28 +112,36 @@ describe('Verbundenes Turnier: Dokument ist Master', () => {
     });
 
     it('übernimmt die unveränderte Formation trotz Anmeldungen', async () => {
-      const response = await settings({ formation: 'tete', formuleXRounds: 5 });
+      const response = await settings({ formation: 'tete', koPlatz3: false });
 
       expect(response.status).toBe(200);
-      expect(turnier()).toMatchObject({ formation: 'tete', formule_x_rounds: 5 });
+      expect(turnier()).toMatchObject({ formation: 'tete', ko_platz3: 0 });
     });
 
     it('übernimmt nur die übergebenen Werte', async () => {
-      await settings({ formuleXRounds: 5 });
+      await settings({ koPlatz3: false });
 
-      expect(turnier()).toMatchObject({ formation: 'tete', schweizer_ranking_mode: 'ohne_buchholz', formule_x_rounds: 5 });
+      expect(turnier()).toMatchObject({ formation: 'tete', schweizer_ranking_mode: 'ohne_buchholz', ko_platz3: 0 });
+    });
+
+    it('ignoriert die Formule-X-Rundenzahl älterer PTM-Versionen', async () => {
+      const vorher = turnier();
+
+      const response = await settings({ formuleXRounds: 0 });
+
+      expect(response.status).toBe(200);
+      expect(turnier()).toMatchObject({ formule_x_rounds: vorher.formule_x_rounds, updated_at: vorher.updated_at });
     });
 
     it('lehnt ungültige Werte ab', async () => {
       await expect(settings({ formation: 'quadrette' })).rejects.toMatchObject({ status: 400 });
-      await expect(settings({ formuleXRounds: 0 })).rejects.toMatchObject({ status: 400 });
       await expect(settings({ koPlatz3: 'ja' })).rejects.toMatchObject({ status: 400 });
       sql("UPDATE tournaments SET registration_type = 'melee' WHERE id = 't1'");
       await expect(settings({ formation: 'tete' })).rejects.toMatchObject({ status: 400 });
     });
 
     it('verlangt die Schreib-Lease des verbundenen Dokuments', async () => {
-      const request = syncAnfrage('PUT', '/api/sync/tournaments/t1/settings', { formuleXRounds: 5 }, { lease: 'falsch-falsch-falsch-falsch-falsch-falsch' });
+      const request = syncAnfrage('PUT', '/api/sync/tournaments/t1/settings', { koPlatz3: false }, { lease: 'falsch-falsch-falsch-falsch-falsch-falsch' });
 
       await expect(executeSyncWrite(request, env.DB, turnier(), (db) => syncPutTournamentSettings(request, db, turnier())))
         .rejects.toMatchObject({ status: 409 });

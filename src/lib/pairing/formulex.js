@@ -18,9 +18,10 @@ function shuffle(items) {
 
 function pairKey(a, b) { return a < b ? `${a}|${b}` : `${b}|${a}`; }
 
-// Siegaufschlag hängt von den BISHER GESPIELTEN Runden ab, nicht von der konfigurierten
-// Gesamtrundenzahl - er wird bei jeder Neuberechnung frisch bestimmt und rückwirkend auf
-// die gesamte Historie angewendet (siehe FormuleXRanglisteSheet.leseAlleRunden).
+// Siegaufschlag hängt von den BISHER GESPIELTEN Runden ab (eine feste Gesamtrundenzahl gibt
+// es nicht, die Turnierleitung beendet das Turnier selbst) - er wird bei jeder Neuberechnung
+// frisch bestimmt und rückwirkend auf die gesamte Historie angewendet (siehe
+// FormuleXRanglisteSheet.leseAlleRunden).
 export function getSiegaufschlag(roundsPlayed) {
   if (roundsPlayed <= 4) return 100;
   if (roundsPlayed <= 8) return 200;
@@ -31,16 +32,13 @@ export { pairingsPerRound };
 
 export const MIN_TEAMS = 4;
 
-export function checkRequirements(confirmedCount, { registrationType, roundsPlayed = 0, formuleXRounds = 4 } = {}) {
+export function checkRequirements(confirmedCount, { registrationType } = {}) {
   if (confirmedCount < MIN_TEAMS) {
     return [{ type: 'minPlayers', min: MIN_TEAMS }];
   }
   // Mêlée-Spieler werden vor der ersten Runde zu festen Teams ausgelost (siehe melee.js).
   if (registrationType && !FIXED_TEAM_REGISTRATION_TYPES.includes(registrationType)) {
     return [{ type: 'message', text: 'Formule X ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.' }];
-  }
-  if (roundsPlayed >= formuleXRounds) {
-    return [{ type: 'message', text: 'Alle Runden wurden bereits gespielt.' }];
   }
   return [];
 }
@@ -187,15 +185,12 @@ function firstRound(teams) {
 }
 
 // history: bisherige Matches dieses Turniers ({ teamA: [teamId], teamB: [teamId], scoreA, scoreB, noShow }).
-export function generateRound(teams, history, { formuleXRounds = 4 } = {}) {
+export function generateRound(teams, history) {
   if (teams.length < 2) {
     throw new Error('Für eine Runde werden mindestens 2 Teams benötigt.');
   }
   const perRound = pairingsPerRound(teams.length);
   const roundsPlayed = Math.floor((history?.length || 0) / perRound);
-  if (roundsPlayed >= formuleXRounds) {
-    throw new Error('Alle Runden wurden bereits gespielt.');
-  }
 
   if (!history?.length) {
     return { matches: firstRound(teams) };

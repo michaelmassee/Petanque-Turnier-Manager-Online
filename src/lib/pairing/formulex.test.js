@@ -241,11 +241,9 @@ describe('Formule X - Rangliste (FormuleXRanglisteRechnerTest)', () => {
 
 describe('Formule X - Voraussetzungen und Rundenende', () => {
   it('liefert für den Worker dieselben verbindlichen Voraussetzungen wie die UI', () => {
-    const tournament = { type: 'formule_x', registrationType: 'melee', formuleXRounds: 4 };
+    const tournament = { type: 'formule_x', registrationType: 'melee' };
     expect(roundRequirementMessage(checkRoundRequirements(tournament, 3, 0)[0]))
       .toBe('Für eine Runde werden mindestens 4 bestätigte Meldungen benötigt.');
-    expect(roundRequirementMessage(checkRoundRequirements({ ...tournament, registrationType: 'forme' }, 4, 4)[0]))
-      .toBe('Alle Runden wurden bereits gespielt.');
     expect(roundRequirementMessage(checkRoundRequirements(tournament, 3, 0)[0], { teams: true }))
       .toBe('Für eine Runde werden mindestens 4 Teams benötigt.');
     expect(checkRoundRequirements(tournament, 4, 0)).toEqual([]);
@@ -263,15 +261,13 @@ describe('Formule X - Voraussetzungen und Rundenende', () => {
     ]);
   });
 
-  it('meldet Turnierende, wenn die konfigurierte Rundenzahl erreicht ist', () => {
-    expect(checkRequirements(6, { registrationType: 'forme', roundsPlayed: 4, formuleXRounds: 4 })).toEqual([
-      { type: 'message', text: 'Alle Runden wurden bereits gespielt.' },
-    ]);
+  it('hat keine feste Rundenzahl - auch nach vielen Runden gibt es kein automatisches Turnierende', () => {
+    expect(checkRoundRequirements({ type: 'formule_x', registrationType: 'forme' }, 6, 12)).toEqual([]);
   });
 
-  it('generateRound wirft, wenn alle konfigurierten Runden bereits gespielt sind', () => {
+  it('generateRound lost auch nach 4 gespielten Runden eine weitere Runde aus', () => {
     const teams = teamsOf(4);
     const history = Array.from({ length: 2 * 4 }, (_, i) => ({ teamA: [teams[i % 4].id], teamB: [teams[(i + 1) % 4].id], scoreA: 13, scoreB: 5 }));
-    expect(() => generateRound(teams, history, { formuleXRounds: 4 })).toThrow('Alle Runden wurden bereits gespielt.');
+    expect(generateRound(teams, history).matches).toHaveLength(2);
   });
 });

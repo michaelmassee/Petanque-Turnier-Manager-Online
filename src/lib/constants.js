@@ -165,7 +165,6 @@ export const EMPTY_TOURNAMENT_FORM = {
   phoneRequired: false,
   approvalRequired: false,
   schweizerRankingMode: 'mit_buchholz',
-  formuleXRounds: 4,
   koPlatz3: true,
   websiteUrl: '',
   logoUrl: '',
