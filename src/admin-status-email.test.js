@@ -106,6 +106,19 @@ describe('Tägliche Administrator-Statusmail', () => {
     expect(env.DB.sqlite.prepare('SELECT COUNT(*) AS count FROM admin_status_reports').get().count).toBe(0);
   });
 
+  it('sendet den Bericht auch, wenn das Aufräumen alter Einträge fehlschlägt', async () => {
+    user('admin');
+    const prepare = env.DB.prepare.bind(env.DB);
+    vi.spyOn(env.DB, 'prepare').mockImplementation((statement) => {
+      if (statement.startsWith('DELETE FROM admin_postbox_messages')) throw new Error('D1 nicht verfügbar');
+      return prepare(statement);
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await send();
+    expect(env.MAIL_QUEUE.send).toHaveBeenCalledTimes(1);
+    expect(console.error).toHaveBeenCalledWith('Admin status cleanup failed', expect.any(Error));
+  });
+
   it('berechnet den Bericht für mehrere Empfänger nur einmal', async () => {
     user('admin'); user('other');
     const batch = vi.spyOn(env.DB, 'batch');

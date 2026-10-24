@@ -160,10 +160,15 @@ export async function sendAdminStatusEmails(env, jobs, scheduledTime, systemUser
   const until = new Date(scheduledTime).toISOString();
   const from = new Date(scheduledTime - DAY_MS).toISOString();
   const day = until.slice(0, 10);
-  await env.DB.prepare('DELETE FROM admin_status_reports WHERE report_day < ?')
-    .bind(new Date(scheduledTime - 7 * DAY_MS).toISOString().slice(0, 10)).run();
-  await env.DB.prepare('DELETE FROM admin_postbox_messages WHERE created_at < ?')
-    .bind(new Date(scheduledTime - 7 * DAY_MS).toISOString()).run();
+  // Aufräumen ist nachrangig: Schlägt es fehl, geht der Bericht trotzdem raus; der nächste Lauf räumt nach.
+  try {
+    await env.DB.prepare('DELETE FROM admin_status_reports WHERE report_day < ?')
+      .bind(new Date(scheduledTime - 7 * DAY_MS).toISOString().slice(0, 10)).run();
+    await env.DB.prepare('DELETE FROM admin_postbox_messages WHERE created_at < ?')
+      .bind(new Date(scheduledTime - 7 * DAY_MS).toISOString()).run();
+  } catch (error) {
+    console.error('Admin status cleanup failed', error);
+  }
   const admins = await env.DB.prepare(`SELECT u.id, u.email, u.language FROM users u
     WHERE u.role = 'admin' AND u.email_verified_at IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM admin_status_reports r WHERE r.report_day = ? AND r.user_id = u.id)`)
