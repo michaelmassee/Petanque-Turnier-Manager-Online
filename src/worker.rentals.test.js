@@ -197,6 +197,10 @@ describe('Platz mieten', () => {
     const availability = await (await call('GET', `/api/rentals/${offer.id}/availability?from=2026-10-24`)).json();
     expect(availability.days[0].slots.find((slot) => slot.hour === 10)).toEqual({ hour: 10, free: 1, requested: 0, blocked: 3, blockLabels: ['Vereinstraining'], bookable: true });
     expect(availability.days[0].slots.find((slot) => slot.hour === 12)).toEqual({ hour: 12, free: 4, requested: 0, bookable: true });
+    expect(availability.recurring).toBeUndefined();
+    // Verwalter sehen die Belegung auch in der Wochenliste.
+    const forClub = await (await call('GET', `/api/rentals/${offer.id}/availability?from=2026-10-24`, { headers: VEREIN })).json();
+    expect(forClub.recurring).toEqual([{ date: '2026-10-24', startHour: 10, hours: 2, lanes: 3, label: 'Vereinstraining' }]);
     expect((await reserve(offer.id, { lanes: 2 })).status).toBe(409);
     expect((await reserve(offer.id, { lanes: 1 })).status).toBe(201);
     // Eine Woche später gilt die Belegung nicht mehr.

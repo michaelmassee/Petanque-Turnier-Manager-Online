@@ -215,6 +215,26 @@ describe('Platz mieten: Angebot und Kalender', () => {
     expect(screen.getByRole('button', { name: /10:00: 2 von 4 Bahnen frei – Max Mieter$/ })).toBeInTheDocument();
   });
 
+  it('listet Verwaltern auch regelmäßige Belegungen der Woche chronologisch', async () => {
+    const bookings = [{ id: 'r1', date: '2026-10-24', startHour: 10, hours: 1, lanes: 2, status: 'confirmed', renterName: 'Max Mieter' }];
+    const recurring = [
+      { date: '2026-10-24', startHour: 9, hours: 1, lanes: 3, label: 'Jugend trainiert' },
+      { date: '2026-10-24', startHour: 11, hours: 2, lanes: 4, label: null },
+    ];
+    api.mockImplementation(async (path) => (path.includes('/availability') ? { ...AVAILABILITY, bookings, recurring } : { offer: { ...OFFER, canManage: true } }));
+    render(<RentalOfferView id="o1" language="de" currentUser={{ id: 'u1' }} navigate={vi.fn()} onLogin={vi.fn()} />);
+
+    const list = (await screen.findByRole('heading', { name: 'Belegung dieser Woche' })).closest('section');
+    const rows = within(list).getAllByRole('article').map((row) => row.querySelector('strong').textContent);
+    expect(rows).toEqual([
+      expect.stringMatching(/09:00–10:00 · Jugend trainiert$/),
+      expect.stringMatching(/10:00–11:00 · Max Mieter$/),
+      expect.stringMatching(/11:00–13:00 · Regelmäßige Belegung$/),
+    ]);
+    expect(within(list).getByText(/3 Bahn\(en\)/)).toBeInTheDocument();
+    expect(within(list).getAllByText(/regelmäßig belegt/)).toHaveLength(2);
+  });
+
   it.each([null, { id: 'u2' }])('entfernt Mieternamen bei Abmeldung oder Kontowechsel (%j)', async (nextUser) => {
     let manager = true;
     const bookings = [{ id: 'r1', date: '2026-10-24', startHour: 10, hours: 1, lanes: 2, status: 'confirmed', renterName: 'Max Mieter' }];

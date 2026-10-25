@@ -14,7 +14,7 @@ import {
   TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT, unreadPostboxCount,
 } from './postbox-core.js';
 import {
-  addDays, buildAvailability, dayAvailabilityStatus, formatRentalSlot, isValidLocalDate, monthRange, normalizeOfferInput, RENTAL_AVAILABILITY_DAYS, rentalBlocksConflict,
+  addDays, buildAvailability, dayAvailabilityStatus, expandRentalBlocks, formatRentalSlot, isValidLocalDate, monthRange, normalizeOfferInput, RENTAL_AVAILABILITY_DAYS, rentalBlocksConflict,
   rentalMinLanes, validateReservationRequest,
 } from './rental-core.js';
 import { CURRENCY_CODES } from './currencies.js';
@@ -10157,6 +10157,9 @@ async function getRentalAvailability(db, id, fromParam, user, monthParam = null)
       const { id: bookingId, date, startHour, hours, lanes, whole, persons, status, renterName, decidedByName, decidedAt, internalNote } = toRentalReservation(booking, { withRenter: true });
       return { id: bookingId, date, startHour, hours, lanes, whole, persons, status, renterName, decidedByName, decidedAt, internalNote };
     }),
+    // Regelmäßige Belegungen dieses Angebots (z. B. Training) gehören in die Wochenübersicht der Verwalter.
+    recurring: expandRentalBlocks(blocks.filter((block) => block.offerId === id), from, days, new Map([[id, offer.laneCount]]))
+      .map(({ localDate, startHour, hours, lanes, label }) => ({ date: localDate, startHour, hours, lanes, label })),
   });
 }
 

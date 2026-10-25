@@ -43,14 +43,32 @@ function RentalInternalNote({ note, navigate }) {
   );
 }
 
-function RentalBookingList({ bookings, offer, language, navigate }) {
+// Regelmäßige Belegung (z. B. Training) als Eintrag der Wochenübersicht; Bezeichnung vom Verein, sonst generisch.
+function RecurringBookingRow({ entry, offer, language }) {
   const { t } = useTranslation();
+  return (
+    <article className="data-row">
+      <div>
+        <strong data-i18n-skip>{formatReservationSlot(entry, language)} · {entry.label || t('Regelmäßige Belegung')}</strong>
+        <span>
+          <span data-i18n-skip>{reservationScope(t, { ...entry, whole: entry.lanes >= offer.laneCount, venueType: offer.venueType })}</span>
+          {' · '}{t('regelmäßig belegt')}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function RentalBookingList({ bookings, recurring = [], offer, language, navigate }) {
+  const { t } = useTranslation();
+  const entries = [...bookings.map((booking) => ({ ...booking, kind: 'booking' })), ...recurring.map((entry, index) => ({ ...entry, kind: 'recurring', id: `recurring-${index}` }))]
+    .sort((left, right) => left.date.localeCompare(right.date) || left.startHour - right.startHour);
   return (
     <section className="rental-bookings">
       <h3>{t('Belegung dieser Woche')}</h3>
-      {bookings.length === 0 ? <p className="muted">{t('Keine Reservierungen in dieser Woche.')}</p> : (
+      {entries.length === 0 ? <p className="muted">{t('Keine Reservierungen in dieser Woche.')}</p> : (
         <div className="user-list">
-          {bookings.map((booking) => (
+          {entries.map((booking) => booking.kind === 'recurring' ? <RecurringBookingRow key={booking.id} entry={booking} offer={offer} language={language} /> : (
             <article className="data-row" key={booking.id}>
               <div>
                 <strong data-i18n-skip>{formatReservationSlot(booking, language)} · {booking.renterName}</strong>
@@ -404,7 +422,7 @@ function RentalOfferContent({ id, language, currentUser, navigate, onLogin }) {
           : null}
         bookings={offer.canManage ? availability.bookings : undefined}
       />
-      {offer.canManage && availability.bookings && <RentalBookingList bookings={availability.bookings} offer={offer} language={language} navigate={navigate} />}
+      {offer.canManage && availability.bookings && <RentalBookingList bookings={availability.bookings} recurring={availability.recurring} offer={offer} language={language} navigate={navigate} />}
       <Feedback message={message} />
       {selection && (
         currentUser ? (
