@@ -245,6 +245,7 @@ describe('Öffentliche Meldeliste', () => {
       waitlist: [{ registrationId: null, firstName: 'Wanda', lastName: 'Warte' }],
       pending: [],
       pendingCount: 0,
+      approvalRequired: false,
     }));
 
     renderDetail(tournamentWith({}), 'teilnehmer');
@@ -260,15 +261,29 @@ describe('Öffentliche Meldeliste', () => {
       waitlist: [{ registrationId: null, firstName: 'Wanda', lastName: 'Warte' }],
       pending: [{ registrationId: null, firstName: 'Otto', lastName: 'Offen' }, { registrationId: null, firstName: 'Olga', lastName: 'Offen' }],
       pendingCount: 2,
+      approvalRequired: true,
     }));
 
-    renderDetail(tournamentWith({ approvalRequired: true }), 'teilnehmer');
+    // Der Footer folgt der Serverantwort, nicht den (womöglich veralteten) Turnierdaten im Browser.
+    renderDetail(tournamentWith({ approvalRequired: false }), 'teilnehmer');
 
     expect(await screen.findByText('Otto Offen')).toBeInTheDocument();
     const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
     expect(headings.slice(-2)).toEqual(['Warteliste', 'Wartet auf Bestätigung']);
     expect(screen.queryByRole('button', { name: 'Absagen' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Zusammenfassung')).toHaveTextContent('2 Offen1 Bestätigt1 Warteliste4 Gesamt');
+    expect(screen.getByLabelText('Zusammenfassung')).toHaveTextContent('2 Wartet auf Bestätigung1 Bestätigt1 Warteliste4 Gesamt');
+  });
+
+  it('zeigt bei Bestätigungspflicht den Offen-Badge auch ohne offene Meldungen', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({
+      participants: [{ registrationId: null, firstName: 'Anna', lastName: 'Bestätigt' }], waitlist: [], pending: [], approvalRequired: true,
+    }));
+
+    renderDetail(tournamentWith({}), 'teilnehmer');
+
+    expect(await screen.findByText('Anna Bestätigt')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Wartet auf Bestätigung' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Zusammenfassung')).toHaveTextContent('0 Wartet auf Bestätigung1 Bestätigt0 Warteliste1 Gesamt');
   });
 
   it('bietet dem eigenen Wartelisten-Team die Abmeldung an', async () => {

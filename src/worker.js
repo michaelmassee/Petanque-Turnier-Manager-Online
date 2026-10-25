@@ -6926,15 +6926,17 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
   const confirmed = result.results.filter((row) => row.status === 'confirmed');
   // Die Warteliste ist wie die Meldeliste öffentlich, in Meldereihenfolge (= Nachrückreihenfolge).
   const waitlist = result.results.filter((row) => row.status === 'waitlist');
-  // Mit Bestätigungspflicht sind offene Meldungen wie die Warteliste öffentlich, in Meldereihenfolge. Ohne
-  // Bestätigungspflicht gibt es regulär keine offenen Meldungen; Altbestände bleiben dann nur als Anzahl sichtbar.
-  const pending = approvalRequired ? result.results.filter((row) => row.status === 'pending') : [];
+  // Offene Meldungen sind wie die Warteliste öffentlich, in Meldereihenfolge. Ohne Bestätigungspflicht gibt es sie
+  // nur als Altbestand oder von Hand gesetzt; auch dann bleiben sie sichtbar, statt aus der Liste zu verschwinden.
+  const pending = result.results.filter((row) => row.status === 'pending');
 
   return json({
     participants: confirmed.map(toParticipant),
     waitlist: waitlist.map(toParticipant),
     pending: pending.map(toParticipant),
-    pendingCount: result.results.filter((row) => row.status === 'pending').length,
+    pendingCount: pending.length,
+    // Der Footer zeigt den Offen-Badge bei Bestätigungspflicht auch mit 0; maßgeblich ist der Serverstand.
+    approvalRequired,
   });
 }
 

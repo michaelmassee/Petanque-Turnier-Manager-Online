@@ -224,7 +224,7 @@ function compareByLastName(a, b) {
     || a.number - b.number;
 }
 
-function TournamentParticipants({ tournamentId, approvalRequired, language, timeZone, onMessage, onError }) {
+function TournamentParticipants({ tournamentId, language, timeZone, onMessage, onError }) {
   const { t } = useTranslation();
   const [prefs, setPrefs] = useState(loadParticipantListPrefs);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -233,7 +233,7 @@ function TournamentParticipants({ tournamentId, approvalRequired, language, time
   const [participants, setParticipants] = useState(null);
   const [waitlist, setWaitlist] = useState([]);
   const [pending, setPending] = useState([]);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [approvalRequired, setApprovalRequired] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [cancellingRegistrationId, setCancellingRegistrationId] = useState('');
@@ -247,7 +247,7 @@ function TournamentParticipants({ tournamentId, approvalRequired, language, time
           setParticipants(data.participants);
           setWaitlist(data.waitlist || []);
           setPending(data.pending || []);
-          setPendingCount(data.pendingCount || 0);
+          setApprovalRequired(Boolean(data.approvalRequired));
         }
       })
       .catch(() => {
@@ -336,11 +336,11 @@ function TournamentParticipants({ tournamentId, approvalRequired, language, time
   const visibleWaitlist = visibleEntries(numberedWaitlist);
   const visiblePending = visibleEntries(numberedPending);
   const filtering = vipFilter !== 'all' || Boolean(foldedQuery);
-  // Offene Meldungen gibt es nur bei Bestätigungspflicht; ohne sie wäre der Badge stets 0.
+  // Den Offen-Badge nur bei Bestätigungspflicht oder vorhandenen offenen Meldungen; sonst wäre er stets 0.
   const summaryItems = [
-    ...(approvalRequired ? [['pending', pendingCount]] : []),
-    ['confirmed', participants.length],
-    ['waitlist', waitlist.length],
+    ...(approvalRequired || pending.length > 0 ? [['pending', pending.length, t('Wartet auf Bestätigung')]] : []),
+    ['confirmed', participants.length, labelFor(REGISTRATION_STATUSES, 'confirmed')],
+    ['waitlist', waitlist.length, labelFor(REGISTRATION_STATUSES, 'waitlist')],
   ];
   const vipLabels = { all: t('VIP: alle'), only: t('Nur VIP'), without: t('Ohne VIP') };
 
@@ -438,9 +438,9 @@ function TournamentParticipants({ tournamentId, approvalRequired, language, time
         </>
       )}
       <div className="registration-summary" aria-label={t('Zusammenfassung')}>
-        {summaryItems.map(([status, count]) => (
+        {summaryItems.map(([status, count, label]) => (
           <span key={status} className={`status registration-${status} registration-summary-item`}>
-            <strong>{count}</strong> {labelFor(REGISTRATION_STATUSES, status)}
+            <strong>{count}</strong> {label}
           </span>
         ))}
         <span className="registration-summary-item registration-summary-total">
@@ -833,7 +833,7 @@ export function TournamentDetailPage({
               <p className="hint">
                 {t('Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.')}
               </p>
-              <TournamentParticipants tournamentId={tournament.id} approvalRequired={Boolean(tournament.approvalRequired)} language={language} timeZone={tournament.timezone} onMessage={setMessage} onError={setError} />
+              <TournamentParticipants tournamentId={tournament.id} language={language} timeZone={tournament.timezone} onMessage={setMessage} onError={setError} />
             </>
           )}
 

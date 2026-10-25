@@ -63,7 +63,7 @@ describe('Öffentliche Meldeliste', () => {
     expect(JSON.stringify(participant)).not.toContain('u1');
   });
 
-  it('zeigt offene Meldungen nur bei Bestätigungspflicht öffentlich, die Storno-ID nur dem eigenen Konto', async () => {
+  it('zeigt offene Meldungen öffentlich, die Storno-ID nur dem eigenen Konto, und meldet die Bestätigungspflicht', async () => {
     const db = d1MitSchema();
     db.sqlite.prepare(`INSERT INTO users (id, email, role, first_name, last_name, password_salt, password_hash, created_at, updated_at)
       VALUES ('u1', 'maria@example.test', 'user', 'Maria', 'Bieder', 'salt', 'hash', '2026-09-01', '2026-09-01')`).run();
@@ -74,12 +74,14 @@ describe('Öffentliche Meldeliste', () => {
       VALUES ('pending', 't1', 'Maria', 'Bieder', 'maria@example.test', 'u1', 'pending', 'inactive',
         '2026-09-01', '2026-09-01', '2026-09-01', 1, 'de')`).run();
 
+    // Ohne Bestätigungspflicht (Altbestand oder von Hand gesetzt) verschwindet die offene Meldung nicht.
     const ohnePflicht = await (await listPublicParticipants(db, 't1')).json();
-    expect(ohnePflicht).toEqual({ participants: [], waitlist: [], pending: [], pendingCount: 1 });
+    expect(ohnePflicht).toMatchObject({ participants: [], waitlist: [], pendingCount: 1, approvalRequired: false });
+    expect(ohnePflicht.pending.map((entry) => entry.firstName)).toEqual(['Maria']);
 
     const anonymous = await (await listPublicParticipants(db, 't1', null, { approvalRequired: true })).json();
     expect(anonymous.pending.map((entry) => [entry.firstName, entry.registrationId])).toEqual([['Maria', null]]);
-    expect(anonymous.pendingCount).toBe(1);
+    expect(anonymous).toMatchObject({ pendingCount: 1, approvalRequired: true });
 
     const mine = await (await listPublicParticipants(db, 't1', { id: 'u1', email: 'maria@example.test' }, { approvalRequired: true })).json();
     expect(mine.participants).toEqual([]);
