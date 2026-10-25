@@ -5035,6 +5035,7 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
   .rental-offer-row .row-actions { grid-column: 1 / -1; }
 }
 .rental-manage-club { display: grid; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e2e7f0; }
+.rental-reservation-filter { align-items: end; margin-bottom: 20px; }
 .rental-manage-section + .rental-manage-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e7f0; }
 .rental-manage-section .section-title { margin-bottom: 12px; }
 .rental-section-heading { display: flex; align-items: center; gap: 10px; }

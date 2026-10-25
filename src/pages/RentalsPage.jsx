@@ -87,6 +87,38 @@ function RentalBookingList({ bookings, recurring = [], offer, language, navigate
   );
 }
 
+// Wann die Anfrage gestellt wurde, in der Zeitzone des Angebots.
+function createdAtLine(t, reservation, language) {
+  if (!reservation.createdAt) return null;
+  return t('Erstellt am {{date}}', { date: formatTournamentDateTime(reservation.createdAt, language, reservation.timezone) });
+}
+
+const EMPTY_RESERVATION_FILTER = { offerId: '', from: '', to: '', search: '' };
+
+// Filter der Verwaltungslisten: Angebot, Reservierungsdatum von–bis (einschließlich) und Mieter (Name, E-Mail, Telefon).
+export function matchesReservationFilter(reservation, { offerId, from, to, search }) {
+  const needle = search.trim().toLowerCase();
+  return (!offerId || reservation.offerId === offerId) && (!from || reservation.date >= from) && (!to || reservation.date <= to)
+    && (!needle || [reservation.renterName, reservation.renterEmail, reservation.renterPhone].some((value) => value?.toLowerCase().includes(needle)));
+}
+
+function ReservationFilter({ filter, setFilter, offers }) {
+  const { t } = useTranslation();
+  const active = Object.values(filter).some(Boolean);
+  return (
+    <div className="form-grid-3 rental-reservation-filter">
+      {offers.length > 1 && (
+        <SelectField label={t('Angebot')} value={filter.offerId} onChange={(offerId) => setFilter({ ...filter, offerId })}
+          options={[{ value: '', label: t('Alle Angebote') }, ...offers.map((offer) => ({ value: offer.id, label: offer.title }))]} />
+      )}
+      <TextField label={t('Datum von')} type="date" value={filter.from} onChange={(from) => setFilter({ ...filter, from })} />
+      <TextField label={t('Datum bis')} type="date" value={filter.to} min={filter.from || undefined} onChange={(to) => setFilter({ ...filter, to })} />
+      <TextField label={t('Mieter')} type="search" value={filter.search} placeholder={t('Name, E-Mail oder Telefon')} onChange={(search) => setFilter({ ...filter, search })} />
+      {active && <Button variant="secondary" onClick={() => setFilter(EMPTY_RESERVATION_FILTER)}>{t('Filter zurücksetzen')}</Button>}
+    </div>
+  );
+}
+
 // Komplettmiete heißt je nach Spielort „Komplette Halle“ oder „Kompletter Platz“.
 function wholeLabel(t, venueType) {
   return venueType === 'indoor' ? t('Komplette Halle') : t('Kompletter Platz');
@@ -521,6 +553,7 @@ export function MyRentalReservations({ language, navigate }) {
               <strong data-i18n-skip>{reservation.offerTitle} · {formatReservationSlot(reservation, language)}</strong>
               <span data-i18n-skip>{reservation.placeName} · {reservation.clubName} · {reservationScope(t, reservation)}</span>
               <span className={`rental-status rental-status-${reservation.status}`}>{t(RESERVATION_STATUS_LABELS[reservation.status])}</span>
+              {createdAtLine(t, reservation, language) && <small className="muted" data-i18n-skip>{createdAtLine(t, reservation, language)}</small>}
               {reservation.decisionNote && <span data-i18n-skip>{t('Nachricht vom Verein')}: {reservation.decisionNote}</span>}
             </div>
             <div className="row-actions">
@@ -700,6 +733,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
   const [noteReservation, setNoteReservation] = useState(null);
   const [noteDraft, setNoteDraft] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
+  const [reservationFilter, setReservationFilter] = useState(EMPTY_RESERVATION_FILTER);
   const isAdmin = currentUser?.role === 'admin';
   const canManageClub = Boolean(data?.canManageClub);
   // Kandidaten für Angebotsverwalter wie bei Turnieren: alle Benutzer, erst beim Bearbeiten eines Angebots geladen.
@@ -867,8 +901,11 @@ export function RentalManagement({ language, navigate, currentUser }) {
   const canEditOffers = clubPublished && Boolean(data?.places.length);
   const canCreateOffers = canEditOffers && canManageClub;
   const offerTitle = (offerId) => data?.offers.find((offer) => offer.id === offerId)?.title || '';
-  const requests = (data?.reservations || []).filter((reservation) => reservation.status === 'requested');
-  const confirmed = (data?.reservations || []).filter((reservation) => reservation.status === 'confirmed');
+  const reservations = data?.reservations || [];
+  const filtered = reservations.filter((reservation) => matchesReservationFilter(reservation, reservationFilter));
+  const filterActive = Object.values(reservationFilter).some(Boolean);
+  const requests = filtered.filter((reservation) => reservation.status === 'requested');
+  const confirmed = filtered.filter((reservation) => reservation.status === 'confirmed');
   const reservationRow = (reservation, actions) => (
     <article className="data-row" key={reservation.id}>
       <div>
@@ -876,6 +913,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
         <span data-i18n-skip>{reservation.renterName} · {reservationScope(t, reservation)}{reservation.renterEmail ? ` · ${reservation.renterEmail}` : ''}{reservation.renterPhone ? ` · ${reservation.renterPhone}` : ''}</span>
         {reservation.note && <span data-i18n-skip>„{reservation.note}“</span>}
         {confirmedByLine(t, reservation, language, reservation.timezone) && <span data-i18n-skip>{confirmedByLine(t, reservation, language, reservation.timezone)}</span>}
+        {createdAtLine(t, reservation, language) && <small className="muted" data-i18n-skip>{createdAtLine(t, reservation, language)}</small>}
         <RentalInternalNote note={reservation.internalNote} navigate={navigate} />
       </div>
       <div className="row-actions">
@@ -897,7 +935,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
             label={t('Verein')}
             entries={clubEntries}
             value={clubId}
-            onChange={(value) => { if (value) setClubId(value); }}
+            onChange={(value) => { if (value) { setClubId(value); setReservationFilter(EMPTY_RESERVATION_FILTER); } }}
             placeholder={t('Verein suchen…')}
             emptyText={t('Keine Vereine gefunden.')}
             storageScope="rental-clubs"
@@ -908,11 +946,12 @@ export function RentalManagement({ language, navigate, currentUser }) {
       )}
       {!data && !error && <p className="muted">{t('Wird geladen…')}</p>}
       {data && <>
+        {reservations.length > 0 && <ReservationFilter filter={reservationFilter} setFilter={setReservationFilter} offers={data.offers} />}
         <section className="rental-manage-section">
           <div className="section-title">
             <div className="rental-section-heading"><h3>{t('Offene Anfragen')}</h3><span className="counter">{requests.length}</span></div>
           </div>
-          {requests.length === 0 ? <p className="muted">{t('Keine offenen Anfragen.')}</p> : (
+          {requests.length === 0 ? <p className="muted">{filterActive ? t('Keine passenden Reservierungen.') : t('Keine offenen Anfragen.')}</p> : (
             <div className="user-list">{requests.map((reservation) => reservationRow(reservation, ['confirm', 'reject']))}</div>
           )}
         </section>
@@ -920,7 +959,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
           <div className="section-title">
             <div className="rental-section-heading"><h3>{t('Bestätigte Reservierungen')}</h3><span className="counter">{confirmed.length}</span></div>
           </div>
-          {confirmed.length === 0 ? <p className="muted">{t('Keine kommenden Reservierungen.')}</p> : (
+          {confirmed.length === 0 ? <p className="muted">{filterActive ? t('Keine passenden Reservierungen.') : t('Keine kommenden Reservierungen.')}</p> : (
             <div className="user-list">{confirmed.map((reservation) => reservationRow(reservation, ['cancel']))}</div>
           )}
         </section>

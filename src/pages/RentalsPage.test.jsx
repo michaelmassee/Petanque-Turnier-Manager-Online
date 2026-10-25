@@ -101,6 +101,13 @@ describe('Reservierung aus der Zusagemail', () => {
     await waitFor(() => expect(authenticatedApi).toHaveBeenCalledWith('/api/rentals/reservations/r1/cancel', { method: 'POST' }));
     expect(await screen.findByText('Reservierung storniert.')).toBeInTheDocument();
   });
+
+  it('zeigt bei eigenen Reservierungen, wann sie erstellt wurden', async () => {
+    const reservation = { id: 'r1', offerId: 'o1', offerTitle: 'Boulehalle', date: '2099-10-24', startHour: 10, hours: 2, lanes: 2, status: 'requested', startUtc: '2099-10-24T08:00:00.000Z', createdAt: '2026-10-20T17:05:00.000Z', timezone: 'Europe/Berlin' };
+    authenticatedApi.mockResolvedValue({ reservations: [reservation] });
+    render(<MyRentalReservations language="de" navigate={vi.fn()} />);
+    expect(await screen.findByText('Erstellt am 20.10.2026, 19:05')).toBeInTheDocument();
+  });
 });
 
 describe('Platz mieten: Angebot und Kalender', () => {
@@ -483,10 +490,44 @@ describe('Platz mieten: Vereinsverwaltung', () => {
       return { ...MANAGE, offers: [OFFER, { ...OFFER, id: 'paused', title: 'Pausiertes Angebot', status: 'paused', isPublic: false }] };
     });
     render(<RentalManagement language="de" navigate={vi.fn()} />);
-    const publicRow = (await screen.findByText(OFFER.title)).closest('article');
+    const publicRow = (await screen.findByText(OFFER.title, { selector: 'strong' })).closest('article');
     expect(within(publicRow).getByRole('button', { name: 'Teilen' })).toBeInTheDocument();
-    const pausedRow = screen.getByText('Pausiertes Angebot').closest('article');
+    const pausedRow = screen.getByText('Pausiertes Angebot', { selector: 'strong' }).closest('article');
     expect(within(pausedRow).queryByRole('button', { name: 'Teilen' })).not.toBeInTheDocument();
+  });
+
+  it('filtert Anfragen und Reservierungen nach Angebot, Datum und Mieter und zeigt das Erstelldatum', async () => {
+    const reservations = [
+      { id: 'r1', offerId: 'o1', date: '2026-10-24', startHour: 9, hours: 2, lanes: 2, status: 'requested', renterName: 'Max Mieter', renterEmail: 'max@example.test', createdAt: '2026-10-20T17:05:00.000Z', timezone: 'Europe/Berlin' },
+      { id: 'r2', offerId: 'o2', date: '2026-10-31', startHour: 12, hours: 1, lanes: 1, status: 'requested', renterName: 'Otto Platz', createdAt: '2026-10-21T08:00:00.000Z', timezone: 'Europe/Berlin' },
+      { id: 'r3', offerId: 'o1', date: '2026-11-07', startHour: 10, hours: 1, lanes: 1, status: 'confirmed', renterName: 'Anna Anders', renterPhone: '0170 123', createdAt: '2026-10-22T09:30:00.000Z', timezone: 'Europe/Berlin' },
+    ];
+    authenticatedApi.mockImplementation(async (path) => {
+      if (path === '/api/clubs/mine') return { clubs: [{ id: 'c1', name: 'BC Test', canEdit: true, status: 'published' }] };
+      return { ...MANAGE, offers: [OFFER, { ...OFFER, id: 'o2', title: 'Außenplatz' }], reservations };
+    });
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+
+    const requestsSection = (await screen.findByRole('heading', { name: 'Offene Anfragen' })).closest('section');
+    const confirmedSection = screen.getByRole('heading', { name: 'Bestätigte Reservierungen' }).closest('section');
+    expect(within(requestsSection).getByText(/Max Mieter/).closest('article')).toHaveTextContent('Erstellt am 20.10.2026, 19:05');
+
+    fireEvent.change(screen.getByLabelText('Angebot'), { target: { value: 'o2' } });
+    expect(within(requestsSection).queryByText(/Max Mieter/)).not.toBeInTheDocument();
+    expect(within(requestsSection).getByText(/Otto Platz/)).toBeInTheDocument();
+    expect(within(confirmedSection).getByText('Keine passenden Reservierungen.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    fireEvent.change(screen.getByLabelText('Datum von'), { target: { value: '2026-10-25' } });
+    fireEvent.change(screen.getByLabelText('Datum bis'), { target: { value: '2026-10-31' } });
+    expect(within(requestsSection).getAllByRole('article')).toHaveLength(1);
+    expect(within(requestsSection).getByText(/Otto Platz/)).toBeInTheDocument();
+    expect(within(confirmedSection).queryByText(/Anna Anders/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    fireEvent.change(screen.getByLabelText('Mieter'), { target: { value: '0170' } });
+    expect(within(requestsSection).queryAllByRole('article')).toHaveLength(0);
+    expect(within(confirmedSection).getByText(/Anna Anders/)).toBeInTheDocument();
   });
 
   it('bestätigt eine offene Anfrage mit Nachricht', async () => {
