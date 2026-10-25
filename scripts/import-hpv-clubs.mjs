@@ -25,6 +25,8 @@ const SECOND_PLACE = {
   'boule club linden e.v.': { merge: true },
   'bornheim boules e.v.': { independent: true, name: 'Günthersburgpark' },
 };
+// Nie importieren (Entscheidung des Users).
+const EXCLUDED = new Set(['isd e.v. intosports steinbach deutschland']);
 
 const args = new Set(process.argv.slice(2));
 const target = args.has('--remote') ? '--remote' : args.has('--local') ? '--local' : null;
@@ -53,8 +55,7 @@ function url(value) {
 }
 
 function logo(picture) {
-  // Die Karte lässt teils die Dateiendung weg („06-119_k.“); auf dem Server liegt das Logo dann als .jpg.
-  const path = clean(picture).replace(/^(\.\.\/)+/, '').replace(/\.$/, '.jpg');
+  const path = clean(picture).replace(/^(\.\.\/)+/, '');
   return path.startsWith('Image/') ? new URL(path, IMAGE_BASE).href : null;
 }
 
@@ -82,7 +83,8 @@ function placeDescription(entries) {
 
 const response = await fetch(VEREINE_URL);
 if (!response.ok) throw new Error(`${VEREINE_URL}: HTTP ${response.status}`);
-const entries = JSON.parse((await response.text()).replace(/^﻿/, ''));
+const entries = JSON.parse((await response.text()).replace(/^﻿/, ''))
+  .filter((entry) => !EXCLUDED.has(key(entry.name)));
 
 const groups = new Map();
 for (const entry of entries) {
