@@ -56,7 +56,7 @@ function url(value) {
 
 function logo(picture) {
   const path = clean(picture).replace(/^(\.\.\/)+/, '');
-  return path.startsWith('Image/') ? new URL(path, IMAGE_BASE).href : null;
+  return path.startsWith('Image/') && /\.(png|jpe?g|gif)$/i.test(path) ? new URL(path, IMAGE_BASE).href : null;
 }
 
 function address(entry) {
