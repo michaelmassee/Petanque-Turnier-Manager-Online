@@ -122,15 +122,21 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
     expect(anmeldungen().map((zeile) => zeile.first_name)).toEqual(['a', 'b']);
   });
 
-  async function vipEinschalten(id) {
+  async function vipEinschalten(id, status = 'waitlist') {
     const existing = await getRegistrationWithTournament(env.DB, id);
     const request = new Request(`https://ptm.test/api/registrations/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firstName: id, lastName: 'Vorhanden', email: `${id}@example.test`, playerEmail: `${id}@example.test`, status: 'waitlist', isVip: true }),
+      body: JSON.stringify({ firstName: id, lastName: 'Vorhanden', email: `${id}@example.test`, playerEmail: `${id}@example.test`, status, isVip: true }),
     });
     expect((await updateRegistration(request, env, existing, leitung.user)).status).toBe(200);
     return env.DB.sqlite.prepare('SELECT status, confirmed_at FROM registrations WHERE id = ?').get(id);
   }
+
+  it('reaktiviert stornierte oder abgelehnte Meldungen nicht durch VIP', async () => {
+    vorhandeneAnmeldung('storniert', 'cancelled');
+
+    expect((await vipEinschalten('storniert', 'cancelled')).status).toBe('cancelled');
+  });
 
   it('bestätigt eine VIP-Meldung von der Warteliste direkt, wenn keine Bestätigung erforderlich ist', async () => {
     vorhandeneAnmeldung('a', 'confirmed');

@@ -8897,6 +8897,10 @@ async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
     .first();
   const activeCount = Number(activeCountRow?.count || 0);
   const isCurrentlyActive = current.status === 'pending' || current.status === 'confirmed';
+  // VIP holt nur Wartelisten-Meldungen nach vorn; stornierte oder abgelehnte Meldungen bleiben, wie sie sind.
+  if (!isCurrentlyActive && current.status !== 'waitlist') {
+    return;
+  }
   const overCapacity = activeCount + 1 > Number(existing.max_registrations);
 
   if (!overCapacity) {
