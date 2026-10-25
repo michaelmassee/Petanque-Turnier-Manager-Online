@@ -97,9 +97,17 @@ const PLACES = {
   'fc st. pauli von 1910 e.v.': { noPlace: 'Spielt am Platz der Republik in Hamburg-Altona (Bouleplatz des Altonaer Boule Clubs).' },
   'sg druckpétanqueung': { noPlace: 'Spielt auf dem kleinen öffentlichen Platz an der Honigfabrik, Industriestraße 125, 21107 Hamburg-Wilhelmsburg (wie SG Boulevard Wilhelmsburg).' },
 };
-// Zusätzliche Hallen (Winterbetrieb) je Verein.
+// Zusätzliche Hallen (Winterbetrieb) je Verein; placeName/courtCount überschreiben Vereinsname bzw. 0 Bahnen.
 const INDOOR = {
   'boulefreunde fehmarn e.v.': { street: 'Grüner Weg (Halle)', postcode: '23769', city: 'Fehmarn', latitude: 54.4274432, longitude: 11.196334, description: 'Im Winter dienstags 19 Uhr und samstags 15 Uhr.' },
+  // Betrieben vom Hamburger Rugby Club (hrc-rugby.de/petanque, Stand 2026-10-26); auch Gäste, Gruppen und andere Vereine.
+  'hamburger rugby club von 1950 e.v.': {
+    placeName: 'Hamburger Boulehalle', courtCount: 10, street: 'Langenhorner Chaussee 142', postcode: '22415', city: 'Hamburg-Langenhorn',
+    latitude: 53.6447517, longitude: 10.013595, verified: true,
+    description: 'Boulehalle mit 8–10 Bahnen für bis zu 50 Spieler, betrieben vom Hamburger Rugby Club. In der Hallensaison (Oktober bis April) '
+      + 'mittwochs, donnerstags, freitags und sonntags bis 22 Uhr offen für Tagesgäste, Saisongäste, Gruppen und Vereine; montags und dienstags '
+      + 'vorrangig HRC-Mitglieder, samstags Sondervermietung. Voranmeldung: boulehalle@hrc-rugby.de. Tageskarte 8 €, Saisonkarte 120 €.',
+  },
 };
 
 const args = new Set(process.argv.slice(2));
@@ -179,14 +187,14 @@ for (const entry of clubs) {
     ...(place.noPlace ? [] : [{ ...place, venueType: 'outdoor', description: placeDescription(entry) }]),
     ...(INDOOR[key(name)] ? [{ ...INDOOR[key(name)], venueType: 'indoor' }] : []),
   ];
-  for (const { street, postcode, city, latitude, longitude, venueType, description } of venues) {
+  for (const { placeName = name, courtCount = 0, verified = false, street, postcode, city, latitude, longitude, venueType, description } of venues) {
     const address = [street, [postcode, city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-    checklist.push([name, venueType, address, latitude, longitude].join(' | '));
+    checklist.push([placeName, venueType, address, latitude, longitude].join(' | '));
     // Vereinsplätze nur anlegen, wenn der Verein in diesem Lauf wirklich neu entstanden ist (kein verwaister Platz).
     statements.push(
       'INSERT INTO boule_places (id, club_id, club_name, name, address, latitude, longitude, venue_type, court_count, description, accessible, facility_codes, status, reported_by_user_id, address_unverified, created_at, updated_at) '
-      + `SELECT ${quote(crypto.randomUUID())}, ${quote(clubId)}, NULL, ${quote(name)}, ${quote(address)}, ${latitude}, ${longitude}, ${quote(venueType)}, 0, ${quote(description)}, 0, '[]', ${quote(status)}, NULL, 1, ${quote(now)}, ${quote(now)} `
-      + `WHERE EXISTS (SELECT 1 FROM clubs WHERE id = ${quote(clubId)}) AND NOT EXISTS (SELECT 1 FROM boule_places WHERE lower(trim(name)) = lower(trim(${quote(name)})) AND lower(trim(address)) = lower(trim(${quote(address)})) AND venue_type = ${quote(venueType)});`,
+      + `SELECT ${quote(crypto.randomUUID())}, ${quote(clubId)}, NULL, ${quote(placeName)}, ${quote(address)}, ${latitude}, ${longitude}, ${quote(venueType)}, ${courtCount}, ${quote(description)}, 0, '[]', ${quote(status)}, NULL, ${verified ? 0 : 1}, ${quote(now)}, ${quote(now)} `
+      + `WHERE EXISTS (SELECT 1 FROM clubs WHERE id = ${quote(clubId)}) AND NOT EXISTS (SELECT 1 FROM boule_places WHERE lower(trim(name)) = lower(trim(${quote(placeName)})) AND lower(trim(address)) = lower(trim(${quote(address)})) AND venue_type = ${quote(venueType)});`,
     );
     placeCount += 1;
   }
