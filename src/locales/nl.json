@@ -1,4 +1,5 @@
 {
+  "Wartet auf Bestätigung": "Wacht op bevestiging",
   "Die Anmeldungen wurden zeitgleich geändert. Bitte erneut versuchen.": "De inschrijvingen zijn gelijktijdig gewijzigd. Probeer het opnieuw.",
   "Gelesene Nachrichten löschen nach (Tagen)": "Gelezen berichten verwijderen na (dagen)",
   "Standard: 7 Tage ab dem ersten Lesen. Die tägliche Bereinigung läuft auch, wenn du offline bist. Eine geänderte Frist gilt beim nächsten Lauf auch für bereits gelesene Nachrichten. Maximal 25 Nachrichten bleiben gespeichert; bei neuen Nachrichten entfallen die ältesten, auch ungelesene. Andere Nutzer behalten ihre eigenen Kopien.": "Standaard: 7 dagen na de eerste keer lezen. De dagelijkse opschoning werkt ook als je offline bent. Een gewijzigde termijn geldt bij de volgende uitvoering ook voor eerder gelezen berichten. Er blijven maximaal 25 berichten bewaard; bij nieuwe berichten vervallen de oudste, ook ongelezen berichten. Andere gebruikers behouden hun eigen kopieën.",
@@ -147,7 +148,6 @@
   "Die Anmeldung wurde bereits bearbeitet": "De inschrijving is al verwerkt",
   "Eine Anmeldung kann nur über die Ablehnen-Funktion abgelehnt werden": "Een inschrijving kan alleen via de functie Afwijzen worden afgewezen",
   "Deine Anmeldung": "Jouw inschrijving",
-  "Deine Anmeldung wartet noch auf die Bestätigung der Turnierleitung und ist nur für dich sichtbar.": "Je inschrijving wacht nog op bevestiging door de toernooiorganisator en is alleen voor jou zichtbaar.",
   "Anmeldungen müssen als nicht-leeres Array übergeben werden": "Inschrijvingen moeten als niet-lege array worden opgegeven",
   "Anmeldungen müssen vom Turnierersteller bestätigt werden.": "Inschrijvingen moeten door de toernooimaker worden goedgekeurd.",
   "Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen": "Inschrijvingen laten beoordelen door de toernooileider voordat ze worden bevestigd",

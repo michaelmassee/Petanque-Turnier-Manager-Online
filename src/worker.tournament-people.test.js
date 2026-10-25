@@ -63,7 +63,7 @@ describe('Öffentliche Meldeliste', () => {
     expect(JSON.stringify(participant)).not.toContain('u1');
   });
 
-  it('zeigt unbestätigte Meldungen ausschließlich dem zugehörigen Konto', async () => {
+  it('zeigt offene Meldungen nur bei Bestätigungspflicht öffentlich, die Storno-ID nur dem eigenen Konto', async () => {
     const db = d1MitSchema();
     db.sqlite.prepare(`INSERT INTO users (id, email, role, first_name, last_name, password_salt, password_hash, created_at, updated_at)
       VALUES ('u1', 'maria@example.test', 'user', 'Maria', 'Bieder', 'salt', 'hash', '2026-09-01', '2026-09-01')`).run();
@@ -74,12 +74,16 @@ describe('Öffentliche Meldeliste', () => {
       VALUES ('pending', 't1', 'Maria', 'Bieder', 'maria@example.test', 'u1', 'pending', 'inactive',
         '2026-09-01', '2026-09-01', '2026-09-01', 1, 'de')`).run();
 
-    const anonymous = await (await listPublicParticipants(db, 't1')).json();
-    expect(anonymous).toEqual({ participants: [], waitlist: [], ownUnconfirmed: [], pendingCount: 1 });
+    const ohnePflicht = await (await listPublicParticipants(db, 't1')).json();
+    expect(ohnePflicht).toEqual({ participants: [], waitlist: [], pending: [], pendingCount: 1 });
 
-    const mine = await (await listPublicParticipants(db, 't1', { id: 'u1', email: 'maria@example.test' })).json();
+    const anonymous = await (await listPublicParticipants(db, 't1', null, { approvalRequired: true })).json();
+    expect(anonymous.pending.map((entry) => [entry.firstName, entry.registrationId])).toEqual([['Maria', null]]);
+    expect(anonymous.pendingCount).toBe(1);
+
+    const mine = await (await listPublicParticipants(db, 't1', { id: 'u1', email: 'maria@example.test' }, { approvalRequired: true })).json();
     expect(mine.participants).toEqual([]);
-    expect(mine.ownUnconfirmed).toEqual([expect.objectContaining({ registrationId: 'pending', status: 'pending' })]);
+    expect(mine.pending.map((entry) => entry.registrationId)).toEqual(['pending']);
   });
 
   it('zeigt die Warteliste öffentlich in Meldereihenfolge, die Storno-ID nur dem eigenen Konto', async () => {
@@ -95,12 +99,12 @@ describe('Öffentliche Meldeliste', () => {
 
     const anonymous = await (await listPublicParticipants(db, 't1')).json();
     expect(anonymous.participants).toEqual([]);
-    expect(anonymous.ownUnconfirmed).toEqual([]);
+    expect(anonymous.pending).toEqual([]);
     expect(anonymous.waitlist.map((entry) => [entry.firstName, entry.registrationId])).toEqual([['Wanda', null], ['Zweite', null]]);
 
     const mine = await (await listPublicParticipants(db, 't1', { id: 'u1', email: 'wanda@example.test' })).json();
     expect(mine.waitlist.map((entry) => entry.registrationId)).toEqual(['w1', null]);
-    expect(mine.ownUnconfirmed).toEqual([]);
+    expect(mine.pending).toEqual([]);
   });
 
   it('gibt dem anmeldenden Konto und verknüpften Teammitgliedern die Storno-ID', async () => {

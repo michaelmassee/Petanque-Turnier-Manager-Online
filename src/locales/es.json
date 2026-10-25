@@ -1,4 +1,5 @@
 {
+  "Wartet auf Bestätigung": "Pendiente de confirmación",
   "Die Anmeldungen wurden zeitgleich geändert. Bitte erneut versuchen.": "Las inscripciones se modificaron al mismo tiempo. Inténtalo de nuevo.",
   "Gelesene Nachrichten löschen nach (Tagen)": "Eliminar los mensajes leídos después de (días)",
   "Standard: 7 Tage ab dem ersten Lesen. Die tägliche Bereinigung läuft auch, wenn du offline bist. Eine geänderte Frist gilt beim nächsten Lauf auch für bereits gelesene Nachrichten. Maximal 25 Nachrichten bleiben gespeichert; bei neuen Nachrichten entfallen die ältesten, auch ungelesene. Andere Nutzer behalten ihre eigenen Kopien.": "Por defecto: 7 días desde la primera lectura. La limpieza diaria funciona incluso sin conexión. Un cambio de plazo también se aplica a los mensajes ya leídos en la siguiente ejecución. Se conservan como máximo 25 mensajes; los nuevos sustituyen a los más antiguos, incluso si no se han leído. Los demás usuarios conservan sus propias copias.",
@@ -147,7 +148,6 @@
   "Die Anmeldung wurde bereits bearbeitet": "La inscripción ya fue procesada",
   "Eine Anmeldung kann nur über die Ablehnen-Funktion abgelehnt werden": "Una inscripción solo puede rechazarse con la función Rechazar",
   "Deine Anmeldung": "Tu inscripción",
-  "Deine Anmeldung wartet noch auf die Bestätigung der Turnierleitung und ist nur für dich sichtbar.": "Tu inscripción está pendiente de confirmación por parte del organizador del torneo y solo tú puedes verla.",
   "Anmeldungen müssen als nicht-leeres Array übergeben werden": "Las inscripciones deben enviarse como una matriz no vacía",
   "Anmeldungen müssen vom Turnierersteller bestätigt werden.": "Las inscripciones deben ser aprobadas por el creador del torneo.",
   "Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen": "Revisar las inscripciones antes de que el organizador del torneo las confirme",

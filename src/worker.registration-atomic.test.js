@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import worker, { createRegistration } from './worker.js';
+import worker, { createRegistration, getRegistrationWithTournament, updateRegistration } from './worker.js';
 
 describe('Atomare Online-Anmeldung (T-12)', () => {
   let env;
@@ -109,6 +109,49 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
       { first_name: 'Neu', status: 'confirmed', is_vip: 1 },
     ]);
     expect(env.MAIL_QUEUE.send).toHaveBeenCalledWith(expect.objectContaining({ to: 'jung@example.test' }));
+  });
+
+  it('meldet der Turnierleitung bei voller Kapazität ohne Warteliste „ausgebucht“', async () => {
+    env.DB.sqlite.prepare("UPDATE tournaments SET waitlist_enabled = 0 WHERE id = 't1'").run();
+    vorhandeneAnmeldung('a', 'confirmed');
+    vorhandeneAnmeldung('b', 'confirmed');
+
+    await expect(anmelden({}, { session: leitung })).rejects.toMatchObject({
+      status: 409, message: 'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.',
+    });
+    expect(anmeldungen().map((zeile) => zeile.first_name)).toEqual(['a', 'b']);
+  });
+
+  async function vipEinschalten(id) {
+    const existing = await getRegistrationWithTournament(env.DB, id);
+    const request = new Request(`https://ptm.test/api/registrations/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName: id, lastName: 'Vorhanden', email: `${id}@example.test`, playerEmail: `${id}@example.test`, status: 'waitlist', isVip: true }),
+    });
+    expect((await updateRegistration(request, env, existing, leitung.user)).status).toBe(200);
+    return env.DB.sqlite.prepare('SELECT status, confirmed_at FROM registrations WHERE id = ?').get(id);
+  }
+
+  it('bestätigt eine VIP-Meldung von der Warteliste direkt, wenn keine Bestätigung erforderlich ist', async () => {
+    vorhandeneAnmeldung('a', 'confirmed');
+    vorhandeneAnmeldung('warte', 'waitlist', '2026-09-02T10:00:00.000Z');
+
+    const vip = await vipEinschalten('warte');
+
+    expect(vip.status).toBe('confirmed');
+    expect(vip.confirmed_at).not.toBeNull();
+  });
+
+  it('setzt eine VIP-Meldung von der Warteliste bei Bestätigungspflicht auf offen und verdrängt bei voller Kapazität', async () => {
+    env.DB.sqlite.prepare("UPDATE tournaments SET approval_required = 1 WHERE id = 't1'").run();
+    vorhandeneAnmeldung('a', 'confirmed');
+    vorhandeneAnmeldung('b', 'confirmed', '2026-09-02T10:00:00.000Z');
+    vorhandeneAnmeldung('warte', 'waitlist', '2026-09-03T10:00:00.000Z');
+
+    const vip = await vipEinschalten('warte');
+
+    expect(vip).toEqual({ status: 'pending', confirmed_at: null });
+    expect(env.DB.sqlite.prepare("SELECT status FROM registrations WHERE id = 'b'").get().status).toBe('waitlist');
   });
 
   it('ignoriert ein VIP-Kennzeichen aus der Selbstanmeldung', async () => {

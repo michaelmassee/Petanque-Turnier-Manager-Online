@@ -243,22 +243,39 @@ describe('Öffentliche Meldeliste', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({
       participants: [{ registrationId: null, firstName: 'Anna', lastName: 'Bestätigt' }],
       waitlist: [{ registrationId: null, firstName: 'Wanda', lastName: 'Warte' }],
-      ownUnconfirmed: [],
-      pendingCount: 2,
+      pending: [],
+      pendingCount: 0,
     }));
 
     renderDetail(tournamentWith({}), 'teilnehmer');
 
     expect(await screen.findByText('Wanda Warte')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Warteliste' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Zusammenfassung')).toHaveTextContent('2 Offen1 Bestätigt1 Warteliste');
+    expect(screen.getByLabelText('Zusammenfassung')).toHaveTextContent('1 Bestätigt1 Warteliste2 Gesamt');
+  });
+
+  it('zeigt bei Bestätigungspflicht offene Meldungen am Ende und zählt sie in der Zusammenfassung', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({
+      participants: [{ registrationId: null, firstName: 'Anna', lastName: 'Bestätigt' }],
+      waitlist: [{ registrationId: null, firstName: 'Wanda', lastName: 'Warte' }],
+      pending: [{ registrationId: null, firstName: 'Otto', lastName: 'Offen' }, { registrationId: null, firstName: 'Olga', lastName: 'Offen' }],
+      pendingCount: 2,
+    }));
+
+    renderDetail(tournamentWith({ approvalRequired: true }), 'teilnehmer');
+
+    expect(await screen.findByText('Otto Offen')).toBeInTheDocument();
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
+    expect(headings.slice(-2)).toEqual(['Warteliste', 'Wartet auf Bestätigung']);
+    expect(screen.queryByRole('button', { name: 'Absagen' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Zusammenfassung')).toHaveTextContent('2 Offen1 Bestätigt1 Warteliste4 Gesamt');
   });
 
   it('bietet dem eigenen Wartelisten-Team die Abmeldung an', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (path) => {
       if (String(path).endsWith('/participants')) return jsonResponse({
-        participants: [], waitlist: [{ registrationId: 'r1', firstName: 'Wanda', lastName: 'Warte' }], ownUnconfirmed: [],
+        participants: [], waitlist: [{ registrationId: 'r1', firstName: 'Wanda', lastName: 'Warte' }], pending: [],
       });
       if (String(path) === '/api/registrations/r1/cancel') return jsonResponse({ registration: { id: 'r1', status: 'cancelled' } });
       throw new Error(`Unerwartete Anfrage: ${path}`);
@@ -270,21 +287,19 @@ describe('Öffentliche Meldeliste', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/registrations/r1/cancel', expect.objectContaining({ method: 'POST' })));
   });
 
-  it('zeigt die eigene offene Anmeldung mit Hinweis und bietet die Abmeldung an', async () => {
-    const hint = 'Deine Anmeldung wartet noch auf die Bestätigung der Turnierleitung und ist nur für dich sichtbar.';
+  it('bietet die Abmeldung der eigenen offenen Anmeldung an', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (path) => {
       if (String(path).endsWith('/participants')) return jsonResponse({
-        participants: [], ownUnconfirmed: [{ registrationId: 'r1', firstName: 'Anna', lastName: 'Wartet', status: 'pending' }],
+        participants: [], waitlist: [], pending: [{ registrationId: 'r1', firstName: 'Anna', lastName: 'Wartet' }], pendingCount: 1,
       });
       if (String(path) === '/api/registrations/r1/cancel') return jsonResponse({ registration: { id: 'r1', status: 'cancelled' } });
       throw new Error(`Unerwartete Anfrage: ${path}`);
     });
 
-    renderDetail(tournamentWith({}), 'teilnehmer');
+    renderDetail(tournamentWith({ approvalRequired: true }), 'teilnehmer');
 
-    expect(await screen.findByText(hint)).toBeInTheDocument();
-    expect(screen.getByText('Anna Wartet')).toBeInTheDocument();
+    expect(await screen.findByText('Anna Wartet')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Absagen' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/registrations/r1/cancel', expect.objectContaining({ method: 'POST' })));
   });
@@ -292,7 +307,7 @@ describe('Öffentliche Meldeliste', () => {
   it('bietet dem angemeldeten Teammitglied die Abmeldung in der Teilnehmerliste an', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (path, options = {}) => {
-      if (String(path).endsWith('/participants')) return jsonResponse({ participants: [{ registrationId: 'r1', firstName: 'Anna', lastName: 'Anmeldung' }], ownUnconfirmed: [] });
+      if (String(path).endsWith('/participants')) return jsonResponse({ participants: [{ registrationId: 'r1', firstName: 'Anna', lastName: 'Anmeldung' }], pending: [] });
       if (String(path) === '/api/registrations/r1/cancel') return jsonResponse({ registration: { id: 'r1', status: 'cancelled' } });
       throw new Error(`Unerwartete Anfrage: ${path} ${options.method || 'GET'}`);
     });
@@ -305,7 +320,7 @@ describe('Öffentliche Meldeliste', () => {
 
   it('versteckt die Abmeldung für einen bloß sichtbaren Teilnehmer', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({
-      participants: [{ registrationId: null, firstName: 'Anna', lastName: 'Anmeldung' }], ownUnconfirmed: [],
+      participants: [{ registrationId: null, firstName: 'Anna', lastName: 'Anmeldung' }], pending: [],
     }));
 
     renderDetail(tournamentWith({}), 'teilnehmer');
@@ -328,7 +343,7 @@ describe('Ansichtsschalter der öffentlichen Meldeliste', () => {
       { firstName: 'Mia', lastName: 'Müller', club: 'BC Nord', registeredAt: '2026-09-03T12:00:00.000Z' },
     ],
     waitlist: [{ firstName: 'Wanda', lastName: 'Warte', registeredAt: '2026-09-04T09:00:00.000Z' }],
-    ownUnconfirmed: [],
+    pending: [],
   };
 
   function renderList(list = LIST) {

@@ -2429,7 +2429,9 @@ export default {
           if (!canViewParticipants(tournament, session?.user || null)) {
             throw new HttpError(403, 'Zugriff verweigert');
           }
-          return await listPublicParticipants(env.DB, tournament.id, session?.user || null);
+          return await listPublicParticipants(env.DB, tournament.id, session?.user || null, {
+            approvalRequired: Boolean(Number(tournament.approval_required || 0)),
+          });
         }
       }
 
@@ -6879,7 +6881,7 @@ async function confirmPendingRegistrations(env, tournament, appOrigin) {
   return json({ confirmedCount: confirmedRegistrations.length });
 }
 
-export async function listPublicParticipants(db, tournamentId, currentUser = null) {
+export async function listPublicParticipants(db, tournamentId, currentUser = null, { approvalRequired = false } = {}) {
   const result = await db
     .prepare(
       `SELECT id, email, first_name, last_name, club, team_name,
@@ -6924,20 +6926,14 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
   const confirmed = result.results.filter((row) => row.status === 'confirmed');
   // Die Warteliste ist wie die Meldeliste öffentlich, in Meldereihenfolge (= Nachrückreihenfolge).
   const waitlist = result.results.filter((row) => row.status === 'waitlist');
-  // Offene Meldungen gehören nicht in die öffentliche Meldeliste. Nur die angemeldete Person darf
-  // ihre eigene Meldung sehen, damit sie deren Zustand nachvollziehen und sie bei Bedarf absagen kann.
-  const ownUnconfirmed = result.results
-    .filter((row) => row.status === 'pending' && (
-      registrationBelongsToUser(row, currentUser?.id)
-      || registrationBelongsToEmail(row, currentUser?.email)
-    ))
-    .map((row) => ({ ...toParticipant(row), status: row.status }));
+  // Mit Bestätigungspflicht sind offene Meldungen wie die Warteliste öffentlich, in Meldereihenfolge. Ohne
+  // Bestätigungspflicht gibt es regulär keine offenen Meldungen; Altbestände bleiben dann nur als Anzahl sichtbar.
+  const pending = approvalRequired ? result.results.filter((row) => row.status === 'pending') : [];
 
   return json({
     participants: confirmed.map(toParticipant),
     waitlist: waitlist.map(toParticipant),
-    ownUnconfirmed,
-    // Nur die Anzahl offener Meldungen ist öffentlich (Zusammenfassung), nie Namen.
+    pending: pending.map(toParticipant),
     pendingCount: result.results.filter((row) => row.status === 'pending').length,
   });
 }
@@ -8588,8 +8584,12 @@ async function throwRegistrationRejection(db, tournament, { isManager, shareAcce
   if (syncBootstrap) {
     throw new HttpError(409, 'Anmeldung geschlossen – Turnier läuft', { code: 'tournament_running' });
   }
-  if (isManager) {
+  // Für die Turnierleitung sperrt nur ein verbundenes Turnierdokument; sonst fehlte ein Startplatz.
+  if (isManager && Number(current.desktop_execution || 0)) {
     throw new HttpError(409, 'Die Meldeliste wird nach Turnierstart ausschließlich im Turnierdokument geführt.');
+  }
+  if (isManager) {
+    throw new HttpError(409, 'Das Turnier ist ausgebucht. Eine Warteliste ist für dieses Turnier nicht aktiviert.');
   }
   const stillShared = shareAccess && current.visibility === 'private'
     && Boolean(await db.prepare('SELECT 1 FROM tournament_share_links WHERE tournament_id = ?').bind(current.id).first());
@@ -8857,6 +8857,20 @@ async function setRegistrationParticipation(db, existing, participation) {
   return json({ registration: toManagedRegistration(updated) });
 }
 
+// Wie beim Nachrücken: Offen nur bei Bestätigungspflicht, sonst direkt bestätigt.
+async function activateVipRegistration(db, registrationId) {
+  const now = new Date().toISOString();
+  await db.prepare(`UPDATE registrations
+      SET status = (SELECT CASE WHEN COALESCE(t.approval_required, 0) = 1 THEN 'pending' ELSE 'confirmed' END
+                    FROM tournaments t WHERE t.id = registrations.tournament_id),
+          confirmed_at = (SELECT CASE WHEN COALESCE(t.approval_required, 0) = 1 THEN NULL ELSE ? END
+                          FROM tournaments t WHERE t.id = registrations.tournament_id),
+          updated_at = ?
+      WHERE id = ?`)
+    .bind(now, now, registrationId)
+    .run();
+}
+
 async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
   const db = env.DB;
   const current = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
@@ -8886,12 +8900,7 @@ async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
   const overCapacity = activeCount + 1 > Number(existing.max_registrations);
 
   if (!overCapacity) {
-    if (!isCurrentlyActive) {
-      await db
-        .prepare("UPDATE registrations SET status = 'pending', updated_at = ? WHERE id = ?")
-        .bind(new Date().toISOString(), existing.id)
-        .run();
-    }
+    if (!isCurrentlyActive) await activateVipRegistration(db, existing.id);
     return;
   }
 
@@ -8900,12 +8909,7 @@ async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
     return;
   }
 
-  if (!isCurrentlyActive) {
-    await db
-      .prepare("UPDATE registrations SET status = 'pending', updated_at = ? WHERE id = ?")
-      .bind(new Date().toISOString(), existing.id)
-      .run();
-  }
+  if (!isCurrentlyActive) await activateVipRegistration(db, existing.id);
 
   await displaceRegistration(env, tournament, displace, appOrigin);
 }

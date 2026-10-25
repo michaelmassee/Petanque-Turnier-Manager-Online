@@ -1,4 +1,5 @@
 {
+  "Wartet auf Bestätigung": "En attente de confirmation",
   "Die Anmeldungen wurden zeitgleich geändert. Bitte erneut versuchen.": "Les inscriptions ont été modifiées simultanément. Veuillez réessayer.",
   "Gelesene Nachrichten löschen nach (Tagen)": "Supprimer les messages lus après (jours)",
   "Standard: 7 Tage ab dem ersten Lesen. Die tägliche Bereinigung läuft auch, wenn du offline bist. Eine geänderte Frist gilt beim nächsten Lauf auch für bereits gelesene Nachrichten. Maximal 25 Nachrichten bleiben gespeichert; bei neuen Nachrichten entfallen die ältesten, auch ungelesene. Andere Nutzer behalten ihre eigenen Kopien.": "Par défaut : 7 jours après la première lecture. Le nettoyage quotidien fonctionne même hors ligne. Une modification du délai s’applique aussi aux messages déjà lus lors de la prochaine exécution. Au maximum 25 messages sont conservés ; les nouveaux messages remplacent les plus anciens, même non lus. Les autres utilisateurs conservent leurs propres copies.",
@@ -147,7 +148,6 @@
   "Die Anmeldung wurde bereits bearbeitet": "L’inscription a déjà été traitée",
   "Eine Anmeldung kann nur über die Ablehnen-Funktion abgelehnt werden": "Une inscription ne peut être refusée que via l’action Refuser",
   "Deine Anmeldung": "Votre inscription",
-  "Deine Anmeldung wartet noch auf die Bestätigung der Turnierleitung und ist nur für dich sichtbar.": "Votre inscription attend encore la confirmation de l’organisateur et n’est visible que par vous.",
   "Anmeldungen müssen als nicht-leeres Array übergeben werden": "Les inscriptions doivent être fournies sous forme de tableau non vide",
   "Anmeldungen müssen vom Turnierersteller bestätigt werden.": "Les inscriptions doivent être approuvées par le créateur du tournoi.",
   "Anmeldungen vor der Bestätigung durch den Turnierleiter prüfen": "Vérifier les inscriptions avant que l’organisateur du tournoi ne les confirme",

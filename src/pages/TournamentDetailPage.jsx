@@ -224,7 +224,7 @@ function compareByLastName(a, b) {
     || a.number - b.number;
 }
 
-function TournamentParticipants({ tournamentId, language, timeZone, onMessage, onError }) {
+function TournamentParticipants({ tournamentId, approvalRequired, language, timeZone, onMessage, onError }) {
   const { t } = useTranslation();
   const [prefs, setPrefs] = useState(loadParticipantListPrefs);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -232,7 +232,7 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
   const searchInputRef = useRef(null);
   const [participants, setParticipants] = useState(null);
   const [waitlist, setWaitlist] = useState([]);
-  const [ownUnconfirmed, setOwnUnconfirmed] = useState([]);
+  const [pending, setPending] = useState([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [forbidden, setForbidden] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -246,7 +246,7 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
         if (!cancelled) {
           setParticipants(data.participants);
           setWaitlist(data.waitlist || []);
-          setOwnUnconfirmed(data.ownUnconfirmed || []);
+          setPending(data.pending || []);
           setPendingCount(data.pendingCount || 0);
         }
       })
@@ -312,7 +312,7 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
     );
   }
 
-  if (!participants.length && !waitlist.length && !ownUnconfirmed.length) {
+  if (!participants.length && !waitlist.length && !pending.length) {
     return (
       <>
         <p className="muted">{t('Noch keine Anmeldungen.')}</p>
@@ -323,7 +323,8 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
   // Lfd.-Nr. = Position in der Meldereihenfolge (API sortiert nach registered_at), unabhängig von Filter und Sortierung.
   const numberedParticipants = participants.map((participant, index) => ({ ...participant, number: index + 1 }));
   const numberedWaitlist = waitlist.map((participant, index) => ({ ...participant, number: index + 1 }));
-  const hasVip = [...participants, ...waitlist].some((participant) => participant.isVip);
+  const numberedPending = pending.map((participant, index) => ({ ...participant, number: index + 1 }));
+  const hasVip = [...participants, ...waitlist, ...pending].some((participant) => participant.isVip);
   const vipFilter = hasVip ? prefs.vip : 'all';
   const foldedQuery = foldText(query.trim());
   const visibleEntries = (list) => {
@@ -333,7 +334,14 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
   };
   const visibleParticipants = visibleEntries(numberedParticipants);
   const visibleWaitlist = visibleEntries(numberedWaitlist);
+  const visiblePending = visibleEntries(numberedPending);
   const filtering = vipFilter !== 'all' || Boolean(foldedQuery);
+  // Offene Meldungen gibt es nur bei Bestätigungspflicht; ohne sie wäre der Badge stets 0.
+  const summaryItems = [
+    ...(approvalRequired ? [['pending', pendingCount]] : []),
+    ['confirmed', participants.length],
+    ['waitlist', waitlist.length],
+  ];
   const vipLabels = { all: t('VIP: alle'), only: t('Nur VIP'), without: t('Ohne VIP') };
 
   const renderParticipantRow = (participant, index) => (
@@ -389,7 +397,7 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
 
   return (
     <>
-      {(participants.length > 0 || waitlist.length > 0) && (
+      {(participants.length > 0 || waitlist.length > 0 || pending.length > 0) && (
         <>
           <div className="participants-toolbar" role="toolbar" aria-label={t('Ansicht der Meldeliste')}>
             {toolbarButton(t('Lfd.-Nr.'), prefs.numbers, () => updatePrefs({ numbers: !prefs.numbers }), <NumberIcon />)}
@@ -406,7 +414,7 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
           )}
         </>
       )}
-      {filtering && !visibleParticipants.length && !visibleWaitlist.length ? (
+      {filtering && !visibleParticipants.length && !visibleWaitlist.length && !visiblePending.length ? (
         <p className="muted">{t('Keine Anmeldungen passen zum Filter.')}</p>
       ) : (
         <div className="participants-list">
@@ -421,29 +429,23 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
           </div>
         </>
       )}
-      {ownUnconfirmed.length > 0 && (
+      {visiblePending.length > 0 && (
         <>
-          <h3>{t('Deine Anmeldung')}</h3>
+          <h3>{t('Wartet auf Bestätigung')}</h3>
           <div className="participants-list">
-            {ownUnconfirmed.map((participant, index) => (
-              <div key={`${participant.registrationId}-${participant.status}-${index}`}>
-                <p className="hint">{t('Deine Anmeldung wartet noch auf die Bestätigung der Turnierleitung und ist nur für dich sichtbar.')}</p>
-                {renderParticipantRow(participant, index)}
-              </div>
-            ))}
+            {visiblePending.map(renderParticipantRow)}
           </div>
         </>
       )}
       <div className="registration-summary" aria-label={t('Zusammenfassung')}>
-        {[
-          ['pending', pendingCount],
-          ['confirmed', participants.length],
-          ['waitlist', waitlist.length],
-        ].map(([status, count]) => (
+        {summaryItems.map(([status, count]) => (
           <span key={status} className={`status registration-${status} registration-summary-item`}>
             <strong>{count}</strong> {labelFor(REGISTRATION_STATUSES, status)}
           </span>
         ))}
+        <span className="registration-summary-item registration-summary-total">
+          <strong>{summaryItems.reduce((sum, [, count]) => sum + count, 0)}</strong> {t('Gesamt')}
+        </span>
       </div>
     </>
   );
@@ -831,7 +833,7 @@ export function TournamentDetailPage({
               <p className="hint">
                 {t('Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.')}
               </p>
-              <TournamentParticipants tournamentId={tournament.id} language={language} timeZone={tournament.timezone} onMessage={setMessage} onError={setError} />
+              <TournamentParticipants tournamentId={tournament.id} approvalRequired={Boolean(tournament.approvalRequired)} language={language} timeZone={tournament.timezone} onMessage={setMessage} onError={setError} />
             </>
           )}
 
