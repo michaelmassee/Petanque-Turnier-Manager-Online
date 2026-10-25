@@ -97,7 +97,8 @@ const PLACE_FIXES = {
   'turnerbund emmendingen 1844 e.v.': { latitude: 48.120642, longitude: 7.8383247 },
   'boulefreunde rheinhausen 2010 e.v.': { latitude: 48.2399444, longitude: 7.7108669 },
   'boule-club friedrichshafen e.v.': { latitude: 47.6663313, longitude: 9.4526756 },
-  'tsv lindau von 1850 e.v.': { latitude: 47.570758, longitude: 9.676262 },
+  // Boulodrome laut BPV-Karte und Pétanque-Aktuell am Rotkreuzplatz auf der Insel (nicht am Sportplatz Schönauer Straße).
+  'tsv lindau von 1850 e.v.': { street: 'Rotkreuzplatz (Boulodrome am Kleinen See)', postcode: '88131', city: 'Lindau (Bodensee)', latitude: 47.5489672, longitude: 9.6877841 },
   'bc weingarten e.v.': { latitude: 47.79613, longitude: 9.6348736 },
   'petanque club biberach e.v.': { latitude: 48.0994479, longitude: 9.7819293 },
   'boule freaks überlingen e.v.': { latitude: 47.7606829, longitude: 9.1980772 },
