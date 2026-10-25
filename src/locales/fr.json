@@ -1,4 +1,8 @@
 {
+  "Gelesene Nachrichten löschen nach (Tagen)": "Supprimer les messages lus après (jours)",
+  "Standard: 7 Tage ab dem ersten Lesen. Die tägliche Bereinigung läuft auch, wenn du offline bist. Eine geänderte Frist gilt beim nächsten Lauf auch für bereits gelesene Nachrichten. Maximal 25 Nachrichten bleiben gespeichert; bei neuen Nachrichten entfallen die ältesten, auch ungelesene. Andere Nutzer behalten ihre eigenen Kopien.": "Par défaut : 7 jours après la première lecture. Le nettoyage quotidien fonctionne même hors ligne. Une modification du délai s’applique aussi aux messages déjà lus lors de la prochaine exécution. Au maximum 25 messages sont conservés ; les nouveaux messages remplacent les plus anciens, même non lus. Les autres utilisateurs conservent leurs propres copies.",
+  "Die Aufbewahrungsdauer muss eine ganze Zahl zwischen 1 und 365 Tagen sein": "La durée de conservation doit être un nombre entier compris entre 1 et 365 jours",
+  "Ungültige Nachrichtenauswahl": "Sélection de messages non valide",
   "Versendete E-Mails": "E-mails envoyés",
   "Vom Mailanbieter angenommene E-Mails pro Tag (UTC). Die Annahme bestätigt keine Zustellung.": "E-mails acceptés par le prestataire de messagerie par jour (UTC). L’acceptation ne confirme pas la livraison.",
   "Erfassung seit {{date}}. Frühere Versanddaten sind nicht verfügbar.": "Suivi depuis le {{date}}. Les données d’envoi antérieures ne sont pas disponibles.",

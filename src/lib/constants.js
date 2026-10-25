@@ -104,6 +104,7 @@ export const EMPTY_USER_FORM = {
 };
 
 export const EMPTY_PROFILE_FORM = {
+  postboxReadRetentionDays: 7,
   firstName: '',
   lastName: '',
   username: '',

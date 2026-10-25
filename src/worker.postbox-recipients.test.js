@@ -44,7 +44,7 @@ describe('Postbox-Zusammenfassung fürs Polling', () => {
     db.sqlite.exec(`INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, created_at) VALUES
       ('m1', 'recipient-1', 'organizer-1', 'direct', 'Hallo', '2026-01-02'),
       ('m2', 'recipient-1', 'organizer-1', 'direct', 'Gelesen', '2026-01-03');
-      UPDATE postbox_messages SET read_at = '2026-01-04' WHERE id = 'm2';`);
+      UPDATE postbox_entries SET read_at = '2026-01-04' WHERE message_id = 'm2' AND user_id = 'organizer-1';`);
 
     await expect(postboxSummary(db, { id: 'organizer-1', role: 'user' })).resolves.toEqual({
       unreadCount: 1,

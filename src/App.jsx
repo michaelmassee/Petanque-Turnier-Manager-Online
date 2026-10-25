@@ -171,6 +171,8 @@ function AppContent() {
   }, []);
   const [postboxOpen, setPostboxOpen] = useState(false);
   const [postbox, setPostbox] = useState({ messages: [], unreadCount: 0, todos: [] });
+  const postboxReadPendingRef = useRef(new Set());
+  const postboxReaderRef = useRef(null);
   const [postboxRecipients, setPostboxRecipients] = useState([]);
   const [postboxRecipientTournaments, setPostboxRecipientTournaments] = useState([]);
   const [postboxRecipientId, setPostboxRecipientId] = useState('');
@@ -539,6 +541,37 @@ function AppContent() {
     setPostbox(postboxQuery.data);
   }, [postboxQuery.data]);
 
+  useEffect(() => {
+    postboxReaderRef.current = { userId: currentUser?.id };
+    return () => { postboxReaderRef.current = null; };
+  }, [currentUser?.id]);
+
+  // Erst nach erfolgreichem Laden/Anzeigen markieren, einschließlich eigener gesendeter Kopien.
+  useEffect(() => {
+    if (!postboxOpen || !currentUser) return undefined;
+    const userId = currentUser.id;
+    const ids = postbox.messages.filter((entry) => !entry.readAt && !postboxReadPendingRef.current.has(`${userId}:${entry.id}`))
+      .map((entry) => entry.id);
+    if (!ids.length) return undefined;
+    const pending = postboxReadPendingRef.current;
+    ids.forEach((id) => pending.add(`${userId}:${id}`));
+    const reader = postboxReaderRef.current;
+    authenticatedApi('/api/postbox/read-all', { method: 'POST', body: JSON.stringify({ messageIds: ids }) })
+      .then((result) => {
+        if (postboxReaderRef.current !== reader) return;
+        const selected = new Set(ids);
+        queryClient.setQueryData(['postbox', userId], (previous) => {
+          if (!previous) return previous;
+          const messages = previous.messages.map((entry) => selected.has(entry.id)
+            ? { ...entry, readAt: entry.readAt || result.readAt || new Date().toISOString() } : entry);
+          return { ...previous, messages, unreadCount: messages.filter((entry) => !entry.mine && !entry.readAt).length };
+        });
+      })
+      .catch((requestError) => { if (postboxReaderRef.current === reader) setError(requestError.message); })
+      .finally(() => ids.forEach((id) => pending.delete(`${userId}:${id}`)));
+    return undefined;
+  }, [postboxOpen, currentUser, postbox.messages]);
+
   // Benutzerwechsel: Zählerstand des vorherigen Kontos nicht vergleichen.
   useEffect(() => { lastUnreadCountRef.current = null; }, [currentUser?.id]);
 
@@ -804,18 +837,10 @@ function AppContent() {
   async function handleOpenPostbox() {
     setMenuOpen(false);
     setSearchMenuOpen(false);
-    setPostboxOpen((open) => {
-      const willOpen = !open;
-      if (willOpen && postbox.unreadCount > 0) {
-        authenticatedApi('/api/postbox/read-all', { method: 'POST' })
-          .then(loadPostbox)
-          .catch((requestError) => setError(requestError.message));
-      }
-      return willOpen;
-    });
+    setPostboxOpen((open) => !open);
   }
 
-  // Gelesen-Markierung passiert schon beim Öffnen der Postbox (read-all); der Klick belegt nur die Antwort vor bzw. navigiert.
+  // Die geladenen Nachrichten werden beim Anzeigen markiert; der Klick antwortet bzw. navigiert.
   function handleReadPostboxMessage(message) {
     if (message.kind === 'direct' && !message.mine && message.senderId) {
       setPostboxRecipientId(message.senderId);
@@ -1016,6 +1041,7 @@ function AppContent() {
           phone: profileForm.phone,
           club: profileForm.club,
           licenseNr: profileForm.licenseNr,
+          postboxReadRetentionDays: profileForm.postboxReadRetentionDays,
           currentPassword: profileForm.currentPassword,
           newPassword: profileForm.newPassword,
           language,
@@ -1030,6 +1056,7 @@ function AppContent() {
         phone: data.user.phone || '',
         club: data.user.club || '',
         licenseNr: data.user.licenseNr || '',
+        postboxReadRetentionDays: data.user.postboxReadRetentionDays ?? 7,
         currentPassword: '',
         newPassword: '',
         newPasswordConfirm: '',
@@ -1299,6 +1326,7 @@ function AppContent() {
       phone: currentUser.phone || '',
       club: currentUser.club || '',
       licenseNr: currentUser.licenseNr || '',
+      postboxReadRetentionDays: currentUser.postboxReadRetentionDays ?? 7,
       currentPassword: '',
       newPassword: '',
       newPasswordConfirm: '',
@@ -2300,6 +2328,10 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = fa
           {!clubLinked && (form.club || '').trim() && clubNames.length > 0 && <p className="hint">{t('Wähle deinen Verein aus der Liste, damit er mit dem Vereinsverzeichnis verknüpft wird.')}</p>}
           <p className="hint">{t('Benutzername und Verein werden anderen Nutzern angezeigt, damit man dich auch bei gleichem Namen unterscheiden kann.')}</p>
           <TextField label={t('Lizenznummer')} value={form.licenseNr} onChange={(licenseNr) => setForm({ ...form, licenseNr })} />
+          <TextField label={t('Gelesene Nachrichten löschen nach (Tagen)')} type="number" min={1} max={365} step={1}
+            value={form.postboxReadRetentionDays ?? 7} required
+            onChange={(value) => setForm({ ...form, postboxReadRetentionDays: value === '' ? '' : Number(value) })} />
+          <p className="hint">{t('Standard: 7 Tage ab dem ersten Lesen. Die tägliche Bereinigung läuft auch, wenn du offline bist. Eine geänderte Frist gilt beim nächsten Lauf auch für bereits gelesene Nachrichten. Maximal 25 Nachrichten bleiben gespeichert; bei neuen Nachrichten entfallen die ältesten, auch ungelesene. Andere Nutzer behalten ihre eigenen Kopien.')}</p>
           <TextField
             label={t('Aktuelles Passwort')}
             type="password"

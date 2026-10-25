@@ -140,7 +140,7 @@ describe('Tägliche Administrator-Statusmail', () => {
 
   it.each(['de', 'en', 'fr', 'nl', 'es', 'unknown'])('rendert leere Bestände vollständig in %s', async (language) => {
     const stats = await collectAdminStatus(env.DB, from, until, systemId);
-    const mail = buildAdminStatusEmail(stats, [{ key: 'stale', ok: true }, { key: 'reminders', ok: false }, { key: 'rentalsCleanup', ok: true }], from, until, language);
+    const mail = buildAdminStatusEmail(stats, [{ key: 'stale', ok: true }, { key: 'reminders', ok: false }, { key: 'rentalsCleanup', ok: true }, { key: 'postboxCleanup', ok: true }], from, until, language);
     expect(mail.text).not.toMatch(/undefined|NaN|null/);
     expect(mail.text).toContain('0 / +0');
     expect(mail.language).toBe(language === 'unknown' ? 'de' : language);
@@ -170,6 +170,7 @@ describe('Tägliche Administrator-Statusmail', () => {
     expect(mail.text).toContain('Turniererinnerungen: Beendet ohne Abbruch');
     expect(mail.text).toContain('Pétanque-Aktuell-Abgleich: Beendet ohne Abbruch');
     expect(mail.text).toContain('Abgelaufene Mietanfragen und Reservierungen löschen: Beendet ohne Abbruch');
+    expect(mail.text).toContain('Gelesene Postbox-Nachrichten bereinigen: Beendet ohne Abbruch');
   });
 
   it('versendet beim Stunden-Cron keine Statusmail und liest auch keine Berichtsmarker', async () => {

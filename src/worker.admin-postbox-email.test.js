@@ -96,6 +96,8 @@ describe('Nachrichten an Administratoren', () => {
       WHEN NEW.recipient_id = 'other' BEGIN SELECT RAISE(ABORT, 'archive unavailable'); END`);
     await expect(send(POSTBOX_ADMIN_RECIPIENT_ID)).rejects.toThrow('archive unavailable');
     expect(rows('SELECT * FROM postbox_messages')).toEqual([]);
+    expect(rows('SELECT * FROM postbox_entries')).toEqual([]);
+    expect(rows('SELECT * FROM postbox_orphan_candidates')).toEqual([]);
     expect(rows('SELECT * FROM admin_postbox_messages')).toEqual([]);
     expect(env.MAIL_QUEUE.send).not.toHaveBeenCalled();
   });
@@ -202,7 +204,7 @@ describe('Nachrichten an Administratoren', () => {
 
   it('behält alle Berichtseinträge auch nach mehr als 25 eingegangenen Nachrichten', async () => {
     for (let i = 0; i < 30; i += 1) await send('admin', `Nachricht ${i}`);
-    expect(rows("SELECT id FROM postbox_messages WHERE recipient_id = 'admin'")).toHaveLength(25);
+    expect(rows("SELECT id FROM postbox_entries WHERE user_id = 'admin'")).toHaveLength(25);
     expect(rows('SELECT message_id FROM admin_postbox_messages')).toHaveLength(30);
   });
 

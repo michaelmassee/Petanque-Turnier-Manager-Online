@@ -2,6 +2,7 @@ import { limitPlayerDetails, registrationPlayerDetails, resolveSelectedRegistrat
 import tzlookup from 'tz-lookup';
 import { sendAdminStatusEmails } from './admin-status-email.js';
 import { collectEmailStats, recordEmailSent } from './email-stats.js';
+import { cleanupReadPostboxMessages, DEFAULT_POSTBOX_READ_RETENTION_DAYS } from './postbox-retention.js';
 import { buildAdminPostboxEmail } from './admin-postbox-email.js';
 import { REGISTRATION_OPENED_EVENT, OPENING_MESSAGES, synchronizeOpeningSchedule } from './registration-opening.js';
 export { RegistrationOpeningScheduler } from './registration-opening.js';
@@ -1657,6 +1658,7 @@ export default {
     }));
     if (event.cron === DAILY_CRON) {
       jobs.push(
+        runJob('postboxCleanup', () => cleanupReadPostboxMessages(env.DB, event.scheduledTime ?? Date.now())),
         runJob('rentalsCleanup', () => cleanupExpiredRentalReservations(env.DB, event.scheduledTime ?? Date.now())),
         runJob('reminders', () => sendTournamentReminders(env)),
         runJob('importSync', () => syncPetanqueAktuellImports(env)),
@@ -1835,7 +1837,8 @@ export default {
 
       if (request.method === 'POST' && url.pathname === '/api/postbox/read-all') {
         const session = await requireSession(request, env.DB);
-        return await markAllPostboxMessagesRead(env.DB, session.user.id);
+        const body = request.body ? await readJson(request) : {};
+        return await markAllPostboxMessagesRead(env.DB, session.user.id, body.messageIds);
       }
 
       if (request.method === 'GET' && url.pathname === '/api/push/public-key') {
@@ -3893,17 +3896,19 @@ const PARTICIPANT_TOURNAMENTS_SUBQUERY = `SELECT DISTINCT reg.tournament_id FROM
   WHERE (reg.user_id = ?1 OR reg.partner_user_id = ?1 OR reg.partner2_user_id = ?1)
     AND reg.status IN ${BROADCAST_REGISTRATION_STATUSES_SQL}`;
 
+// Eine persönliche Zustellung gewährt nach einer Abmeldung keinen weiteren Turnierzugriff.
+const POSTBOX_ENTRY_ACCESS_SQL = `(m.broadcast_tournament_id IS NULL OR m.sender_id = ?1 OR m.recipient_id = ?1
+  OR m.broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))`;
+
 async function getPostbox(db, user) {
   const result = await db.prepare(
-    `SELECT m.*, s.first_name AS sender_first_name, s.last_name AS sender_last_name, s.username AS sender_username, r.first_name AS recipient_first_name, r.last_name AS recipient_last_name, r.username AS recipient_username, t.name AS broadcast_tournament_name
-     FROM postbox_messages m
+    `SELECT m.*, e.read_at AS personal_read_at, s.first_name AS sender_first_name, s.last_name AS sender_last_name, s.username AS sender_username, r.first_name AS recipient_first_name, r.last_name AS recipient_last_name, r.username AS recipient_username, t.name AS broadcast_tournament_name
+     FROM postbox_entries e JOIN postbox_messages m ON m.id = e.message_id
      LEFT JOIN users s ON s.id = m.sender_id
      LEFT JOIN users r ON r.id = m.recipient_id
      LEFT JOIN tournaments t ON t.id = m.broadcast_tournament_id
-     WHERE m.recipient_id = ?1
-        OR (m.sender_id = ?1 AND (m.event_type IS NOT '${POSTBOX_ADMIN_GROUP_EVENT}' OR json_extract(m.event_data, '$.senderCopy') = 1))
-        OR (m.broadcast_tournament_id IS NOT NULL AND m.broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
-     ORDER BY m.created_at DESC LIMIT 25`,
+     WHERE e.user_id = ?1 AND ${POSTBOX_ENTRY_ACCESS_SQL}
+     ORDER BY e.created_at DESC, e.id DESC LIMIT 25`,
   ).bind(user.id).all();
   const messages = result.results.map((row) => toPostboxMessage(row, user.id));
   return json({ messages, ...(await postboxSummary(db, user)) });
@@ -3911,11 +3916,8 @@ async function getPostbox(db, user) {
 
 export async function postboxSummary(db, user) {
   const unread = await db.prepare(
-    `SELECT COUNT(*) AS count FROM postbox_messages m
-     WHERE m.read_at IS NULL AND (
-       m.recipient_id = ?1
-       OR (m.broadcast_tournament_id IS NOT NULL AND m.broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
-     )`,
+    `SELECT COUNT(*) AS count FROM postbox_entries e JOIN postbox_messages m ON m.id = e.message_id
+     WHERE e.user_id = ?1 AND e.read_at IS NULL AND m.sender_id IS NOT ?1 AND ${POSTBOX_ENTRY_ACCESS_SQL}`,
   ).bind(user.id).first();
   return { unreadCount: unreadPostboxCount(unread), todos: await listPostboxTodos(db, user) };
 }
@@ -3979,15 +3981,22 @@ export async function sendPostboxMessage(request, env, sender) {
   return json({ message }, 201);
 }
 
-async function markAllPostboxMessagesRead(db, userId) {
+async function markAllPostboxMessagesRead(db, userId, messageIds) {
+  if (messageIds !== undefined && (!Array.isArray(messageIds) || messageIds.length > 25
+    || messageIds.some((id) => typeof id !== 'string' || !id || id.length > 100))) {
+    throw new HttpError(400, 'Ungültige Nachrichtenauswahl');
+  }
+  if (messageIds?.length === 0) return json({ ok: true });
   const now = new Date().toISOString();
   await db.prepare(
-    `UPDATE postbox_messages SET read_at = COALESCE(read_at, ?2) WHERE read_at IS NULL AND (
-       recipient_id = ?1
-       OR (broadcast_tournament_id IS NOT NULL AND broadcast_tournament_id IN (${PARTICIPANT_TOURNAMENTS_SUBQUERY}))
-     )`,
-  ).bind(userId, now).run();
-  return json({ ok: true });
+    `UPDATE postbox_entries SET read_at = ?2 WHERE read_at IS NULL AND id IN (
+      SELECT e.id FROM postbox_entries e JOIN postbox_messages m ON m.id = e.message_id
+      WHERE e.user_id = ?1 AND ${POSTBOX_ENTRY_ACCESS_SQL}
+      ${messageIds ? `AND m.id IN (${messageIds.map(() => '?').join(', ')})` : ''}
+      ORDER BY e.created_at DESC, e.id DESC LIMIT 25
+    )`,
+  ).bind(userId, now, ...(messageIds || [])).run();
+  return json({ ok: true, readAt: now });
 }
 
 async function listPostboxTodos(db, user) {
@@ -4017,11 +4026,6 @@ async function createPostboxMessage(env, options) {
 }
 
 async function finishPostboxMessage(env, { id, senderId = null, recipientId, kind, body = null, eventType = null, eventData = null, pushTitle = 'Neue Nachricht', pushActor = '', recipient = null, sender = null, emailedAddresses = [] }) {
-  await env.DB.prepare(
-    `DELETE FROM postbox_messages WHERE recipient_id = ? AND id NOT IN (
-       SELECT id FROM postbox_messages WHERE recipient_id = ? ORDER BY created_at DESC LIMIT 25
-     )`,
-  ).bind(recipientId, recipientId).run();
   const row = await env.DB.prepare('SELECT * FROM postbox_messages WHERE id = ?').bind(id).first();
   const message = toPostboxMessage(row, recipientId);
   if (kind === 'direct' && senderId && (senderId !== recipientId || eventType === POSTBOX_ADMIN_GROUP_EVENT)) {
@@ -4076,11 +4080,6 @@ export async function createBroadcastPostboxMessage(env, { sender, tournament, b
   await env.DB.prepare(
     'INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, created_at, broadcast_tournament_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
   ).bind(id, sender.id, sender.id, 'direct', body, createdAt, tournament.id).run();
-  await env.DB.prepare(
-    `DELETE FROM postbox_messages WHERE recipient_id = ? AND id NOT IN (
-       SELECT id FROM postbox_messages WHERE recipient_id = ? ORDER BY created_at DESC LIMIT 25
-     )`,
-  ).bind(sender.id, sender.id).run();
   const row = await env.DB.prepare(
     `SELECT m.*, t.name AS broadcast_tournament_name FROM postbox_messages m LEFT JOIN tournaments t ON t.id = m.broadcast_tournament_id WHERE m.id = ?`,
   ).bind(id).first();
@@ -4311,13 +4310,6 @@ async function notifySavedSearchesForPublishedTournament(env, tournament, search
   }
 
   const recipientIds = [...new Set(notifications.map((notification) => notification.recipientId))];
-  for (const batch of batches(recipientIds)) {
-    await env.DB.batch(batch.map((recipientId) => env.DB.prepare(
-      `DELETE FROM postbox_messages WHERE recipient_id = ? AND id NOT IN (
-         SELECT id FROM postbox_messages WHERE recipient_id = ? ORDER BY created_at DESC LIMIT 25
-       )`,
-    ).bind(recipientId, recipientId)));
-  }
 
   const languages = new Map();
   for (const batch of batches(recipientIds)) {
@@ -4541,6 +4533,11 @@ export async function updateOwnProfile(request, env, url, userId) {
   const { club, clubId } = await resolveProfileClub(db, nullableText(body.club));
   // Ältere Clients ohne Feld lassen eine gespeicherte Nummer unverändert.
   const phone = body.phone === undefined ? existing.phone ?? null : normalizePhone(body.phone);
+  const postboxReadRetentionDays = body.postboxReadRetentionDays === undefined
+    ? existing.postbox_read_retention_days ?? DEFAULT_POSTBOX_READ_RETENTION_DAYS : body.postboxReadRetentionDays;
+  if (!Number.isInteger(postboxReadRetentionDays) || postboxReadRetentionDays < 1 || postboxReadRetentionDays > 365) {
+    throw new HttpError(400, 'Die Aufbewahrungsdauer muss eine ganze Zahl zwischen 1 und 365 Tagen sein');
+  }
 
   if (firstName.length < 2 || lastName.length < 2) {
     throw new HttpError(400, 'Vorname und Nachname müssen mindestens 2 Zeichen enthalten');
@@ -4587,16 +4584,16 @@ export async function updateOwnProfile(request, env, url, userId) {
         db
           .prepare(
             `UPDATE users
-             SET first_name = ?, last_name = ?, pending_email = ?, club = ?, club_id = ?, license_nr = ?, phone = ?, password_salt = ?, password_hash = ?, updated_at = ?
+             SET first_name = ?, last_name = ?, pending_email = ?, club = ?, club_id = ?, license_nr = ?, phone = ?, postbox_read_retention_days = ?, password_salt = ?, password_hash = ?, updated_at = ?
              WHERE id = ?`,
           )
-          .bind(firstName, lastName, pendingEmail, club, clubId, licenseNr, phone, password.salt, password.hash, now, userId),
+          .bind(firstName, lastName, pendingEmail, club, clubId, licenseNr, phone, postboxReadRetentionDays, password.salt, password.hash, now, userId),
         db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(userId, currentSessionId || ''),
       ]);
     } else {
       await db
-        .prepare('UPDATE users SET first_name = ?, last_name = ?, pending_email = ?, club = ?, club_id = ?, license_nr = ?, phone = ?, updated_at = ? WHERE id = ?')
-        .bind(firstName, lastName, pendingEmail, club, clubId, licenseNr, phone, now, userId)
+        .prepare('UPDATE users SET first_name = ?, last_name = ?, pending_email = ?, club = ?, club_id = ?, license_nr = ?, phone = ?, postbox_read_retention_days = ?, updated_at = ? WHERE id = ?')
+        .bind(firstName, lastName, pendingEmail, club, clubId, licenseNr, phone, postboxReadRetentionDays, now, userId)
         .run();
     }
   } catch (error) {
@@ -4613,7 +4610,7 @@ export async function updateOwnProfile(request, env, url, userId) {
 
   const updated = await db
     .prepare(
-      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, club_id, license_nr, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, club_id, license_nr, postbox_read_retention_days, email_verified_at, password_change_required, created_at, updated_at FROM users WHERE id = ?',
     )
     .bind(userId)
     .first();
@@ -11693,7 +11690,7 @@ async function requireSession(request, db) {
   const row = await db
     .prepare(
       `SELECT users.id, users.first_name, users.last_name, users.username, users.username_changed_at, users.username_confirmed_at, users.email, users.pending_email, users.phone, users.role, users.club, users.club_id, users.license_nr, users.email_verified_at, users.password_change_required,
-              users.tournament_limit, users.mail_enabled, users.created_at, users.updated_at, sessions.expires_at
+              users.tournament_limit, users.mail_enabled, users.postbox_read_retention_days, users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
        WHERE sessions.id = ?`,
@@ -12360,6 +12357,7 @@ function toPublicUser(row) {
     passwordChangeRequired: Boolean(Number(row.password_change_required || 0)),
     tournamentLimit: row.tournament_limit === undefined || row.tournament_limit === null ? DEFAULT_TOURNAMENT_LIMIT : Number(row.tournament_limit),
     mailEnabled: row.mail_enabled === undefined || row.mail_enabled === null ? true : Boolean(Number(row.mail_enabled)),
+    postboxReadRetentionDays: row.postbox_read_retention_days ?? DEFAULT_POSTBOX_READ_RETENTION_DAYS,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -12383,7 +12381,7 @@ function toPostboxMessage(row, currentUserId) {
     eventType: row.event_type || null,
     eventData,
     createdAt: row.created_at,
-    readAt: row.read_at || null,
+    readAt: Object.hasOwn(row, 'personal_read_at') ? row.personal_read_at : row.read_at || null,
     mine: row.sender_id === currentUserId,
   };
 }
