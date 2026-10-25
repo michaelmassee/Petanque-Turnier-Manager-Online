@@ -1,5 +1,5 @@
 // Importiert Mitgliedsvereine des Pétanqueverbands Ost (PV Ost: Sachsen, Sachsen-Anhalt, Thüringen) als Organisationen;
-// bisher die sächsischen Vereine. Quelle ist pv-ost.de/verband („Vereine im PV Ost“), die nur Logos mit Link zur
+// bisher die sächsischen und thüringischen Vereine. Quelle ist pv-ost.de/verband („Vereine im PV Ost“), die nur Logos mit Link zur
 // Vereinswebsite zeigt. Namen und Spielorte stammen darum von den Vereinswebsites, abgeglichen mit der
 // Pétanque-Aktuell-Karte und Nominatim (Stand 2026-10-25); das Skript bricht ab, wenn die Verbandsseite einen Verein
 // nicht mehr verlinkt. Vereine werden mit Owner = Admin und Status 'pending' angelegt, mit --publish gleich freigegeben.
@@ -9,7 +9,9 @@
 //   node scripts/import-pvost-clubs.mjs --remote --apply --publish    # Produktion, gleich freigegeben
 //
 // Idempotent: vorhandene Vereine (gleicher Name) und Plätze (gleicher Name, Adresse, Typ) werden übersprungen.
-// Vorerst nicht importiert: SV Horken Kittlitz (verlinkte Domain gehört inzwischen einem Online-Casino, Spielort unbekannt).
+// Vorerst nicht importiert: SV Horken Kittlitz (verlinkte Domain gehört inzwischen einem Online-Casino, Spielort unbekannt);
+// Kahla (nur Logo) und Nordhausen (Link auf eine gelöschte Stadtnachricht) – Vereinsname und Spielort unbekannt.
+// Die neue Abteilung der SG Fortuna in Rhönblick steht nicht auf der Verbandsseite.
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -55,6 +57,21 @@ const CLUBS = [
     name: "Roter Stern Leipzig '99 e.V.", listLink: 'rotersternleipzig.de', website: 'https://rotersternleipzig.de/boule-selbstverstaendnis/',
     places: [{ street: 'Teichstraße (Sportplatz)', postcode: '04277', city: 'Leipzig-Connewitz', latitude: 51.3060445, longitude: 12.367816,
       description: 'Sektion Boule/Pétanque; ab Mai mittwochs ab 15:30 Uhr (Kinder/Jugend 15:30–18 Uhr, Erwachsene 16:30–19:30 Uhr).' }],
+  },
+  // Thüringen
+  {
+    name: 'Nebenbouler Jena e.V.', listLink: 'nebenbouler-jena.de', website: 'https://www.nebenbouler-jena.de/',
+    places: [{ street: 'Bouleplatz im Paradies (Rasenmühleninsel)', postcode: '07745', city: 'Jena', latitude: 50.91982, longitude: 11.58209 }],
+  },
+  {
+    name: 'Boule- und Pétanquefreunde Weimar', listLink: 'weimar-356843891078311', website: 'https://www.facebook.com/Boule-und-P%C3%A9tanquefreunde-Weimar-356843891078311/',
+    places: [{ street: 'Ackerwand (am Park an der Ilm)', postcode: '99423', city: 'Weimar', latitude: 50.97663, longitude: 11.33104 }],
+  },
+  {
+    // Hauptplatz laut Verein ist das „Brühlodrom“ (ohne Adresse); verortet im Brühler Garten.
+    name: 'douze partout erfurt e.V.', listLink: 'douzepartout.de', website: 'https://www.douzepartout.de/',
+    places: [{ street: 'Brühler Garten („Brühlodrom“)', postcode: '99084', city: 'Erfurt', latitude: 50.973629, longitude: 11.0198594,
+      description: 'Weitere Spielorte: Am Umspanner, Stadtpark (am Hauptbahnhof), Gothaer Platz (Südeingang der ega), Petersberg, Zughafen.' }],
   },
 ];
 
