@@ -1,6 +1,7 @@
 import { limitPlayerDetails, registrationPlayerDetails, resolveSelectedRegistrationPlayers } from './registration-player-search.js';
 import tzlookup from 'tz-lookup';
 import { sendAdminStatusEmails } from './admin-status-email.js';
+import { collectEmailStats, recordEmailSent } from './email-stats.js';
 import { buildAdminPostboxEmail } from './admin-postbox-email.js';
 import { REGISTRATION_OPENED_EVENT, OPENING_MESSAGES, synchronizeOpeningSchedule } from './registration-opening.js';
 export { RegistrationOpeningScheduler } from './registration-opening.js';
@@ -2280,6 +2281,11 @@ export default {
       if (request.method === 'GET' && url.pathname === '/api/admin/growth-stats') {
         await requireAdmin(request, env.DB);
         return await getGrowthStats(env.DB, url.searchParams.get('kind'), Number(url.searchParams.get('days')));
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/admin/email-stats') {
+        await requireAdmin(request, env.DB);
+        return json(await collectEmailStats(env.DB, Number(url.searchParams.get('days'))));
       }
 
       if (request.method === 'GET' && url.pathname === '/api/admin/cloudflare-usage') {
@@ -9463,7 +9469,8 @@ async function sendViaStrato(env, { to, subject, body, html, attachments }) {
       ...(attachments ? { attachments } : {}),
     });
   } finally {
-    await mailer.close?.();
+    // Ein Fehler beim Verbindungsabbau darf eine bereits angenommene Mail nicht erneut versenden.
+    try { await mailer.close?.(); } catch (error) { console.error('SMTP connection close failed', error); }
   }
 }
 
@@ -9480,7 +9487,7 @@ function isGoogleMailRecipient(to) {
 
 // messageBox: optionale Nutzernachricht (Klartext oder Rich Text), im HTML-Teil formatiert in einer eigenen Box,
 // im Klartext-Teil als Klartext angehängt.
-async function sendTransactionalEmail(env, { to, subject, text, messageBox = null, textAfterMessageBox = '', actions = [], plainTextActions = false, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
+export async function sendTransactionalEmail(env, { to, subject, text, messageBox = null, textAfterMessageBox = '', actions = [], plainTextActions = false, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
   const stratoAvailable = stratoConfigured(env);
   const resendAvailable = Boolean(env.RESEND_API_KEY && env.MAIL_FROM);
 
@@ -9507,12 +9514,17 @@ async function sendTransactionalEmail(env, { to, subject, text, messageBox = nul
   const preferResend = isGoogleMailRecipient(to);
   const primaryAvailable = preferResend ? resendAvailable : stratoAvailable;
   const fallbackAvailable = preferResend ? stratoAvailable : resendAvailable;
-  const sendPrimary = () => (preferResend
-    ? sendViaResend(env, { to, subject, body, html, attachments, failureContext })
-    : sendViaStrato(env, { to, subject, body, html, attachments }));
-  const sendFallback = () => (preferResend
-    ? sendViaStrato(env, { to, subject, body, html, attachments })
-    : sendViaResend(env, { to, subject, body, html, attachments, failureContext }));
+  const sendAndCount = async (provider) => {
+    if (provider === 'resend') await sendViaResend(env, { to, subject, body, html, attachments, failureContext });
+    else await sendViaStrato(env, { to, subject, body, html, attachments });
+    // Statistikfehler dürfen weder Fallback noch Queue-Retry und damit Doppelversand auslösen.
+    if (env.DB) {
+      try { await recordEmailSent(env.DB, provider); }
+      catch (error) { console.error('Email delivery statistics could not be recorded', error); }
+    }
+  };
+  const sendPrimary = () => sendAndCount(preferResend ? 'resend' : 'strato');
+  const sendFallback = () => sendAndCount(preferResend ? 'strato' : 'resend');
 
   if (primaryAvailable) {
     try {

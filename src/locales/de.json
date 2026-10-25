@@ -1,4 +1,11 @@
 {
+  "Versendete E-Mails": "Versendete E-Mails",
+  "Vom Mailanbieter angenommene E-Mails pro Tag (UTC). Die Annahme bestätigt keine Zustellung.": "Vom Mailanbieter angenommene E-Mails pro Tag (UTC). Die Annahme bestätigt keine Zustellung.",
+  "Erfassung seit {{date}}. Frühere Versanddaten sind nicht verfügbar.": "Erfassung seit {{date}}. Frühere Versanddaten sind nicht verfügbar.",
+  "Diese Woche (ab Montag, UTC)": "Diese Woche (ab Montag, UTC)",
+  "Strato: {{strato}} · Resend: {{resend}}": "Strato: {{strato}} · Resend: {{resend}}",
+  "E-Mails: {{count}}": "E-Mails: {{count}}",
+  "Versendete E-Mails: {{provider}}": "Versendete E-Mails: {{provider}}",
   "Nachricht an Admin": "Nachricht an Admin",
   "Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.",
   "Neue Anmeldungen einschließlich Warteliste sind geschlossen. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Neue Anmeldungen einschließlich Warteliste sind geschlossen. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.",

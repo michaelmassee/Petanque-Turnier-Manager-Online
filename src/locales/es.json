@@ -1,4 +1,11 @@
 {
+  "Versendete E-Mails": "Correos enviados",
+  "Vom Mailanbieter angenommene E-Mails pro Tag (UTC). Die Annahme bestätigt keine Zustellung.": "Correos aceptados por el proveedor de correo por día (UTC). La aceptación no confirma la entrega.",
+  "Erfassung seit {{date}}. Frühere Versanddaten sind nicht verfügbar.": "Registro desde el {{date}}. No hay datos de envío anteriores disponibles.",
+  "Diese Woche (ab Montag, UTC)": "Esta semana (desde el lunes, UTC)",
+  "Strato: {{strato}} · Resend: {{resend}}": "Strato: {{strato}} · Resend: {{resend}}",
+  "E-Mails: {{count}}": "Correos: {{count}}",
+  "Versendete E-Mails: {{provider}}": "Correos enviados: {{provider}}",
   "Nachricht an Admin": "Mensaje a Admin",
   "Schließt neue Anmeldungen einschließlich Warteliste. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Cierra las nuevas inscripciones, incluida la lista de espera. La visibilidad del torneo no cambia. Las inscripciones existentes en la lista de espera se conservan.",
   "Neue Anmeldungen einschließlich Warteliste sind geschlossen. Die Sichtbarkeit des Turniers bleibt unverändert. Bestehende Wartelistenplätze bleiben erhalten.": "Las nuevas inscripciones, incluida la lista de espera, están cerradas. La visibilidad del torneo no cambia. Las inscripciones existentes en la lista de espera se conservan.",

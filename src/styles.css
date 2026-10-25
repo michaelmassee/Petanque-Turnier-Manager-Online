@@ -2607,6 +2607,16 @@ a.left-panel-link {
   padding: 12px 14px;
 }
 
+.email-totals {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 800px) {
+  .email-totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .visitor-total-label,
 .visitor-total-split {
   color: #53627a;

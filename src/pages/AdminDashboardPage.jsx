@@ -656,6 +656,125 @@ export function GrowthStatsPanel({ kind, title, description, totalLabel }) {
   );
 }
 
+const EMAIL_RANGES = [7, 30, 90, 365];
+
+function groupEmailDays(days, range) {
+  if (range < 365) return days.map((entry) => ({ ...entry, from: entry.day, to: entry.day }));
+  const groups = [];
+  for (let index = 0; index < days.length;) {
+    const size = index === 0 ? days.length % 7 || 7 : 7;
+    const week = days.slice(index, index + size);
+    groups.push({
+      from: week[0].day, to: week.at(-1).day,
+      total: week.reduce((sum, entry) => sum + entry.total, 0),
+      strato: week.reduce((sum, entry) => sum + entry.strato, 0),
+      resend: week.reduce((sum, entry) => sum + entry.resend, 0),
+    });
+    index += size;
+  }
+  return groups;
+}
+
+export function EmailStatsPanel() {
+  const { t, i18n } = useTranslation();
+  const [range, setRange] = useState(30);
+  const [metric, setMetric] = useState('total');
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeIndex, setActiveIndex] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    authenticatedApi(`/api/admin/email-stats?days=${range}`)
+      .then((result) => { if (!cancelled) { setStats(result); setActiveIndex(null); } })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [range]);
+
+  const bars = useMemo(() => (stats ? groupEmailDays(stats.days, stats.range) : []), [stats]);
+  const shownBar = bars[activeIndex ?? bars.length - 1];
+  const number = numberFormatter(i18n.language);
+  const metrics = [{ key: 'total', label: t('Summe') }, { key: 'strato', label: 'Strato' }, { key: 'resend', label: 'Resend' }];
+  const barLabel = (bar) => (bar.from === bar.to ? formatDate(bar.from, i18n.language)
+    : `${formatDate(bar.from, i18n.language)} – ${formatDate(bar.to, i18n.language)}`);
+  const splitLabel = (counts) => t('Strato: {{strato}} · Resend: {{resend}}', {
+    strato: number.format(counts.strato), resend: number.format(counts.resend),
+  });
+
+  return (
+    <div className="panel">
+      <div className="section-title">
+        <div>
+          <h2>{t('Versendete E-Mails')}</h2>
+          <p className="muted">{t('Vom Mailanbieter angenommene E-Mails pro Tag (UTC). Die Annahme bestätigt keine Zustellung.')}</p>
+        </div>
+        <div className="visitor-range" role="group" aria-label={t('Zeitraum')}>
+          {EMAIL_RANGES.map((days) => (
+            <Button key={days} variant={range === days ? 'primary' : 'secondary'} aria-pressed={range === days}
+              loading={loading && range === days} onClick={() => setRange(days)}>{t('{{count}} Tage', { count: days })}</Button>
+          ))}
+        </div>
+      </div>
+      <Feedback error={error} />
+      {loading && !stats && <p className="muted">{t('Lädt …')}</p>}
+      {stats && (
+        <div aria-busy={loading}>
+          <p className="hint">{t('Erfassung seit {{date}}. Frühere Versanddaten sind nicht verfügbar.', {
+            date: formatDate(stats.trackingSince.slice(0, 10), i18n.language),
+          })}</p>
+          <div className="visitor-totals email-totals">
+            {[
+              ['today', t('Heute')], ['week', t('Diese Woche (ab Montag, UTC)')],
+              ['range', t('Letzte {{count}} Tage', { count: stats.range })], ['allTime', t('Gesamt')],
+            ].map(([key, label]) => (
+              <div key={key} className="visitor-total">
+                <span className="visitor-total-label">{label}</span>
+                <strong>{number.format(stats.totals[key].total)}</strong>
+                <span className="visitor-total-split">{splitLabel(stats.totals[key])}</span>
+              </div>
+            ))}
+          </div>
+          <div className="visitor-range usage-metrics" role="group" aria-label={t('Kennzahl')}>
+            {metrics.map(({ key, label }) => (
+              <Button key={key} variant={metric === key ? 'primary' : 'secondary'} aria-pressed={metric === key}
+                onClick={() => setMetric(key)}>{label}</Button>
+            ))}
+          </div>
+          {shownBar && (
+            <p className="visitor-readout" aria-live="polite">
+              <strong>{barLabel(shownBar)}</strong>{' '}
+              {t('E-Mails: {{count}}', { count: shownBar.total })}{' · '}{splitLabel(shownBar)}
+            </p>
+          )}
+          {bars.length > 0 && <UsageChart bars={bars.map((bar) => ({ key: bar.from, value: bar[metric] }))}
+            labelFor={(index) => formatDate(bars[index].from, i18n.language)}
+            labelIndexes={[...new Set([0, Math.floor((bars.length - 1) / 2), bars.length - 1])]}
+            language={i18n.language} activeIndex={activeIndex} onActivate={setActiveIndex}
+            ariaLabel={t('Versendete E-Mails: {{provider}}', { provider: metrics.find((entry) => entry.key === metric).label })} />}
+          <details className="visitor-table">
+            <summary>{t('Als Tabelle anzeigen')}</summary>
+            <div className="table-scroll">
+              <table>
+                <thead><tr><th>{stats.range < 365 ? t('Tag') : t('Woche')}</th><th>Strato</th><th>Resend</th><th>{t('Summe')}</th></tr></thead>
+                <tbody>
+                  {[...bars].reverse().map((bar) => (
+                    <tr key={bar.from}><td>{barLabel(bar)}</td><td>{number.format(bar.strato)}</td>
+                      <td>{number.format(bar.resend)}</td><td>{number.format(bar.total)}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, registrationsCount }) {
   const { t } = useTranslation();
   const [stats, setStats] = useState(null);
@@ -792,6 +911,7 @@ export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, 
       <GrowthStatsPanel kind="tournaments" title={t('Turniere')} totalLabel={t('Turniere')}
         description={t('Angelegte Turniere ohne Kalendereinträge, pro Tag (UTC). Gelöschte Turniere fehlen im Verlauf.')} />
       <CloudflareUsagePanel />
+      <EmailStatsPanel />
       <DataRetentionPanel />
     </section>
   );

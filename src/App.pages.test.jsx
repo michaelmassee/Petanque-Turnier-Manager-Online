@@ -413,6 +413,10 @@ describe('Admin-Dashboard', () => {
         },
       });
       if (path.startsWith('/api/admin/cloudflare-usage')) return Promise.resolve({ configured: false });
+      if (path.startsWith('/api/admin/email-stats')) return Promise.resolve({
+        range: 30, trackingSince: '2026-10-10T09:00:00Z', days: [{ day: '2026-10-10', strato: 1, resend: 2, total: 3 }],
+        totals: Object.fromEntries(['today', 'week', 'range', 'allTime'].map((key) => [key, { strato: 1, resend: 2, total: 3 }])),
+      });
       if (path.startsWith('/api/admin/growth-stats?kind=')) {
         const users = path.includes('kind=users');
         return Promise.resolve({
@@ -432,6 +436,7 @@ describe('Admin-Dashboard', () => {
     expect(within(screen.getByRole('button', { name: /Pétanque Aktuell importieren/ })).getByText('1')).toBeInTheDocument();
     expect(await screen.findByText(/Nicht eingerichtet: Der Worker braucht die Secrets/)).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Registrierte Benutzer' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Versendete E-Mails' })).toBeInTheDocument();
     expect(await screen.findByText('2 neu · 49 insgesamt')).toBeInTheDocument();
     expect(await screen.findByText('3 neu · 15 insgesamt')).toBeInTheDocument();
   });
