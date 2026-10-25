@@ -1,5 +1,5 @@
 // Importiert Mitgliedsvereine des Pétanqueverbands Ost (PV Ost: Sachsen, Sachsen-Anhalt, Thüringen) als Organisationen;
-// bisher die sächsischen und thüringischen Vereine. Quelle ist pv-ost.de/verband („Vereine im PV Ost“), die nur Logos mit Link zur
+// Sachsen, Thüringen und Sachsen-Anhalt. Quelle ist pv-ost.de/verband („Vereine im PV Ost“), die nur Logos mit Link zur
 // Vereinswebsite zeigt. Namen und Spielorte stammen darum von den Vereinswebsites, abgeglichen mit der
 // Pétanque-Aktuell-Karte und Nominatim (Stand 2026-10-25); das Skript bricht ab, wenn die Verbandsseite einen Verein
 // nicht mehr verlinkt. Vereine werden mit Owner = Admin und Status 'pending' angelegt, mit --publish gleich freigegeben.
@@ -72,6 +72,22 @@ const CLUBS = [
     name: 'douze partout erfurt e.V.', listLink: 'douzepartout.de', website: 'https://www.douzepartout.de/',
     places: [{ street: 'Brühler Garten („Brühlodrom“)', postcode: '99084', city: 'Erfurt', latitude: 50.973629, longitude: 11.0198594,
       description: 'Weitere Spielorte: Am Umspanner, Stadtpark (am Hauptbahnhof), Gothaer Platz (Südeingang der ega), Petersberg, Zughafen.' }],
+  },
+  // Sachsen-Anhalt
+  {
+    name: 'Bamboule Halle e.V.', listLink: 'bamboule-halle.de', website: 'https://bamboule-halle.de/',
+    places: [
+      { street: 'Stadtpark (an der Gottesackermauer)', postcode: '06108', city: 'Halle (Saale)', latitude: 51.4828167, longitude: 11.9796548,
+        description: 'Im Sommer montags ab 16 Uhr; freitags ab 18 Uhr an der Saalepromenade.' },
+      // Navi-Empfehlung des Vereins: Nachbarhaus Oelsnitzer Str. 14.
+      { venueType: 'indoor', street: 'Oelsnitzer Straße 18 (Glashaus)', postcode: '06116', city: 'Halle-Reideburg', latitude: 51.4888807, longitude: 12.0450607,
+        description: 'Winterdomizil; im Winter freitags Supermêlée.' },
+    ],
+  },
+  {
+    name: 'Union 1861 Schönebeck e.V.', listLink: 'union1861.de', website: 'https://petanque.union1861.de/',
+    places: [{ street: 'Barbarastraße (KT-Sportforum)', postcode: '39218', city: 'Schönebeck (Elbe)', latitude: 52.00944, longitude: 11.74778,
+      description: 'Abteilung Pétanque; mittwochs ab 18 Uhr (hier oder auf dem Bouleplatz in Magdeburg-Buckau), sonntags ab Frühjahr ab 14 Uhr öffentliches Spiel im Kurpark Bad Salzelmen (Treffpunkt Café Parkidyll).' }],
   },
 ];
 
