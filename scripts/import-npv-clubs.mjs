@@ -17,13 +17,6 @@ import { join } from 'node:path';
 
 const VEREINE_URL = 'https://dpvserver.de/npv/web/vmap/src/vereine.json';
 const MEMBER_OF = ['Niedersächsischer Pétanque-Verband'];
-// Vorerst nicht importieren: Spielort weder aus Karte, Website noch anderen Karten bestimmbar (nur Ortsmitte,
-// Postfach oder keine Adresse). Später mit geprüftem Spielort nachholen.
-const EXCLUDED = new Set([
-  'mtv eickeloh-hademstorf von 1921 ev', 'turn- und sportverein "jahn" reyershausen e.v.', 'bffnl bremen e.v.',
-  'bfnl göttingen e.v.', 'sonnenfreunde langenhagen-krähenwinkel e.v.', 'nordhorner sportverein sparta 09 e.v.',
-  'rasenkitzler wilsum (r.k.) e.v.',
-]);
 // Tote, falsch geschriebene oder umgezogene Vereinsseiten (geprüft 2026-10-25), nach Hostname; null = keine Website.
 const WEBSITE_FIXES = {
   'tus-hermannsburg.de': 'https://www.mtv-moisburg.de/', // MTV Moisburg verlinkte auf die Seite des TuS Hermannsburg
@@ -46,8 +39,17 @@ const WEBSITE_FIXES = {
   'klack95.de': 'https://klack95.jimdoweb.com/',
   'fsb-salzgitter.de': 'https://www.fsb-salzgitter.de/',
 };
-// Geprüfter Spielort je Verein (Schlüssel = Vereinsname klein).
+// Geprüfter Spielort je Verein (Schlüssel = Vereinsname klein); null = Verein ohne Platz, weil der Spielort unbekannt ist.
 const PLACES = {
+  // Nachgeholt (früher zurückgestellt): Spielort aus Vereinswebsite, per Geocoding geprüft.
+  'bffnl bremen e.v.': { street: 'Habichthorster Straße (FKK-Sportgelände)', postcode: '28790', city: 'Schwanewede-Brundorf', latitude: 53.2149291, longitude: 8.6596339 },
+  'bfnl göttingen e.v.': { street: 'Willy-Vogel-Weg 1 (Vereinsgelände)', postcode: '37127', city: 'Dransfeld', latitude: 51.4954925, longitude: 9.7946148 },
+  'rasenkitzler wilsum (r.k.) e.v.': { street: 'Am Sportplatz', postcode: '49849', city: 'Wilsum', latitude: 52.5361398, longitude: 6.8286679 },
+  // Nachgeholt ohne Platz: Spielort weiter unbekannt (nur Ortsmitte, Wohn- oder Kontaktadresse, keine Website).
+  'mtv eickeloh-hademstorf von 1921 ev': null,
+  'turn- und sportverein "jahn" reyershausen e.v.': null,
+  'sonnenfreunde langenhagen-krähenwinkel e.v.': null,
+  'nordhorner sportverein sparta 09 e.v.': null,
   // Pin der Pétanque-Aktuell-Karte (gleicher Verein, Adresse bestätigt bzw. Reverse-Geokodierung: Sportplatz).
   '1. hamelner boule club': { street: 'Heinestr. 7A', postcode: '31785', city: 'Hameln', latitude: 52.1179573, longitude: 9.347233 },
   '1.göttinger pétanque club 1989 „boule sur leine“ e. v.': { street: 'Sandweg 5', postcode: '37083', city: 'Göttingen', latitude: 51.5186504, longitude: 9.9292268 },
@@ -248,8 +250,8 @@ const response = await fetch(VEREINE_URL);
 if (!response.ok) throw new Error(`${VEREINE_URL}: HTTP ${response.status}`);
 const entries = JSON.parse((await response.text()).replace(/^﻿/, ''));
 if (entries.length < 100) throw new Error(`Vereinskarte unvollständig (${entries.length} Einträge) – Datenaufbau geändert?`);
-const clubs = entries.filter((entry) => !EXCLUDED.has(key(entry.name)));
-const unchecked = clubs.filter((entry) => !PLACES[key(entry.name)]).map((entry) => clean(entry.name));
+const clubs = entries;
+const unchecked = clubs.filter((entry) => !(key(entry.name) in PLACES)).map((entry) => clean(entry.name));
 if (unchecked.length) throw new Error(`Neue Vereine ohne geprüften Spielort (PLACES ergänzen): ${unchecked.join('; ')}`);
 
 const [owner] = query("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1");
@@ -261,6 +263,7 @@ const status = args.has('--publish') ? 'published' : 'pending';
 const now = new Date().toISOString();
 const statements = [];
 const skipped = [];
+const withoutPlace = [];
 const checklist = [];
 let placeCount = 0;
 
@@ -276,6 +279,10 @@ for (const entry of clubs) {
     + `VALUES (${quote(clubId)}, ${quote(name)}, 'club', ${quote(multiline(entry.Beschreibung))}, ${quote(url(entry.Homepage))}, NULL, '{}', ${quote(JSON.stringify(MEMBER_OF))}, NULL, ${quote(clean(entry.email))}, NULL, ${quote(status)}, ${quote(owner.id)}, ${quote(now)}, ${quote(now)});`,
   );
 
+  if (!PLACES[key(name)]) {
+    withoutPlace.push(name);
+    continue;
+  }
   const { street, postcode, city, latitude, longitude } = PLACES[key(name)];
   const address = [street, [postcode, city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   checklist.push([name, address, latitude, longitude].join(' | '));
@@ -288,7 +295,8 @@ for (const entry of clubs) {
   placeCount += 1;
 }
 
-console.log(`${entries.length} Karteneinträge, ${clubs.length} Vereine: ${clubs.length - skipped.length} neu, ${placeCount} Plätze, ${skipped.length} übersprungen, ${EXCLUDED.size} zurückgestellt.`);
+console.log(`${entries.length} Karteneinträge, ${clubs.length} Vereine: ${clubs.length - skipped.length} neu, ${placeCount} Plätze, ${skipped.length} übersprungen.`);
+if (withoutPlace.length) console.log(`Ohne Platz: ${withoutPlace.join('; ')}`);
 if (skipped.length) console.log(`Übersprungen (bereits vorhanden): ${skipped.join('; ')}`);
 if (statements.length === 0) process.exit(0);
 if (args.has('--checklist')) console.log(checklist.join('\n'));

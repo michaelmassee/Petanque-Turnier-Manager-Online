@@ -1,10 +1,11 @@
 // Importiert die Mitgliedsvereine des Hessischen Petanque Verbands (HPV) als Organisationen zur Moderation.
 // Quelle: hessenpetanque.de/verband/mitgliedsvereine/ bettet nur die DPV-Vereinskarte ein, deren Daten liegen in
-// VEREINE_URL. Vereine werden mit Owner = Admin und Status 'pending' angelegt, Plätze mit den Koordinaten der Quelle.
+// VEREINE_URL. Vereine werden mit Owner = Admin und Status 'pending' angelegt (mit --publish gleich freigegeben), Plätze
+// mit den Koordinaten der Quelle.
 //
 //   node scripts/import-hpv-clubs.mjs --local            # SQL erzeugen und anzeigen
 //   node scripts/import-hpv-clubs.mjs --local --apply    # zusätzlich ausführen
-//   node scripts/import-hpv-clubs.mjs --remote --apply   # Produktion
+//   node scripts/import-hpv-clubs.mjs --remote --apply --publish    # Produktion, gleich freigegeben
 //
 // Idempotent: vorhandene Vereine (gleicher Name) und Plätze (gleicher Name, Adresse, Typ) werden übersprungen.
 import { execFileSync } from 'node:child_process';
@@ -24,8 +25,6 @@ const SECOND_PLACE = {
   'boule club linden e.v.': { merge: true },
   'bornheim boules e.v.': { independent: true, name: 'Günthersburgpark' },
 };
-// Nicht importieren: ISD trägt in der Quelle Adresse, Koordinaten und Logo eines anderen Eintrags.
-const EXCLUDED = new Set(['isd e.v. intosports steinbach deutschland']);
 
 const args = new Set(process.argv.slice(2));
 const target = args.has('--remote') ? '--remote' : args.has('--local') ? '--local' : null;
@@ -54,7 +53,8 @@ function url(value) {
 }
 
 function logo(picture) {
-  const path = clean(picture).replace(/^(\.\.\/)+/, '');
+  // Die Karte lässt teils die Dateiendung weg („06-119_k.“); auf dem Server liegt das Logo dann als .jpg.
+  const path = clean(picture).replace(/^(\.\.\/)+/, '').replace(/\.$/, '.jpg');
   return path.startsWith('Image/') ? new URL(path, IMAGE_BASE).href : null;
 }
 
@@ -82,8 +82,7 @@ function placeDescription(entries) {
 
 const response = await fetch(VEREINE_URL);
 if (!response.ok) throw new Error(`${VEREINE_URL}: HTTP ${response.status}`);
-const entries = JSON.parse((await response.text()).replace(/^﻿/, ''))
-  .filter((entry) => !EXCLUDED.has(key(entry.name)));
+const entries = JSON.parse((await response.text()).replace(/^﻿/, ''));
 
 const groups = new Map();
 for (const entry of entries) {
@@ -96,6 +95,7 @@ const [owner] = query("SELECT id FROM users WHERE role = 'admin' ORDER BY create
 if (!owner) throw new Error('Kein Admin-Konto als Owner gefunden.');
 const existing = new Set(query('SELECT lower(trim(name)) AS name FROM clubs').map((row) => row.name));
 
+const status = args.has('--publish') ? 'published' : 'pending';
 const now = new Date().toISOString();
 const statements = [];
 const skipped = [];
@@ -110,7 +110,7 @@ function insertPlace({ clubId, clubName, name, entry, venueType = 'outdoor', des
   const clubCondition = clubId ? `EXISTS (SELECT 1 FROM clubs WHERE id = ${quote(clubId)})` : '1';
   statements.push(
     `INSERT INTO boule_places (id, club_id, club_name, name, address, latitude, longitude, venue_type, court_count, description, accessible, facility_codes, status, reported_by_user_id, address_unverified, created_at, updated_at) `
-    + `SELECT ${quote(place.id)}, ${quote(clubId)}, ${quote(clubName)}, ${quote(name)}, ${quote(place.address)}, ${place.latitude ?? 'NULL'}, ${place.longitude ?? 'NULL'}, ${quote(venueType)}, 0, ${quote(description)}, 0, '[]', 'pending', ${clubId ? 'NULL' : quote(owner.id)}, 1, ${quote(now)}, ${quote(now)} `
+    + `SELECT ${quote(place.id)}, ${quote(clubId)}, ${quote(clubName)}, ${quote(name)}, ${quote(place.address)}, ${place.latitude ?? 'NULL'}, ${place.longitude ?? 'NULL'}, ${quote(venueType)}, 0, ${quote(description)}, 0, '[]', ${quote(status)}, ${clubId ? 'NULL' : quote(owner.id)}, 1, ${quote(now)}, ${quote(now)} `
     + `WHERE ${clubCondition} AND NOT EXISTS (SELECT 1 FROM boule_places WHERE lower(trim(name)) = lower(trim(${quote(name)})) AND lower(trim(address)) = lower(trim(${quote(place.address)})) AND venue_type = ${quote(venueType)});`,
   );
   placeCount += 1;
@@ -131,7 +131,7 @@ for (const [groupKey, group] of groups) {
   const logoUrl = group.entries.map((entry) => logo(entry.picture)).find(Boolean) || null;
   statements.push(
     'INSERT OR IGNORE INTO clubs (id, name, kind, description, website_url, logo_url, social_links, member_of, contact_name, contact_email, contact_phone, status, owner_id, created_at, updated_at) '
-    + `VALUES (${quote(clubId)}, ${quote(group.name)}, 'club', ${quote(description)}, ${quote(websiteUrl)}, ${quote(logoUrl)}, '{}', ${quote(JSON.stringify(MEMBER_OF))}, NULL, ${quote(contactEmail)}, NULL, 'pending', ${quote(owner.id)}, ${quote(now)}, ${quote(now)});`,
+    + `VALUES (${quote(clubId)}, ${quote(group.name)}, 'club', ${quote(description)}, ${quote(websiteUrl)}, ${quote(logoUrl)}, '{}', ${quote(JSON.stringify(MEMBER_OF))}, NULL, ${quote(contactEmail)}, NULL, ${quote(status)}, ${quote(owner.id)}, ${quote(now)}, ${quote(now)});`,
   );
   const placeEntries = second.merge ? group.entries : [first];
   insertPlace({ clubId, clubName: null, name: group.name, entry: first, description: placeDescription(placeEntries) });

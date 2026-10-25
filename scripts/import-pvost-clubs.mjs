@@ -9,9 +9,8 @@
 //   node scripts/import-pvost-clubs.mjs --remote --apply --publish    # Produktion, gleich freigegeben
 //
 // Idempotent: vorhandene Vereine (gleicher Name) und Plätze (gleicher Name, Adresse, Typ) werden übersprungen.
-// Vorerst nicht importiert: SV Horken Kittlitz (verlinkte Domain gehört inzwischen einem Online-Casino, Spielort unbekannt);
-// Kahla (nur Logo) und Nordhausen (Link auf eine gelöschte Stadtnachricht) – Vereinsname und Spielort unbekannt.
-// Die neue Abteilung der SG Fortuna in Rhönblick steht nicht auf der Verbandsseite.
+// Nicht importiert: Kahla (nur Logo) und Nordhausen (Link auf eine gelöschte Stadtnachricht) – Vereinsname und Spielort
+// unbekannt. Die neue Abteilung der SG Fortuna in Rhönblick steht nicht auf der Verbandsseite.
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,7 +18,7 @@ import { join } from 'node:path';
 
 const LIST_URL = 'https://pv-ost.de/verband/';
 const MEMBER_OF = ['Pétanqueverband Ost'];
-// listLink: Domain, mit der die Verbandsseite den Verein verlinkt; places: Spielorte (outdoor/indoor).
+// listLink: Domain, mit der die Verbandsseite den Verein verlinkt; places: Spielorte (outdoor/indoor), leer = ohne Platz.
 const CLUBS = [
   {
     name: 'Leipziger Pétanque Club "Pastis 1996" e.V.', listLink: 'leipzigboule.de', website: 'https://www.leipzigboule.de/',
@@ -89,6 +88,8 @@ const CLUBS = [
     places: [{ street: 'Barbarastraße (KT-Sportforum)', postcode: '39218', city: 'Schönebeck (Elbe)', latitude: 52.00944, longitude: 11.74778,
       description: 'Abteilung Pétanque; mittwochs ab 18 Uhr (hier oder auf dem Bouleplatz in Magdeburg-Buckau), sonntags ab Frühjahr ab 14 Uhr öffentliches Spiel im Kurpark Bad Salzelmen (Treffpunkt Café Parkidyll).' }],
   },
+  // Spielort unbekannt; die verlinkte Domain gehört inzwischen einem Online-Casino, darum ohne Website.
+  { name: 'SV Horken Kittlitz e.V.', listLink: 'svhorkenkittlitz.de', website: null, places: [] },
 ];
 
 const args = new Set(process.argv.slice(2));

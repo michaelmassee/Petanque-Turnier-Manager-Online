@@ -16,13 +16,8 @@ import { join } from 'node:path';
 
 const LIST_URL = 'https://www.petanque-sbv.de/content/unser-verband/vereine/';
 const MEMBER_OF = ['Saarländischer Boule-Verband'];
-// Vorerst nicht importieren: Der Verband nennt keine Sportanlage (später mit geprüftem Spielort nachholen). Die
-// Boule-Freunde Überherrn gibt es schon als „Boulefreunde Überherrn e.V.“ (von Hand angelegt).
-const EXCLUDED = new Set([
-  'boule-club hirzweiler "aufer" 2011 e.v.', 'boule-freunde perl-besch e.v.', 'kewelsberg bouler - vfb. tünsdorf 1954 e.v.',
-  'boule-freunde überherrn e.v.',
-]);
-// Vereinswebsites aus der Pétanque-Aktuell-Karte, wo die Vereinsseite des Verbands keine nennt.
+// Nicht importieren: Die Boule-Freunde Überherrn gibt es schon als „Boulefreunde Überherrn e.V.“ (von Hand angelegt).
+const EXCLUDED = new Set(['boule-freunde überherrn e.v.']);
 const WEBSITES = {
   'boule-club 1966 saarlouis e.v.': 'https://www.boulesaarlouis.de/',
   'boule-club 1987 saarlouis-picard e.v.': 'https://www.boule-club-picard.de/',
@@ -34,6 +29,10 @@ const WEBSITES = {
 // zur Verbandsangabe passt, sonst Nominatim-Treffer der Verbandsangabe (Nunkirchen BSG, Rodenhof, Senioren-SG,
 // St. Wendel, Hühnerfeld). Dirmingen spielt in der Boulehalle.
 const PLACES = {
+  // Nachgeholt ohne Platz (null): Der Verband nennt keine Sportanlage, eine Vereinswebsite gibt es nicht.
+  'boule-club hirzweiler "aufer" 2011 e.v.': null,
+  'boule-freunde perl-besch e.v.': null,
+  'kewelsberg bouler - vfb. tünsdorf 1954 e.v.': null,
   'bouchon neunkirchen e.v.': { street: 'Kirkeler Straße (Campingplatz Prießnitz-Kneippverein)', postcode: '66538', city: 'Neunkirchen-Oberstadt', latitude: 49.3266762, longitude: 7.1948889 },
   'boule kg sitterswald': { street: 'Nauwieser Straße (Wanderparkplatz Blies-Grenz-Weg)', postcode: '66271', city: 'Kleinblittersdorf-Sitterswald', latitude: 49.1311797, longitude: 7.0707269 },
   'boule verein dirmingen': { street: 'Hierscheider Straße 2b', postcode: '66571', city: 'Eppelborn-Dirmingen', latitude: 49.4165021, longitude: 7.0106684, venueType: 'indoor' },
@@ -131,7 +130,7 @@ for (const [name, href] of links) {
   const website = page.match(/Website:\s*(https?:\/\/\S+)/)?.[1] ?? WEBSITES[key(name)] ?? null;
   clubs.push({ name, website });
 }
-const unchecked = clubs.filter((club) => !PLACES[key(club.name)]).map((club) => club.name);
+const unchecked = clubs.filter((club) => !(key(club.name) in PLACES)).map((club) => club.name);
 if (unchecked.length) throw new Error(`Neue Vereine ohne geprüften Spielort (PLACES ergänzen): ${unchecked.join('; ')}`);
 
 const [owner] = query("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1");
@@ -143,6 +142,7 @@ const status = args.has('--publish') ? 'published' : 'pending';
 const now = new Date().toISOString();
 const statements = [];
 const skipped = [];
+const withoutPlace = [];
 const checklist = [];
 let placeCount = 0;
 
@@ -158,6 +158,10 @@ for (const entry of clubs) {
     + `VALUES (${quote(clubId)}, ${quote(name)}, 'club', NULL, ${quote(entry.website)}, NULL, '{}', ${quote(JSON.stringify(MEMBER_OF))}, NULL, NULL, NULL, ${quote(status)}, ${quote(owner.id)}, ${quote(now)}, ${quote(now)});`,
   );
 
+  if (!PLACES[key(name)]) {
+    withoutPlace.push(name);
+    continue;
+  }
   const { street, postcode, city, latitude, longitude, venueType = 'outdoor' } = PLACES[key(name)];
   const address = [street, [postcode, city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   checklist.push([name, address, latitude, longitude].join(' | '));
@@ -171,6 +175,7 @@ for (const entry of clubs) {
 }
 
 console.log(`${links.length} Vereine im Verband, ${clubs.length} importierbar: ${clubs.length - skipped.length} neu, ${placeCount} Plätze, ${skipped.length} übersprungen, ${EXCLUDED.size} zurückgestellt.`);
+if (withoutPlace.length) console.log(`Ohne Platz: ${withoutPlace.join('; ')}`);
 if (skipped.length) console.log(`Übersprungen (bereits vorhanden): ${skipped.join('; ')}`);
 if (statements.length === 0) process.exit(0);
 if (args.has('--checklist')) console.log(checklist.join('\n'));

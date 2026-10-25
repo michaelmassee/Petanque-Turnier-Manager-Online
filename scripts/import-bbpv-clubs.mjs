@@ -2,11 +2,11 @@
 // zur Moderation. Quelle: petanque-bw.de/service/vereinsregister/ bettet nur die DPV-Vereinskarte ein, deren Daten in
 // VEREINE_URL liegen. Die Karte hat meist Breite und Länge vertauscht, Ort/Adresse in wechselnden Formaten und für
 // mehrere Einträge eines Vereins dieselbe Koordinate – geprüfte Korrekturen stehen in PLACE_FIXES und EXTRA_PLACES.
-// Vereine werden mit Owner = Admin und Status 'pending' angelegt.
+// Vereine werden mit Owner = Admin und Status 'pending' angelegt, mit --publish gleich freigegeben (wie die Admin-Freigabe).
 //
 //   node scripts/import-bbpv-clubs.mjs --local            # SQL erzeugen und anzeigen
 //   node scripts/import-bbpv-clubs.mjs --local --apply    # zusätzlich ausführen
-//   node scripts/import-bbpv-clubs.mjs --remote --apply   # Produktion
+//   node scripts/import-bbpv-clubs.mjs --remote --apply --publish    # Produktion, gleich freigegeben
 //
 // Idempotent: vorhandene Vereine (gleicher Name) und Plätze (gleicher Name, Adresse, Typ) werden übersprungen.
 import { execFileSync } from 'node:child_process';
@@ -17,26 +17,8 @@ import { join } from 'node:path';
 const VEREINE_URL = 'https://dpvserver.de/bbpv/web/vmap2/src/vereine.json';
 const IMAGE_BASE = 'https://dpvserver.de/bbpv/';
 const MEMBER_OF = ['Boule, Boccia und Pétanque Verband Baden-Württemberg'];
-// Vorerst nicht importieren: Vinomna sitzt in Rankweil (Vorarlberg, Österreich); Vereine ohne Straßenangabe, deren
-// Spielort nur als Ortsmitte bekannt ist; Vereine, deren Hauptsparte kein Boule ist und deren Mitgliedschaft erst geprüft wird.
-const EXCLUDED = new Set([
-  'club pétanque vinomna',
-  // Nur Ortsmitte bekannt.
-  'bte bönnigheim e.v.', 'bc sandhofen e.v.', 'tv 1900 oberhausen e.v.', 'pétanque club bâtard neckargerach e.v.',
-  'tg laudenbach 1889 e.v.', 'club bouliste sigmaringen e.v.', 'sv hardt e.v.', 'vfb neuffen e.v.',
-  'bc pfullinger leg- und schießgesellschaft e.v.', 'pétanque-club aalen e.v.', 'sport- und kulturverein erligheim e.v.',
-  'boule-club öhringen e.v.', 'tv ersingen e.v.', 'bc 1991 boulin rouge straubenhardt-karlsbad e.v.',
-  'boule für alle ötisheim e.v.', 'erster boule club karlsruhe e.v.', 'sv karlsruhe-beiertheim 1884/98 e.v.',
-  'bc durmersheim e.v.', 'fv viktoria 1927 ubstadt e.v.', 'bc fessenbacchus offenburg e.v.',
-  'boulefreunde mundelfingen e.v.', 'bbbc singen e.v.', 'tsv alemannia freiburg-zähringen e.v.',
-  'badischer pétanque-verein freiburg e.v.', 'boule13waldkirch e.v.', 'bsg le cochonnet schopfheim e.v.',
-  'psg friedrichshafen e.v.', 'terra libre ravensburg e.v.', 'bv grenzbach e.v.', 'boule club meßkirch ohne ehrgeiz e.v.',
-  'latschari-boule gutach e.v.',
-  // Hauptsparte kein Boule.
-  'skiclub hockenheim e.v.', 'tennis-club st. leon 1971 e.v.', 'tc ludwigsburg e.v.', 'tc 88 hambrücken e.v.',
-  'waldheimverein backnang e.v.', 'ttc-gnadental e.v.', 'naturbad sulz e.v.', 'schützenverein altheim e.v.',
-  'karlsruher fussballverein e.v.', 'fv grünwinkel 1910 e.v.',
-]);
+// Nicht importieren: Vinomna sitzt in Rankweil (Vorarlberg, Österreich).
+const EXCLUDED = new Set(['club pétanque vinomna']);
 // Tippfehler in Website-Adressen.
 const URL_FIXES = { 'tgs-pfotzheim.de': 'tgs-pforzheim.de' };
 // Tote, verkaufte oder fremde Websites.
@@ -119,6 +101,50 @@ const PLACE_FIXES = {
   'ssv ulm 1846 e.v.': { street: 'Stadionstraße', postcode: '89073', city: 'Ulm', latitude: 48.402363, longitude: 10.009337 },
   'kdrei e.v. frickenhausen': { street: 'Gartenstraße 12', latitude: 48.593963, longitude: 9.362256 },
   'naturboulefreunde ruit e.v.': { street: 'Kirchheimer Straße 123', latitude: 48.7264875, longitude: 9.2628248 },
+  // Nachgeholt (früher zurückgestellt, weil die Karte nur die Ortsmitte nennt): Spielort aus Vereinswebsite,
+  // Kartentext oder Pétanque-Aktuell-Pin, jeweils per Reverse-Geocoding geprüft.
+  'skiclub hockenheim e.v.': { street: 'Altwingertweg 16 (Vereinsgelände)', postcode: '68766', city: 'Hockenheim', latitude: 49.3207264, longitude: 8.5349864 },
+  'bte bönnigheim e.v.': { street: 'Am Schloss', postcode: '74357', city: 'Bönnigheim', latitude: 49.040215, longitude: 9.093492 },
+  'bc sandhofen e.v.': { street: 'Gaswerkstraße 25 (hinter dem SKV-Gelände)', postcode: '68307', city: 'Mannheim', latitude: 49.53738, longitude: 8.445681 },
+  'tennis-club st. leon 1971 e.v.': { street: 'Kronauer Straße 112', postcode: '68789', city: 'St. Leon-Rot', latitude: 49.252427, longitude: 8.609457 },
+  'tv 1900 oberhausen e.v.': { street: 'Jahnstraße 85', postcode: '68794', city: 'Oberhausen-Rheinhausen', latitude: 49.253479, longitude: 8.478339 },
+  'tg laudenbach 1889 e.v.': { street: 'Elekerstraße 3 (Sportplatzgelände)', postcode: '69514', city: 'Laudenbach', latitude: 49.611967, longitude: 8.649925 },
+  'waldheimverein backnang e.v.': { street: 'Wilhelm-Erlenbusch-Straße 1', postcode: '71522', city: 'Backnang', latitude: 48.959264, longitude: 9.446647 },
+  'tc ludwigsburg e.v.': { street: 'Robert-Franck-Allee 26', postcode: '71638', city: 'Ludwigsburg', latitude: 48.887369, longitude: 9.198265 },
+  'club bouliste sigmaringen e.v.': { street: 'Gorheimer Allee 8', postcode: '72488', city: 'Sigmaringen', latitude: 48.087255, longitude: 9.200485 },
+  'sv hardt e.v.': { street: 'In den Schlagwiesen', postcode: '72622', city: 'Nürtingen-Hardt', latitude: 48.644425, longitude: 9.304781 },
+  'vfb neuffen e.v.': { street: 'Sportgelände Spadelsberg', postcode: '72639', city: 'Neuffen', latitude: 48.54406, longitude: 9.376249 },
+  'bc pfullinger leg- und schießgesellschaft e.v.': { street: 'Laiblinsplatz', postcode: '72793', city: 'Pfullingen', latitude: 48.4643, longitude: 9.22658 },
+  'pétanque-club aalen e.v.': { street: 'Waldhäuser Straße 112', postcode: '73432', city: 'Aalen-Unterkochen', latitude: 48.8162541, longitude: 10.1426037 },
+  'ttc-gnadental e.v.': { street: 'Stuttgarter Straße 181 (Sportgelände Rote Steige)', postcode: '74545', city: 'Michelfeld', latitude: 49.0968798, longitude: 9.6630715 },
+  'boule-club öhringen e.v.': { street: 'Gerbergasse (vor der Stadtmauer)', postcode: '74613', city: 'Öhringen', latitude: 49.1995944, longitude: 9.4989708 },
+  'bc 1991 boulin rouge straubenhardt-karlsbad e.v.': { street: 'Kernstraße 51 (Ortsausgang)', postcode: '75334', city: 'Straubenhardt-Schwann', latitude: 48.8516537, longitude: 8.5563895 },
+  'boule für alle ötisheim e.v.': { street: 'Beim Freibad', postcode: '75443', city: 'Ötisheim', latitude: 48.967595, longitude: 8.793565 },
+  'erster boule club karlsruhe e.v.': { street: 'Schlossplatz', postcode: '76131', city: 'Karlsruhe', latitude: 49.011814, longitude: 8.404199 },
+  'sv karlsruhe-beiertheim 1884/98 e.v.': { street: 'Hermann-Veit-Straße 3', postcode: '76135', city: 'Karlsruhe', latitude: 48.99572, longitude: 8.37811 },
+  'fv grünwinkel 1910 e.v.': { street: 'Joachim-Kurzaj-Weg 5', postcode: '76189', city: 'Karlsruhe', latitude: 48.993986, longitude: 8.362629 },
+  'bc durmersheim e.v.': { street: 'Rathausplatz (zwischen Kirche St. Dionys und Rathaus)', postcode: '76448', city: 'Durmersheim', latitude: 48.93245, longitude: 8.2715 },
+  'fv viktoria 1927 ubstadt e.v.': { street: 'Kolpingstraße (hinter dem Fußballplatz)', postcode: '76698', city: 'Ubstadt-Weiher', latitude: 49.167837, longitude: 8.6291295 },
+  'tc 88 hambrücken e.v.': { street: 'Gartenweg 9', postcode: '76707', city: 'Hambrücken', latitude: 49.1851845, longitude: 8.5468787 },
+  'naturbad sulz e.v.': { street: 'Bachstraße 51', postcode: '77933', city: 'Lahr-Sulz', latitude: 48.3071917, longitude: 7.8678809 },
+  'bbbc singen e.v.': { street: 'Radolfzeller Straße 29', postcode: '78224', city: 'Singen', latitude: 47.765861, longitude: 8.8537954 },
+  'tsv alemannia freiburg-zähringen e.v.': { street: 'Hinterkirchstraße 21', postcode: '79108', city: 'Freiburg', latitude: 48.0175348, longitude: 7.8584997 },
+  'badischer pétanque-verein freiburg e.v.': { street: 'Schlettstadter Straße 45', postcode: '79110', city: 'Freiburg', latitude: 48.00966, longitude: 7.82251 },
+  'boule13waldkirch e.v.': { street: 'Schlettstadtallee (an der Elz)', postcode: '79183', city: 'Waldkirch', latitude: 48.093918, longitude: 7.958146 },
+  'bsg le cochonnet schopfheim e.v.': { street: 'Dr.-Max-Picard-Platz', postcode: '79650', city: 'Schopfheim', latitude: 47.64983, longitude: 7.818326 },
+  'psg friedrichshafen e.v.': { street: 'Am Seemooser Horn', postcode: '88045', city: 'Friedrichshafen', latitude: 47.6580851, longitude: 9.4340151 },
+  'terra libre ravensburg e.v.': { street: 'Hirschgraben', postcode: '88214', city: 'Ravensburg', latitude: 47.780136, longitude: 9.611164 },
+  'boule club meßkirch ohne ehrgeiz e.v.': { street: 'Hofgarten', postcode: '88605', city: 'Meßkirch', latitude: 47.9928094, longitude: 9.1075721 },
+  'schützenverein altheim e.v.': { street: 'Zähringer Weg 2 (Vereinsgelände)', postcode: '89174', city: 'Altheim (Alb)', latitude: 48.5833901, longitude: 10.021386 },
+  // Spielort weiter unbekannt (nur Ortsmitte, keine Website) bzw. Karlsruher FV teilt sich die Anlage mit dem FV Grünwinkel.
+  'pétanque club bâtard neckargerach e.v.': null,
+  'sport- und kulturverein erligheim e.v.': null,
+  'tv ersingen e.v.': null,
+  'karlsruher fussballverein e.v.': null,
+  'bc fessenbacchus offenburg e.v.': null,
+  'boulefreunde mundelfingen e.v.': null,
+  'bv grenzbach e.v.': null,
+  'latschari-boule gutach e.v.': null,
   // Nur Postfach und Stadtmitte bekannt.
   'bffl stuttgart e.v.': null,
   'djk villingen e.v.': null,
@@ -221,6 +247,7 @@ if (!owner) throw new Error('Kein Admin-Konto als Owner gefunden.');
 // In JS normalisieren: SQLites lower() lässt Umlaute wie Ö groß.
 const existing = new Set(query('SELECT name FROM clubs').map((row) => key(row.name)));
 
+const status = args.has('--publish') ? 'published' : 'pending';
 const now = new Date().toISOString();
 const statements = [];
 const skipped = [];
@@ -244,7 +271,7 @@ function insertPlace({ clubId, clubName, name, venueType = 'outdoor', placeEntri
   const clubCondition = `EXISTS (SELECT 1 FROM clubs WHERE id = ${quote(clubId)})`;
   statements.push(
     'INSERT INTO boule_places (id, club_id, club_name, name, address, latitude, longitude, venue_type, court_count, description, accessible, facility_codes, status, reported_by_user_id, address_unverified, created_at, updated_at) '
-    + `SELECT ${quote(crypto.randomUUID())}, ${clubName ? 'NULL' : quote(clubId)}, ${quote(clubName)}, ${quote(name)}, ${quote(address)}, ${latitude ?? 'NULL'}, ${longitude ?? 'NULL'}, ${quote(venueType)}, 0, ${quote(placeDescription(placeEntries))}, 0, '[]', 'pending', ${clubName ? quote(owner.id) : 'NULL'}, 1, ${quote(now)}, ${quote(now)} `
+    + `SELECT ${quote(crypto.randomUUID())}, ${clubName ? 'NULL' : quote(clubId)}, ${quote(clubName)}, ${quote(name)}, ${quote(address)}, ${latitude ?? 'NULL'}, ${longitude ?? 'NULL'}, ${quote(venueType)}, 0, ${quote(placeDescription(placeEntries))}, 0, '[]', ${quote(status)}, ${clubName ? quote(owner.id) : 'NULL'}, 1, ${quote(now)}, ${quote(now)} `
     + `WHERE ${clubCondition} AND NOT EXISTS (SELECT 1 FROM boule_places WHERE lower(trim(name)) = lower(trim(${quote(name)})) AND lower(trim(address)) = lower(trim(${quote(address)})) AND venue_type = ${quote(venueType)});`,
   );
   placeCount += 1;
@@ -262,7 +289,7 @@ for (const [groupKey, group] of groups) {
   const logoUrl = group.entries.map((entry) => logo(entry.picture)).find(Boolean) || null;
   statements.push(
     'INSERT OR IGNORE INTO clubs (id, name, kind, description, website_url, logo_url, social_links, member_of, contact_name, contact_email, contact_phone, status, owner_id, created_at, updated_at) '
-    + `VALUES (${quote(clubId)}, ${quote(group.name)}, 'club', ${quote(description)}, ${quote(websiteUrl)}, ${quote(logoUrl)}, '{}', ${quote(JSON.stringify(MEMBER_OF))}, NULL, ${quote(contactEmail)}, NULL, 'pending', ${quote(owner.id)}, ${quote(now)}, ${quote(now)});`,
+    + `VALUES (${quote(clubId)}, ${quote(group.name)}, 'club', ${quote(description)}, ${quote(websiteUrl)}, ${quote(logoUrl)}, '{}', ${quote(JSON.stringify(MEMBER_OF))}, NULL, ${quote(contactEmail)}, NULL, ${quote(status)}, ${quote(owner.id)}, ${quote(now)}, ${quote(now)});`,
   );
 
   const extras = EXTRA_PLACES[groupKey] ?? [];

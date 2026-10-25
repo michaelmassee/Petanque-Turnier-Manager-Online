@@ -17,18 +17,27 @@ import { join } from 'node:path';
 const VEREINE_URL = 'https://dpvserver.de/bpv/web/vmap/src/vereine.json';
 const IMAGE_BASE = 'https://dpvserver.de/bpv/';
 const MEMBER_OF = ['Bayerischer Pétanque-Verband'];
-// Vorerst nicht importieren: Spielort weder aus Karte, Website noch anderen Karten bestimmbar (nur Ortsmitte,
-// Wohnadresse oder keine Adresse) – später mit geprüftem Spielort nachholen. TSV Lindau ist schon über den BBPV-Import
-// (als „TSV Lindau von 1850 e.V.“) angelegt.
-const EXCLUDED = new Set([
-  'sg bouba bayreuth', 'schweinfurter kugelleger e.v.', 'boule freunde kleeblatt fürth', 'lauf offene boulegruppe',
-  'ts jahn münchen e. v.', 'boupa münchen', 'münchen mesdames', 'toyboyz', 'boule freunde nürnberg e.v.', 'kgb nürnberg',
-  'bc zwanglos zwinger nürnberg', 'bc oettingen', 'pétanque freunde', 'tsv lindau 1850 e.v.',
-]);
+// Nicht importieren: TSV Lindau ist schon über den BBPV-Import (als „TSV Lindau von 1850 e.V.“) angelegt.
+const EXCLUDED = new Set(['tsv lindau 1850 e.v.']);
 // Unbrauchbare Website-Angaben der Karte, nach Hostname; null = keine Website.
 const WEBSITE_FIXES = { '---': null };
-// Geprüfter Spielort je Verein (Schlüssel = Vereinsname klein).
+// Geprüfter Spielort je Verein (Schlüssel = Vereinsname klein); null = Verein ohne Platz, weil der Spielort unbekannt ist.
 const PLACES = {
+  // Nachgeholt (früher zurückgestellt): Sportanlage laut Vereinswebsite, Kartenpin liegt direkt daneben.
+  'ts jahn münchen e. v.': { street: 'Weltenburger Straße 53', postcode: '81677', city: 'München', latitude: 48.1455747, longitude: 11.6272741 },
+  // Nachgeholt ohne Platz: Spielort weiter unbekannt (nur Ortsmitte, Wohn- oder Kontaktadresse, keine Website).
+  'sg bouba bayreuth': null,
+  'schweinfurter kugelleger e.v.': null,
+  'boule freunde kleeblatt fürth': null,
+  'lauf offene boulegruppe': null,
+  'boupa münchen': null,
+  'münchen mesdames': null,
+  'toyboyz': null,
+  'boule freunde nürnberg e.v.': null,
+  'kgb nürnberg': null,
+  'bc zwanglos zwinger nürnberg': null,
+  'bc oettingen': null,
+  'pétanque freunde': null,
   // Pin der Pétanque-Aktuell-Karte (gleicher Verein; Reverse-Geokodierung: Platz/Sportanlage).
   '1. bc germering': { street: 'Max-Reger-Str. 11', postcode: '82110', city: 'Germering', latitude: 48.1343355, longitude: 11.3740593 },
   '1. bcp aschaffenburg': { street: 'Deschstrasse', postcode: '63739', city: 'Aschaffenburg', latitude: 49.9771867, longitude: 9.1589284 },
@@ -149,7 +158,7 @@ if (!response.ok) throw new Error(`${VEREINE_URL}: HTTP ${response.status}`);
 const entries = JSON.parse((await response.text()).replace(/^﻿/, ''));
 if (entries.length < 60) throw new Error(`Vereinskarte unvollständig (${entries.length} Einträge) – Datenaufbau geändert?`);
 const clubs = entries.filter((entry) => !EXCLUDED.has(key(entry.name)));
-const unchecked = clubs.filter((entry) => !PLACES[key(entry.name)]).map((entry) => clean(entry.name));
+const unchecked = clubs.filter((entry) => !(key(entry.name) in PLACES)).map((entry) => clean(entry.name));
 if (unchecked.length) throw new Error(`Neue Vereine ohne geprüften Spielort (PLACES ergänzen): ${unchecked.join('; ')}`);
 
 const [owner] = query("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1");
@@ -161,6 +170,7 @@ const status = args.has('--publish') ? 'published' : 'pending';
 const now = new Date().toISOString();
 const statements = [];
 const skipped = [];
+const withoutPlace = [];
 const checklist = [];
 let placeCount = 0;
 
@@ -176,6 +186,10 @@ for (const entry of clubs) {
     + `VALUES (${quote(clubId)}, ${quote(name)}, 'club', ${quote(multiline(entry.Beschreibung))}, ${quote(url(entry.Homepage))}, ${quote(logo(entry.picture))}, '{}', ${quote(JSON.stringify(MEMBER_OF))}, NULL, ${quote(clean(entry.email))}, NULL, ${quote(status)}, ${quote(owner.id)}, ${quote(now)}, ${quote(now)});`,
   );
 
+  if (!PLACES[key(name)]) {
+    withoutPlace.push(name);
+    continue;
+  }
   const { street, postcode, city, latitude, longitude } = PLACES[key(name)];
   const address = [street, [postcode, city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   checklist.push([name, address, latitude, longitude].join(' | '));
@@ -189,6 +203,7 @@ for (const entry of clubs) {
 }
 
 console.log(`${entries.length} Karteneinträge, ${clubs.length} Vereine: ${clubs.length - skipped.length} neu, ${placeCount} Plätze, ${skipped.length} übersprungen, ${EXCLUDED.size} zurückgestellt.`);
+if (withoutPlace.length) console.log(`Ohne Platz: ${withoutPlace.join('; ')}`);
 if (skipped.length) console.log(`Übersprungen (bereits vorhanden): ${skipped.join('; ')}`);
 if (statements.length === 0) process.exit(0);
 if (args.has('--checklist')) console.log(checklist.join('\n'));

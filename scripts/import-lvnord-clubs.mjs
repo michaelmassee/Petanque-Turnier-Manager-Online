@@ -18,20 +18,6 @@ import { join } from 'node:path';
 const VEREINE_URL = 'https://dpvserver.de/lvnord/web/vmap/src/vereine.json';
 const IMAGE_BASE = 'https://dpvserver.de/lvnord/';
 const MEMBER_OF = ['Pétanque Verband Nord'];
-// Vorerst nicht importieren: Spielort nicht bestimmbar – Kartenadresse ist ein Wohnhaus (Kontaktadresse), nur die
-// Ortsmitte oder fehlt ganz; Elbe Pétanque Club ist kein eingetragener Verein. Später mit geprüftem Spielort nachholen.
-const EXCLUDED = new Set([
-  'boule apostel',
-  'bsg chausette rougette',
-  'elbe pétanque club n.e.v.',
-  'bim bam boule altona',
-  'belle boule ahrensburg',
-  'norderstedter sport- und freizeitverein e.v.',
-  'sg motor boizenburg e.v.',
-  'sg boulerei horst',
-  'sg hamburger bouletten',
-  'ts einfeld',
-]);
 // Tote oder umgezogene Vereinsseiten (geprüft 2026-10-26), nach Hostname; null = keine Website.
 const WEBSITE_FIXES = {
   'wrister-tennisclub.de': null,
@@ -40,8 +26,21 @@ const WEBSITE_FIXES = {
 };
 // Logos, die die Karte nennt, die aber nicht (mehr) existieren.
 const BAD_LOGOS = new Set(['https://dpvserver.de/lvnord/Image/ligalogos/gross/11-053_k.jpg']);
-// Geprüfter Spielort je Verein (Schlüssel = Vereinsname klein); noPlace = kein eigener Platz, Hinweis als Vereinsbeschreibung.
+// Geprüfter Spielort je Verein (Schlüssel = Vereinsname klein); noPlace = kein eigener Platz, Hinweis als Vereinsbeschreibung;
+// null = Verein ohne Platz, weil der Spielort unbekannt ist.
 const PLACES = {
+  // Nachgeholt (früher zurückgestellt): Spielort aus Vereinswebsite bzw. Pétanque-Aktuell-Karte, per Geocoding geprüft.
+  'boule apostel': { street: 'Bei der Apostelkirche', postcode: '20257', city: 'Hamburg-Eimsbüttel', latitude: 53.576181, longitude: 9.944098 },
+  'norderstedter sport- und freizeitverein e.v.': { street: 'Oadby-and-Wigston-Straße (Tennispark)', postcode: '22846', city: 'Norderstedt', latitude: 53.7221334, longitude: 9.9939497 },
+  'sg motor boizenburg e.v.': { street: 'Grüner Weg 5b (Sportplatz)', postcode: '19258', city: 'Boizenburg/Elbe', latitude: 53.3812644, longitude: 10.72569 },
+  'ts einfeld': { street: 'Roschdohler Weg 26 (bei den Tennisplätzen)', postcode: '24536', city: 'Neumünster-Einfeld', latitude: 54.1262355, longitude: 9.9851648 },
+  // Nachgeholt ohne Platz: Spielort weiter unbekannt (nur Ortsmitte, Wohn- oder Kontaktadresse, keine Website).
+  'bsg chausette rougette': null,
+  'elbe pétanque club n.e.v.': null,
+  'bim bam boule altona': null,
+  'belle boule ahrensburg': null,
+  'sg boulerei horst': null,
+  'sg hamburger bouletten': null,
   // Pin der Pétanque-Aktuell-Karte (gleicher Verein; Reverse-Geokodierung: Platz/Park/Sportanlage).
   'a.p.b.c. schwerin': { street: 'Alter Garten', postcode: '19055', city: 'Schwerin', latitude: 53.6262, longitude: 11.41676 },
   'altonaer boule club hamburg e.v.': { street: 'Platz der Republik', postcode: '22765', city: 'Hamburg', latitude: 53.5491039, longitude: 9.9355694 },
@@ -155,8 +154,8 @@ const response = await fetch(VEREINE_URL);
 if (!response.ok) throw new Error(`${VEREINE_URL}: HTTP ${response.status}`);
 const entries = JSON.parse((await response.text()).replace(/^﻿/, ''));
 if (entries.length < 40) throw new Error(`Vereinskarte unvollständig (${entries.length} Einträge) – Datenaufbau geändert?`);
-const clubs = entries.filter((entry) => !EXCLUDED.has(key(entry.name)));
-const unchecked = clubs.filter((entry) => !PLACES[key(entry.name)]).map((entry) => clean(entry.name));
+const clubs = entries;
+const unchecked = clubs.filter((entry) => !(key(entry.name) in PLACES)).map((entry) => clean(entry.name));
 if (unchecked.length) throw new Error(`Neue Vereine ohne geprüften Spielort (PLACES ergänzen): ${unchecked.join('; ')}`);
 
 const [owner] = query("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1");
@@ -181,10 +180,10 @@ for (const entry of clubs) {
   const place = PLACES[key(name)];
   statements.push(
     'INSERT OR IGNORE INTO clubs (id, name, kind, description, website_url, logo_url, social_links, member_of, contact_name, contact_email, contact_phone, status, owner_id, created_at, updated_at) '
-    + `VALUES (${quote(clubId)}, ${quote(name)}, 'club', ${quote(place.noPlace ?? multiline(entry.Beschreibung))}, ${quote(url(entry.Homepage))}, ${quote(logo(entry.picture))}, '{}', ${quote(JSON.stringify(MEMBER_OF))}, NULL, ${quote(clean(entry.email))}, NULL, ${quote(status)}, ${quote(owner.id)}, ${quote(now)}, ${quote(now)});`,
+    + `VALUES (${quote(clubId)}, ${quote(name)}, 'club', ${quote(place?.noPlace ?? multiline(entry.Beschreibung))}, ${quote(url(entry.Homepage))}, ${quote(logo(entry.picture))}, '{}', ${quote(JSON.stringify(MEMBER_OF))}, NULL, ${quote(clean(entry.email))}, NULL, ${quote(status)}, ${quote(owner.id)}, ${quote(now)}, ${quote(now)});`,
   );
   const venues = [
-    ...(place.noPlace ? [] : [{ ...place, venueType: 'outdoor', description: placeDescription(entry) }]),
+    ...(!place || place.noPlace ? [] : [{ ...place, venueType: 'outdoor', description: placeDescription(entry) }]),
     ...(INDOOR[key(name)] ? [{ ...INDOOR[key(name)], venueType: 'indoor' }] : []),
   ];
   for (const { placeName = name, courtCount = 0, verified = false, street, postcode, city, latitude, longitude, venueType, description } of venues) {
@@ -200,7 +199,7 @@ for (const entry of clubs) {
   }
 }
 
-console.log(`${entries.length} Karteneinträge, ${clubs.length} Vereine: ${clubs.length - skipped.length} neu, ${placeCount} Plätze, ${skipped.length} übersprungen, ${EXCLUDED.size} zurückgestellt.`);
+console.log(`${entries.length} Karteneinträge, ${clubs.length} Vereine: ${clubs.length - skipped.length} neu, ${placeCount} Plätze, ${skipped.length} übersprungen.`);
 if (skipped.length) console.log(`Übersprungen (bereits vorhanden): ${skipped.join('; ')}`);
 if (statements.length === 0) process.exit(0);
 if (args.has('--checklist')) console.log(checklist.join('\n'));

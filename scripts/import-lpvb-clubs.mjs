@@ -9,7 +9,6 @@
 //   node scripts/import-lpvb-clubs.mjs --remote --apply --publish    # Produktion, gleich freigegeben
 //
 // Idempotent: vorhandene Vereine (gleicher Name) und Plätze (gleicher Name, Adresse, Typ) werden übersprungen.
-// Vorerst nicht importiert, weil die Liste keinen Spielort nennt: CHABOULI, Roter Stern Berlin 2012 e.V.
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -85,6 +84,9 @@ const CLUBS = [
     name: 'SV Grün-Weiss Brieselang e.V.', listName: 'SV Grün-Weiss Brieselang', website: 'http://sv-gruen-weiss-brieselang.de/',
     places: [{ street: 'Karl-Marx-Straße 198', postcode: '14656', city: 'Brieselang', latitude: 52.5936093, longitude: 12.9890499 }],
   },
+  // Die Verbandsliste nennt keinen Spielort, eine Vereinswebsite gibt es nicht.
+  { name: 'CHABOULI', listName: 'CHABOULI', website: null, places: [] },
+  { name: 'Roter Stern Berlin 2012 e.V.', listName: 'Roter Stern Berlin 2012', website: null, places: [] },
 ];
 
 const args = new Set(process.argv.slice(2));
