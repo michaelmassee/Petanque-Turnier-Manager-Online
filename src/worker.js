@@ -6736,7 +6736,7 @@ export async function listRegistrations(db, tournament) {
   });
 }
 
-// Kennzeichen für Verwaltung und Abgleich: Doppelbelegung eines Kontos (Ausschlussgrund), mögliche Dublette (nur
+// Kennzeichen für Verwaltung und Abgleich: Doppelbelegung eines Kontos (Ausschlussgrund), möglicherweise doppelte Anmeldung (nur
 // Hinweis) und unvollständiges Formée-Team (A-10, KP-06).
 function registrationFlags(tournament, row, flagsFor) {
   const { accountConflictWith, possibleDuplicateWith } = flagsFor(row.id);
@@ -8431,6 +8431,7 @@ export async function createRegistration(request, env, tournament, {
   // kann etwa ein Team mit fremden E-Mail-Adressen anmelden und darf diese eigene
   // Meldung später dennoch stornieren.
   record.registrant_user_id = isManager ? null : session?.user?.id || null;
+  if (!isManager && !syncBootstrap) await assertNotAlreadyRegistered(db, tournament.id, record);
   const statusSql = `CASE WHEN ? = 0 OR capacity.used < ? THEN ? ELSE 'waitlist' END`;
   const statusBinds = [maxRegistrations, maxRegistrations, baseStatus];
   const columns = Object.keys(record);
@@ -12189,6 +12190,33 @@ function assertLicenseMatchesTournament(tournament, registration) {
 function assertPhoneMatchesTournament(tournament, registration, { isManager = false } = {}) {
   if (!isManager && Number(tournament.phone_required || 0) && !registration.phone) {
     throw new HttpError(400, 'Eine Telefonnummer ist erforderlich', { field: 'phone' });
+  }
+}
+
+// Erneutes Absenden derselben Selbstanmeldung (gleiche Personen mit gleichen Slot-E-Mails) wird abgewiesen, statt
+// eine Dublette anzulegen (Issue #31). Nur die vollständig identische Besetzung zählt: Wer eine Person in ein anderes
+// Team einträgt, kann sie so nicht aussperren (KP-06 b). Turnierleitung und Dokument behalten den Hinweis „möglicherweise
+// doppelt angemeldet“.
+function registrationIdentity(row) {
+  return registrationSlots(row)
+    .map((slot) => `${normalizePlayerName(slot.firstName, slot.lastName)}\u0000${(slot.email || '').trim().toLowerCase()}`)
+    .sort()
+    .join('\u0001');
+}
+
+async function assertNotAlreadyRegistered(db, tournamentId, record) {
+  const email = (record.player_email || '').trim().toLowerCase();
+  if (!email || isPlaceholderEmail(email)) return;
+  const candidates = await db
+    .prepare(`SELECT * FROM registrations
+       WHERE tournament_id = ? AND status IN ${ACTIVE_REGISTRATION_STATUSES_SQL} AND LOWER(TRIM(player_email)) = ?`)
+    .bind(tournamentId, email)
+    .all();
+  const identity = registrationIdentity(record);
+  if ((candidates.results || []).some((row) => registrationIdentity(row) === identity)) {
+    throw new HttpError(409, 'Diese Anmeldung liegt für dieses Turnier bereits vor', {
+      code: 'already_registered', name: `${record.first_name} ${record.last_name}`.trim(),
+    });
   }
 }
 

@@ -152,6 +152,29 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
       const liste = (await (await listRegistrations(env.DB, turnier())).json()).registrations;
       expect(liste.map((entry) => [entry.possibleDuplicate, entry.accountConflict])).toEqual([[true, false], [true, false]]);
     });
+
+    it('weist das erneute Absenden derselben Anmeldung ab (P-86)', async () => {
+      setzeTurnier({ formation: 'tete', registration_type: 'melee' });
+      await oeffentlichAnmelden({ firstName: 'Angelika', lastName: 'Remsperger' });
+
+      await expect(oeffentlichAnmelden({ firstName: 'angelika', lastName: 'Remsperger', playerEmail: 'SPIELER1@example.test' }))
+        .rejects.toMatchObject({ status: 409, message: 'Diese Anmeldung liegt für dieses Turnier bereits vor' });
+      expect(zeilen('SELECT id FROM registrations')).toHaveLength(1);
+
+      // Andere E-Mail bleibt ein unverbindlicher Hinweis; nach einer Absage ist die erneute Anmeldung möglich.
+      expect((await oeffentlichAnmelden({ firstName: 'Angelika', lastName: 'Remsperger', playerEmail: 'andere@example.test' })).status).toBe(201);
+      sql("UPDATE registrations SET status = 'rejected'");
+      expect((await oeffentlichAnmelden({ firstName: 'Angelika', lastName: 'Remsperger' })).status).toBe(201);
+    });
+
+    it('sperrt bei Teams nur die vollständig gleiche Besetzung (P-86, KP-06 b)', async () => {
+      await oeffentlichAnmelden({ firstName: 'Max', lastName: 'Muster', partnerFirstName: 'Uli', partnerLastName: 'Ulm' });
+
+      await expect(oeffentlichAnmelden({ firstName: 'Max', lastName: 'Muster', partnerFirstName: 'Uli', partnerLastName: 'Ulm' }))
+        .rejects.toMatchObject({ status: 409 });
+      expect((await oeffentlichAnmelden({ firstName: 'Max', lastName: 'Muster', partnerFirstName: 'Ben', partnerLastName: 'Berg' })).status)
+        .toBe(201);
+    });
   });
 
   describe('Abgleich mit dem Turnierdokument (T-17, T-18, KP-18)', () => {
