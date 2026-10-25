@@ -175,6 +175,109 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
       expect((await oeffentlichAnmelden({ firstName: 'Max', lastName: 'Muster', partnerFirstName: 'Ben', partnerLastName: 'Berg' })).status)
         .toBe(201);
     });
+
+    it('speichert bei zwei parallelen identischen Selbstanmeldungen nur eine und benachrichtigt einmal', async () => {
+      const body = { firstName: 'Anna', lastName: 'Adler', partnerFirstName: 'Ben', partnerLastName: 'Berg' };
+      const results = await Promise.allSettled([oeffentlichAnmelden(body), oeffentlichAnmelden(body)]);
+
+      expect(results.filter((result) => result.status === 'fulfilled').map((result) => result.value.status)).toEqual([201]);
+      expect(results.filter((result) => result.status === 'rejected').map((result) => result.reason))
+        .toEqual([expect.objectContaining({ status: 409, details: expect.objectContaining({ code: 'already_registered' }) })]);
+      expect(zeilen('SELECT id FROM registrations')).toHaveLength(1);
+      expect(zeilen("SELECT id FROM postbox_messages WHERE recipient_id = 'owner' AND event_type = 'registration_status_changed'"))
+        .toHaveLength(1);
+    });
+
+    it('erkennt dieselbe Doublette auch mit vertauschten Personen samt deren E-Mail-Adressen', async () => {
+      await oeffentlichAnmelden({ firstName: 'Anna', lastName: 'Adler', playerEmail: 'anna@example.test',
+        partnerFirstName: 'Ben', partnerLastName: 'Berg', partnerEmail: 'ben@example.test' });
+
+      await expect(oeffentlichAnmelden({ firstName: 'Ben', lastName: 'Berg', playerEmail: 'ben@example.test',
+        partnerFirstName: 'Anna', partnerLastName: 'Adler', partnerEmail: 'anna@example.test' }))
+        .rejects.toMatchObject({ status: 409, details: { code: 'already_registered' } });
+      expect(zeilen('SELECT id FROM registrations')).toHaveLength(1);
+    });
+
+    it('erkennt dieselbe Triplette unabhängig von allen drei Personenpositionen', async () => {
+      setzeTurnier({ formation: 'triplette' });
+      const people = [
+        ['Anna', 'Adler', 'anna@example.test'], ['Ben', 'Berg', 'ben@example.test'], ['Clara', 'Cramer', 'clara@example.test'],
+      ];
+      const body = (order) => Object.fromEntries(order.flatMap((person, index) => {
+        const fields = [['firstName', 'lastName', 'playerEmail'], ['partnerFirstName', 'partnerLastName', 'partnerEmail'],
+          ['partner2FirstName', 'partner2LastName', 'partner2Email']][index];
+        return fields.map((field, column) => [field, people[person][column]]);
+      }));
+      await oeffentlichAnmelden(body([0, 1, 2]));
+      for (const order of [[0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]) {
+        await expect(oeffentlichAnmelden(body(order))).rejects.toMatchObject({ status: 409 });
+      }
+      expect(zeilen('SELECT id FROM registrations')).toHaveLength(1);
+    });
+
+    it.each([
+      [['Ann', 'Abel'], ['Anna', 'Bel']],
+      [['Иван', 'Иванов'], ['Пётр', 'Петров']],
+      [['Anne-Marie', 'Müller'], ['Annemarie', 'Müller']],
+    ])('lässt verschiedene Personen mit gemeinsamer Kontaktadresse zu: %j', async (first, second) => {
+      setzeTurnier({ formation: 'tete' });
+      await oeffentlichAnmelden({ firstName: first[0], lastName: first[1] });
+      expect((await oeffentlichAnmelden({ firstName: second[0], lastName: second[1] })).status).toBe(201);
+      expect(zeilen('SELECT id FROM registrations')).toHaveLength(2);
+    });
+
+    it('weist auch eine kyrillische Selbstanmeldung bei anderer Großschreibung als identisch ab', async () => {
+      setzeTurnier({ formation: 'tete' });
+      await oeffentlichAnmelden({ firstName: 'Иван', lastName: 'Иванов' });
+      await expect(oeffentlichAnmelden({ firstName: 'ИВАН', lastName: 'ИВАНОВ' }))
+        .rejects.toMatchObject({ status: 409 });
+    });
+
+    it('nimmt parallele Anmeldungen unterschiedlicher Personen mit gemeinsamer E-Mail weiterhin an', async () => {
+      setzeTurnier({ formation: 'tete' });
+      const results = await Promise.all([
+        oeffentlichAnmelden({ firstName: 'Anna', lastName: 'Adler' }),
+        oeffentlichAnmelden({ firstName: 'Ben', lastName: 'Berg' }),
+      ]);
+      expect(results.map((result) => result.status)).toEqual([201, 201]);
+      expect(zeilen('SELECT id FROM registrations')).toHaveLength(2);
+    });
+
+    it('prüft bei einer gleichzeitigen Personenänderung vor dem Schreiben erneut auf identische Besetzung', async () => {
+      setzeTurnier({ formation: 'tete' });
+      await oeffentlichAnmelden({ firstName: 'Ben', lastName: 'Berg' });
+      env.DB.vorBatch((sqlite) => sqlite.exec("UPDATE registrations SET first_name = 'Anna', last_name = 'Adler'"));
+
+      await expect(oeffentlichAnmelden({ firstName: 'Anna', lastName: 'Adler' }))
+        .rejects.toMatchObject({ status: 409, details: { code: 'already_registered' } });
+      expect(zeilen('SELECT id FROM registrations')).toHaveLength(1);
+    });
+
+    it('erlaubt der Turnierleitung weiterhin das bewusste Anlegen einer identischen Besetzung', async () => {
+      setzeTurnier({ formation: 'tete' });
+      const body = { firstName: 'Anna', lastName: 'Adler' };
+      await oeffentlichAnmelden(body);
+      expect((await oeffentlichAnmelden(body, { user: { id: 'owner', role: 'user' } })).status).toBe(201);
+      expect(zeilen('SELECT id FROM registrations')).toHaveLength(2);
+    });
+
+    it('bricht bei anhaltenden parallelen Änderungen begrenzt und ohne neue Anmeldung oder Benachrichtigung ab', async () => {
+      setzeTurnier({ formation: 'tete' });
+      await oeffentlichAnmelden({ firstName: 'Ben', lastName: 'Berg' });
+      const notificationCount = zeilen('SELECT id FROM postbox_messages').length;
+      let changes = 0;
+      const change = (sqlite) => {
+        sqlite.prepare('UPDATE registrations SET first_name = ?').run(`Ben ${++changes}`);
+        env.DB.vorBatch(change);
+      };
+      env.DB.vorBatch(change);
+
+      await expect(oeffentlichAnmelden({ firstName: 'Anna', lastName: 'Adler' }))
+        .rejects.toMatchObject({ status: 409, message: 'Die Anmeldungen wurden zeitgleich geändert. Bitte erneut versuchen.' });
+      expect(changes).toBe(3);
+      expect(zeilen('SELECT id FROM registrations')).toHaveLength(1);
+      expect(zeilen('SELECT id FROM postbox_messages')).toHaveLength(notificationCount);
+    });
   });
 
   describe('Abgleich mit dem Turnierdokument (T-17, T-18, KP-18)', () => {

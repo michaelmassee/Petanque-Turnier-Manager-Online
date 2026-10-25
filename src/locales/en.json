@@ -1,4 +1,5 @@
 {
+  "Die Anmeldungen wurden zeitgleich geändert. Bitte erneut versuchen.": "Registrations changed at the same time. Please try again.",
   "Gelesene Nachrichten löschen nach (Tagen)": "Delete read messages after (days)",
   "Standard: 7 Tage ab dem ersten Lesen. Die tägliche Bereinigung läuft auch, wenn du offline bist. Eine geänderte Frist gilt beim nächsten Lauf auch für bereits gelesene Nachrichten. Maximal 25 Nachrichten bleiben gespeichert; bei neuen Nachrichten entfallen die ältesten, auch ungelesene. Andere Nutzer behalten ihre eigenen Kopien.": "Default: 7 days after first reading. Daily cleanup runs even when you are offline. A changed period also applies to previously read messages at the next run. At most 25 messages are kept; new messages remove the oldest, including unread ones. Other users keep their own copies.",
   "Die Aufbewahrungsdauer muss eine ganze Zahl zwischen 1 und 365 Tagen sein": "The retention period must be a whole number between 1 and 365 days",

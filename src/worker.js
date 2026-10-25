@@ -8431,30 +8431,47 @@ export async function createRegistration(request, env, tournament, {
   // kann etwa ein Team mit fremden E-Mail-Adressen anmelden und darf diese eigene
   // Meldung später dennoch stornieren.
   record.registrant_user_id = isManager ? null : session?.user?.id || null;
-  if (!isManager && !syncBootstrap) await assertNotAlreadyRegistered(db, tournament.id, record);
+  let duplicateGuard = !isManager && !syncBootstrap
+    ? await registrationDuplicateGuard(db, tournament.id, record) : null;
   const statusSql = `CASE WHEN ? = 0 OR capacity.used < ? THEN ? ELSE 'waitlist' END`;
   const statusBinds = [maxRegistrations, maxRegistrations, baseStatus];
   const columns = Object.keys(record);
-  statements.push(db.prepare(`INSERT INTO registrations (${columns.join(', ')}, status, participation, confirmed_at)
+  let results;
+  let created;
+  // Der Unicode-Vergleich erfolgt in JS. Das INSERT prüft atomar, dass sein gelesener Kandidatenbestand noch gilt.
+  // Nur bei einer parallelen Änderung erneut lesen; normale Anmeldungen benötigen keinen zusätzlichen Roundtrip.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const insert = db.prepare(`INSERT INTO registrations (${columns.join(', ')}, status, participation, confirmed_at)
       SELECT ${columns.map(() => '?').join(', ')}, ${statusSql},
         CASE WHEN (${statusSql}) = 'confirmed' THEN ? ELSE ? END,
         CASE WHEN (${statusSql}) = 'confirmed' THEN ? ELSE NULL END
       FROM (SELECT COUNT(*) AS used FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')) capacity
       WHERE EXISTS (SELECT 1 FROM tournaments t WHERE t.id = ? AND ${openCondition.sql})
-        AND (? = 0 OR capacity.used < ? OR ? = 1)`)
-    .bind(...Object.values(record), ...statusBinds,
-      ...statusBinds, initialParticipation(tournament, 'confirmed', body.participation, syncBootstrap),
-      initialParticipation(tournament, baseStatus === 'confirmed' ? 'waitlist' : baseStatus, body.participation, syncBootstrap),
-      ...statusBinds, now,
-      tournament.id, tournament.id, ...openCondition.binds, maxRegistrations, maxRegistrations, waitlistEnabled ? 1 : 0));
-  const results = await db.batch(statements);
-
-  const created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
-  if (!created) {
+        AND (? = 0 OR capacity.used < ? OR ? = 1)
+        ${duplicateGuard ? `AND (${duplicateGuard.sql}) = ?` : ''}`)
+      .bind(...Object.values(record), ...statusBinds,
+        ...statusBinds, initialParticipation(tournament, 'confirmed', body.participation, syncBootstrap),
+        initialParticipation(tournament, baseStatus === 'confirmed' ? 'waitlist' : baseStatus, body.participation, syncBootstrap),
+        ...statusBinds, now,
+        tournament.id, tournament.id, ...openCondition.binds, maxRegistrations, maxRegistrations, waitlistEnabled ? 1 : 0,
+        ...(duplicateGuard ? [...duplicateGuard.binds, duplicateGuard.snapshot] : []));
+    results = await db.batch([...statements, insert]);
+    created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
+    if (created) break;
+    if (duplicateGuard) {
+      const currentGuard = await registrationDuplicateGuard(db, tournament.id, record);
+      if (currentGuard.snapshot !== duplicateGuard.snapshot) {
+        duplicateGuard = currentGuard;
+        continue;
+      }
+    }
     await throwRegistrationRejection(db, tournament, { isManager, shareAccess, syncBootstrap });
   }
+  if (!created) {
+    throw new HttpError(409, 'Die Anmeldungen wurden zeitgleich geändert. Bitte erneut versuchen.');
+  }
   // Benachrichtigungen und E-Mails erst nach dem erfolgreichen Commit.
-  const displacedId = statements.length > 1 ? results[0]?.results?.[0]?.id : null;
+  const displacedId = statements.length > 0 ? results[0]?.results?.[0]?.id : null;
   const appOrigin = new URL(request.url).origin;
   const links = newSlotLinks(null, created, created.id, tournament.id);
   if (links.length > 0) {
@@ -12198,26 +12215,34 @@ function assertPhoneMatchesTournament(tournament, registration, { isManager = fa
 // Team einträgt, kann sie so nicht aussperren (KP-06 b). Turnierleitung und Dokument behalten den Hinweis „möglicherweise
 // doppelt angemeldet“.
 function registrationIdentity(row) {
+  // Für die Sperre Feldgrenzen, Unicode und Satzzeichen erhalten. Die unscharfe Namensnormalisierung bleibt
+  // ausschließlich bei den Hinweisen auf mögliche Doppelanmeldungen (z. B. Ann Abel / Anna Bel).
+  const name = (value) => (value || '').normalize('NFC').trim().replace(/\s+/gu, ' ').toLowerCase();
   return registrationSlots(row)
-    .map((slot) => `${normalizePlayerName(slot.firstName, slot.lastName)}\u0000${(slot.email || '').trim().toLowerCase()}`)
+    .map((slot) => JSON.stringify([name(slot.firstName), name(slot.lastName), (slot.email || '').trim().toLowerCase()]))
     .sort()
-    .join('\u0001');
+    .join('\n');
 }
 
-async function assertNotAlreadyRegistered(db, tournamentId, record) {
+async function registrationDuplicateGuard(db, tournamentId, record) {
   const email = (record.player_email || '').trim().toLowerCase();
-  if (!email || isPlaceholderEmail(email)) return;
-  const candidates = await db
-    .prepare(`SELECT * FROM registrations
-       WHERE tournament_id = ? AND status IN ${ACTIVE_REGISTRATION_STATUSES_SQL} AND LOWER(TRIM(player_email)) = ?`)
-    .bind(tournamentId, email)
-    .all();
+  const fields = ['id', ...SLOT_COLUMNS.flatMap(({ first, last, email: slotEmail }) => [first, last, slotEmail])];
+  // Spieler 1 kann in einer bestehenden Besetzung an jeder Position stehen. Der Turnierindex begrenzt den Zugriff;
+  // der Snapshot enthält nur Identitätsfelder und erkennt auch Änderungen an bereits vorhandenen Anmeldungen.
+  const sql = `SELECT json_group_array(json_object(${fields.map((field) => `'${field}', ${field}`).join(', ')})) AS snapshot
+    FROM (SELECT ${fields.join(', ')} FROM registrations
+      WHERE tournament_id = ? AND status IN ${ACTIVE_REGISTRATION_STATUSES_SQL}
+        AND (LOWER(TRIM(player_email)) = ? OR LOWER(TRIM(partner_email)) = ? OR LOWER(TRIM(partner2_email)) = ?)
+      ORDER BY id)`;
+  const binds = [tournamentId, email, email, email];
+  const { snapshot } = await db.prepare(sql).bind(...binds).first();
   const identity = registrationIdentity(record);
-  if ((candidates.results || []).some((row) => registrationIdentity(row) === identity)) {
+  if (JSON.parse(snapshot).some((row) => registrationIdentity(row) === identity)) {
     throw new HttpError(409, 'Diese Anmeldung liegt für dieses Turnier bereits vor', {
       code: 'already_registered', name: `${record.first_name} ${record.last_name}`.trim(),
     });
   }
+  return { sql, binds, snapshot };
 }
 
 async function assertNoDuplicateTeamName(db, tournamentId, teamName, excludeId) {

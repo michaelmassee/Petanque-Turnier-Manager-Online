@@ -1,4 +1,5 @@
 {
+  "Die Anmeldungen wurden zeitgleich geändert. Bitte erneut versuchen.": "Les inscriptions ont été modifiées simultanément. Veuillez réessayer.",
   "Gelesene Nachrichten löschen nach (Tagen)": "Supprimer les messages lus après (jours)",
   "Standard: 7 Tage ab dem ersten Lesen. Die tägliche Bereinigung läuft auch, wenn du offline bist. Eine geänderte Frist gilt beim nächsten Lauf auch für bereits gelesene Nachrichten. Maximal 25 Nachrichten bleiben gespeichert; bei neuen Nachrichten entfallen die ältesten, auch ungelesene. Andere Nutzer behalten ihre eigenen Kopien.": "Par défaut : 7 jours après la première lecture. Le nettoyage quotidien fonctionne même hors ligne. Une modification du délai s’applique aussi aux messages déjà lus lors de la prochaine exécution. Au maximum 25 messages sont conservés ; les nouveaux messages remplacent les plus anciens, même non lus. Les autres utilisateurs conservent leurs propres copies.",
   "Die Aufbewahrungsdauer muss eine ganze Zahl zwischen 1 und 365 Tagen sein": "La durée de conservation doit être un nombre entier compris entre 1 et 365 jours",

@@ -1,4 +1,5 @@
 {
+  "Die Anmeldungen wurden zeitgleich geändert. Bitte erneut versuchen.": "De inschrijvingen zijn gelijktijdig gewijzigd. Probeer het opnieuw.",
   "Gelesene Nachrichten löschen nach (Tagen)": "Gelezen berichten verwijderen na (dagen)",
   "Standard: 7 Tage ab dem ersten Lesen. Die tägliche Bereinigung läuft auch, wenn du offline bist. Eine geänderte Frist gilt beim nächsten Lauf auch für bereits gelesene Nachrichten. Maximal 25 Nachrichten bleiben gespeichert; bei neuen Nachrichten entfallen die ältesten, auch ungelesene. Andere Nutzer behalten ihre eigenen Kopien.": "Standaard: 7 dagen na de eerste keer lezen. De dagelijkse opschoning werkt ook als je offline bent. Een gewijzigde termijn geldt bij de volgende uitvoering ook voor eerder gelezen berichten. Er blijven maximaal 25 berichten bewaard; bij nieuwe berichten vervallen de oudste, ook ongelezen berichten. Andere gebruikers behouden hun eigen kopieën.",
   "Die Aufbewahrungsdauer muss eine ganze Zahl zwischen 1 und 365 Tagen sein": "De bewaartermijn moet een geheel getal tussen 1 en 365 dagen zijn",
