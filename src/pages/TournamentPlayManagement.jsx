@@ -319,6 +319,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [finishing, setFinishing] = useState(false);
+  const [bulkParticipation, setBulkParticipation] = useState('');
   const [quickPlayer, setQuickPlayer] = useState(EMPTY_QUICK_PLAYER);
   // Der `tournaments`-Prop kommt vom Elternteil und wird nicht sofort neu geladen,
   // nachdem hier der Status auf "Läuft" gesetzt wurde - deshalb lokal vormerken,
@@ -434,6 +435,31 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       setError(err.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Alle bestätigten Meldungen auf einmal (de)aktivieren; ausgesetzte bleiben ausgesetzt.
+  async function handleAllParticipation(participation) {
+    setBusy(true);
+    setBulkParticipation(participation);
+    setError('');
+    try {
+      await authenticatedApi(`/api/tournaments/${selectedTournamentId}/participation`, {
+        method: 'PUT',
+        body: JSON.stringify({ participation }),
+      });
+      queryClient.setQueryData([...queryKey, 'registrations'], (current) => ({
+        ...current,
+        registrations: current.registrations.map((registration) => (
+          registration.status === 'confirmed' && registration.participation !== 'withdrawn' ? { ...registration, participation } : registration
+        )),
+      }));
+      if (canEditMeleeTeams && swissTeams.length) await queryClient.invalidateQueries({ queryKey: [...queryKey, 'rounds'] });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+      setBulkParticipation('');
     }
   }
 
@@ -658,6 +684,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const currentRound = rounds[rounds.length - 1] || null;
   const currentRoundOpen = currentRound ? !isRoundComplete(currentRound) : false;
   const activeConfirmedCount = confirmedRegistrations.filter((registration) => registration.participation === 'active').length;
+  const inactiveConfirmedCount = confirmedRegistrations.filter((registration) => registration.participation === 'inactive').length;
   // Mêlée: aktive Spieler werden schrittweise zu festen Teams ausgelost (wie die Mêlée-Übernahme im Hauptprojekt).
   const isMelee = Boolean(selectedTournament) && isMeleeTeamTournament(selectedTournament);
   const meleeSize = meleeTeamSize(selectedTournament?.formation) || 2;
@@ -806,6 +833,10 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
             {isMelee && canEditMeleeTeams && t('Neue Spieler spielen erst mit, wenn sie per „Mêlée-Teams auslosen“ einem Team zugeteilt sind.')}
             {isMelee && !canEditMeleeTeams && t('Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.')}
           </p>
+          <div className="row-actions round-participant-bulk">
+            <Button variant="secondary" disabled={busy || !inactiveConfirmedCount} loading={bulkParticipation === 'active'} onClick={() => handleAllParticipation('active')}>{t('Alle aktivieren')}</Button>
+            <Button variant="secondary" disabled={busy || !activeConfirmedCount} loading={bulkParticipation === 'inactive'} onClick={() => handleAllParticipation('inactive')}>{t('Alle deaktivieren')}</Button>
+          </div>
           <div className="round-participant-list">
             {visibleConfirmedRegistrations.items.map((registration) => (
               <div className="round-participant-row" key={registration.id}>

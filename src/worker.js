@@ -2901,6 +2901,17 @@ export default {
         return await setRegistrationParticipation(env.DB, registration, participation);
       }
 
+      const tournamentParticipationMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/participation$/);
+      if (tournamentParticipationMatch && request.method === 'PUT') {
+        const tournament = await getTournamentById(env.DB, tournamentParticipationMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await requireSession(request, env.DB);
+        assertCanManageTournament(tournament, session.user);
+        assertRegistrationOnlineEditable(tournament);
+        const body = await readJson(request);
+        return await setTournamentParticipation(env.DB, tournament, parseParticipation(body.participation));
+      }
+
       if (url.pathname === '/api/sync/tournaments' && request.method === 'GET') {
         const auth = await requireApiKey(request, env.DB);
         return await listManagedTournaments(env.DB, auth.user);
@@ -8857,6 +8868,18 @@ async function setRegistrationParticipation(db, existing, participation) {
   await releaseInvalidMeleeTeams(db, existing.tournament_id);
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
   return json({ registration: toManagedRegistration(updated) });
+}
+
+// „Alle aktivieren/deaktivieren“ in der Turnierdurchführung: betrifft alle bestätigten Meldungen;
+// ausgesetzte (withdrawn) bleiben bewusst ausgesetzt, ausgesetzt wird nur einzeln.
+export async function setTournamentParticipation(db, tournament, participation) {
+  if (participation === 'withdrawn') throw new HttpError(400, 'Ungültige Teilnahme');
+  const now = new Date().toISOString();
+  const result = await db.prepare(`UPDATE registrations SET participation = ?, updated_at = ?
+      WHERE tournament_id = ? AND status = 'confirmed' AND participation IN ('active', 'inactive') AND participation != ?`)
+    .bind(participation, now, tournament.id, participation).run();
+  await releaseInvalidMeleeTeams(db, tournament.id);
+  return json({ updatedCount: Number(result.meta?.changes || 0) });
 }
 
 // Wie beim Nachrücken: Offen nur bei Bestätigungspflicht, sonst direkt bestätigt.

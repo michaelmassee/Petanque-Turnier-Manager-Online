@@ -1801,5 +1801,8 @@
   "Nur Plätze im Kartenausschnitt": "Alleen banen in het kaartgebied",
   "Keine Bouleplätze im Kartenausschnitt. Verschiebe oder verkleinere die Karte.": "Geen jeu-de-boulesbanen in het kaartgebied. Verschuif de kaart of zoom uit.",
   "Details": "Details",
-  "Nur diesen Treffer": "Alleen dit resultaat"
+  "Nur diesen Treffer": "Alleen dit resultaat",
+  "Alle aktivieren": "Alles activeren",
+  "Alle deaktivieren": "Alles deactiveren",
+  "Ungültige Teilnahme": "Ongeldige deelname"
 }

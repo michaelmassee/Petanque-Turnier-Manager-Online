@@ -84,6 +84,9 @@ function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registratio
     if (path === '/api/tournaments/t1/teams' && options.method === 'DELETE') {
       return Promise.resolve(jsonResponse({ teams: [] }));
     }
+    if (path === '/api/tournaments/t1/participation' && options.method === 'PUT') {
+      return Promise.resolve(jsonResponse({ updatedCount: 1 }));
+    }
     if (/^\/api\/registrations\/.+\/participation$/.test(path) && options.method === 'PUT') {
       return Promise.resolve(jsonResponse({ registration: {} }));
     }
@@ -425,6 +428,29 @@ describe('TournamentPlayManagement', () => {
     await waitFor(() => expect(calls).toContain('/api/registrations/p4/participation'));
     expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 4 (4 aktiv)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erste Runde starten' })).not.toBeDisabled();
+  });
+
+  it('deaktiviert und aktiviert alle bestätigten Teilnehmer, ausgesetzte bleiben ausgesetzt', async () => {
+    const calls = [];
+    const registrations = [
+      { id: 'p1', firstName: 'Anna', lastName: 'Muster', status: 'confirmed', participation: 'active' },
+      { id: 'p2', firstName: 'Bert', lastName: 'Beispiel', status: 'confirmed', participation: 'inactive' },
+      { id: 'p3', firstName: 'Clara', lastName: 'Test', status: 'confirmed', participation: 'withdrawn' },
+    ];
+    installFetchMock(calls, { rounds: [], registrations });
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 3 (1 aktiv)')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Teilnehmer'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Alle deaktivieren' }));
+    expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 3 (0 aktiv)')).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/participation', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ participation: 'inactive' }) }));
+    expect(screen.getByRole('button', { name: 'Alle deaktivieren' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Alle aktivieren' }));
+    expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 3 (2 aktiv)')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Teilnahme: Clara Test' })).toHaveValue('withdrawn');
   });
 
   it('speichert ein Ergebnis über die Eingabefelder', async () => {
