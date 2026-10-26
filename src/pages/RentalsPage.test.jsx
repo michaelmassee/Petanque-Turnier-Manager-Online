@@ -106,7 +106,8 @@ describe('Reservierung aus der Zusagemail', () => {
     const reservation = { id: 'r1', offerId: 'o1', offerTitle: 'Boulehalle', date: '2099-10-24', startHour: 10, hours: 2, lanes: 2, status: 'requested', startUtc: '2099-10-24T08:00:00.000Z', createdAt: '2026-10-20T17:05:00.000Z', timezone: 'Europe/Berlin' };
     authenticatedApi.mockResolvedValue({ reservations: [reservation] });
     render(<MyRentalReservations language="de" navigate={vi.fn()} />);
-    expect(await screen.findByText('Erstellt am 20.10.2026, 19:05')).toBeInTheDocument();
+    // Uhrzeit in der Zeitzone des Angebots; sitzt der Betrachter woanders (CI: UTC), folgt das Zonenkürzel.
+    expect(await screen.findByText(/^Erstellt am 20\.10\.2026, 19:05( \S+)?$/)).toBeInTheDocument();
   });
 });
 
