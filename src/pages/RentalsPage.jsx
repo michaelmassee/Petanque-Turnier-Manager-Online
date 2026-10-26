@@ -407,6 +407,10 @@ function RentalOfferContent({ id, language, currentUser, navigate, onLogin }) {
     .map((hours) => ({ value: String(hours), label: t('{{hours}} Std.', { hours }) }));
   const tooShort = selection && maxHours < offer.minHours;
   const wholeFree = freeLanes >= offer.laneCount;
+  const canGoBack = availability.from > availability.today;
+  const canGoForward = addDays(availability.from, 7) <= lastDate;
+  const previousWeek = () => setFrom(addDays(availability.from, -7) < availability.today ? availability.today : addDays(availability.from, -7));
+  const nextWeek = () => setFrom(addDays(availability.from, 7));
 
   return (
     <div className="panel rental-offer">
@@ -429,7 +433,7 @@ function RentalOfferContent({ id, language, currentUser, navigate, onLogin }) {
         {t('Buchbar in vollen Stunden, {{min}} bis {{max}} Stunden am Stück, bis {{days}} Tage im Voraus.', { min: offer.minHours, max: offer.maxHours, days: offer.bookingHorizonDays })}
       </p>
       <div className="rental-week-nav">
-        <Button variant="secondary" disabled={availability.from <= availability.today} onClick={() => setFrom(addDays(availability.from, -7) < availability.today ? availability.today : addDays(availability.from, -7))}>{t('Vorherige Woche')}</Button>
+        <Button variant="secondary" disabled={!canGoBack} onClick={previousWeek}>{t('Vorherige Woche')}</Button>
         <RentalMonthPicker
           offerId={id}
           language={language}
@@ -439,7 +443,7 @@ function RentalOfferContent({ id, language, currentUser, navigate, onLogin }) {
           rangeLabel={`${formatDate(availability.days[0].date, language)} – ${formatDate(availability.days.at(-1).date, language)}`}
           onSelect={(date) => { setSelection(null); setFrom(date); }}
         />
-        <Button variant="secondary" disabled={addDays(availability.from, 7) > lastDate} onClick={() => setFrom(addDays(availability.from, 7))}>{t('Nächste Woche')}</Button>
+        <Button variant="secondary" disabled={!canGoForward} onClick={nextWeek}>{t('Nächste Woche')}</Button>
       </div>
       <RentalCalendar
         days={availability.days}
@@ -453,6 +457,8 @@ function RentalOfferContent({ id, language, currentUser, navigate, onLogin }) {
             onChooseFullDay={() => chooseDuration(fullDay.hours, fullDay.startHour)} onClose={() => setDurationOpen(false)} />
           : null}
         bookings={offer.canManage ? availability.bookings : undefined}
+        onPreviousWeek={canGoBack ? previousWeek : null}
+        onNextWeek={canGoForward ? nextWeek : null}
       />
       {offer.canManage && availability.bookings && <RentalBookingList bookings={availability.bookings} recurring={availability.recurring} offer={offer} language={language} navigate={navigate} />}
       <Feedback message={message} />

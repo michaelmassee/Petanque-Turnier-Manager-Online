@@ -5030,14 +5030,21 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
 }
 
 @media (max-width: 640px) {
-  .rental-day-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; margin-bottom: 8px; }
+  /* Bleibt beim Scrollen durch die Stunden unter der Kopfzeile stehen, damit der Tag jederzeit wechselbar ist. */
+  .rental-day-tabs {
+    position: sticky; top: var(--rental-day-tabs-top, 0px); z-index: 30; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px; margin: 0 -4px 8px; padding: 6px 4px; background: #ffffff; box-shadow: 0 6px 8px -8px rgb(23 32 51 / 35%);
+  }
   .rental-day-tab {
     display: flex; flex-direction: column; align-items: center; padding: 4px 0; border: 1px solid #d7deea; border-radius: 8px;
     background: #ffffff; color: #172033; font-size: 0.75rem; text-transform: capitalize;
   }
   .rental-day-tab.closed { color: #9aa3b2; }
   .rental-day-tab.active { background: linear-gradient(135deg, #1468e8, #0846a3); border-color: #0a4fb0; color: #ffffff; }
-  .rental-grid { grid-template-columns: 3.4rem minmax(0, 1fr); }
+  /* touch-action: Senkrecht scrollt der Browser, waagerechtes Wischen wechselt den Tag (RentalCalendar). */
+  .rental-grid { grid-template-columns: 3.4rem minmax(0, 1fr); touch-action: pan-y; }
+  .rental-grid.swipe-next .active { animation: rental-swipe-next 180ms ease-out; }
+  .rental-grid.swipe-prev .active { animation: rental-swipe-prev 180ms ease-out; }
   .rental-grid-head:not(.active), .rental-grid .rental-slot:not(.active), .rental-grid .rental-slot-anchor:not(.active) { display: none; }
   .rental-grid-corner { display: none; }
   .rental-grid-head.active { grid-column: 1 / -1; }
@@ -5046,6 +5053,11 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
   .rental-duration-popover { right: 0; width: auto; max-width: none; }
   .rental-offer-row { grid-template-columns: auto 1fr; }
   .rental-offer-row .row-actions { grid-column: 1 / -1; }
+}
+@keyframes rental-swipe-next { from { opacity: 0.4; transform: translateX(24px); } }
+@keyframes rental-swipe-prev { from { opacity: 0.4; transform: translateX(-24px); } }
+@media (prefers-reduced-motion: reduce) {
+  .rental-grid.swipe-next .active, .rental-grid.swipe-prev .active { animation: none; }
 }
 .rental-manage-club { display: grid; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e2e7f0; }
 .rental-reservation-filter { align-items: end; margin-bottom: 20px; }

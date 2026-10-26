@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDate, formatWeekdayShort } from '../lib/format.js';
+
+// Ab dieser Breite zeigt das Raster nur einen Tag (siehe Media-Query in styles.css); nur dann wird gewischt.
+const SINGLE_DAY_QUERY = '(max-width: 640px)';
+const SWIPE_MIN_DISTANCE = 50;
 
 const hourLabel = (hour) => `${String(hour).padStart(2, '0')}:00`;
 
@@ -26,24 +30,83 @@ function slotRenters(bookings, date, hour) {
 
 /**
  * Wochenraster der freien Bahnen (Tage × Stunden). Auf dem Handy zeigt es nur den gewählten Tag, umschaltbar über
- * die Tagesleiste – so bleibt die Seite ohne horizontales Scrollen.
+ * die Tagesleiste oder durch Wischen – so bleibt die Seite ohne horizontales Scrollen.
  * @param days Verfügbarkeit aus GET /api/rentals/:id/availability
  * @param onSelect (date, hour) => void; ohne onSelect ist das Raster nur zur Ansicht
  * @param minLanes so viele Bahnen müssen frei sein, damit eine Stunde wählbar ist (Nur-komplett-Angebote: alle)
  * @param popover Inhalt, der direkt an der Startstunde der Auswahl aufklappt (z. B. die Dauerwahl)
  * @param bookings nur für Verwalter: Buchungen des Angebots mit Mieternamen (Tooltip der belegten Stunden)
+ * @param onPreviousWeek/onNextWeek Wischen über den Wochenrand hinaus; null, wenn es dort nicht weitergeht
  */
-export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSelect, language, popover = null, bookings = [] }) {
+export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSelect, language, popover = null, bookings = [], onPreviousWeek = null, onNextWeek = null }) {
   const { t } = useTranslation();
   const firstOpenDay = Math.max(0, days.findIndex((day) => day.slots.some((slot) => slot.bookable)));
   const [activeDay, setActiveDay] = useState(firstOpenDay);
-  useEffect(() => { setActiveDay(firstOpenDay); }, [days[0]?.date]);
+  // Nach einem Wochenwechsel per Wischen auf dem angrenzenden Tag landen statt auf dem ersten offenen.
+  const pendingDayRef = useRef(null);
+  useEffect(() => {
+    const pending = pendingDayRef.current;
+    pendingDayRef.current = null;
+    setActiveDay(pending === 'first' ? 0 : pending === 'last' ? days.length - 1 : firstOpenDay);
+  }, [days[0]?.date]);
+
+  const [swipe, setSwipe] = useState('');
+  const touchStartRef = useRef(null);
+
+  function goToDay(index, direction) {
+    if (index >= 0 && index < days.length) {
+      setActiveDay(index);
+    } else if (index >= days.length && onNextWeek) {
+      pendingDayRef.current = 'first';
+      onNextWeek();
+    } else if (index < 0 && onPreviousWeek) {
+      pendingDayRef.current = 'last';
+      onPreviousWeek();
+    } else {
+      return;
+    }
+    setSwipe(direction);
+  }
+
+  function handleTouchStart(event) {
+    const touch = event.touches[0];
+    touchStartRef.current = touch && window.matchMedia?.(SINGLE_DAY_QUERY).matches ? { x: touch.clientX, y: touch.clientY } : null;
+  }
+
+  function handleTouchEnd(event) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    // Nur deutlich waagerechte Gesten wechseln den Tag, senkrechtes Scrollen bleibt unberührt.
+    if (Math.abs(dx) < SWIPE_MIN_DISTANCE || Math.abs(dx) <= 1.5 * Math.abs(dy)) return;
+    if (dx < 0) goToDay(activeDay + 1, 'next');
+    else goToDay(activeDay - 1, 'prev');
+  }
 
   const hours = [...new Set(days.flatMap((day) => day.slots.map((slot) => slot.hour)))].sort((left, right) => left - right);
+
+  // Die Tagesleiste (Handy) klebt beim Scrollen direkt unter der ebenfalls klebenden Kopfzeile;
+  // deren Höhe hängt vom Inhalt ab, deshalb gemessen statt fest eingetragen.
+  const calendarRef = useRef(null);
+  useEffect(() => {
+    const topbar = document.querySelector('.topbar');
+    const calendar = calendarRef.current;
+    if (!topbar || !calendar) return undefined;
+    const update = () => calendar.style.setProperty('--rental-day-tabs-top', `${topbar.getBoundingClientRect().height}px`);
+    update();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(update);
+    observer.observe(topbar);
+    return () => observer.disconnect();
+  }, [hours.length > 0]);
+
   if (!hours.length) return <p className="muted">{t('In dieser Woche ist nicht geöffnet.')}</p>;
 
   return (
-    <div className="rental-calendar">
+    <div className="rental-calendar" ref={calendarRef}>
       <div className="rental-day-tabs" role="tablist" aria-label={t('Tag wählen')}>
         {days.map((day, index) => (
           <button
@@ -59,7 +122,13 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
           </button>
         ))}
       </div>
-      <div className="rental-grid" style={{ '--rental-days': days.length }}>
+      <div
+        className={`rental-grid${swipe ? ` swipe-${swipe}` : ''}`}
+        style={{ '--rental-days': days.length }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onAnimationEnd={() => setSwipe('')}
+      >
         <div className="rental-grid-corner" aria-hidden="true" />
         {days.map((day, index) => (
           <div key={day.date} className={`rental-grid-head${index === activeDay ? ' active' : ''}`}>
