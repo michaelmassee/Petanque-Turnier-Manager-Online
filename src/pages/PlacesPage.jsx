@@ -14,7 +14,7 @@ import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { POSTBOX_ADMIN_RECIPIENT_ID } from '../postbox-core.js';
-import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx';
+import { TileFallbackMap, FitToBounds, ReportMapBounds } from '../components/TileFallbackMap.jsx';
 
 const FALLBACK_CENTER = [51.1, 10.4];
 const marker = new L.Icon({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow, iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] });
@@ -228,7 +228,7 @@ function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onRep
   </details>;
 }
 
-function PlacesMap({ places, center, maptilerApiKey, focus }) {
+function PlacesMap({ places, center, maptilerApiKey, focus, onBoundsChange, onShowDetails, onOnlyThis, onClearFilters }) {
   const { t } = useTranslation();
   const markerRefs = useRef({});
   const positions = useMemo(() => places.map((place) => [place.latitude, place.longitude]), [places]);
@@ -236,6 +236,7 @@ function PlacesMap({ places, center, maptilerApiKey, focus }) {
   return (
     <TileFallbackMap center={center} maptilerApiKey={maptilerApiKey}>
       <FitToBounds positions={positions} />
+      <ReportMapBounds onChange={onBoundsChange} />
       {markerGroups.map(({ id, place, places: groupedPlaces }) => (
         <Marker
           key={id}
@@ -266,6 +267,11 @@ function PlacesMap({ places, center, maptilerApiKey, focus }) {
             <span data-i18n-skip className="map-popup-address">{formatLocationAddress(place.address)}</span>
             {place.addressUnverified && <span className="map-popup-address muted">⚠ {t('Adresse ungeprüft')}</span>}
             <a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
+            <div className="map-popup-actions">
+              <Button variant="secondary" onClick={() => onShowDetails(place)}>{t('Details')}</Button>
+              <Button variant="secondary" onClick={() => onOnlyThis(place)}>{t('Nur diesen Treffer')}</Button>
+              {onClearFilters && <Button variant="secondary" onClick={onClearFilters}>{t('Alle Filter entfernen')}</Button>}
+            </div>
           </Popup>
         </Marker>
       ))}
@@ -311,6 +317,10 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState('');
   const [visibleCount, setVisibleCount] = useState(10);
+  const [mapBounds, setMapBounds] = useState(null);
+  const [detailsRequest, setDetailsRequest] = useState(null);
+  const detailsTargetRef = useRef(null);
+  const [viewportOnly, setViewportOnly] = useState(true);
 
   async function load() {
     setLoading(true); setError('');
@@ -334,6 +344,33 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
     window.history.replaceState(window.history.state, '', `${window.location.pathname}${params.size ? `?${params}` : ''}`);
   }
 
+  // Aus dem Kartenpopup: Liste/Karte wie bei einem geteilten Link auf diesen Verein bzw. Platz beschränken.
+  function showOnlyPlace(place) {
+    linkedPlaceScrolledRef.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('verein');
+    url.hash = '';
+    if (hasClub(place)) {
+      setLinkedPlaceId('');
+      setLinkedOrganizationId(clubKey(place));
+      url.searchParams.set('verein', clubKey(place));
+    } else {
+      setLinkedOrganizationId('');
+      setLinkedPlaceId(place.id);
+      url.hash = encodeURIComponent(place.id);
+    }
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  function clearAllFilters() {
+    setQuery('');
+    setFavoritesOnly(false);
+    setClubsOnly(false);
+    setIndoorOnly(false);
+    handleClearSearchOrigin();
+    clearLinkedPlaceFilter();
+  }
+
   const visiblePlaces = useMemo(() => {
     let results = filterPlaces(places, { placeId: linkedPlaceId, organizationId: linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly });
     if (searchOrigin) {
@@ -347,12 +384,35 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
     return results;
   }, [places, linkedPlaceId, linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm]);
 
+  const mapped = useMemo(() => visiblePlaces.filter((place) => place.latitude !== null && place.longitude !== null), [visiblePlaces]);
+  const center = mapped.length ? [mapped[0].latitude, mapped[0].longitude] : FALLBACK_CENTER;
+
+  // Die Karte zeigt immer alle Treffer; nur die Liste folgt dem sichtbaren Ausschnitt.
+  // Ohne Karte (keine Koordinaten) wären die Bounds veraltet, dann bleibt die Liste ungefiltert.
+  const viewportFilterActive = viewportOnly && Boolean(mapBounds) && mapped.length > 0;
+  const listPlaces = useMemo(() => (viewportFilterActive
+    ? mapped.filter((place) => mapBounds.contains([place.latitude, place.longitude]))
+    : visiblePlaces), [viewportFilterActive, mapped, mapBounds, visiblePlaces]);
+
   useEffect(() => {
     setVisibleCount(10);
-  }, [query, linkedPlaceId, linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm, places]);
+  }, [query, linkedPlaceId, linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm, places, viewportOnly, mapBounds]);
 
-  const placeGroups = useMemo(() => groupPlacesByOrganization(visiblePlaces), [visiblePlaces]);
+  const placeGroups = useMemo(() => groupPlacesByOrganization(listPlaces), [listPlaces]);
   const displayedPlaceGroups = useMemo(() => placeGroups.slice(0, visibleCount), [placeGroups, visibleCount]);
+
+  // „Details“ im Kartenpopup: Listeneintrag nachladen, aufklappen und hinscrollen.
+  function showPlaceDetails(place) {
+    const index = placeGroups.findIndex((group) => group.places.some((entry) => entry.id === place.id));
+    if (index === -1) return;
+    setVisibleCount((count) => Math.max(count, index + 1));
+    setDetailsRequest({ id: place.id });
+  }
+
+  useEffect(() => {
+    if (!detailsRequest || !detailsTargetRef.current) return;
+    detailsTargetRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [detailsRequest, displayedPlaceGroups]);
 
   useEffect(() => {
     if (!linkedPlaceId || loading) return;
@@ -365,9 +425,6 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
     linkedPlaceScrolledRef.current = true;
     linkedPlaceRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [linkedPlaceId, linkedOrganizationId, loading, displayedPlaceGroups]);
-
-  const mapped = useMemo(() => visiblePlaces.filter((place) => place.latitude !== null && place.longitude !== null), [visiblePlaces]);
-  const center = mapped.length ? [mapped[0].latitude, mapped[0].longitude] : FALLBACK_CENTER;
 
   async function toggleLike(place) {
     if (!currentUser) { navigate('/'); return; }
@@ -532,23 +589,38 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       <Feedback error={error} />
       {mapped.length > 0 && (
         <div className="panel places-map-panel" ref={mapSectionRef}>
-          <PlacesMap places={mapped} center={center} maptilerApiKey={maptilerApiKey} focus={focusPlace} />
+          <PlacesMap
+            places={mapped}
+            center={center}
+            maptilerApiKey={maptilerApiKey}
+            focus={focusPlace}
+            onBoundsChange={setMapBounds}
+            onShowDetails={showPlaceDetails}
+            onOnlyThis={showOnlyPlace}
+            onClearFilters={activeFilterCount > 0 || searchOrigin ? clearAllFilters : null}
+          />
         </div>
       )}
 
       <div className="section-title home-results-title" ref={resultsRef}>
         <p className="eyebrow">{t('Alle passenden Bouleplätze')}</p>
-        <span className="counter">{visiblePlaces.length}</span>
+        <span className="counter">{listPlaces.length}</span>
       </div>
+      {mapped.length > 0 && (
+        <label className="checkbox-field places-viewport-toggle">
+          <input type="checkbox" checked={viewportOnly} onChange={(event) => setViewportOnly(event.target.checked)} />
+          {t('Nur Plätze im Kartenausschnitt')}
+        </label>
+      )}
 
-      {loading ? <p className="muted">{t('Lädt …')}</p> : visiblePlaces.length === 0 ? (
+      {loading ? <p className="muted">{t('Lädt …')}</p> : listPlaces.length === 0 ? (
         <div className="empty-state">
-          <strong>{t('Noch keine veröffentlichten Bouleplätze gefunden.')}</strong>
+          <strong>{visiblePlaces.length > 0 ? t('Keine Bouleplätze im Kartenausschnitt. Verschiebe oder verkleinere die Karte.') : t('Noch keine veröffentlichten Bouleplätze gefunden.')}</strong>
         </div>
       ) : (
         <div className="places-list">
           {displayedPlaceGroups.map((group) => group.clubName ? (
-            <details className="panel place-group" key={group.id} ref={linkedOrganizationId && clubKey(group.places[0]) === linkedOrganizationId ? linkedPlaceRef : undefined} open={Boolean(linkedOrganizationId) || group.places.some((place) => place.id === linkedPlaceId) || undefined}>
+            <details className="panel place-group" key={group.id} ref={linkedOrganizationId && clubKey(group.places[0]) === linkedOrganizationId ? linkedPlaceRef : group.places.some((place) => place.id === detailsRequest?.id) ? detailsTargetRef : undefined} open={Boolean(linkedOrganizationId) || group.places.some((place) => place.id === linkedPlaceId || place.id === detailsRequest?.id) || undefined}>
               <summary className="place-group-summary">
                 <span className="place-group-badge"><ClubBadge clubName={group.clubName} clubKind={group.clubKind} /></span>
                 <span className="place-group-title">
@@ -573,13 +645,13 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
                 {group.clubDescription && <RichText value={group.clubDescription} onNavigate={navigate} />}
                 <div className="place-group-places">
                   {group.places.map((place) => (
-                    <PlaceDetails onNavigate={navigate} place={place} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} onReportAddress={reportAddress} heading="h3" forceOpen={place.id === linkedPlaceId} detailRef={place.id === linkedPlaceId ? linkedPlaceRef : undefined} key={place.id} />
+                    <PlaceDetails onNavigate={navigate} place={place} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} onReportAddress={reportAddress} heading="h3" forceOpen={place.id === linkedPlaceId || place.id === detailsRequest?.id} detailRef={place.id === linkedPlaceId ? linkedPlaceRef : undefined} key={place.id} />
                   ))}
                 </div>
               </div>
             </details>
           ) : (
-            <PlaceDetails onNavigate={navigate} place={group.places[0]} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} onReportAddress={reportAddress} forceOpen={group.places[0].id === linkedPlaceId} detailRef={group.places[0].id === linkedPlaceId ? linkedPlaceRef : undefined} key={group.id} />
+            <PlaceDetails onNavigate={navigate} place={group.places[0]} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} onReportAddress={reportAddress} forceOpen={group.places[0].id === linkedPlaceId || group.places[0].id === detailsRequest?.id} detailRef={group.places[0].id === linkedPlaceId ? linkedPlaceRef : group.places[0].id === detailsRequest?.id ? detailsTargetRef : undefined} key={group.id} />
           ))}
         </div>
       )}

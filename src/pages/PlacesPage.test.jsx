@@ -1,10 +1,11 @@
 import { forwardRef, useImperativeHandle } from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlacesPage, { filterPlaces, groupMapPlaces, groupPlacesByOrganization } from './PlacesPage.jsx';
 import '../lib/i18next-config.js';
 
 const map = vi.hoisted(() => ({ flyTo: vi.fn(), getZoom: vi.fn(() => 12), openPopup: vi.fn() }));
+const mapBounds = vi.hoisted(() => ({ report: null }));
 
 vi.mock('react-leaflet', () => ({
   Marker: forwardRef(function Marker({ children, position }, ref) {
@@ -18,7 +19,12 @@ vi.mock('react-leaflet', () => ({
 vi.mock('../components/TileFallbackMap.jsx', () => ({
   TileFallbackMap: ({ children }) => <div>{children}</div>,
   FitToBounds: () => null,
+  ReportMapBounds: ({ onChange }) => { mapBounds.report = onChange; return null; },
 }));
+
+function boundsBetween(south, west, north, east) {
+  return { contains: ([lat, lng]) => lat >= south && lat <= north && lng >= west && lng <= east };
+}
 
 function place(index, overrides = {}) {
   return {
@@ -355,3 +361,93 @@ describe('Übernahme eines Admin-Vereins anfragen', () => {
     expect(screen.queryByRole('button', { name: 'Verein übernehmen?', hidden: true })).not.toBeInTheDocument();
   });
 });
+
+describe('Liste nach Kartenausschnitt', () => {
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+    mapBounds.report = null;
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ places: Array.from({ length: 5 }, (_, index) => place(index + 1)) }), { status: 200 }))));
+    window.history.replaceState({}, '', '/plaetze');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('zeigt nur Plätze im sichtbaren Ausschnitt, die Karte behält alle Marker', async () => {
+    renderPlacesPage();
+    await screen.findByRole('heading', { name: 'Bouleplatz 5' }, { timeout: 5_000 });
+
+    act(() => mapBounds.report(boundsBetween(50.015, 8.015, 50.035, 8.035)));
+
+    expect(screen.getByRole('heading', { name: 'Bouleplatz 2' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Bouleplatz 3' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Bouleplatz 1' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Bouleplatz 5' })).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('place-marker')).toHaveLength(5);
+    expect(screen.getByRole('button', { name: '5 gefundene Bouleplätze – zur Liste springen' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Nur Plätze im Kartenausschnitt' }));
+    expect(screen.getByRole('heading', { name: 'Bouleplatz 1' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Bouleplatz 5' })).toBeInTheDocument();
+  });
+
+  it('weist auf einen leeren Kartenausschnitt hin', async () => {
+    renderPlacesPage();
+    await screen.findByRole('heading', { name: 'Bouleplatz 1' }, { timeout: 5_000 });
+
+    act(() => mapBounds.report(boundsBetween(10, 10, 11, 11)));
+
+    expect(screen.getByText('Keine Bouleplätze im Kartenausschnitt. Verschiebe oder verkleinere die Karte.')).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine veröffentlichten Bouleplätze gefunden.')).not.toBeInTheDocument();
+  });
+});
+
+describe('Aktionen im Kartenpopup', () => {
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ places: Array.from({ length: 15 }, (_, index) => place(index + 1)) }), { status: 200 }))));
+    window.history.replaceState({}, '', '/plaetze');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.history.replaceState({}, '', '/');
+  });
+
+  function marker(index) {
+    return screen.getAllByTestId('place-marker').find((element) => element.dataset.position === `${50 + index / 100},${8 + index / 100}`);
+  }
+
+  it('filtert auf einen Treffer und entfernt danach alle Filter', async () => {
+    renderPlacesPage();
+    await screen.findByRole('heading', { name: 'Bouleplatz 1' }, { timeout: 5_000 });
+    expect(screen.queryByRole('button', { name: 'Alle Filter entfernen' })).not.toBeInTheDocument();
+
+    fireEvent.click(within(marker(3)).getByRole('button', { name: 'Nur diesen Treffer' }));
+
+    expect(screen.getByRole('heading', { name: 'Bouleplatz 3' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Bouleplatz 1' })).not.toBeInTheDocument();
+    expect(window.location.hash).toBe('#place-3');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Alle Filter entfernen' }));
+
+    expect(screen.getByRole('heading', { name: 'Bouleplatz 1' })).toBeInTheDocument();
+    expect(screen.getAllByTestId('place-marker')).toHaveLength(15);
+    expect(window.location.hash).toBe('');
+  });
+
+  it('lädt, öffnet und zeigt den Listeneintrag über „Details“', async () => {
+    renderPlacesPage();
+    await screen.findByRole('heading', { name: 'Bouleplatz 1' }, { timeout: 5_000 });
+    expect(screen.queryByRole('heading', { name: 'Bouleplatz 14' })).not.toBeInTheDocument();
+
+    fireEvent.click(within(marker(14)).getByRole('button', { name: 'Details' }));
+
+    const details = screen.getByRole('heading', { name: 'Bouleplatz 14' }).closest('details');
+    expect(details).toHaveAttribute('open');
+    expect(Element.prototype.scrollIntoView.mock.contexts).toContain(details);
+  });
+});
+

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useTranslation } from 'react-i18next';
+import { Button, Feedback } from './ui.jsx';
 
 const OSM_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a>';
@@ -17,6 +18,17 @@ export function FitToBounds({ positions, maxZoom = 13, singleZoom = 13 }) {
     }
     map.fitBounds(L.latLngBounds(positions), { padding: [32, 32], maxZoom });
   }, [map, positions]);
+  return null;
+}
+
+// Meldet den sichtbaren Kartenausschnitt (L.LatLngBounds) nach jedem Verschieben/Zoomen,
+// z. B. um eine Liste auf die gerade sichtbaren Treffer zu beschränken.
+export function ReportMapBounds({ onChange }) {
+  const map = useMap();
+  useMapEvents({ moveend: () => onChange(map.getBounds()) });
+  useEffect(() => {
+    map.whenReady(() => onChange(map.getBounds()));
+  }, [map]);
   return null;
 }
 
@@ -40,6 +52,50 @@ function KeepMapSized() {
   return null;
 }
 
+// Zentriert die Karte auf den Gerätestandort und markiert ihn. Liegt außerhalb des
+// Leaflet-Containers, damit Klicks nicht als Karten-Klick/Doppelklick-Zoom ankommen.
+function LocateButton({ map, onLocated }) {
+  const { t } = useTranslation();
+  const [locating, setLocating] = useState(false);
+  const [error, setError] = useState('');
+
+  function locate() {
+    setError('');
+    if (!navigator.geolocation) {
+      setError(t('Geolocation wird von diesem Browser nicht unterstützt.'));
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latLng = [position.coords.latitude, position.coords.longitude];
+        onLocated(latLng);
+        map?.flyTo(latLng, Math.max(map.getZoom(), 13));
+        setLocating(false);
+      },
+      (geoErr) => {
+        setError(
+          geoErr.code === geoErr.PERMISSION_DENIED
+            ? t('Standort-Zugriff wurde verweigert. Bitte erlaube den Zugriff in den Einstellungen deines Geräts unter Datenschutz > Ortungsdienste.')
+            : t('Standort konnte nicht ermittelt werden.'),
+        );
+        setLocating(false);
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+    );
+  }
+
+  return (
+    <>
+      <Button className="button button-secondary map-locate-button" disabled={!map} loading={locating} onClick={locate} title={t('Mein Standort')} aria-label={t('Mein Standort')}>
+        {!locating && <span className="map-locate-icon" aria-hidden="true">⌖</span>}
+        <span className="map-locate-label">{t('Mein Standort')}</span>
+      </Button>
+      {error && <div className="map-locate-feedback"><Feedback error={error} /></div>}
+    </>
+  );
+}
+
 // Leaflet-Karte mit automatischem Fallback von MapTiler auf OpenStreetMap,
 // Lade-/Fehleranzeige und Retry-Button (z.B. wenn ein Kartenanbieter ausfällt).
 export function TileFallbackMap({ center, maptilerApiKey, children, className = 'places-map' }) {
@@ -50,6 +106,8 @@ export function TileFallbackMap({ center, maptilerApiKey, children, className = 
   const [loadingTiles, setLoadingTiles] = useState(true);
   const [tileError, setTileError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [map, setMap] = useState(null);
+  const [ownPosition, setOwnPosition] = useState(null);
 
   useEffect(() => {
     setLoadingTiles(true);
@@ -119,7 +177,7 @@ export function TileFallbackMap({ center, maptilerApiKey, children, className = 
 
   return (
     <div className={className} aria-busy={loadingTiles}>
-      <MapContainer key={reloadKey} center={center} zoom={7} scrollWheelZoom={false}>
+      <MapContainer key={reloadKey} ref={setMap} center={center} zoom={7} scrollWheelZoom={false}>
         {provider && (
           <TileLayer
             key={provider}
@@ -131,7 +189,9 @@ export function TileFallbackMap({ center, maptilerApiKey, children, className = 
         )}
         <KeepMapSized />
         {children}
+        {ownPosition && <CircleMarker center={ownPosition} radius={8} pathOptions={{ color: '#fff', weight: 3, fillColor: '#1a73e8', fillOpacity: 1 }} />}
       </MapContainer>
+      <LocateButton map={map} onLocated={setOwnPosition} />
       {loadingTiles && <p className="places-map-status" role="status">{usingFallback ? t('Ersatzkarte wird geladen …') : t('Karte wird geladen …')}</p>}
       {usingFallback && !loadingTiles && !tileError && <p className="places-map-status places-map-notice" role="status">{t('Ersatzkarte aktiv, weil der primäre Kartenanbieter nicht erreichbar ist.')}</p>}
       {tileError && <div className="places-map-status places-map-error" role="alert"><span>{t('Karte konnte nicht geladen werden.')}</span><button type="button" onClick={retry}>{t('Karte erneut laden')}</button></div>}

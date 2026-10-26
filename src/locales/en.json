@@ -1797,5 +1797,10 @@
   "Verein übernehmen": "Take over club",
   "Ich bin für den Verein „{{name}}“ zuständig und möchte ihn übernehmen.": "I am responsible for the club “{{name}}” and would like to take it over.",
   "Deine Anfrage ist an alle Admins gegangen. Die Antwort bekommst du in deiner Postbox.": "Your request has been sent to all admins. You will receive the reply in your inbox.",
-  "Dieser Verein wird derzeit von den Admins verwaltet. Schreib ihnen, warum du ihn übernehmen möchtest, z. B. deine Funktion im Verein.": "This club is currently managed by the admins. Tell them why you would like to take it over, e.g. your role in the club."
+  "Dieser Verein wird derzeit von den Admins verwaltet. Schreib ihnen, warum du ihn übernehmen möchtest, z. B. deine Funktion im Verein.": "This club is currently managed by the admins. Tell them why you would like to take it over, e.g. your role in the club.",
+  "Nur Plätze im Kartenausschnitt": "Only courts in the map area",
+  "Keine Bouleplätze im Kartenausschnitt. Verschiebe oder verkleinere die Karte.": "No boules courts in the map area. Move or zoom out the map.",
+  "Details": "Details",
+  "Nur diesen Treffer": "Only this result",
+  "Alle Filter entfernen": "Remove all filters"
 }

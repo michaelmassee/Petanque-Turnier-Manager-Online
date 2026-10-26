@@ -1797,5 +1797,10 @@
   "Verein übernehmen": "Club overnemen",
   "Ich bin für den Verein „{{name}}“ zuständig und möchte ihn übernehmen.": "Ik ben verantwoordelijk voor de club ‘{{name}}’ en wil deze graag overnemen.",
   "Deine Anfrage ist an alle Admins gegangen. Die Antwort bekommst du in deiner Postbox.": "Je verzoek is naar alle beheerders gestuurd. Het antwoord ontvang je in je postbus.",
-  "Dieser Verein wird derzeit von den Admins verwaltet. Schreib ihnen, warum du ihn übernehmen möchtest, z. B. deine Funktion im Verein.": "Deze club wordt momenteel door de beheerders beheerd. Schrijf hun waarom je hem wilt overnemen, bijv. je functie in de club."
+  "Dieser Verein wird derzeit von den Admins verwaltet. Schreib ihnen, warum du ihn übernehmen möchtest, z. B. deine Funktion im Verein.": "Deze club wordt momenteel door de beheerders beheerd. Schrijf hun waarom je hem wilt overnemen, bijv. je functie in de club.",
+  "Nur Plätze im Kartenausschnitt": "Alleen banen in het kaartgebied",
+  "Keine Bouleplätze im Kartenausschnitt. Verschiebe oder verkleinere die Karte.": "Geen jeu-de-boulesbanen in het kaartgebied. Verschuif de kaart of zoom uit.",
+  "Details": "Details",
+  "Nur diesen Treffer": "Alleen dit resultaat",
+  "Alle Filter entfernen": "Alle filters verwijderen"
 }

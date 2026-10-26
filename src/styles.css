@@ -1523,6 +1523,10 @@ a.left-panel-link {
   margin-bottom: 6px;
 }
 
+.places-viewport-toggle {
+  margin: 0 0 12px;
+}
+
 .load-more-wrap {
   display: flex;
   justify-content: center;
@@ -4003,13 +4007,21 @@ details[open] > .play-round-summary::before {
  .places-map-status { position: absolute; z-index: 500; right: .75rem; bottom: .75rem; margin: 0; padding: .45rem .65rem; border-radius: 6px; background: rgb(255 255 255 / 94%); color: #263648; box-shadow: 0 1px 4px rgb(0 0 0 / 18%); font-size: .875rem; }
  .places-map-notice { max-width: min(90%, 34rem); }
  .places-map-error { display: flex; align-items: center; gap: .5rem; }
+.map-locate-button { position: absolute; z-index: 500; top: .6rem; right: .6rem; min-height: 36px; padding: 6px 10px; gap: .35rem; box-shadow: 0 1px 4px rgb(0 0 0 / 18%); }
+.map-locate-icon { font-size: 1.15rem; line-height: 1; }
+.map-locate-feedback { position: absolute; z-index: 500; top: 3.4rem; right: .6rem; left: 3.4rem; display: flex; justify-content: flex-end; pointer-events: none; }
+.map-locate-feedback .feedback { margin: 0; max-width: 34rem; pointer-events: auto; }
+@media (max-width: 480px) { .map-locate-label { display: none; } }
 .places-map-error button { border: 0; border-radius: 4px; background: #263648; color: white; padding: .3rem .5rem; font: inherit; cursor: pointer; }
 .map-popup-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
 .map-popup-heading .club-badge { margin: 0; }
 .map-popup-logo { width: 28px; height: 28px; flex: 0 0 auto; border: 1px solid #dfe6f0; border-radius: 6px; object-fit: contain; background: #fff; }
 .map-popup-venues { margin: .4rem 0; padding-left: 1.1rem; }
 .map-popup-address { display: block; margin-bottom: .45rem; color: #53627a; }
+.map-popup-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
+.map-popup-actions .button { min-height: 32px; padding: 4px 10px; font-size: .85rem; }
  .places-list { display: grid; gap: 1rem; margin-top: 1rem; }
+ .places-list > * { scroll-margin-block-start: 120px; }
  .place-group,
  .place-card-details { padding: 0; overflow: hidden; }
  .place-group-summary,

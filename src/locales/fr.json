@@ -1797,5 +1797,10 @@
   "Verein übernehmen": "Reprendre le club",
   "Ich bin für den Verein „{{name}}“ zuständig und möchte ihn übernehmen.": "Je suis responsable du club « {{name}} » et souhaite le reprendre.",
   "Deine Anfrage ist an alle Admins gegangen. Die Antwort bekommst du in deiner Postbox.": "Ta demande a été envoyée à tous les administrateurs. Tu recevras la réponse dans ta messagerie.",
-  "Dieser Verein wird derzeit von den Admins verwaltet. Schreib ihnen, warum du ihn übernehmen möchtest, z. B. deine Funktion im Verein.": "Ce club est actuellement géré par les administrateurs. Explique-leur pourquoi tu souhaites le reprendre, p. ex. ta fonction au sein du club."
+  "Dieser Verein wird derzeit von den Admins verwaltet. Schreib ihnen, warum du ihn übernehmen möchtest, z. B. deine Funktion im Verein.": "Ce club est actuellement géré par les administrateurs. Explique-leur pourquoi tu souhaites le reprendre, p. ex. ta fonction au sein du club.",
+  "Nur Plätze im Kartenausschnitt": "Uniquement les terrains de la zone de la carte",
+  "Keine Bouleplätze im Kartenausschnitt. Verschiebe oder verkleinere die Karte.": "Aucun terrain de pétanque dans la zone de la carte. Déplacez ou dézoomez la carte.",
+  "Details": "Détails",
+  "Nur diesen Treffer": "Uniquement ce résultat",
+  "Alle Filter entfernen": "Supprimer tous les filtres"
 }

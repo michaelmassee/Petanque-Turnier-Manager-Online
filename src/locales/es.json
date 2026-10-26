@@ -1797,5 +1797,10 @@
   "Verein übernehmen": "Hacerse cargo del club",
   "Ich bin für den Verein „{{name}}“ zuständig und möchte ihn übernehmen.": "Soy responsable del club «{{name}}» y me gustaría hacerme cargo de él.",
   "Deine Anfrage ist an alle Admins gegangen. Die Antwort bekommst du in deiner Postbox.": "Tu solicitud se ha enviado a todos los administradores. Recibirás la respuesta en tu buzón.",
-  "Dieser Verein wird derzeit von den Admins verwaltet. Schreib ihnen, warum du ihn übernehmen möchtest, z. B. deine Funktion im Verein.": "Este club lo gestionan actualmente los administradores. Explícales por qué quieres hacerte cargo, p. ej. tu función en el club."
+  "Dieser Verein wird derzeit von den Admins verwaltet. Schreib ihnen, warum du ihn übernehmen möchtest, z. B. deine Funktion im Verein.": "Este club lo gestionan actualmente los administradores. Explícales por qué quieres hacerte cargo, p. ej. tu función en el club.",
+  "Nur Plätze im Kartenausschnitt": "Solo pistas en la zona del mapa",
+  "Keine Bouleplätze im Kartenausschnitt. Verschiebe oder verkleinere die Karte.": "No hay pistas de petanca en la zona del mapa. Mueve o aleja el mapa.",
+  "Details": "Detalles",
+  "Nur diesen Treffer": "Solo este resultado",
+  "Alle Filter entfernen": "Quitar todos los filtros"
 }
