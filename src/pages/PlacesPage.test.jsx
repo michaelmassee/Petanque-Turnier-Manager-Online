@@ -420,10 +420,9 @@ describe('Aktionen im Kartenpopup', () => {
     return screen.getAllByTestId('place-marker').find((element) => element.dataset.position === `${50 + index / 100},${8 + index / 100}`);
   }
 
-  it('filtert auf einen Treffer und entfernt danach alle Filter', async () => {
+  it('filtert auf einen Treffer', async () => {
     renderPlacesPage();
     await screen.findByRole('heading', { name: 'Bouleplatz 1' }, { timeout: 5_000 });
-    expect(screen.queryByRole('button', { name: 'Alle Filter entfernen' })).not.toBeInTheDocument();
 
     fireEvent.click(within(marker(3)).getByRole('button', { name: 'Nur diesen Treffer' }));
 
@@ -431,10 +430,9 @@ describe('Aktionen im Kartenpopup', () => {
     expect(screen.queryByRole('heading', { name: 'Bouleplatz 1' })).not.toBeInTheDocument();
     expect(window.location.hash).toBe('#place-3');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Alle Filter entfernen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Entfernen: Bouleplatz 3' }));
 
     expect(screen.getByRole('heading', { name: 'Bouleplatz 1' })).toBeInTheDocument();
-    expect(screen.getAllByTestId('place-marker')).toHaveLength(15);
     expect(window.location.hash).toBe('');
   });
 

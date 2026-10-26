@@ -228,7 +228,7 @@ function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onRep
   </details>;
 }
 
-function PlacesMap({ places, center, maptilerApiKey, focus, onBoundsChange, onShowDetails, onOnlyThis, onClearFilters }) {
+function PlacesMap({ places, center, maptilerApiKey, focus, onBoundsChange, onShowDetails, onOnlyThis }) {
   const { t } = useTranslation();
   const markerRefs = useRef({});
   const positions = useMemo(() => places.map((place) => [place.latitude, place.longitude]), [places]);
@@ -270,7 +270,6 @@ function PlacesMap({ places, center, maptilerApiKey, focus, onBoundsChange, onSh
             <div className="map-popup-actions">
               <Button variant="secondary" onClick={() => onShowDetails(place)}>{t('Details')}</Button>
               <Button variant="secondary" onClick={() => onOnlyThis(place)}>{t('Nur diesen Treffer')}</Button>
-              {onClearFilters && <Button variant="secondary" onClick={onClearFilters}>{t('Alle Filter entfernen')}</Button>}
             </div>
           </Popup>
         </Marker>
@@ -360,15 +359,6 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       url.hash = encodeURIComponent(place.id);
     }
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
-  }
-
-  function clearAllFilters() {
-    setQuery('');
-    setFavoritesOnly(false);
-    setClubsOnly(false);
-    setIndoorOnly(false);
-    handleClearSearchOrigin();
-    clearLinkedPlaceFilter();
   }
 
   const visiblePlaces = useMemo(() => {
@@ -597,7 +587,6 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
             onBoundsChange={setMapBounds}
             onShowDetails={showPlaceDetails}
             onOnlyThis={showOnlyPlace}
-            onClearFilters={activeFilterCount > 0 || searchOrigin ? clearAllFilters : null}
           />
         </div>
       )}
