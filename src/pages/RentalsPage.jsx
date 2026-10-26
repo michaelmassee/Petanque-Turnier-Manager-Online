@@ -432,19 +432,6 @@ function RentalOfferContent({ id, language, currentUser, navigate, onLogin }) {
       <p className="hint">
         {t('Buchbar in vollen Stunden, {{min}} bis {{max}} Stunden am Stück, bis {{days}} Tage im Voraus.', { min: offer.minHours, max: offer.maxHours, days: offer.bookingHorizonDays })}
       </p>
-      <div className="rental-week-nav">
-        <Button variant="secondary" disabled={!canGoBack} onClick={previousWeek}>{t('Vorherige Woche')}</Button>
-        <RentalMonthPicker
-          offerId={id}
-          language={language}
-          today={availability.today}
-          lastDate={lastDate}
-          selectedDate={availability.from}
-          rangeLabel={`${formatDate(availability.days[0].date, language)} – ${formatDate(availability.days.at(-1).date, language)}`}
-          onSelect={(date) => { setSelection(null); setFrom(date); }}
-        />
-        <Button variant="secondary" disabled={!canGoForward} onClick={nextWeek}>{t('Nächste Woche')}</Button>
-      </div>
       <RentalCalendar
         days={availability.days}
         laneCount={offer.laneCount}
@@ -459,6 +446,21 @@ function RentalOfferContent({ id, language, currentUser, navigate, onLogin }) {
         bookings={offer.canManage ? availability.bookings : undefined}
         onPreviousWeek={canGoBack ? previousWeek : null}
         onNextWeek={canGoForward ? nextWeek : null}
+        toolbar={(
+          <div className="rental-week-nav">
+            <Button variant="secondary" disabled={!canGoBack} onClick={previousWeek}>{t('Vorherige Woche')}</Button>
+            <RentalMonthPicker
+              offerId={id}
+              language={language}
+              today={availability.today}
+              lastDate={lastDate}
+              selectedDate={availability.from}
+              rangeLabel={`${formatDate(availability.days[0].date, language)} – ${formatDate(availability.days.at(-1).date, language)}`}
+              onSelect={(date) => { setSelection(null); setFrom(date); }}
+            />
+            <Button variant="secondary" disabled={!canGoForward} onClick={nextWeek}>{t('Nächste Woche')}</Button>
+          </div>
+        )}
       />
       {offer.canManage && availability.bookings && <RentalBookingList bookings={availability.bookings} recurring={availability.recurring} offer={offer} language={language} navigate={navigate} />}
       <Feedback message={message} />

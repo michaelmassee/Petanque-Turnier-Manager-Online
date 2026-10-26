@@ -4940,6 +4940,15 @@ details[open] > .play-round-summary::before {
 .rental-month-day.today { font-weight: 700; text-decoration: underline; }
 .rental-month-day.current { box-shadow: inset 0 0 0 3px #0a5fd1, 0 0 0 2px rgb(22 119 255 / 25%); }
 .rental-calendar { margin-bottom: 12px; }
+/* Wochen-Navigation und Tagesköpfe kleben beim Scrollen durch die Stunden unter der Kopfzeile (Höhe per JS gemessen). */
+.rental-calendar-head {
+  position: sticky; top: var(--rental-sticky-top, 0px); z-index: 30; margin: 0 -4px 3px; padding: 0 4px 3px;
+  background: #ffffff; box-shadow: 0 6px 8px -8px rgb(23 32 51 / 35%);
+}
+@media (min-width: 641px) {
+  .rental-calendar-head { padding-top: 8px; }
+  .rental-calendar-head .rental-week-nav { margin-top: 0; }
+}
 .rental-grid {
   display: grid;
   grid-template-columns: 3.4rem repeat(var(--rental-days, 7), minmax(0, 1fr));
@@ -5032,7 +5041,7 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
 @media (max-width: 640px) {
   /* Bleibt beim Scrollen durch die Stunden unter der Kopfzeile stehen, damit der Tag jederzeit wechselbar ist. */
   .rental-day-tabs {
-    position: sticky; top: var(--rental-day-tabs-top, 0px); z-index: 30; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+    position: sticky; top: var(--rental-sticky-top, 0px); z-index: 30; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 3px; margin: 0 -4px 8px; padding: 6px 4px; background: #ffffff; box-shadow: 0 6px 8px -8px rgb(23 32 51 / 35%);
   }
   .rental-day-tab {
@@ -5041,6 +5050,8 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
   }
   .rental-day-tab.closed { color: #9aa3b2; }
   .rental-day-tab.active { background: linear-gradient(135deg, #1468e8, #0846a3); border-color: #0a4fb0; color: #ffffff; }
+  /* Am Handy klebt nur die Tagesleiste; die Wochen-Navigation (zweizeilig) würde zu viel Platz nehmen. */
+  .rental-calendar-head { display: contents; }
   /* touch-action: Senkrecht scrollt der Browser, waagerechtes Wischen wechselt den Tag (RentalCalendar). */
   .rental-grid { grid-template-columns: 3.4rem minmax(0, 1fr); touch-action: pan-y; }
   .rental-grid.swipe-next .active { animation: rental-swipe-next 180ms ease-out; }

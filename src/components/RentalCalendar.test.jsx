@@ -15,7 +15,7 @@ function activeTab() {
 }
 
 function swipe(dx, dy = 0) {
-  const grid = document.querySelector('.rental-grid');
+  const grid = document.querySelector('.rental-grid:not(.rental-grid-header)');
   fireEvent.touchStart(grid, { touches: [{ clientX: 200, clientY: 300 }] });
   fireEvent.touchEnd(grid, { changedTouches: [{ clientX: 200 + dx, clientY: 300 + dy }] });
 }

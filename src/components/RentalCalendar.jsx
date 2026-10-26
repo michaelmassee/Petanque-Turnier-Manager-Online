@@ -37,8 +37,9 @@ function slotRenters(bookings, date, hour) {
  * @param popover Inhalt, der direkt an der Startstunde der Auswahl aufklappt (z. B. die Dauerwahl)
  * @param bookings nur für Verwalter: Buchungen des Angebots mit Mieternamen (Tooltip der belegten Stunden)
  * @param onPreviousWeek/onNextWeek Wischen über den Wochenrand hinaus; null, wenn es dort nicht weitergeht
+ * @param toolbar Wochen-Navigation; klebt am Desktop zusammen mit den Tagesköpfen beim Scrollen oben
  */
-export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSelect, language, popover = null, bookings = [], onPreviousWeek = null, onNextWeek = null }) {
+export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSelect, language, popover = null, bookings = [], onPreviousWeek = null, onNextWeek = null, toolbar = null }) {
   const { t } = useTranslation();
   const firstOpenDay = Math.max(0, days.findIndex((day) => day.slots.some((slot) => slot.bookable)));
   const [activeDay, setActiveDay] = useState(firstOpenDay);
@@ -88,14 +89,14 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
 
   const hours = [...new Set(days.flatMap((day) => day.slots.map((slot) => slot.hour)))].sort((left, right) => left - right);
 
-  // Die Tagesleiste (Handy) klebt beim Scrollen direkt unter der ebenfalls klebenden Kopfzeile;
-  // deren Höhe hängt vom Inhalt ab, deshalb gemessen statt fest eingetragen.
+  // Kalenderkopf (Desktop: Wochen-Navigation + Tagesköpfe, Handy: Tagesleiste) klebt beim Scrollen direkt unter
+  // der ebenfalls klebenden Kopfzeile; deren Höhe hängt vom Inhalt ab, deshalb gemessen statt fest eingetragen.
   const calendarRef = useRef(null);
   useEffect(() => {
     const topbar = document.querySelector('.topbar');
     const calendar = calendarRef.current;
     if (!topbar || !calendar) return undefined;
-    const update = () => calendar.style.setProperty('--rental-day-tabs-top', `${topbar.getBoundingClientRect().height}px`);
+    const update = () => calendar.style.setProperty('--rental-sticky-top', `${topbar.getBoundingClientRect().height}px`);
     update();
     if (typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(update);
@@ -103,38 +104,46 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
     return () => observer.disconnect();
   }, [hours.length > 0]);
 
-  if (!hours.length) return <p className="muted">{t('In dieser Woche ist nicht geöffnet.')}</p>;
+  if (!hours.length) return <>{toolbar}<p className="muted">{t('In dieser Woche ist nicht geöffnet.')}</p></>;
+
+  const swipeClass = swipe ? ` swipe-${swipe}` : '';
 
   return (
     <div className="rental-calendar" ref={calendarRef}>
-      <div className="rental-day-tabs" role="tablist" aria-label={t('Tag wählen')}>
-        {days.map((day, index) => (
-          <button
-            key={day.date}
-            type="button"
-            role="tab"
-            aria-selected={index === activeDay}
-            className={`rental-day-tab${index === activeDay ? ' active' : ''}${day.slots.length ? '' : ' closed'}`}
-            onClick={() => setActiveDay(index)}
-          >
-            <span>{formatWeekdayShort(day.date, language)}</span>
-            <strong>{Number(day.date.slice(8, 10))}</strong>
-          </button>
-        ))}
+      <div className="rental-calendar-head">
+        {toolbar}
+        <div className="rental-day-tabs" role="tablist" aria-label={t('Tag wählen')}>
+          {days.map((day, index) => (
+            <button
+              key={day.date}
+              type="button"
+              role="tab"
+              aria-selected={index === activeDay}
+              className={`rental-day-tab${index === activeDay ? ' active' : ''}${day.slots.length ? '' : ' closed'}`}
+              onClick={() => setActiveDay(index)}
+            >
+              <span>{formatWeekdayShort(day.date, language)}</span>
+              <strong>{Number(day.date.slice(8, 10))}</strong>
+            </button>
+          ))}
+        </div>
+        {/* Eigenes Raster mit denselben Spalten wie die Stunden, damit die Tagesköpfe mitkleben können. */}
+        <div className={`rental-grid rental-grid-header${swipeClass}`} style={{ '--rental-days': days.length }}>
+          <div className="rental-grid-corner" aria-hidden="true" />
+          {days.map((day, index) => (
+            <div key={day.date} className={`rental-grid-head${index === activeDay ? ' active' : ''}`}>
+              <span>{formatWeekdayShort(day.date, language)}</span> {formatDate(day.date, language)}
+            </div>
+          ))}
+        </div>
       </div>
       <div
-        className={`rental-grid${swipe ? ` swipe-${swipe}` : ''}`}
+        className={`rental-grid${swipeClass}`}
         style={{ '--rental-days': days.length }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onAnimationEnd={() => setSwipe('')}
       >
-        <div className="rental-grid-corner" aria-hidden="true" />
-        {days.map((day, index) => (
-          <div key={day.date} className={`rental-grid-head${index === activeDay ? ' active' : ''}`}>
-            <span>{formatWeekdayShort(day.date, language)}</span> {formatDate(day.date, language)}
-          </div>
-        ))}
         {hours.map((hour) => [
           <div key={`h${hour}`} className="rental-grid-hour">{hourLabel(hour)}</div>,
           ...days.map((day, index) => {
