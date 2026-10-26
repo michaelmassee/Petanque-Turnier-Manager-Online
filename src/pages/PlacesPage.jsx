@@ -266,8 +266,8 @@ function PlacesMap({ places, center, maptilerApiKey, focus, onBoundsChange, onSh
             ) : <strong data-i18n-skip>{place.name}</strong>}
             <span data-i18n-skip className="map-popup-address">{formatLocationAddress(place.address)}</span>
             {place.addressUnverified && <span className="map-popup-address muted">⚠ {t('Adresse ungeprüft')}</span>}
-            <a href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
             <div className="map-popup-actions">
+              <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
               <Button variant="secondary" onClick={() => onShowDetails(place)}>{t('Details')}</Button>
               <Button variant="secondary" onClick={() => onOnlyThis(place)}>{t('Nur diesen Treffer')}</Button>
             </div>

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { useEffect, useRef, useState } from 'react';
+import { CircleMarker, MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useTranslation } from 'react-i18next';
 import { Button, Feedback } from './ui.jsx';
@@ -23,11 +23,18 @@ export function FitToBounds({ positions, maxZoom = 13, singleZoom = 13 }) {
 
 // Meldet den sichtbaren Kartenausschnitt (L.LatLngBounds) nach jedem Verschieben/Zoomen,
 // z. B. um eine Liste auf die gerade sichtbaren Treffer zu beschränken.
+// Der Listener bleibt pro Karte registriert (onChange über eine Ref): useMapEvents würde ihn
+// bei jedem Rendern ab- und wieder anmelden, und ein synchrones moveend aus FitToBounds
+// (großer Zoomsprung ohne Animation) fiele genau in diese Lücke.
 export function ReportMapBounds({ onChange }) {
   const map = useMap();
-  useMapEvents({ moveend: () => onChange(map.getBounds()) });
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   useEffect(() => {
-    map.whenReady(() => onChange(map.getBounds()));
+    const report = () => onChangeRef.current(map.getBounds());
+    map.on('moveend', report);
+    map.whenReady(report);
+    return () => { map.off('moveend', report); };
   }, [map]);
   return null;
 }

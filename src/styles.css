@@ -4020,6 +4020,7 @@ details[open] > .play-round-summary::before {
 .map-popup-address { display: block; margin-bottom: .45rem; color: #53627a; }
 .map-popup-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
 .map-popup-actions .button { min-height: 32px; padding: 4px 10px; font-size: .85rem; }
+.map-popup-actions a.button { color: #172033; text-decoration: none; }
  .places-list { display: grid; gap: 1rem; margin-top: 1rem; }
  .places-list > * { scroll-margin-block-start: 120px; }
  .place-group,
