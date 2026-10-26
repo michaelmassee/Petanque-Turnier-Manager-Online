@@ -1,4 +1,6 @@
 {
+  "Zuletzt angemeldet": "Laatst aangemeld",
+  "Bisher nicht erfasst": "Nog niet geregistreerd",
   "Wartet auf Bestätigung": "Wacht op bevestiging",
   "Die Anmeldungen wurden zeitgleich geändert. Bitte erneut versuchen.": "De inschrijvingen zijn gelijktijdig gewijzigd. Probeer het opnieuw.",
   "Gelesene Nachrichten löschen nach (Tagen)": "Gelezen berichten verwijderen na (dagen)",
@@ -1804,5 +1806,23 @@
   "Nur diesen Treffer": "Alleen dit resultaat",
   "Alle aktivieren": "Alles activeren",
   "Alle deaktivieren": "Alles deactiveren",
-  "Ungültige Teilnahme": "Ongeldige deelname"
+  "Ungültige Teilnahme": "Ongeldige deelname",
+  "Erfasste Ergebnisse": "Vastgelegde uitslagen",
+  "Alle Ergebnisse dieser Runde sind erfasst.": "Alle uitslagen van deze ronde zijn vastgelegd.",
+  "nächste Aktualisierung in {{time}}": "volgende update over {{time}}",
+  "wird aktualisiert …": "wordt bijgewerkt …",
+  "Push einschalten": "Push inschakelen",
+  "Lädt diese Seite bei jeder neuen Runde sofort neu. Dafür muss der Browser Benachrichtigungen erlauben.": "Laadt deze pagina bij elke nieuwe ronde direct opnieuw. Hiervoor moet de browser meldingen toestaan.",
+  "Diese Seite aktualisiert sich jetzt bei jeder neuen Runde sofort.": "Deze pagina wordt nu bij elke nieuwe ronde direct bijgewerkt.",
+  "Für dieses Turnier sind bereits zu viele Geräte für die Sofort-Aktualisierung angemeldet.": "Er zijn al te veel apparaten aangemeld voor directe updates van dit toernooi.",
+  "Anzeige pausiert": "Weergave gepauzeerd",
+  "neu laden": "opnieuw laden",
+  "Aktuelle Runde neu auslosen": "Huidige ronde opnieuw loten",
+  "Runde {{round}} neu auslosen? Die bisherige Einteilung wird ersetzt.": "Ronde {{round}} opnieuw loten? De huidige indeling wordt vervangen.",
+  "Runde {{round}} wurde neu ausgelost.": "Ronde {{round}} is opnieuw geloot.",
+  "In der aktuellen Runde sind schon Ergebnisse eingetragen. Neu auslosen geht nur ohne Ergebnisse.": "In de huidige ronde zijn al uitslagen ingevoerd. Opnieuw loten kan alleen zonder uitslagen.",
+  "Es gibt noch keine Runde, die neu ausgelost werden kann": "Er is nog geen ronde die opnieuw geloot kan worden",
+  "Runde 1 wurde zurückgenommen, weil die Mêlée-Teams nicht mehr zu den aktiven Spielern passen. Bitte Teams auslosen und Runde 1 neu starten.": "Ronde 1 is ingetrokken omdat de Mêlée-teams niet meer overeenkomen met de actieve spelers. Loot de teams en start ronde 1 opnieuw.",
+  "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "De wedstrijdleiding heeft de uitslag van je partij al ingevoerd.",
+  "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "Er is al een uitslag voor je partij gemeld."
 }

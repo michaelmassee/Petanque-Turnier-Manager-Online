@@ -1856,25 +1856,38 @@ a.left-panel-link {
   margin: 0 0 10px;
 }
 
-/* Reine Anzeige (/turnierseite/<id>/anzeige) für einen zweiten Bildschirm: ohne Menü, etwas größere Schrift für Fernsicht. */
-.tournament-display {
-  font-size: 1.1rem;
-}
-
+/* Reine Anzeige (/turnierseite/<id>/anzeige) für einen zweiten Bildschirm: ohne Menü. */
 .tournament-display .tournament-board-page {
   position: relative;
 }
 
-.display-fullscreen {
+.display-actions {
   position: absolute;
   top: 0;
   right: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 60%;
 }
 
-.play-schedule.is-display {
+.board-push {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.display-actions .board-push {
+  justify-items: end;
+}
+
+/* Turnierseite und Anzeige: nur aktuelle Runde + Rangliste. Partien als Kartenraster, das je nach Breite 1…n Spalten nutzt. */
+.play-schedule {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
+  gap: 16px;
 }
 
 .display-columns {
@@ -1885,37 +1898,110 @@ a.left-panel-link {
 }
 
 .display-current-round,
-.display-history-round {
+.schedule-stage {
   display: grid;
   gap: 8px;
 }
 
-.display-columns h2,
-.display-history h2 {
+.display-columns h2 {
   margin: 0 0 8px;
+  font-size: 1.3em;
 }
 
-.display-ranking {
-  overflow-x: auto;
+.schedule-stage h3 {
+  margin: 8px 0 0;
+  font-size: 1rem;
 }
 
-.display-history {
+.schedule-match-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16em), 1fr));
+  gap: 8px;
 }
 
-.display-history h2 {
-  grid-column: 1 / -1;
-}
-
-.display-history h3 {
+.schedule-match-grid > .data-row {
+  height: 100%;
   margin: 0;
 }
 
-@media (min-width: 1100px) {
-  .display-columns {
+/* Runde und Rangliste nebeneinander, sobald beide genug Platz haben (die Rangliste braucht ~46em ohne seitliches
+   Scrollen), sonst untereinander. In em gerechnet, damit es mit der Schriftgröße der Anzeige mitwächst.
+   Ohne Rangliste (KO) nutzt die Runde die volle Breite. */
+.display-columns.has-ranking {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 47em), 1fr));
+}
+
+/* Bildschirm vor Ort: Schrift wächst mit der Bildschirmbreite (Fernsicht auf großen Monitoren/TVs). */
+.tournament-display {
+  font-size: clamp(1rem, 0.5rem + 0.55vw, 1.6rem);
+}
+
+/* Bildschirm vor Ort (Querformat): Die Anzeige füllt genau den Bildschirm, niemand scrollt dort. Runde und Rangliste
+   stehen nebeneinander in voller Höhe; was nicht passt, scrollt in .display-scroll von selbst (useAutoScroll). */
+@media (min-width: 900px) and (orientation: landscape) {
+  .tournament-display {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    padding: 16px 20px;
+    overflow: hidden;
+  }
+
+  .tournament-display .tournament-board-page {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+  }
+
+  .play-schedule.is-display {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+  }
+
+  .is-display .display-columns {
+    flex: 1;
+    align-items: stretch;
+    min-height: 0;
+  }
+
+  .is-display .display-columns.has-ranking {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .is-display .display-columns > section {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .is-display .display-scroll {
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  /* Veröffentlichte Endrangliste: Logos/Titel oben fest, die Tabelle füllt den Rest und scrollt von selbst. */
+  .final-ranking.is-display {
+    flex: 1;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 12px;
+    min-height: 0;
+  }
+
+  /* Die Spalte scrollt, nicht die Tabelle: so bleibt der Tabellenkopf beim Durchlaufen oben stehen. */
+  .is-display .display-scroll .table-scroll {
+    overflow: visible;
+  }
+
+  .is-display .ranking-table th,
+  .is-display .ranking-table td {
+    padding: 4px 8px;
+    font-size: 0.9em;
   }
 }
 
@@ -3564,6 +3650,11 @@ a.left-panel-link {
     padding: 0 14px 14px;
   }
 
+  .play-decided-matches,
+  .play-all-decided {
+    margin-inline: 14px;
+  }
+
   .play-match-teams {
     grid-template-columns: 1fr;
     text-align: center;
@@ -3722,8 +3813,7 @@ a.left-panel-link {
   background: #fff;
 }
 
-.ranking-panel .table-scroll,
-.play-schedule .table-scroll {
+.ranking-panel .table-scroll {
   max-height: 60vh;
   overflow-y: auto;
 }
@@ -3889,6 +3979,27 @@ details[open] > .play-round-summary::before {
   display: grid;
   gap: 12px;
   padding: 0 20px 20px;
+}
+
+/* Laufende Runde: Partien mit gespeichertem Ergebnis zugeklappt unter den offenen. */
+.play-decided-matches {
+  margin: 0 20px 20px;
+  border: 1px solid #e2e7f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.play-decided-matches > .play-round-summary {
+  padding: 12px 16px;
+  font-size: 0.95rem;
+}
+
+.play-decided-matches > .play-match-list {
+  padding: 0 12px 12px;
+}
+
+.play-all-decided {
+  margin: 0 20px 12px;
 }
 
 .play-match {

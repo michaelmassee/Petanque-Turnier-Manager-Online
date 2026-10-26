@@ -257,7 +257,7 @@ function UserStat({ label, value }) {
 }
 
 function UserRow({ user, currentUser, selected, busy, busyOther, onEdit, onDelete }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const systemUser = user.id === 'system-tournament-reports';
 
   return (
@@ -267,6 +267,13 @@ function UserRow({ user, currentUser, selected, busy, busyOther, onEdit, onDelet
         {user.username && <span className="user-handle" data-i18n-skip>@{user.username}{user.club ? ` · ${user.club}` : ''}</span>}
         <span>{user.email}</span>
         {user.phone && <span data-i18n-skip>{user.phone}</span>}
+        <span className="muted">
+          {t('Zuletzt angemeldet')}: {user.lastLoginAt ? (
+            <time dateTime={user.lastLoginAt} data-i18n-skip>
+              {new Intl.DateTimeFormat(i18n.resolvedLanguage || i18n.language, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(user.lastLoginAt))}
+            </time>
+          ) : t('Bisher nicht erfasst')}
+        </span>
       </div>
       <div className="badges">
         <span className={`role role-${user.role}`}>{roleName(user.role)}</span>

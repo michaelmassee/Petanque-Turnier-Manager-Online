@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { FORMATIONS, REGISTRATION_STATUSES, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
 import { api, authenticatedApi } from '../lib/api.js';
-import { useLivePushRefresh, useRoutedTournament } from '../lib/hooks.js';
+import { DISPLAY_FIT_QUERY, useAutoScroll, useLivePushRefresh, useMediaQuery, useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { DISPLAY_LOCALES, REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
 import { isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl, calendarEventLink } from '../lib/domain.js';
@@ -474,24 +474,86 @@ function matchesByStage(matches) {
 // Ganzes Turnier zum aktuellen Stand für alle (die Live-Ansicht zeigt nur das eigene Team). Lädt alle 2 Minuten neu,
 // solange das Turnier läuft; unverändert antwortet der Server mit 304.
 const SCHEDULE_REFRESH_MS = 120_000;
+const SCHEDULE_GONE_STATUSES = [403, 404];
+
+// Eine tagelang offene Anzeige soll nicht endlos weiter abfragen: Schluss, wenn der Spielplan nicht mehr sichtbar ist
+// (privat gestellt, gelöscht) oder 8 Stunden nach Turnierbeginn (pollUntil vom Server). Neuladen holt den Stand einmal.
+function isSchedulePollingPaused({ error, data }, now = Date.now()) {
+  if (SCHEDULE_GONE_STATUSES.includes(error?.status)) return true;
+  const pollUntil = Date.parse(data?.pollUntil || '');
+  return Number.isFinite(pollUntil) && now >= pollUntil;
+}
 
 function formatClock(timestamp, language) {
   if (!timestamp) return '';
   return new Intl.DateTimeFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de, { hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
 }
 
-// display: reine Anzeige für einen Bildschirm vor Ort – ohne Bedienelemente, aktualisiert sich über Polling und Live-Push.
-export function TournamentSchedule({ tournamentId, tournament, language, shareToken = '', onAnnouncement, display = false }) {
+function formatCountdown(ms) {
+  const seconds = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+/**
+ * Countdown bis zum nächsten automatischen Spielplan-Abruf (useScheduleQuery), damit Zuschauer und der Bildschirm vor
+ * Ort sehen, dass sich die Seite selbst aktualisiert. Nach Turnierende wird nicht mehr abgefragt, dann nichts anzeigen;
+ * pausiert (siehe isSchedulePollingPaused) nur ein Hinweis zum Neuladen.
+ */
+export function ScheduleRefreshCountdown({ query }) {
   const { t } = useTranslation();
+  const [now, setNow] = useState(() => Date.now());
+  const finished = query.data?.status === 'finished';
+  const paused = !finished && isSchedulePollingPaused(query, now);
+  const active = Boolean(query.dataUpdatedAt) && !finished && !paused;
+  useEffect(() => {
+    if (!active) return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [active]);
+  if (paused) {
+    return (
+      <span className="schedule-refresh-countdown">
+        {t('Anzeige pausiert')} – <button type="button" className="link-button" onClick={() => window.location.reload()}>{t('neu laden')}</button>
+      </span>
+    );
+  }
+  if (!active) return null;
+  if (query.isFetching) return <span className="schedule-refresh-countdown">{t('wird aktualisiert …')}</span>;
+  const remaining = query.dataUpdatedAt + SCHEDULE_REFRESH_MS - now;
+  return (
+    <span className="schedule-refresh-countdown">
+      {t('nächste Aktualisierung in {{time}}', { time: formatCountdown(remaining) })}
+    </span>
+  );
+}
+
+// Spielplan-Abruf mit Polling und Live-Push. Die Antwort enthält auch den aktuellen Turnierstatus; die Turnierseite
+// nutzt ihn (gleicher Query-Key, also kein zusätzlicher Abruf), um nach dem Start von selbst umzuschalten.
+export function useScheduleQuery(tournamentId, shareToken = '', enabled = true) {
   const query = useQuery({
     queryKey: ['schedule', tournamentId, shareToken],
     queryFn: () => api(`/api/tournaments/${tournamentId}/schedule${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`),
-    refetchInterval: (current) => (current.state.data?.status === 'finished' ? false : SCHEDULE_REFRESH_MS),
+    refetchInterval: (current) => (current.state.data?.status === 'finished' || isSchedulePollingPaused(current.state) ? false : SCHEDULE_REFRESH_MS),
     refetchIntervalInBackground: false,
     staleTime: 0,
     retry: false,
+    enabled: Boolean(tournamentId) && enabled,
   });
-  useLivePushRefresh(tournamentId, () => query.refetch());
+  // Turnierseite und eingebetteter Spielplan hören beide auf den Push: Ein laufender Abruf wird mitbenutzt statt
+  // abgebrochen und neu gestartet, sonst gingen pro Push zwei Anfragen raus.
+  useLivePushRefresh(enabled ? tournamentId : null, () => query.refetch({ cancelRefetch: false }));
+  return query;
+}
+
+// display: reine Anzeige für einen Bildschirm vor Ort – ohne Bedienelemente, aktualisiert sich über Polling und Live-Push.
+export function TournamentSchedule({ tournamentId, tournament, language, shareToken = '', onAnnouncement, display = false }) {
+  const { t } = useTranslation();
+  const query = useScheduleQuery(tournamentId, shareToken);
+  // Bildschirm vor Ort im Querformat: Die Anzeige füllt den Bildschirm, Runde und Rangliste scrollen von selbst durch.
+  const fitsScreen = useMediaQuery(DISPLAY_FIT_QUERY);
+  const autoScroll = display && fitsScreen;
+  const roundScrollRef = useAutoScroll(autoScroll);
+  const rankingScrollRef = useAutoScroll(autoScroll);
   const announcement = query.data?.announcement;
   useEffect(() => {
     if (query.data) onAnnouncement?.(announcement || null);
@@ -509,6 +571,7 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
       <span className="muted">
         {t('Stand')}: {formatClock(query.dataUpdatedAt, language)}
         {dataAsOf && <> · {t('Turnierdaten vom')} {formatTournamentDateTime(dataAsOf, language, tournament?.timezone)}</>}
+        {query.data?.status !== 'finished' && <>{' · '}<ScheduleRefreshCountdown query={query} /></>}
       </span>
       {!display && <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>}
     </div>
@@ -518,77 +581,61 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
     return (
       <div className="play-schedule">
         <Feedback error={query.error?.message} />
-        <p className="muted">{t('Noch keine Runde gestartet.')}</p>
         {refresh}
+        <p className="muted">{t('Noch keine Runde gestartet.')}</p>
       </div>
     );
   }
 
   const currentRound = rounds[rounds.length - 1];
-  const olderRoundsNewestFirst = rounds.slice(0, -1).reverse();
   const showRanking = ranking.length > 0 && tournament?.type !== 'ko';
+  // Bildschirm vor Ort nach Turnierende: statt der letzten Runde nur noch die komplette Rangliste über die volle Breite.
+  const finalStanding = display && showRanking && query.data?.status === 'finished';
 
-  if (display) {
+  if (finalStanding) {
     return (
       <div className="play-schedule is-display">
         <Feedback error={query.error?.message} />
-        <div className="display-columns">
-          <section className="display-current-round">
-            <h2>{t('Runde')} {currentRound.roundNumber}</h2>
-            <ScheduleRoundMatches round={currentRound} />
-          </section>
-          {showRanking && (
-            <section className="display-ranking">
-              <h2>{t('Rangliste')}</h2>
-              <RankingTable tournament={tournament} entries={ranking} />
-            </section>
-          )}
-        </div>
-        {olderRoundsNewestFirst.length > 0 && (
-          <section className="display-history">
-            <h2>{t('Turnierverlauf')}</h2>
-            {olderRoundsNewestFirst.map((round) => (
-              <div key={round.id} className="display-history-round">
-                <h3>{t('Runde')} {round.roundNumber}</h3>
-                <ScheduleRoundMatches round={round} />
-              </div>
-            ))}
-          </section>
-        )}
         {refresh}
+        <div className="display-columns">
+          <section className="display-ranking">
+            <h2>{t('Endrangliste')}</h2>
+            <div className="display-scroll" ref={rankingScrollRef}>
+              <div className="table-scroll">
+                <RankingTable tournament={tournament} entries={ranking} />
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
     );
   }
 
+  // Turnierseite und Bildschirm-Anzeige zeigen nur die aktuelle Runde und die Rangliste. Das Layout passt sich der
+  // Breite an: Partien als Kartenraster, auf breiten Bildschirmen Runde und Rangliste nebeneinander.
   return (
-    <div className="play-schedule">
+    <div className={`play-schedule${display ? ' is-display' : ''}`}>
       <Feedback error={query.error?.message} />
-      <h3>
-        {t('Runde')} {currentRound.roundNumber}
-      </h3>
-      <ScheduleRoundMatches round={currentRound} />
-
-      {showRanking && (
-        <>
-          <h3>{t('Rangliste')}</h3>
-          <div className="table-scroll">
-            <RankingTable tournament={tournament} entries={ranking} />
-          </div>
-        </>
-      )}
-
-      {olderRoundsNewestFirst.length > 0 && (
-        <>
-          <h3>{t('Vergangene Runden')}</h3>
-          {olderRoundsNewestFirst.map((round) => (
-            <details key={round.id} className="panel play-round">
-              <summary>{t('Runde')} {round.roundNumber}</summary>
-              <ScheduleRoundMatches round={round} />
-            </details>
-          ))}
-        </>
-      )}
+      {/* Oben, damit auch der Bildschirm vor Ort ohne Scrollen zeigt, wie aktuell er ist und wann er neu lädt. */}
       {refresh}
+      <div className={`display-columns${showRanking ? ' has-ranking' : ''}`}>
+        <section className="display-current-round">
+          <h2>{t('Runde')} {currentRound.roundNumber}</h2>
+          <div className="display-scroll" ref={roundScrollRef}>
+            <ScheduleRoundMatches round={currentRound} />
+          </div>
+        </section>
+        {showRanking && (
+          <section className="display-ranking">
+            <h2>{t('Rangliste')}</h2>
+            <div className="display-scroll" ref={rankingScrollRef}>
+              <div className="table-scroll">
+                <RankingTable tournament={tournament} entries={ranking} />
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }
@@ -596,19 +643,21 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
 function ScheduleRoundMatches({ round }) {
   const { t } = useTranslation();
   return matchesByStage(round.matches).map(([stage, matches]) => (
-    <section key={stage || 'ohne-stufe'}>
-      {stage && <h4 data-i18n-skip>{stage}</h4>}
-      {matches.map((match) => (
-        <article className="data-row" key={match.id}>
-          <div>
-            <CourtLabel court={match.court} className="play-schedule-court" />
-            <strong>{match.teamA.map(playerLabel).join(' + ')}</strong>
-            <span>{match.teamB.length ? t('gegen') : t('Freilos')}</span>
-            <strong>{match.teamB.map(playerLabel).join(' + ')}</strong>
-          </div>
-          <div>{match.noShow ? t('Nicht angetreten') : match.scoreA != null ? `${match.scoreA}:${match.scoreB}` : t('Offen')}</div>
-        </article>
-      ))}
+    <section key={stage || 'ohne-stufe'} className="schedule-stage">
+      {stage && <h3 data-i18n-skip>{stage}</h3>}
+      <div className="schedule-match-grid">
+        {matches.map((match) => (
+          <article className="data-row" key={match.id}>
+            <div>
+              <CourtLabel court={match.court} className="play-schedule-court" />
+              <strong>{match.teamA.map(playerLabel).join(' + ')}</strong>
+              <span>{match.teamB.length ? t('gegen') : t('Freilos')}</span>
+              <strong>{match.teamB.map(playerLabel).join(' + ')}</strong>
+            </div>
+            <div>{match.noShow ? t('Nicht angetreten') : match.scoreA != null ? `${match.scoreA}:${match.scoreB}` : t('Offen')}</div>
+          </article>
+        ))}
+      </div>
     </section>
   ));
 }

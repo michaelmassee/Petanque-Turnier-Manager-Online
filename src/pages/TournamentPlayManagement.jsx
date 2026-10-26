@@ -126,15 +126,19 @@ function TournamentBoardShare({ tournament }) {
   );
 }
 
+function isMatchDecided(match) {
+  return match.scoreA != null || match.scoreB != null || match.noShow;
+}
+
 function isRoundComplete(round) {
-  return round.matches.every((match) => match.scoreA != null || match.scoreB != null || match.noShow);
+  return round.matches.every(isMatchDecided);
 }
 
 function MatchRow({ match, draft, onChange, onSave, busy, isNewReport }) {
   const { t } = useTranslation();
   const scoreA = draft?.scoreA ?? String(match.scoreA ?? '');
   const scoreB = draft?.scoreB ?? String(match.scoreB ?? '');
-  const decided = match.scoreA != null || match.scoreB != null || match.noShow;
+  const decided = isMatchDecided(match);
   const isDraw = scoreA !== '' && scoreB !== '' && scoreA === scoreB;
 
   return (
@@ -195,7 +199,9 @@ function MatchRow({ match, draft, onChange, onSave, busy, isNewReport }) {
   );
 }
 
-function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, newReportIds = [], onReportsSeen }) {
+// collapseDecided (laufende Runde): Partien mit gespeichertem Ergebnis wandern in ein zugeklapptes Panel, damit oben nur
+// noch die offenen stehen. Neue Spielermeldungen bleiben sichtbar, bis die Turnierleitung sie als gesehen markiert.
+function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, newReportIds = [], onReportsSeen, collapseDecided = false }) {
   const { t } = useTranslation();
   const [drafts, setDrafts] = useState({});
   const changes = round.matches.filter((match) => drafts[match.id]).map((match) => ({
@@ -216,6 +222,10 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, n
     });
   }
   const newReports = round.matches.filter((match) => match.reportedBy && newReportIds.includes(match.id)).length;
+  const isCollapsed = (match) => isMatchDecided(match) && !newReportIds.includes(match.id);
+  const openMatches = round.matches.filter((match) => !isCollapsed(match));
+  const decidedMatches = round.matches.filter(isCollapsed);
+  const matchRow = (match) => <MatchRow key={match.id} match={match} draft={drafts[match.id]} onChange={(draft) => changeDraft(match.id, draft)} onSave={onSave} busy={busy} isNewReport={newReportIds.includes(match.id)} />;
   return (
     <>
       {newReports > 0 && (
@@ -231,9 +241,19 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, n
         }}>{t('Alle speichern')}</Button>
         {onRefresh && <Button variant="secondary" disabled={busy} loading={refreshing} onClick={onRefresh}>{t('Aktualisieren')}</Button>}
       </div>
-      <div className="play-match-list">
-        {round.matches.map((match) => <MatchRow key={match.id} match={match} draft={drafts[match.id]} onChange={(draft) => changeDraft(match.id, draft)} onSave={onSave} busy={busy} isNewReport={newReportIds.includes(match.id)} />)}
-      </div>
+      {collapseDecided ? (
+        <>
+          {openMatches.length > 0
+            ? <div className="play-match-list">{openMatches.map(matchRow)}</div>
+            : <p className="hint play-all-decided">{t('Alle Ergebnisse dieser Runde sind erfasst.')}</p>}
+          {decidedMatches.length > 0 && (
+            <details className="play-decided-matches">
+              <summary className="play-round-summary"><span>{t('Erfasste Ergebnisse')}</span><span className="counter">{decidedMatches.length}</span></summary>
+              <div className="play-match-list">{decidedMatches.map(matchRow)}</div>
+            </details>
+          )}
+        </>
+      ) : <div className="play-match-list">{round.matches.map(matchRow)}</div>}
     </>
   );
 }
@@ -319,6 +339,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [finishing, setFinishing] = useState(false);
+  const [redrawing, setRedrawing] = useState(false);
   const [bulkParticipation, setBulkParticipation] = useState('');
   const [quickPlayer, setQuickPlayer] = useState(EMPTY_QUICK_PLAYER);
   // Der `tournaments`-Prop kommt vom Elternteil und wird nicht sofort neu geladen,
@@ -409,6 +430,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     try {
       await authenticatedApi(`/api/tournaments/${selectedTournamentId}/start`, { method: 'POST' });
       setStartedTournamentIds((current) => new Set(current).add(selectedTournamentId));
+      // Der Start checkt alle noch inaktiven bestätigten Meldungen ein; ohne Neuladen stünden sie hier weiter auf "Inaktiv".
+      await queryClient.invalidateQueries({ queryKey: [...queryKey, 'registrations'] });
       setMessage(t('Turnier wurde gestartet.'));
     } catch (err) {
       setError(err.message);
@@ -522,6 +545,27 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       setError(err.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Aktuelle Runde neu auslosen, solange noch kein Ergebnis eingetragen ist (z. B. ein Spieler fehlt doch).
+  async function handleRedrawRound() {
+    if (!window.confirm(t('Runde {{round}} neu auslosen? Die bisherige Einteilung wird ersetzt.', { round: currentRound.roundNumber }))) return;
+    setRedrawing(true);
+    setError('');
+    setMessage('');
+    try {
+      await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
+      const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/rounds/redraw`, { method: 'POST' });
+      queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, rounds: data.rounds, teams: data.teams ?? current?.teams }));
+      // Mêlée: Passen die Teams nicht mehr zu den aktiven Spielern, nimmt der Server die erste Runde zurück.
+      setMessage(data.roundWithdrawn
+        ? t('Runde 1 wurde zurückgenommen, weil die Mêlée-Teams nicht mehr zu den aktiven Spielern passen. Bitte Teams auslosen und Runde 1 neu starten.')
+        : t('Runde {{round}} wurde neu ausgelost.', { round: currentRound.roundNumber }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRedrawing(false);
     }
   }
 
@@ -683,6 +727,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
   const currentRound = rounds[rounds.length - 1] || null;
   const currentRoundOpen = currentRound ? !isRoundComplete(currentRound) : false;
+  // Freilose tragen ihr Ergebnis automatisch und zählen nicht als eingetragenes Ergebnis.
+  const currentRoundHasResults = Boolean(currentRound?.matches.some((match) => match.teamB?.length && isMatchDecided(match)));
   const activeConfirmedCount = confirmedRegistrations.filter((registration) => registration.participation === 'active').length;
   const inactiveConfirmedCount = confirmedRegistrations.filter((registration) => registration.participation === 'inactive').length;
   // Mêlée: aktive Spieler werden schrittweise zu festen Teams ausgelost (wie die Mêlée-Übernahme im Hauptprojekt).
@@ -726,11 +772,16 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
             {missingRequirements.map((requirement) => <p className="hint" key={requirement}>{requirement}</p>)}
           </div>
         )}
-        <Button disabled={busy || finishing || !selectedTournamentId || !canGenerateRound} loading={busy} onClick={handleNewRound}>
+        <Button disabled={busy || finishing || redrawing || !selectedTournamentId || !canGenerateRound} loading={busy} onClick={handleNewRound}>
           {currentRound ? t('Nächste Runde starten') : t('Erste Runde starten')}
         </Button>
+        {currentRound && !currentRoundHasResults && (
+          <Button variant="secondary" disabled={busy || finishing || redrawing} loading={redrawing} onClick={handleRedrawRound}>
+            {t('Aktuelle Runde neu auslosen')}
+          </Button>
+        )}
         {currentRound && (
-          <Button variant="secondary" disabled={busy || finishing} loading={finishing} onClick={handleFinishTournament}>
+          <Button variant="secondary" disabled={busy || finishing || redrawing} loading={finishing} onClick={handleFinishTournament}>
             {t('Turnier abschließen')}
           </Button>
         )}
@@ -854,7 +905,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       {currentRound && (
         <section className="panel play-current-round">
           <div className="section-title"><h2>{t('Runde')} {currentRound.roundNumber}</h2><span className={`status ${currentRoundOpen ? 'status-running' : 'registration-confirmed'}`}>{currentRoundOpen ? t('Offen') : t('Abgeschlossen')}</span></div>
-          <RoundResults key={`${selectedTournamentId}:${currentRound.id}`} round={currentRound} onSave={handleSaveResult} onSaveAll={handleSaveAll} onRefresh={() => roundsQuery.refetch()} busy={busy} refreshing={roundsQuery.isFetching} newReportIds={newReportIds} onReportsSeen={() => setNewReportIds([])} />
+          <RoundResults key={`${selectedTournamentId}:${currentRound.id}`} round={currentRound} collapseDecided onSave={handleSaveResult} onSaveAll={handleSaveAll} onRefresh={() => roundsQuery.refetch()} busy={busy} refreshing={roundsQuery.isFetching} newReportIds={newReportIds} onReportsSeen={() => setNewReportIds([])} />
           <RoundAction />
         </section>
       )}

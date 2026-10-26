@@ -1,4 +1,6 @@
 {
+  "Zuletzt angemeldet": "Last signed in",
+  "Bisher nicht erfasst": "Not recorded yet",
   "Wartet auf Bestätigung": "Awaiting confirmation",
   "Die Anmeldungen wurden zeitgleich geändert. Bitte erneut versuchen.": "Registrations changed at the same time. Please try again.",
   "Gelesene Nachrichten löschen nach (Tagen)": "Delete read messages after (days)",
@@ -1804,5 +1806,23 @@
   "Nur diesen Treffer": "Only this result",
   "Alle aktivieren": "Activate all",
   "Alle deaktivieren": "Deactivate all",
-  "Ungültige Teilnahme": "Invalid participation"
+  "Ungültige Teilnahme": "Invalid participation",
+  "Erfasste Ergebnisse": "Recorded results",
+  "Alle Ergebnisse dieser Runde sind erfasst.": "All results of this round have been recorded.",
+  "nächste Aktualisierung in {{time}}": "next update in {{time}}",
+  "wird aktualisiert …": "updating …",
+  "Push einschalten": "Enable push",
+  "Lädt diese Seite bei jeder neuen Runde sofort neu. Dafür muss der Browser Benachrichtigungen erlauben.": "Reloads this page immediately with every new round. The browser must allow notifications for this.",
+  "Diese Seite aktualisiert sich jetzt bei jeder neuen Runde sofort.": "This page now updates immediately with every new round.",
+  "Für dieses Turnier sind bereits zu viele Geräte für die Sofort-Aktualisierung angemeldet.": "Too many devices are already registered for instant updates for this tournament.",
+  "Anzeige pausiert": "Display paused",
+  "neu laden": "reload",
+  "Aktuelle Runde neu auslosen": "Redraw current round",
+  "Runde {{round}} neu auslosen? Die bisherige Einteilung wird ersetzt.": "Redraw round {{round}}? The current draw will be replaced.",
+  "Runde {{round}} wurde neu ausgelost.": "Round {{round}} has been redrawn.",
+  "In der aktuellen Runde sind schon Ergebnisse eingetragen. Neu auslosen geht nur ohne Ergebnisse.": "Results have already been entered in the current round. A redraw is only possible without results.",
+  "Es gibt noch keine Runde, die neu ausgelost werden kann": "There is no round to redraw yet",
+  "Runde 1 wurde zurückgenommen, weil die Mêlée-Teams nicht mehr zu den aktiven Spielern passen. Bitte Teams auslosen und Runde 1 neu starten.": "Round 1 has been withdrawn because the Mêlée teams no longer match the active players. Please draw teams and start round 1 again.",
+  "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "The organizers have already entered the result of your match.",
+  "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "A result has already been reported for your match."
 }

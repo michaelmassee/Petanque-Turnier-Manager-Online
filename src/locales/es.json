@@ -1,4 +1,6 @@
 {
+  "Zuletzt angemeldet": "Último inicio de sesión",
+  "Bisher nicht erfasst": "Aún no registrado",
   "Wartet auf Bestätigung": "Pendiente de confirmación",
   "Die Anmeldungen wurden zeitgleich geändert. Bitte erneut versuchen.": "Las inscripciones se modificaron al mismo tiempo. Inténtalo de nuevo.",
   "Gelesene Nachrichten löschen nach (Tagen)": "Eliminar los mensajes leídos después de (días)",
@@ -1804,5 +1806,23 @@
   "Nur diesen Treffer": "Solo este resultado",
   "Alle aktivieren": "Activar todos",
   "Alle deaktivieren": "Desactivar todos",
-  "Ungültige Teilnahme": "Participación no válida"
+  "Ungültige Teilnahme": "Participación no válida",
+  "Erfasste Ergebnisse": "Resultados registrados",
+  "Alle Ergebnisse dieser Runde sind erfasst.": "Todos los resultados de esta ronda están registrados.",
+  "nächste Aktualisierung in {{time}}": "próxima actualización en {{time}}",
+  "wird aktualisiert …": "actualizando …",
+  "Push einschalten": "Activar push",
+  "Lädt diese Seite bei jeder neuen Runde sofort neu. Dafür muss der Browser Benachrichtigungen erlauben.": "Recarga esta página inmediatamente con cada nueva ronda. Para ello, el navegador debe permitir notificaciones.",
+  "Diese Seite aktualisiert sich jetzt bei jeder neuen Runde sofort.": "Esta página se actualiza ahora inmediatamente con cada nueva ronda.",
+  "Für dieses Turnier sind bereits zu viele Geräte für die Sofort-Aktualisierung angemeldet.": "Ya hay demasiados dispositivos registrados para la actualización instantánea de este torneo.",
+  "Anzeige pausiert": "Pantalla en pausa",
+  "neu laden": "volver a cargar",
+  "Aktuelle Runde neu auslosen": "Volver a sortear la ronda actual",
+  "Runde {{round}} neu auslosen? Die bisherige Einteilung wird ersetzt.": "¿Volver a sortear la ronda {{round}}? El emparejamiento actual se reemplazará.",
+  "Runde {{round}} wurde neu ausgelost.": "La ronda {{round}} se ha vuelto a sortear.",
+  "In der aktuellen Runde sind schon Ergebnisse eingetragen. Neu auslosen geht nur ohne Ergebnisse.": "Ya hay resultados en la ronda actual. Solo se puede volver a sortear sin resultados.",
+  "Es gibt noch keine Runde, die neu ausgelost werden kann": "Todavía no hay ninguna ronda que volver a sortear",
+  "Runde 1 wurde zurückgenommen, weil die Mêlée-Teams nicht mehr zu den aktiven Spielern passen. Bitte Teams auslosen und Runde 1 neu starten.": "Se ha retirado la ronda 1 porque los equipos Mêlée ya no coinciden con los jugadores activos. Sortea los equipos y vuelve a iniciar la ronda 1.",
+  "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "La organización ya ha introducido el resultado de tu partida.",
+  "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "Ya se ha comunicado un resultado para tu partida."
 }

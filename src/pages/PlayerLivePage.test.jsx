@@ -141,12 +141,16 @@ describe('Live-Ansicht für Spieler', () => {
     expect(pushManager.subscribe).not.toHaveBeenCalled();
   });
 
-  it('registriert ein bereits aktiviertes Runden-Push-Abo beim erneuten Öffnen nicht erneut', async () => {
-    installPushBrowser();
+  it('frischt ein bereits aktiviertes Runden-Push-Abo beim erneuten Öffnen beim Server auf, ohne neues Browser-Abo', async () => {
+    // Der Server kann das Abo inzwischen verworfen haben (abgelaufen gemeldet, Meldung neu angelegt).
+    const { pushManager } = installPushBrowser();
     localStorage.setItem('ptm_live_push_r1', '1');
     renderDetail();
     await screen.findByRole('button', { name: 'Benachrichtigungen ausschalten' });
-    expect(global.fetch.mock.calls.filter(([path]) => path.endsWith('/push'))).toHaveLength(0);
+    const writes = global.fetch.mock.calls.filter(([path, options]) => path.endsWith('/push') && options.method === 'POST');
+    expect(writes).toHaveLength(1);
+    expect(JSON.parse(writes[0][1].body)).toMatchObject({ endpoint: 'https://push.test/endpoint' });
+    expect(pushManager.subscribe).not.toHaveBeenCalled();
   });
 
   it('respektiert eine ausdrücklich ausgeschaltete Runden-Benachrichtigung', async () => {
@@ -157,9 +161,10 @@ describe('Live-Ansicht für Spieler', () => {
     await screen.findByRole('button', { name: 'Benachrichtigungen für neue Runden aktivieren' });
     expect(localStorage.getItem('ptm_live_push_r1')).toBe('0');
     view.unmount();
+    const postsBefore = global.fetch.mock.calls.filter(([path, options]) => path.endsWith('/push') && options.method === 'POST').length;
     renderDetail();
     await screen.findByRole('button', { name: 'Benachrichtigungen für neue Runden aktivieren' });
-    expect(global.fetch.mock.calls.filter(([path, options]) => path.endsWith('/push') && options.method === 'POST')).toHaveLength(0);
+    expect(global.fetch.mock.calls.filter(([path, options]) => path.endsWith('/push') && options.method === 'POST')).toHaveLength(postsBefore);
   });
 
   it.each(['default', 'denied'])('fordert Push-Erlaubnis beim Öffnen nicht ungefragt an (%s)', async (permission) => {
@@ -311,6 +316,39 @@ describe('Live-Ansicht für Spieler', () => {
     expect(await screen.findByText('Das Turnier ist beendet.')).toBeInTheDocument();
     expect(screen.queryByLabelText('Eigene Punkte')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Ergebnis melden' })).not.toBeInTheDocument();
+  });
+
+  it('lädt neu und erklärt es, wenn die Turnierleitung das Ergebnis schon eingetragen hat', async () => {
+    const initial = livePayload();
+    initial.tournament.playerResultReportingEnabled = true;
+    const entered = livePayload();
+    entered.tournament.playerResultReportingEnabled = true;
+    Object.assign(entered.live.currentMatch, { ownScore: 8, opponentScore: 13, outcome: 'lost' });
+    let liveResponse = initial;
+    global.fetch = vi.fn((path, options = {}) => {
+      if (path.endsWith('/result') && options.method === 'POST') {
+        liveResponse = entered;
+        return Promise.resolve({ ok: false, status: 409, headers: new Headers(), json: () => Promise.resolve({
+          error: 'Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.', details: { code: 'result_already_entered' },
+        }) });
+      }
+      return Promise.resolve(jsonResponse(liveResponse));
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de" canReportResult />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(await screen.findByLabelText('Eigene Punkte'), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText('Gegnerische Punkte'), { target: { value: '13' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ergebnis melden' }));
+
+    expect(await screen.findByText('Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.')).toHaveAttribute('role', 'status');
+    expect(await screen.findAllByText('8:13')).not.toHaveLength(0);
+    expect(screen.queryByLabelText('Eigene Punkte')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it.each(TOURNAMENT_TYPES)('meldet das Ergebnis für $label aus eigener Sicht', async ({ value: type }) => {

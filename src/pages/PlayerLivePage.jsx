@@ -108,7 +108,11 @@ function LivePushToggle({ path, registrationId }) {
         if (existing) {
           // Mit vorhandenem Abo nie automatisch anmelden: Ältere Versionen haben beim Ausschalten
           // den Merker gelöscht, ein fehlender Merker kann also "ausgeschaltet" bedeuten.
-          if (readPushFlag(registrationId) === '1') setEnabled(true);
+          if (readPushFlag(registrationId) !== '1') return;
+          // Eingeschaltet: Abo beim Server auffrischen. Er kann es inzwischen verworfen haben (vom Push-Dienst als
+          // abgelaufen gemeldet, Meldung neu angelegt) - sonst stünde hier "an", aber es käme kein Push mehr.
+          await authenticatedApi(`${path}/push`, { method: 'POST', signal: controller.signal, body: JSON.stringify(existing.toJSON()) });
+          if (!cancelled) setEnabled(true);
           return;
         }
         const result = await ensureBrowserPushSubscription(async () => (await api('/api/live/push/public-key', { signal: controller.signal })).publicKey);
@@ -189,7 +193,7 @@ function scoreLabel(entry, t) {
   return `${entry.ownScore}:${entry.opponentScore}`;
 }
 
-function PlayerResultReport({ path, onSaved }) {
+function PlayerResultReport({ path, onSaved, onAlreadyEntered }) {
   const { t } = useTranslation();
   const [scoreA, setScoreA] = useState('');
   const [scoreB, setScoreB] = useState('');
@@ -204,7 +208,9 @@ function PlayerResultReport({ path, onSaved }) {
       const updated = await authenticatedApi(`${path}/result`, { method: 'POST', body: JSON.stringify({ ownScore: Number(scoreA), opponentScore: Number(scoreB) }) });
       onSaved(updated);
     } catch (err) {
-      setError(err.message);
+      // Schon eingetragen (z. B. von der Turnierleitung): Die Ansicht war veraltet, neu laden zeigt das Ergebnis.
+      if (err.payload?.details?.code === 'result_already_entered') onAlreadyEntered(err.message);
+      else setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -235,13 +241,17 @@ function DocumentResultReportHint({ report }) {
   return <p className="hint">{t('Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.', { score })}</p>;
 }
 
-function CurrentMatchCard({ live, participation, canReportResult, reportingDisabled, resultReport, path, onResultSaved }) {
+function CurrentMatchCard({ live, participation, canReportResult, reportingDisabled, resultReport, path, onResultSaved, onRefresh }) {
   const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const match = live.currentMatch;
   function resultSaved(updated) {
     setMessage(t('Ergebnis gemeldet.'));
     onResultSaved(updated);
+  }
+  function alreadyEntered(text) {
+    setMessage(text);
+    onRefresh();
   }
   return (
     <section className="panel live-card live-current" aria-label={t('Aktuelle Partie')}>
@@ -267,7 +277,7 @@ function CurrentMatchCard({ live, participation, canReportResult, reportingDisab
           )}
           <p className={`live-score live-${match.outcome}`}>{scoreLabel(match, t)}</p>
           {!match.bye && match.outcome === 'open' && <DocumentResultReportHint report={resultReport} />}
-          {canReportResult && !match.bye && match.outcome === 'open' && <PlayerResultReport path={path} onSaved={resultSaved} />}
+          {canReportResult && !match.bye && match.outcome === 'open' && <PlayerResultReport path={path} onSaved={resultSaved} onAlreadyEntered={alreadyEntered} />}
           {reportingDisabled && !match.bye && match.outcome === 'open' && <p className="hint">{t('Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.')}</p>}
           <Feedback message={message} />
         </>
@@ -466,7 +476,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
         canReportResult={canReportResult && reportingOpen && !reportPending}
         reportingDisabled={tournament.status === 'running' && !reportingOpen}
         resultReport={registration.resultReport} path={path}
-        onResultSaved={(updated) => queryClient.setQueryData(queryKey, updated)} />}
+        onResultSaved={(updated) => queryClient.setQueryData(queryKey, updated)} onRefresh={() => query.refetch()} />}
       <RankingCard live={live} tournament={tournament} />
       <HistoryCard live={live} />
       {tournament.status === 'running' && <LivePushToggle path={path} registrationId={registration.id} />}

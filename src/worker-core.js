@@ -585,11 +585,11 @@ export function dateDaysAgo(days, now = new Date()) {
 
 // Push bei neuer Runde (Bereich "Live"). Kurz halten: Titel = Turnier + Runde, Text = Bahn und Gegner.
 export const LIVE_ROUND_PUSH_TEXTS = {
-  de: { round: 'Runde', court: 'Bahn', versus: 'gegen', bye: 'Freilos' },
-  nl: { round: 'Ronde', court: 'Baan', versus: 'tegen', bye: 'Vrijloting' },
-  en: { round: 'Round', court: 'Lane', versus: 'vs.', bye: 'Bye' },
-  es: { round: 'Ronda', court: 'Pista', versus: 'contra', bye: 'Exento' },
-  fr: { round: 'Tour', court: 'Terrain', versus: 'contre', bye: 'Exempt' },
+  de: { round: 'Runde', court: 'Bahn', versus: 'gegen', bye: 'Freilos', notPlaying: 'In dieser Runde nicht eingeteilt' },
+  nl: { round: 'Ronde', court: 'Baan', versus: 'tegen', bye: 'Vrijloting', notPlaying: 'Niet ingedeeld in deze ronde' },
+  en: { round: 'Round', court: 'Lane', versus: 'vs.', bye: 'Bye', notPlaying: 'Not drawn for this round' },
+  es: { round: 'Ronda', court: 'Pista', versus: 'contra', bye: 'Exento', notPlaying: 'No asignado en esta ronda' },
+  fr: { round: 'Tour', court: 'Terrain', versus: 'contre', bye: 'Exempt', notPlaying: 'Non placé dans ce tour' },
 };
 
 // Paketgröße pro Queue-Nachricht: Der Consumer verarbeitet bis zu 3 Nachrichten pro Aufruf und
@@ -612,6 +612,87 @@ export function buildLiveRoundPush({ tournamentName, match, language, url, tourn
     body: parts.join(' · '),
     url,
     tag: `live-round-${match.roundNumber}`,
+    ...livePushRefreshFields(tournamentId),
+  };
+}
+
+// Neue Runde ohne eigene Partie (inaktiv oder ausgesetzt): still, damit die offene Live-Ansicht nicht weiter die Partie
+// der Vorrunde zeigt.
+export function buildLiveRoundNotPlayingPush({ tournamentName, roundNumber, language, url, tournamentId }) {
+  const texts = LIVE_ROUND_PUSH_TEXTS[language] || LIVE_ROUND_PUSH_TEXTS.de;
+  return {
+    title: `${tournamentName}: ${texts.round} ${roundNumber}`,
+    body: texts.notPlaying,
+    url,
+    tag: `live-round-${roundNumber}`,
+    silent: true,
+    ...livePushRefreshFields(tournamentId),
+  };
+}
+
+const LIVE_RESULT_PUSH_TEXTS = {
+  de: { entered: 'Ergebnis eingetragen', noShow: 'Nicht angetreten' },
+  nl: { entered: 'Uitslag ingevoerd', noShow: 'Niet verschenen' },
+  en: { entered: 'Result entered', noShow: 'No-show' },
+  es: { entered: 'Resultado registrado', noShow: 'No presentado' },
+  fr: { entered: 'Résultat saisi', noShow: 'Forfait' },
+};
+
+// Ergebnis der eigenen Partie eingetragen (Turnierleitung oder Mitspieler): still, die offene Live-Ansicht zeigt es
+// sofort statt erst beim nächsten Abruf. Gleiches Tag wie die Runde, damit "Bahn 7 · gegen …" ersetzt wird.
+export function buildLiveResultPush({ tournamentName, roundNumber, ownScore, opponentScore, noShow, language, url, tournamentId }) {
+  const texts = LIVE_RESULT_PUSH_TEXTS[language] || LIVE_RESULT_PUSH_TEXTS.de;
+  const roundTexts = LIVE_ROUND_PUSH_TEXTS[language] || LIVE_ROUND_PUSH_TEXTS.de;
+  return {
+    title: `${tournamentName}: ${roundTexts.round} ${roundNumber}`,
+    body: `${texts.entered}: ${noShow ? texts.noShow : `${ownScore}:${opponentScore}`}`,
+    url,
+    tag: `live-round-${roundNumber}`,
+    silent: true,
+    ...livePushRefreshFields(tournamentId),
+  };
+}
+
+// Obergrenze je Turnier für die Sofort-Aktualisierung der Turnierseite: Jede neue Runde kostet einen Push pro Abo
+// (externe Anfrage in der Queue).
+export const MAX_BOARD_PUSH_SUBSCRIPTIONS = 50;
+
+const BOARD_ROUND_PUSH_BODIES = {
+  de: 'Spielplan aktualisiert', nl: 'Speelschema bijgewerkt', en: 'Schedule updated', es: 'Calendario actualizado', fr: 'Programme mis à jour',
+};
+
+// Turnierseite/Bildschirm-Anzeige: Die offene Seite lädt sofort neu. Still (ohne Ton), weil sie meist auf einem
+// Bildschirm vor Ort läuft; gleiches Tag, damit die nächste Runde die Benachrichtigung ersetzt.
+export function buildBoardRoundPush({ tournamentName, roundNumber, language, url, tournamentId }) {
+  const texts = LIVE_ROUND_PUSH_TEXTS[language] || LIVE_ROUND_PUSH_TEXTS.de;
+  return {
+    title: `${tournamentName}: ${texts.round} ${roundNumber}`,
+    body: BOARD_ROUND_PUSH_BODIES[language] || BOARD_ROUND_PUSH_BODIES.de,
+    url,
+    tag: 'board-round',
+    silent: true,
+    ...livePushRefreshFields(tournamentId),
+  };
+}
+
+const BOARD_FINISHED_PUSH_TEXTS = {
+  de: { title: 'Turnier beendet', body: 'Endrangliste' },
+  nl: { title: 'Toernooi afgelopen', body: 'Eindrangschikking' },
+  en: { title: 'Tournament finished', body: 'Final ranking' },
+  es: { title: 'Torneo finalizado', body: 'Clasificación final' },
+  fr: { title: 'Tournoi terminé', body: 'Classement final' },
+};
+
+// Turnierende: Eine offene Turnierseite/Anzeige lädt neu und zeigt die Endrangliste - auch wenn sie das regelmäßige
+// Abfragen schon pausiert hat. Gleiches Tag wie die Runden, damit die Benachrichtigung die letzte Runde ersetzt.
+export function buildBoardFinishedPush({ tournamentName, language, url, tournamentId }) {
+  const texts = BOARD_FINISHED_PUSH_TEXTS[language] || BOARD_FINISHED_PUSH_TEXTS.de;
+  return {
+    title: `${tournamentName}: ${texts.title}`,
+    body: texts.body,
+    url,
+    tag: 'board-round',
+    silent: true,
     ...livePushRefreshFields(tournamentId),
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from 'vitest';
-import { render as renderBase, screen, waitFor } from '@testing-library/react';
+import { act, render as renderBase, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { normalizeRanking } from '../lib/live-ranking.js';
 import { TournamentSchedule } from './TournamentDetailPage.jsx';
@@ -89,7 +89,7 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     expect(screen.getByText(/Stand:/)).toBeInTheDocument();
   });
 
-  it('zeigt als reine Anzeige aktuelle Runde, Rangliste und Turnierverlauf ohne Bedienelemente', async () => {
+  it('zeigt als reine Anzeige nur aktuelle Runde und Rangliste ohne Bedienelemente', async () => {
     mockSchedule({
       rounds: [
         { id: 'r1', roundNumber: 1, matches: [{ id: 'm1', teamA: [anna], teamB: [clara], scoreA: 13, scoreB: 11, noShow: null }] },
@@ -102,15 +102,36 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
 
     expect(await screen.findByRole('heading', { name: 'Runde 2' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Rangliste' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Turnierverlauf' })).toBeInTheDocument();
-    // Turnierverlauf offen statt eingeklappt, damit ihn alle vor dem Bildschirm sehen.
-    expect(screen.getByText('13:11')).toBeVisible();
+    // Kein Turnierverlauf: vergangene Runden gehören nicht auf die Anzeige.
+    expect(screen.queryByRole('heading', { name: 'Turnierverlauf' })).not.toBeInTheDocument();
+    expect(screen.queryByText('13:11')).not.toBeInTheDocument();
     expect(document.querySelector('details')).toBeNull();
+    // Runde und Rangliste je in einem eigenen Scrollbereich (Auto-Scroll auf dem Bildschirm vor Ort).
+    expect(document.querySelectorAll('.display-scroll')).toHaveLength(2);
     expect(screen.queryAllByRole('button')).toEqual([]);
     expect(screen.getByText(/Stand:/)).toBeInTheDocument();
   });
 
-  it('zeigt die aktuelle Runde oben, vergangene Runden eingeklappt, und kennzeichnet offene sowie nicht angetretene Partien', async () => {
+  it('zeigt als reine Anzeige nach Turnierende nur noch die komplette Rangliste', async () => {
+    mockSchedule({
+      status: 'finished',
+      rounds: [{ id: 'r1', roundNumber: 1, matches: [{ id: 'm1', teamA: [anna], teamB: [clara], scoreA: 13, scoreB: 11, noShow: null }] }],
+      ranking: [
+        { rank: 1, playerId: 'p1', firstName: 'Anna', lastName: 'Muster', wins: 1, gameDiff: 2, pointsFor: 13, pointsAgainst: 11 },
+        { rank: 2, playerId: 'p3', firstName: 'Clara', lastName: 'Muster', wins: 0, gameDiff: -2, pointsFor: 11, pointsAgainst: 13 },
+      ],
+    });
+
+    render(<TournamentSchedule tournamentId="t1" language="de" display />);
+
+    expect(await screen.findByRole('heading', { name: 'Endrangliste' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Runde 1' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(document.querySelectorAll('.display-scroll')).toHaveLength(1);
+    expect(document.querySelector('.display-columns.has-ranking')).toBeNull();
+  });
+
+  it('zeigt nur die aktuelle Runde ohne vergangene Runden und kennzeichnet offene sowie nicht angetretene Partien', async () => {
     mockSchedule({
       rounds: [
         { id: 'r1', roundNumber: 1, matches: [{ id: 'm1', teamA: [anna], teamB: [clara], scoreA: 13, scoreB: 11, noShow: null }] },
@@ -129,9 +150,8 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
 
     expect(await screen.findByRole('heading', { name: 'Runde 2' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Runde 1' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Vergangene Runden' })).toBeInTheDocument();
-    expect(screen.getByText('Runde 1').closest('details')).not.toHaveAttribute('open');
-    expect(screen.getByText('13:11')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Vergangene Runden' })).not.toBeInTheDocument();
+    expect(screen.queryByText('13:11')).not.toBeInTheDocument();
     expect(screen.getByText('Offen')).toBeInTheDocument();
     expect(screen.getByText('Nicht angetreten')).toBeInTheDocument();
   });
@@ -151,6 +171,84 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
       await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
     } finally {
       delete navigator.serviceWorker;
+    }
+  });
+
+  it('fragt 8 Stunden nach Turnierbeginn nicht mehr von selbst ab und bietet Neuladen an', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockSchedule({ pollUntil: new Date(Date.now() + 60_000).toISOString() });
+      render(<TournamentSchedule tournamentId="t1" language="de" />);
+      expect(await screen.findByText(/^nächste Aktualisierung in/)).toBeInTheDocument();
+
+      await act(async () => { vi.advanceTimersByTime(120_000); });
+      expect(await screen.findByText(/Anzeige pausiert/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'neu laden' })).toBeInTheDocument();
+      const calls = global.fetch.mock.calls.length;
+      await act(async () => { vi.advanceTimersByTime(600_000); });
+      expect(global.fetch).toHaveBeenCalledTimes(calls);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('zeigt auch nach der Pause die Endrangliste, sobald der Push zum Turnierende kommt', async () => {
+    const ranking = [{ rank: 1, playerId: 'p1', firstName: 'Anna', lastName: 'Muster', wins: 1, gameDiff: 2, pointsFor: 13, pointsAgainst: 11 }];
+    const rounds = [{ id: 'r1', roundNumber: 1, matches: [{ id: 'm1', teamA: [anna], teamB: [clara], scoreA: 13, scoreB: 11, noShow: null }] }];
+    mockSchedule({ rounds, ranking, pollUntil: '2000-01-01T00:00:00.000Z' });
+    const serviceWorker = new EventTarget();
+    Object.defineProperty(navigator, 'serviceWorker', { value: serviceWorker, configurable: true });
+    try {
+      render(<TournamentSchedule tournamentId="t1" language="de" display />);
+      expect(await screen.findByText(/Anzeige pausiert/)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Runde 1' })).toBeInTheDocument();
+
+      mockSchedule({ status: 'finished', rounds, ranking, pollUntil: '2000-01-01T00:00:00.000Z' });
+      serviceWorker.dispatchEvent(Object.assign(new Event('message'), { data: { type: 'live-update', tournamentId: 't1' } }));
+
+      expect(await screen.findByRole('heading', { name: 'Endrangliste' })).toBeInTheDocument();
+      expect(screen.queryByText(/Anzeige pausiert/)).not.toBeInTheDocument();
+    } finally {
+      delete navigator.serviceWorker;
+    }
+  });
+
+  it('fragt nicht weiter ab, wenn der Spielplan nicht mehr sichtbar ist', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockSchedule({});
+      render(<TournamentSchedule tournamentId="t1" language="de" />);
+      await screen.findByText('Noch keine Runde gestartet.');
+      global.fetch = vi.fn(() => Promise.resolve({ ok: false, status: 403, headers: new Headers(), json: () => Promise.resolve({ error: 'Zugriff verweigert' }) }));
+
+      await act(async () => { vi.advanceTimersByTime(120_000); });
+      expect(await screen.findByText(/Anzeige pausiert/)).toBeInTheDocument();
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      await act(async () => { vi.advanceTimersByTime(600_000); });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lädt nach einem Live-Push nach 20 Sekunden noch einmal, falls der Server-Cache noch den alten Stand hatte', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockSchedule({});
+    const serviceWorker = new EventTarget();
+    Object.defineProperty(navigator, 'serviceWorker', { value: serviceWorker, configurable: true });
+    try {
+      render(<TournamentSchedule tournamentId="t1" language="de" />);
+      await screen.findByText('Noch keine Runde gestartet.');
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      serviceWorker.dispatchEvent(Object.assign(new Event('message'), { data: { type: 'live-update', tournamentId: 't1' } }));
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+
+      await act(async () => { vi.advanceTimersByTime(20_000); });
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
+    } finally {
+      delete navigator.serviceWorker;
+      vi.useRealTimers();
     }
   });
 

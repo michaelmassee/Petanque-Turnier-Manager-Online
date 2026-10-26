@@ -7,7 +7,8 @@ import { isDocumentBound, formatTournamentStartTime, formatLocationAddress } fro
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
-import { TournamentSchedule } from './TournamentDetailPage.jsx';
+import { BoardPushToggle } from '../components/BoardPushToggle.jsx';
+import { ScheduleRefreshCountdown, TournamentSchedule, useScheduleQuery } from './TournamentDetailPage.jsx';
 
 // Vollbild-Schalter für die reine Anzeige; verschwindet im Vollbild und in Browsern ohne Fullscreen-API.
 function FullscreenButton() {
@@ -43,6 +44,13 @@ export default function TournamentBoardPage({
   const { tournament, notFound } = useRoutedTournament(tournamentId, tournaments, shareToken);
   // Aktuelle Ankündigung aus dem Spielplan-Abruf (alle 2 Minuten bzw. sofort nach einem Live-Push).
   const [announcementUpdate, setAnnouncementUpdate] = useState({ tournamentId: null, announcement: null });
+  const rankingPublished = Boolean(tournament?.rankingPublishedAt);
+  const participantsVisible = Boolean(tournament && (tournament.participantsPublic || tournament.canManage) && tournament.registrationEnabled !== false);
+  const playable = Boolean(tournament) && (isOnlinePlayable(tournament) || isDocumentBound(tournament));
+  // Der Status aus der Turnierliste stammt vom Laden der App. Eine vor dem Start geöffnete Seite (z. B. Bildschirm vor
+  // Ort) erfährt den Start aus dem Spielplan-Abruf (Polling + Live-Push) und schaltet ohne Neuladen auf den Spielplan um.
+  const scheduleVisible = Boolean(!rankingPublished && participantsVisible && playable);
+  const scheduleQuery = useScheduleQuery(tournament?.id, shareToken, scheduleVisible);
 
   const header = (heading) => (display ? null : (
     <StandalonePageHeader
@@ -78,19 +86,27 @@ export default function TournamentBoardPage({
     return <main className={shellClass}>{display ? <p className="muted">{t('Turnier wird geladen…')}</p> : header(t('Turnier wird geladen…'))}</main>;
   }
 
-  const started = tournament.status === 'running' || tournament.status === 'finished';
-  const rankingPublished = Boolean(tournament.rankingPublishedAt);
-  const participantsVisible = (tournament.participantsPublic || tournament.canManage) && tournament.registrationEnabled !== false;
-  const playable = isOnlinePlayable(tournament) || isDocumentBound(tournament);
+  const status = scheduleQuery.data?.status || tournament.status;
+  // Sofort-Aktualisierung per Push lohnt nur, solange noch Runden kommen.
+  const pushToggle = scheduleVisible && status !== 'finished'
+    ? <BoardPushToggle tournamentId={tournament.id} shareToken={shareToken} language={language} />
+    : null;
+  const started = status === 'running' || status === 'finished';
   const announcement = announcementUpdate.tournamentId === tournament.id ? announcementUpdate.announcement : tournament.announcement;
 
   let content;
   if (rankingPublished) {
-    content = <FinalRankingView tournament={tournament} language={language} shareToken={shareToken} />;
+    content = <FinalRankingView tournament={tournament} language={language} shareToken={shareToken} display={display} />;
   } else if (!participantsVisible || !playable) {
     content = <p className="muted">{t('Für dieses Turnier gibt es keinen öffentlichen Spielplan.')}</p>;
   } else if (!started) {
-    content = <p className="muted">{t('Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.')}</p>;
+    content = (
+      <>
+        <p className="muted">{t('Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.')}</p>
+        {/* Auch vor dem Start sichtbar, dass die Seite von selbst auf den Spielplan umschaltet. */}
+        <p className="muted"><ScheduleRefreshCountdown query={scheduleQuery} /></p>
+      </>
+    );
   } else {
     content = (
       <TournamentSchedule
@@ -117,7 +133,7 @@ export default function TournamentBoardPage({
           </p>
           {!display && <button className="link-button" type="button" onClick={() => navigate(`/turniere/${encodeURIComponent(tournament.id)}/info${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`)}>{t('Turnierdetails')}</button>}
         </header>
-        {display && <FullscreenButton />}
+        {display ? <div className="display-actions">{pushToggle}<FullscreenButton /></div> : pushToggle}
         <AnnouncementBanner announcement={announcement} language={language} />
         {content}
       </section>

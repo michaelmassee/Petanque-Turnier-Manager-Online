@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
+import { DISPLAY_FIT_QUERY, useAutoScroll, useMediaQuery } from '../lib/hooks.js';
 import { formatLocationAddress, tournamentImageUrl } from '../lib/domain.js';
 import { formatDate, formatTournamentDateTime } from '../lib/format.js';
 import { normalizeRanking } from '../lib/live-ranking.js';
@@ -41,9 +42,14 @@ export async function downloadRankingPdf({ tournament, entries, publishedAt, sha
   saveBlob(new Blob([pdf], { type: 'application/pdf' }), rankingFileName(tournament));
 }
 
-/** Veröffentlichte Endrangliste mit Vereins- und PTM-Logo; das PDF entsteht im Browser. */
-export function FinalRankingView({ tournament, language, shareToken = '' }) {
+/**
+ * Veröffentlichte Endrangliste mit Vereins- und PTM-Logo; das PDF entsteht im Browser.
+ * display: Bildschirm vor Ort – ohne PDF-Button; im Querformat scrollt die Tabelle von selbst, der Kopf bleibt stehen.
+ */
+export function FinalRankingView({ tournament, language, shareToken = '', display = false }) {
   const { t } = useTranslation();
+  const fitsScreen = useMediaQuery(DISPLAY_FIT_QUERY);
+  const scrollRef = useAutoScroll(display && fitsScreen);
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
@@ -76,7 +82,7 @@ export function FinalRankingView({ tournament, language, shareToken = '' }) {
   if (!data) return <p className="muted">{t('Wird geladen…')}</p>;
 
   return (
-    <section className="final-ranking">
+    <section className={`final-ranking${display ? ' is-display' : ''}`}>
       <header className="final-ranking-header">
         {tournament.logoUrl
           ? <img className="final-ranking-logo" src={tournamentImageUrl(tournament.id, 'logo', shareToken)} alt={t('Vereinslogo')} />
@@ -88,16 +94,22 @@ export function FinalRankingView({ tournament, language, shareToken = '' }) {
         </div>
         <img className="final-ranking-logo" src={PTM_LOGO_URL} alt={PTM_NAME} />
       </header>
-      <div className="table-scroll">
-        <RankingTable tournament={tournament} entries={entries} />
+      <div className="display-scroll" ref={scrollRef}>
+        <div className="table-scroll">
+          <RankingTable tournament={tournament} entries={entries} />
+        </div>
       </div>
       {data.publishedAt && (
         <p className="muted">{t('Veröffentlicht am')} {formatTournamentDateTime(data.publishedAt, language, tournament.timezone)}</p>
       )}
-      <Feedback error={error} />
-      <div className="final-ranking-actions">
-        <Button variant="secondary" disabled={busy || !entries.length} loading={busy} onClick={handleDownload}>{t('PDF herunterladen')}</Button>
-      </div>
+      {!display && (
+        <>
+          <Feedback error={error} />
+          <div className="final-ranking-actions">
+            <Button variant="secondary" disabled={busy || !entries.length} loading={busy} onClick={handleDownload}>{t('PDF herunterladen')}</Button>
+          </div>
+        </>
+      )}
     </section>
   );
 }
