@@ -13,6 +13,7 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "node scripts/assert-deploy-branch.mjs && wrangler d1 migrations apply DB --remote",
     "db:backfill:local": "node scripts/backfill-usernames.mjs --local --apply",
+    "db:seed:testturniere": "npm run db:migrate:local && node scripts/seed-test-tournaments.mjs",
     "db:backfill:remote": "node scripts/assert-deploy-branch.mjs && node scripts/backfill-usernames.mjs --remote --apply",
     "security:check": "node scripts/security-check.mjs && node scripts/i18n-check.mjs",
     "i18n:check": "node scripts/i18n-check.mjs",

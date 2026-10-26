@@ -82,6 +82,7 @@ Ergebnisse synchronisieren.
 ## 🛠️ Entwicklung und Deployment
 
 * `npm run dev` baut die App, wendet die D1-Migrationen lokal an, vergibt fehlende Benutzernamen und startet `wrangler dev`.
+* `npm run db:seed:testturniere` legt in der lokalen D1 für manuelle Tests je ein Testturnier pro online durchführbarem System an (Schweizer, Formule X, KO, Jeder gegen jeden, Mêlée, Supermêlée). Die Turniere finden heute statt, alle Meldungen sind bestätigt (70, bei Jeder gegen jeden 8), und sie lassen sich sofort starten. Live-Ansicht und Ergebnismeldung durch Spieler sind freigegeben. Das Testkonto `ptm-user@example.test` ist jeweils mit Meldung 1 verknüpft. Das Skript darf beliebig oft laufen: Es löscht nur Turniere mit ID-Präfix `testturnier-` und setzt sie auf den Anmeldestatus zurück. Es arbeitet nur lokal und spielt vorher die gitignorierte `.dev.vars.test-users.sql` ein, falls vorhanden.
 * `npm run deploy` (nur von `master`) führt das Quality-Gate aus und dann in dieser Reihenfolge:
   1. D1-Migrationen remote anwenden (`db:migrate:remote`)
   2. Fehlende Benutzernamen vergeben (`db:backfill:remote`, Skript `scripts/backfill-usernames.mjs`)
