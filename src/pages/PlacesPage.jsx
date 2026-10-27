@@ -388,7 +388,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
         .sort((a, b) => a.distanceKm - b.distanceKm);
     }
     return results;
-  }, [places, linkedPlaceId, linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm]);
+  }, [places, query, linkedPlaceId, linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly, searchOrigin, searchRadiusKm]);
 
   const mapped = useMemo(() => visiblePlaces.filter((place) => place.latitude !== null && place.longitude !== null), [visiblePlaces]);
   const center = mapped.length ? [mapped[0].latitude, mapped[0].longitude] : FALLBACK_CENTER;

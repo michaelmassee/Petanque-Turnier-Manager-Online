@@ -330,6 +330,33 @@ describe('Ungeprüfte Platzadresse', () => {
   });
 });
 
+describe('Suche auf der Plätze-Seite', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('filtert Liste und Karte beim Tippen, ohne erneut vom Server zu laden', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ places: [
+      place(1, { name: 'Am Weiher', clubName: 'BC Linden' }),
+      place(2, { name: 'Stadtpark', clubName: 'Boule Freunde Karben' }),
+      place(3, { name: 'Dorfplatz', address: 'Hauptstraße 3, Lindenfels' }),
+    ] }), { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+    renderPlacesPage();
+    await screen.findByRole('heading', { name: 'Stadtpark' }, { timeout: 5_000 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Suche öffnen' }));
+    fireEvent.change(screen.getByRole('searchbox', { name: /Nach Platz, Verein oder Ort suchen/ }), { target: { value: 'bc linden' } });
+
+    expect(screen.getByRole('heading', { name: 'Am Weiher' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Stadtpark' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Dorfplatz' })).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('place-marker')).toHaveLength(1);
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /Nach Platz, Verein oder Ort suchen/ }), { target: { value: 'LINDEN' } });
+    expect(screen.getByRole('heading', { name: 'Dorfplatz' })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/places'))).toHaveLength(1);
+  });
+});
+
 describe('Persönliche Markierungen zur gemeinsamen Plätzeliste', () => {
   afterEach(() => vi.unstubAllGlobals());
 
