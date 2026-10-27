@@ -65,6 +65,23 @@ describe('Letzte erfolgreiche Konto-Anmeldung', () => {
     expect(lastLogin()).toBe('2026-10-26T13:00:00.000Z');
   });
 
+  it('führt „zuletzt online“ bei Login und stündlicher Sitzungsverlängerung mit', async () => {
+    const lastSeen = () => db.sqlite.prepare('SELECT last_seen_at FROM users WHERE id = ?').get(userId).last_seen_at;
+    const response = await login();
+    expect(lastSeen()).toBe(now);
+    const cookie = response.headers.get('Set-Cookie').split(';')[0];
+
+    vi.setSystemTime('2026-10-26T13:00:00.000Z');
+    expect((await request('/api/session', { headers: { Cookie: cookie } })).status).toBe(200);
+    expect(lastSeen()).toBe(now); // Innerhalb einer Stunde kein Schreibzugriff.
+
+    vi.setSystemTime('2026-10-26T14:00:00.000Z');
+    expect((await request('/api/session', { headers: { Cookie: cookie } })).status).toBe(200);
+    expect(lastSeen()).toBe('2026-10-26T14:00:00.000Z');
+    expect(lastLogin()).toBe(now);
+    expect((await adminUsers()).find((user) => user.id === userId).lastSeenAt).toBe('2026-10-26T14:00:00.000Z');
+  });
+
   it.each([
     ['falsches Passwort', '', 'falsch', 401],
     ['unbestätigte E-Mail', 'email_verified_at = NULL', password, 403],

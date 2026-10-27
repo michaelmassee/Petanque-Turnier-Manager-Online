@@ -3802,10 +3802,10 @@ async function resetPassword(request, db) {
 async function listUsers(db) {
   const result = await db
     .prepare(
-      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, club_id, email_verified_at, password_change_required, tournament_limit, mail_enabled, last_login_at, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, club_id, email_verified_at, password_change_required, tournament_limit, mail_enabled, last_login_at, last_seen_at, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
     )
     .all();
-  return json({ users: result.results.map((row) => ({ ...toPublicUser(row), lastLoginAt: row.last_login_at || null })) });
+  return json({ users: result.results.map((row) => ({ ...toPublicUser(row), lastLoginAt: row.last_login_at || null, lastSeenAt: row.last_seen_at || null })) });
 }
 
 export async function listPostboxRecipients(db, userId) {
@@ -12117,7 +12117,11 @@ async function requireSession(request, db) {
   // below refreshes the HttpOnly cookie with the same expiry.
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
   if (expiresAt.getTime() - new Date(row.expires_at).getTime() >= SESSION_REFRESH_INTERVAL_SECONDS * 1000) {
-    await db.prepare('UPDATE sessions SET expires_at = ? WHERE id = ?').bind(expiresAt.toISOString(), sessionId).run();
+    // Im selben Batch „zuletzt online“ für die Admin-Benutzerliste (dadurch auf etwa eine Stunde genau).
+    await db.batch([
+      db.prepare('UPDATE sessions SET expires_at = ? WHERE id = ?').bind(expiresAt.toISOString(), sessionId),
+      db.prepare('UPDATE users SET last_seen_at = ? WHERE id = ?').bind(new Date().toISOString(), row.id),
+    ]);
     sessionRefreshes.set(request, { id: sessionId, expiresAt });
   }
 
@@ -12133,8 +12137,8 @@ async function createSession(db, userId) {
   await db.batch([
     db.prepare('INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
       .bind(id, userId, expiresAt.toISOString(), loggedInAt),
-    db.prepare('UPDATE users SET last_login_at = ? WHERE id = ? AND (last_login_at IS NULL OR last_login_at < ?)')
-      .bind(loggedInAt, userId, loggedInAt),
+    db.prepare('UPDATE users SET last_login_at = ?1, last_seen_at = ?1 WHERE id = ?2 AND (last_login_at IS NULL OR last_login_at < ?1)')
+      .bind(loggedInAt, userId),
   ]);
 
   return { id, expiresAt };

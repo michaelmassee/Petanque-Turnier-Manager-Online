@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterApiKeys, filterRegistrations, filterTournaments, filterUsers } from './frontend-core.js';
+import { filterApiKeys, filterRegistrations, filterTournaments, filterUsers, sortUsers } from './frontend-core.js';
 import { currencyDecimals } from './currencies.js';
 
 const tournaments = [
@@ -67,6 +67,44 @@ describe('filterRegistrations', () => {
     expect(filterRegistrations(vipRegistrations, '', '', { vipFilter: 'vip' })).toEqual([vipRegistrations[0]]);
     expect(filterRegistrations(vipRegistrations, '', '', { vipFilter: 'not_vip' })).toEqual([vipRegistrations[1], vipRegistrations[2]]);
     expect(filterRegistrations(vipRegistrations, '', '', { vipFilter: 'unknown' })).toEqual([]);
+  });
+});
+
+describe('sortUsers', () => {
+  const users = [
+    { id: 'zoe', firstName: 'Zoe', lastName: 'Adler', club: 'BC Linden', lastSeenAt: '2026-10-20T10:00:00.000Z' },
+    { id: 'anna-b', firstName: 'anna', lastName: 'Bauer', club: null, lastSeenAt: null },
+    { id: 'anna-a', firstName: 'Anna', lastName: 'Adler', club: 'Ärzte Boule', lastSeenAt: '2026-10-27T08:00:00.000Z' },
+    { id: 'max', firstName: 'Max', lastName: 'Müller', club: 'bc linden', lastSeenAt: '2026-10-25T08:00:00.000Z' },
+  ];
+  const ids = (sortBy) => sortUsers(users, sortBy).map((user) => user.id);
+
+  it('sortiert nach Vorname, dann Nachname, ohne Groß-/Kleinschreibung (Standard)', () => {
+    expect(ids()).toEqual(['anna-a', 'anna-b', 'max', 'zoe']);
+    expect(ids('unbekannt')).toEqual(['anna-a', 'anna-b', 'max', 'zoe']);
+  });
+
+  it('sortiert nach „zuletzt online“, nie Gesehene am Ende', () => {
+    expect(ids('lastSeen')).toEqual(['anna-a', 'max', 'zoe', 'anna-b']);
+  });
+
+  it('sortiert nach Verein, Umlaute richtig, ohne Verein am Ende, innerhalb des Vereins nach Name', () => {
+    expect(ids('club')).toEqual(['anna-a', 'max', 'zoe', 'anna-b']);
+  });
+
+  it('sortiert bei Gleichstand und fehlenden Namensteilen stabil nach Name', () => {
+    const ties = [
+      { id: 'ohne-nachname', firstName: 'Ida', club: null, lastSeenAt: null },
+      { id: 'ohne-vorname', lastName: 'Kranz', club: null, lastSeenAt: null },
+      { id: 'ida-a', firstName: 'Ida', lastName: 'Adler', club: null, lastSeenAt: null },
+    ];
+    expect(sortUsers(ties, 'lastSeen').map((user) => user.id)).toEqual(['ohne-vorname', 'ohne-nachname', 'ida-a']);
+    expect(sortUsers(ties, 'club').map((user) => user.id)).toEqual(['ohne-vorname', 'ohne-nachname', 'ida-a']);
+  });
+
+  it('verändert die übergebene Liste nicht', () => {
+    sortUsers(users, 'club');
+    expect(users.map((user) => user.id)).toEqual(['zoe', 'anna-b', 'anna-a', 'max']);
   });
 });
 

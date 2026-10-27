@@ -4,7 +4,7 @@ import { authenticatedApi } from '../lib/api.js';
 import { DEFAULT_TOURNAMENT_LIMIT, ROLES, EMPTY_USER_FORM } from '../lib/constants.js';
 import { PASSWORD_STRENGTH_HINT, PASSWORD_STRENGTH_ERROR, isPasswordStrong } from '../lib/format.js';
 import { roleName, translatedOptions } from '../lib/domain.js';
-import { filterUsers } from '../frontend-core.js';
+import { filterUsers, sortUsers } from '../frontend-core.js';
 import { Feedback, IntegerField, SelectField, TextField, Button, ListToolbar, EditDialog } from '../components/ui.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { UsernameField } from '../components/UsernameField.jsx';
@@ -15,6 +15,12 @@ const USER_STATUS_FILTERS = [
   { value: 'verified', label: 'E-Mail bestätigt' },
   { value: 'unverified', label: 'E-Mail offen' },
   { value: 'password_change_required', label: 'Passwortwechsel nötig' },
+];
+
+const USER_SORT_OPTIONS = [
+  { value: 'name', label: 'Name' },
+  { value: 'lastSeen', label: 'Zuletzt online' },
+  { value: 'club', label: 'Verein' },
 ];
 
 const USER_MAIL_FILTERS = [
@@ -53,6 +59,7 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
   const [statusFilter, setStatusFilter] = useState('');
   const [tournamentLimitFilter, setTournamentLimitFilter] = useState('');
   const [mailFilter, setMailFilter] = useState('');
+  const [sortBy, setSortBy] = useState('name');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_USER_FORM);
   const [mode, setMode] = useState('create');
@@ -68,7 +75,7 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
   }
   useEffect(() => { load(); }, []);
 
-  const filtered = useMemo(() => filterUsers(users, query, roleFilter, statusFilter, { tournamentLimitFilter, mailFilter }), [users, query, roleFilter, statusFilter, tournamentLimitFilter, mailFilter]);
+  const filtered = useMemo(() => sortUsers(filterUsers(users, query, roleFilter, statusFilter, { tournamentLimitFilter, mailFilter }), sortBy), [users, query, roleFilter, statusFilter, tournamentLimitFilter, mailFilter, sortBy]);
   const tournamentLimits = useMemo(() => [...new Set(users.filter((user) => user.role !== 'admin')
     .map((user) => user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT))].sort((left, right) => left - right), [users]);
   const stats = useMemo(() => ({
@@ -201,6 +208,7 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
               { value: 'unlimited', label: t('Unbegrenzt') },
             ] },
             { label: t('E-Mail-Versand filtern'), value: mailFilter, onChange: setMailFilter, options: translatedOptions(USER_MAIL_FILTERS) },
+            { label: t('Sortieren nach'), value: sortBy, onChange: setSortBy, options: translatedOptions(USER_SORT_OPTIONS) },
           ]}
           onReset={resetFilters}
           resetDisabled={!isFiltered}
@@ -271,6 +279,13 @@ function UserRow({ user, currentUser, selected, busy, busyOther, onEdit, onDelet
           {t('Zuletzt angemeldet')}: {user.lastLoginAt ? (
             <time dateTime={user.lastLoginAt} data-i18n-skip>
               {new Intl.DateTimeFormat(i18n.resolvedLanguage || i18n.language, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(user.lastLoginAt))}
+            </time>
+          ) : t('Bisher nicht erfasst')}
+        </span>
+        <span className="muted">
+          {t('Zuletzt online')}: {user.lastSeenAt ? (
+            <time dateTime={user.lastSeenAt} data-i18n-skip>
+              {new Intl.DateTimeFormat(i18n.resolvedLanguage || i18n.language, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(user.lastSeenAt))}
             </time>
           ) : t('Bisher nicht erfasst')}
         </span>

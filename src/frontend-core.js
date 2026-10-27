@@ -41,6 +41,22 @@ export function filterUsers(users, query, roleFilter, statusFilter, { tournament
   });
 }
 
+const compareText = (left, right) => (left || '').localeCompare(right || '', undefined, { sensitivity: 'base' });
+const compareUserNames = (left, right) => compareText(left.firstName, right.firstName) || compareText(left.lastName, right.lastName);
+
+// Admin-Benutzerliste: 'name' (Vorname, Nachname), 'lastSeen' (zuletzt online zuerst) oder 'club' (Verein A–Z).
+// Ohne Wert (nie online, kein Verein) stehen Benutzer jeweils am Ende, danach nach Name.
+export function sortUsers(users, sortBy = 'name') {
+  const missingLast = (left, right) => Number(!left) - Number(!right);
+  const comparators = {
+    name: compareUserNames,
+    lastSeen: (left, right) => missingLast(left.lastSeenAt, right.lastSeenAt)
+      || compareText(right.lastSeenAt, left.lastSeenAt) || compareUserNames(left, right),
+    club: (left, right) => missingLast(left.club, right.club) || compareText(left.club, right.club) || compareUserNames(left, right),
+  };
+  return [...users].sort(comparators[sortBy] || comparators.name);
+}
+
 export function filterApiKeys(apiKeys, query, statusFilter) {
   const normalizedQuery = (query || '').trim().toLowerCase();
   return apiKeys.filter((key) => {
