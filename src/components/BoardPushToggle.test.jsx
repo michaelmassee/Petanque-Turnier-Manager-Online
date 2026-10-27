@@ -58,8 +58,14 @@ describe('BoardPushToggle', () => {
       render(<BoardPushToggle tournamentId="t1" language="de" />);
       fireEvent.click(await screen.findByRole('button', { name: 'Push einschalten' }));
       expect(await screen.findByText('Diese Seite aktualisiert sich jetzt bei jeder neuen Runde sofort.')).toBeInTheDocument();
-      act(() => vi.advanceTimersByTime(5000));
-      expect(screen.queryByText('Diese Seite aktualisiert sich jetzt bei jeder neuen Runde sofort.')).not.toBeInTheDocument();
+      // Der Ausblend-Timer entsteht erst im Effect nach dem Rendern der Meldung; unter Last (volle Suite) läuft der
+      // manchmal erst nach findByText. Daher in act vorspulen, bis die Meldung weg ist (nicht in waitFor: dort ist die
+      // act-Umgebung aus und React rendert das Ausblenden nicht).
+      const confirmation = () => screen.queryByText('Diese Seite aktualisiert sich jetzt bei jeder neuen Runde sofort.');
+      for (let attempt = 0; attempt < 5 && confirmation(); attempt += 1) {
+        await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      }
+      expect(confirmation()).not.toBeInTheDocument();
       expect(screen.queryByRole('button')).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
