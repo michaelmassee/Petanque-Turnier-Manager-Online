@@ -21,6 +21,7 @@
     "test:checks": "node scripts/formation-registration-type-check.mjs && node scripts/timezone-check.mjs && node scripts/email-cancel-link-check.mjs && node scripts/email-footer-check.mjs && node scripts/required-fields-check.mjs && node scripts/feedback-visibility-check.mjs",
     "test": "npm run test:checks && npm run test:ui",
     "test:ui": "vitest run",
+    "test:e2e": "playwright test",
     "test:coverage": "npm run test:checks && vitest run --coverage && node scripts/coverage-gate.mjs",
     "quality-gate": "npm run lint && npm run build && npm run test:coverage && npm run security:check && npm audit --audit-level=high"
   },
@@ -46,6 +47,7 @@
     "worker-mailer": "^1.2.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
