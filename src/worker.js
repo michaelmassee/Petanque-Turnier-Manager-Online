@@ -1993,7 +1993,7 @@ export default {
         if (request.method === 'GET') {
           const session = await optionalSession(request, env.DB);
           if (!session) return await listTournamentsAnonymous(env.DB, url.origin);
-          return await listTournaments(env.DB, session.user);
+          return await listTournamentsForUser(env.DB, url.origin, session.user);
         }
 
         if (request.method === 'POST') {
@@ -3144,6 +3144,9 @@ export default {
         // Keep the committed mutation response. The dirty marker enables recovery on later writes/cron.
         console.error('Registration opening schedule remains pending', error);
       }
+    }
+    if (request.method !== 'GET' && response.ok && TOURNAMENT_LIST_WRITE_PATH.test(url.pathname)) {
+      await invalidateAnonymousTournamentList(url.origin);
     }
     return withRefreshedSessionCookie(request, response, url);
   },
@@ -4773,14 +4776,56 @@ export function sortTournamentRows(rows) {
     || plainCompare(tournamentNameSortKey(left.name), tournamentNameSortKey(right.name)));
 }
 
-// Ohne Anmeldung sehen alle dieselbe Liste. Sie kostet in Prod trotz warmem Isolate 6-24 ms CPU (Free-Plan: 10 ms),
-// daher kurz im Cloudflare-Cache (pro Rechenzentrum). Änderungen erscheinen für Anonyme bis zu 60 s verzögert;
-// Angemeldete lesen immer frisch.
+// Die öffentliche Liste ist für alle gleich. Sie kostet in Prod trotz warmem Isolate 6-24 ms CPU (Free-Plan: 10 ms),
+// daher kurz im Cloudflare-Cache (pro Rechenzentrum). Kein Versionsschlüssel wie bei den Plätzen: Die Desktop-
+// Synchronisation schreibt tournaments bei Live-Turnieren laufend. Fremde Turniere erscheinen bis zu 60 s verzögert;
+// eigene Schreibzugriffe löschen den Eintrag im eigenen Rechenzentrum (TOURNAMENT_LIST_WRITE_PATH).
 const ANONYMOUS_TOURNAMENT_LIST_TTL_SECONDS = 60;
+const TOURNAMENT_LIST_WRITE_PATH = /^\/api\/(?:tournaments|registrations)(?:\/|$)/;
+
+function anonymousTournamentListCacheKey(origin) {
+  return new Request(`${origin}/__tournament-list/anonymous`);
+}
 
 async function listTournamentsAnonymous(db, origin) {
-  return cachedJsonResponse(new Request(`${origin}/__tournament-list/anonymous`), ANONYMOUS_TOURNAMENT_LIST_TTL_SECONDS,
+  return cachedJsonResponse(anonymousTournamentListCacheKey(origin), ANONYMOUS_TOURNAMENT_LIST_TTL_SECONDS,
     () => listTournaments(db, null));
+}
+
+async function invalidateAnonymousTournamentList(origin) {
+  try {
+    await edgeCache()?.delete(anonymousTournamentListCacheKey(origin));
+  } catch (error) {
+    console.error('Failed to invalidate tournament list cache', error);
+  }
+}
+
+// Angemeldete: die gemeinsame öffentliche Liste aus dem Cache, nur die eigenen Turniere (Owner/Bearbeiter, auch
+// Entwürfe und private) frisch aus D1 mit Verwaltungsfeldern. Für fremde öffentliche Turniere liefert
+// toPublicTournament mit und ohne Benutzer dasselbe. Admins verwalten alle Turniere und lesen daher alles frisch.
+async function listTournamentsForUser(db, origin, user) {
+  if (user.role === 'admin') return listTournaments(db, user);
+  const [shared, managedRows] = await Promise.all([
+    listTournamentsAnonymous(db, origin).then((response) => response.json()),
+    db.prepare(`SELECT * FROM tournaments WHERE owner_id = ?1
+      UNION SELECT t.* FROM tournaments t JOIN tournament_editors te ON te.tournament_id = t.id WHERE te.user_id = ?1`)
+      .bind(user.id).all(),
+  ]);
+  const managed = (await withTournamentPeople(db, sortTournamentRows(managedRows.results || [])))
+    .map((row) => toPublicTournament(row, user));
+  if (!managed.length) return json(shared);
+  const managedById = new Map(managed.map((tournament) => [tournament.id, tournament]));
+  const tournaments = shared.tournaments.map((tournament) => managedById.get(tournament.id) || tournament);
+  const sharedIds = new Set(shared.tournaments.map((tournament) => tournament.id));
+  tournaments.push(...managed.filter((tournament) => !sharedIds.has(tournament.id)));
+  return json({ tournaments: sortPublicTournaments(tournaments) });
+}
+
+// Gleiche Reihenfolge wie sortTournamentRows, aber auf den Feldern von toPublicTournament.
+function sortPublicTournaments(tournaments) {
+  return tournaments.sort((left, right) => plainCompare(left.date, right.date)
+    || plainCompare(left.startTime || '', right.startTime || '')
+    || plainCompare(tournamentNameSortKey(left.name), tournamentNameSortKey(right.name)));
 }
 
 // Liefert eine JSON-Antwort aus dem Cloudflare-Cache (pro Rechenzentrum) oder baut sie mit load() und legt sie ab.

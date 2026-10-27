@@ -46,6 +46,13 @@ Einordnung 26.10.: Der Entwickler war an dem Tag oft angemeldet zum Testen auf d
 - Speicherdauer `PUBLISHED_LISTS_CACHE_SECONDS` = 14 Tage, nur noch Aufräumgrenze. Cloudflare kann Einträge früher verdrängen, dann normaler Neuaufbau.
 - Kosten je Abruf: +1 row read (Version per Primärschlüssel).
 - Die Spielort-Auswahl im Turnierformular lädt die Plätze erst in der Turnierverwaltung, `staleTime` 10 min, ohne Fokus-Refetch.
+- Die Suche auf der Plätze-Seite filtert im Browser (`filterPlaces` mit `query`: Platzname, Vereinsname, Adresse) statt per `/api/places?q=` (vorher je Eingabe ~3.770 Zeilen per `LIKE`). Der Server unterstützt `q` weiterhin.
+
+## Turnierliste (`/api/tournaments`)
+
+- Öffentliche Liste 60 s im Edge-Cache, jetzt auch für Angemeldete. Deren eigene Turniere (Owner/Bearbeiter, inkl. Entwürfe/private, mit Verwaltungsfeldern) kommen frisch aus D1 und werden eingemischt (`listTournamentsForUser`); Admins lesen weiter alles frisch.
+- Kein Versionsschlüssel wie bei den Plätzen: Die Desktop-Synchronisation schreibt `tournaments` bei Live-Turnieren laufend, die Liste würde sonst ständig neu gebaut.
+- Erfolgreiche Schreibzugriffe auf `/api/tournaments/*` und `/api/registrations/*` löschen den Eintrag im eigenen Rechenzentrum, damit die handelnde Person den neuen Stand sofort sieht. Andere Rechenzentren: bis zu 60 s Verzögerung.
 
 ## Todo
 

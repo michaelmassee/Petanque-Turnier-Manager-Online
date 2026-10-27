@@ -78,8 +78,15 @@ export function groupMapPlaces(places) {
   return [...groups.values()];
 }
 
-export function filterPlaces(places, { placeId = '', organizationId = '', favoritesOnly = false, clubsOnly = false, indoorOnly = false } = {}) {
-  return places.filter((place) => (!placeId || place.id === placeId)
+// Suchbegriff wie früher serverseitig: Teiltreffer in Platzname, Vereinsname oder Adresse, ohne Groß-/Kleinschreibung.
+function matchesSearch(place, term) {
+  return [place.name, place.clubName, place.address].some((value) => String(value || '').toLocaleLowerCase().includes(term));
+}
+
+export function filterPlaces(places, { query = '', placeId = '', organizationId = '', favoritesOnly = false, clubsOnly = false, indoorOnly = false } = {}) {
+  const term = query.trim().toLocaleLowerCase();
+  return places.filter((place) => (!term || matchesSearch(place, term))
+    && (!placeId || place.id === placeId)
     && (!organizationId || clubKey(place) === organizationId)
     && (!favoritesOnly || place.favorited)
     && (!clubsOnly || hasClub(place))
@@ -324,17 +331,18 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   async function load() {
     setLoading(true); setError('');
     try {
-      // Ohne Suchbegriff kommt die Liste für alle aus dem Edge-Cache; Likes/Favoriten/Bearbeitungsrechte separat.
-      const personal = currentUser && !query.trim();
+      // Die Liste kommt für alle aus dem Edge-Cache und wird im Browser durchsucht (filterPlaces);
+      // Likes/Favoriten/Bearbeitungsrechte der angemeldeten Person separat.
       const [data, marks] = await Promise.all([
-        api(`/api/places?q=${encodeURIComponent(query)}`),
-        personal ? authenticatedApi('/api/places/personal') : null,
+        api('/api/places'),
+        currentUser ? authenticatedApi('/api/places/personal') : null,
       ]);
       setPlaces(withPersonalPlaceMarks(data.places || [], marks));
     }
     catch (err) { setError(err.message); } finally { setLoading(false); }
   }
-  useEffect(() => { const timer = setTimeout(load, 180); return () => clearTimeout(timer); }, [query, currentUser?.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [currentUser?.id]);
 
   // Link aus den Turnierdetails: nur diesen Platz in Liste und Karte anzeigen.
   const [linkedPlaceId, setLinkedPlaceId] = useState(() => decodeURIComponent(window.location.hash.slice(1)));
@@ -370,7 +378,7 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   }
 
   const visiblePlaces = useMemo(() => {
-    let results = filterPlaces(places, { placeId: linkedPlaceId, organizationId: linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly });
+    let results = filterPlaces(places, { query, placeId: linkedPlaceId, organizationId: linkedOrganizationId, favoritesOnly, clubsOnly, indoorOnly });
     if (searchOrigin) {
       const radius = Number(searchRadiusKm);
       results = results

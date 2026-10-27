@@ -81,6 +81,19 @@ describe('Kartenmarker für Bouleplätze', () => {
     expect(filterPlaces(places, { clubsOnly: true, indoorOnly: true }).map((place) => place.id)).toEqual(['club-hall']);
   });
 
+  it('sucht im Browser nach Platz, Verein oder Ort, ohne Groß-/Kleinschreibung', () => {
+    const places = [
+      { id: 'name', name: 'Bouleplatz am Weiher', clubName: null, address: 'Parkweg 1, Linden' },
+      { id: 'club', name: 'Halle', clubName: 'Boule Freunde Überlingen', address: 'Hallenweg 2, Konstanz' },
+      { id: 'address', name: 'Dorfplatz', clubName: null, address: 'Hauptstraße 3, Lindenfels' },
+    ];
+
+    expect(filterPlaces(places, { query: ' weiher ' }).map((place) => place.id)).toEqual(['name']);
+    expect(filterPlaces(places, { query: 'überlingen' }).map((place) => place.id)).toEqual(['club']);
+    expect(filterPlaces(places, { query: 'LINDEN' }).map((place) => place.id)).toEqual(['name', 'address']);
+    expect(filterPlaces(places, { query: '' })).toHaveLength(3);
+  });
+
   it('behandelt einen vorhandenen Vereinsnamen auch ohne Organisations-ID als Verein', () => {
     const place = { id: 'legacy-club-place', clubId: null, clubName: 'Boules Brothers Ostheim', address: 'Limesstraße 10-12, Ostheim', venueType: 'outdoor' };
 
