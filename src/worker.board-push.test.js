@@ -8,12 +8,23 @@ import { MAX_BOARD_PUSH_SUBSCRIPTIONS } from './worker-core.js';
 
 const ORIGIN = 'https://ptm.test';
 
+async function sha256Hex(text) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 describe('Sofort-Aktualisierung der Turnierseite', () => {
   let env;
   const sql = (statement, ...params) => env.DB.sqlite.prepare(statement).run(...params);
   const abos = () => env.DB.sqlite.prepare('SELECT endpoint, language, page_url FROM tournament_board_push_subscriptions ORDER BY endpoint').all();
   const abonnieren = (body, method = 'POST') => worker.fetch(new Request(`${ORIGIN}/api/tournaments/t1/schedule/push`, {
     method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }), env);
+  const abonnierenMitFreigabe = (share, body) => worker.fetch(new Request(`${ORIGIN}/api/tournaments/t1/schedule/push?share=${share}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }), env);
+  const ankuendigen = (text) => worker.fetch(new Request(`${ORIGIN}/api/tournaments/t1/announcement`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: 'ptm_session=owner-session' }, body: JSON.stringify({ text }),
   }), env);
   const abo = (endpoint, extra = {}) => ({ endpoint, keys: { p256dh: 'k', auth: 'a' }, ...extra });
   const pushItems = () => env.MAIL_QUEUE.sendBatch.mock.calls.flatMap(([batch]) => batch.flatMap((message) => message.body.items));
@@ -120,18 +131,29 @@ describe('Sofort-Aktualisierung der Turnierseite', () => {
     }), env);
     expect(pushItems()).toEqual([]);
 
-    // Privat mit Freigabe-Link und veröffentlichter Teilnehmerliste bleibt der Spielplan sichtbar, also auch der Push.
+    // Privat mit Freigabe-Link und veröffentlichter Teilnehmerliste: Das alte Abo (abgeschlossen, als das Turnier
+    // öffentlich war) hat keinen Link nachgewiesen und bekommt nichts, auch wenn es inzwischen einen Link gibt.
     sql("UPDATE tournaments SET participants_public = 1 WHERE id = 't1'");
     sql(`INSERT INTO tournament_share_links (tournament_id, token_hash, token, created_at, updated_at)
-      VALUES ('t1', 'hash', 'token', '2026-09-01', '2026-09-01')`);
-    await worker.fetch(new Request(`${ORIGIN}/api/tournaments/t1/announcement`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: 'ptm_session=owner-session' }, body: JSON.stringify({ text: 'Mit Freigabe' }),
-    }), env);
-    expect(pushItems()).toEqual([expect.objectContaining({ payload: expect.objectContaining({ body: 'Mit Freigabe' }) })]);
+      VALUES ('t1', ?, 'token', '2026-09-01', '2026-09-01')`, await sha256Hex('token'));
+    expect((await worker.fetch(new Request(`${ORIGIN}/api/tournaments/t1/schedule`), env)).status).toBe(403);
+    await ankuendigen('Ohne eigene Freigabe');
+    expect(pushItems()).toEqual([]);
+
+    // Über den Freigabe-Link abonniert: Der Push kommt an.
+    expect((await abonnierenMitFreigabe('token', abo('https://fcm.googleapis.com/fcm/send/2'))).status).toBe(201);
+    await ankuendigen('Mit Freigabe');
+    expect(pushItems()).toEqual([expect.objectContaining({ endpoint: 'https://fcm.googleapis.com/fcm/send/2', payload: expect.objectContaining({ body: 'Mit Freigabe' }) })]);
+
+    // Link widerrufen und neu erzeugt: Das Abo des alten Links bekommt nichts mehr.
+    sql("UPDATE tournament_share_links SET token_hash = ?, token = 'neu' WHERE tournament_id = 't1'", await sha256Hex('neu'));
+    env.MAIL_QUEUE.sendBatch.mockClear();
+    await ankuendigen('Nach Widerruf');
+    expect(pushItems()).toEqual([]);
 
     sql("UPDATE tournaments SET participants_public = 0 WHERE id = 't1'");
     expect((await abonnieren({ endpoint: 'https://fcm.googleapis.com/fcm/send/1' }, 'DELETE')).status).toBe(200);
-    expect(abos()).toEqual([]);
+    expect(abos().map((row) => row.endpoint)).toEqual(['https://fcm.googleapis.com/fcm/send/2']);
   });
 
   it('nennt im Spielplan, bis wann die Seite von selbst abfragt: 8 Stunden nach Beginn, ohne Startzeit bis Tagesende', async () => {

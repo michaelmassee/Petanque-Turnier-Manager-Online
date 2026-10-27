@@ -55,6 +55,21 @@ describe('Aktuelle Runde neu auslosen', () => {
     expect(rows('SELECT id FROM tournament_rounds')).toEqual([before]);
   });
 
+  it('löscht kein Ergebnis, das zwischen Prüfung und Austausch der Runde gemeldet wird', async () => {
+    await post('/api/tournaments/t1/rounds');
+    const [before] = rows('SELECT id FROM tournament_rounds');
+    const [match] = rows("SELECT id FROM tournament_matches WHERE team_b_registration_ids != '[]' LIMIT 1");
+    // Die Meldung trifft nach der Ergebnisprüfung, aber vor dem Batch ein.
+    env.DB.vorBatch((sqlite) => sqlite.prepare('UPDATE tournament_matches SET score_a = 13, score_b = 5 WHERE id = ?').run(match.id));
+
+    const response = await post('/api/tournaments/t1/rounds/redraw');
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe('Die Runde wurde inzwischen geändert (Ergebnis eingetragen oder bereits neu ausgelost). Bitte aktualisieren.');
+    expect(rows('SELECT id FROM tournament_rounds')).toEqual([before]);
+    expect(rows('SELECT score_a, score_b FROM tournament_matches WHERE id = ?', match.id)).toEqual([{ score_a: 13, score_b: 5 }]);
+    expect(rows('SELECT COUNT(*) AS count FROM tournament_matches WHERE round_id = ?', before.id)[0].count).toBe(4);
+  });
+
   it('lehnt ohne Runde ab und lässt nur die Turnierleitung zu', async () => {
     expect((await post('/api/tournaments/t1/rounds/redraw')).status).toBe(400);
     const anonymous = await worker.fetch(new Request(`${ORIGIN}/api/tournaments/t1/rounds/redraw`, { method: 'POST' }), env);
@@ -155,6 +170,22 @@ describe('Aktuelle Runde neu auslosen', () => {
       const teams = rows('SELECT member_registration_ids FROM tournament_teams').map((row) => JSON.parse(row.member_registration_ids));
       expect(teams).toHaveLength(5);
       expect(teams.flat()).not.toContain('r1');
+    });
+
+    it('Mêlée: nimmt die erste Runde nicht zurück, wenn zwischendurch ein Ergebnis gemeldet wird', async () => {
+      sql("UPDATE tournaments SET registration_type = 'melee', formation = 'doublette' WHERE id = 't1'");
+      addPlayers(8, 12);
+      await post('/api/tournaments/t1/teams/draw');
+      await post('/api/tournaments/t1/rounds');
+      deactivate('r1');
+      const [match] = rows("SELECT id FROM tournament_matches WHERE team_b_registration_ids != '[]' LIMIT 1");
+      env.DB.vorBatch((sqlite) => sqlite.prepare('UPDATE tournament_matches SET score_a = 13, score_b = 5 WHERE id = ?').run(match.id));
+
+      const response = await post('/api/tournaments/t1/rounds/redraw');
+      expect(response.status).toBe(409);
+      expect(rows('SELECT COUNT(*) AS count FROM tournament_rounds')[0].count).toBe(1);
+      expect(rows('SELECT score_a FROM tournament_matches WHERE id = ?', match.id)).toEqual([{ score_a: 13 }]);
+      expect(rows('SELECT COUNT(*) AS count FROM tournament_teams')[0].count).toBe(6);
     });
 
     it('Mêlée: lost normal neu aus, wenn die Teams noch passen', async () => {

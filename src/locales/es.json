@@ -1828,6 +1828,7 @@
   "Runde {{round}} neu auslosen? Die bisherige Einteilung wird ersetzt.": "¿Volver a sortear la ronda {{round}}? El emparejamiento actual se reemplazará.",
   "Runde {{round}} wurde neu ausgelost.": "La ronda {{round}} se ha vuelto a sortear.",
   "In der aktuellen Runde sind schon Ergebnisse eingetragen. Neu auslosen geht nur ohne Ergebnisse.": "Ya hay resultados en la ronda actual. Solo se puede volver a sortear sin resultados.",
+  "Die Runde wurde inzwischen geändert (Ergebnis eingetragen oder bereits neu ausgelost). Bitte aktualisieren.": "La ronda ha cambiado entretanto (se ha introducido un resultado o ya se ha vuelto a sortear). Actualiza la página.",
   "Es gibt noch keine Runde, die neu ausgelost werden kann": "Todavía no hay ninguna ronda que volver a sortear",
   "Runde 1 wurde zurückgenommen, weil die Mêlée-Teams nicht mehr zu den aktiven Spielern passen. Bitte Teams auslosen und Runde 1 neu starten.": "Se ha retirado la ronda 1 porque los equipos Mêlée ya no coinciden con los jugadores activos. Sortea los equipos y vuelve a iniciar la ronda 1.",
   "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "La organización ya ha introducido el resultado de tu partida.",

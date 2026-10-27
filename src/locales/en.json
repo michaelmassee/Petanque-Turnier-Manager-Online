@@ -1828,6 +1828,7 @@
   "Runde {{round}} neu auslosen? Die bisherige Einteilung wird ersetzt.": "Redraw round {{round}}? The current draw will be replaced.",
   "Runde {{round}} wurde neu ausgelost.": "Round {{round}} has been redrawn.",
   "In der aktuellen Runde sind schon Ergebnisse eingetragen. Neu auslosen geht nur ohne Ergebnisse.": "Results have already been entered in the current round. A redraw is only possible without results.",
+  "Die Runde wurde inzwischen geändert (Ergebnis eingetragen oder bereits neu ausgelost). Bitte aktualisieren.": "The round has changed in the meantime (a result was entered or it was already redrawn). Please refresh.",
   "Es gibt noch keine Runde, die neu ausgelost werden kann": "There is no round to redraw yet",
   "Runde 1 wurde zurückgenommen, weil die Mêlée-Teams nicht mehr zu den aktiven Spielern passen. Bitte Teams auslosen und Runde 1 neu starten.": "Round 1 has been withdrawn because the Mêlée teams no longer match the active players. Please draw teams and start round 1 again.",
   "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "The organizers have already entered the result of your match.",

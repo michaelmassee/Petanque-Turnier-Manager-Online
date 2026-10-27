@@ -2501,8 +2501,8 @@ export default {
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         // Abmelden geht immer (der Endpoint ist der Nachweis), auch wenn der Spielplan inzwischen nicht mehr sichtbar ist.
         if (request.method === 'DELETE') return await removeBoardPushSubscription(request, env.DB, tournament);
-        await assertCanViewSchedule(request, env.DB, tournament, url);
-        return await saveBoardPushSubscription(request, env.DB, tournament, url.origin);
+        const shareTokenHash = await assertCanViewSchedule(request, env.DB, tournament, url);
+        return await saveBoardPushSubscription(request, env.DB, tournament, url.origin, shareTokenHash);
       }
 
       const tournamentTeamDrawMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/teams\/draw$/);
@@ -7138,13 +7138,21 @@ async function withdrawFirstMeleeRoundIfTeamsChanged(db, tournamentId, roundId) 
   const assigned = new Set(teams.flatMap((team) => team.members));
   const unassigned = [...activeIds].some((id) => !assigned.has(id));
   if (!invalidTeamIds.length && !unassigned) return false;
-  await db.batch([
-    db.prepare('DELETE FROM tournament_matches WHERE round_id = ?').bind(roundId),
-    db.prepare('DELETE FROM tournament_rounds WHERE id = ?').bind(roundId),
-    ...invalidTeamIds.map((id) => db.prepare('DELETE FROM tournament_teams WHERE id = ?').bind(id)),
+  // Die Ergebnisprüfung des Aufrufers ist nur ein Vorab-Lesen; erst hier im Batch wird atomar geprüft, damit ein
+  // inzwischen gemeldetes Ergebnis nicht still gelöscht wird. Bleibt die Runde stehen, ändern auch die Folgezeilen nichts.
+  const [roundDeleted] = await db.batch([
+    db.prepare(`DELETE FROM tournament_rounds WHERE id = ? AND NOT EXISTS (${DECIDED_MATCH_IN_ROUND_SQL})`).bind(roundId, roundId),
+    db.prepare('DELETE FROM tournament_matches WHERE round_id = ? AND NOT EXISTS (SELECT 1 FROM tournament_rounds WHERE id = ?)').bind(roundId, roundId),
+    ...invalidTeamIds.map((id) => db.prepare('DELETE FROM tournament_teams WHERE id = ? AND NOT EXISTS (SELECT 1 FROM tournament_rounds WHERE id = ?)').bind(id, roundId)),
   ]);
+  if (!Number(roundDeleted.meta?.changes || 0)) throw new HttpError(409, REDRAW_CONFLICT_MESSAGE);
   return true;
 }
+
+// Partie mit eingetragenem Ergebnis in der Runde (Parameter: round_id). Freilose tragen ihr 13:7 automatisch und zählen nicht.
+const DECIDED_MATCH_IN_ROUND_SQL = `SELECT 1 FROM tournament_matches WHERE round_id = ? AND team_b_registration_ids != '[]'
+  AND (score_a IS NOT NULL OR score_b IS NOT NULL OR no_show IS NOT NULL)`;
+const REDRAW_CONFLICT_MESSAGE = 'Die Runde wurde inzwischen geändert (Ergebnis eingetragen oder bereits neu ausgelost). Bitte aktualisieren.';
 
 async function createFormeTeams(db, tournament) {
   const current = await getSchweizerTeams(db, tournament);
@@ -7294,12 +7302,8 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
   if (redraw) {
     if (!lastRound) throw new HttpError(400, 'Es gibt noch keine Runde, die neu ausgelost werden kann');
     // Freilose tragen ihr Ergebnis (13:7) automatisch; sie zählen nicht als eingetragenes Ergebnis.
-    const decided = await db
-      .prepare(`SELECT COUNT(*) AS count FROM tournament_matches WHERE round_id = ? AND team_b_registration_ids != '[]'
-          AND (score_a IS NOT NULL OR score_b IS NOT NULL OR no_show IS NOT NULL)`)
-      .bind(lastRound.id)
-      .first();
-    if (Number(decided.count) > 0) {
+    const decided = await db.prepare(DECIDED_MATCH_IN_ROUND_SQL).bind(lastRound.id).first();
+    if (decided) {
       throw new HttpError(409, 'In der aktuellen Runde sind schon Ergebnisse eingetragen. Neu auslosen geht nur ohne Ergebnisse.');
     }
     // Mêlée, erste Runde: Passen die ausgelosten Teams nicht mehr zu den aktiven Spielern, wird die Runde
@@ -7346,7 +7350,8 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
     }
     if ((isSchweizer || isFormuleX) && !melee && !rebuiltTeams) {
       // Schweizer/Formule X paaren wie das Hauptprojekt jede Runde nur aktive Teams; nachgemeldete aktive Teams
-      // bekommen dabei ihr Team.
+      // bekommen dabei ihr Team. Partien gegen inzwischen inaktive Teams zählen für die Setzliste bewusst nicht mit –
+      // so auch das Hauptprojekt (gespieltenRundenEinlesen/leseRundeEin mit aktiveMeldungen: „Team inaktiv, überspringen“).
       teams = await activeTeamsForRound(db, tournament.id, teams);
     }
     if (!teams.length) throw new HttpError(400, 'Bitte zuerst Mêlée-Teams auslosen');
@@ -7400,9 +7405,12 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
   const now = new Date().toISOString();
 
   const statements = [
+    // Neuauslosen: Die Ergebnisprüfung oben ist nur ein Vorab-Lesen. Kommt bis hierher noch eine Meldung, bleibt die
+    // alte Runde stehen, das INSERT der neuen Runde mit derselben Nummer verletzt den Unique-Index und D1 rollt den
+    // ganzen Batch zurück (409 unten) - so wird kein Ergebnis still gelöscht.
     ...(redraw ? [
-      db.prepare('DELETE FROM tournament_matches WHERE round_id = ?').bind(lastRound.id),
-      db.prepare('DELETE FROM tournament_rounds WHERE id = ?').bind(lastRound.id),
+      db.prepare(`DELETE FROM tournament_rounds WHERE id = ? AND NOT EXISTS (${DECIDED_MATCH_IN_ROUND_SQL})`).bind(lastRound.id, lastRound.id),
+      db.prepare('DELETE FROM tournament_matches WHERE round_id = ? AND NOT EXISTS (SELECT 1 FROM tournament_rounds WHERE id = ?)').bind(lastRound.id, lastRound.id),
     ] : []),
     ...(rebuiltTeams ? [
       db.prepare('DELETE FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id),
@@ -7434,6 +7442,7 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
     // gleichzeitig sehen. Der eindeutige Zähler entscheidet atomar, welche
     // Anfrage gewinnt; die andere ist ein erwartbarer Konflikt, kein 500er.
     if (isTournamentRoundNumberConflict(error)) {
+      if (redraw) throw new HttpError(409, REDRAW_CONFLICT_MESSAGE);
       throw new HttpError(409, 'Eine neue Runde wurde bereits zeitgleich erstellt. Bitte aktualisieren.');
     }
     throw error;
@@ -8240,16 +8249,19 @@ async function participantAccountUserIds(db, tournamentId, excludedUserId, { inc
 }
 
 // Private Turniere stehen nur nicht in der öffentlichen Liste: Mit dem Freigabe-Token der Turnierleitung
-// ist der Spielplan sichtbar, sofern die Teilnehmerliste veröffentlicht ist.
+// ist der Spielplan sichtbar, sofern die Teilnehmerliste veröffentlicht ist. Liefert den Hash eines gültigen
+// Freigabe-Tokens (sonst null), damit ein Push-Abo an diesen Link gebunden werden kann.
 async function assertCanViewSchedule(request, db, tournament, url) {
   const session = await optionalSession(request, db);
-  const shareAccess = await hasTournamentShareAccess(db, tournament, url.searchParams.get('share'));
+  const share = url.searchParams.get('share');
+  const shareAccess = await hasTournamentShareAccess(db, tournament, share);
   if (!canViewParticipants(tournament, session?.user || null) && !(shareAccess && Number(tournament.participants_public))) {
     throw new HttpError(403, 'Zugriff verweigert');
   }
+  return shareAccess ? sha256Hex(share) : null;
 }
 
-export async function saveBoardPushSubscription(request, db, tournament, origin) {
+export async function saveBoardPushSubscription(request, db, tournament, origin, shareTokenHash = null) {
   const body = await readJson(request);
   const endpoint = String(body.endpoint || '');
   const p256dh = String(body.keys?.p256dh || '');
@@ -8268,13 +8280,13 @@ export async function saveBoardPushSubscription(request, db, tournament, origin)
   const now = new Date().toISOString();
   // Obergrenze in derselben Anweisung prüfen, damit parallele Anmeldungen sie nicht überholen; ein bekanntes Gerät
   // darf sein Abo immer auffrischen.
-  const result = await db.prepare(`INSERT INTO tournament_board_push_subscriptions (endpoint, tournament_id, p256dh, auth, language, page_url, created_at, updated_at)
-      SELECT ?, ?, ?, ?, ?, ?, ?, ?
+  const result = await db.prepare(`INSERT INTO tournament_board_push_subscriptions (endpoint, tournament_id, p256dh, auth, language, page_url, share_token_hash, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
       WHERE EXISTS (SELECT 1 FROM tournament_board_push_subscriptions WHERE endpoint = ? AND tournament_id = ?)
         OR (SELECT COUNT(*) FROM tournament_board_push_subscriptions WHERE tournament_id = ?) < ?
       ON CONFLICT(endpoint, tournament_id) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth,
-        language = excluded.language, page_url = excluded.page_url, updated_at = excluded.updated_at`)
-    .bind(endpoint, tournament.id, p256dh, auth, normalizeLanguage(body.language), safePageUrl, now, now,
+        language = excluded.language, page_url = excluded.page_url, share_token_hash = excluded.share_token_hash, updated_at = excluded.updated_at`)
+    .bind(endpoint, tournament.id, p256dh, auth, normalizeLanguage(body.language), safePageUrl, shareTokenHash, now, now,
       endpoint, tournament.id, tournament.id, MAX_BOARD_PUSH_SUBSCRIPTIONS).run();
   if (!Number(result.meta?.changes || 0)) {
     throw new HttpError(409, 'Für dieses Turnier sind bereits zu viele Geräte für die Sofort-Aktualisierung angemeldet.');
@@ -8295,14 +8307,16 @@ export async function removeBoardPushSubscription(request, db, tournament) {
 }
 
 // Push-Abos der Turnierseite/Anzeige als Queue-Einträge; buildPayload(language, pageUrl) liefert den Inhalt.
-// Die Sichtbarkeit wird beim Versand erneut geprüft (wie assertCanViewSchedule ohne Login): Wird das Turnier privat
-// ohne Freigabe-Link oder die Teilnehmerliste ausgeblendet, gehen keine Runden/Ankündigungen mehr an alte Abos.
+// Die Sichtbarkeit wird beim Versand je Abo erneut geprüft (wie assertCanViewSchedule ohne Login): Bei privaten
+// Turnieren nur Abos, deren Freigabe-Link noch gilt – nicht schon, weil irgendein Link existiert. Ist die
+// Teilnehmerliste ausgeblendet, gehen keine Runden/Ankündigungen mehr an alte Abos.
 async function boardPushItems(db, tournamentId, buildPayload) {
   const subscriptions = await db.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.language, s.page_url
       FROM tournament_board_push_subscriptions s JOIN tournaments t ON t.id = s.tournament_id
       WHERE s.tournament_id = ? AND t.participants_public = 1
         AND ((t.visibility = 'public' AND t.status != 'draft')
-          OR (t.visibility = 'private' AND EXISTS (SELECT 1 FROM tournament_share_links l WHERE l.tournament_id = t.id)))`)
+          OR (t.visibility = 'private' AND EXISTS (SELECT 1 FROM tournament_share_links l
+            WHERE l.tournament_id = t.id AND l.token_hash = s.share_token_hash)))`)
     .bind(tournamentId).all();
   return (subscriptions.results || []).map((subscription) => ({
     endpoint: subscription.endpoint,
