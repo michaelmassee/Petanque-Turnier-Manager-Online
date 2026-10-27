@@ -142,6 +142,17 @@ export function clubLogoImageUrl(placeId) {
   return `/api/places/${placeId}/club-logo`;
 }
 
+// Überlagert die gemeinsame (gecachte) Plätzeliste mit den Markierungen aus GET /api/places/personal.
+export function withPersonalPlaceMarks(places, marks) {
+  if (!marks) return places;
+  const liked = new Set(marks.likedIds); const favorited = new Set(marks.favoritedIds);
+  const editableClubs = new Set(marks.editableClubIds); const editablePlaces = new Set(marks.editablePlaceIds);
+  return places.map((place) => ({
+    ...place, liked: liked.has(place.id), favorited: favorited.has(place.id),
+    canEdit: Boolean(marks.isAdmin || (place.clubId ? editableClubs.has(place.clubId) : editablePlaces.has(place.id))),
+  }));
+}
+
 export function tournamentPayload(form) {
   return {
     boulePlaceId: form.boulePlaceId || null,

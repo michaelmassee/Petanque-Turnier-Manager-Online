@@ -317,14 +317,41 @@ describe('Ungeprüfte Platzadresse', () => {
   });
 });
 
+describe('Persönliche Markierungen zur gemeinsamen Plätzeliste', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('übernimmt Like und Favorit der angemeldeten Person aus /api/places/personal', async () => {
+    const fetchMock = vi.fn((url) => Promise.resolve(new Response(JSON.stringify(String(url) === '/api/places/personal'
+      ? { likedIds: ['place-1'], favoritedIds: ['place-2'], editableClubIds: [], editablePlaceIds: [], isAdmin: false }
+      : { places: [place(1, { likeCount: 3 }), place(2)] }), { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<PlacesPage language="de" setLanguage={() => {}} menuOpen={false} setMenuOpen={() => {}} navigate={() => {}} currentUser={{ id: 'u1' }} isAdmin={false} />);
+
+    const first = (await screen.findByRole('heading', { name: 'Bouleplatz 1' }, { timeout: 5_000 })).closest('details');
+    const second = screen.getByRole('heading', { name: 'Bouleplatz 2' }).closest('details');
+    expect(within(first).getByRole('button', { name: '♥ 3', hidden: true })).toBeInTheDocument();
+    expect(within(second).getByRole('button', { name: '★ Favorit', hidden: true })).toBeInTheDocument();
+  });
+
+  it('fragt ohne Anmeldung keine persönlichen Markierungen ab', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ places: [place(1)] }), { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+    renderPlacesPage();
+    await screen.findByRole('heading', { name: 'Bouleplatz 1' }, { timeout: 5_000 });
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).not.toContain('/api/places/personal');
+  });
+});
+
 describe('Übernahme eines Admin-Vereins anfragen', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   const clubPlace = (overrides) => place(1, { clubId: 'club-1', clubName: 'BC Linden', clubOwnedByAdmin: true, canEdit: false, ...overrides });
   function renderWith(places, { currentUser = { id: 'u1' }, isAdmin = false } = {}) {
+    // Bearbeitungsrechte kommen wie in Produktion aus /api/places/personal, nicht aus der gemeinsamen Liste.
+    const marks = { likedIds: [], favoritedIds: [], editableClubIds: places.filter((entry) => entry.canEdit).map((entry) => entry.clubId), editablePlaceIds: [], isAdmin };
     const fetchMock = vi.fn((url) => Promise.resolve(new Response(JSON.stringify(String(url).includes('/api/postbox/messages')
       ? { message: {}, recipientCount: 2 }
-      : { places }), { status: 200 })));
+      : String(url) === '/api/places/personal' ? marks : { places }), { status: 200 })));
     vi.stubGlobal('fetch', fetchMock);
     render(<PlacesPage language="de" setLanguage={() => {}} menuOpen={false} setMenuOpen={() => {}} navigate={() => {}} currentUser={currentUser} isAdmin={isAdmin} />);
     return fetchMock;

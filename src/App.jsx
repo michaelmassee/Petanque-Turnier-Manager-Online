@@ -262,7 +262,11 @@ function AppContent() {
 
   const tournamentsQuery = useQuery({ queryKey: ['tournaments'], queryFn: () => api('/api/tournaments') });
   const clubsQuery = useQuery({ queryKey: ['published-clubs'], queryFn: () => api('/api/clubs') });
-  const boulePlacesQuery = useQuery({ queryKey: ['boule-places-for-tournament'], queryFn: () => api('/api/places'), enabled: canManageTournaments });
+  // Spielort-Auswahl im Turnierformular: große Liste (Edge-Cache), daher erst in der Turnierverwaltung und ohne Fokus-Refetch.
+  const boulePlacesQuery = useQuery({
+    queryKey: ['boule-places-for-tournament'], queryFn: () => api('/api/places'),
+    enabled: canManageTournaments && activeTab === 'tournaments', staleTime: 10 * 60_000, refetchOnWindowFocus: false,
+  });
   // Polling nur für die Badge-Zahlen; Nachrichten und Empfänger erst bei geöffneter Postbox (D1-Leselimit).
   const postboxSummaryQuery = useQuery({
     queryKey: ['postbox-summary', currentUser?.id],

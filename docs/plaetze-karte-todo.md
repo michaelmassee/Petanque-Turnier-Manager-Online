@@ -30,28 +30,29 @@ Jeder Aufruf, der nicht aus dem Cache kommt, wird mit jedem importierten Verein 
 
 Einordnung 26.10.: Der Entwickler war an dem Tag oft angemeldet zum Testen auf der Karte. Jeder dieser Aufrufe liest die Plätzeliste direkt aus D1, etwa 3.800 Zeilen pro Aufruf. Ein guter Teil der 386 Aufrufe ist also Testverkehr. Die Aufteilung lässt sich nachträglich nicht beziffern, weil die D1-Analytics keine Nutzer kennen. Aussagekräftig ist erst ein Tag ohne Importe und ohne Tests.
 
-## So funktioniert der Edge-Cache heute
+## Nachmessung 27.10. (bis ~09 Uhr UTC)
+
+- D1 ~234 k rows read (26.10. zur gleichen Zeit ~550 k). 80 % davon aus zwei Abfragen: Plätzeliste 29 × ~3.770 Zeilen, Vereinsliste 22 × ~3.590 Zeilen.
+- CPU p99 weiter 25–50 ms; `/api/places` ist 879 KB JSON (1.252 Plätze).
+- Hauptursache: `src/App.jsx` lud für **jeden Angemeldeten bei jedem App-Start** die volle Plätzeliste (nur für die Spielort-Auswahl im Turnierformular), am Cache vorbei, und nach jedem Tab-Wechsel erneut (react-query `staleTime` 30 s + Fokus-Refetch). Also nicht nur Import-/Testverkehr.
+
+## So funktioniert der Edge-Cache jetzt (seit 27.10.)
 
 - `cachedJsonResponse` (`src/worker.js`) legt die JSON-Antwort per `caches.default` im Cloudflare-Cache ab, getrennt pro Rechenzentrum. Der Browser bekommt `no-store`.
-- Vereinsliste `/api/clubs`: für **alle** gecacht (enthält nur Name und Koordinaten).
-- Plätzeliste `/api/places`: nur **ohne Anmeldung und ohne Suchbegriff** gecacht. Angemeldete bekommen persönliche Felder (`liked`, `favorited`, `editor_user_id`/`owner_id`, Admin-Liste), die man nicht teilen darf. Suchen (`q`) lesen immer aus D1.
-- Speicherdauer: `PUBLISHED_CLUBS_TTL_SECONDS = 300` (5 min). Seit e3a0c0a (09.10.) als vorsichtiger Notfallwert gegen das D1-Limit, ohne fachliche Begründung. c6db82b hat ihn für die Plätzeliste übernommen.
-- `invalidatePublishedClubs` löscht den Eintrag bei Änderungen an Vereinen und Plätzen, **auch bei Likes und Favoriten**.
-- Vermutlich wirkt `cache.delete` nur im eigenen Rechenzentrum (nicht geprüft). Dann begrenzt die Speicherdauer, wie lange andere Rechenzentren veraltete Daten zeigen.
-
-## Ursachen für Aufrufe am Cache vorbei
-
-1. Jedes Rechenzentrum hat einen eigenen, anfangs leeren Cache.
-2. Der Eintrag verfällt nach 5 min, also bis zu 12 D1-Abfragen pro Stunde und Rechenzentrum.
-3. Jede Änderung leert den Cache, auch ein Like oder Favorit.
-4. Angemeldete Nutzer und Suchen lesen bei der Plätzeliste immer aus D1.
+- Vereinsliste `/api/clubs`, Plätzeliste `/api/places` (ohne Suchbegriff) und Mietangebote `/api/rentals`: für **alle** gecacht, auch für Angemeldete. Die Plätzeliste ist nutzerneutral (`liked`/`favorited`/`canEdit` immer false).
+- Persönliche Markierungen kommen aus `GET /api/places/personal` (Likes, Favoriten, bearbeitbare Vereine/Plätze, Admin-Flag; wenige Index-Zugriffe) und werden im Client überlagert (`withPersonalPlaceMarks` in `src/lib/domain.js`). Suchen (`q`) lesen weiter aus D1.
+- Cache-Schlüssel = Datenversion + Deploy-Kennung: `cache_versions.places` wird per Trigger (Migration 0137) bei jeder Änderung an `clubs`, `boule_places`, `boule_place_likes`, `rental_offers` und an `users.role` erhöht – auch bei direkten SQL-Änderungen (Import-Skripte). Die Deploy-Kennung (`CF_VERSION_METADATA`, Binding `version_metadata`) ändert sich bei jedem Deploy, damit ein geändertes Listenformat nicht aus dem alten Cache kommt.
+- Neuaufbau also nur einmal pro Rechenzentrum und Version (Änderung oder Deploy), sonst nie; alle Rechenzentren sehen Änderungen sofort. Favoriten lösen keinen Neuaufbau aus.
+- Speicherdauer `PUBLISHED_LISTS_CACHE_SECONDS` = 14 Tage, nur noch Aufräumgrenze. Cloudflare kann Einträge früher verdrängen, dann normaler Neuaufbau.
+- Kosten je Abruf: +1 row read (Version per Primärschlüssel).
+- Die Spielort-Auswahl im Turnierformular lädt die Plätze erst in der Turnierverwaltung, `staleTime` 10 min, ohne Fokus-Refetch.
 
 ## Todo
 
-- [ ] 27.10. abends nachmessen: ist die Last ohne Importe weiter hoch? Wenn nein, ist nichts weiter nötig.
-- [ ] Anteil der Plätzeliste-Abfragen aufschlüsseln: anonym, angemeldet, Suche.
-- [ ] Speicherdauer für Vereins- und Plätzeliste auf 30–60 min erhöhen (Verzögerung für Anonyme ist vertretbar, die Daten ändern sich selten).
-- [ ] Prüfen, ob Likes und Favoriten den Cache leeren müssen oder ob Like-Zahlen für Anonyme etwas veraltet sein dürfen.
-- [ ] Plätzeliste für Angemeldete aufteilen: gemeinsame Liste aus dem Cache plus kleine Zusatzabfrage nur für die persönlichen Markierungen (Likes, Favoriten, Bearbeitungsrechte der Person).
-- [ ] Prüfen, ob `cache.delete` nur im eigenen Rechenzentrum wirkt; ggf. Versionsschlüssel im Cache-Key statt Löschen.
+- [x] 27.10. nachmessen – Last blieb ohne Importe hoch, Ursache s. o.
+- [x] Speicherdauer erhöhen → ersetzt durch Versionsschlüssel + 14 Tage.
+- [x] Plätzeliste für Angemeldete aufteilen (gemeinsame Liste + `/api/places/personal`).
+- [x] Versionsschlüssel statt `cache.delete` (wirkt nur im eigenen Rechenzentrum).
+- [ ] Nach Deploy: `wrangler tail --format json` (cpuTime je Pfad) und am Folgetag GraphQL `d1QueriesAdaptiveGroups` – Ziel: Plätze-/Vereinsliste < 30 Aufrufe/Tag.
+- [ ] Bei vielen Likes: Like-Zahl aus der gemeinsamen Liste lösen (jedes Like baut die Liste in jedem Rechenzentrum neu).
 - [ ] CPU p99 > 10 ms beobachten: welche Pfade sind die Ausreißer?

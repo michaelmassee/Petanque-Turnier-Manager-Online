@@ -2042,9 +2042,9 @@ export default {
       }
 
       if (request.method === 'GET' && url.pathname === '/api/places') {
-        const session = await optionalSession(request, env.DB);
         const query = String(url.searchParams.get('q') || '').trim();
-        if (!session && !query) return await listBoulePlacesAnonymous(env.DB, url.origin);
+        if (!query) return await listSharedBoulePlaces(env.DB, url.origin, deployId(env));
+        const session = await optionalSession(request, env.DB);
         return await listBoulePlaces(env.DB, session?.user || null, query);
       }
       if (request.method === 'POST' && url.pathname === '/api/places') {
@@ -2064,6 +2064,10 @@ export default {
       if (placeReportTokenMatch && request.method === 'PUT') {
         return await updatePlaceReportByToken(request, env.DB, placeReportTokenMatch[1], request.headers.get('CF-IPCountry'));
       }
+      if (request.method === 'GET' && url.pathname === '/api/places/personal') {
+        const session = await requireSession(request, env.DB);
+        return await listPersonalPlaceMarks(env.DB, session.user);
+      }
       if (request.method === 'GET' && url.pathname === '/api/places/mine') {
         const session = await requireSession(request, env.DB);
         return await listMyPlaceReports(env.DB, session.user.id);
@@ -2073,7 +2077,7 @@ export default {
         return await createClub(request, env.DB, session.user);
       }
       if (request.method === 'GET' && url.pathname === '/api/clubs') {
-        return await listPublishedClubs(env.DB, url.origin);
+        return await listPublishedClubs(env.DB, url.origin, deployId(env));
       }
       if (request.method === 'GET' && url.pathname === '/api/clubs/mine') {
         const session = await requireSession(request, env.DB);
@@ -2145,7 +2149,7 @@ export default {
         return await toggleBoulePlaceFavorite(env.DB, placeFavoriteMatch[1], session.user.id);
       }
       if (request.method === 'GET' && url.pathname === '/api/rentals') {
-        return await listRentalOffers(env.DB, url.origin);
+        return await listRentalOffers(env.DB, url.origin, deployId(env));
       }
       if (request.method === 'GET' && url.pathname === '/api/rentals/reservations/mine') {
         const session = await requireSession(request, env.DB);
@@ -3140,12 +3144,6 @@ export default {
         // Keep the committed mutation response. The dirty marker enables recovery on later writes/cron.
         console.error('Registration opening schedule remains pending', error);
       }
-    }
-    if (request.method !== 'GET' && response.ok && PUBLISHED_CLUBS_WRITE_PATH.test(url.pathname)) {
-      await invalidatePublishedClubs(url.origin);
-    }
-    if (request.method !== 'GET' && response.ok && RENTAL_OFFERS_WRITE_PATH.test(url.pathname)) {
-      await invalidateRentalOffers(url.origin);
     }
     return withRefreshedSessionCookie(request, response, url);
   },
@@ -10175,37 +10173,35 @@ function toPublicClub(row, user) {
 }
 
 // GET /api/clubs lädt jeder App-Start (Filter, Vereinsvorschläge) und liest dabei alle Vereine und Plätze;
-// GET /api/places ohne Anmeldung und Suchbegriff (Plätze-Seite) zählt zusätzlich die Likes je Platz.
-// Darum beide kurz im Cloudflare-Cache (pro Rechenzentrum) halten; Schreibzugriffe auf Vereine/Plätze (auch
-// Likes/Favoriten) löschen die Einträge sofort (invalidatePublishedClubs), andere Rechenzentren sehen die Änderung
-// spätestens nach der TTL.
-const PUBLISHED_CLUBS_TTL_SECONDS = 300;
-const PUBLISHED_CLUBS_WRITE_PATH = /^\/api\/(?:admin\/)?(?:clubs|places|place-reports)(?:\/|$)/;
+// GET /api/places ohne Suchbegriff (Plätze-Seite, Spielort-Auswahl) zählt zusätzlich die Likes je Platz.
+// Beide liegen im Cloudflare-Cache (pro Rechenzentrum) unter einem Schlüssel mit cache_versions.places. Trigger
+// erhöhen die Version bei jeder Änderung an Vereinen, Plätzen, Likes und Mietangeboten (Migration 0137), dann
+// bauen alle Rechenzentren die Listen beim nächsten Abruf neu auf. Die Deploy-Kennung im Schlüssel sorgt dafür, dass
+// ein Deploy mit geändertem Listenformat nicht alte Einträge ausliefert. Die lange Speicherdauer räumt nur auf.
+const PUBLISHED_LISTS_CACHE_SECONDS = 14 * 24 * 60 * 60;
 
-function publishedClubsCacheKey(origin) {
-  return new Request(`${origin}/__published-clubs`);
+// Ändert sich mit jedem Deploy (Binding version_metadata in wrangler.jsonc); fehlt lokal/in Tests.
+function deployId(env) {
+  return env.CF_VERSION_METADATA?.id || '';
 }
 
-function anonymousPlacesCacheKey(origin) {
-  return new Request(`${origin}/__places/anonymous`);
+async function placesCacheVersion(db) {
+  const row = await db.prepare("SELECT version FROM cache_versions WHERE name = 'places'").first();
+  return Number(row?.version || 0);
 }
 
-async function invalidatePublishedClubs(origin) {
-  try {
-    // Die Angebotsliste zeigt Vereins- und Platznamen und blendet nicht freigegebene aus.
-    await Promise.all([publishedClubsCacheKey(origin), anonymousPlacesCacheKey(origin), rentalOffersCacheKey(origin)].map((key) => edgeCache()?.delete(key)));
-  } catch (error) {
-    console.error('Failed to invalidate published clubs cache', error);
-  }
+async function placesCacheKey(db, origin, name, deploy) {
+  return new Request(`${origin}/__${name}?v=${await placesCacheVersion(db)}&deploy=${encodeURIComponent(deploy)}`);
 }
 
-async function listPublishedClubs(db, origin) {
-  return cachedJsonResponse(publishedClubsCacheKey(origin), PUBLISHED_CLUBS_TTL_SECONDS,
+async function listPublishedClubs(db, origin, deploy) {
+  return cachedJsonResponse(await placesCacheKey(db, origin, 'published-clubs', deploy), PUBLISHED_LISTS_CACHE_SECONDS,
     async () => json(await loadPublishedClubs(db)));
 }
 
-async function listBoulePlacesAnonymous(db, origin) {
-  return cachedJsonResponse(anonymousPlacesCacheKey(origin), PUBLISHED_CLUBS_TTL_SECONDS,
+// Nutzerneutrale Plätzeliste für alle, auch Angemeldete; deren Markierungen liefert GET /api/places/personal.
+async function listSharedBoulePlaces(db, origin, deploy) {
+  return cachedJsonResponse(await placesCacheKey(db, origin, 'places', deploy), PUBLISHED_LISTS_CACHE_SECONDS,
     () => listBoulePlaces(db, null, ''));
 }
 
@@ -10237,12 +10233,25 @@ async function listBoulePlaces(db, user, query) {
      WHERE p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')
        AND (?2 = '' OR p.name LIKE '%' || ?2 || '%' COLLATE NOCASE OR c.name LIKE '%' || ?2 || '%' COLLATE NOCASE OR p.club_name LIKE '%' || ?2 || '%' COLLATE NOCASE OR p.address LIKE '%' || ?2 || '%' COLLATE NOCASE)
      ORDER BY COALESCE(c.name, p.club_name) COLLATE NOCASE, p.name COLLATE NOCASE`).bind(user?.id || '', term);
-  // Nur für Angemeldete: Die wenigen Admin-IDs im selben Batch statt eines Lesezugriffs pro Zeile.
-  const [rows, admins] = user
-    ? await db.batch([placesQuery, db.prepare("SELECT id FROM users WHERE role = 'admin'")])
-    : [await placesQuery.all(), null];
-  const adminIds = admins ? new Set((admins.results || []).map((admin) => admin.id)) : null;
+  // Die wenigen Admin-IDs im selben Batch statt eines Lesezugriffs pro Zeile (für clubOwnedByAdmin).
+  const [rows, admins] = await db.batch([placesQuery, db.prepare("SELECT id FROM users WHERE role = 'admin'")]);
+  const adminIds = new Set((admins.results || []).map((admin) => admin.id));
   return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, user, adminIds)) });
+}
+
+// Persönliche Markierungen zur gemeinsamen Plätzeliste: wenige Index-Zugriffe statt der ganzen Liste pro Person.
+async function listPersonalPlaceMarks(db, user) {
+  const ids = (result, column = 'id') => (result.results || []).map((row) => row[column]);
+  const [liked, favorited, editableClubs, editablePlaces] = await db.batch([
+    db.prepare('SELECT place_id FROM boule_place_likes WHERE user_id = ?').bind(user.id),
+    db.prepare('SELECT place_id FROM boule_place_favorites WHERE user_id = ?').bind(user.id),
+    db.prepare('SELECT club_id AS id FROM club_editors WHERE user_id = ?1 UNION SELECT id FROM clubs WHERE owner_id = ?1').bind(user.id),
+    db.prepare('SELECT id FROM boule_places WHERE reported_by_user_id = ? AND club_id IS NULL').bind(user.id),
+  ]);
+  return json({
+    likedIds: ids(liked, 'place_id'), favoritedIds: ids(favorited, 'place_id'),
+    editableClubIds: ids(editableClubs), editablePlaceIds: ids(editablePlaces), isAdmin: user.role === 'admin',
+  });
 }
 
 async function getClub(db, id, user) {
@@ -10300,23 +10309,10 @@ async function assertClubEditor(db, clubId, user) {
 
 // ---------------------------------------------------------------------------------------------------------------
 // Platz mieten: Vereine bieten Hallen/Plätze stundenweise an, angemeldete Benutzer fragen an, der Verein entscheidet.
-// Eigener Präfix /api/rentals, damit Buchungen nicht den Vereins-/Platz-Cache (PUBLISHED_CLUBS_WRITE_PATH) leeren.
-// Die öffentliche Angebotsliste liegt wie die Vereine 300 s im Edge-Cache; Angebotsänderungen löschen ihn.
-const RENTAL_OFFERS_WRITE_PATH = /^\/api\/rentals\/offers(?:\/|$)/;
+// Die öffentliche Angebotsliste liegt wie die Vereine im Edge-Cache (Schlüssel mit cache_versions.places); Trigger
+// auf rental_offers erneuern sie bei Angebotsänderungen, Buchungen berühren sie nicht.
 // Schutz vor Spam an den Verein: offene, künftige Anfragen je Benutzer und Angebot.
 const RENTAL_MAX_OPEN_REQUESTS = 10;
-
-function rentalOffersCacheKey(origin) {
-  return new Request(`${origin}/__rentals`);
-}
-
-async function invalidateRentalOffers(origin) {
-  try {
-    await edgeCache()?.delete(rentalOffersCacheKey(origin));
-  } catch (error) {
-    console.error('Failed to invalidate rental offers cache', error);
-  }
-}
 
 // Aktuelle Ortszeit des Platzes als { date, hour }; MEZ-Zonen ohne Intl (siehe EU_CENTRAL_TIME_ZONES).
 function rentalLocalNow(timeZone, now = Date.now()) {
@@ -10434,8 +10430,8 @@ async function assertRentalOfferManager(db, row, user) {
   return access;
 }
 
-async function listRentalOffers(db, origin) {
-  return cachedJsonResponse(rentalOffersCacheKey(origin), PUBLISHED_CLUBS_TTL_SECONDS, async () => {
+async function listRentalOffers(db, origin, deploy) {
+  return cachedJsonResponse(await placesCacheKey(db, origin, 'rentals', deploy), PUBLISHED_LISTS_CACHE_SECONDS, async () => {
     const rows = await db.prepare(`${RENTAL_OFFER_SELECT}
       WHERE o.status = 'active' AND c.status = 'published' AND p.status = 'published'
       ORDER BY c.name COLLATE NOCASE, o.title COLLATE NOCASE`).all();

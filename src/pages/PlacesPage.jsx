@@ -6,7 +6,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
-import { clubLogoImageUrl, formatLocationAddress, googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
+import { clubLogoImageUrl, withPersonalPlaceMarks, formatLocationAddress, googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
 import { Feedback, Button, ClubBadge, DistanceBadge, SelectField, CloseButton, ShareLinkButton, EditDialog, TextArea } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
@@ -323,10 +323,18 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
 
   async function load() {
     setLoading(true); setError('');
-    try { const data = await api(`/api/places?q=${encodeURIComponent(query)}`); setPlaces(data.places || []); }
+    try {
+      // Ohne Suchbegriff kommt die Liste für alle aus dem Edge-Cache; Likes/Favoriten/Bearbeitungsrechte separat.
+      const personal = currentUser && !query.trim();
+      const [data, marks] = await Promise.all([
+        api(`/api/places?q=${encodeURIComponent(query)}`),
+        personal ? authenticatedApi('/api/places/personal') : null,
+      ]);
+      setPlaces(withPersonalPlaceMarks(data.places || [], marks));
+    }
     catch (err) { setError(err.message); } finally { setLoading(false); }
   }
-  useEffect(() => { const timer = setTimeout(load, 180); return () => clearTimeout(timer); }, [query]);
+  useEffect(() => { const timer = setTimeout(load, 180); return () => clearTimeout(timer); }, [query, currentUser?.id]);
 
   // Link aus den Turnierdetails: nur diesen Platz in Liste und Karte anzeigen.
   const [linkedPlaceId, setLinkedPlaceId] = useState(() => decodeURIComponent(window.location.hash.slice(1)));
