@@ -49,11 +49,11 @@ const CONFIRMED_REGISTRATIONS = [
   { id: 'p6', firstName: 'Finn', lastName: 'Test' },
 ].map((registration) => ({ ...registration, status: 'confirmed', participation: 'active' }));
 
-function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registrations = CONFIRMED_REGISTRATIONS } = {}) {
+function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registrations = CONFIRMED_REGISTRATIONS, teams } = {}) {
   global.fetch = vi.fn((path, options = {}) => {
     calls.push(path);
     if (path === '/api/tournaments/t1/rounds' && (!options.method || options.method === 'GET')) {
-      return Promise.resolve(jsonResponse({ rounds }));
+      return Promise.resolve(jsonResponse({ rounds, teams }));
     }
     if (path === '/api/tournaments/t1/ranking?live=1') {
       return Promise.resolve(jsonResponse({ ranking }));
@@ -972,5 +972,56 @@ describe('TournamentPlayManagement', () => {
     expect(partner2First).not.toBeRequired();
     fireEvent.change(partner2First, { target: { value: 'Ida' } });
     expect(screen.getByRole('textbox', { name: 'Partner 2: Nachname' })).toBeRequired();
+  });
+  it('nimmt ein abgeschlossenes Turnier nur nach Rückfrage wieder auf', async () => {
+    const calls = [];
+    installFetchMock(calls, { ranking: [{ playerId: 'p1', id: 'p1', rank: 1, wins: 1, firstName: 'Anna', lastName: 'Muster' }] });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, status: 'finished' }]} language="de" />);
+
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking?live=1'));
+    expect(screen.queryByRole('button', { name: 'Turnier starten' })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Turnier wieder aufnehmen' }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Endrangliste wird zurückgezogen'));
+    expect(calls).not.toContain('/api/tournaments/t1/start');
+
+    // Der Button bleibt bis zum Ende des (asynchronen) Handlers gesperrt.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Turnier wieder aufnehmen' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Turnier wieder aufnehmen' }));
+    expect(await screen.findByText('Turnier wurde wieder aufgenommen.')).toBeInTheDocument();
+    expect(calls).toContain('/api/tournaments/t1/start');
+  });
+
+  it('sperrt nach dem K.O.-Finale die nächste Runde, auch wenn Ausgeschiedene inaktiv sind', async () => {
+    const calls = [];
+    const ko = { ...TOURNAMENT, registrationType: 'forme', type: 'ko', formation: 'tete' };
+    const decided = (id, roundNumber) => ({ id, roundNumber, matches: [{ ...ROUND_1.matches[0], id: `m${id}`, scoreA: 13, scoreB: 5 }] });
+    const teams = Array.from({ length: 4 }, (_, index) => ({ id: `team-${index}`, members: [`p${index + 1}`] }));
+    // Vier feste Teams: Halbfinale und Finale; nach dem Halbfinale sind die Verlierer inaktiv.
+    const registrations = CONFIRMED_REGISTRATIONS.map((registration, index) => ({ ...registration, participation: index < 2 ? 'active' : 'inactive' }));
+    installFetchMock(calls, { rounds: [decided('r1', 1), decided('r2', 2)], teams, registrations });
+    render(<TournamentPlayManagement tournaments={[ko]} language="de" />);
+
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t1/registrations'));
+    await screen.findByRole('button', { name: 'Nächste Runde starten' });
+    expect(await screen.findByText('Alle Runden wurden bereits gespielt.', { selector: '.hint' }, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeDisabled();
+  });
+
+  it('lässt die Rangliste nach dem Veröffentlichen aufgeklappt, damit die Erfolgsmeldung sichtbar bleibt', async () => {
+    const calls = [];
+    installFetchMock(calls, { ranking: [{ playerId: 'p1', id: 'p1', rank: 1, wins: 1, firstName: 'Anna', lastName: 'Muster' }] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const wrapper = ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const finished = { ...TOURNAMENT, status: 'finished' };
+    const { rerender } = rtlRender(<TournamentPlayManagement tournaments={[finished]} language="de" />, { wrapper });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Endrangliste veröffentlichen' }));
+    expect(await screen.findByText(/Endrangliste veröffentlicht/)).toBeInTheDocument();
+    // Die neu geladene Turnierliste trägt jetzt den Veröffentlichungszeitpunkt.
+    rerender(<TournamentPlayManagement tournaments={[{ ...finished, rankingPublishedAt: '2026-10-27T12:00:00.000Z' }]} language="de" />);
+
+    expect(document.querySelector('.ranking-panel').open).toBe(true);
+    expect(screen.getByText(/Endrangliste veröffentlicht/)).toBeInTheDocument();
   });
 });

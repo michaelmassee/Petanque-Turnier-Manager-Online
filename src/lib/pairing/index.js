@@ -57,16 +57,16 @@ export function getPairingStrategy(tournament) {
 // Fragt die Mindestvoraussetzungen für eine Runde generisch beim jeweiligen
 // System ab (checkRequirements ist Teil des PAIRING_STRATEGIES-Vertrags, siehe
 // supermelee.js) - UI-Code muss dadurch nicht wissen, welches System aktuell
-// online spielbar ist bzw. welche Regeln dafür gelten. roundsPlayed wird nur von
-// Systemen mit natürlichem Ende (Jeder gegen Jeden) ausgewertet, andere ignorieren
-// es.
-export function checkRoundRequirements(tournament, confirmedCount, roundsPlayed = 0) {
+// online spielbar ist bzw. welche Regeln dafür gelten. roundsPlayed und teamCount (feste
+// Teams seit der ersten Runde) werden nur von Systemen mit natürlichem Ende (Jeder gegen
+// Jeden, K.O.) ausgewertet, andere ignorieren sie.
+export function checkRoundRequirements(tournament, confirmedCount, roundsPlayed = 0, { teamCount } = {}) {
   const strategy = getPairingStrategy(tournament);
   if (!strategy?.checkRequirements) {
     return [];
   }
   const registrationType = tournament.registrationType ?? tournament.registration_type;
-  return strategy.checkRequirements(confirmedCount, { formation: tournament.formation, registrationType, roundsPlayed });
+  return strategy.checkRequirements(confirmedCount, { formation: tournament.formation, registrationType, roundsPlayed, teamCount });
 }
 
 // Die UI zeigt diese Texte vorab, der Worker verwendet sie ebenfalls für direkte

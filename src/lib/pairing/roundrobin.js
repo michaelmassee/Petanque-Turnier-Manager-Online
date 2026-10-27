@@ -13,7 +13,7 @@ export function totalRounds(teamCount) {
 
 export const MIN_TEAMS = 3;
 
-export function checkRequirements(confirmedCount, { registrationType, roundsPlayed = 0 } = {}) {
+export function checkRequirements(confirmedCount, { registrationType, roundsPlayed = 0, teamCount } = {}) {
   if (confirmedCount < MIN_TEAMS) {
     return [{ type: 'minPlayers', min: MIN_TEAMS }];
   }
@@ -21,7 +21,8 @@ export function checkRequirements(confirmedCount, { registrationType, roundsPlay
   if (registrationType && !FIXED_TEAM_REGISTRATION_TYPES.includes(registrationType)) {
     return [{ type: 'message', text: 'Jeder gegen Jeden ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.' }];
   }
-  if (roundsPlayed >= totalRounds(confirmedCount)) {
+  // Ab der ersten Runde zählen die festen Teams, nicht die gerade aktiven Meldungen.
+  if (roundsPlayed >= totalRounds((roundsPlayed > 0 && teamCount) || confirmedCount)) {
     return [{ type: 'message', text: 'Alle Runden wurden bereits gespielt.' }];
   }
   return [];

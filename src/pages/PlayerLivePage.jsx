@@ -199,7 +199,11 @@ function PlayerResultReport({ path, onSaved, onAlreadyEntered }) {
   const [scoreB, setScoreB] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const invalid = scoreA === '' || scoreB === '' || Number(scoreA) === Number(scoreB);
+  const complete = scoreA !== '' && scoreB !== '';
+  const draw = complete && Number(scoreA) === Number(scoreB);
+  // Nur das Siegerteam meldet (der Server prüft das ebenso).
+  const lost = complete && Number(scoreA) < Number(scoreB);
+  const invalid = !complete || draw || lost;
 
   async function submit(event) {
     event.preventDefault();
@@ -218,14 +222,14 @@ function PlayerResultReport({ path, onSaved, onAlreadyEntered }) {
 
   return (
     <form className="live-result-report" onSubmit={submit}>
-      <p className="hint">{t('Ergebnis dieser Partie melden')}</p>
+      <p className="hint">{t('Ergebnis dieser Partie melden – das Siegerteam meldet.')}</p>
       <div className="play-result-row">
         <input className="score-input" type="text" inputMode="numeric" pattern="[0-9]{0,2}" maxLength={2} value={scoreA} onChange={(event) => setScoreA(sanitizeScore(event.target.value))} aria-label={t('Eigene Punkte')} />
         <span className="play-score-sep">:</span>
         <input className="score-input" type="text" inputMode="numeric" pattern="[0-9]{0,2}" maxLength={2} value={scoreB} onChange={(event) => setScoreB(sanitizeScore(event.target.value))} aria-label={t('Gegnerische Punkte')} />
         <Button type="submit" disabled={invalid || busy} loading={busy}>{t('Ergebnis melden')}</Button>
       </div>
-      <Feedback error={error || (scoreA !== '' && scoreB !== '' && Number(scoreA) === Number(scoreB) ? t('Unentschieden ist nicht möglich') : '')} />
+      <Feedback error={error || (draw ? t('Unentschieden ist nicht möglich') : '') || (lost ? t('Nur das Siegerteam meldet das Ergebnis.') : '')} />
     </form>
   );
 }

@@ -83,13 +83,27 @@ export function assignGroups(orderedTeamIds, { maxGroupSize = 16, minLastGroupSi
 
 export const MIN_TEAMS = 2;
 
-export function checkRequirements(confirmedCount, { registrationType } = {}) {
+// Rundenzahl bis zum letzten Finale: Teilbäume spielen parallel, der größte (mit Cadrage) bestimmt das Ende.
+export function totalRounds(teamCount) {
+  const sizes = new Map();
+  for (const { group } of assignGroups(Array.from({ length: teamCount }, (_, index) => index))) {
+    sizes.set(group, (sizes.get(group) || 0) + 1);
+  }
+  return Math.max(0, ...[...sizes.values()].map((size) => groupStagePlan(size, false).stages.length));
+}
+
+// teamCount: Zahl der festen Teams ab der ersten Runde. Ausgeschiedene dürfen danach inaktiv sein, ohne dass das
+// Rundenende früher erreicht scheint.
+export function checkRequirements(confirmedCount, { registrationType, roundsPlayed = 0, teamCount } = {}) {
   if (confirmedCount < MIN_TEAMS) {
     return [{ type: 'minPlayers', min: MIN_TEAMS }];
   }
   // Mêlée-Spieler werden vor der ersten Runde zu festen Teams ausgelost (siehe melee.js).
   if (registrationType && !FIXED_TEAM_REGISTRATION_TYPES.includes(registrationType)) {
     return [{ type: 'message', text: 'K.O. ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.' }];
+  }
+  if (roundsPlayed > 0 && roundsPlayed >= totalRounds(teamCount || confirmedCount)) {
+    return [{ type: 'message', text: 'Alle Runden wurden bereits gespielt.' }];
   }
   return [];
 }

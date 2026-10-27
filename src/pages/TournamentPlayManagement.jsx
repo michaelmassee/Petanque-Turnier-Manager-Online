@@ -262,6 +262,22 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, n
  * Endrangliste nach Turnierende einfrieren und öffentlich machen, auf Wunsch mit Mail-Link, Postfach und Push an alle
  * bestätigten Teilnehmer. Ein erneuter Versand muss ausdrücklich bestätigt werden.
  */
+// Nach Turnierende klappt die Rangliste zum Veröffentlichen auf. Danach schließt nur der Nutzer sie wieder – sonst
+// verschwände die Erfolgsmeldung des Veröffentlichens im zugeklappten Panel.
+function RankingPanel({ openInitially, children }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(openInitially);
+  useEffect(() => {
+    if (openInitially) setOpen(true);
+  }, [openInitially]);
+  return (
+    <details className="panel ranking-panel" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary className="play-round-summary"><span>{t('Rangliste')}</span></summary>
+      {children}
+    </details>
+  );
+}
+
 export function FinalRankingPublisher({ tournament, onPublished }) {
   const { t, i18n } = useTranslation();
   const [notify, setNotify] = useState(true);
@@ -423,7 +439,11 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     await queryClient.invalidateQueries({ queryKey: ['tournament-play', tournamentId] });
   }
 
+  // Ein abgeschlossenes Turnier lässt sich wieder aufnehmen (z. B. zu früh abgeschlossen); der Server zieht dabei eine
+  // veröffentlichte Endrangliste zurück. Deshalb nur nach Rückfrage.
   async function handleStartTournament() {
+    const resume = selectedTournamentStatus === 'finished';
+    if (resume && !window.confirm(t('Turnier wieder aufnehmen? Eine veröffentlichte Endrangliste wird zurückgezogen, bis du das Turnier erneut abschließt.'))) return;
     setBusy(true);
     setError('');
     setMessage('');
@@ -432,7 +452,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       setStartedTournamentIds((current) => new Set(current).add(selectedTournamentId));
       // Der Start checkt alle noch inaktiven bestätigten Meldungen ein; ohne Neuladen stünden sie hier weiter auf "Inaktiv".
       await queryClient.invalidateQueries({ queryKey: [...queryKey, 'registrations'] });
-      setMessage(t('Turnier wurde gestartet.'));
+      if (resume) await queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+      setMessage(resume ? t('Turnier wurde wieder aufgenommen.') : t('Turnier wurde gestartet.'));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -749,7 +770,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   // keine Anpassung an dieser Stelle brauchen. Nur aktive Meldungen zählen, analog zum
   // Hauptprojekt (nur Meldungen mit Spieltag-Status "JA" gehen in die Rundenauslosung ein).
   const strategyRequirementGaps = selectedTournament && selectedTournamentStatus === 'running' && !missingMeleeDraw
-    ? checkRoundRequirements(selectedTournament, isMelee ? swissTeams.length : activeConfirmedCount, rounds.length)
+    ? checkRoundRequirements(selectedTournament, isMelee ? swissTeams.length : activeConfirmedCount, rounds.length, { teamCount: swissTeams.length })
     : [];
   const missingRequirements = [
     ...strategyRequirementGaps.map((requirement) => requirementText(requirement, t, { teams: isMelee })),
@@ -803,7 +824,9 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
         {selectedTournament && selectedTournamentStatus !== 'running' && (
           <div className="play-toolbar-actions">
 
-            <Button disabled={busy || !selectedTournamentId} loading={busy} onClick={handleStartTournament}>{t('Turnier starten')}</Button>
+            <Button disabled={busy || !selectedTournamentId} loading={busy} onClick={handleStartTournament}>
+              {selectedTournamentStatus === 'finished' ? t('Turnier wieder aufnehmen') : t('Turnier starten')}
+            </Button>
           </div>
         )}
         {selectedTournamentStatus === 'running' && (
@@ -925,8 +948,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       )}
 
       {Boolean(ranking.length) && (
-        <details className="panel ranking-panel" open={selectedTournamentStatus === 'finished' && !selectedTournament?.rankingPublishedAt}>
-          <summary className="play-round-summary"><span>{t('Rangliste')}</span></summary>
+        <RankingPanel key={selectedTournamentId} openInitially={selectedTournamentStatus === 'finished' && !selectedTournament?.rankingPublishedAt}>
           <div className="table-scroll">
             <RankingTable tournament={selectedTournament} entries={normalizeRanking(ranking)} />
           </div>
@@ -934,7 +956,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
             tournament={selectedTournament}
             onPublished={() => queryClient.invalidateQueries({ queryKey: ['tournaments'] })}
           />
-        </details>
+        </RankingPanel>
       )}
     </div>
   );

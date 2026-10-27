@@ -7271,16 +7271,18 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
   // Bei Mêlée zählen die ausgelosten Teams, nicht die Einzelanmeldungen.
   const melee = isMeleeTeamTournament(tournament);
   if (melee) await releaseInvalidMeleeTeams(db, tournament.id);
-  const [activeConfirmed, existingRounds] = await Promise.all([
+  // Feste Teams (tournament_teams) bestimmen bei Jeder gegen Jeden und K.O. das Rundenende, nicht die aktiven Meldungen.
+  const [activeConfirmed, existingRounds, fixedTeamCount] = await Promise.all([
     melee
       ? db.prepare('SELECT COUNT(*) AS count FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).first()
       : db.prepare("SELECT COUNT(*) AS count FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active'").bind(tournament.id).first(),
     db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?').bind(tournament.id).first(),
+    db.prepare('SELECT COUNT(*) AS count FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).first(),
   ]);
   if (melee && !Number(activeConfirmed.count)) throw new HttpError(400, 'Bitte zuerst Mêlée-Teams auslosen');
   // Beim Neuauslosen zählt die zu ersetzende Runde nicht mit (z. B. Rundenende bei Jeder gegen Jeden).
   const roundsBefore = Number(existingRounds.count) - (redraw ? 1 : 0);
-  const requirement = checkRoundRequirements(tournament, Number(activeConfirmed.count), roundsBefore)[0];
+  const requirement = checkRoundRequirements(tournament, Number(activeConfirmed.count), roundsBefore, { teamCount: Number(fixedTeamCount.count) })[0];
   if (requirement) {
     throw new HttpError(400, roundRequirementMessage(requirement, { teams: melee }));
   }
@@ -7544,6 +7546,14 @@ async function throwNoOpenMatch(db, tournamentId, registrationId) {
   throw new HttpError(403, 'Du kannst nur das Ergebnis deiner aktuellen offenen Partie melden');
 }
 
+// Spieler melden nur als Siegerteam: Eine Meldung pro Partie, und Sieger und Verlierer können sich nicht
+// widersprechen. Hat das Siegerteam nicht gemeldet, trägt die Turnierleitung ein.
+function assertWinnerReports(ownScore, opponentScore) {
+  if (ownScore < opponentScore) {
+    throw new HttpError(400, 'Nur das Siegerteam meldet das Ergebnis.', { code: 'winner_reports_only' });
+  }
+}
+
 async function reportLiveMatchResult(request, env, registration, reporterUserId) {
   const db = env.DB;
   const tournament = await getTournamentById(db, registration.tournament_id);
@@ -7574,6 +7584,7 @@ async function reportLiveMatchResult(request, env, registration, reporterUserId)
   const ownScore = validateMatchScore(body.ownScore);
   const opponentScore = validateMatchScore(body.opponentScore);
   if (ownScore === opponentScore) throw new HttpError(400, 'Ungültiges Ergebnis');
+  assertWinnerReports(ownScore, opponentScore);
   const scoreA = Number(match.in_a) === 1 ? ownScore : opponentScore;
   const scoreB = Number(match.in_a) === 1 ? opponentScore : ownScore;
   const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, result_reported_by = ?, updated_at = ?
@@ -7615,6 +7626,7 @@ async function reportDocumentMatchResult(request, db, tournament, registration, 
   const ownScore = validateMatchScore(body.ownScore);
   const opponentScore = validateMatchScore(body.opponentScore);
   if (ownScore === opponentScore) throw new HttpError(400, 'Ungültiges Ergebnis');
+  assertWinnerReports(ownScore, opponentScore);
   const inA = Number(match.in_a) === 1;
   try {
     await db.prepare(`INSERT INTO document_result_reports (id, tournament_id, round_number, team_a_registration_ids,

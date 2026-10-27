@@ -341,14 +341,39 @@ describe('Live-Ansicht für Spieler', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(await screen.findByLabelText('Eigene Punkte'), { target: { value: '8' } });
-    fireEvent.change(screen.getByLabelText('Gegnerische Punkte'), { target: { value: '13' } });
+    // Der Spieler hält sich für den Sieger, die Turnierleitung hat schon 8:13 eingetragen: Ihr Eintrag gilt.
+    fireEvent.change(await screen.findByLabelText('Eigene Punkte'), { target: { value: '13' } });
+    fireEvent.change(screen.getByLabelText('Gegnerische Punkte'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: 'Ergebnis melden' }));
 
     expect(await screen.findByText('Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.')).toHaveAttribute('role', 'status');
     expect(await screen.findAllByText('8:13')).not.toHaveLength(0);
     expect(screen.queryByLabelText('Eigene Punkte')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('lässt nur das Siegerteam melden', async () => {
+    const initial = livePayload();
+    initial.tournament.playerResultReportingEnabled = true;
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(initial)));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <LiveDetail queryKey={['live', 'registration', 'r1']} path="/api/live/registrations/r1" language="de" canReportResult />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('Ergebnis dieser Partie melden – das Siegerteam meldet.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Eigene Punkte'), { target: { value: '9' } });
+    fireEvent.change(screen.getByLabelText('Gegnerische Punkte'), { target: { value: '13' } });
+    expect(screen.getByRole('button', { name: 'Ergebnis melden' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Nur das Siegerteam meldet das Ergebnis.');
+
+    fireEvent.change(screen.getByLabelText('Eigene Punkte'), { target: { value: '13' } });
+    fireEvent.change(screen.getByLabelText('Gegnerische Punkte'), { target: { value: '9' } });
+    expect(screen.getByRole('button', { name: 'Ergebnis melden' })).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/live/registrations/r1/result', expect.anything());
   });
 
   it.each(TOURNAMENT_TYPES)('meldet das Ergebnis für $label aus eigener Sicht', async ({ value: type }) => {
@@ -460,7 +485,7 @@ describe('Live-Ansicht für Spieler', () => {
     );
 
     expect(await screen.findByText(text)).toBeInTheDocument();
-    const formularText = screen.queryByText('Ergebnis dieser Partie melden');
+    const formularText = screen.queryByText('Ergebnis dieser Partie melden – das Siegerteam meldet.');
     if (formular) expect(formularText).toBeInTheDocument();
     else expect(formularText).not.toBeInTheDocument();
   });

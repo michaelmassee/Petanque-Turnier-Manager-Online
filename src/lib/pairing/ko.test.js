@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  assignGroups, berechneSetzliste, checkRequirements, generateRound, highestPowerOfTwo,
+  assignGroups, berechneSetzliste, checkRequirements, generateRound, highestPowerOfTwo, totalRounds,
   planBracket, roundTitle,
 } from './ko.js';
 
@@ -109,6 +109,23 @@ describe('K.O. - checkRequirements', () => {
       { type: 'message', text: 'K.O. ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.' },
     ]);
     expect(checkRequirements(8, { registrationType: 'forme' })).toEqual([]);
+  });
+
+  it('kennt das Rundenende: Cadrage zählt mit, bei Teilbäumen bestimmt der größte', () => {
+    expect(totalRounds(8)).toBe(3);
+    expect(totalRounds(5)).toBe(3);
+    expect(totalRounds(2)).toBe(1);
+    expect(totalRounds(32)).toBe(4);
+    expect(totalRounds(19)).toBe(5);
+  });
+
+  it('meldet nach dem Finale „Alle Runden wurden bereits gespielt.“ – gemessen an den festen Teams', () => {
+    const ende = [{ type: 'message', text: 'Alle Runden wurden bereits gespielt.' }];
+    expect(checkRequirements(8, { roundsPlayed: 2 })).toEqual([]);
+    expect(checkRequirements(8, { roundsPlayed: 3 })).toEqual(ende);
+    // Ausgeschiedene inaktiv gesetzt: nur noch 4 aktiv, das Finale steht trotzdem noch aus.
+    expect(checkRequirements(4, { roundsPlayed: 2, teamCount: 8 })).toEqual([]);
+    expect(checkRequirements(4, { roundsPlayed: 3, teamCount: 8 })).toEqual(ende);
   });
 });
 

@@ -63,6 +63,14 @@ describe('Ergebnismeldung bei verbundenem Turnierdokument', () => {
       .toEqual({ score_a: null, score_b: null });
   });
 
+  it('nimmt nur die Meldung des Siegerteams an', async () => {
+    const verlierer = await melden('anna-session', ANNA, 7, 13);
+
+    expect(verlierer.status).toBe(400);
+    expect((await verlierer.json()).details).toEqual({ code: 'winner_reports_only' });
+    expect(meldungen()).toEqual([]);
+  });
+
   it('lässt keine zweite offene Meldung derselben Partie zu', async () => {
     await melden('bert-session', BERT, 13, 7);
 

@@ -92,4 +92,11 @@ describe('Jeder gegen Jeden (Round Robin)', () => {
     ]);
     expect(checkRequirements(6, { registrationType: 'forme' })).toEqual([]);
   });
+
+  it('misst das Rundenende ab der ersten Runde an den festen Teams, nicht an den aktiven Meldungen', () => {
+    const ende = [{ type: 'message', text: 'Alle Runden wurden bereits gespielt.' }];
+    expect(checkRequirements(4, { roundsPlayed: 3, teamCount: 6 })).toEqual([]);
+    expect(checkRequirements(4, { roundsPlayed: 5, teamCount: 6 })).toEqual(ende);
+    expect(checkRequirements(4, { roundsPlayed: 3 })).toEqual(ende);
+  });
 });

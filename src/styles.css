@@ -3845,6 +3845,8 @@ a.left-panel-link {
 /* Veröffentlichte Endrangliste: Kopf mit Vereinslogo links, PTM-Logo rechts */
 .final-ranking {
   display: grid;
+  /* minmax(0, …): Die breite Tabelle scrollt in .table-scroll, statt die Seite auf dem Handy zu verbreitern. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 

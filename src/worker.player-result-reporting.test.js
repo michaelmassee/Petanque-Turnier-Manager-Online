@@ -168,6 +168,20 @@ describe('Ergebnismeldung durch Spieler', () => {
     expect((await melden('player-session', { ownScore: 13, opponentScore: 7 })).status).toBe(403);
   });
 
+  it('nimmt nur die Meldung des Siegerteams an', async () => {
+    const verlierer = await melden('player-session', { ownScore: 9, opponentScore: 13 });
+
+    expect(verlierer.status).toBe(400);
+    expect(await verlierer.json()).toEqual({ error: 'Nur das Siegerteam meldet das Ergebnis.', details: { code: 'winner_reports_only' } });
+    expect(env.DB.sqlite.prepare("SELECT score_a, score_b FROM tournament_matches WHERE id = 'match1'").get())
+      .toEqual({ score_a: null, score_b: null });
+
+    // Der Gegner (Team B) hat gewonnen und meldet: aus seiner Sicht 13:9, gespeichert als Team A 9, Team B 13.
+    expect((await melden('other-session', { ownScore: 13, opponentScore: 9 }, 'r2')).status).toBe(200);
+    expect(env.DB.sqlite.prepare("SELECT score_a, score_b, result_reported_by FROM tournament_matches WHERE id = 'match1'").get())
+      .toEqual({ score_a: 9, score_b: 13, result_reported_by: 'r2' });
+  });
+
   it.each([
     [{ ownScore: 13, opponentScore: 13 }],
     [{ ownScore: -1, opponentScore: 13 }],
