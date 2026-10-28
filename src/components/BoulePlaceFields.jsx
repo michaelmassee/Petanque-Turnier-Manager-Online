@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { IntegerField, TextField, SelectField } from './ui.jsx';
-import { LocationAutocomplete } from './LocationAutocomplete.jsx';
+import { BoulePlaceLocationFields } from './BoulePlaceLocationFields.jsx';
 import { RichTextEditor } from './RichTextEditor.jsx';
 
 export function BoulePlaceFields({ form, setForm, language }) {
@@ -15,22 +15,7 @@ export function BoulePlaceFields({ form, setForm, language }) {
     <>
       <TextField label={t('Name')} value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
       <SelectField label={t('Spielorttyp')} value={form.venueType || 'outdoor'} onChange={(venueType) => setForm({ ...form, venueType })} options={[{ value: 'outdoor', label: t('Bouleplatz') }, { value: 'indoor', label: t('Boulehalle') }]} />
-      <LocationAutocomplete
-        label={t('Adresse')}
-        value={form.address}
-        onChange={(address) => setForm({ ...form, address, locationConfirmed: false })}
-        onSelect={(candidate) => setForm({
-          ...form,
-          address: candidate.displayName,
-          latitude: candidate.lat,
-          longitude: candidate.lng,
-          locationConfirmed: true,
-        })}
-        confirmed={form.locationConfirmed}
-        required
-        minLength={5}
-        language={language}
-      />
+      <BoulePlaceLocationFields form={form} setForm={setForm} />
       {form.addressUnverified && (
         <label className="checkbox-row">
           <input type="checkbox" checked={Boolean(form.addressVerified)} onChange={(event) => setForm({ ...form, addressVerified: event.target.checked })} />

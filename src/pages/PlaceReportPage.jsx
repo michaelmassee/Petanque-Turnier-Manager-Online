@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { EMPTY_PLACE_REPORT_FORM } from '../lib/constants.js';
 import { api } from '../lib/api.js';
 import { IntegerField, RequiredMark, TextField, TextArea, Button, Feedback } from '../components/ui.jsx';
-import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
+import { BoulePlaceLocationFields } from '../components/BoulePlaceLocationFields.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 
 function PlaceReportForm({ form, setForm, onSubmit, navigate, language, turnstileSiteKey, saving }) {
@@ -23,22 +23,7 @@ function PlaceReportForm({ form, setForm, onSubmit, navigate, language, turnstil
   return (
     <form className="form dense" onSubmit={onSubmit}>
       <TextField label={t('Name')} value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
-      <LocationAutocomplete
-        label={t('Adresse')}
-        value={form.address}
-        onChange={(address) => setForm({ ...form, address, locationConfirmed: false })}
-        onSelect={(candidate) => setForm({
-          ...form,
-          address: candidate.displayName,
-          latitude: candidate.lat,
-          longitude: candidate.lng,
-          locationConfirmed: true,
-        })}
-        confirmed={form.locationConfirmed}
-        required
-        minLength={5}
-        language={language}
-      />
+      <BoulePlaceLocationFields form={form} setForm={setForm} />
       <TextField label={t('Verein')} value={form.clubName} onChange={(clubName) => setForm({ ...form, clubName })} placeholder={t('Optional, falls vorhanden')} />
       <IntegerField label={t('Platzanzahl')} min={0} value={form.courtCount} onChange={(courtCount) => setForm({ ...form, courtCount })} />
       <TextArea label={t('Weitere Infos')} value={form.description} onChange={(description) => setForm({ ...form, description })} />
@@ -78,7 +63,7 @@ function PlaceReportForm({ form, setForm, onSubmit, navigate, language, turnstil
           <RequiredMark />
         </span>
       </label>
-      {turnstileSiteKey && <div className="cf-turnstile" data-sitekey={turnstileSiteKey} />}
+      {turnstileSiteKey && <div className="cf-turnstile" data-sitekey={turnstileSiteKey} data-size="compact" />}
       <div className="dialog-actions">
         <Button type="submit" loading={saving}>{t('Bouleplatz melden')}</Button>
       </div>

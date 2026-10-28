@@ -329,7 +329,7 @@ export function CloseButton({ onClick, className = '' }) {
   );
 }
 
-export function EditDialog({ open = true, title, subtitle, message, error, onClose, wide, nested, children }) {
+export function EditDialog({ open = true, title, subtitle, message, error, onClose, wide, nested, compact, children }) {
   const titleId = useId();
 
   if (!open) {
@@ -339,7 +339,7 @@ export function EditDialog({ open = true, title, subtitle, message, error, onClo
   return (
     <div className={`modal-backdrop${nested ? ' modal-backdrop--nested' : ''}`} onClick={onClose}>
       <div
-        className={`modal-panel${wide ? ' modal-panel--wide' : ''}`}
+        className={`modal-panel${wide ? ' modal-panel--wide' : ''}${compact ? ' modal-panel--compact' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

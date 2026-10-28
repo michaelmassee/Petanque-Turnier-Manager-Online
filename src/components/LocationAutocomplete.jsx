@@ -6,7 +6,7 @@ import { RequiredMark } from './ui.jsx';
 
 const EMPTY_PLACES = [];
 
-export function LocationAutocomplete({ label, value, onChange, onSelect, confirmed, required, minLength, disabled, places = EMPTY_PLACES }) {
+export function LocationAutocomplete({ label, labelAction, value, onChange, onSelect, confirmed, required, minLength, disabled, places = EMPTY_PLACES }) {
   const { t } = useTranslation();
   const listId = useId();
   const [suggestions, setSuggestions] = useState([]);
@@ -131,10 +131,15 @@ export function LocationAutocomplete({ label, value, onChange, onSelect, confirm
 
   return (
     <div className="location-autocomplete" ref={containerRef}>
-      <label>
-        {label}
-        {required ? <RequiredMark /> : null}
+      <div className={labelAction ? 'location-autocomplete-heading' : undefined}>
+        <label htmlFor={`${listId}-input`}>
+          {label}
+          {required ? <RequiredMark /> : null}
+        </label>
+        {labelAction}
+      </div>
         <input
+          id={`${listId}-input`}
           ref={inputRef}
           type="text"
           value={value}
@@ -162,7 +167,6 @@ export function LocationAutocomplete({ label, value, onChange, onSelect, confirm
           aria-activedescendant={open && matches[activeIndex] ? `${listId}-${activeIndex}` : undefined}
           aria-autocomplete="list"
         />
-      </label>
       {open && !composing && matches.length > 0 && menuRect && createPortal(
         <ul
           id={listId}

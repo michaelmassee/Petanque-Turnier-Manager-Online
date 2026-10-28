@@ -19,6 +19,7 @@ import {
 } from './rental-core.js';
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
+import { googleMapsCoordinates, googleMapsUrl, isGoogleMapsShortUrl } from './lib/google-maps-location.js';
 import {
   assertPartnerCountMatchesFormation as assertCorePartnerCountMatchesFormation,
   assertTournamentSystemAllowed,
@@ -2024,6 +2025,31 @@ export default {
       if (url.pathname === '/api/admin/petanque-aktuell/import' && request.method === 'POST') {
         const session = await requireAdmin(request, env.DB);
         return await importPetanqueAktuellTournaments(request, env, session.user);
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/locations/google-maps') {
+        const body = await readJson(request);
+        let target = googleMapsUrl(body.url);
+        if (!isGoogleMapsShortUrl(target)) return json(googleMapsCoordinates(target.href));
+        await enforceGeocodeRateLimit(env.DB, request.headers.get('CF-Connecting-IP') || 'unknown');
+        const signal = AbortSignal.timeout(8000);
+        for (let step = 0; step < 3; step += 1) {
+          let upstream;
+          try {
+            upstream = await fetch(target.href, { method: 'HEAD', redirect: 'manual', signal });
+          } catch {
+            throw new HttpError(502, 'Der Google-Maps-Link konnte nicht aufgelöst werden. Bitte erneut versuchen.');
+          }
+          const redirect = upstream.headers.get('Location');
+          await upstream.body?.cancel();
+          if (![301, 302, 303, 307, 308].includes(upstream.status) || !redirect) break;
+          let next;
+          try { next = new URL(redirect, target).href; }
+          catch { throw new HttpError(400, 'Bitte einen gültigen Google-Maps-Link eingeben.'); }
+          target = googleMapsUrl(next);
+          if (!isGoogleMapsShortUrl(target)) return json(googleMapsCoordinates(target.href));
+        }
+        throw new HttpError(502, 'Der Google-Maps-Link konnte nicht aufgelöst werden. Bitte erneut versuchen.');
       }
 
       if (request.method === 'POST' && url.pathname === '/api/geocode') {
@@ -5531,6 +5557,23 @@ async function resolveTournamentBoulePlace(db, placeId) {
   return place;
 }
 
+function tournamentPlaceCoordinates(body, place, existing) {
+  if (!place) return body;
+  const location = place.address;
+  if (body.overrideCoordinates === true) {
+    if ([body.latitude, body.longitude].some((value) => !['string', 'number'].includes(typeof value) || String(value).trim() === '')) {
+      throw new HttpError(400, 'Ungültige Koordinate');
+    }
+    return { ...body, location };
+  }
+  // Beim erneuten Öffnen sendet das Formular ohne neue Ortsauswahl keine Koordinaten.
+  if (existing?.boule_place_id === place.id && existing.location === location
+    && body.latitude == null && body.longitude == null && existing.latitude != null && existing.longitude != null) {
+    return { ...body, location, latitude: existing.latitude, longitude: existing.longitude };
+  }
+  return { ...body, location, latitude: place.latitude, longitude: place.longitude };
+}
+
 // Ein Intl.DateTimeFormat mit Zeitzone anzulegen ist teuer; die Turnierliste rechnet je Turnier bis zu
 // sechsmal um. Ohne Cache kostete GET /api/tournaments bei 68 Turnieren 25-92 ms CPU (Free-Plan: 10 ms).
 const localDateTimeFormatters = new Map();
@@ -5621,7 +5664,7 @@ async function createTournament(request, env, user) {
   const db = env.DB;
   let body = await readJson(request);
   const selectedPlace = await resolveTournamentBoulePlace(db, body.boulePlaceId);
-  if (selectedPlace) body = { ...body, location: selectedPlace.address, latitude: selectedPlace.latitude, longitude: selectedPlace.longitude };
+  body = tournamentPlaceCoordinates(body, selectedPlace);
   const tournament = normalizeCoreTournamentInput(body);
   assertTournamentSystemAllowed(tournament);
 
@@ -5965,7 +6008,7 @@ async function updateTournament(request, env, existing, user) {
   }
   let body = await readJson(request);
   const selectedPlace = await resolveTournamentBoulePlace(db, body.boulePlaceId);
-  if (selectedPlace) body = { ...body, location: selectedPlace.address, latitude: selectedPlace.latitude, longitude: selectedPlace.longitude };
+  body = tournamentPlaceCoordinates(body, selectedPlace, existing);
   const tournament = normalizeCoreTournamentInput(body);
   await assertDraftTransitionAllowed(db, existing, tournament.status);
   assertFormationChangeAllowed(existing, tournament.formation, tournament.formationOther);
@@ -11162,13 +11205,28 @@ async function removeClubEditor(db, clubId, userId, user) {
   return json({ ok: true });
 }
 
-async function placeInput(body, countryCode) {
-  const name = text(body.name); const address = text(body.address); if (name.length < 2 || address.length < 5) throw new HttpError(400, 'Name und vollständige Adresse des Platzes sind erforderlich');
-  // Die Adresse ist die Quelle der Wahrheit. Client-Koordinaten wären sonst auch
-  // außerhalb der LocationAutocomplete-Oberfläche frei fälschbar.
+async function resolvePlaceGeolocation(body, address, countryCode, existing) {
+  if (body.overrideCoordinates === true) {
+    if ([body.latitude, body.longitude].some((value) => !['number', 'string'].includes(typeof value) || String(value).trim() === '')) {
+      throw new HttpError(400, 'Ungültige Koordinate');
+    }
+    const latitude = nullableCoordinate(body.latitude, -90, 90);
+    const longitude = nullableCoordinate(body.longitude, -180, 180);
+    if (latitude === null || longitude === null) throw new HttpError(400, 'Ungültige Koordinate');
+    return { latitude, longitude };
+  }
+  // Gespeicherte Korrekturen bei unveränderter Adresse behalten, auch bei späteren Bearbeitungen.
+  if (existing && text(existing.address) === address && existing.latitude != null && existing.longitude != null) {
+    return { latitude: Number(existing.latitude), longitude: Number(existing.longitude) };
+  }
   const [geo] = await geocodeLocation(address, { countryCode, limit: 1 });
   if (!geo) throw new HttpError(400, 'Kein Ort gefunden.');
-  const { lat: latitude, lng: longitude } = geo;
+  return { latitude: geo.lat, longitude: geo.lng };
+}
+
+async function placeInput(body, countryCode, existing) {
+  const name = text(body.name); const address = text(body.address); if (name.length < 2 || address.length < 5) throw new HttpError(400, 'Name und vollständige Adresse des Platzes sind erforderlich');
+  const { latitude, longitude } = await resolvePlaceGeolocation(body, address, countryCode, existing);
   const codes = facilityCodes(body.facilityCodes);
   const accessible = codes.includes('accessible') || Boolean(body.accessible);
   if (accessible && !codes.includes('accessible')) codes.push('accessible');
@@ -11195,7 +11253,7 @@ async function createIndependentBoulePlace(request, db, user, countryCode) {
 }
 
 async function assertBoulePlaceEditor(db, id, user) {
-  const place = await db.prepare('SELECT club_id, reported_by_user_id, venue_type, address FROM boule_places WHERE id = ?').bind(id).first();
+  const place = await db.prepare('SELECT club_id, reported_by_user_id, venue_type, address, latitude, longitude FROM boule_places WHERE id = ?').bind(id).first();
   if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
   let club = null;
   if (place.club_id) {
@@ -11210,9 +11268,9 @@ async function updateBoulePlace(request, db, id, user, countryCode) {
   const current = await assertBoulePlaceEditor(db, id, user);
   const { club, venue_type: currentVenueType } = current;
   const body = await readJson(request);
-  const input = await placeInput(body, countryCode);
+  const input = await placeInput(body, countryCode, current);
   // Ungeprüfte Importadresse: gilt als geprüft, sobald die Adresse geändert oder ausdrücklich bestätigt wird.
-  // Koordinaten zählen nicht, placeInput geokodiert sie bei jedem Speichern neu.
+  // Eine reine Koordinatenkorrektur bestätigt die Postanschrift nicht.
   const addressChecked = body.addressVerified === true || input.address !== String(current.address || '').trim();
   // Plätze eines bereits freigegebenen Vereins bleiben bei Bearbeitung freigegeben, statt erneut zur Moderation zu müssen.
   const status = club ? (club.status === 'published' ? 'published' : 'pending') : 'published';
@@ -11262,12 +11320,14 @@ async function deleteBoulePlace(db, id, user) {
 }
 
 async function getPlaceReportByToken(db, token) {
-  const place = await db.prepare('SELECT id, name, address, court_count, description, accessible, facilities FROM boule_places WHERE edit_token = ?').bind(token).first();
+  const place = await db.prepare('SELECT id, name, address, latitude, longitude, court_count, description, accessible, facilities FROM boule_places WHERE edit_token = ?').bind(token).first();
   if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
   return json({
     id: place.id,
     name: place.name,
     address: place.address,
+    latitude: place.latitude,
+    longitude: place.longitude,
     courtCount: place.court_count,
     description: place.description || '',
     accessible: Boolean(place.accessible),
@@ -11276,9 +11336,9 @@ async function getPlaceReportByToken(db, token) {
 }
 
 async function updatePlaceReportByToken(request, db, token, countryCode) {
-  const place = await db.prepare('SELECT id FROM boule_places WHERE edit_token = ?').bind(token).first();
+  const place = await db.prepare('SELECT id, address, latitude, longitude FROM boule_places WHERE edit_token = ?').bind(token).first();
   if (!place) throw new HttpError(404, 'Bouleplatz nicht gefunden');
-  const input = await placeInput(await readJson(request), countryCode);
+  const input = await placeInput(await readJson(request), countryCode, place);
   await db.prepare("UPDATE boule_places SET name = ?, address = ?, latitude = ?, longitude = ?, court_count = ?, description = ?, accessible = ?, facilities = ?, status = 'pending', updated_at = ? WHERE id = ?").bind(input.name, input.address, input.latitude, input.longitude, input.courtCount, input.description, input.accessible ? 1 : 0, input.facilities, new Date().toISOString(), place.id).run();
   return json({ ok: true });
 }
@@ -11520,11 +11580,7 @@ async function createPlaceReport(request, env, url) {
   const name = text(body.name);
   const address = text(body.address);
   if (name.length < 2 || address.length < 5) throw new HttpError(400, 'Name und vollständige Adresse des Platzes sind erforderlich');
-  // Die Adresse ist die Quelle der Wahrheit. Ein öffentlicher API-Aufruf darf
-  // keine beliebige Kartenposition neben einer anderen Adresse veröffentlichen.
-  const [geo] = await geocodeLocation(address, { countryCode: request.headers.get('CF-IPCountry'), limit: 1 });
-  if (!geo) throw new HttpError(400, 'Kein Ort gefunden.');
-  const { lat: latitude, lng: longitude } = geo;
+  const { latitude, longitude } = await resolvePlaceGeolocation(body, address, request.headers.get('CF-IPCountry'));
   const courtCount = nonNegativeInteger(body.courtCount);
   const description = nullableText(body.description);
   const accessible = Boolean(body.accessible);

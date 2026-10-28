@@ -8,6 +8,7 @@ import { filterTournaments } from '../frontend-core.js';
 import { Feedback, IntegerField, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog, RequiredMark } from '../components/ui.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
+import { GoogleMapsImport } from '../components/GoogleMapsImport.jsx';
 import { authenticatedApi } from '../lib/api.js';
 import { formatUserLabel, formatUserName } from '../lib/userLabel.js';
 import { useClubSuggestions } from '../components/ClubSuggestions.jsx';
@@ -98,6 +99,23 @@ function TournamentOwnerPanel({ tournamentId, ownerId, candidates = [], currentU
         </div>
       )}
     </div>
+  );
+}
+
+function LocationHelpDialog({ onClose }) {
+  const { t } = useTranslation();
+  return (
+    <EditDialog wide nested title={t('Ort, Verein und Koordinaten')} onClose={onClose}>
+      <p>{t('Im Turnierformular bestimmen die Felder Spielort, Ausrichter und genaue Kartenposition:')}</p>
+      <p><strong>{t('Ort')}</strong> – {t('Adresse beziehungsweise Bouleplatz, an dem gespielt wird. Eine Auswahl aus den Suchvorschlägen übernimmt auch die Koordinaten.')}</p>
+      <p><strong>{t('Verein')}</strong> – {t('Der ausrichtende Verein. Er kann vom Verein des Spielorts abweichen. Eine Änderung verschiebt die Kartenposition nicht.')}</p>
+      <p><strong>{t('Koordinaten manuell anpassen')}</strong> – {t('Damit kannst du den genauen Punkt korrigieren, etwa vom Straßenrand zum tatsächlichen Bouleplatz. Adresse und Verein bleiben erhalten.')}</p>
+      <p>{t('Wählst du einen bekannten Bouleplatz aus, wird dessen Verein nur übernommen, wenn das Vereinsfeld noch leer ist. Ein bereits eingetragener Ausrichter bleibt stehen.')}</p>
+      <p>{t('Das Google-Maps-Icon übernimmt ausschließlich die Koordinaten und aktiviert die manuelle Anpassung.')}</p>
+      <p><strong>{t('Beispiel:')}</strong> {t('Das Turnier findet im Stadtpark statt, Ausrichter ist „BC Linden“. Die Adresse zeigt auf den Parkeingang. Über Google Maps setzt du den Punkt direkt auf die Spielfläche.')}</p>
+      <p><strong>{t('Die sinnvolle Reihenfolge ist: Ort auswählen → Verein prüfen → Kartenposition korrigieren.')}</strong></p>
+      <p>{t('Eine spätere Auswahl aus den Ortsvorschlägen übernimmt wieder die Koordinaten dieses Treffers. Bei bloßer Texteingabe bleibt eine aktivierte manuelle Position erhalten.')}</p>
+    </EditDialog>
   );
 }
 
@@ -236,6 +254,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
   const { t } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
   const [showFormationHelp, setShowFormationHelp] = useState(false);
+  const [showLocationHelp, setShowLocationHelp] = useState(false);
   // Mails zum Turnier hängen an der Freischaltung des Owners: Hinweis beim Anlegen und für den Owner beim Bearbeiten.
   const showMailNotEnabledHint = !isAdmin && currentUser?.mailEnabled === false && (mode !== 'edit' || form.ownerId === currentUser.id);
   const canManageEditors = mode === 'edit' && form.id && Boolean(currentUser) && (isAdmin || form.ownerId === currentUser.id);
@@ -261,6 +280,9 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
       </div>
       <LocationAutocomplete
         label={t('Ort')}
+        labelAction={<button type="button" className="help-btn" onClick={() => setShowLocationHelp(true)} aria-label={t('Hilfe zu Ort, Verein und Koordinaten')}>
+          {t('? Hilfe')}
+        </button>}
         value={form.location}
         places={boulePlaces}
         onChange={(location) => setForm({ ...form, location, boulePlaceId: '', ...(form.overrideCoordinates ? {} : { latitude: '', longitude: '' }), locationConfirmed: false })}
@@ -280,22 +302,29 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         required
         minLength={2}
       />
+      {showLocationHelp && <LocationHelpDialog onClose={() => setShowLocationHelp(false)} />}
       <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} required={isCalendarEntry} minLength={2} list={clubSuggestions.listId} />
       {clubSuggestions.datalist}
-      <label className="checkbox-field">
-        <input
-          type="checkbox"
-          checked={form.overrideCoordinates}
-          onChange={(event) => setForm({ ...form, overrideCoordinates: event.target.checked })}
-        />
-        {t('Koordinaten manuell anpassen')}
-      </label>
+      <div className="coordinate-actions">
+        <label className="checkbox-field">
+          <input
+            type="checkbox"
+            checked={form.overrideCoordinates}
+            onChange={(event) => setForm({ ...form, overrideCoordinates: event.target.checked })}
+          />
+          {t('Koordinaten manuell anpassen')}
+        </label>
+        <GoogleMapsImport location={form.location} onImport={(coordinates) => setForm({ ...form, ...coordinates, overrideCoordinates: true })} />
+      </div>
       {form.overrideCoordinates && (
         <div className="form-grid">
           <TextField
             label={t('Breitengrad')}
             type="number"
             inputMode="decimal"
+            step="any"
+            min={-90}
+            max={90}
             value={form.latitude}
             onChange={(latitude) => setForm({ ...form, latitude })}
           />
@@ -303,6 +332,9 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             label={t('Längengrad')}
             type="number"
             inputMode="decimal"
+            step="any"
+            min={-180}
+            max={180}
             value={form.longitude}
             onChange={(longitude) => setForm({ ...form, longitude })}
           />

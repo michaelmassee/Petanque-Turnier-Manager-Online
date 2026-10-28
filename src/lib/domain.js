@@ -156,6 +156,7 @@ export function withPersonalPlaceMarks(places, marks) {
 export function tournamentPayload(form) {
   return {
     boulePlaceId: form.boulePlaceId || null,
+    overrideCoordinates: Boolean(form.overrideCoordinates),
     club: form.club || null,
     name: form.name,
     date: form.date,

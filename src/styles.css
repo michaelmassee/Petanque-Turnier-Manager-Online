@@ -176,6 +176,8 @@ small {
 
 .form {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 16px;
   margin-top: 24px;
 }
@@ -1155,6 +1157,9 @@ a.left-panel-link {
   position: relative;
 }
 
+.location-autocomplete-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.location-autocomplete > input { margin-top: 7px; }
+
 .location-autocomplete-results {
   z-index: 1000;
   margin: 0;
@@ -1327,6 +1332,9 @@ a.left-panel-link {
   min-height: 0;
   margin-top: 2px;
 }
+
+.checkbox-field > span { min-width: 0; overflow-wrap: anywhere; }
+.checkbox-field .link-button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 
 .checkbox-row {
   display: flex;
@@ -3597,6 +3605,11 @@ a.left-panel-link {
     grid-template-columns: 1fr;
   }
 
+  .form-grid,
+  .form-grid-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   /* Bearbeiter bleiben als klare Einheit: erst der Name, darunter Melden und
      Entfernen. Das verhindert, dass Flex-Zeilen das Icon und den Button bei
      langen Namen in unterschiedliche, wechselnde Zeilen schieben. */
@@ -5206,3 +5219,21 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
 .rental-internal-note { display: grid; gap: 2px; margin-top: 6px; padding: 6px 10px; border-left: 3px solid #c7d0df; background: #f6f8fb; border-radius: 4px; overflow-wrap: anywhere; }
 .rental-internal-note .rich-text, .rental-internal-note .rich-text-plain { margin: 0; }
 .rental-bookings h3 { margin-bottom: 8px; }
+
+.coordinate-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.coordinate-actions > .checkbox-field { flex: 1 1 0; min-width: 0; align-items: center; margin: 0; overflow-wrap: anywhere; }
+.coordinate-actions > .checkbox-field input { margin-top: 0; }
+.google-maps-import-trigger { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border: 1px solid #d7deea; border-radius: 8px; color: #165fbd; background: #f4f6fa; }
+.google-maps-import-trigger:hover { background: #e8effb; }
+.google-maps-import-trigger:focus-visible { outline: 3px solid rgb(22 119 255 / 40%); outline-offset: 2px; }
+.google-maps-import-feedback { flex-basis: 100%; min-width: 0; }
+.google-maps-import-feedback .feedback { margin: 0; }
+.google-maps-import-layer > .modal-backdrop { top: var(--import-viewport-top, 0px); bottom: auto; height: var(--import-viewport-height, 100dvh); padding: 12px; z-index: 100; }
+.modal-panel.modal-panel--compact { width: min(100%, 420px); max-width: 420px; height: auto; max-height: 100%; min-width: 0; padding: 20px; border-radius: 12px; overscroll-behavior: contain; overflow-wrap: anywhere; }
+.modal-panel--compact > h2 { margin: 0 44px 16px 0; font-size: 1.2rem; line-height: 1.35; }
+.modal-panel.modal-panel--compact > .close-icon-button { top: 8px; right: 8px; width: 44px; height: 44px; }
+.google-maps-import-form, .google-maps-import-form > label { min-width: 0; }
+.google-maps-import-form input { width: 100%; min-width: 0; font-size: max(16px, 1em); }
+.google-maps-import-form .hint { margin: 0; }
+.google-maps-import-form .dialog-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); }
+.google-maps-import-form .button { min-width: 0; min-height: 44px; white-space: normal; overflow-wrap: anywhere; }

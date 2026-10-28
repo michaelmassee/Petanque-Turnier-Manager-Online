@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { EMPTY_TOURNAMENT_FORM } from '../lib/constants.js';
 import { api } from '../lib/api.js';
+import { tournamentPayload } from '../lib/domain.js';
 import { TournamentForm, tournamentToForm } from './TournamentManagement.jsx';
 
 vi.mock('../lib/api.js', async (importOriginal) => ({ ...(await importOriginal()), api: vi.fn(() => new Promise(() => {})) }));
@@ -10,17 +11,57 @@ vi.mock('../lib/api.js', async (importOriginal) => ({ ...(await importOriginal()
 const place = { id: 'p1', clubName: 'BC Linden', name: 'Boulehalle', address: 'Hauptstraße 12, Linden', latitude: 50, longitude: 8 };
 const tournament = { id: 't1', name: 'Turnier', date: '2026-11-01', location: place.address, boulePlaceId: place.id, latitude: 50, longitude: 8 };
 
-function renderForm(mode, initial, changed = vi.fn()) {
+function renderForm(mode, initial, changed = vi.fn(), onSubmit = vi.fn()) {
   function Form() {
     const [form, setForm] = useState(initial);
     return <TournamentForm form={form} setForm={(next) => { changed(next); setForm(next); }}
-      mode={mode} language="de" boulePlaces={[place]} />;
+      mode={mode} language="de" boulePlaces={[place]} onSubmit={onSubmit} />;
   }
   render(<Form />);
   return changed;
 }
 
 describe('Turnierort in einem Suchfeld', () => {
+  it.each([
+    ['create', true], ['edit', true], ['edit', false],
+  ])('öffnet die Hilfe direkt hinter Ort und erhält die Formulardaten (%s, Anmeldung %s)', (mode, registrationEnabled) => {
+    const changed = vi.fn();
+    const submitted = vi.fn();
+    renderForm(mode, { ...tournamentToForm(tournament), registrationEnabled, club: 'BC Linden' }, changed, submitted);
+    const location = screen.getByRole('combobox', { name: 'Ort', exact: true });
+    const help = screen.getByRole('button', { name: 'Hilfe zu Ort, Verein und Koordinaten' });
+    expect(help).toHaveClass('help-btn');
+    expect(help).toHaveTextContent('? Hilfe');
+    expect(help.previousElementSibling).toBe(location.labels[0]);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(help);
+    const dialog = screen.getByRole('dialog', { name: 'Ort, Verein und Koordinaten' });
+    expect(dialog).toHaveClass('modal-panel--wide');
+    expect(within(dialog).getByText(/wenn das Vereinsfeld noch leer ist/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Google-Maps-Icon übernimmt ausschließlich/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Stadtpark/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Ort auswählen → Verein prüfen → Kartenposition korrigieren/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Schließen' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(location).toHaveValue(place.address);
+    expect(screen.getByRole('textbox', { name: /^Verein/ })).toHaveValue('BC Linden');
+    expect(changed).not.toHaveBeenCalled();
+    expect(submitted).not.toHaveBeenCalled();
+  });
+
+  it.each(['create', 'edit'])('übernimmt den Google-Maps-Punkt ohne Orts- oder Vereinsänderung (%s)', async (mode) => {
+    const initial = { ...tournamentToForm(tournament), club: 'BC Linden' };
+    const changed = renderForm(mode, initial);
+    fireEvent.click(screen.getByRole('button', { name: 'Koordinaten aus Google Maps importieren' }));
+    fireEvent.change(screen.getByLabelText('Google-Maps-Link'), { target: { value: 'https://www.google.com/maps?q=50.5000636,8.4206376' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    const updated = changed.mock.lastCall[0];
+    expect(updated).toMatchObject({ overrideCoordinates: true, latitude: 50.5000636, longitude: 8.4206376,
+      location: place.address, club: 'BC Linden', boulePlaceId: place.id });
+    expect(tournamentPayload(updated)).toMatchObject({ overrideCoordinates: true, latitude: 50.5000636, longitude: 8.4206376, boulePlaceId: place.id });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Breitengrad' })).toHaveValue(50.5000636);
+  });
   it('übernimmt beim Bearbeiten den gespeicherten Bouleplatz ins Formular', () => {
     expect(tournamentToForm(tournament)).toMatchObject({ boulePlaceId: place.id, latitude: 50, longitude: 8 });
     expect(tournamentToForm({ ...tournament, boulePlaceId: null }).boulePlaceId).toBe('');

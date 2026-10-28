@@ -24,7 +24,7 @@ export function PlaceEditByTokenPage({ language, setLanguage, menuOpen, setMenuO
       try {
         const place = await api(`/api/place-reports/by-token/${encodeURIComponent(token)}`);
         setForm({
-          name: place.name, address: place.address, latitude: null, longitude: null, locationConfirmed: true,
+          name: place.name, address: place.address, latitude: place.latitude, longitude: place.longitude, locationConfirmed: true,
           courtCount: String(place.courtCount ?? ''), description: place.description || '', accessible: place.accessible, facilities: place.facilities || '',
         });
       } catch {
