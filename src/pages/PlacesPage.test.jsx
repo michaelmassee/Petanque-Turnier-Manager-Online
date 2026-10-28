@@ -42,6 +42,9 @@ function place(index, overrides = {}) {
   };
 }
 
+// Aufrufe der gemeinsamen Liste; Detailabrufe (/api/places/:id) beim Aufklappen zählen nicht mit.
+const listFetches = () => fetch.mock.calls.filter(([url]) => String(url) === '/api/places');
+
 function renderPlacesPage() {
   return render(
     <PlacesPage
@@ -103,13 +106,13 @@ describe('Kartenmarker für Bouleplätze', () => {
 
   it('fasst die Plätze eines Vereins unabhängig von ihren Adressen in einem Listenbereich zusammen', () => {
     const groups = groupPlacesByOrganization([
-      { id: 'outdoor', clubId: 'club-1', clubName: 'BC Linden', clubDescription: 'Gemeinsam Boule spielen', clubLogoUrl: 'https://example.test/logo.png', address: 'Parkweg 1, Linden' },
+      { id: 'outdoor', clubId: 'club-1', clubName: 'BC Linden', hasClubLogo: true, address: 'Parkweg 1, Linden' },
       { id: 'indoor', clubId: 'club-1', clubName: 'BC Linden', address: 'Hallenweg 2, Linden' },
       { id: 'independent', clubId: null, clubName: null, address: 'Dorfplatz 3, Linden' },
     ]);
 
     expect(groups).toHaveLength(2);
-    expect(groups[0]).toMatchObject({ clubName: 'BC Linden', clubDescription: 'Gemeinsam Boule spielen', places: [{ id: 'outdoor', clubLogoUrl: 'https://example.test/logo.png' }, { id: 'indoor' }] });
+    expect(groups[0]).toMatchObject({ clubName: 'BC Linden', places: [{ id: 'outdoor', hasClubLogo: true }, { id: 'indoor' }] });
     expect(groups[1]).toMatchObject({ clubName: null, places: [{ id: 'independent' }] });
   });
 });
@@ -157,7 +160,7 @@ describe('Bouleplatz-Deep-Link aus Turnierdetails', () => {
     expect(window.location.hash).toBe('');
     expect(screen.getByRole('button', { name: '15 gefundene Bouleplätze – zur Liste springen' })).toBeInTheDocument();
     expect(screen.getAllByTestId('place-marker')).toHaveLength(15);
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(listFetches()).toHaveLength(1);
     Element.prototype.scrollIntoView.mockClear();
 
     const otherDetails = screen.getByRole('heading', { name: 'Bouleplatz 1' }).closest('details');
@@ -258,7 +261,7 @@ describe('Bouleplätze und Vereine teilen', () => {
     vi.spyOn(navigator, 'share', 'get').mockReturnValue(share);
     fireEvent.click(await shareButton(name));
     await vi.waitFor(() => expect(share).toHaveBeenCalledWith({ title: name, text: name, url: `${window.location.origin}${path}` }));
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(listFetches()).toHaveLength(1);
   });
 
   it('kopiert Name und Link und zeigt die Rückmeldung am Platz', async () => {
@@ -301,7 +304,7 @@ describe('Bouleplätze und Vereine teilen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Entfernen: BC Linden' }));
     expect(window.location.search).toBe('');
     expect(screen.getByRole('heading', { name: 'Bouleplatz 3' })).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(listFetches()).toHaveLength(1);
   });
 });
 
@@ -387,18 +390,34 @@ describe('Übernahme eines Admin-Vereins anfragen', () => {
 
   const clubPlace = (overrides) => place(1, { clubId: 'club-1', clubName: 'BC Linden', clubOwnedByAdmin: true, canEdit: false, ...overrides });
   function renderWith(places, { currentUser = { id: 'u1' }, isAdmin = false } = {}) {
-    // Bearbeitungsrechte kommen wie in Produktion aus /api/places/personal, nicht aus der gemeinsamen Liste.
+    // Bearbeitungsrechte kommen wie in Produktion aus /api/places/personal, nicht aus der gemeinsamen Liste,
+    // und „Verein eines Admins“ erst mit den Details beim Aufklappen.
     const marks = { likedIds: [], favoritedIds: [], editableClubIds: places.filter((entry) => entry.canEdit).map((entry) => entry.clubId), editablePlaceIds: [], isAdmin };
-    const fetchMock = vi.fn((url) => Promise.resolve(new Response(JSON.stringify(String(url).includes('/api/postbox/messages')
-      ? { message: {}, recipientCount: 2 }
-      : String(url) === '/api/places/personal' ? marks : { places }), { status: 200 })));
+    const listed = places.map(({ clubOwnedByAdmin, canEdit, ...entry }) => entry);
+    const fetchMock = vi.fn((url) => {
+      const path = String(url);
+      const details = places.find((entry) => path === `/api/places/${entry.id}`);
+      return Promise.resolve(new Response(JSON.stringify(path.includes('/api/postbox/messages')
+        ? { message: {}, recipientCount: 2 }
+        : path === '/api/places/personal' ? marks
+          : details ? { id: details.id, clubOwnedByAdmin: details.clubOwnedByAdmin } : { places: listed }), { status: 200 }));
+    });
     vi.stubGlobal('fetch', fetchMock);
     render(<PlacesPage language="de" setLanguage={() => {}} menuOpen={false} setMenuOpen={() => {}} navigate={() => {}} currentUser={currentUser} isAdmin={isAdmin} />);
     return fetchMock;
   }
 
+  async function openClub() {
+    const heading = await screen.findByRole('heading', { name: 'BC Linden' }, { timeout: 5_000 });
+    const group = heading.closest('details');
+    group.open = true;
+    fireEvent(group, new Event('toggle'));
+    await vi.waitFor(() => expect(fetch.mock.calls.some(([url]) => String(url) === '/api/places/place-1')).toBe(true));
+  }
+
   it('schickt die Anfrage als Nachricht an alle Admins', async () => {
     const fetchMock = renderWith([clubPlace()]);
+    await openClub();
     fireEvent.click(await screen.findByRole('button', { name: 'Verein übernehmen?', hidden: true }, { timeout: 5_000 }));
 
     const text = screen.getByRole('textbox', { name: /Nachricht an Admin/ });
@@ -413,7 +432,7 @@ describe('Übernahme eines Admin-Vereins anfragen', () => {
 
   it('bietet die Übernahme nur angemeldeten Nicht-Admins bei Admin-Vereinen an, die sie nicht schon bearbeiten', async () => {
     renderWith([clubPlace({ clubOwnedByAdmin: false })]);
-    await screen.findByRole('heading', { name: 'BC Linden' }, { timeout: 5_000 });
+    await openClub();
     expect(screen.queryByRole('button', { name: 'Verein übernehmen?', hidden: true })).not.toBeInTheDocument();
     vi.unstubAllGlobals();
   });
@@ -424,7 +443,7 @@ describe('Übernahme eines Admin-Vereins anfragen', () => {
     ['für Bearbeiter des Vereins', {}, { canEdit: true }],
   ])('zeigt keine Übernahme %s', async (_label, options, overrides) => {
     renderWith([clubPlace(overrides)], options);
-    await screen.findByRole('heading', { name: 'BC Linden' }, { timeout: 5_000 });
+    await openClub();
     expect(screen.queryByRole('button', { name: 'Verein übernehmen?', hidden: true })).not.toBeInTheDocument();
   });
 });
@@ -516,3 +535,43 @@ describe('Aktionen im Kartenpopup', () => {
   });
 });
 
+
+describe('Details der schlanken Plätzeliste', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('lädt Beschreibung, Ausstattung und Vereinsangaben erst beim Aufklappen', async () => {
+    vi.stubGlobal('fetch', vi.fn((url) => Promise.resolve(new Response(JSON.stringify(String(url) === '/api/places'
+      ? { places: [place(1, { clubId: 'club-1', clubName: 'BC Linden' })] }
+      : { id: 'place-1', description: 'Hinter der Turnhalle', facilities: 'Bänke', facilityCodes: ['toilet'], clubDescription: 'Gemeinsam Boule spielen', clubWebsiteUrl: 'https://bc-linden.test', clubSocialLinks: {}, clubOwnedByAdmin: false }), { status: 200 }))));
+    renderPlacesPage();
+    const group = (await screen.findByRole('heading', { name: 'BC Linden' }, { timeout: 5_000 })).closest('details');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Hinter der Turnhalle')).not.toBeInTheDocument();
+
+    group.open = true;
+    fireEvent(group, new Event('toggle'));
+    expect(await screen.findByText('Gemeinsam Boule spielen')).toBeInTheDocument();
+    expect(screen.getByText('Hinter der Turnhalle')).toBeInTheDocument();
+    expect(screen.getByText('Ausstattung: Bänke')).toBeInTheDocument();
+    expect(within(group).getByRole('link', { name: 'Website', hidden: true })).toHaveAttribute('href', 'https://bc-linden.test');
+    expect(fetch).toHaveBeenCalledWith('/api/places/place-1', expect.anything());
+
+    // Zuklappen und erneut öffnen lädt nicht noch einmal.
+    group.open = false;
+    fireEvent(group, new Event('toggle'));
+    group.open = true;
+    fireEvent(group, new Event('toggle'));
+    expect(fetch.mock.calls.filter(([url]) => String(url) === '/api/places/place-1')).toHaveLength(1);
+  });
+
+  it('zeigt einen Fehler, wenn die Details nicht geladen werden können', async () => {
+    vi.stubGlobal('fetch', vi.fn((url) => Promise.resolve(String(url) === '/api/places'
+      ? new Response(JSON.stringify({ places: [place(1)] }), { status: 200 })
+      : new Response(JSON.stringify({ error: 'Bouleplatz nicht gefunden' }), { status: 404 }))));
+    renderPlacesPage();
+    const card = (await screen.findByRole('heading', { name: 'Bouleplatz 1' }, { timeout: 5_000 })).closest('details');
+    card.open = true;
+    fireEvent(card, new Event('toggle'));
+    expect(await within(card).findByRole('alert')).toBeInTheDocument();
+  });
+});

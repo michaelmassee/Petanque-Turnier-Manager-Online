@@ -2151,6 +2151,9 @@ export default {
         return await proxyBoulePlaceClubLogo(env.DB, placeClubLogoMatch[1]);
       }
       const placeMatch = url.pathname.match(/^\/api\/places\/([^/]+)$/);
+      if (placeMatch && request.method === 'GET') {
+        return await getBoulePlaceDetails(env.DB, placeMatch[1]);
+      }
       if (placeMatch && request.method === 'PUT') {
         const session = await requireSession(request, env.DB);
         return await updateBoulePlace(request, env.DB, placeMatch[1], session.user, request.headers.get('CF-IPCountry'));
@@ -10316,7 +10319,50 @@ async function listPublishedClubs(db, origin, deploy) {
 // Nutzerneutrale Plätzeliste für alle, auch Angemeldete; deren Markierungen liefert GET /api/places/personal.
 async function listSharedBoulePlaces(db, origin, deploy) {
   return cachedJsonResponse(await placesCacheKey(db, origin, 'places', deploy), PUBLISHED_LISTS_CACHE_SECONDS,
-    () => listBoulePlaces(db, null, ''));
+    async () => json(await loadBoulePlaceSummaries(db)));
+}
+
+// Schlanke Plätzeliste (Karte, Suche, Spielort-Auswahl): Der Neuaufbau kostet CPU proportional zur JSON-Größe, daher
+// ohne Beschreibungen/Vereinslinks (GET /api/places/:id) und ohne Felder mit Standardwert (false, null, 0,
+// 'outdoor', 'club'). Nur latitude/longitude bleiben immer drin, weil der Client sie auf null prüft.
+async function loadBoulePlaceSummaries(db) {
+  const rows = await db.prepare(
+    `SELECT p.id, p.club_id, p.club_name, c.name AS club_display_name, c.kind AS club_kind, c.logo_url IS NOT NULL AND c.logo_url <> '' AS has_club_logo,
+       p.venue_type, p.name, p.address, p.latitude, p.longitude, p.court_count, p.accessible, p.address_unverified,
+       (SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id) AS like_count
+     FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
+     WHERE p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')
+     ORDER BY COALESCE(c.name, p.club_name) COLLATE NOCASE, p.name COLLATE NOCASE`).all();
+  return { places: (rows.results || []).map((row) => {
+    const place = { id: row.id, name: row.name, address: formatLocationAddress(row.address),
+      latitude: row.latitude === null ? null : Number(row.latitude), longitude: row.longitude === null ? null : Number(row.longitude) };
+    if (row.club_id) place.clubId = row.club_id;
+    const clubName = row.club_display_name || row.club_name;
+    if (clubName) place.clubName = clubName;
+    if (row.club_kind && row.club_kind !== 'club') place.clubKind = row.club_kind;
+    if (Number(row.has_club_logo)) place.hasClubLogo = true;
+    if (row.venue_type && row.venue_type !== 'outdoor') place.venueType = row.venue_type;
+    if (Number(row.court_count)) place.courtCount = Number(row.court_count);
+    if (Number(row.accessible)) place.accessible = true;
+    if (Number(row.address_unverified)) place.addressUnverified = true;
+    if (Number(row.like_count)) place.likeCount = Number(row.like_count);
+    return place;
+  }) };
+}
+
+// Ergänzt einen Eintrag der schlanken Liste um das, was erst beim Aufklappen gebraucht wird.
+async function getBoulePlaceDetails(db, id) {
+  const row = await db.prepare(
+    `SELECT p.description, p.facilities, p.facility_codes, c.description AS club_description, c.website_url AS club_website_url,
+       c.social_links AS club_social_links, (SELECT role FROM users WHERE id = c.owner_id) = 'admin' AS club_owned_by_admin
+     FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
+     WHERE p.id = ? AND p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')`).bind(id).first();
+  if (!row) throw new HttpError(404, 'Bouleplatz nicht gefunden');
+  return json({
+    id, description: row.description || null, facilities: row.facilities || null, facilityCodes: rowFacilityCodes(row),
+    clubDescription: row.club_description || null, clubWebsiteUrl: row.club_website_url || null,
+    clubSocialLinks: rowSocialLinks(row.club_social_links), clubOwnedByAdmin: Boolean(Number(row.club_owned_by_admin || 0)),
+  });
 }
 
 async function loadPublishedClubs(db) {

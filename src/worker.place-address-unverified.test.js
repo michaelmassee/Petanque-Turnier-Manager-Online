@@ -78,8 +78,8 @@ describe('Ungeprüfte Platzadresse', () => {
   });
 
   it('kennzeichnet für Angemeldete Vereine eines Admins, damit sie die Übernahme anfragen können', async () => {
-    const plaetze = async (session) => Object.fromEntries((await (await anfrage('/api/places', { session })).json()).places
-      .map((entry) => [entry.id, entry.clubOwnedByAdmin]));
+    const plaetze = async (session) => Object.fromEntries(await Promise.all(['p1', 'p2', 'p3']
+      .map(async (id) => [id, (await (await anfrage(`/api/places/${id}`, { session })).json()).clubOwnedByAdmin])));
 
     expect(await plaetze('raffi-session')).toEqual({ p1: true, p2: false, p3: true });
     sql("UPDATE users SET role = 'user' WHERE id = 'admin'");

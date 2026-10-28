@@ -101,7 +101,11 @@ describe('Cache für Vereins- und Plätzeliste', () => {
       const [place] = await plaetze('/api/places', angemeldet);
 
       expect(listenAbfragen()).toBe(1);
-      expect(place).toMatchObject({ name: 'Platz', liked: false, favorited: false, canEdit: false });
+      // Schlanke Liste: persönliche Markierungen kommen aus /api/places/personal, Standardwerte fehlen.
+      expect(place).toMatchObject({ id: 'p1', name: 'Platz' });
+      expect(place).not.toHaveProperty('liked');
+      expect(place).not.toHaveProperty('canEdit');
+      expect(place).not.toHaveProperty('description');
     });
 
     it('liest Suchanfragen immer frisch', async () => {
@@ -111,7 +115,7 @@ describe('Cache für Vereins- und Plätzeliste', () => {
     });
 
     it('zählt ein neues Like sofort mit', async () => {
-      expect((await plaetze())[0].likeCount).toBe(0);
+      expect((await plaetze())[0].likeCount).toBeUndefined();
       const response = await worker.fetch(new Request('https://ptm.test/api/places/p1/like', { method: 'POST', headers: angemeldet }), env);
       expect(response.ok).toBe(true);
 
@@ -127,9 +131,33 @@ describe('Cache für Vereins- und Plätzeliste', () => {
       expect(listenAbfragen()).toBe(1);
     });
 
-    it('markiert Vereine von Admins auch in der gemeinsamen Liste', async () => {
+    it('liefert eine schlanke Liste ohne Standardwerte, Koordinaten aber immer', async () => {
+      sql(`UPDATE clubs SET kind = 'group', logo_url = 'https://example.test/logo.png', description = 'Wir spielen' WHERE id = 'c1'`);
+      sql(`UPDATE boule_places SET venue_type = 'indoor', court_count = 6, accessible = 1, description = 'Hinter der Halle' WHERE id = 'p1'`);
+      sql(`INSERT INTO boule_places (id, name, address, status, created_at, updated_at)
+        VALUES ('p2', 'Ohne Verein', 'Dorfplatz', 'published', '2026-09-01', '2026-09-01')`);
+      expect(await plaetze()).toEqual([
+        { id: 'p2', name: 'Ohne Verein', address: 'Dorfplatz', latitude: null, longitude: null },
+        { id: 'p1', name: 'Platz', address: 'Hauptstr. 1, Ort', latitude: 50.5, longitude: 9.5, clubId: 'c1', clubName: 'Boule Club',
+          clubKind: 'group', hasClubLogo: true, venueType: 'indoor', courtCount: 6, accessible: true },
+      ]);
+    });
+
+    it('liefert Beschreibung und Vereinsangaben über GET /api/places/:id', async () => {
+      sql(`UPDATE clubs SET description = 'Wir spielen', website_url = 'https://example.test' WHERE id = 'c1'`);
+      sql(`UPDATE boule_places SET description = 'Hinter der Halle', facilities = 'Bänke' WHERE id = 'p1'`);
+      expect(await (await get('/api/places/p1')).json()).toEqual({
+        id: 'p1', description: 'Hinter der Halle', facilities: 'Bänke', facilityCodes: [], clubDescription: 'Wir spielen',
+        clubWebsiteUrl: 'https://example.test', clubSocialLinks: {}, clubOwnedByAdmin: false,
+      });
+      sql(`UPDATE boule_places SET status = 'pending' WHERE id = 'p1'`);
+      expect((await get('/api/places/p1')).status).toBe(404);
+      expect((await get('/api/places/gibt-es-nicht')).status).toBe(404);
+    });
+
+    it('markiert Vereine von Admins in den Details (GET /api/places/:id)', async () => {
       sql("UPDATE users SET role = 'admin' WHERE id = 'owner'");
-      expect((await plaetze())[0].clubOwnedByAdmin).toBe(true);
+      expect((await (await get('/api/places/p1')).json()).clubOwnedByAdmin).toBe(true);
     });
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -102,7 +102,7 @@ export function groupPlacesByOrganization(places) {
     if (group) {
       group.places.push(place);
     } else {
-      groups.set(key, { id: key, clubName: place.clubName || null, clubKind: place.clubKind || 'club', clubDescription: place.clubDescription || null, places: [place] });
+      groups.set(key, { id: key, clubName: place.clubName || null, clubKind: place.clubKind || 'club', places: [place] });
     }
   }
   return [...groups.values()];
@@ -204,9 +204,23 @@ function AddressUnverifiedHint({ place, t, onReportAddress }) {
   </p>;
 }
 
-function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onReportAddress, onNavigate, heading = 'h2', forceOpen = false, detailRef }) {
+// Beschreibungen, Ausstattung und Vereinslinks fehlen in der schlanken Liste; beim ersten Aufklappen per
+// GET /api/places/:id nachladen (auch wenn ein Link den Eintrag gleich aufgeklappt öffnet).
+function useLoadDetailsWhenOpen(placeId, forceOpen, onLoadDetails) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => { if (forceOpen || open) onLoadDetails(placeId); }, [placeId, forceOpen, open, onLoadDetails]);
+  return (event) => setOpen(event.currentTarget.open);
+}
+
+function PlaceDetailsStatus({ details, t }) {
+  if (details?.loading) return <p className="muted">{t('Lädt …')}</p>;
+  return <Feedback error={details?.error || ''} />;
+}
+
+function PlaceDetails({ place, details, t, onLoadDetails, onFocus, onToggleLike, onToggleFavorite, onReportAddress, onNavigate, heading = 'h2', forceOpen = false, detailRef }) {
   const Heading = heading;
-  return <details className="panel place-card place-card-details" open={forceOpen || undefined} ref={detailRef}>
+  const handleToggle = useLoadDetailsWhenOpen(place.id, forceOpen, onLoadDetails);
+  return <details className="panel place-card place-card-details" open={forceOpen || undefined} ref={detailRef} onToggle={handleToggle}>
     <summary className="place-card-summary">
       <span className="place-card-summary-title">
         <Heading data-i18n-skip>{place.name}</Heading>
@@ -221,6 +235,7 @@ function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onRep
     <div className="place-card-content">
       <p className="muted" data-i18n-skip>{formatLocationAddress(place.address)}</p>
       <AddressUnverifiedHint place={place} t={t} onReportAddress={onReportAddress} />
+      <PlaceDetailsStatus details={details} t={t} />
       {place.description && <RichText value={place.description} onNavigate={onNavigate} />}
       {place.facilities && <p>{t('Ausstattung:')} {place.facilities}</p>}
       {place.facilityCodes?.length > 0 && <p className="muted">{place.facilityCodes.map((code) => t(facilityLabels[code])).join(' · ')}</p>}
@@ -228,11 +243,41 @@ function PlaceDetails({ place, t, onFocus, onToggleLike, onToggleFavorite, onRep
         <SharePlaceButton name={place.name} placeId={place.id} />
         <Button variant="secondary" onClick={() => onFocus(place)} disabled={place.latitude === null || place.longitude === null}>{t('Karte')}</Button>
         <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
-        <Button variant={place.liked ? 'primary' : 'secondary'} onClick={() => onToggleLike(place)}>{place.liked ? '♥' : '♡'} {place.likeCount}</Button>
+        <Button variant={place.liked ? 'primary' : 'secondary'} onClick={() => onToggleLike(place)}>{place.liked ? '♥' : '♡'} {place.likeCount || 0}</Button>
         <Button variant={place.favorited ? 'primary' : 'secondary'} onClick={() => onToggleFavorite(place)}>{place.favorited ? '★' : '☆'} {t('Favorit')}</Button>
       </div>
     </div>
   </details>;
+}
+
+function OrganizationGroup({ group, groupRef, forceOpen, details, t, onLoadDetails, onRequestTakeover, onNavigate, children }) {
+  const first = group.places[0];
+  const handleToggle = useLoadDetailsWhenOpen(first.id, forceOpen, onLoadDetails);
+  return (
+    <details className="panel place-group" ref={groupRef} open={forceOpen || undefined} onToggle={handleToggle}>
+      <summary className="place-group-summary">
+        <span className="place-group-badge"><ClubBadge clubName={group.clubName} clubKind={group.clubKind} /></span>
+        <span className="place-group-title">
+          {first.hasClubLogo && (
+            <img
+              className="place-group-logo"
+              src={clubLogoImageUrl(first.id)}
+              alt=""
+              onError={(event) => { event.currentTarget.style.display = 'none'; }}
+            />
+          )}
+          <h2 data-i18n-skip>{group.clubName}</h2>
+        </span>
+        <span className="place-group-count">{group.places.length} {t(group.places.length === 1 ? 'Bouleplatz' : 'Bouleplätze')}</span>
+      </summary>
+      <div className="place-group-content">
+        <OrganizationLinks place={first} t={t} onRequestTakeover={onRequestTakeover && first.clubOwnedByAdmin && !first.canEdit ? onRequestTakeover : null} />
+        <PlaceDetailsStatus details={details} t={t} />
+        {first.clubDescription && <RichText value={first.clubDescription} onNavigate={onNavigate} />}
+        <div className="place-group-places">{children}</div>
+      </div>
+    </details>
+  );
 }
 
 function PlacesMap({ places, center, maptilerApiKey, focus, onBoundsChange, onShowDetails, onOnlyThis }) {
@@ -255,7 +300,7 @@ function PlacesMap({ places, center, maptilerApiKey, focus, onBoundsChange, onSh
             {place.clubName ? (
               <>
                 <div className="map-popup-heading">
-                  {place.clubLogoUrl && (
+                  {place.hasClubLogo && (
                     <img
                       className="map-popup-logo"
                       src={clubLogoImageUrl(place.id)}
@@ -327,6 +372,23 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
   const [detailsRequest, setDetailsRequest] = useState(null);
   const detailsTargetRef = useRef(null);
   const [viewportOnly, setViewportOnly] = useState(true);
+  // id -> { loading } | { error } | { data }: Detailfelder je Platz, einmal pro Seitenaufruf geladen.
+  const [placeDetails, setPlaceDetails] = useState({});
+  const requestedDetailsRef = useRef(new Set());
+
+  const loadPlaceDetails = useCallback(async (placeId) => {
+    if (requestedDetailsRef.current.has(placeId)) return;
+    requestedDetailsRef.current.add(placeId);
+    setPlaceDetails((current) => ({ ...current, [placeId]: { loading: true } }));
+    try {
+      const data = await api(`/api/places/${encodeURIComponent(placeId)}`);
+      setPlaceDetails((current) => ({ ...current, [placeId]: { data } }));
+    } catch (err) {
+      requestedDetailsRef.current.delete(placeId);
+      setPlaceDetails((current) => ({ ...current, [placeId]: { error: err.message } }));
+    }
+  }, []);
+  const withDetails = (place) => (placeDetails[place.id]?.data ? { ...place, ...placeDetails[place.id].data } : place);
 
   async function load() {
     setLoading(true); setError('');
@@ -625,38 +687,23 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       ) : (
         <div className="places-list">
           {displayedPlaceGroups.map((group) => group.clubName ? (
-            <details className="panel place-group" key={group.id} ref={linkedOrganizationId && clubKey(group.places[0]) === linkedOrganizationId ? linkedPlaceRef : group.places.some((place) => place.id === detailsRequest?.id) ? detailsTargetRef : undefined} open={Boolean(linkedOrganizationId) || group.places.some((place) => place.id === linkedPlaceId || place.id === detailsRequest?.id) || undefined}>
-              <summary className="place-group-summary">
-                <span className="place-group-badge"><ClubBadge clubName={group.clubName} clubKind={group.clubKind} /></span>
-                <span className="place-group-title">
-                  {group.places[0].clubLogoUrl && (
-                    <img
-                      className="place-group-logo"
-                      src={clubLogoImageUrl(group.places[0].id)}
-                      alt=""
-                      onError={(event) => { event.currentTarget.style.display = 'none'; }}
-                    />
-                  )}
-                  <h2 data-i18n-skip>{group.clubName}</h2>
-                </span>
-                <span className="place-group-count">{group.places.length} {t(group.places.length === 1 ? 'Bouleplatz' : 'Bouleplätze')}</span>
-              </summary>
-              <div className="place-group-content">
-                <OrganizationLinks
-                  place={group.places[0]}
-                  t={t}
-                  onRequestTakeover={currentUser && !isAdmin && group.places[0].clubOwnedByAdmin && !group.places[0].canEdit ? setTakeoverPlace : null}
-                />
-                {group.clubDescription && <RichText value={group.clubDescription} onNavigate={navigate} />}
-                <div className="place-group-places">
-                  {group.places.map((place) => (
-                    <PlaceDetails onNavigate={navigate} place={place} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} onReportAddress={reportAddress} heading="h3" forceOpen={place.id === linkedPlaceId || place.id === detailsRequest?.id} detailRef={place.id === linkedPlaceId ? linkedPlaceRef : undefined} key={place.id} />
-                  ))}
-                </div>
-              </div>
-            </details>
+            <OrganizationGroup
+              key={group.id}
+              group={{ ...group, places: group.places.map(withDetails) }}
+              groupRef={linkedOrganizationId && clubKey(group.places[0]) === linkedOrganizationId ? linkedPlaceRef : group.places.some((place) => place.id === detailsRequest?.id) ? detailsTargetRef : undefined}
+              forceOpen={Boolean(linkedOrganizationId) || group.places.some((place) => place.id === linkedPlaceId || place.id === detailsRequest?.id)}
+              details={placeDetails[group.places[0].id]}
+              t={t}
+              onLoadDetails={loadPlaceDetails}
+              onRequestTakeover={currentUser && !isAdmin ? setTakeoverPlace : null}
+              onNavigate={navigate}
+            >
+              {group.places.map((place) => (
+                <PlaceDetails onNavigate={navigate} place={withDetails(place)} details={placeDetails[place.id]} onLoadDetails={loadPlaceDetails} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} onReportAddress={reportAddress} heading="h3" forceOpen={place.id === linkedPlaceId || place.id === detailsRequest?.id} detailRef={place.id === linkedPlaceId ? linkedPlaceRef : undefined} key={place.id} />
+              ))}
+            </OrganizationGroup>
           ) : (
-            <PlaceDetails onNavigate={navigate} place={group.places[0]} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} onReportAddress={reportAddress} forceOpen={group.places[0].id === linkedPlaceId || group.places[0].id === detailsRequest?.id} detailRef={group.places[0].id === linkedPlaceId ? linkedPlaceRef : group.places[0].id === detailsRequest?.id ? detailsTargetRef : undefined} key={group.id} />
+            <PlaceDetails onNavigate={navigate} place={withDetails(group.places[0])} details={placeDetails[group.places[0].id]} onLoadDetails={loadPlaceDetails} t={t} onFocus={handleFocusPlace} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} onReportAddress={reportAddress} forceOpen={group.places[0].id === linkedPlaceId || group.places[0].id === detailsRequest?.id} detailRef={group.places[0].id === linkedPlaceId ? linkedPlaceRef : group.places[0].id === detailsRequest?.id ? detailsTargetRef : undefined} key={group.id} />
           ))}
         </div>
       )}
