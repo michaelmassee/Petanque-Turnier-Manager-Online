@@ -497,6 +497,17 @@ describe('Platz mieten: Vereinsverwaltung', () => {
     expect(within(pausedRow).queryByRole('button', { name: 'Teilen' })).not.toBeInTheDocument();
   });
 
+  it('öffnet per „E-Mail an Mieter“ das E-Mail-Programm, nur wenn der Mieter eine Adresse hat', async () => {
+    mockManagement();
+    render(<RentalManagement language="de" navigate={vi.fn()} />);
+    const requestRow = (await screen.findByText('Max Mieter', { exact: false })).closest('article');
+    const link = within(requestRow).getByRole('link', { name: 'E-Mail an Mieter' });
+    expect(link.getAttribute('href')).toMatch(/^mailto:max%40example\.test\?subject=/);
+    expect(decodeURIComponent(link.getAttribute('href').split('subject=')[1])).toContain(OFFER.title);
+    const confirmedRow = screen.getByText('Anna Anders', { exact: false }).closest('article');
+    expect(within(confirmedRow).queryByRole('link', { name: 'E-Mail an Mieter' })).not.toBeInTheDocument();
+  });
+
   it('filtert Anfragen und Reservierungen nach Angebot, Datum und Mieter und zeigt das Erstelldatum', async () => {
     const reservations = [
       { id: 'r1', offerId: 'o1', date: '2026-10-24', startHour: 9, hours: 2, lanes: 2, status: 'requested', renterName: 'Max Mieter', renterEmail: 'max@example.test', createdAt: '2026-10-20T17:05:00.000Z', timezone: 'Europe/Berlin' },

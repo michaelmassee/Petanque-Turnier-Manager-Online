@@ -345,6 +345,11 @@ textarea:focus {
   gap: 6px;
 }
 
+/* Links im Button-Stil (mailto:, externe Seiten) wie Buttons ohne Unterstreichung. */
+a.button {
+  text-decoration: none;
+}
+
 .button-spinner {
   width: 14px;
   height: 14px;

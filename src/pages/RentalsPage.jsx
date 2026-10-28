@@ -173,6 +173,17 @@ function RentalContactLink({ offer }) {
   );
 }
 
+// „E-Mail an Mieter“ für Verwalter: öffnet das E-Mail-Programm mit der Adresse des Mieters, Betreff wie die Reservierungszeile.
+function RenterMailLink({ reservation, subject }) {
+  const { t } = useTranslation();
+  if (!reservation.renterEmail) return null;
+  return (
+    <a className="button button-secondary" href={`mailto:${encodeURIComponent(reservation.renterEmail)}?subject=${encodeURIComponent(subject)}`}>
+      {t('E-Mail an Mieter')}
+    </a>
+  );
+}
+
 function ShareRentalOfferButton({ offer }) {
   return <ShareLinkButton title={offer.title} url={new URL(`/platz-mieten/${encodeURIComponent(offer.id)}`, window.location.origin).href} />;
 }
@@ -926,6 +937,7 @@ export function RentalManagement({ language, navigate, currentUser }) {
       </div>
       <div className="row-actions">
         <Button variant="secondary" onClick={() => openInternalNote(reservation)}>{t('Interne Notiz')}</Button>
+        <RenterMailLink reservation={reservation} subject={`${offerTitle(reservation.offerId)} · ${formatReservationSlot(reservation, language)}`} />
         {actions.map((kind) => (
           <Button key={kind} variant={kind === 'confirm' ? 'primary' : 'danger'} onClick={() => openDecision(reservation, kind)}>{t(DECISION_LABELS[kind])}</Button>
         ))}

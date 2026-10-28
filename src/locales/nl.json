@@ -1853,5 +1853,6 @@
   "Runde 1 wurde zurückgenommen, weil die Mêlée-Teams nicht mehr zu den aktiven Spielern passen. Bitte Teams auslosen und Runde 1 neu starten.": "Ronde 1 is ingetrokken omdat de Mêlée-teams niet meer overeenkomen met de actieve spelers. Loot de teams en start ronde 1 opnieuw.",
   "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "De wedstrijdleiding heeft de uitslag van je partij al ingevoerd.",
   "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "Er is al een uitslag voor je partij gemeld.",
-  "{count} Mitspielgesuche": "{count} spelersoproepen"
+  "{count} Mitspielgesuche": "{count} spelersoproepen",
+  "E-Mail an Mieter": "E-mail naar huurder"
 }
