@@ -34,6 +34,7 @@ const UserManagementPanel = lazy(() => import('./pages/UserManagementPanel.jsx')
 const ApiKeysPanel = lazy(() => import('./pages/ApiKeysPanel.jsx'));
 const OwnApiKeysPanel = lazy(() => import('./pages/ApiKeysPanel.jsx').then((module) => ({ default: module.OwnApiKeysPanel })));
 const TournamentPlayManagement = lazy(() => import('./pages/TournamentPlayManagement.jsx'));
+const TournamentQuickStart = lazy(() => import('./pages/TournamentQuickStart.jsx'));
 const PetanqueAktuellImportPanel = lazy(() => import('./pages/PetanqueAktuellImportPanel.jsx'));
 const PlacesPage = lazy(() => import('./pages/PlacesPage.jsx'));
 const MyClubsPage = lazy(() => import('./pages/MyClubsPage.jsx'));
@@ -73,6 +74,12 @@ export function ContextualDrawerContent({ area, currentUser, canManageTournament
     {(showAllAreas || area === 'turniere') && <div className="drawer-menu-section" aria-label={t('Turniere')}>
       {canManageTournaments && <button className={`drawer-link ${activeTab === 'tournaments' ? 'active' : ''}`} type="button" onClick={selectTab('tournaments')}>{t('Turnierverwaltung')}</button>}
       {currentUser && <button className={`drawer-link ${activeTab === 'registrations' ? 'active' : ''}`} type="button" onClick={selectTab('registrations')}>{t('Anmeldungen')}</button>}
+      {canManageTournaments && <button className={`drawer-link drawer-link-with-icon ${activeTab === 'quickstart' ? 'active' : ''}`} type="button" onClick={selectTab('quickstart')}>
+        <svg className="drawer-link-icon drawer-link-icon-quickstart" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M13 2.5 4.5 13.5h6.5l-1 8 8.5-11h-6.5z" />
+        </svg>
+        {t('Schnellstart')}
+      </button>}
       {canManageTournaments && <button className={`drawer-link ${activeTab === 'play' ? 'active' : ''}`} type="button" onClick={selectTab('play')}>{t('Turnier starten')}</button>}
       <button className="drawer-link" type="button" onClick={navigate('/turnier-melden')}>{t('Turnier melden')}</button>
     </div>}
@@ -1951,6 +1958,8 @@ function AppContent() {
         ? t('Alle API-Schlüssel')
         : activeTab === 'petanque-aktuell-import'
           ? t('Pétanque Aktuell importieren')
+        : activeTab === 'quickstart'
+          ? t('Schnellstart')
         : activeTab === 'play'
           ? t('Turnier starten')
           : activeTab === 'registrations'
@@ -2265,6 +2274,22 @@ function AppContent() {
         </Suspense>
       )}
 
+      {activeTab === 'quickstart' && canManageTournaments && (
+        <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
+          <section className="single-column">
+            <TournamentQuickStart
+              currentUser={currentUser}
+              onCreated={() => loadTournaments(true)}
+              onStarted={async (tournamentId) => {
+                await loadTournaments(true);
+                setPlayFocus({ tournamentId });
+                setActiveTab('play');
+              }}
+            />
+          </section>
+        </Suspense>
+      )}
+
       {activeTab === 'play' && canManageTournaments && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
@@ -2408,7 +2433,7 @@ const TOURNAMENT_INFO_CARD_CONTENT = [
   { text: 'Du möchtest noch mehr aus deinem Turnier machen? Mit PTM Desktop planst und leitest du professionelle Turniere auf Mac, Linux oder Windows – kostenlos, leistungsstark und genau für Pétanque gemacht.', href: 'https://michaelmassee.github.io/Petanque-Turnier-Manager/' },
 ];
 
-const TOURNAMENT_AREA_TABS = new Set(['home', 'tournaments', 'registrations', 'play', 'petanque-aktuell-import']);
+const TOURNAMENT_AREA_TABS = new Set(['home', 'tournaments', 'registrations', 'quickstart', 'play', 'petanque-aktuell-import']);
 
 // Menübereich eines Startseiten-Tabs; null für Tabs ohne eigenen Bereich (Profil, Admin), die den Bereich
 // übernehmen, aus dem man kommt – sonst fehlte dort z. B. der Weg zurück zur Turnierverwaltung.

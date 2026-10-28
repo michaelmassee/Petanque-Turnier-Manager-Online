@@ -1097,6 +1097,32 @@ a.left-panel-link {
   color: #ffffff;
 }
 
+.drawer-link-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drawer-link-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 6px;
+  padding: 3px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.drawer-link-icon-quickstart { background: #fff4e0; color: #b45309; fill: #fbbf24; }
+
+.quickstart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: 10px;
+}
+
 .drawer-menu-section {
   display: grid;
   gap: 10px;

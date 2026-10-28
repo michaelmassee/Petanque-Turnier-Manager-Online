@@ -1864,5 +1864,8 @@
   "Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet": "The live view is not enabled for this tournament",
   "Der bisherige Live-Link kann nicht angezeigt werden": "The previous live link cannot be shown",
   "Was bewirkt VIP?": "What does VIP do?",
-  "QR-Code zum Turnier": "Tournament QR code"
+  "QR-Code zum Turnier": "Tournament QR code",
+  "Schnellstart": "Quick start",
+  "Vorlage wählen – das private Turnier wird sofort angelegt und gestartet. Danach meldest du die Spieler nach und lost die erste Runde aus.": "Choose a template – the private tournament is created and started right away. Then add the players and draw the first round.",
+  "Das Turnier wurde angelegt, konnte aber nicht gestartet werden. Du kannst es unter „Turnier starten“ starten.": "The tournament was created but could not be started. You can start it under “Start tournament”."
 }

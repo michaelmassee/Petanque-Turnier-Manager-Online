@@ -934,7 +934,7 @@ describe('Öffentliche Turnierdetailseite', () => {
 });
 
 describe('Mein Profil', () => {
-  it.each(['home', 'tournaments', 'registrations', 'play', 'petanque-aktuell-import'])('ordnet den Tab %s dem Bereich Turniere zu', (tab) => {
+  it.each(['home', 'tournaments', 'registrations', 'quickstart', 'play', 'petanque-aktuell-import'])('ordnet den Tab %s dem Bereich Turniere zu', (tab) => {
     expect(drawerAreaForTab(tab)).toBe('turniere');
   });
 
@@ -956,6 +956,15 @@ describe('Mein Profil', () => {
     render(<ContextualDrawerContent area={area} currentUser={{ id: 'u1' }} canManageTournaments activeTab="home" onSelectTab={() => {}} onNavigate={() => {}} onOpenProfile={() => {}} onLogout={() => {}} onLogin={() => {}} />);
     expect(screen.getByRole('button', { name: entry })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mein Profil' })).toBeInTheDocument();
+  });
+
+  it('zeigt den Schnellstart mit farbigem Icon im Turnier-Menü und wählt den Tab', () => {
+    const onSelectTab = vi.fn();
+    render(<ContextualDrawerContent area="turniere" currentUser={{ id: 'u1' }} canManageTournaments activeTab="home" onSelectTab={onSelectTab} onNavigate={() => {}} onOpenProfile={() => {}} onLogout={() => {}} onLogin={() => {}} />);
+    const quickStart = screen.getByRole('button', { name: 'Schnellstart' });
+    expect(quickStart.querySelector('svg.drawer-link-icon-quickstart')).not.toBeNull();
+    fireEvent.click(quickStart);
+    expect(onSelectTab).toHaveBeenCalledWith('quickstart');
   });
 
   it('rendert das Profilformular für einen angemeldeten Benutzer', () => {

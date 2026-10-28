@@ -1864,5 +1864,8 @@
   "Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet": "La vista en directo no está activada para este torneo",
   "Der bisherige Live-Link kann nicht angezeigt werden": "El enlace en directo anterior no se puede mostrar",
   "Was bewirkt VIP?": "¿Qué hace el VIP?",
-  "QR-Code zum Turnier": "Código QR del torneo"
+  "QR-Code zum Turnier": "Código QR del torneo",
+  "Schnellstart": "Inicio rápido",
+  "Vorlage wählen – das private Turnier wird sofort angelegt und gestartet. Danach meldest du die Spieler nach und lost die erste Runde aus.": "Elige una plantilla: el torneo privado se crea e inicia de inmediato. Después añade a los jugadores y sortea la primera ronda.",
+  "Das Turnier wurde angelegt, konnte aber nicht gestartet werden. Du kannst es unter „Turnier starten“ starten.": "El torneo se ha creado, pero no se ha podido iniciar. Puedes iniciarlo en «Iniciar torneo»."
 }

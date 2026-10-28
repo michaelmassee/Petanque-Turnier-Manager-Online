@@ -1,0 +1,36 @@
+import { describe, expect, it } from 'vitest';
+import './i18next-config.js';
+import { assertTournamentSystemAllowed, normalizeTournamentInput } from '../worker-core.js';
+import { isOnlinePlayable } from './pairing/index.js';
+import { localIsoDate, QUICK_START_TEMPLATES, quickStartPayload, quickStartTemplateLabel } from './quickstart-templates.js';
+
+const user = { firstName: 'Erste', lastName: 'Person', email: 'erste@example.org', phone: '', club: 'BC Linden' };
+
+describe('Schnellstart-Vorlagen', () => {
+  it.each(QUICK_START_TEMPLATES)('$id ist online spielbar und besteht die Worker-Prüfung', (template) => {
+    const payload = quickStartPayload(template, { currentUser: user, today: '2026-10-28', fallbackLocation: 'Schnellstart' });
+    expect(isOnlinePlayable(payload)).toBe(true);
+    const tournament = normalizeTournamentInput(payload);
+    expect(() => assertTournamentSystemAllowed(tournament)).not.toThrow();
+    expect(tournament).toMatchObject({ visibility: 'private', status: 'draft', registrationEnabled: true, date: '2026-10-28' });
+  });
+
+  it('benennt das Turnier nach Vorlage und Datum und nimmt den Profilverein als Ort', () => {
+    const payload = quickStartPayload(QUICK_START_TEMPLATES[0], { currentUser: user, today: '2026-10-28', fallbackLocation: 'Schnellstart' });
+    expect(payload).toMatchObject({ name: 'Supermêlée Doublette 2026-10-28', location: 'BC Linden', contactName: 'Erste Person', contactEmail: 'erste@example.org' });
+  });
+
+  it('nimmt ohne Profilverein den Platzhalter als Ort', () => {
+    const payload = quickStartPayload(QUICK_START_TEMPLATES[0], { currentUser: { ...user, club: '' }, today: '2026-10-28', fallbackLocation: 'Schnellstart' });
+    expect(payload.location).toBe('Schnellstart');
+  });
+
+  it('zeigt Systemnamen statt Rangliste für Supermêlée', () => {
+    expect(QUICK_START_TEMPLATES.map(quickStartTemplateLabel)).toContain('Schweizer Triplette');
+    expect(new Set(QUICK_START_TEMPLATES.map(quickStartTemplateLabel)).size).toBe(QUICK_START_TEMPLATES.length);
+  });
+
+  it('liefert das lokale Datum', () => {
+    expect(localIsoDate(new Date(2026, 0, 2, 0, 30))).toBe('2026-01-02');
+  });
+});
