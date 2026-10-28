@@ -43,9 +43,7 @@
   "Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "De handmatige inschrijfblokkade is opgeheven. De inschrijftermijn is verstreken. Deze moet worden aangepast om nieuwe inschrijvingen toe te staan.",
   "Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.": "De handmatige inschrijfblokkade is opgeheven. Het toernooi is al begonnen, nieuwe inschrijvingen zijn niet meer mogelijk.",
   "Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.": "De handmatige inschrijfblokkade is opgeheven. De inschrijftermijn, de opening van de inschrijving en de deelnemerslimiet blijven gelden.",
-  "VIP an": "VIP aan",
-  "VIP aus": "VIP uit",
-  "VIP-Status wurde aktualisiert.": "VIP-status is bijgewerkt.",
+      "VIP-Status wurde aktualisiert.": "VIP-status is bijgewerkt.",
   "openingNotificationSubscribeShort": "Herinner mij",
   "openingNotificationActiveShort": "Actief",
   "openingNotificationSubscribe": "Waarschuw mij wanneer de inschrijving opent",
@@ -1854,5 +1852,15 @@
   "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "De wedstrijdleiding heeft de uitslag van je partij al ingevoerd.",
   "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "Er is al een uitslag voor je partij gemeld.",
   "{count} Mitspielgesuche": "{count} spelersoproepen",
-  "E-Mail an Mieter": "E-mail naar huurder"
+  "E-Mail an Mieter": "E-mail naar huurder",
+  "VIP ausschalten": "VIP uitschakelen",
+  "VIP einschalten": "VIP inschakelen",
+  "Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.": "Schakelt alleen VIP uit. Er wordt geen inschrijving verplaatst en niemand schuift door.",
+  "VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.": "VIP-inschrijvingen hebben voorrang: is het deelnemerslimiet bereikt, dan gaat de laatst aangemelde inschrijving zonder VIP naar de wachtlijst (zonder wachtlijst wordt ze geannuleerd) en krijgt ze een e-mail. Staat deze inschrijving op de wachtlijst, dan schuift ze door.",
+  "QR-Code Live-Ansicht": "QR-code liveweergave",
+  "Der bisherige Live-Link dieser Meldung kann nicht angezeigt werden, weil er vor dieser Funktion verschickt wurde. Ein neuer Link macht den bisherigen aus der Bestätigungsmail ungültig.": "De vorige livelink van deze inschrijving kan niet worden getoond, omdat hij vóór deze functie is verstuurd. Een nieuwe link maakt de vorige uit de bevestigingsmail ongeldig.",
+  "Neuen Live-Link erzeugen": "Nieuwe livelink maken",
+  "Mit dem Handy scannen: öffnet die Live-Ansicht dieses Teams (Runde, Gegner, Bahn), ohne Anmeldung.": "Scan met een telefoon: opent de liveweergave van dit team (ronde, tegenstander, baan) zonder in te loggen.",
+  "Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet": "De liveweergave is voor dit toernooi niet ingeschakeld",
+  "Der bisherige Live-Link kann nicht angezeigt werden": "De vorige livelink kan niet worden getoond"
 }

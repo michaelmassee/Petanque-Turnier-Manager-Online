@@ -42,9 +42,7 @@
   "Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.",
   "Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.": "Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.",
   "Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.": "Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.",
-  "VIP an": "VIP an",
-  "VIP aus": "VIP aus",
-  "VIP-Status wurde aktualisiert.": "VIP-Status wurde aktualisiert.",
+      "VIP-Status wurde aktualisiert.": "VIP-Status wurde aktualisiert.",
   "openingNotificationSubscribeShort": "Erinnern",
   "openingNotificationActiveShort": "Aktiv",
   "openingNotificationSubscribe": "Benachrichtigen, wenn Anmeldung öffnet",
@@ -258,5 +256,15 @@
   "Zusatztext ausblenden": "Zusatztext ausblenden",
   "E-Mail an die Turnierleitung": "E-Mail an die Turnierleitung",
   "{count} Mitspielgesuche": "{count} Mitspielgesuche",
-  "E-Mail an Mieter": "E-Mail an Mieter"
+  "E-Mail an Mieter": "E-Mail an Mieter",
+  "VIP ausschalten": "VIP ausschalten",
+  "VIP einschalten": "VIP einschalten",
+  "Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.": "Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.",
+  "VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.": "VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.",
+  "QR-Code Live-Ansicht": "QR-Code Live-Ansicht",
+  "Der bisherige Live-Link dieser Meldung kann nicht angezeigt werden, weil er vor dieser Funktion verschickt wurde. Ein neuer Link macht den bisherigen aus der Bestätigungsmail ungültig.": "Der bisherige Live-Link dieser Meldung kann nicht angezeigt werden, weil er vor dieser Funktion verschickt wurde. Ein neuer Link macht den bisherigen aus der Bestätigungsmail ungültig.",
+  "Neuen Live-Link erzeugen": "Neuen Live-Link erzeugen",
+  "Mit dem Handy scannen: öffnet die Live-Ansicht dieses Teams (Runde, Gegner, Bahn), ohne Anmeldung.": "Mit dem Handy scannen: öffnet die Live-Ansicht dieses Teams (Runde, Gegner, Bahn), ohne Anmeldung.",
+  "Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet": "Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet",
+  "Der bisherige Live-Link kann nicht angezeigt werden": "Der bisherige Live-Link kann nicht angezeigt werden"
 }

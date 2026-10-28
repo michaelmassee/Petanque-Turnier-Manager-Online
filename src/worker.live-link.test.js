@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 import { bindeDokument, syncAnfrage } from './test-support/sync.js';
 import worker, {
-  createRegistration, executeSyncWrite, listMyLiveRegistrations, resendLiveLink, upsertDocumentRegistration,
+  createRegistration, executeSyncWrite, listMyLiveRegistrations, liveLinkForQr, resendLiveLink, upsertDocumentRegistration,
 } from './worker.js';
 
 async function sha256Hex(text) {
@@ -192,5 +192,81 @@ describe('Persönlicher Live-Link (E-21)', () => {
     expect(zeile("SELECT participation FROM registrations WHERE id = ?", ONLINE_ID).participation).toBe('active');
     expect(zeile('SELECT COUNT(*) AS anzahl FROM postbox_messages').anzahl).toBe(0);
     expect(env.MAIL_QUEUE.send).not.toHaveBeenCalled();
+  });
+});
+
+describe('QR-Code Live-Ansicht in der Anmeldeverwaltung', () => {
+  let env;
+  const sql = (statement, ...params) => env.DB.sqlite.prepare(statement).run(...params);
+  const zeile = (statement, ...params) => env.DB.sqlite.prepare(statement).get(...params);
+  const meldung = () => zeile('SELECT * FROM registrations WHERE id = ?', ONLINE_ID);
+  const liveAbrufen = (token) => worker.fetch(new Request(`https://ptm.test/api/live/token/${token}`), env);
+  const leitung = { id: 'u1', role: 'user' };
+  const tokenAus = (url) => url.match(/\/live\/t\/([0-9a-f]{64})$/)?.[1];
+  const KEY = btoa(String.fromCharCode(...new Uint8Array(32).map((_, index) => index + 1)));
+
+  beforeEach(() => {
+    env = { DB: d1MitSchema(), MAIL_QUEUE: { send: vi.fn() }, LIVE_LINK_KEY: KEY };
+    sql(`INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at, mail_enabled)
+      VALUES ('u1', 'leitung@example.test', 'user', 'salt', 'hash', '2026-09-01', '2026-09-01', 1)`);
+    sql(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at,
+        live_view_enabled)
+      VALUES ('t1', 'u1', 'Turnier', '2099-09-28', 'Ort', 'tete', 'registration', 'public', '2026-09-01', '2026-09-01', 1)`);
+    sql(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email, status, participation,
+        registered_at, created_at, updated_at, execution_revision, player_email)
+      VALUES (?, 't1', 'Maria', 'Bieder', '', 'confirmed', 'inactive', '2026-09-01', '2026-09-01', '2026-09-01', 1, NULL)`, ONLINE_ID);
+  });
+
+  it('legt für eine Meldung ohne Link (z. B. ohne E-Mail) einen an und zeigt danach immer denselben', async () => {
+    const erster = await liveLinkForQr(env, meldung(), leitung, 'https://ptm.test');
+    const token = tokenAus(erster.url);
+    expect(token).toBeTruthy();
+    expect(meldung().live_token_enc).toBeTruthy();
+    expect(meldung().live_token_enc).not.toContain(token);
+    expect(await liveLinkForQr(env, meldung(), leitung, 'https://ptm.test')).toEqual(erster);
+    expect((await liveAbrufen(token)).status).toBe(200);
+    expect(zeile("SELECT details_json FROM audit_log WHERE action = 'live_link_issued'").details_json).toContain('qr');
+    expect(env.MAIL_QUEUE.send).not.toHaveBeenCalled();
+  });
+
+  it('zeigt den Link aus der Bestätigungsmail, ohne ihn ungültig zu machen', async () => {
+    sql("UPDATE registrations SET email = 'maria@example.test', player_email = 'maria@example.test' WHERE id = ?", ONLINE_ID);
+    await resendLiveLink(env, meldung(), leitung, 'https://ptm.test');
+    const ausMail = env.MAIL_QUEUE.send.mock.calls.at(-1)[0].text.match(/\/live\/t\/([0-9a-f]{64})/)[1];
+    expect(tokenAus((await liveLinkForQr(env, meldung(), leitung, 'https://ptm.test')).url)).toBe(ausMail);
+    expect((await liveAbrufen(ausMail)).status).toBe(200);
+  });
+
+  it('meldet einen nur als Hash gespeicherten Link als nicht wiederherstellbar; erneuern ersetzt ihn', async () => {
+    sql("UPDATE registrations SET live_token_hash = 'alt' WHERE id = ?", ONLINE_ID);
+    await expect(liveLinkForQr(env, meldung(), leitung, 'https://ptm.test'))
+      .rejects.toMatchObject({ status: 409, details: { code: 'live_link_not_recoverable' } });
+    const neu = await liveLinkForQr(env, meldung(), leitung, 'https://ptm.test', { renew: true });
+    expect(meldung().live_token_hash).not.toBe('alt');
+    expect(await liveLinkForQr(env, meldung(), leitung, 'https://ptm.test')).toEqual(neu);
+    expect(zeile("SELECT action FROM audit_log WHERE action = 'live_link_reissued'")).toBeTruthy();
+  });
+
+  it('gibt es nur bei freigeschalteter Live-Ansicht und für bestätigte Meldungen', async () => {
+    sql("UPDATE tournaments SET live_view_enabled = 0 WHERE id = 't1'");
+    await expect(liveLinkForQr(env, meldung(), leitung, 'https://ptm.test')).rejects.toMatchObject({ status: 409 });
+    sql("UPDATE tournaments SET live_view_enabled = 1 WHERE id = 't1'");
+    sql("UPDATE registrations SET status = 'pending' WHERE id = ?", ONLINE_ID);
+    await expect(liveLinkForQr(env, meldung(), leitung, 'https://ptm.test')).rejects.toMatchObject({ status: 409 });
+    expect(meldung().live_token_hash).toBeNull();
+  });
+
+  it('funktioniert ohne Schlüssel weiter, der Link ist dann nur einmal sichtbar', async () => {
+    delete env.LIVE_LINK_KEY;
+    const erster = await liveLinkForQr(env, meldung(), leitung, 'https://ptm.test');
+    expect(meldung().live_token_enc).toBeNull();
+    expect((await liveAbrufen(tokenAus(erster.url))).status).toBe(200);
+    await expect(liveLinkForQr(env, meldung(), leitung, 'https://ptm.test'))
+      .rejects.toMatchObject({ details: { code: 'live_link_not_recoverable' } });
+  });
+
+  it('lässt nur die Turnierleitung an den Endpunkt', async () => {
+    const antwort = await worker.fetch(new Request(`https://ptm.test/api/registrations/${ONLINE_ID}/live-link/qr`), env);
+    expect(antwort.status).toBe(401);
   });
 });

@@ -43,9 +43,7 @@
   "Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "Se ha levantado el bloqueo manual de inscripciones. El plazo de inscripción ha vencido. Debe modificarse para permitir nuevas inscripciones.",
   "Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.": "Se ha levantado el bloqueo manual de inscripciones. El torneo ya ha comenzado, por lo que ya no se admiten nuevas inscripciones.",
   "Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.": "Se ha levantado el bloqueo manual de inscripciones. El plazo, la apertura de inscripciones y el límite de participantes siguen vigentes.",
-  "VIP an": "VIP activado",
-  "VIP aus": "VIP desactivado",
-  "VIP-Status wurde aktualisiert.": "El estado VIP se ha actualizado.",
+      "VIP-Status wurde aktualisiert.": "El estado VIP se ha actualizado.",
   "openingNotificationSubscribeShort": "Avisarme",
   "openingNotificationActiveShort": "Activo",
   "openingNotificationSubscribe": "Avisarme cuando se abra la inscripción",
@@ -1854,5 +1852,15 @@
   "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "La organización ya ha introducido el resultado de tu partida.",
   "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "Ya se ha comunicado un resultado para tu partida.",
   "{count} Mitspielgesuche": "{count} búsquedas de jugadores",
-  "E-Mail an Mieter": "Correo al arrendatario"
+  "E-Mail an Mieter": "Correo al arrendatario",
+  "VIP ausschalten": "Desactivar VIP",
+  "VIP einschalten": "Activar VIP",
+  "Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.": "Solo desactiva el VIP. No se mueve ninguna inscripción y nadie sube.",
+  "VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.": "Las inscripciones VIP tienen prioridad: si se alcanza el límite de participantes, la última inscripción sin VIP pasa a la lista de espera (se cancela si no hay lista de espera) y se le avisa por correo. Si esta inscripción está en la lista de espera, sube.",
+  "QR-Code Live-Ansicht": "Código QR vista en directo",
+  "Der bisherige Live-Link dieser Meldung kann nicht angezeigt werden, weil er vor dieser Funktion verschickt wurde. Ein neuer Link macht den bisherigen aus der Bestätigungsmail ungültig.": "El enlace en directo anterior de esta inscripción no se puede mostrar porque se envió antes de esta función. Un enlace nuevo invalida el del correo de confirmación.",
+  "Neuen Live-Link erzeugen": "Crear nuevo enlace en directo",
+  "Mit dem Handy scannen: öffnet die Live-Ansicht dieses Teams (Runde, Gegner, Bahn), ohne Anmeldung.": "Escanear con el móvil: abre la vista en directo de este equipo (ronda, rival, pista) sin iniciar sesión.",
+  "Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet": "La vista en directo no está activada para este torneo",
+  "Der bisherige Live-Link kann nicht angezeigt werden": "El enlace en directo anterior no se puede mostrar"
 }

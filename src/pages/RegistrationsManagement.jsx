@@ -10,6 +10,7 @@ import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { formatMoney } from '../lib/format.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
+import { LiveQrDialog } from '../components/LiveQrDialog.jsx';
 import { richTextPlainText } from '../lib/rich-text.js';
 
 const TEAM_MESSAGE_MAX_LENGTH = 500;
@@ -268,7 +269,7 @@ function RegistrationDetails({ registration, tournament }) {
   );
 }
 
-function RegistrationRow({ registration, tournament, showConfirm = false, showReject = false, busy, busyOther, onConfirm, onReject, onEdit, onMessage, onDelete, onToggleVip }) {
+function RegistrationRow({ registration, tournament, showConfirm = false, showReject = false, busy, busyOther, onConfirm, onReject, onEdit, onMessage, onDelete, onToggleVip, onLiveQr }) {
   const { t } = useTranslation();
   return (
     <article className="data-row">
@@ -315,15 +316,17 @@ function RegistrationRow({ registration, tournament, showConfirm = false, showRe
       </div>
       <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
       <div className="row-actions">
+        {/* Der Text nennt die Aktion; den Zustand zeigt das VIP-Badge am Namen. */}
         <Button
           variant="secondary"
-          data-vip-toggle="true"
-          aria-pressed={Boolean(registration.isVip)}
+          title={registration.isVip
+            ? t('Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.')
+            : t('VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.')}
           loading={busy === `vip-${registration.id}`}
           disabled={Boolean(busy || busyOther)}
           onClick={() => onToggleVip(registration)}
         >
-          {registration.isVip ? t('VIP an') : t('VIP aus')}
+          {registration.isVip ? t('VIP ausschalten') : t('VIP einschalten')}
         </Button>
         {showConfirm && (
           <Button loading={busy === `confirm-${registration.id}`} disabled={Boolean(busy || busyOther)} onClick={() => onConfirm(registration)}>
@@ -333,6 +336,9 @@ function RegistrationRow({ registration, tournament, showConfirm = false, showRe
         {showReject && <Button variant="danger" disabled={Boolean(busy || busyOther)} onClick={() => onReject(registration)}>{t('Ablehnen')}</Button>}
         <Button variant="secondary" disabled={Boolean(busy)} onClick={() => onEdit(registration)}>{t('Bearbeiten')}</Button>
         <Button variant="secondary" disabled={Boolean(busy)} onClick={() => onMessage(registration)}>{t('Nachricht an Team')}</Button>
+        {onLiveQr && tournament?.liveViewEnabled && registration.status === 'confirmed' && (
+          <Button variant="secondary" disabled={Boolean(busy)} onClick={() => onLiveQr(registration)}>{t('QR-Code Live-Ansicht')}</Button>
+        )}
         <Button variant="danger" loading={busy === `delete-${registration.id}`} disabled={Boolean(busy || busyOther)} onClick={() => onDelete(registration)}>{t('Löschen')}</Button>
       </div>
     </article>
@@ -457,6 +463,7 @@ export function RegistrationsPanel({
   onConfirm,
   onConfirmAll,
   onToggleVip,
+  onLiveQr,
   onReject,
   approvalInboxActive = false,
   onExitApprovalInbox,
@@ -482,7 +489,7 @@ export function RegistrationsPanel({
 
   function rowProps(registration) {
     const busy = ['confirm', 'delete', 'vip'].some((action) => busyId === `${action}-${registration.id}`) ? busyId : '';
-    return { busy, busyOther: Boolean(busyId) && !busy, onToggleVip };
+    return { busy, busyOther: Boolean(busyId) && !busy, onToggleVip, onLiveQr };
   }
 
   if (approvalInboxActive) {
@@ -623,6 +630,7 @@ export function RegistrationsManagementPage({
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState('');
   const [messageRegistration, setMessageRegistration] = useState(null);
+  const [liveQrRegistration, setLiveQrRegistration] = useState(null);
   const [rejectionRegistration, setRejectionRegistration] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
@@ -856,6 +864,7 @@ export function RegistrationsManagementPage({
         onMessage={openTeamMessage}
         onConfirm={handleConfirm}
         onToggleVip={handleToggleVip}
+        onLiveQr={setLiveQrRegistration}
         onConfirmAll={handleConfirmAll}
         onReject={(registration) => { setRejectionRegistration(registration); setRejectionReason(''); }}
         approvalInboxActive={approvalInboxActive}
@@ -914,6 +923,7 @@ export function RegistrationsManagementPage({
       </EditDialog>
 
       <TeamMessageDialog registration={messageRegistration} onClose={() => setMessageRegistration(null)} onSent={handleTeamMessageSent} />
+      <LiveQrDialog registration={liveQrRegistration} onClose={() => setLiveQrRegistration(null)} />
     </>
   );
 }

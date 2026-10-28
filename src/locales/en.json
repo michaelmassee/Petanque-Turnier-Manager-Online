@@ -43,9 +43,7 @@
   "Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "The manual registration block has been lifted. The registration deadline has passed. It must be adjusted to allow new registrations.",
   "Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.": "The manual registration block has been lifted. The tournament has already started, so new registrations are no longer possible.",
   "Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.": "The manual registration block has been lifted. The registration deadline, opening time and participant limit still apply.",
-  "VIP an": "VIP on",
-  "VIP aus": "VIP off",
-  "VIP-Status wurde aktualisiert.": "VIP status has been updated.",
+      "VIP-Status wurde aktualisiert.": "VIP status has been updated.",
   "openingNotificationSubscribeShort": "Remind me",
   "openingNotificationActiveShort": "Active",
   "openingNotificationSubscribe": "Notify me when registration opens",
@@ -1854,5 +1852,15 @@
   "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "The organizers have already entered the result of your match.",
   "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "A result has already been reported for your match.",
   "{count} Mitspielgesuche": "{count} player searches",
-  "E-Mail an Mieter": "Email renter"
+  "E-Mail an Mieter": "Email renter",
+  "VIP ausschalten": "Turn VIP off",
+  "VIP einschalten": "Turn VIP on",
+  "Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.": "Only turns VIP off. No registration is moved and nobody moves up.",
+  "VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.": "VIP registrations take priority: if the participant limit is reached, the most recent registration without VIP goes to the waiting list (cancelled if there is no waiting list) and is notified by email. If this registration is on the waiting list, it moves up.",
+  "QR-Code Live-Ansicht": "Live view QR code",
+  "Der bisherige Live-Link dieser Meldung kann nicht angezeigt werden, weil er vor dieser Funktion verschickt wurde. Ein neuer Link macht den bisherigen aus der Bestätigungsmail ungültig.": "The previous live link for this registration cannot be shown because it was sent before this feature existed. A new link invalidates the previous one from the confirmation email.",
+  "Neuen Live-Link erzeugen": "Create new live link",
+  "Mit dem Handy scannen: öffnet die Live-Ansicht dieses Teams (Runde, Gegner, Bahn), ohne Anmeldung.": "Scan with a phone: opens this team’s live view (round, opponent, lane) without signing in.",
+  "Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet": "The live view is not enabled for this tournament",
+  "Der bisherige Live-Link kann nicht angezeigt werden": "The previous live link cannot be shown"
 }

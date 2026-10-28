@@ -43,9 +43,7 @@
   "Die manuelle Anmeldesperre wurde aufgehoben. Die Meldefrist ist abgelaufen. Für neue Anmeldungen muss sie angepasst werden.": "Le blocage manuel des inscriptions a été levé. La date limite d’inscription est dépassée. Elle doit être modifiée pour permettre de nouvelles inscriptions.",
   "Die manuelle Anmeldesperre wurde aufgehoben. Das Turnier hat bereits begonnen, neue Anmeldungen sind nicht mehr möglich.": "Le blocage manuel des inscriptions a été levé. Le tournoi a déjà commencé, les nouvelles inscriptions ne sont plus possibles.",
   "Die manuelle Anmeldesperre wurde aufgehoben. Meldefrist, Anmeldebeginn und Teilnehmerlimit gelten weiterhin.": "Le blocage manuel des inscriptions a été levé. La date limite, l’ouverture des inscriptions et la limite de participants restent applicables.",
-  "VIP an": "VIP activé",
-  "VIP aus": "VIP désactivé",
-  "VIP-Status wurde aktualisiert.": "Le statut VIP a été mis à jour.",
+      "VIP-Status wurde aktualisiert.": "Le statut VIP a été mis à jour.",
   "openingNotificationSubscribeShort": "Me prévenir",
   "openingNotificationActiveShort": "Actif",
   "openingNotificationSubscribe": "Me prévenir à l’ouverture des inscriptions",
@@ -1854,5 +1852,15 @@
   "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "L'organisation a déjà saisi le résultat de ta partie.",
   "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "Un résultat a déjà été signalé pour ta partie.",
   "{count} Mitspielgesuche": "{count} recherches de partenaires",
-  "E-Mail an Mieter": "E-mail au locataire"
+  "E-Mail an Mieter": "E-mail au locataire",
+  "VIP ausschalten": "Désactiver VIP",
+  "VIP einschalten": "Activer VIP",
+  "Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.": "Désactive seulement le statut VIP. Aucune inscription n’est déplacée et personne ne remonte.",
+  "VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.": "Les inscriptions VIP sont prioritaires : si la limite de participants est atteinte, la dernière inscription sans VIP passe en liste d’attente (annulée s’il n’y a pas de liste d’attente) et en est informée par e-mail. Si cette inscription est en liste d’attente, elle remonte.",
+  "QR-Code Live-Ansicht": "QR code vue en direct",
+  "Der bisherige Live-Link dieser Meldung kann nicht angezeigt werden, weil er vor dieser Funktion verschickt wurde. Ein neuer Link macht den bisherigen aus der Bestätigungsmail ungültig.": "L’ancien lien direct de cette inscription ne peut pas être affiché, car il a été envoyé avant cette fonction. Un nouveau lien rend invalide celui de l’e-mail de confirmation.",
+  "Neuen Live-Link erzeugen": "Créer un nouveau lien direct",
+  "Mit dem Handy scannen: öffnet die Live-Ansicht dieses Teams (Runde, Gegner, Bahn), ohne Anmeldung.": "À scanner avec un téléphone : ouvre la vue en direct de cette équipe (tour, adversaire, terrain) sans connexion.",
+  "Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet": "La vue en direct n’est pas activée pour ce tournoi",
+  "Der bisherige Live-Link kann nicht angezeigt werden": "L’ancien lien direct ne peut pas être affiché"
 }

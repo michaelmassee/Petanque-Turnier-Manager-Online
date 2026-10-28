@@ -526,15 +526,14 @@ describe('Anmeldungsverwaltung: VIP-Schalter', () => {
     { isVip: false, status: 'pending', approvalInboxActive: true },
   ])('speichert VIP von $isVip um bei $status (Freigabeeingang: $approvalInboxActive)', async (options) => {
     const { fetchMock, onTournamentsChanged } = setup(options);
-    const before = options.isVip ? 'VIP an' : 'VIP aus';
-    const after = options.isVip ? 'VIP aus' : 'VIP an';
+    // Der Button nennt die Aktion, nicht den Zustand.
+    const before = options.isVip ? 'VIP ausschalten' : 'VIP einschalten';
+    const after = options.isVip ? 'VIP einschalten' : 'VIP ausschalten';
     const toggle = await screen.findByRole('button', { name: before });
-    expect(toggle).toHaveAttribute('aria-pressed', String(options.isVip));
     fireEvent.click(toggle);
     expect(toggle).toBeDisabled();
 
-    const updatedToggle = await screen.findByRole('button', { name: after });
-    expect(updatedToggle).toHaveAttribute('aria-pressed', String(!options.isVip));
+    expect(await screen.findByRole('button', { name: after })).toBeEnabled();
     const update = fetchMock.mock.calls.find(([, request]) => request?.method === 'PUT');
     expect(update[0]).toBe('/api/registrations/vip-1');
     expect(JSON.parse(update[1].body)).toMatchObject({
@@ -546,12 +545,63 @@ describe('Anmeldungsverwaltung: VIP-Schalter', () => {
 
   it('behält den VIP-Status bei einem fehlgeschlagenen Speichern', async () => {
     const { fetchMock, onTournamentsChanged } = setup({ fail: true });
-    fireEvent.click(await screen.findByRole('button', { name: 'VIP aus' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'VIP einschalten' }));
 
     expect(await screen.findByText('Speichern fehlgeschlagen')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'VIP aus' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: 'VIP aus' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'VIP einschalten' })).toBeEnabled();
     expect(onTournamentsChanged).not.toHaveBeenCalled();
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/tournaments/t1/registrations')).toHaveLength(1);
   });
 });
+
+
+describe('Anmeldungsverwaltung: QR-Code Live-Ansicht', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function setup({ liveViewEnabled = true, status = 'confirmed', liveLink = { status: 200, body: { url: 'https://ptm.test/live/t/abc' } } } = {}) {
+    const registration = {
+      id: 'live-1', tournamentId: 't1', firstName: 'Anna', lastName: 'Muster', noEmail: true,
+      status, isVip: false, feeSelections: [], registrationAnswers: [],
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
+      if (String(url).endsWith('/live-link/qr')) {
+        if (options.method === 'POST') return new Response(JSON.stringify({ url: 'https://ptm.test/live/t/neu' }), { status: 200 });
+        return new Response(JSON.stringify(liveLink.body), { status: liveLink.status });
+      }
+      return new Response(JSON.stringify({ registrations: [registration] }), { status: 200 });
+    });
+    render(
+      <RegistrationsManagementPage
+        tournaments={[{ ...TOURNAMENT, registrationEnabled: true, liveViewEnabled }]}
+        selectedTournamentId="t1"
+        setSelectedTournamentId={() => {}}
+        language="de"
+      />,
+    );
+    return { fetchMock };
+  }
+
+  it('zeigt den persönlichen Live-Link einer bestätigten Meldung als QR-Code', async () => {
+    const { fetchMock } = setup();
+    fireEvent.click(await screen.findByRole('button', { name: 'QR-Code Live-Ansicht' }));
+    expect(await screen.findByText('https://ptm.test/live/t/abc')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/registrations/live-1/live-link/qr', expect.anything());
+    expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+  });
+
+  it('bietet die Aktion nur bei freigeschalteter Live-Ansicht und bestätigten Meldungen an', async () => {
+    setup({ liveViewEnabled: false });
+    await screen.findByText(/Anna Muster/);
+    expect(screen.queryByRole('button', { name: 'QR-Code Live-Ansicht' })).not.toBeInTheDocument();
+  });
+
+  it('erzeugt einen neuen Link erst nach Klick, wenn der alte nicht wiederherstellbar ist', async () => {
+    const { fetchMock } = setup({ liveLink: { status: 409, body: { error: 'Der bisherige Live-Link kann nicht angezeigt werden', details: { code: 'live_link_not_recoverable' } } } });
+    fireEvent.click(await screen.findByRole('button', { name: 'QR-Code Live-Ansicht' }));
+    const renew = await screen.findByRole('button', { name: 'Neuen Live-Link erzeugen' });
+    expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+    fireEvent.click(renew);
+    expect(await screen.findByText('https://ptm.test/live/t/neu')).toBeInTheDocument();
+  });
+});
+

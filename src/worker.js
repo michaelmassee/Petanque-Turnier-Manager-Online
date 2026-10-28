@@ -1206,7 +1206,7 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
   const ics = buildTournamentIcs(tournament, appOrigin);
   const participantsBlock = buildRegistrationParticipantsBlock(registration, language);
   // Persönlicher Live-Link (E-21). Die Live-Ansicht gehört zu jedem Turnier.
-  const liveLink = buildLiveLink(appOrigin, await issueLiveToken(env.DB, registration.id));
+  const liveLink = buildLiveLink(appOrigin, await issueLiveToken(env, registration.id));
   const directionsBlock = directionsEmailBlock(tournament, language);
   const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
 
@@ -1237,7 +1237,7 @@ export async function resendLiveLink(env, registration, user, appOrigin) {
   if (!(await canSendTournamentMail(env.DB, tournament))) throw new HttpError(409, 'Für dieses Turnier ist der E-Mail-Versand nicht freigeschaltet');
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = LIVE_LINK_EMAILS[language] || LIVE_LINK_EMAILS.de;
-  const liveLink = buildLiveLink(appOrigin, await issueLiveToken(env.DB, registration.id));
+  const liveLink = buildLiveLink(appOrigin, await issueLiveToken(env, registration.id));
   const directionsBlock = directionsEmailBlock(tournament, language);
   const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
   for (const recipient of recipients) {
@@ -1355,15 +1355,80 @@ function createRandomToken() {
   return crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
 }
 
+// Schlüssel für den wiederherstellbaren Live-Link (Secret LIVE_LINK_KEY, 32 Byte Base64). Ohne Schlüssel bleibt es beim
+// Hash; der QR-Code in der Anmeldeverwaltung braucht dann einen neuen Link.
+async function liveLinkCryptoKey(env) {
+  const raw = String(env.LIVE_LINK_KEY || '').trim();
+  if (!raw) return null;
+  const bytes = Uint8Array.from(atob(raw), (char) => char.charCodeAt(0));
+  if (bytes.length !== 32) throw new Error('LIVE_LINK_KEY muss 32 Byte (Base64) lang sein');
+  return crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+// Gespeichert als Base64 von IV (12 Byte) + Chiffrat.
+async function encryptLiveToken(env, token) {
+  const key = await liveLinkCryptoKey(env);
+  if (!key) return null;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(token)));
+  const combined = new Uint8Array(iv.length + cipher.length);
+  combined.set(iv);
+  combined.set(cipher, iv.length);
+  return bytesToBase64(combined);
+}
+
+// null, wenn kein Schlüssel da ist oder der Wert nicht (mehr) passt, z. B. nach einem Schlüsselwechsel.
+async function decryptLiveToken(env, value) {
+  const key = value ? await liveLinkCryptoKey(env) : null;
+  if (!key) return null;
+  try {
+    const bytes = Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes.slice(0, 12) }, key, bytes.slice(12));
+    return new TextDecoder().decode(plain);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Erzeugt einen neuen persönlichen Live-Link je Anmeldung (EW-02). Gespeichert wird nur der Hash, deshalb gibt es den
- * Link im Klartext nur in der Mail, die ihn verschickt; jeder neue Link macht den vorherigen ungültig (Widerruf).
- * Bewusst getrennt vom cancel_token: Der Link darf nicht abmelden können.
+ * Erzeugt einen neuen persönlichen Live-Link je Anmeldung (EW-02). Gespeichert werden der Hash (Nachschlagen) und,
+ * sofern LIVE_LINK_KEY gesetzt ist, der verschlüsselte Token für den QR-Code der Turnierleitung; jeder neue Link macht
+ * den vorherigen ungültig (Widerruf). Bewusst getrennt vom cancel_token: Der Link darf nicht abmelden können.
  */
-async function issueLiveToken(db, registrationId) {
+async function issueLiveToken(env, registrationId) {
   const token = createRandomToken();
-  await db.prepare('UPDATE registrations SET live_token_hash = ? WHERE id = ?').bind(await sha256Hex(token), registrationId).run();
+  await env.DB.prepare('UPDATE registrations SET live_token_hash = ?, live_token_enc = ? WHERE id = ?')
+    .bind(await sha256Hex(token), await encryptLiveToken(env, token), registrationId).run();
   return token;
+}
+
+/**
+ * QR-Code „Live-Ansicht“ in der Anmeldeverwaltung: liefert den bestehenden persönlichen Link, ohne ihn zu ändern. Hat die
+ * Meldung noch gar keinen (z. B. ohne E-Mail-Adresse), entsteht er hier. Liegt nur der Hash vor (Link aus einer Mail
+ * vor der Verschlüsselung), gibt es 409 live_link_not_recoverable; renew erzeugt dann einen neuen und macht den alten
+ * ungültig. Nur bei freigeschalteter Live-Ansicht und bestätigten Anmeldungen.
+ */
+export async function liveLinkForQr(env, registration, user, appOrigin, { renew = false } = {}) {
+  const tournament = await getTournamentById(env.DB, registration.tournament_id);
+  if (!Number(tournament?.live_view_enabled || 0)) throw new HttpError(409, 'Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet');
+  if (registration.status !== 'confirmed') throw new HttpError(409, 'Einen Live-Link gibt es nur für bestätigte Anmeldungen');
+  if (!renew && registration.live_token_hash) {
+    const token = await decryptLiveToken(env, registration.live_token_enc);
+    if (!token) throw new HttpError(409, 'Der bisherige Live-Link kann nicht angezeigt werden', { code: 'live_link_not_recoverable' });
+    return { url: buildLiveLink(appOrigin, token) };
+  }
+  const replaced = Boolean(registration.live_token_hash);
+  const url = buildLiveLink(appOrigin, await issueLiveToken(env, registration.id));
+  await env.DB.batch([auditStatement(env.DB, { tournamentId: tournament.id, registrationId: registration.id, actorUserId: user.id,
+    actorRole: actorRoleFor(tournament, user), action: replaced ? 'live_link_reissued' : 'live_link_issued', target: 'registration',
+    details: { delivery: 'qr' } })]);
+  return { url };
 }
 
 async function sendDisplacementEmail(env, tournament, registration, wasCancelled, appOrigin) {
@@ -2932,6 +2997,15 @@ export default {
         if (!registration) throw new HttpError(404, 'Anmeldung nicht gefunden');
         assertCanManageTournament(registration, auth.user);
         return await resendLiveLink(env, registration, auth.user, url.origin);
+      }
+
+      const registrationLiveQrMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/live-link\/qr$/);
+      if (registrationLiveQrMatch && (request.method === 'GET' || request.method === 'POST')) {
+        const auth = await requireManagerAuth(request, env.DB);
+        const registration = await getRegistrationWithTournament(env.DB, registrationLiveQrMatch[1]);
+        if (!registration) throw new HttpError(404, 'Anmeldung nicht gefunden');
+        assertCanManageTournament(registration, auth.user);
+        return json(await liveLinkForQr(env, registration, auth.user, url.origin, { renew: request.method === 'POST' }));
       }
 
       const registrationMessageMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/message$/);
