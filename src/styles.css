@@ -2301,6 +2301,7 @@ a.left-panel-link {
 
 .tournament-info-top {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
@@ -2308,6 +2309,8 @@ a.left-panel-link {
 }
 
 .tournament-info-top .tournament-icon-bar {
+  min-width: 0;
+  flex-wrap: wrap;
   justify-content: flex-start;
   margin: 0;
 }
