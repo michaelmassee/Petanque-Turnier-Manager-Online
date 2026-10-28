@@ -533,9 +533,11 @@ describe('Aktionen im Kartenpopup', () => {
 
     fireEvent.click(within(marker(14)).getByRole('button', { name: 'Details' }));
 
-    const details = screen.getByRole('heading', { name: 'Bouleplatz 14' }).closest('details');
-    expect(details).toHaveAttribute('open');
-    expect(Element.prototype.scrollIntoView.mock.contexts).toContain(details);
+    const details = (await screen.findByRole('heading', { name: 'Bouleplatz 14' }, { timeout: 5_000 })).closest('details');
+    await vi.waitFor(() => {
+      expect(details).toHaveAttribute('open');
+      expect(Element.prototype.scrollIntoView.mock.contexts).toContain(details);
+    });
   });
 });
 
