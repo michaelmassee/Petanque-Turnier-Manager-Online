@@ -5877,7 +5877,7 @@ async function createTournament(request, env, user) {
     const limit = user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT;
     const { count } = await db.prepare('SELECT COUNT(*) AS count FROM tournaments WHERE owner_id = ? AND registration_enabled = 1').bind(user.id).first();
     if (count >= limit) {
-      throw new HttpError(403, 'Turnier-Limit erreicht. Bitte bei einem Admin um mehr Turniere bitten.');
+      throw new HttpError(403, 'Turnier-Limit erreicht. Lösche alte Turniere oder kontaktiere einen Admin für mehr Turniere.');
     }
   }
 

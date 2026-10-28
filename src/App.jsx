@@ -2279,10 +2279,11 @@ function AppContent() {
           <section className="single-column">
             <TournamentQuickStart
               currentUser={currentUser}
+              tournaments={tournaments}
               onCreated={() => loadTournaments(true)}
               onStarted={async (tournamentId) => {
                 await loadTournaments(true);
-                setPlayFocus({ tournamentId });
+                setPlayFocus({ tournamentId, openParticipants: true });
                 setActiveTab('play');
               }}
             />

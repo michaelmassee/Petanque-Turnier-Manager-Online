@@ -60,6 +60,54 @@ describe('Schnellstart', () => {
     expect(onStarted).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [undefined, 5],
+    [null, 5],
+    [2, 2],
+    [0, 0],
+  ])('sperrt den Schnellstart beim Turnier-Limit %s', (tournamentLimit, count) => {
+    const tournaments = Array.from({ length: count }, (_, index) => ({
+      id: `t${index}`, ownerId: user.id, registrationEnabled: true,
+    }));
+    render(<TournamentQuickStart currentUser={{ ...user, tournamentLimit }} tournaments={tournaments} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Turnier-Limit erreicht. Lösche alte Turniere oder kontaktiere einen Admin für mehr Turniere.');
+    expect(screen.getByRole('alert')).toHaveClass('feedback', 'error');
+    expect(screen.getByText(`Turnier-Limit: ${count} / ${count}`)).toBeInTheDocument();
+    for (const button of screen.getAllByRole('button')) expect(button).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Supermêlée' }));
+    expect(authenticatedApi).not.toHaveBeenCalled();
+  });
+
+  it('zählt nur eigene Turniere mit Anmeldung, auch abgeschlossene, und reagiert auf Löschungen', async () => {
+    const tournaments = [
+      { id: 'own', ownerId: user.id, registrationEnabled: true, status: 'finished' },
+      { id: 'calendar', ownerId: user.id, registrationEnabled: false },
+      { id: 'shared', ownerId: 'other', registrationEnabled: true, canManage: true },
+    ];
+    const currentUser = { ...user, tournamentLimit: 1 };
+    const { rerender } = render(<TournamentQuickStart currentUser={currentUser} tournaments={tournaments} />);
+
+    expect(screen.getByRole('button', { name: 'Supermêlée' })).toBeDisabled();
+    expect(screen.getByText('Turnier-Limit: 1 / 1')).toBeInTheDocument();
+
+    rerender(<TournamentQuickStart currentUser={currentUser} tournaments={tournaments.slice(1)} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('Turnier-Limit: 0 / 1')).toBeInTheDocument();
+    authenticatedApi.mockResolvedValue({ tournament: { id: 'new' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Supermêlée' }));
+    await waitFor(() => expect(authenticatedApi).toHaveBeenCalledTimes(2));
+  });
+
+  it('begrenzt Admins nicht durch ihr gespeichertes Turnier-Limit', async () => {
+    authenticatedApi.mockResolvedValue({ tournament: { id: 'new' } });
+    render(<TournamentQuickStart currentUser={{ ...user, role: 'admin', tournamentLimit: 0 }} />);
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Supermêlée' }));
+    await waitFor(() => expect(authenticatedApi).toHaveBeenCalledTimes(2));
+  });
+
   it('weist darauf hin, wenn nur der Start scheitert, und lädt die Turniere neu', async () => {
     authenticatedApi.mockImplementation((path) => (path === '/api/tournaments'
       ? Promise.resolve({ tournament: { id: 't9' } })

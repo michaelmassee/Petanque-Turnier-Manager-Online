@@ -358,6 +358,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const [redrawing, setRedrawing] = useState(false);
   const [bulkParticipation, setBulkParticipation] = useState('');
   const [quickPlayer, setQuickPlayer] = useState(EMPTY_QUICK_PLAYER);
+  const participantsRef = useRef(null);
   // Der `tournaments`-Prop kommt vom Elternteil und wird nicht sofort neu geladen,
   // nachdem hier der Status auf "Läuft" gesetzt wurde - deshalb lokal vormerken,
   // welche Turniere in dieser Sitzung bereits gestartet wurden.
@@ -561,6 +562,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
       const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/rounds`, { method: 'POST' });
       queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, rounds: data.rounds }));
+      if (participantsRef.current) participantsRef.current.open = false;
       setMessage(t('Neue Runde wurde erstellt.'));
     } catch (err) {
       setError(err.message);
@@ -883,7 +885,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       )}
 
       {selectedTournamentStatus === 'running' && (
-        <details className="panel round-participants">
+        <details key={selectedTournamentId} ref={participantsRef} className="panel round-participants" open={focus?.openParticipants && focusTournamentId === selectedTournamentId}>
           <summary className="play-round-summary"><span>{t('Teilnehmer')}</span><span className="counter">{activeConfirmedCount}</span></summary>
           <form className={`quick-player-form${isTeamQuickAdd ? ' is-team' : ''}`} onSubmit={handleQuickPlayerSubmit}>
             {quickSlots.map(({ prefix, label, required }) => {

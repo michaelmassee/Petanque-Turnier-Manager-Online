@@ -2,19 +2,24 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { Button, Feedback } from '../components/ui.jsx';
-import { FORMATIONS } from '../lib/constants.js';
+import { DEFAULT_TOURNAMENT_LIMIT, FORMATIONS } from '../lib/constants.js';
 import { labelFor } from '../lib/domain.js';
 import { QUICK_START_FORMATIONS, quickStartPayload, quickStartSystemLabel, quickStartTemplates } from '../lib/quickstart-templates.js';
 
 // Schnellstart: Formation und System wählen, das private Turnier wird angelegt und sofort gestartet. Danach geht es in
 // „Turnier starten“ weiter (Spieler nachmelden, Runde auslosen).
-export default function TournamentQuickStart({ currentUser, onStarted, onCreated }) {
+export default function TournamentQuickStart({ currentUser, tournaments = [], onStarted, onCreated }) {
   const { t } = useTranslation();
   const [formation, setFormation] = useState('doublette');
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
+  const tournamentLimit = currentUser?.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT;
+  const ownedTournamentCount = tournaments.filter((tournament) => tournament.ownerId === currentUser?.id && tournament.registrationEnabled !== false).length;
+  const limitReached = currentUser?.role !== 'admin' && ownedTournamentCount >= tournamentLimit;
+  const disabled = Boolean(busyId) || limitReached;
 
   async function handleStart(template) {
+    if (disabled) return;
     setError('');
     setBusyId(template.id);
     let tournamentId = '';
@@ -40,12 +45,14 @@ export default function TournamentQuickStart({ currentUser, onStarted, onCreated
     <div className="panel">
       <h2>{t('Schnellstart')}</h2>
       <p className="hint">{t('Formation und System wählen – das private Turnier wird sofort angelegt und gestartet. Danach meldest du die Spieler nach und lost die erste Runde aus.')}</p>
+      {currentUser?.role !== 'admin' && <p className="hint">{t('Turnier-Limit:')} {ownedTournamentCount} / {tournamentLimit}</p>}
+      <Feedback error={limitReached ? t('Turnier-Limit erreicht. Lösche alte Turniere oder kontaktiere einen Admin für mehr Turniere.') : ''} />
       <Feedback error={error} />
       <fieldset className="quickstart-formations">
         <legend>{t('Formation')}</legend>
         {QUICK_START_FORMATIONS.map((value) => (
           <label key={value} className={formation === value ? 'active' : ''}>
-            <input type="radio" name="quickstart-formation" value={value} checked={formation === value} disabled={Boolean(busyId)} onChange={() => setFormation(value)} />
+            <input type="radio" name="quickstart-formation" value={value} checked={formation === value} disabled={disabled} onChange={() => setFormation(value)} />
             {labelFor(FORMATIONS, value)}
           </label>
         ))}
@@ -55,7 +62,7 @@ export default function TournamentQuickStart({ currentUser, onStarted, onCreated
           <Button
             key={template.id}
             variant="secondary"
-            disabled={Boolean(busyId)}
+            disabled={disabled}
             loading={busyId === template.id}
             onClick={() => handleStart(template)}
           >
