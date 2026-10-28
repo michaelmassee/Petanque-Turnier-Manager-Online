@@ -1401,11 +1401,12 @@ async function decryptLiveToken(env, value) {
  * sofern LIVE_LINK_KEY gesetzt ist, der verschlüsselte Token für den QR-Code der Turnierleitung; jeder neue Link macht
  * den vorherigen ungültig (Widerruf). Bewusst getrennt vom cancel_token: Der Link darf nicht abmelden können.
  */
-async function issueLiveToken(env, registrationId) {
+async function issueLiveToken(env, registrationId, { onlyIfMissing = false } = {}) {
   const token = createRandomToken();
-  await env.DB.prepare('UPDATE registrations SET live_token_hash = ?, live_token_enc = ? WHERE id = ?')
+  // onlyIfMissing: erstmalige Erzeugung atomar – bei gleichzeitigen Aufrufen gewinnt einer, die anderen erhalten null.
+  const result = await env.DB.prepare(`UPDATE registrations SET live_token_hash = ?, live_token_enc = ? WHERE id = ?${onlyIfMissing ? ' AND live_token_hash IS NULL' : ''}`)
     .bind(await sha256Hex(token), await encryptLiveToken(env, token), registrationId).run();
-  return token;
+  return onlyIfMissing && !result.meta?.changes ? null : token;
 }
 
 /**
@@ -1418,13 +1419,20 @@ export async function liveLinkForQr(env, registration, user, appOrigin, { renew 
   const tournament = await getTournamentById(env.DB, registration.tournament_id);
   if (!Number(tournament?.live_view_enabled || 0)) throw new HttpError(409, 'Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet');
   if (registration.status !== 'confirmed') throw new HttpError(409, 'Einen Live-Link gibt es nur für bestätigte Anmeldungen');
-  if (!renew && registration.live_token_hash) {
-    const token = await decryptLiveToken(env, registration.live_token_enc);
+  const existingLink = async (encrypted) => {
+    const token = await decryptLiveToken(env, encrypted);
     if (!token) throw new HttpError(409, 'Der bisherige Live-Link kann nicht angezeigt werden', { code: 'live_link_not_recoverable' });
     return { url: buildLiveLink(appOrigin, token) };
-  }
+  };
+  if (!renew && registration.live_token_hash) return existingLink(registration.live_token_enc);
   const replaced = Boolean(registration.live_token_hash);
-  const url = buildLiveLink(appOrigin, await issueLiveToken(env, registration.id));
+  const token = await issueLiveToken(env, registration.id, { onlyIfMissing: !renew });
+  // Ein gleichzeitiger Abruf hat den Link schon angelegt: denselben zurückgeben, statt ihn zu überschreiben.
+  if (!token) {
+    const row = await env.DB.prepare('SELECT live_token_enc FROM registrations WHERE id = ?').bind(registration.id).first();
+    return existingLink(row?.live_token_enc);
+  }
+  const url = buildLiveLink(appOrigin, token);
   await env.DB.batch([auditStatement(env.DB, { tournamentId: tournament.id, registrationId: registration.id, actorUserId: user.id,
     actorRole: actorRoleFor(tournament, user), action: replaced ? 'live_link_reissued' : 'live_link_issued', target: 'registration',
     details: { delivery: 'qr' } })]);
@@ -2922,7 +2930,7 @@ export default {
         if (!canViewTournament(tournament, session?.user || null) && !shareAccess) throw new HttpError(403, 'Zugriff verweigert');
         if (tournament.status === 'draft' && tournament.visibility !== 'private') throw new HttpError(404, 'Turnier nicht gefunden');
         const qrToken = tournament.qr_token || await ensureTournamentQrToken(env.DB, tournament.id);
-        return json({ qrUrl: qrLinkUrl(url, qrToken), design: parseStoredQrDesign(tournament.qr_design) });
+        return json({ qrUrl: qrLinkUrl(url, qrToken), design: parseStoredQrDesign(tournament.qr_design), shareActive: await isTournamentShareActive(env.DB, tournament) });
       }
 
       const qrDesignMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/qr-design$/);
@@ -2933,7 +2941,7 @@ export default {
         assertCanManageTournament(tournament, session.user);
         if (request.method === 'GET') {
           const qrToken = await ensureTournamentQrToken(env.DB, tournament.id);
-          return json({ design: parseStoredQrDesign(tournament.qr_design), qrUrl: qrLinkUrl(url, qrToken) });
+          return json({ design: parseStoredQrDesign(tournament.qr_design), qrUrl: qrLinkUrl(url, qrToken), shareActive: await isTournamentShareActive(env.DB, tournament) });
         }
         return json({ design: await saveTournamentQrDesign(env.DB, tournament.id, await readJson(request)) });
       }
@@ -12112,6 +12120,12 @@ export async function createTournamentShareLink(db, tournamentId, origin) {
   ).bind(tournamentId, await sha256Hex(token), token, now, now).run();
   const link = await db.prepare('SELECT token FROM tournament_share_links WHERE tournament_id = ?').bind(tournamentId).first();
   return json({ shareUrl: `${origin}/turniere/${tournamentId}/info?share=${encodeURIComponent(link.token)}` });
+}
+
+// Führt der feste QR-Link Gäste aufs Turnier? Bei privaten Turnieren nur mit aktivem Freigabe-Link (siehe resolveQrLinkTarget).
+async function isTournamentShareActive(db, tournament) {
+  if (tournament.visibility !== 'private') return true;
+  return Boolean(await db.prepare('SELECT 1 FROM tournament_share_links WHERE tournament_id = ? AND token IS NOT NULL').bind(tournament.id).first());
 }
 
 export async function deleteTournamentShareLink(db, tournamentId) {

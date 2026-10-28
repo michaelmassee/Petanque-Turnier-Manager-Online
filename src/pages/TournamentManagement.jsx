@@ -698,6 +698,8 @@ export function TournamentList({
     setBusyId(`flyer-${tournament.id}`);
     setShareError('');
     try {
+      // Der Flyer trägt denselben QR-Code: bei privaten Turnieren wie beim QR-Code die Freigabe aktivieren.
+      if (tournament.visibility === 'private') await tournamentShareUrl(tournament);
       const data = await authenticatedApi(`/api/tournaments/${tournament.id}/qr-design`);
       setFlyerTarget({ tournament, url: data.qrUrl, design: data.design });
     } catch (error) {

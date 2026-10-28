@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '../lib/i18next-config.js';
 import { authenticatedApi } from '../lib/api.js';
 import { TournamentList } from './TournamentManagement.jsx';
@@ -67,6 +67,18 @@ describe('Turnierverwaltung: QR-Code zur Anmeldung', () => {
     expect(screen.getByLabelText('Header-Text')).toHaveValue('Gespeicherter Header');
     expect(authenticatedApi).toHaveBeenCalledWith('/api/tournaments/privat/share-link', { method: 'POST' });
     expect(authenticatedApi).toHaveBeenCalledWith('/api/tournaments/privat/qr-design');
+  });
+
+  it('aktiviert beim Flyer eines privaten Turniers die Freigabe, weil er denselben QR-Code trägt', async () => {
+    authenticatedApi.mockImplementation(async (path) => (path.endsWith('/share-link')
+      ? { shareUrl: 'https://ptmonline.org/q/fester-link-privat-01' }
+      : { design: null, qrUrl: 'https://ptmonline.org/q/fester-link-privat-01' }));
+    renderList([{ ...BASIS, id: 'privat', name: 'Privates Turnier', visibility: 'private' }]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Flyer erstellen' }));
+
+    await waitFor(() => expect(authenticatedApi).toHaveBeenCalledWith('/api/tournaments/privat/qr-design'));
+    expect(authenticatedApi).toHaveBeenNthCalledWith(1, '/api/tournaments/privat/share-link', { method: 'POST' });
   });
 
   it('nutzt bei öffentlichen Turnieren den festen Link ohne Freigabe-Aufruf', async () => {

@@ -229,6 +229,17 @@ describe('QR-Code Live-Ansicht in der Anmeldeverwaltung', () => {
     expect(env.MAIL_QUEUE.send).not.toHaveBeenCalled();
   });
 
+  it('liefert bei gleichzeitigen ersten Abrufen allen denselben gültigen Link', async () => {
+    const zuvor = meldung();
+    const [erster, zweiter] = await Promise.all([
+      liveLinkForQr(env, zuvor, leitung, 'https://ptm.test'),
+      liveLinkForQr(env, zuvor, leitung, 'https://ptm.test'),
+    ]);
+    expect(zweiter).toEqual(erster);
+    expect((await liveAbrufen(tokenAus(erster.url))).status).toBe(200);
+    expect(env.DB.sqlite.prepare("SELECT COUNT(*) AS anzahl FROM audit_log WHERE action = 'live_link_issued'").get().anzahl).toBe(1);
+  });
+
   it('zeigt den Link aus der Bestätigungsmail, ohne ihn ungültig zu machen', async () => {
     sql("UPDATE registrations SET email = 'maria@example.test', player_email = 'maria@example.test' WHERE id = ?", ONLINE_ID);
     await resendLiveLink(env, meldung(), leitung, 'https://ptm.test');

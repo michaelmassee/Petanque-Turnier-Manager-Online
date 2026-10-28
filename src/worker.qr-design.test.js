@@ -226,6 +226,19 @@ describe('QR-Panel der Turnierseite (alle Besucher)', () => {
     expect((await abrufen('?share=falsch')).status).toBe(403);
   });
 
+  it('meldet, ob der feste Link Gäste aufs Turnier führt', async () => {
+    const mitSitzung = () => worker.fetch(new Request('https://ptm.test/api/tournaments/t1/qr', { headers: { Cookie: 'ptm_session=s1' } }), env);
+    expect((await (await abrufen()).json()).shareActive).toBe(true);
+    sql("UPDATE tournaments SET visibility = 'private' WHERE id = 't1'");
+    expect((await (await mitSitzung()).json()).shareActive).toBe(false);
+    await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/share-link', {
+      method: 'POST', headers: { Cookie: 'ptm_session=s1', Origin: 'https://ptm.test' },
+    }), env);
+    expect((await (await mitSitzung()).json()).shareActive).toBe(true);
+    const design = await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/qr-design', { headers: { Cookie: 'ptm_session=s1' } }), env);
+    expect((await design.json()).shareActive).toBe(true);
+  });
+
   it('hat für öffentliche Entwürfe keinen Link', async () => {
     sql("UPDATE tournaments SET status = 'draft' WHERE id = 't1'");
     expect((await abrufen()).status).not.toBe(200);

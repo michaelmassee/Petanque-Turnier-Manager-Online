@@ -47,6 +47,24 @@ describe('QR-Panel der Turnierseite', () => {
     expect(await screen.findByText('Bild in die Zwischenablage kopiert')).toBeInTheDocument();
   });
 
+  it('bietet bei privaten Turnieren ohne aktive Freigabe statt des Codes die ausdrückliche Freigabe an', async () => {
+    global.fetch = vi.fn(async (path, options = {}) => new Response(JSON.stringify(options.method === 'POST'
+      ? { shareUrl: QR_URL, shareToken: 'neu' }
+      : { qrUrl: QR_URL, design: null, shareActive: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    render(<TournamentQrPanel tournament={TOURNAMENT} />);
+
+    expect(await screen.findByText(/Freigabe-Link ist nicht aktiv/)).toBeInTheDocument();
+    expect(screen.queryByText(QR_URL)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Teilen/ })).not.toBeInTheDocument();
+    expect(qrImage.createQrBitmap).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Freigabe-Link aktivieren' }));
+    expect(await screen.findByText('Freigabe-Link aktiviert')).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/share-link', expect.objectContaining({ method: 'POST' }));
+    expect(screen.getByText(QR_URL)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: /Teilen/ })).toBeEnabled());
+  });
+
   it('bleibt ohne Link (z. B. Entwurf, kein Zugriff) unsichtbar', async () => {
     respond(404, { error: 'Turnier nicht gefunden' });
     const { container } = render(<TournamentQrPanel tournament={TOURNAMENT} />);
