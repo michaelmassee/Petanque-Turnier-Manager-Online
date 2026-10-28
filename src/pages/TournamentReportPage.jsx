@@ -6,7 +6,7 @@ import { RequiredMark, TextField, TextArea, SelectField, Button, Feedback } from
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { useClubSuggestions } from '../components/ClubSuggestions.jsx';
 
-function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSiteKey, saving, clubNames }) {
+function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSiteKey, saving, clubNames, clubOptions }) {
   const { t } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
   useEffect(() => {
@@ -23,7 +23,7 @@ function TournamentReportForm({ form, setForm, onSubmit, navigate, turnstileSite
 
   return (
     <form className="form dense" onSubmit={onSubmit}>
-      <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} required minLength={2} list={clubSuggestions.listId} />
+      <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club, organizerClubId: clubOptions.find((option) => option.name === club)?.id || '' })} required minLength={2} list={clubSuggestions.listId} />
       {clubSuggestions.datalist}
       <TextField label={t('Turnier-Informationen')} value={form.name} onChange={(name) => setForm({ ...form, name })} required minLength={2} />
       <TextField label={t('Ort')} value={form.location} onChange={(location) => setForm({ ...form, location })} required minLength={2} />
@@ -109,6 +109,7 @@ export function TournamentReportPage({
   setMenuOpen,
   navigate,
   clubNames = [],
+  clubOptions = [],
   currentUser,
   isAdmin,
   onSelectAdminDashboard,
@@ -189,6 +190,7 @@ export function TournamentReportPage({
                 turnstileSiteKey={turnstileSiteKey}
                 saving={saving}
                 clubNames={clubNames}
+                clubOptions={clubOptions}
               />
               <Feedback message={message} error={error} />
             </>

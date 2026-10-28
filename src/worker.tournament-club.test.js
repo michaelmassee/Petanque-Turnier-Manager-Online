@@ -3,7 +3,7 @@
 // vom verknüpften Spielort übernommen (gewählt oder über die Adresse zugeordnet). Bei gleicher Adresse gewinnt der Vereinsplatz (0114).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import worker from './worker.js';
+import worker, { duplicateTournament } from './worker.js';
 
 describe('Ausrichtender Verein am Turnier', () => {
   let env;
@@ -30,6 +30,55 @@ describe('Ausrichtender Verein am Turnier', () => {
       ('p-club', 'c1', 'Vereinsplatz', 'Parkweg 1, Linden', 50, 8, 'published', '2026-10-13', '2026-10-13')`);
   });
   afterEach(() => env.DB.sqlite.close());
+
+  it('verknüpft den Veranstalter ohne passenden Spielort und priorisiert sein Logo', async () => {
+    sql("UPDATE clubs SET logo_url = 'https://example.test/club.png' WHERE id = 'c1'");
+    const point = { latitude: 50.5009807, longitude: 8.4167299 };
+    const tournament = await create({ club: ' bc linden ', ...point });
+    expect(tournament).toMatchObject({ ...point, organizerClubId: 'c1', boulePlaceId: null,
+      logoUrl: 'https://example.test/club.png', customLogoUrl: null });
+    const custom = await create({ organizerClubId: 'c1', club: 'alter Name', logoUrl: 'https://example.test/custom.png', ...point });
+    expect(custom).toMatchObject({ club: 'BC Linden', organizerClubId: 'c1',
+      logoUrl: 'https://example.test/custom.png', customLogoUrl: 'https://example.test/custom.png' });
+  });
+
+  it('behält die Vereins-ID nach Umbenennung beim Bearbeiten', async () => {
+    const tournament = await create({ club: 'BC Linden' });
+    sql("UPDATE clubs SET name = 'Neuer Name', logo_url = 'https://example.test/new.png' WHERE id = 'c1'");
+    const response = await worker.fetch(new Request(`https://ptm.test/api/tournaments/${tournament.id}`, {
+      method: 'PUT', headers: { Cookie: 'ptm_session=session1', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...tournament, organizerClubId: 'c1', name: 'Bearbeitet' }),
+    }), env);
+    expect(response.status).toBe(200);
+    expect((await response.json()).tournament).toMatchObject({ organizerClubId: 'c1', club: 'Neuer Name', logoUrl: 'https://example.test/new.png' });
+  });
+
+  it('behält Veranstalter beim Kopieren nach Umbenennung und fällt auf das Spielortlogo zurück', async () => {
+    sql("UPDATE clubs SET logo_url = 'https://example.test/venue.png' WHERE id='c1'");
+    sql(`INSERT INTO clubs (id,name,status,logo_url,owner_id,created_at,updated_at)
+      VALUES ('c2','Gastverein','published','https://example.test/organizer.png','u1','2026','2026')`);
+    const tournament = await create({ club: 'Gastverein', boulePlaceId: 'p-club' });
+    expect(tournament.logoUrl).toBe('https://example.test/organizer.png');
+    sql("UPDATE clubs SET name='Gastverein umbenannt' WHERE id='c2'");
+    const stored = env.DB.sqlite.prepare('SELECT * FROM tournaments WHERE id=?').get(tournament.id);
+    const copy = await duplicateTournament(env.DB, stored, { id: 'u1' });
+    expect(copy.organizer_club_id).toBe('c2');
+    expect(copy.organizer_club_logo_url).toBe('https://example.test/organizer.png');
+    sql("UPDATE clubs SET logo_url=NULL WHERE id='c2'");
+    const response = await worker.fetch(new Request(`https://ptm.test/api/tournaments/${tournament.id}`, {
+      headers: { Cookie: 'ptm_session=session1' },
+    }), env);
+    expect((await response.json()).tournament.logoUrl).toBe('https://example.test/venue.png');
+  });
+
+  it('lehnt unbekannte Veranstalter-IDs vor dem Anlegen ab', async () => {
+    const response = await worker.fetch(new Request('https://ptm.test/api/tournaments', {
+      method: 'POST', headers: { Cookie: 'ptm_session=session1', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organizerClubId: 'missing' }),
+    }), env);
+    expect(response.status).toBe(400);
+    expect(env.DB.sqlite.prepare('SELECT COUNT(*) AS count FROM tournaments').get().count).toBe(0);
+  });
 
   it('speichert importierte Koordinaten am verknüpften Platz und behält sie bei späteren Bearbeitungen', async () => {
     const point = { latitude: 50.5000636, longitude: 8.4206376 };

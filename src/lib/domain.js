@@ -199,6 +199,7 @@ export function tournamentPayload(form) {
     approvalRequired: Boolean(form.approvalRequired),
     phoneRequired: Boolean(form.phoneRequired),
     websiteUrl: form.websiteUrl || null,
+    organizerClubId: form.organizerClubId || null,
     logoUrl: form.logoUrl || null,
     flyerUrl: form.flyerUrl || null,
     whatsappGroupUrl: form.whatsappGroupUrl || null,

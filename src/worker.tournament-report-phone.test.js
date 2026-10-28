@@ -26,6 +26,14 @@ describe('Turnier melden: Kontakt-Telefon', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
+  it('verknüpft auch neue Kalendermeldungen automatisch mit ihrem Veranstalterlogo', async () => {
+    db.sqlite.exec(`INSERT INTO clubs (id,name,status,logo_url,owner_id,created_at,updated_at)
+      VALUES ('club','BC Linden','published','https://example.test/logo.png','admin','2026','2026')`);
+    await createTournamentReport(meldung({}), env(), url);
+    expect(db.sqlite.prepare("SELECT organizer_club_id, organizer_club_logo_url, boule_place_id FROM tournaments WHERE name='Sommerturnier'").get())
+      .toEqual({ organizer_club_id: 'club', organizer_club_logo_url: 'https://example.test/logo.png', boule_place_id: null });
+  });
+
   it('speichert die Nummer als Turnierkontakt', async () => {
     await createTournamentReport(meldung({ contactPhone: '+49 171 1234567' }), env(), url);
     expect(db.sqlite.prepare("SELECT contact_name, contact_email, contact_phone FROM tournaments WHERE name = 'Sommerturnier'").get())

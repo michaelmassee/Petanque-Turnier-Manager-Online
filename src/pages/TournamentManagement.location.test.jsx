@@ -62,6 +62,13 @@ describe('Turnierort in einem Suchfeld', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('spinbutton', { name: 'Breitengrad' })).toHaveValue(50.5000636);
   });
+  it('speichert automatisch angezeigte Logos nicht als eigenes Turnierlogo zurück', () => {
+    expect(tournamentToForm({ ...tournament, logoUrl: 'https://example.test/auto.png', customLogoUrl: null, organizerClubId: 'c' }))
+      .toMatchObject({ logoUrl: '', organizerClubId: 'c' });
+    expect(tournamentToForm({ ...tournament, logoUrl: 'https://example.test/custom.png', customLogoUrl: 'https://example.test/custom.png' }).logoUrl)
+      .toBe('https://example.test/custom.png');
+  });
+
   it('übernimmt beim Bearbeiten den gespeicherten Bouleplatz ins Formular', () => {
     expect(tournamentToForm(tournament)).toMatchObject({ boulePlaceId: place.id, latitude: 50, longitude: 8 });
     expect(tournamentToForm({ ...tournament, boulePlaceId: null }).boulePlaceId).toBe('');

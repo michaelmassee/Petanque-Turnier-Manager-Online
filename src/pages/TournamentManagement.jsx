@@ -250,7 +250,7 @@ function venuePlaceFor(places, candidate) {
   return matches.find((place) => place.clubName) || matches[0] || null;
 }
 
-export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, owner, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [], formationLocked = false }) {
+export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, owner, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [], clubOptions = [], formationLocked = false }) {
   const { t } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
   const [showFormationHelp, setShowFormationHelp] = useState(false);
@@ -303,7 +303,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
         minLength={2}
       />
       {showLocationHelp && <LocationHelpDialog onClose={() => setShowLocationHelp(false)} />}
-      <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club })} required={isCalendarEntry} minLength={2} list={clubSuggestions.listId} />
+      <TextField label={t('Verein')} value={form.club} onChange={(club) => setForm({ ...form, club, organizerClubId: clubOptions.find((option) => option.name === club)?.id || '' })} required={isCalendarEntry} minLength={2} list={clubSuggestions.listId} />
       {clubSuggestions.datalist}
       <div className="coordinate-actions">
         <label className="checkbox-field">
@@ -989,7 +989,8 @@ export function tournamentToForm(tournament) {
     registrationEnabled: tournament.registrationEnabled === undefined ? true : Boolean(tournament.registrationEnabled),
     phoneRequired: Boolean(tournament.phoneRequired),
     websiteUrl: tournament.websiteUrl || '',
-    logoUrl: tournament.logoUrl || '',
+    organizerClubId: tournament.organizerClubId || '',
+    logoUrl: ('customLogoUrl' in tournament ? tournament.customLogoUrl : tournament.logoUrl) || '',
     flyerUrl: tournament.flyerUrl || '',
     whatsappGroupUrl: tournament.whatsappGroupUrl || '',
     paymentInfo: tournament.paymentInfo || '',
@@ -1007,6 +1008,7 @@ export function TournamentManagementPage({
   setSelectedTournamentId,
   onTournamentsChanged,
   clubNames = [],
+  clubOptions = [],
   onOpenTournament = () => {},
 }) {
   const { t } = useTranslation();
@@ -1314,6 +1316,7 @@ export function TournamentManagementPage({
           saving={saving}
           invalidField={invalidField}
           clubNames={clubNames}
+          clubOptions={clubOptions}
           formationLocked={mode === 'edit' && hasRegistrations(editedTournament)}
         />
       </EditDialog>

@@ -5754,6 +5754,15 @@ async function fillTournamentClubFromPlace(db, tournamentId) {
     WHERE id = ? AND COALESCE(trim(club), '') = '' AND boule_place_id IS NOT NULL`).bind(tournamentId).run();
 }
 
+async function resolveTournamentOrganizer(db, body, existing = null) {
+  const id = nullableText(body.organizerClubId);
+  if (!id) return body.club === existing?.club ? existing?.organizer_club_id || null : null;
+  const club = await db.prepare("SELECT id, name, status FROM clubs WHERE id = ?").bind(id).first();
+  if (!club || (club.status !== 'published' && id !== existing?.organizer_club_id)) throw new HttpError(400, 'Verein nicht gefunden');
+  body.club = club.status === 'published' ? club.name : existing.club;
+  return club.id;
+}
+
 async function resolveTournamentBoulePlace(db, placeId) {
   const id = nullableText(placeId);
   if (!id) return null;
@@ -5868,6 +5877,7 @@ function resolveRegistrationTimes(tournament, timezone, { legacyUtc = false } = 
 async function createTournament(request, env, user) {
   const db = env.DB;
   let body = await readJson(request);
+  const organizerClubId = await resolveTournamentOrganizer(db, body);
   const selectedPlace = await resolveTournamentBoulePlace(db, body.boulePlaceId);
   body = tournamentPlaceCoordinates(body, selectedPlace);
   const tournament = normalizeCoreTournamentInput(body);
@@ -5896,14 +5906,15 @@ async function createTournament(request, env, user) {
   await db
     .prepare(
       `INSERT INTO tournaments (
-        id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
+        id, organizer_club_id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, phone_required, website_url, logo_url, flyer_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, live_view_enabled, player_result_reporting_enabled, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
+      organizerClubId,
       user.id,
       user.id,
       tournament.name,
@@ -6021,12 +6032,12 @@ export async function duplicateTournament(db, existing, actingUser) {
   await db
     .prepare(
       `INSERT INTO tournaments (
-        id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
+        id, organizer_club_id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, phone_required, website_url, logo_url, flyer_url, whatsapp_group_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, player_result_reporting_enabled, qr_design, created_at, updated_at
       )
-      SELECT ?, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
+      SELECT ?, organizer_club_id, owner_id, ?, ?, club, date, start_time, location, description, type, formation, formation_other, registration_type, 'draft',
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, phone_required, website_url, logo_url, flyer_url, whatsapp_group_url, payment_info,
         latitude, longitude, geocoded_at, timezone, boule_place_id, fee_tiers, registration_questions, live_view_enabled, player_result_reporting_enabled, qr_design, ?, ?
@@ -6212,6 +6223,7 @@ async function updateTournament(request, env, existing, user) {
     throw new HttpError(409, 'Die Eckdaten dieses Turniers werden im Turnierdokument gepflegt.');
   }
   let body = await readJson(request);
+  const organizerClubId = await resolveTournamentOrganizer(db, body, existing);
   const selectedPlace = await resolveTournamentBoulePlace(db, body.boulePlaceId);
   body = tournamentPlaceCoordinates(body, selectedPlace, existing);
   const tournament = normalizeCoreTournamentInput(body);
@@ -6230,13 +6242,14 @@ async function updateTournament(request, env, existing, user) {
   await db
     .prepare(
       `UPDATE tournaments
-       SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
+       SET organizer_club_id = ?, name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, schweizer_ranking_mode = ?, ko_platz3 = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
            participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, waitlist_auto_promote = ?, registration_enabled = ?, approval_required = ?, phone_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, boule_place_id = ?, live_view_enabled = ?, player_result_reporting_enabled = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
+      organizerClubId,
       tournament.name,
       tournament.club,
       tournament.date,
@@ -6619,6 +6632,7 @@ export async function createTournamentReport(request, env, url) {
   await enforceTournamentReportRateLimit(db, ip);
   await verifyTurnstileToken(env, body.turnstileToken, ip);
 
+  const organizerClubId = await resolveTournamentOrganizer(db, body);
   const club = text(body.club);
   const name = text(body.name);
   const location = text(body.location);
@@ -6659,13 +6673,14 @@ export async function createTournamentReport(request, env, url) {
   await db
     .prepare(
       `INSERT INTO tournaments (
-        id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, license_required,
+        id, organizer_club_id, owner_id, creator_id, name, date, start_time, location, description, type, formation, formation_other, license_required,
         registration_type, status, visibility, registration_enabled, club, website_url, logo_url, flyer_url, contact_name, contact_email,
         contact_phone, latitude, longitude, geocoded_at, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
+      organizerClubId,
       ownerId,
       TOURNAMENT_REPORT_SYSTEM_USER_ID,
       name,
@@ -6774,7 +6789,7 @@ async function proxyTournamentImage(tournament, field) {
   }
   // Ein explizit am Turnier hinterlegtes Logo hat Vorrang. Ohne ein solches
   // verwenden wir das Logo des veröffentlichten Vereins am gewählten Spielort.
-  const targetUrl = field === 'logo' ? tournament.logo_url || tournament.venue_club_logo_url : tournament[column];
+  const targetUrl = field === 'logo' ? tournament.logo_url || tournament.organizer_club_logo_url || tournament.venue_club_logo_url : tournament[column];
   return proxyExternalImage(targetUrl, `tournaments/${tournament.id}/${field}`);
 }
 
@@ -13302,7 +13317,9 @@ export function toPublicTournament(row, user) {
     websiteUrl: row.website_url || null,
     websiteIsOriginalClubSite: false,
     // venue_club_logo_url wird per Trigger (Migration 0099) beim Schreiben berechnet.
-    logoUrl: row.logo_url || row.venue_club_logo_url || null,
+    organizerClubId: row.organizer_club_id || null,
+    customLogoUrl: row.logo_url || null,
+    logoUrl: row.logo_url || row.organizer_club_logo_url || row.venue_club_logo_url || null,
     flyerUrl: row.flyer_url || null,
     // Der Gruppenlink geht nur per Mail an Gemeldete, öffentlich würde jeder beitreten können.
     whatsappGroupUrl: canManageTournament(row, user) ? row.whatsapp_group_url || null : undefined,

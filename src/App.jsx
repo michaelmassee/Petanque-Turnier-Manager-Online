@@ -1536,6 +1536,7 @@ function AppContent() {
           turnstileSiteKey={turnstileSiteKey}
           verifyStatus={reportVerifyStatus}
           clubNames={publishedClubNames}
+          clubOptions={publishedClubs}
           drawerContent={drawerContent('turniere')}
           postboxControl={renderPostboxControl()}
         />
@@ -2203,6 +2204,7 @@ function AppContent() {
               boulePlaces={boulePlacesQuery.data?.places || []}
               postboxRecipients={postboxRecipients}
               clubNames={publishedClubNames}
+              clubOptions={publishedClubs}
               selectedTournamentId={selectedTournamentId}
               setSelectedTournamentId={setSelectedTournamentId}
               onTournamentsChanged={() => loadTournaments(true)}
