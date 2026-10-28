@@ -146,15 +146,31 @@ function pairOrdered(ordered, played) {
   return result;
 }
 
+// Erste Runde wie SchweizerSystem.ersteRunde() im Hauptprojekt: Freilos an ein zufälliges ungesetztes Team (nur
+// ohne Ungesetzte an eines aus der größten Setzgruppe). Die übrigen stehen in einer Reihe – Ungesetzte, dann jede
+// Setzgruppe als zusammenhängender Block in zufälliger Reihenfolge – und Platz i spielt gegen Platz i + n/2. Ein
+// Block mit höchstens n/2 Teams enthält so kein Paar; gleiche Setzposition > 0 trifft nur aufeinander, wenn eine
+// Gruppe mehr als die Hälfte stellt, und dann so selten wie möglich.
+function firstRound(teams) {
+  const shuffled = shuffle(teams);
+  const unseeded = shuffled.filter((team) => !(team.seedPosition > 0));
+  const seedGroups = new Map();
+  for (const team of shuffled) if (team.seedPosition > 0) seedGroups.set(team.seedPosition, [...(seedGroups.get(team.seedPosition) || []), team]);
+  const groups = [...seedGroups.values()];
+  let bye = null;
+  if (shuffled.length % 2) bye = unseeded.length ? unseeded.pop() : groups.reduce((largest, group) => (group.length > largest.length ? group : largest)).pop();
+  const row = [...unseeded, ...groups.flat()];
+  const half = row.length / 2;
+  const matches = row.slice(0, half).map((team, index) => ({ teamA: [team.id], teamB: [row[index + half].id] }));
+  if (bye) matches.push({ teamA: [bye.id], teamB: [] });
+  return matches;
+}
+
 export function generateRound(teams, history, { mode = 'mit_buchholz' } = {}) {
   if (teams.length < 6) throw new Error('Für eine Runde werden mindestens 6 Teams benötigt.');
   const played = opponentPairs(history);
   const hadBye = new Set(history.filter((match) => !match.teamB?.length).map((match) => match.teamA[0]));
-  if (!history.length) {
-    const seeded = shuffle(teams).sort((a, b) => (a.seedPosition || 0) - (b.seedPosition || 0));
-    const half = Math.ceil(seeded.length / 2); const first = seeded.slice(0, half); const second = seeded.slice(half);
-    return { matches: first.map((team, index) => second.length > index ? ({ teamA: [team.id], teamB: [second[second.length - index - 1].id] }) : ({ teamA: [team.id], teamB: [] })) };
-  }
+  if (!history.length) return { matches: firstRound(teams) };
   const ranked = sortSwiss(swissStats(teams, history, mode), mode);
   const byId = new Map(teams.map((team) => [team.id, team]));
   let ordered = ranked.map((entry) => byId.get(entry.teamId)); const matches = [];

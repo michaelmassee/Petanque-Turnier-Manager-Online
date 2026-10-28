@@ -83,4 +83,38 @@ describe('Schweizer Pairing', () => {
     expect(new Set(matches.flatMap((match) => [...match.teamA, ...match.teamB])).size).toBe(32);
     expect(matches.filter((match) => played.has([match.teamA[0], match.teamB[0]].sort().join('|')))).toEqual([]);
   });
+
+  it('lost gleiche Setzposition in Runde 1 nur gegeneinander, wenn es unvermeidbar ist', () => {
+    // früher immer ein 1–1 oder 2–2, obwohl 1–2, 1–2, 1–2 und 0–0 möglich ist
+    const seeded = [0, 0, 1, 1, 1, 2, 2, 2].map((seedPosition, index) => ({ id: `s${index}`, seedPosition }));
+    const seedOf = new Map(seeded.map((team) => [team.id, team.seedPosition]));
+    for (let run = 0; run < 200; run++) {
+      const { matches } = generateRound(seeded, []);
+      expect(matches).toHaveLength(4);
+      expect(new Set(matches.flatMap((match) => [...match.teamA, ...match.teamB])).size).toBe(8);
+      expect(matches.filter((match) => seedOf.get(match.teamA[0]) > 0 && seedOf.get(match.teamA[0]) === seedOf.get(match.teamB[0]))).toEqual([]);
+    }
+  });
+
+  it('gibt das Freilos in Runde 1 nicht an gesetzte Teams, solange ungesetzte da sind', () => {
+    // 7 Teams, 4 gesetzt: Freilos an ein ungesetztes, von 4 gesetzten unter 6 Teams spielt genau ein Paar gegeneinander
+    const seeded = [0, 0, 0, 1, 1, 1, 1].map((seedPosition, index) => ({ id: `s${index}`, seedPosition }));
+    const seedOf = new Map(seeded.map((team) => [team.id, team.seedPosition]));
+    for (let run = 0; run < 200; run++) {
+      const { matches } = generateRound(seeded, []);
+      const byes = matches.filter((match) => !match.teamB.length);
+      expect(byes).toHaveLength(1);
+      expect(seedOf.get(byes[0].teamA[0])).toBe(0);
+      expect(matches.filter((match) => match.teamB.length && seedOf.get(match.teamA[0]) === 1 && seedOf.get(match.teamB[0]) === 1)).toHaveLength(1);
+    }
+  });
+
+  it('gibt das Freilos an das schlechteste Team, wenn alle schon eins hatten', () => {
+    const seven = Array.from({ length: 7 }, (_, index) => ({ id: `t${index + 1}` }));
+    const history = seven.map((team) => ({ teamA: [team.id], teamB: [] }));
+    history.push({ teamA: ['t7'], teamB: ['t6'], scoreA: 0, scoreB: 13 });
+    const last = sortSwiss(swissStats(seven, history)).at(-1).teamId;
+    const { matches } = generateRound(seven, history);
+    expect(matches.filter((match) => !match.teamB.length).map((match) => match.teamA[0])).toEqual([last]);
+  });
 });
