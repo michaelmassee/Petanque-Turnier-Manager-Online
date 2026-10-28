@@ -5,7 +5,7 @@ import { AppRecoveryBoundary } from './AppRecovery.jsx';
 import { ServiceWorkerUpdateBanner } from './components/ServiceWorkerUpdateBanner.jsx';
 import { OfflineNotice } from './components/layout.jsx';
 import { applySeasonClass } from './lib/seasonal.js';
-import { markServiceWorkerUpdateAvailable } from './lib/service-worker-update.js';
+import { checkForUpdateWhenVisible, markServiceWorkerUpdateAvailable } from './lib/service-worker-update.js';
 import './lib/i18next-config.js';
 import './styles.css';
 import 'leaflet/dist/leaflet.css';
@@ -32,7 +32,10 @@ if ('serviceWorker' in navigator) {
   });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
-      .then((registration) => registration.update())
+      .then((registration) => {
+        checkForUpdateWhenVisible(registration);
+        return registration.update();
+      })
       .catch((error) => console.error('Service worker registration failed', error));
   });
 }

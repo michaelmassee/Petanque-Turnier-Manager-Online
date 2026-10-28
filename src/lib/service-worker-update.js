@@ -19,6 +19,14 @@ export function subscribeServiceWorkerUpdate(listener) {
   return () => listeners.delete(listener);
 }
 
+// Der Browser sucht nur beim Laden der Seite nach einem neuen Service Worker. Eine PWA, die aus dem Hintergrund
+// zurückkommt, oder ein lange offener Tab liefe sonst unbegrenzt mit altem Code.
+export function checkForUpdateWhenVisible(registration, doc = document) {
+  doc.addEventListener('visibilitychange', () => {
+    if (doc.visibilityState === 'visible') registration.update().catch(() => {});
+  });
+}
+
 export function resetServiceWorkerUpdateForTest() {
   updateAvailable = false;
 }

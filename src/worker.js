@@ -2246,10 +2246,11 @@ export default {
       }
 
       if (request.method === 'GET' && url.pathname === '/api/places') {
-        const query = String(url.searchParams.get('q') || '').trim();
-        if (!query) return await listSharedBoulePlaces(env.DB, url.origin, deployId(env));
-        const session = await optionalSession(request, env.DB);
-        return await listBoulePlaces(env.DB, session?.user || null, query);
+        // Seit 7b2d502 sucht der Client im Browser; einen Suchbegriff schicken nur noch veraltete App-Stände.
+        if (String(url.searchParams.get('q') || '').trim()) {
+          throw new HttpError(410, 'Neue Version verfügbar. Speichere offene Eingaben und lade dann neu.', { code: 'client_outdated' });
+        }
+        return await listSharedBoulePlaces(env.DB, url.origin, deployId(env));
       }
       if (request.method === 'POST' && url.pathname === '/api/places') {
         const session = await requireSession(request, env.DB);
@@ -10467,8 +10468,7 @@ function rowMemberOf(value) {
   } catch { return []; }
 }
 
-// adminIds: Vereine, deren Owner ein Admin ist (z. B. aus Verbandsimporten), können angemeldete Nutzer zur Übernahme anfragen.
-function toPublicBoulePlace(row, user, adminIds = null) {
+function toPublicBoulePlace(row, user) {
   const canEdit = row.club_id ? clubCanEdit(row, user) : Boolean(user?.role === 'admin' || (row.reported_by_user_id && row.reported_by_user_id === user?.id));
   return {
     id: row.id, clubId: row.club_id, clubName: row.club_display_name || row.club_name || null, clubKind: row.club_kind || 'club', clubDescription: row.club_description || null, clubLogoUrl: row.club_logo_url || null, clubWebsiteUrl: row.club_website_url || null, clubSocialLinks: rowSocialLinks(row.club_social_links), venueType: row.venue_type || 'outdoor', name: row.name, address: formatLocationAddress(row.address),
@@ -10477,7 +10477,6 @@ function toPublicBoulePlace(row, user, adminIds = null) {
     facilities: row.facilities || null, facilityCodes: rowFacilityCodes(row), status: row.status, likeCount: Number(row.like_count || 0), liked: Boolean(Number(row.liked || 0)),
     favorited: Boolean(Number(row.favorited || 0)),
     addressUnverified: Boolean(Number(row.address_unverified || 0)),
-    clubOwnedByAdmin: Boolean(row.club_id && adminIds?.has(row.owner_id)),
     canEdit,
   };
 }
@@ -10581,24 +10580,6 @@ async function loadPublishedClubs(db) {
     if (row.latitude !== null && row.longitude !== null) clubs.get(row.id).locations.push({ latitude: Number(row.latitude), longitude: Number(row.longitude) });
   }
   return { clubs: [...clubs.values()] };
-}
-
-async function listBoulePlaces(db, user, query) {
-  const term = String(query || '').trim();
-  const placesQuery = db.prepare(
-    `SELECT p.*, c.name AS club_display_name, c.kind AS club_kind, c.description AS club_description, c.logo_url AS club_logo_url, c.website_url AS club_website_url, c.social_links AS club_social_links, c.owner_id,
-       EXISTS(SELECT 1 FROM club_editors ce WHERE ce.club_id = c.id AND ce.user_id = ?1) AS editor_user_id,
-       (SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id) AS like_count,
-       EXISTS(SELECT 1 FROM boule_place_likes l WHERE l.place_id = p.id AND l.user_id = ?1) AS liked,
-       EXISTS(SELECT 1 FROM boule_place_favorites f WHERE f.place_id = p.id AND f.user_id = ?1) AS favorited
-     FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
-     WHERE p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')
-       AND (?2 = '' OR p.name LIKE '%' || ?2 || '%' COLLATE NOCASE OR c.name LIKE '%' || ?2 || '%' COLLATE NOCASE OR p.club_name LIKE '%' || ?2 || '%' COLLATE NOCASE OR p.address LIKE '%' || ?2 || '%' COLLATE NOCASE)
-     ORDER BY COALESCE(c.name, p.club_name) COLLATE NOCASE, p.name COLLATE NOCASE`).bind(user?.id || '', term);
-  // Die wenigen Admin-IDs im selben Batch statt eines Lesezugriffs pro Zeile (für clubOwnedByAdmin).
-  const [rows, admins] = await db.batch([placesQuery, db.prepare("SELECT id FROM users WHERE role = 'admin'")]);
-  const adminIds = new Set((admins.results || []).map((admin) => admin.id));
-  return json({ places: (rows.results || []).map((row) => toPublicBoulePlace(row, user, adminIds)) });
 }
 
 // Persönliche Markierungen zur gemeinsamen Plätzeliste: wenige Index-Zugriffe statt der ganzen Liste pro Person.

@@ -40,13 +40,13 @@ Einordnung 26.10.: Der Entwickler war an dem Tag oft angemeldet zum Testen auf d
 
 - `cachedJsonResponse` (`src/worker.js`) legt die JSON-Antwort per `caches.default` im Cloudflare-Cache ab, getrennt pro Rechenzentrum. Der Browser bekommt `no-store`.
 - Vereinsliste `/api/clubs`, Plätzeliste `/api/places` (ohne Suchbegriff) und Mietangebote `/api/rentals`: für **alle** gecacht, auch für Angemeldete. Die Plätzeliste ist nutzerneutral (`liked`/`favorited`/`canEdit` immer false).
-- Persönliche Markierungen kommen aus `GET /api/places/personal` (Likes, Favoriten, bearbeitbare Vereine/Plätze, Admin-Flag; wenige Index-Zugriffe) und werden im Client überlagert (`withPersonalPlaceMarks` in `src/lib/domain.js`). Suchen (`q`) lesen weiter aus D1.
+- Persönliche Markierungen kommen aus `GET /api/places/personal` (Likes, Favoriten, bearbeitbare Vereine/Plätze, Admin-Flag; wenige Index-Zugriffe) und werden im Client überlagert (`withPersonalPlaceMarks` in `src/lib/domain.js`). Suchbegriffe (`q`) beantwortet der Server mit 410 und Update-Hinweis (nur veraltete App-Stände senden sie).
 - Cache-Schlüssel = Datenversion + Deploy-Kennung: `cache_versions.places` wird per Trigger (Migration 0137) bei jeder Änderung an `clubs`, `boule_places`, `boule_place_likes`, `rental_offers` und an `users.role` erhöht – auch bei direkten SQL-Änderungen (Import-Skripte). Die Deploy-Kennung (`CF_VERSION_METADATA`, Binding `version_metadata`) ändert sich bei jedem Deploy, damit ein geändertes Listenformat nicht aus dem alten Cache kommt.
 - Neuaufbau also nur einmal pro Rechenzentrum und Version (Änderung oder Deploy), sonst nie; alle Rechenzentren sehen Änderungen sofort. Favoriten lösen keinen Neuaufbau aus.
 - Speicherdauer `PUBLISHED_LISTS_CACHE_SECONDS` = 14 Tage, nur noch Aufräumgrenze. Cloudflare kann Einträge früher verdrängen, dann normaler Neuaufbau.
 - Kosten je Abruf: +1 row read (Version per Primärschlüssel).
 - Die Spielort-Auswahl im Turnierformular lädt die Plätze erst in der Turnierverwaltung, `staleTime` 10 min, ohne Fokus-Refetch.
-- Die Suche auf der Plätze-Seite filtert im Browser (`filterPlaces` mit `query`: Platzname, Vereinsname, Adresse) statt per `/api/places?q=` (vorher je Eingabe ~3.770 Zeilen per `LIKE`). Der Server unterstützt `q` weiterhin.
+- Die Suche auf der Plätze-Seite filtert im Browser (`filterPlaces` mit `query`: Platzname, Vereinsname, Adresse) statt per `/api/places?q=` (vorher je Eingabe ~3.770 Zeilen per `LIKE`). Der Server weist `q` mit 410 (`client_outdated`, Hinweis „Neue Version verfügbar …“) ab, ohne D1 zu lesen; offene Tabs/PWAs prüfen beim Zurückholen auf ein Update (`checkForUpdateWhenVisible`).
 
 ## Turnierliste (`/api/tournaments`)
 

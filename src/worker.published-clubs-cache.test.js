@@ -108,10 +108,16 @@ describe('Cache für Vereins- und Plätzeliste', () => {
       expect(place).not.toHaveProperty('description');
     });
 
-    it('liest Suchanfragen immer frisch', async () => {
+    it('weist Suchanfragen veralteter App-Stände ohne D1-Abfrage mit Update-Hinweis ab', async () => {
       await plaetze();
-      await plaetze('/api/places?q=Platz');
-      expect(listenAbfragen()).toBe(2);
+      const response = await get('/api/places?q=Platz');
+
+      expect(response.status).toBe(410);
+      expect(await response.json()).toMatchObject({
+        error: 'Neue Version verfügbar. Speichere offene Eingaben und lade dann neu.', details: { code: 'client_outdated' },
+      });
+      expect(await plaetze('/api/places?q=')).toHaveLength(1);
+      expect(listenAbfragen()).toBe(1);
     });
 
     it('zählt ein neues Like sofort mit', async () => {
