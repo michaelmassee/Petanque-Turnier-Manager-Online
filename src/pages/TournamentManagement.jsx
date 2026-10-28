@@ -1005,6 +1005,7 @@ export function TournamentManagementPage({
   setSelectedTournamentId,
   onTournamentsChanged,
   clubNames = [],
+  onOpenTournament = () => {},
 }) {
   const { t } = useTranslation();
   const [error, setError] = useState('');
@@ -1260,7 +1261,8 @@ export function TournamentManagementPage({
         tournaments={filteredTournaments}
         totalTournaments={manageableTournaments.length}
         selectedId={selectedTournamentId}
-        onSelect={setSelectedTournamentId}
+        // Klick aufs Turnier öffnet wie in der Hauptliste die Turnierdetails; die Auswahl bleibt für die Rückkehr markiert.
+        onSelect={(tournamentId) => { setSelectedTournamentId(tournamentId); onOpenTournament(tournamentId); }}
         onEdit={openEdit}
         onDelete={handleDelete}
         onDuplicate={handleDuplicate}

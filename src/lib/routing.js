@@ -1,10 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+// Hat das letzte popstate den Pfad gewechselt (Zurück von einer Route) statt nur einen App-Eintrag (Dialog, Tab)
+// zu verlassen? Der Listener in usePath läuft vor später registrierten (App) und hält den Wert für sie bereit.
+// Deren eigener Pfadvergleich käme zu spät: popstate ist für React ein diskretes Ereignis, nach diesem Listener
+// rendert React samt Effekten sofort neu.
+let lastPopStateChangedPath = false;
+
+export function popStateChangedPath() {
+  return lastPopStateChangedPath;
+}
 
 export function usePath() {
   const [path, setPath] = useState(() => window.location.pathname);
+  const pathRef = useRef(path);
+  pathRef.current = path;
 
   useEffect(() => {
     function onPopState() {
+      lastPopStateChangedPath = window.location.pathname !== pathRef.current;
       setPath(window.location.pathname);
       window.scrollTo(0, 0);
     }

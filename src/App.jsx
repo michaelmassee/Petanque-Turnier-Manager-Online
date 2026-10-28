@@ -8,7 +8,7 @@ import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { pruneExpiredFlyerDesigns } from './lib/flyer-background-storage.js';
 import { LIVE_VIEW_EVENTS, liveViewPathFor, rentalPathFor } from './postbox-core.js';
-import { usePath, areaForPath, matchTournamentRoute, matchTournamentBoardRoute, tournamentBoardPath, matchLiveRoute, matchRentalRoute } from './lib/routing.js';
+import { usePath, popStateChangedPath, areaForPath, matchTournamentRoute, matchTournamentBoardRoute, tournamentBoardPath, matchLiveRoute, matchRentalRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
 import { authTitle, authSubtitle, authErrorMessage, googleMapsUrl, tournamentImageUrl, registrationPayload, labelFor, formationLabel, isOwnTournament, isUpcoming, registrationNotYetOpen, hasOpenRegistration, hasOnlineRegistrationAvailable, isCalendarEntry, SLOTS_FREE_TEMPLATES, REGISTERED_COUNT_TEMPLATES, registrationStatusClass, registrationStatusLabel, registrationStatusReason, API_KEY_STATUS_LABELS, formatTournamentStartTime, formatLocationAddress, distanceKm, clubMatchesTournament } from './lib/domain.js';
@@ -491,6 +491,9 @@ function AppContent() {
         suppressNavPopCountRef.current -= 1;
         return;
       }
+      // Zurück von einer Route (z. B. Turnierdetails aus der Turnierverwaltung) verlässt nur diese Route; der Tab
+      // darunter bleibt offen. Den Ebenenzähler gleicht der Effekt oben beim Pfadwechsel ab.
+      if (popStateChangedPath()) return;
       if (navDepthRef.current <= 0) return;
       navDepthRef.current -= 1;
       if (anyDialogOpen) {
@@ -2194,6 +2197,7 @@ function AppContent() {
               selectedTournamentId={selectedTournamentId}
               setSelectedTournamentId={setSelectedTournamentId}
               onTournamentsChanged={() => loadTournaments(true)}
+              onOpenTournament={(tournamentId) => navigate(`/turniere/${tournamentId}`)}
             />
           </section>
         </Suspense>

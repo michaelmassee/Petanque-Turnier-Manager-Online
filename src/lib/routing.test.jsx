@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { areaForPath, matchRentalRoute, matchTournamentBoardRoute, matchTournamentRoute, tournamentBoardPath, tournamentDisplayPath, usePath } from './routing.js';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { areaForPath, popStateChangedPath, matchRentalRoute, matchTournamentBoardRoute, matchTournamentRoute, tournamentBoardPath, tournamentDisplayPath, usePath } from './routing.js';
 
 function NavigationHarness() {
   const [path, navigate] = usePath();
@@ -66,5 +66,19 @@ describe('areaForPath', () => {
     ['/', null], ['/impressum', null], ['/datenschutz', null],
   ])('ordnet %s dem Bereich %s zu', (path, area) => {
     expect(areaForPath(path)).toBe(area);
+  });
+});
+
+describe('popStateChangedPath', () => {
+  it('unterscheidet Zurück von einer Route vom Zurück innerhalb derselben Seite (Dialog, Tab)', () => {
+    window.history.replaceState({}, '', '/turniere/t1');
+    render(<NavigationHarness />);
+    act(() => {
+      window.history.replaceState({ ptmNav: true }, '', '/');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect(popStateChangedPath()).toBe(true);
+    act(() => window.dispatchEvent(new PopStateEvent('popstate')));
+    expect(popStateChangedPath()).toBe(false);
   });
 });

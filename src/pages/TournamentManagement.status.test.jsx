@@ -126,4 +126,21 @@ describe('Turnierverwaltung: Anmeldestatus', () => {
     expect(screen.getByText('1 Warteliste')).toBeInTheDocument();
   });
 
+  it('öffnet per Klick aufs Turnier die Turnierdetails wie die Hauptliste und markiert die Zeile', () => {
+    const setSelectedTournamentId = vi.fn();
+    const onOpenTournament = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <TournamentManagementPage
+          tournaments={[{ ...tournament, canManage: true }]}
+          currentUser={{ id: 'u1' }} language="de" setSelectedTournamentId={setSelectedTournamentId}
+          onOpenTournament={onOpenTournament}
+        />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Testturnier/ }));
+    expect(onOpenTournament).toHaveBeenCalledWith('t1');
+    expect(setSelectedTournamentId).toHaveBeenCalledWith('t1');
+  });
+
 });
