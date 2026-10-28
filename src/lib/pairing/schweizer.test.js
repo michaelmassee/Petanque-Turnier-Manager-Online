@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sameSwissRankingPlace, sortSwiss, swissStats, generateRound } from './schweizer.js';
+import runde16History from './schweizer.32-teams-runde-16.json';
 
 const teams = Array.from({ length: 6 }, (_, index) => ({ id: `t${index + 1}`, seedPosition: index + 1 }));
 
@@ -69,5 +70,17 @@ describe('Schweizer Pairing', () => {
     expect(matches).toHaveLength(3);
     expect(matches.filter((match) => match.teamA[0] === 't1' && played.has(match.teamB[0]))).toHaveLength(1);
     expect(new Set(matches.flatMap((match) => [...match.teamA, ...match.teamB])).size).toBe(6);
+  });
+
+  it('findet auch in späten Runden großer Felder eine wiederholungsfreie Paarung, wenn es eine gibt', () => {
+    // Review-Fall 32 Teams, Runde 16: das frühere Backtracking mit Suchbudget lieferte acht Wiederholungen
+    // (und brauchte fast eine Sekunde CPU), obwohl eine Paarung ohne Wiederholung existiert.
+    const id = (index) => `t${String(index).padStart(3, '0')}`;
+    const fieldTeams = Array.from({ length: 32 }, (_, index) => ({ id: id(index) }));
+    const history = runde16History.map(([a, b, scoreA, scoreB]) => ({ teamA: [id(a)], teamB: [id(b)], scoreA, scoreB }));
+    const played = new Set(history.map((match) => [match.teamA[0], match.teamB[0]].sort().join('|')));
+    const { matches } = generateRound(fieldTeams, history);
+    expect(new Set(matches.flatMap((match) => [...match.teamA, ...match.teamB])).size).toBe(32);
+    expect(matches.filter((match) => played.has([match.teamA[0], match.teamB[0]].sort().join('|')))).toEqual([]);
   });
 });
