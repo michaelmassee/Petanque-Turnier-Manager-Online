@@ -6,7 +6,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { DISPLAY_FIT_QUERY, useAutoScroll, useLivePushRefresh, useMediaQuery, useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { DISPLAY_LOCALES, REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
-import { isCalendarEntry, isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl, calendarEventLink } from '../lib/domain.js';
+import { isCalendarEntry, isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, calendarEventLink } from '../lib/domain.js';
 import { AccountBadge, Button, ClockIcon, Feedback, NumberIcon, RequiredMark, SearchIcon, ShareIcon, SortAlphaIcon, StarIcon } from '../components/ui.jsx';
 import { loadParticipantListPrefs, nextVipFilter, saveParticipantListPrefs } from '../lib/participantListPrefs.js';
 import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
@@ -102,16 +102,6 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
             </a>
           )}
         </div>
-        {tournament.logoUrl && (
-          <img
-            className="tournament-logo tournament-info-logo"
-            src={tournamentImageUrl(tournament.id, 'logo', shareToken)}
-            alt=""
-            onError={(event) => {
-              event.target.style.display = 'none';
-            }}
-          />
-        )}
       </div>
       {showTimezoneHint && <p className="hint">{(TIMEZONE_HINT_TEMPLATES[language] || TIMEZONE_HINT_TEMPLATES.de)(tournamentTimeZone)}</p>}
       {showTitle && <h2 data-i18n-skip>{tournament.name}</h2>}

@@ -2326,12 +2326,6 @@ a.left-panel-link {
   overflow-wrap: anywhere;
 }
 
-.tournament-info-logo {
-  max-width: 44px;
-  max-height: 44px;
-  flex: 0 1 44px;
-}
-
 .participants-list {
   display: grid;
   gap: 10px;

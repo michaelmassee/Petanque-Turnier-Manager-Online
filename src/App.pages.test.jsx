@@ -840,7 +840,7 @@ describe('Öffentliche Turnierdetailseite', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Vereinsabend' })).toBeInTheDocument();
-    expect(container.querySelector('.tournament-info-logo')).toHaveAttribute('src', '/api/tournaments/calendar-1/image?field=logo');
+    expect(container.querySelector('.tournament-info-logo')).toBeNull();
     expect(screen.getByText('Gemeinsames Spielen.')).toBeInTheDocument();
     expect(screen.queryByText('Formation')).not.toBeInTheDocument();
     expect(screen.queryByText('Anmeldetyp')).not.toBeInTheDocument();
