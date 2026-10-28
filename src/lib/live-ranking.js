@@ -21,11 +21,11 @@ export function normalizeRanking(ranking) {
   });
 }
 
-const OPTIONAL_COLUMNS = new Set(['bhz', 'fbhz', 'wertung', 'losses', 'gameDiff']);
+const OPTIONAL_COLUMNS = new Set(['bhz', 'fbhz', 'wertung', 'gameDiff']);
 
 /**
  * Spalten-Schlüssel der Rangliste je Turniersystem (wie im Turnierdokument): Schweizer/Maastrichter mit Buchholz,
- * Formule X mit Wertung, sonst Niederlagen und Spieldifferenz. Wertungskriterien, die kein Eintrag führt (z. B. weil
+ * Formule X mit Wertung, sonst Spieldifferenz; Niederlagen zeigt die Rangliste nicht. Wertungskriterien, die kein Eintrag führt (z. B. weil
  * das verbundene Dokument sie nicht überträgt), entfallen.
  */
 export function rankingColumnKeys(tournament, entries) {
@@ -35,7 +35,6 @@ export function rankingColumnKeys(tournament, entries) {
     'rank', 'label', 'wins',
     ...(swiss && tournament?.schweizerRankingMode !== 'ohne_buchholz' ? ['bhz', 'fbhz'] : []),
     ...(formuleX ? ['wertung'] : []),
-    ...(!swiss ? ['losses'] : []),
     ...(!swiss && !formuleX ? ['gameDiff'] : []),
     'pointsFor', 'pointsAgainst', 'pointsDiff',
   ];
@@ -51,10 +50,43 @@ export function rankingColumnLabel(key, tournament, t) {
     case 'bhz': return t('BHZ');
     case 'fbhz': return t('FBHZ');
     case 'wertung': return t('Wertung');
-    case 'losses': return t('Niederlagen');
     case 'gameDiff': return t('Spieldifferenz');
     case 'pointsFor': return t('Punkte+');
     case 'pointsAgainst': return t('Punkte−');
     default: return t('Δ');
   }
+}
+
+const POINT_SUB_LABELS = { pointsFor: '+', pointsAgainst: '−', pointsDiff: 'Δ' };
+
+/**
+ * Zweizeiliger Tabellenkopf (Tabelle und PDF, wie im Turnierdokument): Einzelspalten überspannen beide Zeilen, die
+ * Gruppen „Spiele“ und „Punkte“ tragen in der zweiten Zeile +, − und Δ. Siege werden nur zur Spiele-Gruppe, wenn es
+ * eine Spieldifferenz gibt.
+ */
+export function rankingHeaderGroups(columns, tournament, t) {
+  const withGameDiff = columns.includes('gameDiff');
+  const groups = [];
+  for (const key of columns) {
+    let group = null;
+    if (withGameDiff && (key === 'wins' || key === 'gameDiff')) group = { id: 'games', label: t('Spiele'), sub: key === 'wins' ? '+' : 'Δ' };
+    else if (POINT_SUB_LABELS[key]) group = { id: 'points', label: t('Punkte'), sub: POINT_SUB_LABELS[key] };
+    const last = groups[groups.length - 1];
+    if (group && last?.id === group.id) {
+      last.keys.push(key);
+      last.subLabels.push(group.sub);
+    } else if (group) {
+      groups.push({ id: group.id, label: group.label, keys: [key], subLabels: [group.sub] });
+    } else {
+      groups.push({ id: key, label: rankingColumnLabel(key, tournament, t), keys: [key] });
+    }
+  }
+  return groups;
+}
+
+/** Zellwert der Rangliste: Differenzen mit Vorzeichen (+3, −2), fehlende Werte als Gedankenstrich. */
+export function rankingValue(key, value) {
+  if (value == null) return '—';
+  if ((key === 'gameDiff' || key === 'pointsDiff') && value !== 0) return value > 0 ? `+${value}` : `−${Math.abs(value)}`;
+  return String(value);
 }

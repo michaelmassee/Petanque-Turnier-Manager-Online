@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { createFlyerTypesetter } from './flyer-text.js';
-import { buildRankingPages, rankingFileName, rankingPdfColumns, rankingPdfHeader, rankingPdfValue, renderRankingSvg, RANKING_PAGE } from './ranking-pdf.js';
+import { rankingColumnKeys, rankingHeaderGroups, rankingValue } from './live-ranking.js';
+import { buildRankingPages, rankingFileName, renderRankingSvg, RANKING_PAGE } from './ranking-pdf.js';
 
 const require = createRequire(import.meta.url);
 const typeset = createFlyerTypesetter(async (subset, weight, style) => readFileSync(require.resolve(`@fontsource/noto-sans/files/noto-sans-${subset}-${weight}-${style}.woff`)),
@@ -45,14 +46,14 @@ describe('Ranglisten-PDF', () => {
   });
 });
 
-describe('Ranglisten-PDF: Spalten', () => {
+describe('Ranglisten-Spalten (Tabelle und PDF)', () => {
   const koEntry = { rank: 1, registrationIds: ['r1'], label: 'Team A', wins: 2, losses: 1, gameDiff: 1, pointsFor: 30, pointsAgainst: 31, pointsDiff: -1 };
 
   it('lässt Niederlagen weg und fasst Spiele und Punkte zu Gruppen mit +, − und Δ zusammen', () => {
     const ko = { type: 'ko' };
-    const columns = rankingPdfColumns(ko, [koEntry]);
+    const columns = rankingColumnKeys(ko, [koEntry]);
     expect(columns).toEqual(['rank', 'label', 'wins', 'gameDiff', 'pointsFor', 'pointsAgainst', 'pointsDiff']);
-    expect(rankingPdfHeader(columns, ko, t)).toEqual([
+    expect(rankingHeaderGroups(columns, ko, t)).toEqual([
       { id: 'rank', label: 'Platz', keys: ['rank'] },
       { id: 'label', label: 'Team', keys: ['label'] },
       { id: 'games', label: 'Spiele', keys: ['wins', 'gameDiff'], subLabels: ['+', 'Δ'] },
@@ -61,14 +62,14 @@ describe('Ranglisten-PDF: Spalten', () => {
   });
 
   it('behält Siege als Einzelspalte, wenn es keine Spieldifferenz gibt (Schweizer)', () => {
-    const columns = rankingPdfColumns(tournament, [entry(0)]);
-    expect(rankingPdfHeader(columns, tournament, t).map((group) => group.label)).toEqual(['Platz', 'Team', 'Siege', 'BHZ', 'FBHZ', 'Punkte']);
+    const columns = rankingColumnKeys(tournament, [entry(0)]);
+    expect(rankingHeaderGroups(columns, tournament, t).map((group) => group.label)).toEqual(['Platz', 'Team', 'Siege', 'BHZ', 'FBHZ', 'Punkte']);
   });
 
   it('zeigt Differenzen mit Vorzeichen', () => {
-    expect(['gameDiff', 'pointsDiff'].map((key) => [rankingPdfValue(key, 3), rankingPdfValue(key, -2), rankingPdfValue(key, 0)])).toEqual([['+3', '−2', '0'], ['+3', '−2', '0']]);
-    expect(rankingPdfValue('wins', 3)).toBe('3');
-    expect(rankingPdfValue('pointsDiff', null)).toBe('—');
+    expect(['gameDiff', 'pointsDiff'].map((key) => [rankingValue(key, 3), rankingValue(key, -2), rankingValue(key, 0)])).toEqual([['+3', '−2', '0'], ['+3', '−2', '0']]);
+    expect(rankingValue('wins', 3)).toBe('3');
+    expect(rankingValue('pointsDiff', null)).toBe('—');
   });
 
   it('setzt die K.O.-Rangliste mit zweizeiligem Kopf', async () => {

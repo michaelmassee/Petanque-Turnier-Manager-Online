@@ -68,9 +68,10 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     expect(screen.getByText('A3')).toBeInTheDocument();
     expect(screen.getByText(/Turnierdaten vom/)).toBeInTheDocument();
     expect(screen.getAllByRole('columnheader').map((cell) => cell.textContent))
-      .toEqual(['Platz', 'Team', 'Siege', 'Niederlagen', 'Spieldifferenz', 'Punkte+', 'Punkte−', 'Δ']);
+      .toEqual(['Platz', 'Team', 'Spiele', 'Punkte', '+', 'Δ', '+', '−', 'Δ']);
+    expect(screen.getByRole('columnheader', { name: 'Punkte Δ' })).toBeInTheDocument();
     const row = screen.getAllByRole('cell', { name: 'Anna Muster' }).at(-1).closest('tr');
-    expect(row).toHaveTextContent('6');
+    expect(row).toHaveTextContent('+6');
   });
 
   it('zeigt die aktuelle Runde und die Rangliste rein lesend an, nur mit „Aktualisieren“', async () => {
@@ -126,7 +127,8 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
 
     expect(await screen.findByRole('heading', { name: 'Endrangliste' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Runde 1' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('row')).toHaveLength(3);
+    // Zwei Kopfzeilen (Spiele/Punkte mit +, − und Δ) und die beiden Einträge.
+    expect(screen.getAllByRole('row')).toHaveLength(4);
     expect(document.querySelectorAll('.display-scroll')).toHaveLength(1);
     expect(document.querySelector('.display-columns.has-ranking')).toBeNull();
   });

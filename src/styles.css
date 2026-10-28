@@ -4033,12 +4033,19 @@ a.left-panel-link {
   text-align: left;
 }
 
-.ranking-table thead th {
+.ranking-table thead {
   position: sticky;
   top: 0;
+  z-index: 1;
+}
+
+.ranking-table thead th {
   background: #f4f6fa;
   border-bottom: 1px solid #d7deea;
-  z-index: 1;
+}
+
+.ranking-table thead th.ranking-group {
+  padding-bottom: 2px;
 }
 
 /* Veröffentlichte Endrangliste: Kopf mit Vereinslogo links, PTM-Logo rechts */

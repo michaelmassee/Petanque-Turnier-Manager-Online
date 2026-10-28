@@ -1,6 +1,6 @@
 import { fileNameSlug } from './flyer-scene.js';
 import { PX_PER_MM, el, stackNode, textNode } from './flyer-text.js';
-import { rankingColumnKeys, rankingColumnLabel } from './live-ranking.js';
+import { rankingColumnKeys, rankingHeaderGroups, rankingValue } from './live-ranking.js';
 
 // Endrangliste als A4-PDF: Texte setzt satori wie beim Flyer als Vektorpfade (alle Noto-Sans-Teilschriften, also auch
 // Ł, Кириллица …), das PDF entsteht mit svg2pdf im Browser. Kein Serveraufwand, keine eingebetteten Schriftdateien.
@@ -44,44 +44,6 @@ function columnCell(key, value, options = {}) {
   return cell(value, { width: columnWidth(key), align: key === 'rank' ? 'left' : 'right', ...options });
 }
 
-// Im PDF wie im Turnierdokument ohne Niederlagen: Spiele und Punkte als Gruppen mit +, − und Δ.
-export function rankingPdfColumns(tournament, entries) {
-  return rankingColumnKeys(tournament, entries).filter((key) => key !== 'losses');
-}
-
-const POINT_SUB_LABELS = { pointsFor: '+', pointsAgainst: '−', pointsDiff: 'Δ' };
-
-/**
- * Zweizeiliger Tabellenkopf: Einzelspalten überspannen beide Zeilen, Gruppen („Spiele“, „Punkte“) tragen in der
- * zweiten Zeile +, − und Δ. Siege werden nur zur Spiele-Gruppe, wenn es eine Spieldifferenz gibt.
- */
-export function rankingPdfHeader(columns, tournament, t) {
-  const withGameDiff = columns.includes('gameDiff');
-  const groups = [];
-  for (const key of columns) {
-    let group = null;
-    if (withGameDiff && (key === 'wins' || key === 'gameDiff')) group = { id: 'games', label: t('Spiele'), sub: key === 'wins' ? '+' : 'Δ' };
-    else if (POINT_SUB_LABELS[key]) group = { id: 'points', label: t('Punkte'), sub: POINT_SUB_LABELS[key] };
-    const last = groups[groups.length - 1];
-    if (group && last?.id === group.id) {
-      last.keys.push(key);
-      last.subLabels.push(group.sub);
-    } else if (group) {
-      groups.push({ id: group.id, label: group.label, keys: [key], subLabels: [group.sub] });
-    } else {
-      groups.push({ id: key, label: rankingColumnLabel(key, tournament, t), keys: [key] });
-    }
-  }
-  return groups;
-}
-
-// Differenzen mit Vorzeichen (+3, −2), alle übrigen Werte unverändert.
-export function rankingPdfValue(key, value) {
-  if (value == null) return '—';
-  if ((key === 'gameDiff' || key === 'pointsDiff') && value !== 0) return value > 0 ? `+${value}` : `−${Math.abs(value)}`;
-  return String(value);
-}
-
 function headerNode(groups) {
   const headerCell = (key, text, align) => columnCell(key, text, { weight: 700, color: BRAND, ...(align ? { align } : {}) });
   return el('div', {
@@ -103,7 +65,7 @@ function tableNode(columns, groups, entries, firstIndex) {
   return stackNode([
     headerNode(groups),
     ...entries.map((entry, offset) => tableRow(
-      columns.map((key) => columnCell(key, rankingPdfValue(key, entry[key]))),
+      columns.map((key) => columnCell(key, rankingValue(key, entry[key]))),
       { background: (firstIndex + offset) % 2 === 1 ? STRIPE : null },
     )),
   ]);
@@ -135,8 +97,8 @@ export async function buildRankingPages({ tournament, entries, header, logos, fo
   const tableTop = MARGIN + Math.max(LOGO_BOX, headerBlock.height) + 7;
   const available = RANKING_PAGE.height - MARGIN - FOOTER_HEIGHT - tableTop;
 
-  const columns = rankingPdfColumns(tournament, entries);
-  const groups = rankingPdfHeader(columns, tournament, t);
+  const columns = rankingColumnKeys(tournament, entries);
+  const groups = rankingHeaderGroups(columns, tournament, t);
   const chunks = [];
   let start = 0;
   // Zeilen je Seite: so viele wie passen; umbrechende Namen machen Zeilen höher, daher nachmessen.

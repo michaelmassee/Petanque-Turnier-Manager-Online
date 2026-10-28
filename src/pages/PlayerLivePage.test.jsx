@@ -176,12 +176,12 @@ describe('Live-Ansicht für Spieler', () => {
   });
 
   it.each([
-    ['schweizer', 'forme', 'mit_buchholz', ['Platz', 'Team', 'Siege', 'BHZ', 'FBHZ', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '5', '12', '13', '5', '8']],
-    ['schweizer', 'forme', 'ohne_buchholz', ['Platz', 'Team', 'Siege', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '13', '5', '8']],
-    ['formule_x', 'forme', null, ['Platz', 'Team', 'Siege', 'Wertung', 'Niederlagen', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '121', '0', '13', '5', '8']],
-    ['rangliste', 'supermelee', null, ['Platz', 'Spieler', 'Siege', 'Niederlagen', 'Spieldifferenz', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '0', '1', '13', '5', '8']],
-    ['jeder_gegen_jeden', 'forme', null, ['Platz', 'Team', 'Siege', 'Niederlagen', 'Spieldifferenz', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '0', '1', '13', '5', '8']],
-    ['maastrichter', 'forme', 'mit_buchholz', ['Platz', 'Team', 'Siege', 'BHZ', 'FBHZ', 'Punkte+', 'Punkte−', 'Δ'], ['1', 'Anna Muster', '1', '5', '12', '13', '5', '8']],
+    ['schweizer', 'forme', 'mit_buchholz', ['Platz', 'Team', 'Siege', 'BHZ', 'FBHZ', 'Punkte', '+', '−', 'Δ'], ['1', 'Anna Muster', '1', '5', '12', '13', '5', '+8']],
+    ['schweizer', 'forme', 'ohne_buchholz', ['Platz', 'Team', 'Siege', 'Punkte', '+', '−', 'Δ'], ['1', 'Anna Muster', '1', '13', '5', '+8']],
+    ['formule_x', 'forme', null, ['Platz', 'Team', 'Siege', 'Wertung', 'Punkte', '+', '−', 'Δ'], ['1', 'Anna Muster', '1', '121', '13', '5', '+8']],
+    ['rangliste', 'supermelee', null, ['Platz', 'Spieler', 'Spiele', 'Punkte', '+', 'Δ', '+', '−', 'Δ'], ['1', 'Anna Muster', '1', '+1', '13', '5', '+8']],
+    ['jeder_gegen_jeden', 'forme', null, ['Platz', 'Team', 'Spiele', 'Punkte', '+', 'Δ', '+', '−', 'Δ'], ['1', 'Anna Muster', '1', '+1', '13', '5', '+8']],
+    ['maastrichter', 'forme', 'mit_buchholz', ['Platz', 'Team', 'Siege', 'BHZ', 'FBHZ', 'Punkte', '+', '−', 'Δ'], ['1', 'Anna Muster', '1', '5', '12', '13', '5', '+8']],
   ])('zeigt die passende Rangliste für %s / %s / %s', async (type, registrationType, schweizerRankingMode, headers, values) => {
     const payload = livePayload();
     Object.assign(payload.tournament, { type, registrationType, schweizerRankingMode });
@@ -217,7 +217,7 @@ describe('Live-Ansicht für Spieler', () => {
     const table = await screen.findByRole('table', { hidden: true });
     fireEvent.click(screen.getByText('Rangliste anzeigen'));
     expect(within(table).getAllByRole('columnheader').map((cell) => cell.textContent))
-      .toEqual(['Platz', 'Team', 'Siege', 'Punkte+', 'Punkte−', 'Δ']);
+      .toEqual(['Platz', 'Team', 'Siege', 'Punkte', '+', '−', 'Δ']);
   });
 
   it('zeigt keine generische Rangliste für K.O.', async () => {
