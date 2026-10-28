@@ -892,7 +892,7 @@ a.left-panel-link {
 .postbox-message-head { display: flex; align-items: center; gap: 4px; }
 .postbox-message-head .postbox-message-open { flex: 1; min-width: 0; }
 .postbox-message-open:focus-visible { outline: 3px solid rgb(22 119 255 / 35%); outline-offset: 2px; border-radius: 4px; }
-.rich-text a, .postbox-message-body a { overflow-wrap: anywhere; }
+.rich-text a, .rich-text-plain a, .postbox-message-body a { overflow-wrap: anywhere; }
 .postbox-message-body .rich-text p, .postbox-message-body .rich-text h2, .postbox-message-body .rich-text ul, .postbox-message-body .rich-text ol { margin: 0; }
 .postbox-message-body .rich-text h2 { font-size: 1rem; }
 .postbox-message-body .rich-text ul, .postbox-message-body .rich-text ol { padding-left: 1.25rem; }
