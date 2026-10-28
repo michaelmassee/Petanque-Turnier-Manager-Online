@@ -1888,6 +1888,23 @@ a.left-panel-link {
 .tournament-qr-canvas {
   width: min(280px, 100%);
   height: auto;
+  animation: tournament-qr-wiggle 4s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+
+/* Kurz wackeln (~0,6 s), dann stillstehen; nur Darstellung, das PNG bleibt gerade. */
+@keyframes tournament-qr-wiggle {
+  0%, 15%, 100% { transform: rotate(0); }
+  3% { transform: rotate(-4deg); }
+  6% { transform: rotate(4deg); }
+  9% { transform: rotate(-3deg); }
+  12% { transform: rotate(2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tournament-qr-canvas {
+    animation: none;
+  }
 }
 
 .tournament-qr-panel .qr-url {
