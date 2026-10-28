@@ -1117,6 +1117,51 @@ a.left-panel-link {
 
 .drawer-link-icon-quickstart { background: #fff4e0; color: #b45309; fill: #fbbf24; }
 
+.quickstart-formations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+.quickstart-formations legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 800;
+}
+
+.quickstart-formations label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid #cfd6e4;
+  border-radius: 999px;
+  background: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quickstart-formations label.active {
+  border-color: #1677ff;
+  background: #1677ff;
+  color: #ffffff;
+}
+
+.quickstart-formations label:focus-within {
+  outline: 2px solid #1677ff;
+  outline-offset: 2px;
+}
+
+.quickstart-formations input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .quickstart-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));

@@ -20,7 +20,7 @@ describe('Schnellstart', () => {
     const onStarted = vi.fn();
     render(<TournamentQuickStart currentUser={user} onStarted={onStarted} />);
 
-    const button = screen.getByRole('button', { name: 'Supermêlée Doublette' });
+    const button = screen.getByRole('button', { name: 'Supermêlée' });
     fireEvent.click(button);
 
     await waitFor(() => expect(authenticatedApi).toHaveBeenCalledTimes(2));
@@ -28,11 +28,25 @@ describe('Schnellstart', () => {
     expect(button.querySelector('.button-spinner')).not.toBeNull();
     const [createPath, createOptions] = authenticatedApi.mock.calls[0];
     expect(createPath).toBe('/api/tournaments');
-    expect(JSON.parse(createOptions.body)).toMatchObject({ visibility: 'private', registrationType: 'supermelee', type: 'rangliste', location: 'BC Linden' });
+    expect(JSON.parse(createOptions.body)).toMatchObject({ visibility: 'private', registrationType: 'supermelee', type: 'rangliste', formation: 'doublette', location: 'BC Linden' });
+    expect(screen.getByRole('radio', { name: 'Triplette' })).toBeDisabled();
     expect(authenticatedApi.mock.calls[1]).toEqual(['/api/tournaments/t9/start', { method: 'POST' }]);
 
     finishStart();
     await waitFor(() => expect(onStarted).toHaveBeenCalledWith('t9'));
+  });
+
+  it('legt das Turnier in der gewählten Formation an und blendet Supermêlée bei Tête aus', async () => {
+    authenticatedApi.mockResolvedValue({ tournament: { id: 't3' } });
+    render(<TournamentQuickStart currentUser={user} onStarted={vi.fn()} />);
+
+    expect(screen.getByRole('radio', { name: 'Doublette' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: 'Tête' }));
+    expect(screen.queryByRole('button', { name: 'Supermêlée' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Jeder gegen Jeden' }));
+
+    await waitFor(() => expect(authenticatedApi).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(authenticatedApi.mock.calls[0][1].body)).toMatchObject({ type: 'jeder_gegen_jeden', formation: 'tete', registrationType: 'forme', name: expect.stringMatching(/^Jeder gegen Jeden Tête \d{4}-\d{2}-\d{2}$/) });
   });
 
   it('zeigt einen Fehler beim Anlegen sichtbar an', async () => {
@@ -40,7 +54,7 @@ describe('Schnellstart', () => {
     const onStarted = vi.fn();
     render(<TournamentQuickStart currentUser={user} onStarted={onStarted} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'K.O. Doublette' }));
+    fireEvent.click(screen.getByRole('button', { name: 'K.O.' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Turnier-Limit erreicht.');
     expect(onStarted).not.toHaveBeenCalled();
@@ -53,7 +67,7 @@ describe('Schnellstart', () => {
     const onCreated = vi.fn();
     render(<TournamentQuickStart currentUser={user} onStarted={vi.fn()} onCreated={onCreated} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Schweizer Doublette' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Schweizer' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Das Turnier wurde angelegt, konnte aber nicht gestartet werden.');
     expect(onCreated).toHaveBeenCalled();
