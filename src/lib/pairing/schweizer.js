@@ -59,17 +59,37 @@ export function sameSwissRankingPlace(a, b, mode = 'mit_buchholz') {
     && a.pointsFor === b.pointsFor;
 }
 
-function pairOrdered(ordered, played) {
-  const result = [];
-  for (let index = 0; index < ordered.length; index += 2) {
-    const a = ordered[index]; let candidate = index + 1;
-    while (candidate < ordered.length && played.has(pairKey(a.id, ordered[candidate].id))) candidate++;
-    if (candidate >= ordered.length) candidate = index + 1; // Hauptprojekt-Fallback: Rematch nur wenn unvermeidbar.
-    const b = ordered[candidate];
-    ordered.splice(candidate, 1); ordered.splice(index, 1);
-    result.push({ teamA: [a.id], teamB: [b.id] }); index -= 2;
+// Paarung von oben nach unten mit Backtracking wie SchweizerSystem.paareGruppen() im Hauptprojekt:
+// jedes Team bekommt den ersten noch nicht gespielten Gegner in Ranglistenreihenfolge (eigene Sieggruppe
+// zuerst, sonst Float nach unten). Wiederholungen nur, wenn keine wiederholungsfreie Paarung existiert,
+// und dann so wenige wie möglich. Greedy je Gruppe erzwang eine vermeidbare Wiederholung, sobald die
+// oberste Gruppe festsaß.
+const MAX_SEARCH_STEPS = 200_000;
+
+function pairBacktracking(open, allowedRepeats, chosen, budget, played) {
+  if (!open.length) return true;
+  if (--budget.steps < 0) return false;
+  const team = open.shift();
+  for (let index = 0; index < open.length; index++) {
+    const opponent = open[index];
+    const repeat = played.has(pairKey(team.id, opponent.id));
+    if (repeat && allowedRepeats === 0) continue;
+    open.splice(index, 1);
+    chosen.push({ teamA: [team.id], teamB: [opponent.id] });
+    if (pairBacktracking(open, allowedRepeats - (repeat ? 1 : 0), chosen, budget, played)) return true;
+    chosen.pop();
+    open.splice(index, 0, opponent);
   }
-  return result;
+  open.unshift(team);
+  return false;
+}
+
+function pairOrdered(ordered, played) {
+  for (let allowedRepeats = 0; allowedRepeats <= ordered.length / 2; allowedRepeats++) {
+    const chosen = [];
+    if (pairBacktracking([...ordered], allowedRepeats, chosen, { steps: MAX_SEARCH_STEPS }, played)) return chosen;
+  }
+  return [];
 }
 
 export function generateRound(teams, history, { mode = 'mit_buchholz' } = {}) {
@@ -88,14 +108,8 @@ export function generateRound(teams, history, { mode = 'mit_buchholz' } = {}) {
     const bye = [...ordered].reverse().find((team) => !hadBye.has(team.id)) || ordered[ordered.length - 1];
     ordered = ordered.filter((team) => team.id !== bye.id); matches.push({ teamA: [bye.id], teamB: [] });
   }
-  const groups = new Map();
-  for (const team of ordered) { const wins = ranked.find((entry) => entry.teamId === team.id).wins; groups.set(wins, [...(groups.get(wins) || []), team]); }
-  let floating = null;
-  for (const group of [...groups.values()]) {
-    if (floating) group.unshift(floating);
-    floating = group.length % 2 ? group.pop() : null;
-    matches.push(...pairOrdered([...group], played));
-  }
-  if (floating) matches.push({ teamA: [floating.id], teamB: [] });
+  // Sieggruppen mit Float nach unten ergeben genau die Ranglistenreihenfolge (Hauptprojekt:
+  // baueSiegeGruppen() hängt das Float-Team vorne an die nächste Gruppe), daher direkt gesamt paaren.
+  matches.push(...pairOrdered(ordered, played));
   return { matches };
 }

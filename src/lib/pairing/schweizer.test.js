@@ -47,4 +47,27 @@ describe('Schweizer Pairing', () => {
     expect(sameSwissRankingPlace({ ...base, bhz: 3, fbhz: 4 }, { ...base, bhz: 4, fbhz: 4 })).toBe(false);
     expect(sameSwissRankingPlace({ ...base, bhz: 3, fbhz: 4 }, { ...base, bhz: 4, fbhz: 4 }, 'ohne_buchholz')).toBe(true);
   });
+
+  it('erzeugt keine vermeidbare Wiederholung, wenn die oberste Sieggruppe festsitzt (Hauptprojekt test-schweizer.ods, Runde 4)', () => {
+    // Runden 1–3: 3–2, 5–4, 6–1 | 5–3, 1–2, 6–4 | 4–2, 3–1, 6–5 → Rangfolge 5, 3, 6, 4, 2, 1
+    const game = (a, b, scoreA, scoreB) => ({ teamA: [`t${a}`], teamB: [`t${b}`], scoreA, scoreB });
+    const history = [
+      game(3, 2, 13, 12), game(5, 4, 13, 12), game(6, 1, 13, 0),
+      game(5, 3, 13, 12), game(1, 2, 13, 12), game(6, 4, 7, 13),
+      game(4, 2, 12, 13), game(3, 1, 13, 12), game(6, 5, 12, 13),
+    ];
+    expect(sortSwiss(swissStats(teams, history)).map((entry) => entry.teamId)).toEqual(['t5', 't3', 't6', 't4', 't2', 't1']);
+    const { matches } = generateRound(teams, history);
+    expect(matches.map((match) => `${match.teamA[0]}–${match.teamB[0]}`)).toEqual(['t5–t2', 't3–t6', 't4–t1']);
+  });
+
+  it('lässt nur unvermeidbare Wiederholungen zu, und so wenige wie möglich', () => {
+    // t1 hat schon gegen t2..t6 gespielt; nur t1 muss wiederholen, die übrigen werden neu gepaart
+    const history = ['t2', 't3', 't4', 't5', 't6'].map((id) => ({ teamA: ['t1'], teamB: [id], scoreA: 13, scoreB: 7 }));
+    const { matches } = generateRound(teams, history);
+    const played = new Set(history.map((match) => match.teamB[0]));
+    expect(matches).toHaveLength(3);
+    expect(matches.filter((match) => match.teamA[0] === 't1' && played.has(match.teamB[0]))).toHaveLength(1);
+    expect(new Set(matches.flatMap((match) => [...match.teamA, ...match.teamB])).size).toBe(6);
+  });
 });
