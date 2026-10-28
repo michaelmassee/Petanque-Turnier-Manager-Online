@@ -17,10 +17,10 @@ function clusterSize(count) {
 
 const ICON_SIZES = { small: 34, medium: 40, large: 48 };
 
-function createClusterIcon(cluster) {
+function createClusterIcon(cluster, labelKey) {
   const count = clusterPlaceCount(cluster.getAllChildMarkers());
   const size = clusterSize(count);
-  const label = i18next.t('{count} Bouleplätze').replace('{count}', count);
+  const label = i18next.t(labelKey).replace('{count}', count);
   return L.divIcon({
     className: `place-cluster-icon place-cluster-icon--${size}`,
     html: `<span title="${label}" aria-label="${label}">${count}</span>`,
@@ -30,12 +30,13 @@ function createClusterIcon(cluster) {
 
 // Fasst nahe Marker zu einem Kreis mit Anzahl zusammen (leaflet.markercluster). Die Kinder (<Marker>, <Popup>)
 // hängen sich über den Kontext in die Cluster-Gruppe statt direkt in die Karte ein.
-export const MarkerClusterGroup = createPathComponent(({ children: _children, ...options }, context) => {
+// labelKey: i18n-Key mit {count} für Tooltip/Screenreader, z. B. '{count} Mitspielgesuche'.
+export const MarkerClusterGroup = createPathComponent(({ children: _children, labelKey = '{count} Bouleplätze', ...options }, context) => {
   const group = L.markerClusterGroup({
     showCoverageOnHover: false,
     spiderfyOnMaxZoom: true,
     maxClusterRadius: 50,
-    iconCreateFunction: createClusterIcon,
+    iconCreateFunction: (cluster) => createClusterIcon(cluster, labelKey),
     ...options,
   });
   return createElementObject(group, extendContext(context, { layerContainer: group }));

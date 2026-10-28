@@ -1852,5 +1852,6 @@
   "Es gibt noch keine Runde, die neu ausgelost werden kann": "Todavía no hay ninguna ronda que volver a sortear",
   "Runde 1 wurde zurückgenommen, weil die Mêlée-Teams nicht mehr zu den aktiven Spielern passen. Bitte Teams auslosen und Runde 1 neu starten.": "Se ha retirado la ronda 1 porque los equipos Mêlée ya no coinciden con los jugadores activos. Sortea los equipos y vuelve a iniciar la ronda 1.",
   "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "La organización ya ha introducido el resultado de tu partida.",
-  "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "Ya se ha comunicado un resultado para tu partida."
+  "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "Ya se ha comunicado un resultado para tu partida.",
+  "{count} Mitspielgesuche": "{count} búsquedas de jugadores"
 }

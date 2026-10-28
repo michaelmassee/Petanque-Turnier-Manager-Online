@@ -1852,5 +1852,6 @@
   "Es gibt noch keine Runde, die neu ausgelost werden kann": "Aucun tour ne peut encore être tiré à nouveau",
   "Runde 1 wurde zurückgenommen, weil die Mêlée-Teams nicht mehr zu den aktiven Spielern passen. Bitte Teams auslosen und Runde 1 neu starten.": "Le tour 1 a été annulé, car les équipes Mêlée ne correspondent plus aux joueurs actifs. Veuillez tirer les équipes et relancer le tour 1.",
   "Die Turnierleitung hat das Ergebnis deiner Partie bereits eingetragen.": "L'organisation a déjà saisi le résultat de ta partie.",
-  "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "Un résultat a déjà été signalé pour ta partie."
+  "Für deine Partie wurde bereits ein Ergebnis gemeldet.": "Un résultat a déjà été signalé pour ta partie.",
+  "{count} Mitspielgesuche": "{count} recherches de partenaires"
 }

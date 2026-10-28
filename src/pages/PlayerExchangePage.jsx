@@ -16,6 +16,7 @@ import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { TileFallbackMap, FitToBounds } from '../components/TileFallbackMap.jsx';
+import { MarkerClusterGroup } from '../components/MarkerClusterGroup.jsx';
 import { UsernameReportButton } from '../components/UsernameReportDialog.jsx';
 
 const FALLBACK_CENTER = [51.1, 10.4];
@@ -315,11 +316,13 @@ export default function PlayerExchangePage({ language, setLanguage, menuOpen, se
           <div className="panel">
             <TileFallbackMap center={center} maptilerApiKey={maptilerApiKey}>
               <FitToBounds positions={mapped.map((listing) => [listing.latitude, listing.longitude])} maxZoom={12} singleZoom={11} />
-              {mapped.map((listing) => (
-                <Marker key={listing.id} icon={marker} position={[listing.latitude, listing.longitude]}>
-                  <Popup><strong>{listing.title}</strong><br />{formatLocationAddress(listing.locationName)}</Popup>
-                </Marker>
-              ))}
+              <MarkerClusterGroup labelKey="{count} Mitspielgesuche">
+                {mapped.map((listing) => (
+                  <Marker key={listing.id} icon={marker} position={[listing.latitude, listing.longitude]}>
+                    <Popup><strong>{listing.title}</strong><br />{formatLocationAddress(listing.locationName)}</Popup>
+                  </Marker>
+                ))}
+              </MarkerClusterGroup>
             </TileFallbackMap>
           </div>
         )}

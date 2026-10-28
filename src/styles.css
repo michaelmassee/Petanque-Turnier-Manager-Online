@@ -1796,7 +1796,7 @@ a.left-panel-link {
   color: #3f566d;
 }
 
-/* Cluster der Bouleplatz-Karte: Kreis mit Anzahl der zusammengefassten Plätze. */
+/* Cluster der Karten (Bouleplätze, Spielerbörse): Kreis mit Anzahl der zusammengefassten Einträge. */
 .leaflet-marker-icon.place-cluster-icon {
   display: flex;
   align-items: center;
