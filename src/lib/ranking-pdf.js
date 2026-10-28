@@ -20,32 +20,90 @@ const FOOTER_HEIGHT = 8;
 const px = (mm) => Math.round(mm * PX_PER_MM * 100) / 100;
 const n = (value) => Math.round(value * 100) / 100;
 
+const JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' };
+
 function cell(text, { width, grow = false, align = 'left', weight = 400, color = TEXT }) {
   return el('div', {
-    display: 'flex', justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+    display: 'flex', alignItems: 'center', justifyContent: JUSTIFY[align],
     ...(grow ? { flexGrow: 1, flexShrink: 1, flexBasis: 0 } : { width: px(width), flexShrink: 0 }),
     paddingLeft: px(1.2), paddingRight: px(1.2),
   }, [textNode(text, { size: FONT, weight, color, align })]);
 }
 
-function tableRow(cells, { background, header = false } = {}) {
+function tableRow(cells, { background } = {}) {
   return el('div', {
     display: 'flex', flexDirection: 'row', alignItems: 'center', paddingTop: px(1.3), paddingBottom: px(1.3),
     ...(background ? { backgroundColor: background } : {}),
-    ...(header ? { borderBottom: `${px(0.4)}px solid ${BRAND}` } : {}),
   }, cells);
 }
 
+const columnWidth = (key) => (key === 'rank' ? RANK_COLUMN : NUMBER_COLUMN);
+
 function columnCell(key, value, options = {}) {
   if (key === 'label') return cell(value, { grow: true, ...options });
-  return cell(value, { width: key === 'rank' ? RANK_COLUMN : NUMBER_COLUMN, align: key === 'rank' ? 'left' : 'right', ...options });
+  return cell(value, { width: columnWidth(key), align: key === 'rank' ? 'left' : 'right', ...options });
 }
 
-function tableNode(columns, labels, entries, firstIndex) {
+// Im PDF wie im Turnierdokument ohne Niederlagen: Spiele und Punkte als Gruppen mit +, − und Δ.
+export function rankingPdfColumns(tournament, entries) {
+  return rankingColumnKeys(tournament, entries).filter((key) => key !== 'losses');
+}
+
+const POINT_SUB_LABELS = { pointsFor: '+', pointsAgainst: '−', pointsDiff: 'Δ' };
+
+/**
+ * Zweizeiliger Tabellenkopf: Einzelspalten überspannen beide Zeilen, Gruppen („Spiele“, „Punkte“) tragen in der
+ * zweiten Zeile +, − und Δ. Siege werden nur zur Spiele-Gruppe, wenn es eine Spieldifferenz gibt.
+ */
+export function rankingPdfHeader(columns, tournament, t) {
+  const withGameDiff = columns.includes('gameDiff');
+  const groups = [];
+  for (const key of columns) {
+    let group = null;
+    if (withGameDiff && (key === 'wins' || key === 'gameDiff')) group = { id: 'games', label: t('Spiele'), sub: key === 'wins' ? '+' : 'Δ' };
+    else if (POINT_SUB_LABELS[key]) group = { id: 'points', label: t('Punkte'), sub: POINT_SUB_LABELS[key] };
+    const last = groups[groups.length - 1];
+    if (group && last?.id === group.id) {
+      last.keys.push(key);
+      last.subLabels.push(group.sub);
+    } else if (group) {
+      groups.push({ id: group.id, label: group.label, keys: [key], subLabels: [group.sub] });
+    } else {
+      groups.push({ id: key, label: rankingColumnLabel(key, tournament, t), keys: [key] });
+    }
+  }
+  return groups;
+}
+
+// Differenzen mit Vorzeichen (+3, −2), alle übrigen Werte unverändert.
+export function rankingPdfValue(key, value) {
+  if (value == null) return '—';
+  if ((key === 'gameDiff' || key === 'pointsDiff') && value !== 0) return value > 0 ? `+${value}` : `−${Math.abs(value)}`;
+  return String(value);
+}
+
+function headerNode(groups) {
+  const headerCell = (key, text, align) => columnCell(key, text, { weight: 700, color: BRAND, ...(align ? { align } : {}) });
+  return el('div', {
+    display: 'flex', flexDirection: 'row', alignItems: 'stretch', paddingTop: px(1.3), paddingBottom: px(1.3),
+    borderBottom: `${px(0.4)}px solid ${BRAND}`,
+  }, groups.map((group) => {
+    if (!group.subLabels) return headerCell(group.keys[0], group.label);
+    const width = group.keys.reduce((sum, key) => sum + columnWidth(key), 0);
+    return el('div', { display: 'flex', flexDirection: 'column', width: px(width), flexShrink: 0 }, [
+      el('div', { display: 'flex', justifyContent: 'center', marginLeft: px(1.2), marginRight: px(1.2), paddingBottom: px(0.5), borderBottom: `${px(0.2)}px solid ${BRAND}` }, [
+        textNode(group.label, { size: FONT, weight: 700, color: BRAND, align: 'center' }),
+      ]),
+      el('div', { display: 'flex', flexDirection: 'row', paddingTop: px(0.5) }, group.keys.map((key, index) => headerCell(key, group.subLabels[index]))),
+    ]);
+  }));
+}
+
+function tableNode(columns, groups, entries, firstIndex) {
   return stackNode([
-    tableRow(columns.map((key, index) => columnCell(key, labels[index], { weight: 700, color: BRAND })), { header: true }),
+    headerNode(groups),
     ...entries.map((entry, offset) => tableRow(
-      columns.map((key) => columnCell(key, entry[key] == null ? '—' : String(entry[key]))),
+      columns.map((key) => columnCell(key, rankingPdfValue(key, entry[key]))),
       { background: (firstIndex + offset) % 2 === 1 ? STRIPE : null },
     )),
   ]);
@@ -77,17 +135,17 @@ export async function buildRankingPages({ tournament, entries, header, logos, fo
   const tableTop = MARGIN + Math.max(LOGO_BOX, headerBlock.height) + 7;
   const available = RANKING_PAGE.height - MARGIN - FOOTER_HEIGHT - tableTop;
 
-  const columns = rankingColumnKeys(tournament, entries);
-  const labels = columns.map((key) => rankingColumnLabel(key, tournament, t));
+  const columns = rankingPdfColumns(tournament, entries);
+  const groups = rankingPdfHeader(columns, tournament, t);
   const chunks = [];
   let start = 0;
   // Zeilen je Seite: so viele wie passen; umbrechende Namen machen Zeilen höher, daher nachmessen.
   do {
     let count = Math.min(entries.length - start, 45);
-    let block = await typeset(tableNode(columns, labels, entries.slice(start, start + count), start), contentWidth);
+    let block = await typeset(tableNode(columns, groups, entries.slice(start, start + count), start), contentWidth);
     while (block.height > available && count > 1) {
       count = Math.max(1, Math.min(count - 1, Math.floor(count * available / block.height)));
-      block = await typeset(tableNode(columns, labels, entries.slice(start, start + count), start), contentWidth);
+      block = await typeset(tableNode(columns, groups, entries.slice(start, start + count), start), contentWidth);
     }
     chunks.push(block);
     start += count;
