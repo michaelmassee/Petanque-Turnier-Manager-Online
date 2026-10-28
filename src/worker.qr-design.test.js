@@ -190,3 +190,46 @@ describe('QR-Code-Design pro Turnier', () => {
   });
 });
 
+describe('QR-Panel der Turnierseite (alle Besucher)', () => {
+  let env;
+  const sql = (statement, ...params) => env.DB.sqlite.prepare(statement).run(...params);
+  const abrufen = (query = '') => worker.fetch(new Request(`https://ptm.test/api/tournaments/t1/qr${query}`), env);
+
+  beforeEach(() => {
+    env = { DB: d1MitSchema() };
+    sql(`INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at)
+      VALUES ('u1', 'leitung@example.test', 'user', 'salt', 'hash', '2026-09-01', '2026-09-01')`);
+    sql(`INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ('s1', 'u1', '2099-01-01T00:00:00.000Z', '2026-09-01')`);
+    sql(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at, qr_design)
+      VALUES ('t1', 'u1', 'Turnier', '2099-10-04', 'Ort', 'triplette', 'registration', 'public', '2026-09-01', '2026-09-01', ?)`, JSON.stringify(DESIGN));
+  });
+
+  it('liefert anonym den festen Link im gespeicherten Design, der Link bleibt gleich', async () => {
+    const antwort = await abrufen();
+    expect(antwort.status).toBe(200);
+    const daten = await antwort.json();
+    expect(daten.qrUrl).toMatch(/\/q\/[A-Za-z0-9_-]{16,64}$/);
+    expect(daten.design).toEqual(DESIGN);
+    expect((await (await abrufen()).json()).qrUrl).toBe(daten.qrUrl);
+    // Derselbe Link wie im QR-Code der Turnierleitung.
+    expect(daten.qrUrl).toContain(await ensureTournamentQrToken(env.DB, 't1'));
+  });
+
+  it('zeigt private Turniere nur mit gültigem Freigabe-Schlüssel', async () => {
+    sql("UPDATE tournaments SET visibility = 'private' WHERE id = 't1'");
+    expect((await abrufen()).status).toBe(403);
+    const freigabe = await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/share-link', {
+      method: 'POST', headers: { Cookie: 'ptm_session=s1', Origin: 'https://ptm.test' },
+    }), env);
+    const { shareToken } = await freigabe.json();
+    expect((await abrufen(`?share=${shareToken}`)).status).toBe(200);
+    expect((await abrufen('?share=falsch')).status).toBe(403);
+  });
+
+  it('hat für öffentliche Entwürfe keinen Link', async () => {
+    sql("UPDATE tournaments SET status = 'draft' WHERE id = 't1'");
+    expect((await abrufen()).status).not.toBe(200);
+    expect(env.DB.sqlite.prepare("SELECT qr_token FROM tournaments WHERE id = 't1'").get().qr_token).toBeNull();
+  });
+});
+

@@ -8,37 +8,9 @@ import {
 } from '../lib/qr-style.js';
 import { Button, DownloadIcon, EditDialog, SelectField, ShareIcon, TextField } from './ui.jsx';
 import { TournamentPicker } from './TournamentPicker.jsx';
+import { canvasToBlob, createQrBitmap, loadQrCodeStyling, saveBlob, shareQrPng } from '../lib/qr-image.js';
 
 const PREVIEW_DELAY_MS = 200;
-
-function loadQrCodeStyling() {
-  return import('qr-code-styling').then((module) => module.default);
-}
-
-function saveBlob(blob, fileName) {
-  const href = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = href;
-  link.download = fileName;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(href), 1000);
-}
-
-// Rendert den QR-Code (ohne Header/Footer) für design/url als Bitmap; Vorschau und Export nutzen dieselbe Funktion.
-async function createQrBitmap(design, url) {
-  const QRCodeStyling = await loadQrCodeStyling();
-  const logoUrl = await loadQrLogo(design);
-  const blob = await new QRCodeStyling(toQrOptions(design, url, { logoUrl })).getRawData('png');
-  return createImageBitmap(blob);
-}
-
-function canvasToBlob(canvas) {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob'))), 'image/png');
-  });
-}
 
 function ColorField({ label, value, onChange }) {
   const { t } = useTranslation();
@@ -207,21 +179,15 @@ export function TournamentQrDialog({ tournament, url, initialDesign = null, sour
     setError('');
     setMessage('');
     try {
-      const blob = await currentPngBlob();
-      const file = new File([blob], qrFileName(tournament.name, 'png', t('Turnier')), { type: 'image/png' });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: tournament.name, text: `${tournament.name}\n${url}` });
-      } else if (navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        setMessage(t('Bild in die Zwischenablage kopiert'));
-      } else {
-        setError(t('Teilen wird von diesem Gerät nicht unterstützt'));
-      }
+      const result = await shareQrPng({
+        blob: await currentPngBlob(), fileName: qrFileName(tournament.name, 'png', t('Turnier')),
+        title: tournament.name, text: `${tournament.name}\n${url}`,
+      });
+      if (result === 'copied') setMessage(t('Bild in die Zwischenablage kopiert'));
+      else if (result === 'unsupported') setError(t('Teilen wird von diesem Gerät nicht unterstützt'));
     } catch (shareError) {
-      if (shareError.name !== 'AbortError') {
-        console.error('QR share failed', shareError);
-        setError(t('Bild konnte nicht geteilt werden'));
-      }
+      console.error('QR share failed', shareError);
+      setError(t('Bild konnte nicht geteilt werden'));
     } finally {
       setSharing(false);
     }

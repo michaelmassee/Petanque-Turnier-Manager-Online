@@ -2911,6 +2911,20 @@ export default {
         if (request.method === 'DELETE') return await deleteTournamentShareLink(env.DB, tournament.id);
       }
 
+      // QR-Panel der Turnierseite (alle Besucher): fester Link /q/<qr_token> im gespeicherten Design, wie gedruckt.
+      // Sichtbarkeit wie GET /api/tournaments/:id; öffentliche Entwürfe haben noch keinen teilbaren Link.
+      const tournamentQrMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/qr$/);
+      if (tournamentQrMatch && request.method === 'GET') {
+        const tournament = await getTournamentById(env.DB, tournamentQrMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await optionalSession(request, env.DB);
+        const shareAccess = await hasTournamentShareAccess(env.DB, tournament, url.searchParams.get('share'));
+        if (!canViewTournament(tournament, session?.user || null) && !shareAccess) throw new HttpError(403, 'Zugriff verweigert');
+        if (tournament.status === 'draft' && tournament.visibility !== 'private') throw new HttpError(404, 'Turnier nicht gefunden');
+        const qrToken = tournament.qr_token || await ensureTournamentQrToken(env.DB, tournament.id);
+        return json({ qrUrl: qrLinkUrl(url, qrToken), design: parseStoredQrDesign(tournament.qr_design) });
+      }
+
       const qrDesignMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/qr-design$/);
       if (qrDesignMatch && (request.method === 'GET' || request.method === 'PUT')) {
         const session = await requireSession(request, env.DB);

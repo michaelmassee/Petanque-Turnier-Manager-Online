@@ -94,7 +94,8 @@ describe('Anmelde-Öffnungsbenachrichtigung', () => {
         setLanguage={() => {}} navigate={() => {}} menuOpen={false} setMenuOpen={() => {}} setError={() => {}} setMessage={() => {}} />
     </>);
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Benachrichtigung aktiv' })).toHaveLength(2));
-    expect(fetch).toHaveBeenCalledOnce();
+    // Liste und Details teilen sich die Abfrage der Abos; die Turnierdetails laden daneben nur den QR-Code.
+    expect(fetch.mock.calls.filter(([url]) => !String(url).endsWith('/qr'))).toHaveLength(1);
   });
 
   it('zeigt die Erinnerung in den Turnierdetails als kleine Glocke hinter „Anmeldung möglich ab“', async () => {

@@ -160,7 +160,8 @@ describe('Turnierdetail-Reiter', () => {
     expect(tabNames()).not.toContain('Mitspieler');
     expect(screen.queryByText('Mitspielgesuche zu diesem Turnier')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Info' })).toHaveAttribute('aria-current', 'page');
-    expect(global.fetch).not.toHaveBeenCalled();
+    // Keine Mitspielgesuche laden; die Info-Ansicht holt nur den QR-Code des Turniers.
+    expect(global.fetch.mock.calls.map(([url]) => url).filter((url) => !url.endsWith('/qr'))).toEqual([]);
   });
 
   it.each([

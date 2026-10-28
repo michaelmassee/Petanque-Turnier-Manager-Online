@@ -1801,6 +1801,34 @@ a.left-panel-link {
   color: #3f566d;
 }
 
+.tournament-qr-panel {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+}
+
+.tournament-qr-panel > h2 {
+  justify-self: stretch;
+  margin: 0;
+  text-align: left;
+}
+
+.tournament-qr-canvas {
+  width: min(280px, 100%);
+  height: auto;
+}
+
+.tournament-qr-panel .qr-url {
+  max-width: 100%;
+  color: #53627a;
+  overflow-wrap: anywhere;
+}
+
+.tournament-qr-panel .row-actions {
+  justify-content: center;
+}
+
 .live-qr {
   display: grid;
   gap: 12px;
