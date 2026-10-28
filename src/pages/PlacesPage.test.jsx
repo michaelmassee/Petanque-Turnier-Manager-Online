@@ -16,6 +16,10 @@ vi.mock('react-leaflet', () => ({
   useMap: () => ({ flyTo: map.flyTo, getZoom: map.getZoom }),
 }));
 
+vi.mock('../components/MarkerClusterGroup.jsx', () => ({
+  MarkerClusterGroup: ({ children }) => <>{children}</>,
+}));
+
 vi.mock('../components/TileFallbackMap.jsx', () => ({
   TileFallbackMap: ({ children }) => <div>{children}</div>,
   FitToBounds: () => null,

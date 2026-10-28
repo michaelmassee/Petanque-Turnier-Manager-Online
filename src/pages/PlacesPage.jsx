@@ -15,6 +15,7 @@ import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { POSTBOX_ADMIN_RECIPIENT_ID } from '../postbox-core.js';
 import { TileFallbackMap, FitToBounds, ReportMapBounds } from '../components/TileFallbackMap.jsx';
+import { MarkerClusterGroup } from '../components/MarkerClusterGroup.jsx';
 
 const FALLBACK_CENTER = [51.1, 10.4];
 const marker = new L.Icon({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow, iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] });
@@ -49,13 +50,29 @@ function SharePlaceButton({ name, placeId, organizationId }) {
   return <ShareLinkButton title={name} url={url.href} />;
 }
 
-function FocusOnPlace({ focus, markerRefs }) {
+function FocusOnPlace({ focus, markerRefs, clusterRef }) {
   const map = useMap();
   useEffect(() => {
     if (!focus) return;
-    map.flyTo([focus.lat, focus.lng], Math.max(map.getZoom(), 15));
-    markerRefs.current[focus.id]?.openPopup();
-  }, [focus, map, markerRefs]);
+    const marker = markerRefs.current[focus.id];
+    const group = clusterRef.current;
+    const zoom = Math.max(map.getZoom(), 15);
+    if (!marker || !group) {
+      map.flyTo([focus.lat, focus.lng], zoom);
+      marker?.openPopup();
+      return;
+    }
+    // Liegt der Marker noch in einem Cluster, ist er nicht auf der Karte und openPopup greift ins Leere:
+    // nach dem Flug den Cluster auflösen (zoomToShowLayer), dann das Popup öffnen.
+    const showMarker = () => group.zoomToShowLayer(marker, () => marker.openPopup());
+    if (map.getZoom() === zoom && map.getCenter().equals([focus.lat, focus.lng])) {
+      showMarker();
+      return;
+    }
+    map.once('moveend', showMarker);
+    map.flyTo([focus.lat, focus.lng], zoom);
+    return () => map.off('moveend', showMarker);
+  }, [focus, map, markerRefs, clusterRef]);
   return null;
 }
 
@@ -283,51 +300,55 @@ function OrganizationGroup({ group, groupRef, forceOpen, details, t, onLoadDetai
 function PlacesMap({ places, center, maptilerApiKey, focus, onBoundsChange, onShowDetails, onOnlyThis }) {
   const { t } = useTranslation();
   const markerRefs = useRef({});
+  const clusterRef = useRef(null);
   const positions = useMemo(() => places.map((place) => [place.latitude, place.longitude]), [places]);
   const markerGroups = useMemo(() => groupMapPlaces(places), [places]);
   return (
     <TileFallbackMap center={center} maptilerApiKey={maptilerApiKey}>
       <FitToBounds positions={positions} />
       <ReportMapBounds onChange={onBoundsChange} />
-      {markerGroups.map(({ id, place, places: groupedPlaces }) => (
-        <Marker
-          key={id}
-          ref={(instance) => { groupedPlaces.forEach((groupedPlace) => { markerRefs.current[groupedPlace.id] = instance; }); }}
-          icon={hasClub(place) ? (place.clubKind === 'group' ? groupMarker : clubMarker) : marker}
-          position={[place.latitude, place.longitude]}
-        >
-          <Popup>
-            {place.clubName ? (
-              <>
-                <div className="map-popup-heading">
-                  {place.hasClubLogo && (
-                    <img
-                      className="map-popup-logo"
-                      src={clubLogoImageUrl(place.id)}
-                      alt=""
-                      onError={(event) => { event.currentTarget.style.display = 'none'; }}
-                    />
-                  )}
-                  <ClubBadge clubName={place.clubName} clubKind={place.clubKind} />
-                  <strong data-i18n-skip>{place.clubName}</strong>
-                </div>
-                <ul className="map-popup-venues">
-                  {groupedPlaces.map((groupedPlace) => <li key={groupedPlace.id} data-i18n-skip>{groupedPlace.name} ({t(groupedPlace.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')})</li>)}
-                </ul>
-              </>
-            ) : <strong data-i18n-skip>{place.name}</strong>}
-            <span data-i18n-skip className="map-popup-address">{formatLocationAddress(place.address)}</span>
-            {place.addressUnverified && <span className="map-popup-address muted">⚠ {t('Adresse ungeprüft')}</span>}
-            <div className="map-popup-actions">
-              <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
-              <Button variant="secondary" onClick={() => onShowDetails(place)}>{t('Details')}</Button>
-              <Button variant="secondary" onClick={() => onOnlyThis(place)}>{t('Nur diesen Treffer')}</Button>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+      <MarkerClusterGroup ref={clusterRef}>
+        {markerGroups.map(({ id, place, places: groupedPlaces }) => (
+          <Marker
+            key={id}
+            placeCount={groupedPlaces.length}
+            ref={(instance) => { groupedPlaces.forEach((groupedPlace) => { markerRefs.current[groupedPlace.id] = instance; }); }}
+            icon={hasClub(place) ? (place.clubKind === 'group' ? groupMarker : clubMarker) : marker}
+            position={[place.latitude, place.longitude]}
+          >
+            <Popup>
+              {place.clubName ? (
+                <>
+                  <div className="map-popup-heading">
+                    {place.hasClubLogo && (
+                      <img
+                        className="map-popup-logo"
+                        src={clubLogoImageUrl(place.id)}
+                        alt=""
+                        onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                      />
+                    )}
+                    <ClubBadge clubName={place.clubName} clubKind={place.clubKind} />
+                    <strong data-i18n-skip>{place.clubName}</strong>
+                  </div>
+                  <ul className="map-popup-venues">
+                    {groupedPlaces.map((groupedPlace) => <li key={groupedPlace.id} data-i18n-skip>{groupedPlace.name} ({t(groupedPlace.venueType === 'indoor' ? 'Boulehalle' : 'Bouleplatz')})</li>)}
+                  </ul>
+                </>
+              ) : <strong data-i18n-skip>{place.name}</strong>}
+              <span data-i18n-skip className="map-popup-address">{formatLocationAddress(place.address)}</span>
+              {place.addressUnverified && <span className="map-popup-address muted">⚠ {t('Adresse ungeprüft')}</span>}
+              <div className="map-popup-actions">
+                <a className="button button-secondary" href={googleMapsUrl(place)} target="_blank" rel="noreferrer">{t('Anfahrt')}</a>
+                <Button variant="secondary" onClick={() => onShowDetails(place)}>{t('Details')}</Button>
+                <Button variant="secondary" onClick={() => onOnlyThis(place)}>{t('Nur diesen Treffer')}</Button>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MarkerClusterGroup>
       {/* Nach den Markern, damit sie beim ersten Rendern (Link mit #placeId) schon auf der Karte liegen und openPopup greift. */}
-      <FocusOnPlace focus={focus} markerRefs={markerRefs} />
+      <FocusOnPlace focus={focus} markerRefs={markerRefs} clusterRef={clusterRef} />
     </TileFallbackMap>
   );
 }

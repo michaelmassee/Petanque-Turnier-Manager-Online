@@ -35,6 +35,7 @@
     "i18next": "^26.4.2",
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
     "prosemirror-view": "^1.42.6",
     "qr-code-styling": "^1.9.2",
     "react": "^19.0.0",

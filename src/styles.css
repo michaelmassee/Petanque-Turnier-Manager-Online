@@ -1796,6 +1796,31 @@ a.left-panel-link {
   color: #3f566d;
 }
 
+/* Cluster der Bouleplatz-Karte: Kreis mit Anzahl der zusammengefassten Plätze. */
+.leaflet-marker-icon.place-cluster-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: #1677ff;
+  box-shadow: 0 2px 8px rgb(23 32 51 / 35%);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.place-cluster-icon--medium {
+  font-size: 15px;
+}
+
+.place-cluster-icon--large {
+  background: #0958d9;
+  font-size: 16px;
+}
+
 .club-marker-icon {
   position: relative;
 }

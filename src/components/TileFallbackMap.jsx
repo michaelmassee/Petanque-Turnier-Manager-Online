@@ -184,7 +184,8 @@ export function TileFallbackMap({ center, maptilerApiKey, children, className = 
 
   return (
     <div className={className} aria-busy={loadingTiles}>
-      <MapContainer key={reloadKey} ref={setMap} center={center} zoom={7} scrollWheelZoom={false}>
+      {/* maxZoom fest wie beim TileLayer: Der Kartenanbieter wird erst nachgeladen, leaflet.markercluster braucht den Wert aber schon beim Einhängen. */}
+      <MapContainer key={reloadKey} ref={setMap} center={center} zoom={7} maxZoom={20} scrollWheelZoom={false}>
         {provider && (
           <TileLayer
             key={provider}
