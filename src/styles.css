@@ -3137,6 +3137,15 @@ a.left-panel-link {
   justify-content: flex-end;
 }
 
+/* Schmale Container (Dialoge): Aktionen unter den Text statt daneben. */
+.data-row.stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.data-row.stacked .row-actions {
+  justify-content: flex-start;
+}
+
 .row-actions.stretch {
   display: grid;
   grid-template-columns: 1fr 1fr;

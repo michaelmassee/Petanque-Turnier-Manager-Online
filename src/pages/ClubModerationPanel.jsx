@@ -446,7 +446,7 @@ export function ClubModerationPanel({ language, section = 'clubs', currentUserId
           <div className="user-list">
             {clubPlaces.length === 0 && <p className="muted">{t('Keine Bouleplätze diesem Verein zugeordnet.')}</p>}
             {clubPlaces.map((place) => (
-              <article className="data-row" key={place.id}>
+              <article className="data-row stacked" key={place.id}>
                 <div>
                   <strong data-i18n-skip>{place.name}</strong>
                   <span data-i18n-skip>{statusLabel(place.status, t)} · {formatLocationAddress(place.address)}</span>
