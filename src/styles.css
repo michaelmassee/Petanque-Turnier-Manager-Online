@@ -5425,6 +5425,15 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
 .button.opening-reminder-icon { min-height: 32px; width: 32px; padding: 0; border-radius: 50%; }
 .button.opening-reminder-icon[aria-pressed="true"] { color: #0a5fd1; border-color: #1677ff; background: #ecf4ff; }
 .button.opening-reminder-icon[aria-busy="true"] svg { display: none; }
+/* „Erinnern“ in der Turnierliste: hellblau wie das Status-Badge daneben, Glocke in Amber; aktiv kräftig blau. */
+.opening-reminder { display: flex; flex-direction: column; }
+.opening-reminder .feedback { margin: 4px 0 0; }
+.button.opening-reminder-button { border-color: #9cc3ff; background: #ecf4ff; color: #0a5fd1; }
+.button.opening-reminder-button:not([aria-pressed="true"]):hover:not(:disabled) { background: #dbeaff; }
+.button.opening-reminder-button[aria-pressed="true"]:hover:not(:disabled) { background: #0a5fd1; }
+.button.opening-reminder-button svg { color: #f59e0b; }
+.button.opening-reminder-button[aria-pressed="true"] { border-color: #1677ff; background: #1677ff; color: #ffffff; }
+.button.opening-reminder-button[aria-pressed="true"] svg { color: #ffd34d; }
 .rental-bookings { margin-top: 16px; }
 .rental-internal-note { display: grid; gap: 2px; margin-top: 6px; padding: 6px 10px; border-left: 3px solid #c7d0df; background: #f6f8fb; border-radius: 4px; overflow-wrap: anywhere; }
 .rental-internal-note .rich-text, .rental-internal-note .rich-text-plain { margin: 0; }

@@ -68,8 +68,9 @@ function OpeningSubscriptionControl({ tournament, userId, compact = false }) {
     finally { setSaving(false); }
   }
 
-  return <div className={compact ? 'opening-reminder-compact' : undefined}>
-    <Button variant="secondary" className={compact ? 'button button-secondary opening-reminder-icon' : undefined} onClick={toggle} loading={saving} aria-pressed={active}
+  // className ersetzt die Standardklasse von Button komplett – deshalb immer vollständig angeben, nie undefined.
+  return <div className={compact ? 'opening-reminder-compact' : 'opening-reminder'}>
+    <Button className={compact ? 'button button-secondary opening-reminder-icon' : 'button opening-reminder-button'} onClick={toggle} loading={saving} aria-pressed={active}
       disabled={subscriptions.isLoading || Boolean(subscriptions.error) || (!active && waitingForRelease)}
       aria-label={description}
       title={active ? t('openingNotificationDeactivate') : description}>
