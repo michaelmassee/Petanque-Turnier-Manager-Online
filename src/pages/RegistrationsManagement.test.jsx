@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '../lib/i18next-config.js';
 import { RegistrationForm, RegistrationsManagementPage, RegistrationsPanel, registrationsToCsv } from './RegistrationsManagement.jsx';
@@ -541,6 +541,14 @@ describe('Anmeldungsverwaltung: VIP-Schalter', () => {
     });
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/tournaments/t1/registrations')).toHaveLength(2);
     expect(onTournamentsChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('erklärt die Wirkung von VIP auch ohne Hover (Handy) per „?“', async () => {
+    setup();
+    fireEvent.click(await screen.findByRole('button', { name: 'Was bewirkt VIP?' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/zuletzt angemeldete Meldung ohne VIP auf die Warteliste/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Keine Meldung wird verschoben/)).toBeInTheDocument();
   });
 
   it('behält den VIP-Status bei einem fehlgeschlagenen Speichern', async () => {

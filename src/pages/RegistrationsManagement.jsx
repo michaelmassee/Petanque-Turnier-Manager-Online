@@ -269,9 +269,23 @@ function RegistrationDetails({ registration, tournament }) {
   );
 }
 
-function RegistrationRow({ registration, tournament, showConfirm = false, showReject = false, busy, busyOther, onConfirm, onReject, onEdit, onMessage, onDelete, onToggleVip, onLiveQr }) {
+function VipHelpDialog({ open, onClose }) {
   const { t } = useTranslation();
   return (
+    <EditDialog open={open} title={t('Was bewirkt VIP?')} onClose={onClose}>
+      <div className="vip-help">
+        <p><strong>{t('VIP einschalten')}:</strong> {t('VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.')}</p>
+        <p><strong>{t('VIP ausschalten')}:</strong> {t('Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.')}</p>
+      </div>
+    </EditDialog>
+  );
+}
+
+function RegistrationRow({ registration, tournament, showConfirm = false, showReject = false, busy, busyOther, onConfirm, onReject, onEdit, onMessage, onDelete, onToggleVip, onLiveQr }) {
+  const { t } = useTranslation();
+  const [vipHelpOpen, setVipHelpOpen] = useState(false);
+  return (
+    <>
     <article className="data-row">
       <div>
         <strong data-i18n-skip>
@@ -316,18 +330,20 @@ function RegistrationRow({ registration, tournament, showConfirm = false, showRe
       </div>
       <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
       <div className="row-actions">
-        {/* Der Text nennt die Aktion; den Zustand zeigt das VIP-Badge am Namen. */}
-        <Button
-          variant="secondary"
-          title={registration.isVip
-            ? t('Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.')
-            : t('VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.')}
-          loading={busy === `vip-${registration.id}`}
-          disabled={Boolean(busy || busyOther)}
-          onClick={() => onToggleVip(registration)}
-        >
-          {registration.isVip ? t('VIP ausschalten') : t('VIP einschalten')}
-        </Button>
+        {/* Der Text nennt die Aktion; den Zustand zeigt das VIP-Badge am Namen. Die Wirkung steht im Tooltip (Desktop)
+            und hinter „?“ (Handy: kein Hover). */}
+        <span className="vip-toggle">
+          <Button
+            variant="secondary"
+            title={registration.isVip ? t('Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.') : t('VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.')}
+            loading={busy === `vip-${registration.id}`}
+            disabled={Boolean(busy || busyOther)}
+            onClick={() => onToggleVip(registration)}
+          >
+            {registration.isVip ? t('VIP ausschalten') : t('VIP einschalten')}
+          </Button>
+          <button type="button" className="help-btn" onClick={() => setVipHelpOpen(true)} aria-label={t('Was bewirkt VIP?')}>?</button>
+        </span>
         {showConfirm && (
           <Button loading={busy === `confirm-${registration.id}`} disabled={Boolean(busy || busyOther)} onClick={() => onConfirm(registration)}>
             {t('Bestätigen')}
@@ -342,6 +358,9 @@ function RegistrationRow({ registration, tournament, showConfirm = false, showRe
         <Button variant="danger" loading={busy === `delete-${registration.id}`} disabled={Boolean(busy || busyOther)} onClick={() => onDelete(registration)}>{t('Löschen')}</Button>
       </div>
     </article>
+    {/* Neben der Zeile, nicht darin: sonst greifen die .data-row-Regeln (Grid, Farben) auch im Dialog. */}
+    <VipHelpDialog open={vipHelpOpen} onClose={() => setVipHelpOpen(false)} />
+    </>
   );
 }
 

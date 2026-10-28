@@ -2471,6 +2471,35 @@ a.left-panel-link {
   background: #e9edf5;
 }
 
+/* VIP-Button mit „?“ daneben: teilen sich eine Zelle der Aktionen, am Handy eine volle Zeile. */
+.vip-toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.vip-toggle > .button {
+  flex: 1;
+}
+
+.vip-help {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  margin-top: 12px;
+}
+
+.vip-help p {
+  margin: 0;
+}
+
+.vip-toggle > .help-btn {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  font-size: 1rem;
+}
+
 .table-scroll {
   overflow-x: auto;
 }
