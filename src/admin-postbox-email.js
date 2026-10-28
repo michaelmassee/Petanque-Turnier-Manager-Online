@@ -14,6 +14,11 @@ const TEMPLATES = {
     text: (name) => `${name} vous a envoyé un message dans la messagerie PTM Online.\n\nVeuillez répondre depuis la messagerie de l’application.`,
     open: 'Ouvrir PTM Online', sender: 'Utilisateur',
   },
+  it: {
+    subject: 'PTM Online – nuovo messaggio per te come amministratore',
+    text: (name) => `${name} ti ha inviato un messaggio nella casella di posta di PTM Online.\n\nRispondi dalla casella di posta dell’app.`,
+    open: 'Apri PTM Online', sender: 'Utente',
+  },
   nl: {
     subject: 'PTM Online – nieuw bericht voor jou als beheerder',
     text: (name) => `${name} heeft je een bericht gestuurd in de PTM Online-postbus.\n\nAntwoord via de postbus in de app.`,

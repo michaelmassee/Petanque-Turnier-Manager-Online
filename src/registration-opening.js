@@ -8,6 +8,7 @@ export const OPENING_MESSAGES = {
   en: '{{name}}: Registration is now open.',
   es: '{{name}}: La inscripción ya está abierta.',
   fr: '{{name}} : Les inscriptions sont maintenant ouvertes.',
+  it: '{{name}}: le iscrizioni sono ora aperte.',
 };
 
 // The stored gate is released together with the one-shot subscriptions and their

@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = join(ROOT, '..', 'src');
 const LOCALES_DIR = join(SRC_DIR, 'locales');
-const LANGUAGES = ['nl', 'en', 'es', 'fr'];
+const LANGUAGES = ['nl', 'en', 'es', 'fr', 'it'];
 
 function walk(dir, files = []) {
   for (const entry of readdirSync(dir)) {

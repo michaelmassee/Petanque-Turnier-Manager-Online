@@ -288,6 +288,7 @@ const SLOT_DATE_FORMATS = {
   en: ([year, month, day]) => `${year}-${month}-${day}`,
   es: ([year, month, day]) => `${day}/${month}/${year}`,
   fr: ([year, month, day]) => `${day}/${month}/${year}`,
+  it: ([year, month, day]) => `${day}/${month}/${year}`,
 };
 
 const hourLabel = (hour) => `${String(hour).padStart(2, '0')}:00`;

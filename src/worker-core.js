@@ -590,6 +590,7 @@ export const LIVE_ROUND_PUSH_TEXTS = {
   en: { round: 'Round', court: 'Lane', versus: 'vs.', bye: 'Bye', notPlaying: 'Not drawn for this round' },
   es: { round: 'Ronda', court: 'Pista', versus: 'contra', bye: 'Exento', notPlaying: 'No asignado en esta ronda' },
   fr: { round: 'Tour', court: 'Terrain', versus: 'contre', bye: 'Exempt', notPlaying: 'Non placé dans ce tour' },
+  it: { round: 'Turno', court: 'Campo', versus: 'contro', bye: 'Riposo', notPlaying: 'Non sorteggiato in questo turno' },
 };
 
 // Paketgröße pro Queue-Nachricht: Der Consumer verarbeitet bis zu 3 Nachrichten pro Aufruf und
@@ -636,6 +637,7 @@ const LIVE_RESULT_PUSH_TEXTS = {
   en: { entered: 'Result entered', noShow: 'No-show' },
   es: { entered: 'Resultado registrado', noShow: 'No presentado' },
   fr: { entered: 'Résultat saisi', noShow: 'Forfait' },
+  it: { entered: 'Risultato inserito', noShow: 'Non presentato' },
 };
 
 // Ergebnis der eigenen Partie eingetragen (Turnierleitung oder Mitspieler): still, die offene Live-Ansicht zeigt es
@@ -658,7 +660,7 @@ export function buildLiveResultPush({ tournamentName, roundNumber, ownScore, opp
 export const MAX_BOARD_PUSH_SUBSCRIPTIONS = 50;
 
 const BOARD_ROUND_PUSH_BODIES = {
-  de: 'Spielplan aktualisiert', nl: 'Speelschema bijgewerkt', en: 'Schedule updated', es: 'Calendario actualizado', fr: 'Programme mis à jour',
+  de: 'Spielplan aktualisiert', nl: 'Speelschema bijgewerkt', en: 'Schedule updated', es: 'Calendario actualizado', fr: 'Programme mis à jour', it: 'Calendario aggiornato',
 };
 
 // Turnierseite/Bildschirm-Anzeige: Die offene Seite lädt sofort neu. Still (ohne Ton), weil sie meist auf einem
@@ -681,6 +683,7 @@ const BOARD_FINISHED_PUSH_TEXTS = {
   en: { title: 'Tournament finished', body: 'Final ranking' },
   es: { title: 'Torneo finalizado', body: 'Clasificación final' },
   fr: { title: 'Tournoi terminé', body: 'Classement final' },
+  it: { title: 'Torneo concluso', body: 'Classifica finale' },
 };
 
 // Turnierende: Eine offene Turnierseite/Anzeige lädt neu und zeigt die Endrangliste - auch wenn sie das regelmäßige
@@ -697,7 +700,7 @@ export function buildBoardFinishedPush({ tournamentName, language, url, tourname
   };
 }
 
-const LIVE_ANNOUNCEMENT_PUSH_TITLES = { de: 'Ankündigung', nl: 'Mededeling', en: 'Announcement', es: 'Aviso', fr: 'Annonce' };
+const LIVE_ANNOUNCEMENT_PUSH_TITLES = { de: 'Ankündigung', nl: 'Mededeling', en: 'Announcement', es: 'Aviso', fr: 'Annonce', it: 'Avviso' };
 
 // Ankündigung der Turnierleitung als Live-Push; gleiches Tag, damit eine neue Ankündigung die alte ersetzt.
 export function buildLiveAnnouncementPush({ tournamentName, text, language, url, tournamentId }) {

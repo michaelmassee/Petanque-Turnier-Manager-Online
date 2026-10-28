@@ -1,6 +1,6 @@
 import { CURRENCY_CODES, currencyDecimals } from '../currencies.js';
 
-export const DISPLAY_LOCALES = { de: 'de-DE', nl: 'nl-NL', en: 'en-US', es: 'es-ES', fr: 'fr-FR' };
+export const DISPLAY_LOCALES = { de: 'de-DE', nl: 'nl-NL', en: 'en-US', es: 'es-ES', fr: 'fr-FR', it: 'it-IT' };
 
 export const TIMEZONE_HINT_TEMPLATES = {
   de: (timeZone) => `Hinweis: Datum, Startzeit und Anmeldezeiten dieses Turniers gelten in der Zeitzone des Turnierstandorts: ${timeZone}. Deine Zeitzone weicht davon ab.`,
@@ -8,6 +8,7 @@ export const TIMEZONE_HINT_TEMPLATES = {
   en: (timeZone) => `Note: this tournament's date, start time and registration times are in the tournament location's time zone: ${timeZone}. Your time zone differs.`,
   es: (timeZone) => `Aviso: la fecha, hora de inicio y horarios de inscripción de este torneo son en la zona horaria de la sede: ${timeZone}. Tu zona horaria es diferente.`,
   fr: (timeZone) => `Remarque : la date, l'heure de début et les horaires d'inscription de ce tournoi sont dans le fuseau horaire du lieu : ${timeZone}. Votre fuseau horaire est différent.`,
+  it: (timeZone) => `Nota: data, ora di inizio e orari di iscrizione di questo torneo valgono nel fuso orario del luogo del torneo: ${timeZone}. Il tuo fuso orario è diverso.`,
 };
 
 export const REGISTRATION_OPENS_TEMPLATES = {
@@ -16,6 +17,7 @@ export const REGISTRATION_OPENS_TEMPLATES = {
   en: (dateTime) => `Registration for this tournament is available from ${dateTime} onwards.`,
   es: (dateTime) => `La inscripción para este torneo está disponible desde ${dateTime}.`,
   fr: (dateTime) => `Les inscriptions pour ce tournoi sont possibles à partir du ${dateTime}.`,
+  it: (dateTime) => `Le iscrizioni a questo torneo sono possibili dal ${dateTime}.`,
 };
 
 export const PASSWORD_STRENGTH_ERROR = 'Das Passwort muss mindestens 8 Zeichen lang sein und mindestens eine Zahl, einen Kleinbuchstaben, einen Großbuchstaben und ein Sonderzeichen enthalten';

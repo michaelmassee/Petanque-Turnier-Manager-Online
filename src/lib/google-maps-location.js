@@ -1,6 +1,6 @@
 import { HttpError } from '../errors.js';
 
-const MAP_HOSTS = new Set(['com', 'de', 'nl', 'fr', 'es'].flatMap((suffix) => [
+const MAP_HOSTS = new Set(['com', 'de', 'nl', 'fr', 'es', 'it'].flatMap((suffix) => [
   `google.${suffix}`, `www.google.${suffix}`, `maps.google.${suffix}`,
 ]));
 const DECIMAL = '[+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)';

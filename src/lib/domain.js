@@ -344,6 +344,7 @@ export const SLOTS_FREE_TEMPLATES = {
   en: (free, max) => `${free} of ${max} spots free`,
   es: (free, max) => `${free} de ${max} plazas libres`,
   fr: (free, max) => `${free} sur ${max} places libres`,
+  it: (free, max) => `${free} posti liberi su ${max}`,
 };
 
 export const REGISTERED_COUNT_TEMPLATES = {
@@ -352,6 +353,7 @@ export const REGISTERED_COUNT_TEMPLATES = {
   en: (count) => `${count} registered`,
   es: (count) => `${count} inscritos`,
   fr: (count) => `${count} inscrits`,
+  it: (count) => `${count} iscritti`,
 };
 
 /**

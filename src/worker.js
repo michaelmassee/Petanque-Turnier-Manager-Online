@@ -101,7 +101,7 @@ const VISIBILITIES = ['public', 'private'];
 const REGISTRATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'waitlist', 'rejected'];
 // Stornierte und abgelehnte Meldungen belegen weder Teamnamen noch Live-Zugang oder Turnierzustand.
 const ACTIVE_REGISTRATION_STATUSES_SQL = `(${ACTIVE_REGISTRATION_STATUSES.map((status) => `'${status}'`).join(', ')})`;
-const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
+const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr', 'it'];
 const SESSION_COOKIE = 'ptm_session';
 const sessionRefreshes = new WeakMap();
 const GOOGLE_OAUTH_STATE_COOKIE = 'ptm_google_oauth_state';
@@ -168,6 +168,10 @@ const EMAIL_VERIFICATION_EMAILS = {
     subject: 'Confirmer l’adresse e-mail',
     text: (verificationUrl) => `Confirme ton adresse e-mail avec ce lien:\n\n${verificationUrl}\n\nLe lien est valable 24 heures.`,
   },
+  it: {
+    subject: 'Conferma l’indirizzo e-mail',
+    text: (verificationUrl) => `Conferma il tuo indirizzo e-mail con questo link:\n\n${verificationUrl}\n\nIl link è valido per 24 ore.`,
+  },
 };
 
 const TOURNAMENT_REPORT_VERIFICATION_EMAILS = {
@@ -190,6 +194,10 @@ const TOURNAMENT_REPORT_VERIFICATION_EMAILS = {
   fr: {
     subject: 'Confirmer le tournoi signalé',
     text: (verificationUrl) => `Confirme le tournoi signalé via ce lien :\n\n${verificationUrl}\n\nL’entrée ne devient publique qu’après confirmation. Le lien est valable 24 heures.`,
+  },
+  it: {
+    subject: 'Conferma il torneo segnalato',
+    text: (verificationUrl) => `Conferma il torneo segnalato tramite questo link:\n\n${verificationUrl}\n\nLa voce diventa pubblica solo dopo la conferma. Il link è valido per 24 ore.`,
   },
 };
 
@@ -214,6 +222,10 @@ const PLACE_REPORT_VERIFICATION_EMAILS = {
     subject: 'Confirmer le terrain signalé',
     text: (verificationUrl, editUrl) => `Confirme le terrain signalé via ce lien :\n\n${verificationUrl}\n\nLe terrain ne devient public qu’après confirmation. Le lien est valable 24 heures.\n\nTu peux modifier les informations plus tard à tout moment via ce lien (valable sans limite, à conserver) :\n\n${editUrl}`,
   },
+  it: {
+    subject: 'Conferma il campo segnalato',
+    text: (verificationUrl, editUrl) => `Conferma il campo segnalato tramite questo link:\n\n${verificationUrl}\n\nIl campo diventa pubblico solo dopo la conferma. Il link è valido per 24 ore.\n\nPuoi modificare i dati in qualsiasi momento anche in seguito tramite questo link (valido senza scadenza, conservalo):\n\n${editUrl}`,
+  },
 };
 
 const EMAIL_CHANGE_EMAILS = {
@@ -237,6 +249,10 @@ const EMAIL_CHANGE_EMAILS = {
     subject: 'Confirmer la nouvelle adresse e-mail',
     text: (verificationUrl) => `Confirme ta nouvelle adresse e-mail avec ce lien :\n\n${verificationUrl}\n\nLe lien est valable 24 heures. Si tu n’es pas à l’origine de cette demande, tu peux ignorer cet e-mail.`,
   },
+  it: {
+    subject: 'Conferma il nuovo indirizzo e-mail',
+    text: (verificationUrl) => `Conferma il tuo nuovo indirizzo e-mail con questo link:\n\n${verificationUrl}\n\nIl link è valido per 24 ore. Se non hai richiesto questa modifica, puoi ignorare questa e-mail.`,
+  },
 };
 
 const PARTICIPANTS_EMAIL_LABELS = {
@@ -245,6 +261,7 @@ const PARTICIPANTS_EMAIL_LABELS = {
   en: { team: 'Team', participants: 'Participants', license: 'License number' },
   es: { team: 'Equipo', participants: 'Participantes', license: 'Número de licencia' },
   fr: { team: 'Équipe', participants: 'Participants', license: 'Numéro de licence' },
+  it: { team: 'Squadra', participants: 'Partecipanti', license: 'Numero di licenza' },
 };
 
 // Listet alle an einer Anmeldung beteiligten Personen (Hauptmelder + ggf. Partner) mit
@@ -298,6 +315,11 @@ export const REGISTRATION_RECEIVED_EMAILS = {
     text: (firstName, name, link, cancelLink, participantsBlock = '') =>
       `Bonjour ${firstName},\n\nton inscription pour « ${name} » a bien été reçue.${participantsBlock}\n\nL’organisateur du tournoi doit encore confirmer ton inscription. Tu recevras un autre e-mail dès que ta participation sera confirmée.\n\nToutes les informations sur le tournoi :\n${link}\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
   },
+  it: {
+    subject: (name) => `Iscrizione ricevuta: ${name}`,
+    text: (firstName, name, link, cancelLink, participantsBlock = '') =>
+      `Ciao ${firstName},\n\nabbiamo ricevuto la tua iscrizione a “${name}”.${participantsBlock}\n\nL’organizzazione del torneo deve ancora confermare la tua iscrizione. Riceverai un’altra e-mail non appena la tua partecipazione sarà confermata.\n\nTutte le informazioni sul torneo:\n${link}\n\nVuoi annullare l’iscrizione? Usa questo link:\n${cancelLink}`,
+  },
 };
 
 const REGISTRATION_REJECTION_EMAILS = {
@@ -306,6 +328,7 @@ const REGISTRATION_REJECTION_EMAILS = {
   en: { subject: (name) => `Registration rejected: ${name}`, text: (firstName, name, link, reason) => `Hi ${firstName},\n\nyour registration for "${name}" was rejected.${reason ? `\n\nReason from the tournament organizer:\n${reason}` : ''}\n\nAll tournament details:\n${link}` },
   es: { subject: (name) => `Inscripción rechazada: ${name}`, text: (firstName, name, link, reason) => `Hola ${firstName},\n\ntu inscripción para "${name}" fue rechazada.${reason ? `\n\nMotivo del organizador del torneo:\n${reason}` : ''}\n\nToda la información del torneo:\n${link}` },
   fr: { subject: (name) => `Inscription refusée : ${name}`, text: (firstName, name, link, reason) => `Bonjour ${firstName},\n\nton inscription à « ${name} » a été refusée.${reason ? `\n\nMotif de l’organisateur :\n${reason}` : ''}\n\nToutes les informations sur le tournoi :\n${link}` },
+  it: { subject: (name) => `Iscrizione rifiutata: ${name}`, text: (firstName, name, link, reason) => `Ciao ${firstName},\n\nla tua iscrizione a “${name}” è stata rifiutata.${reason ? `\n\nMotivo dell’organizzazione:\n${reason}` : ''}\n\nTutte le informazioni sul torneo:\n${link}` },
 };
 
 // Automatisch von der Warteliste nachgerückt: Betreff und Einleitungssatz ersetzen bzw. ergänzen die Bestätigung
@@ -316,6 +339,7 @@ export const WAITLIST_PROMOTED_EMAILS = {
   en: { subject: (name) => `Moved up from the waitlist: ${name}`, intro: 'A spot has opened up – you have moved up from the waitlist.' },
   es: { subject: (name) => `Has pasado de la lista de espera: ${name}`, intro: 'Se ha liberado una plaza: habéis pasado de la lista de espera.' },
   fr: { subject: (name) => `Repêchés de la liste d’attente : ${name}`, intro: 'Une place s’est libérée – vous passez de la liste d’attente aux inscrits.' },
+  it: { subject: (name) => `Ripescati dalla lista d’attesa: ${name}`, intro: 'Si è liberato un posto: passate dalla lista d’attesa agli iscritti.' },
 };
 
 // Setzt den Nachrück-Hinweis direkt hinter die Anrede ("Hallo X,").
@@ -351,6 +375,11 @@ export const REGISTRATION_CONFIRMATION_EMAILS = {
     text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '', liveLink = '') =>
       `Bonjour ${firstName},\n\nTa participation à « ${name} » est confirmée.\n\nDate : ${dateTimeLabel}\nLieu : ${location}${participantsBlock}\n\nToutes les informations sur le tournoi :\n${link}${liveLink ? `\n\nTon équipe en direct le jour du tournoi (tour, adversaire, terrain) :\n${liveLink}` : ''}\n\nUn rendez-vous de calendrier est joint à cet e-mail.\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
   },
+  it: {
+    subject: (name) => `Partecipazione confermata: ${name}`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink, participantsBlock = '', liveLink = '') =>
+      `Ciao ${firstName},\n\nla tua partecipazione a “${name}” è confermata.\n\nData: ${dateTimeLabel}\nLuogo: ${location}${participantsBlock}\n\nTutte le informazioni sul torneo:\n${link}${liveLink ? `\n\nLa tua squadra in diretta il giorno del torneo (turno, avversario, campo):\n${liveLink}` : ''}\n\nIn allegato trovi un appuntamento per il calendario.\n\nVuoi annullare l’iscrizione? Usa questo link:\n${cancelLink}`,
+  },
 };
 
 
@@ -381,6 +410,11 @@ export const LIVE_LINK_EMAILS = {
     text: (firstName, name, liveLink) =>
       `Bonjour ${firstName},\n\nvoici ton lien direct personnel pour « ${name} » (tour, adversaire, terrain) :\n${liveLink}\n\nTout lien direct envoyé auparavant n’est plus valable.`,
   },
+  it: {
+    subject: (name) => `Il tuo link diretta: ${name}`,
+    text: (firstName, name, liveLink) =>
+      `Ciao ${firstName},\n\necco il tuo link personale alla diretta di “${name}” (turno, avversario, campo):\n${liveLink}\n\nI link alla diretta inviati in precedenza non sono più validi.`,
+  },
 };
 
 export function buildLiveLink(appOrigin, token) {
@@ -393,6 +427,7 @@ const WHATSAPP_GROUP_EMAIL_LABELS = {
   en: 'Join the tournament WhatsApp group:',
   es: 'Únete al grupo de WhatsApp del torneo:',
   fr: 'Rejoins le groupe WhatsApp du tournoi :',
+  it: 'Entra nel gruppo WhatsApp del torneo:',
 };
 
 const DIRECTIONS_EMAIL_LABELS = {
@@ -401,6 +436,7 @@ const DIRECTIONS_EMAIL_LABELS = {
   en: 'Directions to the tournament:',
   es: 'Cómo llegar al torneo:',
   fr: 'Itinéraire vers le tournoi :',
+  it: 'Indicazioni stradali per il torneo:',
 };
 
 export function buildDirectionsLink(location) {
@@ -414,6 +450,7 @@ const PAYMENT_INFO_EMAIL_LABELS = {
   en: 'Payment information from the organizers:',
   es: 'Indicaciones de pago de la organización:',
   fr: 'Informations de paiement de l’organisation :',
+  it: 'Informazioni di pagamento dell’organizzazione:',
 };
 
 // Zahlungshinweise stehen frei formuliert am Turnier (IBAN, PayPal, Twint, bar vor Ort …) und werden unverändert zitiert.
@@ -435,6 +472,7 @@ const TOURNAMENT_CONTACT_EMAIL_LABELS = {
   en: { subject: 'Message about the tournament', greeting: 'Hello tournament organizers,', tournament: 'Tournament', date: 'Date', location: 'Location', link: 'Tournament link', message: 'My message:', closing: 'Kind regards' },
   es: { subject: 'Mensaje sobre el torneo', greeting: 'Hola, organización del torneo:', tournament: 'Torneo', date: 'Fecha', location: 'Lugar', link: 'Enlace del torneo', message: 'Mi mensaje:', closing: 'Saludos' },
   fr: { subject: 'Message concernant le tournoi', greeting: 'Bonjour à l’organisation du tournoi,', tournament: 'Tournoi', date: 'Date', location: 'Lieu', link: 'Lien du tournoi', message: 'Mon message :', closing: 'Cordialement' },
+  it: { subject: 'Messaggio sul torneo', greeting: 'Gentile organizzazione del torneo,', tournament: 'Torneo', date: 'Data', location: 'Luogo', link: 'Link al torneo', message: 'Il mio messaggio:', closing: 'Cordiali saluti' },
 };
 
 export function buildTournamentContactLink(tournament, appOrigin, language) {
@@ -518,6 +556,13 @@ export const REGISTRATION_DISPLACED_EMAILS = {
     textCancelled: (firstName, name, link) =>
       `Bonjour ${firstName},\n\nUn participant VIP s'est inscrit pour « ${name} » et il ne restait plus de place normale. Comme aucune liste d'attente n'est activée pour ce tournoi, ton inscription a malheureusement été annulée.\n\nToutes les informations sur le tournoi :\n${link}`,
   },
+  it: {
+    subject: (name) => `Modifica della tua iscrizione: ${name}`,
+    textWaitlisted: (firstName, name, link, cancelLink) =>
+      `Ciao ${firstName},\n\nun partecipante VIP si è iscritto a “${name}” e non c’erano più posti normali liberi. La tua iscrizione è quindi stata spostata in lista d’attesa.\n\nTutte le informazioni sul torneo:\n${link}\n\nVuoi annullare l’iscrizione? Usa questo link:\n${cancelLink}`,
+    textCancelled: (firstName, name, link) =>
+      `Ciao ${firstName},\n\nun partecipante VIP si è iscritto a “${name}” e non c’erano più posti normali liberi. Poiché per questo torneo non è attiva una lista d’attesa, purtroppo la tua iscrizione è stata annullata.\n\nTutte le informazioni sul torneo:\n${link}`,
+  },
 };
 
 export const TOURNAMENT_REMINDER_EMAILS = {
@@ -545,6 +590,11 @@ export const TOURNAMENT_REMINDER_EMAILS = {
     subject: (name) => `Rappel : ${name} dans 2 jours`,
     text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
       `Bonjour ${firstName},\n\nPlus que 2 jours avant « ${name} » !\n\nDate : ${dateTimeLabel}\nLieu : ${location}\n\nToutes les informations sur le tournoi :\n${link}\n\nLe rendez-vous de calendrier est joint à cet e-mail.\n\nTu veux te désinscrire ? Utilise ce lien :\n${cancelLink}`,
+  },
+  it: {
+    subject: (name) => `Promemoria: ${name} tra 2 giorni`,
+    text: (firstName, name, dateTimeLabel, location, link, cancelLink) =>
+      `Ciao ${firstName},\n\nmancano solo 2 giorni a “${name}”!\n\nData: ${dateTimeLabel}\nLuogo: ${location}\n\nTutte le informazioni sul torneo:\n${link}\n\nIn allegato trovi l’appuntamento per il calendario.\n\nVuoi annullare l’iscrizione? Usa questo link:\n${cancelLink}`,
   },
 };
 
@@ -574,6 +624,11 @@ const REGISTRATION_CANCELLED_EMAILS = {
     text: (firstName, name, link) =>
       `Bonjour ${firstName},\n\nTa désinscription de « ${name} » a été confirmée.\n\nToutes les informations sur le tournoi :\n${link}`,
   },
+  it: {
+    subject: (name) => `Cancellazione confermata: ${name}`,
+    text: (firstName, name, link) =>
+      `Ciao ${firstName},\n\nla cancellazione della tua iscrizione a “${name}” è confermata.\n\nTutte le informazioni sul torneo:\n${link}`,
+  },
 };
 
 const TOURNAMENT_BROADCAST_EMAILS = {
@@ -601,6 +656,11 @@ const TOURNAMENT_BROADCAST_EMAILS = {
     subject: (name) => `Message à tous les participants : ${name}`,
     text: (firstName, name, senderName) =>
       `Bonjour ${firstName},\n\n${senderName} a envoyé le message suivant à tous les participants de « ${name} » :`,
+  },
+  it: {
+    subject: (name) => `Messaggio a tutti i partecipanti: ${name}`,
+    text: (firstName, name, senderName) =>
+      `Ciao ${firstName},\n\n${senderName} ha inviato il seguente messaggio a tutti i partecipanti di “${name}”:`,
   },
 };
 
@@ -630,6 +690,11 @@ const TOURNAMENT_RANKING_EMAILS = {
     subject: (name) => `Classement final : ${name}`,
     text: (firstName, name, link) =>
       `Bonjour ${firstName},\n\nl’organisation a publié le classement final de « ${name} ». Merci d’avoir joué !\n\nVoir le classement (aussi en PDF) :\n${link}`,
+  },
+  it: {
+    subject: (name) => `Classifica finale: ${name}`,
+    text: (firstName, name, link) =>
+      `Ciao ${firstName},\n\nl’organizzazione ha pubblicato la classifica finale di “${name}”. Grazie per aver giocato!\n\nVedi la classifica (anche in PDF):\n${link}`,
   },
 };
 
@@ -680,6 +745,15 @@ export const RENTAL_EMAILS = {
     decidedSubject: (title, status) => `${({ confirmed: 'Réservation confirmée', rejected: 'Réservation refusée', cancelled: 'Réservation annulée' })[status]} : ${title}`,
     decided: ({ firstName, title, slot, scope, status, club }) => `Bonjour ${firstName},\n\n${({ confirmed: `${club} a confirmé votre réservation de « ${title} »`, rejected: `${club} a refusé votre demande de réservation de « ${title} »`, cancelled: `${club} a annulé votre réservation de « ${title} »` })[status]} : ${slot}, ${scope}.`,
   },
+  it: {
+    scope: ({ lanes, whole, indoor, persons }) => `${(whole ? (indoor ? 'l’intero bocciodromo coperto' : 'l’intero campo') : `${lanes} corsia/e`)}${persons ? `, ${persons} persona/e` : ''}`,
+    requestedSubject: (title) => `Richiesta di prenotazione: ${title}`,
+    requested: ({ title, who, slot, scope }) => `Ciao,\n\n${who} vorrebbe prenotare “${title}”: ${slot}, ${scope}. Conferma o rifiuta la richiesta.`,
+    cancelledSubject: (title) => `Prenotazione annullata: ${title}`,
+    cancelled: ({ title, who, slot, scope }) => `Ciao,\n\n${who} ha annullato la prenotazione di “${title}”: ${slot}, ${scope}.`,
+    decidedSubject: (title, status) => `${({ confirmed: 'Prenotazione confermata', rejected: 'Prenotazione rifiutata', cancelled: 'Prenotazione annullata' })[status]}: ${title}`,
+    decided: ({ firstName, title, slot, scope, status, club }) => `Ciao ${firstName},\n\n${({ confirmed: `${club} ha confermato la tua prenotazione di “${title}”`, rejected: `${club} ha rifiutato la tua richiesta di prenotazione di “${title}”`, cancelled: `${club} ha annullato la tua prenotazione di “${title}”` })[status]}: ${slot}, ${scope}.`,
+  },
 };
 
 // "Nachricht an Team": Turnierleitung schreibt den Personen einer einzelnen Anmeldung.
@@ -713,6 +787,12 @@ const TEAM_MESSAGE_EMAILS = {
     text: (firstName, name, senderName) =>
       `Bonjour ${firstName},\n\n${senderName} t'a envoyé le message suivant au sujet de ton inscription à « ${name} » :`,
     linkLabel: 'Toutes les informations sur le tournoi :',
+  },
+  it: {
+    subject: (name) => `Messaggio dall’organizzazione del torneo: ${name}`,
+    text: (firstName, name, senderName) =>
+      `Ciao ${firstName},\n\n${senderName} ti ha inviato il seguente messaggio sulla tua iscrizione a “${name}”:`,
+    linkLabel: 'Tutte le informazioni sul torneo:',
   },
 };
 
@@ -831,6 +911,28 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     rentalCancelled: (title, who, slot) => `${title} : ${who} a annulé la réservation pour ${slot}`,
     rentalDecided: (title, slot, status) => `${title} : votre réservation pour ${slot} a été ${({ confirmed: 'confirmée', rejected: 'refusée', cancelled: 'annulée par le club' })[status] || status}`,
   },
+  it: {
+    tournamentStatus: { draft: 'Bozza', registration: 'Iscrizioni aperte', running: 'In corso', finished: 'Concluso' },
+    registrationStatus: { pending: 'In attesa', confirmed: 'Confermata', waitlist: 'Lista d’attesa', cancelled: 'Annullata', rejected: 'Rifiutata' },
+    registrationFor: (participant) => `Iscrizione di ${participant}`,
+    ownRegistration: 'La tua iscrizione',
+    organizerMessage: 'Messaggio',
+    accountEmailUnverified: 'e-mail non confermata',
+    accountPasswordChangeRequired: 'cambio password richiesto',
+    apiKeyApproved: (label) => `La chiave API “${label}” è stata approvata`,
+    apiKeyRevoked: (label) => `La chiave API “${label}” è stata revocata`,
+    savedSearchMatches: (name, count) => `${count} ${count === 1 ? 'nuovo torneo' : 'nuovi tornei'} per “${name}”`,
+    tournamentAutoFinished: 'Concluso automaticamente perché il torneo è iniziato più di 48 ore fa.',
+    liveViewAvailable: (name) => `${name}: sei registrato – sorteggi e risultati nella diretta`,
+    slotLinked: (name) => `${name}: sei stato iscritto a questo torneo. Se non sei tu, scegli “Non sono io” nella diretta.`,
+    accountConflict: (name) => `${name}: compari in più iscrizioni. L’organizzazione lo chiarirà; contattala.`,
+    adminAction: (name, action) => `${name}: ${({ binding_takeover: 'collegamento al documento rilevato', binding_release: 'collegamento al documento rimosso', running_reset: 'avvio del torneo annullato', tournament_deleted: 'torneo eliminato' })[action] || action}`,
+    usernameChangedByAdmin: (username) => `Un amministratore ha cambiato il tuo nome utente in @${username}.`,
+    usernameReported: (username) => `Il nome utente @${username} è stato segnalato`,
+    rentalRequested: (title, who, slot) => `${title}: nuova richiesta di prenotazione da ${who} per ${slot}`,
+    rentalCancelled: (title, who, slot) => `${title}: ${who} ha annullato la prenotazione per ${slot}`,
+    rentalDecided: (title, slot, status) => `${title}: la tua prenotazione per ${slot} è stata ${({ confirmed: 'confermata', rejected: 'rifiutata', cancelled: 'annullata dal club' })[status] || status}`,
+  },
 };
 
 function buildSystemNotificationPushBody(eventType, eventData, language) {
@@ -880,6 +982,7 @@ const EMAIL_FOOTERS = {
   en: `Pétanque Turnier Manager Online\nFind your next tournament – by location, club or tournament system – and register directly online.\n\nFor tournament directors: Pétanque Turnier Manager is the professional software for running tournaments:\n\n${DESKTOP_APP_URL}`,
   es: `Pétanque Turnier Manager Online\nEncuentra tu próximo torneo – por lugar, club o sistema de torneo – e inscríbete directamente en línea.\n\nPara directores de torneo: Pétanque Turnier Manager es el software profesional para gestionar torneos:\n\n${DESKTOP_APP_URL}`,
   fr: `Pétanque Turnier Manager Online\nTrouve ton prochain tournoi – par lieu, club ou système de tournoi – et inscris-toi directement en ligne.\n\nPour les organisateurs de tournois : Pétanque Turnier Manager est le logiciel professionnel de gestion de tournois :\n\n${DESKTOP_APP_URL}`,
+  it: `Pétanque Turnier Manager Online\nTrova il tuo prossimo torneo – per luogo, club o sistema di gioco – e iscriviti direttamente online.\n\nPer chi organizza tornei: Pétanque Turnier Manager è il software professionale per la gestione dei tornei:\n\n${DESKTOP_APP_URL}`,
 };
 
 export function appendEmailFooter(text, language) {
@@ -894,6 +997,7 @@ const EMAIL_LAYOUT_LABELS = {
   en: { openLink: 'Open link', automated: `This email was sent automatically by ${EMAIL_BRAND}.`, desktop: 'Open desktop app', legal: 'Legal notice', privacy: 'Privacy' },
   es: { openLink: 'Abrir enlace', automated: `Este correo se ha enviado automáticamente desde ${EMAIL_BRAND}.`, desktop: 'Abrir aplicación de escritorio', legal: 'Aviso legal', privacy: 'Privacidad' },
   fr: { openLink: 'Ouvrir le lien', automated: `Cet e-mail a été envoyé automatiquement par ${EMAIL_BRAND}.`, desktop: "Ouvrir l’application de bureau", legal: 'Mentions légales', privacy: 'Confidentialité' },
+  it: { openLink: 'Apri il link', automated: `Questa e-mail è stata inviata automaticamente da ${EMAIL_BRAND}.`, desktop: 'Apri l’app desktop', legal: 'Note legali', privacy: 'Privacy' },
 };
 
 const EMAIL_ACTION_LABELS = {
@@ -902,6 +1006,7 @@ const EMAIL_ACTION_LABELS = {
   en: { tournament: 'View tournament', ranking: 'View standings', directions: 'Plan directions', live: 'Open live view', cancel: 'Withdraw registration', whatsapp: 'Open WhatsApp group', confirm: 'Confirm', edit: 'Edit boules court', reset: 'Reset password', contact: 'Message the tournament organizers', rentals: 'My reservations', rentalRequests: 'Manage requests', rentalCancel: 'Cancel reservation', rentalOffer: 'View offer' },
   es: { tournament: 'Ver torneo', ranking: 'Ver clasificación', directions: 'Planificar ruta', live: 'Abrir vista en directo', cancel: 'Cancelar inscripción', whatsapp: 'Abrir grupo de WhatsApp', confirm: 'Confirmar', edit: 'Editar pista', reset: 'Restablecer contraseña', contact: 'Mensaje a la organización del torneo', rentals: 'Mis reservas', rentalRequests: 'Gestionar solicitudes', rentalCancel: 'Cancelar reserva', rentalOffer: 'Ver oferta' },
   fr: { tournament: 'Voir le tournoi', ranking: 'Voir le classement', directions: 'Préparer l’itinéraire', live: 'Ouvrir la vue en direct', cancel: 'Annuler l’inscription', whatsapp: 'Ouvrir le groupe WhatsApp', confirm: 'Confirmer', edit: 'Modifier le terrain', reset: 'Réinitialiser le mot de passe', contact: 'Contacter l’organisation du tournoi', rentals: 'Mes réservations', rentalRequests: 'Gérer les demandes', rentalCancel: 'Annuler la réservation', rentalOffer: 'Voir l’offre' },
+  it: { tournament: 'Vedi il torneo', ranking: 'Vedi la classifica', directions: 'Calcola il percorso', live: 'Apri la diretta', cancel: 'Annulla l’iscrizione', whatsapp: 'Apri il gruppo WhatsApp', confirm: 'Conferma', edit: 'Modifica il campo', reset: 'Reimposta la password', contact: 'Contatta l’organizzazione del torneo', rentals: 'Le mie prenotazioni', rentalRequests: 'Gestisci le richieste', rentalCancel: 'Annulla la prenotazione', rentalOffer: 'Vedi l’offerta' },
 };
 
 const EMAIL_ACTION_ICONS = { tournament: '▣', ranking: '≡', directions: '⌖', live: '▶', cancel: '×', whatsapp: '◉', confirm: '✓', edit: '✎', reset: '↻', contact: '✉', rentals: '◷', rentalRequests: '☰', rentalCancel: '×', rentalOffer: '▣', desktop: '↗', legal: '§', privacy: '◌' };
@@ -1055,7 +1160,7 @@ export function renderTransactionalEmailHtml(subject, text, language, messageBox
 </html>`;
 }
 
-const EMAIL_LOCALES = { de: 'de-DE', nl: 'nl-NL', en: 'en-GB', es: 'es-ES', fr: 'fr-FR' };
+const EMAIL_LOCALES = { de: 'de-DE', nl: 'nl-NL', en: 'en-GB', es: 'es-ES', fr: 'fr-FR', it: 'it-IT' };
 
 function formatTournamentDateTime(tournament, language) {
   const locale = EMAIL_LOCALES[language] || EMAIL_LOCALES.de;
@@ -7893,6 +7998,7 @@ const RESULT_REPORTED_TEXTS = {
   en: { title: 'Result reported', body: (tournament, team, score) => `${tournament}: ${team} reports ${score}` },
   es: { title: 'Resultado comunicado', body: (tournament, team, score) => `${tournament}: ${team} comunica ${score}` },
   fr: { title: 'Résultat saisi', body: (tournament, team, score) => `${tournament} : ${team} indique ${score}` },
+  it: { title: 'Risultato inserito', body: (tournament, team, score) => `${tournament}: ${team} segnala ${score}` },
   nl: { title: 'Uitslag doorgegeven', body: (tournament, team, score) => `${tournament}: ${team} meldt ${score}` },
 };
 
@@ -11521,6 +11627,7 @@ const PLAYER_LISTING_PUSH_TITLES = {
   nl: 'Nieuwe spelersoproep',
   es: 'Nueva búsqueda de compañeros',
   fr: 'Nouvelle recherche de partenaires',
+  it: 'Nuova ricerca di compagni di squadra',
 };
 
 export function toPublicPlayerListing(row, includeOwner = false) {

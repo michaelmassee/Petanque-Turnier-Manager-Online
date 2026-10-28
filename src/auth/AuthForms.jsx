@@ -28,6 +28,7 @@ const LANGUAGE_FLAGS = [
   { value: 'en', flag: '🇬🇧', label: 'English' },
   { value: 'es', flag: '🇪🇸', label: 'Español' },
   { value: 'fr', flag: '🇫🇷', label: 'Français' },
+  { value: 'it', flag: '🇮🇹', label: 'Italiano' },
 ];
 
 export function LanguageSelect({ language, setLanguage }) {

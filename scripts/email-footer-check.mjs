@@ -15,7 +15,7 @@ function expectContains(label, text, needle) {
 }
 
 const DESKTOP_APP_URL = 'https://michaelmassee.github.io/Petanque-Turnier-Manager/';
-const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
+const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr', 'it'];
 
 for (const language of LANGUAGES) {
   const result = appendEmailFooter('E-Mail-Inhalt', language);

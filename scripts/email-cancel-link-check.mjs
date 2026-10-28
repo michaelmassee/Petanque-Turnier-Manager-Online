@@ -22,7 +22,7 @@ function expectContainsCancelLink(label, text, cancelLink) {
   console.error(`FAIL ${label}: cancel link "${cancelLink}" missing from:\n${text}`);
 }
 
-const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr'];
+const LANGUAGES = ['de', 'nl', 'en', 'es', 'fr', 'it'];
 const cancelLink = buildCancelLink('https://ptmonline.org', 'test-token-123');
 const link = 'https://ptmonline.org/turniere/1/info';
 

@@ -5,6 +5,7 @@ import nl from '../locales/nl.json';
 import en from '../locales/en.json';
 import es from '../locales/es.json';
 import fr from '../locales/fr.json';
+import it from '../locales/it.json';
 
 i18next.use(initReactI18next).init({
   resources: {
@@ -13,6 +14,7 @@ i18next.use(initReactI18next).init({
     en: { translation: en },
     es: { translation: es },
     fr: { translation: fr },
+    it: { translation: it },
   },
   lng: localStorage.getItem('ptm_language') || 'de',
   fallbackLng: 'de',
