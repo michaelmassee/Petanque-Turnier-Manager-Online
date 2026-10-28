@@ -39,11 +39,12 @@ describe('Boule-Treff: Einstieg über ?anzeige=<id>', () => {
 
     renderPage();
 
-    const heading = await screen.findByRole('heading', { name: 'Gesuch 14' });
+    // Großzügiges Zeitlimit: Unter der Last der kompletten Suite brauchte das Rendern schon über 1 s.
+    const heading = await screen.findByRole('heading', { name: 'Gesuch 14' }, { timeout: 5_000 });
     const card = heading.closest('article');
     expect(card).toHaveClass('highlighted');
     // Das Scrollen läuft in einem useEffect nach dem Rendern – darauf warten.
-    await vi.waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled());
+    await vi.waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled(), { timeout: 5_000 });
     expect(Element.prototype.scrollIntoView.mock.contexts).toContain(card);
     expect(screen.getByRole('heading', { name: 'Gesuch 1' }).closest('article')).not.toHaveClass('highlighted');
   });
