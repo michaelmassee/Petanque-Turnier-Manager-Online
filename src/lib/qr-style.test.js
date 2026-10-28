@@ -38,10 +38,10 @@ describe('QR-Code-Darstellung', () => {
   });
 
   it('enthält immer das Logo und nutzt ohne eigene Eckfarbe die Code-Farbe', () => {
-    const options = toQrOptions(design(), 'https://ptm.test/x');
+    const options = toQrOptions(design({ cornerColor: '', cornerType: 'square' }), 'https://ptm.test/x');
 
     expect(options.image).toBe('/icons/logo.png');
-    expect(options.cornersSquareOptions.color).toBe('#000000');
+    expect(options.cornersSquareOptions.color).toBe('#1677ff');
     expect(options.cornersDotOptions.type).toBe('square');
   });
 
@@ -84,6 +84,7 @@ describe('QR-Code-Darstellung', () => {
 
   it('bereinigt Designs aus unsicherer Quelle', () => {
     expect(sanitizeQrDesign(null)).toEqual(DEFAULT_QR_DESIGN);
+    expect(sanitizeQrDesign({ cornerColor: '' }).cornerColor).toBe('');
     expect(sanitizeQrDesign({ fgColor: '#ABCDEF', textSize: 'xl' })).toMatchObject({ fgColor: '#abcdef', textSize: 'm' });
     // Früher gespeichertes showLogo wird ignoriert – das Logo ist immer enthalten.
     expect(sanitizeQrDesign({ showLogo: false })).not.toHaveProperty('showLogo');

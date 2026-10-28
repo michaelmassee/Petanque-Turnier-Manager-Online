@@ -57,8 +57,8 @@ describe('QR-Code-Design pro Turnier', () => {
     await anfrage('PUT', 's1', { design: { fgColor: 'red', dotType: 'stern', header: `a\u0000b${'x'.repeat(200)}`, evil: '<script>' } });
 
     const { design } = await (await anfrage('GET', 's1')).json();
-    expect(design.fgColor).toBe('#000000');
-    expect(design.dotType).toBe('square');
+    expect(design.fgColor).toBe('#1677ff');
+    expect(design.dotType).toBe('dots');
     expect(design.header).toHaveLength(120);
     expect(design.header.startsWith('a b')).toBe(true);
     expect(design).not.toHaveProperty('evil');

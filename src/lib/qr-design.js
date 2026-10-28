@@ -6,13 +6,14 @@ export const QR_CORNER_TYPES = ['square', 'extra-rounded', 'dot'];
 export const QR_TEXT_SIZES = ['s', 'm', 'l'];
 export const QR_TEXT_MAX_LENGTH = 120;
 
+// Standard: blaue runde Punkte, schwarze runde Eckmarken, PTM-Logo im Original.
 export const DEFAULT_QR_DESIGN = Object.freeze({
-  fgColor: '#000000',
+  fgColor: '#1677ff',
   bgColor: '#ffffff',
   // Leer = Eckmarken in der Vordergrundfarbe.
-  cornerColor: '',
-  dotType: 'square',
-  cornerType: 'square',
+  cornerColor: '#000000',
+  dotType: 'dots',
+  cornerType: 'dot',
   // PTM-Logo zweifarbig in Code-/Hintergrundfarbe statt im Original.
   logoInCodeColor: false,
   header: '',
@@ -45,7 +46,8 @@ export function sanitizeQrDesign(value) {
   return {
     fgColor: color(input.fgColor, DEFAULT_QR_DESIGN.fgColor),
     bgColor: color(input.bgColor, DEFAULT_QR_DESIGN.bgColor),
-    cornerColor: input.cornerColor ? color(input.cornerColor, '') : '',
+    // Fehlt der Schlüssel, gilt der Standard; ein gespeichertes '' bleibt „Eckmarken in Code-Farbe“.
+    cornerColor: 'cornerColor' in input ? (input.cornerColor ? color(input.cornerColor, '') : '') : DEFAULT_QR_DESIGN.cornerColor,
     dotType: oneOf(input.dotType, QR_DOT_TYPES, DEFAULT_QR_DESIGN.dotType),
     cornerType: oneOf(input.cornerType, QR_CORNER_TYPES, DEFAULT_QR_DESIGN.cornerType),
     logoInCodeColor: input.logoInCodeColor === true,

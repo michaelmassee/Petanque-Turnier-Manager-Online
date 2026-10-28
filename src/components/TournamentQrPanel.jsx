@@ -7,7 +7,8 @@ import { canvasToBlob, createQrBitmap, saveBlob, shareQrPng } from '../lib/qr-im
 import { Button, DownloadIcon, Feedback, ShareIcon } from './ui.jsx';
 
 // QR-Code des Turniers auf der Turnierseite (Info) für alle Besucher: derselbe feste Link /q/… im selben Design wie
-// der gedruckte QR-Code der Turnierleitung. „Teilen“ teilt das Bild. Ohne Link (z. B. Entwurf) bleibt das Panel weg.
+// der gedruckte QR-Code der Turnierleitung; ohne eigenen Header-Text steht der Turniername darüber. „Teilen“ teilt
+// das Bild. Ohne Link (z. B. Entwurf) bleibt das Panel weg.
 // Bei privaten Turnieren ohne aktiven Freigabe-Link (sieht nur die Turnierleitung) führt der Code Gäste ins Leere:
 // statt Code und Teilen-Knöpfen gibt es dann einen Hinweis und die ausdrückliche Freigabe.
 export function TournamentQrPanel({ tournament, shareToken = '' }) {
@@ -19,6 +20,7 @@ export function TournamentQrPanel({ tournament, shareToken = '' }) {
   const [message, setMessage] = useState('');
   const canvasRef = useRef(null);
   const tournamentId = tournament.id;
+  const tournamentName = tournament.name;
 
   useEffect(() => {
     let cancelled = false;
@@ -37,9 +39,10 @@ export function TournamentQrPanel({ tournament, shareToken = '' }) {
     let cancelled = false;
     (async () => {
       try {
-        const image = await createQrBitmap(qr.design, qr.url);
+        const design = qr.design.header ? qr.design : { ...qr.design, header: tournamentName };
+        const image = await createQrBitmap(design, qr.url);
         if (cancelled || !canvasRef.current) return;
-        drawQrImage(canvasRef.current, image, qr.design);
+        drawQrImage(canvasRef.current, image, design);
         setDrawn(true);
       } catch (qrError) {
         console.error('QR panel failed', qrError);
@@ -47,7 +50,7 @@ export function TournamentQrPanel({ tournament, shareToken = '' }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [qr, t]);
+  }, [qr, tournamentName, t]);
 
   if (!qr) return null;
   const fileName = qrFileName(tournament.name, 'png', t('Turnier'));

@@ -37,6 +37,14 @@ describe('QR-Panel der Turnierseite', () => {
     expect(qrImage.createQrBitmap).toHaveBeenCalledWith(expect.objectContaining({ header: 'Jetzt anmelden!' }), QR_URL);
   });
 
+  it('setzt ohne eigenen Header-Text den Turniernamen als Überschrift ins Standard-Design', async () => {
+    respond(200, { qrUrl: QR_URL, design: null });
+    render(<TournamentQrPanel tournament={TOURNAMENT} />);
+    await waitFor(() => expect(qrImage.createQrBitmap).toHaveBeenCalledWith(
+      expect.objectContaining({ header: 'Frühlingsturnier', fgColor: '#1677ff', cornerColor: '#000000', dotType: 'dots', cornerType: 'dot' }), QR_URL,
+    ));
+  });
+
   it('meldet, wenn das Bild statt geteilt in die Zwischenablage kopiert wurde', async () => {
     respond(200, { qrUrl: QR_URL, design: null });
     qrImage.shareQrPng.mockResolvedValueOnce('copied');
