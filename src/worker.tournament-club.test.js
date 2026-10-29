@@ -42,7 +42,13 @@ describe('Ausrichtender Verein am Turnier', () => {
       today: '2099-07-02', fallbackLocation: 'Schnellstart',
     });
     const tournament = await create({ ...payload, latitude: 52.52, longitude: 13.405 });
-    expect(tournament).toMatchObject({ club: 'BC Linden', organizerClubId: 'c1', logoUrl: 'https://example.test/club.png' });
+    expect(tournament).toMatchObject({ club: 'BC Linden', organizerClubId: 'c1', logoUrl: 'https://example.test/club.png', quickStart: true });
+  });
+
+  it('kennzeichnet nur per Schnellstart angelegte Turniere', async () => {
+    const tournament = await create({ club: 'BC Linden', latitude: 52.52, longitude: 13.405 });
+    expect(tournament.quickStart).toBe(false);
+    expect(env.DB.sqlite.prepare('SELECT quick_start FROM tournaments WHERE id = ?').get(tournament.id)).toEqual({ quick_start: 0 });
   });
 
   it('verknüpft den Veranstalter ohne passenden Spielort und priorisiert sein Logo', async () => {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '../lib/i18next-config.js';
 import { authenticatedApi } from '../lib/api.js';
 import TournamentQuickStart from './TournamentQuickStart.jsx';
@@ -30,7 +30,7 @@ describe('Schnellstart', () => {
     expect(createPath).toBe('/api/tournaments');
     expect(JSON.parse(createOptions.body)).toMatchObject({
       visibility: 'private', registrationType: 'supermelee', type: 'rangliste', formation: 'doublette', location: 'BC Linden',
-      liveViewEnabled: true, playerResultReportingEnabled: true,
+      liveViewEnabled: true, playerResultReportingEnabled: true, quickStart: true,
     });
     expect(screen.getByRole('radio', { name: 'Triplette' })).toBeDisabled();
     expect(authenticatedApi.mock.calls[1]).toEqual(['/api/tournaments/t9/start', { method: 'POST' }]);
@@ -122,5 +122,30 @@ describe('Schnellstart', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Das Turnier wurde angelegt, konnte aber nicht gestartet werden.');
     expect(onCreated).toHaveBeenCalled();
+  });
+
+  it('listet nur eigene Schnellstart-Turniere mit Status, neueste zuerst, und öffnet sie per Klick', () => {
+    const onOpen = vi.fn();
+    const tournaments = [
+      { id: 'alt', name: 'Schweizer Doublette 2026-10-01', date: '2026-10-01', status: 'finished', ownerId: 'u1', quickStart: true },
+      { id: 'neu', name: 'Supermêlée Doublette 2026-10-29', date: '2026-10-29', status: 'running', ownerId: 'u1', quickStart: true },
+      { id: 'normal', name: 'Vereinsmeisterschaft', date: '2026-10-30', status: 'registration', ownerId: 'u1' },
+      { id: 'fremd', name: 'Formule X Triplette 2026-10-28', date: '2026-10-28', status: 'running', ownerId: 'u2', quickStart: true },
+    ];
+    render(<TournamentQuickStart currentUser={user} tournaments={tournaments} onOpen={onOpen} />);
+
+    const list = screen.getByRole('region', { name: 'Meine Schnellstart-Turniere' });
+    const entries = within(list).getAllByRole('button');
+    expect(entries.map((entry) => entry.textContent)).toEqual([
+      'Supermêlée Doublette 2026-10-29Läuft',
+      'Schweizer Doublette 2026-10-01Abgeschlossen',
+    ]);
+    fireEvent.click(entries[1]);
+    expect(onOpen).toHaveBeenCalledWith('alt');
+  });
+
+  it('blendet die Liste ohne Schnellstart-Turniere aus', () => {
+    render(<TournamentQuickStart currentUser={user} tournaments={[{ id: 'normal', name: 'Pokal', status: 'draft', ownerId: 'u1' }]} />);
+    expect(screen.queryByRole('region', { name: 'Meine Schnellstart-Turniere' })).not.toBeInTheDocument();
   });
 });

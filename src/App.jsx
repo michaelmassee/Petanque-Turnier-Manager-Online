@@ -2279,6 +2279,10 @@ function AppContent() {
                 setPlayFocus({ tournamentId, openParticipants: true });
                 setActiveTab('play');
               }}
+              onOpen={(tournamentId) => {
+                setPlayFocus({ tournamentId });
+                setActiveTab('play');
+              }}
             />
           </section>
         </Suspense>

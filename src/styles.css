@@ -1182,6 +1182,64 @@ a.left-panel-link {
   gap: 10px;
 }
 
+/* „Meine Schnellstart-Turniere“: ganze Zeile klickbar, Status rechts; lange Namen brechen um statt zu überlaufen. */
+.quickstart-history {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e7f0;
+}
+
+.quickstart-history h3 {
+  margin: 0 0 8px;
+}
+
+.quickstart-history ul {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quickstart-history li + li {
+  border-top: 1px solid #e5e9f0;
+}
+
+.quickstart-history-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quickstart-history-entry:hover,
+.quickstart-history-entry:focus-visible {
+  background: #f4f7fb;
+}
+
+.quickstart-history-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.quickstart-history-name .nowrap {
+  white-space: nowrap;
+}
+
+.quickstart-history-entry .status {
+  flex-shrink: 0;
+}
+
 .drawer-menu-section {
   display: grid;
   gap: 10px;

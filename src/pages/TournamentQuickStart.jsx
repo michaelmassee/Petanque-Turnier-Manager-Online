@@ -2,13 +2,21 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { Button, Feedback } from '../components/ui.jsx';
-import { DEFAULT_TOURNAMENT_LIMIT, FORMATIONS } from '../lib/constants.js';
+import { DEFAULT_TOURNAMENT_LIMIT, FORMATIONS, TOURNAMENT_STATUSES } from '../lib/constants.js';
 import { labelFor } from '../lib/domain.js';
+import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { QUICK_START_FORMATIONS, quickStartPayload, quickStartSystemLabel, quickStartTemplates } from '../lib/quickstart-templates.js';
+
+// Am Handy bricht „2026-10-29“ sonst am Bindestrich um; das Datum am Namensende bleibt zusammen.
+function nameWithUnbrokenDate(name) {
+  const match = /^(.+) (\d{4}-\d{2}-\d{2})$/.exec(name || '');
+  if (!match) return name;
+  return <>{match[1]} <span className="nowrap">{match[2]}</span></>;
+}
 
 // Schnellstart: Formation und System wählen, das private Turnier wird angelegt und sofort gestartet. Danach geht es in
 // „Turnier starten“ weiter (Spieler nachmelden, Runde auslosen).
-export default function TournamentQuickStart({ currentUser, tournaments = [], onStarted, onCreated }) {
+export default function TournamentQuickStart({ currentUser, tournaments = [], onStarted, onCreated, onOpen }) {
   const { t } = useTranslation();
   const [formation, setFormation] = useState('doublette');
   const [busyId, setBusyId] = useState('');
@@ -17,6 +25,11 @@ export default function TournamentQuickStart({ currentUser, tournaments = [], on
   const ownedTournamentCount = tournaments.filter((tournament) => tournament.ownerId === currentUser?.id && tournament.registrationEnabled !== false).length;
   const limitReached = currentUser?.role !== 'admin' && ownedTournamentCount >= tournamentLimit;
   const disabled = Boolean(busyId) || limitReached;
+  // Eigene Schnellstart-Turniere, neueste zuerst; ein Klick führt wie nach dem Anlegen in „Turnier starten“.
+  const quickStartTournaments = tournaments
+    .filter((tournament) => tournament.quickStart && tournament.ownerId === currentUser?.id)
+    .sort((left, right) => (right.date || '').localeCompare(left.date || '') || (right.createdAt || '').localeCompare(left.createdAt || ''));
+  const visibleQuickStarts = useInfiniteList(quickStartTournaments);
 
   async function handleStart(template) {
     if (disabled) return;
@@ -70,6 +83,22 @@ export default function TournamentQuickStart({ currentUser, tournaments = [], on
           </Button>
         ))}
       </div>
+      {quickStartTournaments.length > 0 && (
+        <section className="quickstart-history" aria-label={t('Meine Schnellstart-Turniere')}>
+          <h3>{t('Meine Schnellstart-Turniere')}</h3>
+          <ul>
+            {visibleQuickStarts.items.map((tournament) => (
+              <li key={tournament.id}>
+                <button type="button" className="quickstart-history-entry" onClick={() => onOpen?.(tournament.id)}>
+                  <span className="quickstart-history-name" data-i18n-skip>{nameWithUnbrokenDate(tournament.name)}</span>
+                  <span className={`status status-${tournament.status}`}>{labelFor(TOURNAMENT_STATUSES, tournament.status)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <InfiniteListLoadMore hasMore={visibleQuickStarts.hasMore} onLoadMore={visibleQuickStarts.loadMore} label={t('Weitere Einträge laden')} />
+        </section>
+      )}
     </div>
   );
 }

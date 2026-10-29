@@ -5909,8 +5909,8 @@ async function createTournament(request, env, user) {
         id, organizer_club_id, owner_id, creator_id, name, club, date, start_time, location, description, type, formation, formation_other, registration_type, status,
         max_registrations, registration_deadline, registration_opens_at, entry_fee_cents, currency, schweizer_ranking_mode, ko_platz3, contact_name, contact_email, contact_phone,
         visibility, internal_notes, participants_public, license_required, team_name_enabled, waitlist_enabled, waitlist_auto_promote, registration_enabled, approval_required, phone_required, website_url, logo_url, flyer_url, payment_info,
-        latitude, longitude, geocoded_at, timezone, boule_place_id, live_view_enabled, player_result_reporting_enabled, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        latitude, longitude, geocoded_at, timezone, boule_place_id, live_view_enabled, player_result_reporting_enabled, quick_start, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -5959,6 +5959,8 @@ async function createTournament(request, env, user) {
       selectedPlace?.id || null,
       tournament.liveViewEnabled ? 1 : 0,
       tournament.playerResultReportingEnabled ? 1 : 0,
+      // Nur beim Anlegen per Schnellstart; Bearbeiten und Kopieren ändern die Kennzeichnung nicht.
+      body.quickStart === true ? 1 : 0,
       now,
       now,
     )
@@ -13385,6 +13387,7 @@ export function toPublicTournament(row, user) {
     createdBy: tournamentCreatedBy(row),
     // Nur Verwalter erfahren, ob ein QR-Design existiert (Auswahl „Design übernehmen von …“).
     hasQrDesign: canManageTournament(row, user) ? Boolean(row.qr_design) : undefined,
+    quickStart: canManageTournament(row, user) ? Boolean(Number(row.quick_start || 0)) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
