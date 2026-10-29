@@ -384,36 +384,43 @@ export const REGISTRATION_CONFIRMATION_EMAILS = {
 
 
 // Neuer persönlicher Live-Link auf Wunsch der Turnierleitung; der vorherige Link wird damit ungültig (EW-02).
+// Der Hinweis auf den ungültigen alten Link steht nur in der Mail, wenn wirklich ein neuer Link erzeugt wurde.
 export const LIVE_LINK_EMAILS = {
   de: {
     subject: (name) => `Dein Live-Link: ${name}`,
-    text: (firstName, name, liveLink) =>
-      `Hallo ${firstName},\n\nhier ist dein persönlicher Live-Link für "${name}" (Runde, Gegner, Bahn):\n${liveLink}\n\nEin früher verschickter Live-Link ist damit ungültig.`,
+    text: (firstName, name, liveLink, replaced = false) =>
+      `Hallo ${firstName},\n\nhier ist dein persönlicher Live-Link für "${name}" (Runde, Gegner, Bahn):\n${liveLink}`
+      + (replaced ? '\n\nEin früher verschickter Live-Link ist damit ungültig.' : ''),
   },
   nl: {
     subject: (name) => `Je livelink: ${name}`,
-    text: (firstName, name, liveLink) =>
-      `Hallo ${firstName},\n\nhier is je persoonlijke livelink voor "${name}" (ronde, tegenstander, baan):\n${liveLink}\n\nEen eerder verstuurde livelink is daarmee ongeldig.`,
+    text: (firstName, name, liveLink, replaced = false) =>
+      `Hallo ${firstName},\n\nhier is je persoonlijke livelink voor "${name}" (ronde, tegenstander, baan):\n${liveLink}`
+      + (replaced ? '\n\nEen eerder verstuurde livelink is daarmee ongeldig.' : ''),
   },
   en: {
     subject: (name) => `Your live link: ${name}`,
-    text: (firstName, name, liveLink) =>
-      `Hi ${firstName},\n\nhere is your personal live link for "${name}" (round, opponent, lane):\n${liveLink}\n\nAny live link sent earlier is no longer valid.`,
+    text: (firstName, name, liveLink, replaced = false) =>
+      `Hi ${firstName},\n\nhere is your personal live link for "${name}" (round, opponent, lane):\n${liveLink}`
+      + (replaced ? '\n\nAny live link sent earlier is no longer valid.' : ''),
   },
   es: {
     subject: (name) => `Tu enlace en directo: ${name}`,
-    text: (firstName, name, liveLink) =>
-      `Hola ${firstName},\n\naquí tienes tu enlace en directo personal para "${name}" (ronda, rival, pista):\n${liveLink}\n\nCualquier enlace enviado antes ya no es válido.`,
+    text: (firstName, name, liveLink, replaced = false) =>
+      `Hola ${firstName},\n\naquí tienes tu enlace en directo personal para "${name}" (ronda, rival, pista):\n${liveLink}`
+      + (replaced ? '\n\nCualquier enlace enviado antes ya no es válido.' : ''),
   },
   fr: {
     subject: (name) => `Ton lien direct : ${name}`,
-    text: (firstName, name, liveLink) =>
-      `Bonjour ${firstName},\n\nvoici ton lien direct personnel pour « ${name} » (tour, adversaire, terrain) :\n${liveLink}\n\nTout lien direct envoyé auparavant n’est plus valable.`,
+    text: (firstName, name, liveLink, replaced = false) =>
+      `Bonjour ${firstName},\n\nvoici ton lien direct personnel pour « ${name} » (tour, adversaire, terrain) :\n${liveLink}`
+      + (replaced ? '\n\nTout lien direct envoyé auparavant n’est plus valable.' : ''),
   },
   it: {
     subject: (name) => `Il tuo link diretta: ${name}`,
-    text: (firstName, name, liveLink) =>
-      `Ciao ${firstName},\n\necco il tuo link personale alla diretta di “${name}” (turno, avversario, campo):\n${liveLink}\n\nI link alla diretta inviati in precedenza non sono più validi.`,
+    text: (firstName, name, liveLink, replaced = false) =>
+      `Ciao ${firstName},\n\necco il tuo link personale alla diretta di “${name}” (turno, avversario, campo):\n${liveLink}`
+      + (replaced ? '\n\nI link alla diretta inviati in precedenza non sono più validi.' : ''),
   },
 };
 
@@ -1311,7 +1318,9 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
   const ics = buildTournamentIcs(tournament, appOrigin);
   const participantsBlock = buildRegistrationParticipantsBlock(registration, language);
   // Persönlicher Live-Link (E-21). Die Live-Ansicht gehört zu jedem Turnier.
-  const liveLink = buildLiveLink(appOrigin, await issueLiveToken(env, registration.id));
+  // Vorhandenen Link wiederverwenden (z. B. Nachrücken von der Warteliste): ein neuer würde den Link für das ganze Team
+  // und einen schon gezeigten QR-Code ungültig machen. Nur ein nicht wiederherstellbarer alter Link wird ersetzt.
+  const liveLink = buildLiveLink(appOrigin, (await currentLiveToken(env, registration, { renewIfUnrecoverable: true })).token);
   const directionsBlock = directionsEmailBlock(tournament, language);
   const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
 
@@ -1331,10 +1340,11 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
 }
 
 /**
- * "Live-Link neu senden" (EW-02): erzeugt einen neuen persönlichen Link, macht den alten ungültig und schickt ihn an
- * die E-Mail-Adressen der Spieler. Der Link selbst erscheint nie in der Antwort, nur in der Mail.
+ * "Live-Link erneut senden" (EW-02): schickt den bestehenden Link der Anmeldung an die E-Mail-Adressen der Spieler. Er
+ * gilt für das ganze Team und bleibt gültig. Nur ein nicht wiederherstellbarer alter Link (nur als Hash gespeichert)
+ * meldet 409 live_link_not_recoverable; mit renew ersetzt ihn ein neuer. Der Link erscheint nie in der Antwort.
  */
-export async function resendLiveLink(env, registration, user, appOrigin) {
+export async function resendLiveLink(env, registration, user, appOrigin, { renew = false } = {}) {
   const tournament = await getTournamentById(env.DB, registration.tournament_id);
   if (registration.status !== 'confirmed') throw new HttpError(409, 'Einen Live-Link gibt es nur für bestätigte Anmeldungen');
   const recipients = buildTeamRecipients(registration);
@@ -1342,14 +1352,15 @@ export async function resendLiveLink(env, registration, user, appOrigin) {
   if (!(await canSendTournamentMail(env.DB, tournament))) throw new HttpError(409, 'Für dieses Turnier ist der E-Mail-Versand nicht freigeschaltet');
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = LIVE_LINK_EMAILS[language] || LIVE_LINK_EMAILS.de;
-  const liveLink = buildLiveLink(appOrigin, await issueLiveToken(env, registration.id));
+  const { token, created, replaced } = await currentLiveToken(env, registration, { renewIfUnrecoverable: renew });
+  const liveLink = buildLiveLink(appOrigin, token);
   const directionsBlock = directionsEmailBlock(tournament, language);
   const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
   for (const recipient of recipients) {
     await enqueueTransactionalEmail(env, {
       to: recipient.email,
       subject: templates.subject(tournament.name),
-      text: templates.text(recipient.firstName, tournament.name, liveLink) + directionsBlock + whatsappBlock,
+      text: templates.text(recipient.firstName, tournament.name, liveLink, replaced) + directionsBlock + whatsappBlock,
       actions: tournamentEmailActions(tournament, appOrigin, language, [emailAction('live', liveLink, language), whatsappEmailAction(whatsappBlock, language)]),
       language,
       logFallback: `Live link email for ${recipient.email} (tournament ${tournament.id})`,
@@ -1358,8 +1369,8 @@ export async function resendLiveLink(env, registration, user, appOrigin) {
     });
   }
   await env.DB.batch([auditStatement(env.DB, { tournamentId: tournament.id, registrationId: registration.id, actorUserId: user.id,
-    actorRole: actorRoleFor(tournament, user), action: 'live_link_reissued', target: 'registration',
-    details: { recipients: recipients.length } })]);
+    actorRole: actorRoleFor(tournament, user), action: replaced ? 'live_link_reissued' : created ? 'live_link_issued' : 'live_link_resent',
+    target: 'registration', details: { recipients: recipients.length } })]);
   return json({ sent: recipients.length });
 }
 
@@ -1515,6 +1526,28 @@ async function issueLiveToken(env, registrationId, { onlyIfMissing = false } = {
 }
 
 /**
+ * Aktueller persönlicher Link einer Anmeldung, ohne ihn zu ändern. Fehlt er, entsteht er atomar (bei gleichzeitigen
+ * Aufrufen gewinnt einer, die anderen lesen dessen Link). Liegt nur der Hash vor, gibt es 409 live_link_not_recoverable –
+ * außer mit renewIfUnrecoverable, dann ersetzt ein neuer Link den alten.
+ */
+async function currentLiveToken(env, registration, { renewIfUnrecoverable = false } = {}) {
+  const notRecoverable = () => new HttpError(409, 'Der bisherige Live-Link kann nicht angezeigt werden', { code: 'live_link_not_recoverable' });
+  const stored = await env.DB.prepare('SELECT live_token_hash, live_token_enc FROM registrations WHERE id = ?').bind(registration.id).first();
+  if (stored?.live_token_hash) {
+    const token = await decryptLiveToken(env, stored.live_token_enc);
+    if (token) return { token, created: false, replaced: false };
+    if (!renewIfUnrecoverable) throw notRecoverable();
+    return { token: await issueLiveToken(env, registration.id), created: false, replaced: true };
+  }
+  const token = await issueLiveToken(env, registration.id, { onlyIfMissing: true });
+  if (token) return { token, created: true, replaced: false };
+  const row = await env.DB.prepare('SELECT live_token_enc FROM registrations WHERE id = ?').bind(registration.id).first();
+  const concurrent = await decryptLiveToken(env, row?.live_token_enc);
+  if (!concurrent) throw notRecoverable();
+  return { token: concurrent, created: false, replaced: false };
+}
+
+/**
  * QR-Code „Live-Ansicht“ in der Anmeldeverwaltung: liefert den bestehenden persönlichen Link, ohne ihn zu ändern. Hat die
  * Meldung noch gar keinen (z. B. ohne E-Mail-Adresse), entsteht er hier. Liegt nur der Hash vor (Link aus einer Mail
  * vor der Verschlüsselung), gibt es 409 live_link_not_recoverable; renew erzeugt dann einen neuen und macht den alten
@@ -1524,20 +1557,9 @@ export async function liveLinkForQr(env, registration, user, appOrigin, { renew 
   const tournament = await getTournamentById(env.DB, registration.tournament_id);
   if (!Number(tournament?.live_view_enabled || 0)) throw new HttpError(409, 'Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet');
   if (registration.status !== 'confirmed') throw new HttpError(409, 'Einen Live-Link gibt es nur für bestätigte Anmeldungen');
-  const existingLink = async (encrypted) => {
-    const token = await decryptLiveToken(env, encrypted);
-    if (!token) throw new HttpError(409, 'Der bisherige Live-Link kann nicht angezeigt werden', { code: 'live_link_not_recoverable' });
-    return { url: buildLiveLink(appOrigin, token) };
-  };
-  if (!renew && registration.live_token_hash) return existingLink(registration.live_token_enc);
-  const replaced = Boolean(registration.live_token_hash);
-  const token = await issueLiveToken(env, registration.id, { onlyIfMissing: !renew });
-  // Ein gleichzeitiger Abruf hat den Link schon angelegt: denselben zurückgeben, statt ihn zu überschreiben.
-  if (!token) {
-    const row = await env.DB.prepare('SELECT live_token_enc FROM registrations WHERE id = ?').bind(registration.id).first();
-    return existingLink(row?.live_token_enc);
-  }
+  const { token, created, replaced } = await currentLiveToken(env, registration, { renewIfUnrecoverable: renew });
   const url = buildLiveLink(appOrigin, token);
+  if (!created && !replaced) return { url };
   await env.DB.batch([auditStatement(env.DB, { tournamentId: tournament.id, registrationId: registration.id, actorUserId: user.id,
     actorRole: actorRoleFor(tournament, user), action: replaced ? 'live_link_reissued' : 'live_link_issued', target: 'registration',
     details: { delivery: 'qr' } })]);
@@ -3124,7 +3146,8 @@ export default {
         const registration = await getRegistrationWithTournament(env.DB, registrationLiveLinkMatch[1]);
         if (!registration) throw new HttpError(404, 'Anmeldung nicht gefunden');
         assertCanManageTournament(registration, auth.user);
-        return await resendLiveLink(env, registration, auth.user, url.origin);
+        const body = await readJson(request).catch(() => ({}));
+        return await resendLiveLink(env, registration, auth.user, url.origin, { renew: body?.renew === true });
       }
 
       const registrationLiveQrMatch = url.pathname.match(/^\/api\/registrations\/([^/]+)\/live-link\/qr$/);

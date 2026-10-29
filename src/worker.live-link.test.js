@@ -1,7 +1,8 @@
 // @vitest-environment node
 // Live-Ansicht über den persönlichen Link (E-21): ohne Konto für jedes Turnier verfügbar.
 // Der Link kommt mit der Anmeldebestätigung; beim Check-in gibt es weder E-Mail noch Postbox-Nachricht (E-09).
-// Gespeichert wird nur der Hash des Links; "Live-Link neu senden" macht den bisherigen ungültig (EW-02).
+// Gespeichert werden der Hash und (mit LIVE_LINK_KEY) der verschlüsselte Link; "Live-Link erneut senden" schickt den
+// bestehenden Link, nur ein nicht wiederherstellbarer alter Link wird auf Wunsch ersetzt (EW-02).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 import { bindeDokument, syncAnfrage } from './test-support/sync.js';
@@ -152,9 +153,14 @@ describe('Persönlicher Live-Link (E-21)', () => {
     expect(gesendeteTexte().find((mail) => mail.to === 'neu@example.test').text).toContain('/live/');
   });
 
-  it('sendet auf Wunsch der Turnierleitung einen neuen Link; der alte wird ungültig', async () => {
+  it('ersetzt einen nicht wiederherstellbaren Link nur auf ausdrücklichen Wunsch; der alte wird dann ungültig', async () => {
     const registration = zeile('SELECT * FROM registrations WHERE id = ?', ONLINE_ID);
-    const antwort = await resendLiveLink(env, registration, { id: 'u1', role: 'user' }, 'https://ptm.test');
+    await expect(resendLiveLink(env, registration, { id: 'u1', role: 'user' }, 'https://ptm.test'))
+      .rejects.toMatchObject({ status: 409, details: { code: 'live_link_not_recoverable' } });
+    expect(env.MAIL_QUEUE.send).not.toHaveBeenCalled();
+    expect((await liveAbrufen(TOKEN)).status).toBe(200);
+
+    const antwort = await resendLiveLink(env, registration, { id: 'u1', role: 'user' }, 'https://ptm.test', { renew: true });
 
     expect(await antwort.json()).toEqual({ sent: 1 });
     const neu = linkAusMail('maria@example.test');
@@ -172,7 +178,7 @@ describe('Persönlicher Live-Link (E-21)', () => {
   it('sendet keinen neuen Link für nicht bestätigte Anmeldungen', async () => {
     sql("UPDATE tournaments SET live_view_enabled = 0 WHERE id = 't1'");
     const registration = zeile('SELECT * FROM registrations WHERE id = ?', ONLINE_ID);
-    await expect(resendLiveLink(env, registration, { id: 'u1' }, 'https://ptm.test')).resolves.toMatchObject({ status: 200 });
+    await expect(resendLiveLink(env, registration, { id: 'u1' }, 'https://ptm.test', { renew: true })).resolves.toMatchObject({ status: 200 });
 
     env.MAIL_QUEUE.send.mockClear();
     await expect(resendLiveLink(env, { ...registration, status: 'waitlist' }, { id: 'u1' }, 'https://ptm.test'))
@@ -279,5 +285,61 @@ describe('QR-Code Live-Ansicht in der Anmeldeverwaltung', () => {
   it('lässt nur die Turnierleitung an den Endpunkt', async () => {
     const antwort = await worker.fetch(new Request(`https://ptm.test/api/registrations/${ONLINE_ID}/live-link/qr`), env);
     expect(antwort.status).toBe(401);
+  });
+
+  const mitEmail = () => sql("UPDATE registrations SET email = 'maria@example.test', player_email = 'maria@example.test' WHERE id = ?", ONLINE_ID);
+  const tokenAusMail = () => env.MAIL_QUEUE.send.mock.calls.at(-1)[0].text.match(/\/live\/t\/([0-9a-f]{64})/)[1];
+
+  it('schickt beim erneuten Senden den bestehenden Link; QR-Code und Teamlink bleiben gültig', async () => {
+    mitEmail();
+    const gezeigt = tokenAus((await liveLinkForQr(env, meldung(), leitung, 'https://ptm.test')).url);
+    await resendLiveLink(env, meldung(), leitung, 'https://ptm.test');
+
+    expect(tokenAusMail()).toBe(gezeigt);
+    expect(env.MAIL_QUEUE.send.mock.calls.at(-1)[0].text).not.toContain('ungültig');
+    expect((await liveAbrufen(gezeigt)).status).toBe(200);
+    expect(zeile("SELECT action FROM audit_log WHERE action = 'live_link_resent'")).toBeTruthy();
+    expect(zeile("SELECT action FROM audit_log WHERE action = 'live_link_reissued'")).toBeUndefined();
+  });
+
+  it('verlangt für einen nur als Hash gespeicherten Link die Bestätigung, bevor ein neuer verschickt wird', async () => {
+    mitEmail();
+    sql("UPDATE registrations SET live_token_hash = 'alt' WHERE id = ?", ONLINE_ID);
+    await expect(resendLiveLink(env, meldung(), leitung, 'https://ptm.test'))
+      .rejects.toMatchObject({ status: 409, details: { code: 'live_link_not_recoverable' } });
+    expect(env.MAIL_QUEUE.send).not.toHaveBeenCalled();
+
+    await resendLiveLink(env, meldung(), leitung, 'https://ptm.test', { renew: true });
+    const neu = tokenAusMail();
+    expect(env.MAIL_QUEUE.send.mock.calls.at(-1)[0].text).toContain('Ein früher verschickter Live-Link ist damit ungültig.');
+    expect(tokenAus((await liveLinkForQr(env, meldung(), leitung, 'https://ptm.test')).url)).toBe(neu);
+    expect(zeile("SELECT action FROM audit_log WHERE action = 'live_link_reissued'")).toBeTruthy();
+  });
+
+  it('verwendet in einer späteren Anmeldebestätigung den bestehenden Link wieder', async () => {
+    mitEmail();
+    const gezeigt = tokenAus((await liveLinkForQr(env, meldung(), leitung, 'https://ptm.test')).url);
+    sql("UPDATE registrations SET status = 'pending' WHERE id = ?", ONLINE_ID);
+    sql("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ('s-leitung', 'u1', '2199-01-01', '2026-09-01')");
+    const antwort = await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/registrations/confirm-pending', {
+      method: 'POST', headers: { Cookie: 'ptm_session=s-leitung' },
+    }), env);
+
+    expect(antwort.status).toBe(200);
+    expect(tokenAusMail()).toBe(gezeigt);
+    expect((await liveAbrufen(gezeigt)).status).toBe(200);
+  });
+
+  it('nimmt renew über den Endpunkt nur als ausdrückliches true an', async () => {
+    mitEmail();
+    sql("UPDATE registrations SET live_token_hash = 'alt' WHERE id = ?", ONLINE_ID);
+    sql("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ('s-leitung', 'u1', '2199-01-01', '2026-09-01')");
+    const senden = (body) => worker.fetch(new Request(`https://ptm.test/api/registrations/${ONLINE_ID}/live-link`, {
+      method: 'POST', headers: { Cookie: 'ptm_session=s-leitung', 'Content-Type': 'application/json' }, body,
+    }), env);
+
+    expect((await senden(undefined)).status).toBe(409);
+    expect((await senden(JSON.stringify({ renew: 'ja' }))).status).toBe(409);
+    expect((await senden(JSON.stringify({ renew: true }))).status).toBe(200);
   });
 });

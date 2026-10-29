@@ -320,30 +320,57 @@ describe('Anmeldungsverwaltung: Konto-Verknüpfungen', () => {
   });
 });
 
-describe('Anmeldungsverwaltung: Live-Link neu senden', () => {
+describe('Anmeldungsverwaltung: Live-Link erneut senden', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('schickt unabhängig vom alten Live-Flag einen neuen Link und meldet den Versand', async () => {
-    const registration = { id: 'r1', tournamentId: 't1', firstName: 'Anna', lastName: 'Muster', playerEmail: 'anna@example.test',
-      status: 'confirmed', participation: 'inactive', feeSelections: [], registrationAnswers: [] };
+  const registration = { id: 'r1', tournamentId: 't1', firstName: 'Anna', lastName: 'Muster', playerEmail: 'anna@example.test',
+    status: 'confirmed', participation: 'inactive', feeSelections: [], registrationAnswers: [] };
+  const renderPage = () => render(
+    <RegistrationsManagementPage
+      tournaments={[{ id: 't1', name: 'Sommer Cup', canManage: true, registrationEnabled: true }]}
+      selectedTournamentId="t1"
+      setSelectedTournamentId={() => {}}
+      language="de"
+    />,
+  );
+  const liveLinkCalls = (fetchMock) => fetchMock.mock.calls.filter(([url, options = {}]) => String(url).endsWith('/live-link') && options.method === 'POST');
+
+  it('schickt den bestehenden Link erneut, ohne ihn zu ersetzen, und meldet den Versand', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
       const body = String(url).endsWith('/live-link') && options.method === 'POST' ? { sent: 1 } : { registrations: [registration] };
       return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
     });
-    render(
-      <RegistrationsManagementPage
-        tournaments={[{ id: 't1', name: 'Sommer Cup', canManage: true, registrationEnabled: true }]}
-        selectedTournamentId="t1"
-        setSelectedTournamentId={() => {}}
-        language="de"
-      />,
-    );
+    renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Live-Link neu senden' }));
+    expect(screen.getByText('Schickt den Spielern den bestehenden Live-Link noch einmal per E-Mail. Er gilt für das ganze Team und bleibt gültig.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Live-Link erneut senden' }));
+
+    expect(await screen.findAllByText('Der Live-Link wurde erneut an die Spieler geschickt.')).not.toHaveLength(0);
+    expect(JSON.parse(liveLinkCalls(fetchMock)[0][1].body)).toEqual({ renew: false });
+  });
+
+  it('bietet für einen alten, nicht wiederherstellbaren Link erst nach Hinweis einen neuen an', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
+      if (String(url).endsWith('/live-link') && options.method === 'POST') {
+        if (JSON.parse(options.body).renew) return new Response(JSON.stringify({ sent: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: 'Der bisherige Live-Link kann nicht angezeigt werden', details: { code: 'live_link_not_recoverable' } }),
+          { status: 409, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ registrations: [registration] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Live-Link erneut senden' }));
+
+    expect(await screen.findByText(/kann nicht erneut verschickt werden/)).toBeInTheDocument();
+    expect(liveLinkCalls(fetchMock)).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Neuen Live-Link senden' }));
 
     expect(await screen.findAllByText('Ein neuer Live-Link wurde an die Spieler geschickt.')).not.toHaveLength(0);
-    expect(fetchMock).toHaveBeenCalledWith('/api/registrations/r1/live-link', expect.objectContaining({ method: 'POST' }));
+    expect(JSON.parse(liveLinkCalls(fetchMock)[1][1].body)).toEqual({ renew: true });
+    expect(screen.getByRole('button', { name: 'Live-Link erneut senden' })).toBeInTheDocument();
   });
 });
 

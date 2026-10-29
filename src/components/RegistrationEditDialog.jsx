@@ -105,19 +105,33 @@ function RelinkAccounts({ registration, busyId, onRelink }) {
   );
 }
 
-// "Live-Link neu senden" (EW-02): neuer persönlicher Link an die Spieler, der bisherige wird ungültig.
-function LiveLinkResend({ registration, tournament, busyId, onResend }) {
+// "Live-Link erneut senden" (EW-02): derselbe Link an die Spieler; er gilt für das ganze Team und bleibt gültig. Nur ein
+// alter, nicht wiederherstellbarer Link wird nach einem Hinweis durch einen neuen ersetzt (wie im QR-Dialog).
+function LiveLinkResend({ registration, busyId, notRecoverable, onResend }) {
   const { t } = useTranslation();
   if (!registration || registration.status !== 'confirmed') return null;
   return (
     <section className="relink-accounts" aria-label={t('Live-Link')}>
       <h3>{t('Live-Link')}</h3>
-      <p className="hint">{t('Schickt den Spielern einen neuen persönlichen Live-Link. Der bisherige Link wird damit ungültig.')}</p>
-      <div className="row-actions">
-        <Button variant="secondary" loading={busyId === 'live-link'} disabled={Boolean(busyId)} onClick={() => onResend(registration)}>
-          {t('Live-Link neu senden')}
-        </Button>
-      </div>
+      {notRecoverable ? (
+        <>
+          <p className="hint">{t('Der bisherige Live-Link dieser Meldung kann nicht erneut verschickt werden, weil er vor dieser Funktion erstellt wurde. Ein neuer Link macht den bisherigen für das ganze Team ungültig.')}</p>
+          <div className="row-actions">
+            <Button variant="secondary" loading={busyId === 'live-link'} disabled={Boolean(busyId)} onClick={() => onResend(registration, { renew: true })}>
+              {t('Neuen Live-Link senden')}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="hint">{t('Schickt den Spielern den bestehenden Live-Link noch einmal per E-Mail. Er gilt für das ganze Team und bleibt gültig.')}</p>
+          <div className="row-actions">
+            <Button variant="secondary" loading={busyId === 'live-link'} disabled={Boolean(busyId)} onClick={() => onResend(registration)}>
+              {t('Live-Link erneut senden')}
+            </Button>
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -132,13 +146,14 @@ export function RegistrationEditDialog({ registration, tournament, tournaments, 
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [liveLinkNotRecoverable, setLiveLinkNotRecoverable] = useState(false);
   // Nur beim Öffnen bzw. Wechsel der Meldung neu befüllen, nicht bei jedem Neuladen der Liste (sonst gehen Eingaben verloren).
   const [loadedId, setLoadedId] = useState(null);
   const registrationId = registration?.id || null;
   if (registrationId !== loadedId) {
     setLoadedId(registrationId);
     if (registration) setForm(registrationToForm(registration));
-    setInvalidField(null); setError(''); setMessage('');
+    setInvalidField(null); setError(''); setMessage(''); setLiveLinkNotRecoverable(false);
   }
 
   async function handleSubmit(event) {
@@ -169,13 +184,17 @@ export function RegistrationEditDialog({ registration, tournament, tournaments, 
     } catch (err) { setError(err.message); } finally { setBusyId(''); }
   }
 
-  async function handleLiveLinkResend(target) {
+  async function handleLiveLinkResend(target, { renew = false } = {}) {
     setError(''); setMessage('');
     setBusyId('live-link');
     try {
-      await authenticatedApi(`/api/registrations/${target.id}/live-link`, { method: 'POST' });
-      setMessage(t('Ein neuer Live-Link wurde an die Spieler geschickt.'));
-    } catch (err) { setError(err.message); } finally { setBusyId(''); }
+      await authenticatedApi(`/api/registrations/${target.id}/live-link`, { method: 'POST', body: JSON.stringify({ renew }) });
+      setLiveLinkNotRecoverable(false);
+      setMessage(renew ? t('Ein neuer Live-Link wurde an die Spieler geschickt.') : t('Der Live-Link wurde erneut an die Spieler geschickt.'));
+    } catch (err) {
+      if (err.payload?.details?.code === 'live_link_not_recoverable') setLiveLinkNotRecoverable(true);
+      else setError(err.message);
+    } finally { setBusyId(''); }
   }
 
   return (
@@ -196,7 +215,7 @@ export function RegistrationEditDialog({ registration, tournament, tournaments, 
       />
       {children}
       <RelinkAccounts registration={registration} busyId={busyId} onRelink={handleRelink} />
-      <LiveLinkResend registration={registration} tournament={tournament} busyId={busyId} onResend={handleLiveLinkResend} />
+      <LiveLinkResend registration={registration} busyId={busyId} notRecoverable={liveLinkNotRecoverable} onResend={handleLiveLinkResend} />
     </EditDialog>
   );
 }
