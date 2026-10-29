@@ -289,6 +289,27 @@ describe('TournamentPlayManagement', () => {
     await waitFor(() => expect(calls).toContain('/api/tournaments/t1/ranking?live=1'));
   });
 
+  it('zeigt nach einem Turnierwechsel genau ein Teilnehmer-Panel (Teilnehmer und Rangliste mit eigenem Key)', async () => {
+    const ranking = [{ rank: 1, playerId: 'p1', firstName: 'Anna', lastName: 'Muster', wins: 1, gameDiff: 1, pointsFor: 13, pointsAgainst: 7 }];
+    global.fetch = vi.fn((path) => {
+      if (path.endsWith('/rounds')) return Promise.resolve(jsonResponse({ rounds: [ROUND_1] }));
+      if (path.endsWith('/ranking?live=1')) return Promise.resolve(jsonResponse({ ranking }));
+      if (path.endsWith('/registrations')) return Promise.resolve(jsonResponse({ registrations: CONFIRMED_REGISTRATIONS }));
+      return Promise.resolve(jsonResponse({}));
+    });
+    const tournaments = [TOURNAMENT, { ...TOURNAMENT, id: 't2', name: 'Zweites Turnier' }];
+    const panels = () => document.querySelectorAll('details.round-participants:not(.melee-teams)');
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const page = (tournamentId) => <QueryClientProvider client={client}><TournamentPlayManagement tournaments={tournaments} focus={{ tournamentId }} language="de" /></QueryClientProvider>;
+    const { rerender } = rtlRender(page('t1'));
+    await waitFor(() => expect(screen.getAllByText('Rangliste').length).toBeGreaterThan(0));
+
+    rerender(page('t2'));
+    await waitFor(() => expect(global.fetch.mock.calls.map(([path]) => path)).toContain('/api/tournaments/t2/ranking?live=1'));
+    await waitFor(() => expect(screen.getAllByText('Rangliste').length).toBeGreaterThan(0));
+    expect(panels()).toHaveLength(1);
+  });
+
   it('klappt die Teilnehmerverwaltung standardmäßig ein', async () => {
     const calls = [];
     installFetchMock(calls);

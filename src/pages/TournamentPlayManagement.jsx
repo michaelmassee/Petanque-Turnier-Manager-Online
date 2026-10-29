@@ -885,7 +885,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       )}
 
       {selectedTournamentStatus === 'running' && (
-        <details key={selectedTournamentId} ref={participantsRef} className="panel round-participants" open={focus?.openParticipants && focusTournamentId === selectedTournamentId}>
+        <details key={`participants:${selectedTournamentId}`} ref={participantsRef} className="panel round-participants" open={focus?.openParticipants && focusTournamentId === selectedTournamentId}>
           <summary className="play-round-summary"><span>{t('Teilnehmer')}</span><span className="counter">{activeConfirmedCount}</span></summary>
           <form className={`quick-player-form${isTeamQuickAdd ? ' is-team' : ''}`} onSubmit={handleQuickPlayerSubmit}>
             {quickSlots.map(({ prefix, label, required }) => {
@@ -950,7 +950,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       )}
 
       {Boolean(ranking.length) && (
-        <RankingPanel key={selectedTournamentId} openInitially={selectedTournamentStatus === 'finished' && !selectedTournament?.rankingPublishedAt}>
+        <RankingPanel key={`ranking:${selectedTournamentId}`} openInitially={selectedTournamentStatus === 'finished' && !selectedTournament?.rankingPublishedAt}>
           <div className="table-scroll">
             <RankingTable tournament={selectedTournament} entries={normalizeRanking(ranking)} />
           </div>
