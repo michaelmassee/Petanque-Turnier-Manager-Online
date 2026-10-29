@@ -2732,7 +2732,10 @@ export default {
         // Abmelden geht immer (der Endpoint ist der Nachweis), auch wenn der Spielplan inzwischen nicht mehr sichtbar ist.
         if (request.method === 'DELETE') return await removeBoardPushSubscription(request, env.DB, tournament);
         const shareTokenHash = await assertCanViewSchedule(request, env.DB, tournament, url);
-        return await saveBoardPushSubscription(request, env.DB, tournament, url.origin, shareTokenHash);
+        // Eingeloggte Turnierleitung: Konto am Abo merken, damit der Push auch ohne öffentliche Teilnehmerliste kommt.
+        const session = await optionalSession(request, env.DB);
+        const managerUserId = canManageTournament(tournament, session?.user || null) ? session.user.id : null;
+        return await saveBoardPushSubscription(request, env.DB, tournament, url.origin, shareTokenHash, { managerUserId });
       }
 
       const tournamentTeamDrawMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/teams\/draw$/);
@@ -8576,7 +8579,7 @@ async function assertCanViewSchedule(request, db, tournament, url) {
   return shareAccess ? sha256Hex(share) : null;
 }
 
-export async function saveBoardPushSubscription(request, db, tournament, origin, shareTokenHash = null) {
+export async function saveBoardPushSubscription(request, db, tournament, origin, shareTokenHash = null, { managerUserId = null } = {}) {
   const body = await readJson(request);
   const endpoint = String(body.endpoint || '');
   const p256dh = String(body.keys?.p256dh || '');
@@ -8595,13 +8598,14 @@ export async function saveBoardPushSubscription(request, db, tournament, origin,
   const now = new Date().toISOString();
   // Obergrenze in derselben Anweisung prüfen, damit parallele Anmeldungen sie nicht überholen; ein bekanntes Gerät
   // darf sein Abo immer auffrischen.
-  const result = await db.prepare(`INSERT INTO tournament_board_push_subscriptions (endpoint, tournament_id, p256dh, auth, language, page_url, share_token_hash, created_at, updated_at)
-      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+  const result = await db.prepare(`INSERT INTO tournament_board_push_subscriptions (endpoint, tournament_id, p256dh, auth, language, page_url, share_token_hash, user_id, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       WHERE EXISTS (SELECT 1 FROM tournament_board_push_subscriptions WHERE endpoint = ? AND tournament_id = ?)
         OR (SELECT COUNT(*) FROM tournament_board_push_subscriptions WHERE tournament_id = ?) < ?
       ON CONFLICT(endpoint, tournament_id) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth,
-        language = excluded.language, page_url = excluded.page_url, share_token_hash = excluded.share_token_hash, updated_at = excluded.updated_at`)
-    .bind(endpoint, tournament.id, p256dh, auth, normalizeLanguage(body.language), safePageUrl, shareTokenHash, now, now,
+        language = excluded.language, page_url = excluded.page_url, share_token_hash = excluded.share_token_hash, user_id = excluded.user_id,
+        updated_at = excluded.updated_at`)
+    .bind(endpoint, tournament.id, p256dh, auth, normalizeLanguage(body.language), safePageUrl, shareTokenHash, managerUserId, now, now,
       endpoint, tournament.id, tournament.id, MAX_BOARD_PUSH_SUBSCRIPTIONS).run();
   if (!Number(result.meta?.changes || 0)) {
     throw new HttpError(409, 'Für dieses Turnier sind bereits zu viele Geräte für die Sofort-Aktualisierung angemeldet.');
@@ -8626,12 +8630,18 @@ export async function removeBoardPushSubscription(request, db, tournament) {
 // Turnieren nur Abos, deren Freigabe-Link noch gilt – nicht schon, weil irgendein Link existiert. Ist die
 // Teilnehmerliste ausgeblendet, gehen keine Runden/Ankündigungen mehr an alte Abos.
 async function boardPushItems(db, tournamentId, buildPayload) {
+  // Dieselbe Sichtregel wie beim Spielplan (assertCanViewSchedule): öffentlich bzw. per Freigabelink bei öffentlicher
+  // Teilnehmerliste – oder das Abo stammt von einem Konto, das das Turnier (noch) verwaltet.
   const subscriptions = await db.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.language, s.page_url
       FROM tournament_board_push_subscriptions s JOIN tournaments t ON t.id = s.tournament_id
-      WHERE s.tournament_id = ? AND t.participants_public = 1
-        AND ((t.visibility = 'public' AND t.status != 'draft')
-          OR (t.visibility = 'private' AND EXISTS (SELECT 1 FROM tournament_share_links l
-            WHERE l.tournament_id = t.id AND l.token_hash = s.share_token_hash)))`)
+      WHERE s.tournament_id = ? AND (
+        (t.participants_public = 1
+          AND ((t.visibility = 'public' AND t.status != 'draft')
+            OR (t.visibility = 'private' AND EXISTS (SELECT 1 FROM tournament_share_links l
+              WHERE l.tournament_id = t.id AND l.token_hash = s.share_token_hash))))
+        OR (s.user_id IS NOT NULL AND (s.user_id = t.owner_id
+          OR EXISTS (SELECT 1 FROM tournament_editors e WHERE e.tournament_id = t.id AND e.user_id = s.user_id)
+          OR EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.role = 'admin'))))`)
     .bind(tournamentId).all();
   return (subscriptions.results || []).map((subscription) => ({
     endpoint: subscription.endpoint,

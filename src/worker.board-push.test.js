@@ -109,6 +109,36 @@ describe('Sofort-Aktualisierung der Turnierseite', () => {
     })]);
   });
 
+  it('schickt den Push auch an die eingeloggte Turnierleitung eines privaten Turniers ohne öffentliche Teilnehmerliste', async () => {
+    // Wie ein Schnellstart-Turnier: privat, Teilnehmerliste nicht veröffentlicht, kein Freigabe-Link.
+    sql("UPDATE tournaments SET visibility = 'private', participants_public = 0 WHERE id = 't1'");
+    const alsLeitung = (body) => worker.fetch(new Request(`${ORIGIN}/api/tournaments/t1/schedule/push`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: 'ptm_session=owner-session' }, body: JSON.stringify(body),
+    }), env);
+    expect((await alsLeitung(abo('https://fcm.googleapis.com/fcm/send/leitung', { url: `${ORIGIN}/turnierseite/t1` }))).status).toBe(201);
+    expect(env.DB.sqlite.prepare('SELECT user_id FROM tournament_board_push_subscriptions').get()).toEqual({ user_id: 'owner' });
+
+    await ankuendigen('Runde gleich');
+    expect(pushItems()).toEqual([expect.objectContaining({ endpoint: 'https://fcm.googleapis.com/fcm/send/leitung', payload: expect.objectContaining({ body: 'Runde gleich' }) })]);
+
+    // Verwaltet das Konto das Turnier nicht mehr, bekommt das Abo nichts mehr.
+    sql(`INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at)
+      VALUES ('andere', 'andere@example.test', 'user', 'salt', 'hash', '2026-09-01', '2026-09-01')`);
+    sql("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ('andere-session', 'andere', '2099-01-01T00:00:00.000Z', '2026-09-01')");
+    sql("UPDATE tournaments SET owner_id = 'andere' WHERE id = 't1'");
+    env.MAIL_QUEUE.sendBatch.mockClear();
+    const antwort = await worker.fetch(new Request(`${ORIGIN}/api/tournaments/t1/announcement`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: 'ptm_session=andere-session' }, body: JSON.stringify({ text: 'Neue Leitung' }),
+    }), env);
+    expect(antwort.status).toBe(200);
+    expect(pushItems()).toEqual([]);
+  });
+
+  it('merkt sich bei anonymen Abos kein Konto', async () => {
+    await abonnieren(abo('https://fcm.googleapis.com/fcm/send/anonym'));
+    expect(env.DB.sqlite.prepare('SELECT user_id FROM tournament_board_push_subscriptions').get()).toEqual({ user_id: null });
+  });
+
   it('schickt Ankündigungen auch an die Turnierseite', async () => {
     await abonnieren(abo('https://fcm.googleapis.com/fcm/send/1', { url: `${ORIGIN}/turnierseite/t1` }));
     await worker.fetch(new Request(`${ORIGIN}/api/tournaments/t1/announcement`, {
