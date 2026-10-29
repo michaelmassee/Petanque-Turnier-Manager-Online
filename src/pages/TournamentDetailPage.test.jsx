@@ -66,6 +66,24 @@ describe('Turnierdetail-Reiter', () => {
     expect(meta[2]).toContain('Parkweg 1');
   });
 
+  it('zeigt das Vereinslogo im Kopf vor dem Verein und blendet es bei Ladefehler aus', () => {
+    renderDetail(tournamentWith({ club: 'BC Linden', logoUrl: 'https://example.test/logo.png' }));
+    const club = document.querySelector('.tournament-detail-club');
+    const logo = club.querySelector('img.tournament-detail-club-logo');
+    expect(logo).toHaveAttribute('src', '/api/tournaments/t1/image?field=logo');
+    expect(club.firstChild).toBe(logo);
+    expect(club).toHaveTextContent('BC Linden');
+
+    fireEvent.error(logo);
+    expect(club.querySelector('img')).toBeNull();
+    expect(club).toHaveTextContent('BC Linden');
+  });
+
+  it('zeigt ohne Logo nur den Vereinsnamen', () => {
+    renderDetail(tournamentWith({ club: 'BC Linden', logoUrl: null }));
+    expect(document.querySelector('.tournament-detail-club img')).toBeNull();
+  });
+
   it('lässt die Vereinszeile ohne Verein weg', () => {
     renderDetail(tournamentWith({ club: null }));
     expect(Array.from(document.querySelectorAll('p > strong')).map((label) => label.textContent)).not.toContain('Verein');

@@ -6,7 +6,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { DISPLAY_FIT_QUERY, useAutoScroll, useLivePushRefresh, useMediaQuery, useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { DISPLAY_LOCALES, REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
-import { isCalendarEntry, isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, calendarEventLink } from '../lib/domain.js';
+import { isCalendarEntry, isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl, calendarEventLink } from '../lib/domain.js';
 import { AccountBadge, Button, ClockIcon, Feedback, NumberIcon, RequiredMark, SearchIcon, ShareIcon, SortAlphaIcon, StarIcon } from '../components/ui.jsx';
 import { loadParticipantListPrefs, nextVipFilter, saveParticipantListPrefs } from '../lib/participantListPrefs.js';
 import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
@@ -683,6 +683,8 @@ export function TournamentDetailPage({
   const shareSuffix = shareToken ? `?share=${encodeURIComponent(shareToken)}` : '';
   const detailPath = (view) => `/turniere/${route.id}/${view}${shareSuffix}`;
   const { tournament, notFound } = useRoutedTournament(route.id, tournaments, shareToken);
+  // Merkt sich die fehlgeschlagene Logo-URL, damit beim Wechsel zu einem anderen Turnier dessen Logo wieder versucht wird.
+  const [brokenClubLogo, setBrokenClubLogo] = useState('');
 
   if (notFound) {
     return (
@@ -815,7 +817,19 @@ export function TournamentDetailPage({
           <h1 data-i18n-skip>{tournament.name}</h1>
           <p className="tournament-detail-meta" data-i18n-skip>
             <span>{formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}</span>
-            {tournament.club && <span>{tournament.club}</span>}
+            {tournament.club && (
+              <span className="tournament-detail-club">
+                {tournament.logoUrl && brokenClubLogo !== tournamentImageUrl(tournament.id, 'logo', shareToken) && (
+                  <img
+                    className="tournament-detail-club-logo"
+                    src={tournamentImageUrl(tournament.id, 'logo', shareToken)}
+                    alt=""
+                    onError={(event) => setBrokenClubLogo(event.currentTarget.getAttribute('src'))}
+                  />
+                )}
+                {tournament.club}
+              </span>
+            )}
             <span>{formatLocationAddress(tournament.location)}</span>
           </p>
         </header>

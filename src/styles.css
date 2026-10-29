@@ -5480,3 +5480,20 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
 .google-maps-import-form .hint { margin: 0; }
 .google-maps-import-form .dialog-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); }
 .google-maps-import-form .button { min-width: 0; min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+
+/* Vereinslogo vor dem Veranstalter im Kopf der Turnierdetails; gleiche Logik wie in der Turnierliste. */
+.tournament-detail-club {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tournament-detail-club-logo {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  object-fit: contain;
+  background: #ffffff;
+}
