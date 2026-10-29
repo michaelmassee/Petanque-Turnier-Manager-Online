@@ -15,6 +15,7 @@ import { normalizeRanking } from '../lib/live-ranking.js';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { formatTournamentDateTime } from '../lib/format.js';
 import { meleeTeamSize } from '../lib/pairing/melee.js';
+import { RegistrationPlayerPicker } from '../components/RegistrationPlayerPicker.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
@@ -36,6 +37,7 @@ const EMPTY_QUICK_PLAYER = {
   firstName: '', lastName: '', licenseNr: '',
   partnerFirstName: '', partnerLastName: '', partnerLicenseNr: '',
   partner2FirstName: '', partner2LastName: '', partner2LicenseNr: '',
+  playerSelections: {},
 };
 
 // Personen einer Nachmeldung nach der Anmeldeeinheit (registrationUnit): einzeln bei Tête, Mêlée und Supermêlée, sonst
@@ -326,7 +328,7 @@ export function FinalRankingPublisher({ tournament, onPublished }) {
   );
 }
 
-export default function TournamentPlayManagement({ tournaments: managedTournaments, currentUserId, focus = null }) {
+export default function TournamentPlayManagement({ tournaments: managedTournaments, currentUserId, turnstileSiteKey, focus = null }) {
   const { t, i18n } = useTranslation();
   // Kalendereinträge sind reine Termine ohne Teilnehmer und tauchen hier gar nicht auf.
   const allTournaments = managedTournaments.filter((tournament) => !isCalendarEntry(tournament));
@@ -353,6 +355,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const [redrawing, setRedrawing] = useState(false);
   const [bulkParticipation, setBulkParticipation] = useState('');
   const [quickPlayer, setQuickPlayer] = useState(EMPTY_QUICK_PLAYER);
+  // Eine Auswahl aus der Namenssuche gilt nur für das Turnier, für das sie geladen wurde.
+  useEffect(() => setQuickPlayer(EMPTY_QUICK_PLAYER), [selectedTournamentId]);
   const participantsRef = useRef(null);
   // Der `tournaments`-Prop kommt vom Elternteil und wird nicht sofort neu geladen,
   // nachdem hier der Status auf "Läuft" gesetzt wurde - deshalb lokal vormerken,
@@ -513,6 +517,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       const result = await api(`/api/tournaments/${selectedTournamentId}/registrations`, {
         method: 'POST',
         body: JSON.stringify({
+          // Über die Namenssuche ausgewählte Konten wie in der Anmeldeverwaltung (registrationPayload).
+          ...(Object.keys(quickPlayer.playerSelections).length ? { playerSelections: quickPlayer.playerSelections } : {}),
           firstName: quickPlayer.firstName,
           lastName: quickPlayer.lastName,
           licenseNr: quickPlayer.licenseNr || null,
@@ -889,10 +895,33 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
               // Partner 2 ist optional; wer dort etwas einträgt, muss den Namen aber vollständig angeben.
               const needed = required || Boolean(value('firstName') || value('lastName'));
               const caption = (field) => (label ? `${t(label)}: ${t(field)}` : t(field));
+              const slot = prefix || 'primary';
+              const selections = quickPlayer.playerSelections;
               return (
                 <div className="quick-player-person" key={prefix || 'player'}>
-                  <TextField label={caption('Vorname')} value={value('firstName')} onChange={set('firstName')} required={needed} minLength={2} />
-                  <TextField label={caption('Nachname')} value={value('lastName')} onChange={set('lastName')} required={needed} minLength={2} />
+                  {currentUserId ? (
+                    <RegistrationPlayerPicker
+                      key={`${selectedTournamentId}:${slot}`} tournamentId={selectedTournamentId} siteKey={turnstileSiteKey}
+                      selected={selections[slot]} excludedIds={Object.values(selections).map((selection) => selection.userId)}
+                      currentUserId={currentUserId}
+                      firstName={value('firstName')} lastName={value('lastName')} firstRequired={needed} lastRequired={needed}
+                      firstLabel={caption('Vorname')} lastLabel={caption('Nachname')}
+                      onNameChange={(field, next) => setQuickPlayer((current) => ({ ...current, [quickPlayerKey(prefix, field)]: next }))}
+                      onSelect={(player) => setQuickPlayer((current) => ({
+                        ...current,
+                        [quickPlayerKey(prefix, 'firstName')]: player.firstName, [quickPlayerKey(prefix, 'lastName')]: player.lastName,
+                        [quickPlayerKey(prefix, 'licenseNr')]: player.licenseNr || current[quickPlayerKey(prefix, 'licenseNr')],
+                        playerSelections: { ...current.playerSelections, [slot]: { userId: player.id, proof: player.proof, licenseNr: player.licenseNr } },
+                      }))}
+                      onClear={() => setQuickPlayer((current) => ({
+                        ...current, playerSelections: Object.fromEntries(Object.entries(current.playerSelections).filter(([key]) => key !== slot)),
+                      }))} />
+                  ) : (
+                    <>
+                      <TextField label={caption('Vorname')} value={value('firstName')} onChange={set('firstName')} required={needed} minLength={2} />
+                      <TextField label={caption('Nachname')} value={value('lastName')} onChange={set('lastName')} required={needed} minLength={2} />
+                    </>
+                  )}
                   {selectedTournament?.licenseRequired && <TextField label={caption('Lizenznummer')} value={value('licenseNr')} onChange={set('licenseNr')} required={needed} />}
                 </div>
               );

@@ -30,7 +30,7 @@ function usePlayerDirectory(currentUserId, currentUser, enabled) {
 }
 
 export function RegistrationPlayerPicker({ tournamentId, siteKey, shareToken, selected, excludedIds, currentUserId, currentUser,
-  firstName, lastName, onNameChange, firstRequired, lastRequired, invalid, onSelect, onClear }) {
+  firstName, lastName, onNameChange, firstRequired, lastRequired, invalid, onSelect, onClear, firstLabel, lastLabel }) {
   const { t, i18n } = useTranslation();
   const listId = useId();
   const [wanted, setWanted] = useState(false);
@@ -139,8 +139,8 @@ export function RegistrationPlayerPicker({ tournamentId, siteKey, shareToken, se
 
   return <div className="registration-player-picker" ref={root}>
     <div className="form-grid">
-      {nameField('firstName', t('Vorname'), firstName, firstRequired)}
-      {nameField('lastName', t('Nachname'), lastName, lastRequired)}
+      {nameField('firstName', firstLabel || t('Vorname'), firstName, firstRequired)}
+      {nameField('lastName', lastLabel || t('Nachname'), lastName, lastRequired)}
     </div>
     <div ref={challenge} />
     {busy && <p className="muted" role="status">{t('Wird geladen…')}</p>}

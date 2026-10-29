@@ -3996,6 +3996,11 @@ a.left-panel-link {
   margin: 0;
 }
 
+/* Namenssuche: Vor- und Nachname bilden zusammen eine Zeile, eine Lizenznummer folgt darunter. */
+.quick-player-person > .registration-player-picker {
+  grid-column: 1 / -1;
+}
+
 .quick-player-form input {
   min-width: 0;
 }

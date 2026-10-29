@@ -3,6 +3,9 @@ import { render as rtlRender, screen, fireEvent, waitFor, act, within } from '@t
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TournamentPlayManagement from './TournamentPlayManagement.jsx';
 
+// Turnstile für die Namenssuche läuft in jsdom nicht; die Prüfung selbst testet RegistrationPlayerPicker.test.jsx.
+vi.mock('../lib/player-search-turnstile.js', () => ({ playerSearchTurnstileToken: vi.fn(() => Promise.resolve('turnstile-token')) }));
+
 function render(ui) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
@@ -128,7 +131,7 @@ describe('TournamentPlayManagement', () => {
     // Vorausgewählt ist das erste durchführbare Turnier, nicht das gesperrte.
     expect(await screen.findByRole('link', { name: 'Anzeige für Bildschirm' })).toBeInTheDocument();
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
-    fireEvent.focus(screen.getByRole('combobox'));
+    fireEvent.focus(screen.getByRole('combobox', { name: 'Turnier' }));
 
     const options = screen.getAllByRole('option');
     expect(options.map((option) => option.textContent)).toEqual([
@@ -959,6 +962,34 @@ describe('TournamentPlayManagement', () => {
     const addCall = global.fetch.mock.calls.find(([path, options]) => path === '/api/tournaments/t1/registrations' && options.method === 'POST');
     expect(JSON.parse(addCall[1].body)).toMatchObject({ firstName: 'Gina', lastName: 'Neu', noEmail: true, confirmImmediately: true });
     expect(JSON.parse(addCall[1].body)).not.toHaveProperty('partnerFirstName');
+  });
+
+  it('übernimmt beim Hinzufügen einen Spieler aus der Namenssuche mit seinem Konto', async () => {
+    installFetchMock([]);
+    const fetchMock = global.fetch;
+    global.fetch = vi.fn((path, options = {}) => {
+      if (path === '/api/postbox/recipients') return Promise.resolve(jsonResponse({ recipients: [{ id: 'u9', firstName: 'Gina', lastName: 'Neu', username: 'gina', role: 'user' }] }));
+      if (path === '/api/tournaments/t1/registration-players/details') {
+        return Promise.resolve(jsonResponse({ player: { id: 'u9', firstName: 'Gina', lastName: 'Neu', email: 'gina@example.test', licenseNr: null, proof: 'beweis' } }));
+      }
+      return fetchMock(path, options);
+    });
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} currentUserId="me" turnstileSiteKey="site-key" language="de" />);
+    await screen.findByText('Anna Muster + Bert Beispiel + Clara Test');
+    fireEvent.click(screen.getByText('Teilnehmer'));
+    const firstName = screen.getByRole('combobox', { name: /Vorname/ });
+    fireEvent.focus(firstName);
+    fireEvent.change(firstName, { target: { value: 'Gin' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Gina Neu/ }));
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /Nachname/ })).toHaveValue('Neu'));
+    fireEvent.click(screen.getByRole('button', { name: 'Spieler hinzufügen' }));
+
+    await screen.findByText(/^Spieler hinzugefügt:/);
+    const addCall = global.fetch.mock.calls.find(([path, options]) => path === '/api/tournaments/t1/registrations' && options?.method === 'POST');
+    expect(JSON.parse(addCall[1].body)).toMatchObject({
+      firstName: 'Gina', lastName: 'Neu', playerSelections: { primary: { userId: 'u9', proof: 'beweis' } },
+    });
   });
 
   it('meldet bei Doublette ein ganzes Team nach, nicht nur einen Spieler', async () => {
