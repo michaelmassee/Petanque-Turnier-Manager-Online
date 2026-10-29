@@ -4030,6 +4030,53 @@ a.left-panel-link {
   border-bottom: none;
 }
 
+/* Name darf umbrechen, die Symbol-Buttons bleiben rechts in einer Zeile (auch bei 360 px). */
+.round-participant-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.round-participant-actions {
+  display: flex;
+  gap: 6px;
+  justify-self: end;
+}
+
+.button.icon-action {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+/* Während des Umschaltens ersetzt der Spinner das Symbol. */
+.button.icon-action[aria-busy="true"] svg {
+  display: none;
+}
+
+.button.participation-toggle {
+  color: #8a96a8;
+}
+
+.button.participation-toggle.is-active {
+  color: #1f9d55;
+  border-color: #8fd3aa;
+  background: #effaf3;
+}
+
+.participation-withdrawn {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #fff4e5;
+  color: #9a5b00;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
 .melee-teams .round-participant-row {
   grid-template-columns: auto minmax(0, 1fr);
 }

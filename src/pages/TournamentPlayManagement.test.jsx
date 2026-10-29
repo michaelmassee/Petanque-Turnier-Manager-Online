@@ -338,11 +338,11 @@ describe('TournamentPlayManagement', () => {
     fireEvent.click(screen.getByText('Teilnehmer'));
 
     for (const name of ['Anna Muster', 'Bert Beispiel']) {
-      const row = screen.getByRole('combobox', { name: `Teilnahme: ${name}` }).closest('.round-participant-row');
+      const row = screen.getByRole('button', { name: `Aktiv: ${name}` }).closest('.round-participant-row');
       expect(within(row).getByLabelText('Mit Benutzerkonto verbunden')).toHaveTextContent('👤');
     }
     for (const name of ['Clara Test', 'Dirk Demo']) {
-      const row = screen.getByRole('combobox', { name: `Teilnahme: ${name}` }).closest('.round-participant-row');
+      const row = screen.getByRole('button', { name: `Aktiv: ${name}` }).closest('.round-participant-row');
       expect(within(row).queryByLabelText('Mit Benutzerkonto verbunden')).not.toBeInTheDocument();
     }
     expect(calls.filter((path) => path === '/api/tournaments/t1/registrations')).toHaveLength(1);
@@ -434,7 +434,7 @@ describe('TournamentPlayManagement', () => {
 
     expect(await screen.findByText('Turnier wurde gestartet.')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Teilnehmer'));
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Teilnahme: Anna Muster' })).toHaveValue('active'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Aktiv: Anna Muster' })).toHaveAttribute('aria-pressed', 'true'));
   });
 
   it('zeigt einen Fehler, wenn der Turnierstart vom Server abgelehnt wird', async () => {
@@ -539,7 +539,8 @@ describe('TournamentPlayManagement', () => {
     expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Teilnehmer'));
-    fireEvent.change(screen.getByRole('combobox', { name: 'Teilnahme: Dirk Demo' }), { target: { value: 'active' } });
+    // Ausgesetzt → ein Tipp auf den Schalter macht die Meldung wieder aktiv.
+    fireEvent.click(screen.getByRole('button', { name: 'Aktiv: Dirk Demo' }));
 
     await waitFor(() => expect(calls).toContain('/api/registrations/p4/participation'));
     expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 4 (4 aktiv)')).toBeInTheDocument();
@@ -566,7 +567,70 @@ describe('TournamentPlayManagement', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Alle aktivieren' }));
     expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 3 (2 aktiv)')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Teilnahme: Clara Test' })).toHaveValue('withdrawn');
+    const clara = screen.getByRole('button', { name: 'Aktiv: Clara Test' });
+    expect(clara).toHaveAttribute('aria-pressed', 'false');
+    expect(within(clara.closest('.round-participant-row')).getByText('Ausgesetzt')).toBeInTheDocument();
+  });
+
+  it('schaltet einen Teilnehmer per Symbol-Button aktiv/inaktiv', async () => {
+    const calls = [];
+    installFetchMock(calls, { rounds: [] });
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    await screen.findByText('Anna Muster');
+    fireEvent.click(screen.getByText('Teilnehmer'));
+
+    const toggle = screen.getByRole('button', { name: 'Aktiv: Anna Muster' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(toggle).not.toHaveTextContent('Aktiv');
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/registrations/p1/participation', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ participation: 'inactive' }) })));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Aktiv: Anna Muster' })).toHaveAttribute('aria-pressed', 'false'));
+  });
+
+  it('bietet den QR-Code zur Live-Ansicht nur bei freigeschalteter Live-Ansicht an', async () => {
+    const calls = [];
+    installFetchMock(calls, { rounds: [] });
+    const { unmount } = render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    await screen.findByText('Anna Muster');
+    fireEvent.click(screen.getByText('Teilnehmer'));
+    expect(screen.queryByRole('button', { name: 'QR-Code Live-Ansicht: Anna Muster' })).not.toBeInTheDocument();
+    unmount();
+
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, liveViewEnabled: true }]} language="de" />);
+    await screen.findByText('Anna Muster');
+    fireEvent.click(screen.getByText('Teilnehmer'));
+    fireEvent.click(screen.getByRole('button', { name: 'QR-Code Live-Ansicht: Anna Muster' }));
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent('QR-Code Live-Ansicht');
+    await waitFor(() => expect(calls).toContain('/api/registrations/p1/live-link/qr'));
+  });
+
+  it('bearbeitet eine Meldung im Anmeldeformular und setzt dort „Ausgesetzt“', async () => {
+    const calls = [];
+    // Wie vom Server (toPublicRegistration): mit Turnier-ID, damit das Formular die Felder des Turniers zeigt.
+    const registrations = CONFIRMED_REGISTRATIONS.map((registration) => ({ ...registration, tournamentId: 't1', playerEmail: `${registration.id}@example.test` }));
+    installFetchMock(calls, { rounds: [], registrations });
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    await screen.findByText('Anna Muster');
+    fireEvent.click(screen.getByText('Teilnehmer'));
+    fireEvent.click(screen.getByRole('button', { name: 'Anna Muster bearbeiten' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Anmeldung bearbeiten')).toBeInTheDocument();
+    expect(within(dialog).getByDisplayValue('Muster')).toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByRole('combobox', { name: 'Teilnahme' }), { target: { value: 'withdrawn' } });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/registrations/p1/participation', expect.objectContaining({ body: JSON.stringify({ participation: 'withdrawn' }) })));
+
+    fireEvent.change(within(dialog).getByDisplayValue('Muster'), { target: { value: 'Mustermann' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Anmeldung speichern' }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/registrations/p1', expect.objectContaining({ method: 'PUT' })));
+    const [, options] = global.fetch.mock.calls.find(([path, init]) => path === '/api/registrations/p1' && init?.method === 'PUT');
+    expect(JSON.parse(options.body)).toMatchObject({ firstName: 'Anna', lastName: 'Mustermann' });
+    expect(await screen.findByText('Anmeldung wurde aktualisiert.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('speichert ein Ergebnis über die Eingabefelder', async () => {

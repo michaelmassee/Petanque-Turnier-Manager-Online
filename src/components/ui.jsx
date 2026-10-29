@@ -67,6 +67,36 @@ export function SortAlphaIcon({ size = 18 }) {
   );
 }
 
+export function EditIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+    </svg>
+  );
+}
+
+export function QrIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8-2h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm2 2h2v2h-2v-2zm-6 2h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm2 2h2v2h-2v-2z" />
+    </svg>
+  );
+}
+
+// Teilnahme: aktiv = gefüllter Kreis mit Haken, inaktiv = leerer Ring.
+export function ParticipationIcon({ size = 18, active = false }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      {active ? (
+        <>
+          <circle cx="12" cy="12" r="10" fill="currentColor" />
+          <path d="m7.5 12.5 3 3 6-6.5" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      ) : <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" />}
+    </svg>
+  );
+}
+
 export function RequiredMark() {
   return <span className="required-mark" aria-hidden="true"> *</span>;
 }

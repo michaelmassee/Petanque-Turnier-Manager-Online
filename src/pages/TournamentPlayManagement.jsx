@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
-import { TextField, Button, Feedback, ShareLinkButton, AccountBadge } from '../components/ui.jsx';
+import { TextField, Button, Feedback, ShareLinkButton, AccountBadge, EditIcon, QrIcon, ParticipationIcon, SelectField } from '../components/ui.jsx';
+import { RegistrationEditDialog } from '../components/RegistrationEditDialog.jsx';
+import { LiveQrDialog } from '../components/LiveQrDialog.jsx';
 import { tournamentBoardPath } from '../lib/routing.js';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { ACTIVE_REGISTRATION_STATUSES, normalizePlayerName, registrationUnit } from '../registration-core.js';
@@ -368,6 +370,9 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const [finishing, setFinishing] = useState(false);
   const [redrawing, setRedrawing] = useState(false);
   const [bulkParticipation, setBulkParticipation] = useState('');
+  const [participationBusyId, setParticipationBusyId] = useState('');
+  const [editRegistrationId, setEditRegistrationId] = useState('');
+  const [liveQrRegistration, setLiveQrRegistration] = useState(null);
   const [quickPlayer, setQuickPlayer] = useState(EMPTY_QUICK_PLAYER);
   // Eine Auswahl aus der Namenssuche gilt nur für das Turnier, für das sie geladen wurde.
   useEffect(() => setQuickPlayer(EMPTY_QUICK_PLAYER), [selectedTournamentId]);
@@ -430,6 +435,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const confirmedRegistrations = (registrationsQuery.data?.registrations || [])
     .filter((registration) => registration.status === 'confirmed');
   const registrationsById = new Map((registrationsQuery.data?.registrations || []).map((registration) => [registration.id, registration]));
+  const editRegistration = registrationsById.get(editRegistrationId) || null;
   const visibleConfirmedRegistrations = useInfiniteList(confirmedRegistrations);
   const queryError = roundsQuery.error || rankingQuery.error || registrationsQuery.error;
 
@@ -477,6 +483,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
   async function handleParticipationChange(registrationId, participation) {
     setBusy(true);
+    setParticipationBusyId(registrationId);
     setError('');
     try {
       await authenticatedApi(`/api/registrations/${registrationId}/participation`, {
@@ -493,7 +500,16 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       setError(err.message);
     } finally {
       setBusy(false);
+      setParticipationBusyId('');
     }
+  }
+
+  async function handleRegistrationSaved(savedMessage) {
+    setEditRegistrationId('');
+    setMessage(savedMessage);
+    await queryClient.invalidateQueries({ queryKey: [...queryKey, 'registrations'] });
+    // Mêlée-Teams zeigen die Spielernamen; nach einer Namenskorrektur auch die Teams neu laden.
+    if (isMelee) await queryClient.invalidateQueries({ queryKey: [...queryKey, 'rounds'] });
   }
 
   // Alle bestätigten Meldungen auf einmal (de)aktivieren; ausgesetzte bleiben ausgesetzt.
@@ -956,13 +972,32 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           <div className="round-participant-list">
             {visibleConfirmedRegistrations.items.map((registration) => (
               <div className="round-participant-row" key={registration.id}>
-                <span className={registration.participation === 'active' ? '' : 'muted'} data-i18n-skip>
-                  {playerLabel(registration)}
+                <span className={`round-participant-name${registration.participation === 'active' ? '' : ' muted'}`}>
+                  <span data-i18n-skip>{playerLabel(registration)}</span>
                   {registration.accountConnected && <AccountBadge />}
+                  {registration.participation === 'withdrawn' && <span className="participation-withdrawn">{t('Ausgesetzt')}</span>}
                 </span>
-                <select aria-label={`${t('Teilnahme')}: ${playerLabel(registration)}`} value={registration.participation} disabled={busy} onChange={(event) => handleParticipationChange(registration.id, event.target.value)}>
-                  {translatedOptions(PARTICIPATIONS).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
+                {/* Am Handy nur Symbole: Bearbeiten, Live-QR, Teilnahme. „Ausgesetzt“ gibt es nur im Bearbeiten-Dialog. */}
+                <span className="round-participant-actions">
+                  <Button className="button button-secondary icon-action" disabled={busy}
+                    aria-label={t('{{name}} bearbeiten', { name: playerLabel(registration) })} title={t('Bearbeiten')}
+                    onClick={() => { setError(''); setMessage(''); setEditRegistrationId(registration.id); }}>
+                    <EditIcon />
+                  </Button>
+                  {selectedTournament?.liveViewEnabled && (
+                    <Button className="button button-secondary icon-action" aria-label={`${t('QR-Code Live-Ansicht')}: ${playerLabel(registration)}`}
+                      title={t('QR-Code Live-Ansicht')} onClick={() => setLiveQrRegistration(registration)}>
+                      <QrIcon />
+                    </Button>
+                  )}
+                  <Button className={`button button-secondary icon-action participation-toggle${registration.participation === 'active' ? ' is-active' : ''}`}
+                    disabled={busy} loading={participationBusyId === registration.id} aria-pressed={registration.participation === 'active'}
+                    aria-label={`${t('Aktiv')}: ${playerLabel(registration)}`}
+                    title={registration.participation === 'active' ? t('Aktiv') : labelFor(PARTICIPATIONS, registration.participation)}
+                    onClick={() => handleParticipationChange(registration.id, registration.participation === 'active' ? 'inactive' : 'active')}>
+                    <ParticipationIcon active={registration.participation === 'active'} />
+                  </Button>
+                </span>
               </div>
             ))}
           </div>
@@ -1003,6 +1038,29 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           />
         </RankingPanel>
       )}
+
+      <RegistrationEditDialog
+        registration={editRegistration}
+        tournament={selectedTournament}
+        tournaments={tournaments}
+        language={i18n.language}
+        turnstileSiteKey={turnstileSiteKey}
+        currentUserId={currentUserId}
+        onClose={() => setEditRegistrationId('')}
+        onChanged={() => queryClient.invalidateQueries({ queryKey: [...queryKey, 'registrations'] })}
+        onSaved={handleRegistrationSaved}
+      >
+        {/* Außerhalb des Formulars und sofort wirksam wie der Schalter in der Liste; einziger Weg zu „Ausgesetzt“. */}
+        {editRegistration && (
+          <section className="relink-accounts" aria-label={t('Teilnahme')}>
+            <h3>{t('Teilnahme')}</h3>
+            <Feedback error={error} />
+            <SelectField label={t('Teilnahme')} value={editRegistration.participation} disabled={busy}
+              options={translatedOptions(PARTICIPATIONS)} onChange={(participation) => handleParticipationChange(editRegistration.id, participation)} />
+          </section>
+        )}
+      </RegistrationEditDialog>
+      <LiveQrDialog registration={liveQrRegistration} onClose={() => setLiveQrRegistration(null)} />
     </div>
   );
 }
