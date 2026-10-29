@@ -324,6 +324,30 @@ describe('TournamentPlayManagement', () => {
     expect(screen.getByText('Teilnehmer').closest('details')).not.toHaveAttribute('open');
   });
 
+  it('zeigt das Kontosymbol nur bei verknüpften Teilnehmern, auch wenn sie inaktiv sind', async () => {
+    const calls = [];
+    installFetchMock(calls, { rounds: [], registrations: [
+      { ...CONFIRMED_REGISTRATIONS[0], accountConnected: true },
+      { ...CONFIRMED_REGISTRATIONS[1], accountConnected: true, participation: 'inactive' },
+      { ...CONFIRMED_REGISTRATIONS[2], accountConnected: false },
+      CONFIRMED_REGISTRATIONS[3],
+    ] });
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    await screen.findByText('Anna Muster');
+    fireEvent.click(screen.getByText('Teilnehmer'));
+
+    for (const name of ['Anna Muster', 'Bert Beispiel']) {
+      const row = screen.getByRole('combobox', { name: `Teilnahme: ${name}` }).closest('.round-participant-row');
+      expect(within(row).getByLabelText('Mit Benutzerkonto verbunden')).toHaveTextContent('👤');
+    }
+    for (const name of ['Clara Test', 'Dirk Demo']) {
+      const row = screen.getByRole('combobox', { name: `Teilnahme: ${name}` }).closest('.round-participant-row');
+      expect(within(row).queryByLabelText('Mit Benutzerkonto verbunden')).not.toBeInTheDocument();
+    }
+    expect(calls.filter((path) => path === '/api/tournaments/t1/registrations')).toHaveLength(1);
+  });
+
   it('erstellt über den Button eine neue Runde, sobald alle Ergebnisse der aktuellen Runde feststehen', async () => {
     const calls = [];
     const decidedRound = { ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 7 }] };

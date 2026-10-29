@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
-import { TextField, Button, Feedback, ShareLinkButton } from '../components/ui.jsx';
+import { TextField, Button, Feedback, ShareLinkButton, AccountBadge } from '../components/ui.jsx';
 import { tournamentBoardPath } from '../lib/routing.js';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { ACTIVE_REGISTRATION_STATUSES, normalizePlayerName, registrationUnit } from '../registration-core.js';
@@ -956,7 +956,10 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           <div className="round-participant-list">
             {visibleConfirmedRegistrations.items.map((registration) => (
               <div className="round-participant-row" key={registration.id}>
-                <span className={registration.participation === 'active' ? '' : 'muted'} data-i18n-skip>{playerLabel(registration)}</span>
+                <span className={registration.participation === 'active' ? '' : 'muted'} data-i18n-skip>
+                  {playerLabel(registration)}
+                  {registration.accountConnected && <AccountBadge />}
+                </span>
                 <select aria-label={`${t('Teilnahme')}: ${playerLabel(registration)}`} value={registration.participation} disabled={busy} onChange={(event) => handleParticipationChange(registration.id, event.target.value)}>
                   {translatedOptions(PARTICIPATIONS).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
