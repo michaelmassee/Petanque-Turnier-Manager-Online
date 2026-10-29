@@ -25,7 +25,7 @@ describe('Cache für Vereins- und Plätzeliste', () => {
   const get = (path, headers = {}) => worker.fetch(new Request(`https://ptm.test${path}`, { headers }), env);
   const vereine = async () => (await (await get('/api/clubs')).json()).clubs;
   const plaetze = async (path = '/api/places', headers = {}) => (await (await get(path, headers)).json()).places;
-  const listenAbfragen = () => queries.filter((statement) => /json_object\('(clubs|places)'/.test(statement)).length;
+  const listenAbfragen = () => queries.filter((statement) => /json_group_array\(json\(item\)/.test(statement)).length;
   const angemeldet = { Cookie: 'ptm_session=s1' };
 
   beforeEach(() => {
@@ -112,6 +112,8 @@ describe('Cache für Vereins- und Plätzeliste', () => {
       VALUES (?, ?, 'published', 'owner', '2026-09-01', '2026-09-01')`);
     for (let index = 0; index < 9000; index += 1) insert.run(`club-${index}`, `Verein ${String(index).padStart(5, '0')} ${'ä'.repeat(60)}`);
     const erwartet = await vereine();
+    // Mehrere Teil-Arrays aus D1 (je Wert max. 2 MB), lückenlos und in Namensreihenfolge zusammengesetzt.
+    expect(erwartet.map((club) => club.name)).toEqual(['Boule Club', ...Array.from({ length: 9000 }, (_, index) => `Verein ${String(index).padStart(5, '0')} ${'ä'.repeat(60)}`)]);
     expect(env.DB.sqlite.prepare("SELECT COUNT(*) AS parts FROM list_snapshots WHERE name = 'published-clubs'").get().parts).toBeGreaterThan(1);
 
     cache.entries.clear();
@@ -141,7 +143,14 @@ describe('Cache für Vereins- und Plätzeliste', () => {
     sql("UPDATE users SET role = 'admin' WHERE id = 'owner'");
 
     await vereine();
-    expect(queries.filter((statement) => /json_object\('clubs'/.test(statement))).toHaveLength(1);
+    expect(queries.filter((statement) => /json_group_array\(json\(item\)[\s\S]*FROM clubs c WHERE/.test(statement))).toHaveLength(1);
+  });
+
+  it('liefert leere Listen als gültiges JSON', async () => {
+    sql("UPDATE clubs SET status = 'pending'");
+    sql("UPDATE boule_places SET status = 'pending'");
+    expect(await vereine()).toEqual([]);
+    expect(await plaetze()).toEqual([]);
   });
 
   it('baut die Vereinsliste bei neuen Koordinaten oder einem unveröffentlichten Platz neu auf', async () => {

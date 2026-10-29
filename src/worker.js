@@ -10565,12 +10565,13 @@ async function listSharedBoulePlaces(db, origin, deploy) {
 
 // Schlanke Plätzeliste (Karte, Suche, Spielort-Auswahl) ohne Beschreibungen/Vereinslinks (GET /api/places/:id) und
 // ohne Felder mit Standardwert (false, null, 0, 'outdoor', 'club'); nur latitude/longitude bleiben immer drin, weil
-// der Client sie auf null prüft. D1 baut den JSON-Text selbst (json_patch lässt NULL-Felder weg): Der Worker reicht
-// eine Zeile durch, seine CPU-Zeit wächst also nicht mit der Zahl der Plätze (10 ms je Anfrage im Free-Plan).
+// der Client sie auf null prüft. D1 baut den JSON-Text selbst (json_patch lässt NULL-Felder weg): Der Worker fügt
+// nur wenige Teil-Arrays zusammen (jsonListInChunks), seine CPU-Zeit wächst also kaum mit der Zahl der Plätze
+// (10 ms je Anfrage im Free-Plan).
 // Adressen werden beim Speichern formatiert (placeInput, createPlaceReport), nicht hier.
 async function boulePlaceSummariesJson(db) {
-  const row = await db.prepare(
-    `SELECT json_object('places', json_group_array(json_patch(
+  return jsonListInChunks(db, 'places',
+    `json_patch(
        json_object('id', p.id, 'name', p.name, 'address', p.address,
          'latitude', CAST(p.latitude AS REAL), 'longitude', CAST(p.longitude AS REAL)),
        json_object('clubId', NULLIF(p.club_id, ''), 'clubName', COALESCE(NULLIF(c.name, ''), NULLIF(p.club_name, '')),
@@ -10578,11 +10579,10 @@ async function boulePlaceSummariesJson(db) {
          'venueType', NULLIF(p.venue_type, 'outdoor'), 'courtCount', NULLIF(p.court_count, 0),
          'accessible', CASE WHEN p.accessible THEN json('true') END,
          'addressUnverified', CASE WHEN p.address_unverified THEN json('true') END,
-         'likeCount', NULLIF((SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id), 0)))
-       ORDER BY COALESCE(c.name, p.club_name) COLLATE NOCASE, p.name COLLATE NOCASE)) AS body
-     FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
-     WHERE p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')`).first();
-  return row.body;
+         'likeCount', NULLIF((SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id), 0)))`,
+    `FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
+     WHERE p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')`,
+    'COALESCE(c.name, p.club_name) COLLATE NOCASE, p.name COLLATE NOCASE');
 }
 
 // Ergänzt einen Eintrag der schlanken Liste um das, was erst beim Aufklappen gebraucht wird.
@@ -10602,15 +10602,26 @@ async function getBoulePlaceDetails(db, id) {
 
 // Wie boulePlaceSummariesJson: D1 baut den JSON-Text, der Worker reicht ihn durch.
 async function publishedClubsJson(db) {
-  const row = await db.prepare(
-    `SELECT json_object('clubs', json_group_array(json_object('id', c.id, 'name', c.name, 'locations', json(
+  return jsonListInChunks(db, 'clubs',
+    `json_object('id', c.id, 'name', c.name, 'locations', json(
        (SELECT json_group_array(json_object('latitude', CAST(p.latitude AS REAL), 'longitude', CAST(p.longitude AS REAL)))
         FROM boule_places p
-        WHERE p.club_id = c.id AND p.status = 'published' AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL)))
-       ORDER BY c.name COLLATE NOCASE)) AS body
-     FROM clubs c
-     WHERE c.status = 'published'`).first();
-  return row.body;
+        WHERE p.club_id = c.id AND p.status = 'published' AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL)))`,
+    `FROM clubs c WHERE c.status = 'published'`,
+    'c.name COLLATE NOCASE');
+}
+
+// D1 begrenzt jeden Wert auf 2 MB, auch Zwischenergebnisse wie json_group_array: Ein einziges Array über alle
+// Einträge scheiterte also schon in der Abfrage. Deshalb baut D1 je LIST_JSON_CHUNK_ROWS Einträge ein Teil-Array,
+// der Worker fügt die wenigen Zeilen nur noch zusammen (CPU wächst nicht mit der Zahl der Einträge).
+const LIST_JSON_CHUNK_ROWS = 2000;
+
+async function jsonListInChunks(db, key, itemSql, fromSql, orderSql) {
+  const { results } = await db.prepare(
+    `SELECT json_group_array(json(item) ORDER BY rn) AS items
+     FROM (SELECT ${itemSql} AS item, row_number() OVER (ORDER BY ${orderSql}) AS rn ${fromSql})
+     GROUP BY (rn - 1) / ? ORDER BY MIN(rn)`).bind(LIST_JSON_CHUNK_ROWS).all();
+  return `{"${key}":[${(results || []).map((row) => row.items.slice(1, -1)).join(',')}]}`;
 }
 
 // Persönliche Markierungen zur gemeinsamen Plätzeliste: wenige Index-Zugriffe statt der ganzen Liste pro Person.
