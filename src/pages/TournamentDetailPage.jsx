@@ -554,6 +554,15 @@ export function TournamentClub({ tournament, shareToken = '' }) {
   );
 }
 
+// Ort im Turnierkopf. Schnellstart-Turniere tragen den Profilverein auch als Ort ein; steht dort nur der Vereinsname,
+// zeigt die Vereinszeile (mit Logo) ihn schon und der Ort entfällt.
+export function TournamentLocation({ tournament }) {
+  const location = formatLocationAddress(tournament.location);
+  const sameAsClub = (value) => String(value || '').trim().toLowerCase();
+  if (!location || (tournament.club && sameAsClub(location) === sameAsClub(tournament.club))) return null;
+  return <span>{location}</span>;
+}
+
 export function TournamentSchedule({ tournamentId, tournament, language, shareToken = '', onAnnouncement, display = false }) {
   const { t } = useTranslation();
   const query = useScheduleQuery(tournamentId, shareToken);
@@ -836,7 +845,7 @@ export function TournamentDetailPage({
           <p className="tournament-detail-meta" data-i18n-skip>
             <span>{formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}</span>
             <TournamentClub tournament={tournament} shareToken={shareToken} />
-            <span>{formatLocationAddress(tournament.location)}</span>
+            <TournamentLocation tournament={tournament} />
           </p>
         </header>
         <nav className="tournament-detail-tabs" aria-label={t('Turnierdetails')}>

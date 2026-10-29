@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { useRoutedTournament } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { formatDate, formatWeekdayShort } from '../lib/format.js';
-import { isDocumentBound, formatTournamentStartTime, formatLocationAddress } from '../lib/domain.js';
+import { isDocumentBound, formatTournamentStartTime } from '../lib/domain.js';
 import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
 import { BoardPushToggle } from '../components/BoardPushToggle.jsx';
-import { TournamentClub, TournamentSchedule, useScheduleQuery } from './TournamentDetailPage.jsx';
+import { TournamentClub, TournamentLocation, TournamentSchedule, useScheduleQuery } from './TournamentDetailPage.jsx';
 
 // Vollbild-Schalter für die reine Anzeige; verschwindet im Vollbild und in Browsern ohne Fullscreen-API.
 function FullscreenButton() {
@@ -99,7 +99,7 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
             {/* Ohne Uhrzeit nur das Datum: „Ganztägig“ sagt auf der Anzeige nichts. */}
             <span>{formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)}{tournament.startTime ? ` ${formatTournamentStartTime(tournament, language)}` : ''}</span>
             <TournamentClub tournament={tournament} shareToken={shareToken} />
-            <span>{formatLocationAddress(tournament.location)}</span>
+            <TournamentLocation tournament={tournament} />
           </p>
         </header>
         <div className="display-actions">{pushToggle}<FullscreenButton /></div>

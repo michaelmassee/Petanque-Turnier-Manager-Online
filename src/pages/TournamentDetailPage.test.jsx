@@ -2,7 +2,7 @@ import { describe, expect, it, afterEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
 import { matchTournamentRoute } from '../lib/routing.js';
-import { TournamentDetailPage } from './TournamentDetailPage.jsx';
+import { TournamentDetailPage, TournamentLocation } from './TournamentDetailPage.jsx';
 
 function jsonResponse(payload) {
   return { ok: true, json: () => Promise.resolve(payload) };
@@ -479,5 +479,18 @@ describe('Ansichtsschalter der öffentlichen Meldeliste', () => {
     await screen.findByText('Zoe Zander');
     fireEvent.click(toolbarButton('Lfd.-Nr.'));
     expect(numbers()).toEqual(['1', '2', '3', '1']);
+  });
+});
+
+describe('TournamentLocation', () => {
+  it('lässt den Ort weg, wenn er nur den Vereinsnamen wiederholt (Schnellstart)', () => {
+    const { container, rerender } = render(<TournamentLocation tournament={{ club: '1. BCP Aschaffenburg', location: ' 1. bcp aschaffenburg ' }} />);
+    expect(container).toBeEmptyDOMElement();
+
+    rerender(<TournamentLocation tournament={{ club: '1. BCP Aschaffenburg', location: 'Schlossplatz 1, Aschaffenburg' }} />);
+    expect(screen.getByText('Schlossplatz 1, Aschaffenburg')).toBeInTheDocument();
+
+    rerender(<TournamentLocation tournament={{ club: null, location: 'Boulodrome Linden' }} />);
+    expect(screen.getByText('Boulodrome Linden')).toBeInTheDocument();
   });
 });
