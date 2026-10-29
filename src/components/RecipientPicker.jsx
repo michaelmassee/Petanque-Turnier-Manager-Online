@@ -93,7 +93,7 @@ export function RecipientPicker({ label, recipients, recipientTournaments = NO_T
     const knownIds = new Set(recipients.map((recipient) => recipient.id));
     const recipientEntries = [...recipients, ...emailMatches.filter((recipient) => !knownIds.has(recipient.id))]
       .map((recipient) => recipientEntry(recipient, t('allRecipientsSection')));
-    return [adminEntry, ...tournamentEntries, ...recipientEntries];
+    return [...tournamentEntries, adminEntry, ...recipientEntries];
   }, [recipients, emailMatches, recipientTournaments, t, i18n.language]);
 
   return (
@@ -106,6 +106,8 @@ export function RecipientPicker({ label, recipients, recipientTournaments = NO_T
       placeholder={t('searchRecipient')}
       storageScope="postbox"
       currentUserId={currentUserId}
+      recentFirst
+      pageSize={20}
       matchesQuery={matchesQuery}
       onQueryChange={setQuery}
       renderEmpty={() => (

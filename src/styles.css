@@ -973,6 +973,20 @@ a.left-panel-link {
   max-width: none;
 }
 
+.search-results-status {
+  padding: 10px 12px;
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  background: #f4f7fb;
+  color: #234564;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.search-results-status strong {
+  font-variant-numeric: tabular-nums;
+}
+
 .search-tabs {
   display: flex;
   gap: 4px;
@@ -2310,9 +2324,22 @@ a.left-panel-link {
 
 .tournament-info-top .tournament-icon-bar {
   min-width: 0;
-  flex-wrap: wrap;
+  width: 100%;
+  flex-wrap: nowrap;
   justify-content: flex-start;
   margin: 0;
+}
+
+.tournament-info-top .icon-bar-button {
+  flex: 0 1 44px;
+  min-width: 0;
+  padding: 0;
+}
+
+@media (max-width: 560px) {
+  .tournament-info-top .tournament-icon-bar {
+    gap: 4px;
+  }
 }
 
 /* Zahlungshinweise sind frei formuliert: Zeilenumbrüche erhalten, lange IBANs/Links auf dem Handy umbrechen. */

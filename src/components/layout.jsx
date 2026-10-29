@@ -6,7 +6,7 @@ import { currentBrowserPushSubscription, ensureBrowserPushSubscription } from '.
 import { useInstallPrompt, isIosSafari, useOnlineStatus } from '../lib/hooks.js';
 import { MONTHS, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, RADIUS_OPTIONS, TOURNAMENT_STATUSES, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor, roleName, translatedOptions } from '../lib/domain.js';
-import { Feedback, EditDialog, SelectField, Button, CloseButton } from './ui.jsx';
+import { Feedback, EditDialog, SelectField, Button, CloseButton, SearchResultsStatus } from './ui.jsx';
 import { LocationAutocomplete } from './LocationAutocomplete.jsx';
 import { RecipientPicker } from './RecipientPicker.jsx';
 import { UsernameReportButton } from './UsernameReportDialog.jsx';
@@ -631,6 +631,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
 
 export function SearchMenuControl({
   open,
+  resultCount,
   onToggle,
   onClose,
   activeTab,
@@ -691,6 +692,7 @@ export function SearchMenuControl({
               <h2>{t('Suche')}</h2>
               <CloseButton onClick={onClose} />
             </div>
+            <SearchResultsStatus count={resultCount} />
             <div className="search-tabs" role="tablist" aria-label={t('Suche')}>
               <button type="button" role="tab" aria-selected={activeTab === 'filters'} className={activeTab === 'filters' ? 'active' : ''} onClick={() => setActiveTab('filters')}>{t('Filter')}</button>
               <button type="button" role="tab" aria-selected={activeTab === 'radius'} className={activeTab === 'radius' ? 'active' : ''} onClick={() => setActiveTab('radius')}>{t('Umkreissuche')}</button>

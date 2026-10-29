@@ -1,6 +1,15 @@
 import { useState, useId, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
+export function SearchResultsStatus({ count, loading = false, error = '' }) {
+  const { t } = useTranslation();
+  return (
+    <div className="search-results-status" role="status" aria-atomic="true">
+      {loading ? t('Lädt …') : error || <>{t('searchResults')}: <strong>{count}</strong></>}
+    </div>
+  );
+}
+
 export function ShareIcon({ size = 20 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

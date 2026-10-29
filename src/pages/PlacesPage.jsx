@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { clubLogoImageUrl, withPersonalPlaceMarks, formatLocationAddress, googleMapsUrl, distanceKm, translatedOptions, labelFor } from '../lib/domain.js';
 import { RADIUS_OPTIONS } from '../lib/constants.js';
-import { Feedback, Button, ClubBadge, DistanceBadge, SelectField, CloseButton, ShareLinkButton, EditDialog, TextArea } from '../components/ui.jsx';
+import { Feedback, Button, ClubBadge, DistanceBadge, SelectField, CloseButton, ShareLinkButton, EditDialog, TextArea, SearchResultsStatus } from '../components/ui.jsx';
 import { LocationAutocomplete } from '../components/LocationAutocomplete.jsx';
 import { RichText } from '../components/RichText.jsx';
 import { InfiniteListLoadMore } from '../components/InfiniteListLoadMore.jsx';
@@ -610,6 +610,9 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
       postboxControl={postboxControl}
       searchControl={
         <PlacesSearchMenu
+          resultCount={listPlaces.length}
+          loading={loading}
+          error={error}
           open={searchMenuOpen}
           onToggle={() => setSearchMenuOpen((open) => !open)}
           onClose={() => setSearchMenuOpen(false)}
@@ -741,6 +744,9 @@ export default function PlacesPage({ language, setLanguage, menuOpen, setMenuOpe
 
 function PlacesSearchMenu({
   open,
+  resultCount,
+  loading,
+  error,
   onToggle,
   onClose,
   activeTab,
@@ -783,6 +789,7 @@ function PlacesSearchMenu({
           <div className="search-menu-backdrop" onClick={onClose} />
           <div className="search-menu-panel" role="search">
             <div className="section-title"><h2>{t('Suche')}</h2><CloseButton onClick={onClose} /></div>
+            <SearchResultsStatus count={resultCount} loading={loading} error={error} />
             <div className="search-tabs" role="tablist" aria-label={t('Suche')}>
               <button type="button" role="tab" aria-selected={activeTab === 'filters'} className={activeTab === 'filters' ? 'active' : ''} onClick={() => setActiveTab('filters')}>{t('Filter')}</button>
               <button type="button" role="tab" aria-selected={activeTab === 'radius'} className={activeTab === 'radius' ? 'active' : ''} onClick={() => setActiveTab('radius')}>{t('Umkreissuche')}</button>

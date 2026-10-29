@@ -1678,6 +1678,7 @@ function AppContent() {
           navigate={navigate}
           searchControl={
             <SearchMenuControl
+              resultCount={filteredHomeTournaments.length}
               language={language}
               open={searchMenuOpen}
               onToggle={() => {
@@ -1993,6 +1994,7 @@ function AppContent() {
         searchControl={
           activeTab === 'home' ? (
             <SearchMenuControl
+              resultCount={filteredHomeTournaments.length}
               language={language}
               open={searchMenuOpen}
               onToggle={() => {
