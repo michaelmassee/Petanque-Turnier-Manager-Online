@@ -10510,7 +10510,8 @@ function toPublicClub(row, user) {
 // Beide liegen im Cloudflare-Cache (pro Rechenzentrum) unter einem Schlüssel mit einer Version aus cache_versions.
 // Trigger erhöhen 'places' bei jeder Änderung an Vereinen, Plätzen, Likes und Mietangeboten (Migration 0137),
 // 'clubs' nur bei Name/Status von Vereinen und Zuordnung/Status/Koordinaten von Plätzen (Migration 0142); dann
-// bauen alle Rechenzentren die betroffene Liste beim nächsten Abruf neu auf. Die Deploy-Kennung im Schlüssel sorgt dafür, dass
+// holen alle Rechenzentren die betroffene Liste beim nächsten Abruf neu – das erste baut sie aus den Quelltabellen und
+// legt sie in list_snapshots ab (Migration 0143), alle weiteren lesen nur diese eine Zeile. Die Deploy-Kennung im Schlüssel sorgt dafür, dass
 // ein Deploy mit geändertem Listenformat nicht alte Einträge ausliefert. Die lange Speicherdauer räumt nur auf.
 const PUBLISHED_LISTS_CACHE_SECONDS = 14 * 24 * 60 * 60;
 
@@ -10524,19 +10525,42 @@ async function listsCacheVersion(db, versionName) {
   return Number(row?.version || 0);
 }
 
-async function placesCacheKey(db, origin, name, deploy, versionName = 'places') {
-  return new Request(`${origin}/__${name}?v=${await listsCacheVersion(db, versionName)}&deploy=${encodeURIComponent(deploy)}`);
+// D1 erlaubt höchstens 2 MB je Wert: 600.000 Zeichen sind in UTF-8 höchstens 1,8 MB.
+const LIST_SNAPSHOT_PART_CHARS = 600_000;
+
+// Gecachte Liste: zuerst der Cache des Rechenzentrums, dann der Snapshot in D1 (eine Zeile je 600.000 Zeichen), erst
+// danach build(). Damit baut nach einer Änderung nur das erste Rechenzentrum die Liste aus den Quelltabellen neu auf.
+async function sharedListResponse(db, origin, name, deploy, versionName, build) {
+  const version = await listsCacheVersion(db, versionName);
+  const key = new Request(`${origin}/__${name}?v=${version}&deploy=${encodeURIComponent(deploy)}`);
+  return cachedJsonResponse(key, PUBLISHED_LISTS_CACHE_SECONDS, async () => {
+    const snapshot = await db.prepare('SELECT body FROM list_snapshots WHERE name = ? AND version = ? AND deploy = ? ORDER BY part')
+      .bind(name, version, deploy).all();
+    if (snapshot.results?.length) return new Response(snapshot.results.map((row) => row.body).join(''));
+    const body = await (await build()).text();
+    const updatedAt = new Date().toISOString();
+    const parts = [];
+    for (let start = 0; start < body.length; start += LIST_SNAPSHOT_PART_CHARS) parts.push(body.slice(start, start + LIST_SNAPSHOT_PART_CHARS));
+    try {
+      await db.batch([
+        db.prepare('DELETE FROM list_snapshots WHERE name = ?').bind(name),
+        ...parts.map((part, index) => db.prepare('INSERT INTO list_snapshots (name, part, version, deploy, body, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+          .bind(name, index, version, deploy, part, updatedAt)),
+      ]);
+    } catch (error) {
+      console.error(`Failed to store list snapshot ${name}`, error);
+    }
+    return new Response(body);
+  });
 }
 
 async function listPublishedClubs(db, origin, deploy) {
-  return cachedJsonResponse(await placesCacheKey(db, origin, 'published-clubs', deploy, 'clubs'), PUBLISHED_LISTS_CACHE_SECONDS,
-    async () => json(await loadPublishedClubs(db)));
+  return sharedListResponse(db, origin, 'published-clubs', deploy, 'clubs', async () => json(await loadPublishedClubs(db)));
 }
 
 // Nutzerneutrale Plätzeliste für alle, auch Angemeldete; deren Markierungen liefert GET /api/places/personal.
 async function listSharedBoulePlaces(db, origin, deploy) {
-  return cachedJsonResponse(await placesCacheKey(db, origin, 'places', deploy), PUBLISHED_LISTS_CACHE_SECONDS,
-    async () => json(await loadBoulePlaceSummaries(db)));
+  return sharedListResponse(db, origin, 'places', deploy, 'places', async () => json(await loadBoulePlaceSummaries(db)));
 }
 
 // Schlanke Plätzeliste (Karte, Suche, Spielort-Auswahl): Der Neuaufbau kostet CPU proportional zur JSON-Größe, daher
@@ -10790,7 +10814,7 @@ async function assertRentalOfferManager(db, row, user) {
 }
 
 async function listRentalOffers(db, origin, deploy) {
-  return cachedJsonResponse(await placesCacheKey(db, origin, 'rentals', deploy), PUBLISHED_LISTS_CACHE_SECONDS, async () => {
+  return sharedListResponse(db, origin, 'rentals', deploy, 'places', async () => {
     const rows = await db.prepare(`${RENTAL_OFFER_SELECT}
       WHERE o.status = 'active' AND c.status = 'published' AND p.status = 'published'
       ORDER BY c.name COLLATE NOCASE, o.title COLLATE NOCASE`).all();

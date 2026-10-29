@@ -96,6 +96,42 @@ describe('Cache für Vereins- und Plätzeliste', () => {
     expect(listenAbfragen()).toBe(1);
   });
 
+  it('baut die Listen in einem weiteren Rechenzentrum nicht neu auf, sondern liest den Snapshot aus D1', async () => {
+    await vereine();
+    await plaetze();
+    cache.entries.clear();
+
+    expect((await vereine())[0].name).toBe('Boule Club');
+    expect((await plaetze()).map((place) => place.name)).toEqual(['Platz']);
+    expect(listenAbfragen()).toBe(2);
+    expect(queries.filter((statement) => statement.startsWith('SELECT body FROM list_snapshots'))).toHaveLength(4);
+  });
+
+  it('setzt große Listen aus mehreren Snapshot-Teilen zusammen', async () => {
+    const insert = env.DB.sqlite.prepare(`INSERT INTO clubs (id, name, status, owner_id, created_at, updated_at)
+      VALUES (?, ?, 'published', 'owner', '2026-09-01', '2026-09-01')`);
+    for (let index = 0; index < 9000; index += 1) insert.run(`club-${index}`, `Verein ${String(index).padStart(5, '0')} ${'ä'.repeat(60)}`);
+    const erwartet = await vereine();
+    expect(env.DB.sqlite.prepare("SELECT COUNT(*) AS parts FROM list_snapshots WHERE name = 'published-clubs'").get().parts).toBeGreaterThan(1);
+
+    cache.entries.clear();
+    expect(await vereine()).toEqual(erwartet);
+    expect(listenAbfragen()).toBe(1);
+  });
+
+  it('nutzt den Snapshot nach einer Änderung oder einem Deploy nicht mehr', async () => {
+    env.CF_VERSION_METADATA = { id: 'deploy-1' };
+    await vereine();
+    sql("UPDATE clubs SET name = 'Umbenannt' WHERE id = 'c1'");
+    cache.entries.clear();
+    expect((await vereine())[0].name).toBe('Umbenannt');
+
+    env.CF_VERSION_METADATA = { id: 'deploy-2' };
+    cache.entries.clear();
+    await vereine();
+    expect(listenAbfragen()).toBe(3);
+  });
+
   it('baut die Vereinsliste bei Änderungen ohne Einfluss auf sie nicht neu auf', async () => {
     await vereine();
     const response = await worker.fetch(new Request('https://ptm.test/api/places/p1/like', { method: 'POST', headers: angemeldet }), env);
