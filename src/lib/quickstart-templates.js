@@ -34,7 +34,7 @@ export function localIsoDate(date = new Date()) {
   return date.toLocaleDateString('sv');
 }
 
-// Schnellstart-Turniere sind immer privat und ohne Rückfragen: Name aus Vorlage und Datum, Ort aus dem Profilverein.
+// Schnellstart-Turniere sind privat: Name aus Vorlage und Datum, Veranstalter und Ort aus dem Profilverein.
 export function quickStartPayload(template, { currentUser, today = localIsoDate(), fallbackLocation }) {
   const club = (currentUser?.club || '').trim();
   return tournamentPayload({
@@ -45,6 +45,8 @@ export function quickStartPayload(template, { currentUser, today = localIsoDate(
     name: `${quickStartTemplateLabel(template)} ${today}`,
     date: today,
     location: club.length >= 2 ? club : fallbackLocation,
+    club,
+    organizerClubId: currentUser?.clubId || null,
     visibility: 'private',
     status: 'draft',
     registrationEnabled: true,

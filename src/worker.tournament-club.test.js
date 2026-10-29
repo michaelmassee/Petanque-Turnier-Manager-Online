@@ -4,6 +4,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 import worker, { duplicateTournament } from './worker.js';
+import { quickStartPayload, quickStartTemplates } from './lib/quickstart-templates.js';
+
+// Schnellstart-Payload im Worker-Test ohne Browser-Spracheinstellung erzeugen.
+vi.mock('./lib/i18next-config.js', () => ({ default: { t: (key) => key } }));
 
 describe('Ausrichtender Verein am Turnier', () => {
   let env;
@@ -30,6 +34,16 @@ describe('Ausrichtender Verein am Turnier', () => {
       ('p-club', 'c1', 'Vereinsplatz', 'Parkweg 1, Linden', 50, 8, 'published', '2026-10-13', '2026-10-13')`);
   });
   afterEach(() => env.DB.sqlite.close());
+
+  it.each([null, 'c1'])('ordnet beim Schnellstart den Profilverein und sein Logo zu (Vereins-ID %s)', async (clubId) => {
+    sql("UPDATE clubs SET logo_url = 'https://example.test/club.png' WHERE id = 'c1'");
+    const payload = quickStartPayload(quickStartTemplates('doublette')[0], {
+      currentUser: { firstName: 'Olga', lastName: 'Orga', club: 'BC Linden', clubId },
+      today: '2099-07-02', fallbackLocation: 'Schnellstart',
+    });
+    const tournament = await create({ ...payload, latitude: 52.52, longitude: 13.405 });
+    expect(tournament).toMatchObject({ club: 'BC Linden', organizerClubId: 'c1', logoUrl: 'https://example.test/club.png' });
+  });
 
   it('verknüpft den Veranstalter ohne passenden Spielort und priorisiert sein Logo', async () => {
     sql("UPDATE clubs SET logo_url = 'https://example.test/club.png' WHERE id = 'c1'");

@@ -8298,9 +8298,31 @@ async function computeLiveSnapshot(db, tournament) {
     loadTournamentRounds(db, tournament.id),
     computeTournamentRanking(db, tournament),
   ]);
-  const content = { tournament: toLiveTournament(tournament), rounds, ranking: normalizeRanking(ranking) };
+  // Vor der ersten Runde gehört die Meldeliste zur Anzeige. Sie nutzt denselben kurzen Cache
+  // und dasselbe ETag wie der Spielplan; nach der ersten Runde entfällt der zusätzliche Datenabruf.
+  const entries = !rounds.length && tournament.status !== 'finished' ? await loadScheduleEntries(db, tournament.id) : undefined;
+  const content = { tournament: toLiveTournament(tournament), rounds, ranking: normalizeRanking(ranking), entries };
   const version = (await sha256Hex(JSON.stringify(content))).slice(0, 16);
   return { ...content, version };
+}
+
+async function loadScheduleEntries(db, tournamentId) {
+  const result = await db.prepare(`SELECT first_name, last_name, club, team_name,
+      partner_first_name, partner_last_name, partner_club, partner2_first_name, partner2_last_name, partner2_club,
+      user_id IS NOT NULL AS account_connected, partner_user_id IS NOT NULL AS partner_account_connected,
+      partner2_user_id IS NOT NULL AS partner2_account_connected, status, participation, is_vip
+    FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed', 'waitlist')
+    ORDER BY registered_at, id`).bind(tournamentId).all();
+  return result.results.map((row) => ({
+    status: row.status,
+    participation: row.status === 'confirmed' ? row.participation || 'inactive' : null,
+    teamName: row.team_name || null,
+    isVip: Boolean(row.is_vip),
+    persons: ['', 'partner_', 'partner2_'].map((prefix) => ({
+      firstName: row[`${prefix}first_name`] || '', lastName: row[`${prefix}last_name`] || '',
+      club: row[`${prefix}club`] || null, accountConnected: Boolean(row[`${prefix}account_connected`]),
+    })).filter((person) => person.firstName || person.lastName),
+  }));
 }
 
 async function getLiveSnapshot(db, tournament, origin) {
@@ -8348,7 +8370,9 @@ export async function buildScheduleResponse(request, db, tournament) {
   if (request.headers.get('If-None-Match') === etag) {
     return new Response(null, { status: 304, headers: { ...SECURITY_HEADERS, ...cacheHeaders } });
   }
-  return json({ status: tournament.status, rounds: snapshot.rounds, ranking: snapshot.ranking, dataAsOf, announcement, pollUntil }, 200, cacheHeaders);
+  return json({ status: tournament.status, rounds: snapshot.rounds, ranking: snapshot.ranking,
+    ...(!snapshot.rounds.length && tournament.status !== 'finished' ? { entries: snapshot.entries || [] } : {}),
+    dataAsOf, announcement, pollUntil }, 200, cacheHeaders);
 }
 
 function liveRegistrationLabel(registration) {

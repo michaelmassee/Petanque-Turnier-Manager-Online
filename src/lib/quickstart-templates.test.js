@@ -6,7 +6,7 @@ import { localIsoDate, QUICK_START_FORMATIONS, quickStartPayload, quickStartSyst
 
 const ALL_TEMPLATES = QUICK_START_FORMATIONS.flatMap(quickStartTemplates);
 
-const user = { firstName: 'Erste', lastName: 'Person', email: 'erste@example.org', phone: '', club: 'BC Linden' };
+const user = { firstName: 'Erste', lastName: 'Person', email: 'erste@example.org', phone: '', club: 'BC Linden', clubId: 'linden' };
 
 describe('Schnellstart-Vorlagen', () => {
   it.each(ALL_TEMPLATES)('$id ist online spielbar und besteht die Worker-Prüfung', (template) => {
@@ -20,14 +20,14 @@ describe('Schnellstart-Vorlagen', () => {
     });
   });
 
-  it('benennt das Turnier nach Vorlage und Datum und nimmt den Profilverein als Ort', () => {
+  it('benennt das Turnier nach Vorlage und Datum und übernimmt den Profilverein als Veranstalter und Ort', () => {
     const payload = quickStartPayload(quickStartTemplates('doublette')[0], { currentUser: user, today: '2026-10-28', fallbackLocation: 'Schnellstart' });
-    expect(payload).toMatchObject({ name: 'Supermêlée Doublette 2026-10-28', location: 'BC Linden', contactName: 'Erste Person', contactEmail: 'erste@example.org' });
+    expect(payload).toMatchObject({ name: 'Supermêlée Doublette 2026-10-28', location: 'BC Linden', club: 'BC Linden', organizerClubId: 'linden', contactName: 'Erste Person', contactEmail: 'erste@example.org' });
   });
 
   it('nimmt ohne Profilverein den Platzhalter als Ort', () => {
-    const payload = quickStartPayload(quickStartTemplates('doublette')[0], { currentUser: { ...user, club: '' }, today: '2026-10-28', fallbackLocation: 'Schnellstart' });
-    expect(payload.location).toBe('Schnellstart');
+    const payload = quickStartPayload(quickStartTemplates('doublette')[0], { currentUser: { ...user, club: '', clubId: null }, today: '2026-10-28', fallbackLocation: 'Schnellstart' });
+    expect(payload).toMatchObject({ location: 'Schnellstart', club: null, organizerClubId: null });
   });
 
   it('bietet jedes System in jeder Formation an, Supermêlée aber nicht als Tête', () => {

@@ -7,7 +7,7 @@ import { isDocumentBound, formatTournamentStartTime, formatLocationAddress } fro
 import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
 import { BoardPushToggle } from '../components/BoardPushToggle.jsx';
-import { ScheduleRefreshCountdown, TournamentClub, TournamentSchedule, useScheduleQuery } from './TournamentDetailPage.jsx';
+import { TournamentClub, TournamentSchedule, useScheduleQuery } from './TournamentDetailPage.jsx';
 
 // Vollbild-Schalter für die reine Anzeige; verschwindet im Vollbild und in Browsern ohne Fullscreen-API.
 function FullscreenButton() {
@@ -70,7 +70,6 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
   const pushToggle = scheduleVisible && status !== 'finished'
     ? <BoardPushToggle tournamentId={tournament.id} shareToken={shareToken} language={language} />
     : null;
-  const started = status === 'running' || status === 'finished';
   const announcement = announcementUpdate.tournamentId === tournament.id ? announcementUpdate.announcement : tournament.announcement;
 
   let content;
@@ -78,14 +77,6 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
     content = <FinalRankingView tournament={tournament} language={language} shareToken={shareToken} display />;
   } else if (!participantsVisible || !playable) {
     content = <p className="muted">{t('Für dieses Turnier gibt es keinen öffentlichen Spielplan.')}</p>;
-  } else if (!started) {
-    content = (
-      <>
-        <p className="muted">{t('Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.')}</p>
-        {/* Auch vor dem Start sichtbar, dass die Seite von selbst auf den Spielplan umschaltet. */}
-        <p className="muted"><ScheduleRefreshCountdown query={scheduleQuery} /></p>
-      </>
-    );
   } else {
     content = (
       <TournamentSchedule

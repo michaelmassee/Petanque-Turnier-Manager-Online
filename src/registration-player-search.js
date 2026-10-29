@@ -47,9 +47,12 @@ export async function limitPlayerDetails(env, request, user) {
   if (results.some((result) => !result.success)) throw new HttpError(429, 'Zu viele Spielersuchen. Bitte warte eine Minute und versuche es erneut.');
 }
 
-async function selectedPlayer(env, id) {
+async function selectedPlayer(env, id, actorId) {
+  // Das eigene verifizierte Konto darf auch mit Admin-Rolle mitspielen.
+  // Fremde Admin-Profile bleiben von der geschützten Detailauswahl ausgeschlossen.
   const player = await env.DB.prepare(`SELECT id, first_name, last_name, email, club, license_nr FROM users
-    WHERE id = ? AND id != 'system-tournament-reports' AND role = 'user' AND email_verified_at IS NOT NULL`).bind(id).first();
+    WHERE id = ? AND id != 'system-tournament-reports' AND (role = 'user' OR (role = 'admin' AND id = ?))
+      AND email_verified_at IS NOT NULL`).bind(id, actorId).first();
   if (!player) throw new HttpError(400, 'Der ausgewählte Spieler ist nicht mehr verfügbar. Bitte erneut auswählen.');
   return player;
 }
@@ -57,7 +60,7 @@ async function selectedPlayer(env, id) {
 // Die Nutzerliste kennt jede Sitzung bereits aus der Postbox; Schutz für E-Mail/Lizenz: Turnstile + Rate-Limit.
 export async function registrationPlayerDetails(env, actorId, tournamentId, body) {
   if (typeof body.userId !== 'string' || !body.userId) throw new HttpError(400, 'Der ausgewählte Spieler ist nicht mehr verfügbar. Bitte erneut auswählen.');
-  const player = await selectedPlayer(env, body.userId);
+  const player = await selectedPlayer(env, body.userId, actorId);
   return { player: {
     id: player.id, firstName: player.first_name, lastName: player.last_name,
     email: player.email, club: player.club, licenseNr: player.license_nr,
@@ -82,7 +85,7 @@ export async function resolveSelectedRegistrationPlayers(env, body, user, tourna
     if (!selection.userId || seen.has(selection.userId)) throw new HttpError(400, 'Ein Spieler kann pro Team nur einmal ausgewählt werden.');
     seen.add(selection.userId);
     await verifyPlayerSelectionProof(env, selection.proof, user.id, tournamentId, selection.userId, 'save');
-    const player = await selectedPlayer(env, selection.userId);
+    const player = await selectedPlayer(env, selection.userId, user.id);
     const [first, last, email, club, license] = fields(slot);
     if (body[first] !== player.first_name || body[last] !== player.last_name) {
       throw new HttpError(400, 'Die Spielerauswahl ist ungültig oder abgelaufen. Bitte erneut auswählen.');

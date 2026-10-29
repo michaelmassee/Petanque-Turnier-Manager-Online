@@ -344,7 +344,7 @@ export function FinalRankingPublisher({ tournament, onPublished }) {
   );
 }
 
-export default function TournamentPlayManagement({ tournaments: managedTournaments, currentUserId, turnstileSiteKey, focus = null }) {
+export default function TournamentPlayManagement({ tournaments: managedTournaments, currentUserId, currentUser, turnstileSiteKey, focus = null }) {
   const { t, i18n } = useTranslation();
   // Kalendereinträge sind reine Termine ohne Teilnehmer und tauchen hier gar nicht auf.
   const allTournaments = managedTournaments.filter((tournament) => !isCalendarEntry(tournament));
@@ -935,7 +935,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
                     <RegistrationPlayerPicker
                       key={`${selectedTournamentId}:${slot}`} tournamentId={selectedTournamentId} siteKey={turnstileSiteKey}
                       selected={selections[slot]} excludedIds={Object.values(selections).map((selection) => selection.userId)}
-                      currentUserId={currentUserId}
+                      currentUserId={currentUserId} currentUser={currentUser}
                       firstName={value('firstName')} lastName={value('lastName')} firstRequired={needed} lastRequired={needed}
                       firstLabel={caption('Vorname')} lastLabel={caption('Nachname')}
                       onNameChange={(field, next) => setQuickPlayer((current) => ({ ...current, [quickPlayerKey(prefix, field)]: next }))}

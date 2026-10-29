@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { TournamentEntryList } from '../components/TournamentEntryList.jsx';
 import { useQuery } from '@tanstack/react-query';
 import { FORMATIONS, REGISTRATION_STATUSES, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
 import { api, authenticatedApi } from '../lib/api.js';
@@ -586,10 +587,13 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
 
   if (!rounds.length) {
     return (
-      <div className="play-schedule">
+      <div className={`play-schedule${display ? ' is-display' : ''}`}>
         <Feedback error={query.error?.message} />
         {refresh}
-        <p className="muted">{t('Noch keine Runde gestartet.')}</p>
+        <p className="muted">{t(query.data?.status === 'running' || query.data?.status === 'finished'
+          ? 'Noch keine Runde gestartet.' : 'Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.')}</p>
+        {display && query.data?.status !== 'finished' && Array.isArray(query.data?.entries)
+          && <TournamentEntryList entries={query.data.entries} scrollRef={roundScrollRef} />}
       </div>
     );
   }

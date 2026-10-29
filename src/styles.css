@@ -2124,6 +2124,46 @@ a.left-panel-link {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 47em), 1fr));
 }
 
+.board-entry-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.board-entry-heading h2 { margin: 0; }
+
+.board-entry-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.board-entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid #e2e7f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.board-entry-number { color: #53627a; font-weight: 700; }
+.board-entry-players, .board-entry-players > div { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.board-entry-players { gap: 8px; }
+.board-entry-status { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
+
+@media (max-width: 560px) {
+  .board-entry { grid-template-columns: auto minmax(0, 1fr); }
+  .board-entry-status { grid-column: 2; justify-content: flex-start; }
+}
+
 /* Bildschirm vor Ort: Schrift wächst mit der Bildschirmbreite (Fernsicht auf großen Monitoren/TVs). */
 .tournament-display {
   font-size: clamp(1rem, 0.5rem + 0.55vw, 1.6rem);

@@ -2287,7 +2287,7 @@ function AppContent() {
       {activeTab === 'play' && canManageTournaments && (
         <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
           <section className="single-column">
-            <TournamentPlayManagement tournaments={manageableTournaments} currentUserId={currentUser?.id} turnstileSiteKey={turnstileSiteKey} focus={playFocus} />
+            <TournamentPlayManagement tournaments={manageableTournaments} currentUserId={currentUser?.id} currentUser={currentUser} turnstileSiteKey={turnstileSiteKey} focus={playFocus} />
           </section>
         </Suspense>
       )}

@@ -20,9 +20,9 @@ describe('Protected registration player details', () => {
   const selection = async (id = 'player', slot = 'primary', actorId = 'owner') => ({
     [slot]: { userId: id, proof: await playerSelectionProof(env, actorId, 't1', id, 'save') },
   });
-  const create = async (changes = {}) => createRegistration(request('/api/tournaments/t1/registrations', {
+  const create = async (changes = {}, currentActor = actor) => createRegistration(request('/api/tournaments/t1/registrations', {
     ...body, ...changes,
-  }), env, tournament(), { session: { user: actor } });
+  }), env, tournament(), { session: { user: currentActor } });
 
   beforeEach(() => {
     env = { DB: d1MitSchema(), TURNSTILE_SECRET_KEY: 'test-secret', MAIL_QUEUE: { send: vi.fn() } };
@@ -38,7 +38,8 @@ describe('Protected registration player details', () => {
       ('extra', 'extra@example.test', 'Other', 'Person', 'extra', 'user', null, null, null, 's', 'h', '2026-01-01', '2026-01-01');
       UPDATE users SET first_name = 'Anna', last_name = 'System', club = 'Club' WHERE id = 'system-tournament-reports';
       INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES
-      ('session-owner', 'owner', '2099-01-01', '2026-01-01'), ('session-player', 'player', '2099-01-01', '2026-01-01'), ('session-unverified', 'unverified', '2099-01-01', '2026-01-01');
+      ('session-owner', 'owner', '2099-01-01', '2026-01-01'), ('session-player', 'player', '2099-01-01', '2026-01-01'), ('session-unverified', 'unverified', '2099-01-01', '2026-01-01'),
+      ('session-admin', 'admin', '2099-01-01', '2026-01-01');
       INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at)
       VALUES ('t1', 'owner', 'Turnier', '2099-01-01', 'Ort', 'tete', 'registration', 'public', '2026-01-01', '2026-01-01');`);
     vi.stubGlobal('fetch', vi.fn(async (_url, options) => Response.json({
@@ -58,6 +59,27 @@ describe('Protected registration player details', () => {
     expect(saved.status).toBe(201);
     expect(env.DB.sqlite.prepare('SELECT user_id, player_email, license_nr FROM registrations').get())
       .toEqual({ user_id: 'player', player_email: 'anna@example.test', license_nr: 'L-123' });
+  });
+
+  it.each([
+    ['owner', 'user', 'Olga', 'Orga', 'owner@example.test'],
+    ['admin', 'admin', 'Anna', 'Admin', 'admin@example.test'],
+  ])('links the own account %s when added through the quick player form', async (id, role, firstName, lastName, email) => {
+    const response = await api('details', { userId: id }, `session-${id}`);
+    expect(response.status).toBe(200);
+    const { player } = await response.json();
+    const saved = await create({
+      firstName, lastName, playerEmail: undefined, noEmail: true, confirmImmediately: true,
+      playerSelections: { primary: { userId: id, proof: player.proof } },
+    }, { id, role, emailVerifiedAt: '2026-01-01' });
+    expect(saved.status).toBe(201);
+    expect(env.DB.sqlite.prepare('SELECT user_id, player_email, email FROM registrations').get())
+      .toEqual({ user_id: id, player_email: email, email });
+    const listed = await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/registrations', {
+      headers: { Cookie: `ptm_session=session-${id}` },
+    }), env);
+    expect(listed.status).toBe(200);
+    expect((await listed.json()).registrations[0].accountConnected).toBe(true);
   });
 
   it('rejects anonymous/unverified access and missing bot protection configuration', async () => {
@@ -108,7 +130,7 @@ describe('Protected registration player details', () => {
     expect((await api('details')).status).toBe(403);
   });
 
-  it('rejects unknown, unverified, admin and system accounts, and the removed search endpoint', async () => {
+  it('rejects unknown, unverified, other admin and system accounts, and the removed search endpoint', async () => {
     for (const userId of [undefined, 'missing', 'unverified', 'admin', 'system-tournament-reports']) {
       expect((await api('details', { userId })).status).toBe(400);
     }

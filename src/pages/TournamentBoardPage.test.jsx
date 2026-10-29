@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TournamentBoardPage from './TournamentBoardPage.jsx';
 
@@ -16,11 +16,11 @@ function tournamentWith(overrides) {
 
 function renderBoard(tournament) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  return { client, ...render(
     <QueryClientProvider client={client}>
       <TournamentBoardPage tournamentId={tournament.id} tournaments={[tournament]} language="de" />
     </QueryClientProvider>,
-  );
+  ) };
 }
 
 describe('Turnierseite', () => {
@@ -98,6 +98,44 @@ describe('Turnierseite', () => {
     renderBoard(tournamentWith({ status: 'registration' }));
     expect(await screen.findByText('Noch keine Runde gestartet.')).toBeInTheDocument();
     expect(screen.queryByText(/hat noch nicht begonnen/)).not.toBeInTheDocument();
+  });
+
+  it.each(['registration', 'running'])('zeigt bis zur ersten Runde Meldeliste, Teammitglieder und Check-in-Status (%s)', async (status) => {
+    const person = (firstName) => ({ firstName, lastName: 'Muster', club: 'BC Linden', accountConnected: firstName === 'Anna' });
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ status, rounds: [], ranking: [], entries: [
+      { status: 'confirmed', participation: 'active', teamName: 'Team Eins', persons: [person('Anna'), person('Bert')] },
+      { status: 'confirmed', participation: 'inactive', persons: [person('Clara')] },
+      { status: 'confirmed', participation: 'withdrawn', persons: [person('Dirk')] },
+      { status: 'pending', participation: null, persons: [person('Eva')] },
+      { status: 'waitlist', participation: null, persons: [person('Finn')] },
+    ] })));
+    renderBoard(tournamentWith({ status }));
+    const list = await screen.findByRole('region', { name: 'Meldeliste' });
+    for (const name of ['Anna', 'Bert', 'Clara', 'Dirk', 'Eva', 'Finn']) expect(within(list).getByText(`${name} Muster`)).toBeInTheDocument();
+    expect(within(list).getByText('Team Eins')).toBeInTheDocument();
+    expect(within(list).getByLabelText('Check-in: Eingecheckt.')).toBeInTheDocument();
+    expect(within(list).getByLabelText('Check-in: Noch nicht eingecheckt.')).toBeInTheDocument();
+    expect(within(list).getByLabelText('Check-in: Ausgesetzt')).toBeInTheDocument();
+    expect(within(list).getByLabelText('Mit Benutzerkonto verbunden')).toBeInTheDocument();
+    expect(within(list).queryByRole('button')).not.toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/schedule', expect.anything());
+  });
+
+  it('aktualisiert Check-in über den Spielplan-Abruf und wechselt bei der ersten Runde automatisch zum Spielplan', async () => {
+    const entry = { status: 'confirmed', participation: 'inactive', persons: [{ firstName: 'Anna', lastName: 'Muster' }] };
+    let data = { status: 'registration', rounds: [], ranking: [], entries: [entry] };
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(data)));
+    const { client } = renderBoard(tournamentWith({ status: 'registration' }));
+    await screen.findByLabelText('Check-in: Noch nicht eingecheckt.');
+    data = { ...data, entries: [{ ...entry, participation: 'active' }] };
+    await act(() => client.invalidateQueries({ queryKey: ['schedule', 't1', ''] }));
+    expect(await screen.findByLabelText('Check-in: Eingecheckt.')).toBeInTheDocument();
+    data = { status: 'running', rounds: [{ id: 'r1', roundNumber: 1, matches: [] }], ranking: [] };
+    await act(() => client.invalidateQueries({ queryKey: ['schedule', 't1', ''] }));
+    expect(await screen.findByRole('heading', { name: 'Runde 1' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Meldeliste' })).not.toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(3);
   });
 
   it('lädt bei einem Live-Push den Spielplan nur einmal, obwohl Seite und Spielplan beide zuhören', async () => {
