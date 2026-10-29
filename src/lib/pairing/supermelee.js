@@ -131,6 +131,10 @@ export function buildHistoryIndex(history, formation) {
 
 export const MIN_PLAYERS = 4;
 
+// Partien haben 4, 5 oder 6 Spieler; daraus lässt sich jede Zahl ab 4 außer 7 zusammensetzen (computeGameSizes).
+// Deshalb nennt die Meldung die 7 und die Abhilfe konkret, statt nur „keine gültige Rundenaufteilung“.
+export const SEVEN_PLAYERS_MESSAGE = 'Mit 7 aktiven Spielern ist keine Supermêlée-Runde möglich, weil jede Partie 4, 5 oder 6 Spieler hat. Bitte einen Spieler aktivieren bzw. nachmelden oder einen deaktivieren.';
+
 // Prüft, ob genug bestätigte Meldungen für eine gültige Rundenaufteilung vorliegen,
 // ohne (wie generateRound) tatsächlich eine Runde auszulosen. Gibt eine Liste
 // generischer, UI-seitig renderbarer Anforderungs-Objekte zurück (leer = alle
@@ -146,7 +150,7 @@ export function checkRequirements(confirmedCount, { formation } = {}) {
     return [{ type: 'minPlayers', min: MIN_PLAYERS }];
   }
   if (!computeGameSizes(confirmedCount, formation)) {
-    return [{ type: 'message', text: 'Für diese Anzahl bestätigter Meldungen ist keine gültige Rundenaufteilung möglich.' }];
+    return [{ type: 'message', text: SEVEN_PLAYERS_MESSAGE }];
   }
   return [];
 }
@@ -288,7 +292,7 @@ export function generateRound(players, history, { formation, random = Math.rando
 
   const gameSizes = computeGameSizes(playerIds.length, formation);
   if (!gameSizes) {
-    throw new Error('Für diese Spieleranzahl ist keine gültige Rundenaufteilung möglich.');
+    throw new Error(SEVEN_PLAYERS_MESSAGE);
   }
 
   // Paar-Eigenschaften als n×n-Matrizen über Spieler-Indizes, damit die Suche auch bei 100 Spielern im CPU-Budget

@@ -25,10 +25,11 @@ import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteLis
 // eingebacken zu sein (verschiedene Systeme/Formationen können unterschiedliche
 // Mindestanzahlen haben), 'message' ist ein fertiger, übersetzbarer Freitext für
 // alles, was sich nicht in ein generisches Muster fassen lässt.
-function requirementText(requirement, t, { teams = false } = {}) {
+// count: aktuelle Zahl (aktive Meldungen bzw. ausgeloste Mêlée-Teams), damit klar ist, wie viele fehlen.
+function requirementText(requirement, t, { teams = false, count = 0 } = {}) {
   if (requirement.type === 'minPlayers') {
-    if (teams) return t('Es werden mindestens {{min}} Teams benötigt.', { min: requirement.min });
-    return `${t('Es werden mindestens')} ${requirement.min} ${t('bestätigte Meldungen benötigt.')}`;
+    if (teams) return t('Es werden mindestens {{min}} Teams benötigt, ausgelost sind {{count}}.', { min: requirement.min, count });
+    return t('Es werden mindestens {{min}} aktive Meldungen benötigt, aktiv sind {{count}}.', { min: requirement.min, count });
   }
   return t(requirement.text);
 }
@@ -807,10 +808,15 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const strategyRequirementGaps = selectedTournament && selectedTournamentStatus === 'running' && !missingMeleeDraw
     ? checkRoundRequirements(selectedTournament, isMelee ? swissTeams.length : activeConfirmedCount, rounds.length, { teamCount: swissTeams.length })
     : [];
+  const openResultCount = currentRound ? currentRound.matches.filter((match) => !isMatchDecided(match)).length : 0;
   const missingRequirements = [
-    ...strategyRequirementGaps.map((requirement) => requirementText(requirement, t, { teams: isMelee })),
+    ...strategyRequirementGaps.map((requirement) => requirementText(requirement, t, { teams: isMelee, count: isMelee ? swissTeams.length : activeConfirmedCount })),
+    // Häufigste Ursache: bestätigte Meldungen, die (noch) nicht aktiv sind, zählen für die Auslosung nicht mit.
+    ...(strategyRequirementGaps.length && !isMelee && inactiveConfirmedCount
+      ? [t('{{count}} bestätigte Meldungen sind inaktiv und zählen nicht mit – unter „Teilnehmer“ aktivieren.', { count: inactiveConfirmedCount })]
+      : []),
     ...(selectedTournamentStatus === 'running' && currentRoundOpen
-      ? [t('Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen.')]
+      ? [t('Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen ({{count}} offen).', { count: openResultCount })]
       : []),
     ...(missingMeleeDraw ? [t('Bitte zuerst Mêlée-Teams auslosen')] : []),
   ];
@@ -825,7 +831,10 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       <div className="play-round-action">
         {missingRequirements.length > 0 && (
           <div className="round-requirements">
-            {missingRequirements.map((requirement) => <p className="hint" key={requirement}>{requirement}</p>)}
+            <strong>{t('Die Runde kann noch nicht gestartet werden:')}</strong>
+            <ul>
+              {missingRequirements.map((requirement) => <li key={requirement}>{requirement}</li>)}
+            </ul>
           </div>
         )}
         <Button disabled={busy || finishing || redrawing || !selectedTournamentId || !canGenerateRound} loading={busy} onClick={handleNewRound}>

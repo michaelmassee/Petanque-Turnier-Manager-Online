@@ -519,7 +519,32 @@ describe('TournamentPlayManagement', () => {
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
 
     expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 1 (1 aktiv)')).toBeInTheDocument();
-    expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
+    expect(screen.getByText('Die Runde kann noch nicht gestartet werden:')).toBeInTheDocument();
+    expect(screen.getByText('Es werden mindestens 4 aktive Meldungen benötigt, aktiv sind 1.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erste Runde starten' })).toBeDisabled();
+  });
+
+  it('nennt die Zahl der offenen Ergebnisse, solange die aktuelle Runde nicht abgeschlossen ist', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+
+    // RoundAction wird bei jedem Rendern neu eingehängt: gegen den aktuellen DOM prüfen, nicht gegen ein gefundenes Element.
+    await waitFor(() => expect(screen.getByText('Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen (1 offen).')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeDisabled();
+  });
+
+  it('nennt bei 7 aktiven Supermêlée-Spielern den Grund und weist auf inaktive Meldungen hin', async () => {
+    const calls = [];
+    const registrations = Array.from({ length: 9 }, (_, index) => ({
+      id: `p${index}`, firstName: `Spieler ${index}`, status: 'confirmed', participation: index < 7 ? 'active' : 'inactive',
+    }));
+    installFetchMock(calls, { rounds: [], registrations });
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+
+    await waitFor(() => expect(screen.getByText(/^Mit 7 aktiven Spielern ist keine Supermêlée-Runde möglich/)).toBeInTheDocument());
+    expect(screen.getByText('2 bestätigte Meldungen sind inaktiv und zählen nicht mit – unter „Teilnehmer“ aktivieren.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erste Runde starten' })).toBeDisabled();
   });
 
@@ -536,7 +561,7 @@ describe('TournamentPlayManagement', () => {
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
 
     expect(await screen.findByText('Bestätigte Meldungen · Supermêlée · Rangliste · Triplette: 4 (3 aktiv)')).toBeInTheDocument();
-    expect(screen.getByText('Es werden mindestens 4 bestätigte Meldungen benötigt.')).toBeInTheDocument();
+    expect(screen.getByText('Es werden mindestens 4 aktive Meldungen benötigt, aktiv sind 3.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Teilnehmer'));
     // Ausgesetzt → ein Tipp auf den Schalter macht die Meldung wieder aktiv.
@@ -1182,7 +1207,7 @@ describe('TournamentPlayManagement', () => {
 
     await waitFor(() => expect(calls).toContain('/api/tournaments/t1/registrations'));
     await screen.findByRole('button', { name: 'Nächste Runde starten' });
-    expect(await screen.findByText('Alle Runden wurden bereits gespielt.', { selector: '.hint' }, { timeout: 3000 })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Alle Runden wurden bereits gespielt.', { selector: '.round-requirements li' })).toBeInTheDocument(), { timeout: 3000 });
     expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeDisabled();
   });
 
