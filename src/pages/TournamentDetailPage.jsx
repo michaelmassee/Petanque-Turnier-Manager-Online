@@ -537,6 +537,22 @@ export function useScheduleQuery(tournamentId, shareToken = '', enabled = true) 
 }
 
 // display: reine Anzeige für einen Bildschirm vor Ort – ohne Bedienelemente, aktualisiert sich über Polling und Live-Push.
+// Veranstalter mit Vereinslogo im Kopf von Turnierdetails und Turnierseite; gleiche Logik wie in der Turnierliste.
+export function TournamentClub({ tournament, shareToken = '' }) {
+  // Merkt sich die fehlgeschlagene Logo-URL, damit beim Wechsel zu einem anderen Turnier dessen Logo wieder versucht wird.
+  const [brokenClubLogo, setBrokenClubLogo] = useState('');
+  if (!tournament.club) return null;
+  const logoUrl = tournamentImageUrl(tournament.id, 'logo', shareToken);
+  return (
+    <span className="tournament-detail-club">
+      {tournament.logoUrl && brokenClubLogo !== logoUrl && (
+        <img className="tournament-detail-club-logo" src={logoUrl} alt="" onError={(event) => setBrokenClubLogo(event.currentTarget.getAttribute('src'))} />
+      )}
+      {tournament.club}
+    </span>
+  );
+}
+
 export function TournamentSchedule({ tournamentId, tournament, language, shareToken = '', onAnnouncement, display = false }) {
   const { t } = useTranslation();
   const query = useScheduleQuery(tournamentId, shareToken);
@@ -683,8 +699,6 @@ export function TournamentDetailPage({
   const shareSuffix = shareToken ? `?share=${encodeURIComponent(shareToken)}` : '';
   const detailPath = (view) => `/turniere/${route.id}/${view}${shareSuffix}`;
   const { tournament, notFound } = useRoutedTournament(route.id, tournaments, shareToken);
-  // Merkt sich die fehlgeschlagene Logo-URL, damit beim Wechsel zu einem anderen Turnier dessen Logo wieder versucht wird.
-  const [brokenClubLogo, setBrokenClubLogo] = useState('');
 
   if (notFound) {
     return (
@@ -817,19 +831,7 @@ export function TournamentDetailPage({
           <h1 data-i18n-skip>{tournament.name}</h1>
           <p className="tournament-detail-meta" data-i18n-skip>
             <span>{formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}</span>
-            {tournament.club && (
-              <span className="tournament-detail-club">
-                {tournament.logoUrl && brokenClubLogo !== tournamentImageUrl(tournament.id, 'logo', shareToken) && (
-                  <img
-                    className="tournament-detail-club-logo"
-                    src={tournamentImageUrl(tournament.id, 'logo', shareToken)}
-                    alt=""
-                    onError={(event) => setBrokenClubLogo(event.currentTarget.getAttribute('src'))}
-                  />
-                )}
-                {tournament.club}
-              </span>
-            )}
+            <TournamentClub tournament={tournament} shareToken={shareToken} />
             <span>{formatLocationAddress(tournament.location)}</span>
           </p>
         </header>

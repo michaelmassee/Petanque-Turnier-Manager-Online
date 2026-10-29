@@ -56,6 +56,24 @@ describe('Turnierseite', () => {
     expect(screen.queryByRole('button', { name: 'Aktualisieren' })).not.toBeInTheDocument();
   });
 
+  it('zeigt das Vereinslogo vor dem Verein und ohne Uhrzeit nur das Datum', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ status: 'running', rounds: [], ranking: [], dataAsOf: null, announcement: null })));
+    renderBoard(tournamentWith({ club: 'BC Linden', logoUrl: 'https://example.test/logo.png', startTime: null }));
+
+    const club = document.querySelector('.tournament-detail-club');
+    expect(club.querySelector('img.tournament-detail-club-logo')).toHaveAttribute('src', '/api/tournaments/t1/image?field=logo');
+    expect(club).toHaveTextContent('BC Linden');
+    expect(document.querySelector('.tournament-detail-meta')).not.toHaveTextContent('Ganztägig');
+    await screen.findByText('Noch keine Runde gestartet.');
+  });
+
+  it('zeigt die Uhrzeit, wenn das Turnier eine hat', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ status: 'running', rounds: [], ranking: [], dataAsOf: null, announcement: null })));
+    renderBoard(tournamentWith({ startTime: '10:00', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }));
+    expect(document.querySelector('.tournament-detail-meta')).toHaveTextContent(/2099 10:00/);
+    await screen.findByText('Noch keine Runde gestartet.');
+  });
+
   it('reicht bei privaten Turnieren den Freigabe-Token an den Spielplan weiter', async () => {
     global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ status: 'running', rounds: [], ranking: [], dataAsOf: null, announcement: null })));
     window.history.replaceState({}, '', '/turnierseite/t1?share=geheim');

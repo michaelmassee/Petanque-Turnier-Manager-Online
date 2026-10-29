@@ -7,7 +7,7 @@ import { isDocumentBound, formatTournamentStartTime, formatLocationAddress } fro
 import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
 import { BoardPushToggle } from '../components/BoardPushToggle.jsx';
-import { ScheduleRefreshCountdown, TournamentSchedule, useScheduleQuery } from './TournamentDetailPage.jsx';
+import { ScheduleRefreshCountdown, TournamentClub, TournamentSchedule, useScheduleQuery } from './TournamentDetailPage.jsx';
 
 // Vollbild-Schalter für die reine Anzeige; verschwindet im Vollbild und in Browsern ohne Fullscreen-API.
 function FullscreenButton() {
@@ -105,8 +105,9 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
         <header className="tournament-detail-heading">
           <h1 data-i18n-skip>{tournament.name}</h1>
           <p className="tournament-detail-meta" data-i18n-skip>
-            <span>{formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)} {formatTournamentStartTime(tournament, language)}</span>
-            {tournament.club && <span>{tournament.club}</span>}
+            {/* Ohne Uhrzeit nur das Datum: „Ganztägig“ sagt auf der Anzeige nichts. */}
+            <span>{formatWeekdayShort(tournament.date, language)}, {formatDate(tournament.date, language)}{tournament.startTime ? ` ${formatTournamentStartTime(tournament, language)}` : ''}</span>
+            <TournamentClub tournament={tournament} shareToken={shareToken} />
             <span>{formatLocationAddress(tournament.location)}</span>
           </p>
         </header>
