@@ -88,21 +88,17 @@ const PATH_AREAS = {
   '/spielerboerse': 'spielerboerse', '/meine-anzeigen': 'spielerboerse',
 };
 
-// Turnierseite im Vollformat (Ankündigung, Spielplan, Rangliste). Der frühere Reiter /turniere/<id>/spielplan
-// führt ebenfalls hierher, damit geteilte alte Links weiter funktionieren.
+// Turnierseite als reine Anzeige (Ankündigung, Spielplan, Rangliste). Der frühere Reiter /turniere/<id>/spielplan
+// und die frühere eigene Bildschirm-Anzeige /turnierseite/<id>/anzeige (auch in gespeicherten Push-Abos) führen
+// ebenfalls hierher, damit alte Links weiter funktionieren.
 export function tournamentBoardPath(tournamentId) {
   return `/turnierseite/${encodeURIComponent(tournamentId)}`;
-}
-
-// Reine Anzeige der Turnierseite ohne Menü, z. B. für einen zweiten Bildschirm vor Ort.
-export function tournamentDisplayPath(tournamentId) {
-  return `${tournamentBoardPath(tournamentId)}/anzeige`;
 }
 
 export function matchTournamentBoardRoute(path) {
   const segments = path.split('/').filter(Boolean);
   if (segments[0] === 'turnierseite' && segments.length === 2) return { id: decodeURIComponent(segments[1]), legacy: false };
-  if (segments[0] === 'turnierseite' && segments.length === 3 && segments[2] === 'anzeige') return { id: decodeURIComponent(segments[1]), legacy: false, display: true };
+  if (segments[0] === 'turnierseite' && segments.length === 3 && segments[2] === 'anzeige') return { id: decodeURIComponent(segments[1]), legacy: true };
   if (segments[0] === 'turniere' && segments.length === 3 && segments[2] === 'spielplan') return { id: decodeURIComponent(segments[1]), legacy: true };
   return null;
 }

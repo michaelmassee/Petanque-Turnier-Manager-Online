@@ -126,7 +126,7 @@ describe('TournamentPlayManagement', () => {
 
     render(<TournamentPlayManagement tournaments={[liga, TOURNAMENT, desktop]} currentUserId="user-1" language="de" />);
     // Vorausgewählt ist das erste durchführbare Turnier, nicht das gesperrte.
-    expect(await screen.findByText('Turnierseite')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Anzeige für Bildschirm' })).toBeInTheDocument();
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
     fireEvent.focus(screen.getByRole('combobox'));
 
@@ -156,16 +156,17 @@ describe('TournamentPlayManagement', () => {
     expect(notice).toHaveTextContent('PTM Desktop unterstützt dieses Turniersystem');
     expect(within(notice).getByRole('link', { name: 'PTM Desktop entdecken' })).toHaveAttribute('href', expect.stringContaining('Petanque-Turnier-Manager'));
     expect(screen.queryByRole('button', { name: 'Turnier starten' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Turnierseite')).not.toBeInTheDocument();
+    expect(screen.queryByText('Anzeige für Bildschirm')).not.toBeInTheDocument();
     expect(calls.some((path) => String(path).includes('/api/tournaments/t3/'))).toBe(false);
   });
 
-  it('verlinkt die reine Anzeige der Turnierseite für einen zweiten Bildschirm', async () => {
+  it('verlinkt nur noch die Turnierseite als Anzeige, z. B. für einen zweiten Bildschirm', async () => {
     installFetchMock([]);
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
     const link = await screen.findByRole('link', { name: 'Anzeige für Bildschirm' });
-    expect(link).toHaveAttribute('href', `/turnierseite/${TOURNAMENT.id}/anzeige`);
+    expect(link).toHaveAttribute('href', `/turnierseite/${TOURNAMENT.id}`);
     expect(link).toHaveAttribute('target', '_blank');
+    expect(within(link.closest('.tournament-board-share')).getAllByRole('link')).toHaveLength(1);
   });
 
   it('zeigt die Ankündigung schon vor dem Turnierstart', async () => {
@@ -183,7 +184,7 @@ describe('TournamentPlayManagement', () => {
     installFetchMock([]);
     render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, visibility: 'public', participantsPublic: true }]} language="de" />);
 
-    const open = await screen.findByRole('link', { name: 'Öffnen' });
+    const open = await screen.findByRole('link', { name: 'Anzeige für Bildschirm' });
     expect(open).toHaveAttribute('href', '/turnierseite/t1');
     const share = within(open.closest('.tournament-board-share')).getByRole('button', { name: /Teilen/ });
     const editor = screen.getByLabelText(/Mitteilung an alle Teilnehmer/).closest('.announcement-editor');
@@ -201,7 +202,7 @@ describe('TournamentPlayManagement', () => {
     Object.defineProperty(navigator, 'share', { value: share, configurable: true });
     try {
       render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, visibility: 'private', participantsPublic: true }]} language="de" />);
-      fireEvent.click(await within(await screen.findByText('Turnierseite').then((el) => el.closest('.tournament-board-share'))).findByRole('button', { name: /Teilen/ }));
+      fireEvent.click(await within(await screen.findByRole('button', { name: 'Anzeige für Bildschirm' }).then((el) => el.closest('.tournament-board-share'))).findByRole('button', { name: /Teilen/ }));
       await waitFor(() => expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: `${window.location.origin}/turnierseite/t1?share=geheim` })));
     } finally {
       delete navigator.share;
@@ -222,7 +223,7 @@ describe('TournamentPlayManagement', () => {
     expect(await screen.findByText(/Wer den Link hat, sieht Spielplan und Rangliste/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Anzeige für Bildschirm' }));
 
-    await waitFor(() => expect(displayWindow.location.href).toBe(`${window.location.origin}/turnierseite/t1/anzeige?share=geheim`));
+    await waitFor(() => expect(displayWindow.location.href).toBe(`${window.location.origin}/turnierseite/t1?share=geheim`));
     expect(window.open).toHaveBeenCalledWith('', '_blank');
     expect(displayWindow.opener).toBeNull();
   });

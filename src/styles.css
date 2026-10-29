@@ -2049,7 +2049,7 @@ a.left-panel-link {
   margin: 0 0 10px;
 }
 
-/* Reine Anzeige (/turnierseite/<id>/anzeige) für einen zweiten Bildschirm: ohne Menü. */
+/* Turnierseite als reine Anzeige ohne Menü (Bildschirm vor Ort und Handy). */
 .tournament-display .tournament-board-page {
   position: relative;
 }
@@ -2205,6 +2205,17 @@ a.left-panel-link {
 
   .display-fullscreen {
     display: none;
+  }
+
+  /* Handy: Push-Schalter unter den Turniernamen statt darüber. */
+  .display-actions {
+    position: static;
+    max-width: none;
+    justify-content: flex-start;
+  }
+
+  .display-actions .board-push {
+    justify-items: start;
   }
 }
 

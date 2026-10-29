@@ -1430,19 +1430,8 @@ function AppContent() {
       <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
         <TournamentBoardPage
           tournamentId={tournamentBoardRoute.id}
-          display={Boolean(tournamentBoardRoute.display)}
           tournaments={tournaments}
-          currentUser={currentUser}
           language={language}
-          setLanguage={setLanguage}
-          navigate={navigate}
-          menuOpen={menuOpen}
-          setMenuOpen={setMenuOpen}
-          isAdmin={isAdmin}
-          onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')}
-          onLogout={handleLogout}
-          drawerContent={drawerContent('turniere')}
-          postboxControl={renderPostboxControl()}
         />
       </Suspense>
     );

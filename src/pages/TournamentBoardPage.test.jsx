@@ -14,17 +14,16 @@ function tournamentWith(overrides) {
   };
 }
 
-function renderBoard(tournament, { display = false } = {}) {
+function renderBoard(tournament) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <TournamentBoardPage tournamentId={tournament.id} tournaments={[tournament]} currentUser={null} language="de"
-        setLanguage={() => {}} navigate={() => {}} menuOpen={false} setMenuOpen={() => {}} display={display} />
+      <TournamentBoardPage tournamentId={tournament.id} tournaments={[tournament]} language="de" />
     </QueryClientProvider>,
   );
 }
 
-describe('Turnierseite im Vollformat', () => {
+describe('Turnierseite', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('zeigt Ankündigung und Spielplan eines laufenden Turniers ohne Reiter', async () => {
@@ -42,12 +41,12 @@ describe('Turnierseite im Vollformat', () => {
     expect(screen.queryByRole('navigation', { name: 'Turnierdetails' })).not.toBeInTheDocument();
   });
 
-  it('zeigt als reine Anzeige für einen zweiten Bildschirm weder Menü noch Bedienelemente', async () => {
+  it('zeigt als reine Anzeige (auch für einen Bildschirm vor Ort) weder Menü noch Bedienelemente', async () => {
     global.fetch = vi.fn(() => Promise.resolve(jsonResponse({
       status: 'running', rounds: [], ranking: [], dataAsOf: null, announcement: { text: 'Mittagspause bis 13 Uhr', at: '2099-06-01T11:00:00.000Z' },
     })));
 
-    const { container } = renderBoard(tournamentWith({}), { display: true });
+    const { container } = renderBoard(tournamentWith({}));
 
     expect(screen.getByRole('heading', { name: 'Herbstturnier' })).toBeInTheDocument();
     expect(await screen.findByText('Mittagspause bis 13 Uhr')).toBeInTheDocument();

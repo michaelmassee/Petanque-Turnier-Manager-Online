@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { areaForPath, popStateChangedPath, matchRentalRoute, matchTournamentBoardRoute, matchTournamentRoute, tournamentBoardPath, tournamentDisplayPath, usePath } from './routing.js';
+import { areaForPath, popStateChangedPath, matchRentalRoute, matchTournamentBoardRoute, matchTournamentRoute, tournamentBoardPath, usePath } from './routing.js';
 
 function NavigationHarness() {
   const [path, navigate] = usePath();
@@ -38,9 +38,8 @@ describe('matchTournamentBoardRoute', () => {
     expect(areaForPath('/turnierseite/t1')).toBe('turniere');
   });
 
-  it('erkennt die reine Anzeige der Turnierseite', () => {
-    expect(tournamentDisplayPath('t 1')).toBe('/turnierseite/t%201/anzeige');
-    expect(matchTournamentBoardRoute('/turnierseite/t%201/anzeige')).toEqual({ id: 't 1', legacy: false, display: true });
+  it('führt die frühere Bildschirm-Anzeige auf die Turnierseite (alte Links, Push-Abos)', () => {
+    expect(matchTournamentBoardRoute('/turnierseite/t%201/anzeige')).toEqual({ id: 't 1', legacy: true });
     expect(matchTournamentBoardRoute('/turnierseite/t1/sonstwas')).toBeNull();
   });
 });

@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
 import { TextField, Button, Feedback, ShareLinkButton } from '../components/ui.jsx';
-import { tournamentBoardPath, tournamentDisplayPath } from '../lib/routing.js';
+import { tournamentBoardPath } from '../lib/routing.js';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { registrationUnit } from '../registration-core.js';
 import { NotOnlinePlayableNotice } from '../components/NotOnlinePlayableNotice.jsx';
@@ -69,7 +69,6 @@ function TournamentBoardShare({ tournament }) {
   const [displayBusy, setDisplayBusy] = useState(false);
   const [displayError, setDisplayError] = useState('');
   const path = tournamentBoardPath(tournament.id);
-  const displayPath = tournamentDisplayPath(tournament.id);
   // Ohne veröffentlichte Teilnehmerliste zeigt die Turnierseite Fremden ohnehin keinen Spielplan; dann reicht die Anmeldung.
   const withShareToken = tournament.visibility === 'private' && tournament.participantsPublic;
   async function resolveShareToken() {
@@ -87,7 +86,7 @@ function TournamentBoardShare({ tournament }) {
     setDisplayError('');
     setDisplayBusy(true);
     try {
-      const url = urlWithShare(displayPath, await resolveShareToken());
+      const url = urlWithShare(path, await resolveShareToken());
       if (displayWindow) {
         displayWindow.opener = null;
         displayWindow.location.href = url;
@@ -104,18 +103,14 @@ function TournamentBoardShare({ tournament }) {
   return (
     <div className="panel tournament-board-share">
       <p>
-        <strong>{t('Turnierseite')}</strong>: {t('Spielplan, Rangliste und Ankündigungen für alle.')}
-        {' '}<a href={path} target="_blank" rel="noreferrer">{t('Öffnen')}</a>
-      </p>
-      <p>
         {withShareToken
           ? <Button variant="secondary" loading={displayBusy} onClick={openDisplay}>{t('Anzeige für Bildschirm')}</Button>
-          : <a href={displayPath} target="_blank" rel="noreferrer">{t('Anzeige für Bildschirm')}</a>}
+          : <a href={path} target="_blank" rel="noreferrer">{t('Anzeige für Bildschirm')}</a>}
         {' '}<span className="muted">{t('Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.')}</span>
       </p>
       {withShareToken && (
         <p className="hint">
-          {t('Privates Turnier: Turnierseite und Anzeige enthalten den Freigabe-Schlüssel, damit sie auch ohne Anmeldung funktionieren, z. B. auf einem Rechner vor Ort. Wer den Link hat, sieht Spielplan und Rangliste. Deaktivierst du den Freigabe-Link, funktionieren diese Links nicht mehr.')}
+          {t('Privates Turnier: Anzeige und geteilter Link enthalten den Freigabe-Schlüssel, damit sie auch ohne Anmeldung funktionieren, z. B. auf einem Rechner vor Ort. Wer den Link hat, sieht Spielplan und Rangliste. Deaktivierst du den Freigabe-Link, funktionieren diese Links nicht mehr.')}
         </p>
       )}
       <Feedback error={displayError} />
