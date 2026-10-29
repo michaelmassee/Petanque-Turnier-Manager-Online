@@ -19,11 +19,14 @@ export function LiveQrDialog({ registration, onClose }) {
   const [renewing, setRenewing] = useState(false);
   const qrRef = useRef(null);
   const registrationId = registration?.id;
+  // Der Dialog bleibt gemountet; eine verspätete Antwort für eine vorher geöffnete Meldung darf nicht in die nächste.
+  const currentIdRef = useRef(registrationId);
+  currentIdRef.current = registrationId;
 
   useEffect(() => {
     if (!registrationId) return undefined;
     let cancelled = false;
-    setUrl(''); setError(''); setNotRecoverable(false); setLoading(true);
+    setUrl(''); setError(''); setNotRecoverable(false); setRenewing(false); setLoading(true);
     authenticatedApi(`/api/registrations/${registrationId}/live-link/qr`)
       .then((data) => { if (!cancelled) setUrl(data.url); })
       .catch((err) => {
@@ -55,16 +58,19 @@ export function LiveQrDialog({ registration, onClose }) {
   }, [url, t]);
 
   async function renew() {
+    const id = registrationId;
+    const stillCurrent = () => currentIdRef.current === id;
     setError('');
     setRenewing(true);
     try {
-      const data = await authenticatedApi(`/api/registrations/${registrationId}/live-link/qr`, { method: 'POST' });
+      const data = await authenticatedApi(`/api/registrations/${id}/live-link/qr`, { method: 'POST' });
+      if (!stillCurrent()) return;
       setNotRecoverable(false);
       setUrl(data.url);
     } catch (err) {
-      setError(err.message);
+      if (stillCurrent()) setError(err.message);
     } finally {
-      setRenewing(false);
+      if (stillCurrent()) setRenewing(false);
     }
   }
 
