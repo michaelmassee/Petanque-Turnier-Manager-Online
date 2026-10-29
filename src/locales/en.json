@@ -836,6 +836,7 @@
   "Neue Spieler sind sofort für die nächste Runde aktiv.": "New players are immediately active for the next round.",
   "Spieler hinzufügen": "Add player",
   "Spieler hinzugefügt:": "Player added:",
+  "Bereits angemeldet: {{names}}. Trotzdem hinzufügen?": "Already registered: {{names}}. Add anyway?",
   "Vergangene Runden": "Previous rounds",
   "Bearbeitungsrechte verwalten": "Manage editing rights",
   "Lädt …": "Loading …",

@@ -5,7 +5,7 @@ import { api, authenticatedApi } from '../lib/api.js';
 import { TextField, Button, Feedback, ShareLinkButton } from '../components/ui.jsx';
 import { tournamentBoardPath } from '../lib/routing.js';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
-import { registrationUnit } from '../registration-core.js';
+import { ACTIVE_REGISTRATION_STATUSES, normalizePlayerName, registrationUnit } from '../registration-core.js';
 import { NotOnlinePlayableNotice } from '../components/NotOnlinePlayableNotice.jsx';
 import { checkRoundRequirements, isMeleeTeamTournament, isOnlinePlayable, minimumTeams } from '../lib/pairing/index.js';
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
@@ -53,6 +53,20 @@ function quickPlayerSlots(tournament) {
 }
 
 const quickPlayerKey = (prefix, field) => (prefix ? `${prefix}${field[0].toUpperCase()}${field.slice(1)}` : field);
+
+// Nachmeldung schon vorhanden? Namen normalisiert wie in registrationConflicts, gegen alle Personen aktiver Meldungen
+// (auch Warteliste und nicht aktive Teilnehmer). Gleichnamige Personen gibt es, daher nur eine Rückfrage.
+function alreadyRegisteredNames(registrations, quickPlayer, slots) {
+  const registered = new Set(registrations
+    .filter((registration) => ACTIVE_REGISTRATION_STATUSES.includes(registration.status))
+    .flatMap((registration) => ['', 'partner', 'partner2'].map((prefix) => normalizePlayerName(
+      registration[quickPlayerKey(prefix, 'firstName')], registration[quickPlayerKey(prefix, 'lastName')])))
+    .filter(Boolean));
+  return slots
+    .map(({ prefix }) => [quickPlayer[quickPlayerKey(prefix, 'firstName')], quickPlayer[quickPlayerKey(prefix, 'lastName')]])
+    .filter(([first, last]) => registered.has(normalizePlayerName(first, last)))
+    .map(([first, last]) => `${first.trim()} ${last.trim()}`);
+}
 
 function playerLabel(player) {
   if (player.teamLabel) return player.teamLabel;
@@ -510,6 +524,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   async function handleQuickPlayerSubmit(event) {
     event.preventDefault();
     if (!selectedTournamentId) return;
+    const duplicates = alreadyRegisteredNames(registrationsQuery.data?.registrations || [], quickPlayer, quickSlots);
+    if (duplicates.length && !window.confirm(t('Bereits angemeldet: {{names}}. Trotzdem hinzufügen?', { names: duplicates.join(', ') }))) return;
     setBusy(true);
     setError('');
     setMessage('');

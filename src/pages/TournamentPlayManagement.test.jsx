@@ -992,6 +992,43 @@ describe('TournamentPlayManagement', () => {
     });
   });
 
+  it('fragt nach, bevor ein bereits angemeldeter Spieler noch einmal hinzugefügt wird', async () => {
+    installFetchMock([], { registrations: [
+      ...CONFIRMED_REGISTRATIONS,
+      { id: 'w1', firstName: 'Wilma', lastName: 'Warte', status: 'waitlist', participation: 'active' },
+      { id: 'x1', firstName: 'Xaver', lastName: 'Abgesagt', status: 'cancelled', participation: 'active' },
+    ] });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const addCalls = () => global.fetch.mock.calls.filter(([path, options]) => path === '/api/tournaments/t1/registrations' && options?.method === 'POST');
+    const add = (firstName, lastName) => {
+      fireEvent.change(screen.getByRole('textbox', { name: /Vorname/ }), { target: { value: firstName } });
+      fireEvent.change(screen.getByRole('textbox', { name: /Nachname/ }), { target: { value: lastName } });
+      fireEvent.click(screen.getByRole('button', { name: 'Spieler hinzufügen' }));
+    };
+
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+    await screen.findByText('Anna Muster + Bert Beispiel + Clara Test');
+    fireEvent.click(screen.getByText('Teilnehmer'));
+
+    // Groß-/Kleinschreibung, Akzente und Leerzeichen spielen keine Rolle.
+    add('anna', ' Müster ');
+    expect(confirm).toHaveBeenCalledWith('Bereits angemeldet: anna Müster. Trotzdem hinzufügen?');
+    expect(addCalls()).toHaveLength(0);
+
+    add('Wilma', 'Warte');
+    expect(confirm).toHaveBeenLastCalledWith('Bereits angemeldet: Wilma Warte. Trotzdem hinzufügen?');
+    confirm.mockReturnValue(true);
+    add('Wilma', 'Warte');
+    await waitFor(() => expect(addCalls()).toHaveLength(1));
+
+    // Abgesagte Meldungen zählen nicht.
+    confirm.mockClear();
+    await screen.findByText('Spieler hinzugefügt: Gina Neu');
+    add('Xaver', 'Abgesagt');
+    await waitFor(() => expect(addCalls()).toHaveLength(2));
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
   it('meldet bei Doublette ein ganzes Team nach, nicht nur einen Spieler', async () => {
     installFetchMock([]);
     const doublette = { ...TOURNAMENT, name: 'Doublette formée', registrationType: 'forme', type: 'schweizer', formation: 'doublette' };
