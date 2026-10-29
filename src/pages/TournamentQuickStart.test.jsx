@@ -28,7 +28,10 @@ describe('Schnellstart', () => {
     expect(button.querySelector('.button-spinner')).not.toBeNull();
     const [createPath, createOptions] = authenticatedApi.mock.calls[0];
     expect(createPath).toBe('/api/tournaments');
-    expect(JSON.parse(createOptions.body)).toMatchObject({ visibility: 'private', registrationType: 'supermelee', type: 'rangliste', formation: 'doublette', location: 'BC Linden' });
+    expect(JSON.parse(createOptions.body)).toMatchObject({
+      visibility: 'private', registrationType: 'supermelee', type: 'rangliste', formation: 'doublette', location: 'BC Linden',
+      liveViewEnabled: true, playerResultReportingEnabled: true,
+    });
     expect(screen.getByRole('radio', { name: 'Triplette' })).toBeDisabled();
     expect(authenticatedApi.mock.calls[1]).toEqual(['/api/tournaments/t9/start', { method: 'POST' }]);
 

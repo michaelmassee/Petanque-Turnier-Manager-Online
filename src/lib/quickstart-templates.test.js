@@ -14,7 +14,10 @@ describe('Schnellstart-Vorlagen', () => {
     expect(isOnlinePlayable(payload)).toBe(true);
     const tournament = normalizeTournamentInput(payload);
     expect(() => assertTournamentSystemAllowed(tournament)).not.toThrow();
-    expect(tournament).toMatchObject({ visibility: 'private', status: 'draft', registrationEnabled: true, date: '2026-10-28' });
+    expect(tournament).toMatchObject({
+      visibility: 'private', status: 'draft', registrationEnabled: true, date: '2026-10-28',
+      liveViewEnabled: true, playerResultReportingEnabled: true,
+    });
   });
 
   it('benennt das Turnier nach Vorlage und Datum und nimmt den Profilverein als Ort', () => {

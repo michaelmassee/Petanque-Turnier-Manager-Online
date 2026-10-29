@@ -48,6 +48,8 @@ export function quickStartPayload(template, { currentUser, today = localIsoDate(
     visibility: 'private',
     status: 'draft',
     registrationEnabled: true,
+    liveViewEnabled: true,
+    playerResultReportingEnabled: true,
     contactName: currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '',
     contactEmail: currentUser?.email || '',
     contactPhone: currentUser?.phone || '',
