@@ -25,6 +25,7 @@ describe('location-format', () => {
     expect(formatLocationAddress('Ostpark, Rüsselsheim am Main, Hessen, 65428, Deutschland')).toBe('Ostpark, Rüsselsheim am Main, Hessen, 65428, Deutschland');
     expect(formatLocationAddress('75443 Ötisheim')).toBe('75443 Ötisheim');
     expect(formatLocationAddress('Loutraki (Griechenland)')).toBe('Loutraki (Griechenland)');
+    expect(formatLocationAddress('Rue des Deux Maisons, 34-36, 1140 Bruxelles')).toBe('Rue des Deux Maisons, 34-36, 1140 Bruxelles');
   });
 
   it('baut "Straße Nr, PLZ" als Ersatzanfrage für unauffindbare Adressen', () => {

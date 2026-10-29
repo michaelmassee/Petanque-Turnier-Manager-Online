@@ -15,7 +15,8 @@ export function formatLocationAddress(location) {
   const hasStreet = parts.some((part) => STREET_WITH_NUMBER.test(part));
   for (let index = 0; !hasStreet && index < parts.length - 1; index += 1) {
     if (POSTCODE.test(parts[index]) && index + 1 === parts.length - 1) continue;
-    if (HOUSE_NUMBER.test(parts[index]) && /\p{L}/u.test(parts[index + 1])) {
+    // Folgt "PLZ Ort", gehört die Nummer zur Straße davor (belgisch "Rue …, 34-36, 1140 Bruxelles"): nicht tauschen.
+    if (HOUSE_NUMBER.test(parts[index]) && /\p{L}/u.test(parts[index + 1]) && !/^\d{4,5}\s+\p{L}/u.test(parts[index + 1])) {
       parts.splice(index, 2, `${parts[index + 1]} ${parts[index]}`);
       break;
     }

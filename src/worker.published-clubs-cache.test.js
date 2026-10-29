@@ -25,7 +25,7 @@ describe('Cache für Vereins- und Plätzeliste', () => {
   const get = (path, headers = {}) => worker.fetch(new Request(`https://ptm.test${path}`, { headers }), env);
   const vereine = async () => (await (await get('/api/clubs')).json()).clubs;
   const plaetze = async (path = '/api/places', headers = {}) => (await (await get(path, headers)).json()).places;
-  const listenAbfragen = () => queries.filter((statement) => /SELECT c\.id, c\.name, p\.latitude|AS club_display_name/.test(statement)).length;
+  const listenAbfragen = () => queries.filter((statement) => /json_object\('(clubs|places)'/.test(statement)).length;
   const angemeldet = { Cookie: 'ptm_session=s1' };
 
   beforeEach(() => {
@@ -141,7 +141,7 @@ describe('Cache für Vereins- und Plätzeliste', () => {
     sql("UPDATE users SET role = 'admin' WHERE id = 'owner'");
 
     await vereine();
-    expect(queries.filter((statement) => /SELECT c\.id, c\.name, p\.latitude/.test(statement))).toHaveLength(1);
+    expect(queries.filter((statement) => /json_object\('clubs'/.test(statement))).toHaveLength(1);
   });
 
   it('baut die Vereinsliste bei neuen Koordinaten oder einem unveröffentlichten Platz neu auf', async () => {

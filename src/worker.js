@@ -10555,40 +10555,34 @@ async function sharedListResponse(db, origin, name, deploy, versionName, build) 
 }
 
 async function listPublishedClubs(db, origin, deploy) {
-  return sharedListResponse(db, origin, 'published-clubs', deploy, 'clubs', async () => json(await loadPublishedClubs(db)));
+  return sharedListResponse(db, origin, 'published-clubs', deploy, 'clubs', async () => new Response(await publishedClubsJson(db)));
 }
 
 // Nutzerneutrale Plätzeliste für alle, auch Angemeldete; deren Markierungen liefert GET /api/places/personal.
 async function listSharedBoulePlaces(db, origin, deploy) {
-  return sharedListResponse(db, origin, 'places', deploy, 'places', async () => json(await loadBoulePlaceSummaries(db)));
+  return sharedListResponse(db, origin, 'places', deploy, 'places', async () => new Response(await boulePlaceSummariesJson(db)));
 }
 
-// Schlanke Plätzeliste (Karte, Suche, Spielort-Auswahl): Der Neuaufbau kostet CPU proportional zur JSON-Größe, daher
-// ohne Beschreibungen/Vereinslinks (GET /api/places/:id) und ohne Felder mit Standardwert (false, null, 0,
-// 'outdoor', 'club'). Nur latitude/longitude bleiben immer drin, weil der Client sie auf null prüft.
-async function loadBoulePlaceSummaries(db) {
-  const rows = await db.prepare(
-    `SELECT p.id, p.club_id, p.club_name, c.name AS club_display_name, c.kind AS club_kind, c.logo_url IS NOT NULL AND c.logo_url <> '' AS has_club_logo,
-       p.venue_type, p.name, p.address, p.latitude, p.longitude, p.court_count, p.accessible, p.address_unverified,
-       (SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id) AS like_count
+// Schlanke Plätzeliste (Karte, Suche, Spielort-Auswahl) ohne Beschreibungen/Vereinslinks (GET /api/places/:id) und
+// ohne Felder mit Standardwert (false, null, 0, 'outdoor', 'club'); nur latitude/longitude bleiben immer drin, weil
+// der Client sie auf null prüft. D1 baut den JSON-Text selbst (json_patch lässt NULL-Felder weg): Der Worker reicht
+// eine Zeile durch, seine CPU-Zeit wächst also nicht mit der Zahl der Plätze (10 ms je Anfrage im Free-Plan).
+// Adressen werden beim Speichern formatiert (placeInput, createPlaceReport), nicht hier.
+async function boulePlaceSummariesJson(db) {
+  const row = await db.prepare(
+    `SELECT json_object('places', json_group_array(json_patch(
+       json_object('id', p.id, 'name', p.name, 'address', p.address,
+         'latitude', CAST(p.latitude AS REAL), 'longitude', CAST(p.longitude AS REAL)),
+       json_object('clubId', NULLIF(p.club_id, ''), 'clubName', COALESCE(NULLIF(c.name, ''), NULLIF(p.club_name, '')),
+         'clubKind', NULLIF(c.kind, 'club'), 'hasClubLogo', CASE WHEN c.logo_url <> '' THEN json('true') END,
+         'venueType', NULLIF(p.venue_type, 'outdoor'), 'courtCount', NULLIF(p.court_count, 0),
+         'accessible', CASE WHEN p.accessible THEN json('true') END,
+         'addressUnverified', CASE WHEN p.address_unverified THEN json('true') END,
+         'likeCount', NULLIF((SELECT COUNT(*) FROM boule_place_likes l WHERE l.place_id = p.id), 0)))
+       ORDER BY COALESCE(c.name, p.club_name) COLLATE NOCASE, p.name COLLATE NOCASE)) AS body
      FROM boule_places p LEFT JOIN clubs c ON c.id = p.club_id
-     WHERE p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')
-     ORDER BY COALESCE(c.name, p.club_name) COLLATE NOCASE, p.name COLLATE NOCASE`).all();
-  return { places: (rows.results || []).map((row) => {
-    const place = { id: row.id, name: row.name, address: formatLocationAddress(row.address),
-      latitude: row.latitude === null ? null : Number(row.latitude), longitude: row.longitude === null ? null : Number(row.longitude) };
-    if (row.club_id) place.clubId = row.club_id;
-    const clubName = row.club_display_name || row.club_name;
-    if (clubName) place.clubName = clubName;
-    if (row.club_kind && row.club_kind !== 'club') place.clubKind = row.club_kind;
-    if (Number(row.has_club_logo)) place.hasClubLogo = true;
-    if (row.venue_type && row.venue_type !== 'outdoor') place.venueType = row.venue_type;
-    if (Number(row.court_count)) place.courtCount = Number(row.court_count);
-    if (Number(row.accessible)) place.accessible = true;
-    if (Number(row.address_unverified)) place.addressUnverified = true;
-    if (Number(row.like_count)) place.likeCount = Number(row.like_count);
-    return place;
-  }) };
+     WHERE p.status = 'published' AND (p.club_id IS NULL OR c.status = 'published')`).first();
+  return row.body;
 }
 
 // Ergänzt einen Eintrag der schlanken Liste um das, was erst beim Aufklappen gebraucht wird.
@@ -10606,20 +10600,17 @@ async function getBoulePlaceDetails(db, id) {
   });
 }
 
-async function loadPublishedClubs(db) {
-  const rows = await db.prepare(
-    `SELECT c.id, c.name, p.latitude, p.longitude
+// Wie boulePlaceSummariesJson: D1 baut den JSON-Text, der Worker reicht ihn durch.
+async function publishedClubsJson(db) {
+  const row = await db.prepare(
+    `SELECT json_object('clubs', json_group_array(json_object('id', c.id, 'name', c.name, 'locations', json(
+       (SELECT json_group_array(json_object('latitude', CAST(p.latitude AS REAL), 'longitude', CAST(p.longitude AS REAL)))
+        FROM boule_places p
+        WHERE p.club_id = c.id AND p.status = 'published' AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL)))
+       ORDER BY c.name COLLATE NOCASE)) AS body
      FROM clubs c
-     LEFT JOIN boule_places p ON p.club_id = c.id AND p.status = 'published' AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL
-     WHERE c.status = 'published'
-     ORDER BY c.name COLLATE NOCASE`,
-  ).all();
-  const clubs = new Map();
-  for (const row of rows.results || []) {
-    if (!clubs.has(row.id)) clubs.set(row.id, { id: row.id, name: row.name, locations: [] });
-    if (row.latitude !== null && row.longitude !== null) clubs.get(row.id).locations.push({ latitude: Number(row.latitude), longitude: Number(row.longitude) });
-  }
-  return { clubs: [...clubs.values()] };
+     WHERE c.status = 'published'`).first();
+  return row.body;
 }
 
 // Persönliche Markierungen zur gemeinsamen Plätzeliste: wenige Index-Zugriffe statt der ganzen Liste pro Person.
@@ -11494,7 +11485,7 @@ async function resolvePlaceGeolocation(body, address, countryCode, existing) {
 }
 
 async function placeInput(body, countryCode, existing) {
-  const name = text(body.name); const address = text(body.address); if (name.length < 2 || address.length < 5) throw new HttpError(400, 'Name und vollständige Adresse des Platzes sind erforderlich');
+  const name = text(body.name); const address = formatLocationAddress(text(body.address)); if (name.length < 2 || address.length < 5) throw new HttpError(400, 'Name und vollständige Adresse des Platzes sind erforderlich');
   const { latitude, longitude } = await resolvePlaceGeolocation(body, address, countryCode, existing);
   const codes = facilityCodes(body.facilityCodes);
   const accessible = codes.includes('accessible') || Boolean(body.accessible);
@@ -11848,7 +11839,7 @@ async function createPlaceReport(request, env, url) {
   await verifyTurnstileToken(env, body.turnstileToken, ip);
 
   const name = text(body.name);
-  const address = text(body.address);
+  const address = formatLocationAddress(text(body.address));
   if (name.length < 2 || address.length < 5) throw new HttpError(400, 'Name und vollständige Adresse des Platzes sind erforderlich');
   const { latitude, longitude } = await resolvePlaceGeolocation(body, address, request.headers.get('CF-IPCountry'));
   const courtCount = nonNegativeInteger(body.courtCount);
