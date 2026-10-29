@@ -6596,7 +6596,9 @@ export async function verifyTurnstileToken(env, token, ip, { required = false, a
     console.error('Turnstile verification request failed', error);
     throw new HttpError(400, 'Sicherheitsprüfung fehlgeschlagen. Bitte erneut versuchen.');
   }
-  if (!result?.success || (action && result.action !== action) || (hostname && result.hostname !== hostname)) {
+  // Cloudflare's always-pass test secret (local dev) answers without action and with hostname example.com.
+  const testingKey = result?.metadata?.result_with_testing_key === true;
+  if (!result?.success || (!testingKey && ((action && result.action !== action) || (hostname && result.hostname !== hostname)))) {
     throw new HttpError(400, 'Sicherheitsprüfung fehlgeschlagen. Bitte erneut versuchen.');
   }
 }
