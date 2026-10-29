@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkRequirements, findByeTeam, formuleXStats, generateRound, getSiegaufschlag,
-  pairLinearWithSwap, sameFormuleXRankingPlace, sortFormuleX,
+  pairByRanking, sameFormuleXRankingPlace, sortFormuleX,
 } from './formulex.js';
 import { checkRoundRequirements, roundRequirementMessage } from './index.js';
 
 const teamsOf = (count) => Array.from({ length: count }, (_, index) => ({ id: `t${index + 1}` }));
 
-// Baut eine minimale statsById-Map (nur opponents/hadBye) für pairLinearWithSwap/findByeTeam,
+// Baut eine minimale statsById-Map (nur opponents/hadBye) für pairByRanking/findByeTeam,
 // analog zu den FormuleXErgebnis-Fixtures in FormuleXTest.java.
 function statsMap(entries) {
   return new Map(entries.map(([id, opponents = [], hadBye = false]) => [id, { opponents: new Set(opponents), hadBye }]));
 }
 
-// weitereRunde() aus FormuleX.java: Freilos ermitteln (bei ungerader Zahl), Rest linear mit
-// Swap paaren, Freilos ans Ende anhängen - dieselbe Komposition wie generateRound() intern.
+// weitereRunde() aus FormuleX.java: Freilos ermitteln (bei ungerader Zahl), Rest nach
+// Rangliste paaren, Freilos ans Ende anhängen - dieselbe Komposition wie generateRound() intern.
 function weitereRunde(ordered, byId) {
   let rest = ordered;
   let bye = null;
@@ -23,7 +23,7 @@ function weitereRunde(ordered, byId) {
     rest = ordered.filter((id) => id !== byeTeam.id);
     bye = { teamA: [byeTeam.id], teamB: [] };
   }
-  const matches = pairLinearWithSwap(rest.map((id) => ({ id })), byId);
+  const matches = pairByRanking(rest.map((id) => ({ id })), byId);
   if (bye) matches.push(bye);
   return matches;
 }
@@ -94,7 +94,7 @@ describe('Formule X - erste Runde (FormuleXTest#testErsteRunde*)', () => {
   });
 });
 
-describe('Formule X - Paarung weiterer Runden (FormuleXTest#testWeitereRunde*/testRematch*/testSwap*)', () => {
+describe('Formule X - Paarung weiterer Runden (FormuleXTest#testWeitereRunde*/testRematch*/testZweiterKandidat*)', () => {
   it('ohne Historie: 1vs2, 3vs4', () => {
     const byId = statsMap([['t1'], ['t2'], ['t3'], ['t4']]);
     const matches = weitereRunde(['t1', 't2', 't3', 't4'], byId);
@@ -118,10 +118,10 @@ describe('Formule X - Paarung weiterer Runden (FormuleXTest#testWeitereRunde*/te
     }
   });
 
-  it('zweiter Swap-Pfad (A,D)+(C,B) greift, wenn (A,C)+(B,D) fehlschlägt', () => {
+  it('t1 hat gegen t2 und t3 gespielt: t1vs4, übrig bleibt t2vs3', () => {
     const byId = statsMap([['t1', ['t2', 't3']], ['t2', ['t1']], ['t3', ['t1']], ['t4']]);
     const matches = weitereRunde(['t1', 't2', 't3', 't4'], byId);
-    expect(matches).toEqual([{ teamA: ['t1'], teamB: ['t4'] }, { teamA: ['t3'], teamB: ['t2'] }]);
+    expect(matches).toEqual([{ teamA: ['t1'], teamB: ['t4'] }, { teamA: ['t2'], teamB: ['t3'] }]);
   });
 
   it('2 Teams ohne Rematch: eine Paarung', () => {
@@ -129,7 +129,7 @@ describe('Formule X - Paarung weiterer Runden (FormuleXTest#testWeitereRunde*/te
     expect(weitereRunde(['t1', 't2'], byId)).toEqual([{ teamA: ['t1'], teamB: ['t2'] }]);
   });
 
-  it('2 Teams mit Rematch: kein Swap möglich, Rematch wird akzeptiert (Fail-Safe)', () => {
+  it('2 Teams mit Rematch: unvermeidbar, Rematch wird akzeptiert', () => {
     const byId = statsMap([['t1', ['t2']], ['t2', ['t1']]]);
     expect(weitereRunde(['t1', 't2'], byId)).toEqual([{ teamA: ['t1'], teamB: ['t2'] }]);
   });
@@ -139,6 +139,68 @@ describe('Formule X - Paarung weiterer Runden (FormuleXTest#testWeitereRunde*/te
       ['t1', ['t2', 't3', 't4']], ['t2', ['t1', 't3', 't4']], ['t3', ['t1', 't2', 't4']], ['t4', ['t1', 't2', 't3']],
     ]);
     expect(weitereRunde(['t1', 't2', 't3', 't4'], byId)).toHaveLength(2);
+  });
+});
+
+// Kleinstmögliche Zahl an Gegnerwiederholungen per vollständiger Suche (nur für kleine Teamzahlen).
+function minimaleWiederholungen(ids, played) {
+  if (!ids.length) return 0;
+  const [first, ...rest] = ids;
+  let minimum = Infinity;
+  for (const opponent of rest) {
+    const cost = (played(first, opponent) ? 1 : 0) + minimaleWiederholungen(rest.filter((id) => id !== opponent), played);
+    minimum = Math.min(minimum, cost);
+  }
+  return minimum;
+}
+
+// Reproduzierbarer Zufall (mulberry32) für den Historien-Test.
+function zufall(seed) {
+  let state = seed;
+  return () => {
+    state = (state + 0x6D2B79F5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+describe('Formule X - Wiederholungen nur, wenn unvermeidbar', () => {
+  it('letztes Paar hat schon gespielt: 3vs5 und 4vs6 statt Wiederholung 5vs6', () => {
+    const byId = statsMap([['t1'], ['t2'], ['t3'], ['t4'], ['t5', ['t6']], ['t6', ['t5']]]);
+    const matches = weitereRunde(['t1', 't2', 't3', 't4', 't5', 't6'], byId);
+    expect(matches).toEqual([
+      { teamA: ['t1'], teamB: ['t2'] }, { teamA: ['t3'], teamB: ['t5'] }, { teamA: ['t4'], teamB: ['t6'] },
+    ]);
+  });
+
+  it('zufällige Historien: nie mehr Wiederholungen als nötig', () => {
+    const random = zufall(20261029);
+    for (let fall = 0; fall < 400; fall++) {
+      const anzahl = 4 + 2 * Math.floor(random() * 4);
+      const runden = 1 + Math.floor(random() * (anzahl - 2));
+      const ids = teamsOf(anzahl).map((team) => team.id);
+      const opponents = new Map(ids.map((id) => [id, []]));
+      for (let runde = 0; runde < runden; runde++) {
+        const reihe = [...ids];
+        for (let index = reihe.length - 1; index > 0; index--) {
+          const swap = Math.floor(random() * (index + 1));
+          [reihe[index], reihe[swap]] = [reihe[swap], reihe[index]];
+        }
+        for (let index = 0; index + 1 < reihe.length; index += 2) {
+          opponents.get(reihe[index]).push(reihe[index + 1]);
+          opponents.get(reihe[index + 1]).push(reihe[index]);
+        }
+      }
+      const byId = statsMap(ids.map((id) => [id, opponents.get(id)]));
+      const played = (a, b) => byId.get(a).opponents.has(b);
+
+      const matches = weitereRunde(ids, byId);
+
+      expect(matches.flatMap((match) => [...match.teamA, ...match.teamB]).sort(), `Fall ${fall}`).toEqual([...ids].sort());
+      const wiederholungen = matches.filter((match) => played(match.teamA[0], match.teamB[0])).length;
+      expect(wiederholungen, `Fall ${fall}: ${anzahl} Teams nach ${runden} Runden`).toBe(minimaleWiederholungen(ids, played));
+    }
   });
 });
 

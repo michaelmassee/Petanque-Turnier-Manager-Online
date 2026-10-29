@@ -1,8 +1,9 @@
 // Formule X Regeln entsprechend dem Hauptprojekt (algorithmen/formulex/FormuleX.java,
 // FormuleXRanglisteRechner.java, algorithmen/liga/Direktvergleich.java): freie Losung in
-// Runde 1, danach Paarung nach Wertungspunkten mit Swap-Rematch-Vermeidung, Freilos an
+// Runde 1, danach Paarung nach Wertungspunkten mit minimalen Gegnerwiederholungen, Freilos an
 // das schlechtest platzierte Team ohne bisheriges Freilos.
 import { pairingsPerRound } from './util.js';
+import { pairOrdered } from './matching.js';
 import { FIXED_TEAM_REGISTRATION_TYPES } from './melee.js';
 
 const NO_SHOW_SCORE = { winner: 13, loser: 0 };
@@ -15,8 +16,6 @@ function shuffle(items) {
   }
   return result;
 }
-
-function pairKey(a, b) { return a < b ? `${a}|${b}` : `${b}|${a}`; }
 
 // Siegaufschlag hängt von den BISHER GESPIELTEN Runden ab (eine feste Gesamtrundenzahl gibt
 // es nicht, die Turnierleitung beendet das Turnier selbst) - er wird bei jeder Neuberechnung
@@ -127,44 +126,10 @@ export function findByeTeam(ordered, statsById) {
   return ordered[ordered.length - 1];
 }
 
-// Paart linear nach Rangliste mit Swap-Backtracking bei Rematch (paareLinearMitSwap):
-// 1vs2, 3vs4, ...; bei Rematch wird mit dem nächsten unverbrauchten Paar getauscht (zwei
-// Varianten), sonst wird das Rematch als Fail-Safe akzeptiert.
-export function pairLinearWithSwap(ordered, statsById) {
-  const played = (teamA, teamB) => statsById.get(teamA.id).opponents.has(teamB.id);
-  const matches = [];
-  const processed = new Set();
-
-  for (let i = 0; i < ordered.length - 1; i += 2) {
-    if (processed.has(i)) continue;
-    const teamA = ordered[i]; const teamB = ordered[i + 1];
-
-    if (!played(teamA, teamB)) {
-      matches.push({ teamA: [teamA.id], teamB: [teamB.id] });
-      continue;
-    }
-
-    let swapped = false;
-    for (let j = i + 2; j + 1 < ordered.length; j += 2) {
-      if (processed.has(j)) continue;
-      const teamC = ordered[j]; const teamD = ordered[j + 1];
-
-      if (!played(teamA, teamC) && !played(teamB, teamD)) {
-        matches.push({ teamA: [teamA.id], teamB: [teamC.id] });
-        matches.push({ teamA: [teamB.id], teamB: [teamD.id] });
-        processed.add(j); swapped = true; break;
-      }
-      if (!played(teamA, teamD) && !played(teamC, teamB)) {
-        matches.push({ teamA: [teamA.id], teamB: [teamD.id] });
-        matches.push({ teamA: [teamC.id], teamB: [teamB.id] });
-        processed.add(j); swapped = true; break;
-      }
-    }
-    if (!swapped) {
-      matches.push({ teamA: [teamA.id], teamB: [teamB.id] });
-    }
-  }
-  return matches;
+// Paart nach Rangliste 1vs2, 3vs4, ... (paareNachRangliste); Gegnerwiederholungen nur, wenn sie unvermeidbar
+// sind, und dann so wenige wie möglich (siehe matching.js).
+export function pairByRanking(ordered, statsById) {
+  return pairOrdered(ordered, (teamA, teamB) => statsById.get(teamA.id).opponents.has(teamB.id));
 }
 
 // Runde 1 (ersteRunde): Teams zufällig mischen, in zwei Hälften teilen, paarweise gegeneinander;
@@ -208,7 +173,7 @@ export function generateRound(teams, history) {
     byeMatch = { teamA: [byeTeam.id], teamB: [] };
   }
 
-  const matches = pairLinearWithSwap(ordered, statsById);
+  const matches = pairByRanking(ordered, statsById);
   if (byeMatch) matches.push(byeMatch);
   return { matches };
 }
