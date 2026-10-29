@@ -10507,9 +10507,10 @@ function toPublicClub(row, user) {
 
 // GET /api/clubs lädt jeder App-Start (Filter, Vereinsvorschläge) und liest dabei alle Vereine und Plätze;
 // GET /api/places ohne Suchbegriff (Plätze-Seite, Spielort-Auswahl) zählt zusätzlich die Likes je Platz.
-// Beide liegen im Cloudflare-Cache (pro Rechenzentrum) unter einem Schlüssel mit cache_versions.places. Trigger
-// erhöhen die Version bei jeder Änderung an Vereinen, Plätzen, Likes und Mietangeboten (Migration 0137), dann
-// bauen alle Rechenzentren die Listen beim nächsten Abruf neu auf. Die Deploy-Kennung im Schlüssel sorgt dafür, dass
+// Beide liegen im Cloudflare-Cache (pro Rechenzentrum) unter einem Schlüssel mit einer Version aus cache_versions.
+// Trigger erhöhen 'places' bei jeder Änderung an Vereinen, Plätzen, Likes und Mietangeboten (Migration 0137),
+// 'clubs' nur bei Name/Status von Vereinen und Zuordnung/Status/Koordinaten von Plätzen (Migration 0142); dann
+// bauen alle Rechenzentren die betroffene Liste beim nächsten Abruf neu auf. Die Deploy-Kennung im Schlüssel sorgt dafür, dass
 // ein Deploy mit geändertem Listenformat nicht alte Einträge ausliefert. Die lange Speicherdauer räumt nur auf.
 const PUBLISHED_LISTS_CACHE_SECONDS = 14 * 24 * 60 * 60;
 
@@ -10518,17 +10519,17 @@ function deployId(env) {
   return env.CF_VERSION_METADATA?.id || '';
 }
 
-async function placesCacheVersion(db) {
-  const row = await db.prepare("SELECT version FROM cache_versions WHERE name = 'places'").first();
+async function listsCacheVersion(db, versionName) {
+  const row = await db.prepare('SELECT version FROM cache_versions WHERE name = ?').bind(versionName).first();
   return Number(row?.version || 0);
 }
 
-async function placesCacheKey(db, origin, name, deploy) {
-  return new Request(`${origin}/__${name}?v=${await placesCacheVersion(db)}&deploy=${encodeURIComponent(deploy)}`);
+async function placesCacheKey(db, origin, name, deploy, versionName = 'places') {
+  return new Request(`${origin}/__${name}?v=${await listsCacheVersion(db, versionName)}&deploy=${encodeURIComponent(deploy)}`);
 }
 
 async function listPublishedClubs(db, origin, deploy) {
-  return cachedJsonResponse(await placesCacheKey(db, origin, 'published-clubs', deploy), PUBLISHED_LISTS_CACHE_SECONDS,
+  return cachedJsonResponse(await placesCacheKey(db, origin, 'published-clubs', deploy, 'clubs'), PUBLISHED_LISTS_CACHE_SECONDS,
     async () => json(await loadPublishedClubs(db)));
 }
 
@@ -10667,7 +10668,7 @@ async function assertClubEditor(db, clubId, user) {
 
 // ---------------------------------------------------------------------------------------------------------------
 // Platz mieten: Vereine bieten Hallen/Plätze stundenweise an, angemeldete Benutzer fragen an, der Verein entscheidet.
-// Die öffentliche Angebotsliste liegt wie die Vereine im Edge-Cache (Schlüssel mit cache_versions.places); Trigger
+// Die öffentliche Angebotsliste liegt wie die Plätze im Edge-Cache (Schlüssel mit cache_versions.places); Trigger
 // auf rental_offers erneuern sie bei Angebotsänderungen, Buchungen berühren sie nicht.
 // Schutz vor Spam an den Verein: offene, künftige Anfragen je Benutzer und Angebot.
 const RENTAL_MAX_OPEN_REQUESTS = 10;

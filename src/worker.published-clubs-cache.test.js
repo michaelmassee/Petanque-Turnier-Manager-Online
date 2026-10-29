@@ -1,7 +1,8 @@
 // @vitest-environment node
 // GET /api/clubs und GET /api/places (ohne Suche) lädt jeder App-Start bzw. die Plätze-Seite: Die Antwort kommt
 // aus dem Cloudflare-Cache statt bei jedem Aufruf alle Vereine und Plätze aus D1 zu lesen. Der Cache-Schlüssel
-// trägt cache_versions.places; Trigger erhöhen sie bei jeder Änderung, auch direkt per SQL (Import-Skripte).
+// trägt eine Version aus cache_versions (Vereine: 'clubs', Plätze: 'places'); Trigger erhöhen sie bei jeder
+// relevanten Änderung, auch direkt per SQL (Import-Skripte).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 import worker from './worker.js';
@@ -93,6 +94,26 @@ describe('Cache für Vereins- und Plätzeliste', () => {
 
     await vereine();
     expect(listenAbfragen()).toBe(1);
+  });
+
+  it('baut die Vereinsliste bei Änderungen ohne Einfluss auf sie nicht neu auf', async () => {
+    await vereine();
+    const response = await worker.fetch(new Request('https://ptm.test/api/places/p1/like', { method: 'POST', headers: angemeldet }), env);
+    expect(response.ok).toBe(true);
+    sql("UPDATE clubs SET description = 'Neu', logo_url = 'https://example.test/logo.png' WHERE id = 'c1'");
+    sql("UPDATE boule_places SET name = 'Umbenannt', court_count = 8 WHERE id = 'p1'");
+    sql("UPDATE users SET role = 'admin' WHERE id = 'owner'");
+
+    await vereine();
+    expect(queries.filter((statement) => /SELECT c\.id, c\.name, p\.latitude/.test(statement))).toHaveLength(1);
+  });
+
+  it('baut die Vereinsliste bei neuen Koordinaten oder einem unveröffentlichten Platz neu auf', async () => {
+    await vereine();
+    sql('UPDATE boule_places SET latitude = 51.5 WHERE id = ?', 'p1');
+    expect((await vereine())[0].locations).toEqual([{ latitude: 51.5, longitude: 9.5 }]);
+    sql("UPDATE boule_places SET status = 'pending' WHERE id = 'p1'");
+    expect((await vereine())[0].locations).toEqual([]);
   });
 
   describe('GET /api/places', () => {
