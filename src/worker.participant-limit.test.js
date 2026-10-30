@@ -187,23 +187,56 @@ describe('Teilnehmer-Limit pro Turnier', () => {
     expect(env.DB.sqlite.prepare('SELECT status FROM registrations WHERE id = ?').get(ONLINE_ID).status).toBe('cancelled');
   });
 
-  // Älterer Sync-Weg: Statusübernahme aus dem Dokument (POST …/results) darf das Limit ebenso wenig umgehen.
-  it('gilt auch für Statusübernahmen über POST /api/sync/tournaments/:id/results', async () => {
-    const ZUGANG = `ptm-api-${crypto.randomUUID()}`;
-    sql(`INSERT INTO api_keys (id, user_id, key_hash, label, status, requested_at, approved_at, created_at, updated_at)
-      VALUES ('key1', 'u1', ?, 'PTM', 'approved', '2026-01-01', '2026-01-01', '2026-01-01', '2026-01-01')`,
-    createHash('sha256').update(ZUGANG).digest('hex'));
-    bindeDokument(env.DB.sqlite, 't1');
-    vorhanden('a', 'confirmed');
-    vorhanden('b', 'confirmed');
-    vorhanden('alt', 'cancelled');
-    const request = syncAnfrage('POST', '/api/sync/tournaments/t1/results', { registrations: [{ id: 'alt', status: 'confirmed' }] });
-    request.headers.set('Authorization', `Bearer ${ZUGANG}`);
-    const antwort = await worker.fetch(request, env);
+  describe('Statusübernahme aus dem Dokument (POST /api/sync/tournaments/:id/results)', () => {
+    let zugang;
+    const uebernehmen = (registrations, protocol) => {
+      const request = syncAnfrage('POST', '/api/sync/tournaments/t1/results', { registrations },
+        protocol === 2 ? { counter: 1, requestId: crypto.randomUUID() } : {});
+      request.headers.set('Authorization', `Bearer ${zugang}`);
+      return worker.fetch(request, env);
+    };
 
-    expect(antwort.status).toBe(409);
-    expect((await antwort.json()).details).toEqual({ code: 'participant_limit_reached' });
-    expect(env.DB.sqlite.prepare("SELECT status FROM registrations WHERE id = 'alt'").get().status).toBe('cancelled');
+    beforeEach(() => {
+      zugang = `ptm-api-${crypto.randomUUID()}`;
+      sql(`INSERT INTO api_keys (id, user_id, key_hash, label, status, requested_at, approved_at, created_at, updated_at)
+        VALUES ('key1', 'u1', ?, 'PTM', 'approved', '2026-01-01', '2026-01-01', '2026-01-01', '2026-01-01')`,
+      createHash('sha256').update(zugang).digest('hex'));
+    });
+
+    // Ein Auftrag mit einer blockierten Wiederaufnahme speichert nichts halb (Trigger rollt den ganzen Batch zurück).
+    it.each([1, 2])('lehnt eine Wiederaufnahme über der Grenze ab und speichert auch den Rest nicht (Protokoll %i)', async (protocol) => {
+      bindeDokument(env.DB.sqlite, 't1', { protocol });
+      const hubCalls = [];
+      env.TOURNAMENT_LIVE_HUB = { idFromName: (name) => name, get: (id) => ({ fetch: async () => { hubCalls.push(id); return new Response(null, { status: 204 }); } }) };
+      vorhanden('a', 'confirmed');
+      vorhanden('b', 'confirmed');
+      vorhanden('alt', 'cancelled');
+      const vorher = env.DB.sqlite.prepare("SELECT participation, seeding_position, execution_revision FROM registrations WHERE id = 'a'").get();
+
+      const antwort = await uebernehmen([
+        { id: 'a', participation: 'active', seedingPosition: 3 },
+        { id: 'alt', status: 'confirmed' },
+      ], protocol);
+
+      expect(antwort.status).toBe(409);
+      expect((await antwort.json()).details).toEqual({ code: 'participant_limit_reached' });
+      expect(env.DB.sqlite.prepare("SELECT status FROM registrations WHERE id = 'alt'").get().status).toBe('cancelled');
+      expect(env.DB.sqlite.prepare("SELECT participation, seeding_position, execution_revision FROM registrations WHERE id = 'a'").get()).toEqual(vorher);
+      expect(hubCalls).toEqual([]);
+    });
+
+    // D1 erlaubt höchstens 100 gebundene Parameter; die ID-Listen gehen deshalb als JSON in die Abfragen.
+    it.each([1, 2])('verarbeitet einen Auftrag mit 60 Statusübernahmen (Protokoll %i)', async (protocol) => {
+      bindeDokument(env.DB.sqlite, 't1', { protocol });
+      sql("UPDATE users SET participant_limit = 70 WHERE id = 'u1'");
+      const ids = Array.from({ length: 60 }, (_, index) => `m${index}`);
+      ids.forEach((id) => vorhanden(id, 'confirmed'));
+
+      const antwort = await uebernehmen(ids.map((id) => ({ id, status: 'confirmed', participation: 'active', expectedExecutionRevision: 1 })), protocol);
+
+      expect(antwort.status).toBe(200);
+      expect((await antwort.json()).updatedCount).toBe(60);
+    });
   });
 
   // Das Token steht im Body; offene Anzeigen sollen die Abmeldung trotzdem sofort sehen.

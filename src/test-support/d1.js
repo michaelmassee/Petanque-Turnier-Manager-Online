@@ -15,6 +15,9 @@ export function migrationSql(name) {
 
 // vorBatch(fn): fn(sqlite) läuft einmalig direkt vor dem nächsten batch(), außerhalb von dessen Transaktion.
 // Damit lässt sich eine parallele Änderung zwischen Vorab-Lesen und Batch simulieren (Race-Tests).
+// https://developers.cloudflare.com/d1/platform/limits/
+export const D1_MAX_BOUND_PARAMETERS = 100;
+
 export function d1MitSchema() {
   const sqlite = new DatabaseSync(':memory:');
   readdirSync(migrationsDir).filter((name) => name.endsWith('.sql')).sort()
@@ -38,8 +41,14 @@ export function d1MitSchema() {
     vorBatch(fn) { vorNaechstemBatch = fn; },
     prepare(sql) {
       // Wie bei D1 liefert bind() ein neues Statement; dasselbe vorbereitete Statement darf mehrfach gebunden werden.
+      // D1 erlaubt höchstens 100 gebundene Parameter je Abfrage (SQLite selbst viel mehr) - wie dort ein Fehler.
       const statement = (params) => ({
-        bind: (...values) => statement(values),
+        bind: (...values) => {
+          if (values.length > D1_MAX_BOUND_PARAMETERS) {
+            throw new Error(`D1_ERROR: too many SQL variables (${values.length} > ${D1_MAX_BOUND_PARAMETERS})`);
+          }
+          return statement(values);
+        },
         run: async () => ausfuehren(sql, params),
         first: async (spalte) => {
           const zeile = sqlite.prepare(sql).get(...params) ?? null;
