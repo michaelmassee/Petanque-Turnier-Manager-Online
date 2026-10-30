@@ -21,8 +21,8 @@ describe('Schnellstart-Vorlagen', () => {
   });
 
   it('benennt das Turnier nach Vorlage und Datum und übernimmt den Profilverein als Veranstalter und Ort', () => {
-    const payload = quickStartPayload(quickStartTemplates('doublette')[0], { currentUser: user, today: '2026-10-28', fallbackLocation: 'Schnellstart' });
-    expect(payload).toMatchObject({ name: 'Supermêlée Doublette 2026-10-28', location: 'BC Linden', club: 'BC Linden', organizerClubId: 'linden', contactName: 'Erste Person', contactEmail: 'erste@example.org' });
+    const payload = quickStartPayload(quickStartTemplates('doublette')[0], { currentUser: user, today: '2026-10-28', fallbackLocation: 'Schnellstart', language: 'de' });
+    expect(payload).toMatchObject({ name: 'Supermêlée Doublette 28.10.2026', location: 'BC Linden', club: 'BC Linden', organizerClubId: 'linden', contactName: 'Erste Person', contactEmail: 'erste@example.org' });
   });
 
   it('setzt als Startzeit die aktuelle Uhrzeit, abgerundet auf die vergangenen 5 Minuten', () => {

@@ -49,7 +49,7 @@ describe('Schnellstart', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Jeder gegen Jeden' }));
 
     await waitFor(() => expect(authenticatedApi).toHaveBeenCalledTimes(2));
-    expect(JSON.parse(authenticatedApi.mock.calls[0][1].body)).toMatchObject({ type: 'jeder_gegen_jeden', formation: 'tete', registrationType: 'forme', name: expect.stringMatching(/^Jeder gegen Jeden Tête \d{4}-\d{2}-\d{2}$/) });
+    expect(JSON.parse(authenticatedApi.mock.calls[0][1].body)).toMatchObject({ type: 'jeder_gegen_jeden', formation: 'tete', registrationType: 'forme', name: expect.stringMatching(/^Jeder gegen Jeden Tête \d{2}\.\d{2}\.\d{4}$/) });
   });
 
   it('zeigt einen Fehler beim Anlegen sichtbar an', async () => {

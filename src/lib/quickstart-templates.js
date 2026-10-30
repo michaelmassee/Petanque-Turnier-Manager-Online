@@ -1,5 +1,6 @@
 import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from './constants.js';
 import { labelFor, tournamentPayload } from './domain.js';
+import { formatDate } from './format.js';
 
 // Schnellstart: erst die Formation, dann das System wählen – nur online spielbare Systeme (siehe PAIRING_STRATEGIES).
 // Supermêlée verlangt im Worker das Turniersystem Rangliste und gibt es nicht als Tête.
@@ -40,15 +41,15 @@ export function quickStartTime(date = new Date()) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-// Schnellstart-Turniere sind privat: Name aus Vorlage und Datum, Veranstalter und Ort aus dem Profilverein.
-export function quickStartPayload(template, { currentUser, today = localIsoDate(), startTime = quickStartTime(), fallbackLocation }) {
+// Schnellstart-Turniere sind privat: Name aus Vorlage und Datum (im Format der Sprache, wie unter dem Titel), Veranstalter und Ort aus dem Profilverein.
+export function quickStartPayload(template, { currentUser, today = localIsoDate(), startTime = quickStartTime(), fallbackLocation, language }) {
   const club = (currentUser?.club || '').trim();
   const payload = tournamentPayload({
     ...EMPTY_TOURNAMENT_FORM,
     type: template.type,
     formation: template.formation,
     registrationType: template.registrationType,
-    name: `${quickStartTemplateLabel(template)} ${today}`,
+    name: `${quickStartTemplateLabel(template)} ${formatDate(today, language)}`,
     date: today,
     startTime,
     location: club.length >= 2 ? club : fallbackLocation,

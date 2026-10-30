@@ -7,9 +7,10 @@ import { labelFor } from '../lib/domain.js';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { QUICK_START_FORMATIONS, quickStartPayload, quickStartSystemLabel, quickStartTemplates } from '../lib/quickstart-templates.js';
 
-// Am Handy bricht „2026-10-29“ sonst am Bindestrich um; das Datum am Namensende bleibt zusammen.
+// Am Handy bricht „2026-10-29“ bzw. „10/29/2026“ sonst am Bindestrich/Schrägstrich um; das Datum am Namensende
+// bleibt zusammen.
 function nameWithUnbrokenDate(name) {
-  const match = /^(.+) (\d{4}-\d{2}-\d{2})$/.exec(name || '');
+  const match = /^(.+) (\d[\d./-]{4,10}\d)$/.exec(name || '');
   if (!match) return name;
   return <>{match[1]} <span className="nowrap">{match[2]}</span></>;
 }
@@ -17,7 +18,7 @@ function nameWithUnbrokenDate(name) {
 // Schnellstart: Formation und System wählen, das private Turnier wird angelegt und sofort gestartet. Danach geht es in
 // „Turnier starten“ weiter (Spieler nachmelden, Runde auslosen).
 export default function TournamentQuickStart({ currentUser, tournaments = [], onStarted, onCreated, onOpen }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [formation, setFormation] = useState('doublette');
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
@@ -37,7 +38,7 @@ export default function TournamentQuickStart({ currentUser, tournaments = [], on
     setBusyId(template.id);
     let tournamentId = '';
     try {
-      const payload = quickStartPayload(template, { currentUser, fallbackLocation: t('Schnellstart') });
+      const payload = quickStartPayload(template, { currentUser, fallbackLocation: t('Schnellstart'), language: i18n.language });
       const { tournament } = await authenticatedApi('/api/tournaments', { method: 'POST', body: JSON.stringify(payload) });
       tournamentId = tournament.id;
       await authenticatedApi(`/api/tournaments/${tournamentId}/start`, { method: 'POST' });
