@@ -34,8 +34,14 @@ export function localIsoDate(date = new Date()) {
   return date.toLocaleDateString('sv');
 }
 
+// Startzeit (HH:MM, lokal): die aktuelle Uhrzeit, abgerundet auf die vergangenen 5 Minuten (13:47 → 13:45).
+export function quickStartTime(date = new Date()) {
+  const minutes = Math.floor(date.getMinutes() / 5) * 5;
+  return `${String(date.getHours()).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
 // Schnellstart-Turniere sind privat: Name aus Vorlage und Datum, Veranstalter und Ort aus dem Profilverein.
-export function quickStartPayload(template, { currentUser, today = localIsoDate(), fallbackLocation }) {
+export function quickStartPayload(template, { currentUser, today = localIsoDate(), startTime = quickStartTime(), fallbackLocation }) {
   const club = (currentUser?.club || '').trim();
   const payload = tournamentPayload({
     ...EMPTY_TOURNAMENT_FORM,
@@ -44,6 +50,7 @@ export function quickStartPayload(template, { currentUser, today = localIsoDate(
     registrationType: template.registrationType,
     name: `${quickStartTemplateLabel(template)} ${today}`,
     date: today,
+    startTime,
     location: club.length >= 2 ? club : fallbackLocation,
     club,
     organizerClubId: currentUser?.clubId || null,

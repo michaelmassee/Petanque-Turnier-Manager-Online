@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import './i18next-config.js';
 import { assertTournamentSystemAllowed, normalizeTournamentInput } from '../worker-core.js';
 import { isOnlinePlayable } from './pairing/index.js';
-import { localIsoDate, QUICK_START_FORMATIONS, quickStartPayload, quickStartSystemLabel, quickStartTemplateLabel, quickStartTemplates } from './quickstart-templates.js';
+import { localIsoDate, QUICK_START_FORMATIONS, quickStartPayload, quickStartSystemLabel, quickStartTemplateLabel, quickStartTemplates, quickStartTime } from './quickstart-templates.js';
 
 const ALL_TEMPLATES = QUICK_START_FORMATIONS.flatMap(quickStartTemplates);
 
@@ -23,6 +23,14 @@ describe('Schnellstart-Vorlagen', () => {
   it('benennt das Turnier nach Vorlage und Datum und übernimmt den Profilverein als Veranstalter und Ort', () => {
     const payload = quickStartPayload(quickStartTemplates('doublette')[0], { currentUser: user, today: '2026-10-28', fallbackLocation: 'Schnellstart' });
     expect(payload).toMatchObject({ name: 'Supermêlée Doublette 2026-10-28', location: 'BC Linden', club: 'BC Linden', organizerClubId: 'linden', contactName: 'Erste Person', contactEmail: 'erste@example.org' });
+  });
+
+  it('setzt als Startzeit die aktuelle Uhrzeit, abgerundet auf die vergangenen 5 Minuten', () => {
+    expect(quickStartTime(new Date(2026, 9, 30, 13, 47, 59))).toBe('13:45');
+    expect(quickStartTime(new Date(2026, 9, 30, 9, 5, 0))).toBe('09:05');
+    expect(quickStartTime(new Date(2026, 9, 30, 0, 4, 0))).toBe('00:00');
+    const payload = quickStartPayload(quickStartTemplates('doublette')[0], { currentUser: user, today: '2026-10-28', startTime: '13:45', fallbackLocation: 'Schnellstart' });
+    expect(normalizeTournamentInput(payload)).toMatchObject({ date: '2026-10-28', startTime: '13:45' });
   });
 
   it('nimmt ohne Profilverein den Platzhalter als Ort', () => {
