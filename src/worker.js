@@ -2775,6 +2775,19 @@ export default {
         return await setTournamentMatchResult(request, env.DB, tournament, tournamentMatchResultMatch[2]);
       }
 
+      // „Gesehen“ der Turnierleitung: alle offenen Spielermeldungen bestätigen, erst dann sind sie öffentlich (E-27).
+      // Der zentrale Schreibpfad unten leert danach den Snapshot und meldet offenen Seiten „changed“.
+      const resultReportsConfirmMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/result-reports\/confirm$/);
+      if (resultReportsConfirmMatch && request.method === 'POST') {
+        const tournament = await getTournamentById(env.DB, resultReportsConfirmMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await requireSession(request, env.DB);
+        assertCanManageTournament(tournament, session.user);
+        await env.DB.prepare('UPDATE tournament_matches SET result_report_pending = 0 WHERE tournament_id = ? AND result_report_pending = 1')
+          .bind(tournament.id).run();
+        return await listTournamentRounds(env.DB, tournament.id);
+      }
+
       const tournamentRankingMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/ranking$/);
       if (tournamentRankingMatch && request.method === 'GET') {
         const tournament = await getTournamentById(env.DB, tournamentRankingMatch[1]);
@@ -7358,7 +7371,20 @@ function toPublicMatch(row, playersById) {
     stageLabel: row.stage_label || null,
     court: row.court || null,
     reportedBy: row.result_reported_by ? (playersById.get(row.result_reported_by) || { id: row.result_reported_by, firstName: '?', lastName: '' }) : null,
+    reportPending: Number(row.result_report_pending || 0) === 1,
   };
+}
+
+// Spielermeldung, die die Turnierleitung noch nicht bestätigt hat (E-27). Nach Turnierende gilt sie als bestätigt.
+function isUnconfirmedReport(row, tournament) {
+  return Number(row.result_report_pending || 0) === 1 && tournament.status !== 'finished';
+}
+
+// Öffentliche Sicht auf eine Partie: Eine unbestätigte Meldung zählt noch nicht, die Partie ist dort offen.
+function withoutUnconfirmedReport(row, tournament) {
+  return isUnconfirmedReport(row, tournament)
+    ? { ...row, score_a: null, score_b: null, no_show: null, result_reported_by: null, result_report_pending: 0 }
+    : row;
 }
 
 // activeIds (optional) sammelt im selben Lesevorgang die bestätigten, aktiven Meldungen (Supermêlée-Fehlrunden).
@@ -7539,16 +7565,23 @@ async function listTournamentRounds(db, tournamentId) {
   return json(await loadTournamentRounds(db, tournamentId));
 }
 
-async function loadTournamentRounds(db, tournamentId) {
+// publicTournament: öffentliche Sicht (Turnierseite, Live-Ansichten) ohne unbestätigte Spielermeldungen; diese stehen
+// dann getrennt in pendingReports (Registrierungs-IDs und Ergebnis), damit die beteiligten Teams ihre Meldung sehen.
+async function loadTournamentRounds(db, tournamentId, { publicTournament = null } = {}) {
   const roundsResult = await db.prepare('SELECT * FROM tournament_rounds WHERE tournament_id = ? ORDER BY round_number ASC').bind(tournamentId).all();
   const matchesResult = await db.prepare('SELECT * FROM tournament_matches WHERE tournament_id = ? ORDER BY created_at ASC, match_index ASC').bind(tournamentId).all();
   const teamsResult = await db.prepare('SELECT id, member_registration_ids, seed_position FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id').bind(tournamentId).all();
   const playersById = await getPlayersById(db, tournamentId);
 
   const matchesByRound = new Map();
+  const pendingReports = [];
   for (const row of matchesResult.results) {
+    if (publicTournament && isUnconfirmedReport(row, publicTournament)) {
+      pendingReports.push({ matchId: row.id, teamA: parseTeamIds(row.team_a_registration_ids), teamB: parseTeamIds(row.team_b_registration_ids),
+        scoreA: row.score_a, scoreB: row.score_b });
+    }
     const list = matchesByRound.get(row.round_id) || [];
-    list.push(toPublicMatch(row, playersById));
+    list.push(toPublicMatch(publicTournament ? withoutUnconfirmedReport(row, publicTournament) : row, playersById));
     matchesByRound.set(row.round_id, list);
   }
 
@@ -7559,6 +7592,7 @@ async function loadTournamentRounds(db, tournamentId) {
       roundNumber: round.round_number,
       matches: matchesByRound.get(round.id) || [],
     })),
+    ...(publicTournament ? { pendingReports } : {}),
   };
 }
 
@@ -7723,6 +7757,8 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
           VALUES (?, ?, ?, ?, ?, ?)`).bind(team.id, tournament.id, JSON.stringify(team.members), team.seedPosition, team.bracketGroup || null, team.createdAt)),
     ] : []),
     db.prepare('INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES (?, ?, ?, ?)').bind(roundId, tournament.id, roundNumber, now),
+    // Wer die nächste Runde startet, hat die Ergebnisse geprüft: offene Spielermeldungen gelten als bestätigt.
+    db.prepare('UPDATE tournament_matches SET result_report_pending = 0 WHERE tournament_id = ? AND result_report_pending = 1').bind(tournament.id),
   ];
   matches.forEach((match, matchIndex) => {
     const teamA = usesFixedTeams ? teamsById.get(match.teamA[0]) : null;
@@ -7784,7 +7820,8 @@ export async function setTournamentMatchResult(request, db, tournament, matchId)
   if (!noShow && scoreA === scoreB) throw new HttpError(400, 'Ungültiges Ergebnis');
   // Only replace the exact result that the organizer saw and confirmed. A player
   // or another organizer can save between the SELECT and UPDATE.
-  const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = ?, result_reported_by = NULL, updated_at = ?
+  const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = ?, result_reported_by = NULL,
+        result_report_pending = 0, updated_at = ?
       WHERE id = ? AND tournament_id = ? AND score_a IS ? AND score_b IS ? AND no_show IS ?`)
     .bind(scoreA, scoreB, noShow, new Date().toISOString(), matchId, tournament.id, expected.scoreA, expected.scoreB, expected.noShow).run();
   if (!saved.meta.changes) {
@@ -7818,7 +7855,8 @@ export async function setTournamentRoundResults(request, db, tournament, roundId
     if (expected.noShow !== null && expected.noShow !== 'a' && expected.noShow !== 'b') throw new HttpError(400, 'Ungültige Rundenergebnisse');
     return { ...entry, scoreA, scoreB, expected };
   });
-  const saved = await db.batch(entries.map((entry) => db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, result_reported_by = NULL, updated_at = ?
+  const saved = await db.batch(entries.map((entry) => db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, result_reported_by = NULL,
+        result_report_pending = 0, updated_at = ?
       WHERE id = ? AND tournament_id = ? AND round_id = ? AND score_a IS ? AND score_b IS ? AND no_show IS ?
         AND ((score_a IS NULL AND score_b IS NULL AND no_show IS NULL) OR ? = 1)`)
     .bind(entry.scoreA, entry.scoreB, now, entry.matchId, tournament.id, roundId, entry.expected.scoreA, entry.expected.scoreB, entry.expected.noShow, entry.confirmOverwrite === true ? 1 : 0)));
@@ -7899,7 +7937,9 @@ async function reportLiveMatchResult(request, env, registration, reporterUserId)
   assertWinnerReports(ownScore, opponentScore);
   const scoreA = Number(match.in_a) === 1 ? ownScore : opponentScore;
   const scoreB = Number(match.in_a) === 1 ? opponentScore : ownScore;
-  const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, result_reported_by = ?, updated_at = ?
+  // Öffentlich (Turnierseite, Rangliste, Live-Ansichten) erst nach Bestätigung durch die Turnierleitung (E-27).
+  const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, result_reported_by = ?,
+        result_report_pending = 1, updated_at = ?
       WHERE id = ? AND score_a IS NULL AND score_b IS NULL AND no_show IS NULL`)
     .bind(scoreA, scoreB, registration.id, new Date().toISOString(), match.id).run();
   if (!saved.meta.changes) await throwNoOpenMatch(db, tournament.id, registration.id);
@@ -7981,6 +8021,17 @@ export async function currentDocumentResultReport(db, tournament, registrationId
     opponentScore: inA ? row.score_b : row.score_a,
     status: row.status,
   };
+}
+
+/**
+ * Eigene, noch nicht von der Turnierleitung bestätigte Meldung eines online geführten Turniers (E-27), aus Sicht der
+ * Anmeldung. Kommt aus dem Turnier-Snapshot, also ohne zusätzliche Abfrage im Polling-Pfad.
+ */
+export function pendingOwnResultReport(pendingReports, registrationId) {
+  const report = (pendingReports || []).find((entry) => entry.teamA.includes(registrationId) || entry.teamB.includes(registrationId));
+  if (!report) return null;
+  const inA = report.teamA.includes(registrationId);
+  return { ownScore: inA ? report.scoreA : report.scoreB, opponentScore: inA ? report.scoreB : report.scoreA, status: 'open' };
 }
 
 /** Offene Meldungen für das verbundene Dokument; leer, solange Spieler keine Ergebnisse melden dürfen. */
@@ -8187,10 +8238,12 @@ export async function computeTournamentRanking(db, tournament) {
   if (Number(tournament.desktop_execution || 0) === 1 || (isDocumentBound(tournament) && tournament.desktop_ranking_json)) {
     return desktopRankingSnapshot(db, tournament);
   }
-  const matchesResult = await db
-    .prepare('SELECT round_id, team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, no_show FROM tournament_matches WHERE tournament_id = ? ORDER BY created_at, match_index')
+  const matchesQuery = await db
+    .prepare('SELECT round_id, team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, no_show, result_report_pending FROM tournament_matches WHERE tournament_id = ? ORDER BY created_at, match_index')
     .bind(tournament.id)
     .all();
+  // Unbestätigte Spielermeldungen zählen erst nach „Gesehen“ der Turnierleitung (E-27).
+  const matchesResult = { results: matchesQuery.results.map((row) => withoutUnconfirmedReport(row, tournament)) };
   const matches = matchesResult.results.map((row) => ({
     teamA: parseTeamIds(row.team_a_registration_ids),
     teamB: parseTeamIds(row.team_b_registration_ids),
@@ -8331,14 +8384,15 @@ async function invalidateLiveSnapshot(origin, tournamentId) {
 }
 
 async function computeLiveSnapshot(db, tournament) {
-  const [{ rounds }, ranking] = await Promise.all([
-    loadTournamentRounds(db, tournament.id),
+  const [{ rounds, pendingReports }, ranking] = await Promise.all([
+    loadTournamentRounds(db, tournament.id, { publicTournament: tournament }),
     computeTournamentRanking(db, tournament),
   ]);
   // Vor der ersten Runde gehört die Meldeliste zur Anzeige. Sie nutzt denselben kurzen Cache
   // und dasselbe ETag wie der Spielplan; nach der ersten Runde entfällt der zusätzliche Datenabruf.
   const entries = !rounds.length && tournament.status !== 'finished' ? await loadScheduleEntries(db, tournament.id) : undefined;
-  const content = { tournament: toLiveTournament(tournament), rounds, ranking: normalizeRanking(ranking), entries };
+  // pendingReports bleibt serverseitig: Nur die beteiligten Teams sehen ihre Meldung (resultReport der Live-Antwort).
+  const content = { tournament: toLiveTournament(tournament), rounds, ranking: normalizeRanking(ranking), entries, pendingReports };
   const version = (await sha256Hex(JSON.stringify(content))).slice(0, 16);
   return { ...content, version };
 }
@@ -8452,7 +8506,8 @@ export async function buildLiveResponse(request, db, registration) {
     incomplete: isIncompleteTeam(tournament, registration),
     meleeTeammates: await liveMeleeTeammates(db, tournament.id, registration.id),
     // Bei Turnieren aus dem Dokument: eigene Meldung der aktuellen Runde, bis die Turnierleitung entschieden hat.
-    resultReport: await currentDocumentResultReport(db, tournament, registration.id),
+    resultReport: await currentDocumentResultReport(db, tournament, registration.id)
+      || pendingOwnResultReport(snapshot.pendingReports, registration.id),
   };
   // Stand der Daten aus dem Turnierdokument, damit ein Netzausfall in PTM nicht als falsche Auslosung wirkt (KP-12).
   const dataAsOf = Number(tournament.document_managed || 0) === 1 ? tournament.last_sync_write_at || null : null;

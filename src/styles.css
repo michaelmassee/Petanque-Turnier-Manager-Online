@@ -4460,6 +4460,12 @@ details[open] > .play-round-summary::before {
   font-weight: 700;
 }
 
+.play-report-banner-hint {
+  display: block;
+  margin-top: 2px;
+  font-weight: 400;
+}
+
 .play-round > .play-report-banner {
   margin-inline: 16px;
 }
@@ -4838,6 +4844,12 @@ details[open] > .play-round-summary::before {
 
 .live-report-login .hint {
   margin: 0;
+}
+
+/* Turnierseite/Anzeige: PTM-Logo in der Aktualisierungszeile unten rechts. */
+.display-brand-logo {
+  height: 2.4em;
+  width: auto;
 }
 
 /* Sofort-Aktualisierung verbunden: grüner Punkt statt Uhrzeit und Countdown. */

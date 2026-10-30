@@ -27,6 +27,16 @@ describe('Aktuelle Runde neu auslosen', () => {
     }
   });
 
+  // Wer die nächste Runde startet, hat die Ergebnisse geprüft: unbestätigte Spielermeldungen gelten dann als bestätigt (E-27).
+  it('bestätigt beim Start der nächsten Runde offene Spielermeldungen', async () => {
+    expect((await post('/api/tournaments/t1/rounds')).status).toBe(200);
+    sql("UPDATE tournament_matches SET score_a = 13, score_b = 5, result_reported_by = json_extract(team_a_registration_ids, '$[0]'), result_report_pending = 1 WHERE score_a IS NULL");
+    expect(rows('SELECT COUNT(*) AS count FROM tournament_matches WHERE result_report_pending = 1')[0].count).toBe(3);
+
+    expect((await post('/api/tournaments/t1/rounds')).status).toBe(200);
+    expect(rows('SELECT COUNT(*) AS count FROM tournament_matches WHERE result_report_pending = 1')[0].count).toBe(0);
+  });
+
   it('ersetzt die aktuelle Runde mit gleicher Nummer, auch wenn nur das Freilos ein Ergebnis hat', async () => {
     expect((await post('/api/tournaments/t1/rounds')).status).toBe(200);
     const [before] = rows('SELECT id, round_number FROM tournament_rounds');

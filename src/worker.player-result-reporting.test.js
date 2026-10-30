@@ -134,6 +134,72 @@ describe('Ergebnismeldung durch Spieler', () => {
     consoleError.mockRestore();
   });
 
+  describe('Bestätigung durch die Turnierleitung (E-27)', () => {
+    const abrufen = async (path, session = 'player-session') => (await worker.fetch(new Request(`https://ptm.test${path}`, {
+      headers: { Cookie: `ptm_session=${session}` },
+    }), env)).json();
+    const spielplan = () => abrufen('/api/tournaments/t1/schedule');
+    const bestaetigen = () => worker.fetch(new Request('https://ptm.test/api/tournaments/t1/result-reports/confirm', {
+      method: 'POST', headers: { Cookie: 'ptm_session=player-session' },
+    }), env);
+    const pending = () => env.DB.sqlite.prepare("SELECT result_report_pending FROM tournament_matches WHERE id = 'match1'").get().result_report_pending;
+
+    beforeEach(async () => {
+      // Bert (Team B) meldet seinen Sieg 13:7.
+      expect((await melden('other-session', { ownScore: 13, opponentScore: 7 }, 'r2')).status).toBe(200);
+    });
+
+    it('zeigt eine unbestätigte Meldung weder im Spielplan noch in der Rangliste', async () => {
+      const { rounds, ranking } = await spielplan();
+      expect(rounds[0].matches[0]).toMatchObject({ scoreA: null, scoreB: null, reportedBy: null, reportPending: false });
+      expect(ranking.every((entry) => !entry.wins)).toBe(true);
+      expect(pending()).toBe(1);
+    });
+
+    it('zeigt sie der Turnierleitung mit Ergebnis und Kennzeichen', async () => {
+      const { rounds } = await abrufen('/api/tournaments/t1/rounds');
+      expect(rounds[0].matches[0]).toMatchObject({ scoreA: 7, scoreB: 13, reportPending: true, reportedBy: expect.objectContaining({ id: 'r2' }) });
+    });
+
+    it('zeigt beiden Teams „wartet auf Bestätigung“ aus eigener Sicht', async () => {
+      const bert = await abrufen('/api/live/registrations/r2', 'other-session');
+      expect(bert.registration.resultReport).toEqual({ ownScore: 13, opponentScore: 7, status: 'open' });
+      expect(bert.live.currentMatch).toMatchObject({ ownScore: null, opponentScore: null, outcome: 'open' });
+      const anna = await abrufen('/api/live/registrations/r1');
+      expect(anna.registration.resultReport).toEqual({ ownScore: 7, opponentScore: 13, status: 'open' });
+    });
+
+    it('veröffentlicht nach „Gesehen“', async () => {
+      const response = await bestaetigen();
+      expect(response.status).toBe(200);
+      expect((await response.json()).rounds[0].matches[0].reportPending).toBe(false);
+      expect((await spielplan()).rounds[0].matches[0]).toMatchObject({ scoreA: 7, scoreB: 13 });
+      expect((await abrufen('/api/live/registrations/r2', 'other-session')).registration.resultReport).toBeNull();
+    });
+
+    it('lässt nur die Turnierleitung bestätigen', async () => {
+      const fremd = await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/result-reports/confirm', {
+        method: 'POST', headers: { Cookie: 'ptm_session=other-session' },
+      }), env);
+      expect(fremd.status).toBe(403);
+      expect(pending()).toBe(1);
+    });
+
+    it('bestätigt, wenn die Turnierleitung das Ergebnis selbst speichert', async () => {
+      const response = await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/matches/match1/result', {
+        method: 'PUT', headers: { Cookie: 'ptm_session=player-session', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scoreA: 6, scoreB: 13, confirmOverwrite: true, expectedResult: { scoreA: 7, scoreB: 13, noShow: null } }),
+      }), env);
+      expect(response.status).toBe(200);
+      expect(pending()).toBe(0);
+    });
+
+    it('gilt nach Turnierende als bestätigt', async () => {
+      sql("UPDATE tournaments SET status = 'finished' WHERE id = 't1'");
+      expect((await spielplan()).rounds[0].matches[0]).toMatchObject({ scoreA: 7, scoreB: 13 });
+    });
+  });
+
   it('verweigert die Meldung, wenn die Turnierleitung sie nicht freigegeben hat', async () => {
     sql("UPDATE tournaments SET player_result_reporting_enabled = 0 WHERE id = 't1'");
     expect((await melden('player-session', { ownScore: 13, opponentScore: 7 })).status).toBe(403);

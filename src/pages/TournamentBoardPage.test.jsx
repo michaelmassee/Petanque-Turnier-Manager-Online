@@ -38,6 +38,8 @@ describe('Turnierseite', () => {
     expect(await screen.findByText('Noch keine Runde gestartet.')).toBeInTheDocument();
     expect(await screen.findByText('Mittagspause bis 13 Uhr')).toBeInTheDocument();
     expect(await screen.findByText(/^nächste Aktualisierung in [12]:\d\d$/)).toBeInTheDocument();
+    // PTM-Logo unten rechts in der Aktualisierungszeile.
+    expect(screen.getByRole('img', { name: 'Pétanque Turnier Manager Online' }).closest('.live-refresh')).not.toBeNull();
     expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/schedule', expect.anything());
     expect(screen.queryByRole('navigation', { name: 'Turnierdetails' })).not.toBeInTheDocument();
   });

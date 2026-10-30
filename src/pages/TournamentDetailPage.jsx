@@ -613,6 +613,8 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
         {!live && query.data?.status !== 'finished' && <>{' · '}<ScheduleRefreshCountdown query={query} /></>}
       </span>
       {!display && <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>}
+      {/* Turnierseite/Anzeige: PTM-Logo ganz unten rechts. */}
+      {display && <img className="display-brand-logo" src="/icons/logo.png" alt="Pétanque Turnier Manager Online" />}
     </div>
   );
 

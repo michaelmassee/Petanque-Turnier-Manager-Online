@@ -19,6 +19,7 @@ import { formatTournamentDateTime } from '../lib/format.js';
 import { meleeTeamSize } from '../lib/pairing/melee.js';
 import { RegistrationPlayerPicker } from '../components/RegistrationPlayerPicker.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
+import { useTournamentLiveSocket } from '../lib/hooks.js';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
 // Systemwissen: 'minPlayers' trägt die Mindestanzahl als Zahl statt fest im Satz
@@ -215,7 +216,7 @@ function MatchRow({ match, draft, onChange, onSave, busy, isNewReport }) {
 
 // collapseDecided (laufende Runde): Partien mit gespeichertem Ergebnis wandern in ein zugeklapptes Panel, damit oben nur
 // noch die offenen stehen. Neue Spielermeldungen bleiben sichtbar, bis die Turnierleitung sie als gesehen markiert.
-function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, newReportIds = [], onReportsSeen, collapseDecided = false }) {
+function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, onConfirmReports, confirmingReports = false, collapseDecided = false }) {
   const { t } = useTranslation();
   const [drafts, setDrafts] = useState({});
   const changes = round.matches.filter((match) => drafts[match.id]).map((match) => ({
@@ -235,17 +236,21 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, n
       return next;
     });
   }
-  const newReports = round.matches.filter((match) => match.reportedBy && newReportIds.includes(match.id)).length;
-  const isCollapsed = (match) => isMatchDecided(match) && !newReportIds.includes(match.id);
+  // Unbestätigte Spielermeldungen (Server-Kennzeichen): erst nach „Gesehen“ öffentlich (E-27).
+  const newReports = round.matches.filter((match) => match.reportPending).length;
+  const isCollapsed = (match) => isMatchDecided(match) && !match.reportPending;
   const openMatches = round.matches.filter((match) => !isCollapsed(match));
   const decidedMatches = round.matches.filter(isCollapsed);
-  const matchRow = (match) => <MatchRow key={match.id} match={match} draft={drafts[match.id]} onChange={(draft) => changeDraft(match.id, draft)} onSave={onSave} busy={busy} isNewReport={newReportIds.includes(match.id)} />;
+  const matchRow = (match) => <MatchRow key={match.id} match={match} draft={drafts[match.id]} onChange={(draft) => changeDraft(match.id, draft)} onSave={onSave} busy={busy} isNewReport={match.reportPending} />;
   return (
     <>
       {newReports > 0 && (
         <div className="play-report-banner" role="status">
-          <span>{t('Neue Ergebnismeldungen von Teams: {{count}}', { count: newReports })}</span>
-          <Button variant="secondary" onClick={onReportsSeen}>{t('Gesehen')}</Button>
+          <span>
+            {t('Neue Ergebnismeldungen von Teams: {{count}}', { count: newReports })}
+            <small className="play-report-banner-hint">{t('Turnierseite und Rangliste zeigen sie erst nach „Gesehen“.')}</small>
+          </span>
+          <Button variant="secondary" disabled={busy} loading={confirmingReports} onClick={onConfirmReports}>{t('Gesehen')}</Button>
         </div>
       )}
       <div className="play-round-buttons" role="group" aria-label={t('Rundenaktionen')}>
@@ -400,21 +405,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     staleTime: 30_000,
   });
   const rounds = roundsQuery.data?.rounds || [];
-  // Neue Spielermeldungen nur im Browser erkennen: kein Polling, keine zusätzlichen Schreibzugriffe.
-  const knownReports = useRef({ tournamentId: null, ids: new Set() });
-  const [newReportIds, setNewReportIds] = useState([]);
-  useEffect(() => {
-    if (!roundsQuery.data) return;
-    const reported = new Set(roundsQuery.data.rounds.flatMap((round) => round.matches).filter((match) => match.reportedBy).map((match) => match.id));
-    const known = knownReports.current;
-    const firstLoad = known.tournamentId !== selectedTournamentId;
-    knownReports.current = { tournamentId: selectedTournamentId, ids: reported };
-    setNewReportIds((current) => {
-      const kept = firstLoad ? [] : current.filter((id) => reported.has(id));
-      const added = firstLoad ? [] : [...reported].filter((id) => !known.ids.has(id) && !kept.includes(id));
-      return added.length || kept.length !== current.length ? [...kept, ...added] : current;
-    });
-  }, [roundsQuery.data, selectedTournamentId]);
+  const [confirmingReports, setConfirmingReports] = useState(false);
   const swissTeams = roundsQuery.data?.teams || [];
   const rankingQuery = useQuery({
     // Structural query keys keep the ranking cached when a refresh changes no results.
@@ -455,6 +446,11 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     navigator.serviceWorker.addEventListener('message', refreshReported);
     return () => navigator.serviceWorker.removeEventListener('message', refreshReported);
   }, [queryClient, selectedTournamentId]);
+  // Sofort-Aktualisierung: Spielermeldungen (und Eingaben anderer Geräte) erscheinen ohne Push-Abo und ohne Polling.
+  useTournamentLiveSocket(
+    selectedTournamentId && selectedTournamentStatus === 'running' ? `/api/tournaments/${encodeURIComponent(selectedTournamentId)}/schedule/socket` : null,
+    () => queryClient.invalidateQueries({ queryKey: ['tournament-play', selectedTournamentId, 'rounds'] }, { cancelRefetch: false }),
+  );
 
   async function loadData(tournamentId) {
     await queryClient.invalidateQueries({ queryKey: ['tournament-play', tournamentId] });
@@ -713,6 +709,21 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       setError(err.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  // „Gesehen“: bestätigt alle offenen Spielermeldungen, erst dann erscheinen sie auf Turnierseite und Rangliste.
+  async function handleConfirmReports() {
+    setConfirmingReports(true);
+    setError('');
+    setMessage('');
+    try {
+      const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/result-reports/confirm`, { method: 'POST' });
+      queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, rounds: data.rounds }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setConfirmingReports(false);
     }
   }
 
@@ -1017,7 +1028,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       {currentRound && (
         <section className="panel play-current-round">
           <div className="section-title"><h2>{t('Runde')} {currentRound.roundNumber}</h2><span className={`status ${currentRoundOpen ? 'status-running' : 'registration-confirmed'}`}>{currentRoundOpen ? t('Offen') : t('Abgeschlossen')}</span></div>
-          <RoundResults key={`${selectedTournamentId}:${currentRound.id}`} round={currentRound} collapseDecided onSave={handleSaveResult} onSaveAll={handleSaveAll} onRefresh={() => roundsQuery.refetch()} busy={busy} refreshing={roundsQuery.isFetching} newReportIds={newReportIds} onReportsSeen={() => setNewReportIds([])} />
+          <RoundResults key={`${selectedTournamentId}:${currentRound.id}`} round={currentRound} collapseDecided onSave={handleSaveResult} onSaveAll={handleSaveAll} onRefresh={() => roundsQuery.refetch()} busy={busy} refreshing={roundsQuery.isFetching} onConfirmReports={handleConfirmReports} confirmingReports={confirmingReports} />
           <RoundAction />
         </section>
       )}
@@ -1030,7 +1041,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           {olderRoundsNewestFirst.map((round) => (
             <details key={`${selectedTournamentId}:${round.id}`} className="panel play-round">
               <summary className="play-round-summary"><span>{t('Runde')} {round.roundNumber}</span><span className="status registration-confirmed">{t('Abgeschlossen')}</span></summary>
-              <RoundResults round={round} onSave={handleSaveResult} onSaveAll={handleSaveAll} busy={busy} newReportIds={newReportIds} onReportsSeen={() => setNewReportIds([])} />
+              <RoundResults round={round} onSave={handleSaveResult} onSaveAll={handleSaveAll} busy={busy} onConfirmReports={handleConfirmReports} confirmingReports={confirmingReports} />
             </details>
           ))}
         </section>

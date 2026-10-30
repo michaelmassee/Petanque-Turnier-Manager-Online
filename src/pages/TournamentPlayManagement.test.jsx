@@ -2,6 +2,7 @@ import { describe, expect, it, afterEach, vi } from 'vitest';
 import { render as rtlRender, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TournamentPlayManagement from './TournamentPlayManagement.jsx';
+import { FakeWebSocket, installFakeWebSocket, latestSocket, uninstallFakeWebSocket } from '../test-support/fake-websocket.js';
 
 // Turnstile für die Namenssuche läuft in jsdom nicht; die Prüfung selbst testet RegistrationPlayerPicker.test.jsx.
 vi.mock('../lib/player-search-turnstile.js', () => ({ playerSearchTurnstileToken: vi.fn(() => Promise.resolve('turnstile-token')) }));
@@ -936,28 +937,31 @@ describe('TournamentPlayManagement', () => {
     expect(screen.getByLabelText('Punkte Team A')).toHaveValue('12');
   });
 
-  it('kennzeichnet Teammeldungen und hebt neu eingegangene Meldungen hervor', async () => {
+  it('kennzeichnet Teammeldungen und bestätigt offene Meldungen mit „Gesehen“ auf dem Server (E-27)', async () => {
     const calls = [];
     const reporter = { id: 'p4', firstName: 'Dirk', lastName: 'Demo' };
-    const second = { ...ROUND_1.matches[0], id: 'm2', scoreA: 13, scoreB: 2, reportedBy: { id: 'p1', firstName: 'Anna', lastName: 'Muster' } };
-    installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [ROUND_1.matches[0], second] }] });
+    // Schon bestätigte Meldung: nur gekennzeichnet, kein Hinweis.
+    const second = { ...ROUND_1.matches[0], id: 'm2', scoreA: 13, scoreB: 2, reportedBy: { id: 'p1', firstName: 'Anna', lastName: 'Muster' }, reportPending: false };
+    const pendingMatch = { ...ROUND_1.matches[0], scoreA: 7, scoreB: 13, reportedBy: reporter, reportPending: true };
+    installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [pendingMatch, second] }] });
+    const confirmed = { ...ROUND_1, matches: [{ ...pendingMatch, reportPending: false }, second] };
+    const baseFetch = global.fetch;
+    global.fetch = vi.fn((path, options = {}) => (path === '/api/tournaments/t1/result-reports/confirm' && options.method === 'POST'
+      ? Promise.resolve(jsonResponse({ rounds: [confirmed] })) : baseFetch(path, options)));
     render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, playerResultReportingEnabled: true }]} />);
 
-    expect(await screen.findByText('Anna Muster', { selector: 'strong' })).toBeInTheDocument();
-    expect(screen.queryByText('Neu')).not.toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-
-    installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13, reportedBy: reporter }, second] }] });
-    fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
-
+    // Auch eine schon vor dem Öffnen eingegangene, unbestätigte Meldung zählt (Kennzeichen kommt vom Server).
     const banner = await screen.findByRole('status');
     expect(banner).toHaveTextContent('Neue Ergebnismeldungen von Teams: 1');
+    expect(banner).toHaveTextContent('Turnierseite und Rangliste zeigen sie erst nach „Gesehen“.');
     expect(screen.getByText('Neu').closest('article')).toHaveClass('is-new-report', 'is-player-reported');
     expect(screen.getByText('Neu').closest('article')).toHaveTextContent('Ergebnis gemeldet von Dirk Demo');
+    expect(screen.getByText('Anna Muster', { selector: 'strong' }).closest('article')).not.toHaveClass('is-new-report');
 
     fireEvent.click(screen.getByRole('button', { name: 'Gesehen' }));
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.queryByText('Neu')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Neu')).not.toBeInTheDocument());
+    expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/result-reports/confirm', expect.objectContaining({ method: 'POST' }));
+    expect(screen.queryByText(/Neue Ergebnismeldungen/)).not.toBeInTheDocument();
     expect(screen.getByText('Dirk Demo', { selector: 'strong' }).closest('article')).toHaveClass('is-player-reported');
   });
 
@@ -981,7 +985,7 @@ describe('TournamentPlayManagement', () => {
       const roundLoads = () => calls.filter((path) => path === '/api/tournaments/t1/rounds').length;
       expect(roundLoads()).toBe(1);
 
-      installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13, reportedBy: { id: 'p4', firstName: 'Dirk', lastName: 'Demo' } }] }] });
+      installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13, reportedBy: { id: 'p4', firstName: 'Dirk', lastName: 'Demo' }, reportPending: true }] }] });
       serviceWorker.send({ type: 'tournament-result-reported', tournamentId: 'anderes-turnier' });
       serviceWorker.send({ type: 'tournament-result-reported', tournamentId: 't1' });
 
@@ -990,6 +994,28 @@ describe('TournamentPlayManagement', () => {
     } finally {
       view?.unmount();
       serviceWorker.remove();
+    }
+  });
+
+  it('lädt die Runden sofort nach, wenn der WebSocket eine Änderung meldet (z. B. Spielermeldung)', async () => {
+    installFakeWebSocket();
+    let view;
+    try {
+      const calls = [];
+      installFetchMock(calls);
+      view = render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, status: 'running', playerResultReportingEnabled: true }]} />);
+      await screen.findByLabelText('Punkte Team A');
+      const roundLoads = () => calls.filter((path) => path === '/api/tournaments/t1/rounds').length;
+      await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+      expect(latestSocket().url).toMatch(/\/api\/tournaments\/t1\/schedule\/socket$/);
+
+      installFetchMock(calls, { rounds: [{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 7, scoreB: 13, reportedBy: { id: 'p4', firstName: 'Dirk', lastName: 'Demo' }, reportPending: true }] }] });
+      act(() => { latestSocket().open(); latestSocket().receive({ type: 'changed' }); });
+      expect(await screen.findByText('Neu', {}, { timeout: 3000 })).toBeInTheDocument();
+      expect(roundLoads()).toBe(2);
+    } finally {
+      view?.unmount();
+      uninstallFakeWebSocket();
     }
   });
 
