@@ -605,6 +605,8 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
   const live = query.liveConnected && query.data?.status !== 'finished';
   const refresh = (
     <div className="live-refresh">
+      {/* Turnierseite/Anzeige: PTM-Logo unten links, Status unten rechts. */}
+      {display && <img className="display-brand-logo" src="/icons/logo.png" alt="Pétanque Turnier Manager Online" />}
       <span className="muted">
         {live
           ? <span className="live-indicator" title={t('Aktualisiert sich bei jeder Änderung sofort')}>{t('Live')}</span>
@@ -613,8 +615,6 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
         {!live && query.data?.status !== 'finished' && <>{' · '}<ScheduleRefreshCountdown query={query} /></>}
       </span>
       {!display && <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>}
-      {/* Turnierseite/Anzeige: PTM-Logo ganz unten rechts. */}
-      {display && <img className="display-brand-logo" src="/icons/logo.png" alt="Pétanque Turnier Manager Online" />}
     </div>
   );
 

@@ -4846,10 +4846,11 @@ details[open] > .play-round-summary::before {
   margin: 0;
 }
 
-/* Turnierseite/Anzeige: PTM-Logo in der Aktualisierungszeile unten rechts. */
+/* Turnierseite/Anzeige: PTM-Logo in der Aktualisierungszeile unten links; der Status bleibt rechts. */
 .display-brand-logo {
   height: 2.4em;
   width: auto;
+  margin-right: auto;
 }
 
 /* Sofort-Aktualisierung verbunden: grüner Punkt statt Uhrzeit und Countdown. */
