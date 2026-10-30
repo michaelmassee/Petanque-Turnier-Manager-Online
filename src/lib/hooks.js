@@ -103,7 +103,21 @@ export function useRoutedTournament(id, tournaments, shareToken = '') {
   return { tournament: existing || fetched, notFound: notFound && !existing };
 }
 
-const LIVE_PUSH_SECOND_REFRESH_MS = 20_000;
+const LIVE_SECOND_REFRESH_MS = 20_000;
+
+// Der Server hält die Turnier-Sicht 15 s im Cache je Rechenzentrum und löscht sie beim Schreiben nur dort, wo die
+// Turnierleitung arbeitet. Nach dem ersten Abruf holt ein zweiter den neuen Stand sicher, statt bis zum Polling zu warten.
+function createRefreshWithFollowUp(refresh) {
+  let followUp = 0;
+  return {
+    trigger() {
+      refresh();
+      window.clearTimeout(followUp);
+      followUp = window.setTimeout(refresh, LIVE_SECOND_REFRESH_MS);
+    },
+    cancel() { window.clearTimeout(followUp); },
+  };
+}
 
 /**
  * Lädt sofort neu, wenn ein Live-Push (neue Runde, Ankündigung) für dieses Turnier eintrifft, statt bis zum
@@ -115,21 +129,172 @@ export function useLivePushRefresh(tournamentId, refresh) {
   useEffect(() => {
     const serviceWorker = typeof navigator === 'undefined' ? null : navigator.serviceWorker;
     if (!tournamentId || typeof serviceWorker?.addEventListener !== 'function') return undefined;
-    let timer = 0;
+    const refresher = createRefreshWithFollowUp(() => refreshRef.current?.());
     const onMessage = (event) => {
       if (event.data?.type !== 'live-update' || event.data.tournamentId !== tournamentId) return;
-      refreshRef.current?.();
-      // Der Server hält die Turnier-Sicht 15 s im Cache je Rechenzentrum und löscht sie beim Schreiben nur dort, wo die
-      // Turnierleitung arbeitet. Ein zweiter Abruf danach holt die neue Runde sicher, statt bis zum Polling zu warten.
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => refreshRef.current?.(), LIVE_PUSH_SECOND_REFRESH_MS);
+      refresher.trigger();
     };
     serviceWorker.addEventListener('message', onMessage);
     return () => {
-      window.clearTimeout(timer);
+      refresher.cancel();
       serviceWorker.removeEventListener('message', onMessage);
     };
   }, [tournamentId]);
+}
+
+export const LIVE_SOCKET_PING_MS = 50_000;
+const LIVE_SOCKET_RETRY_MIN_MS = 2_000;
+const LIVE_SOCKET_RETRY_MAX_MS = 60_000;
+// Ohne je verbunden gewesen zu sein (z. B. kein Zugriff, Server ohne Socket) nach so vielen Versuchen beim Polling bleiben.
+const LIVE_SOCKET_MAX_FAILED_ATTEMPTS = 5;
+// Streuung, damit nicht alle offenen Seiten im selben Moment nachladen und Serien-Eingaben zu einem Abruf werden.
+const LIVE_SOCKET_REFRESH_DELAY_MIN_MS = 300;
+const LIVE_SOCKET_REFRESH_DELAY_MAX_MS = 1500;
+
+// Eine Verbindung je Pfad, auch wenn Turnierseite und eingebetteter Spielplan beide zuhören.
+const liveSocketChannels = new Map();
+
+function liveSocketUrl(path) {
+  return `${window.location.origin.replace(/^http/, 'ws')}${path}`;
+}
+
+function createLiveSocketChannel(path) {
+  const channel = { listeners: new Set(), connected: false };
+  let socket = null;
+  let stopped = false;
+  let everConnected = false;
+  let failedAttempts = 0;
+  let dropped = false;
+  let retryMs = LIVE_SOCKET_RETRY_MIN_MS;
+  let retryTimer = 0;
+  let pingTimer = 0;
+  let refreshTimer = 0;
+  const emit = (type) => channel.listeners.forEach((listener) => listener(type));
+  const setConnected = (connected) => {
+    if (channel.connected === connected) return;
+    channel.connected = connected;
+    emit('status');
+  };
+  const scheduleRefresh = () => {
+    if (refreshTimer) return;
+    const delay = LIVE_SOCKET_REFRESH_DELAY_MIN_MS + Math.random() * (LIVE_SOCKET_REFRESH_DELAY_MAX_MS - LIVE_SOCKET_REFRESH_DELAY_MIN_MS);
+    refreshTimer = window.setTimeout(() => { refreshTimer = 0; emit('refresh'); }, delay);
+  };
+  const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  const scheduleReconnect = () => {
+    if (stopped || hidden() || (!everConnected && failedAttempts >= LIVE_SOCKET_MAX_FAILED_ATTEMPTS)) return;
+    window.clearTimeout(retryTimer);
+    retryTimer = window.setTimeout(connect, retryMs * (0.75 + Math.random() * 0.5));
+    retryMs = Math.min(retryMs * 2, LIVE_SOCKET_RETRY_MAX_MS);
+  };
+  function connect() {
+    if (stopped || socket || hidden()) return;
+    let current;
+    try {
+      current = new WebSocket(liveSocketUrl(path));
+    } catch {
+      failedAttempts += 1;
+      scheduleReconnect();
+      return;
+    }
+    socket = current;
+    let opened = false;
+    current.onopen = () => {
+      opened = true;
+      everConnected = true;
+      failedAttempts = 0;
+      retryMs = LIVE_SOCKET_RETRY_MIN_MS;
+      setConnected(true);
+      window.clearInterval(pingTimer);
+      pingTimer = window.setInterval(() => { try { current.send('ping'); } catch { /* schließt gleich */ } }, LIVE_SOCKET_PING_MS);
+      // Nach einem Verbindungsabbruch kann eine Änderung verpasst worden sein.
+      if (dropped) scheduleRefresh();
+      dropped = false;
+    };
+    current.onmessage = (event) => {
+      let type = '';
+      try { type = JSON.parse(event.data)?.type || ''; } catch { type = ''; }
+      if (type === 'changed') scheduleRefresh();
+    };
+    current.onclose = (event) => {
+      if (socket !== current) return;
+      socket = null;
+      window.clearInterval(pingTimer);
+      setConnected(false);
+      if (stopped) return;
+      if (!opened) failedAttempts += 1;
+      else dropped = true;
+      // 1013: zu viele Verbindungen für dieses Turnier, die Seite bleibt beim regelmäßigen Abruf.
+      if (event.code === 1013) return;
+      scheduleReconnect();
+    };
+  }
+  const close = () => {
+    window.clearTimeout(retryTimer);
+    window.clearInterval(pingTimer);
+    const current = socket;
+    socket = null;
+    if (current) {
+      try { current.close(1000); } catch { /* bereits zu */ }
+    }
+    setConnected(false);
+  };
+  // Im Hintergrund kein Socket (Handys trennen ihn ohnehin); beim Zurückkehren lädt React Query selbst neu.
+  const onVisibility = () => {
+    if (hidden()) close();
+    else {
+      retryMs = LIVE_SOCKET_RETRY_MIN_MS;
+      connect();
+    }
+  };
+  channel.start = () => {
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility);
+    connect();
+  };
+  channel.stop = () => {
+    stopped = true;
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility);
+    window.clearTimeout(refreshTimer);
+    close();
+  };
+  return channel;
+}
+
+/**
+ * Sofort-Aktualisierung über einen WebSocket (TournamentLiveHub): Der Server meldet nur "changed", die Seite lädt
+ * dann leicht gestreut über den gewohnten Abruf (ETag) neu. path null schließt die Verbindung. Liefert, ob der Socket
+ * gerade verbunden ist – dann reicht seltenes Polling als Sicherheitsnetz.
+ */
+export function useTournamentLiveSocket(path, refresh) {
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  const [connected, setConnected] = useState(false);
+  useEffect(() => {
+    if (!path || typeof WebSocket !== 'function') return undefined;
+    let channel = liveSocketChannels.get(path);
+    if (!channel) {
+      channel = createLiveSocketChannel(path);
+      liveSocketChannels.set(path, channel);
+      channel.start();
+    }
+    const refresher = createRefreshWithFollowUp(() => refreshRef.current?.());
+    const listener = (type) => {
+      if (type === 'status') setConnected(channel.connected);
+      else if (type === 'refresh') refresher.trigger();
+    };
+    channel.listeners.add(listener);
+    setConnected(channel.connected);
+    return () => {
+      refresher.cancel();
+      channel.listeners.delete(listener);
+      setConnected(false);
+      if (!channel.listeners.size) {
+        channel.stop();
+        liveSocketChannels.delete(path);
+      }
+    };
+  }, [path]);
+  return connected;
 }
 
 // Ab hier füllt die Bildschirm-Anzeige genau den Bildschirm (siehe styles.css); darunter normaler Seitenfluss.

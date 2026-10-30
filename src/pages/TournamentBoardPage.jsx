@@ -6,8 +6,7 @@ import { formatDate, formatWeekdayShort } from '../lib/format.js';
 import { isDocumentBound, formatTournamentStartTime } from '../lib/domain.js';
 import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
-import { BoardPushToggle } from '../components/BoardPushToggle.jsx';
-import { TournamentClub, TournamentLocation, TournamentSchedule, useScheduleQuery } from './TournamentDetailPage.jsx';
+import { TournamentClub, TournamentLocation, TournamentSchedule } from './TournamentDetailPage.jsx';
 
 // Vollbild-Schalter für die reine Anzeige; verschwindet im Vollbild und in Browsern ohne Fullscreen-API.
 function FullscreenButton() {
@@ -37,15 +36,14 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
   // Private Turniere (nicht in der öffentlichen Liste) teilt die Turnierleitung mit ihrem Freigabe-Token.
   const shareToken = new URLSearchParams(window.location.search).get('share') || '';
   const { tournament, notFound } = useRoutedTournament(tournamentId, tournaments, shareToken);
-  // Aktuelle Ankündigung aus dem Spielplan-Abruf (alle 2 Minuten bzw. sofort nach einem Live-Push).
+  // Aktuelle Ankündigung aus dem Spielplan-Abruf (sofort über den WebSocket, sonst alle 2 Minuten).
   const [announcementUpdate, setAnnouncementUpdate] = useState({ tournamentId: null, announcement: null });
   const rankingPublished = Boolean(tournament?.rankingPublishedAt);
   const participantsVisible = Boolean(tournament && (tournament.participantsPublic || tournament.canManage) && tournament.registrationEnabled !== false);
   const playable = Boolean(tournament) && (isOnlinePlayable(tournament) || isDocumentBound(tournament));
   // Der Status aus der Turnierliste stammt vom Laden der App. Eine vor dem Start geöffnete Seite (z. B. Bildschirm vor
-  // Ort) erfährt den Start aus dem Spielplan-Abruf (Polling + Live-Push) und schaltet ohne Neuladen auf den Spielplan um.
+  // Ort) erfährt den Start aus dem Spielplan-Abruf (WebSocket bzw. Polling) und schaltet ohne Neuladen auf den Spielplan um.
   const scheduleVisible = Boolean(!rankingPublished && participantsVisible && playable);
-  const scheduleQuery = useScheduleQuery(tournament?.id, shareToken, scheduleVisible);
 
   const shellClass = 'app-shell tournament-display';
 
@@ -65,11 +63,6 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
     return <main className={shellClass}><p className="muted">{t('Turnier wird geladen…')}</p></main>;
   }
 
-  const status = scheduleQuery.data?.status || tournament.status;
-  // Sofort-Aktualisierung per Push lohnt nur, solange noch Runden kommen.
-  const pushToggle = scheduleVisible && status !== 'finished'
-    ? <BoardPushToggle tournamentId={tournament.id} shareToken={shareToken} language={language} />
-    : null;
   const announcement = announcementUpdate.tournamentId === tournament.id ? announcementUpdate.announcement : tournament.announcement;
 
   let content;
@@ -102,7 +95,7 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
             <TournamentLocation tournament={tournament} />
           </p>
         </header>
-        <div className="display-actions">{pushToggle}<FullscreenButton /></div>
+        <div className="display-actions"><FullscreenButton /></div>
         <AnnouncementBanner announcement={announcement} language={language} />
         {content}
       </section>

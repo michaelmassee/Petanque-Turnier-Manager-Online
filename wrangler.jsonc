@@ -5,8 +5,14 @@
   "compatibility_date": "2026-07-31",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
-  "durable_objects": { "bindings": [{ "name": "REGISTRATION_OPENING_SCHEDULER", "class_name": "RegistrationOpeningScheduler" }] },
-  "migrations": [{ "tag": "registration-opening-v1", "new_sqlite_classes": ["RegistrationOpeningScheduler"] }],
+  "durable_objects": { "bindings": [
+    { "name": "REGISTRATION_OPENING_SCHEDULER", "class_name": "RegistrationOpeningScheduler" },
+    { "name": "TOURNAMENT_LIVE_HUB", "class_name": "TournamentLiveHub" }
+  ] },
+  "migrations": [
+    { "tag": "registration-opening-v1", "new_sqlite_classes": ["RegistrationOpeningScheduler"] },
+    { "tag": "tournament-live-hub-v1", "new_sqlite_classes": ["TournamentLiveHub"] }
+  ],
   "ratelimits": [
     { "name": "PLAYER_DETAILS_ACCOUNT_LIMIT", "namespace_id": "2003", "simple": { "limit": 6, "period": 60 } },
     { "name": "PLAYER_DETAILS_IP_LIMIT", "namespace_id": "2004", "simple": { "limit": 30, "period": 60 } }

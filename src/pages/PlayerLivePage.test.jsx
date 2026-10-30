@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   LiveDetail, MyLiveBackLink, MyLiveList, PlayerLivePage, readRememberedTeams, RememberedTeams,
 } from './PlayerLivePage.jsx';
 import { matchLiveRoute } from '../lib/routing.js';
 import { TOURNAMENT_TYPES } from '../lib/constants.js';
+import { FakeWebSocket, installFakeWebSocket, latestSocket, uninstallFakeWebSocket } from '../test-support/fake-websocket.js';
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } });
@@ -89,6 +90,26 @@ describe('Live-Ansicht für Spieler', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     localStorage.clear();
+  });
+
+  it('aktualisiert sich über den WebSocket sofort, aber nur bei freigeschalteter Live-Ansicht', async () => {
+    installFakeWebSocket();
+    try {
+      global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ ...livePayload(), live: null })));
+      const { unmount } = renderDetail();
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+      expect(FakeWebSocket.instances).toHaveLength(0);
+      unmount();
+
+      global.fetch = vi.fn(() => Promise.resolve(jsonResponse(livePayload())));
+      renderDetail();
+      await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+      expect(latestSocket().url).toBe(`${window.location.origin.replace(/^http/, 'ws')}/api/live/registrations/r1/socket`);
+      act(() => { latestSocket().open(); latestSocket().receive({ type: 'changed' }); });
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2), { timeout: 3000 });
+    } finally {
+      uninstallFakeWebSocket();
+    }
   });
 
   function installPushBrowser(permission = 'granted', hasSubscription = true) {

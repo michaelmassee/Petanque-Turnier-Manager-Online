@@ -3,6 +3,7 @@ import { act, render as renderBase, screen, waitFor } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { normalizeRanking } from '../lib/live-ranking.js';
 import { TournamentSchedule } from './TournamentDetailPage.jsx';
+import { installFakeWebSocket, latestSocket, uninstallFakeWebSocket } from '../test-support/fake-websocket.js';
 
 function jsonResponse(payload) {
   return { ok: true, json: () => Promise.resolve(payload) };
@@ -158,21 +159,25 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     expect(screen.getByText('Nicht angetreten')).toBeInTheDocument();
   });
 
-  it('lädt sofort neu, wenn der Service Worker einen Live-Push für dieses Turnier meldet', async () => {
+  it('lädt sofort neu, wenn der WebSocket eine Änderung meldet, und zeigt „Live“', async () => {
     mockSchedule({});
-    const serviceWorker = new EventTarget();
-    Object.defineProperty(navigator, 'serviceWorker', { value: serviceWorker, configurable: true });
+    installFakeWebSocket();
     try {
       render(<TournamentSchedule tournamentId="t1" language="de" />);
       await screen.findByText('Noch keine Runde gestartet.');
       expect(global.fetch).toHaveBeenCalledTimes(1);
+      const socket = latestSocket();
+      expect(socket.url).toBe(`${window.location.origin.replace(/^http/, 'ws')}/api/tournaments/t1/schedule/socket`);
+      act(() => socket.open());
+      expect(await screen.findByText('Live – aktualisiert sich sofort')).toBeInTheDocument();
 
-      serviceWorker.dispatchEvent(Object.assign(new Event('message'), { data: { type: 'live-update', tournamentId: 'anderes' } }));
-      serviceWorker.dispatchEvent(Object.assign(new Event('message'), { data: { type: 'live-update', tournamentId: 't1' } }));
-
-      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+      // Mehrere Änderungen kurz hintereinander (Serien-Eingabe) werden zu einem Abruf.
+      act(() => { socket.receive({ type: 'changed' }); socket.receive({ type: 'changed' }); socket.receive('pong'); });
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2), { timeout: 3000 });
+      await new Promise((resolve) => { setTimeout(resolve, 1600); });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
     } finally {
-      delete navigator.serviceWorker;
+      uninstallFakeWebSocket();
     }
   });
 
@@ -194,24 +199,27 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     }
   });
 
-  it('zeigt auch nach der Pause die Endrangliste, sobald der Push zum Turnierende kommt', async () => {
+  it('zeigt auch nach der Abfrage-Pause die Endrangliste, sobald der WebSocket das Turnierende meldet', async () => {
     const ranking = [{ rank: 1, playerId: 'p1', firstName: 'Anna', lastName: 'Muster', wins: 1, gameDiff: 2, pointsFor: 13, pointsAgainst: 11 }];
     const rounds = [{ id: 'r1', roundNumber: 1, matches: [{ id: 'm1', teamA: [anna], teamB: [clara], scoreA: 13, scoreB: 11, noShow: null }] }];
     mockSchedule({ rounds, ranking, pollUntil: '2000-01-01T00:00:00.000Z' });
-    const serviceWorker = new EventTarget();
-    Object.defineProperty(navigator, 'serviceWorker', { value: serviceWorker, configurable: true });
+    installFakeWebSocket();
     try {
       render(<TournamentSchedule tournamentId="t1" language="de" display />);
       expect(await screen.findByText(/Anzeige pausiert/)).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'Runde 1' })).toBeInTheDocument();
+      const socket = latestSocket();
+      act(() => socket.open());
 
       mockSchedule({ status: 'finished', rounds, ranking, pollUntil: '2000-01-01T00:00:00.000Z' });
-      serviceWorker.dispatchEvent(Object.assign(new Event('message'), { data: { type: 'live-update', tournamentId: 't1' } }));
+      act(() => socket.receive({ type: 'changed' }));
 
-      expect(await screen.findByRole('heading', { name: 'Endrangliste' })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Endrangliste' }, { timeout: 3000 })).toBeInTheDocument();
       expect(screen.queryByText(/Anzeige pausiert/)).not.toBeInTheDocument();
+      // Nach Turnierende kommt nichts mehr: Verbindung schließen.
+      expect(socket.readyState).toBe(3);
     } finally {
-      delete navigator.serviceWorker;
+      uninstallFakeWebSocket();
     }
   });
 
@@ -233,23 +241,25 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     }
   });
 
-  it('lädt nach einem Live-Push nach 20 Sekunden noch einmal, falls der Server-Cache noch den alten Stand hatte', async () => {
+  it('lädt nach einer WebSocket-Änderung nach 20 Sekunden noch einmal, falls der Server-Cache noch den alten Stand hatte', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockSchedule({});
-    const serviceWorker = new EventTarget();
-    Object.defineProperty(navigator, 'serviceWorker', { value: serviceWorker, configurable: true });
+    installFakeWebSocket();
     try {
       render(<TournamentSchedule tournamentId="t1" language="de" />);
       await screen.findByText('Noch keine Runde gestartet.');
       expect(global.fetch).toHaveBeenCalledTimes(1);
+      const socket = latestSocket();
+      act(() => socket.open());
 
-      serviceWorker.dispatchEvent(Object.assign(new Event('message'), { data: { type: 'live-update', tournamentId: 't1' } }));
+      act(() => socket.receive({ type: 'changed' }));
+      await act(async () => { vi.advanceTimersByTime(1500); });
       await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
 
       await act(async () => { vi.advanceTimersByTime(20_000); });
       await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
     } finally {
-      delete navigator.serviceWorker;
+      uninstallFakeWebSocket();
       vi.useRealTimers();
     }
   });

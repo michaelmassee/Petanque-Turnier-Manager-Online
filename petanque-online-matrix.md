@@ -36,7 +36,7 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 | Druck-Dokumente: Check-In-Liste, Starterliste, Excel-Export, QR-Karten je Team, QR-Code Anmeldung, Zuschauer-Live-Link, Foto-Hinweis | ✅ | ⚠️ (CSV-Export, Ranglisten-PDF, QR-Code; keine Team-Karten, kein Zuschauer-Link) |
 | **Turnierserien-Auswertung** über mehrere Turniere als PDF | ✅ | ❌ |
 | Live-Ansicht für Spieler, Ergebnis selbst melden, Push | ⚠️ | ✅ |
-| Öffentlicher Spielplan, aktualisiert sich selbst | ✅ (Zuschauer-Live-Link) | ✅ seit 21.10.2026: Tab „Spielplan“ mit aktueller Runde, Rangliste und vergangenen Runden, lädt alle 2 Minuten neu (Live-Ansicht ebenfalls 2 Minuten) |
+| Öffentlicher Spielplan, aktualisiert sich selbst | ✅ (Zuschauer-Live-Link) | ✅ seit 21.10.2026: Tab „Spielplan“ mit aktueller Runde, Rangliste und vergangenen Runden, lädt alle 2 Minuten neu (Live-Ansicht ebenfalls 2 Minuten); seit 30.10.2026 Sofort-Aktualisierung per WebSocket (Durable Object `TournamentLiveHub`) bei jeder Änderung, Polling dann nur alle 10 Minuten als Sicherheitsnetz; Board-Push-Schalter entfallen |
 | Plätze/Vereinssuche mit Karte, Platzvermietung, Mitspielerbörse, Desktop-Sync, Pétanque-Aktuell-Import | ❌ | ✅ |
 
 ## Priorisierte Lücken (Vorschlag)

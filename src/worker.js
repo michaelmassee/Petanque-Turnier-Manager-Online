@@ -6,6 +6,8 @@ import { cleanupReadPostboxMessages, DEFAULT_POSTBOX_READ_RETENTION_DAYS } from 
 import { buildAdminPostboxEmail } from './admin-postbox-email.js';
 import { REGISTRATION_OPENED_EVENT, OPENING_MESSAGES, synchronizeOpeningSchedule } from './registration-opening.js';
 export { RegistrationOpeningScheduler } from './registration-opening.js';
+import { connectTournamentLiveSocket, notifyTournamentChanged } from './tournament-live-hub.js';
+export { TournamentLiveHub } from './tournament-live-hub.js';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
 import {
   isAllowedPushEndpoint, LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT,
@@ -40,9 +42,6 @@ import {
   buildLiveResultPush,
   buildLiveRoundNotPlayingPush,
   buildLiveRoundPush,
-  buildBoardFinishedPush,
-  buildBoardRoundPush,
-  MAX_BOARD_PUSH_SUBSCRIPTIONS,
   buildLiveAnnouncementPush,
   chunk,
   LIVE_PUSH_CHUNK_SIZE,
@@ -1656,7 +1655,7 @@ async function finishStaleTournaments(env, now = new Date()) {
   for (let index = 0; index < stale.length; index += 1) {
     if (!results[index]?.meta?.changes) continue;
     const row = stale[index];
-    await notifyBoardPushForFinish(env, row);
+    await notifyTournamentChanged(env, row.id);
     try {
       await createSystemNotification(env, row.owner_id, 'tournament_status_changed', { tournamentId: row.id, tournamentName: row.name, status: 'finished', automatic: true });
     } catch (error) {
@@ -1870,7 +1869,6 @@ export default {
         runJob('reminders', () => sendTournamentReminders(env)),
         runJob('importSync', () => syncPetanqueAktuellImports(env)),
         runJob('purge', () => purgeExpiredPersonalDataWennAktiviert(env.DB)),
-        runJob('boardPushCleanup', () => deleteBoardPushSubscriptionsOfFinishedTournaments(env.DB)),
       );
     }
     ctx.waitUntil(Promise.all(jobs).then(async (results) => {
@@ -1916,6 +1914,13 @@ export default {
     if (!url.pathname.startsWith('/api/')) {
       return withSecurityHeaders(await env.ASSETS.fetch(request), url);
     }
+
+    // Änderungen an Meldungen (Teilnahme, Abmeldung, Bearbeitung) gehören zum Turnier: vorher die Turnier-ID merken,
+    // damit offene Seiten danach neu laden (eine Zeile pro Schreibzugriff).
+    const writtenRegistration = request.method !== 'GET' ? url.pathname.match(/^\/api\/registrations\/([^/]+)(?:\/|$)/) : null;
+    const registrationTournamentId = writtenRegistration
+      ? (await env.DB.prepare('SELECT tournament_id FROM registrations WHERE id = ?').bind(decodeURIComponent(writtenRegistration[1])).first().catch(() => null))?.tournament_id || null
+      : null;
 
     const response = await (async () => {
       try {
@@ -2724,18 +2729,14 @@ export default {
         return await buildScheduleResponse(request, env.DB, tournament);
       }
 
-      // Sofort-Aktualisierung der Turnierseite/Anzeige: Push-Abo ohne Meldung, gleiche Sichtbarkeit wie der Spielplan.
-      const tournamentSchedulePushMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/schedule\/push$/);
-      if (tournamentSchedulePushMatch && (request.method === 'POST' || request.method === 'DELETE')) {
-        const tournament = await getTournamentById(env.DB, tournamentSchedulePushMatch[1]);
+      // Sofort-Aktualisierung der Turnierseite/Anzeige: WebSocket mit derselben Sichtbarkeit wie der Spielplan.
+      const tournamentScheduleSocketMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/schedule\/socket$/);
+      if (tournamentScheduleSocketMatch && request.method === 'GET') {
+        assertLiveSocketRequest(request, url);
+        const tournament = await getTournamentById(env.DB, tournamentScheduleSocketMatch[1]);
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
-        // Abmelden geht immer (der Endpoint ist der Nachweis), auch wenn der Spielplan inzwischen nicht mehr sichtbar ist.
-        if (request.method === 'DELETE') return await removeBoardPushSubscription(request, env.DB, tournament);
-        const shareTokenHash = await assertCanViewSchedule(request, env.DB, tournament, url);
-        // Eingeloggte Turnierleitung: Konto am Abo merken, damit der Push auch ohne öffentliche Teilnehmerliste kommt.
-        const session = await optionalSession(request, env.DB);
-        const managerUserId = canManageTournament(tournament, session?.user || null) ? session.user.id : null;
-        return await saveBoardPushSubscription(request, env.DB, tournament, url.origin, shareTokenHash, { managerUserId });
+        await assertCanViewSchedule(request, env.DB, tournament, url);
+        return await connectTournamentLiveSocket(env, tournament.id, request);
       }
 
       const tournamentTeamDrawMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/teams\/draw$/);
@@ -2808,15 +2809,20 @@ export default {
       }
 
       // Persönlicher Live-Link ohne Login (E-21): Wer den Link hat, sieht die Team-Ansicht und kann Push abonnieren.
-      const liveTokenMatch = url.pathname.match(/^\/api\/live\/token\/([^/]+)(\/push)?$/);
+      const liveTokenMatch = url.pathname.match(/^\/api\/live\/token\/([^/]+)(\/push|\/socket)?$/);
+      if (liveTokenMatch?.[2] === '/socket' && request.method === 'GET') {
+        assertLiveSocketRequest(request, url);
+        const registration = await findLiveRegistrationByToken(env.DB, decodeURIComponent(liveTokenMatch[1]));
+        return await connectLiveViewSocket(env, registration, request);
+      }
       if (liveTokenMatch) {
         const registration = await findLiveRegistrationByToken(env.DB, decodeURIComponent(liveTokenMatch[1]));
         if (!liveTokenMatch[2] && request.method === 'GET') return await buildLiveResponse(request, env.DB, registration);
-        if (liveTokenMatch[2] && request.method === 'POST') return await saveLivePushSubscription(request, env.DB, registration);
-        if (liveTokenMatch[2] && request.method === 'DELETE') return await removeLivePushSubscription(request, env.DB, registration);
+        if (liveTokenMatch[2] === '/push' && request.method === 'POST') return await saveLivePushSubscription(request, env.DB, registration);
+        if (liveTokenMatch[2] === '/push' && request.method === 'DELETE') return await removeLivePushSubscription(request, env.DB, registration);
       }
 
-      const liveRegistrationMatch = url.pathname.match(/^\/api\/live\/registrations\/([^/]+)(\/push)?$/);
+      const liveRegistrationMatch = url.pathname.match(/^\/api\/live\/registrations\/([^/]+)(\/push|\/socket)?$/);
       const liveResultMatch = url.pathname.match(/^\/api\/live\/registrations\/([^/]+)\/result$/);
       if (liveResultMatch && request.method === 'POST') {
         const session = await requireSession(request, env.DB);
@@ -2824,12 +2830,18 @@ export default {
         await reportLiveMatchResult(request, env, registration, session.user.id);
         return await buildLiveResponse(request, env.DB, registration);
       }
+      if (liveRegistrationMatch?.[2] === '/socket' && request.method === 'GET') {
+        assertLiveSocketRequest(request, url);
+        const session = await requireSession(request, env.DB);
+        const registration = await findMyLiveRegistration(env.DB, session.user, liveRegistrationMatch[1]);
+        return await connectLiveViewSocket(env, registration, request);
+      }
       if (liveRegistrationMatch) {
         const session = await requireSession(request, env.DB);
         const registration = await findMyLiveRegistration(env.DB, session.user, liveRegistrationMatch[1]);
         if (!liveRegistrationMatch[2] && request.method === 'GET') return await buildLiveResponse(request, env.DB, registration);
-        if (liveRegistrationMatch[2] && request.method === 'POST') return await saveLivePushSubscription(request, env.DB, registration);
-        if (liveRegistrationMatch[2] && request.method === 'DELETE') return await removeLivePushSubscription(request, env.DB, registration);
+        if (liveRegistrationMatch[2] === '/push' && request.method === 'POST') return await saveLivePushSubscription(request, env.DB, registration);
+        if (liveRegistrationMatch[2] === '/push' && request.method === 'DELETE') return await removeLivePushSubscription(request, env.DB, registration);
       }
 
 
@@ -3390,8 +3402,10 @@ export default {
     const writtenTournament = request.method !== 'GET' && response.ok
       ? url.pathname.match(/^\/api\/(?:sync\/)?tournaments\/([^/]+)(?:\/|$)/)
       : null;
-    if (writtenTournament) {
-      await invalidateLiveSnapshot(url.origin, decodeURIComponent(writtenTournament[1]));
+    const changedTournamentId = writtenTournament ? decodeURIComponent(writtenTournament[1]) : response.ok ? registrationTournamentId : null;
+    if (changedTournamentId) {
+      await invalidateLiveSnapshot(url.origin, changedTournamentId);
+      await notifyTournamentChanged(env, changedTournamentId);
     }
     if (response.ok && request.method !== 'GET' && env.REGISTRATION_OPENING_SCHEDULER
       && (/^\/api\/(?:sync\/)?tournaments(?:\/[^/]+(?:\/(?:metadata|publication|registration-closed|start|reset))?)?$/.test(url.pathname)
@@ -3405,6 +3419,8 @@ export default {
     if (request.method !== 'GET' && response.ok && TOURNAMENT_LIST_WRITE_PATH.test(url.pathname)) {
       await invalidateAnonymousTournamentList(url.origin);
     }
+    // WebSocket-Upgrade unverändert durchreichen: Eine neu gebaute Response verlöre den Socket.
+    if (response.status === 101) return response;
     return withRefreshedSessionCookie(request, response, url);
   },
 };
@@ -6346,7 +6362,6 @@ async function notifyTournamentPublicationChange(env, existing, updated) {
     await notifySavedSearchesForPublishedTournament(env, updated);
   }
   if (updated.status !== existing.status) {
-    if (updated.status === 'finished') await notifyBoardPushForFinish(env, updated);
     await createSystemNotification(env, existing.owner_id, 'tournament_status_changed', { tournamentId: existing.id, tournamentName: updated.name, status: updated.status });
     const participants = await participantAccountUserIds(env.DB, existing.id, existing.owner_id);
     await Promise.all((participants.results || []).map((participant) => createSystemNotification(env, participant.id, 'tournament_status_changed', { tournamentId: existing.id, tournamentName: updated.name, status: updated.status })));
@@ -7018,7 +7033,6 @@ async function syncPutTournamentMetadata(request, env, existing) {
       if (isNewlyPublicTournament(existing, updated)) {
         await notifySavedSearchesForPublishedTournament(env, updated);
       }
-      if (updated.status === 'finished' && existing.status !== 'finished') await notifyBoardPushForFinish(env, updated);
     },
   };
 }
@@ -7894,6 +7908,7 @@ async function reportLiveMatchResult(request, env, registration, reporterUserId)
     .bind(scoreA, scoreB, registration.id, new Date().toISOString(), match.id).run();
   if (!saved.meta.changes) await throwNoOpenMatch(db, tournament.id, registration.id);
   await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
+  await notifyTournamentChanged(env, tournament.id);
   // Mitspieler und Gegner sehen das gemeldete Ergebnis sofort; der Meldende hat es schon.
   await notifyLivePushForResults(env, tournament, [match.id], new URL(request.url).origin, { excludeRegistrationId: registration.id });
   try {
@@ -8567,88 +8582,13 @@ async function participantAccountUserIds(db, tournamentId, excludedUserId, { inc
 }
 
 // Private Turniere stehen nur nicht in der öffentlichen Liste: Mit dem Freigabe-Token der Turnierleitung
-// ist der Spielplan sichtbar, sofern die Teilnehmerliste veröffentlicht ist. Liefert den Hash eines gültigen
-// Freigabe-Tokens (sonst null), damit ein Push-Abo an diesen Link gebunden werden kann.
+// ist der Spielplan sichtbar, sofern die Teilnehmerliste veröffentlicht ist.
 async function assertCanViewSchedule(request, db, tournament, url) {
   const session = await optionalSession(request, db);
-  const share = url.searchParams.get('share');
-  const shareAccess = await hasTournamentShareAccess(db, tournament, share);
-  if (!canViewParticipants(tournament, session?.user || null) && !(shareAccess && Number(tournament.participants_public))) {
+  if (canViewParticipants(tournament, session?.user || null)) return;
+  if (!(Number(tournament.participants_public) && await hasTournamentShareAccess(db, tournament, url.searchParams.get('share')))) {
     throw new HttpError(403, 'Zugriff verweigert');
   }
-  return shareAccess ? sha256Hex(share) : null;
-}
-
-export async function saveBoardPushSubscription(request, db, tournament, origin, shareTokenHash = null, { managerUserId = null } = {}) {
-  const body = await readJson(request);
-  const endpoint = String(body.endpoint || '');
-  const p256dh = String(body.keys?.p256dh || '');
-  const auth = String(body.keys?.auth || '');
-  if (!isAllowedPushEndpoint(endpoint) || !p256dh || !auth) throw new HttpError(400, 'Ungültiges Push-Abonnement');
-  // Nur eigene Seiten öffnen: Der Klick auf die Benachrichtigung führt zurück zur abonnierten Turnierseite.
-  const pageUrl = String(body.url || '');
-  const pagePath = `/turnierseite/${encodeURIComponent(tournament.id)}`;
-  let page = null;
-  try {
-    page = new URL(pageUrl);
-  } catch {
-    page = null;
-  }
-  const safePageUrl = page && page.origin === origin && (page.pathname === pagePath || page.pathname === `${pagePath}/anzeige`) ? page.href : `${origin}${pagePath}`;
-  const now = new Date().toISOString();
-  // Obergrenze in derselben Anweisung prüfen, damit parallele Anmeldungen sie nicht überholen; ein bekanntes Gerät
-  // darf sein Abo immer auffrischen.
-  const result = await db.prepare(`INSERT INTO tournament_board_push_subscriptions (endpoint, tournament_id, p256dh, auth, language, page_url, share_token_hash, user_id, created_at, updated_at)
-      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-      WHERE EXISTS (SELECT 1 FROM tournament_board_push_subscriptions WHERE endpoint = ? AND tournament_id = ?)
-        OR (SELECT COUNT(*) FROM tournament_board_push_subscriptions WHERE tournament_id = ?) < ?
-      ON CONFLICT(endpoint, tournament_id) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth,
-        language = excluded.language, page_url = excluded.page_url, share_token_hash = excluded.share_token_hash, user_id = excluded.user_id,
-        updated_at = excluded.updated_at`)
-    .bind(endpoint, tournament.id, p256dh, auth, normalizeLanguage(body.language), safePageUrl, shareTokenHash, managerUserId, now, now,
-      endpoint, tournament.id, tournament.id, MAX_BOARD_PUSH_SUBSCRIPTIONS).run();
-  if (!Number(result.meta?.changes || 0)) {
-    throw new HttpError(409, 'Für dieses Turnier sind bereits zu viele Geräte für die Sofort-Aktualisierung angemeldet.');
-  }
-  return json({ ok: true }, 201);
-}
-
-// Täglicher Cron: Nach Turnierende kommen keine Runden mehr, die Abos der Turnierseite/Anzeige werden nicht mehr gebraucht.
-export async function deleteBoardPushSubscriptionsOfFinishedTournaments(db) {
-  await db.prepare(`DELETE FROM tournament_board_push_subscriptions
-     WHERE tournament_id IN (SELECT id FROM tournaments WHERE status = 'finished')`).run();
-}
-
-export async function removeBoardPushSubscription(request, db, tournament) {
-  const body = await readJson(request);
-  await db.prepare('DELETE FROM tournament_board_push_subscriptions WHERE endpoint = ? AND tournament_id = ?').bind(String(body.endpoint || ''), tournament.id).run();
-  return json({ ok: true });
-}
-
-// Push-Abos der Turnierseite/Anzeige als Queue-Einträge; buildPayload(language, pageUrl) liefert den Inhalt.
-// Die Sichtbarkeit wird beim Versand je Abo erneut geprüft (wie assertCanViewSchedule ohne Login): Bei privaten
-// Turnieren nur Abos, deren Freigabe-Link noch gilt – nicht schon, weil irgendein Link existiert. Ist die
-// Teilnehmerliste ausgeblendet, gehen keine Runden/Ankündigungen mehr an alte Abos.
-async function boardPushItems(db, tournamentId, buildPayload) {
-  // Dieselbe Sichtregel wie beim Spielplan (assertCanViewSchedule): öffentlich bzw. per Freigabelink bei öffentlicher
-  // Teilnehmerliste – oder das Abo stammt von einem Konto, das das Turnier (noch) verwaltet.
-  const subscriptions = await db.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.language, s.page_url
-      FROM tournament_board_push_subscriptions s JOIN tournaments t ON t.id = s.tournament_id
-      WHERE s.tournament_id = ? AND (
-        (t.participants_public = 1
-          AND ((t.visibility = 'public' AND t.status != 'draft')
-            OR (t.visibility = 'private' AND EXISTS (SELECT 1 FROM tournament_share_links l
-              WHERE l.tournament_id = t.id AND l.token_hash = s.share_token_hash))))
-        OR (s.user_id IS NOT NULL AND (s.user_id = t.owner_id
-          OR EXISTS (SELECT 1 FROM tournament_editors e WHERE e.tournament_id = t.id AND e.user_id = s.user_id)
-          OR EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.role = 'admin'))))`)
-    .bind(tournamentId).all();
-  return (subscriptions.results || []).map((subscription) => ({
-    endpoint: subscription.endpoint,
-    p256dh: subscription.p256dh,
-    auth: subscription.auth,
-    payload: buildPayload(subscription.language, subscription.page_url),
-  }));
 }
 
 async function queueLivePushItems(env, items) {
@@ -8657,6 +8597,13 @@ async function queueLivePushItems(env, items) {
   for (const batch of chunk(messages, 100)) {
     await env.MAIL_QUEUE.sendBatch(batch);
   }
+}
+
+// Sofort-Aktualisierung der Live-Ansicht: nur bei freigeschalteter Live-Ansicht (sonst gibt es nichts zu aktualisieren).
+async function connectLiveViewSocket(env, registration, request) {
+  const tournament = await env.DB.prepare('SELECT live_view_enabled FROM tournaments WHERE id = ?').bind(registration.tournament_id).first();
+  if (Number(tournament?.live_view_enabled || 0) !== 1) throw new HttpError(409, 'Die Live-Ansicht wurde für dieses Turnier nicht freigeschaltet');
+  return connectTournamentLiveSocket(env, registration.tournament_id, request);
 }
 
 // Push-Abo aus der Live-Ansicht, an die Meldung gebunden (auch ohne Login über den persönlichen Link).
@@ -8689,12 +8636,10 @@ async function removeLivePushSubscription(request, db, registration) {
  */
 async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
   try {
-    // Turnierseite/Anzeige: unabhängig von der Live-Ansicht, ein stiller Push, der die offene Seite neu laden lässt.
-    const items = await boardPushItems(env.DB, tournament.id, (language, url) => buildBoardRoundPush({
-      tournamentName: tournament.name, roundNumber, language, url, tournamentId: tournament.id,
-    }));
-    if (Number(tournament.live_view_enabled || 0) === 1) items.push(...await livePlayerRoundPushItems(env.DB, tournament, roundNumber, appOrigin));
-    await queueLivePushItems(env, items);
+    // Offene Turnierseiten/Anzeigen erfahren die neue Runde über den WebSocket (TournamentLiveHub).
+    if (Number(tournament.live_view_enabled || 0) !== 1) return;
+    const items = await livePlayerRoundPushItems(env.DB, tournament, roundNumber, appOrigin);
+    if (items.length) await queueLivePushItems(env, items);
   } catch (error) {
     console.error(`Failed to queue live push for tournament ${tournament.id} round ${roundNumber}`, error);
   }
@@ -8745,18 +8690,6 @@ async function notifyLivePushForResults(env, tournament, matchIds, appOrigin, { 
   }
 }
 
-// Turnierende an die Push-Abos der Turnierseite/Anzeige; Fehler lassen den Statuswechsel nie scheitern.
-async function notifyBoardPushForFinish(env, tournament) {
-  try {
-    const items = await boardPushItems(env.DB, tournament.id, (language, url) => buildBoardFinishedPush({
-      tournamentName: tournament.name, language, url, tournamentId: tournament.id,
-    }));
-    if (items.length) await queueLivePushItems(env, items);
-  } catch (error) {
-    console.error(`Failed to queue board finish push for tournament ${tournament.id}`, error);
-  }
-}
-
 async function livePlayerRoundPushItems(db, tournament, roundNumber, appOrigin) {
   const subscriptions = await db.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.language
       FROM live_push_subscriptions s JOIN registrations r ON r.id = s.registration_id
@@ -8795,10 +8728,7 @@ async function notifyLivePushForAnnouncement(env, tournament, text, appOrigin) {
       payload: buildLiveAnnouncementPush({ tournamentName: tournament.name, text, language: subscription.language, tournamentId: tournament.id,
         url: `${appOrigin}/live/${encodeURIComponent(subscription.registration_id)}` }),
     }));
-    items.push(...await boardPushItems(env.DB, tournament.id, (language, url) => buildLiveAnnouncementPush({
-      tournamentName: tournament.name, text, language, url, tournamentId: tournament.id,
-    })));
-    await queueLivePushItems(env, items);
+    if (items.length) await queueLivePushItems(env, items);
   } catch (error) {
     console.error(`Failed to queue live announcement push for tournament ${tournament.id}`, error);
   }
@@ -8816,11 +8746,7 @@ async function sendLivePushItems(env, items) {
       );
       const response = await fetch(item.endpoint, pushPayload);
       if (response.status === 404 || response.status === 410) {
-        // Abgelaufenes Abo: gilt für Live-Ansicht und Turnierseite gleichermaßen (gleiches Browser-Abo).
-        await env.DB.batch([
-          env.DB.prepare('DELETE FROM live_push_subscriptions WHERE endpoint = ?').bind(item.endpoint),
-          env.DB.prepare('DELETE FROM tournament_board_push_subscriptions WHERE endpoint = ?').bind(item.endpoint),
-        ]);
+        await env.DB.prepare('DELETE FROM live_push_subscriptions WHERE endpoint = ?').bind(item.endpoint).run();
       } else if (!response.ok) {
         console.error('Live push failed', response.status, await response.text());
       }
@@ -13616,6 +13542,14 @@ function assertSameOriginForUnsafeMethods(request, url) {
   if (origin && origin !== url.origin) {
     throw new HttpError(403, 'Cross-origin request denied');
   }
+}
+
+// Socket der Sofort-Aktualisierung: nur von der eigenen Seite (der Browser schickt die Cookies auch beim Upgrade von
+// fremden Seiten mit) und nur als echter WebSocket-Upgrade.
+function assertLiveSocketRequest(request, url) {
+  const origin = request.headers.get('Origin');
+  if (origin && origin !== url.origin) throw new HttpError(403, 'Cross-origin request denied');
+  if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') throw new HttpError(426, 'WebSocket-Verbindung erwartet');
 }
 
 function isLocalhost(url) {

@@ -655,51 +655,6 @@ export function buildLiveResultPush({ tournamentName, roundNumber, ownScore, opp
   };
 }
 
-// Obergrenze je Turnier für die Sofort-Aktualisierung der Turnierseite: Jede neue Runde kostet einen Push pro Abo
-// (externe Anfrage in der Queue).
-export const MAX_BOARD_PUSH_SUBSCRIPTIONS = 50;
-
-const BOARD_ROUND_PUSH_BODIES = {
-  de: 'Spielplan aktualisiert', nl: 'Speelschema bijgewerkt', en: 'Schedule updated', es: 'Calendario actualizado', fr: 'Programme mis à jour', it: 'Calendario aggiornato',
-};
-
-// Turnierseite/Bildschirm-Anzeige: Die offene Seite lädt sofort neu. Still (ohne Ton), weil sie meist auf einem
-// Bildschirm vor Ort läuft; gleiches Tag, damit die nächste Runde die Benachrichtigung ersetzt.
-export function buildBoardRoundPush({ tournamentName, roundNumber, language, url, tournamentId }) {
-  const texts = LIVE_ROUND_PUSH_TEXTS[language] || LIVE_ROUND_PUSH_TEXTS.de;
-  return {
-    title: `${tournamentName}: ${texts.round} ${roundNumber}`,
-    body: BOARD_ROUND_PUSH_BODIES[language] || BOARD_ROUND_PUSH_BODIES.de,
-    url,
-    tag: 'board-round',
-    silent: true,
-    ...livePushRefreshFields(tournamentId),
-  };
-}
-
-const BOARD_FINISHED_PUSH_TEXTS = {
-  de: { title: 'Turnier beendet', body: 'Endrangliste' },
-  nl: { title: 'Toernooi afgelopen', body: 'Eindrangschikking' },
-  en: { title: 'Tournament finished', body: 'Final ranking' },
-  es: { title: 'Torneo finalizado', body: 'Clasificación final' },
-  fr: { title: 'Tournoi terminé', body: 'Classement final' },
-  it: { title: 'Torneo concluso', body: 'Classifica finale' },
-};
-
-// Turnierende: Eine offene Turnierseite/Anzeige lädt neu und zeigt die Endrangliste - auch wenn sie das regelmäßige
-// Abfragen schon pausiert hat. Gleiches Tag wie die Runden, damit die Benachrichtigung die letzte Runde ersetzt.
-export function buildBoardFinishedPush({ tournamentName, language, url, tournamentId }) {
-  const texts = BOARD_FINISHED_PUSH_TEXTS[language] || BOARD_FINISHED_PUSH_TEXTS.de;
-  return {
-    title: `${tournamentName}: ${texts.title}`,
-    body: texts.body,
-    url,
-    tag: 'board-round',
-    silent: true,
-    ...livePushRefreshFields(tournamentId),
-  };
-}
-
 const LIVE_ANNOUNCEMENT_PUSH_TITLES = { de: 'Ankündigung', nl: 'Mededeling', en: 'Announcement', es: 'Aviso', fr: 'Annonce', it: 'Avviso' };
 
 // Ankündigung der Turnierleitung als Live-Push; gleiches Tag, damit eine neue Ankündigung die alte ersetzt.

@@ -4,7 +4,7 @@ import { TournamentEntryList } from '../components/TournamentEntryList.jsx';
 import { useQuery } from '@tanstack/react-query';
 import { FORMATIONS, REGISTRATION_STATUSES, REGISTRATION_TYPES, TOURNAMENT_TYPES, EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
 import { api, authenticatedApi } from '../lib/api.js';
-import { DISPLAY_FIT_QUERY, useAutoScroll, useLivePushRefresh, useMediaQuery, useRoutedTournament } from '../lib/hooks.js';
+import { DISPLAY_FIT_QUERY, useAutoScroll, useMediaQuery, useRoutedTournament, useTournamentLiveSocket } from '../lib/hooks.js';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { DISPLAY_LOCALES, REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
 import { isCalendarEntry, isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl, calendarEventLink } from '../lib/domain.js';
@@ -463,15 +463,21 @@ function matchesByStage(matches) {
  * Öffentlicher Spielplan: aktuelle Runde und Rangliste – für online durchgeführte Turniere wie für Turniere, die ein
  * verbundenes Turnierdokument führt (dann mit Bahn, Stufe und Rangliste aus dem Dokument).
  */
-// Ganzes Turnier zum aktuellen Stand für alle (die Live-Ansicht zeigt nur das eigene Team). Lädt alle 2 Minuten neu,
-// solange das Turnier läuft; unverändert antwortet der Server mit 304.
+// Ganzes Turnier zum aktuellen Stand für alle (die Live-Ansicht zeigt nur das eigene Team). Lädt bei jeder Änderung
+// sofort über den WebSocket neu, ohne Verbindung alle 2 Minuten; unverändert antwortet der Server mit 304.
 const SCHEDULE_REFRESH_MS = 120_000;
+// Mit verbundenem WebSocket nur noch als Sicherheitsnetz.
+const SCHEDULE_SOCKET_FALLBACK_MS = 600_000;
 const SCHEDULE_GONE_STATUSES = [403, 404];
 
 // Eine tagelang offene Anzeige soll nicht endlos weiter abfragen: Schluss, wenn der Spielplan nicht mehr sichtbar ist
 // (privat gestellt, gelöscht) oder 8 Stunden nach Turnierbeginn (pollUntil vom Server). Neuladen holt den Stand einmal.
+function isScheduleGone({ error }) {
+  return SCHEDULE_GONE_STATUSES.includes(error?.status);
+}
+
 function isSchedulePollingPaused({ error, data }, now = Date.now()) {
-  if (SCHEDULE_GONE_STATUSES.includes(error?.status)) return true;
+  if (isScheduleGone({ error })) return true;
   const pollUntil = Date.parse(data?.pollUntil || '');
   return Number.isFinite(pollUntil) && now >= pollUntil;
 }
@@ -491,17 +497,20 @@ function formatCountdown(ms) {
  * Ort sehen, dass sich die Seite selbst aktualisiert. Nach Turnierende wird nicht mehr abgefragt, dann nichts anzeigen;
  * pausiert (siehe isSchedulePollingPaused) nur ein Hinweis zum Neuladen.
  */
-export function ScheduleRefreshCountdown({ query }) {
+export function ScheduleRefreshCountdown({ query, live = false }) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
   const finished = query.data?.status === 'finished';
   const paused = !finished && isSchedulePollingPaused(query, now);
-  const active = Boolean(query.dataUpdatedAt) && !finished && !paused;
+  const active = Boolean(query.dataUpdatedAt) && !finished && !paused && !live;
+  const liveText = live && !finished ? (query.isFetching ? t('wird aktualisiert …') : t('Live – aktualisiert sich sofort')) : '';
   useEffect(() => {
     if (!active) return undefined;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [active]);
+  // Mit verbundenem WebSocket kommt jede Änderung sofort, auch nach der Abfrage-Pause (z. B. das Turnierende).
+  if (liveText) return <span className="schedule-refresh-countdown">{liveText}</span>;
   if (paused) {
     return (
       <span className="schedule-refresh-countdown">
@@ -519,25 +528,36 @@ export function ScheduleRefreshCountdown({ query }) {
   );
 }
 
-// Spielplan-Abruf mit Polling und Live-Push. Die Antwort enthält auch den aktuellen Turnierstatus; die Turnierseite
-// nutzt ihn (gleicher Query-Key, also kein zusätzlicher Abruf), um nach dem Start von selbst umzuschalten.
+// Spielplan-Abruf mit WebSocket-Sofort-Aktualisierung und Polling. Die Antwort enthält auch den aktuellen Turnierstatus;
+// die Turnierseite nutzt ihn (gleicher Query-Key, also kein zusätzlicher Abruf), um nach dem Start von selbst umzuschalten.
+// liveConnected: Der WebSocket ist verbunden, Änderungen kommen sofort.
 export function useScheduleQuery(tournamentId, shareToken = '', enabled = true) {
+  const socketConnectedRef = useRef(false);
+  const shareQuery = shareToken ? `?share=${encodeURIComponent(shareToken)}` : '';
   const query = useQuery({
     queryKey: ['schedule', tournamentId, shareToken],
-    queryFn: () => api(`/api/tournaments/${tournamentId}/schedule${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`),
-    refetchInterval: (current) => (current.state.data?.status === 'finished' || isSchedulePollingPaused(current.state) ? false : SCHEDULE_REFRESH_MS),
+    queryFn: () => api(`/api/tournaments/${tournamentId}/schedule${shareQuery}`),
+    refetchInterval: (current) => {
+      if (current.state.data?.status === 'finished' || isSchedulePollingPaused(current.state)) return false;
+      return socketConnectedRef.current ? SCHEDULE_SOCKET_FALLBACK_MS : SCHEDULE_REFRESH_MS;
+    },
     refetchIntervalInBackground: false,
     staleTime: 0,
     retry: false,
     enabled: Boolean(tournamentId) && enabled,
   });
-  // Turnierseite und eingebetteter Spielplan hören beide auf den Push: Ein laufender Abruf wird mitbenutzt statt
-  // abgebrochen und neu gestartet, sonst gingen pro Push zwei Anfragen raus.
-  useLivePushRefresh(enabled ? tournamentId : null, () => query.refetch({ cancelRefetch: false }));
-  return query;
+  // Nach Turnierende kommt nichts mehr, ohne Sichtrecht gibt es nichts zu sehen; dann keine Verbindung halten. Nach der
+  // Abfrage-Pause bleibt der (ruhende, kostenlose) Socket offen, damit die Anzeige das Turnierende noch mitbekommt.
+  const live = Boolean(tournamentId) && enabled && query.data?.status !== 'finished' && !isScheduleGone(query);
+  // Turnierseite und eingebetteter Spielplan teilen sich den Socket: Ein laufender Abruf wird mitbenutzt statt
+  // abgebrochen und neu gestartet, sonst gingen pro Änderung zwei Anfragen raus.
+  const liveConnected = useTournamentLiveSocket(live ? `/api/tournaments/${encodeURIComponent(tournamentId)}/schedule/socket${shareQuery}` : null,
+    () => query.refetch({ cancelRefetch: false }));
+  socketConnectedRef.current = liveConnected;
+  return { ...query, liveConnected };
 }
 
-// display: reine Anzeige für einen Bildschirm vor Ort – ohne Bedienelemente, aktualisiert sich über Polling und Live-Push.
+// display: reine Anzeige für einen Bildschirm vor Ort – ohne Bedienelemente, aktualisiert sich über WebSocket bzw. Polling.
 // Veranstalter mit Vereinslogo im Kopf von Turnierdetails und Turnierseite; gleiche Logik wie in der Turnierliste.
 export function TournamentClub({ tournament, shareToken = '' }) {
   // Merkt sich die fehlgeschlagene Logo-URL, damit beim Wechsel zu einem anderen Turnier dessen Logo wieder versucht wird.
@@ -588,7 +608,7 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
       <span className="muted">
         {t('Stand')}: {formatClock(query.dataUpdatedAt, language)}
         {dataAsOf && <> · {t('Turnierdaten vom')} {formatTournamentDateTime(dataAsOf, language, tournament?.timezone)}</>}
-        {query.data?.status !== 'finished' && <>{' · '}<ScheduleRefreshCountdown query={query} /></>}
+        {query.data?.status !== 'finished' && <>{' · '}<ScheduleRefreshCountdown query={query} live={query.liveConnected} /></>}
       </span>
       {!display && <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>}
     </div>

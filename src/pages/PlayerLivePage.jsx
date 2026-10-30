@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
@@ -10,12 +10,14 @@ import { StandalonePageHeader } from '../components/layout.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
 import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
-import { isIosSafari, useLivePushRefresh } from '../lib/hooks.js';
+import { isIosSafari, useLivePushRefresh, useTournamentLiveSocket } from '../lib/hooks.js';
 import { currentBrowserPushSubscription, ensureBrowserPushSubscription, isPushSupported } from '../lib/push.js';
 
-// 120 Sekunden reichen (halbiert die Last auf dem Free-Plan, Entscheidung vom 2026-10-21): Beim Zurückkehren zur App
-// wird sofort neu geladen (staleTime 0), und neue Runden sowie Ankündigungen kündigt zusätzlich der Push an.
+// Ohne WebSocket 120 Sekunden (halbiert die Last auf dem Free-Plan, Entscheidung vom 2026-10-21): Beim Zurückkehren zur
+// App wird sofort neu geladen (staleTime 0), und neue Runden sowie Ankündigungen kündigt zusätzlich der Push an.
 const LIVE_REFRESH_MS = 120_000;
+// Mit verbundenem WebSocket kommt jede Änderung sofort; Polling nur noch als Sicherheitsnetz.
+const LIVE_SOCKET_FALLBACK_MS = 600_000;
 
 function pushFlagKey(registrationId) {
   return `ptm_live_push_${registrationId}`;
@@ -376,10 +378,11 @@ function RegistrationPhase({ registration, tournament }) {
 export function LiveDetail({ queryKey, path, language, navigate = () => {}, token = null, canReportResult = false }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const socketConnectedRef = useRef(false);
   const query = useQuery({
     queryKey,
     queryFn: () => authenticatedApi(path),
-    refetchInterval: LIVE_REFRESH_MS,
+    refetchInterval: () => (socketConnectedRef.current ? LIVE_SOCKET_FALLBACK_MS : LIVE_REFRESH_MS),
     refetchIntervalInBackground: false,
     // Beim Zurückkehren zur App immer sofort neu laden - unverändert kostet das nur ein 304.
     staleTime: 0,
@@ -387,7 +390,10 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
   });
   const data = query.data;
   const notFound = query.error?.status === 404;
-  useLivePushRefresh(data?.tournament?.id, () => query.refetch());
+  useLivePushRefresh(data?.tournament?.id, () => query.refetch({ cancelRefetch: false }));
+  // Sofort-Aktualisierung nur bei freigeschalteter Live-Ansicht und solange das Turnier nicht beendet ist.
+  const socketPath = data?.live && data.tournament?.status !== 'finished' ? `${path}/socket` : null;
+  socketConnectedRef.current = useTournamentLiveSocket(socketPath, () => query.refetch({ cancelRefetch: false }));
   useEffect(() => {
     if (!token) return;
     if (data) rememberTeam(token, data);

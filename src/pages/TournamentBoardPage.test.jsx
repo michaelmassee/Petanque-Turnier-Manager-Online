@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TournamentBoardPage from './TournamentBoardPage.jsx';
+import { FakeWebSocket, installFakeWebSocket, latestSocket, uninstallFakeWebSocket } from '../test-support/fake-websocket.js';
 
 function jsonResponse(payload) {
   return { ok: true, json: () => Promise.resolve(payload) };
@@ -138,21 +139,23 @@ describe('Turnierseite', () => {
     expect(global.fetch).toHaveBeenCalledTimes(3);
   });
 
-  it('lädt bei einem Live-Push den Spielplan nur einmal, obwohl Seite und Spielplan beide zuhören', async () => {
+  it('öffnet für die Anzeige genau einen WebSocket und lädt pro Änderung einmal', async () => {
     global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ status: 'running', rounds: [], ranking: [], dataAsOf: null, announcement: null })));
-    const serviceWorker = new EventTarget();
-    Object.defineProperty(navigator, 'serviceWorker', { value: serviceWorker, configurable: true });
+    installFakeWebSocket();
     try {
       renderBoard(tournamentWith({}));
       await screen.findByText('Noch keine Runde gestartet.');
       await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+      expect(FakeWebSocket.instances).toHaveLength(1);
+      // Kein Benachrichtigungs-Schalter mehr: Die Seite aktualisiert sich ohne Erlaubnis.
+      expect(screen.queryByRole('button', { name: /Push/ })).not.toBeInTheDocument();
 
-      serviceWorker.dispatchEvent(Object.assign(new Event('message'), { data: { type: 'live-update', tournamentId: 't1' } }));
-      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+      act(() => { latestSocket().open(); latestSocket().receive({ type: 'changed' }); });
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2), { timeout: 3000 });
       await new Promise((resolve) => { setTimeout(resolve, 50); });
       expect(global.fetch).toHaveBeenCalledTimes(2);
     } finally {
-      delete navigator.serviceWorker;
+      uninstallFakeWebSocket();
     }
   });
 
