@@ -1837,6 +1837,8 @@
   "Alle Ergebnisse dieser Runde sind erfasst.": "All results of this round have been recorded.",
   "nächste Aktualisierung in {{time}}": "next update in {{time}}",
   "Aktualisiert sich bei jeder Änderung sofort": "Updates instantly with every change",
+  "Bitte anmelden, um Ergebnisse zu melden.": "Please sign in to report results.",
+  "Mit meinem Konto öffnen": "Open with my account",
   "WebSocket-Verbindung erwartet": "WebSocket connection expected",
   "wird aktualisiert …": "updating …",
   "Für dieses Turnier sind bereits zu viele Geräte für die Sofort-Aktualisierung angemeldet.": "Too many devices are already registered for instant updates for this tournament.",

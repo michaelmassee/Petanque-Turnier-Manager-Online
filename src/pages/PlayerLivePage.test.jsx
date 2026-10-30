@@ -62,7 +62,7 @@ function renderBackLink() {
   );
 }
 
-function renderPlayerLivePage(route, currentUser = null) {
+function renderPlayerLivePage(route, currentUser = null, { navigate = () => {}, onLogin = () => {} } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -72,12 +72,12 @@ function renderPlayerLivePage(route, currentUser = null) {
         setLanguage={() => {}}
         menuOpen={false}
         setMenuOpen={() => {}}
-        navigate={() => {}}
+        navigate={navigate}
         currentUser={currentUser}
         isAdmin={false}
         onSelectAdminDashboard={() => {}}
         onLogout={() => {}}
-        onLogin={() => {}}
+        onLogin={onLogin}
         drawerContent={null}
         postboxControl={null}
       />
@@ -761,6 +761,36 @@ describe('Live-Ansicht für Spieler', () => {
     await screen.findAllByText('Bert Beispiel');
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/live/token/tok1', expect.anything());
     expect(screen.queryByLabelText('Eigene Punkte')).not.toBeInTheDocument();
+  });
+
+  it('bittet über den persönlichen Link um Anmeldung, wenn Ergebnismeldungen freigeschaltet sind (E-27)', async () => {
+    localStorage.clear();
+    const payload = livePayload();
+    payload.tournament.playerResultReportingEnabled = true;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(payload));
+    const onLogin = vi.fn();
+    const { unmount } = renderPlayerLivePage(matchLiveRoute('/live/t/tok1'), null, { onLogin });
+
+    expect(await screen.findByText('Bitte anmelden, um Ergebnisse zu melden.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Eigene Punkte')).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('region', { name: 'Aktuelle Partie' })).getByRole('button', { name: 'Anmelden' }));
+    expect(onLogin).toHaveBeenCalledTimes(1);
+    unmount();
+
+    // Schon angemeldet, aber über den Link geöffnet: Melden geht nur über das eigene Konto.
+    const navigate = vi.fn();
+    renderPlayerLivePage(matchLiveRoute('/live/t/tok1'), { id: 'player' }, { navigate });
+    fireEvent.click(await screen.findByRole('button', { name: 'Mit meinem Konto öffnen' }));
+    expect(navigate).toHaveBeenCalledWith('/live/r1');
+  });
+
+  it('zeigt über den persönlichen Link keinen Anmeldehinweis, wenn Ergebnismeldungen aus sind', async () => {
+    localStorage.clear();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(livePayload()));
+    renderPlayerLivePage(matchLiveRoute('/live/t/tok1'));
+
+    await screen.findAllByText('Bert Beispiel');
+    expect(screen.queryByText('Bitte anmelden, um Ergebnisse zu melden.')).not.toBeInTheDocument();
   });
 
   it('lädt die eigene Meldung mit Konto über den Nutzerzugriff, auch wenn ein Link gemerkt ist', async () => {

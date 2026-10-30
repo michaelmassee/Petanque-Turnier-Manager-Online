@@ -4828,6 +4828,18 @@ details[open] > .play-round-summary::before {
   text-align: right;
 }
 
+/* Live-Ansicht über den persönlichen Link: Ergebnismeldung nur mit Konto (E-27). */
+.live-report-login {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.live-report-login .hint {
+  margin: 0;
+}
+
 /* Sofort-Aktualisierung verbunden: grüner Punkt statt Uhrzeit und Countdown. */
 .live-indicator {
   display: inline-flex;

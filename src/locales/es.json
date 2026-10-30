@@ -1837,6 +1837,8 @@
   "Alle Ergebnisse dieser Runde sind erfasst.": "Todos los resultados de esta ronda están registrados.",
   "nächste Aktualisierung in {{time}}": "próxima actualización en {{time}}",
   "Aktualisiert sich bei jeder Änderung sofort": "Se actualiza al instante con cada cambio",
+  "Bitte anmelden, um Ergebnisse zu melden.": "Inicia sesión para comunicar resultados.",
+  "Mit meinem Konto öffnen": "Abrir con mi cuenta",
   "WebSocket-Verbindung erwartet": "Se esperaba una conexión WebSocket",
   "wird aktualisiert …": "actualizando …",
   "Für dieses Turnier sind bereits zu viele Geräte für die Sofort-Aktualisierung angemeldet.": "Ya hay demasiados dispositivos registrados para la actualización instantánea de este torneo.",

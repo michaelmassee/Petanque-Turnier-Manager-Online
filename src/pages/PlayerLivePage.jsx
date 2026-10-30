@@ -247,7 +247,7 @@ function DocumentResultReportHint({ report }) {
   return <p className="hint">{t('Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.', { score })}</p>;
 }
 
-function CurrentMatchCard({ live, participation, canReportResult, reportingDisabled, resultReport, path, onResultSaved, onRefresh }) {
+function CurrentMatchCard({ live, participation, canReportResult, reportingDisabled, loginHint = null, resultReport, path, onResultSaved, onRefresh }) {
   const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const match = live.currentMatch;
@@ -284,6 +284,7 @@ function CurrentMatchCard({ live, participation, canReportResult, reportingDisab
           <p className={`live-score live-${match.outcome}`}>{scoreLabel(match, t)}</p>
           {!match.bye && match.outcome === 'open' && <DocumentResultReportHint report={resultReport} />}
           {canReportResult && !match.bye && match.outcome === 'open' && <PlayerResultReport path={path} onSaved={resultSaved} onAlreadyEntered={alreadyEntered} />}
+          {loginHint && !match.bye && match.outcome === 'open' && loginHint}
           {reportingDisabled && !match.bye && match.outcome === 'open' && <p className="hint">{t('Die Ergebnismeldung über die Live-Ansicht ist abgeschaltet. Bitte melde dein Ergebnis direkt bei der Turnierleitung.')}</p>}
           <Feedback message={message} />
         </>
@@ -375,7 +376,7 @@ function RegistrationPhase({ registration, tournament }) {
   );
 }
 
-export function LiveDetail({ queryKey, path, language, navigate = () => {}, token = null, canReportResult = false }) {
+export function LiveDetail({ queryKey, path, language, navigate = () => {}, token = null, canReportResult = false, loginForReporting = null }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const socketConnectedRef = useRef(false);
@@ -476,6 +477,16 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
   const reportingOpen = tournament.status === 'running' && tournament.playerResultReportingEnabled
     && (!imDokumentGefuehrt || tournament.resultReportingViaDocument);
   const reportPending = registration.resultReport?.status === 'open';
+  // Über den persönlichen Link darf niemand melden (E-27): Ist die Meldung freigeschaltet, auf den Login bzw. den
+  // Zugriff über das eigene Konto hinweisen.
+  const loginHint = !canReportResult && loginForReporting && reportingOpen && !reportPending && registration.participation !== 'withdrawn' ? (
+    <div className="live-report-login" role="note">
+      <p className="hint">{t('Bitte anmelden, um Ergebnisse zu melden.')}</p>
+      {loginForReporting.loggedIn
+        ? <Button variant="secondary" onClick={() => navigate(`/live/${encodeURIComponent(registration.id)}`)}>{t('Mit meinem Konto öffnen')}</Button>
+        : <Button variant="secondary" onClick={loginForReporting.onLogin}>{t('Anmelden')}</Button>}
+    </div>
+  ) : null;
   return (
     <div className="live-view">
       {header}
@@ -489,6 +500,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
       {(drawn || tournament.status === 'running') && <CurrentMatchCard key={live.currentMatch?.matchId || 'no-current-match'} live={live} participation={registration.participation}
         canReportResult={canReportResult && reportingOpen && !reportPending}
         reportingDisabled={tournament.status === 'running' && !reportingOpen}
+        loginHint={loginHint}
         resultReport={registration.resultReport} path={path}
         onResultSaved={(updated) => queryClient.setQueryData(queryKey, updated)} onRefresh={() => query.refetch()} />}
       <RankingCard live={live} tournament={tournament} />
@@ -600,7 +612,8 @@ export function PlayerLivePage({ route, language, setLanguage, menuOpen, setMenu
     || (!currentUser && route.registrationId ? readRememberedTeams().find((entry) => entry.registrationId === route.registrationId)?.token : null);
   let content;
   if (token) {
-    content = <LiveDetail queryKey={['live', 'token', token]} path={`/api/live/token/${encodeURIComponent(token)}`} language={language} navigate={navigate} token={token} />;
+    content = <LiveDetail queryKey={['live', 'token', token]} path={`/api/live/token/${encodeURIComponent(token)}`} language={language} navigate={navigate} token={token}
+      loginForReporting={{ loggedIn: Boolean(currentUser), onLogin }} />;
   } else if (route.registrationId && currentUser) {
     content = <LiveDetail queryKey={['live', 'registration', route.registrationId]} path={`/api/live/registrations/${encodeURIComponent(route.registrationId)}`} language={language} navigate={navigate} canReportResult />;
   } else {
