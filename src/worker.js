@@ -5587,6 +5587,9 @@ export async function upsertDocumentRegistration(request, env, tournament, local
   const slotSql = slotLinks ? `, user_id = ?, player_email = ?, partner_user_id = ?, partner_email = ?,
       partner2_user_id = ?, partner2_email = ?` : '';
   const slotBinds = slotLinks ? slotLinks.flatMap((link) => [link.userId, link.email]) : [];
+  // Wiederaufnahme (z. B. cancelled → confirmed) belegt einen Platz im Teilnehmer-Limit; die Grenze steht im UPDATE.
+  const reactivates = !PARTICIPANT_LIMIT_ACTIVE_STATUSES.includes(existing.status) && PARTICIPANT_LIMIT_ACTIVE_STATUSES.includes(status) ? 1 : 0;
+  const limitCondition = participantLimitCondition(tournament.id);
   const update = db.prepare(`UPDATE registrations SET status = ?, participation = ?, seeding_position = ?,
       rejection_reason = CASE WHEN ? THEN rejection_reason END, rejected_at = CASE WHEN ? THEN rejected_at END,
       rejected_by = CASE WHEN ? THEN rejected_by END,
@@ -5603,7 +5606,8 @@ export async function upsertDocumentRegistration(request, env, tournament, local
       team_name = CASE WHEN ? THEN ? ELSE team_name END,
       local_registration_uuid = CASE WHEN EXISTS (SELECT 1 FROM registrations other WHERE other.tournament_id = ?
           AND other.local_registration_uuid = ? AND other.id != ?) THEN local_registration_uuid ELSE ? END${slotSql},
-      execution_revision = execution_revision + 1, updated_at = ? WHERE id = ? AND execution_revision = ?`)
+      execution_revision = execution_revision + 1, updated_at = ? WHERE id = ? AND execution_revision = ?
+        AND (? = 0 OR ${limitCondition.sql})`)
     .bind(status, participation, seedingPosition,
       ...Array(3).fill(status === 'rejected' ? 1 : 0),
       documentMaster ? 1 : 0, documentRegistration?.firstName ?? null,
@@ -5618,7 +5622,7 @@ export async function upsertDocumentRegistration(request, env, tournament, local
       persons ? 1 : 0, documentRegistration?.partner2LicenseNr ?? null,
       documentMaster ? 1 : 0, documentRegistration?.teamName ?? null,
       tournament.id, localUuid, existing.id, localUuid, ...slotBinds,
-      now, existing.id, expected);
+      now, existing.id, expected, reactivates, ...limitCondition.binds);
   const unlinkAudits = slotLinks ? SLOT_COLUMNS
     .filter((column, index) => existing[column.userId] && !slotLinks.some((link) => link.userId === existing[column.userId]))
     .map((column) => db.prepare(`INSERT INTO audit_log (id, tournament_id, registration_id, actor_role, action, target, details_json, created_at)
@@ -5631,10 +5635,13 @@ export async function upsertDocumentRegistration(request, env, tournament, local
       sql: `SELECT CASE WHEN EXISTS (SELECT 1 FROM registrations WHERE id = ? AND execution_revision = ? AND updated_at = ?)
           THEN json_object('status', 200, 'body', json_object('created', json('false')),
             'hydrate', json_object('kind', 'registration', 'id', ?))
+          WHEN ? = 1 AND NOT (${limitCondition.sql})
+          THEN json_object('status', 409, 'body', json_object('error', 'Die maximale Teilnehmerzahl für dieses Turnier ist erreicht.',
+            'details', json_object('code', 'participant_limit_reached')))
           ELSE json_object('status', 409, 'body', json_object('error', 'Die Ausführungsdaten wurden zwischenzeitlich geändert',
             'details', json_object('code', 'execution_conflict')))
           END`,
-      binds: [existing.id, expected + 1, now, existing.id],
+      binds: [existing.id, expected + 1, now, existing.id, reactivates, ...limitCondition.binds],
     },
   };
 }
@@ -9091,17 +9098,21 @@ export async function createRegistration(request, env, tournament, {
   const maxRegistrations = Number(tournament.max_registrations || 0);
   const waitlistEnabled = Number(tournament.waitlist_enabled ?? 1) === 1;
   const openCondition = registrationOpenSql({ isManager, syncBootstrap, shareTokenHash });
-  const statements = [];
-  if (registration.isVip && maxRegistrations > 0) {
-    statements.push(db.prepare(`UPDATE registrations SET status = ?, updated_at = ?
+  const limitCondition = participantLimitCondition(tournament.id);
+  // VIP-Verdrängung im selben Batch wie das INSERT. Ein INSERT … SELECT ohne Treffer ist kein Fehler und rollt den Batch
+  // nicht zurück; die Verdrängung trägt deshalb dieselben Bedingungen (Teilnehmer-Limit, Duplikat-Bestand), sonst bliebe
+  // sie bei abgelehnter Anmeldung stehen - und eine Wiederholung der Schleife verdrängte eine weitere Meldung.
+  const displacement = (guard) => (registration.isVip && maxRegistrations > 0 ? [db.prepare(`UPDATE registrations SET status = ?, updated_at = ?
         WHERE id = (SELECT id FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
                     AND is_vip = 0 ORDER BY registered_at DESC LIMIT 1)
           AND (SELECT COUNT(*) FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')) >= ?
           AND EXISTS (SELECT 1 FROM tournaments t WHERE t.id = ? AND ${openCondition.sql})
+          AND ${limitCondition.sql}
+          ${guard ? `AND (${guard.sql}) = ?` : ''}
         RETURNING id`)
-      .bind(waitlistEnabled ? 'waitlist' : 'cancelled', now, tournament.id, tournament.id, maxRegistrations, tournament.id,
-        ...openCondition.binds));
-  }
+    .bind(waitlistEnabled ? 'waitlist' : 'cancelled', now, tournament.id, tournament.id, maxRegistrations, tournament.id,
+      ...openCondition.binds, ...limitCondition.binds, ...(guard ? [...guard.binds, guard.snapshot] : []))] : []);
+  let statements = [];
   const record = registrationRecord(id, tournament.id, registration, {
     organizerMessage, feeSelections, registrationAnswers, language, now, accountLinks,
     cancelToken: crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', ''),
@@ -9113,7 +9124,6 @@ export async function createRegistration(request, env, tournament, {
   let duplicateGuard = !isManager && !syncBootstrap
     ? await registrationDuplicateGuard(db, tournament.id, record) : null;
   const statusSql = `CASE WHEN ? = 0 OR capacity.used < ? THEN ? ELSE 'waitlist' END`;
-  const limitCondition = participantLimitCondition(tournament.id);
   const statusBinds = [maxRegistrations, maxRegistrations, baseStatus];
   const columns = Object.keys(record);
   let results;
@@ -9137,6 +9147,7 @@ export async function createRegistration(request, env, tournament, {
         tournament.id, tournament.id, ...openCondition.binds, maxRegistrations, maxRegistrations, waitlistEnabled ? 1 : 0,
         ...limitCondition.binds,
         ...(duplicateGuard ? [...duplicateGuard.binds, duplicateGuard.snapshot] : []));
+    statements = displacement(duplicateGuard);
     results = await db.batch([...statements, insert]);
     created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
     if (created) break;
@@ -9334,10 +9345,10 @@ export async function updateRegistration(request, env, existing, actingUser = nu
   }
   const registration = normalizeRegistrationInput(body, { requireStatus: true, allowPlaceholder: true });
   assertNotRejectedByStatusEdit(existing.status, registration.status);
-  // Eine abgesagte Meldung wieder aufnehmen belegt einen Platz im Teilnehmer-Limit.
-  if (!PARTICIPANT_LIMIT_ACTIVE_STATUSES.includes(existing.status) && PARTICIPANT_LIMIT_ACTIVE_STATUSES.includes(registration.status)) {
-    await assertParticipantLimitNotReached(db, existing.tournament_id);
-  }
+  // Eine abgesagte Meldung wieder aufnehmen belegt einen Platz im Teilnehmer-Limit: Die Grenze steht im UPDATE selbst,
+  // damit parallele Wiederaufnahmen sie nicht gemeinsam überschreiten.
+  const reactivates = !PARTICIPANT_LIMIT_ACTIVE_STATUSES.includes(existing.status) && PARTICIPANT_LIMIT_ACTIVE_STATUSES.includes(registration.status);
+  const limitCondition = participantLimitCondition(existing.tournament_id);
   assertCorePartnerCountMatchesFormation(existing, registration);
   const feeSelections = resolveFeeSelections(existing, body.feeSelections, registration, existing);
   const registrationAnswers = resolveRegistrationAnswers(existing, body.registrationAnswers, registration, existing);
@@ -9363,7 +9374,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
   }));
   assertUniqueSelectedAccountLinks(Object.fromEntries(linkNames.map((name, index) => [name, resolvedLinks[index]])), selectedLinks);
   const [userId, partnerUserId, partner2UserId] = uniqueAccountLinks(resolvedLinks);
-  await db
+  const saved = await db
     .prepare(
       `UPDATE registrations
        SET first_name = ?, last_name = ?, email = ?, player_email = ?, club = ?, license_nr = ?,
@@ -9371,7 +9382,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
            partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?, partner2_club = ?, partner2_license_nr = ?,
            team_name = ?, seeding_position = ?, status = ?, is_vip = ?, fee_selections = ?, registration_answers = ?, confirmed_at = ?, updated_at = ?,
            user_id = ?, partner_user_id = ?, partner2_user_id = ?, rejection_reason = ?, rejected_at = ?, rejected_by = ?, phone = ?
-       WHERE id = ?`,
+       WHERE id = ? AND (? = 0 OR ${limitCondition.sql})`,
     )
     .bind(
       registration.firstName,
@@ -9406,8 +9417,11 @@ export async function updateRegistration(request, env, existing, actingUser = nu
       keepsRejection ? existing.rejected_by : null,
       registration.phone === undefined ? existing.phone ?? null : registration.phone,
       existing.id,
+      reactivates ? 1 : 0,
+      ...limitCondition.binds,
     )
     .run();
+  if (!saved.meta.changes) throw participantLimitError();
 
   if (registration.isVip && Number(existing.max_registrations)) {
     await enforceVipPriorityOnUpdate(env, existing, new URL(request.url).origin);

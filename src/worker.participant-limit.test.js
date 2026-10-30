@@ -106,6 +106,57 @@ describe('Teilnehmer-Limit pro Turnier', () => {
     expect(anzahl()).toBe(2);
   });
 
+  // Ein INSERT … SELECT ohne Treffer rollt den Batch nicht zurück: Die Verdrängung darf nur zusammen mit der Anmeldung
+  // gelingen, sonst stünde ein Teilnehmer ohne Grund auf der Warteliste.
+  it('verdrängt bei erreichter Grenze niemanden für eine abgelehnte VIP-Anmeldung', async () => {
+    sql("UPDATE tournaments SET max_registrations = 2 WHERE id = 't1'");
+    vorhanden('a', 'confirmed');
+    vorhanden('b', 'confirmed');
+    const request = new Request('https://ptm.test/api/tournaments/t1/registrations', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName: 'Vip', lastName: 'Gast', playerEmail: 'vip@example.test', isVip: true,
+        publicationNoticeAccepted: true, personsConsentAccepted: true, feeSelections: [], registrationAnswers: [] }),
+    });
+    await expect(createRegistration(request, env, turnier(), { isManager: true, session: { user: { id: 'u1', role: 'user' } } }))
+      .rejects.toMatchObject(LIMIT_ERREICHT);
+    expect(env.DB.sqlite.prepare("SELECT id, status FROM registrations ORDER BY id").all())
+      .toEqual([{ id: 'a', status: 'confirmed' }, { id: 'b', status: 'confirmed' }]);
+  });
+
+  it('lässt bei gleichzeitigen Wiederaufnahmen nur so viele zu, wie Platz ist', async () => {
+    vorhanden('a', 'confirmed');
+    vorhanden('alt1', 'cancelled');
+    vorhanden('alt2', 'cancelled');
+    const wiederaufnehmen = async (id) => {
+      const existing = await getRegistrationWithTournament(env.DB, id);
+      const request = new Request(`https://ptm.test/api/registrations/${id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstName: id, lastName: 'Vorhanden', email: `${id}@example.test`, playerEmail: `${id}@example.test`, status: 'confirmed' }),
+      });
+      return updateRegistration(request, env, existing, { id: 'u1', role: 'user' });
+    };
+    const ergebnisse = await Promise.allSettled([wiederaufnehmen('alt1'), wiederaufnehmen('alt2')]);
+
+    expect(ergebnisse.map((ergebnis) => ergebnis.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(ergebnisse.find((ergebnis) => ergebnis.status === 'rejected').reason).toMatchObject(LIMIT_ERREICHT);
+    expect(env.DB.sqlite.prepare("SELECT COUNT(*) AS count FROM registrations WHERE status = 'confirmed'").get().count).toBe(2);
+  });
+
+  it('lässt auch das Turnierdokument eine abgesagte Meldung nicht über die Grenze wieder aufnehmen', async () => {
+    const ONLINE_ID = '66666666-6666-4666-8666-666666666666';
+    bindeDokument(env.DB.sqlite, 't1');
+    vorhanden('a', 'confirmed');
+    vorhanden('b', 'confirmed');
+    vorhanden(ONLINE_ID, 'cancelled');
+    const request = syncAnfrage('PUT', `/api/sync/tournaments/t1/registrations/${LOKALE_ID}`,
+      { onlineRegistrationId: ONLINE_ID, expectedExecutionRevision: 1, status: 'confirmed' });
+    const antwort = await executeSyncWrite(request, env.DB, turnier(), () => upsertDocumentRegistration(request, env, turnier(), LOKALE_ID));
+
+    expect(antwort.status).toBe(409);
+    expect((await antwort.json()).details).toEqual({ code: 'participant_limit_reached' });
+    expect(env.DB.sqlite.prepare('SELECT status FROM registrations WHERE id = ?').get(ONLINE_ID).status).toBe('cancelled');
+  });
+
   describe('„Max. Meldungen“ im Turnier', () => {
     const bearbeiten = (maxRegistrations, session = 'u1-session') => worker.fetch(new Request('https://ptm.test/api/tournaments/t1', {
       method: 'PUT', headers: { Cookie: `ptm_session=${session}`, 'Content-Type': 'application/json' },
