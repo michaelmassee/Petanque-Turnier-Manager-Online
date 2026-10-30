@@ -2124,16 +2124,6 @@ a.left-panel-link {
   max-width: 60%;
 }
 
-.board-push {
-  display: grid;
-  justify-items: start;
-  gap: 6px;
-}
-
-.display-actions .board-push {
-  justify-items: end;
-}
-
 /* Turnierseite und Anzeige: nur aktuelle Runde + Rangliste. Partien als Kartenraster, das je nach Breite 1…n Spalten nutzt. */
 .play-schedule {
   display: grid;
@@ -2305,15 +2295,11 @@ a.left-panel-link {
     display: none;
   }
 
-  /* Handy: Push-Schalter unter den Turniernamen statt darüber. */
+  /* Handy: Bedienelemente unter den Turniernamen statt darüber. */
   .display-actions {
     position: static;
     max-width: none;
     justify-content: flex-start;
-  }
-
-  .display-actions .board-push {
-    justify-items: start;
   }
 }
 
@@ -4834,6 +4820,29 @@ details[open] > .play-round-summary::before {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* Spielplan der Turnierseite/Anzeige: Aktualisierungszeile unten rechts. */
+.play-schedule .live-refresh {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+/* Sofort-Aktualisierung verbunden: grüner Punkt statt Uhrzeit und Countdown. */
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #1f7a45;
+}
+
+.live-indicator::before {
+  content: '';
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .live-list-item {

@@ -105,7 +105,10 @@ describe('Live-Ansicht für Spieler', () => {
       renderDetail();
       await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
       expect(latestSocket().url).toBe(`${window.location.origin.replace(/^http/, 'ws')}/api/live/registrations/r1/socket`);
+      expect(await screen.findByText(/^Stand:/)).toBeInTheDocument();
       act(() => { latestSocket().open(); latestSocket().receive({ type: 'changed' }); });
+      expect(await screen.findByText('Live')).toBeInTheDocument();
+      expect(screen.queryByText(/^Stand:/)).not.toBeInTheDocument();
       await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2), { timeout: 3000 });
     } finally {
       uninstallFakeWebSocket();

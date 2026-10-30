@@ -497,20 +497,17 @@ function formatCountdown(ms) {
  * Ort sehen, dass sich die Seite selbst aktualisiert. Nach Turnierende wird nicht mehr abgefragt, dann nichts anzeigen;
  * pausiert (siehe isSchedulePollingPaused) nur ein Hinweis zum Neuladen.
  */
-export function ScheduleRefreshCountdown({ query, live = false }) {
+export function ScheduleRefreshCountdown({ query }) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
   const finished = query.data?.status === 'finished';
   const paused = !finished && isSchedulePollingPaused(query, now);
-  const active = Boolean(query.dataUpdatedAt) && !finished && !paused && !live;
-  const liveText = live && !finished ? (query.isFetching ? t('wird aktualisiert …') : t('Live – aktualisiert sich sofort')) : '';
+  const active = Boolean(query.dataUpdatedAt) && !finished && !paused;
   useEffect(() => {
     if (!active) return undefined;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [active]);
-  // Mit verbundenem WebSocket kommt jede Änderung sofort, auch nach der Abfrage-Pause (z. B. das Turnierende).
-  if (liveText) return <span className="schedule-refresh-countdown">{liveText}</span>;
   if (paused) {
     return (
       <span className="schedule-refresh-countdown">
@@ -603,12 +600,17 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
   const rounds = query.data?.rounds || [];
   const ranking = query.data?.ranking || [];
   const dataAsOf = query.data?.dataAsOf || null;
+  // Mit verbundenem WebSocket kommt jede Änderung sofort (auch nach der Abfrage-Pause); die Uhrzeit des letzten Abrufs
+  // sähe dann nur veraltet aus. Ohne Verbindung wie bisher Stand und Countdown bis zum nächsten Abruf.
+  const live = query.liveConnected && query.data?.status !== 'finished';
   const refresh = (
     <div className="live-refresh">
       <span className="muted">
-        {t('Stand')}: {formatClock(query.dataUpdatedAt, language)}
+        {live
+          ? <span className="live-indicator" title={t('Aktualisiert sich bei jeder Änderung sofort')}>{t('Live')}</span>
+          : <>{t('Stand')}: {formatClock(query.dataUpdatedAt, language)}</>}
         {dataAsOf && <> · {t('Turnierdaten vom')} {formatTournamentDateTime(dataAsOf, language, tournament?.timezone)}</>}
-        {query.data?.status !== 'finished' && <>{' · '}<ScheduleRefreshCountdown query={query} live={query.liveConnected} /></>}
+        {!live && query.data?.status !== 'finished' && <>{' · '}<ScheduleRefreshCountdown query={query} /></>}
       </span>
       {!display && <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>}
     </div>
@@ -618,11 +620,11 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
     return (
       <div className={`play-schedule${display ? ' is-display' : ''}`}>
         <Feedback error={query.error?.message} />
-        {refresh}
         <p className="muted">{t(query.data?.status === 'running' || query.data?.status === 'finished'
           ? 'Noch keine Runde gestartet.' : 'Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.')}</p>
         {display && query.data?.status !== 'finished' && Array.isArray(query.data?.entries)
           && <TournamentEntryList entries={query.data.entries} scrollRef={roundScrollRef} />}
+        {refresh}
       </div>
     );
   }
@@ -636,7 +638,6 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
     return (
       <div className="play-schedule is-display">
         <Feedback error={query.error?.message} />
-        {refresh}
         <div className="display-columns">
           <section className="display-ranking">
             <h2>{t('Endrangliste')}</h2>
@@ -647,6 +648,7 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
             </div>
           </section>
         </div>
+        {refresh}
       </div>
     );
   }
@@ -656,8 +658,6 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
   return (
     <div className={`play-schedule${display ? ' is-display' : ''}`}>
       <Feedback error={query.error?.message} />
-      {/* Oben, damit auch der Bildschirm vor Ort ohne Scrollen zeigt, wie aktuell er ist und wann er neu lädt. */}
-      {refresh}
       <div className={`display-columns${showRanking ? ' has-ranking' : ''}`}>
         <section className="display-current-round">
           <h2>{t('Runde')} {currentRound.roundNumber}</h2>
@@ -676,6 +676,8 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
           </section>
         )}
       </div>
+      {/* Unten rechts: Der Bildschirm vor Ort füllt die Höhe, die Zeile steht dort ohne Scrollen am unteren Rand. */}
+      {refresh}
     </div>
   );
 }

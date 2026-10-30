@@ -1836,7 +1836,7 @@
   "Erfasste Ergebnisse": "Résultats saisis",
   "Alle Ergebnisse dieser Runde sind erfasst.": "Tous les résultats de ce tour sont saisis.",
   "nächste Aktualisierung in {{time}}": "prochaine mise à jour dans {{time}}",
-  "Live – aktualisiert sich sofort": "En direct – mise à jour instantanée",
+  "Aktualisiert sich bei jeder Änderung sofort": "Se met à jour instantanément à chaque changement",
   "WebSocket-Verbindung erwartet": "Connexion WebSocket attendue",
   "wird aktualisiert …": "mise à jour …",
   "Für dieses Turnier sind bereits zu viele Geräte für die Sofort-Aktualisierung angemeldet.": "Trop d'appareils sont déjà inscrits à la mise à jour instantanée pour ce tournoi.",

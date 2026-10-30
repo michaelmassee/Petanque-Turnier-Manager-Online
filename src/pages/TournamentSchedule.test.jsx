@@ -169,7 +169,10 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
       const socket = latestSocket();
       expect(socket.url).toBe(`${window.location.origin.replace(/^http/, 'ws')}/api/tournaments/t1/schedule/socket`);
       act(() => socket.open());
-      expect(await screen.findByText('Live – aktualisiert sich sofort')).toBeInTheDocument();
+      // Mit Verbindung nur „Live“: Die Uhrzeit des letzten Abrufs sähe ohne Änderungen veraltet aus.
+      expect(await screen.findByText('Live')).toHaveAttribute('title', 'Aktualisiert sich bei jeder Änderung sofort');
+      expect(screen.queryByText(/^Stand:/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/nächste Aktualisierung/)).not.toBeInTheDocument();
 
       // Mehrere Änderungen kurz hintereinander (Serien-Eingabe) werden zu einem Abruf.
       act(() => { socket.receive({ type: 'changed' }); socket.receive({ type: 'changed' }); socket.receive('pong'); });

@@ -393,7 +393,8 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
   useLivePushRefresh(data?.tournament?.id, () => query.refetch({ cancelRefetch: false }));
   // Sofort-Aktualisierung nur bei freigeschalteter Live-Ansicht und solange das Turnier nicht beendet ist.
   const socketPath = data?.live && data.tournament?.status !== 'finished' ? `${path}/socket` : null;
-  socketConnectedRef.current = useTournamentLiveSocket(socketPath, () => query.refetch({ cancelRefetch: false }));
+  const socketConnected = useTournamentLiveSocket(socketPath, () => query.refetch({ cancelRefetch: false }));
+  socketConnectedRef.current = socketConnected;
   useEffect(() => {
     if (!token) return;
     if (data) rememberTeam(token, data);
@@ -442,7 +443,10 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
   const refresh = (
     <div className="live-refresh">
       <span className="muted">
-        {t('Stand')}: {formatClock(query.dataUpdatedAt, language)}
+        {/* Mit verbundenem WebSocket wäre die Uhrzeit des letzten Abrufs nur scheinbar veraltet. */}
+        {socketConnected
+          ? <span className="live-indicator" title={t('Aktualisiert sich bei jeder Änderung sofort')}>{t('Live')}</span>
+          : <>{t('Stand')}: {formatClock(query.dataUpdatedAt, language)}</>}
         {dataAsOf && <> · {t('Turnierdaten vom')} {formatClock(dataAsOf, language)}</>}
       </span>
       <Button variant="secondary" loading={query.isFetching} onClick={() => query.refetch()}>{t('Aktualisieren')}</Button>

@@ -1914,7 +1914,7 @@
   "Erfasste Ergebnisse": "Risultati registrati",
   "Alle Ergebnisse dieser Runde sind erfasst.": "Tutti i risultati di questo turno sono registrati.",
   "nächste Aktualisierung in {{time}}": "prossimo aggiornamento tra {{time}}",
-  "Live – aktualisiert sich sofort": "Live – si aggiorna subito",
+  "Aktualisiert sich bei jeder Änderung sofort": "Si aggiorna subito a ogni modifica",
   "WebSocket-Verbindung erwartet": "Connessione WebSocket prevista",
   "wird aktualisiert …": "aggiornamento in corso …",
   "Für dieses Turnier sind bereits zu viele Geräte für die Sofort-Aktualisierung angemeldet.": "Per questo torneo sono già registrati troppi dispositivi per l’aggiornamento istantaneo.",
