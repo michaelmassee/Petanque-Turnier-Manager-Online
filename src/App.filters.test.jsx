@@ -151,6 +151,14 @@ describe('filterUsers', () => {
     expect(filterUsers(configuredUsers, '', '', '', { mailFilter }).map((user) => user.id)).toEqual(ids);
   });
 
+  it.each([
+    ['70', ['default', 'legacy']], ['120', ['custom']], ['unlimited', ['u1']], ['5', []],
+  ])('filtert nach effektivem Teilnehmer-Limit %s (Standard 70, Admins unbegrenzt)', (participantLimitFilter, ids) => {
+    const withLimits = configuredUsers.map((user) => (user.id === 'custom' ? { ...user, participantLimit: 120 }
+      : user.id === 'u2' ? { ...user, participantLimit: 0 } : user));
+    expect(filterUsers(withLimits, '', '', '', { participantLimitFilter }).map((user) => user.id)).toEqual(ids);
+  });
+
   it('kombiniert beide neuen Filter mit Suche, Rolle und Kontostatus', () => {
     expect(filterUsers(configuredUsers, 'Mehr', 'user', 'verified', { tournamentLimitFilter: '10', mailFilter: 'enabled' })).toEqual([configuredUsers[3]]);
     expect(filterUsers(configuredUsers, '', '', '', { tournamentLimitFilter: '10', mailFilter: 'disabled' })).toEqual([]);

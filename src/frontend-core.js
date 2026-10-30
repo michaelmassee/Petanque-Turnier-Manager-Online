@@ -1,4 +1,4 @@
-import { DEFAULT_TOURNAMENT_LIMIT } from './lib/constants.js';
+import { DEFAULT_PARTICIPANT_LIMIT, DEFAULT_TOURNAMENT_LIMIT } from './lib/constants.js';
 
 export function filterTournaments(tournaments, query, statusFilter) {
   const normalizedQuery = (query || '').trim().toLowerCase();
@@ -23,7 +23,7 @@ export function filterRegistrations(registrations, query, statusFilter, { organi
   });
 }
 
-export function filterUsers(users, query, roleFilter, statusFilter, { tournamentLimitFilter = '', mailFilter = '' } = {}) {
+export function filterUsers(users, query, roleFilter, statusFilter, { tournamentLimitFilter = '', participantLimitFilter = '', mailFilter = '' } = {}) {
   const normalizedQuery = (query || '').trim().toLowerCase();
   return users.filter((user) => {
     const matchesQuery = !normalizedQuery || [user.firstName, user.lastName, user.email, user.phone, user.username, user.username && `@${user.username}`, user.club].some((value) => (value || '').toLowerCase().includes(normalizedQuery));
@@ -35,9 +35,12 @@ export function filterUsers(users, query, roleFilter, statusFilter, { tournament
     const matchesLimit = !tournamentLimitFilter || (tournamentLimitFilter === 'unlimited'
       ? user.role === 'admin'
       : user.role !== 'admin' && String(user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT) === tournamentLimitFilter);
+    const matchesParticipantLimit = !participantLimitFilter || (participantLimitFilter === 'unlimited'
+      ? user.role === 'admin'
+      : user.role !== 'admin' && String(user.participantLimit ?? DEFAULT_PARTICIPANT_LIMIT) === participantLimitFilter);
     const mailEnabled = user.role === 'admin' || (user.mailEnabled ?? true);
     const matchesMail = !mailFilter || (mailFilter === 'enabled' && mailEnabled) || (mailFilter === 'disabled' && !mailEnabled);
-    return matchesQuery && matchesRole && matchesStatus && matchesLimit && matchesMail;
+    return matchesQuery && matchesRole && matchesStatus && matchesLimit && matchesParticipantLimit && matchesMail;
   });
 }
 

@@ -77,6 +77,8 @@ import {
 const ROLES = ['admin', 'user'];
 const USER_NAME_MAX_LENGTH = 50;
 const DEFAULT_TOURNAMENT_LIMIT = 5;
+// Missbrauchsschutz: höchstens so viele Meldungen (pending, confirmed, waitlist) je Turnier, pro Besitzer einstellbar.
+const DEFAULT_PARTICIPANT_LIMIT = 70;
 const TOURNAMENT_TYPES = [
   'formule_x',
   'jeder_gegen_jeden',
@@ -3801,6 +3803,7 @@ export async function findOrCreateOAuthUser(db, provider, profile, env = { DB: d
     email_verified_at: now,
     password_change_required: 0,
     tournament_limit: DEFAULT_TOURNAMENT_LIMIT,
+    participant_limit: DEFAULT_PARTICIPANT_LIMIT,
     created_at: now,
     updated_at: now,
   };
@@ -4093,7 +4096,7 @@ async function resetPassword(request, db) {
 async function listUsers(db) {
   const result = await db
     .prepare(
-      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, club_id, email_verified_at, password_change_required, tournament_limit, mail_enabled, last_login_at, last_seen_at, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, club_id, email_verified_at, password_change_required, tournament_limit, participant_limit, mail_enabled, last_login_at, last_seen_at, created_at, updated_at FROM users ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE',
     )
     .all();
   return json({ users: result.results.map((row) => ({ ...toPublicUser(row), lastLoginAt: row.last_login_at || null, lastSeenAt: row.last_seen_at || null })) });
@@ -4693,17 +4696,18 @@ export async function createUser(request, db) {
   const id = crypto.randomUUID();
   const emailVerifiedAt = body.emailVerified === false ? null : now;
   const passwordChangeRequired = body.passwordChangeRequired === true ? 1 : 0;
-  const tournamentLimit = resolveTournamentLimit(body, DEFAULT_TOURNAMENT_LIMIT);
+  const tournamentLimit = resolveUserLimit(body, 'tournamentLimit', DEFAULT_TOURNAMENT_LIMIT, 'Ungültiges Turnier-Limit');
+  const participantLimit = resolveUserLimit(body, 'participantLimit', DEFAULT_PARTICIPANT_LIMIT, 'Ungültiges Teilnehmer-Limit');
   const mailEnabled = body.mailEnabled === true ? 1 : 0;
   const phone = normalizePhone(body.phone);
   let username;
   try {
     username = await saveAccountWithUsername(db, { chosen: user.username, firstName: user.firstName, lastName: user.lastName }, (candidate) => db
       .prepare(
-        `INSERT INTO users (id, first_name, last_name, username, email, phone, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, first_name, last_name, username, email, phone, role, password_salt, password_hash, email_verified_at, password_change_required, tournament_limit, participant_limit, mail_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, user.firstName, user.lastName, candidate, user.email, phone, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, now)
+      .bind(id, user.firstName, user.lastName, candidate, user.email, phone, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, participantLimit, mailEnabled, now, now)
       .run());
   } catch (error) {
     throw accountConflictError(error) || error;
@@ -4724,6 +4728,7 @@ export async function createUser(request, db) {
         email_verified_at: emailVerifiedAt,
         password_change_required: passwordChangeRequired,
         tournament_limit: tournamentLimit,
+        participant_limit: participantLimit,
         mail_enabled: mailEnabled,
         created_at: now,
         updated_at: now,
@@ -4748,7 +4753,8 @@ export async function updateUser(request, env, id, currentUserId) {
   const now = new Date().toISOString();
   const emailVerifiedAt = resolveAdminEmailVerifiedAt(body, existing, user, now);
   const passwordChangeRequired = body.passwordChangeRequired === true ? 1 : 0;
-  const tournamentLimit = resolveTournamentLimit(body, existing.tournament_limit ?? DEFAULT_TOURNAMENT_LIMIT);
+  const tournamentLimit = resolveUserLimit(body, 'tournamentLimit', existing.tournament_limit ?? DEFAULT_TOURNAMENT_LIMIT, 'Ungültiges Turnier-Limit');
+  const participantLimit = resolveUserLimit(body, 'participantLimit', existing.participant_limit ?? DEFAULT_PARTICIPANT_LIMIT, 'Ungültiges Teilnehmer-Limit');
   const mailEnabled = body.mailEnabled === undefined ? Number(existing.mail_enabled) : (body.mailEnabled ? 1 : 0);
 
   if (id === currentUserId && user.role !== 'admin') {
@@ -4766,17 +4772,17 @@ export async function updateUser(request, env, id, currentUserId) {
       await db
         .prepare(
           `UPDATE users
-           SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, phone = ?, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, mail_enabled = ?, updated_at = ?
+           SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, phone = ?, role = ?, password_salt = ?, password_hash = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, participant_limit = ?, mail_enabled = ?, updated_at = ?
            WHERE id = ?`,
         )
-        .bind(user.firstName, user.lastName, user.email, phone, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, id)
+        .bind(user.firstName, user.lastName, user.email, phone, user.role, password.salt, password.hash, emailVerifiedAt, passwordChangeRequired, tournamentLimit, participantLimit, mailEnabled, now, id)
         .run();
     } else {
       await db
         .prepare(
-          'UPDATE users SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, phone = ?, role = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, mail_enabled = ?, updated_at = ? WHERE id = ?',
+          'UPDATE users SET first_name = ?, last_name = ?, email = ?, pending_email = NULL, phone = ?, role = ?, email_verified_at = ?, password_change_required = ?, tournament_limit = ?, participant_limit = ?, mail_enabled = ?, updated_at = ? WHERE id = ?',
         )
-        .bind(user.firstName, user.lastName, user.email, phone, user.role, emailVerifiedAt, passwordChangeRequired, tournamentLimit, mailEnabled, now, id)
+        .bind(user.firstName, user.lastName, user.email, phone, user.role, emailVerifiedAt, passwordChangeRequired, tournamentLimit, participantLimit, mailEnabled, now, id)
         .run();
     }
   } catch (error) {
@@ -4788,7 +4794,7 @@ export async function updateUser(request, env, id, currentUserId) {
 
   const updated = await db
     .prepare(
-      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, club_id, email_verified_at, password_change_required, tournament_limit, mail_enabled, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, first_name, last_name, username, username_changed_at, username_confirmed_at, email, pending_email, phone, role, club, club_id, email_verified_at, password_change_required, tournament_limit, participant_limit, mail_enabled, created_at, updated_at FROM users WHERE id = ?',
     )
     .bind(id)
     .first();
@@ -5733,6 +5739,8 @@ async function createDocumentRegistration(db, tournament, localUuid, body) {
   });
   const participation = body.participation === undefined ? 'inactive' : parseParticipation(body.participation);
   const maxRegistrations = Number(tournament.max_registrations || 0);
+  // Teilnehmer-Limit gilt auch für die Nachmeldung aus dem Dokument (Missbrauchsschutz), anders als die Kapazität.
+  const limitCondition = participantLimitCondition(tournament.id);
   const columns = Object.keys(record);
   return {
     statements: [
@@ -5742,9 +5750,10 @@ async function createDocumentRegistration(db, tournament, localUuid, body) {
           CASE WHEN ? > 0 AND capacity.used >= ? THEN 1 ELSE 0 END
         FROM (SELECT COUNT(*) AS used FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')) capacity
         WHERE EXISTS (SELECT 1 FROM tournaments t WHERE t.id = ? AND t.status NOT IN ('running', 'finished'))
+          AND ${limitCondition.sql}
         ON CONFLICT DO NOTHING`)
         .bind(...Object.values(record), participation, now, localUuid, maxRegistrations, maxRegistrations,
-          tournament.id, tournament.id),
+          tournament.id, tournament.id, ...limitCondition.binds),
       db.prepare(`INSERT INTO audit_log (id, tournament_id, registration_id, actor_role, action, target, created_at)
           SELECT ?, ?, ?, 'document', 'registration_over_capacity', 'registration', ?
           WHERE EXISTS (SELECT 1 FROM registrations WHERE id = ? AND over_capacity = 1)`)
@@ -5754,10 +5763,13 @@ async function createDocumentRegistration(db, tournament, localUuid, body) {
       sql: `SELECT CASE WHEN EXISTS (SELECT 1 FROM registrations WHERE tournament_id = ? AND local_registration_uuid = ?)
           THEN json_object('status', 201, 'body', json_object('created', json('true')),
             'hydrate', json_object('kind', 'registration', 'uuid', ?))
+          WHEN NOT (${limitCondition.sql})
+          THEN json_object('status', 409, 'body', json_object('error', 'Die maximale Teilnehmerzahl für dieses Turnier ist erreicht.',
+            'details', json_object('code', 'participant_limit_reached')))
           ELSE json_object('status', 409, 'body', json_object('error', 'Anmeldung geschlossen – Turnier läuft',
             'details', json_object('code', 'tournament_running')))
           END`,
-      binds: [tournament.id, localUuid, localUuid],
+      binds: [tournament.id, localUuid, localUuid, ...limitCondition.binds],
     },
   };
 }
@@ -5942,6 +5954,7 @@ async function createTournament(request, env, user) {
   body = tournamentPlaceCoordinates(body, selectedPlace);
   const tournament = normalizeCoreTournamentInput(body);
   assertTournamentSystemAllowed(tournament);
+  assertMaxRegistrationsWithinLimit(tournament.maxRegistrations, participantLimitOfUser(user));
 
   if (user.role !== 'admin' && tournament.registrationEnabled !== false) {
     const limit = user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT;
@@ -6289,6 +6302,10 @@ async function updateTournament(request, env, existing, user) {
   const selectedPlace = await resolveTournamentBoulePlace(db, body.boulePlaceId);
   body = tournamentPlaceCoordinates(body, selectedPlace, existing);
   const tournament = normalizeCoreTournamentInput(body);
+  // Grenze des Besitzers, auch wenn ein Mitverwalter oder Admin bearbeitet; nur bei einer Änderung (eine Abfrage).
+  if (Number(tournament.maxRegistrations || 0) !== Number(existing.max_registrations || 0)) {
+    assertMaxRegistrationsWithinLimit(tournament.maxRegistrations, await participantLimitOfOwner(db, existing.owner_id));
+  }
   await assertDraftTransitionAllowed(db, existing, tournament.status);
   assertFormationChangeAllowed(existing, tournament.formation, tournament.formationOther);
   assertTournamentSystemAllowed(tournament, existing);
@@ -7020,6 +7037,10 @@ async function syncPutTournamentMetadata(request, env, existing) {
     legacyRegistrationTimes,
     registrationTypeDefault: existing.registration_type || 'forme',
   });
+  // Das Dokument führt: Statt die ganze Übertragung abzulehnen, „Max. Meldungen“ auf das Teilnehmer-Limit begrenzen.
+  // Die harte Grenze bei den Meldungen greift ohnehin.
+  const ownerLimit = await participantLimitOfOwner(db, existing.owner_id);
+  if (ownerLimit !== null && Number(tournament.maxRegistrations || 0) > ownerLimit) tournament.maxRegistrations = ownerLimit;
   const now = new Date().toISOString();
   const geo = await resolveTournamentGeolocation(tournament, existing, now, request.headers.get('CF-IPCountry'));
   const timezone = resolveTournamentTimezone(geo, existing.timezone || 'Europe/Berlin');
@@ -9092,6 +9113,7 @@ export async function createRegistration(request, env, tournament, {
   let duplicateGuard = !isManager && !syncBootstrap
     ? await registrationDuplicateGuard(db, tournament.id, record) : null;
   const statusSql = `CASE WHEN ? = 0 OR capacity.used < ? THEN ? ELSE 'waitlist' END`;
+  const limitCondition = participantLimitCondition(tournament.id);
   const statusBinds = [maxRegistrations, maxRegistrations, baseStatus];
   const columns = Object.keys(record);
   let results;
@@ -9106,12 +9128,14 @@ export async function createRegistration(request, env, tournament, {
       FROM (SELECT COUNT(*) AS used FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')) capacity
       WHERE EXISTS (SELECT 1 FROM tournaments t WHERE t.id = ? AND ${openCondition.sql})
         AND (? = 0 OR capacity.used < ? OR ? = 1)
+        AND ${limitCondition.sql}
         ${duplicateGuard ? `AND (${duplicateGuard.sql}) = ?` : ''}`)
       .bind(...Object.values(record), ...statusBinds,
         ...statusBinds, initialParticipation(tournament, 'confirmed', body.participation, syncBootstrap),
         initialParticipation(tournament, baseStatus === 'confirmed' ? 'waitlist' : baseStatus, body.participation, syncBootstrap),
         ...statusBinds, now,
         tournament.id, tournament.id, ...openCondition.binds, maxRegistrations, maxRegistrations, waitlistEnabled ? 1 : 0,
+        ...limitCondition.binds,
         ...(duplicateGuard ? [...duplicateGuard.binds, duplicateGuard.snapshot] : []));
     results = await db.batch([...statements, insert]);
     created = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
@@ -9241,7 +9265,49 @@ function registrationRecord(id, tournamentId, registration, {
 }
 
 // Die Anlage fand nicht statt: Grund aus dem aktuellen Zustand bestimmen.
+// Teilnehmer-Limit (Missbrauchsschutz): pending, confirmed und waitlist zählen; die Grenze ist die des Besitzers, Turniere
+// von Admins sind unbegrenzt (NULL). Als SQL-Bedingung für atomare INSERTs: 1, solange noch Platz ist.
+const PARTICIPANT_LIMIT_SQL = `(SELECT CASE WHEN u.role = 'admin' THEN NULL ELSE u.participant_limit END
+    FROM tournaments t JOIN users u ON u.id = t.owner_id WHERE t.id = ?)`;
+const PARTICIPANT_COUNT_SQL = `(SELECT COUNT(*) FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed', 'waitlist'))`;
+const PARTICIPANT_LIMIT_ACTIVE_STATUSES = ['pending', 'confirmed', 'waitlist'];
+
+function participantLimitCondition(tournamentId) {
+  return { sql: `COALESCE(${PARTICIPANT_COUNT_SQL} < ${PARTICIPANT_LIMIT_SQL}, 1) = 1`, binds: [tournamentId, tournamentId] };
+}
+
+function participantLimitError() {
+  return new HttpError(409, 'Die maximale Teilnehmerzahl für dieses Turnier ist erreicht.', { code: 'participant_limit_reached' });
+}
+
+// Teilnehmer-Limit eines Besitzers; null = unbegrenzt (Admin).
+function participantLimitOfUser(user) {
+  if (!user || user.role === 'admin') return null;
+  const limit = user.participantLimit ?? user.participant_limit;
+  return limit === undefined || limit === null ? DEFAULT_PARTICIPANT_LIMIT : Number(limit);
+}
+
+async function participantLimitOfOwner(db, ownerId) {
+  return participantLimitOfUser(await db.prepare('SELECT role, participant_limit FROM users WHERE id = ?').bind(ownerId).first());
+}
+
+// „Max. Meldungen“ darf das Teilnehmer-Limit des Besitzers nicht übersteigen; 0 (unbegrenzt) bleibt erlaubt, dann greift
+// das Limit als harte Obergrenze.
+function assertMaxRegistrationsWithinLimit(maxRegistrations, limit) {
+  if (limit !== null && Number(maxRegistrations || 0) > limit) {
+    throw new HttpError(400, 'Max. Meldungen überschreitet das Teilnehmer-Limit des Turnierbesitzers.', { code: 'participant_limit_exceeded', limit });
+  }
+}
+
+async function assertParticipantLimitNotReached(db, tournamentId) {
+  const condition = participantLimitCondition(tournamentId);
+  const row = await db.prepare(`SELECT ${condition.sql} AS free`).bind(...condition.binds).first();
+  if (!Number(row?.free)) throw participantLimitError();
+}
+
 async function throwRegistrationRejection(db, tournament, { isManager, shareAccess, syncBootstrap }) {
+  // Zuerst die harte Grenze: Sie gilt auch für Turnierleitung und Sync, eine Warteliste hilft hier nicht.
+  await assertParticipantLimitNotReached(db, tournament.id);
   const current = await getTournamentById(db, tournament.id);
   if (syncBootstrap) {
     throw new HttpError(409, 'Anmeldung geschlossen – Turnier läuft', { code: 'tournament_running' });
@@ -9268,6 +9334,10 @@ export async function updateRegistration(request, env, existing, actingUser = nu
   }
   const registration = normalizeRegistrationInput(body, { requireStatus: true, allowPlaceholder: true });
   assertNotRejectedByStatusEdit(existing.status, registration.status);
+  // Eine abgesagte Meldung wieder aufnehmen belegt einen Platz im Teilnehmer-Limit.
+  if (!PARTICIPANT_LIMIT_ACTIVE_STATUSES.includes(existing.status) && PARTICIPANT_LIMIT_ACTIVE_STATUSES.includes(registration.status)) {
+    await assertParticipantLimitNotReached(db, existing.tournament_id);
+  }
   assertCorePartnerCountMatchesFormation(existing, registration);
   const feeSelections = resolveFeeSelections(existing, body.feeSelections, registration, existing);
   const registrationAnswers = resolveRegistrationAnswers(existing, body.registrationAnswers, registration, existing);
@@ -12413,7 +12483,7 @@ async function requireApiKey(request, db) {
   const row = await db
     .prepare(
       `SELECT api_keys.id AS api_key_id, users.id, users.first_name, users.last_name, users.email, users.role, users.club, users.club_id, users.license_nr,
-              users.email_verified_at, users.password_change_required, users.tournament_limit, users.created_at, users.updated_at
+              users.email_verified_at, users.password_change_required, users.tournament_limit, users.participant_limit, users.created_at, users.updated_at
        FROM api_keys
        JOIN users ON users.id = api_keys.user_id
        WHERE api_keys.key_hash = ? AND api_keys.status = 'approved'`,
@@ -12461,7 +12531,7 @@ async function requireSession(request, db) {
   const row = await db
     .prepare(
       `SELECT users.id, users.first_name, users.last_name, users.username, users.username_changed_at, users.username_confirmed_at, users.email, users.pending_email, users.phone, users.role, users.club, users.club_id, users.license_nr, users.email_verified_at, users.password_change_required,
-              users.tournament_limit, users.mail_enabled, users.postbox_read_retention_days, users.created_at, users.updated_at, sessions.expires_at
+              users.tournament_limit, users.participant_limit, users.mail_enabled, users.postbox_read_retention_days, users.created_at, users.updated_at, sessions.expires_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
        WHERE sessions.id = ?`,
@@ -12756,13 +12826,14 @@ export async function checkUsernameAvailability(db, url) {
   return json({ available: false, problem: 'taken', suggestion: await findAvailableUsername(db, [username]) });
 }
 
-function resolveTournamentLimit(body, fallback) {
-  if (body.tournamentLimit === undefined || body.tournamentLimit === null || body.tournamentLimit === '') {
+// Limits pro Benutzer (Turnier-Limit, Teilnehmer-Limit): fehlt das Feld, bleibt der bisherige Wert.
+function resolveUserLimit(body, field, fallback, message) {
+  if (body[field] === undefined || body[field] === null || body[field] === '') {
     return fallback;
   }
-  const value = Number(body.tournamentLimit);
+  const value = Number(body[field]);
   if (!Number.isInteger(value) || value < 0) {
-    throw new HttpError(400, 'Ungültiges Turnier-Limit');
+    throw new HttpError(400, message);
   }
   return value;
 }
@@ -13169,6 +13240,7 @@ function toPublicUser(row) {
     emailVerifiedAt: row.email_verified_at || null,
     passwordChangeRequired: Boolean(Number(row.password_change_required || 0)),
     tournamentLimit: row.tournament_limit === undefined || row.tournament_limit === null ? DEFAULT_TOURNAMENT_LIMIT : Number(row.tournament_limit),
+    participantLimit: row.participant_limit === undefined || row.participant_limit === null ? DEFAULT_PARTICIPANT_LIMIT : Number(row.participant_limit),
     mailEnabled: row.mail_enabled === undefined || row.mail_enabled === null ? true : Boolean(Number(row.mail_enabled)),
     postboxReadRetentionDays: row.postbox_read_retention_days ?? DEFAULT_POSTBOX_READ_RETENTION_DAYS,
     createdAt: row.created_at,

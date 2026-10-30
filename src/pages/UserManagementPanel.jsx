@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
-import { DEFAULT_TOURNAMENT_LIMIT, ROLES, EMPTY_USER_FORM } from '../lib/constants.js';
+import { DEFAULT_PARTICIPANT_LIMIT, DEFAULT_TOURNAMENT_LIMIT, ROLES, EMPTY_USER_FORM } from '../lib/constants.js';
 import { PASSWORD_STRENGTH_HINT, PASSWORD_STRENGTH_ERROR, isPasswordStrong } from '../lib/format.js';
 import { roleName, translatedOptions } from '../lib/domain.js';
 import { filterUsers, sortUsers } from '../frontend-core.js';
@@ -44,6 +44,7 @@ function userToForm(user) {
     emailVerified: Boolean(user.emailVerifiedAt),
     passwordChangeRequired: Boolean(user.passwordChangeRequired),
     tournamentLimit: user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT,
+    participantLimit: user.participantLimit ?? DEFAULT_PARTICIPANT_LIMIT,
     mailEnabled: user.mailEnabled ?? true,
   };
 }
@@ -58,6 +59,7 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [tournamentLimitFilter, setTournamentLimitFilter] = useState('');
+  const [participantLimitFilter, setParticipantLimitFilter] = useState('');
   const [mailFilter, setMailFilter] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -75,9 +77,12 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
   }
   useEffect(() => { load(); }, []);
 
-  const filtered = useMemo(() => sortUsers(filterUsers(users, query, roleFilter, statusFilter, { tournamentLimitFilter, mailFilter }), sortBy), [users, query, roleFilter, statusFilter, tournamentLimitFilter, mailFilter, sortBy]);
+  const filtered = useMemo(() => sortUsers(filterUsers(users, query, roleFilter, statusFilter, { tournamentLimitFilter, participantLimitFilter, mailFilter }), sortBy),
+    [users, query, roleFilter, statusFilter, tournamentLimitFilter, participantLimitFilter, mailFilter, sortBy]);
   const tournamentLimits = useMemo(() => [...new Set(users.filter((user) => user.role !== 'admin')
     .map((user) => user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT))].sort((left, right) => left - right), [users]);
+  const participantLimits = useMemo(() => [...new Set(users.filter((user) => user.role !== 'admin')
+    .map((user) => user.participantLimit ?? DEFAULT_PARTICIPANT_LIMIT))].sort((left, right) => left - right), [users]);
   const stats = useMemo(() => ({
     total: users.length,
     admins: users.filter((user) => user.role === 'admin').length,
@@ -86,7 +91,7 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
   }), [users]);
 
   const roleOptions = [{ value: '', label: t('Alle Rollen') }, ...translatedOptions(ROLES)];
-  const isFiltered = Boolean(query.trim()) || Boolean(roleFilter) || Boolean(statusFilter) || Boolean(tournamentLimitFilter) || Boolean(mailFilter);
+  const isFiltered = Boolean(query.trim()) || Boolean(roleFilter) || Boolean(statusFilter) || Boolean(tournamentLimitFilter) || Boolean(participantLimitFilter) || Boolean(mailFilter);
   const visibleUsers = useInfiniteList(filtered);
 
   function resetFilters() {
@@ -94,6 +99,7 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
     setRoleFilter('');
     setStatusFilter('');
     setTournamentLimitFilter('');
+    setParticipantLimitFilter('');
     setMailFilter('');
   }
 
@@ -207,6 +213,11 @@ export function UserManagementPanel({ currentUser, tournaments = [], onTournamen
               ...tournamentLimits.map((limit) => ({ value: String(limit), label: String(limit) })),
               { value: 'unlimited', label: t('Unbegrenzt') },
             ] },
+            { label: t('Teilnehmer-Limit filtern'), value: participantLimitFilter, onChange: setParticipantLimitFilter, options: [
+              { value: '', label: t('Alle Teilnehmer-Limits') },
+              ...participantLimits.map((limit) => ({ value: String(limit), label: String(limit) })),
+              { value: 'unlimited', label: t('Unbegrenzt') },
+            ] },
             { label: t('E-Mail-Versand filtern'), value: mailFilter, onChange: setMailFilter, options: translatedOptions(USER_MAIL_FILTERS) },
             { label: t('Sortieren nach'), value: sortBy, onChange: setSortBy, options: translatedOptions(USER_SORT_OPTIONS) },
           ]}
@@ -297,6 +308,7 @@ function UserRow({ user, currentUser, selected, busy, busyOther, onEdit, onDelet
         </span>
         {user.passwordChangeRequired && <span className="status registration-pending">{t('Passwortwechsel nötig')}</span>}
         {user.role !== 'admin' && <span className="status">{t('Turnier-Limit:')} {user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT}</span>}
+        {user.role !== 'admin' && <span className="status">{t('Teilnehmer-Limit:')} {user.participantLimit ?? DEFAULT_PARTICIPANT_LIMIT}</span>}
         {user.role !== 'admin' && (
           <span className={user.mailEnabled ? 'status registration-confirmed' : 'status registration-pending'}>
             {user.mailEnabled ? t('E-Mail-Versand freigeschaltet') : t('E-Mail-Versand gesperrt')}
@@ -368,6 +380,13 @@ function UserEditorForm({ form, setForm, submitLabel, onSubmit, onCancel, passwo
         onChange={(value) => setForm({ ...form, tournamentLimit: value === '' ? '' : Number(value) })}
       />
       <p className="hint">{t('Maximale Anzahl eigener Turniere, die dieser Nutzer anlegen darf (Admins sind unbegrenzt).')}</p>
+      <IntegerField
+        label={t('Teilnehmer-Limit pro Turnier')}
+        min={0}
+        value={form.participantLimit}
+        onChange={(value) => setForm({ ...form, participantLimit: value === '' ? '' : Number(value) })}
+      />
+      <p className="hint">{t('Maximale Zahl der Meldungen (inkl. Warteliste) je Turnier dieses Nutzers, Schutz vor Missbrauch (Admins sind unbegrenzt).')}</p>
       <label className="checkbox-row">
         <input
           type="checkbox"

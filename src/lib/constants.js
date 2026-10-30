@@ -85,6 +85,8 @@ export const RADIUS_OPTIONS = [
 ];
 
 export const DEFAULT_TOURNAMENT_LIMIT = 5;
+// Missbrauchsschutz: höchstens so viele Meldungen je Turnier (pro Besitzer einstellbar, Admins ausgenommen).
+export const DEFAULT_PARTICIPANT_LIMIT = 70;
 
 export const EMPTY_USER_FORM = {
   id: '',
@@ -100,6 +102,7 @@ export const EMPTY_USER_FORM = {
   emailVerified: true,
   passwordChangeRequired: false,
   tournamentLimit: DEFAULT_TOURNAMENT_LIMIT,
+  participantLimit: DEFAULT_PARTICIPANT_LIMIT,
   mailEnabled: false,
 };
 

@@ -1118,6 +1118,25 @@ describe('Benutzer-Seite: Liste + Dialog', () => {
     expect(api).toHaveBeenCalledTimes(callsBefore);
   });
 
+  it('zeigt und filtert das Teilnehmer-Limit pro Turnier (Standard 70, Admins ohne Anzeige)', async () => {
+    vi.spyOn(await import('./lib/api.js'), 'authenticatedApi').mockImplementation(async (path) => path === '/api/users' ? { users: [
+      { id: 'admin', firstName: 'Ada', lastName: 'Admin', email: 'ada@example.test', role: 'admin', participantLimit: 70 },
+      { id: 'default', firstName: 'Clara', lastName: 'Standard', email: 'clara@example.test', role: 'user' },
+      { id: 'custom', firstName: 'Dora', lastName: 'Mehr', email: 'dora@example.test', role: 'user', participantLimit: 120 },
+    ] } : { reports: [] });
+    render(<UserManagementPanel currentUser={{ id: 'admin' }} tournaments={[]} />);
+    await screen.findByText('Dora Mehr');
+    expect(screen.getAllByText(/^Teilnehmer-Limit:/)).toHaveLength(2);
+    const filter = screen.getByLabelText('Teilnehmer-Limit filtern');
+    expect([...filter.options].map((option) => option.value)).toEqual(['', '70', '120', 'unlimited']);
+
+    fireEvent.change(filter, { target: { value: '120' } });
+    expect(screen.getByText('Dora Mehr')).toBeInTheDocument();
+    expect(screen.queryByText('Clara Standard')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(filter).toHaveValue('');
+  });
+
   it.each([
     ['Turnier-Limit filtern', '5'], ['E-Mail-Versand filtern', 'enabled'],
   ])('lässt %s zurücksetzen, auch wenn alle Benutzer übrig bleiben', async (label, value) => {
@@ -1438,6 +1457,28 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     fireEvent.click(screen.getByLabelText('Kalendereinträge ausblenden'));
     expect(screen.getByText('1/2')).toBeInTheDocument();
     expect(screen.queryByText('Keine Turniere gefunden.')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [{ id: 'u1', role: 'user', participantLimit: 50 }, 'create', undefined, 'Höchstens 50 Meldungen (Grenze deines Kontos).'],
+    [{ id: 'u1', role: 'user' }, 'edit', 'u1', 'Höchstens 70 Meldungen (Grenze deines Kontos).'],
+    [{ id: 'admin', role: 'admin', participantLimit: 50 }, 'create', undefined, null],
+    [{ id: 'u1', role: 'user', participantLimit: 50 }, 'edit', 'fremd', null],
+  ])('zeigt bei „Max. Meldungen“ das Teilnehmer-Limit des eigenen Kontos (%o, %s)', (currentUser, mode, ownerId, hint) => {
+    render(
+      <TournamentForm
+        form={{ ...EMPTY_TOURNAMENT_FORM, id: mode === 'edit' ? 't1' : undefined, ownerId, name: 'Sommerturnier', date: '2026-06-01', location: 'Musterstadt' }}
+        setForm={() => {}}
+        onSubmit={(event) => event.preventDefault()}
+        onCancel={() => {}}
+        mode={mode}
+        isAdmin={currentUser.role === 'admin'}
+        currentUser={currentUser}
+        language="de"
+      />,
+    );
+    if (hint) expect(screen.getByText(hint)).toBeInTheDocument();
+    else expect(screen.queryByText(/Grenze deines Kontos/)).not.toBeInTheDocument();
   });
 
   it('zeigt beim Bearbeiten die Formatierungs-Toolbar der Turnierbeschreibung', () => {

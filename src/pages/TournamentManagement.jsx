@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
+import { DEFAULT_PARTICIPANT_LIMIT, EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
 import { hasRegistrations, isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, registrationDeadlinePassed, registrationStatusClass, registrationStatusKind, registrationStatusLabel, registrationStatusReason, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
@@ -257,6 +257,9 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
   const [showLocationHelp, setShowLocationHelp] = useState(false);
   // Mails zum Turnier hängen an der Freischaltung des Owners: Hinweis beim Anlegen und für den Owner beim Bearbeiten.
   const showMailNotEnabledHint = !isAdmin && currentUser?.mailEnabled === false && (mode !== 'edit' || form.ownerId === currentUser.id);
+  // Teilnehmer-Limit des eigenen Kontos (Missbrauchsschutz); bei fremden Turnieren prüft nur der Server die Grenze des Besitzers.
+  const participantLimit = currentUser && currentUser.role !== 'admin' && (mode !== 'edit' || form.ownerId === currentUser.id)
+    ? currentUser.participantLimit ?? DEFAULT_PARTICIPANT_LIMIT : null;
   const canManageEditors = mode === 'edit' && form.id && Boolean(currentUser) && (isAdmin || form.ownerId === currentUser.id);
   const canManageOwner = mode === 'edit' && form.id && isAdmin;
   // Kalendereintrag = per "Turnier melden" eingereicht (registrationEnabled=false), nur die
@@ -435,8 +438,9 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
       {!isCalendarEntry && (
         <>
           <div className="form-grid">
-            <IntegerField label={t('Max. Meldungen')} min={0} value={form.maxRegistrations} onChange={(maxRegistrations) => setForm({ ...form, maxRegistrations })} />
+            <IntegerField label={t('Max. Meldungen')} min={0} max={participantLimit ?? undefined} value={form.maxRegistrations} onChange={(maxRegistrations) => setForm({ ...form, maxRegistrations })} />
           </div>
+          {participantLimit !== null && <p className="hint">{t('Höchstens {{limit}} Meldungen (Grenze deines Kontos).', { limit: participantLimit })}</p>}
           <div className="form-grid">
             <TextField label={t('Startgeld')} inputMode="decimal" value={form.entryFeeAmount} onChange={(entryFeeAmount) => setForm({ ...form, entryFeeAmount })} />
             <SelectField label={t('Währung')} value={form.currency} onChange={(currency) => setForm({ ...form, currency })} options={currencyOptions(language)} />
