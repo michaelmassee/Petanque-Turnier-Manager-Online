@@ -1275,9 +1275,10 @@ function TournamentPageHarness({ onSubmit, visibility = 'private', status = 'reg
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [hideCalendarEntries, setHideCalendarEntries] = useState(false);
+  const [onlyOwn, setOnlyOwn] = useState(false);
   const tournaments = [
-    { id: 't1', name: 'Sommerturnier', location: 'Musterstadt', date: '2026-06-01', formation: 'doublette', registrationType: 'forme', type: 'ko', status, visibility, activeRegistrations: 0, maxRegistrations: 16, waitlistRegistrations: 0, canManage: true },
-    ...(includeCalendar ? [{ id: 'calendar-1', name: 'Boulefest', location: 'Musterstadt', date: '2026-06-02', status: 'draft', visibility: 'public', registrationEnabled: false, canManage: true }] : []),
+    { id: 't1', name: 'Sommerturnier', location: 'Musterstadt', date: '2026-06-01', formation: 'doublette', registrationType: 'forme', type: 'ko', status, visibility, activeRegistrations: 0, maxRegistrations: 16, waitlistRegistrations: 0, canManage: true, ownerId: 'u-ich' },
+    ...(includeCalendar ? [{ id: 'calendar-1', name: 'Boulefest', location: 'Musterstadt', date: '2026-06-02', status: 'draft', visibility: 'public', registrationEnabled: false, canManage: true, ownerId: 'u-andere' }] : []),
   ];
 
   function editTournament(tournament) {
@@ -1316,10 +1317,14 @@ function TournamentPageHarness({ onSubmit, visibility = 'private', status = 'reg
         onStatusFilterChange={setStatusFilter}
         hideCalendarEntries={hideCalendarEntries}
         onHideCalendarEntriesChange={setHideCalendarEntries}
+        onlyOwn={onlyOwn}
+        onOnlyOwnChange={setOnlyOwn}
+        currentUserId="u-ich"
         onResetFilters={() => {
           setQuery('');
           setStatusFilter('');
           setHideCalendarEntries(false);
+          setOnlyOwn(false);
         }}
       />
       <EditDialog open={dialogOpen} wide title={tournamentMode === 'edit' ? 'Turnier bearbeiten' : 'Turnier anlegen'} onClose={closeDialog}>
@@ -1418,6 +1423,21 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     expect(screen.getByRole('button', { name: 'Filter zurücksetzen' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     expect(screen.getByText('Boulefest')).toBeInTheDocument();
+  });
+
+  it('zeigt mit „Nur meine (als Besitzer)“ nur eigene Turniere und zählt erst nach allen Filtern', () => {
+    render(<TournamentPageHarness onSubmit={() => {}} includeCalendar />);
+
+    fireEvent.click(screen.getByLabelText('Nur meine (als Besitzer)'));
+    expect(screen.getByText('Sommerturnier')).toBeInTheDocument();
+    expect(screen.queryByText('Boulefest')).not.toBeInTheDocument();
+    expect(screen.getByText('1/2')).toBeInTheDocument();
+
+    // Der Zähler zählt nach dem Ausblenden der Kalendereinträge (vorher „2/2“ über nur einem sichtbaren Turnier).
+    fireEvent.click(screen.getByLabelText('Nur meine (als Besitzer)'));
+    fireEvent.click(screen.getByLabelText('Kalendereinträge ausblenden'));
+    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Turniere gefunden.')).not.toBeInTheDocument();
   });
 
   it('zeigt beim Bearbeiten die Formatierungs-Toolbar der Turnierbeschreibung', () => {

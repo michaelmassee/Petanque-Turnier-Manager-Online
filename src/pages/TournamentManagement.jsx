@@ -656,6 +656,8 @@ export function TournamentList({
   onStatusFilterChange,
   hideCalendarEntries = false,
   onHideCalendarEntriesChange = () => {},
+  onlyOwn = false,
+  onOnlyOwnChange = () => {},
   onResetFilters,
   busyId = '',
   setBusyId = () => {},
@@ -664,12 +666,16 @@ export function TournamentList({
   onQrDesignSaved = () => {},
 }) {
   const { t } = useTranslation();
-  const filtered = Boolean(query.trim()) || Boolean(statusFilter) || hideCalendarEntries;
+  const filtered = Boolean(query.trim()) || Boolean(statusFilter) || hideCalendarEntries || onlyOwn;
   const [shareError, setShareError] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [qrTarget, setQrTarget] = useState(null);
   const [flyerTarget, setFlyerTarget] = useState(null);
-  const visibleTournaments = useInfiniteList(hideCalendarEntries ? tournaments.filter((tournament) => !isCalendarEntry(tournament)) : tournaments);
+  // Kalendereinträge und „Nur meine“ hier filtern; der Zähler zählt danach, sonst stünde „1/76“ über einer leeren Liste.
+  const shownTournaments = tournaments
+    .filter((tournament) => !hideCalendarEntries || !isCalendarEntry(tournament))
+    .filter((tournament) => !onlyOwn || tournament.ownerId === currentUserId);
+  const visibleTournaments = useInfiniteList(shownTournaments);
 
   // Fester Link /q/<qr_token> – derselbe wie im QR-Code, unabhängig von Sichtbarkeit und Freigabe-Link-Status.
   // Bei privaten Turnieren aktiviert der Aufruf zugleich den Freigabe-Link.
@@ -746,7 +752,7 @@ export function TournamentList({
     <div className="panel">
       <div className="section-title">
         <h2>{t('Turniere')}</h2>
-        <span className="counter">{filtered ? `${tournaments.length}/${totalTournaments}` : totalTournaments}</span>
+        <span className="counter">{filtered ? `${shownTournaments.length}/${totalTournaments}` : totalTournaments}</span>
         <Button onClick={onCreate}>{t('Neues Turnier')}</Button>
       </div>
       <ListToolbar
@@ -766,6 +772,10 @@ export function TournamentList({
           onChange={(event) => onHideCalendarEntriesChange(event.target.checked)}
         />
         {t('Kalendereinträge ausblenden')}
+      </label>
+      <label className="checkbox-field tournament-list-calendar-filter">
+        <input type="checkbox" checked={onlyOwn} onChange={(event) => onOnlyOwnChange(event.target.checked)} />
+        {t('Nur meine (als Besitzer)')}
       </label>
       <Feedback message={shareMessage} />
       <Feedback error={shareError} />
@@ -924,7 +934,7 @@ export function TournamentList({
             )}
           </article>
         ))}
-        {tournaments.length === 0 && <p className="muted">{t('Keine Turniere gefunden.')}</p>}
+        {shownTournaments.length === 0 && <p className="muted">{t('Keine Turniere gefunden.')}</p>}
       </div>
       <InfiniteListLoadMore hasMore={visibleTournaments.hasMore} onLoadMore={visibleTournaments.loadMore} label={t('Weitere Einträge laden')} />
       {qrTarget && (
@@ -1017,6 +1027,7 @@ export function TournamentManagementPage({
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [hideCalendarEntries, setHideCalendarEntries] = useState(false);
+  const [onlyOwn, setOnlyOwn] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_TOURNAMENT_FORM);
   const [mode, setMode] = useState('create');
@@ -1283,7 +1294,9 @@ export function TournamentManagementPage({
         onStatusFilterChange={setStatusFilter}
         hideCalendarEntries={hideCalendarEntries}
         onHideCalendarEntriesChange={setHideCalendarEntries}
-        onResetFilters={() => { setQuery(''); setStatusFilter(''); setHideCalendarEntries(false); }}
+        onlyOwn={onlyOwn}
+        onOnlyOwnChange={setOnlyOwn}
+        onResetFilters={() => { setQuery(''); setStatusFilter(''); setHideCalendarEntries(false); setOnlyOwn(false); }}
         busyId={busyId}
         setBusyId={setBusyId}
         qrSourceTournaments={manageableTournaments}
