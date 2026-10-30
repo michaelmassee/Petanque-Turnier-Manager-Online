@@ -37,7 +37,8 @@
   "vars": {
     "MAIL_FROM": "noreply@ptmonline.org",
     "STRATO_MAIL_FROM": "ptmonline@bclinden.de",
-    "TURNSTILE_SITE_KEY": "0x4AAAAAAEtxoT1UMgPGYH14"
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAEtxoT1UMgPGYH14",
+    "CF_ACCOUNT_ID": "f140eb5685d383d686a5501a02a22d65"
   },
   "triggers": {
     "crons": ["0 1 * * *", "0 * * * *"]

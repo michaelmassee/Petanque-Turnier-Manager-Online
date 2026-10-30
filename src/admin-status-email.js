@@ -1,3 +1,4 @@
+import { FREE_PLAN_DAILY_LIMITS, fetchCloudflareUsage } from './cloudflare-usage.js';
 import { richTextPlainText } from './lib/rich-text.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -19,6 +20,7 @@ export const ADMIN_STATUS_LABELS = {
     opening: 'Ausstehende Anmelde-Zeitsteuerung nachholen', reminders: 'Turniererinnerungen', importSync: 'Pétanque-Aktuell-Abgleich', purge: 'Datenbereinigung (falls aktiviert)',
     note: 'Bestandszahlen zeigen den aktuellen Datenbankstand. Neue Einträge zählen nur noch vorhandene Datensätze. Jobs können ohne anstehende Arbeit enden; Fehler einzelner Datensätze stehen im Worker-Protokoll. Der Mailversand erfolgt über die Warteschlange.',
     dashboard: 'PTM Online öffnen', usage: 'D1-Lesezeilen der 8 Statistikabfragen', unavailable: 'Nicht verfügbar',
+    cloudflare: 'Cloudflare-Auslastung am vorherigen UTC-Kalendertag (Anteil an der Free-Plan-Tagesgrenze)', workerRequests: 'Worker-Aufrufe', errors: 'Fehler', cpuPerRequest: 'CPU je Aufruf (Durchschnitt)', d1RowsRead: 'D1 gelesene Zeilen', d1RowsWritten: 'D1 geschriebene Zeilen', durableObjectRequests: 'Durable-Object-Aufrufe', activeTime: 'aktiv', websockets: 'WebSocket-Nachrichten empfangen / gesendet', websocketMax: 'höchstens gleichzeitig verbunden', queueOperations: 'Queue-Operationen', of: 'von', limitWarning: 'Achtung: nahe an der Tagesgrenze',
     adminMessages: 'An dich gerichtete Postbox-Nachrichten im Berichtszeitraum', sender: 'Absender', sentAt: 'Gesendet (UTC)', message: 'Nachricht', deletedSender: 'Gelöschtes Konto',
   },
   en: {
@@ -36,6 +38,7 @@ export const ADMIN_STATUS_LABELS = {
     opening: 'Recover pending registration scheduling', reminders: 'Tournament reminders', importSync: 'Pétanque Aktuell synchronization', purge: 'Personal data cleanup (if enabled)',
     note: 'Totals reflect the current database state. New entries count only records that still exist. Jobs may have no work due; errors for individual records are in the Worker logs. Email is delivered through the queue.',
     dashboard: 'Open PTM Online', usage: 'D1 rows read by the 8 statistics queries', unavailable: 'Unavailable',
+    cloudflare: 'Cloudflare usage on the previous UTC calendar day (share of the Free plan daily limit)', workerRequests: 'Worker requests', errors: 'Errors', cpuPerRequest: 'CPU per request (average)', d1RowsRead: 'D1 rows read', d1RowsWritten: 'D1 rows written', durableObjectRequests: 'Durable Object requests', activeTime: 'active', websockets: 'WebSocket messages received / sent', websocketMax: 'peak concurrent connections', queueOperations: 'Queue operations', of: 'of', limitWarning: 'Warning: close to the daily limit',
     adminMessages: 'Inbox messages addressed to you in the reporting period', sender: 'Sender', sentAt: 'Sent (UTC)', message: 'Message', deletedSender: 'Deleted account',
   },
   fr: {
@@ -53,6 +56,7 @@ export const ADMIN_STATUS_LABELS = {
     opening: 'Rétablir la planification des inscriptions en attente', reminders: 'Rappels de tournoi', importSync: 'Synchronisation Pétanque Aktuell', purge: 'Nettoyage des données personnelles (si activé)',
     note: 'Les totaux reflètent l’état actuel de la base. Les nouveaux éléments ne comptent que les enregistrements encore présents. Une tâche peut ne rien avoir à traiter ; les erreurs de certains enregistrements figurent dans les journaux du Worker. Les e-mails passent par la file d’attente.',
     dashboard: 'Ouvrir PTM Online', usage: 'Lignes D1 lues par les 8 requêtes statistiques', unavailable: 'Indisponible',
+    cloudflare: 'Utilisation Cloudflare du jour civil UTC précédent (part de la limite quotidienne du plan gratuit)', workerRequests: 'Appels du Worker', errors: 'Erreurs', cpuPerRequest: 'CPU par appel (moyenne)', d1RowsRead: 'Lignes D1 lues', d1RowsWritten: 'Lignes D1 écrites', durableObjectRequests: 'Appels Durable Object', activeTime: 'actif', websockets: 'Messages WebSocket reçus / envoyés', websocketMax: 'connexions simultanées au maximum', queueOperations: 'Opérations de file d’attente', of: 'sur', limitWarning: 'Attention : proche de la limite quotidienne',
     adminMessages: 'Messages qui vous sont adressés pendant la période du rapport', sender: 'Expéditeur', sentAt: 'Envoyé (UTC)', message: 'Message', deletedSender: 'Compte supprimé',
   },
   it: {
@@ -70,6 +74,7 @@ export const ADMIN_STATUS_LABELS = {
     opening: 'Ripristinare la pianificazione delle aperture iscrizioni', reminders: 'Promemoria dei tornei', importSync: 'Sincronizzazione Pétanque Aktuell', purge: 'Pulizia dei dati personali (se attiva)',
     note: 'I totali riflettono lo stato attuale del database. I nuovi elementi contano solo i record ancora presenti. Un’attività può non avere nulla da elaborare; gli errori di singoli record sono nei log del Worker. Le e-mail passano dalla coda.',
     dashboard: 'Apri PTM Online', usage: 'Righe D1 lette dalle 8 query statistiche', unavailable: 'Non disponibile',
+    cloudflare: 'Utilizzo Cloudflare del giorno solare UTC precedente (quota del limite giornaliero del piano gratuito)', workerRequests: 'Chiamate al Worker', errors: 'Errori', cpuPerRequest: 'CPU per chiamata (media)', d1RowsRead: 'Righe D1 lette', d1RowsWritten: 'Righe D1 scritte', durableObjectRequests: 'Chiamate Durable Object', activeTime: 'attivo', websockets: 'Messaggi WebSocket ricevuti / inviati', websocketMax: 'connessioni simultanee al massimo', queueOperations: 'Operazioni della coda', of: 'su', limitWarning: 'Attenzione: vicino al limite giornaliero',
     adminMessages: 'Messaggi indirizzati a te nel periodo del rapporto', sender: 'Mittente', sentAt: 'Inviato (UTC)', message: 'Messaggio', deletedSender: 'Account eliminato',
   },
   nl: {
@@ -87,6 +92,7 @@ export const ADMIN_STATUS_LABELS = {
     opening: 'Openstaande inschrijvingsplanning herstellen', reminders: 'Toernooiherinneringen', importSync: 'Pétanque Aktuell-synchronisatie', purge: 'Persoonsgegevens opruimen (indien ingeschakeld)',
     note: 'Totalen tonen de huidige database-inhoud. Nieuwe items tellen alleen nog bestaande records. Taken kunnen zonder openstaand werk eindigen; fouten voor afzonderlijke records staan in de Worker-logboeken. E-mail wordt via de wachtrij verzonden.',
     dashboard: 'PTM Online openen', usage: 'D1-rijen gelezen door de 8 statistiekquery’s', unavailable: 'Niet beschikbaar',
+    cloudflare: 'Cloudflare-gebruik op de vorige UTC-kalenderdag (aandeel van de dagelijkse limiet van het gratis abonnement)', workerRequests: 'Worker-aanroepen', errors: 'Fouten', cpuPerRequest: 'CPU per aanroep (gemiddeld)', d1RowsRead: 'Gelezen D1-rijen', d1RowsWritten: 'Geschreven D1-rijen', durableObjectRequests: 'Durable Object-aanroepen', activeTime: 'actief', websockets: 'WebSocket-berichten ontvangen / verzonden', websocketMax: 'maximaal gelijktijdig verbonden', queueOperations: 'Wachtrijbewerkingen', of: 'van', limitWarning: 'Let op: dicht bij de daglimiet',
     adminMessages: 'Postbusberichten aan jou in de rapportperiode', sender: 'Afzender', sentAt: 'Verzonden (UTC)', message: 'Bericht', deletedSender: 'Verwijderd account',
   },
   es: {
@@ -104,6 +110,7 @@ export const ADMIN_STATUS_LABELS = {
     opening: 'Recuperar la programación de inscripciones pendiente', reminders: 'Recordatorios de torneos', importSync: 'Sincronización de Pétanque Aktuell', purge: 'Limpieza de datos personales (si está activada)',
     note: 'Los totales reflejan el estado actual de la base de datos. Los nuevos elementos solo cuentan registros que aún existen. Las tareas pueden no tener trabajo pendiente; los errores de registros individuales figuran en los registros del Worker. El correo se envía mediante la cola.',
     dashboard: 'Abrir PTM Online', usage: 'Filas D1 leídas por las 8 consultas estadísticas', unavailable: 'No disponible',
+    cloudflare: 'Uso de Cloudflare del día natural UTC anterior (parte del límite diario del plan gratuito)', workerRequests: 'Llamadas al Worker', errors: 'Errores', cpuPerRequest: 'CPU por llamada (media)', d1RowsRead: 'Filas D1 leídas', d1RowsWritten: 'Filas D1 escritas', durableObjectRequests: 'Llamadas a Durable Object', activeTime: 'activo', websockets: 'Mensajes WebSocket recibidos / enviados', websocketMax: 'conexiones simultáneas como máximo', queueOperations: 'Operaciones de cola', of: 'de', limitWarning: 'Atención: cerca del límite diario',
     adminMessages: 'Mensajes del buzón dirigidos a ti durante el período del informe', sender: 'Remitente', sentAt: 'Enviado (UTC)', message: 'Mensaje', deletedSender: 'Cuenta eliminada',
   },
 };
@@ -141,6 +148,29 @@ export async function collectAdminStatus(db, from, until, systemUserId) {
   };
 }
 
+const LIMIT_WARNING_SHARE = 0.8;
+
+function cloudflareUsageLines(usage, l, language) {
+  if (!usage) return [`${l.cloudflare}: ${l.unavailable}`];
+  const number = new Intl.NumberFormat(language, { maximumFractionDigits: 1 });
+  const percent = new Intl.NumberFormat(language, { style: 'percent', maximumFractionDigits: 1 });
+  const withLimit = (label, key) => {
+    const share = usage[key] / FREE_PLAN_DAILY_LIMITS[key];
+    const warning = share >= LIMIT_WARNING_SHARE ? ` – ${l.limitWarning}` : '';
+    return `${label}: ${number.format(usage[key])} ${l.of} ${number.format(FREE_PLAN_DAILY_LIMITS[key])} (${percent.format(share)})${warning}`;
+  };
+  return [
+    `${l.cloudflare} (${usage.day})`,
+    `${withLimit(l.workerRequests, 'workerRequests')}; ${l.errors}: ${number.format(usage.workerErrors)}`,
+    `${l.cpuPerRequest}: ${number.format(usage.cpuMsPerRequest)} ms`,
+    withLimit(l.d1RowsRead, 'd1RowsRead'),
+    withLimit(l.d1RowsWritten, 'd1RowsWritten'),
+    `${withLimit(l.durableObjectRequests, 'durableObjectRequests')}; ${l.activeTime}: ${number.format(usage.durableObjectActiveSeconds)} s`,
+    `${l.websockets}: ${number.format(usage.websocketIn)} / ${number.format(usage.websocketOut)}; ${l.websocketMax}: ${number.format(usage.websocketMax)}`,
+    withLimit(l.queueOperations, 'queueOperations'),
+  ];
+}
+
 export function buildAdminStatusEmail(stats, jobs, from, until, language = 'de', recipientId = null) {
   const l = ADMIN_STATUS_LABELS[language] || ADMIN_STATUS_LABELS.de;
   const count = (value) => Number(value || 0);
@@ -170,6 +200,7 @@ export function buildAdminStatusEmail(stats, jobs, from, until, language = 'de',
       `${l.message}:\n${richTextPlainText(message.body)}`,
     ]),
     '', l.jobs, ...jobs.map((job) => `${l[job.key]}: ${job.ok ? l.ok : l.failed}`),
+    '', ...cloudflareUsageLines(stats.cloudflareUsage, l, language),
     '', `${l.usage}: ${stats.statisticsRowsRead ?? l.unavailable}`,
     '', l.note, '', `${l.dashboard}: https://ptmonline.org/`,
   ].join('\n');
@@ -197,6 +228,11 @@ export async function sendAdminStatusEmails(env, jobs, scheduledTime, systemUser
     .bind(day).all();
   if (!admins.results.length) return;
   const stats = await collectAdminStatus(env.DB, from, until, systemUserId);
+  // Fehlt die Auslastung (kein Token, API-Fehler), geht der Bericht trotzdem raus.
+  stats.cloudflareUsage = await fetchCloudflareUsage(env, stats.previousDay).catch((error) => {
+    console.error('Cloudflare usage for admin status failed', error);
+    return null;
+  });
   const failures = [];
   for (const admin of admins.results) {
     const claim = await env.DB.prepare('INSERT OR IGNORE INTO admin_status_reports (report_day, user_id, queued_at) VALUES (?, ?, ?)')
