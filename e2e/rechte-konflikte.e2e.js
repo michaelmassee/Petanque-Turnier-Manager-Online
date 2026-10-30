@@ -82,7 +82,7 @@ test.describe.serial('Rechte und Konflikte', () => {
     const { page } = leitung;
     await openPlay(page, turnier);
     await expect(page.getByRole('button', { name: 'Aktuelle Runde neu auslosen', exact: true })).toHaveCount(0);
-    await page.locator('.play-current-round .play-decided-matches summary').click();
+    // Die Meldung ist noch nicht „gesehen“ und steht deshalb bei den offenen Partien.
     const zeile = page.locator('.play-current-round .play-match.is-player-reported');
     await zeile.getByLabel('Punkte Team A').fill('11');
     await zeile.getByLabel('Punkte Team B').fill('13');
@@ -114,7 +114,11 @@ test.describe.serial('Rechte und Konflikte', () => {
 
     const alt = liveToken(turnier, 4);
     expect((await api(request, 'GET', `/api/live/token/${alt}`)).status).toBe(200);
-    expect(await expectOk(alsLeitung(request, 'POST', `/api/registrations/${registrationId(turnier, 4)}/live-link`))).toEqual({ sent: 1 });
+    // Der Seed speichert den Link nur als Hash: Erneut senden lehnt ab, erst renew ersetzt ihn (EW-02).
+    const ohneRenew = await alsLeitung(request, 'POST', `/api/registrations/${registrationId(turnier, 4)}/live-link`);
+    expect([ohneRenew.status, ohneRenew.json.details?.code]).toEqual([409, 'live_link_not_recoverable']);
+    expect((await api(request, 'GET', `/api/live/token/${alt}`)).status).toBe(200);
+    expect(await expectOk(alsLeitung(request, 'POST', `/api/registrations/${registrationId(turnier, 4)}/live-link`, { renew: true }))).toEqual({ sent: 1 });
     expect((await api(request, 'GET', `/api/live/token/${alt}`)).status).toBe(404);
     await anonym.page.goto(`/live/t/${alt}`);
     await expect(anonym.page.getByText('Für diese Anmeldung gibt es keine Live-Ansicht.')).toBeVisible();

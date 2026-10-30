@@ -3,9 +3,7 @@
 import { expect, test } from '@playwright/test';
 import { api, expectNoHorizontalScroll, expectOk, openAs, openMobile, testUserPassword } from './support/browser.js';
 import { ACCOUNTS, ORGANIZER, TOURNAMENTS, liveToken, registrationId } from './support/data.js';
-import {
-  currentMatchOf, enterOpenResults, finishTournament, openPlay, playerIds, reportAsPlayer, rounds, startRound, startTournament,
-} from './support/flow.js';
+import { confirmReports, currentMatchOf, enterOpenResults, finishTournament, openPlay, playerIds, reportAsPlayer, rounds, startRound, startTournament } from './support/flow.js';
 
 const turnier = TOURNAMENTS.supermelee;
 const SPIELER = [ACCOUNTS.spieler1, ACCOUNTS.spieler2, ACCOUNTS.spieler3];
@@ -89,6 +87,8 @@ test.describe.serial('Supermêlée: kompletter Turnierablauf', () => {
       await openPlay(page, turnier);
       const name = `${SPIELER[melder].first_name} ${SPIELER[melder].last_name}`;
       await expect(page.locator('.play-current-round .play-match.is-player-reported .play-report-badge')).toContainText(`Ergebnis gemeldet von ${name}`);
+      // Die neue Meldung bleibt bis „Gesehen“ bei den offenen Partien, danach wandert sie zu den erfassten.
+      await confirmReports(page);
       await expect(page.locator('.play-current-round .play-decided-matches .counter')).toHaveText('1');
       await enterOpenResults(page);
 

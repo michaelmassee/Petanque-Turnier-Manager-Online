@@ -65,7 +65,17 @@ export async function reportAsPlayer(page, registrationId, ownScore, opponentSco
   await card.getByLabel('Gegnerische Punkte').fill(String(opponentScore));
   await card.getByRole('button', { name: 'Ergebnis melden' }).click();
   await expect(card.getByText('Ergebnis gemeldet.')).toBeVisible();
-  await expect(card.locator('.live-score')).toHaveText(`${ownScore}:${opponentScore}`);
+  // Bis zum „Gesehen“ der Turnierleitung ist die Partie offen; das Team sieht seine Meldung als Hinweis (E-27).
+  await expect(card.getByText(`Gemeldet: ${ownScore}:${opponentScore}. Die Turnierleitung bestätigt das Ergebnis.`)).toBeVisible();
+  await expect(card.locator('.live-score')).toHaveText('läuft');
+  await expect(card.getByRole('button', { name: 'Ergebnis melden' })).toHaveCount(0);
+}
+
+// Turnierleitung bestätigt die angezeigten Spielermeldungen; erst dann sind sie öffentlich.
+export async function confirmReports(page) {
+  const banner = page.getByRole('status').filter({ hasText: 'Neue Ergebnismeldungen von Teams' });
+  await banner.getByRole('button', { name: 'Gesehen' }).click();
+  await expect(banner).toHaveCount(0);
 }
 
 export async function rounds(request, tournament) {

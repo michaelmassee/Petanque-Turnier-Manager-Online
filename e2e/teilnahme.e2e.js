@@ -28,7 +28,7 @@ function expectAlleEinmal(runde, erwartet) {
 test.describe.serial('Teilnahme-Änderungen', () => {
   let leitung;
   let aktiv;
-  let pausiertLabel;
+  let pausiertName;
 
   test.beforeAll(async ({ browser }) => {
     leitung = await openAs(browser, ORGANIZER.session);
@@ -50,9 +50,14 @@ test.describe.serial('Teilnahme-Änderungen', () => {
     await openParticipants(page, 17);
     const name = (await expectOk(alsLeitung(request, 'GET', `/api/tournaments/${turnier.id}/registrations`))).registrations
       .find((entry) => entry.id === PAUSIERT);
-    pausiertLabel = `Teilnahme: ${name.firstName} ${name.lastName}`;
-    await page.getByLabel(pausiertLabel).selectOption('withdrawn');
-    await expect(page.getByLabel(pausiertLabel)).toHaveValue('withdrawn');
+    pausiertName = `${name.firstName} ${name.lastName}`;
+    // „Ausgesetzt“ gibt es nur im Bearbeiten-Dialog; der Schalter in der Liste wechselt nur aktiv/inaktiv.
+    await page.getByRole('button', { name: `${pausiertName} bearbeiten` }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('combobox', { name: 'Teilnahme' }).selectOption('withdrawn');
+    await expect(dialog.getByRole('combobox', { name: 'Teilnahme' })).toHaveValue('withdrawn');
+    await dialog.getByRole('button', { name: 'Schließen' }).click();
+    await expect(page.locator('.round-participant-row').filter({ hasText: pausiertName }).getByText('Ausgesetzt')).toBeVisible();
 
     const formular = page.locator('.quick-player-form');
     await formular.getByLabel('Vorname').fill('Nora');
@@ -84,7 +89,9 @@ test.describe.serial('Teilnahme-Änderungen', () => {
     const { page } = leitung;
     await openPlay(page, turnier);
     await openParticipants(page, 18);
-    await page.getByLabel(pausiertLabel).selectOption('active');
+    const schalter = page.getByRole('button', { name: `Aktiv: ${pausiertName}` });
+    await schalter.click();
+    await expect(schalter).toHaveAttribute('aria-pressed', 'true');
     await expect.poll(async () => (await expectOk(alsLeitung(request, 'GET', `/api/tournaments/${turnier.id}/registrations`)))
       .registrations.find((entry) => entry.id === PAUSIERT).participation).toBe('active');
 

@@ -68,6 +68,17 @@ describe('RentalCalendar: Wischen in der Tagesansicht (Handy)', () => {
     expect(activeTab()).toHaveTextContent('18');
   });
 
+  it('landet auch dann auf dem Vortag, wenn die vorige Woche auf heute begrenzt ist', () => {
+    const onPreviousWeek = vi.fn();
+    // Heute 19.10., Ansicht ab 21.10.: Die vorige Woche beginnt am 19.10. und reicht bis 25.10.
+    const { rerender } = render(<RentalCalendar days={week(21)} laneCount={4} language="de" onPreviousWeek={onPreviousWeek} />);
+    swipe(80);
+    expect(onPreviousWeek).toHaveBeenCalledOnce();
+
+    rerender(<RentalCalendar days={week(19)} laneCount={4} language="de" onPreviousWeek={onPreviousWeek} />);
+    expect(activeTab()).toHaveTextContent('20');
+  });
+
   it('bleibt an der Buchungsgrenze stehen, wenn es keine weitere Woche gibt', () => {
     render(<RentalCalendar days={week(19)} laneCount={4} language="de" onPreviousWeek={null} />);
     swipe(80);

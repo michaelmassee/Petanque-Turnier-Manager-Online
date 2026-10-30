@@ -37,6 +37,34 @@ describe('Aktuelle Runde neu auslosen', () => {
     expect(rows('SELECT COUNT(*) AS count FROM tournament_matches WHERE result_report_pending = 1')[0].count).toBe(0);
   });
 
+  // Team-Anlage ist ein eigener Schritt vor dem Runden-Batch; parallele Starts dürfen niemanden doppelt einteilen.
+  const teamsPerRegistration = () => rows(`SELECT m.value AS registration_id, COUNT(*) AS count
+    FROM tournament_teams t, json_each(t.member_registration_ids) m WHERE t.tournament_id = 't1' GROUP BY m.value HAVING COUNT(*) > 1`);
+  const assignmentsInRound = () => rows(`SELECT m.value AS registration_id, COUNT(*) AS count FROM tournament_matches tm,
+    json_each(json_array(json(tm.team_a_registration_ids), json(tm.team_b_registration_ids))) side, json_each(side.value) m
+    GROUP BY tm.round_id, m.value HAVING COUNT(*) > 1`);
+
+  it('legt bei parallelen Starts der ersten Runde jedes Team nur einmal an', async () => {
+    const statuses = (await Promise.all([post('/api/tournaments/t1/rounds'), post('/api/tournaments/t1/rounds')])).map((response) => response.status);
+    expect(statuses).toContain(200);
+    expect(teamsPerRegistration()).toEqual([]);
+    expect(rows("SELECT COUNT(*) AS count FROM tournament_teams WHERE tournament_id = 't1'")[0].count).toBe(7);
+    expect(assignmentsInRound()).toEqual([]);
+  });
+
+  it('legt für einen Nachzügler bei parallelen Rundenstarts nur ein Team an', async () => {
+    expect((await post('/api/tournaments/t1/rounds')).status).toBe(200);
+    sql("UPDATE tournament_matches SET score_a = 13, score_b = 5 WHERE score_a IS NULL");
+    sql(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email, status, participation, registered_at, created_at, updated_at)
+      VALUES ('late', 't1', 'Nachzügler', 'Muster', 'late@example.test', 'confirmed', 'active', '2026-09-02', '2026-09-02', '2026-09-02')`);
+
+    const statuses = (await Promise.all([post('/api/tournaments/t1/rounds'), post('/api/tournaments/t1/rounds')])).map((response) => response.status);
+    expect(statuses).toContain(200);
+    expect(teamsPerRegistration()).toEqual([]);
+    expect(rows("SELECT COUNT(*) AS count FROM tournament_teams WHERE member_registration_ids = '[\"late\"]'")[0].count).toBe(1);
+    expect(assignmentsInRound()).toEqual([]);
+  });
+
   it('ersetzt die aktuelle Runde mit gleicher Nummer, auch wenn nur das Freilos ein Ergebnis hat', async () => {
     expect((await post('/api/tournaments/t1/rounds')).status).toBe(200);
     const [before] = rows('SELECT id, round_number FROM tournament_rounds');

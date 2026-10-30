@@ -12,6 +12,8 @@ const turnier = TOURNAMENTS.meldungen;
 const KONTO = new Map(MELDER.map((account, index) => [`${turnier.id}-r${String(index + 1).padStart(3, '0')}`, account]));
 const alsLeitung = (request, method, path, body) => api(request, method, path, { session: ORGANIZER.session, body });
 const BEREITS_GEMELDET = 'Für deine Partie wurde bereits ein Ergebnis gemeldet.';
+// Live-Socket: „changed“ wird gestreut (bis 1,5 s) nachgeladen, ein zweiter Abruf folgt nach 20 s (Edge-Snapshot).
+const LIVE_UPDATE_MS = 30_000;
 
 test.describe.serial('Ergebnismeldungen der Teams', () => {
   let leitung;
@@ -31,8 +33,8 @@ test.describe.serial('Ergebnismeldungen der Teams', () => {
     await expectOk(alsLeitung(request, 'POST', `/api/tournaments/${turnier.id}/rounds`));
     await leitungAktualisieren();
     await expect(leitung.page.locator('.play-current-round h2')).toHaveText(`Runde ${roundNumber}`);
-    await turnierseite.page.getByRole('button', { name: 'Aktualisieren' }).click();
-    await expect(turnierseite.page.getByRole('heading', { name: `Runde ${roundNumber}` })).toBeVisible();
+    // Die offene Turnierseite aktualisiert sich selbst (Live-Socket), ohne Neuladen.
+    await expect(turnierseite.page.getByRole('heading', { name: `Runde ${roundNumber}` })).toBeVisible({ timeout: LIVE_UPDATE_MS });
     return aktuelleRunde(request);
   }
 
@@ -80,15 +82,31 @@ test.describe.serial('Ergebnismeldungen der Teams', () => {
     await expect(zeile.getByLabel('Punkte Team A')).toHaveValue(String(scoreA));
   }
 
+  // Live-Ansicht aller Spieler beider Teams, jeweils aus eigener Sicht. zustand: 'offen', 'gemeldet' (wartet auf
+  // „Gesehen“, nur das Team sieht seine Meldung als Hinweis) oder 'fertig'.
+  async function erwarteLiveAnsichten(browser, match, scoreA, scoreB, zustand) {
+    for (const [team, eigene, gegner] of [[match.teamA, scoreA, scoreB], [match.teamB, scoreB, scoreA]]) {
+      for (const player of team) {
+        const page = await seiteVon(browser, player);
+        await page.goto(`/live/${player.id}`);
+        const karte = page.getByRole('region', { name: 'Aktuelle Partie' });
+        await expect(karte.locator('.live-score')).toHaveText(zustand === 'fertig' ? `${eigene}:${gegner}` : 'läuft');
+        if (zustand === 'gemeldet') await expect(karte.getByText(`Gemeldet: ${eigene}:${gegner}. Die Turnierleitung bestätigt das Ergebnis.`)).toBeVisible();
+        if (zustand !== 'offen') await expect(karte.getByRole('button', { name: 'Ergebnis melden' })).toHaveCount(0);
+      }
+    }
+  }
+
   // Prüft ein Ergebnis an allen Stellen. gemeldetVon: Spieler der Meldung, null = Eintrag der Turnierleitung,
-  // undefined = noch offen.
+  // undefined = noch offen. Eine noch nicht gesehene Spielermeldung wird zuerst im Wartezustand geprüft und dann
+  // von der Turnierleitung mit „Gesehen“ bestätigt (E-27).
   async function erwarteUeberall({ browser, request }, match, scoreA, scoreB, gemeldetVon) {
     const offen = gemeldetVon === undefined;
     const server = (await aktuelleRunde(request)).matches.find((entry) => entry.id === match.id);
     expect({ scoreA: server.scoreA, scoreB: server.scoreB, reportedBy: server.reportedBy?.id ?? null })
       .toEqual({ scoreA, scoreB, reportedBy: gemeldetVon?.id ?? null });
 
-    // Spielverwaltung und Turnierseite bleiben offen, „Aktualisieren“ holt den neuen Stand.
+    // Spielverwaltung und Turnierseite bleiben offen; die Spielverwaltung holt per „Aktualisieren“ nach.
     await leitungAktualisieren();
     const zeile = leitungsZeile(match);
     await expect(zeile.getByLabel('Punkte Team A')).toHaveValue(offen ? '' : String(scoreA));
@@ -96,19 +114,16 @@ test.describe.serial('Ergebnismeldungen der Teams', () => {
     if (gemeldetVon) await expect(zeile.locator('.play-report-badge')).toContainText(`Ergebnis gemeldet von ${name(gemeldetVon)}`);
     else await expect(zeile.locator('.play-report-badge')).toHaveCount(0);
 
-    await turnierseite.page.getByRole('button', { name: 'Aktualisieren' }).click();
-    await expect(turnierseitenErgebnis(match)).toHaveText(offen ? 'Offen' : `${scoreA}:${scoreB}`);
-
-    // Live-Ansicht aller Spieler beider Teams, jeweils aus eigener Sicht.
-    for (const [team, eigene, gegner] of [[match.teamA, scoreA, scoreB], [match.teamB, scoreB, scoreA]]) {
-      for (const player of team) {
-        const page = await seiteVon(browser, player);
-        await page.goto(`/live/${player.id}`);
-        const karte = page.getByRole('region', { name: 'Aktuelle Partie' });
-        await expect(karte.locator('.live-score')).toHaveText(offen ? 'läuft' : `${eigene}:${gegner}`);
-        if (!offen) await expect(karte.getByRole('button', { name: 'Ergebnis melden' })).toHaveCount(0);
-      }
+    if (server.reportPending) {
+      await expect(turnierseitenErgebnis(match)).toHaveText('Offen');
+      await erwarteLiveAnsichten(browser, match, scoreA, scoreB, 'gemeldet');
+      await leitung.page.getByRole('status').filter({ hasText: 'Neue Ergebnismeldungen von Teams' }).getByRole('button', { name: 'Gesehen' }).click();
+      await expect(leitung.page.getByRole('status').filter({ hasText: 'Neue Ergebnismeldungen von Teams' })).toHaveCount(0);
     }
+
+    // Die offene Turnierseite zeigt den neuen Stand von selbst (Live-Socket).
+    await expect(turnierseitenErgebnis(match)).toHaveText(offen ? 'Offen' : `${scoreA}:${scoreB}`, { timeout: LIVE_UPDATE_MS });
+    await erwarteLiveAnsichten(browser, match, scoreA, scoreB, offen ? 'offen' : 'fertig');
   }
 
   test.beforeAll(async ({ browser }) => {
@@ -219,11 +234,10 @@ test.describe.serial('Ergebnismeldungen der Teams', () => {
     for (const match of (await rounds(request, turnier)).flatMap((round) => round.matches)) {
       for (const player of match.scoreA > match.scoreB ? match.teamA : match.teamB) siege.set(player.id, (siege.get(player.id) || 0) + 1);
     }
-    await turnierseite.page.getByRole('button', { name: 'Aktualisieren' }).click();
     const rangliste = turnierseite.page.locator('.display-ranking');
     for (const entry of ranking) {
       expect(entry.wins, entry.teamLabel).toBe(siege.get(entry.id) || 0);
-      await expect(rangliste.getByRole('row').filter({ hasText: entry.teamLabel }).getByRole('cell').nth(2)).toHaveText(String(entry.wins));
+      await expect(rangliste.getByRole('row').filter({ hasText: entry.teamLabel }).getByRole('cell').nth(2)).toHaveText(String(entry.wins), { timeout: LIVE_UPDATE_MS });
     }
   });
 });

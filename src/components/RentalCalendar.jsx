@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDate, formatWeekdayShort } from '../lib/format.js';
+import { addDays } from '../rental-core.js';
 
 // Ab dieser Breite zeigt das Raster nur einen Tag (siehe Media-Query in styles.css); nur dann wird gewischt.
 const SINGLE_DAY_QUERY = '(max-width: 640px)';
@@ -43,12 +44,14 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
   const { t } = useTranslation();
   const firstOpenDay = Math.max(0, days.findIndex((day) => day.slots.some((slot) => slot.bookable)));
   const [activeDay, setActiveDay] = useState(firstOpenDay);
-  // Nach einem Wochenwechsel per Wischen auf dem angrenzenden Tag landen statt auf dem ersten offenen.
-  const pendingDayRef = useRef(null);
+  // Nach einem Wochenwechsel per Wischen auf dem angrenzenden Tag landen statt auf dem ersten offenen. Gesucht wird
+  // nach Datum: Die vorige Woche kann auf „heute“ begrenzt sein und endet dann nicht am Tag vor der bisherigen Ansicht.
+  const pendingDateRef = useRef(null);
   useEffect(() => {
-    const pending = pendingDayRef.current;
-    pendingDayRef.current = null;
-    setActiveDay(pending === 'first' ? 0 : pending === 'last' ? days.length - 1 : firstOpenDay);
+    const pending = pendingDateRef.current;
+    pendingDateRef.current = null;
+    const index = pending ? days.findIndex((day) => day.date === pending) : -1;
+    setActiveDay(index >= 0 ? index : firstOpenDay);
   }, [days[0]?.date]);
 
   const [swipe, setSwipe] = useState('');
@@ -58,10 +61,10 @@ export function RentalCalendar({ days, laneCount, minLanes = 1, selection, onSel
     if (index >= 0 && index < days.length) {
       setActiveDay(index);
     } else if (index >= days.length && onNextWeek) {
-      pendingDayRef.current = 'first';
+      pendingDateRef.current = addDays(days.at(-1).date, 1);
       onNextWeek();
     } else if (index < 0 && onPreviousWeek) {
-      pendingDayRef.current = 'last';
+      pendingDateRef.current = addDays(days[0].date, -1);
       onPreviousWeek();
     } else {
       return;

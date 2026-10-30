@@ -7482,6 +7482,16 @@ async function activeFormeTeams(db, tournamentId) {
   }));
 }
 
+// Ein-Personen-Team nur anlegen, wenn die Meldung noch in keinem Team steckt: Die Team-Anlage läuft vor dem Runden-Batch,
+// parallele Rundenstarts würden sonst dieselbe Meldung doppelt einteilen.
+function insertSingleTeamUnlessAssigned(db, tournamentId, registration, createdAt) {
+  return db.prepare(`INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at)
+    SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM tournament_teams t, json_each(t.member_registration_ids) m
+      WHERE t.tournament_id = ? AND m.value = ?)`)
+    .bind(crypto.randomUUID(), tournamentId, JSON.stringify([registration.id]), Number(registration.seeding_position || 0), createdAt,
+      tournamentId, registration.id);
+}
+
 // Formée-Teams für die nächste Schweizer/Formule-X-Runde: nur aktive Meldungen; wer nach der ersten Runde aktiv
 // dazukommt (nachgemeldet oder wieder eingecheckt), bekommt sein Team.
 async function activeTeamsForRound(db, tournamentId, teams) {
@@ -7491,8 +7501,7 @@ async function activeTeamsForRound(db, tournamentId, teams) {
   const missing = registrations.results.filter((row) => !withTeam.has(row.id));
   if (missing.length) {
     const nowMs = Date.now();
-    await db.batch(missing.map((row, index) => db.prepare('INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(crypto.randomUUID(), tournamentId, JSON.stringify([row.id]), Number(row.seeding_position || 0), new Date(nowMs + index).toISOString())));
+    await db.batch(missing.map((row, index) => insertSingleTeamUnlessAssigned(db, tournamentId, row, new Date(nowMs + index).toISOString())));
     teams = await getSchweizerTeams(db, { id: tournamentId });
   }
   return teams.filter((team) => team.members.every((id) => activeIds.has(id)));
@@ -7538,7 +7547,7 @@ async function createFormeTeams(db, tournament) {
   // id) bei Gleichstand nach der zufälligen UUID statt der Anmeldereihenfolge, was vor
   // allem bei Jeder-gegen-Jeden die aus Sicht der Teams nachvollziehbare Reihenfolge
   // zerstört (Round Robin ist ansonsten unabhängig von der Reihenfolge korrekt).
-  await db.batch(registrations.results.map((row, index) => db.prepare('INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), tournament.id, JSON.stringify([row.id]), Number(row.seeding_position || 0), new Date(nowMs + index).toISOString())));
+  await db.batch(registrations.results.map((row, index) => insertSingleTeamUnlessAssigned(db, tournament.id, row, new Date(nowMs + index).toISOString())));
   return getSchweizerTeams(db, tournament);
 }
 
