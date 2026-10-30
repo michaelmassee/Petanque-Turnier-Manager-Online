@@ -147,6 +147,34 @@ describe('Tägliche Administrator-Statusmail', () => {
     expect(Object.keys(ADMIN_STATUS_LABELS[mail.language]).sort()).toEqual(Object.keys(ADMIN_STATUS_LABELS.de).sort());
   });
 
+  it('schickt die Test-Statusmail nur an den anfragenden Admin, ohne den Cron-Versand zu blockieren', async () => {
+    user('admin');
+    user('other-admin', 'admin', until, 'en');
+    user('member', 'user');
+    for (const id of ['admin', 'member']) {
+      sql("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES (?, ?, '2099-01-01', ?)", id, id, from);
+    }
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-16T15:30:00.000Z'));
+    for (const [session, status] of [[null, 401], ['member', 403], ['admin', 200]]) {
+      const response = await worker.fetch(new Request('https://ptmonline.org/api/admin/status-email/test', {
+        method: 'POST', headers: { Origin: 'https://ptmonline.org', ...(session ? { Cookie: `ptm_session=${session}` } : {}) },
+      }), env);
+      expect(response.status).toBe(status);
+      if (status === 200) expect(await response.json()).toEqual({ email: 'admin@example.test' });
+    }
+    expect(env.MAIL_QUEUE.send).toHaveBeenCalledTimes(1);
+    const mail = env.MAIL_QUEUE.send.mock.calls[0][0];
+    expect(mail.to).toBe('admin@example.test');
+    expect(mail.subject).toBe('Test: PTM Online – täglicher Administrator-Status (2026-10-16)');
+    expect(mail.text).toContain('2026-10-15T15:30:00.000Z – 2026-10-16T15:30:00.000Z');
+    expect(mail.text).toContain('Testversand auf Anforderung: Zeitraum endet jetzt, Wartungsjobs wurden nicht ausgeführt.');
+    expect(mail.text).toContain('Cloudflare-Auslastung am vorherigen UTC-Kalendertag (Anteil an der Free-Plan-Tagesgrenze): Nicht verfügbar');
+    expect(env.DB.sqlite.prepare('SELECT COUNT(*) AS count FROM admin_status_reports').get().count).toBe(0);
+
+    await send();
+    expect(env.MAIL_QUEUE.send).toHaveBeenCalledTimes(3);
+  });
+
   it('markiert ohne Queue keine Mail als eingereiht', async () => {
     user('admin');
     delete env.MAIL_QUEUE;

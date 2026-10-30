@@ -21,6 +21,7 @@ export const ADMIN_STATUS_LABELS = {
     note: 'Bestandszahlen zeigen den aktuellen Datenbankstand. Neue Einträge zählen nur noch vorhandene Datensätze. Jobs können ohne anstehende Arbeit enden; Fehler einzelner Datensätze stehen im Worker-Protokoll. Der Mailversand erfolgt über die Warteschlange.',
     dashboard: 'PTM Online öffnen', usage: 'D1-Lesezeilen der 8 Statistikabfragen', unavailable: 'Nicht verfügbar',
     cloudflare: 'Cloudflare-Auslastung am vorherigen UTC-Kalendertag (Anteil an der Free-Plan-Tagesgrenze)', workerRequests: 'Worker-Aufrufe', errors: 'Fehler', cpuPerRequest: 'CPU je Aufruf (Durchschnitt)', d1RowsRead: 'D1 gelesene Zeilen', d1RowsWritten: 'D1 geschriebene Zeilen', durableObjectRequests: 'Durable-Object-Aufrufe', activeTime: 'aktiv', websockets: 'WebSocket-Nachrichten empfangen / gesendet', websocketMax: 'höchstens gleichzeitig verbunden', queueOperations: 'Queue-Operationen', of: 'von', limitWarning: 'Achtung: nahe an der Tagesgrenze',
+    test: 'Test', testRun: 'Testversand auf Anforderung: Zeitraum endet jetzt, Wartungsjobs wurden nicht ausgeführt.',
     adminMessages: 'An dich gerichtete Postbox-Nachrichten im Berichtszeitraum', sender: 'Absender', sentAt: 'Gesendet (UTC)', message: 'Nachricht', deletedSender: 'Gelöschtes Konto',
   },
   en: {
@@ -39,6 +40,7 @@ export const ADMIN_STATUS_LABELS = {
     note: 'Totals reflect the current database state. New entries count only records that still exist. Jobs may have no work due; errors for individual records are in the Worker logs. Email is delivered through the queue.',
     dashboard: 'Open PTM Online', usage: 'D1 rows read by the 8 statistics queries', unavailable: 'Unavailable',
     cloudflare: 'Cloudflare usage on the previous UTC calendar day (share of the Free plan daily limit)', workerRequests: 'Worker requests', errors: 'Errors', cpuPerRequest: 'CPU per request (average)', d1RowsRead: 'D1 rows read', d1RowsWritten: 'D1 rows written', durableObjectRequests: 'Durable Object requests', activeTime: 'active', websockets: 'WebSocket messages received / sent', websocketMax: 'peak concurrent connections', queueOperations: 'Queue operations', of: 'of', limitWarning: 'Warning: close to the daily limit',
+    test: 'Test', testRun: 'Test sent on request: the period ends now, maintenance jobs were not run.',
     adminMessages: 'Inbox messages addressed to you in the reporting period', sender: 'Sender', sentAt: 'Sent (UTC)', message: 'Message', deletedSender: 'Deleted account',
   },
   fr: {
@@ -57,6 +59,7 @@ export const ADMIN_STATUS_LABELS = {
     note: 'Les totaux reflètent l’état actuel de la base. Les nouveaux éléments ne comptent que les enregistrements encore présents. Une tâche peut ne rien avoir à traiter ; les erreurs de certains enregistrements figurent dans les journaux du Worker. Les e-mails passent par la file d’attente.',
     dashboard: 'Ouvrir PTM Online', usage: 'Lignes D1 lues par les 8 requêtes statistiques', unavailable: 'Indisponible',
     cloudflare: 'Utilisation Cloudflare du jour civil UTC précédent (part de la limite quotidienne du plan gratuit)', workerRequests: 'Appels du Worker', errors: 'Erreurs', cpuPerRequest: 'CPU par appel (moyenne)', d1RowsRead: 'Lignes D1 lues', d1RowsWritten: 'Lignes D1 écrites', durableObjectRequests: 'Appels Durable Object', activeTime: 'actif', websockets: 'Messages WebSocket reçus / envoyés', websocketMax: 'connexions simultanées au maximum', queueOperations: 'Opérations de file d’attente', of: 'sur', limitWarning: 'Attention : proche de la limite quotidienne',
+    test: 'Test', testRun: 'Envoi de test sur demande : la période se termine maintenant, les tâches de maintenance n’ont pas été exécutées.',
     adminMessages: 'Messages qui vous sont adressés pendant la période du rapport', sender: 'Expéditeur', sentAt: 'Envoyé (UTC)', message: 'Message', deletedSender: 'Compte supprimé',
   },
   it: {
@@ -75,6 +78,7 @@ export const ADMIN_STATUS_LABELS = {
     note: 'I totali riflettono lo stato attuale del database. I nuovi elementi contano solo i record ancora presenti. Un’attività può non avere nulla da elaborare; gli errori di singoli record sono nei log del Worker. Le e-mail passano dalla coda.',
     dashboard: 'Apri PTM Online', usage: 'Righe D1 lette dalle 8 query statistiche', unavailable: 'Non disponibile',
     cloudflare: 'Utilizzo Cloudflare del giorno solare UTC precedente (quota del limite giornaliero del piano gratuito)', workerRequests: 'Chiamate al Worker', errors: 'Errori', cpuPerRequest: 'CPU per chiamata (media)', d1RowsRead: 'Righe D1 lette', d1RowsWritten: 'Righe D1 scritte', durableObjectRequests: 'Chiamate Durable Object', activeTime: 'attivo', websockets: 'Messaggi WebSocket ricevuti / inviati', websocketMax: 'connessioni simultanee al massimo', queueOperations: 'Operazioni della coda', of: 'su', limitWarning: 'Attenzione: vicino al limite giornaliero',
+    test: 'Prova', testRun: 'Invio di prova su richiesta: il periodo termina ora, le attività di manutenzione non sono state eseguite.',
     adminMessages: 'Messaggi indirizzati a te nel periodo del rapporto', sender: 'Mittente', sentAt: 'Inviato (UTC)', message: 'Messaggio', deletedSender: 'Account eliminato',
   },
   nl: {
@@ -93,6 +97,7 @@ export const ADMIN_STATUS_LABELS = {
     note: 'Totalen tonen de huidige database-inhoud. Nieuwe items tellen alleen nog bestaande records. Taken kunnen zonder openstaand werk eindigen; fouten voor afzonderlijke records staan in de Worker-logboeken. E-mail wordt via de wachtrij verzonden.',
     dashboard: 'PTM Online openen', usage: 'D1-rijen gelezen door de 8 statistiekquery’s', unavailable: 'Niet beschikbaar',
     cloudflare: 'Cloudflare-gebruik op de vorige UTC-kalenderdag (aandeel van de dagelijkse limiet van het gratis abonnement)', workerRequests: 'Worker-aanroepen', errors: 'Fouten', cpuPerRequest: 'CPU per aanroep (gemiddeld)', d1RowsRead: 'Gelezen D1-rijen', d1RowsWritten: 'Geschreven D1-rijen', durableObjectRequests: 'Durable Object-aanroepen', activeTime: 'actief', websockets: 'WebSocket-berichten ontvangen / verzonden', websocketMax: 'maximaal gelijktijdig verbonden', queueOperations: 'Wachtrijbewerkingen', of: 'van', limitWarning: 'Let op: dicht bij de daglimiet',
+    test: 'Test', testRun: 'Testverzending op verzoek: de periode eindigt nu, onderhoudstaken zijn niet uitgevoerd.',
     adminMessages: 'Postbusberichten aan jou in de rapportperiode', sender: 'Afzender', sentAt: 'Verzonden (UTC)', message: 'Bericht', deletedSender: 'Verwijderd account',
   },
   es: {
@@ -111,6 +116,7 @@ export const ADMIN_STATUS_LABELS = {
     note: 'Los totales reflejan el estado actual de la base de datos. Los nuevos elementos solo cuentan registros que aún existen. Las tareas pueden no tener trabajo pendiente; los errores de registros individuales figuran en los registros del Worker. El correo se envía mediante la cola.',
     dashboard: 'Abrir PTM Online', usage: 'Filas D1 leídas por las 8 consultas estadísticas', unavailable: 'No disponible',
     cloudflare: 'Uso de Cloudflare del día natural UTC anterior (parte del límite diario del plan gratuito)', workerRequests: 'Llamadas al Worker', errors: 'Errores', cpuPerRequest: 'CPU por llamada (media)', d1RowsRead: 'Filas D1 leídas', d1RowsWritten: 'Filas D1 escritas', durableObjectRequests: 'Llamadas a Durable Object', activeTime: 'activo', websockets: 'Mensajes WebSocket recibidos / enviados', websocketMax: 'conexiones simultáneas como máximo', queueOperations: 'Operaciones de cola', of: 'de', limitWarning: 'Atención: cerca del límite diario',
+    test: 'Prueba', testRun: 'Envío de prueba a petición: el período termina ahora, las tareas de mantenimiento no se ejecutaron.',
     adminMessages: 'Mensajes del buzón dirigidos a ti durante el período del informe', sender: 'Remitente', sentAt: 'Enviado (UTC)', message: 'Mensaje', deletedSender: 'Cuenta eliminada',
   },
 };
@@ -171,7 +177,7 @@ function cloudflareUsageLines(usage, l, language) {
   ];
 }
 
-export function buildAdminStatusEmail(stats, jobs, from, until, language = 'de', recipientId = null) {
+export function buildAdminStatusEmail(stats, jobs, from, until, language = 'de', recipientId = null, { test = false } = {}) {
   const l = ADMIN_STATUS_LABELS[language] || ADMIN_STATUS_LABELS.de;
   const count = (value) => Number(value || 0);
   const pair = (label, row) => `${label}: ${count(row?.total)} / +${count(row?.added)}`;
@@ -199,12 +205,35 @@ export function buildAdminStatusEmail(stats, jobs, from, until, language = 'de',
       `${l.sentAt}: ${message.created_at}`,
       `${l.message}:\n${richTextPlainText(message.body)}`,
     ]),
-    '', l.jobs, ...jobs.map((job) => `${l[job.key]}: ${job.ok ? l.ok : l.failed}`),
+    '', l.jobs, ...(test ? [l.testRun] : jobs.map((job) => `${l[job.key]}: ${job.ok ? l.ok : l.failed}`)),
     '', ...cloudflareUsageLines(stats.cloudflareUsage, l, language),
     '', `${l.usage}: ${stats.statisticsRowsRead ?? l.unavailable}`,
     '', l.note, '', `${l.dashboard}: https://ptmonline.org/`,
   ].join('\n');
-  return { subject: `${l.subject} (${until.slice(0, 10)})`, text, language: ADMIN_STATUS_LABELS[language] ? language : 'de' };
+  return { subject: `${test ? `${l.test}: ` : ''}${l.subject} (${until.slice(0, 10)})`, text, language: ADMIN_STATUS_LABELS[language] ? language : 'de' };
+}
+
+// Fehlt die Auslastung (kein Token, API-Fehler), geht der Bericht trotzdem raus.
+function cloudflareUsageOrNull(env, day) {
+  return fetchCloudflareUsageSummary(env, day).catch((error) => {
+    console.error('Cloudflare usage for admin status failed', error);
+    return null;
+  });
+}
+
+/** Testversand an einen Admin: Zeitraum bis jetzt, ohne Versandmarker, damit der Cron-Lauf unberührt bleibt. */
+export async function sendAdminStatusTestEmail(env, adminId, now, systemUserId) {
+  if (!env.MAIL_QUEUE) throw new Error('Admin status email requires MAIL_QUEUE');
+  const admin = await env.DB.prepare('SELECT id, email, language FROM users WHERE id = ?').bind(adminId).first();
+  const until = new Date(now).toISOString();
+  const from = new Date(now - DAY_MS).toISOString();
+  const stats = await collectAdminStatus(env.DB, from, until, systemUserId);
+  stats.cloudflareUsage = await cloudflareUsageOrNull(env, stats.previousDay);
+  await env.MAIL_QUEUE.send({
+    to: admin.email, ...buildAdminStatusEmail(stats, [], from, until, admin.language, admin.id, { test: true }),
+    failureContext: `admin status test ${until} for ${admin.id}`,
+  });
+  return admin.email;
 }
 
 export async function sendAdminStatusEmails(env, jobs, scheduledTime, systemUserId) {
@@ -229,10 +258,7 @@ export async function sendAdminStatusEmails(env, jobs, scheduledTime, systemUser
   if (!admins.results.length) return;
   const stats = await collectAdminStatus(env.DB, from, until, systemUserId);
   // Fehlt die Auslastung (kein Token, API-Fehler), geht der Bericht trotzdem raus.
-  stats.cloudflareUsage = await fetchCloudflareUsageSummary(env, stats.previousDay).catch((error) => {
-    console.error('Cloudflare usage for admin status failed', error);
-    return null;
-  });
+  stats.cloudflareUsage = await cloudflareUsageOrNull(env, stats.previousDay);
   const failures = [];
   for (const admin of admins.results) {
     const claim = await env.DB.prepare('INSERT OR IGNORE INTO admin_status_reports (report_day, user_id, queued_at) VALUES (?, ?, ?)')

@@ -1889,5 +1889,9 @@
   "Es werden mindestens {{min}} Teams benötigt, ausgelost sind {{count}}.": "Se necesitan al menos {{min}} equipos; se han sorteado {{count}}.",
   "{{count}} bestätigte Meldungen sind inaktiv und zählen nicht mit – unter „Teilnehmer“ aktivieren.": "{{count}} inscripciones confirmadas están inactivas y no cuentan: actívalas en «Participantes».",
   "Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen ({{count}} offen).": "Introduce primero todos los resultados de la ronda actual ({{count}} pendientes).",
-  "Die Runde kann noch nicht gestartet werden:": "Todavía no se puede iniciar la ronda:"
+  "Die Runde kann noch nicht gestartet werden:": "Todavía no se puede iniciar la ronda:",
+  "Die Statusmail ist an {{email}} unterwegs.": "El correo de estado va de camino a {{email}}.",
+  "Tägliche Statusmail": "Correo de estado diario",
+  "Geht täglich um 01:00 UTC an alle Admins. Der Testversand geht nur an dich, deckt die letzten 24 Stunden ab und ändert nichts am regulären Versand.": "Se envía cada día a las 01:00 UTC a todos los administradores. La prueba solo te llega a ti, cubre las últimas 24 horas y no afecta al envío habitual.",
+  "Statusmail jetzt an mich senden": "Enviarme ahora el correo de estado"
 }

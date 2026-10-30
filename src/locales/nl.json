@@ -1889,5 +1889,9 @@
   "Es werden mindestens {{min}} Teams benötigt, ausgelost sind {{count}}.": "Er zijn minstens {{min}} teams nodig; {{count}} zijn geloot.",
   "{{count}} bestätigte Meldungen sind inaktiv und zählen nicht mit – unter „Teilnehmer“ aktivieren.": "{{count}} bevestigde inschrijvingen zijn inactief en tellen niet mee – activeer ze onder „Deelnemers”.",
   "Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen ({{count}} offen).": "Voer eerst alle uitslagen van de huidige ronde in ({{count}} open).",
-  "Die Runde kann noch nicht gestartet werden:": "De ronde kan nog niet worden gestart:"
+  "Die Runde kann noch nicht gestartet werden:": "De ronde kan nog niet worden gestart:",
+  "Die Statusmail ist an {{email}} unterwegs.": "De statusmail is onderweg naar {{email}}.",
+  "Tägliche Statusmail": "Dagelijkse statusmail",
+  "Geht täglich um 01:00 UTC an alle Admins. Der Testversand geht nur an dich, deckt die letzten 24 Stunden ab und ändert nichts am regulären Versand.": "Wordt dagelijks om 01:00 UTC naar alle beheerders verzonden. De test gaat alleen naar jou, beslaat de afgelopen 24 uur en verandert niets aan de normale verzending.",
+  "Statusmail jetzt an mich senden": "Statusmail nu naar mij sturen"
 }

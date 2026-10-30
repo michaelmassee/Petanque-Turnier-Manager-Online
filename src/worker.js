@@ -1,6 +1,6 @@
 import { limitPlayerDetails, registrationPlayerDetails, resolveSelectedRegistrationPlayers } from './registration-player-search.js';
 import tzlookup from 'tz-lookup';
-import { sendAdminStatusEmails } from './admin-status-email.js';
+import { sendAdminStatusEmails, sendAdminStatusTestEmail } from './admin-status-email.js';
 import { collectEmailStats, recordEmailSent } from './email-stats.js';
 import { cleanupReadPostboxMessages, DEFAULT_POSTBOX_READ_RETENTION_DAYS } from './postbox-retention.js';
 import { buildAdminPostboxEmail } from './admin-postbox-email.js';
@@ -2537,6 +2537,11 @@ export default {
       if (request.method === 'GET' && url.pathname === '/api/admin/email-stats') {
         await requireAdmin(request, env.DB);
         return json(await collectEmailStats(env.DB, Number(url.searchParams.get('days'))));
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/admin/status-email/test') {
+        const { user } = await requireAdmin(request, env.DB);
+        return json({ email: await sendAdminStatusTestEmail(env, user.id, Date.now(), TOURNAMENT_REPORT_SYSTEM_USER_ID) });
       }
 
       if (request.method === 'GET' && url.pathname === '/api/admin/cloudflare-usage') {

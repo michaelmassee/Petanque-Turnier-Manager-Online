@@ -1889,5 +1889,9 @@
   "Es werden mindestens {{min}} Teams benötigt, ausgelost sind {{count}}.": "Il faut au moins {{min}} équipes ; {{count}} ont été tirées au sort.",
   "{{count}} bestätigte Meldungen sind inaktiv und zählen nicht mit – unter „Teilnehmer“ aktivieren.": "{{count}} inscriptions confirmées sont inactives et ne comptent pas – active-les sous « Participants ».",
   "Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen ({{count}} offen).": "Saisis d'abord tous les résultats du tour en cours ({{count}} en attente).",
-  "Die Runde kann noch nicht gestartet werden:": "Le tour ne peut pas encore être lancé :"
+  "Die Runde kann noch nicht gestartet werden:": "Le tour ne peut pas encore être lancé :",
+  "Die Statusmail ist an {{email}} unterwegs.": "L’e-mail de statut est en route vers {{email}}.",
+  "Tägliche Statusmail": "E-mail de statut quotidien",
+  "Geht täglich um 01:00 UTC an alle Admins. Der Testversand geht nur an dich, deckt die letzten 24 Stunden ab und ändert nichts am regulären Versand.": "Envoyé chaque jour à 01:00 UTC à tous les administrateurs. Le test n’est envoyé qu’à vous, couvre les dernières 24 heures et ne modifie pas l’envoi régulier.",
+  "Statusmail jetzt an mich senden": "M’envoyer l’e-mail de statut maintenant"
 }

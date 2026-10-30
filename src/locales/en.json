@@ -1889,5 +1889,9 @@
   "Es werden mindestens {{min}} Teams benötigt, ausgelost sind {{count}}.": "At least {{min}} teams are needed; {{count}} have been drawn.",
   "{{count}} bestätigte Meldungen sind inaktiv und zählen nicht mit – unter „Teilnehmer“ aktivieren.": "{{count}} confirmed entries are inactive and do not count – activate them under “Participants”.",
   "Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen ({{count}} offen).": "Please enter all results of the current round first ({{count}} open).",
-  "Die Runde kann noch nicht gestartet werden:": "The round can't be started yet:"
+  "Die Runde kann noch nicht gestartet werden:": "The round can't be started yet:",
+  "Die Statusmail ist an {{email}} unterwegs.": "The status email is on its way to {{email}}.",
+  "Tägliche Statusmail": "Daily status email",
+  "Geht täglich um 01:00 UTC an alle Admins. Der Testversand geht nur an dich, deckt die letzten 24 Stunden ab und ändert nichts am regulären Versand.": "Sent daily at 01:00 UTC to all admins. The test goes only to you, covers the last 24 hours and does not affect the regular delivery.",
+  "Statusmail jetzt an mich senden": "Send status email to me now"
 }

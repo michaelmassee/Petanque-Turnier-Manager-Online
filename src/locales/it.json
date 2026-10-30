@@ -1967,5 +1967,9 @@
   "Es werden mindestens {{min}} Teams benötigt, ausgelost sind {{count}}.": "Servono almeno {{min}} squadre; ne sono state sorteggiate {{count}}.",
   "{{count}} bestätigte Meldungen sind inaktiv und zählen nicht mit – unter „Teilnehmer“ aktivieren.": "{{count}} iscrizioni confermate sono inattive e non contano: attivale in «Partecipanti».",
   "Bitte zuerst alle Ergebnisse der aktuellen Runde eintragen ({{count}} offen).": "Inserisci prima tutti i risultati del turno attuale ({{count}} aperti).",
-  "Die Runde kann noch nicht gestartet werden:": "Il turno non può ancora essere avviato:"
+  "Die Runde kann noch nicht gestartet werden:": "Il turno non può ancora essere avviato:",
+  "Die Statusmail ist an {{email}} unterwegs.": "L’e-mail di stato è in arrivo a {{email}}.",
+  "Tägliche Statusmail": "E-mail di stato giornaliera",
+  "Geht täglich um 01:00 UTC an alle Admins. Der Testversand geht nur an dich, deckt die letzten 24 Stunden ab und ändert nichts am regulären Versand.": "Inviata ogni giorno alle 01:00 UTC a tutti gli amministratori. Il test arriva solo a te, copre le ultime 24 ore e non modifica l’invio regolare.",
+  "Statusmail jetzt an mich senden": "Inviami ora l’e-mail di stato"
 }

@@ -775,6 +775,41 @@ export function EmailStatsPanel() {
   );
 }
 
+export function StatusEmailTestPanel() {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  async function sendTest() {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await authenticatedApi('/api/admin/status-email/test', { method: 'POST' });
+      setMessage(t('Die Statusmail ist an {{email}} unterwegs.', { email: result.email }));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="panel">
+      <div className="section-title">
+        <div>
+          <h2>{t('Tägliche Statusmail')}</h2>
+          <p className="muted">{t('Geht täglich um 01:00 UTC an alle Admins. Der Testversand geht nur an dich, deckt die letzten 24 Stunden ab und ändert nichts am regulären Versand.')}</p>
+        </div>
+        <Button variant="secondary" loading={busy} onClick={sendTest}>{t('Statusmail jetzt an mich senden')}</Button>
+      </div>
+      <Feedback error={error} />
+      <Feedback message={message} />
+    </div>
+  );
+}
+
 export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, registrationsCount }) {
   const { t } = useTranslation();
   const [stats, setStats] = useState(null);
@@ -912,6 +947,7 @@ export function AdminDashboardPage({ onSelectTab, onNavigate, tournamentsCount, 
         description={t('Angelegte Turniere ohne Kalendereinträge, pro Tag (UTC). Gelöschte Turniere fehlen im Verlauf.')} />
       <CloudflareUsagePanel />
       <EmailStatsPanel />
+      <StatusEmailTestPanel />
       <DataRetentionPanel />
     </section>
   );
