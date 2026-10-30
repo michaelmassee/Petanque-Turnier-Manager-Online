@@ -468,6 +468,8 @@ function matchesByStage(matches) {
 const SCHEDULE_REFRESH_MS = 120_000;
 // Mit verbundenem WebSocket nur noch als Sicherheitsnetz.
 const SCHEDULE_SOCKET_FALLBACK_MS = 600_000;
+// Nach dem Turnierende einmal nachladen, wenn der Edge-Snapshot (15 s) sicher erneuert ist.
+const SCHEDULE_FINISH_FOLLOW_UP_MS = 20_000;
 const SCHEDULE_GONE_STATUSES = [403, 404];
 
 // Eine tagelang offene Anzeige soll nicht endlos weiter abfragen: Schluss, wenn der Spielplan nicht mehr sichtbar ist
@@ -551,6 +553,24 @@ export function useScheduleQuery(tournamentId, shareToken = '', enabled = true) 
   const liveConnected = useTournamentLiveSocket(live ? `/api/tournaments/${encodeURIComponent(tournamentId)}/schedule/socket${shareQuery}` : null,
     () => query.refetch({ cancelRefetch: false }));
   socketConnectedRef.current = liveConnected;
+  // Turnierende: Der Status kommt frisch aus der Turnierzeile, Runden und Rangliste aus dem Edge-Snapshot, der in einem
+  // anderen Rechenzentrum noch bis zu 15 s alt sein kann. Danach endet das Abfragen, also einmal nachladen, wenn das Ende
+  // bei offener Seite eintrifft - sonst bliebe dort eine veraltete Endrangliste stehen.
+  const finished = query.data?.status === 'finished';
+  const seenRunningRef = useRef(false);
+  const refetchRef = useRef(query.refetch);
+  refetchRef.current = query.refetch;
+  const hasData = Boolean(query.data);
+  useEffect(() => {
+    if (!finished) {
+      if (hasData) seenRunningRef.current = true;
+      return undefined;
+    }
+    if (!seenRunningRef.current) return undefined;
+    seenRunningRef.current = false;
+    const timer = window.setTimeout(() => refetchRef.current({ cancelRefetch: false }), SCHEDULE_FINISH_FOLLOW_UP_MS);
+    return () => window.clearTimeout(timer);
+  }, [finished, hasData]);
   return { ...query, liveConnected };
 }
 

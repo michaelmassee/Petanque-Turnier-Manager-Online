@@ -164,7 +164,6 @@ function createLiveSocketChannel(path) {
   let stopped = false;
   let everConnected = false;
   let failedAttempts = 0;
-  let dropped = false;
   let retryMs = LIVE_SOCKET_RETRY_MIN_MS;
   let retryTimer = 0;
   let pingTimer = 0;
@@ -207,9 +206,9 @@ function createLiveSocketChannel(path) {
       setConnected(true);
       window.clearInterval(pingTimer);
       pingTimer = window.setInterval(() => { try { current.send('ping'); } catch { /* schließt gleich */ } }, LIVE_SOCKET_PING_MS);
-      // Nach einem Verbindungsabbruch kann eine Änderung verpasst worden sein.
-      if (dropped) scheduleRefresh();
-      dropped = false;
+      // Zwischen dem letzten Abruf und dem (Wieder-)Verbinden kann eine Änderung verpasst worden sein - auch beim ersten
+      // Verbinden kurz nach dem Laden der Seite. Einmal nachladen; unverändert kostet das nur ein 304.
+      emit('resync');
     };
     current.onmessage = (event) => {
       let type = '';
@@ -223,7 +222,6 @@ function createLiveSocketChannel(path) {
       setConnected(false);
       if (stopped) return;
       if (!opened) failedAttempts += 1;
-      else dropped = true;
       // 1013: zu viele Verbindungen für dieses Turnier, die Seite bleibt beim regelmäßigen Abruf.
       if (event.code === 1013) return;
       scheduleReconnect();
@@ -281,6 +279,7 @@ export function useTournamentLiveSocket(path, refresh) {
     const listener = (type) => {
       if (type === 'status') setConnected(channel.connected);
       else if (type === 'refresh') refresher.trigger();
+      else if (type === 'resync') refreshRef.current?.();
     };
     channel.listeners.add(listener);
     setConnected(channel.connected);

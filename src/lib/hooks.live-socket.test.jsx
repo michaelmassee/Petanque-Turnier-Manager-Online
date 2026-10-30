@@ -25,17 +25,19 @@ describe('useTournamentLiveSocket', () => {
     expect(result.current).toBe(false);
     act(() => latestSocket().open());
     expect(result.current).toBe(true);
+    // Erstes Verbinden: einmal nachladen, falls sich seit dem Abruf schon etwas geändert hat.
+    expect(refresh).toHaveBeenCalledTimes(1);
 
     act(() => { vi.advanceTimersByTime(LIVE_SOCKET_PING_MS); });
     expect(latestSocket().sent).toEqual(['ping']);
 
     act(() => { latestSocket().receive({ type: 'changed' }); latestSocket().receive({ type: 'changed' }); });
-    expect(refresh).not.toHaveBeenCalled();
-    act(() => { vi.advanceTimersByTime(1500); });
     expect(refresh).toHaveBeenCalledTimes(1);
+    act(() => { vi.advanceTimersByTime(1500); });
+    expect(refresh).toHaveBeenCalledTimes(2);
     // Zweiter Abruf, falls der Edge-Cache eines anderen Rechenzentrums noch den alten Stand hatte.
     act(() => { vi.advanceTimersByTime(20_000); });
-    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(refresh).toHaveBeenCalledTimes(3);
   });
 
   it('teilt sich eine Verbindung je Pfad und schließt sie mit dem letzten Zuhörer', () => {
@@ -52,14 +54,14 @@ describe('useTournamentLiveSocket', () => {
     const refresh = vi.fn();
     renderHook(() => useTournamentLiveSocket('/api/y/socket', refresh));
     act(() => latestSocket().open());
+    expect(refresh).toHaveBeenCalledTimes(1);
     act(() => latestSocket().drop());
     expect(FakeWebSocket.instances).toHaveLength(1);
 
     act(() => { vi.advanceTimersByTime(3000); });
     expect(FakeWebSocket.instances).toHaveLength(2);
     act(() => latestSocket().open());
-    act(() => { vi.advanceTimersByTime(1500); });
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(2);
   });
 
   it('gibt ohne erfolgreiche Verbindung nach einigen Versuchen auf und bleibt beim Polling', () => {

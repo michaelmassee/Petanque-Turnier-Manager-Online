@@ -960,7 +960,10 @@ describe('TournamentPlayManagement', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Gesehen' }));
     await waitFor(() => expect(screen.queryByText('Neu')).not.toBeInTheDocument());
-    expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/result-reports/confirm', expect.objectContaining({ method: 'POST' }));
+    // Nur die angezeigte, unbestätigte Meldung (m1), nicht die schon bestätigte m2.
+    const confirmCall = global.fetch.mock.calls.find(([path]) => path === '/api/tournaments/t1/result-reports/confirm');
+    expect(confirmCall[1]).toMatchObject({ method: 'POST' });
+    expect(JSON.parse(confirmCall[1].body)).toEqual({ matchIds: ['m1'] });
     expect(screen.queryByText(/Neue Ergebnismeldungen/)).not.toBeInTheDocument();
     expect(screen.getByText('Dirk Demo', { selector: 'strong' }).closest('article')).toHaveClass('is-player-reported');
   });

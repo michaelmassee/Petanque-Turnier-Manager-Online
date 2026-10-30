@@ -173,12 +173,14 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
       expect(await screen.findByText('Live')).toHaveAttribute('title', 'Aktualisiert sich bei jeder Änderung sofort');
       expect(screen.queryByText(/^Stand:/)).not.toBeInTheDocument();
       expect(screen.queryByText(/nächste Aktualisierung/)).not.toBeInTheDocument();
+      // Erstes Verbinden lädt einmal nach: Eine Änderung zwischen Abruf und Verbinden ginge sonst bis zum Polling verloren.
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
 
       // Mehrere Änderungen kurz hintereinander (Serien-Eingabe) werden zu einem Abruf.
       act(() => { socket.receive({ type: 'changed' }); socket.receive({ type: 'changed' }); socket.receive('pong'); });
-      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2), { timeout: 3000 });
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3), { timeout: 3000 });
       await new Promise((resolve) => { setTimeout(resolve, 1600); });
-      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(global.fetch).toHaveBeenCalledTimes(3);
     } finally {
       uninstallFakeWebSocket();
     }
@@ -261,6 +263,36 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
 
       await act(async () => { vi.advanceTimersByTime(20_000); });
       await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
+    } finally {
+      uninstallFakeWebSocket();
+      vi.useRealTimers();
+    }
+  });
+
+  // Status frisch, Rangliste aus einem bis zu 15 s alten Edge-Snapshot: Nach dem Ende endet das Abfragen, also einmal
+  // nachladen, sonst bliebe eine veraltete Endrangliste stehen.
+  it('lädt nach dem Turnierende noch einmal, auch wenn Socket und Polling danach enden', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockSchedule({});
+    installFakeWebSocket();
+    try {
+      render(<TournamentSchedule tournamentId="t1" language="de" />);
+      await screen.findByText('Noch keine Runde gestartet.');
+      const socket = latestSocket();
+      act(() => socket.open());
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+
+      mockSchedule({ status: 'finished' });
+      act(() => socket.receive({ type: 'changed' }));
+      await act(async () => { vi.advanceTimersByTime(1500); });
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+      expect(socket.readyState).toBe(3);
+
+      await act(async () => { vi.advanceTimersByTime(20_000); });
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+      // Danach nichts mehr.
+      await act(async () => { vi.advanceTimersByTime(600_000); });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
     } finally {
       uninstallFakeWebSocket();
       vi.useRealTimers();

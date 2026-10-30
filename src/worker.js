@@ -2775,7 +2775,8 @@ export default {
         return await setTournamentMatchResult(request, env.DB, tournament, tournamentMatchResultMatch[2]);
       }
 
-      // „Gesehen“ der Turnierleitung: alle offenen Spielermeldungen bestätigen, erst dann sind sie öffentlich (E-27).
+      // „Gesehen“ der Turnierleitung: die angezeigten offenen Spielermeldungen bestätigen, erst dann sind sie öffentlich
+      // (E-27). Nur die übergebenen Partien: Eine erst nach dem letzten Laden eingegangene Meldung bleibt offen.
       // Der zentrale Schreibpfad unten leert danach den Snapshot und meldet offenen Seiten „changed“.
       const resultReportsConfirmMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/result-reports\/confirm$/);
       if (resultReportsConfirmMatch && request.method === 'POST') {
@@ -2783,8 +2784,14 @@ export default {
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         const session = await requireSession(request, env.DB);
         assertCanManageTournament(tournament, session.user);
-        await env.DB.prepare('UPDATE tournament_matches SET result_report_pending = 0 WHERE tournament_id = ? AND result_report_pending = 1')
-          .bind(tournament.id).run();
+        const { matchIds } = await readJson(request);
+        if (!Array.isArray(matchIds) || matchIds.length > 500 || !matchIds.every((id) => typeof id === 'string' && id.length <= 64)) {
+          throw new HttpError(400, 'Ungültige Partien');
+        }
+        // json_each statt einzelner Platzhalter: D1 erlaubt höchstens 100 gebundene Parameter.
+        await env.DB.prepare(`UPDATE tournament_matches SET result_report_pending = 0
+            WHERE tournament_id = ? AND result_report_pending = 1 AND id IN (SELECT value FROM json_each(?))`)
+          .bind(tournament.id, JSON.stringify(matchIds)).run();
         return await listTournamentRounds(env.DB, tournament.id);
       }
 
@@ -7914,6 +7921,8 @@ async function reportLiveMatchResult(request, env, registration, reporterUserId)
   if (registration.participation === 'withdrawn') throw new HttpError(403, 'Du kannst nur das Ergebnis deiner aktuellen offenen Partie melden');
   if (isDocumentBound(tournament)) {
     await reportDocumentMatchResult(request, db, tournament, registration, reporterUserId);
+    // Mitspieler und Gegner sehen die offene Meldung („Die Turnierleitung bestätigt …“) sofort.
+    await notifyTournamentChanged(env, tournament.id);
     return;
   }
 

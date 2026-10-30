@@ -718,7 +718,11 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     setError('');
     setMessage('');
     try {
-      const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/result-reports/confirm`, { method: 'POST' });
+      // Nur die angezeigten Meldungen: Eine inzwischen eingegangene bleibt bis zum nächsten „Gesehen“ offen.
+      const matchIds = rounds.flatMap((round) => round.matches).filter((match) => match.reportPending).map((match) => match.id);
+      const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/result-reports/confirm`, {
+        method: 'POST', body: JSON.stringify({ matchIds }),
+      });
       queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, rounds: data.rounds }));
     } catch (err) {
       setError(err.message);

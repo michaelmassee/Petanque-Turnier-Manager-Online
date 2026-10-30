@@ -63,6 +63,15 @@ describe('Ergebnismeldung bei verbundenem Turnierdokument', () => {
       .toEqual({ score_a: null, score_b: null });
   });
 
+  // Mitspieler und Gegner sollen die offene Meldung sofort sehen, nicht erst beim nächsten Abruf.
+  it('meldet offenen Seiten die Änderung über den WebSocket-Hub', async () => {
+    const hubCalls = [];
+    env.TOURNAMENT_LIVE_HUB = { idFromName: (name) => name, get: (id) => ({ fetch: async () => { hubCalls.push(id); return new Response(null, { status: 204 }); } }) };
+
+    expect((await melden('bert-session', BERT, 13, 7)).status).toBe(200);
+    expect(hubCalls).toEqual(['t1']);
+  });
+
   it('nimmt nur die Meldung des Siegerteams an', async () => {
     const verlierer = await melden('anna-session', ANNA, 7, 13);
 

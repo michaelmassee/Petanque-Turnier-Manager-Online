@@ -139,8 +139,8 @@ describe('Ergebnismeldung durch Spieler', () => {
       headers: { Cookie: `ptm_session=${session}` },
     }), env)).json();
     const spielplan = () => abrufen('/api/tournaments/t1/schedule');
-    const bestaetigen = () => worker.fetch(new Request('https://ptm.test/api/tournaments/t1/result-reports/confirm', {
-      method: 'POST', headers: { Cookie: 'ptm_session=player-session' },
+    const bestaetigen = (matchIds = ['match1']) => worker.fetch(new Request('https://ptm.test/api/tournaments/t1/result-reports/confirm', {
+      method: 'POST', headers: { Cookie: 'ptm_session=player-session', 'Content-Type': 'application/json' }, body: JSON.stringify({ matchIds }),
     }), env);
     const pending = () => env.DB.sqlite.prepare("SELECT result_report_pending FROM tournament_matches WHERE id = 'match1'").get().result_report_pending;
 
@@ -177,9 +177,21 @@ describe('Ergebnismeldung durch Spieler', () => {
       expect((await abrufen('/api/live/registrations/r2', 'other-session')).registration.resultReport).toBeNull();
     });
 
+    // Eine erst nach dem letzten Laden eingegangene Meldung hat die Turnierleitung nicht gesehen: Sie bleibt offen.
+    it('bestätigt nur die übergebenen, angezeigten Meldungen', async () => {
+      expect((await bestaetigen([])).status).toBe(200);
+      expect(pending()).toBe(1);
+      expect((await bestaetigen(['andere-partie'])).status).toBe(200);
+      expect(pending()).toBe(1);
+      expect((await bestaetigen('match1')).status).toBe(400);
+      expect(pending()).toBe(1);
+      expect((await bestaetigen(['match1'])).status).toBe(200);
+      expect(pending()).toBe(0);
+    });
+
     it('lässt nur die Turnierleitung bestätigen', async () => {
       const fremd = await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/result-reports/confirm', {
-        method: 'POST', headers: { Cookie: 'ptm_session=other-session' },
+        method: 'POST', headers: { Cookie: 'ptm_session=other-session', 'Content-Type': 'application/json' }, body: JSON.stringify({ matchIds: ['match1'] }),
       }), env);
       expect(fremd.status).toBe(403);
       expect(pending()).toBe(1);
