@@ -1917,7 +1917,9 @@ export default {
 
     // Änderungen an Meldungen (Teilnahme, Abmeldung, Bearbeitung) gehören zum Turnier: vorher die Turnier-ID merken,
     // damit offene Seiten danach neu laden (eine Zeile pro Schreibzugriff).
-    const writtenRegistration = request.method !== 'GET' ? url.pathname.match(/^\/api\/registrations\/([^/]+)(?:\/|$)/) : null;
+    // cancel-by-token ist keine Meldungs-ID (das Token steht im Body); der Handler meldet die Änderung selbst.
+    const writtenRegistration = request.method !== 'GET' && url.pathname !== '/api/registrations/cancel-by-token'
+      ? url.pathname.match(/^\/api\/registrations\/([^/]+)(?:\/|$)/) : null;
     const registrationTournamentId = writtenRegistration
       ? (await env.DB.prepare('SELECT tournament_id FROM registrations WHERE id = ?').bind(decodeURIComponent(writtenRegistration[1])).first().catch(() => null))?.tournament_id || null
       : null;
@@ -9024,6 +9026,9 @@ async function cancelRegistrationByToken(request, env) {
     console.error(`Failed to send cancellation email for registration ${registration.id}`, error);
   }
   if (freesCapacity(registration.status, 'cancelled')) await promoteWaitlistSafely(env, registration.tournament_id, APP_ORIGIN);
+  // Das Token steht im Body, nicht im Pfad: Die zentrale Zuordnung Meldung → Turnier greift hier nicht.
+  await invalidateLiveSnapshot(new URL(request.url).origin, registration.tournament_id);
+  await notifyTournamentChanged(env, registration.tournament_id);
   return result;
 }
 
@@ -10157,6 +10162,8 @@ async function syncPostResults(request, env, tournamentId) {
     if (entry.status !== null) assertNotRejectedByStatusEdit(previousById.get(entry.id)?.status, entry.status);
   }
 
+  // Teilnehmer-Limit: Eine Wiederaufnahme (laut aktuellem Status nicht belegend → belegend) braucht einen freien Platz.
+  const limitCondition = participantLimitCondition(tournamentId);
   const updateStatement = db.prepare(
     `UPDATE registrations
      SET status = COALESCE(?, status),
@@ -10165,14 +10172,22 @@ async function syncPostResults(request, env, tournamentId) {
          rejected_at = CASE WHEN COALESCE(?, status) = 'rejected' THEN rejected_at END,
          rejected_by = CASE WHEN COALESCE(?, status) = 'rejected' THEN rejected_by END,
          seeding_position = ?, participation = COALESCE(?, participation), execution_revision = execution_revision + 1, updated_at = ?
-     WHERE id = ? AND tournament_id = ? AND (? IS NULL OR execution_revision = ?)`,
+     WHERE id = ? AND tournament_id = ? AND (? IS NULL OR execution_revision = ?)
+       AND (registrations.status IN ('pending', 'confirmed', 'waitlist') OR COALESCE(?, registrations.status) NOT IN ('pending', 'confirmed', 'waitlist')
+         OR ${limitCondition.sql})`,
   );
   const ids = parsed.map((entry) => entry.id);
   const expectedIds = expectedRevisionEntries.map((entry) => entry.id);
   const placeholders = (values) => values.map(() => '?').join(', ') || "''";
   // Antwort aus dem Zustand nach dem Batch: geändert sind genau die Zeilen mit dem Zeitstempel dieses Auftrags. Fehlt
   // eine Zeile mit erwarteter Revision, hat eine parallele Änderung sie verhindert (execution_conflict).
-  const responseSql = `SELECT CASE WHEN (SELECT COUNT(*) FROM registrations WHERE tournament_id = ? AND updated_at = ?
+  // Eine angeforderte Wiederaufnahme, deren Meldung danach nicht belegend ist, scheiterte am Teilnehmer-Limit.
+  const reactivationIds = parsed.filter((entry) => PARTICIPANT_LIMIT_ACTIVE_STATUSES.includes(entry.status)).map((entry) => entry.id);
+  const responseSql = `SELECT CASE WHEN EXISTS (SELECT 1 FROM registrations WHERE tournament_id = ? AND id IN (${placeholders(reactivationIds)})
+        AND status NOT IN ('pending', 'confirmed', 'waitlist'))
+      THEN json_object('status', 409, 'body', json_object('error', 'Die maximale Teilnehmerzahl für dieses Turnier ist erreicht.',
+        'details', json_object('code', 'participant_limit_reached')))
+      WHEN (SELECT COUNT(*) FROM registrations WHERE tournament_id = ? AND updated_at = ?
         AND id IN (${placeholders(expectedIds)})) < ?
       THEN json_object('status', 409, 'body', json_object('error', 'Die Ausführungsdaten wurden zwischenzeitlich geändert',
         'details', json_object('code', 'execution_conflict')))
@@ -10182,8 +10197,9 @@ async function syncPostResults(request, env, tournamentId) {
   return {
     statements: parsed.map((entry) => updateStatement.bind(entry.status, entry.status, now, entry.status,
       entry.status, entry.status, entry.status, entry.seedingPosition,
-      entry.participation, now, entry.id, tournamentId, entry.expectedExecutionRevision, entry.expectedExecutionRevision)),
-    response: { sql: responseSql, binds: [tournamentId, now, ...expectedIds, expectedIds.length, tournamentId, now, ...ids] },
+      entry.participation, now, entry.id, tournamentId, entry.expectedExecutionRevision, entry.expectedExecutionRevision,
+      entry.status, ...limitCondition.binds)),
+    response: { sql: responseSql, binds: [tournamentId, ...reactivationIds, tournamentId, now, ...expectedIds, expectedIds.length, tournamentId, now, ...ids] },
     async afterCommit(envelope) {
       if (envelope.status !== 200) return;
       // Der Dokument-Sync löst keine E-Mails aus; Status-Benachrichtigungen bleiben einem ausdrücklichen notify

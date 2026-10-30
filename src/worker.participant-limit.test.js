@@ -1,6 +1,7 @@
 // @vitest-environment node
 // Teilnehmer-Limit pro Turnier (Missbrauchsschutz, 2026-10-30): höchstens so viele Meldungen (pending, confirmed,
 // waitlist), wie der Besitzer des Turniers darf; Admins sind ausgenommen. Gilt für alle Anmeldewege.
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 import { bindeDokument, syncAnfrage } from './test-support/sync.js';
@@ -184,6 +185,41 @@ describe('Teilnehmer-Limit pro Turnier', () => {
     expect(antwort.status).toBe(409);
     expect((await antwort.json()).details).toEqual({ code: 'participant_limit_reached' });
     expect(env.DB.sqlite.prepare('SELECT status FROM registrations WHERE id = ?').get(ONLINE_ID).status).toBe('cancelled');
+  });
+
+  // Älterer Sync-Weg: Statusübernahme aus dem Dokument (POST …/results) darf das Limit ebenso wenig umgehen.
+  it('gilt auch für Statusübernahmen über POST /api/sync/tournaments/:id/results', async () => {
+    const ZUGANG = `ptm-api-${crypto.randomUUID()}`;
+    sql(`INSERT INTO api_keys (id, user_id, key_hash, label, status, requested_at, approved_at, created_at, updated_at)
+      VALUES ('key1', 'u1', ?, 'PTM', 'approved', '2026-01-01', '2026-01-01', '2026-01-01', '2026-01-01')`,
+    createHash('sha256').update(ZUGANG).digest('hex'));
+    bindeDokument(env.DB.sqlite, 't1');
+    vorhanden('a', 'confirmed');
+    vorhanden('b', 'confirmed');
+    vorhanden('alt', 'cancelled');
+    const request = syncAnfrage('POST', '/api/sync/tournaments/t1/results', { registrations: [{ id: 'alt', status: 'confirmed' }] });
+    request.headers.set('Authorization', `Bearer ${ZUGANG}`);
+    const antwort = await worker.fetch(request, env);
+
+    expect(antwort.status).toBe(409);
+    expect((await antwort.json()).details).toEqual({ code: 'participant_limit_reached' });
+    expect(env.DB.sqlite.prepare("SELECT status FROM registrations WHERE id = 'alt'").get().status).toBe('cancelled');
+  });
+
+  // Das Token steht im Body; offene Anzeigen sollen die Abmeldung trotzdem sofort sehen.
+  it('meldet eine Abmeldung per Link offenen Seiten (Snapshot und WebSocket-Hub)', async () => {
+    const hubCalls = [];
+    env.TOURNAMENT_LIVE_HUB = { idFromName: (name) => name, get: (id) => ({ fetch: async () => { hubCalls.push(id); return new Response(null, { status: 204 }); } }) };
+    vorhanden('a', 'confirmed');
+    const abmeldeLink = `abmelde-${crypto.randomUUID()}`;
+    sql("UPDATE registrations SET cancel_token = ? WHERE id = 'a'", abmeldeLink);
+    const antwort = await worker.fetch(new Request('https://ptm.test/api/registrations/cancel-by-token', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: abmeldeLink }),
+    }), env);
+
+    expect(antwort.status).toBe(200);
+    expect(env.DB.sqlite.prepare("SELECT status FROM registrations WHERE id = 'a'").get().status).toBe('cancelled');
+    expect(hubCalls).toEqual(['t1']);
   });
 
   describe('„Max. Meldungen“ im Turnier', () => {
