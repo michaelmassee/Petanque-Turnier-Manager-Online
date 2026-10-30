@@ -1,4 +1,4 @@
-import { FREE_PLAN_DAILY_LIMITS, fetchCloudflareUsage } from './cloudflare-usage.js';
+import { CLOUDFLARE_FREE_SUMMARY_LIMITS, fetchCloudflareUsageSummary } from './cloudflare-usage-core.js';
 import { richTextPlainText } from './lib/rich-text.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -155,9 +155,9 @@ function cloudflareUsageLines(usage, l, language) {
   const number = new Intl.NumberFormat(language, { maximumFractionDigits: 1 });
   const percent = new Intl.NumberFormat(language, { style: 'percent', maximumFractionDigits: 1 });
   const withLimit = (label, key) => {
-    const share = usage[key] / FREE_PLAN_DAILY_LIMITS[key];
+    const share = usage[key] / CLOUDFLARE_FREE_SUMMARY_LIMITS[key];
     const warning = share >= LIMIT_WARNING_SHARE ? ` – ${l.limitWarning}` : '';
-    return `${label}: ${number.format(usage[key])} ${l.of} ${number.format(FREE_PLAN_DAILY_LIMITS[key])} (${percent.format(share)})${warning}`;
+    return `${label}: ${number.format(usage[key])} ${l.of} ${number.format(CLOUDFLARE_FREE_SUMMARY_LIMITS[key])} (${percent.format(share)})${warning}`;
   };
   return [
     `${l.cloudflare} (${usage.day})`,
@@ -229,7 +229,7 @@ export async function sendAdminStatusEmails(env, jobs, scheduledTime, systemUser
   if (!admins.results.length) return;
   const stats = await collectAdminStatus(env.DB, from, until, systemUserId);
   // Fehlt die Auslastung (kein Token, API-Fehler), geht der Bericht trotzdem raus.
-  stats.cloudflareUsage = await fetchCloudflareUsage(env, stats.previousDay).catch((error) => {
+  stats.cloudflareUsage = await fetchCloudflareUsageSummary(env, stats.previousDay).catch((error) => {
     console.error('Cloudflare usage for admin status failed', error);
     return null;
   });

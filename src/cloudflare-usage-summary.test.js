@@ -1,18 +1,18 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchCloudflareUsage } from './cloudflare-usage.js';
+import { fetchCloudflareUsageSummary } from './cloudflare-usage-core.js';
 import { buildAdminStatusEmail, collectAdminStatus, sendAdminStatusEmails } from './admin-status-email.js';
 import { d1MitSchema } from './test-support/d1.js';
 
-const env = { CF_ANALYTICS_TOKEN: 'analytics-read', CF_ACCOUNT_ID: 'account-1' };
+const env = { CF_ANALYTICS_API_TOKEN: 'analytics-read', CF_ACCOUNT_ID: 'account-1' };
 const answer = (data, ok = true, status = 200) => vi.fn().mockResolvedValue({ ok, status, json: async () => data });
 const accountData = {
-  w: [{ sum: { requests: 8000, errors: 2, cpuTimeUs: 20_000_000 } }, { sum: { requests: 2000, errors: 0, cpuTimeUs: 10_000_000 } }],
-  d: [{ sum: { rowsRead: 4_100_000, rowsWritten: 2221 } }],
-  o: [{ sum: { requests: 16 } }],
-  p: [{ sum: { activeTime: 7_800_000, inboundWebsocketMsgCount: 4, outboundWebsocketMsgCount: 138 }, max: { activeWebsocketConnections: 3 } },
+  workers: [{ sum: { requests: 8000, errors: 2, cpuTimeUs: 20_000_000 } }, { sum: { requests: 2000, errors: 0, cpuTimeUs: 10_000_000 } }],
+  d1: [{ sum: { rowsRead: 4_100_000, rowsWritten: 2221 } }],
+  objects: [{ sum: { requests: 16 } }],
+  objectPeriods: [{ sum: { activeTime: 7_800_000, inboundWebsocketMsgCount: 4, outboundWebsocketMsgCount: 138 }, max: { activeWebsocketConnections: 3 } },
     { sum: { activeTime: 0, inboundWebsocketMsgCount: 0, outboundWebsocketMsgCount: 0 }, max: { activeWebsocketConnections: 1 } }],
-  q: [{ sum: { billableOperations: 27 } }],
+  queue: [{ sum: { billableOperations: 27 } }],
 };
 
 describe('Cloudflare-Auslastung für die Admin-Statusmail', () => {
@@ -20,12 +20,12 @@ describe('Cloudflare-Auslastung für die Admin-Statusmail', () => {
 
   it('fragt den Tag einmal ab und summiert alle Gruppen', async () => {
     const fetchImpl = answer({ data: { viewer: { accounts: [accountData] } } });
-    const usage = await fetchCloudflareUsage(env, '2026-10-29', fetchImpl);
+    const usage = await fetchCloudflareUsageSummary(env, '2026-10-29', { fetchImpl });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, init] = fetchImpl.mock.calls[0];
     expect(url).toBe('https://api.cloudflare.com/client/v4/graphql');
     expect(init.headers.Authorization).toBe('Bearer analytics-read');
-    expect(JSON.parse(init.body).variables).toEqual({ a: 'account-1', d: '2026-10-29' });
+    expect(JSON.parse(init.body).variables).toEqual({ account: 'account-1', date: '2026-10-29' });
     expect(usage).toEqual({
       day: '2026-10-29', workerRequests: 10_000, workerErrors: 2, cpuMsPerRequest: 3,
       d1RowsRead: 4_100_000, d1RowsWritten: 2221, durableObjectRequests: 16, durableObjectActiveSeconds: 7.8,
@@ -35,24 +35,24 @@ describe('Cloudflare-Auslastung für die Admin-Statusmail', () => {
 
   it('fragt ohne Token oder Konto nichts ab', async () => {
     const fetchImpl = vi.fn();
-    expect(await fetchCloudflareUsage({ CF_ACCOUNT_ID: 'account-1' }, '2026-10-29', fetchImpl)).toBeNull();
-    expect(await fetchCloudflareUsage({ CF_ANALYTICS_TOKEN: 'x' }, '2026-10-29', fetchImpl)).toBeNull();
+    expect(await fetchCloudflareUsageSummary({ CF_ACCOUNT_ID: 'account-1' }, '2026-10-29', { fetchImpl })).toBeNull();
+    expect(await fetchCloudflareUsageSummary({ CF_ANALYTICS_API_TOKEN: 'x' }, '2026-10-29', { fetchImpl })).toBeNull();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('meldet HTTP-, GraphQL- und Kontofehler', async () => {
-    await expect(fetchCloudflareUsage(env, '2026-10-29', answer({}, false, 403))).rejects.toThrow('HTTP 403');
-    await expect(fetchCloudflareUsage(env, '2026-10-29', answer({ errors: [{ message: 'not authorized' }] }))).rejects.toThrow('not authorized');
-    await expect(fetchCloudflareUsage(env, '2026-10-29', answer({ data: { viewer: { accounts: [] } } }))).rejects.toThrow('account not found');
+    await expect(fetchCloudflareUsageSummary(env, '2026-10-29', { fetchImpl: answer({}, false, 403) })).rejects.toThrow('HTTP 403');
+    await expect(fetchCloudflareUsageSummary(env, '2026-10-29', { fetchImpl: answer({ errors: [{ message: 'not authorized' }] }) })).rejects.toThrow('not authorized');
+    await expect(fetchCloudflareUsageSummary(env, '2026-10-29', { fetchImpl: answer({ data: { viewer: { accounts: [] } } }) })).rejects.toThrow('Konto nicht gefunden');
   });
 
   it('rechnet ohne Worker-Aufrufe keine CPU durch null', async () => {
-    const usage = await fetchCloudflareUsage(env, '2026-10-29', answer({ data: { viewer: { accounts: [{}] } } }));
+    const usage = await fetchCloudflareUsageSummary(env, '2026-10-29', { fetchImpl: answer({ data: { viewer: { accounts: [{}] } } }) });
     expect(usage).toMatchObject({ workerRequests: 0, cpuMsPerRequest: 0, websocketMax: 0 });
   });
 
   it('zeigt Anteile an den Free-Plan-Grenzen und warnt ab 80 %', async () => {
-    const usage = await fetchCloudflareUsage(env, '2026-10-29', answer({ data: { viewer: { accounts: [accountData] } } }));
+    const usage = await fetchCloudflareUsageSummary(env, '2026-10-29', { fetchImpl: answer({ data: { viewer: { accounts: [accountData] } } }) });
     const stats = { ...(await collectAdminStatus(d1MitSchema(), '2026-10-29T01:00:00.000Z', '2026-10-30T01:00:00.000Z', 'system')), cloudflareUsage: usage };
     const de = buildAdminStatusEmail(stats, [], '2026-10-29T01:00:00.000Z', '2026-10-30T01:00:00.000Z', 'de').text.replace(/[\u00a0\u202f]/g, ' ');
     expect(de).toContain('Cloudflare-Auslastung am vorherigen UTC-Kalendertag (Anteil an der Free-Plan-Tagesgrenze) (2026-10-29)');
