@@ -90,8 +90,6 @@ self.addEventListener('push', (event) => {
     badge: '/icons/icon-192.png',
     // Live-Push (neue Runde) bringt eigenes Tag und Ziel mit; Postfach-Push öffnet die Startseite.
     tag: payload.tag || `postbox-${payload.messageId || 'new'}`,
-    // Turnierseite/Bildschirm-Anzeige: Rundenwechsel ohne Ton, die Seite lädt ohnehin selbst neu.
-    silent: payload.silent === true,
     data: {
       url: typeof payload.url === 'string' && payload.url.startsWith(self.location.origin) ? payload.url : '/',
       eventType: payload.eventType || null,

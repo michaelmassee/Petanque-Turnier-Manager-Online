@@ -585,12 +585,12 @@ export function dateDaysAgo(days, now = new Date()) {
 
 // Push bei neuer Runde (Bereich "Live"). Kurz halten: Titel = Turnier + Runde, Text = Bahn und Gegner.
 export const LIVE_ROUND_PUSH_TEXTS = {
-  de: { round: 'Runde', court: 'Bahn', versus: 'gegen', bye: 'Freilos', notPlaying: 'In dieser Runde nicht eingeteilt' },
-  nl: { round: 'Ronde', court: 'Baan', versus: 'tegen', bye: 'Vrijloting', notPlaying: 'Niet ingedeeld in deze ronde' },
-  en: { round: 'Round', court: 'Lane', versus: 'vs.', bye: 'Bye', notPlaying: 'Not drawn for this round' },
-  es: { round: 'Ronda', court: 'Pista', versus: 'contra', bye: 'Exento', notPlaying: 'No asignado en esta ronda' },
-  fr: { round: 'Tour', court: 'Terrain', versus: 'contre', bye: 'Exempt', notPlaying: 'Non placé dans ce tour' },
-  it: { round: 'Turno', court: 'Campo', versus: 'contro', bye: 'Riposo', notPlaying: 'Non sorteggiato in questo turno' },
+  de: { round: 'Runde', court: 'Bahn', versus: 'gegen', bye: 'Freilos' },
+  nl: { round: 'Ronde', court: 'Baan', versus: 'tegen', bye: 'Vrijloting' },
+  en: { round: 'Round', court: 'Lane', versus: 'vs.', bye: 'Bye' },
+  es: { round: 'Ronda', court: 'Pista', versus: 'contra', bye: 'Exento' },
+  fr: { round: 'Tour', court: 'Terrain', versus: 'contre', bye: 'Exempt' },
+  it: { round: 'Turno', court: 'Campo', versus: 'contro', bye: 'Riposo' },
 };
 
 // Paketgröße pro Queue-Nachricht: Der Consumer verarbeitet bis zu 3 Nachrichten pro Aufruf und
@@ -613,44 +613,6 @@ export function buildLiveRoundPush({ tournamentName, match, language, url, tourn
     body: parts.join(' · '),
     url,
     tag: `live-round-${match.roundNumber}`,
-    ...livePushRefreshFields(tournamentId),
-  };
-}
-
-// Neue Runde ohne eigene Partie (inaktiv oder ausgesetzt): still, damit die offene Live-Ansicht nicht weiter die Partie
-// der Vorrunde zeigt.
-export function buildLiveRoundNotPlayingPush({ tournamentName, roundNumber, language, url, tournamentId }) {
-  const texts = LIVE_ROUND_PUSH_TEXTS[language] || LIVE_ROUND_PUSH_TEXTS.de;
-  return {
-    title: `${tournamentName}: ${texts.round} ${roundNumber}`,
-    body: texts.notPlaying,
-    url,
-    tag: `live-round-${roundNumber}`,
-    silent: true,
-    ...livePushRefreshFields(tournamentId),
-  };
-}
-
-const LIVE_RESULT_PUSH_TEXTS = {
-  de: { entered: 'Ergebnis eingetragen', noShow: 'Nicht angetreten' },
-  nl: { entered: 'Uitslag ingevoerd', noShow: 'Niet verschenen' },
-  en: { entered: 'Result entered', noShow: 'No-show' },
-  es: { entered: 'Resultado registrado', noShow: 'No presentado' },
-  fr: { entered: 'Résultat saisi', noShow: 'Forfait' },
-  it: { entered: 'Risultato inserito', noShow: 'Non presentato' },
-};
-
-// Ergebnis der eigenen Partie eingetragen (Turnierleitung oder Mitspieler): still, die offene Live-Ansicht zeigt es
-// sofort statt erst beim nächsten Abruf. Gleiches Tag wie die Runde, damit "Bahn 7 · gegen …" ersetzt wird.
-export function buildLiveResultPush({ tournamentName, roundNumber, ownScore, opponentScore, noShow, language, url, tournamentId }) {
-  const texts = LIVE_RESULT_PUSH_TEXTS[language] || LIVE_RESULT_PUSH_TEXTS.de;
-  const roundTexts = LIVE_ROUND_PUSH_TEXTS[language] || LIVE_ROUND_PUSH_TEXTS.de;
-  return {
-    title: `${tournamentName}: ${roundTexts.round} ${roundNumber}`,
-    body: `${texts.entered}: ${noShow ? texts.noShow : `${ownScore}:${opponentScore}`}`,
-    url,
-    tag: `live-round-${roundNumber}`,
-    silent: true,
     ...livePushRefreshFields(tournamentId),
   };
 }

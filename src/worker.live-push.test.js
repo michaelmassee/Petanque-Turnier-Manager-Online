@@ -63,7 +63,7 @@ describe('Push und Abfragegrenze rund um Runden', () => {
     expect(env.DB.sqlite.prepare("SELECT started_at FROM tournaments WHERE id = 't1'").get().started_at).toEqual(expect.stringMatching(/^\d{4}-\d\d-\d\dT/));
   });
 
-  it('aktualisiert bei neuer Runde auch die Live-Ansicht von Spielern ohne Partie', async () => {
+  it('schickt bei neuer Runde nur Spielern mit Partie einen Push', async () => {
     sql("UPDATE tournaments SET live_view_enabled = 1 WHERE id = 't1'");
     for (let index = 1; index <= 7; index += 1) {
       sql(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email, status, participation, registered_at, created_at, updated_at)
@@ -81,9 +81,7 @@ describe('Push und Abfragegrenze rund um Runden', () => {
     const byEndpoint = Object.fromEntries(pushItems().map((item) => [item.endpoint, item.payload]));
     expect(byEndpoint['https://fcm.googleapis.com/fcm/send/r1']).toMatchObject({ title: 'Herbstturnier: Runde 1', eventType: 'live_update', tournamentId: 't1' });
     expect(byEndpoint['https://fcm.googleapis.com/fcm/send/r1'].silent).toBeUndefined();
-    expect(byEndpoint['https://fcm.googleapis.com/fcm/send/r7']).toEqual({
-      title: 'Herbstturnier: Runde 1', body: 'In dieser Runde nicht eingeteilt', url: `${ORIGIN}/live/r7`,
-      tag: 'live-round-1', silent: true, eventType: 'live_update', tournamentId: 't1',
-    });
+    // Ohne eigene Partie keine (stille) Benachrichtigung; die offene Live-Ansicht lädt über den WebSocket neu.
+    expect(byEndpoint['https://fcm.googleapis.com/fcm/send/r7']).toBeUndefined();
   });
 });

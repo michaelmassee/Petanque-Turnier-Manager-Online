@@ -39,8 +39,6 @@ import {
   buildPlayerLiveView,
   registrationBelongsToEmail,
   registrationBelongsToUser,
-  buildLiveResultPush,
-  buildLiveRoundNotPlayingPush,
   buildLiveRoundPush,
   buildLiveAnnouncementPush,
   chunk,
@@ -2763,7 +2761,7 @@ export default {
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         const session = await requireSession(request, env.DB);
         assertCanManageTournament(tournament, session.user);
-        return await setTournamentRoundResults(request, env.DB, tournament, roundResultsMatch[2], env);
+        return await setTournamentRoundResults(request, env.DB, tournament, roundResultsMatch[2]);
       }
 
       const tournamentMatchResultMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/matches\/([^/]+)\/result$/);
@@ -2774,7 +2772,7 @@ export default {
         }
         const session = await requireSession(request, env.DB);
         assertCanManageTournament(tournament, session.user);
-        return await setTournamentMatchResult(request, env.DB, tournament, tournamentMatchResultMatch[2], env);
+        return await setTournamentMatchResult(request, env.DB, tournament, tournamentMatchResultMatch[2]);
       }
 
       const tournamentRankingMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/ranking$/);
@@ -7758,7 +7756,7 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
   return listTournamentRounds(db, tournament.id);
 }
 
-export async function setTournamentMatchResult(request, db, tournament, matchId, env = null) {
+export async function setTournamentMatchResult(request, db, tournament, matchId) {
   assertOnlineExecution(tournament);
   const match = await db.prepare('SELECT * FROM tournament_matches WHERE id = ? AND tournament_id = ?').bind(matchId, tournament.id).first();
   if (!match) throw new HttpError(404, 'Spiel nicht gefunden');
@@ -7796,11 +7794,10 @@ export async function setTournamentMatchResult(request, db, tournament, matchId,
     throw conflict({ scoreA: latest.score_a, scoreB: latest.score_b, noShow: latest.no_show });
   }
   await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
-  if (env) await notifyLivePushForResults(env, tournament, [matchId], new URL(request.url).origin);
   return listTournamentRounds(db, tournament.id);
 }
 
-export async function setTournamentRoundResults(request, db, tournament, roundId, env = null) {
+export async function setTournamentRoundResults(request, db, tournament, roundId) {
   assertOnlineExecution(tournament);
   const body = await readJson(request);
   if (!Array.isArray(body?.results) || !body.results.length || body.results.length > 25) throw new HttpError(400, 'Ungültige Rundenergebnisse');
@@ -7827,7 +7824,6 @@ export async function setTournamentRoundResults(request, db, tournament, roundId
     .bind(entry.scoreA, entry.scoreB, now, entry.matchId, tournament.id, roundId, entry.expected.scoreA, entry.expected.scoreB, entry.expected.noShow, entry.confirmOverwrite === true ? 1 : 0)));
   const savedMatchIds = entries.filter((entry, index) => saved[index].meta.changes).map((entry) => entry.matchId);
   if (savedMatchIds.length) await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
-  if (env && savedMatchIds.length) await notifyLivePushForResults(env, tournament, savedMatchIds, new URL(request.url).origin);
   const data = await loadTournamentRounds(db, tournament.id);
   const currentMatches = new Map(data.rounds.flatMap((round) => round.matches).map((match) => [match.id, match]));
   const conflicts = entries.filter((entry, index) => !saved[index].meta.changes).map((entry) => {
@@ -7909,8 +7905,6 @@ async function reportLiveMatchResult(request, env, registration, reporterUserId)
   if (!saved.meta.changes) await throwNoOpenMatch(db, tournament.id, registration.id);
   await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
   await notifyTournamentChanged(env, tournament.id);
-  // Mitspieler und Gegner sehen das gemeldete Ergebnis sofort; der Meldende hat es schon.
-  await notifyLivePushForResults(env, tournament, [match.id], new URL(request.url).origin, { excludeRegistrationId: registration.id });
   try {
     await queueResultReportedPush(env, new URL(request.url).origin, tournament, registration, reporterUserId, { matchId: match.id, ownScore, opponentScore });
   } catch (error) {
@@ -8645,51 +8639,6 @@ async function notifyLivePushForRound(env, tournament, roundNumber, appOrigin) {
   }
 }
 
-/**
- * Eingetragene Ergebnisse an die Live-Push-Abos der beteiligten Spieler (beide Teams, ohne Freilose), damit ihre
- * offene Live-Ansicht nicht weiter "läuft" zeigt. Fehler lassen das Speichern nie scheitern.
- */
-async function notifyLivePushForResults(env, tournament, matchIds, appOrigin, { excludeRegistrationId = null } = {}) {
-  if (Number(tournament.live_view_enabled || 0) !== 1 || !matchIds.length) return;
-  try {
-    const matches = await env.DB.prepare(`SELECT m.team_a_registration_ids, m.team_b_registration_ids, m.score_a, m.score_b, m.no_show, r.round_number
-        FROM tournament_matches m JOIN tournament_rounds r ON r.id = m.round_id
-        WHERE m.tournament_id = ? AND m.id IN (${matchIds.map(() => '?').join(', ')})`).bind(tournament.id, ...matchIds).all();
-    const resultByRegistration = new Map();
-    for (const match of matches.results || []) {
-      const teamA = parseTeamIds(match.team_a_registration_ids);
-      const teamB = parseTeamIds(match.team_b_registration_ids);
-      if (!teamB.length) continue;
-      const side = (inA) => ({
-        roundNumber: match.round_number,
-        ownScore: inA ? match.score_a : match.score_b,
-        opponentScore: inA ? match.score_b : match.score_a,
-        noShow: Boolean(match.no_show),
-      });
-      teamA.forEach((id) => resultByRegistration.set(id, side(true)));
-      teamB.forEach((id) => resultByRegistration.set(id, side(false)));
-    }
-    if (excludeRegistrationId) resultByRegistration.delete(excludeRegistrationId);
-    if (!resultByRegistration.size) return;
-    const subscriptions = await env.DB.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.language
-        FROM live_push_subscriptions s JOIN registrations r ON r.id = s.registration_id
-        WHERE r.tournament_id = ? AND r.status = 'confirmed'`).bind(tournament.id).all();
-    const items = (subscriptions.results || []).filter((subscription) => resultByRegistration.has(subscription.registration_id)).map((subscription) => ({
-      endpoint: subscription.endpoint,
-      p256dh: subscription.p256dh,
-      auth: subscription.auth,
-      payload: buildLiveResultPush({
-        ...resultByRegistration.get(subscription.registration_id),
-        tournamentName: tournament.name, language: subscription.language, tournamentId: tournament.id,
-        url: `${appOrigin}/live/${encodeURIComponent(subscription.registration_id)}`,
-      }),
-    }));
-    if (items.length) await queueLivePushItems(env, items);
-  } catch (error) {
-    console.error(`Failed to queue live result push for tournament ${tournament.id}`, error);
-  }
-}
-
 async function livePlayerRoundPushItems(db, tournament, roundNumber, appOrigin) {
   const subscriptions = await db.prepare(`SELECT s.endpoint, s.p256dh, s.auth, s.registration_id, r.language
       FROM live_push_subscriptions s JOIN registrations r ON r.id = s.registration_id
@@ -8701,6 +8650,8 @@ async function livePlayerRoundPushItems(db, tournament, roundNumber, appOrigin) 
   const items = [];
   for (const subscription of subscriptions.results) {
     const match = buildPlayerLiveView({ registrationId: subscription.registration_id, rounds: [round] }).currentMatch;
+    // Ohne eigene Partie keine Benachrichtigung; eine offene Live-Ansicht holt die neue Runde über den WebSocket.
+    if (!match) continue;
     // Der Link selbst ist nur gehasht gespeichert: Die App findet den auf dem Gerät gemerkten Link über die Meldungs-ID.
     const url = `${appOrigin}/live/${encodeURIComponent(subscription.registration_id)}`;
     const common = { tournamentName: tournament.name, language: subscription.language, tournamentId: tournament.id, url };
@@ -8708,8 +8659,7 @@ async function livePlayerRoundPushItems(db, tournament, roundNumber, appOrigin) 
       endpoint: subscription.endpoint,
       p256dh: subscription.p256dh,
       auth: subscription.auth,
-      // Auch ohne eigene Partie, sonst zeigt die offene Live-Ansicht bis zum nächsten Abruf noch die Vorrunde.
-      payload: match ? buildLiveRoundPush({ ...common, match }) : buildLiveRoundNotPlayingPush({ ...common, roundNumber }),
+      payload: buildLiveRoundPush({ ...common, match }),
     });
   }
   return items;

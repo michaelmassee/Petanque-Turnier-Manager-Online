@@ -59,7 +59,7 @@ describe('Ergebnismeldung durch Spieler', () => {
     expect((await response.json()).error).toBe('Für deine Partie wurde bereits ein Ergebnis gemeldet.');
   });
 
-  describe('Push an die Live-Ansicht der Beteiligten', () => {
+  describe('Ergebnisse in der Live-Ansicht der Beteiligten', () => {
     const liveItems = () => env.MAIL_QUEUE.sendBatch.mock.calls
       .flatMap(([batch]) => batch.filter((message) => message.body.kind === 'live_push').flatMap((message) => message.body.items));
     const abonnieren = (registrationId) => sql(`INSERT INTO live_push_subscriptions (endpoint, registration_id, p256dh, auth, created_at, updated_at)
@@ -67,37 +67,24 @@ describe('Ergebnismeldung durch Spieler', () => {
     const organisator = (path, body) => worker.fetch(new Request(`https://ptm.test${path}`, {
       method: 'PUT', headers: { Cookie: 'ptm_session=player-session', 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }), env);
+    let hubCalls;
 
     beforeEach(() => {
       abonnieren('r1');
       abonnieren('r2');
+      hubCalls = [];
+      env.TOURNAMENT_LIVE_HUB = { idFromName: (name) => name, get: (id) => ({ fetch: async () => { hubCalls.push(id); return new Response(null, { status: 204 }); } }) };
     });
 
-    it('meldet ein von der Turnierleitung eingetragenes Ergebnis beiden Spielern aus eigener Sicht', async () => {
-      expect((await organisator('/api/tournaments/t1/matches/match1/result', { scoreA: 13, scoreB: 8 })).status).toBe(200);
-
-      const byEndpoint = Object.fromEntries(liveItems().map((item) => [item.endpoint, item.payload]));
-      expect(byEndpoint['https://push.test/r1']).toEqual({
-        title: 'Turnier: Runde 1', body: 'Ergebnis eingetragen: 13:8', url: 'https://ptm.test/live/r1',
-        tag: 'live-round-1', silent: true, eventType: 'live_update', tournamentId: 't1',
-      });
-      expect(byEndpoint['https://push.test/r2'].body).toBe('Ergebnis eingetragen: 8:13');
-    });
-
-    it('meldet auch Ergebnisse aus „Alle speichern“', async () => {
-      expect((await organisator('/api/tournaments/t1/rounds/round1/results', { results: [{ matchId: 'match1', scoreA: 7, scoreB: 13 }] })).status).toBe(200);
-      expect(liveItems().map((item) => item.payload.body).sort()).toEqual(['Ergebnis eingetragen: 13:7', 'Ergebnis eingetragen: 7:13']);
-    });
-
-    it('benachrichtigt bei einer Spielermeldung die anderen, nicht den Meldenden', async () => {
-      expect((await melden('player-session', { ownScore: 13, opponentScore: 7 })).status).toBe(200);
-      expect(liveItems()).toEqual([expect.objectContaining({ endpoint: 'https://push.test/r2', payload: expect.objectContaining({ body: 'Ergebnis eingetragen: 7:13' }) })]);
-    });
-
-    it('schickt nichts ohne freigeschaltete Live-Ansicht', async () => {
-      sql("UPDATE tournaments SET live_view_enabled = 0 WHERE id = 't1'");
-      expect((await organisator('/api/tournaments/t1/matches/match1/result', { scoreA: 13, scoreB: 8 })).status).toBe(200);
+    // Offene Live-Ansichten laden über den WebSocket neu; ein stiller Push pro Ergebnis wäre nur noch Queue-Last.
+    it.each([
+      ['von der Turnierleitung', () => organisator('/api/tournaments/t1/matches/match1/result', { scoreA: 13, scoreB: 8 })],
+      ['aus „Alle speichern“', () => organisator('/api/tournaments/t1/rounds/round1/results', { results: [{ matchId: 'match1', scoreA: 7, scoreB: 13 }] })],
+      ['von einem Spieler gemeldet', () => melden('player-session', { ownScore: 13, opponentScore: 7 })],
+    ])('meldet ein Ergebnis %s offenen Seiten, ohne Push an die Spieler', async (_label, speichern) => {
+      expect((await speichern()).status).toBe(200);
       expect(liveItems()).toEqual([]);
+      expect(hubCalls).toEqual(['t1']);
     });
   });
 
