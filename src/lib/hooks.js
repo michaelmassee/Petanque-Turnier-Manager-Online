@@ -207,7 +207,7 @@ function createLiveSocketChannel(path) {
       window.clearInterval(pingTimer);
       pingTimer = window.setInterval(() => { try { current.send('ping'); } catch { /* schließt gleich */ } }, LIVE_SOCKET_PING_MS);
       // Zwischen dem letzten Abruf und dem (Wieder-)Verbinden kann eine Änderung verpasst worden sein - auch beim ersten
-      // Verbinden kurz nach dem Laden der Seite. Einmal nachladen; unverändert kostet das nur ein 304.
+      // Verbinden kurz nach dem Laden der Seite. Nachladen (mit Folgeabruf); unverändert kostet das nur ein 304.
       emit('resync');
     };
     current.onmessage = (event) => {
@@ -279,7 +279,8 @@ export function useTournamentLiveSocket(path, refresh) {
     const listener = (type) => {
       if (type === 'status') setConnected(channel.connected);
       else if (type === 'refresh') refresher.trigger();
-      else if (type === 'resync') refreshRef.current?.();
+      // Auch beim (Wieder-)Verbinden mit Folgeabruf: Der erste Abruf kann noch den bis zu 15 s alten Edge-Snapshot liefern.
+      else if (type === 'resync') refresher.trigger();
     };
     channel.listeners.add(listener);
     setConnected(channel.connected);

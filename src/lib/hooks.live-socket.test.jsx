@@ -25,19 +25,22 @@ describe('useTournamentLiveSocket', () => {
     expect(result.current).toBe(false);
     act(() => latestSocket().open());
     expect(result.current).toBe(true);
-    // Erstes Verbinden: einmal nachladen, falls sich seit dem Abruf schon etwas geändert hat.
+    // Erstes Verbinden: einmal nachladen, falls sich seit dem Abruf schon etwas geändert hat - und nach Ablauf des
+    // 15-s-Edge-Snapshots noch einmal, falls der erste Abruf noch den alten Stand lieferte.
     expect(refresh).toHaveBeenCalledTimes(1);
+    act(() => { vi.advanceTimersByTime(20_000); });
+    expect(refresh).toHaveBeenCalledTimes(2);
 
     act(() => { vi.advanceTimersByTime(LIVE_SOCKET_PING_MS); });
     expect(latestSocket().sent).toEqual(['ping']);
 
     act(() => { latestSocket().receive({ type: 'changed' }); latestSocket().receive({ type: 'changed' }); });
-    expect(refresh).toHaveBeenCalledTimes(1);
-    act(() => { vi.advanceTimersByTime(1500); });
     expect(refresh).toHaveBeenCalledTimes(2);
+    act(() => { vi.advanceTimersByTime(1500); });
+    expect(refresh).toHaveBeenCalledTimes(3);
     // Zweiter Abruf, falls der Edge-Cache eines anderen Rechenzentrums noch den alten Stand hatte.
     act(() => { vi.advanceTimersByTime(20_000); });
-    expect(refresh).toHaveBeenCalledTimes(3);
+    expect(refresh).toHaveBeenCalledTimes(4);
   });
 
   it('teilt sich eine Verbindung je Pfad und schließt sie mit dem letzten Zuhörer', () => {

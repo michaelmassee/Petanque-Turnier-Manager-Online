@@ -142,6 +142,35 @@ describe('Teilnehmer-Limit pro Turnier', () => {
     expect(env.DB.sqlite.prepare("SELECT COUNT(*) AS count FROM registrations WHERE status = 'confirmed'").get().count).toBe(2);
   });
 
+  // Die Bearbeitung liest „confirmed“; während sie läuft, wird storniert und der Platz neu vergeben. Das UPDATE darf sich
+  // nicht auf den alten Status verlassen.
+  it('prüft beim Speichern den aktuellen Status, nicht den beim Öffnen gelesenen', async () => {
+    vorhanden('a', 'confirmed');
+    vorhanden('x', 'confirmed');
+    const veraltet = await getRegistrationWithTournament(env.DB, 'x');
+    sql("UPDATE registrations SET status = 'cancelled' WHERE id = 'x'");
+    vorhanden('nachruecker', 'confirmed');
+
+    const request = new Request('https://ptm.test/api/registrations/x', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName: 'Xaver', lastName: 'Vorhanden', email: 'x@example.test', playerEmail: 'x@example.test', status: 'confirmed' }),
+    });
+    await expect(updateRegistration(request, env, veraltet, { id: 'u1', role: 'user' })).rejects.toMatchObject(LIMIT_ERREICHT);
+    expect(env.DB.sqlite.prepare("SELECT status FROM registrations WHERE id = 'x'").get().status).toBe('cancelled');
+    expect(env.DB.sqlite.prepare("SELECT COUNT(*) AS count FROM registrations WHERE status = 'confirmed'").get().count).toBe(2);
+  });
+
+  it('lässt eine bestätigte Meldung bei erreichter Grenze normal bearbeiten', async () => {
+    vorhanden('a', 'confirmed');
+    vorhanden('x', 'confirmed');
+    const request = new Request('https://ptm.test/api/registrations/x', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName: 'Xaver', lastName: 'Vorhanden', email: 'x@example.test', playerEmail: 'x@example.test', status: 'confirmed' }),
+    });
+    expect((await updateRegistration(request, env, await getRegistrationWithTournament(env.DB, 'x'), { id: 'u1', role: 'user' })).status).toBe(200);
+    expect(env.DB.sqlite.prepare("SELECT first_name FROM registrations WHERE id = 'x'").get().first_name).toBe('Xaver');
+  });
+
   it('lässt auch das Turnierdokument eine abgesagte Meldung nicht über die Grenze wieder aufnehmen', async () => {
     const ONLINE_ID = '66666666-6666-4666-8666-666666666666';
     bindeDokument(env.DB.sqlite, 't1');
