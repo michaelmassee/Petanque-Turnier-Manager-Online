@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import '../lib/i18next-config.js';
 import { authenticatedApi } from '../lib/api.js';
@@ -20,6 +20,29 @@ function deferred() {
 
 describe('QR-Code Live-Ansicht', () => {
   beforeEach(() => { authenticatedApi.mockReset(); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  // Der persönliche Live-Link wird weitergegeben, der Name der Meldung nicht.
+  it('teilt nur den Link, ohne Namen', async () => {
+    authenticatedApi.mockResolvedValue({ url: 'https://ptm.test/live/t/abc' });
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, share });
+    render(<LiveQrDialog registration={TEAM_A} onClose={() => {}} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Teilen' }));
+
+    await vi.waitFor(() => expect(share).toHaveBeenCalledWith({ url: 'https://ptm.test/live/t/abc' }));
+  });
+
+  it('kopiert ohne Teilen-Menü nur den Link, ohne Namen', async () => {
+    authenticatedApi.mockResolvedValue({ url: 'https://ptm.test/live/t/abc' });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, share: undefined, clipboard: { writeText } });
+    render(<LiveQrDialog registration={TEAM_A} onClose={() => {}} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Teilen' }));
+
+    expect(await screen.findByText('Link kopiert')).toBeTruthy();
+    expect(writeText).toHaveBeenCalledWith('https://ptm.test/live/t/abc');
+  });
 
   it('zeigt eine verspätete Antwort auf „Neuen Live-Link erzeugen“ nicht bei einer anderen Meldung', async () => {
     const erneuern = deferred();

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import '../lib/i18next-config.js';
-import { Feedback, IntegerField } from './ui.jsx';
+import { Feedback, IntegerField, ShareLinkButton } from './ui.jsx';
 
 describe('Feedback', () => {
   afterEach(() => {
@@ -76,5 +76,24 @@ describe('IntegerField', () => {
     const input = screen.getByLabelText('Anzahl');
     fireEvent.change(input, { target: { value: '9' } });
     expect(input.validationMessage).toBe('Bitte eine ganze Zahl von 0 bis 5 eingeben.');
+  });
+});
+
+describe('ShareLinkButton', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('teilt und kopiert ohne linkOnly weiterhin Titel und Link', async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, share });
+    const { unmount } = render(<ShareLinkButton title="Sommerturnier" url="https://ptm.test/t/1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Teilen' }));
+    await vi.waitFor(() => expect(share).toHaveBeenCalledWith({ title: 'Sommerturnier', text: 'Sommerturnier', url: 'https://ptm.test/t/1' }));
+    unmount();
+
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, share: undefined, clipboard: { writeText } });
+    render(<ShareLinkButton title="Sommerturnier" url="https://ptm.test/t/1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Teilen' }));
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('Sommerturnier\nhttps://ptm.test/t/1'));
   });
 });

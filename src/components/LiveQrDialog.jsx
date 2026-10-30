@@ -92,7 +92,7 @@ export function LiveQrDialog({ registration, onClose }) {
             <div className="live-qr-code" ref={qrRef} role="img" aria-label={t('QR-Code Live-Ansicht')} />
             <p className="live-qr-url" data-i18n-skip>{url}</p>
             <div className="dialog-actions">
-              <ShareLinkButton title={teamName} url={url} />
+              <ShareLinkButton url={url} linkOnly />
             </div>
           </>
         )}

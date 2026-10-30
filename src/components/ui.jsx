@@ -262,7 +262,8 @@ export function Feedback({ message, error }) {
 
 // Teilt Titel und Link über das Teilen-Menü des Geräts, sonst per Zwischenablage; Rückmeldung direkt am Button.
 // resolveUrl ermittelt den Link erst beim Klick (z. B. Freigabe-Link eines privaten Turniers).
-export function ShareLinkButton({ title, url, resolveUrl }) {
+// linkOnly: nur der Link, ohne Titel (z. B. persönlicher Live-Link, der keinen Namen weitergeben soll).
+export function ShareLinkButton({ title, url, resolveUrl, linkOnly = false }) {
   const { t } = useTranslation();
   const [feedback, setFeedback] = useState({ message: '', error: '' });
   const [resolving, setResolving] = useState(false);
@@ -283,10 +284,10 @@ export function ShareLinkButton({ title, url, resolveUrl }) {
     }
     try {
       if (navigator.share) {
-        await navigator.share({ title, text: title, url: target });
+        await navigator.share(linkOnly ? { url: target } : { title, text: title, url: target });
       } else {
         if (!navigator.clipboard?.writeText) throw new Error();
-        await navigator.clipboard.writeText(`${title}\n${target}`);
+        await navigator.clipboard.writeText(linkOnly ? target : `${title}\n${target}`);
         setFeedback({ message: t('Link kopiert'), error: '' });
       }
     } catch (error) {
