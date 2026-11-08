@@ -2291,7 +2291,9 @@ a.left-panel-link {
   }
 
   .is-display .ranking-table th,
-  .is-display .ranking-table td {
+  .is-display .ranking-table td,
+  .is-display .round-table th,
+  .is-display .round-table td {
     padding: 4px 8px;
     font-size: 0.9em;
   }
@@ -4231,8 +4233,8 @@ a.left-panel-link {
   background: #fff;
 }
 
-/* Runde eines beendeten Turniers als Tabelle, Farben wie die Spielrunde im Hauptprojekt (Standard der Konfiguration:
-   Kopf e6ebf4, Zeilen abwechselnd c0d6f7/e1e9f7, dünne Rahmen, fette Linie unter dem Kopf). */
+/* Spielrunde als Tabelle: Aufbau wie im Hauptprojekt (Bahn/Stufe, Team A, Team B, Ergebnis), Aussehen wie die
+   Rangliste daneben (.ranking-table: ohne Rahmen, heller Kopf, Zeilen abwechselnd weiß/hellgrau). */
 .round-table {
   width: 100%;
   border-collapse: collapse;
@@ -4259,46 +4261,51 @@ a.left-panel-link {
 .round-table th,
 .round-table td {
   padding: 6px 10px;
-  border: 1px solid #8a94a3;
   text-align: left;
   vertical-align: middle;
 }
 
-.round-table th {
-  background: #e6ebf4;
-  border-bottom: 2px solid #172033;
+.round-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f4f6fa;
+  border-bottom: 1px solid #d7deea;
   text-align: center;
-  font-weight: 700;
 }
 
 .round-table tbody tr:nth-child(odd) {
-  background: #c0d6f7;
+  background: #fff;
 }
 
 .round-table tbody tr:nth-child(even) {
-  background: #e1e9f7;
+  background: #f3f6fa;
 }
 
 .round-table .round-table-number {
-  width: 3.5em;
+  width: 3em;
   text-align: center;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
 }
 
 @media (max-width: 560px) {
+  /* Wie die Rangliste am Handy: enger und kleiner, damit Namen seltener umbrechen. */
   .round-table {
-    font-size: 0.9rem;
-  }
-
-  .play-round .round-table {
-    width: calc(100% - 24px);
-    margin: 0 12px 12px;
+    font-size: 0.85rem;
   }
 
   .round-table th,
   .round-table td {
     padding: 5px 6px;
+  }
+
+  .round-table .round-table-number {
+    width: 2.2em;
+  }
+
+  .play-round .round-table {
+    width: calc(100% - 24px);
+    margin: 0 12px 12px;
   }
 }
 
@@ -4837,57 +4844,50 @@ details[open] > .play-round-summary::before {
   color: #53627a;
 }
 
-.live-won .live-history-score,
 .live-score.live-won {
   color: #1c7c3c;
 }
 
-.live-lost .live-history-score,
 .live-score.live-lost {
   color: #b42318;
 }
 
-.live-history {
-  display: grid;
-  gap: 6px;
-  margin: 0;
+/* „Meine Partien“: Tabelle wie die Spielrunde (.round-table); Sieg/Niederlage als Randlinie und eigene Punktzahl. */
+.live-history-table tr.live-won > td:first-child {
+  box-shadow: inset 5px 0 #1c7c3c;
+}
+
+.live-history-table tr.live-lost > td:first-child {
+  box-shadow: inset 5px 0 #b42318;
+}
+
+.live-history-table tr.live-won .live-history-own {
+  color: #1c7c3c;
+}
+
+.live-history-table tr.live-lost .live-history-own {
+  color: #b42318;
+}
+
+.live-board-link {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 44px;
+  margin-top: 4px;
+}
+
+/* Nur für Screenreader (z. B. „Sieg“ neben einer farbigen Markierung). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   padding: 0;
-  list-style: none;
-}
-
-.live-history li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: baseline;
-  padding: 8px 0;
-  border-top: 1px solid #e5e9f0;
-}
-
-.live-history-round {
-  color: #53627a;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
-}
-
-.live-history-court {
-  display: block;
-  font-size: 0.85rem;
-}
-
-.live-history-match {
-  display: grid;
-  gap: 2px;
-  overflow-wrap: anywhere;
-}
-
-.live-history-teammates {
-  color: #53627a;
-  font-size: 0.9rem;
-}
-
-.live-history-score {
-  font-weight: 600;
-  white-space: nowrap;
+  border: 0;
 }
 
 .live-ranking summary {
@@ -5099,17 +5099,6 @@ details[open] > .play-round-summary::before {
 
 .live-back {
   justify-self: start;
-}
-
-@media (max-width: 560px) {
-  .live-history li {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .live-history-round {
-    grid-column: 1 / -1;
-    font-size: 0.85rem;
-  }
 }
 
 /* Herbst-Deko (saisonal, siehe src/lib/seasonal.js) */

@@ -212,7 +212,7 @@ describe('Live-Ansicht für Spieler', () => {
     Object.assign(payload.live.ranking[0], { bhz: 5, fbhz: 12, wertung: 121, losses: 0, gameDiff: 1, pointsFor: 13, pointsAgainst: 5 });
     global.fetch = vi.fn().mockResolvedValue(jsonResponse(payload));
     renderDetail();
-    const table = await screen.findByRole('table', { hidden: true });
+    const table = (await screen.findByRole('region', { name: 'Mein Platz' })).querySelector('table');
     fireEvent.click(screen.getByText('Rangliste anzeigen'));
     expect(within(table).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(headers);
     const own = table.querySelector('.live-own-row');
@@ -238,7 +238,7 @@ describe('Live-Ansicht für Spieler', () => {
     Object.assign(payload.tournament, { type: 'formule_x', registrationType: 'forme' });
     global.fetch = vi.fn().mockResolvedValue(jsonResponse(payload));
     renderDetail();
-    const table = await screen.findByRole('table', { hidden: true });
+    const table = (await screen.findByRole('region', { name: 'Mein Platz' })).querySelector('table');
     fireEvent.click(screen.getByText('Rangliste anzeigen'));
     expect(within(table).getAllByRole('columnheader').map((cell) => cell.textContent))
       .toEqual(['Platz', 'Team', 'Siege', 'Punkte', '+', '−', 'Δ']);
@@ -281,11 +281,30 @@ describe('Live-Ansicht für Spieler', () => {
     expect(await screen.findByText('Sommer-Supermêlée')).toBeInTheDocument();
     expect(screen.getByText(/25\.9\.2026 Fr/)).toBeInTheDocument();
     expect(screen.getAllByText('Bert Beispiel').length).toBeGreaterThan(0);
-    expect(screen.getByText('Carla Test', { selector: '.live-history-match span' })).toBeInTheDocument();
-    expect(screen.getByText('Dora Partner + Emil Partner')).toBeInTheDocument();
-    expect(screen.getByText('Dora Partner + Emil Partner').closest('.live-history-teammates')).toHaveTextContent('mit Dora Partner + Emil Partner');
+    // „Meine Partien“ als Tabelle wie die Spielrunde im Hauptprojekt; „Mit“ nur, weil es Mitspieler gibt.
+    const history = within(screen.getByRole('region', { name: 'Meine Partien' })).getByRole('table');
+    expect(within(history).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Runde', 'Mit', 'Gegen', 'Ergebnis']);
+    const rows = within(history).getAllByRole('row').slice(1);
+    expect([...rows[0].cells].map((cell) => cell.textContent)).toEqual(['2', '', 'Bert Beispiel', '–', '–']);
+    expect([...rows[1].cells].map((cell) => cell.textContent)).toEqual(['1', 'Dora Partner + Emil Partner', 'Carla Test', '13 · Sieg', '5']);
+    expect(rows[1]).toHaveClass('live-won');
     expect(screen.queryByText('Bahn')).not.toBeInTheDocument();
-    expect(screen.getByText('13:5')).toBeInTheDocument();
+  });
+
+  it('verlinkt die ganze Runde auf der Turnierseite nur, wenn diese ohne Schlüssel offen ist', async () => {
+    const payload = livePayload();
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    const { unmount } = renderDetail();
+    await screen.findByRole('region', { name: 'Aktuelle Partie' });
+    expect(screen.queryByRole('link', { name: 'Ganze Runde ansehen' })).not.toBeInTheDocument();
+    unmount();
+
+    payload.tournament.scheduleVisible = true;
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    renderDetail();
+    const link = await screen.findByRole('link', { name: 'Ganze Runde ansehen' });
+    expect(link).toHaveAttribute('href', `/turnierseite/${payload.tournament.id}`);
+    expect(link).not.toHaveAttribute('href', expect.stringContaining('share='));
   });
 
   it('zeigt die Bahn, wenn das Turnierdokument sie liefert', async () => {

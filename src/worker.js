@@ -8426,6 +8426,8 @@ function toLiveTournament(tournament) {
     playerResultReportingEnabled: Number(tournament.player_result_reporting_enabled || 0) === 1,
     // Meldungen aus der Live-Ansicht gehen an das verbundene Dokument und warten dort auf die Turnierleitung.
     resultReportingViaDocument: Boolean(tournament.sync_document_id),
+    // Turnierseite (ganze Runde) für jeden ohne Schlüssel offen; den Anzeige-Schlüssel teilt nur die Turnierleitung.
+    scheduleVisible: isPubliclyVisible(tournament) && Number(tournament.participants_public || 0) === 1,
   };
 }
 

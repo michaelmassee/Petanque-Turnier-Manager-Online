@@ -8,6 +8,7 @@ import { labelFor, sanitizeScore } from '../lib/domain.js';
 import { Button, Feedback } from '../components/ui.jsx';
 import { StandalonePageHeader } from '../components/layout.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
+import { tournamentBoardPath } from '../lib/routing.js';
 import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { isIosSafari, useLivePushRefresh, useTournamentLiveSocket } from '../lib/hooks.js';
@@ -247,7 +248,7 @@ function DocumentResultReportHint({ report }) {
   return <p className="hint">{t('Deine Meldung {{score}} wurde von der Turnierleitung nicht übernommen. Bitte kläre das Ergebnis direkt bei der Turnierleitung.', { score })}</p>;
 }
 
-function CurrentMatchCard({ live, participation, canReportResult, reportingDisabled, loginHint = null, resultReport, path, onResultSaved, onRefresh }) {
+function CurrentMatchCard({ live, tournament, participation, canReportResult, reportingDisabled, loginHint = null, resultReport, path, onResultSaved, onRefresh }) {
   const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const match = live.currentMatch;
@@ -289,6 +290,10 @@ function CurrentMatchCard({ live, participation, canReportResult, reportingDisab
           <Feedback message={message} />
         </>
       )}
+      {/* Alle Partien der Runde zeigt die Turnierseite; die Live-Daten enthalten nur das eigene Team. */}
+      {live.lastRoundNumber !== null && tournament.scheduleVisible && (
+        <a className="live-board-link" href={tournamentBoardPath(tournament.id)} target="_blank" rel="noreferrer">{t('Ganze Runde ansehen')}</a>
+      )}
     </section>
   );
 }
@@ -319,31 +324,51 @@ function RankingCard({ live, tournament }) {
   );
 }
 
+// Eigene Partien als Tabelle wie die Spielrunde im Hauptprojekt (Farben wie RoundTable). Sieg/Niederlage: farbige
+// Randlinie und eigene Punktzahl, für Screenreader zusätzlich als Text.
 function HistoryCard({ live }) {
   const { t } = useTranslation();
   if (!live.history.length) return null;
+  const hasCourt = live.history.some((entry) => entry.court);
+  const hasStage = live.history.some((entry) => entry.stageLabel);
+  const hasTeammates = live.history.some((entry) => entry.teammates?.length);
   return (
     <section className="panel live-card" aria-label={t('Meine Partien')}>
       <h2>{t('Meine Partien')}</h2>
-      <ul className="live-history">
-        {live.history.map((entry) => (
-          <li key={entry.matchId} className={`live-${entry.outcome}`}>
-            <span className="live-history-round">{t('Runde')} {entry.roundNumber}<CourtLabel court={entry.court} className="live-history-court" /></span>
-            <span className="live-history-match">
-              {entry.teammates?.length > 0 && (
-                <span className="live-history-teammates">{t('mit')} <span data-i18n-skip>{entry.teammates.join(' + ')}</span></span>
-              )}
-              {entry.bye
-                ? <span>{t('Freilos')}</span>
-                : <span>{t('gegen')} <span data-i18n-skip>{entry.opponentLabel}</span></span>}
-            </span>
-            <span className="live-history-score">
-              {scoreLabel(entry, t)}
-              {entry.outcome !== 'open' && <small> · {entry.outcome === 'won' ? t('Sieg') : t('Niederlage')}</small>}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div className="table-scroll">
+        <table className="round-table live-history-table">
+          <thead>
+            <tr>
+              <th scope="col">{t('Runde')}</th>
+              {hasCourt && <th scope="col">{t('Bahn')}</th>}
+              {hasStage && <th scope="col">{t('Stufe')}</th>}
+              {hasTeammates && <th scope="col">{t('Mit')}</th>}
+              <th scope="col">{t('Gegen')}</th>
+              <th scope="col" colSpan={2}>{t('Ergebnis')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {live.history.map((entry) => (
+              <tr key={entry.matchId} className={`live-${entry.outcome}`}>
+                <td className="round-table-number">{entry.roundNumber}</td>
+                {hasCourt && <td className="round-table-number" data-i18n-skip>{entry.court || ''}</td>}
+                {hasStage && <td data-i18n-skip>{entry.stageLabel || ''}</td>}
+                {hasTeammates && <td data-i18n-skip>{entry.teammates?.join(' + ') || ''}</td>}
+                {entry.bye ? <td className="muted">{t('Freilos')}</td> : <td data-i18n-skip>{entry.opponentLabel}</td>}
+                {entry.noShow
+                  ? <td colSpan={2}>{t('Nicht angetreten')}{entry.outcome !== 'open' && <span className="sr-only"> · {entry.outcome === 'won' ? t('Sieg') : t('Niederlage')}</span>}</td>
+                  : <>
+                    <td className="round-table-number live-history-own">
+                      {entry.ownScore ?? '–'}
+                      {entry.outcome !== 'open' && <span className="sr-only"> · {entry.outcome === 'won' ? t('Sieg') : t('Niederlage')}</span>}
+                    </td>
+                    <td className="round-table-number">{entry.opponentScore ?? '–'}</td>
+                  </>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -497,7 +522,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
       {registration.participation === 'withdrawn' && <p className="hint">{t('Du pausierst gerade. Für neue Runden wirst du nicht ausgelost.')}</p>}
       {!drawn && <RegistrationPhase registration={registration} tournament={tournament} />}
       {drawn && registration.participation === 'inactive' && <p className="hint">{t('Du bist noch nicht eingecheckt.')}</p>}
-      {(drawn || tournament.status === 'running') && <CurrentMatchCard key={live.currentMatch?.matchId || 'no-current-match'} live={live} participation={registration.participation}
+      {(drawn || tournament.status === 'running') && <CurrentMatchCard key={live.currentMatch?.matchId || 'no-current-match'} live={live} tournament={tournament} participation={registration.participation}
         canReportResult={canReportResult && reportingOpen && !reportPending}
         reportingDisabled={tournament.status === 'running' && !reportingOpen}
         loginHint={loginHint}

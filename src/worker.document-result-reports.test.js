@@ -108,6 +108,17 @@ describe('Ergebnismeldung bei verbundenem Turnierdokument', () => {
     expect((await live('bert-session', BERT)).tournament).toMatchObject({ resultReportingViaDocument: true });
   });
 
+  // Link „Ganze Runde ansehen“ in der Live-Ansicht: nur, wenn die Turnierseite ohne Anzeige-Schlüssel aufgeht.
+  it.each([
+    ['public', 1, true],
+    ['public', 0, false],
+    ['private', 1, false],
+  ])('meldet die Turnierseite als offen nur bei öffentlicher Teilnehmerliste (%s, Liste %i)', async (visibility, participantsPublic, expected) => {
+    sql('UPDATE tournaments SET visibility = ?, participants_public = ? WHERE id = ?', visibility, participantsPublic, 't1');
+
+    expect((await live('anna-session', ANNA)).tournament.scheduleVisible).toBe(expected);
+  });
+
   it('liefert dem Dokument die offenen Meldungen mit Meldendem, nur bei eingeschalteter Ergebnismeldung', async () => {
     await melden('bert-session', BERT, 13, 7);
 
