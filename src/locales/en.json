@@ -1918,5 +1918,10 @@
   "Eintrag hinzufügen": "Add entry",
   "Bitte beantworte alle Auswahlfragen.": "Please answer all choice questions.",
   "Turnierseite und Anzeige": "Tournament page and display",
-  "QR-Code zur Turnierseite": "QR code for the tournament page"
+  "QR-Code zur Turnierseite": "QR code for the tournament page",
+  "Runden": "Rounds",
+  "Team A": "Team A",
+  "Team B": "Team B",
+  "Ergebnis": "Result",
+  "Stufe": "Stage"
 }

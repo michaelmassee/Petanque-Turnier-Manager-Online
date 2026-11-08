@@ -292,6 +292,45 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, o
   );
 }
 
+// Beendetes Turnier: Runde nur noch zum Nachlesen, als Tabelle wie die Spielrunde im Hauptprojekt (Team A | Team B |
+// Ergebnis, abwechselnde Zeilenfarben). Ergebnisse ändert man erst nach „Turnier wieder aufnehmen“.
+function RoundTable({ round }) {
+  const { t } = useTranslation();
+  const hasCourt = round.matches.some((match) => match.court);
+  const hasStage = round.matches.some((match) => match.stageLabel);
+  return (
+    <div className="table-scroll">
+      <table className="round-table">
+        <thead>
+          <tr>
+            {hasCourt && <th scope="col">{t('Bahn')}</th>}
+            {hasStage && <th scope="col">{t('Stufe')}</th>}
+            <th scope="col">{t('Team A')}</th>
+            <th scope="col">{t('Team B')}</th>
+            <th scope="col" colSpan={2}>{t('Ergebnis')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {round.matches.map((match) => (
+            <tr key={match.id}>
+              {hasCourt && <td className="round-table-number" data-i18n-skip>{match.court || ''}</td>}
+              {hasStage && <td data-i18n-skip>{match.stageLabel || ''}</td>}
+              <td data-i18n-skip>{teamLabel(match.teamA)}</td>
+              {match.teamB?.length ? <td data-i18n-skip>{teamLabel(match.teamB)}</td> : <td className="muted">{t('Freilos')}</td>}
+              {match.noShow
+                ? <td colSpan={2}>{t('Nicht angetreten')}</td>
+                : <>
+                  <td className="round-table-number">{match.scoreA ?? '–'}</td>
+                  <td className="round-table-number">{match.scoreB ?? '–'}</td>
+                </>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /**
  * Endrangliste nach Turnierende einfrieren und öffentlich machen, auf Wunsch mit Mail-Link, Postfach und Push an alle
  * bestätigten Teilnehmer. Ein erneuter Versand muss ausdrücklich bestätigt werden.
@@ -1052,7 +1091,19 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
         </details>
       )}
 
-      {currentRound && (
+      {selectedTournamentStatus === 'finished' && rounds.length > 0 && (
+        <section className="play-rounds">
+          <h2>{t('Runden')}</h2>
+          {[...rounds].reverse().map((round) => (
+            <details key={`${selectedTournamentId}:${round.id}`} className="panel play-round">
+              <summary className="play-round-summary"><span>{t('Runde')} {round.roundNumber}</span><span className="counter">{round.matches.length}</span></summary>
+              <RoundTable round={round} />
+            </details>
+          ))}
+        </section>
+      )}
+
+      {selectedTournamentStatus !== 'finished' && currentRound && (
         <section className="panel play-current-round">
           <div className="section-title"><h2>{t('Runde')} {currentRound.roundNumber}</h2><span className={`status ${currentRoundOpen ? 'status-running' : 'registration-confirmed'}`}>{currentRoundOpen ? t('Offen') : t('Abgeschlossen')}</span></div>
           <RoundResults key={`${selectedTournamentId}:${currentRound.id}`} round={currentRound} collapseDecided onSave={handleSaveResult} onSaveAll={handleSaveAll} onRefresh={() => roundsQuery.refetch()} busy={busy} refreshing={roundsQuery.isFetching} onConfirmReports={handleConfirmReports} confirmingReports={confirmingReports} />
@@ -1062,7 +1113,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
       {!currentRound && <RoundAction />}
 
-      {Boolean(olderRoundsNewestFirst.length) && (
+      {selectedTournamentStatus !== 'finished' && Boolean(olderRoundsNewestFirst.length) && (
         <section className="play-rounds">
           <h2>{t('Vergangene Runden')}</h2>
           {olderRoundsNewestFirst.map((round) => (

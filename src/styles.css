@@ -4248,6 +4248,58 @@ a.left-panel-link {
   background: #fff;
 }
 
+/* Runde eines beendeten Turniers als Tabelle, Farben wie die Spielrunde im Hauptprojekt (Standard der Konfiguration:
+   Kopf e6ebf4, Zeilen abwechselnd c0d6f7/e1e9f7, dünne Rahmen, fette Linie unter dem Kopf). */
+.round-table {
+  width: calc(100% - 40px);
+  margin: 0 20px 20px;
+  border-collapse: collapse;
+  color: #172033;
+}
+
+.round-table th,
+.round-table td {
+  padding: 6px 10px;
+  border: 1px solid #8a94a3;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.round-table th {
+  background: #e6ebf4;
+  border-bottom: 2px solid #172033;
+  text-align: center;
+  font-weight: 700;
+}
+
+.round-table tbody tr:nth-child(odd) {
+  background: #c0d6f7;
+}
+
+.round-table tbody tr:nth-child(even) {
+  background: #e1e9f7;
+}
+
+.round-table .round-table-number {
+  width: 3.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .round-table {
+    width: calc(100% - 24px);
+    margin: 0 12px 12px;
+    font-size: 0.9rem;
+  }
+
+  .round-table th,
+  .round-table td {
+    padding: 5px 6px;
+  }
+}
+
 .ranking-panel .table-scroll {
   max-height: 60vh;
   overflow-y: auto;

@@ -1245,6 +1245,30 @@ describe('TournamentPlayManagement', () => {
     fireEvent.change(partner2First, { target: { value: 'Ida' } });
     expect(screen.getByRole('textbox', { name: 'Partner 2: Nachname' })).toBeRequired();
   });
+  it('listet bei beendetem Turnier alle Runden nur noch zugeklappt als Tabelle, ohne Eingabe', async () => {
+    const round1 = { ...ROUND_1, matches: [{ ...ROUND_1.matches[0], scoreA: 13, scoreB: 7, court: '4' }] };
+    const round2 = { id: 'r2', roundNumber: 2, matches: [
+      { ...ROUND_1.matches[0], id: 'm2', scoreA: 5, scoreB: 13 },
+      { id: 'm3', teamA: [{ id: 'p7', firstName: 'Gina', lastName: 'Neu' }], teamB: [], scoreA: 13, scoreB: 0, noShow: null },
+    ] };
+    installFetchMock([], { rounds: [round1, round2] });
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, status: 'finished' }]} language="de" />);
+
+    expect(await screen.findByRole('heading', { name: 'Runden' })).toBeInTheDocument();
+    const panels = document.querySelectorAll('.play-rounds details');
+    expect([...panels].map((panel) => panel.querySelector('summary').textContent)).toEqual(['Runde 22', 'Runde 11']);
+    expect([...panels].every((panel) => !panel.open)).toBe(true);
+    expect(screen.queryByText('Vergangene Runden')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Alle speichern' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Punkte Team A' })).not.toBeInTheDocument();
+
+    const [tableRound2, tableRound1] = [...panels].map((panel) => within(panel).getByRole('table'));
+    expect(within(tableRound2).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Team A', 'Team B', 'Ergebnis']);
+    expect(within(tableRound2).getAllByRole('row')[2]).toHaveTextContent('Gina NeuFreilos130');
+    expect(within(tableRound1).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Bahn', 'Team A', 'Team B', 'Ergebnis']);
+    expect(within(tableRound1).getAllByRole('row')[1]).toHaveTextContent('4Anna Muster + Bert Beispiel + Clara TestDirk Demo + Eva Muster + Finn Test137');
+  });
+
   it('nimmt ein abgeschlossenes Turnier nur nach Rückfrage wieder auf', async () => {
     const calls = [];
     installFetchMock(calls, { ranking: [{ playerId: 'p1', id: 'p1', rank: 1, wins: 1, firstName: 'Anna', lastName: 'Muster' }] });
