@@ -1,5 +1,6 @@
 import { useState, useId, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { vipLevelInfo } from '../lib/vip.js';
 
 export function SearchResultsStatus({ count, loading = false, error = '' }) {
   const { t } = useTranslation();
@@ -316,6 +317,14 @@ export function DistanceBadge({ distanceKm }) {
       <strong>{Math.round(distanceKm)} {t('km entfernt')}</strong>
     </span>
   );
+}
+
+// VIP-Stufe einer Meldung; compact zeigt nur „VIP“ (Farbe = Stufe, Name im Tooltip), etwa im schmalen Statusplatz.
+export function VipBadge({ level, compact = false }) {
+  const { t } = useTranslation();
+  const info = vipLevelInfo(level);
+  if (!info) return null;
+  return <span className={`vip-badge vip-badge-${info.key}`} title={t(info.label)} aria-label={t(info.label)}>{compact ? t('VIP') : t(info.label)}</span>;
 }
 
 // 👤 hinter einem Namen: Die Person ist mit einem Benutzerkonto verknüpft.

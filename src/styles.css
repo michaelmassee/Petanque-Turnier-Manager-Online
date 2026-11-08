@@ -2504,7 +2504,6 @@ a.left-panel-link {
 
 .participant-vip-status > .vip-badge {
   margin: 0;
-  color: #795600;
   white-space: nowrap;
   transform: rotate(90deg);
 }
@@ -2727,8 +2726,9 @@ a.left-panel-link {
   align-items: center;
 }
 
-.vip-toggle > .button {
+.vip-toggle > select {
   flex: 1;
+  min-height: 40px;
 }
 
 .vip-help {
@@ -3581,6 +3581,19 @@ a.left-panel-link {
   font-size: 0.8em;
   font-weight: 700;
   vertical-align: middle;
+}
+
+/* Stufen (Issue #34): Gold ist der bisherige VIP-Stil, Silber und Bronze daneben unterscheidbar. */
+.vip-badge-silver {
+  border-color: #8a94a3;
+  background: #eef1f5;
+  color: #3d4652;
+}
+
+.vip-badge-bronze {
+  border-color: #b06a32;
+  background: #f8e5d6;
+  color: #7a3f12;
 }
 
 .account-badge {

@@ -11,11 +11,11 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
   ).all();
   const leitung = { user: { id: 'u1', role: 'user' } };
 
-  function vorhandeneAnmeldung(id, status, registeredAt = '2026-09-01T10:00:00.000Z') {
+  function vorhandeneAnmeldung(id, status, registeredAt = '2026-09-01T10:00:00.000Z', vipLevel = 0) {
     env.DB.sqlite.prepare(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email, status,
-        registered_at, created_at, updated_at, cancel_token)
-      VALUES (?, 't1', ?, 'Vorhanden', ?, ?, ?, ?, ?, ?)`)
-      .run(id, id, `${id}@example.test`, status, registeredAt, registeredAt, registeredAt, `token-${id}`);
+        registered_at, created_at, updated_at, cancel_token, is_vip, vip_level)
+      VALUES (?, 't1', ?, 'Vorhanden', ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, id, `${id}@example.test`, status, registeredAt, registeredAt, registeredAt, `token-${id}`, vipLevel ? 1 : 0, vipLevel);
   }
 
   function anmelden(body = {}, optionen = {}) {
@@ -122,11 +122,11 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
     expect(anmeldungen().map((zeile) => zeile.first_name)).toEqual(['a', 'b']);
   });
 
-  async function vipEinschalten(id, status = 'waitlist') {
+  async function vipEinschalten(id, status = 'waitlist', vip = { isVip: true }) {
     const existing = await getRegistrationWithTournament(env.DB, id);
     const request = new Request(`https://ptm.test/api/registrations/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firstName: id, lastName: 'Vorhanden', email: `${id}@example.test`, playerEmail: `${id}@example.test`, status, isVip: true }),
+      body: JSON.stringify({ firstName: id, lastName: 'Vorhanden', email: `${id}@example.test`, playerEmail: `${id}@example.test`, status, ...vip }),
     });
     expect((await updateRegistration(request, env, existing, leitung.user)).status).toBe(200);
     return env.DB.sqlite.prepare('SELECT status, confirmed_at FROM registrations WHERE id = ?').get(id);
@@ -158,6 +158,64 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
 
     expect(vip).toEqual({ status: 'pending', confirmed_at: null });
     expect(env.DB.sqlite.prepare("SELECT status FROM registrations WHERE id = 'b'").get().status).toBe('waitlist');
+  });
+
+  describe('VIP-Stufen Gold/Silber/Bronze (Issue #34)', () => {
+    const stufe = (id) => env.DB.sqlite.prepare('SELECT status, is_vip, vip_level FROM registrations WHERE id = ?').get(id);
+
+    it('verdrängt zuerst Meldungen ohne VIP, auch wenn eine Bronze-Meldung jünger ist', async () => {
+      vorhandeneAnmeldung('ohne', 'confirmed', '2026-09-01T10:00:00.000Z');
+      vorhandeneAnmeldung('bronze', 'confirmed', '2026-09-02T10:00:00.000Z', 1);
+
+      await anmelden({ vipLevel: 2, playerEmail: 'silber@example.test' }, { session: leitung });
+
+      expect(stufe('ohne').status).toBe('waitlist');
+      expect(stufe('bronze').status).toBe('confirmed');
+      expect(anmeldungen().at(-1)).toEqual({ first_name: 'Neu', status: 'confirmed', is_vip: 1 });
+    });
+
+    it('verdrängt danach die niedrigere Stufe, aber nie eine gleiche oder höhere', async () => {
+      vorhandeneAnmeldung('bronze', 'confirmed', '2026-09-01T10:00:00.000Z', 1);
+      vorhandeneAnmeldung('silber', 'confirmed', '2026-09-02T10:00:00.000Z', 2);
+
+      await anmelden({ vipLevel: 2, playerEmail: 'silber2@example.test' }, { session: leitung });
+      expect(stufe('bronze').status).toBe('waitlist');
+      expect(stufe('silber').status).toBe('confirmed');
+
+      await anmelden({ vipLevel: 1, firstName: 'Bronze2', playerEmail: 'bronze2@example.test' }, { session: leitung });
+      expect(anmeldungen().at(-1)).toEqual({ first_name: 'Bronze2', status: 'waitlist', is_vip: 1 });
+    });
+
+    it('holt eine Wartelisten-Meldung beim Hochstufen nach vorn und verdrängt nur niedrigere Stufen', async () => {
+      vorhandeneAnmeldung('gold', 'confirmed', '2026-09-01T10:00:00.000Z', 3);
+      vorhandeneAnmeldung('ohne', 'confirmed', '2026-09-02T10:00:00.000Z');
+      vorhandeneAnmeldung('warte', 'waitlist', '2026-09-03T10:00:00.000Z');
+
+      await vipEinschalten('warte', 'waitlist', { vipLevel: 1 });
+
+      expect(stufe('warte')).toEqual({ status: 'confirmed', is_vip: 1, vip_level: 1 });
+      expect(stufe('ohne').status).toBe('waitlist');
+      expect(stufe('gold').status).toBe('confirmed');
+    });
+
+    it('behält bei Clients, die nur isVip senden, die gespeicherte Stufe', async () => {
+      vorhandeneAnmeldung('silber', 'confirmed', '2026-09-01T10:00:00.000Z', 2);
+      vorhandeneAnmeldung('neu', 'confirmed', '2026-09-02T10:00:00.000Z');
+
+      await vipEinschalten('silber', 'confirmed');
+      await vipEinschalten('neu', 'confirmed');
+
+      expect(stufe('silber').vip_level).toBe(2);
+      expect(stufe('neu').vip_level).toBe(3);
+    });
+
+    it('setzt beim Ausschalten Stufe und is_vip zurück', async () => {
+      vorhandeneAnmeldung('gold', 'confirmed', '2026-09-01T10:00:00.000Z', 3);
+
+      await vipEinschalten('gold', 'confirmed', { vipLevel: 0, isVip: false });
+
+      expect(stufe('gold')).toEqual({ status: 'confirmed', is_vip: 0, vip_level: 0 });
+    });
   });
 
   it('ignoriert ein VIP-Kennzeichen aus der Selbstanmeldung', async () => {

@@ -1,4 +1,5 @@
 import { DEFAULT_PARTICIPANT_LIMIT, DEFAULT_TOURNAMENT_LIMIT } from './lib/constants.js';
+import { VIP_LEVELS, VIP_NONE, vipLevelOf } from './lib/vip.js';
 
 export function filterTournaments(tournaments, query, statusFilter) {
   const normalizedQuery = (query || '').trim().toLowerCase();
@@ -19,9 +20,12 @@ export function filterRegistrations(registrations, query, statusFilter, { organi
     const matchesQuestion = !questionFilter || (registration.registrationAnswers || []).some((answer) => answer.questionId === filterQuestionId
       && (filterOptionId ? answer.optionId === filterOptionId : answer.checked));
     const matchesFee = !feeFilter || (registration.feeSelections || []).some((selection) => selection.tariffId === feeFilter);
+    // „vip“/„not_vip“ = irgendeine Stufe bzw. keine, sonst genau eine Stufe (gold/silver/bronze).
+    const vipLevel = vipLevelOf(registration);
     const matchesVip = !vipFilter ||
-      (vipFilter === 'vip' && Boolean(registration.isVip)) ||
-      (vipFilter === 'not_vip' && !registration.isVip);
+      (vipFilter === 'vip' && vipLevel > VIP_NONE) ||
+      (vipFilter === 'not_vip' && vipLevel === VIP_NONE) ||
+      VIP_LEVELS.some((level) => level.key === vipFilter && level.value === vipLevel);
     return matchesStatus && matchesQuery && matchesMessage && matchesQuestion && matchesFee && matchesVip;
   });
 }

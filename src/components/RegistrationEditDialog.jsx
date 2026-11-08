@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
 import { registrationPayload } from '../lib/domain.js';
+import { vipLevelOf } from '../lib/vip.js';
 import { Button, EditDialog } from './ui.jsx';
 import { RegistrationFields } from './RegistrationFields.jsx';
 import { TournamentPicker } from './TournamentPicker.jsx';
@@ -76,7 +77,7 @@ export function registrationToForm(registration) {
     teamName: registration.teamName || '',
     seedingPosition: registration.seedingPosition || '',
     status: registration.status || 'pending',
-    isVip: Boolean(registration.isVip),
+    vipLevel: vipLevelOf(registration),
   };
 }
 

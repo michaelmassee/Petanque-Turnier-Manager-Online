@@ -242,7 +242,7 @@ export const EMPTY_REGISTRATION_FORM = {
   teamName: '',
   seedingPosition: '',
   status: 'pending',
-  isVip: false,
+  vipLevel: 0,
   organizerMessage: '',
   publicationNoticeAccepted: false,
   personsConsentAccepted: false,

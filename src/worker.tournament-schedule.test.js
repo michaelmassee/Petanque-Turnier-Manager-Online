@@ -56,7 +56,7 @@ describe('Spielplan-Endpunkt (/schedule)', () => {
     const { entries } = await response.json();
     expect(entries).toHaveLength(5);
     expect(entries.find((entry) => entry.persons[0].firstName === 'Anna')).toEqual({
-      status: 'confirmed', participation: 'active', teamName: 'Team Adler', isVip: false,
+      status: 'confirmed', participation: 'active', teamName: 'Team Adler', isVip: false, vipLevel: 0,
       persons: [
         { firstName: 'Anna', lastName: 'Adler', club: null, accountConnected: true },
         { firstName: 'Bert', lastName: 'Beispiel', club: null, accountConnected: false },
@@ -65,7 +65,7 @@ describe('Spielplan-Endpunkt (/schedule)', () => {
     expect(entries.find((entry) => entry.persons[0].firstName === 'Clara').participation).toBe('inactive');
     expect(entries.find((entry) => entry.persons[0].firstName === 'Dirk').participation).toBe('withdrawn');
     expect(entries.filter((entry) => entry.status !== 'confirmed').every((entry) => entry.participation === null)).toBe(true);
-    for (const entry of entries) expect(Object.keys(entry).sort()).toEqual(['isVip', 'participation', 'persons', 'status', 'teamName']);
+    for (const entry of entries) expect(Object.keys(entry).sort()).toEqual(['isVip', 'participation', 'persons', 'status', 'teamName', 'vipLevel']);
     expect(JSON.stringify(entries)).not.toMatch(/secret@example|partner@example|0123456789|L-123|Private Notiz|owner/);
   });
 

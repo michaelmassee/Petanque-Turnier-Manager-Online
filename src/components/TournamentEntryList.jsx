@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor } from '../lib/domain.js';
-import { AccountBadge } from './ui.jsx';
+import { vipLevelOf } from '../lib/vip.js';
+import { AccountBadge, VipBadge } from './ui.jsx';
 
 // Reine Anzeige bis zur ersten Runde: eine Zeile je Meldung, Check-in gilt für das gesamte Team.
 export function TournamentEntryList({ entries, scrollRef }) {
@@ -30,7 +31,7 @@ export function TournamentEntryList({ entries, scrollRef }) {
                 </div>)}
               </div>
               <div className="board-entry-status">
-                {entry.isVip && <span className="vip-badge">{t('VIP')}</span>}
+                <VipBadge level={vipLevelOf(entry)} />
                 <span className={`status registration-${entry.status}`}>{labelFor(REGISTRATION_STATUSES, entry.status)}</span>
                 {entry.status === 'confirmed' && <span
                   className={`status ${entry.participation === 'active' ? 'registration-confirmed' : 'status-calendar'}`}

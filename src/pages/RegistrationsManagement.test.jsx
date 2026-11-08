@@ -318,6 +318,8 @@ describe('Anmeldungsverwaltung: Anmeldedetails', () => {
     expect(screen.getByRole('button', { name: /Filter zurücksetzen/ })).toBeEnabled();
     fireEvent.change(select, { target: { value: 'not_vip' } });
     expect(onVipFilterChange).toHaveBeenCalledWith('not_vip');
+    fireEvent.change(select, { target: { value: 'silver' } });
+    expect(onVipFilterChange).toHaveBeenCalledWith('silver');
   });
 
   it('zeigt keinen Details-Schalter ohne Zusatzangaben', () => {
@@ -544,14 +546,14 @@ describe('Anmeldungsverwaltung: Freigabe und Storno durch die Turnierleitung', (
 });
 
 
-describe('Anmeldungsverwaltung: VIP-Schalter', () => {
+describe('Anmeldungsverwaltung: VIP-Stufe', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  function setup({ isVip = false, status = 'confirmed', fail = false, approvalInboxActive = false } = {}) {
+  function setup({ vipLevel = 0, status = 'confirmed', fail = false, approvalInboxActive = false } = {}) {
     let registration = {
       id: 'vip-1', tournamentId: 't1', firstName: 'Anna', lastName: 'Muster',
       email: 'anna@example.test', playerEmail: 'anna@example.test', club: 'BC Linden',
-      status, isVip, seedingPosition: 3, feeSelections: [], registrationAnswers: [],
+      status, vipLevel, isVip: vipLevel > 0, seedingPosition: 3, feeSelections: [], registrationAnswers: [],
     };
     const onTournamentsChanged = vi.fn();
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
@@ -576,24 +578,25 @@ describe('Anmeldungsverwaltung: VIP-Schalter', () => {
   }
 
   it.each([
-    { isVip: false, status: 'confirmed', approvalInboxActive: false },
-    { isVip: true, status: 'confirmed', approvalInboxActive: false },
-    { isVip: false, status: 'pending', approvalInboxActive: false },
-    { isVip: false, status: 'pending', approvalInboxActive: true },
-  ])('speichert VIP von $isVip um bei $status (Freigabeeingang: $approvalInboxActive)', async (options) => {
+    { vipLevel: 0, next: 2, status: 'confirmed', approvalInboxActive: false },
+    { vipLevel: 3, next: 0, status: 'confirmed', approvalInboxActive: false },
+    { vipLevel: 1, next: 3, status: 'confirmed', approvalInboxActive: false },
+    { vipLevel: 0, next: 1, status: 'pending', approvalInboxActive: false },
+    { vipLevel: 0, next: 1, status: 'pending', approvalInboxActive: true },
+  ])('speichert VIP-Stufe $vipLevel → $next bei $status (Freigabeeingang: $approvalInboxActive)', async (options) => {
     const { fetchMock, onTournamentsChanged } = setup(options);
-    // Der Button nennt die Aktion, nicht den Zustand.
-    const before = options.isVip ? 'VIP ausschalten' : 'VIP einschalten';
-    const after = options.isVip ? 'VIP einschalten' : 'VIP ausschalten';
-    const toggle = await screen.findByRole('button', { name: before });
-    fireEvent.click(toggle);
-    expect(toggle).toBeDisabled();
+    const select = await screen.findByRole('combobox', { name: 'VIP-Stufe' });
+    expect(select).toHaveValue(String(options.vipLevel));
+    fireEvent.change(select, { target: { value: String(options.next) } });
+    expect(select).toBeDisabled();
+    expect(screen.getByRole('status', { name: 'Wird gespeichert …' })).toBeInTheDocument();
 
-    expect(await screen.findByRole('button', { name: after })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'VIP-Stufe' })).toBeEnabled());
+    expect(screen.getByRole('combobox', { name: 'VIP-Stufe' })).toHaveValue(String(options.next));
     const update = fetchMock.mock.calls.find(([, request]) => request?.method === 'PUT');
     expect(update[0]).toBe('/api/registrations/vip-1');
     expect(JSON.parse(update[1].body)).toMatchObject({
-      isVip: !options.isVip, status: options.status, firstName: 'Anna', lastName: 'Muster', club: 'BC Linden', seedingPosition: 3,
+      vipLevel: options.next, isVip: options.next > 0, status: options.status, firstName: 'Anna', lastName: 'Muster', club: 'BC Linden', seedingPosition: 3,
     });
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/tournaments/t1/registrations')).toHaveLength(2);
     expect(onTournamentsChanged).toHaveBeenCalledTimes(1);
@@ -603,16 +606,20 @@ describe('Anmeldungsverwaltung: VIP-Schalter', () => {
     setup();
     fireEvent.click(await screen.findByRole('button', { name: 'Was bewirkt VIP?' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/zuletzt angemeldete Meldung ohne VIP auf die Warteliste/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/VIP Gold hat Vorrang vor VIP Silber/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/zuerst Meldungen ohne VIP, dann Bronze, dann Silber/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/innerhalb einer Stufe zählt der Meldezeitpunkt/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/halbes VIP/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Keine Meldung wird verschoben/)).toBeInTheDocument();
   });
 
   it('behält den VIP-Status bei einem fehlgeschlagenen Speichern', async () => {
     const { fetchMock, onTournamentsChanged } = setup({ fail: true });
-    fireEvent.click(await screen.findByRole('button', { name: 'VIP einschalten' }));
+    fireEvent.change(await screen.findByRole('combobox', { name: 'VIP-Stufe' }), { target: { value: '3' } });
 
     expect(await screen.findByText('Speichern fehlgeschlagen')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'VIP einschalten' })).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'VIP-Stufe' })).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'VIP-Stufe' })).toHaveValue('0');
     expect(onTournamentsChanged).not.toHaveBeenCalled();
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/tournaments/t1/registrations')).toHaveLength(1);
   });

@@ -8,7 +8,8 @@ import { DISPLAY_FIT_QUERY, useAutoScroll, useMediaQuery, useRoutedTournament, u
 import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { DISPLAY_LOCALES, REGISTRATION_OPENS_TEMPLATES, TIMEZONE_HINT_TEMPLATES, detectViewerTimeZone, formatDate, formatTournamentDateTime, formatMoney, formatWeekdayShort } from '../lib/format.js';
 import { isCalendarEntry, isDocumentBound, isUpcoming, labelFor, formationLabel, hasOpenRegistration, registrationStatusKind, registrationStatusLabel, registrationStatusReason, formatTournamentStartTime, formatLocationAddress, googleMapsUrl, tournamentImageUrl, calendarEventLink } from '../lib/domain.js';
-import { AccountBadge, Button, ClockIcon, Feedback, NumberIcon, RequiredMark, SearchIcon, ShareIcon, SortAlphaIcon, StarIcon } from '../components/ui.jsx';
+import { AccountBadge, Button, ClockIcon, Feedback, NumberIcon, RequiredMark, SearchIcon, ShareIcon, SortAlphaIcon, StarIcon, VipBadge } from '../components/ui.jsx';
+import { vipLevelOf } from '../lib/vip.js';
 import { loadParticipantListPrefs, nextVipFilter, saveParticipantListPrefs } from '../lib/participantListPrefs.js';
 import { RichText, handleOwnLinkClick } from '../components/RichText.jsx';
 import { formatUserName } from '../lib/userLabel.js';
@@ -370,7 +371,7 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
       )}
       {participant.isVip && (
         <span className="participant-vip-status">
-          <span className="vip-badge">{t('VIP')}</span>
+          <VipBadge level={vipLevelOf(participant)} compact />
         </span>
       )}
       {participant.registrationId && (

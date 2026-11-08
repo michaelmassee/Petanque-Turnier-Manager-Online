@@ -56,6 +56,15 @@ describe('Automatisches Nachrücken aus der Warteliste', () => {
     expect(env.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'waitlist_promoted'").get().n).toBe(1);
   });
 
+  it('rückt eine höhere VIP-Stufe vor früher gemeldeten Wartelisten-Meldungen nach (Issue #34)', async () => {
+    anmeldung('bronze', 'waitlist', '2026-09-04T10:00:00.000Z', { is_vip: 1, vip_level: 1 });
+    anmeldung('silber', 'waitlist', '2026-09-05T10:00:00.000Z', { is_vip: 1, vip_level: 2 });
+    env.DB.sqlite.prepare("UPDATE registrations SET status = 'cancelled' WHERE id IN ('a', 'b')").run();
+
+    expect((await promoteWaitlist(env, 't1')).map((row) => row.id).sort()).toEqual(['bronze', 'silber']);
+    expect(status('w1')).toBe('waitlist');
+  });
+
   it('setzt den Nachrücker bei Turnieren mit Freigabe auf offen', async () => {
     env.DB.sqlite.prepare("UPDATE tournaments SET approval_required = 1 WHERE id = 't1'").run();
 

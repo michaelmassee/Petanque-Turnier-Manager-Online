@@ -92,6 +92,15 @@ describe('filterRegistrations', () => {
     expect(filterRegistrations(vipRegistrations, '', '', { vipFilter: 'not_vip' })).toEqual([vipRegistrations[1], vipRegistrations[2]]);
     expect(filterRegistrations(vipRegistrations, '', '', { vipFilter: 'unknown' })).toEqual([]);
   });
+
+  it('filtert nach VIP-Stufe; isVip ohne Stufe gilt als Gold', () => {
+    const levelled = [{ ...registrations[0], vipLevel: 2 }, { ...registrations[1], vipLevel: 1 }, { ...registrations[1], id: 'r3', isVip: true }];
+
+    expect(filterRegistrations(levelled, '', '', { vipFilter: 'silver' })).toEqual([levelled[0]]);
+    expect(filterRegistrations(levelled, '', '', { vipFilter: 'bronze' })).toEqual([levelled[1]]);
+    expect(filterRegistrations(levelled, '', '', { vipFilter: 'gold' })).toEqual([levelled[2]]);
+    expect(filterRegistrations(levelled, '', '', { vipFilter: 'vip' })).toEqual(levelled);
+  });
 });
 
 describe('sortUsers', () => {

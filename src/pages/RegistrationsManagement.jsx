@@ -4,7 +4,8 @@ import { authenticatedApi } from '../lib/api.js';
 import { EMPTY_REGISTRATION_FORM, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { isCalendarEntry, labelFor, registrationPayload, translatedOptions } from '../lib/domain.js';
 import { filterRegistrations, registrationChoiceSummary } from '../frontend-core.js';
-import { Feedback, Button, ListToolbar, EditDialog, AccountBadge, TextArea } from '../components/ui.jsx';
+import { Feedback, Button, ListToolbar, EditDialog, AccountBadge, TextArea, VipBadge } from '../components/ui.jsx';
+import { VIP_LEVELS, vipLevelOf, vipLevelOptions } from '../lib/vip.js';
 import { RegistrationEditDialog, RegistrationForm } from '../components/RegistrationEditDialog.jsx';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { formatMoney } from '../lib/format.js';
@@ -212,14 +213,18 @@ function VipHelpDialog({ open, onClose }) {
   return (
     <EditDialog open={open} title={t('Was bewirkt VIP?')} onClose={onClose}>
       <div className="vip-help">
-        <p><strong>{t('VIP einschalten')}:</strong> {t('VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.')}</p>
-        <p><strong>{t('VIP ausschalten')}:</strong> {t('Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.')}</p>
+        <p><strong>{t('Stufen')}:</strong> {t('VIP Gold hat Vorrang vor VIP Silber, Silber vor VIP Bronze, Bronze vor Meldungen ohne VIP.')}</p>
+        <p><strong>{t('Turnier voll')}:</strong> {t('Ist das Teilnehmerlimit erreicht, verdrängt eine VIP-Meldung die Meldung mit der niedrigsten Stufe unter ihrer eigenen – zuerst Meldungen ohne VIP, dann Bronze, dann Silber; bei gleicher Stufe die zuletzt angemeldete. Diese kommt auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Gleiche oder höhere Stufen werden nie verdrängt.')}</p>
+        <p><strong>{t('Warteliste')}:</strong> {t('Höhere Stufen stehen vorn, innerhalb einer Stufe zählt der Meldezeitpunkt. In dieser Reihenfolge rücken Meldungen auf freie Plätze nach.')}</p>
+        <p><strong>{t('Hochstufen')}:</strong> {t('Eine Meldung auf der Warteliste rückt sofort nach, wenn ein Platz frei ist oder eine Meldung mit niedrigerer Stufe verdrängt werden kann.')}</p>
+        <p><strong>{t('Herabstufen oder ausschalten')}:</strong> {t('Ändert nur die Stufe. Keine Meldung wird verschoben, niemand rückt nach.')}</p>
+        <p><strong>{t('Beispiel')}:</strong> {t('Hat bei einer Doublette nur ein Spieler Vorrang („halbes VIP“), passt Silber oder Bronze: Das Team kommt vor Meldungen ohne VIP, aber nach vollen VIP-Teams.')}</p>
       </div>
     </EditDialog>
   );
 }
 
-function RegistrationRow({ registration, tournament, showConfirm = false, showReject = false, busy, busyOther, onConfirm, onReject, onEdit, onMessage, onDelete, onToggleVip, onLiveQr }) {
+function RegistrationRow({ registration, tournament, showConfirm = false, showReject = false, busy, busyOther, onConfirm, onReject, onEdit, onMessage, onDelete, onVipLevelChange, onLiveQr }) {
   const { t } = useTranslation();
   const [vipHelpOpen, setVipHelpOpen] = useState(false);
   return (
@@ -227,7 +232,7 @@ function RegistrationRow({ registration, tournament, showConfirm = false, showRe
     <article className="data-row">
       <div>
         <strong data-i18n-skip>
-          {registration.isVip && <span className="vip-badge">{t('VIP')}</span>}
+          <VipBadge level={vipLevelOf(registration)} />
           {registration.firstName} {registration.lastName}
           {registration.accountConnected && <AccountBadge />}
         </strong>
@@ -268,18 +273,19 @@ function RegistrationRow({ registration, tournament, showConfirm = false, showRe
       </div>
       <span className={`status registration-${registration.status}`}>{labelFor(REGISTRATION_STATUSES, registration.status)}</span>
       <div className="row-actions">
-        {/* Der Text nennt die Aktion; den Zustand zeigt das VIP-Badge am Namen. Die Wirkung steht im Tooltip (Desktop)
-            und hinter „?“ (Handy: kein Hover). */}
+        {/* Die Auswahl speichert sofort; den Zustand zeigt auch das VIP-Badge am Namen. Die Wirkung steht im Tooltip
+            (Desktop) und hinter „?“ (Handy: kein Hover). */}
         <span className="vip-toggle">
-          <Button
-            variant="secondary"
-            title={registration.isVip ? t('Schaltet nur VIP aus. Keine Meldung wird verschoben, niemand rückt nach.') : t('VIP-Meldungen haben Vorrang: Ist das Teilnehmerlimit erreicht, kommt die zuletzt angemeldete Meldung ohne VIP auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Steht diese Meldung auf der Warteliste, rückt sie nach.')}
-            loading={busy === `vip-${registration.id}`}
+          <select
+            aria-label={t('VIP-Stufe')}
+            title={t('VIP Gold hat Vorrang vor VIP Silber, Silber vor VIP Bronze, Bronze vor Meldungen ohne VIP.')}
+            value={String(vipLevelOf(registration))}
             disabled={Boolean(busy || busyOther)}
-            onClick={() => onToggleVip(registration)}
+            onChange={(event) => onVipLevelChange(registration, Number(event.target.value))}
           >
-            {registration.isVip ? t('VIP ausschalten') : t('VIP einschalten')}
-          </Button>
+            {vipLevelOptions(t).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+          {busy === `vip-${registration.id}` && <span className="button-spinner" role="status" aria-label={t('Wird gespeichert …')} />}
           <button type="button" className="help-btn" onClick={() => setVipHelpOpen(true)} aria-label={t('Was bewirkt VIP?')}>?</button>
         </span>
         {showConfirm && (
@@ -377,7 +383,7 @@ export function RegistrationsPanel({
   onMessage,
   onConfirm,
   onConfirmAll,
-  onToggleVip,
+  onVipLevelChange,
   onLiveQr,
   onReject,
   approvalInboxActive = false,
@@ -407,7 +413,7 @@ export function RegistrationsPanel({
 
   function rowProps(registration) {
     const busy = ['confirm', 'delete', 'vip'].some((action) => busyId === `${action}-${registration.id}`) ? busyId : '';
-    return { busy, busyOther: Boolean(busyId) && !busy, onToggleVip, onLiveQr };
+    return { busy, busyOther: Boolean(busyId) && !busy, onVipLevelChange, onLiveQr };
   }
 
   if (approvalInboxActive) {
@@ -473,7 +479,7 @@ export function RegistrationsPanel({
           { label: t('Nachricht an Turnierleitung'), value: organizerMessageFilter, onChange: onOrganizerMessageFilterChange, options: [{ value: '', label: t('Alle Nachrichten') }, { value: 'with_message', label: t('Mit Nachricht') }, { value: 'without_message', label: t('Ohne Nachricht') }] },
           { label: t('Frage beantwortet'), value: questionFilter, onChange: onQuestionFilterChange, options: [{ value: '', label: t('Alle Fragen') }, ...questionOptions] },
           { label: t('Tarif ausgewählt'), value: feeFilter, onChange: onFeeFilterChange, options: [{ value: '', label: t('Alle Tarife') }, ...feeOptions] },
-          { label: t('VIP'), value: vipFilter, onChange: onVipFilterChange, options: [{ value: '', label: t('Alle Meldungen') }, { value: 'vip', label: t('Nur VIP') }, { value: 'not_vip', label: t('Ohne VIP') }] },
+          { label: t('VIP'), value: vipFilter, onChange: onVipFilterChange, options: [{ value: '', label: t('Alle Meldungen') }, { value: 'vip', label: t('Nur VIP') }, { value: 'not_vip', label: t('Ohne VIP') }, ...VIP_LEVELS.map((level) => ({ value: level.key, label: t(level.label) }))] },
         ]}
         onReset={onResetFilters}
         resetDisabled={!filtered}
@@ -676,11 +682,11 @@ export function RegistrationsManagementPage({
     } catch (err) { setError(err.message); } finally { setBusyId(''); }
   }
 
-  async function handleToggleVip(registration) {
+  async function handleVipLevelChange(registration, vipLevel) {
     setError(''); setMessage('');
     setBusyId(`vip-${registration.id}`);
     try {
-      const payload = registrationPayload({ ...registration, seedingPosition: registration.seedingPosition ?? '', isVip: !registration.isVip }, language);
+      const payload = registrationPayload({ ...registration, seedingPosition: registration.seedingPosition ?? '', vipLevel }, language);
       await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
       setMessage(t('VIP-Status wurde aktualisiert.'));
       await load(registration.tournamentId);
@@ -759,7 +765,7 @@ export function RegistrationsManagementPage({
         onEdit={openEdit}
         onMessage={openTeamMessage}
         onConfirm={handleConfirm}
-        onToggleVip={handleToggleVip}
+        onVipLevelChange={handleVipLevelChange}
         onLiveQr={setLiveQrRegistration}
         onConfirmAll={handleConfirmAll}
         onReject={(registration) => { setRejectionRegistration(registration); setRejectionReason(''); }}

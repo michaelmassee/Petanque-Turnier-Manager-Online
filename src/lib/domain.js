@@ -2,6 +2,7 @@ import { ROLES, FORMATIONS } from './constants.js';
 import { formatTournamentDateTime, timezoneAbbrev, detectViewerTimeZone, amountToMinorUnits, DISPLAY_LOCALES } from './format.js';
 import i18next from './i18next-config.js';
 import { formatLocationAddress } from '../location-format.js';
+import { normalizeVipLevel, VIP_NONE } from './vip.js';
 export { formatLocationAddress };
 
 export function authTitle(needsSetup, authView) {
@@ -232,7 +233,9 @@ export function registrationPayload(form, language) {
     teamName: form.teamName || null,
     seedingPosition: form.seedingPosition === '' ? null : Number(form.seedingPosition),
     status: form.status,
-    isVip: Boolean(form.isVip),
+    vipLevel: normalizeVipLevel(form.vipLevel),
+    // Für ältere Server/Clients, die nur das Kennzeichen kennen.
+    isVip: normalizeVipLevel(form.vipLevel) > VIP_NONE,
     organizerMessage: form.organizerMessage || '',
     feeSelections: form.feeSelections || [],
     registrationAnswers: form.registrationAnswers || [],

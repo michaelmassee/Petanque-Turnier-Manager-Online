@@ -65,6 +65,7 @@ import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schw
 import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
 import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
+import { normalizeVipLevel, VIP_MAX_LEVEL, VIP_NONE, vipLevelOf } from './lib/vip.js';
 import { firstFreeUsername, normalizeUsername, usernameCandidates, usernameProblem, USERNAME_CHANGE_INTERVAL_DAYS } from './lib/username.js';
 import { parseRichText, richTextDocument, richTextPlainText, serializeRichText } from './lib/rich-text.js';
 import { invalidNameBlacklistPatterns, isFuturePetanqueAktuellTournament, mapPetanqueAktuellTournament, NAME_BLACKLIST_MAX_PATTERNS, nameBlacklistMatcher, normalizeNameBlacklist, parsePetanqueAktuellCalendar, parsePetanqueAktuellDetailAddress, parsePetanqueAktuellDetailLogoUrl, petanqueAktuellCalendarUrl, petanqueAktuellPageUrls } from './petanque-aktuell-core.js';
@@ -5582,7 +5583,7 @@ export async function upsertDocumentRegistration(request, env, tournament, local
       partnerEmail: existing.partner_email,
       partner2Email: existing.partner2_email,
       status: existing.status,
-      isVip: Boolean(Number(existing.is_vip || 0)),
+      vipLevel: vipLevelOf(existing),
       organizerMessage: existing.organizer_message,
     }, { requireStatus: true, documentSync: true });
     assertPartnerCountMatchesFormation(tournament, documentRegistration);
@@ -7328,7 +7329,7 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
     .prepare(
       `SELECT id, email, first_name, last_name, club, team_name,
          partner_first_name, partner_last_name, partner_club,
-         partner2_first_name, partner2_last_name, partner2_club, is_vip, status,
+         partner2_first_name, partner2_last_name, partner2_club, is_vip, vip_level, status,
          over_capacity, user_id, partner_user_id, partner2_user_id, registrant_user_id, registered_at
        FROM registrations
        WHERE tournament_id = ? AND status IN ('pending', 'confirmed', 'waitlist')
@@ -7353,7 +7354,8 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
       partner2FirstName: row.partner2_first_name,
       partner2LastName: row.partner2_last_name,
       partner2Club: row.partner2_club,
-      isVip: Boolean(row.is_vip),
+      isVip: vipLevelOf(row) > VIP_NONE,
+      vipLevel: vipLevelOf(row),
       // Meldezeitpunkt; die Meldereihenfolge ist ohnehin öffentlich.
       registeredAt: row.registered_at,
       // Von der Turnierleitung über die Kapazität hinaus nachgemeldet (T-24); öffentlich als solche erkennbar.
@@ -7366,8 +7368,10 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
   };
 
   const confirmed = result.results.filter((row) => row.status === 'confirmed');
-  // Die Warteliste ist wie die Meldeliste öffentlich, in Meldereihenfolge (= Nachrückreihenfolge).
-  const waitlist = result.results.filter((row) => row.status === 'waitlist');
+  // Die Warteliste ist wie die Meldeliste öffentlich, in Nachrückreihenfolge: höhere VIP-Stufe zuerst, sonst
+  // Meldereihenfolge (wie promoteWaitlist).
+  const waitlist = result.results.filter((row) => row.status === 'waitlist')
+    .sort((a, b) => vipLevelOf(b) - vipLevelOf(a));
   // Offene Meldungen sind wie die Warteliste öffentlich, in Meldereihenfolge. Ohne Bestätigungspflicht gibt es sie
   // nur als Altbestand oder von Hand gesetzt; auch dann bleiben sie sichtbar, statt aus der Liste zu verschwinden.
   const pending = result.results.filter((row) => row.status === 'pending');
@@ -8454,14 +8458,15 @@ async function loadScheduleEntries(db, tournamentId) {
   const result = await db.prepare(`SELECT first_name, last_name, club, team_name,
       partner_first_name, partner_last_name, partner_club, partner2_first_name, partner2_last_name, partner2_club,
       user_id IS NOT NULL AS account_connected, partner_user_id IS NOT NULL AS partner_account_connected,
-      partner2_user_id IS NOT NULL AS partner2_account_connected, status, participation, is_vip
+      partner2_user_id IS NOT NULL AS partner2_account_connected, status, participation, is_vip, vip_level
     FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed', 'waitlist')
     ORDER BY registered_at, id`).bind(tournamentId).all();
   return result.results.map((row) => ({
     status: row.status,
     participation: row.status === 'confirmed' ? row.participation || 'inactive' : null,
     teamName: row.team_name || null,
-    isVip: Boolean(row.is_vip),
+    isVip: vipLevelOf(row) > VIP_NONE,
+    vipLevel: vipLevelOf(row),
     persons: ['', 'partner_', 'partner2_'].map((prefix) => ({
       firstName: row[`${prefix}first_name`] || '', lastName: row[`${prefix}last_name`] || '',
       club: row[`${prefix}club`] || null, accountConnected: Boolean(row[`${prefix}account_connected`]),
@@ -8946,7 +8951,8 @@ function freesCapacity(previousStatus, nextStatus) {
 }
 
 /**
- * Automatisches Nachrücken (Entscheidung vom 2026-10-21): Freie Plätze werden in Meldereihenfolge mit der Warteliste
+ * Automatisches Nachrücken (Entscheidung vom 2026-10-21): Freie Plätze werden nach VIP-Stufe, dann in Meldereihenfolge
+ * (Issue #34) mit der Warteliste
  * aufgefüllt, solange das Turnier nicht läuft und die Option aktiv ist. Mit Freigabe rückt die Meldung auf „offen“,
  * sonst auf „bestätigt“. Ein einziges UPDATE prüft Kapazität und Turnierzustand, damit parallele Stornierungen nicht
  * überbuchen. Danach wird das ganze Team per Mail und Postbox informiert, die Turnierleitung per Postbox.
@@ -8965,7 +8971,7 @@ export async function promoteWaitlist(env, tournamentId, appOrigin = APP_ORIGIN)
         WHERE r.tournament_id = ? AND r.status = 'waitlist'
           AND COALESCE(t.waitlist_auto_promote, 1) = 1 AND COALESCE(t.max_registrations, 0) > 0
           AND t.status NOT IN ('draft', 'running', 'finished') AND COALESCE(t.desktop_execution, 0) = 0
-        ORDER BY r.registered_at ASC
+        ORDER BY r.vip_level DESC, r.registered_at ASC
         LIMIT MAX(0, (SELECT max_registrations FROM tournaments WHERE id = ?)
           - (SELECT COUNT(*) FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed'))))
       RETURNING *`)
@@ -9095,7 +9101,7 @@ export async function createRegistration(request, env, tournament, {
 
   const registration = normalizeRegistrationInput(body, { requireStatus: false, allowPlaceholder: isManager });
   // VIP vergibt nur die Turnierleitung; sonst könnte eine Selbstanmeldung andere Teams verdrängen.
-  if (!isManager) registration.isVip = false;
+  if (!isManager) registration.vipLevel = VIP_NONE;
   const organizerMessage = isManager ? null : registration.organizerMessage;
   const language = normalizeLanguage(body.language);
   assertCorePartnerCountMatchesFormation(tournament, registration);
@@ -9121,15 +9127,16 @@ export async function createRegistration(request, env, tournament, {
   // VIP-Verdrängung im selben Batch wie das INSERT. Ein INSERT … SELECT ohne Treffer ist kein Fehler und rollt den Batch
   // nicht zurück; die Verdrängung trägt deshalb dieselben Bedingungen (Teilnehmer-Limit, Duplikat-Bestand), sonst bliebe
   // sie bei abgelehnter Anmeldung stehen - und eine Wiederholung der Schleife verdrängte eine weitere Meldung.
-  const displacement = (guard) => (registration.isVip && maxRegistrations > 0 ? [db.prepare(`UPDATE registrations SET status = ?, updated_at = ?
+  // Verdrängt wird die Meldung mit der niedrigsten VIP-Stufe unter der eigenen, darunter die zuletzt angemeldete.
+  const displacement = (guard) => (registration.vipLevel > VIP_NONE && maxRegistrations > 0 ? [db.prepare(`UPDATE registrations SET status = ?, updated_at = ?
         WHERE id = (SELECT id FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')
-                    AND is_vip = 0 ORDER BY registered_at DESC LIMIT 1)
+                    AND vip_level < ? ORDER BY vip_level ASC, registered_at DESC LIMIT 1)
           AND (SELECT COUNT(*) FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed')) >= ?
           AND EXISTS (SELECT 1 FROM tournaments t WHERE t.id = ? AND ${openCondition.sql})
           AND ${limitCondition.sql}
           ${guard ? `AND (${guard.sql}) = ?` : ''}
         RETURNING id`)
-    .bind(waitlistEnabled ? 'waitlist' : 'cancelled', now, tournament.id, tournament.id, maxRegistrations, tournament.id,
+    .bind(waitlistEnabled ? 'waitlist' : 'cancelled', now, tournament.id, registration.vipLevel, tournament.id, maxRegistrations, tournament.id,
       ...openCondition.binds, ...limitCondition.binds, ...(guard ? [...guard.binds, guard.snapshot] : []))] : []);
   let statements = [];
   const record = registrationRecord(id, tournament.id, registration, {
@@ -9278,7 +9285,8 @@ function registrationRecord(id, tournamentId, registration, {
     partner2_license_nr: registration.partner2LicenseNr,
     team_name: registration.teamName,
     seeding_position: registration.seedingPosition,
-    is_vip: registration.isVip ? 1 : 0,
+    is_vip: registration.vipLevel > VIP_NONE ? 1 : 0,
+    vip_level: registration.vipLevel,
     organizer_message: organizerMessage,
     phone: registration.phone ?? null,
     fee_selections: JSON.stringify(feeSelections),
@@ -9379,6 +9387,10 @@ export async function updateRegistration(request, env, existing, actingUser = nu
     body.email = isPlaceholderEmail(existing.email) ? existing.email : createPlaceholderEmail();
   }
   const registration = normalizeRegistrationInput(body, { requireStatus: true, allowPlaceholder: true });
+  // Ältere Clients (PTM-Desktop) senden nur isVip: Eine bestehende Stufe bleibt dann erhalten.
+  if (body.vipLevel === undefined && registration.vipLevel > VIP_NONE) {
+    registration.vipLevel = vipLevelOf(existing) || registration.vipLevel;
+  }
   assertNotRejectedByStatusEdit(existing.status, registration.status);
   // Eine abgesagte Meldung wieder aufnehmen belegt einen Platz im Teilnehmer-Limit: Die Grenze steht im UPDATE selbst und
   // prüft den aktuellen Status, damit weder parallele Wiederaufnahmen noch eine zwischenzeitliche Stornierung sie umgehen.
@@ -9414,7 +9426,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
        SET first_name = ?, last_name = ?, email = ?, player_email = ?, club = ?, license_nr = ?,
            partner_first_name = ?, partner_last_name = ?, partner_email = ?, partner_club = ?, partner_license_nr = ?,
            partner2_first_name = ?, partner2_last_name = ?, partner2_email = ?, partner2_club = ?, partner2_license_nr = ?,
-           team_name = ?, seeding_position = ?, status = ?, is_vip = ?, fee_selections = ?, registration_answers = ?, confirmed_at = ?, updated_at = ?,
+           team_name = ?, seeding_position = ?, status = ?, is_vip = ?, vip_level = ?, fee_selections = ?, registration_answers = ?, confirmed_at = ?, updated_at = ?,
            user_id = ?, partner_user_id = ?, partner2_user_id = ?, rejection_reason = ?, rejected_at = ?, rejected_by = ?, phone = ?
        WHERE id = ? AND ${limitCondition.sql}`,
     )
@@ -9438,7 +9450,8 @@ export async function updateRegistration(request, env, existing, actingUser = nu
       registration.teamName,
       registration.seedingPosition,
       registration.status,
-      registration.isVip ? 1 : 0,
+      registration.vipLevel > VIP_NONE ? 1 : 0,
+      registration.vipLevel,
       JSON.stringify(feeSelections),
       JSON.stringify(registrationAnswers),
       confirmedAt,
@@ -9456,7 +9469,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
     .run();
   if (!saved.meta.changes) throw participantLimitError();
 
-  if (registration.isVip && Number(existing.max_registrations)) {
+  if (registration.vipLevel > VIP_NONE && Number(existing.max_registrations)) {
     await enforceVipPriorityOnUpdate(env, existing, new URL(request.url).origin);
   }
   await releaseInvalidMeleeTeams(db, existing.tournament_id);
@@ -9665,7 +9678,8 @@ async function activateVipRegistration(db, registrationId) {
 async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
   const db = env.DB;
   const current = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
-  if (!current || !Number(current.is_vip)) {
+  const level = vipLevelOf(current);
+  if (!current || level === VIP_NONE) {
     return;
   }
 
@@ -9699,7 +9713,7 @@ async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
     return;
   }
 
-  const displace = await findDisplaceableNonVip(db, existing.tournament_id, existing.id);
+  const displace = await findDisplaceableLowerVip(db, existing.tournament_id, existing.id, level);
   if (!displace) {
     return;
   }
@@ -10459,14 +10473,14 @@ async function geocodeLocation(query, { limit = 5, countryCode } = {}) {
   return results;
 }
 
-async function findDisplaceableNonVip(db, tournamentId, excludeId) {
+async function findDisplaceableLowerVip(db, tournamentId, excludeId, level) {
   return db
     .prepare(
       `SELECT * FROM registrations
-       WHERE tournament_id = ? AND status IN ('pending', 'confirmed') AND is_vip = 0 AND id != ?
-       ORDER BY registered_at DESC LIMIT 1`,
+       WHERE tournament_id = ? AND status IN ('pending', 'confirmed') AND vip_level < ? AND id != ?
+       ORDER BY vip_level ASC, registered_at DESC LIMIT 1`,
     )
-    .bind(tournamentId, excludeId || '')
+    .bind(tournamentId, level, excludeId || '')
     .first();
 }
 
@@ -13038,7 +13052,7 @@ function normalizeRegistrationInput(body, { requireStatus, allowPlaceholder = fa
     teamName: nullableText(body.teamName),
     seedingPosition: body.seedingPosition === '' || body.seedingPosition === undefined ? null : nonNegativeInteger(body.seedingPosition),
     status: text(body.status || 'pending'),
-    isVip: Boolean(body.isVip),
+    vipLevel: body.vipLevel === undefined ? (body.isVip ? VIP_MAX_LEVEL : VIP_NONE) : normalizeVipLevel(body.vipLevel),
     organizerMessage: nullableText(body.organizerMessage),
     // Eine Kontaktnummer pro Anmeldung; undefined = nicht mitgeschickt (ältere Clients, Dokument-Abgleich).
     phone: body.phone === undefined ? undefined : normalizePhone(body.phone),
@@ -13545,7 +13559,8 @@ function toPublicRegistration(row) {
     teamName: row.team_name,
     seedingPosition: row.seeding_position,
     status: row.status,
-    isVip: Boolean(row.is_vip),
+    isVip: vipLevelOf(row) > VIP_NONE,
+    vipLevel: vipLevelOf(row),
     feeSelections,
     feeTotalCents: feeSelections.reduce((total, selection) => total + Number(selection.amountCents || 0), 0),
     participation: row.participation || 'inactive',

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { REGISTRATION_STATUSES } from '../lib/constants.js';
 import { translatedOptions } from '../lib/domain.js';
 import { formatMoney } from '../lib/format.js';
+import { vipLevelOptions } from '../lib/vip.js';
 import { IntegerField, SelectField, TextField } from './ui.jsx';
 import { RegistrationPlayerPicker } from './RegistrationPlayerPicker.jsx';
 import { useClubSuggestions } from './ClubSuggestions.jsx';
@@ -228,14 +229,9 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
             <IntegerField label={t('Setzposition')} min={0} value={form.seedingPosition} onChange={(seedingPosition) => setForm({ ...form, seedingPosition })} />
             <SelectField label={t('Status')} value={form.status} onChange={(status) => setForm({ ...form, status })} options={translatedOptions(REGISTRATION_STATUSES.filter((option) => option.value !== 'rejected' || form.status === 'rejected'))} />
           </div>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={form.isVip}
-              onChange={(event) => setForm({ ...form, isVip: event.target.checked })}
-            />
-            <span className="vip-badge">{t('VIP')}</span>
-          </label>
+          <div className="form-grid">
+            <SelectField label={t('VIP-Stufe')} value={String(form.vipLevel || 0)} onChange={(vipLevel) => setForm({ ...form, vipLevel: Number(vipLevel) })} options={vipLevelOptions(t)} />
+          </div>
         </RegistrationSection>
       )}
     </>
