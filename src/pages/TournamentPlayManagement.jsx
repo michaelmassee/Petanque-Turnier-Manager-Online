@@ -304,6 +304,8 @@ export function FinalRankingPublisher({ tournament, onPublished }) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  const sharesPrivately = tournament.visibility === 'private';
+
   if (tournament.type === 'ko' || isDocumentBound(tournament)) return null;
   if (tournament.status !== 'finished') {
     return <p className="muted">{t('Nach Turnierende kannst du hier die Endrangliste veröffentlichen.')}</p>;
@@ -314,6 +316,9 @@ export function FinalRankingPublisher({ tournament, onPublished }) {
     setError('');
     setMessage('');
     try {
+      // Der Versand an die Teilnehmer ist ein Teilen: bei privaten Turnieren wie beim Teilen-Button den Freigabe-Link
+      // aktivieren (der Hinweis unter der Checkbox sagt das), sonst lehnt der Server den Versand ab.
+      if (notify && sharesPrivately) await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' });
       await authenticatedApi(`/api/tournaments/${tournament.id}/ranking/publish`, { method: 'POST', body: JSON.stringify({ notify, resend }) });
       setMessage(notify ? t('Endrangliste veröffentlicht und an die Teilnehmer gesendet.') : t('Endrangliste veröffentlicht.'));
       await onPublished?.();
@@ -341,6 +346,9 @@ export function FinalRankingPublisher({ tournament, onPublished }) {
         <input type="checkbox" checked={notify} onChange={(event) => setNotify(event.target.checked)} />
         {t('An alle bestätigten Teilnehmer senden (E-Mail, Postfach, Push)')}
       </label>
+      {notify && sharesPrivately && (
+        <p className="hint">{t('Privates Turnier: Der Versand aktiviert den Freigabe-Link, damit die Teilnehmer die Endrangliste ohne Anmeldung öffnen können.')}</p>
+      )}
       <Feedback message={message} />
       <Feedback error={error} />
       <Button disabled={busy} loading={busy} onClick={() => publish()}>

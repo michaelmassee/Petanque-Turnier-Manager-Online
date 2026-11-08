@@ -34,6 +34,29 @@ describe('Endrangliste veröffentlichen (Spielverwaltung)', () => {
     expect(onPublished).toHaveBeenCalled();
   });
 
+  it('aktiviert bei privaten Turnieren vor dem Versand den Freigabe-Link', async () => {
+    authenticatedApi.mockResolvedValue({});
+    render(<FinalRankingPublisher tournament={{ ...FINISHED, visibility: 'private' }} />);
+    expect(screen.getByText(/Der Versand aktiviert den Freigabe-Link/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Endrangliste veröffentlichen' }));
+
+    expect(await screen.findByText('Endrangliste veröffentlicht und an die Teilnehmer gesendet.')).toBeInTheDocument();
+    expect(authenticatedApi.mock.calls.map(([path]) => path)).toEqual(['/api/tournaments/t1/share-link', '/api/tournaments/t1/ranking/publish']);
+  });
+
+  it('lässt den Freigabe-Link ohne Versand aus', async () => {
+    authenticatedApi.mockResolvedValue({});
+    render(<FinalRankingPublisher tournament={{ ...FINISHED, visibility: 'private' }} />);
+
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(screen.queryByText(/Der Versand aktiviert den Freigabe-Link/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Endrangliste veröffentlichen' }));
+
+    expect(await screen.findByText('Endrangliste veröffentlicht.')).toBeInTheDocument();
+    expect(authenticatedApi.mock.calls.map(([path]) => path)).toEqual(['/api/tournaments/t1/ranking/publish']);
+  });
+
   it('veröffentlicht ohne Versand, wenn die Checkbox aus ist', async () => {
     authenticatedApi.mockResolvedValue({});
     render(<FinalRankingPublisher tournament={{ ...FINISHED, rankingPublishedAt: '2026-10-14T18:00:00.000Z' }} />);
