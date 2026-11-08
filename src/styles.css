@@ -2166,8 +2166,7 @@ a.left-panel-link {
   align-items: start;
 }
 
-.display-current-round,
-.schedule-stage {
+.display-current-round {
   display: grid;
   gap: 8px;
 }
@@ -2175,22 +2174,6 @@ a.left-panel-link {
 .display-columns h2 {
   margin: 0 0 8px;
   font-size: 1.3em;
-}
-
-.schedule-stage h3 {
-  margin: 8px 0 0;
-  font-size: 1rem;
-}
-
-.schedule-match-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16em), 1fr));
-  gap: 8px;
-}
-
-.schedule-match-grid > .data-row {
-  height: 100%;
-  margin: 0;
 }
 
 /* Runde und Rangliste nebeneinander, sobald beide genug Platz haben (die Rangliste braucht ~46em ohne seitliches
@@ -4251,10 +4234,26 @@ a.left-panel-link {
 /* Runde eines beendeten Turniers als Tabelle, Farben wie die Spielrunde im Hauptprojekt (Standard der Konfiguration:
    Kopf e6ebf4, Zeilen abwechselnd c0d6f7/e1e9f7, dünne Rahmen, fette Linie unter dem Kopf). */
 .round-table {
-  width: calc(100% - 40px);
-  margin: 0 20px 20px;
+  width: 100%;
   border-collapse: collapse;
   color: #172033;
+}
+
+/* Im zuklappbaren Rundenpanel mit Innenabstand wie der übrige Panelinhalt. */
+.play-round .round-table {
+  width: calc(100% - 40px);
+  margin: 0 20px 20px;
+}
+
+.schedule-past-rounds {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.schedule-past-rounds h2 {
+  margin: 0;
+  font-size: 1.3em;
 }
 
 .round-table th,
@@ -4289,9 +4288,12 @@ a.left-panel-link {
 
 @media (max-width: 560px) {
   .round-table {
+    font-size: 0.9rem;
+  }
+
+  .play-round .round-table {
     width: calc(100% - 24px);
     margin: 0 12px 12px;
-    font-size: 0.9rem;
   }
 
   .round-table th,
@@ -4869,11 +4871,6 @@ details[open] > .play-round-summary::before {
 
 .live-history-court {
   display: block;
-  font-size: 0.85rem;
-}
-
-.play-schedule-court {
-  color: #53627a;
   font-size: 0.85rem;
 }
 

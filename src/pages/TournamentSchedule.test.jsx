@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from 'vitest';
-import { act, render as renderBase, screen, waitFor } from '@testing-library/react';
+import { act, render as renderBase, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { normalizeRanking } from '../lib/live-ranking.js';
 import { TournamentSchedule } from './TournamentDetailPage.jsx';
@@ -21,6 +21,15 @@ function mockSchedule({ rounds = [], ranking = [], ...rest }) {
     : Promise.resolve(jsonResponse({}))));
 }
 
+// Bildschirm vor Ort im Querformat (DISPLAY_FIT_QUERY): Runde und Rangliste laufen durch, keine früheren Runden.
+// jsdom kennt matchMedia nicht; der Stub gilt für den einen Test (afterEach räumt ihn weg).
+function asLandscapeScreen() {
+  window.matchMedia = vi.fn((query) => ({ matches: query.includes('landscape'), media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+}
+
+const roundRows = (container) => within(container.querySelector('.display-current-round table')).getAllByRole('row').slice(1)
+  .map((row) => [...row.cells].map((cell) => cell.textContent));
+
 const anna = { id: 'p1', firstName: 'Anna', lastName: 'Muster' };
 const bert = { id: 'p2', firstName: 'Bert', lastName: 'Beispiel' };
 const clara = { id: 'p3', firstName: 'Clara', lastName: 'Klar' };
@@ -29,6 +38,7 @@ const dieter = { id: 'p4', firstName: 'Dieter', lastName: 'Damm' };
 describe('TournamentSchedule (öffentliche Ansicht)', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    delete window.matchMedia;
   });
 
   it('zeigt einen Hinweis, solange noch keine Runde existiert', async () => {
@@ -64,11 +74,11 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
 
     render(<TournamentSchedule tournamentId="t1" language="de" tournament={{ type: 'jeder_gegen_jeden', desktopExecution: true, documentManaged: true }} />);
 
-    expect(await screen.findByRole('heading', { name: 'Poule A' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Poule B' })).toBeInTheDocument();
-    expect(screen.getByText('A3')).toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'Runde 1' });
+    // Runde als Tabelle wie die Spielrunde im Hauptprojekt, mit Bahn und Stufe aus dem Dokument.
+    expect(roundRows(document)).toEqual([['A3', 'Poule A', 'Anna Muster', 'Bert Beispiel', '13', '7'], ['4', 'Poule B', 'Clara Klar', 'Dieter Damm', '–', '–']]);
     expect(screen.getByText(/Turnierdaten vom/)).toBeInTheDocument();
-    expect(screen.getAllByRole('columnheader').map((cell) => cell.textContent))
+    expect(within(document.querySelector('.display-ranking')).getAllByRole('columnheader').map((cell) => cell.textContent))
       .toEqual(['Platz', 'Team', 'Spiele', 'Punkte', '+', 'Δ', '+', '−', 'Δ']);
     expect(screen.getByRole('columnheader', { name: 'Punkte Δ' })).toBeInTheDocument();
     const row = screen.getAllByRole('cell', { name: 'Anna Muster' }).at(-1).closest('tr');
@@ -83,7 +93,8 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
 
     render(<TournamentSchedule tournamentId="t1" language="de" />);
 
-    expect(await screen.findByText('13:7')).toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'Runde 1' });
+    expect(roundRows(document)).toEqual([['Anna Muster', 'Bert Beispiel', '13', '7']]);
     const ranglisteRow = (await screen.findAllByRole('cell', { name: 'Anna Muster' })).at(-1).closest('tr');
     expect(ranglisteRow).toHaveTextContent('13');
     expect(ranglisteRow).toHaveTextContent('7');
@@ -100,14 +111,15 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
       ranking: [{ rank: 1, playerId: 'p1', firstName: 'Anna', lastName: 'Muster', wins: 1, gameDiff: 1, pointsFor: 13, pointsAgainst: 11 }],
     });
 
+    asLandscapeScreen();
     render(<TournamentSchedule tournamentId="t1" language="de" display />);
 
     expect(await screen.findByRole('heading', { name: 'Runde 2' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Rangliste' })).toBeInTheDocument();
-    // Kein Turnierverlauf: vergangene Runden gehören nicht auf die Anzeige.
-    expect(screen.queryByRole('heading', { name: 'Turnierverlauf' })).not.toBeInTheDocument();
-    expect(screen.queryByText('13:11')).not.toBeInTheDocument();
+    // Bildschirm vor Ort: frühere Runden gehören nicht auf die Anzeige.
+    expect(screen.queryByRole('heading', { name: 'Vergangene Runden' })).not.toBeInTheDocument();
     expect(document.querySelector('details')).toBeNull();
+    expect(roundRows(document)).toEqual([['Anna Muster', 'Bert Beispiel', '–', '–']]);
     // Runde und Rangliste je in einem eigenen Scrollbereich (Auto-Scroll auf dem Bildschirm vor Ort).
     expect(document.querySelectorAll('.display-scroll')).toHaveLength(2);
     expect(screen.queryAllByRole('button')).toEqual([]);
@@ -134,7 +146,7 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     expect(document.querySelector('.display-columns.has-ranking')).toBeNull();
   });
 
-  it('zeigt nur die aktuelle Runde ohne vergangene Runden und kennzeichnet offene sowie nicht angetretene Partien', async () => {
+  it('zeigt die aktuelle Runde als Tabelle und frühere Runden zugeklappt, mit offenen und nicht angetretenen Partien', async () => {
     mockSchedule({
       rounds: [
         { id: 'r1', roundNumber: 1, matches: [{ id: 'm1', teamA: [anna], teamB: [clara], scoreA: 13, scoreB: 11, noShow: null }] },
@@ -149,14 +161,18 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
       ],
     });
 
-    render(<TournamentSchedule tournamentId="t1" language="de" />);
+    render(<TournamentSchedule tournamentId="t1" language="de" display />);
 
     expect(await screen.findByRole('heading', { name: 'Runde 2' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Runde 1' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Vergangene Runden' })).not.toBeInTheDocument();
-    expect(screen.queryByText('13:11')).not.toBeInTheDocument();
-    expect(screen.getByText('Offen')).toBeInTheDocument();
-    expect(screen.getByText('Nicht angetreten')).toBeInTheDocument();
+    expect(roundRows(document)).toEqual([['Anna Muster', 'Bert Beispiel', '–', '–'], ['Clara Klar', 'Dieter Damm', 'Nicht angetreten']]);
+
+    // Handy bzw. normale Ansicht: frühere Runden zum Nachschauen, zugeklappt und als Tabelle.
+    expect(screen.getByRole('heading', { name: 'Vergangene Runden' })).toBeInTheDocument();
+    const past = document.querySelectorAll('.schedule-past-rounds details');
+    expect(past).toHaveLength(1);
+    expect(past[0].open).toBe(false);
+    expect(past[0].querySelector('summary')).toHaveTextContent('Runde 1');
+    expect(within(past[0]).getAllByRole('row')[1]).toHaveTextContent('Anna MusterClara Klar1311');
   });
 
   it('lädt sofort neu, wenn der WebSocket eine Änderung meldet, und zeigt „Live“', async () => {

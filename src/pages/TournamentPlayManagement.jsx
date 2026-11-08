@@ -21,6 +21,7 @@ import { RegistrationPlayerPicker } from '../components/RegistrationPlayerPicker
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { PHONE_QUERY, useMediaQuery, useTournamentLiveSocket } from '../lib/hooks.js';
 import { QrImageShare } from '../components/TournamentQrPanel.jsx';
+import { RoundTable } from '../components/RoundTable.jsx';
 import { DEFAULT_QR_DESIGN } from '../lib/qr-design.js';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
@@ -289,45 +290,6 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, o
         </>
       ) : <div className="play-match-list">{round.matches.map(matchRow)}</div>}
     </>
-  );
-}
-
-// Beendetes Turnier: Runde nur noch zum Nachlesen, als Tabelle wie die Spielrunde im Hauptprojekt (Team A | Team B |
-// Ergebnis, abwechselnde Zeilenfarben). Ergebnisse ändert man erst nach „Turnier wieder aufnehmen“.
-function RoundTable({ round }) {
-  const { t } = useTranslation();
-  const hasCourt = round.matches.some((match) => match.court);
-  const hasStage = round.matches.some((match) => match.stageLabel);
-  return (
-    <div className="table-scroll">
-      <table className="round-table">
-        <thead>
-          <tr>
-            {hasCourt && <th scope="col">{t('Bahn')}</th>}
-            {hasStage && <th scope="col">{t('Stufe')}</th>}
-            <th scope="col">{t('Team A')}</th>
-            <th scope="col">{t('Team B')}</th>
-            <th scope="col" colSpan={2}>{t('Ergebnis')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {round.matches.map((match) => (
-            <tr key={match.id}>
-              {hasCourt && <td className="round-table-number" data-i18n-skip>{match.court || ''}</td>}
-              {hasStage && <td data-i18n-skip>{match.stageLabel || ''}</td>}
-              <td data-i18n-skip>{teamLabel(match.teamA)}</td>
-              {match.teamB?.length ? <td data-i18n-skip>{teamLabel(match.teamB)}</td> : <td className="muted">{t('Freilos')}</td>}
-              {match.noShow
-                ? <td colSpan={2}>{t('Nicht angetreten')}</td>
-                : <>
-                  <td className="round-table-number">{match.scoreA ?? '–'}</td>
-                  <td className="round-table-number">{match.scoreB ?? '–'}</td>
-                </>}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 

@@ -17,7 +17,7 @@ import { StandalonePageHeader } from '../components/layout.jsx';
 import { TournamentPlayerListings } from '../components/TournamentPlayerListings.jsx';
 import { PublicRegistrationPanel } from '../App.jsx';
 import { RegistrationOpeningReminder, TournamentRegistrationAction } from '../components/TournamentRegistrationAction.jsx';
-import { CourtLabel } from '../components/CourtLabel.jsx';
+import { RoundTable } from '../components/RoundTable.jsx';
 import { TournamentQrPanel } from '../components/TournamentQrPanel.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
@@ -444,22 +444,6 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
   );
 }
 
-function playerLabel(player) {
-  if (player.teamLabel) return player.teamLabel;
-  return [player.firstName, player.lastName].filter(Boolean).join(' ') || player.id;
-}
-
-/** Partien einer Runde, gruppiert nach Stufe (Poule, Turnierbaum-Runde, Gruppe) in der übertragenen Reihenfolge. */
-function matchesByStage(matches) {
-  const groups = new Map();
-  for (const match of matches) {
-    const stage = match.stageLabel || '';
-    if (!groups.has(stage)) groups.set(stage, []);
-    groups.get(stage).push(match);
-  }
-  return [...groups.entries()];
-}
-
 /**
  * Öffentlicher Spielplan: aktuelle Runde und Rangliste – für online durchgeführte Turniere wie für Turniere, die ein
  * verbundenes Turnierdokument führt (dann mit Bahn, Stufe und Rangliste aus dem Dokument).
@@ -690,7 +674,7 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
         <section className="display-current-round">
           <h2>{t('Runde')} {currentRound.roundNumber}</h2>
           <div className="display-scroll" ref={roundScrollRef}>
-            <ScheduleRoundMatches round={currentRound} />
+            <RoundTable round={currentRound} />
           </div>
         </section>
         {showRanking && (
@@ -704,32 +688,23 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
           </section>
         )}
       </div>
+      {/* Frühere Runden zum Nachschauen (Handy, normale Ansicht), zugeklappt; auf dem Bildschirm vor Ort läuft nur die
+          aktuelle Runde. */}
+      {!autoScroll && rounds.length > 1 && (
+        <section className="schedule-past-rounds">
+          <h2>{t('Vergangene Runden')}</h2>
+          {rounds.slice(0, -1).reverse().map((round) => (
+            <details key={round.id} className="panel play-round">
+              <summary className="play-round-summary"><span>{t('Runde')} {round.roundNumber}</span><span className="counter">{round.matches.length}</span></summary>
+              <RoundTable round={round} />
+            </details>
+          ))}
+        </section>
+      )}
       {/* Unten rechts: Der Bildschirm vor Ort füllt die Höhe, die Zeile steht dort ohne Scrollen am unteren Rand. */}
       {refresh}
     </div>
   );
-}
-
-function ScheduleRoundMatches({ round }) {
-  const { t } = useTranslation();
-  return matchesByStage(round.matches).map(([stage, matches]) => (
-    <section key={stage || 'ohne-stufe'} className="schedule-stage">
-      {stage && <h3 data-i18n-skip>{stage}</h3>}
-      <div className="schedule-match-grid">
-        {matches.map((match) => (
-          <article className="data-row" key={match.id}>
-            <div>
-              <CourtLabel court={match.court} className="play-schedule-court" />
-              <strong>{match.teamA.map(playerLabel).join(' + ')}</strong>
-              <span>{match.teamB.length ? t('gegen') : t('Freilos')}</span>
-              <strong>{match.teamB.map(playerLabel).join(' + ')}</strong>
-            </div>
-            <div>{match.noShow ? t('Nicht angetreten') : match.scoreA != null ? `${match.scoreA}:${match.scoreB}` : t('Offen')}</div>
-          </article>
-        ))}
-      </div>
-    </section>
-  ));
 }
 
 export function TournamentDetailPage({
