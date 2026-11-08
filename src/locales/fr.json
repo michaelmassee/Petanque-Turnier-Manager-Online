@@ -1894,5 +1894,15 @@
   "Die Statusmail ist an {{email}} unterwegs.": "L’e-mail de statut est en route vers {{email}}.",
   "Tägliche Statusmail": "E-mail de statut quotidien",
   "Geht täglich um 01:00 UTC an alle Admins. Der Testversand geht nur an dich, deckt die letzten 24 Stunden ab und ändert nichts am regulären Versand.": "Envoyé chaque jour à 01:00 UTC à tous les administrateurs. Le test n’est envoyé qu’à vous, couvre les dernières 24 heures et ne modifie pas l’envoi régulier.",
-  "Statusmail jetzt an mich senden": "M’envoyer l’e-mail de statut maintenant"
+  "Statusmail jetzt an mich senden": "M’envoyer l’e-mail de statut maintenant",
+  "Bitte wählen …": "Veuillez choisir …",
+  "ohne Auswahl": "sans choix",
+  "Fragetyp": "Type de question",
+  "Ankreuzen": "Case à cocher",
+  "Auswahl (Pflicht)": "Choix (obligatoire)",
+  "Bei der Anmeldung wählt jeder Spieler genau einen Eintrag. Die Meldeliste zählt die Auswahl, z. B. für den Einkauf.": "À l’inscription, chaque joueur choisit exactement une entrée. La liste des inscriptions compte les choix, p. ex. pour les achats.",
+  "Eintrag": "Entrée",
+  "Eintrag entfernen": "Supprimer l’entrée",
+  "Eintrag hinzufügen": "Ajouter une entrée",
+  "Bitte beantworte alle Auswahlfragen.": "Veuillez répondre à toutes les questions à choix."
 }

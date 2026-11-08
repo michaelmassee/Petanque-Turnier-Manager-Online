@@ -132,6 +132,23 @@ describe('Turnier-Payload', () => {
     expect(screen.getByText(/Frage 1 \(12\/250\)/)).toBeInTheDocument();
   });
 
+  it('legt Auswahlfragen mit Einträgen an', () => {
+    function Harness() {
+      const [form, setForm] = useState({ ...EMPTY_TOURNAMENT_FORM, registrationEnabled: true, registrationQuestions: [{ id: 'q1', label: 'Essen' }] });
+      return <TournamentForm form={form} setForm={setForm} onSubmit={(event) => event.preventDefault()} onCancel={() => {}} mode="create" language="de" />;
+    }
+    render(<Harness />);
+
+    fireEvent.change(screen.getByLabelText(/^Fragetyp/), { target: { value: 'choice' } });
+    expect(screen.getAllByLabelText(/^Eintrag \d/)).toHaveLength(2);
+    // Mindestens zwei Einträge: entfernen erst ab dem dritten.
+    screen.getAllByRole('button', { name: 'Eintrag entfernen' }).forEach((button) => expect(button).toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Eintrag hinzufügen' }));
+    expect(screen.getAllByLabelText(/^Eintrag \d/)).toHaveLength(3);
+    fireEvent.change(screen.getByLabelText(/^Fragetyp/), { target: { value: 'checkbox' } });
+    expect(screen.queryByLabelText(/^Eintrag \d/)).not.toBeInTheDocument();
+  });
+
   it('kennzeichnet Kalendereinträge unabhängig vom Turnierstatus als Kalendereintrag', () => {
     expect(registrationStatusLabel({ status: 'running', registrationEnabled: false }, 'de')).toBe('Kalendereintrag');
     expect(registrationStatusLabel({ status: 'registration', registrationEnabled: false }, 'de')).toBe('Kalendereintrag');

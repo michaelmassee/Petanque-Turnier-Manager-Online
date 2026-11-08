@@ -2767,6 +2767,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
             teamNameEnabled={tournament.teamNameEnabled}
             feeTiers={tournament.feeTiers}
             registrationQuestions={tournament.registrationQuestions}
+            requireChoices
             currency={tournament.currency}
             invalidField={invalidField}
             clubNames={clubNames}

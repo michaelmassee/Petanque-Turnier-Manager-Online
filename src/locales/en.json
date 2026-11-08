@@ -1894,5 +1894,15 @@
   "Die Statusmail ist an {{email}} unterwegs.": "The status email is on its way to {{email}}.",
   "Tägliche Statusmail": "Daily status email",
   "Geht täglich um 01:00 UTC an alle Admins. Der Testversand geht nur an dich, deckt die letzten 24 Stunden ab und ändert nichts am regulären Versand.": "Sent daily at 01:00 UTC to all admins. The test goes only to you, covers the last 24 hours and does not affect the regular delivery.",
-  "Statusmail jetzt an mich senden": "Send status email to me now"
+  "Statusmail jetzt an mich senden": "Send status email to me now",
+  "Bitte wählen …": "Please choose …",
+  "ohne Auswahl": "no choice",
+  "Fragetyp": "Question type",
+  "Ankreuzen": "Checkbox",
+  "Auswahl (Pflicht)": "Choice (required)",
+  "Bei der Anmeldung wählt jeder Spieler genau einen Eintrag. Die Meldeliste zählt die Auswahl, z. B. für den Einkauf.": "When registering, each player picks exactly one entry. The registration list counts the choices, e.g. for shopping.",
+  "Eintrag": "Entry",
+  "Eintrag entfernen": "Remove entry",
+  "Eintrag hinzufügen": "Add entry",
+  "Bitte beantworte alle Auswahlfragen.": "Please answer all choice questions."
 }

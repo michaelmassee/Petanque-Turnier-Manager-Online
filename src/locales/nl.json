@@ -1894,5 +1894,15 @@
   "Die Statusmail ist an {{email}} unterwegs.": "De statusmail is onderweg naar {{email}}.",
   "Tägliche Statusmail": "Dagelijkse statusmail",
   "Geht täglich um 01:00 UTC an alle Admins. Der Testversand geht nur an dich, deckt die letzten 24 Stunden ab und ändert nichts am regulären Versand.": "Wordt dagelijks om 01:00 UTC naar alle beheerders verzonden. De test gaat alleen naar jou, beslaat de afgelopen 24 uur en verandert niets aan de normale verzending.",
-  "Statusmail jetzt an mich senden": "Statusmail nu naar mij sturen"
+  "Statusmail jetzt an mich senden": "Statusmail nu naar mij sturen",
+  "Bitte wählen …": "Maak een keuze …",
+  "ohne Auswahl": "geen keuze",
+  "Fragetyp": "Vraagtype",
+  "Ankreuzen": "Aanvinken",
+  "Auswahl (Pflicht)": "Keuze (verplicht)",
+  "Bei der Anmeldung wählt jeder Spieler genau einen Eintrag. Die Meldeliste zählt die Auswahl, z. B. für den Einkauf.": "Bij het aanmelden kiest elke speler precies één optie. De inschrijvingslijst telt de keuzes, bijv. voor de inkoop.",
+  "Eintrag": "Optie",
+  "Eintrag entfernen": "Optie verwijderen",
+  "Eintrag hinzufügen": "Optie toevoegen",
+  "Bitte beantworte alle Auswahlfragen.": "Beantwoord alle keuzevragen."
 }

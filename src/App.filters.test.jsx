@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterApiKeys, filterRegistrations, filterTournaments, filterUsers, sortUsers } from './frontend-core.js';
+import { filterApiKeys, filterRegistrations, registrationChoiceSummary, filterTournaments, filterUsers, sortUsers } from './frontend-core.js';
 import { currencyDecimals } from './currencies.js';
 
 const tournaments = [
@@ -59,6 +59,30 @@ describe('filterRegistrations', () => {
     expect(filterRegistrations(detailedRegistrations, '', '', { organizerMessageFilter: 'with_message', questionFilter: 'meal', feeFilter: 'member' })).toEqual([detailedRegistrations[0]]);
     expect(filterRegistrations([...detailedRegistrations, { id: 'r3', firstName: null, lastName: '', teamName: null, status: 'pending', registrationAnswers: [{ questionId: 'meal', checked: false }]}], '', '', { questionFilter: 'meal' })).toEqual([detailedRegistrations[0]]);
     expect(filterRegistrations([...detailedRegistrations, { id: 'r3', firstName: null, lastName: '', teamName: null, status: 'pending' }], 'unbekannt', '', { organizerMessageFilter: 'unknown', questionFilter: 'unknown', feeFilter: 'unknown' })).toEqual([]);
+  });
+
+  it('filtert Auswahlfragen pro Eintrag', () => {
+    const choice = [
+      { ...registrations[0], registrationAnswers: [{ questionId: 'essen', participant: 'primary', optionId: 'veggie' }] },
+      { ...registrations[1], registrationAnswers: [{ questionId: 'essen', participant: 'primary', optionId: 'nichts' }] },
+    ];
+    expect(filterRegistrations(choice, '', '', { questionFilter: 'essen:veggie' })).toEqual([choice[0]]);
+    expect(filterRegistrations(choice, '', '', { questionFilter: 'essen' })).toEqual([]);
+  });
+
+  it('zählt die Auswahl pro Spieler offener und bestätigter Meldungen', () => {
+    const questions = [
+      { id: 'essen', label: 'Essen', type: 'choice', options: [{ id: 'veggie', label: 'Vegetarisch' }, { id: 'nichts', label: 'Nichts' }] },
+      { id: 'shirt', label: 'T-Shirt?' },
+    ];
+    const summary = registrationChoiceSummary([
+      { status: 'confirmed', partnerFirstName: 'Bert', registrationAnswers: [{ questionId: 'essen', participant: 'primary', optionId: 'veggie' }, { questionId: 'essen', participant: 'partner', optionId: 'veggie' }] },
+      { status: 'pending', registrationAnswers: [{ questionId: 'essen', participant: 'primary', optionId: 'nichts' }] },
+      { status: 'confirmed', partnerLastName: 'Berg', registrationAnswers: [] },
+      { status: 'waitlist', registrationAnswers: [{ questionId: 'essen', participant: 'primary', optionId: 'veggie' }] },
+      { status: 'cancelled', registrationAnswers: [{ questionId: 'essen', participant: 'primary', optionId: 'veggie' }] },
+    ], questions);
+    expect(summary).toEqual([{ id: 'essen', label: 'Essen', open: 2, options: [{ id: 'veggie', label: 'Vegetarisch', count: 2 }, { id: 'nichts', label: 'Nichts', count: 1 }] }]);
   });
 
   it('filtert nach VIP', () => {

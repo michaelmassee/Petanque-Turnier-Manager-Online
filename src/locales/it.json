@@ -1972,5 +1972,15 @@
   "Die Statusmail ist an {{email}} unterwegs.": "L’e-mail di stato è in arrivo a {{email}}.",
   "Tägliche Statusmail": "E-mail di stato giornaliera",
   "Geht täglich um 01:00 UTC an alle Admins. Der Testversand geht nur an dich, deckt die letzten 24 Stunden ab und ändert nichts am regulären Versand.": "Inviata ogni giorno alle 01:00 UTC a tutti gli amministratori. Il test arriva solo a te, copre le ultime 24 ore e non modifica l’invio regolare.",
-  "Statusmail jetzt an mich senden": "Inviami ora l’e-mail di stato"
+  "Statusmail jetzt an mich senden": "Inviami ora l’e-mail di stato",
+  "Bitte wählen …": "Scegli …",
+  "ohne Auswahl": "senza scelta",
+  "Fragetyp": "Tipo di domanda",
+  "Ankreuzen": "Casella di spunta",
+  "Auswahl (Pflicht)": "Scelta (obbligatoria)",
+  "Bei der Anmeldung wählt jeder Spieler genau einen Eintrag. Die Meldeliste zählt die Auswahl, z. B. für den Einkauf.": "All’iscrizione ogni giocatore sceglie esattamente una voce. L’elenco iscrizioni conta le scelte, ad es. per la spesa.",
+  "Eintrag": "Voce",
+  "Eintrag entfernen": "Rimuovi voce",
+  "Eintrag hinzufügen": "Aggiungi voce",
+  "Bitte beantworte alle Auswahlfragen.": "Rispondi a tutte le domande a scelta."
 }

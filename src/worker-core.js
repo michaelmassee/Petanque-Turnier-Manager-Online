@@ -39,9 +39,21 @@ function normalizeRegistrationQuestions(value) {
   return value.map((question) => {
     const id = text(question?.id);
     const label = text(question?.label);
-    if (!id || ids.has(id) || label.length < 2 || label.length > 250) throw new HttpError(400, 'Ungültige Teilnehmerfragen');
+    const type = question?.type === undefined || question?.type === 'checkbox' ? 'checkbox' : question?.type;
+    if (!id || ids.has(id) || label.length < 2 || label.length > 250 || !['checkbox', 'choice'].includes(type)) throw new HttpError(400, 'Ungültige Teilnehmerfragen');
     ids.add(id);
-    return { id, label };
+    if (type === 'checkbox') return { id, label };
+    // Auswahlfrage: genau ein Eintrag pro Spieler (z. B. Essen: Schinken, Vegetarisch, Nichts).
+    if (!Array.isArray(question.options) || question.options.length < 2 || question.options.length > 20) throw new HttpError(400, 'Ungültige Teilnehmerfragen');
+    const optionIds = new Set();
+    const options = question.options.map((option) => {
+      const optionId = text(option?.id);
+      const optionLabel = text(option?.label);
+      if (!optionId || optionIds.has(optionId) || optionLabel.length < 1 || optionLabel.length > 80) throw new HttpError(400, 'Ungültige Teilnehmerfragen');
+      optionIds.add(optionId);
+      return { id: optionId, label: optionLabel };
+    });
+    return { id, label, type, options };
   });
 }
 function nullableCoordinate(value, min, max) { if (value === undefined || value === null || value === '') return null; const number = Number(value); if (!Number.isFinite(number) || number < min || number > max) throw new HttpError(400, 'Ungültige Koordinate'); return number; }

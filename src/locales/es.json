@@ -1894,5 +1894,15 @@
   "Die Statusmail ist an {{email}} unterwegs.": "El correo de estado va de camino a {{email}}.",
   "Tägliche Statusmail": "Correo de estado diario",
   "Geht täglich um 01:00 UTC an alle Admins. Der Testversand geht nur an dich, deckt die letzten 24 Stunden ab und ändert nichts am regulären Versand.": "Se envía cada día a las 01:00 UTC a todos los administradores. La prueba solo te llega a ti, cubre las últimas 24 horas y no afecta al envío habitual.",
-  "Statusmail jetzt an mich senden": "Enviarme ahora el correo de estado"
+  "Statusmail jetzt an mich senden": "Enviarme ahora el correo de estado",
+  "Bitte wählen …": "Elige …",
+  "ohne Auswahl": "sin elección",
+  "Fragetyp": "Tipo de pregunta",
+  "Ankreuzen": "Casilla",
+  "Auswahl (Pflicht)": "Selección (obligatoria)",
+  "Bei der Anmeldung wählt jeder Spieler genau einen Eintrag. Die Meldeliste zählt die Auswahl, z. B. für den Einkauf.": "Al inscribirse, cada jugador elige exactamente una opción. La lista de inscripciones cuenta las elecciones, p. ej. para la compra.",
+  "Eintrag": "Opción",
+  "Eintrag entfernen": "Quitar opción",
+  "Eintrag hinzufügen": "Añadir opción",
+  "Bitte beantworte alle Auswahlfragen.": "Responde a todas las preguntas de selección."
 }

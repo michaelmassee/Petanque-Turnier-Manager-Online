@@ -390,6 +390,20 @@ a.button {
   justify-self: start;
 }
 
+/* Jede Teilnehmerfrage als eigener Block, damit die Einträge einer Auswahlfrage erkennbar zu ihr gehören. */
+.registration-question-editor {
+  border-top: 1px solid #e2e7f0;
+  padding-top: 12px;
+}
+
+/* Zählung der Auswahlfragen in der Meldeliste (z. B. Essen für den Einkauf). */
+.registration-choice-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0 0 8px;
+}
+
 /* Ältere Beschreibungen ohne Rich-Text-Format: Zeilenumbrüche aus dem früheren Textfeld bleiben sichtbar. */
 .rich-text-plain {
   white-space: pre-line;

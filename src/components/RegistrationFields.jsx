@@ -7,15 +7,31 @@ import { IntegerField, SelectField, TextField } from './ui.jsx';
 import { RegistrationPlayerPicker } from './RegistrationPlayerPicker.jsx';
 import { useClubSuggestions } from './ClubSuggestions.jsx';
 
-function ParticipantQuestions({ participant, questions, answers, onChange }) {
+// Ankreuzfragen als Checkbox, Auswahlfragen als Liste mit genau einem Eintrag. Pflicht ist die Auswahl nur bei der
+// Selbstanmeldung (requireChoices); die Turnierleitung kennt die Antwort beim Eintragen oft nicht.
+function ParticipantQuestions({ participant, questions, answers, onChange, requireChoices = false }) {
+  const { t } = useTranslation();
   if (questions.length === 0) return null;
   return (
     <div className="participant-questions">
       {questions.map((question) => {
-        const checked = answers.some((answer) => answer.participant === participant && answer.questionId === question.id && answer.checked);
+        const answer = answers.find((item) => item.participant === participant && item.questionId === question.id);
+        if (question.type === 'choice') {
+          return (
+            <div key={question.id} data-i18n-skip>
+              <SelectField
+                label={<span className="registration-question-label">{question.label}</span>}
+                value={answer?.optionId || ''}
+                onChange={(optionId) => onChange(question.id, optionId ? { optionId } : null)}
+                options={[{ value: '', label: t('Bitte wählen …') }, ...question.options.map((option) => ({ value: option.id, label: option.label }))]}
+                required={requireChoices}
+              />
+            </div>
+          );
+        }
         return (
           <label className="checkbox-field" key={question.id} data-i18n-skip>
-            <input type="checkbox" checked={checked} onChange={(event) => onChange(question.id, event.target.checked)} />
+            <input type="checkbox" checked={Boolean(answer?.checked)} onChange={(event) => onChange(question.id, event.target.checked ? { checked: true } : null)} />
             <span className="registration-question-label">{question.label}</span>
           </label>
         );
@@ -34,7 +50,7 @@ function RegistrationSection({ title, children, className = '' }) {
 }
 
 // clubNames: veröffentlichte Vereine als Vorschläge für die Vereinsfelder (Freitext bleibt möglich).
-export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, phoneRequired = false, teamNameEnabled, feeTiers = [], registrationQuestions = [], currency = 'EUR', invalidField, clubNames = [], playerSearchEnabled = false, turnstileSiteKey, tournamentId, shareToken = '', currentUserId, currentUser }) {
+export function RegistrationFields({ form, setForm, showStatus, formation, registrationType, licenseRequired, phoneRequired = false, teamNameEnabled, feeTiers = [], registrationQuestions = [], requireChoices = false, currency = 'EUR', invalidField, clubNames = [], playerSearchEnabled = false, turnstileSiteKey, tournamentId, shareToken = '', currentUserId, currentUser }) {
   const { t, i18n } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
   const clubList = clubSuggestions.listId;
@@ -91,11 +107,11 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
     ...form,
     feeSelections: [...(form.feeSelections || []).filter((selection) => selection.participant !== participant), ...(tariffId ? [{ participant, tariffId }] : [])],
   });
-  const setQuestionAnswer = (participant, questionId, checked) => setForm({
+  const setQuestionAnswer = (participant, questionId, value) => setForm({
     ...form,
     registrationAnswers: [
       ...(form.registrationAnswers || []).filter((answer) => answer.participant !== participant || answer.questionId !== questionId),
-      ...(checked ? [{ participant, questionId, checked: true }] : []),
+      ...(value ? [{ participant, questionId, ...value }] : []),
     ],
   });
   const feeOptions = (participant) => {
@@ -168,7 +184,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
       {clubSuggestions.datalist}
       <RegistrationSection title={t('Spieler 1')}>
         {names('primary')}
-        <ParticipantQuestions participant="primary" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('primary', questionId, checked)} />
+        <ParticipantQuestions participant="primary" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, value) => setQuestionAnswer('primary', questionId, value)} requireChoices={requireChoices} />
         {!(showStatus && form.noEmail) && <TextField label={t('E-Mail')} type="email" readOnly={Boolean(selections.primary)} value={form.playerEmail || ''} onChange={(playerEmail) => setForm({ ...form, playerEmail })} required />}
         <TextField label={t('Telefonnummer')} type="tel" autoComplete="tel" value={form.phone || ''} onChange={(phone) => setForm({ ...form, phone })} required={phoneRequired} invalid={invalidField === 'phone'} />
         <div className="form-grid">
@@ -180,7 +196,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
       {allowsPartner && (
         <RegistrationSection title={t('Spieler 2')}>
           {names('partner')}
-          <ParticipantQuestions participant="partner" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner', questionId, checked)} />
+          <ParticipantQuestions participant="partner" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, value) => setQuestionAnswer('partner', questionId, value)} requireChoices={requireChoices} />
           <TextField label={t('E-Mail')} type="email" readOnly={Boolean(selections.partner)} value={form.partnerEmail} onChange={(partnerEmail) => setForm({ ...form, partnerEmail })} />
           <div className="form-grid">
             <TextField label={t('Verein')} readOnly={Boolean(selections.partner)} value={form.partnerClub} onChange={(partnerClub) => setForm({ ...form, partnerClub })} list={clubList} />
@@ -193,7 +209,7 @@ export function RegistrationFields({ form, setForm, showStatus, formation, regis
         <RegistrationSection title={t('Spieler 3')}>
           <p className="hint">{t('Ein Triplette-Team kann auch zu zweit angemeldet und vor Ort vervollständigt werden.')}</p>
           {names('partner2')}
-          <ParticipantQuestions participant="partner2" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, checked) => setQuestionAnswer('partner2', questionId, checked)} />
+          <ParticipantQuestions participant="partner2" questions={registrationQuestions} answers={form.registrationAnswers || []} onChange={(questionId, value) => setQuestionAnswer('partner2', questionId, value)} requireChoices={requireChoices && Boolean(form.partner2FirstName || form.partner2LastName)} />
           <TextField label={t('E-Mail')} type="email" readOnly={Boolean(selections.partner2)} value={form.partner2Email} onChange={(partner2Email) => setForm({ ...form, partner2Email })} />
           <div className="form-grid">
             <TextField label={t('Verein')} readOnly={Boolean(selections.partner2)} value={form.partner2Club} onChange={(partner2Club) => setForm({ ...form, partner2Club })} list={clubList} />

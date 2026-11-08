@@ -86,6 +86,18 @@ describe('Worker-Fachlogik', () => {
     expect(() => normalizeTournamentInput({ ...base, registrationQuestions: Array.from({ length: 11 }, (_, index) => ({ id: `q${index}`, label: `Frage ${index}` })) })).toThrow('Teilnehmerfragen');
   });
 
+  it('normalisiert Auswahlfragen mit ihren Einträgen', () => {
+    const essen = { id: 'essen', label: 'Essen', type: 'choice', options: [{ id: 'a', label: ' Schinken ' }, { id: 'b', label: 'Nichts' }] };
+    expect(normalizeTournamentInput({ ...base, registrationQuestions: [essen, { id: 'shirt', label: 'T-Shirt?', type: 'checkbox' }] }).registrationQuestions).toEqual([
+      { id: 'essen', label: 'Essen', type: 'choice', options: [{ id: 'a', label: 'Schinken' }, { id: 'b', label: 'Nichts' }] },
+      { id: 'shirt', label: 'T-Shirt?' },
+    ]);
+    expect(() => normalizeTournamentInput({ ...base, registrationQuestions: [{ ...essen, options: [essen.options[0]] }] })).toThrow('Teilnehmerfragen');
+    expect(() => normalizeTournamentInput({ ...base, registrationQuestions: [{ ...essen, options: [essen.options[0], { id: 'a', label: 'Doppelt' }] }] })).toThrow('Teilnehmerfragen');
+    expect(() => normalizeTournamentInput({ ...base, registrationQuestions: [{ ...essen, options: [essen.options[0], { id: 'c', label: '' }] }] })).toThrow('Teilnehmerfragen');
+    expect(() => normalizeTournamentInput({ ...base, registrationQuestions: [{ ...essen, type: 'freitext' }] })).toThrow('Teilnehmerfragen');
+  });
+
   it('respektiert registrationEnabled für Kalendereinträge', () => {
     expect(normalizeTournamentInput({ ...base, registrationEnabled: false })).toMatchObject({ registrationEnabled: false });
     expect(registrationOpenStatus({ visibility: 'public', status: 'registration', registration_enabled: 0 })).toBe('closed');

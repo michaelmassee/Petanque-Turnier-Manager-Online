@@ -250,6 +250,68 @@ function venuePlaceFor(places, candidate) {
   return matches.find((place) => place.clubName) || matches[0] || null;
 }
 
+
+// Teilnehmerfrage im Turnierformular: Ankreuzen (Ja/Nein) oder Auswahl genau eines Eintrags pro Spieler, z. B. fürs Essen.
+function RegistrationQuestionEditor({ question, index, onChange, onRemove }) {
+  const { t } = useTranslation();
+  const options = question.options || [];
+  const setOptions = (nextOptions) => onChange({ ...question, options: nextOptions });
+  function setType(type) {
+    if (type === 'choice') onChange({ ...question, type, options: options.length ? options : [{ id: crypto.randomUUID(), label: '' }, { id: crypto.randomUUID(), label: '' }] });
+    else onChange({ id: question.id, label: question.label, type: 'checkbox' });
+  }
+  return (
+    <div className="form registration-question-editor">
+      <div className="form-grid">
+        <TextArea
+          label={`${t('Frage')} ${index + 1}`}
+          value={question.label}
+          onChange={(label) => onChange({ ...question, label })}
+          required
+          minLength={2}
+          maxLength={250}
+          rows={3}
+        />
+        <SelectField
+          label={t('Fragetyp')}
+          value={question.type === 'choice' ? 'choice' : 'checkbox'}
+          onChange={setType}
+          options={[{ value: 'checkbox', label: t('Ankreuzen') }, { value: 'choice', label: t('Auswahl (Pflicht)') }]}
+        />
+      </div>
+      {question.type === 'choice' && (
+        <>
+          <p className="hint">{t('Bei der Anmeldung wählt jeder Spieler genau einen Eintrag. Die Meldeliste zählt die Auswahl, z. B. für den Einkauf.')}</p>
+          {options.map((option, optionIndex) => (
+            <div className="form-grid" key={option.id}>
+              <TextField
+                label={`${t('Eintrag')} ${optionIndex + 1}`}
+                value={option.label}
+                onChange={(label) => setOptions(options.map((item, itemIndex) => itemIndex === optionIndex ? { ...item, label } : item))}
+                required
+                maxLength={80}
+              />
+              <div className="tournament-question-remove">
+                <Button type="button" variant="danger" disabled={options.length <= 2} onClick={() => setOptions(options.filter((_, itemIndex) => itemIndex !== optionIndex))}>
+                  {t('Eintrag entfernen')}
+                </Button>
+              </div>
+            </div>
+          ))}
+          <p>
+            <Button type="button" variant="secondary" disabled={options.length >= 20} onClick={() => setOptions([...options, { id: crypto.randomUUID(), label: '' }])}>
+              {t('Eintrag hinzufügen')}
+            </Button>
+          </p>
+        </>
+      )}
+      <div className="tournament-question-remove">
+        <Button type="button" variant="danger" onClick={onRemove}>{t('Frage entfernen')}</Button>
+      </div>
+    </div>
+  );
+}
+
 export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, owner, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [], clubOptions = [], formationLocked = false }) {
   const { t } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
@@ -491,26 +553,13 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             </div>
             <p className="hint">{t('Jedem Teilnehmer werden Fragestellungen angeboten')}</p>
             {(form.registrationQuestions || []).map((question, index) => (
-              <div className="form-grid" key={question.id}>
-                <TextArea
-                  label={`${t('Frage')} ${index + 1}`}
-                  value={question.label}
-                  onChange={(label) => setForm({ ...form, registrationQuestions: form.registrationQuestions.map((item, itemIndex) => itemIndex === index ? { ...item, label } : item) })}
-                  required
-                  minLength={2}
-                  maxLength={250}
-                  rows={3}
-                />
-                <div className="tournament-question-remove">
-                  <Button
-                    type="button"
-                    variant="danger"
-                    onClick={() => setForm({ ...form, registrationQuestions: form.registrationQuestions.filter((_, itemIndex) => itemIndex !== index) })}
-                  >
-                    {t('Frage entfernen')}
-                  </Button>
-                </div>
-              </div>
+              <RegistrationQuestionEditor
+                key={question.id}
+                question={question}
+                index={index}
+                onChange={(changed) => setForm({ ...form, registrationQuestions: form.registrationQuestions.map((item, itemIndex) => itemIndex === index ? changed : item) })}
+                onRemove={() => setForm({ ...form, registrationQuestions: form.registrationQuestions.filter((_, itemIndex) => itemIndex !== index) })}
+              />
             ))}
           </div>
           <div className="form-grid">

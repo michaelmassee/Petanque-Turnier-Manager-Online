@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { EMPTY_REGISTRATION_FORM, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { isCalendarEntry, labelFor, registrationPayload, translatedOptions } from '../lib/domain.js';
-import { filterRegistrations } from '../frontend-core.js';
+import { filterRegistrations, registrationChoiceSummary } from '../frontend-core.js';
 import { Feedback, Button, ListToolbar, EditDialog, AccountBadge, TextArea } from '../components/ui.jsx';
 import { RegistrationEditDialog, RegistrationForm } from '../components/RegistrationEditDialog.jsx';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
@@ -74,6 +74,7 @@ function registrationQuestionColumns(tournament, t) {
   return (tournament?.registrationQuestions || []).flatMap((question) => roles.map((participant) => ({
     key: `${question.id}:${participant}`,
     label: `${question.label} (${roleLabels[participant]})`,
+    options: question.type === 'choice' ? question.options : null,
   })));
 }
 
@@ -108,9 +109,11 @@ export function registrationsToCsv(registrations, tournament, t, { namesOnly = f
       if (column === 'feeTotalCents') return csvField(registration.feeSelections?.length ? formatMoney(registration.feeTotalCents, currency, 'de') : '');
       return csvField(registration[column]);
     });
-    const questionValues = questionColumns.map((column) => csvField(
-      (registration.registrationAnswers || []).some((answer) => `${answer.questionId}:${answer.participant}` === column.key) ? t('Ja') : t('Nein'),
-    ));
+    const questionValues = questionColumns.map((column) => {
+      const answer = (registration.registrationAnswers || []).find((item) => `${item.questionId}:${item.participant}` === column.key);
+      if (column.options) return csvField(column.options.find((option) => option.id === answer?.optionId)?.label || '');
+      return csvField(answer?.checked ? t('Ja') : t('Nein'));
+    });
     lines.push([...standardColumns, ...questionValues].join(','));
   }
   return `﻿${lines.join('\r\n')}\r\n`;
@@ -140,11 +143,16 @@ function downloadRegistrationsCsv(tournament, registrations, t, options) {
 function RegistrationDetails({ registration, tournament }) {
   const { t, i18n } = useTranslation();
   const participantLabel = { primary: t('Hauptspieler'), partner: t('Partner'), partner2: t('Partner 2') };
+  // Ankreuzfrage: „Frage: Hauptspieler, Partner“; Auswahlfrage: „Frage: Vegetarisch (Hauptspieler), Nichts (Partner)“.
   const answersByQuestion = (tournament?.registrationQuestions || []).map((question) => ({
     ...question,
     participants: (registration.registrationAnswers || [])
-      .filter((answer) => answer.questionId === question.id)
-      .map((answer) => participantLabel[answer.participant])
+      .filter((answer) => answer.questionId === question.id && participantLabel[answer.participant])
+      .map((answer) => {
+        if (question.type !== 'choice') return participantLabel[answer.participant];
+        const option = question.options.find((item) => item.id === answer.optionId);
+        return option ? `${option.label} (${participantLabel[answer.participant]})` : null;
+      })
       .filter(Boolean),
   })).filter((question) => question.participants.length > 0);
   const hasMessage = Boolean(registration.organizerMessage);
@@ -189,7 +197,7 @@ function RegistrationDetails({ registration, tournament }) {
             <h4>{t('Teilnehmerfragen')}</h4>
             <ul>
               {answersByQuestion.map((question) => (
-                <li key={question.id}><span className="registration-question-label" data-i18n-skip>{question.label}</span>: {question.participants.join(', ')}</li>
+                <li key={question.id}><span className="registration-question-label" data-i18n-skip>{question.label}</span>: <span data-i18n-skip>{question.participants.join(', ')}</span></li>
               ))}
             </ul>
           </section>
@@ -389,7 +397,10 @@ export function RegistrationsPanel({
   const otherRegistrations = filteredRegistrations.filter((registration) => registration.status !== 'pending');
   const visiblePendingRegistrations = useInfiniteList(pendingRegistrations);
   const visibleOtherRegistrations = useInfiniteList(otherRegistrations);
-  const questionOptions = (tournament?.registrationQuestions || []).map((question) => ({ value: question.id, label: question.label }));
+  const questionOptions = (tournament?.registrationQuestions || []).flatMap((question) => (question.type === 'choice'
+    ? question.options.map((option) => ({ value: `${question.id}:${option.id}`, label: `${question.label}: ${option.label}` }))
+    : [{ value: question.id, label: question.label }]));
+  const choiceSummary = registrationChoiceSummary(registrations, tournament?.registrationQuestions);
   const feeOptions = [...new Map(registrations.flatMap((registration) => (registration.feeSelections || []).map((selection) => [selection.tariffId, selection.name]))).entries()]
     .filter(([id, name]) => id && name)
     .map(([value, label]) => ({ value, label }));
@@ -467,6 +478,13 @@ export function RegistrationsPanel({
         onReset={onResetFilters}
         resetDisabled={!filtered}
       />
+      {choiceSummary.map((question) => (
+        <p className="registration-choice-summary" key={question.id}>
+          <strong className="registration-question-label" data-i18n-skip>{question.label}:</strong>
+          {question.options.map((option) => <span key={option.id}><span data-i18n-skip>{option.label}</span> {option.count}</span>)}
+          {question.open > 0 && <span className="muted">{t('ohne Auswahl')} {question.open}</span>}
+        </p>
+      ))}
       {pendingRegistrations.length > 0 && (
         <section className="user-list registration-list" aria-label={t('Offene Anmeldungen')}>
           <div className="section-title">

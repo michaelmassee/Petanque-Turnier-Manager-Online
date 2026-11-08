@@ -181,7 +181,9 @@ export function tournamentPayload(form) {
       amountCents: amountToMinorUnits(tier.amount, form.currency || 'EUR'),
       active: tier.active !== false,
     })),
-    registrationQuestions: (form.registrationQuestions || []).map((question) => ({ id: question.id, label: question.label })),
+    registrationQuestions: (form.registrationQuestions || []).map((question) => (question.type === 'choice'
+      ? { id: question.id, label: question.label, type: 'choice', options: (question.options || []).map((option) => ({ id: option.id, label: option.label })) }
+      : { id: question.id, label: question.label })),
     currency: form.currency || 'EUR',
     contactName: form.contactName || null,
     contactEmail: form.contactEmail || null,

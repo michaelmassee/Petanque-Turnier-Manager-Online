@@ -9100,7 +9100,7 @@ export async function createRegistration(request, env, tournament, {
   const language = normalizeLanguage(body.language);
   assertCorePartnerCountMatchesFormation(tournament, registration);
   const feeSelections = resolveFeeSelections(tournament, body.feeSelections, registration);
-  const registrationAnswers = resolveRegistrationAnswers(tournament, body.registrationAnswers, registration);
+  const registrationAnswers = resolveRegistrationAnswers(tournament, body.registrationAnswers, registration, null, { requireChoices: !isManager && !syncBootstrap });
   assertLicenseMatchesTournament(tournament, registration);
   assertPhoneMatchesTournament(tournament, registration, { isManager: isManager || syncBootstrap });
   await assertNoDuplicateTeamName(db, tournament.id, registration.teamName);
@@ -9913,7 +9913,15 @@ export async function syncGetRegistrations(db, tournament, url) {
   const teams = await meleeTeamsByRegistration(db, tournamentId);
   const flagsFor = registrationFlagsById(all);
 
-  const questionLabels = new Map(registrationQuestionsFromRow(tournament).map((question) => [question.id, question.label]));
+  const questionsById = new Map(registrationQuestionsFromRow(tournament).map((question) => [question.id, question]));
+  // Auswahl-Antworten gehen als „Frage: Eintrag“ mit checked: true raus; so zeigt das Turnierdokument sie wie eine
+  // angekreuzte Frage an, ohne den Fragetyp kennen zu müssen.
+  const syncAnswer = (answer) => {
+    const question = questionsById.get(answer.questionId);
+    if (!answer.optionId) return { ...answer, questionLabel: question?.label || answer.questionId };
+    const optionLabel = question?.options?.find((option) => option.id === answer.optionId)?.label || answer.optionId;
+    return { ...answer, checked: true, optionLabel, questionLabel: `${question?.label || answer.questionId}: ${optionLabel}` };
+  };
   // Die Sync-API ist API-Key-geschützt. Sie liefert daher auch die organisatorischen
   // Anmeldedetails (Tarife und Antworten), damit das Turnierdokument einen vollständigen,
   // nachvollziehbaren Snapshot der Online-Meldung führen kann.
@@ -9925,10 +9933,7 @@ export async function syncGetRegistrations(db, tournament, url) {
       // Personen-Slots mit Benutzer-ID (T-17, T-18); die Benutzer-ID ist der Personenschlüssel registrierter Teilnehmer.
       persons: syncPersons(row),
       meleeTeamUuid: teams.get(row.id) || null,
-      registrationAnswers: registration.registrationAnswers.map((answer) => ({
-        ...answer,
-        questionLabel: questionLabels.get(answer.questionId) || answer.questionId,
-      })),
+      registrationAnswers: registration.registrationAnswers.map(syncAnswer),
     };
   });
   const cursor = registrations.length > 0 ? registrations[registrations.length - 1].updatedAt : sinceIso;
@@ -13344,40 +13349,67 @@ function registrationFeeSelections(row) {
 function registrationQuestionsFromRow(row) {
   return jsonArray(row.registration_questions)
     .filter((question) => question && typeof question.id === 'string' && typeof question.label === 'string')
-    .map((question) => ({ id: question.id, label: question.label }));
+    .map((question) => (question.type === 'choice'
+      ? { id: question.id, label: question.label, type: 'choice', options: (Array.isArray(question.options) ? question.options : []).filter((option) => option && typeof option.id === 'string' && typeof option.label === 'string').map((option) => ({ id: option.id, label: option.label })) }
+      : { id: question.id, label: question.label }));
 }
 
+// Ankreuzfrage: { participant, questionId, checked: true }; Auswahlfrage: { participant, questionId, optionId }.
 function registrationAnswersFromRow(row) {
   return jsonArray(row.registration_answers)
-    .filter((answer) => answer && ['primary', 'partner', 'partner2'].includes(answer.participant) && typeof answer.questionId === 'string' && answer.checked === true);
+    .filter((answer) => answer && ['primary', 'partner', 'partner2'].includes(answer.participant) && typeof answer.questionId === 'string'
+      && (answer.checked === true || (typeof answer.optionId === 'string' && answer.optionId)));
 }
 
-function resolveRegistrationAnswers(tournament, input, registration, existing = null) {
+function resolveRegistrationAnswers(tournament, input, registration, existing = null, { requireChoices = false } = {}) {
   if (input === undefined && existing) return registrationAnswersFromRow(existing);
   if (!Array.isArray(input)) throw new HttpError(400, 'Ungültige Teilnehmerantworten');
   const participants = new Set(['primary']);
   if (registration.partnerFirstName) participants.add('partner');
   if (registration.partner2FirstName) participants.add('partner2');
-  const questionIds = new Set(registrationQuestionsFromRow(tournament).map((question) => question.id));
+  const questions = new Map(registrationQuestionsFromRow(tournament).map((question) => [question.id, question]));
   const seen = new Set();
-  return input.reduce((answers, answer) => {
+  const answers = input.reduce((result, answer) => {
     const participant = text(answer?.participant);
     const questionId = text(answer?.questionId);
+    const question = questions.get(questionId);
     const key = `${participant}:${questionId}`;
-    if (!participants.has(participant) || !questionIds.has(questionId) || seen.has(key) || typeof answer?.checked !== 'boolean') {
-      throw new HttpError(400, 'Ungültige Teilnehmerantworten');
-    }
+    if (!participants.has(participant) || !question || seen.has(key)) throw new HttpError(400, 'Ungültige Teilnehmerantworten');
     seen.add(key);
-    if (answer.checked) answers.push({ participant, questionId, checked: true });
-    return answers;
+    if (question.type === 'choice') {
+      const optionId = text(answer?.optionId);
+      if (!question.options.some((option) => option.id === optionId)) throw new HttpError(400, 'Ungültige Teilnehmerantworten');
+      result.push({ participant, questionId, optionId });
+      return result;
+    }
+    if (typeof answer?.checked !== 'boolean') throw new HttpError(400, 'Ungültige Teilnehmerantworten');
+    if (answer.checked) result.push({ participant, questionId, checked: true });
+    return result;
   }, []);
+  // Pflicht nur bei der Selbstanmeldung: Turnierleitung und Turnierdokument kennen die Antwort oft nicht.
+  if (requireChoices) {
+    for (const question of questions.values()) {
+      if (question.type !== 'choice') continue;
+      if ([...participants].some((participant) => !seen.has(`${participant}:${question.id}`))) {
+        throw new HttpError(400, 'Bitte beantworte alle Auswahlfragen.', { code: 'registration_choice_required' });
+      }
+    }
+  }
+  return answers;
 }
 
+// Antworten auf entfernte Fragen bzw. entfernte Einträge einer Auswahlfrage verwerfen.
 async function pruneRegistrationAnswers(db, tournamentId, questions) {
-  const questionIds = new Set(questions.map((question) => question.id));
+  const questionsById = new Map(questions.map((question) => [question.id, question]));
+  const stillValid = (answer) => {
+    const question = questionsById.get(answer.questionId);
+    if (!question) return false;
+    if (question.type === 'choice') return Boolean(answer.optionId) && question.options.some((option) => option.id === answer.optionId);
+    return answer.checked === true;
+  };
   const result = await db.prepare('SELECT id, registration_answers FROM registrations WHERE tournament_id = ?').bind(tournamentId).all();
   const updates = (result.results || []).flatMap((row) => {
-    const answers = registrationAnswersFromRow(row).filter((answer) => questionIds.has(answer.questionId));
+    const answers = registrationAnswersFromRow(row).filter(stillValid);
     return JSON.stringify(answers) === JSON.stringify(registrationAnswersFromRow(row))
       ? []
       : [db.prepare('UPDATE registrations SET registration_answers = ?, updated_at = ? WHERE id = ?').bind(JSON.stringify(answers), new Date().toISOString(), row.id)];

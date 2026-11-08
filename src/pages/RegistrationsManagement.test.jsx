@@ -56,6 +56,16 @@ describe('registrationsToCsv', () => {
     expect(csv.trim().split('\r\n')).toHaveLength(2);
   });
 
+  it('exportiert Auswahlfragen mit dem gewählten Eintrag', () => {
+    const tournament = { registrationType: 'forme', formation: 'doublette', registrationQuestions: [
+      { id: 'essen', label: 'Essen', type: 'choice', options: [{ id: 'veggie', label: 'Vegetarisch' }, { id: 'nichts', label: 'Nichts' }] },
+    ] };
+    const csv = registrationsToCsv([{ id: 'r1', firstName: 'Anna', registrationAnswers: [{ participant: 'primary', questionId: 'essen', optionId: 'veggie' }] }], tournament, t);
+    const [header, row] = csv.replace(/^﻿/, '').trim().split('\r\n');
+    expect(header.split(',').slice(-2)).toEqual(['Essen (Hauptspieler)', 'Essen (Partner)']);
+    expect(row.split(',').slice(-2)).toEqual(['Vegetarisch', '']);
+  });
+
   it('exportiert die Nachricht an die Turnierleitung als eigene Spalte', () => {
     const csv = registrationsToCsv([{ id: 'r1', firstName: 'Anna', organizerMessage: 'Komme später, ca. 10 Min.' }], TOURNAMENT, t);
     const [header, row] = csv.replace(/^﻿/, '').trim().split('\r\n');
@@ -256,6 +266,25 @@ describe('Anmeldungsverwaltung: Anmeldedetails', () => {
     expect(screen.getByRole('heading', { name: 'Teilnehmerfragen' })).toBeInTheDocument();
     expect(screen.getByText('Bitte ohne Mittagessen einplanen.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Teilnehmerfragen' }).parentElement).toHaveTextContent(/Vegetarisches Essen\?: Hauptspieler/);
+  });
+
+  it('zählt Auswahlfragen über der Liste und zeigt die Auswahl in den Details', () => {
+    const tournament = { ...TOURNAMENT, registrationQuestions: [
+      { id: 'essen', label: 'Essen', type: 'choice', options: [{ id: 'veggie', label: 'Vegetarisch' }, { id: 'nichts', label: 'Nichts' }] },
+    ] };
+    const registration = { ...REGISTRATION_WITH_FEES, status: 'confirmed', partnerFirstName: 'Bert', partnerLastName: 'Berg', feeSelections: [],
+      registrationAnswers: [{ participant: 'primary', questionId: 'essen', optionId: 'veggie' }] };
+    const noop = () => {};
+    const { container } = render(
+      <RegistrationsPanel tournament={tournament} registrations={[registration]} filteredRegistrations={[registration]} tournaments={[tournament]}
+        onTournamentChange={noop} onCreate={noop} query="" onQueryChange={noop} statusFilter="" onStatusFilterChange={noop} onResetFilters={noop}
+        onEdit={noop} onConfirm={noop} onConfirmAll={noop} onDelete={noop} busyId="" />,
+    );
+
+    expect(container.querySelector('.registration-choice-summary')).toHaveTextContent('Essen:Vegetarisch 1Nichts 0ohne Auswahl 1');
+    expect(screen.getByLabelText('Frage beantwortet')).toHaveTextContent('Essen: Vegetarisch');
+    fireEvent.click(screen.getByText('Anmeldedetails anzeigen'));
+    expect(screen.getByRole('heading', { name: 'Teilnehmerfragen' }).parentElement).toHaveTextContent('Essen: Vegetarisch (Hauptspieler)');
   });
 
   it('bietet einen VIP-Filter an', () => {
