@@ -2121,6 +2121,20 @@ a.left-panel-link {
   margin: 0 0 10px;
 }
 
+.tournament-board-share summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.tournament-board-share[open] summary {
+  margin-bottom: 10px;
+}
+
+/* QR-Code zur Turnierseite: Stil des QR-Panels der Turnierseite (.tournament-qr-panel), ohne eigenen Rahmen. */
+.tournament-board-qr {
+  margin-top: 4px;
+}
+
 /* Turnierseite als reine Anzeige ohne Menü (Bildschirm vor Ort und Handy). */
 .tournament-display .tournament-board-page {
   position: relative;

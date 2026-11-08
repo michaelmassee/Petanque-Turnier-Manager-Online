@@ -6,6 +6,15 @@ import { FakeWebSocket, installFakeWebSocket, latestSocket, uninstallFakeWebSock
 
 // Turnstile für die Namenssuche läuft in jsdom nicht; die Prüfung selbst testet RegistrationPlayerPicker.test.jsx.
 vi.mock('../lib/player-search-turnstile.js', () => ({ playerSearchTurnstileToken: vi.fn(() => Promise.resolve('turnstile-token')) }));
+// QR-Bild der Turnierseite: canvas/qr-code-styling gibt es in jsdom nicht; Zeichnen und Teilen sind hier nur Attrappen.
+const qrImage = vi.hoisted(() => ({
+  createQrBitmap: vi.fn(async () => ({})),
+  canvasToBlob: vi.fn(async () => new Blob(['png'], { type: 'image/png' })),
+  saveBlob: vi.fn(),
+  shareQrPng: vi.fn(async () => 'shared'),
+}));
+vi.mock('../lib/qr-image.js', () => qrImage);
+vi.mock('../lib/qr-style.js', async (original) => ({ ...(await original()), drawQrImage: vi.fn() }));
 
 function render(ui) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -56,6 +65,9 @@ const CONFIRMED_REGISTRATIONS = [
 function installFetchMock(calls, { rounds = [ROUND_1], ranking = [], registrations = CONFIRMED_REGISTRATIONS, teams } = {}) {
   global.fetch = vi.fn((path, options = {}) => {
     calls.push(path);
+    if (String(path).endsWith('/display-link') && options.method === 'POST') {
+      return Promise.resolve(jsonResponse({ displayToken: 'anzeige' }));
+    }
     if (path === '/api/tournaments/t1/rounds' && (!options.method || options.method === 'GET')) {
       return Promise.resolve(jsonResponse({ rounds, teams }));
     }
@@ -130,7 +142,7 @@ describe('TournamentPlayManagement', () => {
 
     render(<TournamentPlayManagement tournaments={[liga, TOURNAMENT, desktop]} currentUserId="user-1" language="de" />);
     // Vorausgewählt ist das erste durchführbare Turnier, nicht das gesperrte.
-    expect(await screen.findByRole('link', { name: 'Anzeige für Bildschirm' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Anzeige für Bildschirm' })).toBeInTheDocument();
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
     fireEvent.focus(screen.getByRole('combobox', { name: 'Turnier' }));
 
@@ -164,13 +176,11 @@ describe('TournamentPlayManagement', () => {
     expect(calls.some((path) => String(path).includes('/api/tournaments/t3/'))).toBe(false);
   });
 
-  it('verlinkt nur noch die Turnierseite als Anzeige, z. B. für einen zweiten Bildschirm', async () => {
+  it('bietet nur die Turnierseite als Anzeige an, z. B. für einen zweiten Bildschirm', async () => {
     installFetchMock([]);
     render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
-    const link = await screen.findByRole('link', { name: 'Anzeige für Bildschirm' });
-    expect(link).toHaveAttribute('href', `/turnierseite/${TOURNAMENT.id}`);
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(within(link.closest('.tournament-board-share')).getAllByRole('link')).toHaveLength(1);
+    const open = await screen.findByRole('button', { name: 'Anzeige für Bildschirm' });
+    expect(within(open.closest('.tournament-board-share')).queryAllByRole('link')).toHaveLength(0);
   });
 
   it('zeigt die Ankündigung schon vor dem Turnierstart', async () => {
@@ -188,43 +198,54 @@ describe('TournamentPlayManagement', () => {
     installFetchMock([]);
     render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, visibility: 'public', participantsPublic: true }]} language="de" />);
 
-    const open = await screen.findByRole('link', { name: 'Anzeige für Bildschirm' });
-    expect(open).toHaveAttribute('href', '/turnierseite/t1');
+    const open = await screen.findByRole('button', { name: 'Anzeige für Bildschirm' });
     const share = within(open.closest('.tournament-board-share')).getByRole('button', { name: /Teilen/ });
     const editor = screen.getByLabelText(/Mitteilung an alle Teilnehmer/).closest('.announcement-editor');
     expect(share.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('teilt bei einem privaten Turnier die Turnierseite mit dem Freigabe-Token', async () => {
+  it.each([
+    { visibility: 'private', participantsPublic: true },
+    { visibility: 'public', participantsPublic: false },
+  ])('teilt die Turnierseite mit dem Anzeige-Schlüssel ($visibility, Teilnehmerliste öffentlich: $participantsPublic)', async (variant) => {
     const calls = [];
     installFetchMock(calls);
     const fetchMock = global.fetch;
-    global.fetch = vi.fn((path, options = {}) => (path === '/api/tournaments/t1/share-link' && options.method === 'POST'
-      ? Promise.resolve(jsonResponse({ shareUrl: 'https://ptm.test/q/festerQrSchluessel1234', shareToken: 'geheim' }))
+    global.fetch = vi.fn((path, options = {}) => (path === '/api/tournaments/t1/display-link' && options.method === 'POST'
+      ? Promise.resolve(jsonResponse({ displayToken: 'geheim' }))
       : fetchMock(path, options)));
-    const share = vi.fn(() => Promise.resolve());
-    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    const writeText = vi.fn(() => Promise.resolve());
+    const clipboard = navigator.clipboard;
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const displayUrl = `${window.location.origin}/turnierseite/t1?share=geheim`;
     try {
-      render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, visibility: 'private', participantsPublic: true }]} language="de" />);
-      fireEvent.click(await within(await screen.findByRole('button', { name: 'Anzeige für Bildschirm' }).then((el) => el.closest('.tournament-board-share'))).findByRole('button', { name: /Teilen/ }));
-      await waitFor(() => expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: `${window.location.origin}/turnierseite/t1?share=geheim` })));
+      render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, ...variant }]} language="de" />);
+      const panel = (await screen.findByRole('button', { name: 'Anzeige für Bildschirm' })).closest('.tournament-board-share');
+      // Wie im QR-Panel der Turnierseite: Bild mit Link, Teilen (Bild), PNG und „Link kopieren“.
+      expect(await within(panel).findByText(displayUrl)).toBeInTheDocument();
+      expect(within(panel).getByRole('img', { name: 'QR-Code zur Turnierseite' })).toBeInTheDocument();
+      await waitFor(() => expect(within(panel).getByRole('button', { name: /Teilen/ })).toBeEnabled());
+      fireEvent.click(within(panel).getByRole('button', { name: /Teilen/ }));
+      await waitFor(() => expect(qrImage.shareQrPng).toHaveBeenCalledWith(expect.objectContaining({ text: `${TOURNAMENT.name}\n${displayUrl}` })));
+      fireEvent.click(within(panel).getByRole('button', { name: 'Link kopieren' }));
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith(displayUrl));
     } finally {
-      delete navigator.share;
+      Object.defineProperty(navigator, 'clipboard', { value: clipboard, configurable: true });
     }
   });
 
-  it('öffnet bei einem privaten Turnier die Bildschirm-Anzeige mit dem Freigabe-Token', async () => {
+  it('öffnet die Bildschirm-Anzeige mit dem Anzeige-Schlüssel, auch ohne veröffentlichte Teilnehmerliste', async () => {
     const calls = [];
     installFetchMock(calls);
     const fetchMock = global.fetch;
-    global.fetch = vi.fn((path, options = {}) => (path === '/api/tournaments/t1/share-link' && options.method === 'POST'
-      ? Promise.resolve(jsonResponse({ shareUrl: 'https://ptm.test/q/festerQrSchluessel1234', shareToken: 'geheim' }))
+    global.fetch = vi.fn((path, options = {}) => (path === '/api/tournaments/t1/display-link' && options.method === 'POST'
+      ? Promise.resolve(jsonResponse({ displayToken: 'geheim' }))
       : fetchMock(path, options)));
     const displayWindow = { opener: 'app', location: { href: '' }, close: vi.fn() };
     vi.spyOn(window, 'open').mockReturnValue(displayWindow);
 
-    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, visibility: 'private', participantsPublic: true }]} language="de" />);
-    expect(await screen.findByText(/Wer den Link hat, sieht Spielplan und Rangliste/)).toBeInTheDocument();
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, visibility: 'public', participantsPublic: false }]} language="de" />);
+    expect(await screen.findByText(/auch wenn die Teilnehmerliste nicht veröffentlicht ist/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Anzeige für Bildschirm' }));
 
     await waitFor(() => expect(displayWindow.location.href).toBe(`${window.location.origin}/turnierseite/t1?share=geheim`));
@@ -232,12 +253,31 @@ describe('TournamentPlayManagement', () => {
     expect(displayWindow.opener).toBeNull();
   });
 
-  it('weist darauf hin, wenn die Teilnehmerliste nicht veröffentlicht ist', async () => {
+  it('klappt den Kasten zur Turnierseite am Handy zu und lädt den Link erst beim Aufklappen', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    const matchMedia = window.matchMedia;
+    window.matchMedia = vi.fn((query) => ({ matches: query === '(max-width: 560px)', media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    try {
+      render(<TournamentPlayManagement tournaments={[TOURNAMENT]} language="de" />);
+      const panel = (await screen.findByText('Turnierseite und Anzeige')).closest('details');
+      expect(panel).not.toHaveAttribute('open');
+      expect(calls.some((path) => String(path).endsWith('/display-link'))).toBe(false);
+
+      panel.open = true;
+      fireEvent(panel, new Event('toggle'));
+      await waitFor(() => expect(calls.some((path) => String(path).endsWith('/display-link'))).toBe(true));
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
+
+  it('bietet Teilen auch ohne veröffentlichte Teilnehmerliste an', async () => {
     installFetchMock([]);
     render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, participantsPublic: false }]} language="de" />);
 
-    expect(await screen.findByText(/wenn die Teilnehmerliste veröffentlicht wird/)).toBeInTheDocument();
-    expect(within(document.querySelector('.tournament-board-share')).queryByRole('button', { name: /Teilen/ })).not.toBeInTheDocument();
+    const panel = (await screen.findByRole('button', { name: 'Anzeige für Bildschirm' })).closest('.tournament-board-share');
+    expect(await within(panel).findByRole('button', { name: /Teilen/ })).toBeInTheDocument();
   });
 
   it('bietet „Turnier abschließen“ direkt nach „Nächste Runde starten“ an, auch bei offenen Ergebnissen', async () => {

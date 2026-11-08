@@ -39,7 +39,9 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
   // Aktuelle Ankündigung aus dem Spielplan-Abruf (sofort über den WebSocket, sonst alle 2 Minuten).
   const [announcementUpdate, setAnnouncementUpdate] = useState({ tournamentId: null, announcement: null });
   const rankingPublished = Boolean(tournament?.rankingPublishedAt);
-  const participantsVisible = Boolean(tournament && (tournament.participantsPublic || tournament.canManage) && tournament.registrationEnabled !== false);
+  // Mit Schlüssel (Anzeige-Link der Turnierleitung) entscheidet der Server, ob der Spielplan sichtbar ist – auch ohne
+  // veröffentlichte Teilnehmerliste. Lehnt er ab, zeigt der Spielplan denselben Hinweis wie hier.
+  const participantsVisible = Boolean(tournament && (tournament.participantsPublic || tournament.canManage || shareToken) && tournament.registrationEnabled !== false);
   const playable = Boolean(tournament) && (isOnlinePlayable(tournament) || isDocumentBound(tournament));
   // Der Status aus der Turnierliste stammt vom Laden der App. Eine vor dem Start geöffnete Seite (z. B. Bildschirm vor
   // Ort) erfährt den Start aus dem Spielplan-Abruf (WebSocket bzw. Polling) und schaltet ohne Neuladen auf den Spielplan um.

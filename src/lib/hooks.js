@@ -298,6 +298,8 @@ export function useTournamentLiveSocket(path, refresh) {
 }
 
 // Ab hier füllt die Bildschirm-Anzeige genau den Bildschirm (siehe styles.css); darunter normaler Seitenfluss.
+// Handy-Breite wie die Breakpoints in styles.css (Dialoge bildschirmfüllend).
+export const PHONE_QUERY = '(max-width: 560px)';
 export const DISPLAY_FIT_QUERY = '(min-width: 900px) and (orientation: landscape)';
 
 /** true, solange die Media-Query passt; reagiert auf Drehen und Größenänderungen. */

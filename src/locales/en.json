@@ -1771,7 +1771,6 @@
   "Adresse ungeprüft: aus der Vereinsliste des Landesverbands übernommen, möglicherweise die Postanschrift des Vereins.": "Address not checked: taken from the regional federation's club list, possibly the club's postal address.",
   "Adresse ungeprüft": "Address not checked",
   "Du bist selbst für diesen Spielort verantwortlich und kannst die Adresse direkt bearbeiten": "You are responsible for this venue yourself and can edit the address directly",
-  "Spielplan und Rangliste sind auf der Turnierseite erst für alle sichtbar, wenn die Teilnehmerliste veröffentlicht wird.": "The schedule and standings on the tournament page are only visible to everyone once the participant list is published.",
   "Für dieses Turnier gibt es keinen öffentlichen Spielplan.": "There is no public schedule for this tournament.",
   "Das Turnier hat noch nicht begonnen. Spielplan und Rangliste erscheinen hier nach dem Start.": "The tournament has not started yet. The schedule and standings will appear here once it starts.",
   "Noch keine weiteren Verwalter für dieses Angebot.": "No additional managers for this offer yet.",
@@ -1824,7 +1823,7 @@
   "Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.": "Without menu, e.g. for a second screen on site; updates itself.",
   "Vollbild": "Full screen",
   "Turnierverlauf": "Tournament progress",
-  "Privates Turnier: Anzeige und geteilter Link enthalten den Freigabe-Schlüssel, damit sie auch ohne Anmeldung funktionieren, z. B. auf einem Rechner vor Ort. Wer den Link hat, sieht Spielplan und Rangliste. Deaktivierst du den Freigabe-Link, funktionieren diese Links nicht mehr.": "Private tournament: the display and shared link contain the share key so they work without signing in, e.g. on a computer on site. Anyone with the link can see the schedule and standings. If you disable the share link, these links stop working.",
+  "Anzeige und geteilter Link öffnen Spielplan und Rangliste ohne Anmeldung, auch wenn die Teilnehmerliste nicht veröffentlicht ist. Gib den Link nur weiter, wenn die Teilnehmer ihn sehen dürfen.": "The display and the shared link open the schedule and ranking without signing in, even if the participant list is not published. Only pass the link on if the participants may see it.",
   "Nicht online durchführbar": "Cannot be run online",
   "{{name}} kann nicht online durchgeführt werden.": "{{name}} cannot be run online.",
   "Mit dem Turniersystem {{system}} kann das Turnier hier angelegt und die Anmeldung online geführt werden, Runden und Ergebnisse aber nicht.": "With the tournament system {{system}}, the tournament can be created here and registration can be handled online, but not rounds and results.",
@@ -1917,5 +1916,7 @@
   "Eintrag": "Entry",
   "Eintrag entfernen": "Remove entry",
   "Eintrag hinzufügen": "Add entry",
-  "Bitte beantworte alle Auswahlfragen.": "Please answer all choice questions."
+  "Bitte beantworte alle Auswahlfragen.": "Please answer all choice questions.",
+  "Turnierseite und Anzeige": "Tournament page and display",
+  "QR-Code zur Turnierseite": "QR code for the tournament page"
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
-import { TextField, Button, Feedback, ShareLinkButton, AccountBadge, EditIcon, QrIcon, ParticipationIcon, SelectField } from '../components/ui.jsx';
+import { TextField, Button, Feedback, AccountBadge, EditIcon, QrIcon, ParticipationIcon, SelectField } from '../components/ui.jsx';
 import { RegistrationEditDialog } from '../components/RegistrationEditDialog.jsx';
 import { LiveQrDialog } from '../components/LiveQrDialog.jsx';
 import { tournamentBoardPath } from '../lib/routing.js';
@@ -19,7 +19,9 @@ import { formatTournamentDateTime } from '../lib/format.js';
 import { meleeTeamSize } from '../lib/pairing/melee.js';
 import { RegistrationPlayerPicker } from '../components/RegistrationPlayerPicker.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
-import { useTournamentLiveSocket } from '../lib/hooks.js';
+import { PHONE_QUERY, useMediaQuery, useTournamentLiveSocket } from '../lib/hooks.js';
+import { QrImageShare } from '../components/TournamentQrPanel.jsx';
+import { DEFAULT_QR_DESIGN } from '../lib/qr-design.js';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
 // Systemwissen: 'minPlayers' trägt die Mindestanzahl als Zahl statt fest im Satz
@@ -81,32 +83,46 @@ function teamLabel(team) {
   return team.map(playerLabel).join(' + ');
 }
 
-// Link zur Turnierseite (Spielplan, Rangliste, Ankündigungen) zum Teilen mit Spielern und Zuschauern. „Privat“
-// heißt nur: nicht in der öffentlichen Turnierliste. Geteilt wird dann mit dem Freigabe-Token des Turniers, damit
-// die Seite auch ohne Anmeldung funktioniert – auch die Bildschirm-Anzeige, z. B. auf einem Rechner vor Ort.
+// Link zur Turnierseite (Spielplan, Rangliste, Ankündigungen) zum Teilen mit Spielern und Zuschauern. Er trägt den
+// Anzeige-Schlüssel des Turniers: Die Seite öffnet sich ohne Anmeldung und ohne veröffentlichte Teilnehmerliste, auch
+// die Bildschirm-Anzeige, z. B. auf einem Rechner vor Ort. Den Schlüssel bekommt nur die Turnierleitung.
 function TournamentBoardShare({ tournament }) {
   const { t } = useTranslation();
+  // Am Handy zugeklappt, damit Runden und Ergebnisse oben stehen; am PC offen.
+  const isPhone = useMediaQuery(PHONE_QUERY);
+  const [open, setOpen] = useState(!isPhone);
+  const [displayUrl, setDisplayUrl] = useState('');
+  const [qrLoading, setQrLoading] = useState(false);
   const [displayBusy, setDisplayBusy] = useState(false);
   const [displayError, setDisplayError] = useState('');
   const path = tournamentBoardPath(tournament.id);
-  // Ohne veröffentlichte Teilnehmerliste zeigt die Turnierseite Fremden ohnehin keinen Spielplan; dann reicht die Anmeldung.
-  const withShareToken = tournament.visibility === 'private' && tournament.participantsPublic;
-  async function resolveShareToken() {
-    const { shareToken } = await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' });
-    return shareToken;
-  }
-  function urlWithShare(targetPath, shareToken) {
-    const url = new URL(targetPath, window.location.origin);
-    url.searchParams.set('share', shareToken);
+  async function resolveDisplayUrl() {
+    const { displayToken } = await authenticatedApi(`/api/tournaments/${tournament.id}/display-link`, { method: 'POST' });
+    const url = new URL(path, window.location.origin);
+    url.searchParams.set('share', displayToken);
     return url.href;
   }
+  // QR-Code erst beim Aufklappen: Der Link braucht den Schlüssel vom Server.
+  useEffect(() => {
+    setDisplayUrl('');
+    if (!open) return undefined;
+    let cancelled = false;
+    setDisplayError('');
+    setQrLoading(true);
+    resolveDisplayUrl()
+      .then((url) => { if (!cancelled) setDisplayUrl(url); })
+      .catch((err) => { if (!cancelled) setDisplayError(err.message); })
+      .finally(() => { if (!cancelled) setQrLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- neu laden nur bei anderem Turnier oder Aufklappen
+  }, [tournament.id, open]);
   async function openDisplay() {
     // Fenster sofort im Klick öffnen, sonst blockt der Popup-Blocker; die Adresse folgt, sobald der Schlüssel da ist.
     const displayWindow = window.open('', '_blank');
     setDisplayError('');
     setDisplayBusy(true);
     try {
-      const url = urlWithShare(path, await resolveShareToken());
+      const url = displayUrl || await resolveDisplayUrl();
       if (displayWindow) {
         displayWindow.opener = null;
         displayWindow.location.href = url;
@@ -121,23 +137,22 @@ function TournamentBoardShare({ tournament }) {
     }
   }
   return (
-    <div className="panel tournament-board-share">
+    <details className="panel tournament-board-share" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>{t('Turnierseite und Anzeige')}</summary>
       <p>
-        {withShareToken
-          ? <Button variant="secondary" loading={displayBusy} onClick={openDisplay}>{t('Anzeige für Bildschirm')}</Button>
-          : <a href={path} target="_blank" rel="noreferrer">{t('Anzeige für Bildschirm')}</a>}
+        <Button variant="secondary" loading={displayBusy} onClick={openDisplay}>{t('Anzeige für Bildschirm')}</Button>
         {' '}<span className="muted">{t('Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.')}</span>
       </p>
-      {withShareToken && (
-        <p className="hint">
-          {t('Privates Turnier: Anzeige und geteilter Link enthalten den Freigabe-Schlüssel, damit sie auch ohne Anmeldung funktionieren, z. B. auf einem Rechner vor Ort. Wer den Link hat, sieht Spielplan und Rangliste. Deaktivierst du den Freigabe-Link, funktionieren diese Links nicht mehr.')}
-        </p>
-      )}
+      <p className="hint">
+        {t('Anzeige und geteilter Link öffnen Spielplan und Rangliste ohne Anmeldung, auch wenn die Teilnehmerliste nicht veröffentlicht ist. Gib den Link nur weiter, wenn die Teilnehmer ihn sehen dürfen.')}
+      </p>
       <Feedback error={displayError} />
-      {tournament.participantsPublic
-        ? <ShareLinkButton title={tournament.name} url={new URL(path, window.location.origin).href} resolveUrl={withShareToken ? async () => urlWithShare(path, await resolveShareToken()) : undefined} />
-        : <p className="hint">{t('Spielplan und Rangliste sind auf der Turnierseite erst für alle sichtbar, wenn die Teilnehmerliste veröffentlicht wird.')}</p>}
-    </div>
+      {/* Wie das QR-Panel der Turnierseite (Info): Bild mit Turniername, Teilen, PNG, Link kopieren. */}
+      <div className="tournament-qr-panel tournament-board-qr">
+        {qrLoading && <p className="muted">{t('Wird geladen…')}</p>}
+        {displayUrl && <QrImageShare url={displayUrl} design={DEFAULT_QR_DESIGN} title={tournament.name} label={t('QR-Code zur Turnierseite')} />}
+      </div>
+    </details>
   );
 }
 

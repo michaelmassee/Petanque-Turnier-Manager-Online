@@ -2812,7 +2812,7 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         const session = await optionalSession(request, env.DB);
-        const shareAccess = await hasTournamentShareAccess(env.DB, tournament, url.searchParams.get('share'));
+        const shareAccess = await hasTournamentBoardAccess(env.DB, tournament, url.searchParams.get('share'));
         if (!canViewParticipants(tournament, session?.user || null) && !canViewPublishedRanking(tournament, session?.user || null, shareAccess)) {
           throw new HttpError(403, 'Zugriff verweigert');
         }
@@ -2966,7 +2966,7 @@ export default {
 
         if (request.method === 'GET') {
           const session = await optionalSession(request, env.DB);
-          const shareAccess = await hasTournamentShareAccess(env.DB, tournament, url.searchParams.get('share'));
+          const shareAccess = await hasTournamentBoardAccess(env.DB, tournament, url.searchParams.get('share'));
           if (!canViewTournament(tournament, session?.user || null) && !shareAccess) {
             throw new HttpError(403, 'Zugriff verweigert');
           }
@@ -3090,6 +3090,16 @@ export default {
         if (request.method === 'DELETE') return await deleteTournamentShareLink(env.DB, tournament.id);
       }
 
+      // Link zur Bildschirm-Anzeige: nur die Turnierleitung bekommt den Schlüssel und teilt ihn.
+      const displayLinkMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/display-link$/);
+      if (displayLinkMatch && request.method === 'POST') {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, displayLinkMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        assertCanManageTournament(tournament, session.user);
+        return json({ displayToken: await ensureTournamentDisplayToken(env.DB, tournament.id) });
+      }
+
       // QR-Panel der Turnierseite (alle Besucher): fester Link /q/<qr_token> im gespeicherten Design, wie gedruckt.
       // Sichtbarkeit wie GET /api/tournaments/:id; öffentliche Entwürfe haben noch keinen teilbaren Link.
       const tournamentQrMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/qr$/);
@@ -3124,7 +3134,7 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         const session = await optionalSession(request, env.DB);
-        const shareAccess = await hasTournamentShareAccess(env.DB, tournament, url.searchParams.get('share'));
+        const shareAccess = await hasTournamentBoardAccess(env.DB, tournament, url.searchParams.get('share'));
         if (!canViewTournament(tournament, session?.user || null) && !shareAccess) {
           throw new HttpError(403, 'Zugriff verweigert');
         }
@@ -8689,10 +8699,12 @@ async function participantAccountUserIds(db, tournamentId, excludedUserId, { inc
 }
 
 // Private Turniere stehen nur nicht in der öffentlichen Liste: Mit dem Freigabe-Token der Turnierleitung
-// ist der Spielplan sichtbar, sofern die Teilnehmerliste veröffentlicht ist.
+// ist der Spielplan sichtbar, sofern die Teilnehmerliste veröffentlicht ist. Der Anzeige-Schlüssel, den nur die
+// Turnierleitung teilt, öffnet ihn immer – auch ohne veröffentlichte Teilnehmerliste.
 async function assertCanViewSchedule(request, db, tournament, url) {
   const session = await optionalSession(request, db);
   if (canViewParticipants(tournament, session?.user || null)) return;
+  if (hasTournamentDisplayAccess(tournament, url.searchParams.get('share'))) return;
   if (!(Number(tournament.participants_public) && await hasTournamentShareAccess(db, tournament, url.searchParams.get('share')))) {
     throw new HttpError(403, 'Zugriff verweigert');
   }
@@ -12372,6 +12384,23 @@ export async function hasTournamentShareAccess(db, tournament, token) {
   const tokenHash = await sha256Hex(token);
   const link = await db.prepare('SELECT token_hash FROM tournament_share_links WHERE tournament_id = ? AND token_hash = ?').bind(tournament.id, tokenHash).first();
   return Boolean(link);
+}
+
+// Anzeige-Schlüssel (Bildschirm-Anzeige/Turnierseite) für Turniere jeder Sichtbarkeit; gilt nur für die Endpunkte der
+// Turnierseite, nicht für Anmeldung oder QR-Weiterleitung.
+export function hasTournamentDisplayAccess(tournament, token) {
+  return Boolean(token && tournament.display_token && token === tournament.display_token);
+}
+
+async function hasTournamentBoardAccess(db, tournament, token) {
+  return hasTournamentDisplayAccess(tournament, token) || hasTournamentShareAccess(db, tournament, token);
+}
+
+async function ensureTournamentDisplayToken(db, tournamentId) {
+  const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+  await db.prepare('UPDATE tournaments SET display_token = ? WHERE id = ? AND display_token IS NULL').bind(token, tournamentId).run();
+  const row = await db.prepare('SELECT display_token FROM tournaments WHERE id = ?').bind(tournamentId).first();
+  return row.display_token;
 }
 
 /**

@@ -639,6 +639,11 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
     </div>
   );
 
+  // Anzeige mit ungültigem oder deaktiviertem Schlüssel: kein Spielplan statt Fehlermeldung über leerem Plan.
+  if (display && isScheduleGone(query)) {
+    return <p className="muted">{t('Für dieses Turnier gibt es keinen öffentlichen Spielplan.')}</p>;
+  }
+
   if (!rounds.length) {
     return (
       <div className={`play-schedule${display ? ' is-display' : ''}`}>
