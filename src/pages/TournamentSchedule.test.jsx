@@ -27,7 +27,8 @@ function asLandscapeScreen() {
   window.matchMedia = vi.fn((query) => ({ matches: query.includes('landscape'), media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
 }
 
-const roundRows = (container) => within(container.querySelector('.display-current-round table')).getAllByRole('row').slice(1)
+// Datenzeilen ohne den zweizeiligen Kopf (wie die Rangliste).
+const roundRows = (container) => [...container.querySelectorAll('.display-current-round table tbody tr')]
   .map((row) => [...row.cells].map((cell) => cell.textContent));
 
 const anna = { id: 'p1', firstName: 'Anna', lastName: 'Muster' };
@@ -172,7 +173,8 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     expect(past).toHaveLength(1);
     expect(past[0].open).toBe(false);
     expect(past[0].querySelector('summary')).toHaveTextContent('Runde 1');
-    expect(within(past[0]).getAllByRole('row')[1]).toHaveTextContent('Anna MusterClara Klar1311');
+    expect(past[0].querySelector('tbody tr')).toHaveTextContent('Anna MusterClara Klar1311');
+    expect(within(past[0]).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Team A', 'Team B', 'Ergebnis', 'A', 'B']);
   });
 
   it('lädt sofort neu, wenn der WebSocket eine Änderung meldet, und zeigt „Live“', async () => {

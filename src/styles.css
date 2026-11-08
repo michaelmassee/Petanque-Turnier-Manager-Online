@@ -2166,9 +2166,9 @@ a.left-panel-link {
   align-items: start;
 }
 
+/* Ohne eigenen Abstand: Überschrift und Tabelle stehen wie bei der Rangliste daneben (gleiche Höhe der Zeilen). */
 .display-current-round {
   display: grid;
-  gap: 8px;
 }
 
 .display-columns h2 {
@@ -4265,13 +4265,21 @@ a.left-panel-link {
   vertical-align: middle;
 }
 
-.round-table thead th {
+/* Kopf wie .ranking-table: als Ganzes fixiert (zwei Zeilen), gleiche Abstände, Gruppe „Ergebnis“ mit A/B darunter. */
+.round-table thead {
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+.round-table thead th {
   background: #f4f6fa;
   border-bottom: 1px solid #d7deea;
   text-align: center;
+}
+
+.round-table thead th.round-table-group {
+  padding-bottom: 2px;
 }
 
 .round-table tbody tr:nth-child(odd) {

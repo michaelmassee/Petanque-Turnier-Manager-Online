@@ -9,9 +9,9 @@ function teamLabel(team) {
   return team.map(playerLabel).join(' + ');
 }
 
-// Partien einer Runde als Tabelle wie die Spielrunde im Hauptprojekt (Team A | Team B | Ergebnis, abwechselnde
-// Zeilenfarben); Bahn und Stufe nur, wenn die Runde sie hat. Spielverwaltung (beendetes Turnier) und öffentliche
-// Turnierseite nutzen dieselbe Darstellung.
+// Partien einer Runde als Tabelle wie die Spielrunde im Hauptprojekt (Team A | Team B | Ergebnis A/B); Bahn und Stufe
+// nur, wenn die Runde sie hat. Der zweizeilige Kopf entspricht dem der Rangliste, damit beide auf der Turnierseite
+// nebeneinander auf gleicher Höhe beginnen. Spielverwaltung (beendetes Turnier) und Turnierseite nutzen dieselbe Tabelle.
 export function RoundTable({ round }) {
   const { t } = useTranslation();
   const hasCourt = round.matches.some((match) => match.court);
@@ -21,11 +21,15 @@ export function RoundTable({ round }) {
       <table className="round-table">
         <thead>
           <tr>
-            {hasCourt && <th scope="col">{t('Bahn')}</th>}
-            {hasStage && <th scope="col">{t('Stufe')}</th>}
-            <th scope="col">{t('Team A')}</th>
-            <th scope="col">{t('Team B')}</th>
-            <th scope="col" colSpan={2}>{t('Ergebnis')}</th>
+            {hasCourt && <th scope="col" rowSpan={2}>{t('Bahn')}</th>}
+            {hasStage && <th scope="col" rowSpan={2}>{t('Stufe')}</th>}
+            <th scope="col" rowSpan={2}>{t('Team A')}</th>
+            <th scope="col" rowSpan={2}>{t('Team B')}</th>
+            <th scope="colgroup" colSpan={2} className="round-table-group">{t('Ergebnis')}</th>
+          </tr>
+          <tr>
+            <th scope="col" aria-label={`${t('Ergebnis')} ${t('Team A')}`} data-i18n-skip>A</th>
+            <th scope="col" aria-label={`${t('Ergebnis')} ${t('Team B')}`} data-i18n-skip>B</th>
           </tr>
         </thead>
         <tbody>

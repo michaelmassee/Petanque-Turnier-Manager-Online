@@ -1263,10 +1263,10 @@ describe('TournamentPlayManagement', () => {
     expect(screen.queryByRole('textbox', { name: 'Punkte Team A' })).not.toBeInTheDocument();
 
     const [tableRound2, tableRound1] = [...panels].map((panel) => within(panel).getByRole('table'));
-    expect(within(tableRound2).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Team A', 'Team B', 'Ergebnis']);
-    expect(within(tableRound2).getAllByRole('row')[2]).toHaveTextContent('Gina NeuFreilos130');
-    expect(within(tableRound1).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Bahn', 'Team A', 'Team B', 'Ergebnis']);
-    expect(within(tableRound1).getAllByRole('row')[1]).toHaveTextContent('4Anna Muster + Bert Beispiel + Clara TestDirk Demo + Eva Muster + Finn Test137');
+    expect(within(tableRound2).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Team A', 'Team B', 'Ergebnis', 'A', 'B']);
+    expect(tableRound2.querySelectorAll('tbody tr')[1]).toHaveTextContent('Gina NeuFreilos130');
+    expect(within(tableRound1).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Bahn', 'Team A', 'Team B', 'Ergebnis', 'A', 'B']);
+    expect(tableRound1.querySelector('tbody tr')).toHaveTextContent('4Anna Muster + Bert Beispiel + Clara TestDirk Demo + Eva Muster + Finn Test137');
   });
 
   it('nimmt ein abgeschlossenes Turnier nur nach Rückfrage wieder auf', async () => {
