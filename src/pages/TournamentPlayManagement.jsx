@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api, authenticatedApi } from '../lib/api.js';
@@ -13,6 +13,8 @@ import { checkRoundRequirements, isMeleeTeamTournament, isOnlinePlayable, minimu
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
 import { isCalendarEntry, isDocumentBound, labelFor, sanitizeScore, translatedOptions } from '../lib/domain.js';
 import { AnnouncementEditor } from '../components/TournamentAnnouncement.jsx';
+import { DEFAULT_TOURNAMENT_OPTIONS, TournamentOptionsPanel } from '../components/TournamentOptionsPanel.jsx';
+import { CourtLabel } from '../components/CourtLabel.jsx';
 import { normalizeRanking } from '../lib/live-ranking.js';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { formatTournamentDateTime } from '../lib/format.js';
@@ -21,7 +23,7 @@ import { RegistrationPlayerPicker } from '../components/RegistrationPlayerPicker
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { PHONE_QUERY, useMediaQuery, useTournamentLiveSocket } from '../lib/hooks.js';
 import { QrImageShare } from '../components/TournamentQrPanel.jsx';
-import { RoundTable } from '../components/RoundTable.jsx';
+import { RoundTable, pairingNumbers } from '../components/RoundTable.jsx';
 import { DEFAULT_QR_DESIGN } from '../lib/qr-design.js';
 
 // Rendert ein Anforderungs-Objekt aus checkRoundRequirements() generisch, ohne
@@ -165,7 +167,47 @@ function isRoundComplete(round) {
   return round.matches.every(isMatchDecided);
 }
 
-function MatchRow({ match, draft, onChange, onSave, busy, isNewReport }) {
+// Bahn der Partie: bei Spielbahn „Leer“ (L) händisch eintragen, gespeichert beim Verlassen des Felds; sonst Anzeige der
+// Bahn bzw. ohne Bahn der laufenden Paarungsnummer wie im Hauptprojekt („Nur laufende Nr“).
+function MatchCourt({ match, number, manual, duplicate = false, onSaveCourt }) {
+  const { t } = useTranslation();
+  const [value, setValue] = useState(match.court || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => setValue(match.court || ''), [match.court]);
+  if (!manual) {
+    if (match.court) return <CourtLabel court={match.court} className="play-match-court" as="div" />;
+    return number ? <div className="play-match-court" data-i18n-skip><strong>#{number}</strong></div> : null;
+  }
+  if (!match.teamB?.length) return null;
+  async function save() {
+    if (value.trim() === (match.court || '')) return;
+    setError('');
+    setSaving(true);
+    try {
+      await onSaveCourt(match.id, value.trim());
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <div className="play-match-court">
+      <label>
+        {t('Bahn')}
+        <input type="text" className={`court-input${duplicate ? ' is-duplicate' : ''}`} value={value} maxLength={40} disabled={saving} aria-busy={saving}
+          aria-invalid={duplicate || undefined} title={duplicate ? t('Bahn doppelt vergeben') : undefined}
+          onChange={(event) => setValue(event.target.value)} onBlur={save}
+          onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); } }} />
+      </label>
+      {duplicate && <span className="court-duplicate-hint">{t('Bahn doppelt vergeben')}</span>}
+      <Feedback error={error} />
+    </div>
+  );
+}
+
+function MatchRow({ match, number, draft, onChange, onSave, busy, isNewReport, manualCourt = false, duplicateCourt = false, onSaveCourt }) {
   const { t } = useTranslation();
   const scoreA = draft?.scoreA ?? String(match.scoreA ?? '');
   const scoreB = draft?.scoreB ?? String(match.scoreB ?? '');
@@ -175,6 +217,7 @@ function MatchRow({ match, draft, onChange, onSave, busy, isNewReport }) {
   return (
     <article className={`play-match${match.reportedBy ? ' is-player-reported' : ''}${isNewReport ? ' is-new-report' : ''}`}>
       {match.stageLabel && <div className="play-match-stage" data-i18n-skip>{match.stageLabel}</div>}
+      <MatchCourt match={match} number={number} manual={manualCourt} duplicate={duplicateCourt} onSaveCourt={onSaveCourt} />
       {match.reportedBy && (
         <p className="play-report-badge">
           {isNewReport && <span className="play-report-new">{t('Neu')}</span>}
@@ -182,9 +225,9 @@ function MatchRow({ match, draft, onChange, onSave, busy, isNewReport }) {
         </p>
       )}
       <div className="play-match-teams">
-        <div className="play-team" data-i18n-skip>{teamLabel(match.teamA)}</div>
+        <div className="play-team" data-i18n-skip>{match.teamALabel ?? teamLabel(match.teamA)}</div>
         <div className="play-vs">{t('gegen')}</div>
-        <div className="play-team is-second" data-i18n-skip>{teamLabel(match.teamB)}</div>
+        <div className="play-team is-second" data-i18n-skip>{match.teamBLabel ?? teamLabel(match.teamB)}</div>
       </div>
 
       <div className="play-result-row">
@@ -232,7 +275,7 @@ function MatchRow({ match, draft, onChange, onSave, busy, isNewReport }) {
 
 // collapseDecided (laufende Runde): Partien mit gespeichertem Ergebnis wandern in ein zugeklapptes Panel, damit oben nur
 // noch die offenen stehen. Neue Spielermeldungen bleiben sichtbar, bis die Turnierleitung sie als gesehen markiert.
-function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, onConfirmReports, confirmingReports = false, collapseDecided = false }) {
+function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, onConfirmReports, confirmingReports = false, collapseDecided = false, manualCourt = false, onSaveCourt }) {
   const { t } = useTranslation();
   const [drafts, setDrafts] = useState({});
   const changes = round.matches.filter((match) => drafts[match.id]).map((match) => ({
@@ -257,7 +300,11 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, o
   const isCollapsed = (match) => isMatchDecided(match) && !match.reportPending;
   const openMatches = round.matches.filter((match) => !isCollapsed(match));
   const decidedMatches = round.matches.filter(isCollapsed);
-  const matchRow = (match) => <MatchRow key={match.id} match={match} draft={drafts[match.id]} onChange={(draft) => changeDraft(match.id, draft)} onSave={onSave} busy={busy} isNewReport={match.reportPending} />;
+  const numbers = new Map(pairingNumbers(round.matches).map((number, index) => [round.matches[index].id, number]));
+  // Wie die Duplikat-Prüfung im Hauptprojekt (COUNTIF > 1 auf nicht leeren Bahnzellen): doppelte Bahn rot markieren.
+  const courtKey = (match) => (match.court || '').trim().toLowerCase();
+  const courtCounts = round.matches.reduce((counts, match) => (courtKey(match) ? counts.set(courtKey(match), (counts.get(courtKey(match)) || 0) + 1) : counts), new Map());
+  const matchRow = (match) => <MatchRow key={match.id} match={match} number={numbers.get(match.id)} draft={drafts[match.id]} onChange={(draft) => changeDraft(match.id, draft)} onSave={onSave} busy={busy} isNewReport={match.reportPending} manualCourt={manualCourt} duplicateCourt={(courtCounts.get(courtKey(match)) || 0) > 1} onSaveCourt={onSaveCourt} />;
   return (
     <>
       {newReports > 0 && (
@@ -411,6 +458,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   // nachdem hier der Status auf "Läuft" gesetzt wurde - deshalb lokal vormerken,
   // welche Turniere in dieser Sitzung bereits gestartet wurden.
   const [startedTournamentIds, setStartedTournamentIds] = useState(() => new Set());
+  // Gespeicherte Turnieroptionen je Turnier – aus demselben Grund lokal nachgeführt.
+  const [savedOptions, setSavedOptions] = useState({});
 
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
   const selectedNonPlayable = nonPlayableTournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
@@ -419,6 +468,13 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const selectedTournamentStatus = selectedTournament
     ? (startedTournamentIds.has(selectedTournament.id) ? 'running' : selectedTournament.status)
     : null;
+  const tournamentOptions = useMemo(() => {
+    if (!selectedTournament) return DEFAULT_TOURNAMENT_OPTIONS;
+    const fromTournament = Object.fromEntries(Object.keys(DEFAULT_TOURNAMENT_OPTIONS)
+      .filter((key) => selectedTournament[key] !== undefined).map((key) => [key, selectedTournament[key]]));
+    return { ...DEFAULT_TOURNAMENT_OPTIONS, ...fromTournament, ...savedOptions[selectedTournament.id] };
+  }, [selectedTournament, savedOptions]);
+  const courtMode = tournamentOptions.courtMode;
 
   const queryKey = ['tournament-play', selectedTournamentId];
   const roundsQuery = useQuery({
@@ -669,13 +725,36 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     }
   }
 
+  // Rückfragen wie die Mêlée-Übernahme im Hauptprojekt: doppelte Namen und – ohne Freilos – Neu-Auslosen aller Teams,
+  // wenn ein Nachzügler sonst kein eigenes Team bekäme. Der Server meldet beides als 409 mit code.
   async function handleDrawMeleeTeams() {
     setBusy(true); setError(''); setMessage('');
     try {
       await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
-      const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/teams/draw`, { method: 'POST' });
+      const options = {};
+      let data = null;
+      while (!data) {
+        try {
+          data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/teams/draw`, { method: 'POST', body: JSON.stringify(options) });
+        } catch (err) {
+          const details = err.payload?.details;
+          if (err.status === 409 && details?.code === 'melee_duplicate_names' && !options.allowDuplicateNames) {
+            if (!window.confirm(t('Doppelte Namen: {{names}}. Trotzdem auslosen?', { names: details.names.join(', ') }))) return;
+            options.allowDuplicateNames = true;
+          } else if (err.status === 409 && details?.code === 'melee_redraw_required' && !options.confirmRedraw) {
+            if (!window.confirm(t('Neue Spieler: {{players}} – ohne Freilos ist daraus kein eigenes Team möglich. Die {{teams}} bisherigen Mêlée-Teams werden deshalb zusammen mit den neuen Spielern komplett neu ausgelost, die Teamzusammensetzung ändert sich. Fortfahren?', {
+              players: details.newPlayers, teams: details.teams,
+            }))) return;
+            options.confirmRedraw = true;
+          } else {
+            throw err;
+          }
+        }
+      }
       queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, teams: data.teams || [] }));
-      setMessage(t('{{drawn}} Mêlée-Teams ausgelost, insgesamt {{total}} Teams. {{open}} aktive Spieler ohne Team.', {
+      setMessage(t(data.redrawn
+        ? 'Alle Mêlée-Teams wurden neu ausgelost: {{total}} Teams. {{open}} aktive Spieler ohne Team.'
+        : '{{drawn}} Mêlée-Teams ausgelost, insgesamt {{total}} Teams. {{open}} aktive Spieler ohne Team.', {
         drawn: data.drawnCount, total: data.teams.length, open: data.unassignedCount,
       }));
     } catch (err) { setError(err.message); } finally { setBusy(false); }
@@ -694,8 +773,16 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
   function confirmResultOverwrite(result, match) {
     const existing = result.noShow ? t('Nicht angetreten') : `${result.scoreA}:${result.scoreB}`;
-    const matchup = match ? `${teamLabel(match.teamA)} ${t('gegen')} ${teamLabel(match.teamB)}\n` : '';
+    const matchup = match ? `${match.teamALabel ?? teamLabel(match.teamA)} ${t('gegen')} ${match.teamBLabel ?? teamLabel(match.teamB)}\n` : '';
     return window.confirm(matchup + t('Für diese Partie liegt bereits ein Ergebnis vor: {{result}}. Möchtest du es wirklich überschreiben?', { result: existing }));
+  }
+
+  // Händische Bahn (Spielbahn „Leer“). Fehler zeigt die Partie selbst an.
+  async function handleSaveCourt(matchId, court) {
+    const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/matches/${matchId}/court`, {
+      method: 'PUT', body: JSON.stringify({ court }),
+    });
+    queryClient.setQueryData([...queryKey, 'rounds'], (current) => ({ ...current, rounds: data.rounds }));
   }
 
   async function handleSaveResult(matchId, result) {
@@ -834,7 +921,12 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const openMeleePlayers = confirmedRegistrations.filter((registration) => registration.participation === 'active' && !assignedPlayerIds.has(registration.id)).length;
   const requiredMeleePlayers = meleeSize * (selectedTournament ? minimumTeams(selectedTournament) : 0);
   const canEditMeleeTeams = isMelee && !rounds.length;
-  const canDrawMeleeTeams = canEditMeleeTeams && openMeleePlayers >= meleeSize;
+  // Nach Turnierstart wie im Hauptprojekt nur noch neue Teams anhängen – in Systemen, die jede Runde neu paaren.
+  const canDrawLateMeleeTeams = isMelee && rounds.length > 0 && ['schweizer', 'formule_x'].includes(selectedTournament?.type);
+  const mixedMelee = ['DOUBLETTE_OHNE_FREILOS', 'TRIPLETTE_OHNE_FREILOS'].includes(tournamentOptions.meleeTeamMode);
+  // Ohne Freilos braucht ein neues Team mindestens 4 Spieler; vor Runde 1 reicht ein Nachzügler (Neu-Auslosen aller Teams).
+  const minOpenForDraw = mixedMelee ? (canEditMeleeTeams && swissTeams.length ? 1 : 4) : meleeSize;
+  const canDrawMeleeTeams = (canEditMeleeTeams || canDrawLateMeleeTeams) && openMeleePlayers >= minOpenForDraw;
   const missingMeleeDraw = isMelee && swissTeams.length === 0;
 
   // Voraussetzungen für "Neue Runde starten" proaktiv prüfen, damit der Turniersteller
@@ -918,10 +1010,10 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
               {t('Bestätigte Meldungen')} · {labelFor(REGISTRATION_TYPES, selectedTournament.registrationType)} · {labelFor(TOURNAMENT_TYPES, selectedTournament.type)} · {labelFor(FORMATIONS, selectedTournament.formation)}: {confirmedRegistrations.length} ({activeConfirmedCount} {t('aktiv')})
               {selectedTournament.type === 'schweizer' && ` · ${t(selectedTournament.schweizerRankingMode === 'ohne_buchholz' ? 'Ohne Buchholz' : 'Mit Buchholz und Feinbuchholz')}`}
             </p>
-            {canEditMeleeTeams && (
+            {(canEditMeleeTeams || canDrawLateMeleeTeams) && (
               <>
                 <Button variant="secondary" disabled={busy || !canDrawMeleeTeams} loading={busy} onClick={handleDrawMeleeTeams}>{t('Mêlée-Teams auslosen')}</Button>
-                {swissTeams.length > 0 && <Button variant="secondary" disabled={busy} loading={busy} onClick={handleResetMeleeTeams}>{t('Auslosung zurücksetzen')}</Button>}
+                {canEditMeleeTeams && swissTeams.length > 0 && <Button variant="secondary" disabled={busy} loading={busy} onClick={handleResetMeleeTeams}>{t('Auslosung zurücksetzen')}</Button>}
               </>
             )}
           </div>
@@ -943,6 +1035,14 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       {selectedTournament && <TournamentBoardShare tournament={selectedTournament} />}
       {/* Ankündigungen schon vor dem Turnierstart, damit der Veranstalter vorab informieren kann. */}
       {selectedTournament && selectedTournamentStatus !== 'finished' && <AnnouncementEditor tournament={selectedTournament} />}
+      {selectedTournament && selectedTournamentStatus !== 'finished' && (
+        <TournamentOptionsPanel tournament={selectedTournament} options={tournamentOptions}
+          onSaved={(options) => {
+            setSavedOptions((current) => ({ ...current, [selectedTournament.id]: options }));
+            // Optionen wirken sofort (Bahnen, Team-Anzeige, Freilos-Punkte): Runden und Rangliste neu laden.
+            queryClient.invalidateQueries({ queryKey });
+          }} />
+      )}
 
       {canEditMeleeTeams && selectedTournamentStatus === 'running' && (
         <p className="hint">
@@ -1011,7 +1111,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           <p className="hint">
             {!isMelee && t('Neue Spieler sind sofort für die nächste Runde aktiv.')}
             {isMelee && canEditMeleeTeams && t('Neue Spieler spielen erst mit, wenn sie per „Mêlée-Teams auslosen“ einem Team zugeteilt sind.')}
-            {isMelee && !canEditMeleeTeams && t('Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.')}
+            {isMelee && canDrawLateMeleeTeams && t('Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.')}
+            {isMelee && !canEditMeleeTeams && !canDrawLateMeleeTeams && t('Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.')}
           </p>
           <div className="row-actions round-participant-bulk">
             <Button variant="secondary" disabled={busy || !inactiveConfirmedCount} loading={bulkParticipation === 'active'} onClick={() => handleAllParticipation('active')}>{t('Alle aktivieren')}</Button>
@@ -1068,7 +1169,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       {selectedTournamentStatus !== 'finished' && currentRound && (
         <section className="panel play-current-round">
           <div className="section-title"><h2>{t('Runde')} {currentRound.roundNumber}</h2><span className={`status ${currentRoundOpen ? 'status-running' : 'registration-confirmed'}`}>{currentRoundOpen ? t('Offen') : t('Abgeschlossen')}</span></div>
-          <RoundResults key={`${selectedTournamentId}:${currentRound.id}`} round={currentRound} collapseDecided onSave={handleSaveResult} onSaveAll={handleSaveAll} onRefresh={() => roundsQuery.refetch()} busy={busy} refreshing={roundsQuery.isFetching} onConfirmReports={handleConfirmReports} confirmingReports={confirmingReports} />
+          <RoundResults key={`${selectedTournamentId}:${currentRound.id}`} round={currentRound} collapseDecided onSave={handleSaveResult} onSaveAll={handleSaveAll} onRefresh={() => roundsQuery.refetch()} busy={busy} refreshing={roundsQuery.isFetching} onConfirmReports={handleConfirmReports} confirmingReports={confirmingReports} manualCourt={courtMode === 'L'} onSaveCourt={handleSaveCourt} />
           <RoundAction />
         </section>
       )}

@@ -7,7 +7,8 @@ export function normalizeRanking(ranking) {
     return {
       rank: entry.rank,
       registrationIds: entry.registrationIds || members.map((member) => member.id || member.playerId),
-      label: members.map((member) => member.teamLabel || [member.firstName, member.lastName].filter(Boolean).join(' ') || '?').join(' + '),
+      // displayLabel: Team-Anzeige der Turnieroptionen (Teamnummer/Spielernamen), sonst Teamname bzw. Namen.
+      label: entry.displayLabel ?? members.map((member) => member.teamLabel || [member.firstName, member.lastName].filter(Boolean).join(' ') || '?').join(' + '),
       wins: entry.wins ?? null,
       losses: entry.losses ?? (entry.wins != null && entry.gameDiff != null ? entry.wins - entry.gameDiff : null),
       gameDiff: entry.gameDiff ?? null,

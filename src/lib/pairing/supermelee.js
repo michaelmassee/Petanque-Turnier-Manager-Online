@@ -87,7 +87,7 @@ export function computeGameSizes(playerCount, formation) {
   return sizes;
 }
 
-function splitGameSize(gameSize) {
+export function splitGameSize(gameSize) {
   if (gameSize === 4) return [2, 2];
   if (gameSize === 6) return [3, 3];
   return [3, 2];

@@ -45,6 +45,9 @@ import {
   LIVE_PUSH_CHUNK_SIZE,
   isTournamentStale,
   dateDaysAgo,
+  assignCourts,
+  normalizeCourt,
+  normalizeTournamentOptions,
   registrationOpenStatus as coreRegistrationOpenStatus,
   tournamentMatchesSavedSearch,
   validateMatchScore,
@@ -59,7 +62,7 @@ import { normalizeRanking } from './lib/live-ranking.js';
 import { parseStoredQrDesign } from './lib/qr-design.js';
 import { fetchCloudflareUsageDay, fetchCloudflareUsageDays, isCloudflareUsageConfigured } from './cloudflare-usage-core.js';
 import { checkRoundRequirements, getPairingStrategy, isMeleeTeamTournament, isOnlinePlayable, roundRequirementMessage } from './lib/pairing/index.js';
-import { buildMeleeTeams, meleeTeamSize } from './lib/pairing/melee.js';
+import { buildMeleeTeams, buildMeleeTeamsWithoutBye, duplicateMeleeNames, isMixedMeleeMode, meleeTeamSize, usablePlayersWithoutBye } from './lib/pairing/melee.js';
 import { competitionRanks, computeRanking, computeSupermeleeRanking, sameStandardRankingPlace } from './lib/pairing/ranking.js';
 import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schweizer.js';
 import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
@@ -2715,7 +2718,7 @@ export default {
           if (!canViewParticipants(tournament, session?.user || null)) {
             throw new HttpError(403, 'Zugriff verweigert');
           }
-          return await listTournamentRounds(env.DB, tournament.id);
+          return await listTournamentRounds(env.DB, tournament);
         }
 
         if (request.method === 'POST') {
@@ -2754,7 +2757,8 @@ export default {
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         const session = await requireSession(request, env.DB);
         assertCanManageTournament(tournament, session.user);
-        return await drawMeleeTeams(env.DB, tournament);
+        // Ohne Body (ältere Clients) gelten keine Rückfragen als bestätigt.
+        return await drawMeleeTeams(env.DB, tournament, await request.json().catch(() => ({})));
       }
 
       const tournamentTeamsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/teams$/);
@@ -2773,6 +2777,26 @@ export default {
         const session = await requireSession(request, env.DB);
         assertCanManageTournament(tournament, session.user);
         return await setTournamentRoundResults(request, env.DB, tournament, roundResultsMatch[2]);
+      }
+
+      // Turnieroptionen der Spielverwaltung (Spielbahn). Wirkt auf jede danach ausgeloste Runde.
+      const tournamentOptionsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/options$/);
+      if (tournamentOptionsMatch && request.method === 'PUT') {
+        const tournament = await getTournamentById(env.DB, tournamentOptionsMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await requireSession(request, env.DB);
+        assertCanManageTournament(tournament, session.user);
+        return await setTournamentOptions(request, env.DB, tournament);
+      }
+
+      // Händisch eingetragene Bahn einer Partie (Spielbahn „Leere Spalte“).
+      const tournamentMatchCourtMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/matches\/([^/]+)\/court$/);
+      if (tournamentMatchCourtMatch && request.method === 'PUT') {
+        const tournament = await getTournamentById(env.DB, tournamentMatchCourtMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await requireSession(request, env.DB);
+        assertCanManageTournament(tournament, session.user);
+        return await setTournamentMatchCourt(request, env.DB, tournament, tournamentMatchCourtMatch[2]);
       }
 
       const tournamentMatchResultMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/matches\/([^/]+)\/result$/);
@@ -2803,7 +2827,7 @@ export default {
         await env.DB.prepare(`UPDATE tournament_matches SET result_report_pending = 0
             WHERE tournament_id = ? AND result_report_pending = 1 AND id IN (SELECT value FROM json_each(?))`)
           .bind(tournament.id, JSON.stringify(matchIds)).run();
-        return await listTournamentRounds(env.DB, tournament.id);
+        return await listTournamentRounds(env.DB, tournament);
       }
 
       const tournamentRankingMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/ranking$/);
@@ -7419,13 +7443,21 @@ function parseTeamIds(idsJson) {
   }
 }
 
-function toPublicMatch(row, playersById) {
+// display: Team-Anzeige der Spielrunde (Turnieroption); außer bei NAME (bisherige Anzeige) mit fertiger Bezeichnung.
+function toPublicMatch(row, playersById, display = null) {
   const resolvePlayers = (idsJson) =>
     parseTeamIds(idsJson).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' });
+  const teamA = resolvePlayers(row.team_a_registration_ids);
+  const teamB = resolvePlayers(row.team_b_registration_ids);
+  const labels = display && display.mode !== 'NAME' ? {
+    teamALabel: teamDisplayLabel(teamA, display.numbers.get(row.team_a_id), display.mode),
+    teamBLabel: teamB.length ? teamDisplayLabel(teamB, display.numbers.get(row.team_b_id), display.mode) : null,
+  } : {};
   return {
     id: row.id,
-    teamA: resolvePlayers(row.team_a_registration_ids),
-    teamB: resolvePlayers(row.team_b_registration_ids),
+    teamA,
+    teamB,
+    ...labels,
     scoreA: row.score_a,
     scoreB: row.score_b,
     noShow: row.no_show,
@@ -7468,8 +7500,22 @@ async function getPlayersById(db, tournamentId, activeIds = null) {
     return [row.id, {
       id: row.id, firstName: row.first_name, lastName: row.last_name,
       teamLabel: row.team_name || names.join(' + '),
+      playerNames: names.join(' + '),
     }];
   }));
+}
+
+// Teamnummer wie die Meldelisten-Nr. im Hauptprojekt: Reihenfolge der festen Teams (Anmeldereihenfolge bzw. Auslosung).
+function teamNumbers(teams) {
+  return new Map(teams.map((team, index) => [team.id, index + 1]));
+}
+
+// Team-Anzeige wie im Hauptprojekt (TeamAnzeige): NR = Teamnummer, SPIELERNAMEN = Namen aller Spieler,
+// NAME = Teamname, ohne Teamnamen die Spielernamen. Ohne feste Teamnummer (z. B. Supermêlée) die Namen.
+function teamDisplayLabel(players, number, mode) {
+  if (mode === 'NR' && number) return String(number);
+  if (mode === 'SPIELERNAMEN') return players.map((player) => player.playerNames || player.teamLabel).join(' + ');
+  return players.map((player) => player.teamLabel).join(' + ');
 }
 
 async function getSchweizerTeams(db, tournament) {
@@ -7486,7 +7532,7 @@ async function assignKoBracketGroups(db, tournament, teams) {
     return teams;
   }
   const ordered = orderKoSeeds(teams);
-  const assignment = assignKoGroups(ordered.map((team) => team.id));
+  const assignment = assignKoGroups(ordered.map((team) => team.id), koGroupOptions(tournament));
   const groupById = new Map(assignment.map((entry) => [entry.teamId, entry.group]));
   await db.batch(teams.map((team) => db.prepare('UPDATE tournament_teams SET bracket_group = ? WHERE id = ?').bind(groupById.get(team.id) || 'A', team.id)));
   return teams.map((team) => ({ ...team, bracketGroup: groupById.get(team.id) || 'A' }));
@@ -7577,34 +7623,86 @@ function assertOnlineExecution(tournament) {
   }
 }
 
-// Mêlée-Teams lassen sich nur online und bis zur ersten Runde ändern; liefert die Team-Größe.
-async function assertMeleeTeamsEditable(db, tournament) {
+// Systeme, in denen wie im Hauptprojekt (Mêlée-Übernahme nach Turnierstart) nachgekommene Mêlée-Spieler als neue Teams
+// einsteigen: Schweizer und Formule X paaren jede Runde die aktiven Teams. Jeder gegen Jeden (fester Spielplan) und
+// K.O. (fester Turnierbaum) können keine Teams mehr aufnehmen.
+const LATE_MELEE_TEAM_TYPES = ['schweizer', 'formule_x'];
+
+// Mêlée-Teams lassen sich nur online ändern; bis zur ersten Runde frei, danach (allowLate) nur neue Teams anhängen.
+// Liefert die Team-Größe und ob das Turnier schon begonnen hat.
+async function assertMeleeTeamsEditable(db, tournament, { allowLate = false } = {}) {
   assertOnlineExecution(tournament);
   if (!isMeleeTeamTournament(tournament)) throw new HttpError(400, 'Die Team-Auslosung ist nur für Mêlée-Turniere mit Online-Rundenverwaltung verfügbar.');
   if (tournament.status === 'finished') throw new HttpError(409, 'Nach Turnierende können Teams nicht mehr ausgelost werden');
   const rounds = await db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?').bind(tournament.id).first();
-  if (Number(rounds.count)) throw new HttpError(409, 'Nach der ersten Runde können Teams nicht mehr ausgelost werden');
+  const started = Number(rounds.count) > 0;
+  if (started && !(allowLate && LATE_MELEE_TEAM_TYPES.includes(tournament.type))) {
+    throw new HttpError(409, 'Nach der ersten Runde können Teams nicht mehr ausgelost werden');
+  }
   const size = meleeTeamSize(tournament.formation);
   if (!size) throw new HttpError(400, 'Mêlée-Teams lassen sich nur für Doublette oder Triplette auslosen.');
-  return size;
+  return { size, started };
+}
+
+// afterIso: created_at des letzten bestehenden Teams – neue Teams beginnen dahinter, auch bei rasch aufeinanderfolgenden
+// Auslosungen. Sonst mischten sich die versetzten Zeitstempel und Reihenfolge bzw. Teamnummern sprängen.
+function insertMeleeTeams(db, tournamentId, teams, afterIso = null) {
+  // Versetzte Zeitstempel halten die Reihenfolge der Teams stabil (getSchweizerTeams sortiert nach created_at).
+  const nowMs = Math.max(Date.now(), afterIso ? Date.parse(afterIso) + 1 : 0);
+  return teams.map((team, index) => db.prepare('INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(crypto.randomUUID(), tournamentId, JSON.stringify(team.members), team.seedPosition, new Date(nowMs + index).toISOString()));
 }
 
 // Mêlée-Auslosung wie die Mêlée-Übernahme im Hauptprojekt (AbstractMeleeAnmeldungUebernehmenSheet): nur aktive
-// Spieler ohne Team werden zu neuen Teams gemischt und an die bestehenden angehängt - wiederholbar für Nachzügler.
-export async function drawMeleeTeams(db, tournament) {
-  const size = await assertMeleeTeamsEditable(db, tournament);
-  await releaseInvalidMeleeTeams(db, tournament.id);
+// Spieler ohne Team werden zu neuen Teams gemischt und an die bestehenden angehängt - wiederholbar für Nachzügler,
+// in Schweizer/Formule X auch nach Turnierstart. Je nach Turnieroption feste Teamgröße (EINFACH) oder gemischte
+// Doubletten/Triplettes ohne Freilos. Body: { confirmRedraw, allowDuplicateNames } nach den Rückfragen (409 mit code).
+export async function drawMeleeTeams(db, tournament, body = {}) {
+  const { size, started } = await assertMeleeTeamsEditable(db, tournament, { allowLate: true });
+  const mode = tournament.melee_team_mode || 'EINFACH';
+  const mixed = isMixedMeleeMode(mode);
+  if (!started) await releaseInvalidMeleeTeams(db, tournament.id);
   const existing = await getSchweizerTeams(db, tournament);
   const assigned = new Set(existing.flatMap((team) => team.members));
-  const registrations = await db.prepare("SELECT id, seeding_position FROM registrations WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active' ORDER BY registered_at, id").bind(tournament.id).all();
+  const registrations = await db.prepare(`SELECT id, first_name, last_name, seeding_position FROM registrations
+      WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'active' ORDER BY registered_at, id`).bind(tournament.id).all();
   const open = registrations.results.filter((row) => !assigned.has(row.id));
-  const teams = buildMeleeTeams(open.map((row) => ({ id: row.id, seedPosition: Number(row.seeding_position || 0) })), size);
-  if (!teams.length) throw new HttpError(400, 'Für eine Auslosung sind nicht genügend aktive Spieler ohne Team vorhanden.');
-  // Versetzte Zeitstempel halten die Reihenfolge der Teams stabil (getSchweizerTeams sortiert nach created_at).
-  const nowMs = Date.now();
-  await db.batch(teams.map((team, index) => db.prepare('INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(crypto.randomUUID(), tournament.id, JSON.stringify(team.members), team.seedPosition, new Date(nowMs + index).toISOString())));
-  return json({ teams: await getSchweizerTeams(db, tournament), drawnCount: teams.length, unassignedCount: open.length - teams.length * size });
+  const asPlayer = (row) => ({ id: row.id, seedPosition: Number(row.seeding_position || 0) });
+
+  // Doppelte Namen wie MeleeDoppelteNamen im Hauptprojekt; online nur eine Rückfrage, gleichnamige Personen gibt es.
+  const duplicates = duplicateMeleeNames(registrations.results.map((row) => ({ firstName: row.first_name, lastName: row.last_name, open: !assigned.has(row.id) })));
+  if (duplicates.length && body?.allowDuplicateNames !== true) {
+    throw new HttpError(409, 'Doppelte Namen unter den Spielern.', { code: 'melee_duplicate_names', names: duplicates });
+  }
+
+  // Ohne Freilos und vor Runde 1: Lassen sich die neuen Spieler nicht vollständig zu eigenen Teams formen (z. B. ein
+  // einzelner Nachzügler), werden nach Rückfrage alle Mêlée-Teams mit ihnen neu ausgelost (MeleeNeuAuslosungPlan).
+  if (mixed && !started && existing.length && open.length && usablePlayersWithoutBye(open.length) !== open.length) {
+    const previous = registrations.results.filter((row) => assigned.has(row.id));
+    const teams = buildMeleeTeamsWithoutBye([...previous, ...open].map(asPlayer), mode);
+    const openIds = new Set(open.map((row) => row.id));
+    const newlyAssigned = teams.flatMap((team) => team.members).filter((id) => openIds.has(id)).length;
+    if (newlyAssigned) {
+      if (body?.confirmRedraw !== true) {
+        throw new HttpError(409, 'Ohne Freilos ist aus den neuen Spielern kein eigenes Team möglich.', {
+          code: 'melee_redraw_required', newPlayers: open.length, teams: existing.length,
+        });
+      }
+      await db.batch([db.prepare('DELETE FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id), ...insertMeleeTeams(db, tournament.id, teams)]);
+      return json({ teams: await getSchweizerTeams(db, tournament), drawnCount: teams.length, unassignedCount: open.length - newlyAssigned, redrawn: true });
+    }
+  }
+
+  const teams = mixed ? buildMeleeTeamsWithoutBye(open.map(asPlayer), mode) : buildMeleeTeams(open.map(asPlayer), size);
+  if (!teams.length) {
+    throw new HttpError(400, mixed && started
+      ? 'Für ein Team ohne Freilos sind nicht genügend aktive Spieler ohne Team vorhanden (mindestens 4). Die bisherigen Teams können nach Turnierstart nicht mehr neu ausgelost werden.'
+      : 'Für eine Auslosung sind nicht genügend aktive Spieler ohne Team vorhanden.');
+  }
+  const last = await db.prepare('SELECT MAX(created_at) AS createdAt FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).first();
+  await db.batch(insertMeleeTeams(db, tournament.id, teams, last?.createdAt || null));
+  const drawn = teams.reduce((sum, team) => sum + team.members.length, 0);
+  return json({ teams: await getSchweizerTeams(db, tournament), drawnCount: teams.length, unassignedCount: open.length - drawn });
 }
 
 // Wie das Löschen von Teams im Hauptprojekt: alle Spieler sind danach wieder ohne Team.
@@ -7631,17 +7729,19 @@ async function fixedTeams(db, tournament) {
   return tournament.registration_type === 'melee' ? getSchweizerTeams(db, tournament) : createFormeTeams(db, tournament);
 }
 
-async function listTournamentRounds(db, tournamentId) {
-  return json(await loadTournamentRounds(db, tournamentId));
+async function listTournamentRounds(db, tournament) {
+  return json(await loadTournamentRounds(db, tournament));
 }
 
 // publicTournament: öffentliche Sicht (Turnierseite, Live-Ansichten) ohne unbestätigte Spielermeldungen; diese stehen
 // dann getrennt in pendingReports (Registrierungs-IDs und Ergebnis), damit die beteiligten Teams ihre Meldung sehen.
-async function loadTournamentRounds(db, tournamentId, { publicTournament = null } = {}) {
+async function loadTournamentRounds(db, tournament, { publicTournament = null } = {}) {
+  const tournamentId = tournament.id;
   const roundsResult = await db.prepare('SELECT * FROM tournament_rounds WHERE tournament_id = ? ORDER BY round_number ASC').bind(tournamentId).all();
   const matchesResult = await db.prepare('SELECT * FROM tournament_matches WHERE tournament_id = ? ORDER BY created_at ASC, match_index ASC').bind(tournamentId).all();
   const teamsResult = await db.prepare('SELECT id, member_registration_ids, seed_position FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id').bind(tournamentId).all();
   const playersById = await getPlayersById(db, tournamentId);
+  const display = { mode: tournamentOptions(tournament).teamDisplayRound, numbers: teamNumbers(teamsResult.results) };
 
   const matchesByRound = new Map();
   const pendingReports = [];
@@ -7651,7 +7751,7 @@ async function loadTournamentRounds(db, tournamentId, { publicTournament = null 
         scoreA: row.score_a, scoreB: row.score_b });
     }
     const list = matchesByRound.get(row.round_id) || [];
-    list.push(toPublicMatch(publicTournament ? withoutUnconfirmedReport(row, publicTournament) : row, playersById));
+    list.push(toPublicMatch(publicTournament ? withoutUnconfirmedReport(row, publicTournament) : row, playersById, display));
     matchesByRound.set(row.round_id, list);
   }
 
@@ -7719,7 +7819,7 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
     // zurückgenommen und Teams mit nicht mehr aktiven Spielern aufgelöst; danach Teams auslosen und neu starten.
     if (melee && Number(existingRounds.count) === 1) {
       const withdrawn = await withdrawFirstMeleeRoundIfTeamsChanged(db, tournament.id, lastRound.id);
-      if (withdrawn) return json({ ...(await loadTournamentRounds(db, tournament.id)), roundWithdrawn: true });
+      if (withdrawn) return json({ ...(await loadTournamentRounds(db, tournament)), roundWithdrawn: true });
     }
   } else if (lastRound) {
     const openMatches = await db
@@ -7749,7 +7849,7 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
       // Wie beim Start im Hauptprojekt: Teams (und K.O.-Teilbäume) aus den jetzt aktiven Meldungen.
       teams = await activeFormeTeams(db, tournament.id);
       if (isKo && teams.length) {
-        const groupById = new Map(assignKoGroups(orderKoSeeds(teams).map((team) => team.id)).map((entry) => [entry.teamId, entry.group]));
+        const groupById = new Map(assignKoGroups(orderKoSeeds(teams).map((team) => team.id), koGroupOptions(tournament)).map((entry) => [entry.teamId, entry.group]));
         teams = teams.map((team) => ({ ...team, bracketGroup: groupById.get(team.id) || 'A' }));
       }
       rebuiltTeams = teams;
@@ -7799,7 +7899,7 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
       ? { mode: tournament.schweizer_ranking_mode }
       : isKo
         ? { platz3: !!tournament.ko_platz3 }
-        : { formation: tournament.formation };
+        : { formation: tournament.formation, returnRound: Number(tournament.round_robin_return || 0) === 1 };
     ({ matches } = strategy.generateRound(players, history, strategyOptions));
   } catch (error) {
     // generateRound prüft die Mindestvoraussetzungen (u.a. mind. 4 bestätigte
@@ -7830,20 +7930,22 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
     // Wer die nächste Runde startet, hat die Ergebnisse geprüft: offene Spielermeldungen gelten als bestätigt.
     db.prepare('UPDATE tournament_matches SET result_report_pending = 0 WHERE tournament_id = ? AND result_report_pending = 1').bind(tournament.id),
   ];
+  // Spielbahn wie im Hauptprojekt: beim Auslosen vergeben (N/R), sonst leer (X, L = später händisch).
+  const courts = assignCourts(matches, roundCourtMode(tournament, roundNumber));
   matches.forEach((match, matchIndex) => {
     const teamA = usesFixedTeams ? teamsById.get(match.teamA[0]) : null;
     const teamB = usesFixedTeams && match.teamB.length ? teamsById.get(match.teamB[0]) : null;
     statements.push(
       db
         .prepare(
-          'INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, match_index, stage_label, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, match_index, stage_label, court, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         )
         // Freilos-Anzeigewert 13:7 statt 13:0, konsistent mit den Hauptprojekt-Default-
         // Freispielpunkten (Diff 6), die swissStats() in schweizer.js verbucht. Auch für
         // Jeder-gegen-Jeden nötig, sonst blockiert ein unbewertetes Freilos-Match die
         // nächste Runde (siehe openMatches-Check oben). K.O. kennt kein Freilos (Cadrage
         // statt Freilos, siehe lib/pairing/ko.js), match.teamB ist dort immer belegt.
-        .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(teamA?.members || match.teamA), JSON.stringify(teamB?.members || match.teamB), teamA?.id || null, teamB?.id || null, usesFixedTeams && !teamB ? 13 : null, usesFixedTeams && !teamB ? 7 : null, matchIndex, match.label || null, now, now),
+        .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(teamA?.members || match.teamA), JSON.stringify(teamB?.members || match.teamB), teamA?.id || null, teamB?.id || null, usesFixedTeams && !teamB ? byePoints(tournament).pointsFor : null, usesFixedTeams && !teamB ? byePoints(tournament).pointsAgainst : null, matchIndex, match.label || null, courts[matchIndex], now, now),
     );
   });
   try {
@@ -7859,7 +7961,88 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
     throw error;
   }
 
-  return listTournamentRounds(db, tournament.id);
+  return listTournamentRounds(db, tournament);
+}
+
+// Turnieroptionen der Spielverwaltung für den Client (Standardwerte wie in Migration 0154).
+function tournamentOptions(row) {
+  const number = (value, fallback) => (value === undefined || value === null ? fallback : Number(value));
+  return {
+    courtMode: row.court_mode || 'X',
+    byePointsFor: number(row.bye_points_for, 13),
+    byePointsAgainst: number(row.bye_points_against, 7),
+    missedRoundPointsFor: number(row.missed_round_points_for, 0),
+    missedRoundPointsAgainst: number(row.missed_round_points_against, 13),
+    koGroupSize: number(row.ko_group_size, 16),
+    koMinLastGroupSize: number(row.ko_min_last_group_size, 4),
+    koCourtFirstRoundOnly: number(row.ko_court_first_round_only, 1) === 1,
+    teamDisplayRound: row.team_display_round || 'NAME',
+    teamDisplayRanking: row.team_display_ranking || 'NAME',
+    roundRobinReturn: number(row.round_robin_return, 0) === 1,
+    meleeTeamMode: row.melee_team_mode || 'EINFACH',
+  };
+}
+
+function byePoints(tournament) {
+  const options = tournamentOptions(tournament);
+  return { pointsFor: options.byePointsFor, pointsAgainst: options.byePointsAgainst };
+}
+
+function koGroupOptions(tournament) {
+  const options = tournamentOptions(tournament);
+  return { maxGroupSize: options.koGroupSize, minLastGroupSize: options.koMinLastGroupSize };
+}
+
+// K.O. „Bahn nur Runde 1“ (Hauptprojekt-Standard): ab Runde 2 keine Bahn. Eine Cadrage ist online Runde 1.
+function roundCourtMode(tournament, roundNumber) {
+  const options = tournamentOptions(tournament);
+  if (tournament.type === 'ko' && options.koCourtFirstRoundOnly && roundNumber > 1) return 'X';
+  return options.courtMode;
+}
+
+export async function setTournamentOptions(request, db, tournament) {
+  if (tournament.status === 'finished') throw new HttpError(409, 'Das Turnier ist beendet.');
+  const columns = normalizeTournamentOptions(await readJson(request));
+  const names = Object.keys(columns);
+  if (!names.length) throw new HttpError(400, 'Keine Turnieroptionen übergeben');
+  const updated = { ...tournament, ...columns };
+  const now = new Date().toISOString();
+  const statements = [db.prepare(`UPDATE tournaments SET ${names.map((name) => `${name} = ?`).join(', ')}, updated_at = ? WHERE id = ?`)
+    .bind(...names.map((name) => columns[name]), now, tournament.id)];
+  if (!isDocumentBound(tournament)) {
+    // Spielbahn sofort für die aktuelle (letzte) Runde, frühere Runden bleiben. Bei „Leer“ bleiben eingetragene Bahnen
+    // stehen, damit die Turnierleitung sie nur noch korrigiert.
+    if ((columns.court_mode !== undefined || columns.ko_court_first_round_only !== undefined) && updated.court_mode !== 'L') {
+      const lastRound = await db.prepare('SELECT id, round_number FROM tournament_rounds WHERE tournament_id = ? ORDER BY round_number DESC LIMIT 1')
+        .bind(tournament.id).first();
+      if (lastRound) {
+        const { results: matches = [] } = await db.prepare('SELECT id, team_b_registration_ids FROM tournament_matches WHERE round_id = ? ORDER BY match_index')
+          .bind(lastRound.id).all();
+        const courts = assignCourts(matches.map((match) => ({ teamB: parseTeamIds(match.team_b_registration_ids) })), roundCourtMode(updated, lastRound.round_number));
+        const update = db.prepare('UPDATE tournament_matches SET court = ?, updated_at = ? WHERE id = ?');
+        matches.forEach((match, index) => statements.push(update.bind(courts[index], now, match.id)));
+      }
+    }
+    // Freilos-Punkte gelten für alle Runden: Das Hauptprojekt (Schweizer) rechnet sie bei jeder Auswertung neu ein.
+    if (columns.bye_points_for !== undefined) {
+      statements.push(db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, updated_at = ?
+          WHERE tournament_id = ? AND team_b_registration_ids = '[]' AND team_a_id IS NOT NULL`)
+        .bind(columns.bye_points_for, columns.bye_points_against, now, tournament.id));
+    }
+  }
+  await db.batch(statements);
+  return json(tournamentOptions(updated));
+}
+
+export async function setTournamentMatchCourt(request, db, tournament, matchId) {
+  assertOnlineExecution(tournament);
+  const body = await readJson(request);
+  const court = normalizeCourt(body?.court);
+  const saved = await db.prepare('UPDATE tournament_matches SET court = ?, updated_at = ? WHERE id = ? AND tournament_id = ?')
+    .bind(court, new Date().toISOString(), matchId, tournament.id).run();
+  if (!saved.meta.changes) throw new HttpError(404, 'Spiel nicht gefunden');
+  await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
+  return listTournamentRounds(db, tournament);
 }
 
 export async function setTournamentMatchResult(request, db, tournament, matchId) {
@@ -7901,7 +8084,7 @@ export async function setTournamentMatchResult(request, db, tournament, matchId)
     throw conflict({ scoreA: latest.score_a, scoreB: latest.score_b, noShow: latest.no_show });
   }
   await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
-  return listTournamentRounds(db, tournament.id);
+  return listTournamentRounds(db, tournament);
 }
 
 export async function setTournamentRoundResults(request, db, tournament, roundId) {
@@ -7932,7 +8115,7 @@ export async function setTournamentRoundResults(request, db, tournament, roundId
     .bind(entry.scoreA, entry.scoreB, now, entry.matchId, tournament.id, roundId, entry.expected.scoreA, entry.expected.scoreB, entry.expected.noShow, entry.confirmOverwrite === true ? 1 : 0)));
   const savedMatchIds = entries.filter((entry, index) => saved[index].meta.changes).map((entry) => entry.matchId);
   if (savedMatchIds.length) await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
-  const data = await loadTournamentRounds(db, tournament.id);
+  const data = await loadTournamentRounds(db, tournament);
   const currentMatches = new Map(data.rounds.flatMap((round) => round.matches).map((match) => [match.id, match]));
   const conflicts = entries.filter((entry, index) => !saved[index].meta.changes).map((entry) => {
     const match = currentMatches.get(entry.matchId);
@@ -8304,6 +8487,14 @@ async function notifyFinalRanking(env, tournament, sender, origin, shareToken = 
   }
 }
 
+// Team-Anzeige der Rangliste (Turnieroption); NAME bleibt die bisherige Bezeichnung aus normalizeRanking.
+function withRankingLabels(tournament, teams, entries) {
+  const mode = tournamentOptions(tournament).teamDisplayRanking;
+  if (mode === 'NAME') return entries;
+  const numbers = teamNumbers(teams);
+  return entries.map((entry) => ({ ...entry, displayLabel: teamDisplayLabel(entry.members, numbers.get(entry.teamId), mode) }));
+}
+
 export async function computeTournamentRanking(db, tournament) {
   // Bei einem gebundenen Turnier gilt der Snapshot des Dokuments, auch nach einem Zurücksetzen des Starts: eine
   // Online-Berechnung kennt die Kriterien der Desktop-Systeme (Poule, Kaskade, …) nicht.
@@ -8334,10 +8525,10 @@ export async function computeTournamentRanking(db, tournament) {
       sortSwiss(swissStats(teams, swissMatches, tournament.schweizer_ranking_mode), tournament.schweizer_ranking_mode),
       (previous, entry) => sameSwissRankingPlace(previous, entry, tournament.schweizer_ranking_mode),
     );
-    return ranking.map((entry) => ({
+    return withRankingLabels(tournament, teams, ranking.map((entry) => ({
       ...entry, teamId: entry.teamId,
       members: (teamsById.get(entry.teamId)?.members || []).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
-    }));
+    })));
   }
   if (tournament.type === 'ko') {
     // Anders als Schweizer/Formule X/JGJ kennt das Hauptprojekt für K.O. keine
@@ -8358,10 +8549,10 @@ export async function computeTournamentRanking(db, tournament) {
     const roundsPlayed = perRound ? Math.floor(formuleXMatches.length / perRound) : 0;
     const playersById = await getPlayersById(db, tournament.id);
     const ranking = competitionRanks(sortFormuleX(formuleXStats(teams, formuleXMatches, roundsPlayed)), sameFormuleXRankingPlace);
-    return ranking.map((entry) => ({
+    return withRankingLabels(tournament, teams, ranking.map((entry) => ({
       ...entry, teamId: entry.teamId,
       members: (teamsById.get(entry.teamId)?.members || []).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
-    }));
+    })));
   }
   if (tournament.registration_type === 'melee') {
     // Jeder gegen Jeden mit Mêlée: Rangliste je ausgelostem Team statt je Spieler.
@@ -8371,12 +8562,12 @@ export async function computeTournamentRanking(db, tournament) {
       teamA: row.team_a_id ? [row.team_a_id] : [], teamB: row.team_b_id ? [row.team_b_id] : [], scoreA: row.score_a, scoreB: row.score_b, noShow: row.no_show,
     }));
     const playersById = await getPlayersById(db, tournament.id);
-    return competitionRanks(computeRanking(teamMatches), sameStandardRankingPlace).map(({ playerId, ...entry }) => ({
+    return withRankingLabels(tournament, teams, competitionRanks(computeRanking(teamMatches), sameStandardRankingPlace).map(({ playerId, ...entry }) => ({
       ...entry, teamId: playerId,
       members: (teamsById.get(playerId)?.members || []).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
-    }));
+    })));
   }
-  // Supermêlée: Fehlrunden zählen 0:13 (Hauptprojekt-Standard). Runden und aktive Spieler stammen aus den ohnehin
+  // Supermêlée: Fehlrunden zählen mit den konfigurierten Punkten (Hauptprojekt-Standard 0:13). Runden und aktive Spieler stammen aus den ohnehin
   // geladenen Partien (je Runde ein gemeinsamer created_at) und Meldungen - keine zusätzlichen D1-Lesezugriffe.
   const activeIds = tournament.registration_type === 'supermelee' ? [] : null;
   const playersById = await getPlayersById(db, tournament.id, activeIds);
@@ -8387,7 +8578,9 @@ export async function computeTournamentRanking(db, tournament) {
       if (!matchesByRound.has(row.round_id)) matchesByRound.set(row.round_id, []);
       matchesByRound.get(row.round_id).push(matches[index]);
     });
-    rankingStats = computeSupermeleeRanking([...matchesByRound.values()], activeIds);
+    const options = tournamentOptions(tournament);
+    rankingStats = computeSupermeleeRanking([...matchesByRound.values()], activeIds,
+      { pointsFor: options.missedRoundPointsFor, pointsAgainst: options.missedRoundPointsAgainst });
   } else {
     rankingStats = computeRanking(matches);
   }
@@ -8459,7 +8652,7 @@ async function invalidateLiveSnapshot(origin, tournamentId) {
 
 async function computeLiveSnapshot(db, tournament) {
   const [{ rounds, pendingReports }, ranking] = await Promise.all([
-    loadTournamentRounds(db, tournament.id, { publicTournament: tournament }),
+    loadTournamentRounds(db, tournament, { publicTournament: tournament }),
     computeTournamentRanking(db, tournament),
   ]);
   // Vor der ersten Runde gehört die Meldeliste zur Anzeige. Sie nutzt denselben kurzen Cache
@@ -8776,7 +8969,7 @@ async function livePlayerRoundPushItems(db, tournament, roundNumber, appOrigin) 
       FROM live_push_subscriptions s JOIN registrations r ON r.id = s.registration_id
       WHERE r.tournament_id = ? AND r.status = 'confirmed'`).bind(tournament.id).all();
   if (!subscriptions.results?.length) return [];
-  const { rounds } = await loadTournamentRounds(db, tournament.id);
+  const { rounds } = await loadTournamentRounds(db, tournament);
   const round = rounds.find((entry) => entry.roundNumber === roundNumber);
   if (!round) return [];
   const items = [];
@@ -13512,6 +13705,8 @@ export function toPublicTournament(row, user) {
     registrationType: row.registration_type || 'forme',
     schweizerRankingMode: row.schweizer_ranking_mode || 'mit_buchholz',
     koPlatz3: row.ko_platz3 === undefined ? true : Boolean(Number(row.ko_platz3)),
+    courtMode: row.court_mode || 'X',
+    ...tournamentOptions(row),
     status: row.status,
     maxRegistrations: Number(row.max_registrations || 0),
     registrationDeadline: row.registration_deadline,

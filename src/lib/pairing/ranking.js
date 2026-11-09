@@ -37,13 +37,21 @@ export function sameStandardRankingPlace(a, b) {
 // Siege absteigend, dann Spieldifferenz, dann Punktedifferenz, dann erzielte Punkte.
 // missedRounds: Spieler-IDs je nicht gespielter Runde (mehrfach für mehrere Runden), gewertet mit MISSED_ROUND_SCORE;
 // participants: Spieler, die auch ohne gewertete Partie in der Rangliste stehen.
-export function computeRanking(matches, { missedRounds = [], participants = [] } = {}) {
+export function computeRanking(matches, { missedRounds = [], participants = [], missedRoundScore = MISSED_ROUND_SCORE } = {}) {
   const stats = new Map();
   for (const playerId of participants) {
     if (!stats.has(playerId)) stats.set(playerId, { playerId, wins: 0, gameDiff: 0, pointsFor: 0, pointsAgainst: 0 });
   }
   for (const playerId of missedRounds) {
-    applyResult(stats, playerId, false, MISSED_ROUND_SCORE.pointsFor, MISSED_ROUND_SCORE.pointsAgainst);
+    // Wie das Hauptprojekt (SpieltagRanglisteSheet): eine nicht gespielte Runde zählt mit den konfigurierten Punkten,
+    // Sieg bei Plus > Minus, Niederlage bei Minus > Plus, sonst weder noch (Standard 0:13 = Niederlage).
+    const { pointsFor, pointsAgainst } = missedRoundScore;
+    const entry = stats.get(playerId) || { playerId, wins: 0, gameDiff: 0, pointsFor: 0, pointsAgainst: 0 };
+    entry.wins += pointsFor > pointsAgainst ? 1 : 0;
+    entry.gameDiff += Math.sign(pointsFor - pointsAgainst);
+    entry.pointsFor += pointsFor;
+    entry.pointsAgainst += pointsAgainst;
+    stats.set(playerId, entry);
   }
 
   for (const match of matches) {
@@ -75,7 +83,7 @@ function hasResult(match) {
 // Supermêlée-Rangliste: rounds = [[match, ...], ...] in Rundenreihenfolge, activePlayerIds = aktuell aktive Spieler.
 // Teilnehmer sind alle, die schon gespielt haben, und alle aktiven Spieler. Wer in einer vollständig eingetragenen
 // Runde fehlt (später gekommen, früher gegangen, ausgesetzt), bekommt dafür eine Niederlage 0:13.
-export function computeSupermeleeRanking(rounds, activePlayerIds = []) {
+export function computeSupermeleeRanking(rounds, activePlayerIds = [], missedRoundScore = MISSED_ROUND_SCORE) {
   const participants = new Set(activePlayerIds);
   for (const round of rounds) for (const match of round) for (const playerId of [...match.teamA, ...match.teamB]) participants.add(playerId);
   const missedRounds = [];
@@ -84,5 +92,5 @@ export function computeSupermeleeRanking(rounds, activePlayerIds = []) {
     const played = new Set(round.flatMap((match) => [...match.teamA, ...match.teamB]));
     for (const playerId of participants) if (!played.has(playerId)) missedRounds.push(playerId);
   }
-  return computeRanking(rounds.flat(), { missedRounds, participants: [...participants] });
+  return computeRanking(rounds.flat(), { missedRounds, participants: [...participants], missedRoundScore });
 }

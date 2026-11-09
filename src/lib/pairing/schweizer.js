@@ -29,10 +29,10 @@ export function swissStats(teams, history, mode = 'mit_buchholz') {
     const a = match.teamA?.[0]; const b = match.teamB?.[0];
     if (!a || !stats.has(a)) continue;
     const entryA = stats.get(a);
-    // Freilos: Hauptprojekt-Default Freispielpunkte 13:7 (Diff 6), siehe
+    // Freilos: konfigurierte Freispielpunkte (Turnieroption, gespeichert in der Freilos-Partie; Standard 13:7), siehe
     // SchweizerAbstractSpielrundeSheet.leseRundeEin() – sonst weicht die Punktedifferenz
     // von der Rangliste ab und die Setzliste der naechsten Runde wird bei Freilos falsch sortiert.
-    if (!b) { entryA.wins++; entryA.pointsFor += 13; entryA.pointsAgainst += 7; continue; }
+    if (!b) { entryA.wins++; entryA.pointsFor += match.scoreA ?? 13; entryA.pointsAgainst += match.scoreB ?? 7; continue; }
     const scoreA = match.noShow === 'a' ? 0 : match.noShow === 'b' ? 13 : match.scoreA;
     const scoreB = match.noShow === 'b' ? 0 : match.noShow === 'a' ? 13 : match.scoreB;
     if (scoreA == null || scoreB == null) continue;

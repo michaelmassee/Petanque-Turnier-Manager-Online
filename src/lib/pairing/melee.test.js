@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMeleeTeams, meleeTeamSize } from './melee.js';
+import { buildMeleeTeamsWithoutBye, duplicateMeleeNames, usablePlayersWithoutBye, buildMeleeTeams, meleeTeamSize } from './melee.js';
 
 const spieler = (count, seed = () => 0) => Array.from({ length: count }, (_, index) => ({ id: `p${index + 1}`, seedPosition: seed(index) }));
 // Deterministischer Zufall für reproduzierbare Mischungen.
@@ -42,3 +42,29 @@ describe('Mêlée-Teambildung', () => {
     expect(teams.every((team) => team.seedPosition === 1)).toBe(true);
   });
 });
+
+describe('Mêlée ohne Freilos (Hauptprojekt bildeTeamsOhneFreilos)', () => {
+  const players = (count) => Array.from({ length: count }, (_, index) => ({ id: `p${index + 1}`, seedPosition: 0 }));
+
+  it('nutzt alle Spieler außer bei unter 4 und genau 7', () => {
+    expect([3, 4, 5, 6, 7, 8, 9].map(usablePlayersWithoutBye)).toEqual([0, 4, 5, 6, 6, 8, 9]);
+  });
+
+  it('teilt je nach Modus in Doubletten bzw. Triplettes auf, immer gerade Teamzahl', () => {
+    const teamSizes = (count, mode) => buildMeleeTeamsWithoutBye(players(count), mode).map((team) => team.members.length);
+    expect(teamSizes(10, 'DOUBLETTE_OHNE_FREILOS')).toEqual([2, 2, 3, 3]);
+    expect(teamSizes(12, 'TRIPLETTE_OHNE_FREILOS')).toEqual([3, 3, 3, 3]);
+    expect(teamSizes(12, 'DOUBLETTE_OHNE_FREILOS')).toEqual([2, 2, 2, 2, 2, 2]);
+    expect(teamSizes(5, 'TRIPLETTE_OHNE_FREILOS')).toEqual([2, 3]);
+    expect(buildMeleeTeamsWithoutBye(players(3), 'TRIPLETTE_OHNE_FREILOS')).toEqual([]);
+  });
+
+  it('meldet doppelte Namen nur, wenn einer davon jetzt ausgelost wird', () => {
+    expect(duplicateMeleeNames([
+      { firstName: 'Anna', lastName: 'Muster', open: false }, { firstName: ' anna ', lastName: 'MUSTER', open: true },
+      { firstName: 'Bert', lastName: 'Beispiel', open: false }, { firstName: 'Bert', lastName: 'Beispiel', open: false },
+      { firstName: 'Clara', lastName: 'Test', open: true },
+    ])).toEqual(['Anna Muster']);
+  });
+});
+

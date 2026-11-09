@@ -1,19 +1,25 @@
 // Circle-Method ("Schema F") 1:1 nach Hauptprojekt-Referenz portiert:
 // algorithmen/liga/JederGegenJeden.java. Feste Teams (eine Meldung = ein Team
 // über alle Runden), bei ungerader Teamzahl rotiert ein Freilos durch.
+// Rückrunde (Option): wie LigaSpielPlan.flipTeams() im Hauptprojekt dieselben Runden noch einmal mit getauschten
+// Seiten; ein Freilos bleibt unverändert.
 
 import { pairingsPerRound } from './util.js';
 import { FIXED_TEAM_REGISTRATION_TYPES } from './melee.js';
 
 export { pairingsPerRound };
 
-export function totalRounds(teamCount) {
+function hinrundeRounds(teamCount) {
   return teamCount % 2 === 1 ? teamCount : teamCount - 1;
+}
+
+export function totalRounds(teamCount, { returnRound = false } = {}) {
+  return hinrundeRounds(teamCount) * (returnRound ? 2 : 1);
 }
 
 export const MIN_TEAMS = 3;
 
-export function checkRequirements(confirmedCount, { registrationType, roundsPlayed = 0, teamCount } = {}) {
+export function checkRequirements(confirmedCount, { registrationType, roundsPlayed = 0, teamCount, returnRound = false } = {}) {
   if (confirmedCount < MIN_TEAMS) {
     return [{ type: 'minPlayers', min: MIN_TEAMS }];
   }
@@ -22,7 +28,7 @@ export function checkRequirements(confirmedCount, { registrationType, roundsPlay
     return [{ type: 'message', text: 'Jeder gegen Jeden ist online nur mit festen Teams (Anmeldeart Formée oder Mêlée) spielbar.' }];
   }
   // Ab der ersten Runde zählen die festen Teams, nicht die gerade aktiven Meldungen.
-  if (roundsPlayed >= totalRounds((roundsPlayed > 0 && teamCount) || confirmedCount)) {
+  if (roundsPlayed >= totalRounds((roundsPlayed > 0 && teamCount) || confirmedCount, { returnRound })) {
     return [{ type: 'message', text: 'Alle Runden wurden bereits gespielt.' }];
   }
   return [];
@@ -33,7 +39,7 @@ export function checkRequirements(confirmedCount, { registrationType, roundsPlay
 function generateRoundPairings(teams, rundenCntr) {
   const anzMeldungen = teams.length;
   const freiSpiel = anzMeldungen % 2 === 1;
-  const anzRndn = totalRounds(anzMeldungen);
+  const anzRndn = hinrundeRounds(anzMeldungen);
   const letzteMeldungNr = freiSpiel ? anzMeldungen + 1 : anzMeldungen;
   const anzPaarungen = pairingsPerRound(anzMeldungen);
 
@@ -68,14 +74,19 @@ function generateRoundPairings(teams, rundenCntr) {
 // Schweizer-System ergebnisabhängig), wird die nächste Rundennummer aus der Anzahl
 // bereits erzeugter Matches abgeleitet: jede Runde erzeugt konstant
 // pairingsPerRound(teamCount) Paarungen (Freilos eingeschlossen).
-export function generateRound(teams, history) {
+export function generateRound(teams, history, { returnRound = false } = {}) {
   if (teams.length < 3) {
     throw new Error('Für eine Runde werden mindestens 3 Teams benötigt.');
   }
   const perRound = pairingsPerRound(teams.length);
   const roundsPlayed = Math.floor((history?.length || 0) / perRound);
-  if (roundsPlayed >= totalRounds(teams.length)) {
+  if (roundsPlayed >= totalRounds(teams.length, { returnRound })) {
     throw new Error('Alle Runden wurden bereits gespielt.');
   }
-  return { matches: generateRoundPairings(teams, roundsPlayed + 1) };
+  const hinrunde = hinrundeRounds(teams.length);
+  if (roundsPlayed < hinrunde) return { matches: generateRoundPairings(teams, roundsPlayed + 1) };
+  // Rückrunde: gleiche Paarung wie in der Hinrunde, Team A und B getauscht (Freilos bleibt).
+  const matches = generateRoundPairings(teams, roundsPlayed - hinrunde + 1)
+    .map((match) => (match.teamB.length ? { teamA: match.teamB, teamB: match.teamA } : match));
+  return { matches };
 }

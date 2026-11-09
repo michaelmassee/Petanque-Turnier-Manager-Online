@@ -1,3 +1,4 @@
+import { MELEE_TEAM_MODES } from './lib/pairing/melee.js';
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
 import { sanitizeQrDesign } from './lib/qr-design.js';
@@ -400,7 +401,89 @@ export async function readBodyWithLimit(message, maxBytes, errorMessage = 'Anfra
 
 const MAX_SYNC_MATCHES_PER_ROUND = 500;
 const MAX_SYNC_RANKING_ENTRIES = 1000;
-const MAX_COURT_LENGTH = 40;
+export const MAX_COURT_LENGTH = 40;
+
+// Turnieroption Spielbahn wie im Hauptprojekt (SpielrundeSpielbahn / SpielrundeHelper.datenErsteSpalte):
+// X = keine Bahn, L = leer (händisch), N = durchnummeriert 1..n, R = 1..n zufällig verteilt.
+export const COURT_MODES = ['X', 'L', 'N', 'R'];
+
+export function normalizeCourtMode(value) {
+  if (!COURT_MODES.includes(value)) throw new HttpError(400, 'Ungültige Spielbahn-Einstellung');
+  return value;
+}
+
+/**
+ * Bahnnummern einer neuen Runde in Paarungsreihenfolge (als Text wie die Spalte tournament_matches.court).
+ * Freilos-Partien (ohne Team B) bekommen keine Bahn und verbrauchen keine Nummer. random liefert [0, 1).
+ */
+export function assignCourts(matches, mode, random = Math.random) {
+  const isBye = (match) => !match.teamB?.length;
+  if (mode !== 'N' && mode !== 'R') return matches.map(() => null);
+  const numbers = Array.from({ length: matches.filter((match) => !isBye(match)).length }, (_, index) => index + 1);
+  if (mode === 'R') {
+    for (let index = numbers.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(random() * (index + 1));
+      [numbers[index], numbers[swap]] = [numbers[swap], numbers[index]];
+    }
+  }
+  let next = 0;
+  return matches.map((match) => (isBye(match) ? null : String(numbers[next++])));
+}
+
+export const TEAM_DISPLAYS = ['NR', 'SPIELERNAMEN', 'NAME'];
+
+// Turnieroptionen der Spielverwaltung (PUT /api/tournaments/:id/options) wie die Konfiguration im Hauptprojekt.
+// Jede Option ist optional; nur übergebene Werte werden geprüft. Liefert DB-Spalten mit ihren neuen Werten.
+export function normalizeTournamentOptions(body) {
+  const columns = {};
+  const integer = (value, min, max, message) => {
+    if (!Number.isInteger(value) || value < min || value > max) throw new HttpError(400, message);
+    return value;
+  };
+  const flag = (value, message) => {
+    if (typeof value !== 'boolean') throw new HttpError(400, message);
+    return value ? 1 : 0;
+  };
+  if (body?.courtMode !== undefined) columns.court_mode = normalizeCourtMode(body.courtMode);
+  if (body?.byePointsFor !== undefined || body?.byePointsAgainst !== undefined) {
+    const pointsFor = integer(body.byePointsFor, 0, 13, 'Ungültige Freilos-Punkte');
+    const pointsAgainst = integer(body.byePointsAgainst, 0, 13, 'Ungültige Freilos-Punkte');
+    // Ein Freilos zählt als Sieg (Hauptprojekt); bei gleichen oder vertauschten Punkten wäre es keiner.
+    if (pointsFor <= pointsAgainst) throw new HttpError(400, 'Beim Freilos müssen die Pluspunkte größer als die Minuspunkte sein.');
+    columns.bye_points_for = pointsFor;
+    columns.bye_points_against = pointsAgainst;
+  }
+  if (body?.missedRoundPointsFor !== undefined || body?.missedRoundPointsAgainst !== undefined) {
+    columns.missed_round_points_for = integer(body.missedRoundPointsFor, 0, 13, 'Ungültige Punkte für nicht gespielte Runden');
+    columns.missed_round_points_against = integer(body.missedRoundPointsAgainst, 0, 13, 'Ungültige Punkte für nicht gespielte Runden');
+  }
+  if (body?.koGroupSize !== undefined || body?.koMinLastGroupSize !== undefined) {
+    // Wie im Hauptprojekt beliebig zwischen 2 und 256; Cadrage gleicht auf eine Zweierpotenz aus.
+    columns.ko_group_size = integer(body.koGroupSize, 2, 256, 'Ungültige Gruppengröße');
+    columns.ko_min_last_group_size = integer(body.koMinLastGroupSize, 2, 256, 'Ungültige Mindestgröße der letzten Gruppe');
+    if (columns.ko_min_last_group_size > columns.ko_group_size) throw new HttpError(400, 'Die Mindestgröße der letzten Gruppe darf die Gruppengröße nicht überschreiten.');
+  }
+  if (body?.koCourtFirstRoundOnly !== undefined) columns.ko_court_first_round_only = flag(body.koCourtFirstRoundOnly, 'Ungültige Einstellung Bahn nur Runde 1');
+  for (const [key, column] of [['teamDisplayRound', 'team_display_round'], ['teamDisplayRanking', 'team_display_ranking']]) {
+    if (body?.[key] === undefined) continue;
+    if (!TEAM_DISPLAYS.includes(body[key])) throw new HttpError(400, 'Ungültige Team-Anzeige');
+    columns[column] = body[key];
+  }
+  if (body?.roundRobinReturn !== undefined) columns.round_robin_return = flag(body.roundRobinReturn, 'Ungültige Einstellung Rückrunde');
+  if (body?.meleeTeamMode !== undefined) {
+    if (!MELEE_TEAM_MODES.includes(body.meleeTeamMode)) throw new HttpError(400, 'Ungültige Art der Mêlée-Teams');
+    columns.melee_team_mode = body.meleeTeamMode;
+  }
+  return columns;
+}
+
+/** Händisch eingetragene Bahn (Modus L): leer = keine Bahn, sonst Text bis MAX_COURT_LENGTH Zeichen. */
+export function normalizeCourt(value) {
+  if (value !== null && value !== undefined && typeof value !== 'string') throw new HttpError(400, 'Ungültige Bahn');
+  const court = (value || '').trim();
+  if (court.length > MAX_COURT_LENGTH) throw new HttpError(400, 'Ungültige Bahn');
+  return court || null;
+}
 
 function syncScore(value) {
   return value === undefined || value === null || value === '' ? null : validateMatchScore(value);

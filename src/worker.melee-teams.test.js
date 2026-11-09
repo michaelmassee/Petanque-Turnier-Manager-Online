@@ -64,7 +64,8 @@ describe('Mêlée-Teams online', () => {
     const matches = db.sqlite.prepare('SELECT team_a_registration_ids, team_b_registration_ids, team_a_id FROM tournament_matches').all();
     expect(matches.length).toBeGreaterThan(0);
     for (const match of matches.filter((row) => row.team_a_id)) expect(JSON.parse(match.team_a_registration_ids)).toHaveLength(3);
-    await expect(drawMeleeTeams(db, await turnier())).rejects.toMatchObject({ status: 409 });
+    // Formule X nimmt wie im Hauptprojekt nach Turnierstart neue Teams auf (hier ist niemand offen), JGJ/K.O. nicht.
+    await expect(drawMeleeTeams(db, await turnier())).rejects.toMatchObject({ status: type === 'formule_x' ? 400 : 409 });
     await expect(resetMeleeTeams(db, await turnier())).rejects.toMatchObject({ status: 409 });
   });
 
@@ -146,4 +147,81 @@ describe('Mêlée-Teams online', () => {
     const partners = await liveMeleeTeammates(db, 't1', 'p1');
     expect(partners.sort()).toEqual(['Spieler 2 Muster', 'Spieler 3 Muster']);
   });
+
+  const setMode = (mode) => db.sqlite.prepare("UPDATE tournaments SET melee_team_mode = ? WHERE id = 't1'").run(mode);
+  const sizes = () => teams().map((team) => team.members.length);
+
+  it('bildet ohne Freilos gemischte Doubletten/Triplettes mit gerader Teamzahl, Doubletten zuerst', async () => {
+    setup('schweizer', 'triplette');
+    setMode('TRIPLETTE_OHNE_FREILOS');
+    spieler(11);
+    const result = await (await drawMeleeTeams(db, await turnier())).json();
+    expect(result).toMatchObject({ drawnCount: 4, unassignedCount: 0 });
+    expect(sizes()).toEqual([2, 3, 3, 3]);
+    expect(teams().length % 2).toBe(0);
+  });
+
+  it('lässt ohne Freilos bei 7 Spielern den zuletzt angemeldeten offen (6 = zwei Triplettes)', async () => {
+    setup('schweizer', 'doublette');
+    setMode('DOUBLETTE_OHNE_FREILOS');
+    spieler(7);
+    const result = await (await drawMeleeTeams(db, await turnier())).json();
+    // 6 Spieler: drei Doubletten wären eine ungerade Teamzahl, daher wie im Supermêlée zwei Triplettes.
+    expect(result).toMatchObject({ drawnCount: 2, unassignedCount: 1 });
+    expect(sizes()).toEqual([3, 3]);
+    expect(teams().flatMap((team) => team.members)).not.toContain('p7');
+  });
+
+  it('lost ohne Freilos vor Runde 1 nach Rückfrage alle Teams mit einem Nachzügler neu aus', async () => {
+    setup('schweizer', 'doublette');
+    setMode('DOUBLETTE_OHNE_FREILOS');
+    spieler(8);
+    await drawMeleeTeams(db, await turnier());
+    expect(sizes()).toEqual([2, 2, 2, 2]);
+
+    spieler(1, 9);
+    await expect(drawMeleeTeams(db, await turnier())).rejects.toMatchObject({
+      status: 409, details: { code: 'melee_redraw_required', newPlayers: 1, teams: 4 },
+    });
+    expect(teams()).toHaveLength(4);
+
+    const result = await (await drawMeleeTeams(db, await turnier(), { confirmRedraw: true })).json();
+    expect(result).toMatchObject({ redrawn: true, drawnCount: 4, unassignedCount: 0 });
+    expect(sizes()).toEqual([2, 2, 2, 3]);
+    expect(teams().flatMap((team) => team.members)).toContain('p9');
+  });
+
+  it('nimmt im Schweizer System nach Turnierstart Nachzügler als neue Teams auf, bestehende bleiben', async () => {
+    setup('schweizer', 'doublette');
+    spieler(12);
+    await drawMeleeTeams(db, await turnier());
+    await generateTournamentRound(db, await turnier());
+    const before = teams();
+
+    spieler(2, 13);
+    const result = await (await drawMeleeTeams(db, await turnier())).json();
+    expect(result).toMatchObject({ drawnCount: 1, unassignedCount: 0 });
+    expect(teams().slice(0, before.length)).toEqual(before);
+    expect(teams()[before.length].members.sort()).toEqual(['p13', 'p14']);
+    await expect(resetMeleeTeams(db, await turnier())).rejects.toMatchObject({ status: 409 });
+
+    db.sqlite.prepare('UPDATE tournament_matches SET score_a = 13, score_b = 5 WHERE score_a IS NULL').run();
+    await generateTournamentRound(db, await turnier());
+    const roundTwo = db.sqlite.prepare(`SELECT m.team_a_registration_ids AS a, m.team_b_registration_ids AS b FROM tournament_matches m
+      JOIN tournament_rounds r ON r.id = m.round_id WHERE r.round_number = 2`).all();
+    expect(roundTwo.some((match) => [match.a, match.b].some((ids) => ids.includes('p13')))).toBe(true);
+  });
+
+  it('fragt bei doppelten Namen nach, bevor ausgelost wird', async () => {
+    setup('schweizer');
+    spieler(4);
+    db.sqlite.prepare("UPDATE registrations SET first_name = ' spieler 1 ' WHERE id = 'p2'").run();
+    await expect(drawMeleeTeams(db, await turnier())).rejects.toMatchObject({
+      status: 409, details: { code: 'melee_duplicate_names', names: ['Spieler 1 Muster'] },
+    });
+    expect(teams()).toEqual([]);
+    const result = await (await drawMeleeTeams(db, await turnier(), { allowDuplicateNames: true })).json();
+    expect(result.drawnCount).toBe(2);
+  });
 });
+

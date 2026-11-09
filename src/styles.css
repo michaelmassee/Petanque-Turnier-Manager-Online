@@ -4610,6 +4610,37 @@ details[open] > .play-round-summary::before {
   text-transform: uppercase;
 }
 
+.play-match-court {
+  font-size: 0.9rem;
+  color: #53627a;
+}
+
+.play-match-court label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.play-match-court .court-input {
+  width: 5em;
+  min-height: 36px;
+  padding: 4px 8px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.play-match-court .court-input.is-duplicate {
+  border-color: #c62828;
+  background: #ffecec;
+  color: #c62828;
+}
+
+.court-duplicate-hint {
+  color: #c62828;
+  font-weight: 700;
+}
+
 .play-match-teams {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -5041,17 +5072,45 @@ details[open] > .play-round-summary::before {
   font-size: 1.05rem;
 }
 
-.announcement-editor {
+.announcement-editor,
+.tournament-options {
   margin-bottom: 14px;
 }
 
-.announcement-editor summary {
+.announcement-editor summary,
+.tournament-options summary {
   cursor: pointer;
   font-weight: 700;
 }
 
-.announcement-editor[open] summary {
+.announcement-editor[open] summary,
+.tournament-options[open] summary {
   margin-bottom: 10px;
+}
+
+.tournament-options .form {
+  margin-top: 0;
+}
+
+.tournament-options .options-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.tournament-options .options-pair legend {
+  padding: 0 4px;
+  font-weight: 700;
+}
+
+.tournament-options .options-pair .hint {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .live-disabled {

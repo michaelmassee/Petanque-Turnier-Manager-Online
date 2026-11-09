@@ -66,7 +66,8 @@ export function checkRoundRequirements(tournament, confirmedCount, roundsPlayed 
     return [];
   }
   const registrationType = tournament.registrationType ?? tournament.registration_type;
-  return strategy.checkRequirements(confirmedCount, { formation: tournament.formation, registrationType, roundsPlayed, teamCount });
+  const returnRound = Boolean(tournament.roundRobinReturn ?? Number(tournament.round_robin_return || 0));
+  return strategy.checkRequirements(confirmedCount, { formation: tournament.formation, registrationType, roundsPlayed, teamCount, returnRound });
 }
 
 // Die UI zeigt diese Texte vorab, der Worker verwendet sie ebenfalls für direkte

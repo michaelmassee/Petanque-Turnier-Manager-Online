@@ -9,19 +9,27 @@ function teamLabel(team) {
   return team.map(playerLabel).join(' + ');
 }
 
-// Partien einer Runde als Tabelle wie die Spielrunde im Hauptprojekt (Team A | Team B | Ergebnis A/B); Bahn und Stufe
-// nur, wenn die Runde sie hat. Der zweizeilige Kopf entspricht dem der Rangliste, damit beide auf der Turnierseite
+// Laufende Paarungsnummer 1..n wie die Spalte „#“ im Hauptprojekt (Spielbahn „Nur laufende Nr“): Freilose bekommen
+// keine Nummer und verbrauchen keine. Liefert je Partie die Nummer oder null.
+export function pairingNumbers(matches) {
+  let next = 0;
+  return matches.map((match) => (match.teamB?.length ? (next += 1) : null));
+}
+
+// Partien einer Runde als Tabelle wie die Spielrunde im Hauptprojekt (Team A | Team B | Ergebnis A/B). Erste Spalte:
+// Bahn, wenn die Runde Bahnen hat, sonst die laufende Nummer (#). Stufe nur, wenn die Runde sie hat. Der zweizeilige Kopf entspricht dem der Rangliste, damit beide auf der Turnierseite
 // nebeneinander auf gleicher Höhe beginnen. Spielverwaltung (beendetes Turnier) und Turnierseite nutzen dieselbe Tabelle.
 export function RoundTable({ round }) {
   const { t } = useTranslation();
   const hasCourt = round.matches.some((match) => match.court);
   const hasStage = round.matches.some((match) => match.stageLabel);
+  const numbers = pairingNumbers(round.matches);
   return (
     <div className="table-scroll">
       <table className="round-table">
         <thead>
           <tr>
-            {hasCourt && <th scope="col" rowSpan={2}>{t('Bahn')}</th>}
+            {hasCourt ? <th scope="col" rowSpan={2}>{t('Bahn')}</th> : <th scope="col" rowSpan={2} data-i18n-skip>#</th>}
             {hasStage && <th scope="col" rowSpan={2}>{t('Stufe')}</th>}
             <th scope="col" rowSpan={2}>{t('Team A')}</th>
             <th scope="col" rowSpan={2}>{t('Team B')}</th>
@@ -33,12 +41,12 @@ export function RoundTable({ round }) {
           </tr>
         </thead>
         <tbody>
-          {round.matches.map((match) => (
+          {round.matches.map((match, index) => (
             <tr key={match.id}>
-              {hasCourt && <td className="round-table-number" data-i18n-skip>{match.court || ''}</td>}
+              <td className="round-table-number" data-i18n-skip>{hasCourt ? match.court || '' : numbers[index] ?? ''}</td>
               {hasStage && <td data-i18n-skip>{match.stageLabel || ''}</td>}
-              <td data-i18n-skip>{teamLabel(match.teamA)}</td>
-              {match.teamB?.length ? <td data-i18n-skip>{teamLabel(match.teamB)}</td> : <td className="muted">{t('Freilos')}</td>}
+              <td data-i18n-skip>{match.teamALabel ?? teamLabel(match.teamA)}</td>
+              {match.teamB?.length ? <td data-i18n-skip>{match.teamBLabel ?? teamLabel(match.teamB)}</td> : <td className="muted">{t('Freilos')}</td>}
               {match.noShow
                 ? <td colSpan={2}>{t('Nicht angetreten')}</td>
                 : <>

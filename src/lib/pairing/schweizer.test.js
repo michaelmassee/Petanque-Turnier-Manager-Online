@@ -118,3 +118,12 @@ describe('Schweizer Pairing', () => {
     expect(matches.filter((match) => !match.teamB.length).map((match) => match.teamA[0])).toEqual([last]);
   });
 });
+
+describe('Schweizer Freilos-Punkte', () => {
+  it('bucht die in der Freilos-Partie gespeicherten Punkte, ohne Angabe 13:7', () => {
+    const teams = [{ id: 'a' }, { id: 'b' }];
+    const stats = (match) => swissStats(teams, [match]).find((entry) => entry.teamId === 'a');
+    expect(stats({ teamA: ['a'], teamB: [], scoreA: 11, scoreB: 2 })).toMatchObject({ wins: 1, pointsFor: 11, pointsAgainst: 2 });
+    expect(stats({ teamA: ['a'], teamB: [] })).toMatchObject({ wins: 1, pointsFor: 13, pointsAgainst: 7 });
+  });
+});

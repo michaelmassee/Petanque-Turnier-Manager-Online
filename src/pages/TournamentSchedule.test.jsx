@@ -95,7 +95,7 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     render(<TournamentSchedule tournamentId="t1" language="de" />);
 
     await screen.findByRole('heading', { name: 'Runde 1' });
-    expect(roundRows(document)).toEqual([['Anna Muster', 'Bert Beispiel', '13', '7']]);
+    expect(roundRows(document)).toEqual([['1', 'Anna Muster', 'Bert Beispiel', '13', '7']]);
     const ranglisteRow = (await screen.findAllByRole('cell', { name: 'Anna Muster' })).at(-1).closest('tr');
     expect(ranglisteRow).toHaveTextContent('13');
     expect(ranglisteRow).toHaveTextContent('7');
@@ -120,7 +120,7 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     // Bildschirm vor Ort: frühere Runden gehören nicht auf die Anzeige.
     expect(screen.queryByRole('heading', { name: 'Vergangene Runden' })).not.toBeInTheDocument();
     expect(document.querySelector('details')).toBeNull();
-    expect(roundRows(document)).toEqual([['Anna Muster', 'Bert Beispiel', '–', '–']]);
+    expect(roundRows(document)).toEqual([['1', 'Anna Muster', 'Bert Beispiel', '–', '–']]);
     // Runde und Rangliste je in einem eigenen Scrollbereich (Auto-Scroll auf dem Bildschirm vor Ort).
     expect(document.querySelectorAll('.display-scroll')).toHaveLength(2);
     expect(screen.queryAllByRole('button')).toEqual([]);
@@ -165,7 +165,7 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     render(<TournamentSchedule tournamentId="t1" language="de" display />);
 
     expect(await screen.findByRole('heading', { name: 'Runde 2' })).toBeInTheDocument();
-    expect(roundRows(document)).toEqual([['Anna Muster', 'Bert Beispiel', '–', '–'], ['Clara Klar', 'Dieter Damm', 'Nicht angetreten']]);
+    expect(roundRows(document)).toEqual([['1', 'Anna Muster', 'Bert Beispiel', '–', '–'], ['2', 'Clara Klar', 'Dieter Damm', 'Nicht angetreten']]);
 
     // Handy bzw. normale Ansicht: frühere Runden zum Nachschauen, zugeklappt und als Tabelle.
     expect(screen.getByRole('heading', { name: 'Vergangene Runden' })).toBeInTheDocument();
@@ -173,8 +173,8 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     expect(past).toHaveLength(1);
     expect(past[0].open).toBe(false);
     expect(past[0].querySelector('summary')).toHaveTextContent('Runde 1');
-    expect(past[0].querySelector('tbody tr')).toHaveTextContent('Anna MusterClara Klar1311');
-    expect(within(past[0]).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Team A', 'Team B', 'Ergebnis', 'A', 'B']);
+    expect(past[0].querySelector('tbody tr')).toHaveTextContent('1Anna MusterClara Klar1311');
+    expect(within(past[0]).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['#', 'Team A', 'Team B', 'Ergebnis', 'A', 'B']);
   });
 
   it('lädt sofort neu, wenn der WebSocket eine Änderung meldet, und zeigt „Live“', async () => {

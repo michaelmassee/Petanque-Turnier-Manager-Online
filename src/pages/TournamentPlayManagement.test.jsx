@@ -146,7 +146,7 @@ describe('TournamentPlayManagement', () => {
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
     fireEvent.focus(screen.getByRole('combobox', { name: 'Turnier' }));
 
-    const options = screen.getAllByRole('option');
+    const options = within(screen.getByRole('listbox')).getAllByRole('option');
     expect(options.map((option) => option.textContent)).toEqual([
       expect.stringContaining('Clubabend Supermêlée'),
       expect.stringContaining('Liga ohne Online-Durchführung'),
@@ -539,12 +539,21 @@ describe('TournamentPlayManagement', () => {
     expect(screen.getByRole('button', { name: 'Erste Runde starten' })).toBeDisabled();
   });
 
-  it('weist bei Mêlée nach der ersten Runde darauf hin, dass neue Spieler nicht mehr mitspielen', async () => {
+  it('weist bei Mêlée nach der ersten Runde darauf hin, dass neue Spieler nicht mehr mitspielen (fester Spielplan)', async () => {
     installFetchMock([]);
-    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, type: 'schweizer', registrationType: 'melee', formation: 'doublette' }]} language="de" />);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, type: 'jeder_gegen_jeden', registrationType: 'melee', formation: 'doublette' }]} language="de" />);
 
     expect(await screen.findByText('Die Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler werden keinem Team mehr zugeteilt und spielen nicht mit.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mêlée-Teams auslosen' })).not.toBeInTheDocument();
+  });
+
+  it('lässt bei Mêlée im Schweizer System nach der ersten Runde neue Teams für Nachzügler auslosen', async () => {
+    installFetchMock([]);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, type: 'schweizer', registrationType: 'melee', formation: 'doublette' }]} language="de" />);
+
+    expect(await screen.findByText('Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mêlée-Teams auslosen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Auslosung zurücksetzen' })).not.toBeInTheDocument();
   });
 
   it('zeigt fehlende Voraussetzungen und deaktiviert den Button bei zu wenigen bestätigten Meldungen', async () => {
@@ -752,6 +761,38 @@ describe('TournamentPlayManagement', () => {
     expect(calls.filter((path) => path.endsWith('/rounds'))).toHaveLength(1);
     expect(calls.filter((path) => path.endsWith('/registrations'))).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Alle speichern' })).toBeDisabled();
+  });
+
+  it('zeigt ohne Bahn die laufende Nummer, mit Bahn die Bahn; Freilos ohne Nummer', async () => {
+    const bye = { ...ROUND_1.matches[0], id: 'bye', teamB: [] };
+    const matches = [ROUND_1.matches[0], bye, { ...ROUND_1.matches[0], id: 'm3' }];
+    installBulkMock([{ ...ROUND_1, matches }]);
+    const { unmount } = render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByRole('button', { name: 'Alle speichern' });
+    expect([...document.querySelectorAll('.play-current-round .play-match-court')].map((el) => el.textContent)).toEqual(['#1', '#2']);
+    unmount();
+
+    installBulkMock([{ ...ROUND_1, matches: [{ ...ROUND_1.matches[0], court: '5' }] }]);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByRole('button', { name: 'Alle speichern' });
+    expect(document.querySelector('.play-current-round .play-match-court')).toHaveTextContent('Bahn 5');
+  });
+
+  it('markiert bei händischer Bahn doppelt vergebene Bahnen rot', async () => {
+    const matches = [
+      { ...ROUND_1.matches[0], court: '3' },
+      { ...ROUND_1.matches[0], id: 'm2', court: ' 3 ' },
+      { ...ROUND_1.matches[0], id: 'm3', court: '4' },
+      { ...ROUND_1.matches[0], id: 'm4', court: null },
+      { ...ROUND_1.matches[0], id: 'm5', court: null },
+    ];
+    installBulkMock([{ ...ROUND_1, matches }]);
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, courtMode: 'L' }]} />);
+    await screen.findByRole('button', { name: 'Alle speichern' });
+    const inputs = [...document.querySelectorAll('.play-current-round .court-input')];
+    expect(inputs.map((input) => input.classList.contains('is-duplicate'))).toEqual([true, true, false, false, false]);
+    expect(inputs[0]).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getAllByText('Bahn doppelt vergeben')).toHaveLength(2);
   });
 
   it('klappt in der laufenden Runde Partien mit gespeichertem Ergebnis weg', async () => {
@@ -1263,8 +1304,11 @@ describe('TournamentPlayManagement', () => {
     expect(screen.queryByRole('textbox', { name: 'Punkte Team A' })).not.toBeInTheDocument();
 
     const [tableRound2, tableRound1] = [...panels].map((panel) => within(panel).getByRole('table'));
-    expect(within(tableRound2).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Team A', 'Team B', 'Ergebnis', 'A', 'B']);
+    expect(within(tableRound2).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['#', 'Team A', 'Team B', 'Ergebnis', 'A', 'B']);
+    // Ohne Bahn die laufende Nummer wie im Hauptprojekt; das Freilos bekommt keine.
+    expect(tableRound2.querySelector('tbody tr td')).toHaveTextContent('1');
     expect(tableRound2.querySelectorAll('tbody tr')[1]).toHaveTextContent('Gina NeuFreilos130');
+    expect(tableRound2.querySelectorAll('tbody tr')[1].querySelector('td')).toHaveTextContent('');
     expect(within(tableRound1).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Bahn', 'Team A', 'Team B', 'Ergebnis', 'A', 'B']);
     expect(tableRound1.querySelector('tbody tr')).toHaveTextContent('4Anna Muster + Bert Beispiel + Clara TestDirk Demo + Eva Muster + Finn Test137');
   });

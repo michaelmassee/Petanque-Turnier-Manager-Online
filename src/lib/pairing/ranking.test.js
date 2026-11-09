@@ -68,5 +68,12 @@ describe('computeSupermeleeRanking', () => {
   it('führt neu aktive Spieler ohne gewertete Runde mit 0 in der Rangliste', () => {
     expect(computeSupermeleeRanking([], ['p1'])).toEqual([{ playerId: 'p1', wins: 0, gameDiff: 0, pointsFor: 0, pointsAgainst: 0, pointsDiff: 0 }]);
   });
-});
 
+  it('wertet nicht gespielte Runden mit den konfigurierten Punkten wie das Hauptprojekt', () => {
+    const round = [{ teamA: ['p1'], teamB: ['p2'], scoreA: 13, scoreB: 5 }];
+    const missed = (score) => computeSupermeleeRanking([round], ['p1', 'p2', 'p3'], score).find((entry) => entry.playerId === 'p3');
+    expect(missed(undefined)).toMatchObject({ wins: 0, gameDiff: -1, pointsFor: 0, pointsAgainst: 13 });
+    expect(missed({ pointsFor: 7, pointsAgainst: 5 })).toMatchObject({ wins: 1, gameDiff: 1, pointsFor: 7, pointsAgainst: 5 });
+    expect(missed({ pointsFor: 6, pointsAgainst: 6 })).toMatchObject({ wins: 0, gameDiff: 0, pointsFor: 6, pointsAgainst: 6 });
+  });
+});

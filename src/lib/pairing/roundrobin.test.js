@@ -100,3 +100,23 @@ describe('Jeder gegen Jeden (Round Robin)', () => {
     expect(checkRequirements(4, { roundsPlayed: 3 })).toEqual(ende);
   });
 });
+
+describe('Rückrunde (Hauptprojekt: LigaSpielPlan.flipTeams)', () => {
+  it('wiederholt die Hinrunde mit getauschten Seiten, Freilos unverändert, und endet danach', () => {
+    const teams = teamsOf(5);
+    const history = [];
+    const rounds = [];
+    for (let round = 0; round < 10; round += 1) {
+      const { matches } = generateRound(teams, history, { returnRound: true });
+      rounds.push(matches);
+      history.push(...matches);
+    }
+    for (let round = 0; round < 5; round += 1) {
+      expect(rounds[round + 5]).toEqual(rounds[round].map((match) => (match.teamB.length ? { teamA: match.teamB, teamB: match.teamA } : match)));
+    }
+    expect(() => generateRound(teams, history, { returnRound: true })).toThrow('Alle Runden wurden bereits gespielt.');
+    expect(totalRounds(5, { returnRound: true })).toBe(10);
+    expect(checkRequirements(5, { roundsPlayed: 5, teamCount: 5, returnRound: true })).toEqual([]);
+    expect(checkRequirements(5, { roundsPlayed: 10, teamCount: 5, returnRound: true })).toHaveLength(1);
+  });
+});
