@@ -2,6 +2,7 @@ import { Component, useEffect, useRef } from 'react';
 import { Button } from './components/ui.jsx';
 import i18next from './lib/i18next-config.js';
 import { clearRecoveryAttempt, requestAppRestart, shouldAttemptAutomaticRecovery } from './app-recovery.js';
+import { debugLog } from './lib/debug-log.js';
 
 function recoveryText(key) {
   return i18next.t(key);
@@ -64,15 +65,22 @@ export class AppRecoveryBoundary extends Component {
     this.setState({ offline: !navigator.onLine });
   }
 
-  componentDidCatch() {
+  componentDidCatch(error, info) {
+    // Diagnose (?debug=1): React-Abstürze erreichen window.onerror nicht, daher hier die Ursache festhalten –
+    // vor einem möglichen automatischen Neustart, damit sie im Protokoll erhalten bleibt.
+    const component = String(info?.componentStack || '').split('\n').map((line) => line.trim()).find(Boolean);
+    debugLog('error', `React-Absturz: ${error?.name || 'Error'}: ${error?.message || error}${component ? ` (${component})` : ''}`);
     // Ein fehlender Lazy-Load-Chunk oder eine nicht erreichbare API ist offline
     // kein Grund zum Neustart: der Reload würde denselben Fehler sofort erneut
     // auslösen. Stattdessen bleibt die verständliche Offline-Ansicht stehen.
     if (!shouldAttemptAutomaticRecovery()) {
+      debugLog('error', 'Wiederherstellung: Offline-Ansicht');
       this.setState({ unrecoverable: true, offline: true });
       return;
     }
-    if (requestAppRestart() === 'manual') this.setState({ unrecoverable: true });
+    const restart = requestAppRestart();
+    debugLog('error', `Wiederherstellung: ${restart === 'manual' ? 'manueller Neustart nötig' : 'automatischer Neustart'}`);
+    if (restart === 'manual') this.setState({ unrecoverable: true });
   }
 
   render() {

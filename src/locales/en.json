@@ -1977,5 +1977,10 @@
   "Doppelte Namen: {{names}}. Trotzdem auslosen?": "Duplicate names: {{names}}. Draw anyway?",
   "Neue Spieler: {{players}} – ohne Freilos ist daraus kein eigenes Team möglich. Die {{teams}} bisherigen Mêlée-Teams werden deshalb zusammen mit den neuen Spielern komplett neu ausgelost, die Teamzusammensetzung ändert sich. Fortfahren?": "New players: {{players}} – without a bye they cannot form a team of their own. The {{teams}} existing mêlée teams will therefore be completely redrawn together with the new players; the team line-ups will change. Continue?",
   "Alle Mêlée-Teams wurden neu ausgelost: {{total}} Teams. {{open}} aktive Spieler ohne Team.": "All mêlée teams have been redrawn: {{total}} teams. {{open}} active players without a team.",
-  "Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.": "The existing mêlée teams are fixed since the first round. New players join from the next round once they are assigned to a new team via “Draw mêlée teams”."
+  "Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.": "The existing mêlée teams are fixed since the first round. New players join from the next round once they are assigned to a new team via “Draw mêlée teams”.",
+  "Diagnose": "Diagnostics",
+  "Kopieren": "Copy",
+  "Kopiert.": "Copied.",
+  "Leeren": "Clear",
+  "Beenden": "Stop"
 }

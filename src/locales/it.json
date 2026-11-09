@@ -2055,5 +2055,10 @@
   "Doppelte Namen: {{names}}. Trotzdem auslosen?": "Nomi duplicati: {{names}}. Sorteggiare comunque?",
   "Neue Spieler: {{players}} – ohne Freilos ist daraus kein eigenes Team möglich. Die {{teams}} bisherigen Mêlée-Teams werden deshalb zusammen mit den neuen Spielern komplett neu ausgelost, die Teamzusammensetzung ändert sich. Fortfahren?": "Nuovi giocatori: {{players}} – senza riposo non possono formare una squadra propria. Le {{teams}} squadre mêlée esistenti verranno quindi risorteggiate completamente insieme ai nuovi giocatori; la composizione delle squadre cambia. Continuare?",
   "Alle Mêlée-Teams wurden neu ausgelost: {{total}} Teams. {{open}} aktive Spieler ohne Team.": "Tutte le squadre mêlée sono state risorteggiate: {{total}} squadre. {{open}} giocatori attivi senza squadra.",
-  "Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.": "Le squadre mêlée esistenti sono fisse dal primo turno. I nuovi giocatori partecipano dal turno successivo non appena vengono assegnati a una nuova squadra con «Sorteggia squadre mêlée»."
+  "Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.": "Le squadre mêlée esistenti sono fisse dal primo turno. I nuovi giocatori partecipano dal turno successivo non appena vengono assegnati a una nuova squadra con «Sorteggia squadre mêlée».",
+  "Diagnose": "Diagnostica",
+  "Kopieren": "Copia",
+  "Kopiert.": "Copiato.",
+  "Leeren": "Svuota",
+  "Beenden": "Termina"
 }

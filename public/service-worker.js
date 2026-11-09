@@ -22,8 +22,16 @@ const CACHEABLE_API_PATTERNS = [
   /^\/api\/places$/,
 ];
 
+// Diagnose (?debug=1 in der Seite): Install und Activate an offene Seiten melden. Die Seite protokolliert das nur
+// bei eingeschaltetem Schalter; ohne ihn wird die Nachricht ignoriert.
+function reportToClients(eventName) {
+  return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then((windows) => windows.forEach((client) => client.postMessage({ type: 'sw-debug', event: eventName, cache: CACHE_NAME })))
+    .catch(() => {});
+}
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil(Promise.all([caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)), reportToClients('install')]));
   self.skipWaiting();
 });
 
@@ -36,6 +44,7 @@ self.addEventListener('activate', (event) => {
       ),
   );
   self.clients.claim();
+  event.waitUntil(reportToClients('activate'));
 });
 
 self.addEventListener('fetch', (event) => {

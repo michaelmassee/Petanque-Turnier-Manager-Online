@@ -1977,5 +1977,10 @@
   "Doppelte Namen: {{names}}. Trotzdem auslosen?": "Nombres duplicados: {{names}}. ¿Sortear de todos modos?",
   "Neue Spieler: {{players}} – ohne Freilos ist daraus kein eigenes Team möglich. Die {{teams}} bisherigen Mêlée-Teams werden deshalb zusammen mit den neuen Spielern komplett neu ausgelost, die Teamzusammensetzung ändert sich. Fortfahren?": "Nuevos jugadores: {{players}} – sin descanso no pueden formar un equipo propio. Los {{teams}} equipos mêlée existentes se volverán a sortear por completo junto con los nuevos jugadores; la composición de los equipos cambia. ¿Continuar?",
   "Alle Mêlée-Teams wurden neu ausgelost: {{total}} Teams. {{open}} aktive Spieler ohne Team.": "Todos los equipos mêlée se han vuelto a sortear: {{total}} equipos. {{open}} jugadores activos sin equipo.",
-  "Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.": "Los equipos mêlée existentes están fijados desde la primera ronda. Los nuevos jugadores participan a partir de la siguiente ronda en cuanto se les asigna un nuevo equipo con «Sortear equipos mêlée»."
+  "Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.": "Los equipos mêlée existentes están fijados desde la primera ronda. Los nuevos jugadores participan a partir de la siguiente ronda en cuanto se les asigna un nuevo equipo con «Sortear equipos mêlée».",
+  "Diagnose": "Diagnóstico",
+  "Kopieren": "Copiar",
+  "Kopiert.": "Copiado.",
+  "Leeren": "Vaciar",
+  "Beenden": "Detener"
 }

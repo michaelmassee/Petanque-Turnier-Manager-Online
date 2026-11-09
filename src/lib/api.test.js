@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getDebugLog, resetDebugForTest, setDebugEnabled } from './debug-log.js';
 import { api, authenticatedApi, clearOfflineApiCache, AbortedError, ApiError, InvalidResponseError, NetworkError, OfflineMutationError, setSessionExpiredHandler } from './api.js';
 
 describe('api', () => {
@@ -95,4 +96,28 @@ describe('api', () => {
     }));
     expect(onSessionExpired).not.toHaveBeenCalled();
   });
+
+  it('protokolliert Fehler bei aktiver Diagnose ohne Query, Tokens oder Inhalt', async () => {
+    localStorage.clear();
+    resetDebugForTest();
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'x', details: { code: 'client_outdated' } }), { status: 410 }))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch')));
+    await expect(api('/api/places?q=geheim')).rejects.toBeInstanceOf(ApiError);
+    expect(getDebugLog()).toEqual([]);
+
+    setDebugEnabled(true);
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'x', details: { code: 'client_outdated' } }), { status: 410 }))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch')));
+    await expect(api('/api/places?q=geheim')).rejects.toBeInstanceOf(ApiError);
+    await expect(api('/api/registrations/cancel/abcdefghijklmnopqrstuvwxyz0123456789abcdefg', { method: 'POST', body: '{}' })).rejects.toBeInstanceOf(NetworkError);
+    expect(getDebugLog().map((entry) => entry.m)).toEqual([
+      'GET /api/places → 410 client_outdated',
+      'POST /api/registrations/cancel/… → TypeError',
+    ]);
+    localStorage.clear();
+    resetDebugForTest();
+  });
 });
+

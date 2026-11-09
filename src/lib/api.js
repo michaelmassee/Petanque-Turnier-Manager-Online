@@ -1,3 +1,4 @@
+import { debugLog, debugPath } from './debug-log.js';
 import i18next from './i18next-config.js';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -129,6 +130,10 @@ async function requestOnce(path, options, timeoutMs) {
     }
     return payload;
   } catch (error) {
+    // Diagnose (?debug=1): nur Methode, Pfad ohne Query/Tokens und Status bzw. Fehlerart, kein Inhalt.
+    debugLog('api', `${method} ${debugPath(path)} → ${error instanceof ApiError
+      ? `${error.status}${error.payload?.details?.code ? ` ${error.payload.details.code}` : ''}`
+      : timedOut ? 'Zeitüberschreitung' : error?.name || 'Netzwerkfehler'}`);
     if (error instanceof ApiError) throw error;
     if (timedOut) throw new TimeoutError();
     if (options.signal?.aborted) throw new AbortedError();

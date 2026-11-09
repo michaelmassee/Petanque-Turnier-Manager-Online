@@ -5,12 +5,17 @@ import { AppRecoveryBoundary } from './AppRecovery.jsx';
 import { ServiceWorkerUpdateBanner } from './components/ServiceWorkerUpdateBanner.jsx';
 import { OfflineNotice } from './components/layout.jsx';
 import { applySeasonClass } from './lib/seasonal.js';
-import { checkForUpdateWhenVisible, markServiceWorkerUpdateAvailable } from './lib/service-worker-update.js';
+import { registerServiceWorker } from './lib/service-worker-update.js';
+import { initDebugFromUrl, installDebugListeners } from './lib/debug-log.js';
+import { DebugPanel } from './components/DebugPanel.jsx';
 import './lib/i18next-config.js';
 import './styles.css';
 import 'leaflet/dist/leaflet.css';
 
 applySeasonClass();
+// Diagnose-Schalter (?debug=1) vor allem anderen auswerten, damit auch der Start protokolliert wird.
+initDebugFromUrl();
+installDebugListeners();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -19,23 +24,9 @@ createRoot(document.getElementById('root')).render(
       <App />
       <ServiceWorkerUpdateBanner />
     </AppRecoveryBoundary>
+    {/* Außerhalb der Fehlergrenze: die Diagnose bleibt auch sichtbar, wenn die App abstürzt. */}
+    <DebugPanel />
   </StrictMode>,
 );
 
-if ('serviceWorker' in navigator) {
-  // Ohne bisherigen Controller ist es die Erstinstallation: die Seite ist bereits
-  // aktuell. Sonst nicht selbst neu laden (ungespeicherte Eingaben gingen verloren),
-  // sondern einen Hinweis zeigen und den Zeitpunkt dem Nutzer überlassen.
-  const hadController = Boolean(navigator.serviceWorker.controller);
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (hadController) markServiceWorkerUpdateAvailable();
-  });
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then((registration) => {
-        checkForUpdateWhenVisible(registration);
-        return registration.update();
-      })
-      .catch((error) => console.error('Service worker registration failed', error));
-  });
-}
+registerServiceWorker();

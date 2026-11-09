@@ -1977,5 +1977,10 @@
   "Doppelte Namen: {{names}}. Trotzdem auslosen?": "Dubbele namen: {{names}}. Toch loten?",
   "Neue Spieler: {{players}} – ohne Freilos ist daraus kein eigenes Team möglich. Die {{teams}} bisherigen Mêlée-Teams werden deshalb zusammen mit den neuen Spielern komplett neu ausgelost, die Teamzusammensetzung ändert sich. Fortfahren?": "Nieuwe spelers: {{players}} – zonder vrijloting is daaruit geen eigen team mogelijk. De {{teams}} bestaande mêlée-teams worden daarom samen met de nieuwe spelers volledig opnieuw geloot; de teamsamenstelling verandert. Doorgaan?",
   "Alle Mêlée-Teams wurden neu ausgelost: {{total}} Teams. {{open}} aktive Spieler ohne Team.": "Alle mêlée-teams zijn opnieuw geloot: {{total}} teams. {{open}} actieve spelers zonder team.",
-  "Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.": "De bestaande mêlée-teams liggen sinds de eerste ronde vast. Nieuwe spelers spelen vanaf de volgende ronde mee zodra ze via „Mêlée-teams loten” aan een nieuw team zijn toegewezen."
+  "Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.": "De bestaande mêlée-teams liggen sinds de eerste ronde vast. Nieuwe spelers spelen vanaf de volgende ronde mee zodra ze via „Mêlée-teams loten” aan een nieuw team zijn toegewezen.",
+  "Diagnose": "Diagnose",
+  "Kopieren": "Kopiëren",
+  "Kopiert.": "Gekopieerd.",
+  "Leeren": "Wissen",
+  "Beenden": "Stoppen"
 }

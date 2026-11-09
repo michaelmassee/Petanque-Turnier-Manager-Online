@@ -1977,5 +1977,10 @@
   "Doppelte Namen: {{names}}. Trotzdem auslosen?": "Noms en double : {{names}}. Tirer au sort quand même ?",
   "Neue Spieler: {{players}} – ohne Freilos ist daraus kein eigenes Team möglich. Die {{teams}} bisherigen Mêlée-Teams werden deshalb zusammen mit den neuen Spielern komplett neu ausgelost, die Teamzusammensetzung ändert sich. Fortfahren?": "Nouveaux joueurs : {{players}} – sans exempt, ils ne peuvent pas former leur propre équipe. Les {{teams}} équipes mêlée existantes seront donc entièrement retirées au sort avec les nouveaux joueurs ; la composition des équipes change. Continuer ?",
   "Alle Mêlée-Teams wurden neu ausgelost: {{total}} Teams. {{open}} aktive Spieler ohne Team.": "Toutes les équipes mêlée ont été retirées au sort : {{total}} équipes. {{open}} joueurs actifs sans équipe.",
-  "Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.": "Les équipes mêlée existantes sont fixées depuis le premier tour. Les nouveaux joueurs participent à partir du tour suivant dès qu'ils sont affectés à une nouvelle équipe via « Tirer les équipes mêlée »."
+  "Die bisherigen Mêlée-Teams stehen seit der ersten Runde fest. Neue Spieler spielen ab der nächsten Runde mit, wenn sie per „Mêlée-Teams auslosen“ einem neuen Team zugeteilt sind.": "Les équipes mêlée existantes sont fixées depuis le premier tour. Les nouveaux joueurs participent à partir du tour suivant dès qu'ils sont affectés à une nouvelle équipe via « Tirer les équipes mêlée ».",
+  "Diagnose": "Diagnostic",
+  "Kopieren": "Copier",
+  "Kopiert.": "Copié.",
+  "Leeren": "Vider",
+  "Beenden": "Arrêter"
 }
