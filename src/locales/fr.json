@@ -1985,5 +1985,8 @@
   "Beenden": "Arrêter",
   "Begegnung": "Rencontre",
   "Bahn-Nr.": "N° de terrain",
-  "Nachname Spieler 1": "Nom joueur 1"
+  "Nachname Spieler 1": "Nom joueur 1",
+  "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr gelöscht werden. Bitte aktualisieren.": "Le premier tour a été lancé entre-temps. Les équipes ne peuvent plus être supprimées. Veuillez actualiser.",
+  "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr neu ausgelost werden. Bitte aktualisieren.": "Le premier tour a été lancé entre-temps. Les équipes ne peuvent plus être tirées au sort à nouveau. Veuillez actualiser.",
+  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "Les équipes ont été modifiées entre-temps. Veuillez actualiser et relancer le tour."
 }

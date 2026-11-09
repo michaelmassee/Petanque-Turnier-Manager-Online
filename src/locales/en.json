@@ -1985,5 +1985,8 @@
   "Beenden": "Stop",
   "Begegnung": "Match",
   "Bahn-Nr.": "Court no.",
-  "Nachname Spieler 1": "Last name player 1"
+  "Nachname Spieler 1": "Last name player 1",
+  "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr gelöscht werden. Bitte aktualisieren.": "The first round has been started in the meantime. Teams can no longer be deleted. Please refresh.",
+  "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr neu ausgelost werden. Bitte aktualisieren.": "The first round has been started in the meantime. Teams can no longer be redrawn. Please refresh.",
+  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "The teams have been changed in the meantime. Please refresh and start the round again."
 }

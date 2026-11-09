@@ -7491,7 +7491,7 @@ function withoutUnconfirmedReport(row, tournament) {
 
 // activeIds (optional) sammelt im selben Lesevorgang die bestätigten, aktiven Meldungen (Supermêlée-Fehlrunden).
 async function getPlayersById(db, tournamentId, activeIds = null) {
-  const result = await db.prepare('SELECT id, first_name, last_name, partner_first_name, partner_last_name, partner2_first_name, partner2_last_name, team_name, status, participation FROM registrations WHERE tournament_id = ?').bind(tournamentId).all();
+  const result = await db.prepare('SELECT id, first_name, last_name, partner_first_name, partner_last_name, partner2_first_name, partner2_last_name, team_name, team_number, status, participation FROM registrations WHERE tournament_id = ?').bind(tournamentId).all();
   if (activeIds) for (const row of result.results) if (row.status === 'confirmed' && row.participation === 'active') activeIds.push(row.id);
   return new Map(result.results.map((row) => {
     // Bei Doublette/Triplette-Registrierungen ("forme") steckt das ganze Team in einer
@@ -7510,6 +7510,7 @@ async function getPlayersById(db, tournamentId, activeIds = null) {
       id: row.id, firstName: row.first_name, lastName: row.last_name,
       teamLabel: row.team_name || names.join(' + '),
       playerNames: names.join(' + '),
+      teamNumber: row.team_number == null ? null : Number(row.team_number),
     }];
   }));
 }
@@ -7528,10 +7529,36 @@ function usesRegistrationTeamNumbers(tournament) {
  */
 export async function assignTeamNumbers(db, tournament, rows = null) {
   if (!usesRegistrationTeamNumbers(tournament)) return rows;
-  const list = rows || (await db.prepare('SELECT id, status, team_number, registered_at FROM registrations WHERE tournament_id = ?').bind(tournament.id).all()).results;
+  const readRows = async () => (await db.prepare('SELECT id, status, team_number, registered_at FROM registrations WHERE tournament_id = ?').bind(tournament.id).all()).results;
+  const list = rows || await readRows();
   const teams = await db.prepare('SELECT member_registration_ids FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).all();
   const inTeam = new Set(teams.results.flatMap((row) => JSON.parse(row.member_registration_ids)));
-  const ordered = [...list].sort((a, b) => String(a.registered_at || '').localeCompare(String(b.registered_at || '')) || String(a.id).localeCompare(String(b.id)));
+  // Parallele Vergaben (z. B. zwei Bestätigungen gleichzeitig) lesen denselben Stand und wählen dieselbe freie Nummer.
+  // Das UPDATE schreibt daher nur, wenn die Zeile unverändert und die Nummer im Turnier noch frei ist; ging eine
+  // Vergabe verloren, wird mit frischem Stand neu gerechnet.
+  let current = list;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const updates = teamNumberUpdates(current, inTeam);
+    if (!updates.length) break;
+    const results = await db.batch(updates.map(([row, number]) => db.prepare(`UPDATE registrations SET team_number = ? WHERE id = ? AND team_number IS ?
+        AND (? IS NULL OR NOT EXISTS (SELECT 1 FROM registrations o WHERE o.tournament_id = ? AND o.team_number = ? AND o.id != ?))`)
+      .bind(number, row.id, row.team_number ?? null, number, tournament.id, number, row.id)));
+    if (results.every((result) => Number(result?.meta?.changes || 0) > 0)) {
+      for (const [row, number] of updates) row.team_number = number;
+      break;
+    }
+    current = await readRows();
+  }
+  if (current !== list) {
+    const byId = new Map(current.map((row) => [row.id, row.team_number]));
+    for (const row of list) if (byId.has(row.id)) row.team_number = byId.get(row.id);
+  }
+  return list;
+}
+
+// Nötige Änderungen [Meldung, neue Nummer] für den gelesenen Stand (Lücken füllen, frühere Meldung behält Doppelte).
+function teamNumberUpdates(rows, inTeam) {
+  const ordered = [...rows].sort((a, b) => String(a.registered_at || '').localeCompare(String(b.registered_at || '')) || String(a.id).localeCompare(String(b.id)));
   const taken = new Set();
   const missing = [];
   const updates = [];
@@ -7551,13 +7578,7 @@ export async function assignTeamNumbers(db, tournament, rows = null) {
     taken.add(next);
     updates.push([row, next]);
   }
-  if (updates.length) {
-    // Nur ändern, wenn die Nummer seit dem Lesen gleich geblieben ist (parallele Vergabe).
-    await db.batch(updates.map(([row, number]) => db.prepare('UPDATE registrations SET team_number = ? WHERE id = ? AND team_number IS ?')
-      .bind(number, row.id, row.team_number ?? null)));
-    for (const [row, number] of updates) row.team_number = number;
-  }
-  return list;
+  return updates;
 }
 
 // Teamnummer wie die Meldelisten-Nr. im Hauptprojekt: bei Formée die feste Nummer der Meldung, sonst (Mêlée) die
@@ -7707,12 +7728,17 @@ async function assertMeleeTeamsEditable(db, tournament, { allowLate = false } = 
 
 // afterIso: created_at des letzten bestehenden Teams – neue Teams beginnen dahinter, auch bei rasch aufeinanderfolgenden
 // Auslosungen. Sonst mischten sich die versetzten Zeitstempel und Reihenfolge bzw. Teamnummern sprängen.
-function insertMeleeTeams(db, tournamentId, teams, afterIso = null) {
+// beforeFirstRound: nur einfügen, solange das Turnier keine Runde hat (im Batch geprüft, nicht nur beim Vorab-Lesen).
+function insertMeleeTeams(db, tournamentId, teams, afterIso = null, { beforeFirstRound = false } = {}) {
   // Versetzte Zeitstempel halten die Reihenfolge der Teams stabil (getSchweizerTeams sortiert nach created_at).
   const nowMs = Math.max(Date.now(), afterIso ? Date.parse(afterIso) + 1 : 0);
-  return teams.map((team, index) => db.prepare('INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(crypto.randomUUID(), tournamentId, JSON.stringify(team.members), team.seedPosition, new Date(nowMs + index).toISOString()));
+  const guard = beforeFirstRound ? ' WHERE NOT EXISTS (SELECT 1 FROM tournament_rounds WHERE tournament_id = ?)' : '';
+  return teams.map((team, index) => db.prepare(`INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) SELECT ?, ?, ?, ?, ?${guard}`)
+    .bind(crypto.randomUUID(), tournamentId, JSON.stringify(team.members), team.seedPosition, new Date(nowMs + index).toISOString(), ...(beforeFirstRound ? [tournamentId] : [])));
 }
+
+const NO_ROUND_SQL = 'NOT EXISTS (SELECT 1 FROM tournament_rounds WHERE tournament_id = ?)';
+const MELEE_TEAMS_STARTED_MESSAGE = 'Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr neu ausgelost werden. Bitte aktualisieren.';
 
 // Mêlée-Auslosung wie die Mêlée-Übernahme im Hauptprojekt (AbstractMeleeAnmeldungUebernehmenSheet): nur aktive
 // Spieler ohne Team werden zu neuen Teams gemischt und an die bestehenden angehängt - wiederholbar für Nachzügler,
@@ -7749,7 +7775,13 @@ export async function drawMeleeTeams(db, tournament, body = {}) {
           code: 'melee_redraw_required', newPlayers: open.length, teams: existing.length,
         });
       }
-      await db.batch([db.prepare('DELETE FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id), ...insertMeleeTeams(db, tournament.id, teams)]);
+      // Die Prüfung „noch keine Runde“ oben ist nur ein Vorab-Lesen: Startet parallel Runde 1, darf der Batch deren
+      // Teams weder löschen noch ersetzen (sonst verweisen Partien auf gelöschte Teams).
+      const [, firstInsert] = await db.batch([
+        db.prepare(`DELETE FROM tournament_teams WHERE tournament_id = ? AND ${NO_ROUND_SQL}`).bind(tournament.id, tournament.id),
+        ...insertMeleeTeams(db, tournament.id, teams, null, { beforeFirstRound: true }),
+      ]);
+      if (!Number(firstInsert?.meta?.changes || 0)) throw new HttpError(409, MELEE_TEAMS_STARTED_MESSAGE);
       return json({ teams: await getSchweizerTeams(db, tournament), drawnCount: teams.length, unassignedCount: open.length - newlyAssigned, redrawn: true });
     }
   }
@@ -7761,7 +7793,8 @@ export async function drawMeleeTeams(db, tournament, body = {}) {
       : 'Für eine Auslosung sind nicht genügend aktive Spieler ohne Team vorhanden.');
   }
   const last = await db.prepare('SELECT MAX(created_at) AS createdAt FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).first();
-  await db.batch(insertMeleeTeams(db, tournament.id, teams, last?.createdAt || null));
+  const [firstInsert] = await db.batch(insertMeleeTeams(db, tournament.id, teams, last?.createdAt || null, { beforeFirstRound: !started }));
+  if (!Number(firstInsert?.meta?.changes || 0)) throw new HttpError(409, MELEE_TEAMS_STARTED_MESSAGE);
   const drawn = teams.reduce((sum, team) => sum + team.members.length, 0);
   return json({ teams: await getSchweizerTeams(db, tournament), drawnCount: teams.length, unassignedCount: open.length - drawn });
 }
@@ -7769,7 +7802,10 @@ export async function drawMeleeTeams(db, tournament, body = {}) {
 // Wie das Löschen von Teams im Hauptprojekt: alle Spieler sind danach wieder ohne Team.
 export async function resetMeleeTeams(db, tournament) {
   await assertMeleeTeamsEditable(db, tournament);
-  await db.prepare('DELETE FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).run();
+  const deleted = await db.prepare(`DELETE FROM tournament_teams WHERE tournament_id = ? AND ${NO_ROUND_SQL}`).bind(tournament.id, tournament.id).run();
+  if (!Number(deleted.meta?.changes || 0) && Number((await db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?').bind(tournament.id).first()).count)) {
+    throw new HttpError(409, 'Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr gelöscht werden. Bitte aktualisieren.');
+  }
   return json({ teams: [] });
 }
 
@@ -7982,6 +8018,8 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
   const roundNumber = redraw ? lastRound.round_number : (lastRound?.round_number || 0) + 1;
   const now = new Date().toISOString();
 
+  // Beim Neuauslosen nicht: Dort löscht derselbe Batch die alte Runde, und nach Runde 1 sind Mêlée-Teams gesperrt.
+  const guardedTeamIds = usesFixedTeams && !redraw && !rebuiltTeams ? [...teamsById.keys()] : null;
   const statements = [
     // Neuauslosen: Die Ergebnisprüfung oben ist nur ein Vorab-Lesen. Kommt bis hierher noch eine Meldung, bleibt die
     // alte Runde stehen, das INSERT der neuen Runde mit derselben Nummer verletzt den Unique-Index und D1 rollt den
@@ -7995,10 +8033,17 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
       ...rebuiltTeams.map((team) => db.prepare(`INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, bracket_group, created_at)
           VALUES (?, ?, ?, ?, ?, ?)`).bind(team.id, tournament.id, JSON.stringify(team.members), team.seedPosition, team.bracketGroup || null, team.createdAt)),
     ] : []),
-    db.prepare('INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES (?, ?, ?, ?)').bind(roundId, tournament.id, roundNumber, now),
+    // Feste Teams sind nur vorab gelesen: Wurden sie inzwischen gelöscht (z. B. Mêlée-Teams parallel neu ausgelost),
+    // legt der Batch weder Runde noch Partien an, statt auf gelöschte Teams zu verweisen (409 unten).
+    guardedTeamIds
+      ? db.prepare(`INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) SELECT ?, ?, ?, ?
+          WHERE NOT EXISTS (SELECT 1 FROM json_each(?) j WHERE NOT EXISTS (SELECT 1 FROM tournament_teams t WHERE t.id = j.value AND t.tournament_id = ?))`)
+        .bind(roundId, tournament.id, roundNumber, now, JSON.stringify(guardedTeamIds), tournament.id)
+      : db.prepare('INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES (?, ?, ?, ?)').bind(roundId, tournament.id, roundNumber, now),
     // Wer die nächste Runde startet, hat die Ergebnisse geprüft: offene Spielermeldungen gelten als bestätigt.
-    db.prepare('UPDATE tournament_matches SET result_report_pending = 0 WHERE tournament_id = ? AND result_report_pending = 1').bind(tournament.id),
+    db.prepare('UPDATE tournament_matches SET result_report_pending = 0 WHERE tournament_id = ? AND result_report_pending = 1 AND EXISTS (SELECT 1 FROM tournament_rounds WHERE id = ?)').bind(tournament.id, roundId),
   ];
+  const roundInsertIndex = statements.length - 2;
   // Spielbahn wie im Hauptprojekt: beim Auslosen vergeben (N/R), sonst leer (X, L = später händisch).
   const courts = assignCourts(matches, roundCourtMode(tournament, roundNumber));
   matches.forEach((match, matchIndex) => {
@@ -8007,18 +8052,22 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
     statements.push(
       db
         .prepare(
-          'INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, match_index, stage_label, court, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          `INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, team_a_id, team_b_id, score_a, score_b, match_index, stage_label, court, created_at, updated_at)
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM tournament_rounds WHERE id = ?)`,
         )
         // Freilos-Anzeigewert 13:7 statt 13:0, konsistent mit den Hauptprojekt-Default-
         // Freispielpunkten (Diff 6), die swissStats() in schweizer.js verbucht. Auch für
         // Jeder-gegen-Jeden nötig, sonst blockiert ein unbewertetes Freilos-Match die
         // nächste Runde (siehe openMatches-Check oben). K.O. kennt kein Freilos (Cadrage
         // statt Freilos, siehe lib/pairing/ko.js), match.teamB ist dort immer belegt.
-        .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(teamA?.members || match.teamA), JSON.stringify(teamB?.members || match.teamB), teamA?.id || null, teamB?.id || null, usesFixedTeams && !teamB ? byePoints(tournament).pointsFor : null, usesFixedTeams && !teamB ? byePoints(tournament).pointsAgainst : null, matchIndex, match.label || null, courts[matchIndex], now, now),
+        .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(teamA?.members || match.teamA), JSON.stringify(teamB?.members || match.teamB), teamA?.id || null, teamB?.id || null, usesFixedTeams && !teamB ? byePoints(tournament).pointsFor : null, usesFixedTeams && !teamB ? byePoints(tournament).pointsAgainst : null, matchIndex, match.label || null, courts[matchIndex], now, now, roundId),
     );
   });
   try {
-    await db.batch(statements);
+    const results = await db.batch(statements);
+    if (!Number(results[roundInsertIndex]?.meta?.changes || 0)) {
+      throw new HttpError(409, 'Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.');
+    }
   } catch (error) {
     // Mehrere berechtigte Turnierleiter können die letzte abgeschlossene Runde
     // gleichzeitig sehen. Der eindeutige Zähler entscheidet atomar, welche
@@ -8084,7 +8133,9 @@ export async function setTournamentOptions(request, db, tournament) {
     if ((columns.court_mode !== undefined || columns.ko_court_first_round_only !== undefined) && updated.court_mode !== 'L') {
       const lastRound = await db.prepare('SELECT id, round_number FROM tournament_rounds WHERE tournament_id = ? ORDER BY round_number DESC LIMIT 1')
         .bind(tournament.id).first();
-      if (lastRound) {
+      // Das Formular schickt alle Optionen mit: Nur ein tatsächlich geänderter Bahnmodus der Runde verteilt die Bahnen neu,
+      // sonst würfelte z. B. schon eine geänderte Ranglistenanzeige bei „Zufällig“ laufende Partien auf andere Bahnen.
+      if (lastRound && roundCourtMode(updated, lastRound.round_number) !== roundCourtMode(tournament, lastRound.round_number)) {
         const { results: matches = [] } = await db.prepare('SELECT id, team_b_registration_ids FROM tournament_matches WHERE round_id = ? ORDER BY match_index')
           .bind(lastRound.id).all();
         const courts = assignCourts(matches.map((match) => ({ teamB: parseTeamIds(match.team_b_registration_ids) })), roundCourtMode(updated, lastRound.round_number));
@@ -8654,11 +8705,20 @@ export async function computeTournamentRanking(db, tournament) {
     rankingStats = computeRanking(matches);
   }
   const ranking = competitionRanks(rankingStats, sameStandardRankingPlace);
+  // Jeder gegen Jeden mit Formée: Eine Meldung ist ein Team, die Rangliste läuft über die Meldungen. Die Team-Anzeige
+  // (Turnieroption) gilt hier genauso wie bei Mêlée; Supermêlée hat keine festen Teams.
+  const rankingMode = tournament.registration_type === 'supermelee' ? 'NAME' : tournamentOptions(tournament).teamDisplayRanking;
+  const numbered = usesRegistrationTeamNumbers(tournament);
 
-  return ranking.map((entry) => ({
-    ...entry,
-    ...(playersById.get(entry.playerId) || {}),
-  }));
+  return ranking.map((entry) => {
+    const player = playersById.get(entry.playerId) || {};
+    const { teamNumber, ...rest } = player;
+    return {
+      ...entry,
+      ...rest,
+      ...(rankingMode !== 'NAME' && player.id ? { displayLabel: teamDisplayLabel([player], numbered ? teamNumber : null, rankingMode) } : {}),
+    };
+  });
 }
 
 async function desktopRankingSnapshot(db, tournament) {

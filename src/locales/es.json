@@ -1985,5 +1985,8 @@
   "Beenden": "Detener",
   "Begegnung": "Partido",
   "Bahn-Nr.": "N.º de pista",
-  "Nachname Spieler 1": "Apellido jugador 1"
+  "Nachname Spieler 1": "Apellido jugador 1",
+  "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr gelöscht werden. Bitte aktualisieren.": "Mientras tanto se ha iniciado la primera ronda. Los equipos ya no se pueden eliminar. Actualiza la página.",
+  "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr neu ausgelost werden. Bitte aktualisieren.": "Mientras tanto se ha iniciado la primera ronda. Los equipos ya no se pueden volver a sortear. Actualiza la página.",
+  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "Mientras tanto se han modificado los equipos. Actualiza la página y vuelve a iniciar la ronda."
 }

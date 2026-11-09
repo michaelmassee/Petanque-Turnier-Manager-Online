@@ -68,6 +68,18 @@ describe('Teamnummern der Meldungen', () => {
     expect(numbers('k')).toEqual({ 'k-r1': 1, 'k-r2': 2, 'k-r3': 3 });
   });
 
+  it('vergibt bei paralleler Vergabe keine Nummer doppelt', async () => {
+    tournament('p');
+    registration('p', 1);
+    // Die zweite Vergabe liest denselben Stand (r1 ohne Nummer) wie eine parallele, die r2 schon Nummer 1 gab.
+    registration('p', 2);
+    const stale = env.DB.sqlite.prepare("SELECT id, status, team_number, registered_at FROM registrations WHERE tournament_id = 'p' AND id = 'p-r1'").all();
+    env.DB.vorBatch((sqlite) => sqlite.exec("UPDATE registrations SET team_number = 1 WHERE id = 'p-r2'"));
+    await assignTeamNumbers(env.DB, tournamentRow('p'), stale);
+    expect(stale[0].team_number).toBe(2);
+    expect(numbers('p')).toEqual({ 'p-r1': 2, 'p-r2': 1 });
+  });
+
   it('nummeriert nur online durchgeführte Formée-Turniere', async () => {
     tournament('d', { documentManaged: 1 });
     tournament('m', { registrationType: 'melee' });

@@ -73,9 +73,10 @@ export function TournamentOptionsPanel({ tournament, options, onSaved }) {
   const [message, setMessage] = useState('');
 
   // Inhaltlich vergleichen: Die Seite liefert bei jedem Rendern ein neues Objekt, der Entwurf soll nur bei echten
-  // Änderungen (Turnierwechsel, gespeicherter Stand) zurückgesetzt werden.
+  // Änderungen (Turnierwechsel, gespeicherter Stand) zurückgesetzt werden. Der Turnierwechsel zählt auch dann, wenn
+  // beide Turniere dieselben gespeicherten Optionen haben – sonst landete ein ungespeicherter Entwurf im anderen Turnier.
   const optionsKey = JSON.stringify(options);
-  useEffect(() => setDraft(JSON.parse(optionsKey)), [optionsKey]);
+  useEffect(() => setDraft(JSON.parse(optionsKey)), [optionsKey, tournament.id]);
   // Nur beim Turnierwechsel leeren – sonst verschwände die Erfolgsmeldung, sobald der gespeicherte Stand ankommt.
   useEffect(() => {
     setError('');

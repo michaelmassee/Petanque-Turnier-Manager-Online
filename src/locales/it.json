@@ -2063,5 +2063,8 @@
   "Beenden": "Termina",
   "Begegnung": "Incontro",
   "Bahn-Nr.": "N. campo",
-  "Nachname Spieler 1": "Cognome giocatore 1"
+  "Nachname Spieler 1": "Cognome giocatore 1",
+  "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr gelöscht werden. Bitte aktualisieren.": "Nel frattempo è stato avviato il primo turno. Le squadre non possono più essere eliminate. Aggiorna la pagina.",
+  "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr neu ausgelost werden. Bitte aktualisieren.": "Nel frattempo è stato avviato il primo turno. Le squadre non possono più essere sorteggiate di nuovo. Aggiorna la pagina.",
+  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "Nel frattempo le squadre sono state modificate. Aggiorna la pagina e avvia di nuovo il turno."
 }

@@ -191,6 +191,28 @@ describe('Mêlée-Teams online', () => {
     expect(teams().flatMap((team) => team.members)).toContain('p9');
   });
 
+  it('lost nicht neu aus, wenn parallel die erste Runde gestartet wurde', async () => {
+    setup('schweizer', 'doublette');
+    setMode('DOUBLETTE_OHNE_FREILOS');
+    spieler(8);
+    await drawMeleeTeams(db, await turnier());
+    const before = teams();
+    spieler(1, 9);
+    db.vorBatch((sqlite) => sqlite.exec("INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES ('r1', 't1', 1, '2026-10-15')"));
+    await expect(drawMeleeTeams(db, await turnier(), { confirmRedraw: true })).rejects.toMatchObject({ status: 409 });
+    expect(teams()).toEqual(before);
+  });
+
+  it('startet keine Runde mit Teams, die parallel gelöscht wurden', async () => {
+    setup('schweizer', 'doublette');
+    spieler(12);
+    await drawMeleeTeams(db, await turnier());
+    db.vorBatch((sqlite) => sqlite.exec("DELETE FROM tournament_teams WHERE tournament_id = 't1'"));
+    await expect(generateTournamentRound(db, await turnier())).rejects.toMatchObject({ status: 409 });
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM tournament_rounds').get().count).toBe(0);
+    expect(db.sqlite.prepare('SELECT COUNT(*) AS count FROM tournament_matches').get().count).toBe(0);
+  });
+
   it('nimmt im Schweizer System nach Turnierstart Nachzügler als neue Teams auf, bestehende bleiben', async () => {
     setup('schweizer', 'doublette');
     spieler(12);

@@ -118,6 +118,32 @@ describe('Turnieroptionen in der Spielverwaltung', () => {
     expect((await firstMatch()).teamALabel).toMatch(/^Spieler\d Muster$/);
   });
 
+  it('verteilt zufällige Bahnen nicht neu, wenn das Formular den Bahnmodus unverändert mitschickt', async () => {
+    tournament('z', 'schweizer', 12);
+    expect((await options('z', { courtMode: 'R' })).status).toBe(200);
+    expect((await nextRound('z')).status).toBe(200);
+    const courts = () => rows("SELECT id, court FROM tournament_matches WHERE tournament_id = 'z' ORDER BY id");
+    const before = courts();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect((await options('z', { courtMode: 'R', teamDisplayRanking: attempt % 2 ? 'NR' : 'NAME' })).status).toBe(200);
+      expect(courts()).toEqual(before);
+    }
+    expect((await options('z', { courtMode: 'N' })).status).toBe(200);
+    expect(courts().map((row) => row.court).sort()).toEqual(['1', '2', '3', '4', '5', '6']);
+  });
+
+  it('zeigt bei Jeder gegen Jeden mit Formée die Rangliste als Nummer oder Spielernamen', async () => {
+    tournament('j', 'jeder_gegen_jeden', 4, { teamNames: true });
+    expect((await nextRound('j')).status).toBe(200);
+    decideOpenMatches('j');
+    const labels = async () => (await (await request('/api/tournaments/j/ranking?live=1')).json()).ranking.map((entry) => entry.displayLabel).sort();
+    expect(await labels()).toEqual([undefined, undefined, undefined, undefined]);
+    expect((await options('j', { teamDisplayRanking: 'NR' })).status).toBe(200);
+    expect(await labels()).toEqual(['1', '2', '3', '4']);
+    expect((await options('j', { teamDisplayRanking: 'SPIELERNAMEN' })).status).toBe(200);
+    expect(await labels()).toEqual([1, 2, 3, 4].map((index) => `Spieler${index} Muster`));
+  });
+
   it('spielt bei Jeder gegen Jeden mit Rückrunde jede Paarung zweimal mit getauschten Seiten', async () => {
     tournament('j', 'jeder_gegen_jeden', 3);
     for (let round = 1; round <= 3; round += 1) {

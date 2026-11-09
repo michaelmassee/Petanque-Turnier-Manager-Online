@@ -1436,6 +1436,28 @@ describe('TournamentPlayManagement', () => {
     expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeDisabled();
   });
 
+  it('gibt nach dem Speichern der Rückrunde die nächste Runde ohne Neuladen frei', async () => {
+    const calls = [];
+    const roundRobin = { ...TOURNAMENT, registrationType: 'forme', type: 'jeder_gegen_jeden', formation: 'tete', roundRobinReturn: false };
+    const decided = (id, roundNumber) => ({ id, roundNumber, matches: [{ ...ROUND_1.matches[0], id: `m${id}`, scoreA: 13, scoreB: 5 }] });
+    const teams = Array.from({ length: 4 }, (_, index) => ({ id: `team-${index}`, members: [`p${index + 1}`] }));
+    // Vier feste Teams: Die Hinrunde hat drei Runden und ist abgeschlossen.
+    installFetchMock(calls, { rounds: [decided('r1', 1), decided('r2', 2), decided('r3', 3)], teams });
+    const baseFetch = global.fetch;
+    global.fetch = vi.fn((path, options = {}) => (path === '/api/tournaments/t1/options' && options.method === 'PUT'
+      ? Promise.resolve(jsonResponse({ ...JSON.parse(options.body), roundRobinReturn: true }))
+      : baseFetch(path, options)));
+    render(<TournamentPlayManagement tournaments={[roundRobin]} language="de" />);
+
+    await waitFor(() => expect(screen.getByText('Alle Runden wurden bereits gespielt.', { selector: '.round-requirements li' })).toBeInTheDocument(), { timeout: 3000 });
+    expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeDisabled();
+
+    fireEvent.click(screen.getByLabelText('Rückrunde spielen (Hin- und Rückrunde mit getauschten Seiten)'));
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText('Turnieroptionen gespeichert.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeEnabled());
+  });
+
   it('lässt die Rangliste nach dem Veröffentlichen aufgeklappt, damit die Erfolgsmeldung sichtbar bleibt', async () => {
     const calls = [];
     installFetchMock(calls, { ranking: [{ playerId: 'p1', id: 'p1', rank: 1, wins: 1, firstName: 'Anna', lastName: 'Muster' }] });

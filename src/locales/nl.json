@@ -1985,5 +1985,8 @@
   "Beenden": "Stoppen",
   "Begegnung": "Partij",
   "Bahn-Nr.": "Baannr.",
-  "Nachname Spieler 1": "Achternaam speler 1"
+  "Nachname Spieler 1": "Achternaam speler 1",
+  "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr gelöscht werden. Bitte aktualisieren.": "Inmiddels is de eerste ronde gestart. Teams kunnen niet meer worden verwijderd. Vernieuw de pagina.",
+  "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr neu ausgelost werden. Bitte aktualisieren.": "Inmiddels is de eerste ronde gestart. Teams kunnen niet meer opnieuw worden geloot. Vernieuw de pagina.",
+  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "De teams zijn inmiddels gewijzigd. Vernieuw de pagina en start de ronde opnieuw."
 }

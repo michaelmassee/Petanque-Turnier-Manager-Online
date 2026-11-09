@@ -68,6 +68,15 @@ describe('TournamentOptionsPanel', () => {
     expect([...screen.getByLabelText('Mêlée-Teams').options].map((option) => option.value)).toEqual(['EINFACH', 'DOUBLETTE_OHNE_FREILOS', 'TRIPLETTE_OHNE_FREILOS']);
   });
 
+  it('verwirft den ungespeicherten Entwurf beim Turnierwechsel, auch bei gleichen gespeicherten Optionen', () => {
+    const { rerender } = render(<Page tournament={SCHWEIZER} />);
+    fireEvent.change(screen.getByLabelText('Spielbahn'), { target: { value: 'R' } });
+    expect(screen.getByLabelText('Spielbahn')).toHaveValue('R');
+    rerender(<Page tournament={{ ...SCHWEIZER, id: 't2' }} />);
+    expect(screen.getByLabelText('Spielbahn')).toHaveValue('X');
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+
   it('zeigt Fehler beim Speichern an', async () => {
     authenticatedApi.mockRejectedValue(new Error('Beim Freilos müssen die Pluspunkte größer als die Minuspunkte sein.'));
     render(<Page />);

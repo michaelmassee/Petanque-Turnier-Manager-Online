@@ -990,7 +990,9 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   // keine Anpassung an dieser Stelle brauchen. Nur aktive Meldungen zählen, analog zum
   // Hauptprojekt (nur Meldungen mit Spieltag-Status "JA" gehen in die Rundenauslosung ein).
   const strategyRequirementGaps = selectedTournament && selectedTournamentStatus === 'running' && !missingMeleeDraw
-    ? checkRoundRequirements(selectedTournament, isMelee ? swissTeams.length : activeConfirmedCount, rounds.length, { teamCount: swissTeams.length })
+    // Mit den zuletzt gespeicherten Optionen: Die Turnierliste wird nach dem Speichern nicht neu geladen, eine gerade
+    // aktivierte Rückrunde muss den Start der nächsten Runde aber sofort freigeben.
+    ? checkRoundRequirements({ ...selectedTournament, roundRobinReturn: tournamentOptions.roundRobinReturn }, isMelee ? swissTeams.length : activeConfirmedCount, rounds.length, { teamCount: swissTeams.length })
     : [];
   const openResultCount = currentRound ? currentRound.matches.filter((match) => !isMatchDecided(match)).length : 0;
   const missingRequirements = [
