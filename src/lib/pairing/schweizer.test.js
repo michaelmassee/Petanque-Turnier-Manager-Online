@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sameSwissRankingPlace, sortSwiss, swissStats, generateRound } from './schweizer.js';
+import { downfloatRounds, orderWithDownfloats, sameSwissRankingPlace, sortSwiss, swissStats, generateRound } from './schweizer.js';
 import runde16History from './schweizer.32-teams-runde-16.json';
 
 const teams = Array.from({ length: 6 }, (_, index) => ({ id: `t${index + 1}`, seedPosition: index + 1 }));
@@ -125,5 +125,59 @@ describe('Schweizer Freilos-Punkte', () => {
     const stats = (match) => swissStats(teams, [match]).find((entry) => entry.teamId === 'a');
     expect(stats({ teamA: ['a'], teamB: [], scoreA: 11, scoreB: 2 })).toMatchObject({ wins: 1, pointsFor: 11, pointsAgainst: 2 });
     expect(stats({ teamA: ['a'], teamB: [] })).toMatchObject({ wins: 1, pointsFor: 13, pointsAgainst: 7 });
+  });
+});
+
+// Issue #36, gleiche Fälle wie SchweizerSystemTest im Hauptprojekt.
+describe('Schweizer Herunterlosen', () => {
+  const eight = Array.from({ length: 8 }, (_, index) => ({ id: `t${index + 1}` }));
+  const winsThreeAndFive = new Map(eight.map((team, index) => [team.id, index < 3 ? 3 : 2]));
+  const ids = (teams) => teams.map((team) => team.id);
+  const floaterFromTop = (floats, round) => orderWithDownfloats(eight, winsThreeAndFive, new Map(Object.entries(floats)), round)[2].id;
+
+  it('erkennt Herunterlosen am Siegstand vor der Runde, Freilos und gleiche Siege zählen nicht', () => {
+    const history = [
+      { roundNumber: 1, teamA: ['t1'], teamB: ['t2'], scoreA: 13, scoreB: 5 },
+      { roundNumber: 1, teamA: ['t3'], teamB: ['t4'], scoreA: 13, scoreB: 5 },
+      { roundNumber: 1, teamA: ['t5'], teamB: [] },
+      { roundNumber: 2, teamA: ['t1'], teamB: ['t3'] },
+      { roundNumber: 2, teamA: ['t5'], teamB: ['t2'], scoreA: 4, scoreB: 13 },
+      { roundNumber: 2, teamA: ['t4'], teamB: [] },
+    ];
+    expect(Object.fromEntries(downfloatRounds(history))).toEqual({ t5: [2] });
+  });
+
+  it('liefert ohne roundNumber keine Historie', () => {
+    expect(downfloatRounds([{ teamA: ['t1'], teamB: ['t2'], scoreA: 13, scoreB: 5 }]).size).toBe(0);
+  });
+
+  it('lost ohne Historie das rangniedrigste Team herunter', () => {
+    expect(floaterFromTop({}, 4)).toBe('t3');
+  });
+
+  it('schützt das in der letzten Runde heruntergeloste Team', () => {
+    expect(floaterFromTop({ t3: [3] }, 4)).toBe('t2');
+  });
+
+  it('lost das am seltensten heruntergeloste Team herunter', () => {
+    expect(floaterFromTop({ t1: [1], t2: [1, 2], t3: [1, 2] }, 5)).toBe('t1');
+  });
+
+  it('die vorletzte Runde schützt vor der Häufigkeit', () => {
+    expect(floaterFromTop({ t1: [1, 2], t2: [1, 2], t3: [3] }, 5)).toBe('t2');
+  });
+
+  it('die letzte Runde schützt stärker als die vorletzte', () => {
+    expect(floaterFromTop({ t1: [4], t2: [3], t3: [4] }, 5)).toBe('t2');
+  });
+
+  it('nimmt bei Gleichstand das rangniedrigste Team', () => {
+    expect(floaterFromTop({ t1: [1], t2: [1], t3: [1] }, 4)).toBe('t3');
+  });
+
+  it('lost einen eingehenden Floater nicht gleich weiter herunter', () => {
+    const wins = new Map(eight.map((team, index) => [team.id, index < 3 ? 3 : index < 5 ? 2 : 1]));
+    const ordered = orderWithDownfloats(eight, wins, new Map([['t4', [3]], ['t5', [3]]]), 4);
+    expect(ids(ordered)).toEqual(['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8']);
   });
 });
