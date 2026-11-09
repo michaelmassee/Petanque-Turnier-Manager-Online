@@ -6,6 +6,7 @@ import { ComboboxPicker } from './ComboboxPicker.jsx';
 // Turnierauswahl für Turnierleiter (Meldungen, Turnier starten): wie die Postbox-Empfänger mit Datum und Anzahl
 // der Meldungen in der zweiten Zeile, Favoriten und zuletzt verwendet (gemeinsam für beide Seiten).
 // isUnavailable: Turniere, die auswählbar bleiben, aber rot als „nicht online durchführbar“ markiert werden.
+// Beendete Turniere bleiben auswählbar, tragen aber ein „Beendet“-Badge und sind abgeblendet.
 export function TournamentPicker({ label, tournaments, value, onChange, currentUserId, required, isUnavailable }) {
   const { t, i18n } = useTranslation();
 
@@ -15,13 +16,16 @@ export function TournamentPicker({ label, tournaments, value, onChange, currentU
     const count = Number(tournament.activeRegistrations || 0) + Number(tournament.waitlistRegistrations || 0);
     const unavailable = Boolean(isUnavailable?.(tournament));
     const meta = unavailable ? `${t('Nicht online durchführbar')} · ${date}` : `${date} · ${t('registrationCount', { count })}`;
+    const finished = tournament.status === 'finished';
     return {
       unavailable,
+      badge: finished ? t('Beendet') : '',
+      dimmed: finished,
       id: tournament.id,
       value: tournament.id,
       label: tournament.name,
       meta,
-      searchText: `${tournament.name} ${meta}`.toLowerCase(),
+      searchText: `${tournament.name} ${meta}${finished ? ` ${t('Beendet')}` : ''}`.toLowerCase(),
       selectedLabel: `${tournament.name} · ${date}`,
       group: t('Alle Turniere'),
       favoritable: true,

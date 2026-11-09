@@ -6,6 +6,7 @@ import { TournamentPicker } from './TournamentPicker.jsx';
 const TOURNAMENTS = [
   { id: 't1', name: 'Herbstturnier', date: '2026-10-06', activeRegistrations: 2, waitlistRegistrations: 1 },
   { id: 't2', name: 'Wintercup', date: '2026-12-01', activeRegistrations: 0, waitlistRegistrations: 0 },
+  { id: 't3', name: 'Sommerturnier', date: '2026-07-01', status: 'finished', activeRegistrations: 4, waitlistRegistrations: 0 },
 ];
 
 function renderPicker(onChange = vi.fn()) {
@@ -29,6 +30,19 @@ describe('TournamentPicker', () => {
     expect(screen.getByRole('option')).toHaveTextContent('Wintercup');
   });
 
+  it('markiert beendete Turniere mit Badge, lässt sie auswählbar und findet sie über „Beendet“', () => {
+    const { input, onChange } = renderPicker();
+    const finished = screen.getByRole('option', { name: /Sommerturnier/ });
+    expect(finished).toHaveClass('is-dimmed');
+    expect(finished.querySelector('.recipient-picker-badge')).toHaveTextContent('Beendet');
+    expect(screen.getByRole('option', { name: /Herbstturnier/ }).querySelector('.recipient-picker-badge')).toBeNull();
+
+    fireEvent.change(input, { target: { value: 'beendet' } });
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('option', { name: /Sommerturnier/ }));
+    expect(onChange).toHaveBeenCalledWith('t3');
+  });
+
   it('merkt sich die Auswahl als zuletzt verwendet und zeigt Favoriten zuerst', () => {
     const { input, onChange } = renderPicker();
     fireEvent.click(screen.getByRole('option', { name: /Wintercup/ }));
@@ -37,8 +51,8 @@ describe('TournamentPicker', () => {
     expect(JSON.parse(localStorage.getItem('ptm_tournament_recents_user-1'))).toEqual(['t2']);
 
     fireEvent.focus(input);
-    const stars = screen.getAllByRole('button', { name: 'Als Favorit markieren/entfernen' });
-    fireEvent.click(stars[stars.length - 1]);
+    const herbst = screen.getByRole('option', { name: /Herbstturnier/ }).closest('li');
+    fireEvent.click(within(herbst).getByRole('button', { name: 'Als Favorit markieren/entfernen' }));
     const favorites = screen.getByText('Favoriten').closest('.recipient-picker-group');
     expect(within(favorites).getByRole('option')).toHaveTextContent('Herbstturnier');
     expect(screen.getByText('Zuletzt verwendet').closest('.recipient-picker-group')).toHaveTextContent('Wintercup');

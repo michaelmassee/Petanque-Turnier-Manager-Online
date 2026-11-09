@@ -5,7 +5,8 @@ import { RequiredMark } from './ui.jsx';
 import { loadFavorites, loadRecents, pushRecent, toggleFavorite } from '../lib/pickerStorage.js';
 
 // Durchsuchbare Auswahl mit Favoriten (Stern) und „Zuletzt verwendet“, gemeinsam für Postbox-Empfänger und
-// Turnierauswahl. Einträge: { id, value, label, meta?, searchText?, selectedLabel?, group, favoritable? }.
+// Turnierauswahl. Einträge: { id, value, label, meta?, searchText?, selectedLabel?, group, favoritable?, unavailable?,
+// badge?, dimmed? } – badge: kurzer Status hinter dem Namen (z. B. „Beendet“), dimmed: Eintrag abgeblendet.
 // Ohne Suchbegriff: Favoriten, zuletzt verwendet, danach die Gruppen in Reihenfolge ihres ersten Auftretens.
 // storageScope/currentUserId: Bereich und Nutzer für Favoriten und Verlauf (lib/pickerStorage.js).
 // recordRecentOnSelect: Auswahl sofort als zuletzt verwendet merken (sonst merkt sich der Aufrufer, z. B. beim Senden).
@@ -267,13 +268,14 @@ export function ComboboxPicker({
                           aria-selected={index === activeIndex}
                           aria-posinset={index + 1}
                           aria-setsize={flatItems.length}
-                          className={`recipient-picker-option${index === activeIndex ? ' active' : ''}${entry.unavailable ? ' is-unavailable' : ''}`}
+                          className={`recipient-picker-option${index === activeIndex ? ' active' : ''}${entry.unavailable ? ' is-unavailable' : ''}${entry.dimmed ? ' is-dimmed' : ''}`}
                           onMouseEnter={() => setActiveIndex(index)}
                           onClick={() => handleSelect(entry)}
                         >
                           <span className="recipient-picker-label">
                             {entry.unavailable && <span className="unavailable-mark" aria-hidden="true">✕ </span>}
                             {entry.label}
+                            {entry.badge ? <span className="recipient-picker-badge">{entry.badge}</span> : null}
                           </span>
                           {entry.meta ? <small className="recipient-picker-meta">{entry.meta}</small> : null}
                         </button>

@@ -535,6 +535,25 @@ a.button {
   font-weight: 700;
 }
 
+.recipient-picker-option.is-dimmed .recipient-picker-label,
+.recipient-picker-option.is-dimmed .recipient-picker-meta {
+  color: #66758c;
+}
+
+.recipient-picker-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #e8ebf0;
+  color: #44516a;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
 .recipient-picker-option.is-unavailable .unavailable-mark,
 .recipient-picker-option.is-unavailable .recipient-picker-meta {
   color: #c62828;
