@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './lib/i18next-config.js';
 import { AppRecoveryBoundary } from './AppRecovery.jsx';
@@ -37,6 +37,7 @@ describe('Diagnoseprotokoll bei React-Abstürzen', () => {
     expect(screen.getByText('Die App konnte nicht wiederhergestellt werden.')).toBeInTheDocument();
     expect(messages()[0]).toMatch(/^error:React-Absturz: Error: kaputt \(.*Boom.*\)$/);
     expect(messages()).toContain('error:Wiederherstellung: manueller Neustart nötig');
+    fireEvent.click(screen.getByRole('button', { name: /Diagnose/ }));
     expect(screen.getByRole('region', { name: 'Diagnose' })).toHaveTextContent('React-Absturz: Error: kaputt');
     expect(debugReport()).toMatch(/\[error\] React-Absturz: Error: kaputt/);
   });

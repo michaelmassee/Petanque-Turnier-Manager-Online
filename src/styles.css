@@ -4810,6 +4810,26 @@ details[open] > .play-round-summary::before {
   font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
   box-shadow: 0 4px 16px rgb(0 0 0 / 30%);
 }
+/* Eingeklappt: schmaler Reiter mittig am rechten Rand (verdeckt weder App-Kopf/Menü noch das Update-Banner unten). */
+.debug-panel.is-collapsed {
+  top: 50%;
+  right: 0;
+  left: auto;
+  transform: translateY(-50%);
+  width: auto;
+  max-height: none;
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+  opacity: 0.9;
+}
+.debug-panel.is-collapsed .debug-panel-toggle {
+  min-height: 0;
+  padding: 10px 6px;
+  border: 0;
+  background: transparent;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
 .debug-panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 8px; }
 .debug-panel-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .debug-panel button {
