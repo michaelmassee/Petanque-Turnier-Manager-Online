@@ -51,6 +51,20 @@ describe('Live-Ansicht eines Spielers', () => {
     expect(buildPlayerLiveView({ registrationId: 'r1', rounds }).history[0]).toMatchObject({ pairingNumber: null, ownTeamNumber: null, opponentTeamNumber: null });
   });
 
+  it('übernimmt die Team-Anzeige der Spielrunde, bei reiner Teamnummer aber die Namen neben dem Nummernkästchen', () => {
+    const base = rounds[0].matches[0];
+    const withLabels = (teamALabel, teamBLabel) => [{ roundNumber: 1, matches: [{ ...base, teamANumber: 5, teamBNumber: 2, teamALabel, teamBLabel }] }];
+    const names = buildPlayerLiveView({ registrationId: 'r1', rounds: withLabels('Spieler A1 + A2', 'Spieler B1 + B2') }).currentMatch;
+    expect(names).toMatchObject({ teamLabel: 'Spieler A1 + A2', opponentLabel: 'Spieler B1 + B2' });
+    const fromOpponentSide = buildPlayerLiveView({ registrationId: 'r3', rounds: withLabels('Spieler A1 + A2', 'Spieler B1 + B2') }).currentMatch;
+    expect(fromOpponentSide).toMatchObject({ teamLabel: 'Spieler B1 + B2', opponentLabel: 'Spieler A1 + A2' });
+
+    const plain = buildPlayerLiveView({ registrationId: 'r1', rounds: withLabels(undefined, undefined) }).currentMatch;
+    expect(plain).toMatchObject({ teamLabel: 'Anna X + Ben X', opponentLabel: 'Carl X + Dora X' });
+    const numbersOnly = buildPlayerLiveView({ registrationId: 'r1', rounds: withLabels('5', '2') }).currentMatch;
+    expect(numbersOnly).toMatchObject({ teamLabel: plain.teamLabel, opponentLabel: plain.opponentLabel, ownTeamNumber: 5, opponentTeamNumber: 2 });
+  });
+
   it('kommt ohne Runden aus', () => {
     const view = buildPlayerLiveView({ registrationId: 'r1', rounds: [], ranking: [] });
     expect(view).toMatchObject({ lastRoundNumber: null, currentMatch: null, history: [], rankingPlace: null, rankingSize: 0 });

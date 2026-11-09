@@ -579,6 +579,12 @@ export function parseSyncRanking(body, validRegistrationIds) {
 
 const liveMemberLabel = (member) => [member.firstName, member.lastName].filter(Boolean).join(' ') || member.teamLabel || '?';
 const liveTeamLabel = (members) => members.map((member) => member.teamLabel || liveMemberLabel(member)).join(' + ');
+// Team-Anzeige der Spielrunde (Turnieroption, fertige Bezeichnung teamALabel/teamBLabel der Runde) auch in der
+// Live-Ansicht. Die Teamnummer steht dort ohnehin als eigenes Kästchen davor; eine Bezeichnung, die nur aus der Nummer
+// besteht (Anzeige „Teamnummer“), ersetzt am Handy deshalb nicht den Namen – sonst stünde dort nur „7 gegen 12“.
+const liveMatchTeamLabel = (members, displayLabel, number) => (
+  displayLabel && displayLabel !== String(number ?? '') ? displayLabel : liveTeamLabel(members)
+);
 
 function liveMatchOutcome(own, other, noShow, ownSide) {
   if (noShow) return noShow === ownSide ? 'lost' : 'won';
@@ -612,9 +618,9 @@ export function buildPlayerLiveView({ registrationId, rounds, ranking }) {
         pairingNumber: match.pairingNumber ?? null,
         ownTeamNumber: (inA ? match.teamANumber : match.teamBNumber) ?? null,
         opponentTeamNumber: (inA ? match.teamBNumber : match.teamANumber) ?? null,
-        teamLabel: liveTeamLabel(own),
+        teamLabel: liveMatchTeamLabel(own, inA ? match.teamALabel : match.teamBLabel, inA ? match.teamANumber : match.teamBNumber),
         teammates: own.filter((member) => member.id !== registrationId).map(liveMemberLabel),
-        opponentLabel: bye ? null : liveTeamLabel(opponents),
+        opponentLabel: bye ? null : liveMatchTeamLabel(opponents, inA ? match.teamBLabel : match.teamALabel, inA ? match.teamBNumber : match.teamANumber),
         bye,
         ownScore: ownScore ?? null,
         opponentScore: opponentScore ?? null,
