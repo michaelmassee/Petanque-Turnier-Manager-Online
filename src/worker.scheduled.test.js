@@ -38,14 +38,27 @@ describe('Cron-Wartung', () => {
     expect(JSON.parse(notification.event_data)).toMatchObject({ tournamentId: 'old', status: 'finished', automatic: true });
   });
 
-  it('lässt nicht laufende und noch aktuelle Turniere unverändert', async () => {
+  it('schließt auch ein nie gestartetes Turnier (Anmeldung) 48 Stunden nach Beginn und informiert die Leitung', async () => {
     sql(`INSERT INTO tournaments (id, owner_id, name, date, start_time, location, formation, status, visibility, created_at, updated_at)
-      VALUES ('registration', 'owner', 'Anmeldung offen', '2000-01-01', '10:00', 'Ort', 'tete', 'registration', 'public', '2000-01-01', '2000-01-01'),
-             ('future', 'owner', 'Zukünftiges Turnier', '2099-01-01', '10:00', 'Ort', 'tete', 'running', 'public', '2099-01-01', '2099-01-01')`);
+      VALUES ('registration', 'owner', 'Nie gestartet', '2000-01-01', '10:00', 'Ort', 'tete', 'registration', 'public', '2000-01-01', '2000-01-01')`);
 
     await runCron();
 
-    expect(row("SELECT status FROM tournaments WHERE id = 'registration'").status).toBe('registration');
+    expect(row("SELECT status FROM tournaments WHERE id = 'registration'").status).toBe('finished');
+    const notification = row("SELECT event_data FROM postbox_messages WHERE recipient_id = 'owner'");
+    expect(JSON.parse(notification.event_data)).toMatchObject({ tournamentId: 'registration', status: 'finished', automatic: true });
+  });
+
+  it('lässt Turniere innerhalb der 48 Stunden unverändert', async () => {
+    // Uhr auf scheduledTime 2026-10-23T01:00Z: Beginn 21.10. 10:00 Berlin liegt 41 Stunden zurück.
+    vi.useFakeTimers({ toFake: ['Date'], now: scheduledTime });
+    sql(`INSERT INTO tournaments (id, owner_id, name, date, start_time, location, formation, status, visibility, created_at, updated_at)
+      VALUES ('recent', 'owner', 'Gerade gespielt', '2026-10-21', '10:00', 'Ort', 'tete', 'registration', 'public', '2026-10-01', '2026-10-01'),
+             ('future', 'owner', 'Zukünftiges Turnier', '2099-01-01', '10:00', 'Ort', 'tete', 'running', 'public', '2099-01-01', '2099-01-01')`);
+
+    try { await runCron(); } finally { vi.useRealTimers(); }
+
+    expect(row("SELECT status FROM tournaments WHERE id = 'recent'").status).toBe('registration');
     expect(row("SELECT status FROM tournaments WHERE id = 'future'").status).toBe('running');
     expect(row('SELECT COUNT(*) AS count FROM postbox_messages').count).toBe(0);
   });

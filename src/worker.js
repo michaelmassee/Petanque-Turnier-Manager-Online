@@ -1638,20 +1638,21 @@ export function registrationClosesAtUtcIso(tournament) {
 }
 
 /**
- * Nach 48 Stunden ab Turnierbeginn läuft kein Turnier mehr: vergessene "Läuft"-Turniere werden
- * automatisch abgeschlossen, damit sie nicht dauerhaft im Bereich "Live" stehen. Die
+ * Nach 48 Stunden ab Turnierbeginn läuft kein Turnier mehr: vergessene "Läuft"-Turniere und nie online
+ * gestartete Turniere (Status "Anmeldung", z. B. offline gespielt oder Kalendereintrag) werden automatisch
+ * abgeschlossen, damit sie nicht dauerhaft im Bereich "Live" bzw. als offen stehen. Die
  * Turnierleitung bekommt dazu eine Nachricht ins Postfach. Daten bleiben unverändert; ein späterer Metadaten-Sync aus dem Turnierdokument kann
  * den Status wieder setzen.
  */
 async function finishStaleTournaments(env, now = new Date()) {
   const db = env.DB;
   const candidates = await db.prepare(`SELECT id, name, owner_id, date, start_time, timezone FROM tournaments
-      WHERE status = 'running' AND date <= ?`).bind(dateDaysAgo(1, now)).all();
+      WHERE status IN ('running', 'registration') AND date <= ?`).bind(dateDaysAgo(1, now)).all();
   const stale = (candidates.results || []).filter((row) => isTournamentStale(tournamentStartUtcIso(row), now));
   if (stale.length === 0) return;
-  const statement = db.prepare("UPDATE tournaments SET status = 'finished', updated_at = ? WHERE id = ? AND status = 'running'");
+  const statement = db.prepare("UPDATE tournaments SET status = 'finished', updated_at = ? WHERE id = ? AND status IN ('running', 'registration')");
   const results = await db.batch(stale.map((row) => statement.bind(now.toISOString(), row.id)));
-  console.log(`Finished ${stale.length} stale running tournament(s)`);
+  console.log(`Finished ${stale.length} stale tournament(s)`);
   // Nur die Turnierleitung erfährt davon (Postfach + Push), Teilnehmer nicht.
   for (let index = 0; index < stale.length; index += 1) {
     if (!results[index]?.meta?.changes) continue;
@@ -6264,8 +6265,12 @@ async function upsertPetanqueAktuellTournament(env, entry, ownerId, now, searche
     const previous = await getTournamentById(db, existing.tournament_id);
     const geo = await resolveTournamentGeolocation(mapped, previous, now, countryCode);
     const timezone = resolveTournamentTimezone(geo, previous.timezone || 'Europe/Berlin');
-    await db.prepare(`UPDATE tournaments SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, formation = ?, formation_other = ?, license_required = ?, website_url = ?, flyer_url = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, status = 'registration', visibility = 'public', registration_enabled = 0, updated_at = ? WHERE id = ?`)
-      .bind(mapped.name, mapped.club, mapped.date, mapped.startTime, mapped.location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.licenseRequired ? 1 : 0, mapped.websiteUrl, mapped.flyerUrl, geo.latitude, geo.longitude, geo.geocodedAt, timezone, now, existing.tournament_id).run();
+    // Ein vom Cron abgeschlossener Termin bleibt abgeschlossen, solange sein Beginn weiter über 48 Stunden
+    // zurückliegt; erst eine Verschiebung in die Zukunft öffnet ihn wieder.
+    const startUtc = tournamentStartUtcIso({ date: mapped.date, start_time: mapped.startTime, timezone });
+    const status = previous.status === 'finished' && isTournamentStale(startUtc, new Date(now)) ? 'finished' : 'registration';
+    await db.prepare(`UPDATE tournaments SET name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, formation = ?, formation_other = ?, license_required = ?, website_url = ?, flyer_url = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, status = ?, visibility = 'public', registration_enabled = 0, updated_at = ? WHERE id = ?`)
+      .bind(mapped.name, mapped.club, mapped.date, mapped.startTime, mapped.location, mapped.description, mapped.formation === 'andere' ? 'tete' : mapped.formation, mapped.formation === 'andere' ? 1 : 0, mapped.licenseRequired ? 1 : 0, mapped.websiteUrl, mapped.flyerUrl, geo.latitude, geo.longitude, geo.geocodedAt, timezone, status, now, existing.tournament_id).run();
     // Ein vorhandenes Logo nicht löschen, wenn die Detailseite keins (mehr) liefert.
     if (mapped.logoUrl) await db.prepare('UPDATE tournaments SET logo_url = ? WHERE id = ?').bind(mapped.logoUrl, existing.tournament_id).run();
     await db.prepare('UPDATE petanque_aktuell_imports SET synced_at = ? WHERE external_key = ?').bind(now, mapped.externalKey).run();
