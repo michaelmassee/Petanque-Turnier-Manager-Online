@@ -26,6 +26,14 @@ async function subscribeToPush() {
   return 'enabled';
 }
 
+// Abmelden: erst auf dem Server löschen (sonst schickt er weiter an einen toten Endpunkt), dann im Browser.
+async function unsubscribeFromPush() {
+  const subscription = await currentBrowserPushSubscription();
+  if (!subscription) return;
+  await authenticatedApi('/api/push/subscriptions', { method: 'DELETE', body: JSON.stringify({ endpoint: subscription.endpoint }) });
+  await subscription.unsubscribe();
+}
+
 async function hasActivePushSubscription() {
   return Boolean(await currentBrowserPushSubscription());
 }
@@ -71,6 +79,7 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
   const [pushState, setPushState] = useState('');
   const [pushErrorDetail, setPushErrorDetail] = useState('');
   const [pushActive, setPushActive] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const { t: text } = useTranslation();
 
   useEffect(() => {
@@ -79,15 +88,24 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
     return () => { cancelled = true; };
   }, []);
 
-  async function enablePush() {
+  async function togglePush() {
+    setPushBusy(true);
+    setPushState('');
+    setPushErrorDetail('');
     try {
-      setPushErrorDetail('');
-      const result = await subscribeToPush();
-      setPushState(result);
-      if (result === 'enabled') setPushActive(true);
+      if (pushActive) {
+        await unsubscribeFromPush();
+        setPushActive(false);
+      } else {
+        const result = await subscribeToPush();
+        if (result === 'enabled') setPushActive(true);
+        else setPushState(result);
+      }
     } catch (error) {
-      setPushState('setupError');
+      setPushState(pushActive ? 'disableError' : 'setupError');
       setPushErrorDetail(error.message || '');
+    } finally {
+      setPushBusy(false);
     }
   }
 
@@ -108,22 +126,19 @@ export function PostboxControl({ open, unreadCount, messages, todos = [], recipi
             <div className="section-title">
               <div className="postbox-title">
                 <h2>{text('inbox')}</h2>
-                {pushActive && (
-                  <svg className="postbox-push-active" role="img" aria-label={text('enabled')} viewBox="0 0 24 24" focusable="false">
-                    <title>{text('enabled')}</title>
+                {/* className ersetzt die Standardklasse von Button komplett – deshalb vollständig angeben. */}
+                <Button className="button button-secondary postbox-push-toggle" onClick={togglePush} loading={pushBusy}
+                  aria-pressed={pushActive} aria-label={pushActive ? text('disable') : text('enable')}
+                  title={pushActive ? `${text('enabled')} ${text('disable')}` : text('enable')}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z" />
                     <path d="M10 21h4" />
                   </svg>
-                )}
+                </Button>
               </div>
               <CloseButton onClick={onClose} />
             </div>
-            {!pushActive && (
-              <div>
-                <Button variant="secondary" onClick={enablePush}>{text('enable')}</Button>
-                {pushState && <p className="hint">{text(pushState)}{pushErrorDetail ? ` (${pushErrorDetail})` : ''}</p>}
-              </div>
-            )}
+            <Feedback error={pushState ? `${text(pushState)}${pushErrorDetail ? ` (${pushErrorDetail})` : ''}` : ''} />
             <form className="form postbox-compose" onSubmit={onSubmit}>
               <RecipientPicker
                 label={text('recipient')}

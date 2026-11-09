@@ -111,18 +111,29 @@ describe('Links in Postbox-Nachrichten', () => {
 describe('Push-Status in der Postbox', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('zeigt aktiven Push nur als kleines Glocken-Icon in der Kopfzeile', async () => {
-    vi.spyOn(push, 'currentBrowserPushSubscription').mockResolvedValue({ endpoint: 'https://push.example' });
+  it('zeigt aktiven Push als gedrückten Glocken-Toggle in der Kopfzeile und meldet beim Klick ab', async () => {
+    const unsubscribe = vi.fn().mockResolvedValue(true);
+    vi.spyOn(push, 'currentBrowserPushSubscription').mockResolvedValue({ endpoint: 'https://push.example', unsubscribe });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     renderPostbox();
-    const icon = await screen.findByRole('img', { name: 'Push-Benachrichtigungen sind aktiviert.' });
-    expect(icon.closest('.section-title')).not.toBeNull();
-    expect(screen.queryByRole('button', { name: 'Push-Benachrichtigungen aktivieren' })).toBeNull();
+    const toggle = await screen.findByRole('button', { name: 'Push-Benachrichtigungen deaktivieren' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(toggle.closest('.section-title')).not.toBeNull();
+    fireEvent.click(toggle);
+    const off = await screen.findByRole('button', { name: 'Push-Benachrichtigungen aktivieren' });
+    expect(off).toHaveAttribute('aria-pressed', 'false');
+    const [url, options] = fetchMock.mock.calls.find(([target]) => String(target).includes('/api/push/subscriptions'));
+    expect(String(url)).toContain('/api/push/subscriptions');
+    expect(options.method).toBe('DELETE');
+    expect(JSON.parse(options.body)).toEqual({ endpoint: 'https://push.example' });
+    expect(unsubscribe).toHaveBeenCalled();
   });
 
-  it('bietet ohne aktiven Push den Aktivieren-Button an', async () => {
+  it('bietet ohne aktiven Push den nicht gedrückten Glocken-Toggle zum Aktivieren an', async () => {
     vi.spyOn(push, 'currentBrowserPushSubscription').mockResolvedValue(null);
     renderPostbox();
-    expect(await screen.findByRole('button', { name: 'Push-Benachrichtigungen aktivieren' })).toBeInTheDocument();
-    expect(screen.queryByRole('img', { name: 'Push-Benachrichtigungen sind aktiviert.' })).toBeNull();
+    const toggle = await screen.findByRole('button', { name: 'Push-Benachrichtigungen aktivieren' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle.closest('.section-title')).not.toBeNull();
   });
 });

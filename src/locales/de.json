@@ -89,6 +89,8 @@
   "denied": "Push-Benachrichtigungen wurden nicht erlaubt.",
   "setupError": "Push konnte trotz erteilter Berechtigung nicht eingerichtet werden. Bitte versuche es erneut.",
   "enabled": "Push-Benachrichtigungen sind aktiviert.",
+  "disable": "Push-Benachrichtigungen deaktivieren",
+  "disableError": "Push konnte nicht deaktiviert werden.",
   "migrationTitle": "Push-Benachrichtigungen",
   "migrationText": "Aktiviere Push, damit neue Nachrichten auch bei geschlossener App angezeigt werden.",
   "later": "Nicht aktivieren",

@@ -890,7 +890,11 @@ a.left-panel-link {
 .postbox-panel h2, .postbox-panel h3 { margin: 0; }
 .postbox-panel .section-title { margin-bottom: 0; }
 .postbox-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.postbox-push-active { flex: none; width: 18px; height: 18px; fill: #1a7f4b; stroke: #1a7f4b; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.button.postbox-push-toggle { flex: none; min-height: 32px; width: 32px; padding: 0; border-radius: 50%; color: #66758c; }
+.button.postbox-push-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.button.postbox-push-toggle[aria-pressed="true"] { color: #1a7f4b; border-color: #1a7f4b; background: #eaf6ef; }
+.button.postbox-push-toggle[aria-pressed="true"] svg { fill: currentColor; }
+.button.postbox-push-toggle[aria-busy="true"] svg { display: none; }
 .postbox-compose { gap: 8px; margin-top: 0; }
 .postbox-section { display: grid; gap: 8px; }
 .postbox-todo { display: block; width: 100%; margin: 0; padding: 9px; border: none; border-radius: 6px; background: #fff8e8; color: inherit; text-align: left; cursor: pointer; }

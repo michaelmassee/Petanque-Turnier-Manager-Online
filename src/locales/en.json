@@ -343,6 +343,8 @@
   "Email and password are required": "Email and password are required",
   "enable": "Enable push notifications",
   "enabled": "Push notifications are enabled.",
+  "disable": "Disable push notifications",
+  "disableError": "Push could not be disabled.",
   "Entwurf": "Draft",
   "Ergebnis ändern": "Change result",
   "Ergebnis speichern": "Save result",

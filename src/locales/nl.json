@@ -343,6 +343,8 @@
   "Email and password are required": "E-mail en wachtwoord zijn verplicht",
   "enable": "Pushmeldingen inschakelen",
   "enabled": "Pushmeldingen zijn ingeschakeld.",
+  "disable": "Pushmeldingen uitschakelen",
+  "disableError": "Pushmeldingen konden niet worden uitgeschakeld.",
   "Entwurf": "Concept",
   "Ergebnis ändern": "Resultaat wijzigen",
   "Ergebnis speichern": "Resultaat opslaan",

@@ -343,6 +343,8 @@
   "Email and password are required": "Correo y contraseña son obligatorios",
   "enable": "Activar notificaciones push",
   "enabled": "Las notificaciones push están activadas.",
+  "disable": "Desactivar notificaciones push",
+  "disableError": "No se pudieron desactivar las notificaciones push.",
   "Entwurf": "Borrador",
   "Ergebnis ändern": "Cambiar resultado",
   "Ergebnis speichern": "Guardar resultado",
