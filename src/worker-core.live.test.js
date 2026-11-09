@@ -44,6 +44,13 @@ describe('Live-Ansicht eines Spielers', () => {
     expect(view.history).toHaveLength(1);
   });
 
+  it('reicht Begegnungsnummer und Teamnummern aus Sicht des Spielers durch', () => {
+    const numbered = [{ roundNumber: 1, matches: [{ ...rounds[0].matches[0], pairingNumber: 3, teamANumber: 5, teamBNumber: 2 }] }];
+    expect(buildPlayerLiveView({ registrationId: 'r1', rounds: numbered }).currentMatch).toMatchObject({ pairingNumber: 3, ownTeamNumber: 5, opponentTeamNumber: 2 });
+    expect(buildPlayerLiveView({ registrationId: 'r3', rounds: numbered }).currentMatch).toMatchObject({ pairingNumber: 3, ownTeamNumber: 2, opponentTeamNumber: 5 });
+    expect(buildPlayerLiveView({ registrationId: 'r1', rounds }).history[0]).toMatchObject({ pairingNumber: null, ownTeamNumber: null, opponentTeamNumber: null });
+  });
+
   it('kommt ohne Runden aus', () => {
     const view = buildPlayerLiveView({ registrationId: 'r1', rounds: [], ranking: [] });
     expect(view).toMatchObject({ lastRoundNumber: null, currentMatch: null, history: [], rankingPlace: null, rankingSize: 0 });

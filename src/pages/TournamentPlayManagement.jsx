@@ -77,9 +77,16 @@ function alreadyRegisteredNames(registrations, quickPlayer, slots) {
     .map(([first, last]) => `${first.trim()} ${last.trim()}`);
 }
 
+// Spieler aus Runden tragen ihre fertige Bezeichnung (teamLabel). Meldungen der Teilnehmerliste bestehen bei
+// Doublette/Triplette (Formée) aus einer Meldung mit Partnerfeldern: alle Spieler nennen, ein Teamname steht davor.
 function playerLabel(player) {
   if (player.teamLabel) return player.teamLabel;
-  return [player.firstName, player.lastName].filter(Boolean).join(' ') || player.id;
+  const names = [[player.firstName, player.lastName], [player.partnerFirstName, player.partnerLastName], [player.partner2FirstName, player.partner2LastName]]
+    .map((parts) => parts.filter(Boolean).join(' '))
+    .filter(Boolean)
+    .join(' + ');
+  const label = names || player.id;
+  return player.teamName ? `${player.teamName} (${label})` : label;
 }
 
 function teamLabel(team) {
@@ -273,11 +280,45 @@ function MatchRow({ match, number, draft, onChange, onSave, busy, isNewReport, m
   );
 }
 
+// Sortierung der Partien in den Runden-Panels, auf dem Gerät gemerkt: Bahn-Nr. (ohne Bahn die Begegnungsnummer) oder
+// Nachname von Spieler 1 des ersten Teams, damit die Turnierleitung ein Team schnell findet.
+const ROUND_SORT_KEY = 'ptm_round_sort';
+const ROUND_SORT_OPTIONS = [{ value: 'court', label: 'Bahn-Nr.' }, { value: 'name', label: 'Nachname Spieler 1' }];
+
+function readRoundSort() {
+  try {
+    return localStorage.getItem(ROUND_SORT_KEY) === 'name' ? 'name' : 'court';
+  } catch {
+    return 'court';
+  }
+}
+
+function sortRoundMatches(matches, numbers, sortBy) {
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+  const byNumber = (a, b) => (numbers.get(a.id) ?? Infinity) - (numbers.get(b.id) ?? Infinity);
+  if (sortBy === 'name') {
+    const key = (match) => [match.teamA?.[0]?.lastName, match.teamA?.[0]?.firstName].filter(Boolean).join(' ');
+    return [...matches].sort((a, b) => collator.compare(key(a), key(b)) || byNumber(a, b));
+  }
+  // Bahnen natürlich sortiert (2 vor 10), Partien ohne Bahn (Freilos) dahinter.
+  const court = (match) => (match.court || '').trim();
+  return [...matches].sort((a, b) => (Boolean(court(b)) - Boolean(court(a))) || collator.compare(court(a), court(b)) || byNumber(a, b));
+}
+
 // collapseDecided (laufende Runde): Partien mit gespeichertem Ergebnis wandern in ein zugeklapptes Panel, damit oben nur
 // noch die offenen stehen. Neue Spielermeldungen bleiben sichtbar, bis die Turnierleitung sie als gesehen markiert.
 function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, onConfirmReports, confirmingReports = false, collapseDecided = false, manualCourt = false, onSaveCourt }) {
   const { t } = useTranslation();
   const [drafts, setDrafts] = useState({});
+  const [sortBy, setSortBy] = useState(readRoundSort);
+  function changeSort(value) {
+    setSortBy(value);
+    try {
+      localStorage.setItem(ROUND_SORT_KEY, value);
+    } catch {
+      // Ohne Speicher gilt die Wahl nur bis zum Neuladen.
+    }
+  }
   const changes = round.matches.filter((match) => drafts[match.id]).map((match) => ({
     matchId: match.id,
     scoreA: drafts[match.id].scoreA ?? String(match.scoreA ?? ''),
@@ -298,9 +339,10 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, o
   // Unbestätigte Spielermeldungen (Server-Kennzeichen): erst nach „Gesehen“ öffentlich (E-27).
   const newReports = round.matches.filter((match) => match.reportPending).length;
   const isCollapsed = (match) => isMatchDecided(match) && !match.reportPending;
-  const openMatches = round.matches.filter((match) => !isCollapsed(match));
-  const decidedMatches = round.matches.filter(isCollapsed);
   const numbers = new Map(pairingNumbers(round.matches).map((number, index) => [round.matches[index].id, number]));
+  const sortedMatches = sortRoundMatches(round.matches, numbers, sortBy);
+  const openMatches = sortedMatches.filter((match) => !isCollapsed(match));
+  const decidedMatches = sortedMatches.filter(isCollapsed);
   // Wie die Duplikat-Prüfung im Hauptprojekt (COUNTIF > 1 auf nicht leeren Bahnzellen): doppelte Bahn rot markieren.
   const courtKey = (match) => (match.court || '').trim().toLowerCase();
   const courtCounts = round.matches.reduce((counts, match) => (courtKey(match) ? counts.set(courtKey(match), (counts.get(courtKey(match)) || 0) + 1) : counts), new Map());
@@ -322,6 +364,12 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, o
           setDrafts((current) => Object.fromEntries(Object.entries(current).filter(([id]) => !cleared.includes(id))));
         }}>{t('Alle speichern')}</Button>
         {onRefresh && <Button variant="secondary" disabled={busy} loading={refreshing} onClick={onRefresh}>{t('Aktualisieren')}</Button>}
+        <label className="play-round-sort">
+          {t('Sortieren nach')}
+          <select value={sortBy} onChange={(event) => changeSort(event.target.value)}>
+            {ROUND_SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
+          </select>
+        </label>
       </div>
       {collapseDecided ? (
         <>
@@ -335,7 +383,7 @@ function RoundResults({ round, onSave, onSaveAll, onRefresh, busy, refreshing, o
             </details>
           )}
         </>
-      ) : <div className="play-match-list">{round.matches.map(matchRow)}</div>}
+      ) : <div className="play-match-list">{sortedMatches.map(matchRow)}</div>}
     </>
   );
 }
@@ -487,6 +535,11 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const rounds = roundsQuery.data?.rounds || [];
   const [confirmingReports, setConfirmingReports] = useState(false);
   const swissTeams = roundsQuery.data?.teams || [];
+  // Teamnummer wie bei der Team-Anzeige „Teamnummer“: Reihenfolge der festen Teams (Formée ab der ersten Runde,
+  // Mêlée ab der Auslosung). Vorher gibt es noch keine feste Nummer.
+  // Teamnummer: bei Formée die feste Nummer der Meldung (ab Anmeldung), bei Mêlée die des ausgelosten Teams.
+  const teamNumberByRegistration = new Map(swissTeams.flatMap((team, index) => (team.members || []).map((id) => [id, team.number ?? index + 1])));
+  const teamNumberOf = (registration) => registration.teamNumber ?? teamNumberByRegistration.get(registration.id);
   const rankingQuery = useQuery({
     // Structural query keys keep the ranking cached when a refresh changes no results.
     queryKey: [...queryKey, 'ranking', roundsQuery.data?.rounds],
@@ -1122,6 +1175,9 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
             {visibleConfirmedRegistrations.items.map((registration) => (
               <div className="round-participant-row" key={registration.id}>
                 <span className={`round-participant-name${registration.participation === 'active' ? '' : ' muted'}`}>
+                  {teamNumberOf(registration) != null && (
+                    <span className="round-participant-number" title={t('Teamnummer')} data-i18n-skip>{teamNumberOf(registration)}</span>
+                  )}
                   <span data-i18n-skip>{playerLabel(registration)}</span>
                   {registration.accountConnected && <AccountBadge />}
                   {registration.participation === 'withdrawn' && <span className="participation-withdrawn">{t('Ausgesetzt')}</span>}

@@ -96,6 +96,11 @@ describe('Turnieroptionen in der Spielverwaltung', () => {
     const before = await firstMatch();
     expect(before.teamALabel).toBeUndefined();
     expect(before.teamA[0].teamLabel).toMatch(/^Team [A-F]$/);
+    // Teamnummer und Begegnungsnummer (laufend je Runde) unabhängig von der Anzeige-Option.
+    expect(before.teamANumber).toBe(Number(before.teamA[0].id.replace('t-r', '')));
+    expect(before.teamBNumber).toBe(Number(before.teamB[0].id.replace('t-r', '')));
+    const firstRound = (await (await request('/api/tournaments/t/rounds')).json()).rounds[0].matches;
+    expect(firstRound.map((match) => match.pairingNumber)).toEqual([1, 2, 3]);
 
     expect((await options('t', { teamDisplayRound: 'NR', teamDisplayRanking: 'SPIELERNAMEN' })).status).toBe(200);
     // Teamnummer = Anmeldereihenfolge: die Meldung t-rN ist Team N.

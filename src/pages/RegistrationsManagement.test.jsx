@@ -676,3 +676,25 @@ describe('Anmeldungsverwaltung: QR-Code Live-Ansicht', () => {
   });
 });
 
+
+describe('Anmeldungsverwaltung: Teamnummer', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('zeigt die feste Teamnummer der Meldung vor dem Namen, ohne Nummer keine', async () => {
+    const base = { tournamentId: 't1', lastName: 'Muster', status: 'confirmed', participation: 'active', feeSelections: [], registrationAnswers: [] };
+    const registrations = [{ ...base, id: 'r1', firstName: 'Anna', teamNumber: 7 }, { ...base, id: 'r2', firstName: 'Bert', teamNumber: null }];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ registrations }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    render(
+      <RegistrationsManagementPage
+        tournaments={[{ id: 't1', name: 'Sommer Cup', canManage: true, registrationEnabled: true }]}
+        selectedTournamentId="t1"
+        setSelectedTournamentId={() => {}}
+        language="de"
+      />,
+    );
+
+    const anna = (await screen.findByText(/Anna Muster/)).closest('strong');
+    expect(within(anna).getByTitle('Teamnummer')).toHaveTextContent('7');
+    expect(screen.getByText(/Bert Muster/).closest('strong').querySelector('[title="Teamnummer"]')).toBeNull();
+  });
+});

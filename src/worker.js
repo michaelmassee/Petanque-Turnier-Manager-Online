@@ -7214,9 +7214,15 @@ export async function listRegistrations(db, tournament) {
     .prepare('SELECT * FROM registrations WHERE tournament_id = ? ORDER BY registered_at DESC')
     .bind(tournament.id)
     .all();
+  // Teamnummer wie in der Meldeliste des Hauptprojekts schon bei Anmeldung/Check-in, nur bei online durchgeführten Turnieren.
+  await assignTeamNumbers(db, tournament, result.results);
+  const numbered = usesRegistrationTeamNumbers(tournament);
   const flagsFor = registrationFlagsById(result.results || []);
   return json({
-    registrations: result.results.map((row) => ({ ...toManagedRegistration(row), ...registrationFlags(tournament, row, flagsFor) })),
+    registrations: result.results.map((row) => ({
+      ...toManagedRegistration(row), ...registrationFlags(tournament, row, flagsFor),
+      teamNumber: numbered && row.team_number != null ? Number(row.team_number) : null,
+    })),
   });
 }
 
@@ -7458,6 +7464,9 @@ function toPublicMatch(row, playersById, display = null) {
     teamA,
     teamB,
     ...labels,
+    // Teamnummer (Reihenfolge der festen Teams) für Live-Ansicht und Turnierseite; ohne feste Teams null.
+    teamANumber: display?.numbers.get(row.team_a_id) ?? null,
+    teamBNumber: teamB.length ? display?.numbers.get(row.team_b_id) ?? null : null,
     scoreA: row.score_a,
     scoreB: row.score_b,
     noShow: row.no_show,
@@ -7505,10 +7514,62 @@ async function getPlayersById(db, tournamentId, activeIds = null) {
   }));
 }
 
-// Teamnummer wie die Meldelisten-Nr. im Hauptprojekt: Reihenfolge der festen Teams (Anmeldereihenfolge bzw. Auslosung).
-function teamNumbers(teams) {
-  return new Map(teams.map((team, index) => [team.id, index + 1]));
+// Feste Teamnummern der Meldungen gibt es nur bei Formée und nur, wenn das Turnier online durchgeführt wird. Beim
+// Turnierdokument vergibt das Dokument die Nummern; dann gilt eine früher online vergebene Nummer nicht mehr.
+function usesRegistrationTeamNumbers(tournament) {
+  return (tournament.registration_type || 'forme') === 'forme' && !isDocumentBound(tournament);
 }
+
+/**
+ * Teamnummern wie die Nr. der Meldeliste im Hauptprojekt (TeamNummernVergabe, LUECKEN_FUELLEN): Jede bestätigte
+ * Meldung bekommt eine feste Nummer, neue füllen zuerst die Lücken stornierter Meldungen. Wer schon in einem Team
+ * gespielt hat, behält seine Nummer auch nach einer Stornierung. Doppelte Nummern behält die früheste Meldung.
+ * rows: alle Meldungen des Turniers (id, status, team_number), werden um die neue Nummer ergänzt.
+ */
+export async function assignTeamNumbers(db, tournament, rows = null) {
+  if (!usesRegistrationTeamNumbers(tournament)) return rows;
+  const list = rows || (await db.prepare('SELECT id, status, team_number, registered_at FROM registrations WHERE tournament_id = ?').bind(tournament.id).all()).results;
+  const teams = await db.prepare('SELECT member_registration_ids FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).all();
+  const inTeam = new Set(teams.results.flatMap((row) => JSON.parse(row.member_registration_ids)));
+  const ordered = [...list].sort((a, b) => String(a.registered_at || '').localeCompare(String(b.registered_at || '')) || String(a.id).localeCompare(String(b.id)));
+  const taken = new Set();
+  const missing = [];
+  const updates = [];
+  for (const row of ordered) {
+    const number = row.team_number == null ? null : Number(row.team_number);
+    if (row.status !== 'confirmed' && !inTeam.has(row.id)) {
+      if (number != null) updates.push([row, null]);
+    } else if (number != null && !taken.has(number)) {
+      taken.add(number);
+    } else {
+      missing.push(row);
+    }
+  }
+  let next = 1;
+  for (const row of missing) {
+    while (taken.has(next)) next += 1;
+    taken.add(next);
+    updates.push([row, next]);
+  }
+  if (updates.length) {
+    // Nur ändern, wenn die Nummer seit dem Lesen gleich geblieben ist (parallele Vergabe).
+    await db.batch(updates.map(([row, number]) => db.prepare('UPDATE registrations SET team_number = ? WHERE id = ? AND team_number IS ?')
+      .bind(number, row.id, row.team_number ?? null)));
+    for (const [row, number] of updates) row.team_number = number;
+  }
+  return list;
+}
+
+// Teamnummer wie die Meldelisten-Nr. im Hauptprojekt: bei Formée die feste Nummer der Meldung, sonst (Mêlée) die
+// Reihenfolge der festen Teams (Auslosung).
+function teamNumbers(teams) {
+  return new Map(teams.map((team, index) => [team.id, team.teamNumber ?? index + 1]));
+}
+
+// Feste Nummer einer Ein-Meldungs-Team-Zeile (Formée) per Primärschlüssel nachschlagen.
+const TEAM_NUMBER_SQL = `(SELECT r.team_number FROM registrations r WHERE json_array_length(tournament_teams.member_registration_ids) = 1
+  AND r.id = json_extract(tournament_teams.member_registration_ids, '$[0]')) AS team_number`;
+const teamNumberOf = (tournament, row) => (usesRegistrationTeamNumbers(tournament) && row.team_number != null ? Number(row.team_number) : null);
 
 // Team-Anzeige wie im Hauptprojekt (TeamAnzeige): NR = Teamnummer, SPIELERNAMEN = Namen aller Spieler,
 // NAME = Teamname, ohne Teamnamen die Spielernamen. Ohne feste Teamnummer (z. B. Supermêlée) die Namen.
@@ -7519,8 +7580,8 @@ function teamDisplayLabel(players, number, mode) {
 }
 
 async function getSchweizerTeams(db, tournament) {
-  const result = await db.prepare('SELECT * FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id').bind(tournament.id).all();
-  return result.results.map((row) => ({ id: row.id, members: JSON.parse(row.member_registration_ids), seedPosition: Number(row.seed_position || 0), bracketGroup: row.bracket_group || null }));
+  const result = await db.prepare(`SELECT *, ${TEAM_NUMBER_SQL} FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id`).bind(tournament.id).all();
+  return result.results.map((row) => ({ id: row.id, members: JSON.parse(row.member_registration_ids), seedPosition: Number(row.seed_position || 0), bracketGroup: row.bracket_group || null, teamNumber: teamNumberOf(tournament, row) }));
 }
 
 // Ordnet KO-Teams einmalig (vor der ersten Runde) einem unabhängigen Teilbaum zu (siehe
@@ -7739,9 +7800,10 @@ async function loadTournamentRounds(db, tournament, { publicTournament = null } 
   const tournamentId = tournament.id;
   const roundsResult = await db.prepare('SELECT * FROM tournament_rounds WHERE tournament_id = ? ORDER BY round_number ASC').bind(tournamentId).all();
   const matchesResult = await db.prepare('SELECT * FROM tournament_matches WHERE tournament_id = ? ORDER BY created_at ASC, match_index ASC').bind(tournamentId).all();
-  const teamsResult = await db.prepare('SELECT id, member_registration_ids, seed_position FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id').bind(tournamentId).all();
+  const teamsResult = await db.prepare(`SELECT id, member_registration_ids, seed_position, ${TEAM_NUMBER_SQL} FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id`).bind(tournamentId).all();
   const playersById = await getPlayersById(db, tournamentId);
-  const display = { mode: tournamentOptions(tournament).teamDisplayRound, numbers: teamNumbers(teamsResult.results) };
+  const teamRows = teamsResult.results.map((team) => ({ ...team, teamNumber: teamNumberOf(tournament, team) }));
+  const display = { mode: tournamentOptions(tournament).teamDisplayRound, numbers: teamNumbers(teamRows) };
 
   const matchesByRound = new Map();
   const pendingReports = [];
@@ -7755,8 +7817,14 @@ async function loadTournamentRounds(db, tournament, { publicTournament = null } 
     matchesByRound.set(row.round_id, list);
   }
 
+  // Begegnungsnummer je Runde wie die laufende Nummer im Hauptprojekt: Freilose zählen nicht mit.
+  for (const list of matchesByRound.values()) {
+    let pairingNumber = 0;
+    for (const match of list) match.pairingNumber = match.teamB.length ? (pairingNumber += 1) : null;
+  }
+
   return {
-    teams: teamsResult.results.map((team) => ({ id: team.id, members: JSON.parse(team.member_registration_ids), seedPosition: Number(team.seed_position || 0) })),
+    teams: teamRows.map((team) => ({ id: team.id, members: JSON.parse(team.member_registration_ids), seedPosition: Number(team.seed_position || 0), number: display.numbers.get(team.id) })),
     rounds: roundsResult.results.map((round) => ({
       id: round.id,
       roundNumber: round.round_number,
@@ -7845,6 +7913,7 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
   let rebuiltTeams = null;
   if (usesFixedTeams) {
     let teams;
+    if (!melee) await assignTeamNumbers(db, tournament);
     if (redraw && !melee && Number(existingRounds.count) === 1) {
       // Wie beim Start im Hauptprojekt: Teams (und K.O.-Teilbäume) aus den jetzt aktiven Meldungen.
       teams = await activeFormeTeams(db, tournament.id);
@@ -8771,6 +8840,7 @@ export async function buildLiveResponse(request, db, registration) {
     persons: registrationSlots(registration).map((slot) => [slot.firstName, slot.lastName].filter(Boolean).join(' ')),
     unit: registrationUnit(tournament).kind,
     registrationType: tournament.registration_type || 'forme',
+    teamNumber: usesRegistrationTeamNumbers(tournament) && registration.team_number != null ? Number(registration.team_number) : null,
     incomplete: isIncompleteTeam(tournament, registration),
     meleeTeammates: await liveMeleeTeammates(db, tournament.id, registration.id),
     // Bei Turnieren aus dem Dokument: eigene Meldung der aktuellen Runde, bis die Turnierleitung entschieden hat.

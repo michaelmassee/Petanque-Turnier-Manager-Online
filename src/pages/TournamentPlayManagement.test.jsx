@@ -681,6 +681,53 @@ describe('TournamentPlayManagement', () => {
     await waitFor(() => expect(calls).toContain('/api/registrations/p1/live-link/qr'));
   });
 
+  it('nennt in der Teilnehmerliste bei Doublette/Triplette alle Spieler einer Meldung und den Teamnamen', async () => {
+    const registrations = [
+      { id: 'd1', firstName: 'Anna', lastName: 'Muster', partnerFirstName: 'Bert', partnerLastName: 'Beispiel' },
+      { id: 'd2', firstName: 'Clara', lastName: 'Test', partnerFirstName: 'Dirk', partnerLastName: 'Demo', partner2FirstName: 'Eva', partner2LastName: 'Muster', teamName: 'Les Boulistes' },
+    ].map((registration) => ({ ...registration, status: 'confirmed', participation: 'active' }));
+    installFetchMock([], { rounds: [], registrations });
+    render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, type: 'schweizer', registrationType: 'forme', formation: 'triplette' }]} language="de" />);
+
+    expect(await screen.findByText('Anna Muster + Bert Beispiel')).toBeInTheDocument();
+    expect(screen.getByText('Les Boulistes (Clara Test + Dirk Demo + Eva Muster)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anna Muster + Bert Beispiel bearbeiten' })).toBeInTheDocument();
+  });
+
+  it('zeigt die Teamnummer vor der Meldung, sobald die Teams feststehen, vorher keine', async () => {
+    const registrations = [
+      { id: 'd1', firstName: 'Anna', lastName: 'Muster', partnerFirstName: 'Bert', partnerLastName: 'Beispiel' },
+      { id: 'd2', firstName: 'Clara', lastName: 'Test', partnerFirstName: 'Dirk', partnerLastName: 'Demo' },
+      { id: 'd3', firstName: 'Nach', lastName: 'Zügler', partnerFirstName: 'Ohne', partnerLastName: 'Team' },
+    ].map((registration) => ({ ...registration, status: 'confirmed', participation: 'active' }));
+    const doublette = { ...TOURNAMENT, type: 'schweizer', registrationType: 'forme', formation: 'doublette' };
+    // Feste Teams in Server-Reihenfolge: d2 ist Team 1, d1 Team 2; d3 hat noch kein Team.
+    installFetchMock([], { registrations, teams: [{ id: 'team-a', members: ['d2'] }, { id: 'team-b', members: ['d1'] }] });
+    const { unmount } = render(<TournamentPlayManagement tournaments={[doublette]} language="de" />);
+    const row = (name) => screen.getByText(name).closest('.round-participant-name');
+    await screen.findByText('Anna Muster + Bert Beispiel');
+    await waitFor(() => expect(row('Anna Muster + Bert Beispiel').querySelector('.round-participant-number')).toHaveTextContent('2'));
+    expect(row('Clara Test + Dirk Demo').querySelector('.round-participant-number')).toHaveTextContent('1');
+    expect(row('Nach Zügler + Ohne Team').querySelector('.round-participant-number')).toBeNull();
+    unmount();
+
+    installFetchMock([], { rounds: [], registrations, teams: [] });
+    const second = render(<TournamentPlayManagement tournaments={[doublette]} language="de" />);
+    await screen.findByText('Anna Muster + Bert Beispiel');
+    expect(document.querySelectorAll('.round-participant-number')).toHaveLength(0);
+    second.unmount();
+
+    // Online durchgeführte Formée-Turniere: die feste Nummer der Meldung gilt schon ab Anmeldung, auch vor den Teams;
+    // die Nummer aus dem Server-Team (number) hat Vorrang vor der Reihenfolge.
+    installFetchMock([], { rounds: [], registrations: registrations.map((registration, index) => ({ ...registration, teamNumber: index === 2 ? null : index + 5 })),
+      teams: [{ id: 'team-c', members: ['d3'], number: 9 }] });
+    render(<TournamentPlayManagement tournaments={[doublette]} language="de" />);
+    await screen.findByText('Anna Muster + Bert Beispiel');
+    await waitFor(() => expect(row('Nach Zügler + Ohne Team').querySelector('.round-participant-number')).toHaveTextContent('9'));
+    expect(row('Anna Muster + Bert Beispiel').querySelector('.round-participant-number')).toHaveTextContent('5');
+    expect(row('Clara Test + Dirk Demo').querySelector('.round-participant-number')).toHaveTextContent('6');
+  });
+
   it('bearbeitet eine Meldung im Anmeldeformular und setzt dort „Ausgesetzt“', async () => {
     const calls = [];
     // Wie vom Server (toPublicRegistration): mit Turnier-ID, damit das Formular die Felder des Turniers zeigt.
@@ -793,6 +840,47 @@ describe('TournamentPlayManagement', () => {
     expect(inputs.map((input) => input.classList.contains('is-duplicate'))).toEqual([true, true, false, false, false]);
     expect(inputs[0]).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getAllByText('Bahn doppelt vergeben')).toHaveLength(2);
+  });
+
+  it('sortiert die Partien einer Runde nach Bahn-Nr. oder Nachname Spieler 1 und merkt sich die Wahl', async () => {
+    const team = (firstName, lastName) => [{ id: `${lastName}-1`, firstName, lastName }, { id: `${lastName}-2`, firstName: 'Partner', lastName: 'Aaa' }];
+    const matches = [
+      { ...ROUND_1.matches[0], id: 'm1', court: '10', teamA: team('Zoe', 'Zander') },
+      { ...ROUND_1.matches[0], id: 'm2', court: null, teamA: team('Max', 'Mayer'), teamB: [] },
+      { ...ROUND_1.matches[0], id: 'm3', court: '2', teamA: team('Bea', 'Becker') },
+      { ...ROUND_1.matches[0], id: 'm4', court: '2', teamA: team('Ada', 'Adler') },
+    ];
+    localStorage.removeItem('ptm_round_sort');
+    installBulkMock([{ ...ROUND_1, matches }]);
+    const { unmount } = render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByRole('button', { name: 'Alle speichern' });
+    const order = () => [...document.querySelectorAll('.play-current-round .play-team:not(.is-second)')].map((el) => el.textContent.split(' + ')[0]);
+    // Bahnen natürlich sortiert, gleiche Bahn nach Begegnung, ohne Bahn (Freilos) zuletzt.
+    expect(order()).toEqual(['Bea Becker', 'Ada Adler', 'Zoe Zander', 'Max Mayer']);
+
+    fireEvent.change(within(document.querySelector('.play-current-round')).getByLabelText('Sortieren nach'), { target: { value: 'name' } });
+    expect(order()).toEqual(['Ada Adler', 'Bea Becker', 'Max Mayer', 'Zoe Zander']);
+    expect(localStorage.getItem('ptm_round_sort')).toBe('name');
+    unmount();
+
+    // Gemerkt über Neuladen; ohne Speicher (gesperrt) gilt Bahn-Nr.
+    installBulkMock([{ ...ROUND_1, matches }]);
+    const again = render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByRole('button', { name: 'Alle speichern' });
+    expect(order()).toEqual(['Ada Adler', 'Bea Becker', 'Max Mayer', 'Zoe Zander']);
+    again.unmount();
+    localStorage.removeItem('ptm_round_sort');
+
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('gesperrt'); });
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('gesperrt'); });
+    installBulkMock([{ ...ROUND_1, matches }]);
+    render(<TournamentPlayManagement tournaments={[TOURNAMENT]} />);
+    await screen.findByRole('button', { name: 'Alle speichern' });
+    expect(order()[0]).toBe('Bea Becker');
+    fireEvent.change(within(document.querySelector('.play-current-round')).getByLabelText('Sortieren nach'), { target: { value: 'name' } });
+    expect(order()[0]).toBe('Ada Adler');
+    getItem.mockRestore();
+    setItem.mockRestore();
   });
 
   it('klappt in der laufenden Runde Partien mit gespeichertem Ergebnis weg', async () => {

@@ -232,6 +232,7 @@ function RegistrationRow({ registration, tournament, showConfirm = false, showRe
     <article className="data-row">
       <div>
         <strong data-i18n-skip>
+          {registration.teamNumber != null && <span className="round-participant-number" title={t('Teamnummer')}>{registration.teamNumber}</span>}
           <VipBadge level={vipLevelOf(registration)} />
           {registration.firstName} {registration.lastName}
           {registration.accountConnected && <AccountBadge />}

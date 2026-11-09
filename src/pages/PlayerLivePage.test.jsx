@@ -317,6 +317,34 @@ describe('Live-Ansicht für Spieler', () => {
     expect(screen.getByText('Bahn')).toBeInTheDocument();
   });
 
+  it('zeigt ohne Bahn die Begegnungsnummer und die Teamnummern fester Teams', async () => {
+    const payload = livePayload({
+      currentMatch: { ...livePayload().live.currentMatch, pairingNumber: 4, ownTeamNumber: 7, opponentTeamNumber: 2 },
+    });
+    payload.live.history[0] = { ...payload.live.history[0], pairingNumber: 4, ownTeamNumber: 7, opponentTeamNumber: 2 };
+    payload.live.history[1] = { ...payload.live.history[1], pairingNumber: 1, ownTeamNumber: 7, opponentTeamNumber: 3 };
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    renderDetail();
+
+    const current = await screen.findByRole('region', { name: 'Aktuelle Partie' });
+    expect(current).toHaveTextContent('Begegnung 4');
+    expect(within(current).getAllByTitle('Teamnummer').map((badge) => badge.textContent)).toEqual(['7', '2']);
+    expect(document.querySelector('.live-player')).toHaveTextContent('7Anna Muster');
+    const history = within(screen.getByRole('region', { name: 'Meine Partien' })).getByRole('table');
+    expect(within(history).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Runde', '#', 'Mit', 'Gegen', 'Ergebnis']);
+    const rows = within(history).getAllByRole('row').slice(1);
+    expect([...rows[1].cells].map((cell) => cell.textContent)).toEqual(['1', '1', 'Dora Partner + Emil Partner', '3Carla Test', '13 · Sieg', '5']);
+  });
+
+  it('zeigt die feste Teamnummer der Meldung schon vor der ersten Runde', async () => {
+    const payload = livePayload({ currentMatch: null, history: [] });
+    payload.registration.teamNumber = 12;
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    renderDetail();
+    await screen.findByText('Sommer-Supermêlée');
+    expect(within(document.querySelector('.live-player')).getByTitle('Teamnummer')).toHaveTextContent('12');
+  });
+
   it('zeigt einen pausierten Spieler als pausiert statt als nicht eingeteilt', async () => {
     const payload = livePayload({ currentMatch: null });
     payload.registration.participation = 'withdrawn';

@@ -4237,6 +4237,22 @@ a.left-panel-link {
   margin-inline: 16px;
 }
 
+/* Sortierung der Partien rechts neben den Rundenaktionen, auf dem Handy in eigener Zeile. */
+.play-round-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 0 auto;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.play-round-sort select {
+  width: auto;
+  min-width: 0;
+  margin: 0;
+}
+
 .play-round-action {
   display: grid;
   gap: 10px;
@@ -5926,4 +5942,20 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
   border-radius: 6px;
   object-fit: contain;
   background: #ffffff;
+}
+
+/* Teamnummer vor dem Namen (Teilnehmerliste, Live-Ansicht), ab feststehenden Teams. */
+.round-participant-number,
+.team-number {
+  display: inline-block;
+  min-width: 2.2em;
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #e8ebf0;
+  color: #44516a;
+  font-size: 0.85em;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }

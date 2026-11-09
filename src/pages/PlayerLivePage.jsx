@@ -20,6 +20,26 @@ const LIVE_REFRESH_MS = 120_000;
 // Mit verbundenem WebSocket kommt jede Änderung sofort; Polling nur noch als Sicherheitsnetz.
 const LIVE_SOCKET_FALLBACK_MS = 600_000;
 
+
+// Teamnummer vor einem Teamnamen (feste Teams); ohne Nummer nur der Name.
+function TeamName({ number, label, className }) {
+  const { t } = useTranslation();
+  return (
+    <span className={className} data-i18n-skip>
+      {number ? <span className="team-number" title={t('Teamnummer')}>{number}</span> : null}
+      {label}
+    </span>
+  );
+}
+
+// Bahn, sonst die Begegnungsnummer der Runde (laufende Nummer wie im Hauptprojekt).
+function MatchPlace({ match }) {
+  const { t } = useTranslation();
+  if (match.court) return <CourtLabel court={match.court} className="live-court" as="p" />;
+  if (!match.pairingNumber) return null;
+  return <p className="live-court">{t('Begegnung')} <strong data-i18n-skip>{match.pairingNumber}</strong></p>;
+}
+
 function pushFlagKey(registrationId) {
   return `ptm_live_push_${registrationId}`;
 }
@@ -272,14 +292,14 @@ function CurrentMatchCard({ live, tournament, participation, canReportResult, re
       {match && (
         <>
           {match.stageLabel && <p className="live-stage" data-i18n-skip>{match.stageLabel}</p>}
-          <CourtLabel court={match.court} className="live-court" as="p" />
+          <MatchPlace match={match} />
           {match.bye ? (
             <p className="live-versus"><strong>{t('Freilos')}</strong></p>
           ) : (
             <div className="live-versus">
-              <span className="live-team own" data-i18n-skip>{match.teamLabel}</span>
+              <TeamName className="live-team own" number={match.ownTeamNumber} label={match.teamLabel} />
               <span className="live-vs">{t('gegen')}</span>
-              <span className="live-team" data-i18n-skip>{match.opponentLabel}</span>
+              <TeamName className="live-team" number={match.opponentTeamNumber} label={match.opponentLabel} />
             </div>
           )}
           <p className={`live-score live-${match.outcome}`}>{scoreLabel(match, t)}</p>
@@ -330,6 +350,8 @@ function HistoryCard({ live }) {
   const { t } = useTranslation();
   if (!live.history.length) return null;
   const hasCourt = live.history.some((entry) => entry.court);
+  // Ohne Bahn die Begegnungsnummer (#) wie in der Rundentabelle.
+  const hasPairingNumber = !hasCourt && live.history.some((entry) => entry.pairingNumber);
   const hasStage = live.history.some((entry) => entry.stageLabel);
   const hasTeammates = live.history.some((entry) => entry.teammates?.length);
   return (
@@ -341,6 +363,7 @@ function HistoryCard({ live }) {
             <tr>
               <th scope="col">{t('Runde')}</th>
               {hasCourt && <th scope="col">{t('Bahn')}</th>}
+              {hasPairingNumber && <th scope="col" aria-label={t('Begegnung')} data-i18n-skip>#</th>}
               {hasStage && <th scope="col">{t('Stufe')}</th>}
               {hasTeammates && <th scope="col">{t('Mit')}</th>}
               <th scope="col">{t('Gegen')}</th>
@@ -352,9 +375,10 @@ function HistoryCard({ live }) {
               <tr key={entry.matchId} className={`live-${entry.outcome}`}>
                 <td className="round-table-number">{entry.roundNumber}</td>
                 {hasCourt && <td className="round-table-number" data-i18n-skip>{entry.court || ''}</td>}
+                {hasPairingNumber && <td className="round-table-number" data-i18n-skip>{entry.pairingNumber || ''}</td>}
                 {hasStage && <td data-i18n-skip>{entry.stageLabel || ''}</td>}
                 {hasTeammates && <td data-i18n-skip>{entry.teammates?.join(' + ') || ''}</td>}
-                {entry.bye ? <td className="muted">{t('Freilos')}</td> : <td data-i18n-skip>{entry.opponentLabel}</td>}
+                {entry.bye ? <td className="muted">{t('Freilos')}</td> : <td><TeamName number={entry.opponentTeamNumber} label={entry.opponentLabel} /></td>}
                 {entry.noShow
                   ? <td colSpan={2}>{t('Nicht angetreten')}{entry.outcome !== 'open' && <span className="sr-only"> · {entry.outcome === 'won' ? t('Sieg') : t('Niederlage')}</span>}</td>
                   : <>
@@ -463,7 +487,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
         {formatDate(tournament.date, language)} {formatWeekdayShort(tournament.date, language)}
         {tournament.location ? <> · <span data-i18n-skip>{tournament.location}</span></> : null}
       </p>
-      <p className="live-player"><span data-i18n-skip>{registration.label}</span>{registration.participation === 'withdrawn' && <span className="live-paused">{t('Pausiert')}</span>}</p>
+      <p className="live-player"><TeamName number={live?.history?.find((entry) => entry.ownTeamNumber)?.ownTeamNumber ?? registration.teamNumber} label={registration.label} />{registration.participation === 'withdrawn' && <span className="live-paused">{t('Pausiert')}</span>}</p>
     </header>
   );
   const refresh = (
