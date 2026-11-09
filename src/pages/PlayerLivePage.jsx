@@ -480,6 +480,11 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
   if (!data) return <Feedback error={query.error?.message || t('Die Live-Ansicht konnte nicht geladen werden.')} />;
 
   const { tournament, registration, live, dataAsOf } = data;
+  // Eigenes Team in der Kopfzeile wie in den Partien nach der Team-Anzeige der Spielrunde (Turnieroption), aus der
+  // jüngsten Partie mit fester Teamnummer. Nur bei Formée: Dort ist die Meldung das Team; bei (Super-)Mêlée bleibt es
+  // beim eigenen Namen, die Mitspieler stehen in der Partie.
+  const ownTeamEntry = [...(live?.history || [])].reverse().find((entry) => entry.ownTeamNumber) || null;
+  const headerLabel = (tournament.registrationType || 'forme') === 'forme' && ownTeamEntry?.teamLabel ? ownTeamEntry.teamLabel : registration.label;
   const header = (
     <header className="live-header">
       <h2 data-i18n-skip>{tournament.name}</h2>
@@ -487,7 +492,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
         {formatDate(tournament.date, language)} {formatWeekdayShort(tournament.date, language)}
         {tournament.location ? <> · <span data-i18n-skip>{tournament.location}</span></> : null}
       </p>
-      <p className="live-player"><TeamName number={live?.history?.find((entry) => entry.ownTeamNumber)?.ownTeamNumber ?? registration.teamNumber} label={registration.label} />{registration.participation === 'withdrawn' && <span className="live-paused">{t('Pausiert')}</span>}</p>
+      <p className="live-player"><TeamName number={ownTeamEntry?.ownTeamNumber ?? registration.teamNumber} label={headerLabel} />{registration.participation === 'withdrawn' && <span className="live-paused">{t('Pausiert')}</span>}</p>
     </header>
   );
   const refresh = (

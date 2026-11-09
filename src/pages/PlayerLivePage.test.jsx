@@ -336,6 +336,17 @@ describe('Live-Ansicht für Spieler', () => {
     expect([...rows[1].cells].map((cell) => cell.textContent)).toEqual(['1', '1', 'Dora Partner + Emil Partner', '3Carla Test', '13 · Sieg', '5']);
   });
 
+  it('zeigt bei Formée das eigene Team in der Kopfzeile nach der Team-Anzeige der Partien', async () => {
+    const payload = livePayload();
+    payload.tournament.registrationType = 'forme';
+    payload.registration.label = 'Die Kugelblitze';
+    payload.live.history = payload.live.history.map((entry) => ({ ...entry, ownTeamNumber: 7, teamLabel: 'Anna Muster + Paula Partner' }));
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    renderDetail();
+    await screen.findByRole('region', { name: 'Aktuelle Partie' });
+    expect(document.querySelector('.live-player')).toHaveTextContent('7Anna Muster + Paula Partner');
+  });
+
   it('zeigt die feste Teamnummer der Meldung schon vor der ersten Runde', async () => {
     const payload = livePayload({ currentMatch: null, history: [] });
     payload.registration.teamNumber = 12;
