@@ -1,11 +1,16 @@
 import { Component, useEffect, useRef } from 'react';
 import { Button } from './components/ui.jsx';
 import i18next from './lib/i18next-config.js';
-import { clearRecoveryAttempt, requestAppRestart, shouldAttemptAutomaticRecovery } from './app-recovery.js';
+import { clearRecoveryAttempt, isServerReachable, requestAppRestart, shouldAttemptAutomaticRecovery } from './app-recovery.js';
 import { debugLog } from './lib/debug-log.js';
 
 function recoveryText(key) {
   return i18next.t(key);
+}
+
+function restartNow() {
+  clearRecoveryAttempt();
+  window.location.reload();
 }
 
 export function RecoveryScreen() {
@@ -15,16 +20,11 @@ export function RecoveryScreen() {
     headingRef.current?.focus();
   }, []);
 
-  function restartManually() {
-    clearRecoveryAttempt();
-    window.location.reload();
-  }
-
   return <main className="app-recovery" role="alert">
     <section className="app-recovery-panel">
       <h1 ref={headingRef} tabIndex={-1}>{recoveryText('Die App konnte nicht wiederhergestellt werden.')}</h1>
       <p>{recoveryText('Bitte starte die App erneut.')}</p>
-      <Button onClick={restartManually}>{recoveryText('App neu starten')}</Button>
+      <Button onClick={restartNow}>{recoveryText('App neu starten')}</Button>
     </section>
   </main>;
 }
@@ -44,25 +44,52 @@ export function OfflineRecoveryScreen() {
   </main>;
 }
 
+const SERVER_RETRY_MS = 5_000;
+
+export function ServerUnreachableScreen({ onRetry, checking = false }) {
+  const headingRef = useRef(null);
+
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
+
+  return <main className="app-recovery" role="alert">
+    <section className="app-recovery-panel">
+      <h1 ref={headingRef} tabIndex={-1}>{recoveryText('Der Server ist gerade nicht erreichbar.')}</h1>
+      <p>{recoveryText('Die App lädt automatisch neu, sobald er wieder antwortet.')}</p>
+      <Button onClick={onRetry} loading={checking}>{recoveryText('Erneut versuchen')}</Button>
+    </section>
+  </main>;
+}
+
+// Zustände nach einem Absturz: checking (Server wird geprüft), reloading (automatischer Neustart läuft),
+// manual (Neustart-Knopf), offline (Gerät ohne Netz), server (Gerät online, Server antwortet nicht).
 export class AppRecoveryBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { unrecoverable: false, offline: typeof navigator !== 'undefined' && !navigator.onLine };
-    this.updateConnectivity = this.updateConnectivity.bind(this);
+    this.state = { mode: null, checking: false };
+    this.handleOnline = this.handleOnline.bind(this);
+    this.retryServer = this.retryServer.bind(this);
+    this.retryTimer = null;
+    this.unmounted = false;
+  }
+
+  static getDerivedStateFromError() {
+    return { mode: 'checking' };
   }
 
   componentDidMount() {
-    window.addEventListener('online', this.updateConnectivity);
-    window.addEventListener('offline', this.updateConnectivity);
+    window.addEventListener('online', this.handleOnline);
   }
 
   componentWillUnmount() {
-    window.removeEventListener('online', this.updateConnectivity);
-    window.removeEventListener('offline', this.updateConnectivity);
+    this.unmounted = true;
+    window.removeEventListener('online', this.handleOnline);
+    clearTimeout(this.retryTimer);
   }
 
-  updateConnectivity() {
-    this.setState({ offline: !navigator.onLine });
+  handleOnline() {
+    if (this.state.mode === 'offline' || this.state.mode === 'server') this.retryServer();
   }
 
   componentDidCatch(error, info) {
@@ -75,16 +102,51 @@ export class AppRecoveryBoundary extends Component {
     // auslösen. Stattdessen bleibt die verständliche Offline-Ansicht stehen.
     if (!shouldAttemptAutomaticRecovery()) {
       debugLog('error', 'Wiederherstellung: Offline-Ansicht');
-      this.setState({ unrecoverable: true, offline: true });
+      this.setState({ mode: 'offline' });
       return;
     }
-    const restart = requestAppRestart();
-    debugLog('error', `Wiederherstellung: ${restart === 'manual' ? 'manueller Neustart nötig' : 'automatischer Neustart'}`);
-    if (restart === 'manual') this.setState({ unrecoverable: true });
+    // Gerät online, aber der Server antwortet nicht: ein Neustart lädt nur die zwischengespeicherte Startseite
+    // und scheitert am selben fehlenden Modul. Erst warten, bis der Server wieder da ist.
+    isServerReachable().then((reachable) => {
+      if (this.unmounted) return;
+      if (!reachable) {
+        debugLog('error', 'Wiederherstellung: Server nicht erreichbar');
+        this.setState({ mode: 'server' });
+        this.scheduleServerRetry();
+        return;
+      }
+      const restart = requestAppRestart();
+      debugLog('error', `Wiederherstellung: ${restart === 'manual' ? 'manueller Neustart nötig' : 'automatischer Neustart'}`);
+      this.setState({ mode: restart === 'manual' ? 'manual' : 'reloading' });
+    });
+  }
+
+  scheduleServerRetry() {
+    clearTimeout(this.retryTimer);
+    this.retryTimer = setTimeout(this.retryServer, SERVER_RETRY_MS);
+  }
+
+  async retryServer() {
+    if (this.state.checking) return;
+    clearTimeout(this.retryTimer);
+    this.setState({ checking: true });
+    const reachable = shouldAttemptAutomaticRecovery() && await isServerReachable();
+    if (this.unmounted) return;
+    if (reachable) {
+      debugLog('error', 'Wiederherstellung: Server wieder erreichbar, Neustart');
+      restartNow();
+      return;
+    }
+    this.setState({ checking: false, mode: shouldAttemptAutomaticRecovery() ? 'server' : 'offline' });
+    if (shouldAttemptAutomaticRecovery()) this.scheduleServerRetry();
   }
 
   render() {
-    if (this.state.unrecoverable) return this.state.offline ? <OfflineRecoveryScreen /> : <RecoveryScreen />;
-    return this.props.children;
+    const { mode, checking } = this.state;
+    if (!mode) return this.props.children;
+    if (mode === 'offline') return <OfflineRecoveryScreen />;
+    if (mode === 'server') return <ServerUnreachableScreen onRetry={this.retryServer} checking={checking} />;
+    if (mode === 'manual') return <RecoveryScreen />;
+    return null;
   }
 }

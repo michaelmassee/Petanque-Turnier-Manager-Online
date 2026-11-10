@@ -79,6 +79,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Fehlt ein Skript/Stylesheet (z. B. Lazy-Load-Chunk) im Cache und ist der Server weg, ehrlich scheitern:
+  // die Startseite als Ersatz lieferte HTML statt Code, und die App konnte den Ausfall nicht als solchen erkennen.
+  const isAsset = url.pathname.startsWith('/assets/') || request.destination === 'script' || request.destination === 'style';
   event.respondWith(
     fetch(request)
       .then((response) => {
@@ -86,7 +89,7 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match('/'))),
+      .catch(() => caches.match(request).then((cached) => cached || (isAsset ? Response.error() : caches.match('/')))),
   );
 });
 

@@ -7,6 +7,22 @@ export function shouldAttemptAutomaticRecovery(isOnline = navigator.onLine) {
   return Boolean(isOnline);
 }
 
+const SERVER_PROBE_TIMEOUT_MS = 5_000;
+
+// navigator.onLine meldet nur, ob das Gerät ein Netz hat, nicht ob unser Server antwortet.
+// HEAD geht am Service Worker vorbei (er fängt nur GET ab) und erreicht damit wirklich den Server;
+// jede HTTP-Antwort, auch ein Fehlerstatus, heißt: der Server ist da.
+export async function isServerReachable(fetchImpl = globalThis.fetch) {
+  if (typeof fetchImpl !== 'function') return true;
+  try {
+    const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(SERVER_PROBE_TIMEOUT_MS) : undefined;
+    await fetchImpl('/', { method: 'HEAD', cache: 'no-store', signal });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function recoveryAttemptIsRecent(value, now) {
   try {
     const { timestamp } = JSON.parse(value || '');

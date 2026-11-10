@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { canRestartAutomatically, clearRecoveryAttempt, resetRecoveryForTest, shouldAttemptAutomaticRecovery } from './app-recovery.js';
+import { canRestartAutomatically, clearRecoveryAttempt, isServerReachable, resetRecoveryForTest, shouldAttemptAutomaticRecovery } from './app-recovery.js';
 
 function memoryStorage() {
   const values = new Map();
@@ -44,5 +44,10 @@ describe('app recovery', () => {
   it('never starts an automatic recovery loop while offline', () => {
     expect(shouldAttemptAutomaticRecovery(false)).toBe(false);
     expect(shouldAttemptAutomaticRecovery(true)).toBe(true);
+  });
+
+  it('treats any HTTP answer as reachable and only network failures as unreachable', async () => {
+    await expect(isServerReachable(async () => new Response(null, { status: 503 }))).resolves.toBe(true);
+    await expect(isServerReachable(async () => { throw new TypeError('Failed to fetch'); })).resolves.toBe(false);
   });
 });
