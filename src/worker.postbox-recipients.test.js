@@ -8,7 +8,7 @@ function seed(sqlite) {
       ('organizer-1', 'orga@example.test', 'Olga', 'Orga', 'user', 's', 'h', '2026-01-01', '2026-01-01'),
       ('recipient-1', 'ada@example.test', 'Ada', 'Beispiel', 'user', 's', 'h', '2026-01-01', '2026-01-01');
     INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at) VALUES
-      ('tournament-1', 'organizer-1', 'Herbstturnier', '2026-10-06', 'Ort', 'doublette', 'registration', 'public', '2026-01-01', '2026-01-01'),
+      ('tournament-1', 'organizer-1', 'Herbstturnier', '2999-10-06', 'Ort', 'doublette', 'registration', 'public', '2026-01-01', '2026-01-01'),
       ('tournament-2', 'organizer-1', 'Leeres Turnier', '2026-11-01', 'Ort', 'doublette', 'registration', 'public', '2026-01-01', '2026-01-01');
     UPDATE tournaments SET registration_enabled = 1;`);
   const anmeldung = (id, status) => sqlite.prepare(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email,
@@ -30,7 +30,7 @@ describe('Postbox-Empfänger für Turnier-Broadcasts', () => {
     await expect(response.json()).resolves.toEqual({
       recipients: [{ id: 'recipient-1', firstName: 'Ada', lastName: 'Beispiel', username: null, club: null, role: 'user' }],
       tournaments: [
-        { id: 'tournament-1', name: 'Herbstturnier', date: '2026-10-06', registrationCount: 3 },
+        { id: 'tournament-1', name: 'Herbstturnier', date: '2999-10-06', registrationCount: 3 },
         { id: 'tournament-2', name: 'Leeres Turnier', date: '2026-11-01', registrationCount: 0 },
       ],
     });
@@ -50,6 +50,18 @@ describe('Postbox-Zusammenfassung fürs Polling', () => {
       unreadCount: 1,
       todos: [{ type: 'pending_registrations', count: 1 }, { type: 'waitlist', count: 1 }],
     });
+  });
+
+  it('zählt keine Aufgaben für vergangene oder abgeschlossene Turniere', async () => {
+    const db = d1MitSchema();
+    seed(db.sqlite);
+    const user = { id: 'organizer-1', role: 'user' };
+
+    db.sqlite.exec("UPDATE tournaments SET date = '2000-01-01' WHERE id = 'tournament-1'");
+    await expect(postboxSummary(db, user)).resolves.toMatchObject({ todos: [] });
+
+    db.sqlite.exec("UPDATE tournaments SET date = '2999-01-01', status = 'finished' WHERE id = 'tournament-1'");
+    await expect(postboxSummary(db, user)).resolves.toMatchObject({ todos: [] });
   });
 });
 

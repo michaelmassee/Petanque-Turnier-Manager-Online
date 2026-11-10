@@ -4383,10 +4383,14 @@ async function listPostboxTodos(db, user) {
     if (Number(unverified?.count)) todos.push({ type: 'unverified_users', count: Number(unverified.count) });
     if (Number(keys?.count)) todos.push({ type: 'api_key_requests', count: Number(keys.count) });
   }
-  const pending = await db.prepare("SELECT COUNT(*) AS count FROM registrations r JOIN tournaments t ON t.id = r.tournament_id WHERE t.owner_id = ? AND r.status = 'pending'").bind(user.id).first();
-  const waitlist = await db.prepare("SELECT COUNT(*) AS count FROM registrations r JOIN tournaments t ON t.id = r.tournament_id WHERE t.owner_id = ? AND r.status = 'waitlist'").bind(user.id).first();
-  if (Number(pending?.count)) todos.push({ type: 'pending_registrations', count: Number(pending.count) });
-  if (Number(waitlist?.count)) todos.push({ type: 'waitlist', count: Number(waitlist.count) });
+  // Abgelaufene oder abgeschlossene Turniere erzeugen keine Aufgaben mehr – dort ist nichts mehr zu tun.
+  const counts = await db.prepare(
+    `SELECT SUM(r.status = 'pending') AS pending, SUM(r.status = 'waitlist') AS waitlist
+     FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
+     WHERE t.owner_id = ? AND r.status IN ('pending', 'waitlist') AND t.status <> 'finished' AND t.date >= ?`,
+  ).bind(user.id, dateDaysAgo(0)).first();
+  if (Number(counts?.pending)) todos.push({ type: 'pending_registrations', count: Number(counts.pending) });
+  if (Number(counts?.waitlist)) todos.push({ type: 'waitlist', count: Number(counts.waitlist) });
   return todos;
 }
 
