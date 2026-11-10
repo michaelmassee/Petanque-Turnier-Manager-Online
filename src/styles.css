@@ -2478,6 +2478,16 @@ a.left-panel-link {
   margin: 0 0 1em;
 }
 
+.tournament-description {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #d7deea;
+}
+
+.tournament-description h3 {
+  margin: 0 0 8px;
+}
+
 .payment-info-text {
   margin: 4px 0 0;
   white-space: pre-line;

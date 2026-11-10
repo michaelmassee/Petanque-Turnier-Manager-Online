@@ -194,7 +194,12 @@ export function TournamentInfo({ tournament, language, onShare, showTitle = true
           <strong>{t('Turnier wurde erstellt von')}</strong>: <span data-i18n-skip>{formatUserName(tournament.createdBy)}{tournament.createdBy.username && <span className="user-handle"> @{tournament.createdBy.username}</span>}</span>
         </p>
       )}
-      {tournament.description && <RichText value={tournament.description} onNavigate={onNavigate} />}
+      {tournament.description && (
+        <section className="tournament-description">
+          <h3>{t('Beschreibung')}</h3>
+          <RichText value={tournament.description} onNavigate={onNavigate} />
+        </section>
+      )}
     </div>
   );
 }
