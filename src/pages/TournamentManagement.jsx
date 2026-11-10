@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { DEFAULT_PARTICIPANT_LIMIT, EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
-import { currencyOptions, formatDate, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
+import { currencyOptions, detectViewerTimeZone, formatDate, formatTournamentDateTime, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
 import { hasRegistrations, isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, registrationDeadlinePassed, registrationStatusClass, registrationStatusKind, registrationStatusLabel, registrationStatusReason, tournamentPayload, translatedOptions } from '../lib/domain.js';
 import { filterTournaments } from '../frontend-core.js';
 import { Feedback, IntegerField, TextField, TextArea, SelectField, Button, ListToolbar, EditDialog, RequiredMark } from '../components/ui.jsx';
@@ -847,6 +847,9 @@ export function TournamentList({
               )}
               {tournament.owner && (
                 <small>{t('Owner:')} <span data-i18n-skip>{formatUserName(tournament.owner)}{tournament.owner.username && <span className="user-handle"> @{tournament.owner.username}</span>}</span></small>
+              )}
+              {tournament.createdAt && (
+                <small>{t('Erstellt:')} {formatTournamentDateTime(tournament.createdAt, language, detectViewerTimeZone())}</small>
               )}
               {isAdmin && tournament.editors?.length > 0 && (
                 <small>{t('Bearbeiter:')} <span data-i18n-skip>{tournament.editors.map((editor) => `${editor.firstName || ''} ${editor.lastName || ''}`.trim()).join(', ')}</span></small>
