@@ -85,7 +85,7 @@ function fitLogo(logo, x, y) {
  * @param header { title, name, lines: string[] } – fertig formatierte Kopfzeilen
  * @param logos { club, ptm } jeweils { dataUrl, width, height } oder null
  * @param footer (page, pages) => string
- * @param language Sprache für das Zahlenformat (Buchholz mit einer Nachkommastelle)
+ * @param language Sprache für das Zahlenformat (Buchholz mit halben Punkten)
  */
 export async function buildRankingPages({ tournament, entries, header, logos, footer, t, typeset, language = 'de' }) {
   const contentWidth = RANKING_PAGE.width - 2 * MARGIN;

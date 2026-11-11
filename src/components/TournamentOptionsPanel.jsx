@@ -143,7 +143,7 @@ export function TournamentOptionsPanel({ tournament, options, onSaved }) {
           <>
             <SelectField label={t('Buchholz-Wertung des Freiloses')} value={draft.byeBuchholz} onChange={set('byeBuchholz')} disabled={busy}
               options={BYE_BUCHHOLZ_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
-            <p className="hint">{t('Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.')}</p>
+            <p className="hint">{t('Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz, abgerundet. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.')}</p>
           </>
         )}
 

@@ -207,7 +207,7 @@ describe('Schweizer Freilos-Buchholz', () => {
     { roundNumber: 1, teamA: ['t3'], teamB: [] },
   ];
 
-  it.each([[1, 1, 0, 1], [2, 2, 0.5, 3], [3, 2, 1, 5], [5, 3, 2, 13]])('neutral bei %i Runden und %i Siegen: BHZ %d, FBHZ %d', (rounds, wins, bhz, fbhz) => {
+  it.each([[1, 1, 0, 1], [2, 2, 0, 3], [3, 2, 1, 5], [4, 3, 1, 9], [5, 3, 2, 13]])('neutral bei %i Runden und %i Siegen: BHZ %d, FBHZ %d', (rounds, wins, bhz, fbhz) => {
     const bye = byeBuchholz('neutral', rounds);
     expect([bye.bhz, bye.fbhz(wins)]).toEqual([bhz, fbhz]);
     const none = byeBuchholz('null', rounds);
@@ -229,17 +229,22 @@ describe('Schweizer Freilos-Buchholz', () => {
     expect(stats.t2).toEqual({ bhz: 1, fbhz: 1 });
   });
 
-  it('liefert halbe Punkte und sortiert danach', () => {
+  it('rundet den Freilos-Beitrag ab: im Pétanque gibt es keine halben Buchholz-Punkte', () => {
     const history = [...roundOne, { roundNumber: 2, teamA: ['t3'], teamB: ['t2'], scoreA: 13, scoreB: 11 }];
     const neutral = swissStats(three, history, 'mit_buchholz', { byeBuchholz: 'neutral' });
-    expect(byId(neutral).t3.bhz).toBe(0.5);
-    expect(byId(swissStats(three, history)).t3.bhz).toBe(0);
-    expect(sortSwiss(neutral).map((entry) => entry.teamId)).toEqual(['t3', 't1', 't2']);
+    expect(byId(neutral).t3.bhz).toBe(0);
+    expect(neutral.every((entry) => Number.isInteger(entry.bhz) && Number.isInteger(entry.fbhz))).toBe(true);
   });
 
   it('korrigiert über die BHZ des Freilos-Teams auch die FBHZ seiner Gegner', () => {
-    const history = [...roundOne, { roundNumber: 2, teamA: ['t3'], teamB: ['t2'], scoreA: 13, scoreB: 11 }];
-    expect(byId(swissStats(three, history, 'mit_buchholz', { byeBuchholz: 'neutral' })).t2.fbhz)
-      .toBe(byId(swissStats(three, history)).t2.fbhz + 0.5);
+    // Drei gewertete Runden: Das Freilos bringt t3 ⌊(3 − 1) / 2⌋ = 1 BHZ, seine Gegner t1 und t2 bekommen ihn in der FBHZ.
+    const history = [...roundOne,
+      { roundNumber: 2, teamA: ['t3'], teamB: ['t2'], scoreA: 13, scoreB: 11 },
+      { roundNumber: 3, teamA: ['t1'], teamB: ['t3'], scoreA: 13, scoreB: 7 }];
+    const neutral = byId(swissStats(three, history, 'mit_buchholz', { byeBuchholz: 'neutral' }));
+    const none = byId(swissStats(three, history));
+    expect(neutral.t3.bhz).toBe(none.t3.bhz + 1);
+    expect(neutral.t2.fbhz).toBe(none.t2.fbhz + 1);
+    expect(neutral.t1.fbhz).toBe(none.t1.fbhz + 1);
   });
 });

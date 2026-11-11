@@ -38,11 +38,12 @@ export const BYE_BUCHHOLZ_MODES = ['null', 'neutral'];
 
 // Buchholz-Beitrag eines Freiloses (wie FreilosBuchholz im Hauptprojekt, 03_Schweizer.md 5.1). 'null': BPV-Regel, das
 // Freilos liefert nichts. 'neutral': fiktiver Durchschnittsgegner, der gegen das eigene Team verliert und in den übrigen
-// r − 1 Runden die Hälfte gewinnt → BHZ (r − 1) / 2, FBHZ eigene Siege + (r − 1) · r / 2. r = Runden mit Ergebnis.
+// r − 1 Runden die Hälfte gewinnt, abgerundet (kein Unentschieden im Pétanque, also keine halben Punkte) →
+// BHZ ⌊(r − 1) / 2⌋, FBHZ eigene Siege + (r − 1) · r / 2 (immer ganzzahlig). r = Runden mit Ergebnis.
 export function byeBuchholz(mode, rounds) {
   const active = mode === 'neutral' && rounds > 0;
   return {
-    bhz: active ? (rounds - 1) / 2 : 0,
+    bhz: active ? Math.floor((rounds - 1) / 2) : 0,
     fbhz: (ownWins) => (active ? ownWins + ((rounds - 1) * rounds) / 2 : 0),
   };
 }

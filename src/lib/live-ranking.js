@@ -87,19 +87,19 @@ export function rankingHeaderGroups(columns, tournament, t) {
   return groups;
 }
 
-// Buchholz-Werte mit einer Nachkommastelle wie im Hauptprojekt: der neutrale Freilos-Buchholz liefert halbe Punkte.
+// Buchholz-Werte sind ganzzahlig (03_Schweizer.md 5.1); eine Nachkommastelle erscheint nur bei Altwerten mit halben Punkten.
 const BUCHHOLZ_KEYS = new Set(['bhz', 'fbhz']);
 
 /**
- * Zellwert der Rangliste: Differenzen mit Vorzeichen (+3, −2), Buchholz mit einer Nachkommastelle im Zahlenformat der
- * Sprache (1,5 bzw. 1.5), fehlende Werte als Gedankenstrich.
+ * Zellwert der Rangliste: Differenzen mit Vorzeichen (+3, −2), Buchholz höchstens mit einer Nachkommastelle im
+ * Zahlenformat der Sprache (2 bzw. 1,5/1.5), fehlende Werte als Gedankenstrich.
  */
 export function rankingValue(key, value, language = 'de') {
   if (value == null) return '—';
   if ((key === 'gameDiff' || key === 'pointsDiff') && value !== 0) return value > 0 ? `+${value}` : `−${Math.abs(value)}`;
   if (BUCHHOLZ_KEYS.has(key)) {
     return new Intl.NumberFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de,
-      { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }).format(value);
+      { maximumFractionDigits: 1, useGrouping: false }).format(value);
   }
   return String(value);
 }

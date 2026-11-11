@@ -1996,6 +1996,6 @@
   "Buchholz-Wertung des Freiloses": "Valor Buchholz del descanso",
   "Neutral (fiktiver Durchschnittsgegner)": "Neutral (rival medio ficticio)",
   "Null (BPV-Regel: 0 Buchholz)": "Cero (regla BPV: 0 Buchholz)",
-  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutral: un descanso cuenta como un rival con balance equilibrado, (rondas − 1) / 2 Buchholz por descanso. Cero: sin Buchholz para el descanso. La clasificación se recalcula de inmediato.",
+  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz, abgerundet. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutral: un descanso cuenta como un rival con balance equilibrado, (rondas − 1) / 2 Buchholz por descanso, redondeado hacia abajo. Cero: sin Buchholz para el descanso. La clasificación se recalcula de inmediato.",
   "Ungültige Buchholz-Wertung des Freiloses": "Valor Buchholz del descanso no válido"
 }

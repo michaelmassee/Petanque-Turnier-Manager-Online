@@ -1996,6 +1996,6 @@
   "Buchholz-Wertung des Freiloses": "Buchholz-waarde van een vrijloting",
   "Neutral (fiktiver Durchschnittsgegner)": "Neutraal (fictieve gemiddelde tegenstander)",
   "Null (BPV-Regel: 0 Buchholz)": "Nul (BPV-regel: 0 Buchholz)",
-  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutraal: een vrijloting telt als een tegenstander met een evenwichtige balans, per vrijloting (rondes − 1) / 2 Buchholz. Nul: geen Buchholz voor de vrijloting. Het klassement wordt direct opnieuw berekend.",
+  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz, abgerundet. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutraal: een vrijloting telt als een tegenstander met een evenwichtige balans, per vrijloting (rondes − 1) / 2 Buchholz, naar beneden afgerond. Nul: geen Buchholz voor de vrijloting. Het klassement wordt direct opnieuw berekend.",
   "Ungültige Buchholz-Wertung des Freiloses": "Ongeldige Buchholz-waarde van een vrijloting"
 }

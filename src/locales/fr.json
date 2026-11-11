@@ -1996,6 +1996,6 @@
   "Buchholz-Wertung des Freiloses": "Valeur Buchholz de l'exempt",
   "Neutral (fiktiver Durchschnittsgegner)": "Neutre (adversaire moyen fictif)",
   "Null (BPV-Regel: 0 Buchholz)": "Zéro (règle BPV : 0 Buchholz)",
-  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutre : un exempt compte comme un adversaire au bilan équilibré, (tours − 1) / 2 Buchholz par exempt. Zéro : aucun Buchholz pour l'exempt. Le classement est recalculé immédiatement.",
+  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz, abgerundet. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutre : un exempt compte comme un adversaire au bilan équilibré, (tours − 1) / 2 Buchholz par exempt, arrondi à l'inférieur. Zéro : aucun Buchholz pour l'exempt. Le classement est recalculé immédiatement.",
   "Ungültige Buchholz-Wertung des Freiloses": "Valeur Buchholz de l'exempt non valide"
 }

@@ -2074,6 +2074,6 @@
   "Buchholz-Wertung des Freiloses": "Valore Buchholz del turno di riposo",
   "Neutral (fiktiver Durchschnittsgegner)": "Neutro (avversario medio fittizio)",
   "Null (BPV-Regel: 0 Buchholz)": "Zero (regola BPV: 0 Buchholz)",
-  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutro: un turno di riposo conta come un avversario con bilancio in pari, (turni − 1) / 2 Buchholz per riposo. Zero: nessun Buchholz per il riposo. La classifica viene ricalcolata subito.",
+  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz, abgerundet. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutro: un turno di riposo conta come un avversario con bilancio in pari, (turni − 1) / 2 Buchholz per riposo, arrotondato per difetto. Zero: nessun Buchholz per il riposo. La classifica viene ricalcolata subito.",
   "Ungültige Buchholz-Wertung des Freiloses": "Valore Buchholz del turno di riposo non valido"
 }
