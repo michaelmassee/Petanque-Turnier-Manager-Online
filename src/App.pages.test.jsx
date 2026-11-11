@@ -639,13 +639,37 @@ describe('Kopfzeile', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Bereiche öffnen' }));
 
-    const supportLink = screen.getByRole('link', { name: /Unterstützung/ });
-    const leftPanel = supportLink.closest('.left-panel');
+    const support = screen.getByRole('region', { name: /Unterstützung/ });
+    const leftPanel = support.closest('.left-panel');
     expect(leftPanel).not.toBeNull();
     // Saisonale Deko (aria-hidden) zählt nicht als Eintrag.
     const entries = [...leftPanel.children].filter((child) => child.getAttribute('aria-hidden') !== 'true');
-    expect(entries.at(-1)).toBe(supportLink);
-    expect(within(screen.getByRole('navigation', { name: 'Hauptmenü' })).queryByRole('link', { name: /Unterstützung/ })).not.toBeInTheDocument();
+    expect(entries.at(-1)).toBe(support);
+    expect(within(screen.getByRole('navigation', { name: 'Hauptmenü' })).queryByRole('region', { name: /Unterstützung/ })).not.toBeInTheDocument();
+  });
+
+  it('bietet Direktüberweisung und PayPal mit Hinweis auf „Freunde und Familie“ an', async () => {
+    const writeText = vi.fn().mockResolvedValue();
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    try {
+      render(
+        <AppHeader heading="Turniere" language="de" setLanguage={() => {}} menuOpen={false} onToggleMenu={() => {}} onCloseMenu={() => {}} />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Bereiche öffnen' }));
+      const support = within(screen.getByRole('region', { name: /Unterstützung/ }));
+
+      expect(support.getByText('Direktüberweisung')).toBeInTheDocument();
+      expect(support.getByText('DE24 5135 0025 0043 0676 97')).toBeInTheDocument();
+      expect(support.getByText('SKGIDE5FXXX')).toBeInTheDocument();
+      expect(support.getByRole('link', { name: /paypal\.me\/michaelmassee1/ })).toHaveAttribute('href', 'https://www.paypal.com/paypalme/michaelmassee1');
+      expect(support.getByText(/Freunde und Familie/)).toBeInTheDocument();
+
+      fireEvent.click(support.getByRole('button', { name: 'IBAN kopieren' }));
+      expect(await support.findByRole('button', { name: 'IBAN kopiert' })).toBeInTheDocument();
+      expect(writeText).toHaveBeenCalledWith('DE24513500250043067697');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

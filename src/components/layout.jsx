@@ -402,6 +402,51 @@ export function InstallAppButton() {
   return null;
 }
 
+const SUPPORT_IBAN = 'DE24 5135 0025 0043 0676 97';
+
+// Unterstützung in zwei Wegen: Direktüberweisung (gebührenfrei) und PayPal als „Freunde und Familie“.
+function SupportBox({ onPaypalClick }) {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+
+  async function copyIban() {
+    try {
+      await navigator.clipboard.writeText(SUPPORT_IBAN.replaceAll(' ', ''));
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <section className="left-panel-support" aria-labelledby="left-panel-support-title">
+      <strong id="left-panel-support-title">❤️ {t('Unterstützung')}</strong>
+      <span>{t('Wenn dir der Pétanque-Turnier-Manager hilft, freue ich mich über eine Unterstützung.')}</span>
+      <div className="support-option">
+        <b>{t('Direktüberweisung')}</b>
+        <dl className="support-bank">
+          <dt>{t('Empfänger')}</dt><dd data-i18n-skip>Michael Massee</dd>
+          <dt>{t('Bank')}</dt><dd data-i18n-skip>Sparkasse Gießen</dd>
+          <dt>IBAN</dt><dd data-i18n-skip className="support-iban">{SUPPORT_IBAN}</dd>
+          <dt>BIC</dt><dd data-i18n-skip>SKGIDE5FXXX</dd>
+        </dl>
+        {navigator.clipboard?.writeText && (
+          <button className="link-button" type="button" onClick={copyIban}>
+            {copied ? t('IBAN kopiert') : t('IBAN kopieren')}
+          </button>
+        )}
+      </div>
+      <div className="support-option">
+        <b>PayPal</b>
+        <a href="https://www.paypal.com/paypalme/michaelmassee1" target="_blank" rel="noreferrer" onClick={onPaypalClick}>
+          paypal.me/michaelmassee1
+        </a>
+        <span>{t('Bitte als „Freunde und Familie“ senden, dann fallen keine Gebühren an.')}</span>
+      </div>
+    </section>
+  );
+}
+
 export function AppHeader({ heading, headingNoTranslate, language, setLanguage, menuOpen, onToggleMenu, onCloseMenu, navigate, onLogoClick, currentUser, isAdmin, onSelectAdminDashboard, searchControl, postboxControl, savedSearchesControl, children }) {
   const { t } = useTranslation();
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
@@ -588,16 +633,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
             {t('Admin Dashboard')}
           </button>
         )}
-        <a
-          className="left-panel-support"
-          href="https://www.paypal.com/paypalme/michaelmassee1"
-          target="_blank"
-          rel="noreferrer"
-          onClick={closeLeftPanel}
-        >
-          <strong>❤️ {t('Unterstützung')}</strong>
-          <span>{t('Wenn dir der Pétanque-Turnier-Manager hilft, freue ich mich über eine Unterstützung via PayPal.')}</span>
-        </a>
+        <SupportBox onPaypalClick={closeLeftPanel} />
         <AutumnGarland />
       </nav>
       {menuOpen && (

@@ -1318,9 +1318,45 @@ a.left-panel-link {
   text-align: center;
 }
 
-.left-panel-support:hover,
-.left-panel-support:focus-visible {
-  background: #ffe4e8;
+.support-option {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid #f2b7c0;
+  padding-top: 8px;
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+
+.support-option a {
+  color: #1677ff;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.support-bank {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 8px;
+  margin: 0;
+  text-align: left;
+}
+
+.support-bank dt {
+  color: #53627a;
+}
+
+.support-bank dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.support-option .link-button {
+  justify-self: center;
+}
+
+.support-iban {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 .left-panel-support strong {
