@@ -415,7 +415,8 @@ function RegistrationPhase({ registration, tournament }) {
     <section className="panel live-card" aria-label={t('Meine Anmeldung')}>
       <h2>{t('Meine Anmeldung')}</h2>
       {lines.map((line) => <p key={line} className="live-phase">{line}</p>)}
-      {registration.unit === 'team' && registration.persons?.length > 0 && (
+      {/* Die Besetzung nur, wenn der Kopf sie nicht schon zeigt (z. B. weil dort der Teamname steht). */}
+      {registration.unit === 'team' && registration.persons?.length > 0 && registration.persons.join(' + ') !== registration.label && (
         <p className="muted">{t('Besetzung')}: <span data-i18n-skip>{registration.persons.join(' + ')}</span></p>
       )}
       {registration.meleeTeammates?.length > 0 && (

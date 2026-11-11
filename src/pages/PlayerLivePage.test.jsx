@@ -383,6 +383,24 @@ describe('Live-Ansicht für Spieler', () => {
     expect(screen.queryByText('Noch keine Runde gestartet.')).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['ohne Teamname nur im Kopf', 'Anna Muster + Bert Beispiel', false],
+    ['mit Teamname zusätzlich in der Anmeldung', 'Die Kugelblitze', true],
+  ])('zeigt die Besetzung %s', async (_name, label, showsBesetzung) => {
+    const payload = livePayload({ lastRoundNumber: null, currentMatch: null, history: [], ranking: [], rankingPlace: null, rankingSize: 0 });
+    payload.tournament.status = 'registration';
+    Object.assign(payload.registration, {
+      label, status: 'confirmed', participation: 'active', unit: 'team', registrationType: 'forme', teamNumber: 1,
+      persons: ['Anna Muster', 'Bert Beispiel'],
+    });
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    renderDetail();
+
+    expect(await screen.findByText(label)).toBeInTheDocument();
+    expect(screen.getByTitle('Teamnummer')).toHaveTextContent('1');
+    expect(screen.queryByText('Anna Muster + Bert Beispiel', { selector: '.live-card span' }) !== null).toBe(showsBesetzung);
+  });
+
   it('kennzeichnet die Live-Ansicht nach Turnierende, ohne persönliche Ergebnisse zu erlauben', async () => {
     const payload = livePayload();
     payload.tournament.status = 'finished';
