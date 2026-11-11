@@ -22,7 +22,7 @@ import { meleeTeamSize } from '../lib/pairing/melee.js';
 import { RegistrationPlayerPicker } from '../components/RegistrationPlayerPicker.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { PHONE_QUERY, useMediaQuery, useTournamentLiveSocket } from '../lib/hooks.js';
-import { QrImageShare } from '../components/TournamentQrPanel.jsx';
+import { FinalRankingQrPanel, QrImageShare } from '../components/TournamentQrPanel.jsx';
 import { RoundTable, pairingNumbers } from '../components/RoundTable.jsx';
 import { DEFAULT_QR_DESIGN } from '../lib/qr-design.js';
 
@@ -1265,6 +1265,11 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
             onPublished={() => queryClient.invalidateQueries({ queryKey: ['tournaments'] })}
           />
         </RankingPanel>
+      )}
+
+      {/* Eigenes Panel ganz unten: QR-Code und Teilen der veröffentlichten Endrangliste. */}
+      {selectedTournamentStatus === 'finished' && selectedTournament?.rankingPublishedAt && (
+        <FinalRankingQrPanel key={`ranking-qr:${selectedTournamentId}:${selectedTournament.rankingPublishedAt}`} tournament={selectedTournament} />
       )}
 
       <RegistrationEditDialog

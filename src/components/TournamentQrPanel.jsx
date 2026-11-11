@@ -66,6 +66,74 @@ export function TournamentQrPanel({ tournament, shareToken = '' }) {
   );
 }
 
+// QR-Code zur veröffentlichten Endrangliste (Spielverwaltung, unter der Rangliste): wie das QR-Panel der Turnierseite,
+// aber mit Link direkt auf /turniere/<id>/rangliste und „Endrangliste“ als Überschrift im Bild. Farben/Logo aus dem
+// gespeicherten QR-Design des Turniers. Private Turniere brauchen den Freigabe-Schlüssel im Link; ist der Freigabe-Link
+// nicht aktiv, wird er nicht stillschweigend aktiviert, sondern erst auf ausdrücklichen Klick.
+export function FinalRankingQrPanel({ tournament }) {
+  const { t } = useTranslation();
+  const [state, setState] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const tournamentId = tournament.id;
+  const isPrivate = tournament.visibility === 'private';
+
+  useEffect(() => {
+    let cancelled = false;
+    setState(null);
+    (async () => {
+      try {
+        const qr = await api(`/api/tournaments/${tournamentId}/qr`);
+        const design = { ...sanitizeQrDesign(qr?.design ?? DEFAULT_QR_DESIGN), header: '' };
+        const shareToken = isPrivate && qr?.shareActive !== false
+          ? (await authenticatedApi(`/api/tournaments/${tournamentId}/share-link`, { method: 'POST' })).shareToken
+          : '';
+        if (!cancelled) setState({ design, shareActive: !isPrivate || qr?.shareActive !== false, shareToken });
+      } catch (loadError) {
+        if (!cancelled) setError(loadError.message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tournamentId, isPrivate]);
+
+  async function activateShare() {
+    setError('');
+    setMessage('');
+    setBusy(true);
+    try {
+      const { shareToken } = await authenticatedApi(`/api/tournaments/${tournamentId}/share-link`, { method: 'POST' });
+      setState((current) => ({ ...current, shareActive: true, shareToken }));
+      setMessage(t('Freigabe-Link aktiviert'));
+    } catch (activateError) {
+      setError(activateError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const url = state && `${window.location.origin}/turniere/${encodeURIComponent(tournamentId)}/rangliste${state.shareToken ? `?share=${encodeURIComponent(state.shareToken)}` : ''}`;
+
+  return (
+    <section className="panel tournament-qr-panel" aria-labelledby={`ranking-qr-panel-${tournamentId}`}>
+      <h2 id={`ranking-qr-panel-${tournamentId}`}>{t('QR-Code zur Endrangliste')}</h2>
+      {!state && !error && <p className="muted">{t('Wird geladen…')}</p>}
+      {state?.shareActive && (
+        <QrImageShare url={url} design={state.design} title={`${t('Endrangliste')}: ${tournament.name}`} label={t('QR-Code zur Endrangliste')} />
+      )}
+      {state && !state.shareActive && (
+        <>
+          <p className="muted">{t('Das Turnier ist privat und der Freigabe-Link ist nicht aktiv. Gäste können den QR-Code daher nicht öffnen.')}</p>
+          <div className="row-actions">
+            <Button loading={busy} onClick={activateShare}>{t('Freigabe-Link aktivieren')}</Button>
+          </div>
+        </>
+      )}
+      <Feedback message={message} error={error} />
+    </section>
+  );
+}
+
 // QR-Bild mit Teilen (Bild + Link), PNG-Download und „Link kopieren“ – im Info-Panel der Turnierseite und für den
 // Anzeige-Link unter „Turnier starten“. Ohne eigenen Header-Text im Design steht der Titel über dem Code.
 export function QrImageShare({ url, design, title, label }) {

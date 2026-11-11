@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '../lib/i18next-config.js';
-import { TournamentQrPanel } from './TournamentQrPanel.jsx';
+import { FinalRankingQrPanel, TournamentQrPanel } from './TournamentQrPanel.jsx';
 
 const qrImage = vi.hoisted(() => ({
   createQrBitmap: vi.fn(async () => ({})),
@@ -78,5 +78,46 @@ describe('QR-Panel der Turnierseite', () => {
     const { container } = render(<TournamentQrPanel tournament={TOURNAMENT} />);
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('QR-Panel der Endrangliste', () => {
+  afterEach(() => vi.clearAllMocks());
+
+  function route({ shareActive = true } = {}) {
+    global.fetch = vi.fn(async (path, options = {}) => new Response(JSON.stringify(options.method === 'POST'
+      ? { shareUrl: QR_URL, shareToken: 'geheim' }
+      : { qrUrl: QR_URL, design: { header: 'Jetzt anmelden!' }, shareActive }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  }
+  const rankingUrl = (query = '') => `${window.location.origin}/turniere/t1/rangliste${query}`;
+
+  it('verlinkt direkt die Endrangliste, mit „Endrangliste“ als Überschrift statt des Design-Texts', async () => {
+    route();
+    render(<FinalRankingQrPanel tournament={TOURNAMENT} />);
+
+    expect(await screen.findByText(rankingUrl())).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'QR-Code zur Endrangliste' })).toBeInTheDocument();
+    await waitFor(() => expect(qrImage.createQrBitmap).toHaveBeenCalledWith(expect.objectContaining({ header: 'Endrangliste: Frühlingsturnier' }), rankingUrl()));
+    expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+    expect(screen.getByRole('button', { name: /Teilen/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /PNG herunterladen/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Link kopieren' })).toBeInTheDocument();
+  });
+
+  it('hängt bei privaten Turnieren mit aktiver Freigabe den Schlüssel an', async () => {
+    route();
+    render(<FinalRankingQrPanel tournament={{ ...TOURNAMENT, visibility: 'private' }} />);
+    expect(await screen.findByText(rankingUrl('?share=geheim'))).toBeInTheDocument();
+  });
+
+  it('aktiviert bei privaten Turnieren eine inaktive Freigabe erst auf Klick', async () => {
+    route({ shareActive: false });
+    render(<FinalRankingQrPanel tournament={{ ...TOURNAMENT, visibility: 'private' }} />);
+
+    const activate = await screen.findByRole('button', { name: 'Freigabe-Link aktivieren' });
+    expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+    fireEvent.click(activate);
+    expect(await screen.findByText(rankingUrl('?share=geheim'))).toBeInTheDocument();
+    expect(screen.getByText('Freigabe-Link aktiviert')).toBeInTheDocument();
   });
 });
