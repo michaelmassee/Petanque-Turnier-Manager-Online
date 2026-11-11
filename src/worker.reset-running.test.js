@@ -21,9 +21,9 @@ describe('Turnierstart zurücksetzen und Anmeldung schließen (E-23)', () => {
     db.sqlite.prepare(`INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at)
       VALUES ('u1', 'leitung@example.test', 'user', 'salt', 'hash', '2026-09-01', '2026-09-01')`).run();
     db.sqlite.prepare(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility,
-        created_at, updated_at, desktop_execution, local_started_at)
+        created_at, updated_at, desktop_execution, local_started_at, started_at)
       VALUES ('t1', 'u1', 'Turnier', '2026-09-28', 'Ort', 'tete', 'running', 'public', '2026-09-01', '2026-09-01', 1,
-        '2026-09-28T08:00:00.000Z')`).run();
+        '2026-09-28T08:00:00.000Z', '2026-09-28T08:00:00.000Z')`).run();
   });
 
   it('setzt ein versehentlich gestartetes Turnier zurück und schließt die Anmeldung (P-27)', async () => {
@@ -32,7 +32,7 @@ describe('Turnierstart zurücksetzen und Anmeldung schließen (E-23)', () => {
     const antwort = await resetTournamentRunning(db, turnier(), leitung);
 
     expect((await antwort.json()).tournament).toMatchObject({ status: 'registration', registrationClosed: true });
-    expect(turnier()).toMatchObject({ status: 'registration', registration_closed: 1, local_started_at: null, desktop_execution: 0 });
+    expect(turnier()).toMatchObject({ status: 'registration', registration_closed: 1, local_started_at: null, started_at: null, desktop_execution: 0 });
     expect(turnier().running_reset_at).toBeTruthy();
     expect(protokoll()).toEqual([{ action: 'running_reset', actor_user_id: 'u1', actor_role: 'owner' }]);
   });

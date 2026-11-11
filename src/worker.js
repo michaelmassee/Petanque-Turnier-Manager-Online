@@ -44,6 +44,7 @@ import {
   chunk,
   LIVE_PUSH_CHUNK_SIZE,
   isTournamentStale,
+  STALE_TOURNAMENT_HOURS,
   dateDaysAgo,
   assignCourts,
   normalizeCourt,
@@ -1644,14 +1645,18 @@ export function registrationClosesAtUtcIso(tournament) {
  * Nach 48 Stunden ab Turnierbeginn läuft kein Turnier mehr: vergessene "Läuft"-Turniere und nie online
  * gestartete Turniere (Status "Anmeldung", z. B. offline gespielt oder Kalendereintrag) werden automatisch
  * abgeschlossen, damit sie nicht dauerhaft im Bereich "Live" bzw. als offen stehen. Die
+ * Laufende Turniere zählen zusätzlich ab dem tatsächlichen Start (started_at): ein vorab gestartetes Turnier (z. B.
+ * Schnellstart mit Datum in der Zukunft) wird 48 Stunden nach dem Start abgeschlossen, nicht erst nach dem Datum.
  * Turnierleitung bekommt dazu eine Nachricht ins Postfach. Daten bleiben unverändert; ein späterer Metadaten-Sync aus dem Turnierdokument kann
  * den Status wieder setzen.
  */
 async function finishStaleTournaments(env, now = new Date()) {
   const db = env.DB;
-  const candidates = await db.prepare(`SELECT id, name, owner_id, date, start_time, timezone FROM tournaments
-      WHERE status IN ('running', 'registration') AND date <= ?`).bind(dateDaysAgo(1, now)).all();
-  const stale = (candidates.results || []).filter((row) => isTournamentStale(tournamentStartUtcIso(row), now));
+  const candidates = await db.prepare(`SELECT id, name, owner_id, date, start_time, timezone, status, started_at FROM tournaments
+      WHERE status IN ('running', 'registration') AND (date <= ? OR (status = 'running' AND started_at <= ?))`)
+    .bind(dateDaysAgo(1, now), new Date(now.getTime() - STALE_TOURNAMENT_HOURS * 3600000).toISOString()).all();
+  const stale = (candidates.results || []).filter((row) => isTournamentStale(tournamentStartUtcIso(row), now)
+    || (row.status === 'running' && row.started_at && isTournamentStale(row.started_at, now)));
   if (stale.length === 0) return;
   const statement = db.prepare("UPDATE tournaments SET status = 'finished', updated_at = ? WHERE id = ? AND status IN ('running', 'registration')");
   const results = await db.batch(stale.map((row) => statement.bind(now.toISOString(), row.id)));
@@ -6624,7 +6629,7 @@ export async function resetTournamentRunning(db, tournament, user) {
   const now = new Date().toISOString();
   const [reset] = await db.batch([
     db.prepare(`UPDATE tournaments SET status = 'registration', registration_closed = 1, running_reset_at = ?,
-        local_started_at = NULL, desktop_execution = 0, updated_at = ?
+        local_started_at = NULL, started_at = NULL, desktop_execution = 0, updated_at = ?
         WHERE id = ? AND status = 'running'
           AND NOT EXISTS (SELECT 1 FROM tournament_matches WHERE tournament_id = ? AND (score_a IS NOT NULL OR score_b IS NOT NULL))`)
       .bind(now, now, tournament.id, tournament.id),

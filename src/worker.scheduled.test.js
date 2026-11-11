@@ -49,6 +49,22 @@ describe('Cron-Wartung', () => {
     expect(JSON.parse(notification.event_data)).toMatchObject({ tournamentId: 'registration', status: 'finished', automatic: true });
   });
 
+  it('schließt ein vorab gestartetes Turnier 48 Stunden nach dem tatsächlichen Start, auch wenn das Datum in der Zukunft liegt', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: scheduledTime });
+    sql(`INSERT INTO tournaments (id, owner_id, name, date, start_time, location, formation, status, started_at, visibility, created_at, updated_at)
+      VALUES ('early', 'owner', 'Schnellstart', '2099-12-24', '11:00', 'Ort', 'tete', 'running', '2026-10-20T10:00:00.000Z', 'private', '2026-10-20', '2026-10-20'),
+             ('fresh', 'owner', 'Gerade gestartet', '2099-12-24', '11:00', 'Ort', 'tete', 'running', '2026-10-22T10:00:00.000Z', 'private', '2026-10-22', '2026-10-22'),
+             ('notrunning', 'owner', 'Zurückgesetzt', '2099-12-24', '11:00', 'Ort', 'tete', 'registration', '2026-10-20T10:00:00.000Z', 'private', '2026-10-20', '2026-10-20')`);
+
+    try { await runCron(); } finally { vi.useRealTimers(); }
+
+    expect(row("SELECT status FROM tournaments WHERE id = 'early'").status).toBe('finished');
+    expect(row("SELECT status FROM tournaments WHERE id = 'fresh'").status).toBe('running');
+    expect(row("SELECT status FROM tournaments WHERE id = 'notrunning'").status).toBe('registration');
+    expect(JSON.parse(row("SELECT event_data FROM postbox_messages WHERE recipient_id = 'owner'").event_data))
+      .toMatchObject({ tournamentId: 'early', status: 'finished', automatic: true });
+  });
+
   it('lässt Turniere innerhalb der 48 Stunden unverändert', async () => {
     // Uhr auf scheduledTime 2026-10-23T01:00Z: Beginn 21.10. 10:00 Berlin liegt 41 Stunden zurück.
     vi.useFakeTimers({ toFake: ['Date'], now: scheduledTime });
