@@ -91,10 +91,11 @@ describe('Ausrichtender Verein am Turnier', () => {
     expect((await response.json()).tournament.logoUrl).toBe('https://example.test/venue.png');
   });
 
-  it('legt neue und kopierte Turniere mit neutralem Freilos-Buchholz an (Issue #38)', async () => {
+  // Issue #38: NULL (BPV-Regel) gleicht den geschenkten Sieg des Freiloses am besten aus, NEUTRAL bevorzugt Freilos-Teams.
+  it('legt neue Turniere mit Freilos-Buchholz null an, Kopien übernehmen die Einstellung (Issue #38)', async () => {
     const created = await create({ type: 'schweizer' });
-    expect(created.byeBuchholz).toBe('neutral');
-    sql("UPDATE tournaments SET schweizer_bye_buchholz = 'null' WHERE id = ?", created.id);
+    expect(created.byeBuchholz).toBe('null');
+    sql("UPDATE tournaments SET schweizer_bye_buchholz = 'neutral' WHERE id = ?", created.id);
     const stored = env.DB.sqlite.prepare('SELECT * FROM tournaments WHERE id=?').get(created.id);
     const copy = await duplicateTournament(env.DB, stored, { id: 'u1' });
     expect(env.DB.sqlite.prepare('SELECT schweizer_bye_buchholz FROM tournaments WHERE id=?').get(copy.id).schweizer_bye_buchholz)

@@ -72,7 +72,7 @@ describe('TournamentOptionsPanel', () => {
     authenticatedApi.mockImplementation(async (path, { body }) => ({ ...DEFAULT_TOURNAMENT_OPTIONS, ...JSON.parse(body) }));
     const { unmount } = render(<Page />);
     const select = screen.getByLabelText('Buchholz-Wertung des Freiloses');
-    expect([...select.options].map((option) => option.value)).toEqual(['neutral', 'null']);
+    expect([...select.options].map((option) => option.value)).toEqual(['null', 'neutral']);
     fireEvent.change(select, { target: { value: 'neutral' } });
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(authenticatedApi).toHaveBeenCalled());

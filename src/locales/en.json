@@ -1996,6 +1996,6 @@
   "Buchholz-Wertung des Freiloses": "Buchholz value of a bye",
   "Neutral (fiktiver Durchschnittsgegner)": "Neutral (fictitious average opponent)",
   "Null (BPV-Regel: 0 Buchholz)": "Zero (BPV rule: 0 Buchholz)",
-  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz, abgerundet. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutral: a bye counts like an opponent with a balanced record, (rounds − 1) / 2 Buchholz per bye, rounded down. Zero: no Buchholz for the bye. The ranking is recalculated immediately.",
+  "Null (Standard): kein Buchholz für das Freilos; gleicht den geschenkten Sieg weitgehend aus. Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz, abgerundet; bevorzugt Freilos-Teams. Die Rangliste wird sofort neu berechnet.": "Zero (default): no Buchholz for the bye; largely offsets the free win. Neutral: a bye counts like an opponent with a balanced record, (rounds − 1) / 2 Buchholz per bye, rounded down; favours teams with a bye. The ranking is recalculated immediately.",
   "Ungültige Buchholz-Wertung des Freiloses": "Invalid Buchholz value of a bye"
 }

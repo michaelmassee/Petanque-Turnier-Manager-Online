@@ -28,8 +28,8 @@ export const MELEE_TEAM_MODE_OPTIONS = [
 
 // Buchholz-Wertung eines Freiloses im Schweizer System wie FreilosBuchholz im Hauptprojekt (03_Schweizer.md 5.1).
 export const BYE_BUCHHOLZ_OPTIONS = [
-  { value: 'neutral', label: 'Neutral (fiktiver Durchschnittsgegner)' },
   { value: 'null', label: 'Null (BPV-Regel: 0 Buchholz)' },
+  { value: 'neutral', label: 'Neutral (fiktiver Durchschnittsgegner)' },
 ];
 
 // Standardwerte wie Migrationen 0154/0155/0157 bzw. Hauptprojekt.
@@ -143,7 +143,7 @@ export function TournamentOptionsPanel({ tournament, options, onSaved }) {
           <>
             <SelectField label={t('Buchholz-Wertung des Freiloses')} value={draft.byeBuchholz} onChange={set('byeBuchholz')} disabled={busy}
               options={BYE_BUCHHOLZ_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
-            <p className="hint">{t('Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz, abgerundet. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.')}</p>
+            <p className="hint">{t('Null (Standard): kein Buchholz für das Freilos; gleicht den geschenkten Sieg weitgehend aus. Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz, abgerundet; bevorzugt Freilos-Teams. Die Rangliste wird sofort neu berechnet.')}</p>
           </>
         )}
 
