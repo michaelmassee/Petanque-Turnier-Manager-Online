@@ -24,8 +24,8 @@ export function TournamentEntryList({ entries, scrollRef }) {
             {entries.map((entry, index) => <li className="board-entry" key={index}>
               <span className="board-entry-number" aria-label={`${t('Lfd.-Nr.')} ${index + 1}`}>{index + 1}</span>
               <div className="board-entry-players">
-                {entry.teamName && <strong data-i18n-skip>{entry.teamName}</strong>}
-                {entry.persons.map((person, personIndex) => <div key={personIndex} data-i18n-skip>
+                {entry.teamName && <strong className="board-entry-team" data-i18n-skip>{entry.teamName}</strong>}
+                {entry.persons.map((person, personIndex) => <div className="board-entry-person" key={personIndex} data-i18n-skip>
                   <strong>{[person.firstName, person.lastName].filter(Boolean).join(' ')}{person.accountConnected && <AccountBadge />}</strong>
                   {person.club && <small className="muted">{person.club}</small>}
                 </div>)}

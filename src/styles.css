@@ -2234,17 +2234,26 @@ a.left-panel-link {
 .board-entry {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: start;
-  padding: 12px;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 6px 12px;
   border: 1px solid #e2e7f0;
   border-radius: 8px;
   background: #fff;
 }
 
 .board-entry-number { color: #53627a; font-weight: 700; }
-.board-entry-players, .board-entry-players > div { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
-.board-entry-players { gap: 8px; }
+/* Spieler einer Meldung nebeneinander in gleich breiten Spalten (über alle Meldungen bündig), der Teamname
+   steht über die ganze Zeile. Bei wenig Platz rutschen die Spieler untereinander. */
+.board-entry-players {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14em), 1fr));
+  gap: 2px 16px;
+  min-width: 0;
+}
+.board-entry-players > * { min-width: 0; overflow-wrap: anywhere; }
+.board-entry-team { grid-column: 1 / -1; }
+.board-entry-person { display: grid; }
 .board-entry-status { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
 
 @media (max-width: 560px) {
