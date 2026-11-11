@@ -408,6 +408,15 @@ function RankingPanel({ openInitially, children }) {
   );
 }
 
+// Meldung nach dem Veröffentlichen: sagt, wie viele E-Mails rausgingen – auch wenn es keine war.
+function publishedMessage(t, notify, mailCount) {
+  if (!notify) return t('Endrangliste veröffentlicht.');
+  if (mailCount === null) return t('Endrangliste veröffentlicht und per Postfach und Push gesendet. Der E-Mail-Versand ist für dein Konto nicht freigeschaltet.');
+  if (mailCount === 0) return t('Endrangliste veröffentlicht und per Postfach und Push gesendet. Keine E-Mail verschickt: Kein Teilnehmer hat eine E-Mail-Adresse hinterlegt.');
+  if (typeof mailCount !== 'number') return t('Endrangliste veröffentlicht und an die Teilnehmer gesendet.');
+  return t('finalRankingMailed', { count: mailCount });
+}
+
 export function FinalRankingPublisher({ tournament, onPublished }) {
   const { t, i18n } = useTranslation();
   const [notify, setNotify] = useState(true);
@@ -430,8 +439,8 @@ export function FinalRankingPublisher({ tournament, onPublished }) {
       // Der Versand an die Teilnehmer ist ein Teilen: bei privaten Turnieren wie beim Teilen-Button den Freigabe-Link
       // aktivieren (der Hinweis unter der Checkbox sagt das), sonst lehnt der Server den Versand ab.
       if (notify && sharesPrivately) await authenticatedApi(`/api/tournaments/${tournament.id}/share-link`, { method: 'POST' });
-      await authenticatedApi(`/api/tournaments/${tournament.id}/ranking/publish`, { method: 'POST', body: JSON.stringify({ notify, resend }) });
-      setMessage(notify ? t('Endrangliste veröffentlicht und an die Teilnehmer gesendet.') : t('Endrangliste veröffentlicht.'));
+      const result = await authenticatedApi(`/api/tournaments/${tournament.id}/ranking/publish`, { method: 'POST', body: JSON.stringify({ notify, resend }) });
+      setMessage(publishedMessage(t, notify, result?.mailCount));
       await onPublished?.();
     } catch (requestError) {
       if (requestError.payload?.details?.code === 'ranking_already_mailed') {

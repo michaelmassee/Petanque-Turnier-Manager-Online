@@ -58,13 +58,30 @@ describe('Endrangliste veröffentlichen', () => {
   });
 
   it('schreibt bestätigte Teilnehmer per Mail mit Link, Postfach und Push an – nicht die Warteliste', async () => {
-    expect((await publish({ notify: true })).status).toBe(200);
+    const response = await publish({ notify: true });
+    expect(response.status).toBe(200);
+    expect((await response.json()).mailCount).toBe(2);
 
     expect(mails().map((mail) => mail.to).sort()).toEqual(['anna@example.test', 'bert@example.test']);
     expect(mails()[0]).toMatchObject({ subject: 'Endrangliste: Herbstturnier', actions: [expect.objectContaining({ url: 'https://ptm.test/turniere/t1/rangliste' })] });
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ kind: 'push', userId: 'u3' }));
     expect(env.DB.sqlite.prepare("SELECT kind, event_type, broadcast_tournament_id FROM postbox_messages").all())
       .toEqual([{ kind: 'system', event_type: 'tournament_ranking_published', broadcast_tournament_id: 't1' }]);
+  });
+
+  it('schickt die Mail auch an die Turnierleitung, wenn sie selbst mitgespielt hat', async () => {
+    sql(`INSERT INTO registrations (id, tournament_id, user_id, first_name, last_name, email, status, participation, registered_at, created_at, updated_at)
+      VALUES ('p4', 't1', 'u1', 'Lea', 'Leitung', 'leitung@example.test', 'confirmed', 'active', '2026-10-14', '2026-10-14', '2026-10-14')`);
+    expect((await publish({ notify: true })).status).toBe(200);
+    expect(mails().map((mail) => mail.to).sort()).toEqual(['anna@example.test', 'bert@example.test', 'leitung@example.test']);
+  });
+
+  it('meldet 0 Mails, wenn kein Teilnehmer eine echte E-Mail-Adresse hat', async () => {
+    sql("UPDATE registrations SET email = 'ohne-email-x@ohne-email.invalid' WHERE id = 'p1'");
+    sql("UPDATE registrations SET email = 'ohne-email-y@ohne-email.invalid' WHERE id = 'p2'");
+    const response = await publish({ notify: true });
+    expect((await response.json()).mailCount).toBe(0);
+    expect(mails()).toEqual([]);
   });
 
   it('verlangt für einen zweiten Versand eine ausdrückliche Bestätigung', async () => {
@@ -83,7 +100,9 @@ describe('Endrangliste veröffentlichen', () => {
 
   it('schickt keine Mails, wenn der Mailversand der Turnierleitung gesperrt ist', async () => {
     sql("UPDATE users SET mail_enabled = 0 WHERE id = 'u1'");
-    expect((await publish({ notify: true })).status).toBe(200);
+    const response = await publish({ notify: true });
+    expect(response.status).toBe(200);
+    expect((await response.json()).mailCount).toBeNull();
     expect(mails()).toEqual([]);
   });
 

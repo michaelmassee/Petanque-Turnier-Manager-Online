@@ -106,6 +106,8 @@
   "allParticipantsOf": "Alle Teilnehmer von {name}",
   "registrationCount_one": "{{count}} Anmeldung",
   "registrationCount_other": "{{count}} Anmeldungen",
+  "finalRankingMailed_one": "Endrangliste veröffentlicht und an die Teilnehmer gesendet (E-Mail an {{count}} Adresse).",
+  "finalRankingMailed_other": "Endrangliste veröffentlicht und an die Teilnehmer gesendet (E-Mail an {{count}} Adressen).",
   "favorites": "Favoriten",
   "recentRecipients": "Zuletzt verwendet",
   "allTournamentsSection": "Turnier-Broadcasts",

@@ -8576,8 +8576,9 @@ async function publishFinalRanking(request, env, tournament, user, origin) {
           mailed_at = excluded.mailed_at`).bind(tournament.id, JSON.stringify(ranking), now, mailedAt),
     env.DB.prepare('UPDATE tournaments SET final_ranking_published_at = ? WHERE id = ?').bind(now, tournament.id),
   ]);
-  if (body.notify === true) await notifyFinalRanking(env, tournament, user, origin, share?.token);
-  return json({ ranking, publishedAt: now, mailedAt });
+  // mailCount: Zahl der verschickten Mails, null bei gesperrtem Mailversand; die Oberfläche meldet damit auch „keine Mail“.
+  const mailCount = body.notify === true ? await notifyFinalRanking(env, tournament, user, origin, share?.token) : undefined;
+  return json({ ranking, publishedAt: now, mailedAt, mailCount });
 }
 
 async function notifyFinalRanking(env, tournament, sender, origin, shareToken = null) {
@@ -8592,9 +8593,10 @@ async function notifyFinalRanking(env, tournament, sender, origin, shareToken = 
     await enqueuePushNotification(env, { userId: accountUser.id, payload: { title: 'Neue Statusmeldung', actor: tournament.name, messageId: id } });
   }
 
-  if (!(await canSendTournamentMail(env.DB, tournament))) return;
+  if (!(await canSendTournamentMail(env.DB, tournament))) return null;
   const link = `${origin}/turniere/${encodeURIComponent(tournament.id)}/rangliste${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`;
-  const recipients = await tournamentEmailRecipients(env.DB, tournament.id, "('confirmed')", sender.email);
+  // Anders als bei der Rundmail bekommt auch die Turnierleitung die Mail, wenn sie selbst mitgespielt hat.
+  const recipients = await tournamentEmailRecipients(env.DB, tournament.id, "('confirmed')", null);
   for (const recipient of recipients.values()) {
     const templates = TOURNAMENT_RANKING_EMAILS[recipient.language] || TOURNAMENT_RANKING_EMAILS.de;
     try {
@@ -8612,6 +8614,7 @@ async function notifyFinalRanking(env, tournament, sender, origin, shareToken = 
       console.error('Final ranking email dispatch failed', error);
     }
   }
+  return recipients.size;
 }
 
 // Team-Anzeige der Rangliste (Turnieroption); NAME bleibt die bisherige Bezeichnung aus normalizeRanking.
