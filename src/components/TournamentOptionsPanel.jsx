@@ -26,11 +26,17 @@ export const MELEE_TEAM_MODE_OPTIONS = [
   { value: 'TRIPLETTE_OHNE_FREILOS', label: 'Ohne Freilos, Triplettes bevorzugt' },
 ];
 
-// Standardwerte wie Migrationen 0154/0155 bzw. Hauptprojekt.
+// Buchholz-Wertung eines Freiloses im Schweizer System wie FreilosBuchholz im Hauptprojekt (03_Schweizer.md 5.1).
+export const BYE_BUCHHOLZ_OPTIONS = [
+  { value: 'neutral', label: 'Neutral (fiktiver Durchschnittsgegner)' },
+  { value: 'null', label: 'Null (BPV-Regel: 0 Buchholz)' },
+];
+
+// Standardwerte wie Migrationen 0154/0155/0157 bzw. Hauptprojekt.
 export const DEFAULT_TOURNAMENT_OPTIONS = {
   courtMode: 'X', byePointsFor: 13, byePointsAgainst: 7, missedRoundPointsFor: 0, missedRoundPointsAgainst: 13,
   koGroupSize: 16, koMinLastGroupSize: 4, koCourtFirstRoundOnly: true, teamDisplayRound: 'NAME', teamDisplayRanking: 'NAME',
-  roundRobinReturn: false, meleeTeamMode: 'EINFACH',
+  roundRobinReturn: false, meleeTeamMode: 'EINFACH', byeBuchholz: 'null',
 };
 
 // Welche Optionen das Turniersystem kennt – wie die Konfiguration je System im Hauptprojekt.
@@ -45,6 +51,9 @@ export function tournamentOptionFields(tournament) {
     teamDisplayRanking: fixedTeams && system !== 'ko',
     roundRobinReturn: system === 'jeder_gegen_jeden',
     meleeTeamMode: fixedTeams && (tournament.registrationType ?? tournament.registration_type) === 'melee',
+    // Nur mit Buchholz-Wertung sinnvoll; bei „Ohne Buchholz“ hat die Einstellung keine Wirkung.
+    byeBuchholz: system === 'schweizer'
+      && (tournament.schweizerRankingMode ?? tournament.schweizer_ranking_mode ?? 'mit_buchholz') === 'mit_buchholz',
   };
 }
 
@@ -59,6 +68,7 @@ function payloadFor(fields, options) {
     ...(fields.teamDisplayRanking ? { teamDisplayRanking: options.teamDisplayRanking } : {}),
     ...(fields.roundRobinReturn ? { roundRobinReturn: options.roundRobinReturn } : {}),
     ...(fields.meleeTeamMode ? { meleeTeamMode: options.meleeTeamMode } : {}),
+    ...(fields.byeBuchholz ? { byeBuchholz: options.byeBuchholz } : {}),
   };
 }
 
@@ -127,6 +137,14 @@ export function TournamentOptionsPanel({ tournament, options, onSaved }) {
             <IntegerField label={t('Minuspunkte')} min={0} max={13} value={draft.byePointsAgainst} onChange={setNumber('byePointsAgainst')} disabled={busy} />
             <p className="hint">{t('Ein Freilos zählt als Sieg mit diesen Punkten, auch rückwirkend für bereits gespielte Runden.')}</p>
           </fieldset>
+        )}
+
+        {fields.byeBuchholz && (
+          <>
+            <SelectField label={t('Buchholz-Wertung des Freiloses')} value={draft.byeBuchholz} onChange={set('byeBuchholz')} disabled={busy}
+              options={BYE_BUCHHOLZ_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
+            <p className="hint">{t('Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.')}</p>
+          </>
         )}
 
         {fields.missedRound && (

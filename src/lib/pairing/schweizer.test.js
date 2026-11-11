@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { downfloatRounds, orderWithDownfloats, sameSwissRankingPlace, sortSwiss, swissStats, generateRound } from './schweizer.js';
+import { byeBuchholz, downfloatRounds, orderWithDownfloats, sameSwissRankingPlace, sortSwiss, swissStats, generateRound } from './schweizer.js';
 import runde16History from './schweizer.32-teams-runde-16.json';
 
 const teams = Array.from({ length: 6 }, (_, index) => ({ id: `t${index + 1}`, seedPosition: index + 1 }));
@@ -195,5 +195,51 @@ describe('Schweizer Herunterlosen', () => {
     const wins = new Map(eight.map((team, index) => [team.id, index < 3 ? 3 : index < 5 ? 2 : 1]));
     const ordered = orderWithDownfloats(eight, wins, new Map([['t4', [3]], ['t5', [3]]]), 4);
     expect(ids(ordered)).toEqual(['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8']);
+  });
+});
+
+// Issue #38 Punkt 1, gleiche Regel wie FreilosBuchholz/SchweizerSystemTest im Hauptprojekt.
+describe('Schweizer Freilos-Buchholz', () => {
+  const three = [{ id: 't1' }, { id: 't2' }, { id: 't3' }];
+  const byId = (stats) => Object.fromEntries(stats.map((entry) => [entry.teamId, { bhz: entry.bhz, fbhz: entry.fbhz }]));
+  const roundOne = [
+    { roundNumber: 1, teamA: ['t1'], teamB: ['t2'], scoreA: 13, scoreB: 5 },
+    { roundNumber: 1, teamA: ['t3'], teamB: [] },
+  ];
+
+  it.each([[1, 1, 0, 1], [2, 2, 0.5, 3], [3, 2, 1, 5], [5, 3, 2, 13]])('neutral bei %i Runden und %i Siegen: BHZ %d, FBHZ %d', (rounds, wins, bhz, fbhz) => {
+    const bye = byeBuchholz('neutral', rounds);
+    expect([bye.bhz, bye.fbhz(wins)]).toEqual([bhz, fbhz]);
+    const none = byeBuchholz('null', rounds);
+    expect([none.bhz, none.fbhz(wins)]).toEqual([0, 0]);
+  });
+
+  it('gibt dem Freilos-Team nach Runde 1 dieselben Werte wie einem Sieger', () => {
+    expect(byId(swissStats(three, roundOne, 'mit_buchholz', { byeBuchholz: 'neutral' })))
+      .toEqual({ t1: { bhz: 0, fbhz: 1 }, t2: { bhz: 1, fbhz: 0 }, t3: { bhz: 0, fbhz: 1 } });
+    expect(byId(swissStats(three, roundOne)).t3).toEqual({ bhz: 0, fbhz: 0 });
+  });
+
+  it('zählt ein Freilos einer ausgelosten, ungespielten Runde nicht', () => {
+    const history = [...roundOne,
+      { roundNumber: 2, teamA: ['t1'], teamB: ['t3'] },
+      { roundNumber: 2, teamA: ['t2'], teamB: [] }];
+    const stats = byId(swissStats(three, history, 'mit_buchholz', { byeBuchholz: 'neutral' }));
+    expect(stats.t3).toEqual({ bhz: 0, fbhz: 1 });
+    expect(stats.t2).toEqual({ bhz: 1, fbhz: 1 });
+  });
+
+  it('liefert halbe Punkte und sortiert danach', () => {
+    const history = [...roundOne, { roundNumber: 2, teamA: ['t3'], teamB: ['t2'], scoreA: 13, scoreB: 11 }];
+    const neutral = swissStats(three, history, 'mit_buchholz', { byeBuchholz: 'neutral' });
+    expect(byId(neutral).t3.bhz).toBe(0.5);
+    expect(byId(swissStats(three, history)).t3.bhz).toBe(0);
+    expect(sortSwiss(neutral).map((entry) => entry.teamId)).toEqual(['t3', 't1', 't2']);
+  });
+
+  it('korrigiert über die BHZ des Freilos-Teams auch die FBHZ seiner Gegner', () => {
+    const history = [...roundOne, { roundNumber: 2, teamA: ['t3'], teamB: ['t2'], scoreA: 13, scoreB: 11 }];
+    expect(byId(swissStats(three, history, 'mit_buchholz', { byeBuchholz: 'neutral' })).t2.fbhz)
+      .toBe(byId(swissStats(three, history)).t2.fbhz + 0.5);
   });
 });

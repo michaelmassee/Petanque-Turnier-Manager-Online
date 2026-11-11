@@ -1,3 +1,5 @@
+import { DISPLAY_LOCALES } from './format.js';
+
 // Vereinheitlicht die systemabhängigen Ranglisten-Formen (Spieler-, Team- und Snapshot-Einträge aus dem
 // Turnierdokument) für die Anzeige; systemabhängige Wertungskriterien bleiben erhalten. Gemeinsam genutzt von der
 // Live-Ansicht (Server) und den Ranglisten-Tabellen (Client).
@@ -85,9 +87,19 @@ export function rankingHeaderGroups(columns, tournament, t) {
   return groups;
 }
 
-/** Zellwert der Rangliste: Differenzen mit Vorzeichen (+3, −2), fehlende Werte als Gedankenstrich. */
-export function rankingValue(key, value) {
+// Buchholz-Werte mit einer Nachkommastelle wie im Hauptprojekt: der neutrale Freilos-Buchholz liefert halbe Punkte.
+const BUCHHOLZ_KEYS = new Set(['bhz', 'fbhz']);
+
+/**
+ * Zellwert der Rangliste: Differenzen mit Vorzeichen (+3, −2), Buchholz mit einer Nachkommastelle im Zahlenformat der
+ * Sprache (1,5 bzw. 1.5), fehlende Werte als Gedankenstrich.
+ */
+export function rankingValue(key, value, language = 'de') {
   if (value == null) return '—';
   if ((key === 'gameDiff' || key === 'pointsDiff') && value !== 0) return value > 0 ? `+${value}` : `−${Math.abs(value)}`;
+  if (BUCHHOLZ_KEYS.has(key)) {
+    return new Intl.NumberFormat(DISPLAY_LOCALES[language] || DISPLAY_LOCALES.de,
+      { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }).format(value);
+  }
   return String(value);
 }

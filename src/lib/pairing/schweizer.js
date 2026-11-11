@@ -34,26 +34,63 @@ function matchScores(match) {
   return scoreA == null || scoreB == null ? null : { scoreA, scoreB };
 }
 
-export function swissStats(teams, history, mode = 'mit_buchholz') {
-  const stats = new Map(teams.map((team) => [team.id, { teamId: team.id, wins: 0, pointsFor: 0, pointsAgainst: 0, opponents: [] }]));
+export const BYE_BUCHHOLZ_MODES = ['null', 'neutral'];
+
+// Buchholz-Beitrag eines Freiloses (wie FreilosBuchholz im Hauptprojekt, 03_Schweizer.md 5.1). 'null': BPV-Regel, das
+// Freilos liefert nichts. 'neutral': fiktiver Durchschnittsgegner, der gegen das eigene Team verliert und in den übrigen
+// r − 1 Runden die Hälfte gewinnt → BHZ (r − 1) / 2, FBHZ eigene Siege + (r − 1) · r / 2. r = Runden mit Ergebnis.
+export function byeBuchholz(mode, rounds) {
+  const active = mode === 'neutral' && rounds > 0;
+  return {
+    bhz: active ? (rounds - 1) / 2 : 0,
+    fbhz: (ownWins) => (active ? ownWins + ((rounds - 1) * rounds) / 2 : 0),
+  };
+}
+
+// Runde einer Partie: roundNumber (Auslosung) oder roundId (Rangliste); ohne beides zählt sie nicht als Runde.
+function roundKey(match) {
+  return match.roundNumber ?? match.roundId ?? null;
+}
+
+export function swissStats(teams, history, mode = 'mit_buchholz', { byeBuchholz: byeMode = 'null' } = {}) {
+  const stats = new Map(teams.map((team) => [team.id, { teamId: team.id, wins: 0, pointsFor: 0, pointsAgainst: 0, opponents: [], byes: 0 }]));
+  // Freilose zählen für den Buchholz nur in Runden mit mindestens einem Ergebnis (wie im Hauptprojekt): eine
+  // ausgeloste, ungespielte Runde verändert BHZ/FBHZ nicht.
+  const rounds = new Map();
+  const round = (match) => {
+    const key = roundKey(match);
+    if (key == null) return null;
+    if (!rounds.has(key)) rounds.set(key, { scored: false, byes: [] });
+    return rounds.get(key);
+  };
   for (const match of history) {
     const a = match.teamA?.[0]; const b = match.teamB?.[0];
     if (!a || !stats.has(a)) continue;
     const entryA = stats.get(a);
     const scores = matchScores(match);
-    if (!b) { entryA.wins++; entryA.pointsFor += scores.scoreA; entryA.pointsAgainst += scores.scoreB; continue; }
+    if (!b) {
+      entryA.wins++; entryA.pointsFor += scores.scoreA; entryA.pointsAgainst += scores.scoreB;
+      round(match)?.byes.push(entryA);
+      continue;
+    }
     if (!scores) continue;
     const { scoreA, scoreB } = scores;
     const entryB = stats.get(b); if (!entryB) continue;
+    const matchRound = round(match); if (matchRound) matchRound.scored = true;
     entryA.pointsFor += scoreA; entryA.pointsAgainst += scoreB;
     entryB.pointsFor += scoreB; entryB.pointsAgainst += scoreA;
     entryA.opponents.push(b); entryB.opponents.push(a);
     if (scoreA > scoreB) entryA.wins++; else if (scoreB > scoreA) entryB.wins++;
   }
+  const scoredRounds = [...rounds.values()].filter((entry) => entry.scored);
+  for (const entry of scoredRounds) for (const team of entry.byes) team.byes++;
+  const bye = byeBuchholz(byeMode, scoredRounds.length);
   const wins = (id) => stats.get(id)?.wins || 0;
-  const bhz = (entry) => entry.opponents.reduce((sum, id) => sum + wins(id), 0);
-  const fbhz = (entry) => entry.opponents.reduce((sum, id) => sum + bhz(stats.get(id)), 0);
-  return [...stats.values()].map((entry) => ({ ...entry, pointsDiff: entry.pointsFor - entry.pointsAgainst, bhz: bhz(entry), fbhz: fbhz(entry), mode }));
+  // Zweistufig ohne Rekursion: FBHZ summiert die bereits um Freilose korrigierte BHZ der Gegner.
+  const bhzById = new Map([...stats.values()].map((entry) => [entry.teamId,
+    entry.opponents.reduce((sum, id) => sum + wins(id), 0) + entry.byes * bye.bhz]));
+  const fbhz = (entry) => entry.opponents.reduce((sum, id) => sum + (bhzById.get(id) || 0), 0) + entry.byes * bye.fbhz(entry.wins);
+  return [...stats.values()].map(({ byes, ...entry }) => ({ ...entry, pointsDiff: entry.pointsFor - entry.pointsAgainst, bhz: bhzById.get(entry.teamId), fbhz: fbhz({ ...entry, byes }), mode }));
 }
 
 // Runden, in denen ein Team heruntergelost wurde (wie HerunterlosChronik im Hauptprojekt): Ein Team gilt in Runde r
@@ -161,12 +198,12 @@ function firstRound(teams) {
   return matches;
 }
 
-export function generateRound(teams, history, { mode = 'mit_buchholz' } = {}) {
+export function generateRound(teams, history, { mode = 'mit_buchholz', byeBuchholz: byeMode = 'null' } = {}) {
   if (teams.length < 6) throw new Error('Für eine Runde werden mindestens 6 Teams benötigt.');
   const played = opponentPairs(history);
   const hadBye = new Set(history.filter((match) => !match.teamB?.length).map((match) => match.teamA[0]));
   if (!history.length) return { matches: firstRound(teams) };
-  const ranked = sortSwiss(swissStats(teams, history, mode), mode);
+  const ranked = sortSwiss(swissStats(teams, history, mode, { byeBuchholz: byeMode }), mode);
   const winsById = new Map(ranked.map((entry) => [entry.teamId, entry.wins]));
   const byId = new Map(teams.map((team) => [team.id, team]));
   let ordered = ranked.map((entry) => byId.get(entry.teamId)); const matches = [];

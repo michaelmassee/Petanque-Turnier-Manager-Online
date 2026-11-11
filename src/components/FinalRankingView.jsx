@@ -37,6 +37,7 @@ export async function downloadRankingPdf({ tournament, entries, publishedAt, sha
     footer: (page, total) => `${PTM_NAME} · ptmonline.org · ${t('Seite')} ${page} / ${total}`,
     t,
     typeset: typesetFlyerText,
+    language,
   });
   const pdf = await renderFlyerPdf(pages.map(renderRankingSvg), RANKING_PAGE, { title: `${t('Endrangliste')} – ${tournament.name}` });
   saveBlob(new Blob([pdf], { type: 'application/pdf' }), rankingFileName(tournament));

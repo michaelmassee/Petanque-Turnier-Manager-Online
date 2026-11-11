@@ -91,6 +91,16 @@ describe('Ausrichtender Verein am Turnier', () => {
     expect((await response.json()).tournament.logoUrl).toBe('https://example.test/venue.png');
   });
 
+  it('legt neue und kopierte Turniere mit neutralem Freilos-Buchholz an (Issue #38)', async () => {
+    const created = await create({ type: 'schweizer' });
+    expect(created.byeBuchholz).toBe('neutral');
+    sql("UPDATE tournaments SET schweizer_bye_buchholz = 'null' WHERE id = ?", created.id);
+    const stored = env.DB.sqlite.prepare('SELECT * FROM tournaments WHERE id=?').get(created.id);
+    const copy = await duplicateTournament(env.DB, stored, { id: 'u1' });
+    expect(env.DB.sqlite.prepare('SELECT schweizer_bye_buchholz FROM tournaments WHERE id=?').get(copy.id).schweizer_bye_buchholz)
+      .toBe('neutral');
+  });
+
   it('lehnt unbekannte Veranstalter-IDs vor dem Anlegen ab', async () => {
     const response = await worker.fetch(new Request('https://ptm.test/api/tournaments', {
       method: 'POST', headers: { Cookie: 'ptm_session=session1', 'Content-Type': 'application/json' },

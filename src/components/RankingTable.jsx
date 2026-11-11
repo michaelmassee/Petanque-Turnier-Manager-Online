@@ -9,7 +9,7 @@ import { rankingColumnKeys, rankingHeaderGroups, rankingValue } from '../lib/liv
  * @param entries normalisierte Einträge (siehe normalizeRanking); `own` markiert die eigene Zeile
  */
 export function RankingTable({ tournament, entries }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const columns = rankingColumnKeys(tournament, entries);
   const groups = rankingHeaderGroups(columns, tournament, t);
   return (
@@ -29,7 +29,7 @@ export function RankingTable({ tournament, entries }) {
       <tbody>
         {entries.map((entry) => (
           <tr key={entry.registrationIds.join('-')} className={entry.own ? 'live-own-row' : undefined}>
-            {columns.map((key) => <td key={key} data-i18n-skip={key === 'label' || undefined}>{key === 'label' ? entry[key] ?? '—' : rankingValue(key, entry[key])}</td>)}
+            {columns.map((key) => <td key={key} data-i18n-skip={key === 'label' || undefined}>{key === 'label' ? entry[key] ?? '—' : rankingValue(key, entry[key], i18n.language)}</td>)}
           </tr>
         ))}
       </tbody>

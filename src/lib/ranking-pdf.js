@@ -61,11 +61,11 @@ function headerNode(groups) {
   }));
 }
 
-function tableNode(columns, groups, entries, firstIndex) {
+function tableNode(columns, groups, entries, firstIndex, language) {
   return stackNode([
     headerNode(groups),
     ...entries.map((entry, offset) => tableRow(
-      columns.map((key) => columnCell(key, rankingValue(key, entry[key]))),
+      columns.map((key) => columnCell(key, rankingValue(key, entry[key], language))),
       { background: (firstIndex + offset) % 2 === 1 ? STRIPE : null },
     )),
   ]);
@@ -85,8 +85,9 @@ function fitLogo(logo, x, y) {
  * @param header { title, name, lines: string[] } – fertig formatierte Kopfzeilen
  * @param logos { club, ptm } jeweils { dataUrl, width, height } oder null
  * @param footer (page, pages) => string
+ * @param language Sprache für das Zahlenformat (Buchholz mit einer Nachkommastelle)
  */
-export async function buildRankingPages({ tournament, entries, header, logos, footer, t, typeset }) {
+export async function buildRankingPages({ tournament, entries, header, logos, footer, t, typeset, language = 'de' }) {
   const contentWidth = RANKING_PAGE.width - 2 * MARGIN;
   const headerWidth = contentWidth - 2 * (LOGO_BOX + 4);
   const headerBlock = await typeset(stackNode([
@@ -104,10 +105,10 @@ export async function buildRankingPages({ tournament, entries, header, logos, fo
   // Zeilen je Seite: so viele wie passen; umbrechende Namen machen Zeilen höher, daher nachmessen.
   do {
     let count = Math.min(entries.length - start, 45);
-    let block = await typeset(tableNode(columns, groups, entries.slice(start, start + count), start), contentWidth);
+    let block = await typeset(tableNode(columns, groups, entries.slice(start, start + count), start, language), contentWidth);
     while (block.height > available && count > 1) {
       count = Math.max(1, Math.min(count - 1, Math.floor(count * available / block.height)));
-      block = await typeset(tableNode(columns, groups, entries.slice(start, start + count), start), contentWidth);
+      block = await typeset(tableNode(columns, groups, entries.slice(start, start + count), start, language), contentWidth);
     }
     chunks.push(block);
     start += count;

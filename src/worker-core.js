@@ -1,4 +1,5 @@
 import { MELEE_TEAM_MODES } from './lib/pairing/melee.js';
+import { BYE_BUCHHOLZ_MODES } from './lib/pairing/schweizer.js';
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
 import { sanitizeQrDesign } from './lib/qr-design.js';
@@ -473,6 +474,10 @@ export function normalizeTournamentOptions(body) {
   if (body?.meleeTeamMode !== undefined) {
     if (!MELEE_TEAM_MODES.includes(body.meleeTeamMode)) throw new HttpError(400, 'Ungültige Art der Mêlée-Teams');
     columns.melee_team_mode = body.meleeTeamMode;
+  }
+  if (body?.byeBuchholz !== undefined) {
+    if (!BYE_BUCHHOLZ_MODES.includes(body.byeBuchholz)) throw new HttpError(400, 'Ungültige Buchholz-Wertung des Freiloses');
+    columns.schweizer_bye_buchholz = body.byeBuchholz;
   }
   return columns;
 }

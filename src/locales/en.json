@@ -1992,5 +1992,10 @@
   "Nachname Spieler 1": "Last name player 1",
   "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr gelöscht werden. Bitte aktualisieren.": "The first round has been started in the meantime. Teams can no longer be deleted. Please refresh.",
   "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr neu ausgelost werden. Bitte aktualisieren.": "The first round has been started in the meantime. Teams can no longer be redrawn. Please refresh.",
-  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "The teams have been changed in the meantime. Please refresh and start the round again."
+  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "The teams have been changed in the meantime. Please refresh and start the round again.",
+  "Buchholz-Wertung des Freiloses": "Buchholz value of a bye",
+  "Neutral (fiktiver Durchschnittsgegner)": "Neutral (fictitious average opponent)",
+  "Null (BPV-Regel: 0 Buchholz)": "Zero (BPV rule: 0 Buchholz)",
+  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutral: a bye counts like an opponent with a balanced record, (rounds − 1) / 2 Buchholz per bye. Zero: no Buchholz for the bye. The ranking is recalculated immediately.",
+  "Ungültige Buchholz-Wertung des Freiloses": "Invalid Buchholz value of a bye"
 }

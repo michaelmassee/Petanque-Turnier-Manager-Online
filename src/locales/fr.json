@@ -1992,5 +1992,10 @@
   "Nachname Spieler 1": "Nom joueur 1",
   "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr gelöscht werden. Bitte aktualisieren.": "Le premier tour a été lancé entre-temps. Les équipes ne peuvent plus être supprimées. Veuillez actualiser.",
   "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr neu ausgelost werden. Bitte aktualisieren.": "Le premier tour a été lancé entre-temps. Les équipes ne peuvent plus être tirées au sort à nouveau. Veuillez actualiser.",
-  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "Les équipes ont été modifiées entre-temps. Veuillez actualiser et relancer le tour."
+  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "Les équipes ont été modifiées entre-temps. Veuillez actualiser et relancer le tour.",
+  "Buchholz-Wertung des Freiloses": "Valeur Buchholz de l'exempt",
+  "Neutral (fiktiver Durchschnittsgegner)": "Neutre (adversaire moyen fictif)",
+  "Null (BPV-Regel: 0 Buchholz)": "Zéro (règle BPV : 0 Buchholz)",
+  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutre : un exempt compte comme un adversaire au bilan équilibré, (tours − 1) / 2 Buchholz par exempt. Zéro : aucun Buchholz pour l'exempt. Le classement est recalculé immédiatement.",
+  "Ungültige Buchholz-Wertung des Freiloses": "Valeur Buchholz de l'exempt non valide"
 }

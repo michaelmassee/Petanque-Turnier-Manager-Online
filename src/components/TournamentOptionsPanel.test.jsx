@@ -36,7 +36,7 @@ describe('TournamentOptionsPanel', () => {
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(JSON.parse(authenticatedApi.mock.calls[0][1].body)).toEqual({
-      courtMode: 'R', byePointsFor: 13, byePointsAgainst: 5, teamDisplayRound: 'NAME', teamDisplayRanking: 'NR',
+      courtMode: 'R', byePointsFor: 13, byePointsAgainst: 5, teamDisplayRound: 'NAME', teamDisplayRanking: 'NR', byeBuchholz: 'null',
     });
     expect(await screen.findByText('Turnieroptionen gespeichert.')).toBeInTheDocument();
     expect(select).toHaveValue('R');
@@ -66,6 +66,21 @@ describe('TournamentOptionsPanel', () => {
 
     render(<Page tournament={{ id: 'm', type: 'schweizer', registrationType: 'melee' }} />);
     expect([...screen.getByLabelText('Mêlée-Teams').options].map((option) => option.value)).toEqual(['EINFACH', 'DOUBLETTE_OHNE_FREILOS', 'TRIPLETTE_OHNE_FREILOS']);
+  });
+
+  it('bietet die Buchholz-Wertung des Freiloses nur im Schweizer System mit Buchholz an', async () => {
+    authenticatedApi.mockImplementation(async (path, { body }) => ({ ...DEFAULT_TOURNAMENT_OPTIONS, ...JSON.parse(body) }));
+    const { unmount } = render(<Page />);
+    const select = screen.getByLabelText('Buchholz-Wertung des Freiloses');
+    expect([...select.options].map((option) => option.value)).toEqual(['neutral', 'null']);
+    fireEvent.change(select, { target: { value: 'neutral' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(authenticatedApi).toHaveBeenCalled());
+    expect(JSON.parse(authenticatedApi.mock.calls[0][1].body)).toMatchObject({ byeBuchholz: 'neutral' });
+    unmount();
+
+    render(<Page tournament={{ ...SCHWEIZER, id: 't3', schweizerRankingMode: 'ohne_buchholz' }} />);
+    expect(screen.queryByLabelText('Buchholz-Wertung des Freiloses')).toBeNull();
   });
 
   it('verwirft den ungespeicherten Entwurf beim Turnierwechsel, auch bei gleichen gespeicherten Optionen', () => {

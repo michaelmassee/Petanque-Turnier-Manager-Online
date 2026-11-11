@@ -72,6 +72,10 @@ describe('Ranglisten-Spalten (Tabelle und PDF)', () => {
     expect(rankingValue('pointsDiff', null)).toBe('—');
   });
 
+  it('zeigt Buchholz mit einer Nachkommastelle im Zahlenformat der Sprache', () => {
+    expect([rankingValue('bhz', 1.5), rankingValue('fbhz', 12), rankingValue('bhz', 2, 'en')]).toEqual(['1,5', '12,0', '2.0']);
+  });
+
   it('setzt die K.O.-Rangliste mit zweizeiligem Kopf', async () => {
     const [page] = await buildRankingPages({ tournament: { type: 'ko', name: 'K.O.' }, entries: [koEntry], header, logos: { club: null, ptm: null }, footer: () => '', t, typeset });
     expect(renderRankingSvg(page)).toContain('<path');

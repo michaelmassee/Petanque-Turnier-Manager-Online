@@ -1992,5 +1992,10 @@
   "Nachname Spieler 1": "Apellido jugador 1",
   "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr gelöscht werden. Bitte aktualisieren.": "Mientras tanto se ha iniciado la primera ronda. Los equipos ya no se pueden eliminar. Actualiza la página.",
   "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr neu ausgelost werden. Bitte aktualisieren.": "Mientras tanto se ha iniciado la primera ronda. Los equipos ya no se pueden volver a sortear. Actualiza la página.",
-  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "Mientras tanto se han modificado los equipos. Actualiza la página y vuelve a iniciar la ronda."
+  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "Mientras tanto se han modificado los equipos. Actualiza la página y vuelve a iniciar la ronda.",
+  "Buchholz-Wertung des Freiloses": "Valor Buchholz del descanso",
+  "Neutral (fiktiver Durchschnittsgegner)": "Neutral (rival medio ficticio)",
+  "Null (BPV-Regel: 0 Buchholz)": "Cero (regla BPV: 0 Buchholz)",
+  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutral: un descanso cuenta como un rival con balance equilibrado, (rondas − 1) / 2 Buchholz por descanso. Cero: sin Buchholz para el descanso. La clasificación se recalcula de inmediato.",
+  "Ungültige Buchholz-Wertung des Freiloses": "Valor Buchholz del descanso no válido"
 }

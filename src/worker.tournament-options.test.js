@@ -22,6 +22,8 @@ describe('normalizeTournamentOptions', () => {
     expect(() => normalizeTournamentOptions({ roundRobinReturn: 'ja' })).toThrow('Ungültige Einstellung Rückrunde');
     expect(normalizeTournamentOptions({ meleeTeamMode: 'TRIPLETTE_OHNE_FREILOS' })).toEqual({ melee_team_mode: 'TRIPLETTE_OHNE_FREILOS' });
     expect(() => normalizeTournamentOptions({ meleeTeamMode: 'GEMISCHT' })).toThrow('Ungültige Art der Mêlée-Teams');
+    expect(normalizeTournamentOptions({ byeBuchholz: 'neutral' })).toEqual({ schweizer_bye_buchholz: 'neutral' });
+    expect(() => normalizeTournamentOptions({ byeBuchholz: 'fide' })).toThrow('Ungültige Buchholz-Wertung des Freiloses');
   });
 });
 
@@ -67,6 +69,19 @@ describe('Turnieroptionen in der Spielverwaltung', () => {
     const { ranking } = await (await request('/api/tournaments/s/ranking?live=1')).json();
     expect(ranking.find((entry) => entry.teamId === bye().team_a_id)).toMatchObject({ wins: 1, pointsFor: 11, pointsAgainst: 3 });
     expect((await options('s', { byePointsFor: 5, byePointsAgainst: 9 })).status).toBe(400);
+  });
+
+  it('wertet den Buchholz eines Freiloses je nach Option neutral oder mit null (Issue #38)', async () => {
+    tournament('s', 'schweizer', 7);
+    expect((await nextRound('s')).status).toBe(200);
+    decideOpenMatches('s');
+    const byeTeam = rows("SELECT team_a_id FROM tournament_matches WHERE tournament_id = 's' AND team_b_registration_ids = '[]'")[0].team_a_id;
+    const byeEntry = async () => (await (await request('/api/tournaments/s/ranking?live=1')).json()).ranking.find((entry) => entry.teamId === byeTeam);
+
+    expect(rows("SELECT schweizer_bye_buchholz FROM tournaments WHERE id = 's'")[0].schweizer_bye_buchholz).toBe('null');
+    expect(await byeEntry()).toMatchObject({ wins: 1, bhz: 0, fbhz: 0 });
+    expect((await options('s', { byeBuchholz: 'neutral' })).status).toBe(200);
+    expect(await byeEntry()).toMatchObject({ wins: 1, bhz: 0, fbhz: 1 });
   });
 
   it('teilt K.O.-Teams nach Gruppengröße auf und vergibt Bahnen nur in Runde 1', async () => {

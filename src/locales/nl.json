@@ -1992,5 +1992,10 @@
   "Nachname Spieler 1": "Achternaam speler 1",
   "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr gelöscht werden. Bitte aktualisieren.": "Inmiddels is de eerste ronde gestart. Teams kunnen niet meer worden verwijderd. Vernieuw de pagina.",
   "Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr neu ausgelost werden. Bitte aktualisieren.": "Inmiddels is de eerste ronde gestart. Teams kunnen niet meer opnieuw worden geloot. Vernieuw de pagina.",
-  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "De teams zijn inmiddels gewijzigd. Vernieuw de pagina en start de ronde opnieuw."
+  "Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.": "De teams zijn inmiddels gewijzigd. Vernieuw de pagina en start de ronde opnieuw.",
+  "Buchholz-Wertung des Freiloses": "Buchholz-waarde van een vrijloting",
+  "Neutral (fiktiver Durchschnittsgegner)": "Neutraal (fictieve gemiddelde tegenstander)",
+  "Null (BPV-Regel: 0 Buchholz)": "Nul (BPV-regel: 0 Buchholz)",
+  "Neutral: Das Freilos zählt wie ein Gegner mit ausgeglichener Bilanz, je Freilos (Runden − 1) / 2 Buchholz. Null: kein Buchholz für das Freilos. Die Rangliste wird sofort neu berechnet.": "Neutraal: een vrijloting telt als een tegenstander met een evenwichtige balans, per vrijloting (rondes − 1) / 2 Buchholz. Nul: geen Buchholz voor de vrijloting. Het klassement wordt direct opnieuw berekend.",
+  "Ungültige Buchholz-Wertung des Freiloses": "Ongeldige Buchholz-waarde van een vrijloting"
 }
