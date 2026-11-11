@@ -54,7 +54,10 @@ function roundKey(match) {
 }
 
 export function swissStats(teams, history, mode = 'mit_buchholz', { byeBuchholz: byeMode = 'null' } = {}) {
-  const stats = new Map(teams.map((team) => [team.id, { teamId: team.id, wins: 0, pointsFor: 0, pointsAgainst: 0, opponents: [], byes: 0 }]));
+  // Teamnummer wie in der Anzeige (teamNumbers im Worker): feste Nummer, sonst laufende Nummer der Teamliste.
+  const stats = new Map(teams.map((team, index) => [team.id, {
+    teamId: team.id, teamNumber: team.teamNumber ?? index + 1, wins: 0, pointsFor: 0, pointsAgainst: 0, opponents: [], byes: 0,
+  }]));
   // Freilose zählen für den Buchholz nur in Runden mit mindestens einem Ergebnis (wie im Hauptprojekt): eine
   // ausgeloste, ungespielte Runde verändert BHZ/FBHZ nicht.
   const rounds = new Map();
@@ -166,10 +169,13 @@ export function orderWithDownfloats(ordered, winsById, floats, round) {
   return groups.flat();
 }
 
+// Wie SchweizerSystem.sortiereNachAuswertungskriterien im Hauptprojekt. Die Teamnummer ist kein Wertungskriterium:
+// Teams mit gleicher Wertung teilen sich den Platz (sameSwissRankingPlace); sie legt nur ihre Reihenfolge fest.
 export function sortSwiss(stats, mode = 'mit_buchholz') {
   return [...stats].sort((a, b) => b.wins - a.wins
     || (mode === 'mit_buchholz' ? b.bhz - a.bhz || b.fbhz - a.fbhz : 0)
-    || b.pointsDiff - a.pointsDiff || b.pointsFor - a.pointsFor || a.teamId.localeCompare(b.teamId));
+    || b.pointsDiff - a.pointsDiff || b.pointsFor - a.pointsFor
+    || (a.teamNumber ?? 0) - (b.teamNumber ?? 0) || a.teamId.localeCompare(b.teamId));
 }
 
 export function sameSwissRankingPlace(a, b, mode = 'mit_buchholz') {
