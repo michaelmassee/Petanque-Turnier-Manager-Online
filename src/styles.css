@@ -409,6 +409,12 @@ a.button {
   white-space: pre-line;
 }
 
+/* Mehrere Teilnehmerfragen untereinander mit demselben Abstand wie die übrigen Felder der Anmeldung. */
+.participant-questions {
+  display: grid;
+  gap: 16px;
+}
+
 /* Teilnehmerfragen werden in einer Textbox erfasst; Zeilenumbrüche bleiben sichtbar. */
 .registration-question-label {
   white-space: pre-line;
