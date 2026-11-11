@@ -639,16 +639,16 @@ describe('Kopfzeile', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Bereiche öffnen' }));
 
-    const support = screen.getByRole('region', { name: /Unterstützung/ });
+    const support = screen.getByRole('button', { name: /Unterstützung/ });
     const leftPanel = support.closest('.left-panel');
     expect(leftPanel).not.toBeNull();
     // Saisonale Deko (aria-hidden) zählt nicht als Eintrag.
     const entries = [...leftPanel.children].filter((child) => child.getAttribute('aria-hidden') !== 'true');
     expect(entries.at(-1)).toBe(support);
-    expect(within(screen.getByRole('navigation', { name: 'Hauptmenü' })).queryByRole('region', { name: /Unterstützung/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: 'Hauptmenü' })).queryByRole('button', { name: /Unterstützung/ })).not.toBeInTheDocument();
   });
 
-  it('bietet Direktüberweisung und PayPal mit Hinweis auf „Freunde und Familie“ an', async () => {
+  it('öffnet aus der Bereichsleiste einen Dialog mit Direktüberweisung und PayPal', async () => {
     const writeText = vi.fn().mockResolvedValue();
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
     try {
@@ -656,17 +656,23 @@ describe('Kopfzeile', () => {
         <AppHeader heading="Turniere" language="de" setLanguage={() => {}} menuOpen={false} onToggleMenu={() => {}} onCloseMenu={() => {}} />,
       );
       fireEvent.click(screen.getByRole('button', { name: 'Bereiche öffnen' }));
-      const support = within(screen.getByRole('region', { name: /Unterstützung/ }));
+      expect(screen.queryByText('SKGIDE5FXXX')).not.toBeInTheDocument();
 
-      expect(support.getByText('Direktüberweisung')).toBeInTheDocument();
-      expect(support.getByText('DE24 5135 0025 0043 0676 97')).toBeInTheDocument();
-      expect(support.getByText('SKGIDE5FXXX')).toBeInTheDocument();
-      expect(support.getByRole('link', { name: /paypal\.me\/michaelmassee1/ })).toHaveAttribute('href', 'https://www.paypal.com/paypalme/michaelmassee1');
-      expect(support.getByText(/Freunde und Familie/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Unterstützung/ }));
+      expect(screen.getByRole('button', { name: 'Bereiche öffnen' })).toHaveAttribute('aria-expanded', 'false');
+      const dialog = within(screen.getByRole('dialog', { name: /Unterstützung/ }));
+      expect(dialog.getByRole('heading', { name: 'Direktüberweisung' })).toBeInTheDocument();
+      expect(dialog.getByText('DE24 5135 0025 0043 0676 97')).toBeInTheDocument();
+      expect(dialog.getByText('SKGIDE5FXXX')).toBeInTheDocument();
+      expect(dialog.getByRole('link', { name: /paypal\.me\/michaelmassee1/ })).toHaveAttribute('href', 'https://www.paypal.com/paypalme/michaelmassee1');
+      expect(dialog.getByText(/Freunde und Familie/)).toBeInTheDocument();
 
-      fireEvent.click(support.getByRole('button', { name: 'IBAN kopieren' }));
-      expect(await support.findByRole('button', { name: 'IBAN kopiert' })).toBeInTheDocument();
+      fireEvent.click(dialog.getByRole('button', { name: 'IBAN kopieren' }));
+      expect(await dialog.findByRole('button', { name: 'IBAN kopiert' })).toBeInTheDocument();
       expect(writeText).toHaveBeenCalledWith('DE24513500250043067697');
+
+      fireEvent.click(dialog.getByRole('button', { name: 'Schließen' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     } finally {
       vi.unstubAllGlobals();
     }

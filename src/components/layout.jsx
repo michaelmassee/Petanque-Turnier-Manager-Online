@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ClubPicker } from './ClubPicker.jsx';
 import { authenticatedApi } from '../lib/api.js';
@@ -404,9 +405,12 @@ export function InstallAppButton() {
 
 const SUPPORT_IBAN = 'DE24 5135 0025 0043 0676 97';
 
-// Unterstützung in zwei Wegen: Direktüberweisung (gebührenfrei) und PayPal als „Freunde und Familie“.
-function SupportBox({ onPaypalClick }) {
+// Unterstützung: Kachel in der Bereichsleiste öffnet einen Dialog mit zwei Wegen, Direktüberweisung (gebührenfrei)
+// und PayPal als „Freunde und Familie“. Der Dialog liegt per Portal außerhalb der Leiste, weil diese verschoben
+// (transform) und geschlossen inert ist.
+function SupportBox({ onOpen }) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   async function copyIban() {
@@ -418,32 +422,53 @@ function SupportBox({ onPaypalClick }) {
     }
   }
 
+  function close() {
+    setOpen(false);
+    setCopied(false);
+  }
+
   return (
-    <section className="left-panel-support" aria-labelledby="left-panel-support-title">
-      <strong id="left-panel-support-title">❤️ {t('Unterstützung')}</strong>
-      <span>{t('Wenn dir der Pétanque-Turnier-Manager hilft, freue ich mich über eine Unterstützung.')}</span>
-      <div className="support-option">
-        <b>{t('Direktüberweisung')}</b>
-        <dl className="support-bank">
-          <dt>{t('Empfänger')}</dt><dd data-i18n-skip>Michael Massee</dd>
-          <dt>{t('Bank')}</dt><dd data-i18n-skip>Sparkasse Gießen</dd>
-          <dt>IBAN</dt><dd data-i18n-skip className="support-iban">{SUPPORT_IBAN}</dd>
-          <dt>BIC</dt><dd data-i18n-skip>SKGIDE5FXXX</dd>
-        </dl>
-        {navigator.clipboard?.writeText && (
-          <button className="link-button" type="button" onClick={copyIban}>
-            {copied ? t('IBAN kopiert') : t('IBAN kopieren')}
-          </button>
-        )}
-      </div>
-      <div className="support-option">
-        <b>PayPal</b>
-        <a href="https://www.paypal.com/paypalme/michaelmassee1" target="_blank" rel="noreferrer" onClick={onPaypalClick}>
-          paypal.me/michaelmassee1
-        </a>
-        <span>{t('Bitte als „Freunde und Familie“ senden, dann fallen keine Gebühren an.')}</span>
-      </div>
-    </section>
+    <>
+      <button
+        className="left-panel-support"
+        type="button"
+        onClick={() => {
+          onOpen();
+          setOpen(true);
+        }}
+      >
+        <strong>❤️ {t('Unterstützung')}</strong>
+        <span>{t('Wenn dir der Pétanque-Turnier-Manager hilft, freue ich mich über eine Unterstützung.')}</span>
+      </button>
+      {open && createPortal(
+        <EditDialog title={`❤️ ${t('Unterstützung')}`} subtitle={t('Wenn dir der Pétanque-Turnier-Manager hilft, freue ich mich über eine Unterstützung.')} onClose={close} compact>
+          <div className="support-options">
+            <section className="support-option" aria-labelledby="support-transfer-title">
+              <h3 id="support-transfer-title">{t('Direktüberweisung')}</h3>
+              <dl className="support-bank">
+                <dt>{t('Empfänger')}</dt><dd data-i18n-skip>Michael Massee</dd>
+                <dt>{t('Bank')}</dt><dd data-i18n-skip>Sparkasse Gießen</dd>
+                <dt>IBAN</dt><dd data-i18n-skip className="support-iban">{SUPPORT_IBAN}</dd>
+                <dt>BIC</dt><dd data-i18n-skip>SKGIDE5FXXX</dd>
+              </dl>
+              {navigator.clipboard?.writeText && (
+                <Button variant="secondary" onClick={copyIban}>
+                  {copied ? t('IBAN kopiert') : t('IBAN kopieren')}
+                </Button>
+              )}
+            </section>
+            <section className="support-option" aria-labelledby="support-paypal-title">
+              <h3 id="support-paypal-title">PayPal</h3>
+              <a href="https://www.paypal.com/paypalme/michaelmassee1" target="_blank" rel="noreferrer">
+                paypal.me/michaelmassee1
+              </a>
+              <p className="hint">{t('Bitte als „Freunde und Familie“ senden, dann fallen keine Gebühren an.')}</p>
+            </section>
+          </div>
+        </EditDialog>,
+        document.body,
+      )}
+    </>
   );
 }
 
@@ -633,7 +658,7 @@ export function AppHeader({ heading, headingNoTranslate, language, setLanguage, 
             {t('Admin Dashboard')}
           </button>
         )}
-        <SupportBox onPaypalClick={closeLeftPanel} />
+        <SupportBox onOpen={closeLeftPanel} />
         <AutumnGarland />
       </nav>
       {menuOpen && (

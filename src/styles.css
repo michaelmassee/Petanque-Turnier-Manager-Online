@@ -1318,13 +1318,33 @@ a.left-panel-link {
   text-align: center;
 }
 
+.left-panel-support {
+  font: inherit;
+  width: 100%;
+  cursor: pointer;
+}
+
+.left-panel-support:hover,
+.left-panel-support:focus-visible {
+  background: #ffe4e8;
+}
+
+.support-options {
+  display: grid;
+  gap: 12px;
+}
+
 .support-option {
   display: grid;
-  gap: 4px;
-  border-top: 1px solid #f2b7c0;
-  padding-top: 8px;
-  margin-top: 4px;
-  font-size: 0.85rem;
+  gap: 8px;
+  border: 1px solid #dde3ee;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.support-option h3 {
+  margin: 0;
+  font-size: 1rem;
 }
 
 .support-option a {
@@ -1333,12 +1353,15 @@ a.left-panel-link {
   overflow-wrap: anywhere;
 }
 
+.support-option .hint {
+  margin: 0;
+}
+
 .support-bank {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 2px 8px;
+  gap: 4px 12px;
   margin: 0;
-  text-align: left;
 }
 
 .support-bank dt {
@@ -1350,8 +1373,8 @@ a.left-panel-link {
   overflow-wrap: anywhere;
 }
 
-.support-option .link-button {
-  justify-self: center;
+.support-option .button {
+  justify-self: start;
 }
 
 .support-iban {
