@@ -8797,22 +8797,25 @@ async function computeLiveSnapshot(db, tournament) {
   ]);
   // Vor der ersten Runde gehört die Meldeliste zur Anzeige. Sie nutzt denselben kurzen Cache
   // und dasselbe ETag wie der Spielplan; nach der ersten Runde entfällt der zusätzliche Datenabruf.
-  const entries = !rounds.length && tournament.status !== 'finished' ? await loadScheduleEntries(db, tournament.id) : undefined;
+  const entries = !rounds.length && tournament.status !== 'finished' ? await loadScheduleEntries(db, tournament) : undefined;
   // pendingReports bleibt serverseitig: Nur die beteiligten Teams sehen ihre Meldung (resultReport der Live-Antwort).
   const content = { tournament: toLiveTournament(tournament), rounds, ranking: normalizeRanking(ranking), entries, pendingReports };
   const version = (await sha256Hex(JSON.stringify(content))).slice(0, 16);
   return { ...content, version };
 }
 
-async function loadScheduleEntries(db, tournamentId) {
-  const result = await db.prepare(`SELECT first_name, last_name, club, team_name,
+async function loadScheduleEntries(db, tournament) {
+  const numbered = usesRegistrationTeamNumbers(tournament);
+  const result = await db.prepare(`SELECT first_name, last_name, club, team_name, team_number,
       partner_first_name, partner_last_name, partner_club, partner2_first_name, partner2_last_name, partner2_club,
       user_id IS NOT NULL AS account_connected, partner_user_id IS NOT NULL AS partner_account_connected,
       partner2_user_id IS NOT NULL AS partner2_account_connected, status, participation, is_vip, vip_level
     FROM registrations WHERE tournament_id = ? AND status IN ('pending', 'confirmed', 'waitlist')
-    ORDER BY registered_at, id`).bind(tournamentId).all();
+    ORDER BY registered_at, id`).bind(tournament.id).all();
   return result.results.map((row) => ({
     status: row.status,
+    // Teamnummer wie in der Live-Ansicht, damit man sich in der Meldeliste wiederfindet.
+    teamNumber: numbered && row.team_number != null ? Number(row.team_number) : null,
     participation: row.status === 'confirmed' ? row.participation || 'inactive' : null,
     teamName: row.team_name || null,
     isVip: vipLevelOf(row) > VIP_NONE,

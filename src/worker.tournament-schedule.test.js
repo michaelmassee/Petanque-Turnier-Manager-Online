@@ -56,7 +56,7 @@ describe('Spielplan-Endpunkt (/schedule)', () => {
     const { entries } = await response.json();
     expect(entries).toHaveLength(5);
     expect(entries.find((entry) => entry.persons[0].firstName === 'Anna')).toEqual({
-      status: 'confirmed', participation: 'active', teamName: 'Team Adler', isVip: false, vipLevel: 0,
+      status: 'confirmed', participation: 'active', teamNumber: null, teamName: 'Team Adler', isVip: false, vipLevel: 0,
       persons: [
         { firstName: 'Anna', lastName: 'Adler', club: null, accountConnected: true },
         { firstName: 'Bert', lastName: 'Beispiel', club: null, accountConnected: false },
@@ -65,8 +65,18 @@ describe('Spielplan-Endpunkt (/schedule)', () => {
     expect(entries.find((entry) => entry.persons[0].firstName === 'Clara').participation).toBe('inactive');
     expect(entries.find((entry) => entry.persons[0].firstName === 'Dirk').participation).toBe('withdrawn');
     expect(entries.filter((entry) => entry.status !== 'confirmed').every((entry) => entry.participation === null)).toBe(true);
-    for (const entry of entries) expect(Object.keys(entry).sort()).toEqual(['isVip', 'participation', 'persons', 'status', 'teamName', 'vipLevel']);
+    for (const entry of entries) expect(Object.keys(entry).sort()).toEqual(['isVip', 'participation', 'persons', 'status', 'teamName', 'teamNumber', 'vipLevel']);
     expect(JSON.stringify(entries)).not.toMatch(/secret@example|partner@example|0123456789|L-123|Private Notiz|owner/);
+  });
+
+  it('liefert die feste Teamnummer nur bei online durchgeführten Formée-Turnieren', async () => {
+    sql('UPDATE tournaments SET status = ? WHERE id = ?', 'registration', 't1');
+    anmeldung('Anna', 'confirmed', 'active');
+    sql("UPDATE registrations SET team_number = 3 WHERE first_name = 'Anna'");
+    expect((await (await abrufen()).json()).entries[0].teamNumber).toBe(3);
+
+    sql("UPDATE tournaments SET registration_type = 'supermelee' WHERE id = 't1'");
+    expect((await (await abrufen()).json()).entries[0].teamNumber).toBeNull();
   });
 
   it('ändert das ETag nach Check-in, neuen Meldungen und Absagen', async () => {

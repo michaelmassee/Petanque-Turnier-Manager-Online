@@ -4936,7 +4936,8 @@ details[open] > .play-round-summary::before {
 }
 
 /* Die eigene Teamnummer muss man auf einen Blick finden (Aushang, Ansage der Turnierleitung). */
-.live-player .team-number {
+.live-player .team-number,
+.team-number.prominent {
   min-width: 2em;
   margin-right: 10px;
   padding: 2px 10px;
@@ -4945,6 +4946,9 @@ details[open] > .play-round-summary::before {
   font-size: 1.5em;
   vertical-align: middle;
 }
+
+/* In der Meldeliste etwas kleiner, damit die Zeilen flach bleiben. */
+.board-entry .team-number.prominent { margin-right: 0; font-size: 1.15em; }
 
 .live-card-head {
   display: flex;

@@ -8,6 +8,8 @@ import { AccountBadge, VipBadge } from './ui.jsx';
 export function TournamentEntryList({ entries, scrollRef }) {
   const { t } = useTranslation();
   const confirmed = entries.filter((entry) => entry.status === 'confirmed');
+  // Mit festen Teamnummern (Formée, online durchgeführt) steht vorne die Teamnummer statt der laufenden Nummer.
+  const hasTeamNumbers = entries.some((entry) => entry.teamNumber != null);
   const checkedIn = confirmed.filter((entry) => entry.participation === 'active').length;
   const checkInLabel = (entry) => entry.participation === 'active' ? t('Eingecheckt.')
     : entry.participation === 'withdrawn' ? t('Ausgesetzt') : t('Noch nicht eingecheckt.');
@@ -22,7 +24,10 @@ export function TournamentEntryList({ entries, scrollRef }) {
         {!entries.length ? <p className="muted">{t('Noch keine Anmeldungen.')}</p> : (
           <ol className="board-entry-list">
             {entries.map((entry, index) => <li className="board-entry" key={index}>
-              <span className="board-entry-number" aria-label={`${t('Lfd.-Nr.')} ${index + 1}`}>{index + 1}</span>
+              {hasTeamNumbers
+                ? <span className="board-entry-number">{entry.teamNumber != null
+                  && <span className="team-number prominent" title={t('Teamnummer')} aria-label={`${t('Teamnummer')} ${entry.teamNumber}`}>{entry.teamNumber}</span>}</span>
+                : <span className="board-entry-number" aria-label={`${t('Lfd.-Nr.')} ${index + 1}`}>{index + 1}</span>}
               <div className="board-entry-players">
                 {entry.teamName && <strong className="board-entry-team" data-i18n-skip>{entry.teamName}</strong>}
                 {entry.persons.map((person, personIndex) => <div className="board-entry-person" key={personIndex} data-i18n-skip>

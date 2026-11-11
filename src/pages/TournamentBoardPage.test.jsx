@@ -125,6 +125,17 @@ describe('Turnierseite', () => {
     expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t1/schedule', expect.anything());
   });
 
+  it('zeigt mit festen Teamnummern die Teamnummer statt der laufenden Nummer', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ status: 'registration', rounds: [], ranking: [], entries: [
+      { status: 'confirmed', participation: 'active', teamNumber: 7, persons: [{ firstName: 'Anna', lastName: 'Muster' }] },
+      { status: 'pending', participation: null, teamNumber: null, persons: [{ firstName: 'Bert', lastName: 'Muster' }] },
+    ] })));
+    renderBoard(tournamentWith({ status: 'registration' }));
+    const list = await screen.findByRole('region', { name: 'Meldeliste' });
+    expect(within(list).getByLabelText('Teamnummer 7')).toHaveTextContent('7');
+    expect(within(list).queryByLabelText(/Lfd\.-Nr\./)).not.toBeInTheDocument();
+  });
+
   it('aktualisiert Check-in über den Spielplan-Abruf und wechselt bei der ersten Runde automatisch zum Spielplan', async () => {
     const entry = { status: 'confirmed', participation: 'inactive', persons: [{ firstName: 'Anna', lastName: 'Muster' }] };
     let data = { status: 'registration', rounds: [], ranking: [], entries: [entry] };
