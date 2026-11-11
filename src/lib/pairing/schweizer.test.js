@@ -135,7 +135,7 @@ describe('Schweizer Herunterlosen', () => {
   const ids = (teams) => teams.map((team) => team.id);
   const floaterFromTop = (floats, round) => orderWithDownfloats(eight, winsThreeAndFive, new Map(Object.entries(floats)), round)[2].id;
 
-  it('erkennt Herunterlosen am Siegstand vor der Runde, Freilos und gleiche Siege zählen nicht', () => {
+  it('erkennt Herunterlosen am Siegstand vor der Runde, Freilos zählt, gleiche Siege zählen nicht', () => {
     const history = [
       { roundNumber: 1, teamA: ['t1'], teamB: ['t2'], scoreA: 13, scoreB: 5 },
       { roundNumber: 1, teamA: ['t3'], teamB: ['t4'], scoreA: 13, scoreB: 5 },
@@ -144,7 +144,7 @@ describe('Schweizer Herunterlosen', () => {
       { roundNumber: 2, teamA: ['t5'], teamB: ['t2'], scoreA: 4, scoreB: 13 },
       { roundNumber: 2, teamA: ['t4'], teamB: [] },
     ];
-    expect(Object.fromEntries(downfloatRounds(history))).toEqual({ t5: [2] });
+    expect(Object.fromEntries(downfloatRounds(history))).toEqual({ t5: [1, 2], t4: [2] });
   });
 
   it('liefert ohne roundNumber keine Historie', () => {
@@ -173,6 +173,22 @@ describe('Schweizer Herunterlosen', () => {
 
   it('nimmt bei Gleichstand das rangniedrigste Team', () => {
     expect(floaterFromTop({ t1: [1], t2: [1], t3: [1] }, 4)).toBe('t3');
+  });
+
+  // Issue #38, gleicher Fall wie SchweizerSystemTest im Hauptprojekt.
+  it('lost das Freilos-Team der Vorrunde nicht herunter', () => {
+    const nine = Array.from({ length: 9 }, (_, index) => ({ id: `t${index + 1}` }));
+    const history = [
+      ...[[1, 6], [2, 7], [3, 8], [4, 9]].map(([a, b]) => ({ roundNumber: 1, teamA: [`t${a}`], teamB: [`t${b}`], scoreA: 13, scoreB: 5 })),
+      { roundNumber: 1, teamA: ['t5'], teamB: [] },
+    ];
+    const { matches } = generateRound(nine, history);
+    const opponent = (id) => {
+      const match = matches.find((entry) => entry.teamB.length && (entry.teamA[0] === id || entry.teamB[0] === id));
+      return match.teamA[0] === id ? match.teamB[0] : match.teamA[0];
+    };
+    expect(['t1', 't2', 't3']).toContain(opponent('t5'));
+    expect(['t6', 't7', 't8']).toContain(opponent('t4'));
   });
 
   it('lost einen eingehenden Floater nicht gleich weiter herunter', () => {

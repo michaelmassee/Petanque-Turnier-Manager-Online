@@ -58,7 +58,9 @@ export function swissStats(teams, history, mode = 'mit_buchholz') {
 
 // Runden, in denen ein Team heruntergelost wurde (wie HerunterlosChronik im Hauptprojekt): Ein Team gilt in Runde r
 // als heruntergelost, wenn sein Gegner vor Runde r weniger Siege hatte. Maßgeblich ist die Paarung, nicht das
-// Ergebnis; Freilose zählen nicht. Partien ohne roundNumber liefern keine Historie.
+// Ergebnis. Ein Freilos zählt wie eine Herunterlosung (Issue #38): Das Freilos-Team steht mangels Gegner (BHZ/FBHZ 0)
+// am Ende seiner Sieggruppe und würde sonst in der Folgerunde bevorzugt heruntergelost. Partien ohne roundNumber
+// liefern keine Historie.
 export function downfloatRounds(history) {
   const rounds = new Map();
   for (const match of history) {
@@ -70,7 +72,8 @@ export function downfloatRounds(history) {
   for (const [round, matches] of [...rounds].sort(([a], [b]) => a - b)) {
     for (const match of matches) {
       const a = match.teamA?.[0]; const b = match.teamB?.[0];
-      if (!a || !b) continue;
+      if (!a) continue;
+      if (!b) { note(a, round); continue; }
       const winsA = wins.get(a) || 0; const winsB = wins.get(b) || 0;
       if (winsA > winsB) note(a, round); else if (winsB > winsA) note(b, round);
     }
