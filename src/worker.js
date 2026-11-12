@@ -66,7 +66,7 @@ import { checkRoundRequirements, getPairingStrategy, isMeleeTeamTournament, isOn
 import { buildMeleeTeams, buildMeleeTeamsWithoutBye, duplicateMeleeNames, isMixedMeleeMode, meleeTeamSize, usablePlayersWithoutBye } from './lib/pairing/melee.js';
 import { competitionRanks, computeRanking, computeSupermeleeRanking, sameStandardRankingPlace } from './lib/pairing/ranking.js';
 import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schweizer.js';
-import { formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
+import { formuleXRoundsPlayed, formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
 import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
 import { normalizeVipLevel, VIP_MAX_LEVEL, VIP_NONE, vipLevelOf } from './lib/vip.js';
@@ -8820,11 +8820,11 @@ export async function computeTournamentRanking(db, tournament) {
     const teamsById = new Map(teams.map((team) => [team.id, team]));
     const formuleXMatches = matchesResult.results.map((row) => ({
       teamA: row.team_a_id ? [row.team_a_id] : [], teamB: row.team_b_id ? [row.team_b_id] : [], scoreA: row.score_a, scoreB: row.score_b, noShow: row.no_show,
+      roundId: row.round_id,
     }));
-    // Siegaufschlag hängt von den bisher gespielten Runden ab (siehe formulex.js) -
-    // pro erzeugter Runde entsteht konstant pairingsPerRound(teams.length) Matches.
-    const perRound = Math.ceil(teams.length / 2);
-    const roundsPlayed = perRound ? Math.floor(formuleXMatches.length / perRound) : 0;
+    // Siegaufschlag hängt von den bisher gespielten Runden ab (siehe formulex.js); gezählt werden die Runden selbst,
+    // weil nach Mêlée-Nachmeldungen die Partienzahl je Runde wächst.
+    const roundsPlayed = formuleXRoundsPlayed(formuleXMatches, teams.length);
     const playersById = await getPlayersById(db, tournament.id);
     const ranking = competitionRanks(sortFormuleX(formuleXStats(teams, formuleXMatches, roundsPlayed)), sameFormuleXRankingPlace);
     return withRankingLabels(tournament, teams, ranking.map((entry) => ({

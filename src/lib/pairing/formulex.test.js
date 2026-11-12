@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  checkRequirements, findByeTeam, formuleXStats, generateRound, getSiegaufschlag,
+  checkRequirements, findByeTeam, formuleXRoundsPlayed, formuleXStats, generateRound, getSiegaufschlag,
   pairByRanking, sameFormuleXRankingPlace, sortFormuleX,
 } from './formulex.js';
 import { checkRoundRequirements, roundRequirementMessage } from './index.js';
@@ -331,5 +331,33 @@ describe('Formule X - Voraussetzungen und Rundenende', () => {
     const teams = teamsOf(4);
     const history = Array.from({ length: 2 * 4 }, (_, i) => ({ teamA: [teams[i % 4].id], teamB: [teams[(i + 1) % 4].id], scoreA: 13, scoreB: 5 }));
     expect(generateRound(teams, history).matches).toHaveLength(2);
+  });
+});
+
+describe('Formule X: gespielte Runden nach Mêlée-Nachmeldungen', () => {
+  // Vier Teams über vier Runden (je 2 Partien), danach sechs Teams und Runde fünf (3 Partien): 11 Partien.
+  const history = [
+    ...[1, 2, 3, 4].flatMap((round) => [
+      { teamA: ['t1'], teamB: [`t${round === 1 ? 2 : round === 2 ? 3 : round === 3 ? 4 : 2}`], scoreA: 13, scoreB: 0, roundNumber: round },
+      { teamA: ['t5'], teamB: ['t6'], scoreA: 13, scoreB: 13, roundNumber: round },
+    ]),
+    { teamA: ['t1'], teamB: ['t3'], scoreA: 13, scoreB: 0, roundNumber: 5 },
+    { teamA: ['t2'], teamB: ['t4'], scoreA: 13, scoreB: 0, roundNumber: 5 },
+    { teamA: ['t5'], teamB: ['t6'], scoreA: 13, scoreB: 13, roundNumber: 5 },
+  ];
+
+  it('zählt die Runden selbst statt Partien geteilt durch die aktuelle Partienzahl je Runde', () => {
+    expect(formuleXRoundsPlayed(history, 6)).toBe(5);
+    expect(formuleXRoundsPlayed(history.map((match) => ({ ...match, roundNumber: undefined, roundId: `r${match.roundNumber}` })), 6)).toBe(5);
+  });
+
+  it('wertet fünf Siege mit dem Siegaufschlag ab Runde fünf', () => {
+    const stats = formuleXStats(teamsOf(6), history, formuleXRoundsPlayed(history, 6));
+    expect(stats.find((entry) => entry.teamId === 't1').wertung).toBe(5 * (200 + 13 + 13));
+  });
+
+  it('schätzt ohne Rundenangabe wie bisher über die Partien je Runde', () => {
+    expect(formuleXRoundsPlayed([{ teamA: ['t1'], teamB: ['t2'] }, { teamA: ['t3'], teamB: ['t4'] }], 4)).toBe(1);
+    expect(formuleXRoundsPlayed([], 4)).toBe(0);
   });
 });

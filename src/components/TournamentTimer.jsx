@@ -168,6 +168,11 @@ export function TimerEditor({ tournament, saved = null, onSaved }) {
   const durationSec = parseTimerDuration(duration);
   const remaining = useTimerRemaining(timer);
   const expired = timer?.state === 'running' && remaining === 0;
+  // Trifft die Antwort eines früheren Editors desselben Turniers erst nach der Rückkehr ein (A → B → A), kommt ihr
+  // Stand über saved an; diesen übernehmen, sonst bliebe ein laufender Timer unsichtbar.
+  useEffect(() => {
+    if (saved) setTimer(saved.timer || null);
+  }, [saved]);
   // Eine Antwort, die erst nach einem Turnierwechsel eintrifft, darf nur den Stand ihres eigenen Turniers ändern.
   const mountedRef = useRef(true);
   useEffect(() => {

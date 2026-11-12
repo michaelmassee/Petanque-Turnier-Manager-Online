@@ -95,6 +95,19 @@ describe('Rundenzeit-Timer (Frontend)', () => {
     expect(screen.getByText('10:00')).toBeTruthy();
   });
 
+  it('zeigt den Timer, wenn die Antwort erst nach schneller Rückkehr (A → B → A) eintrifft', async () => {
+    let resolve;
+    authenticatedApi.mockReturnValue(new Promise((done) => { resolve = done; }));
+    render(<Wechsel tournaments={zweiTurniere} />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Timer starten' })); });
+    fireEvent.click(screen.getByRole('button', { name: 'Wähle b' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Wähle a' }));
+    await act(async () => { resolve({ timer: { state: 'running', label: '', endsAt: new Date(NOW + 600000).toISOString() }, settings: null }); });
+
+    expect(screen.getByRole('button', { name: 'Anhalten' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Neu starten' })).toBeTruthy();
+  });
+
   it('übernimmt eine verspätete Antwort nicht in den Timer des neu gewählten Turniers', async () => {
     let resolve;
     authenticatedApi.mockReturnValue(new Promise((done) => { resolve = done; }));

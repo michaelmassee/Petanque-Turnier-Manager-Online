@@ -149,13 +149,23 @@ function firstRound(teams) {
   return [...matches.filter((match) => match.teamB.length), ...matches.filter((match) => !match.teamB.length)];
 }
 
-// history: bisherige Matches dieses Turniers ({ teamA: [teamId], teamB: [teamId], scoreA, scoreB, noShow }).
+// Gespielte Runden für den Siegaufschlag: die verschiedenen Runden der Matches (roundNumber bzw. roundId). Partien
+// geteilt durch die aktuelle Partienzahl je Runde stimmt nicht mehr, sobald nach Turnierstart Teams dazukommen
+// (Mêlée-Nachzügler). Nur ohne Rundenangabe bleibt diese Schätzung als Rückfall.
+export function formuleXRoundsPlayed(history, teamCount) {
+  if (!history?.length) return 0;
+  const rounds = history.map((match) => match.roundNumber ?? match.roundId);
+  if (rounds.every((round) => round !== undefined && round !== null)) return new Set(rounds).size;
+  const perRound = pairingsPerRound(teamCount);
+  return perRound ? Math.floor(history.length / perRound) : 0;
+}
+
+// history: bisherige Matches dieses Turniers ({ teamA: [teamId], teamB: [teamId], scoreA, scoreB, noShow, roundNumber }).
 export function generateRound(teams, history) {
   if (teams.length < 2) {
     throw new Error('Für eine Runde werden mindestens 2 Teams benötigt.');
   }
-  const perRound = pairingsPerRound(teams.length);
-  const roundsPlayed = Math.floor((history?.length || 0) / perRound);
+  const roundsPlayed = formuleXRoundsPlayed(history, teams.length);
 
   if (!history?.length) {
     return { matches: firstRound(teams) };
