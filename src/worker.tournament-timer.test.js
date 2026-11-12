@@ -74,6 +74,19 @@ describe('Rundenzeit-Timer', () => {
     expect((await (await steuern({ action: 'stop' })).json()).revision).toBe(4);
   });
 
+  it('schickt bei einem Zustandskonflikt den aktuellen Timer mit', async () => {
+    await steuern({ action: 'start', durationSec: 600, label: 'Runde 1' });
+    await steuern({ action: 'stop' });
+    const response = await steuern({ action: 'pause' });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'Der Timer läuft nicht.', details: { timer: null, revision: 2 } });
+
+    await steuern({ action: 'start', durationSec: 300 });
+    const resumed = await steuern({ action: 'resume' });
+    expect(resumed.status).toBe(409);
+    expect((await resumed.json()).details).toEqual({ timer: expect.objectContaining({ state: 'running', durationSec: 300 }), revision: 3 });
+  });
+
   it('pausiert mit Restzeit, setzt fort, passt die Zeit an und stoppt mit Vorbelegung', async () => {
     await steuern({ action: 'start', durationSec: 600, label: 'Runde 1' });
     vi.setSystemTime(NOW + 100_000);

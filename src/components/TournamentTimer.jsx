@@ -203,6 +203,13 @@ export function TimerEditor({ tournament, saved = null, onSaved }) {
       showIfNewer(data);
       if (successMessage) setMessage(successMessage);
     } catch (requestError) {
+      // Bei einem Zustandskonflikt schickt der Server den aktuellen Timer mit (z. B. von einem anderen Gerät gestoppt).
+      const details = requestError.payload?.details;
+      if (details && 'timer' in details) {
+        const current = { timer: details.timer || null, settings: null, revision: Number(details.revision) || 0 };
+        onSaved?.(tournamentId, current);
+        if (mountedRef.current) showIfNewer(current);
+      }
       if (mountedRef.current) setError(requestError.message);
     } finally {
       if (mountedRef.current) setBusy('');

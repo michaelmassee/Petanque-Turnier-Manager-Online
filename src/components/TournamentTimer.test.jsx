@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import '../lib/i18next-config.js';
-import { authenticatedApi } from '../lib/api.js';
+import { ApiError, authenticatedApi } from '../lib/api.js';
 import { formatTimerSeconds, parseTimerDuration, TimerBanner, TimerEditor } from './TournamentTimer.jsx';
 
-vi.mock('../lib/api.js', () => ({ authenticatedApi: vi.fn() }));
+vi.mock('../lib/api.js', async (importOriginal) => ({ ...(await importOriginal()), authenticatedApi: vi.fn() }));
 
 const NOW = Date.parse('2099-09-28T10:00:00.000Z');
 
@@ -143,6 +143,15 @@ describe('Rundenzeit-Timer (Frontend)', () => {
     expect(screen.queryByRole('button', { name: 'Anhalten' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Wähle a' }));
     expect(screen.getByRole('button', { name: 'Anhalten' })).toBeTruthy();
+  });
+
+  it('übernimmt bei einem Konflikt den aktuellen Stand, etwa einen auf einem anderen Gerät gestoppten Timer', async () => {
+    authenticatedApi.mockRejectedValue(new ApiError('Der Timer läuft nicht.', { status: 409, payload: { error: 'Der Timer läuft nicht.', details: { timer: null, revision: 4 } } }));
+    render(<TimerEditor tournament={{ id: 't1', timer: { state: 'running', label: '', endsAt: new Date(NOW + 60000).toISOString() } }} />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Anhalten' })); });
+    expect(screen.getByRole('alert').textContent).toContain('Der Timer läuft nicht.');
+    expect(screen.queryByRole('button', { name: 'Anhalten' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Timer starten' })).toBeTruthy();
   });
 
   it('zeigt Serverfehler über Feedback', async () => {

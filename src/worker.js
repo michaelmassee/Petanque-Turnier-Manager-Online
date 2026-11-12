@@ -7184,7 +7184,18 @@ async function updateTournamentTimer(request, env, tournament) {
     // revision zählt jede gespeicherte Änderung hoch (dank der Bedingung unten in Speicherreihenfolge); die Verwaltung
     // erkennt daran eine verspätet eintreffende ältere Antwort.
     const revision = (Number(current.revision) || 0) + 1;
-    const timerJson = JSON.stringify({ ...nextTournamentTimer(body, current, nowMs), revision });
+    let next;
+    try {
+      next = nextTournamentTimer(body, current, nowMs);
+    } catch (error) {
+      // Zustandskonflikt (z. B. „Anhalten“, obwohl ein anderes Gerät den Timer schon gestoppt hat): den aktuellen
+      // Stand mitschicken, damit die Verwaltung ihre veraltete Anzeige berichtigt.
+      if (error instanceof HttpError && error.status === 409) {
+        throw new HttpError(409, error.message, { ...(error.details || {}), timer: tournamentTimer(row), revision: revision - 1 });
+      }
+      throw error;
+    }
+    const timerJson = JSON.stringify({ ...next, revision });
     const result = await env.DB.prepare('UPDATE tournaments SET timer = ?, updated_at = ? WHERE id = ? AND timer IS ?')
       .bind(timerJson, new Date(nowMs).toISOString(), tournament.id, row.timer ?? null).run();
     if (Number(result.meta?.changes || 0)) {
