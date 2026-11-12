@@ -87,6 +87,33 @@ describe('Cron-Wartung', () => {
     expect(row("SELECT status FROM tournaments WHERE id = 'old'").status).toBe('running');
   });
 
+  it('beendet ein vom Turnierdokument wieder gesetztes Turnier nicht erneut und schreibt nur einmal ins Postfach', async () => {
+    const hoursAgo = (hours) => new Date(scheduledTime - hours * 3600000).toISOString();
+    sql(`INSERT INTO tournaments (id, owner_id, name, date, start_time, location, formation, status, started_at, document_managed,
+        desktop_execution, last_sync_write_at, visibility, created_at, updated_at)
+      VALUES ('doc', 'owner', 'Dokumentturnier', '2026-10-01', '10:00', 'Ort', 'tete', 'running', '2026-10-01T08:00:00.000Z', 1, 1, ?,
+             'private', '2026-10-01', '2026-10-01'),
+             ('aktiv', 'owner', 'Dokument synct noch', '2026-10-01', '10:00', 'Ort', 'tete', 'running', '2026-10-01T08:00:00.000Z', 1, 1, ?,
+             'private', '2026-10-01', '2026-10-01')`, hoursAgo(49), hoursAgo(1));
+    const messages = () => row("SELECT COUNT(*) AS count FROM postbox_messages WHERE recipient_id = 'owner'").count;
+
+    vi.useFakeTimers({ toFake: ['Date'], now: scheduledTime });
+    try {
+      await runCron();
+      expect(row("SELECT status FROM tournaments WHERE id = 'doc'").status).toBe('finished');
+      expect(row("SELECT status FROM tournaments WHERE id = 'aktiv'").status).toBe('running');
+      expect(messages()).toBe(1);
+
+      // Metadaten-Sync aus dem Dokument (executeSyncWrite + syncPutTournamentMetadata): Status wieder „läuft“,
+      // last_sync_write_at = jetzt.
+      sql("UPDATE tournaments SET status = 'running', last_sync_write_at = ? WHERE id = 'doc'", new Date(scheduledTime).toISOString());
+      await runCron();
+    } finally { vi.useRealTimers(); }
+
+    expect(row("SELECT status FROM tournaments WHERE id = 'doc'").status).toBe('running');
+    expect(messages()).toBe(1);
+  });
+
   it('lässt Turniere innerhalb der 48 Stunden unverändert', async () => {
     // Uhr auf scheduledTime 2026-10-23T01:00Z: Beginn 21.10. 10:00 Berlin liegt 41 Stunden zurück.
     vi.useFakeTimers({ toFake: ['Date'], now: scheduledTime });

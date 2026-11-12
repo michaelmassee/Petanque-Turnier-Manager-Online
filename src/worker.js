@@ -1651,16 +1651,23 @@ export function registrationClosesAtUtcIso(tournament) {
  * Turnierleitung bekommt dazu eine Nachricht ins Postfach. Daten bleiben unverändert; ein späterer Metadaten-Sync aus dem Turnierdokument kann
  * den Status wieder setzen.
  */
+// Bezugszeit des Auto-Beendens. Mit tatsächlichem Start zählt nur dieser, nicht das Datum: Eine Wiederaufnahme setzt
+// started_at neu, sonst schlösse der nächste Lauf ein Tage später wieder aufgenommenes Turnier sofort wieder.
+// Ein Schreibzugriff des Turnierdokuments (last_sync_write_at) ist ein Lebenszeichen: Das Dokument führt den Status,
+// ein Metadaten-Sync setzt ein automatisch beendetes Turnier wieder auf seinen Stand. Ohne diese Regel beendete der
+// Cron es danach sofort wieder und schickte der Turnierleitung jedes Mal eine neue Postfach-Nachricht.
+function staleReferenceUtcIso(row) {
+  const start = row.status === 'running' && row.started_at ? row.started_at : tournamentStartUtcIso(row);
+  const sync = row.last_sync_write_at;
+  return sync && Date.parse(sync) > Date.parse(start) ? sync : start;
+}
+
 async function finishStaleTournaments(env, now = new Date()) {
   const db = env.DB;
-  const candidates = await db.prepare(`SELECT id, name, owner_id, date, start_time, timezone, status, started_at FROM tournaments
-      WHERE status IN ('running', 'registration') AND (date <= ? OR (status = 'running' AND started_at <= ?))`)
+  const candidates = await db.prepare(`SELECT id, name, owner_id, date, start_time, timezone, status, started_at, last_sync_write_at
+      FROM tournaments WHERE status IN ('running', 'registration') AND (date <= ? OR (status = 'running' AND started_at <= ?))`)
     .bind(dateDaysAgo(1, now), new Date(now.getTime() - STALE_TOURNAMENT_HOURS * 3600000).toISOString()).all();
-  // Mit tatsächlichem Start zählt nur dieser, nicht das Datum: Eine Wiederaufnahme setzt started_at neu, sonst schlösse
-  // der nächste Lauf ein Tage später wieder aufgenommenes Turnier sofort wieder.
-  const stale = (candidates.results || []).filter((row) => (row.status === 'running' && row.started_at
-    ? isTournamentStale(row.started_at, now)
-    : isTournamentStale(tournamentStartUtcIso(row), now)));
+  const stale = (candidates.results || []).filter((row) => isTournamentStale(staleReferenceUtcIso(row), now));
   if (stale.length === 0) return;
   const statement = db.prepare("UPDATE tournaments SET status = 'finished', updated_at = ? WHERE id = ? AND status IN ('running', 'registration')");
   const results = await db.batch(stale.map((row) => statement.bind(now.toISOString(), row.id)));
