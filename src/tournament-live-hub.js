@@ -1,11 +1,18 @@
 // Sofort-Aktualisierung offener Turnierseiten, Anzeigen und Live-Ansichten: ein Durable Object je Turnier hält die
 // WebSockets im Ruhezustand (Hibernation, kostet keine Laufzeit) und meldet nach jedem Schreibzugriff nur "changed".
 // Die Seiten laden dann über den gewohnten Abruf (ETag/Edge-Cache) neu, über den Socket gehen keine Turnierdaten.
+// Das Signal nennt die Quelle der Änderung: Das verbundene Turnierdokument (PTM) erkennt daran das Echo seiner eigenen
+// Schreibaufträge (source 'document') und lädt nur bei Änderungen aus PTM Online nach (source 'online').
 // Wie RegistrationOpeningScheduler ohne cloudflare:workers-Import, damit die Klasse in Node testbar bleibt.
 
 // Obergrenze je Turnier; darüber bleibt die Seite beim regelmäßigen Abruf.
 export const MAX_LIVE_SOCKETS_PER_TOURNAMENT = 500;
-export const LIVE_SOCKET_CHANGED_MESSAGE = JSON.stringify({ type: 'changed' });
+export const CHANGE_SOURCE_DOCUMENT = 'document';
+export const CHANGE_SOURCE_ONLINE = 'online';
+
+export function liveSocketChangedMessage(source) {
+  return JSON.stringify({ type: 'changed', source: source === CHANGE_SOURCE_DOCUMENT ? CHANGE_SOURCE_DOCUMENT : CHANGE_SOURCE_ONLINE });
+}
 
 export class TournamentLiveHub {
   constructor(ctx, env) {
@@ -24,10 +31,12 @@ export class TournamentLiveHub {
       if (this.ctx.getWebSockets().length > MAX_LIVE_SOCKETS_PER_TOURNAMENT) server.close(1013, 'Too many connections');
       return new Response(null, { status: 101, webSocket: client });
     }
-    if (request.method === 'POST' && new URL(request.url).pathname === '/notify') {
+    const url = new URL(request.url);
+    if (request.method === 'POST' && url.pathname === '/notify') {
+      const message = liveSocketChangedMessage(url.searchParams.get('source'));
       for (const socket of this.ctx.getWebSockets()) {
         try {
-          socket.send(LIVE_SOCKET_CHANGED_MESSAGE);
+          socket.send(message);
         } catch {
           // Gerade geschlossene Verbindung: Der Client verbindet sich selbst neu.
         }
@@ -58,11 +67,11 @@ export class TournamentLiveHub {
 }
 
 // Meldet dem Hub eines Turniers eine Änderung. Fehler dürfen den Schreibzugriff nie scheitern lassen.
-export async function notifyTournamentChanged(env, tournamentId) {
+export async function notifyTournamentChanged(env, tournamentId, source = CHANGE_SOURCE_ONLINE) {
   if (!env?.TOURNAMENT_LIVE_HUB || !tournamentId) return;
   try {
     const stub = env.TOURNAMENT_LIVE_HUB.get(env.TOURNAMENT_LIVE_HUB.idFromName(String(tournamentId)));
-    await stub.fetch('https://live-hub/notify', { method: 'POST' });
+    await stub.fetch(`https://live-hub/notify?source=${encodeURIComponent(source)}`, { method: 'POST' });
   } catch (error) {
     console.error(`Failed to notify live hub for tournament ${tournamentId}`, error);
   }

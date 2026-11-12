@@ -6,7 +6,7 @@ import { cleanupReadPostboxMessages, DEFAULT_POSTBOX_READ_RETENTION_DAYS } from 
 import { buildAdminPostboxEmail } from './admin-postbox-email.js';
 import { REGISTRATION_OPENED_EVENT, OPENING_MESSAGES, synchronizeOpeningSchedule } from './registration-opening.js';
 export { RegistrationOpeningScheduler } from './registration-opening.js';
-import { connectTournamentLiveSocket, notifyTournamentChanged } from './tournament-live-hub.js';
+import { CHANGE_SOURCE_DOCUMENT, CHANGE_SOURCE_ONLINE, connectTournamentLiveSocket, notifyTournamentChanged } from './tournament-live-hub.js';
 export { TournamentLiveHub } from './tournament-live-hub.js';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
 import {
@@ -3400,6 +3400,17 @@ export default {
         });
       }
 
+      // Sofort-Signal für das verbundene Turnierdokument: nur das aktuell gebundene Dokument (Lease), keine Kopie.
+      const syncSocketMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/socket$/);
+      if (syncSocketMatch && request.method === 'GET') {
+        assertLiveSocketRequest(request, url);
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncSocketMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        await requireSyncLease(request, tournament);
+        return await connectTournamentLiveSocket(env, tournament.id, request);
+      }
+
       const syncResultReportsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/result-reports$/);
       if (syncResultReportsMatch && request.method === 'GET') {
         const auth = await requireApiKey(request, env.DB);
@@ -3499,7 +3510,9 @@ export default {
     const changedTournamentId = writtenTournament ? decodeURIComponent(writtenTournament[1]) : response.ok ? registrationTournamentId : null;
     if (changedTournamentId) {
       await invalidateLiveSnapshot(url.origin, changedTournamentId);
-      await notifyTournamentChanged(env, changedTournamentId);
+      // Schreibaufträge des Turnierdokuments als solche kennzeichnen, damit PTM sein eigenes Echo überspringt.
+      const source = url.pathname.startsWith('/api/sync/') ? CHANGE_SOURCE_DOCUMENT : CHANGE_SOURCE_ONLINE;
+      await notifyTournamentChanged(env, changedTournamentId, source);
     }
     if (response.ok && request.method !== 'GET' && env.REGISTRATION_OPENING_SCHEDULER
       && (/^\/api\/(?:sync\/)?tournaments(?:\/[^/]+(?:\/(?:metadata|publication|registration-closed|start|reset))?)?$/.test(url.pathname)
