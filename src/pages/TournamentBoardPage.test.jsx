@@ -172,6 +172,24 @@ describe('Turnierseite', () => {
     }
   });
 
+  it('nimmt den Timer aus dem Spielplan-Abruf, nicht aus der Turnierliste', async () => {
+    const stale = { state: 'running', label: 'Alt', endsAt: '2099-06-01T12:00:00.000Z' };
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({
+      status: 'running', rounds: [], ranking: [], dataAsOf: null, timer: { state: 'paused', label: 'Runde 2', remainingSec: 754 },
+    })));
+    renderBoard(tournamentWith({ timer: stale }));
+    expect(await screen.findByText('Runde 2')).toBeInTheDocument();
+    expect(screen.getByText('12:34')).toBeInTheDocument();
+    expect(screen.queryByText('Alt')).not.toBeInTheDocument();
+  });
+
+  it('zeigt ohne sichtbaren Spielplan keinen (womöglich veralteten) Timer aus der Turnierliste', () => {
+    global.fetch = vi.fn();
+    renderBoard(tournamentWith({ participantsPublic: false, timer: { state: 'running', label: 'Alt', endsAt: '2099-06-01T12:00:00.000Z' } }));
+    expect(screen.queryByText('Alt')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Rundenzeit' })).not.toBeInTheDocument();
+  });
+
   it('lädt bei nicht öffentlicher Teilnehmerliste keinen Spielplan', () => {
     global.fetch = vi.fn();
     renderBoard(tournamentWith({ participantsPublic: false }));

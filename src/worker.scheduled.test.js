@@ -65,6 +65,28 @@ describe('Cron-Wartung', () => {
       .toMatchObject({ tournamentId: 'early', status: 'finished', automatic: true });
   });
 
+  it('schließt ein wieder aufgenommenes Turnier erst 48 Stunden nach der Wiederaufnahme', async () => {
+    sql(`INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ('s1', 'owner', '2199-01-01T00:00:00.000Z', '2026-01-01')`);
+    sql(`INSERT INTO tournaments (id, owner_id, name, date, start_time, location, formation, status, started_at, visibility, created_at, updated_at)
+      VALUES ('resumed', 'owner', 'Schnellstart', '2099-12-24', '11:00', 'Ort', 'tete', 'finished', '2026-10-20T10:00:00.000Z', 'private', '2026-10-20', '2026-10-20'),
+             ('old', 'owner', 'Altes Datum', '2026-10-01', '11:00', 'Ort', 'tete', 'finished', '2026-10-01T09:00:00.000Z', 'private', '2026-10-01', '2026-10-01')`);
+    vi.useFakeTimers({ toFake: ['Date'], now: scheduledTime - 30 * 60 * 1000 });
+    try {
+      for (const id of ['resumed', 'old']) {
+        const response = await worker.fetch(new Request(`https://ptm.test/api/tournaments/${id}/start`, {
+          method: 'POST', headers: { Cookie: 'ptm_session=s1', 'Content-Type': 'application/json' }, body: '{}',
+        }), env);
+        expect(response.status).toBe(200);
+      }
+      vi.setSystemTime(scheduledTime);
+      await runCron();
+    } finally { vi.useRealTimers(); }
+
+    expect(row("SELECT status, started_at FROM tournaments WHERE id = 'resumed'"))
+      .toEqual({ status: 'running', started_at: new Date(scheduledTime - 30 * 60 * 1000).toISOString() });
+    expect(row("SELECT status FROM tournaments WHERE id = 'old'").status).toBe('running');
+  });
+
   it('lässt Turniere innerhalb der 48 Stunden unverändert', async () => {
     // Uhr auf scheduledTime 2026-10-23T01:00Z: Beginn 21.10. 10:00 Berlin liegt 41 Stunden zurück.
     vi.useFakeTimers({ toFake: ['Date'], now: scheduledTime });

@@ -1645,8 +1645,9 @@ export function registrationClosesAtUtcIso(tournament) {
  * Nach 48 Stunden ab Turnierbeginn läuft kein Turnier mehr: vergessene "Läuft"-Turniere und nie online
  * gestartete Turniere (Status "Anmeldung", z. B. offline gespielt oder Kalendereintrag) werden automatisch
  * abgeschlossen, damit sie nicht dauerhaft im Bereich "Live" bzw. als offen stehen. Die
- * Laufende Turniere zählen zusätzlich ab dem tatsächlichen Start (started_at): ein vorab gestartetes Turnier (z. B.
- * Schnellstart mit Datum in der Zukunft) wird 48 Stunden nach dem Start abgeschlossen, nicht erst nach dem Datum.
+ * Laufende Turniere mit bekanntem Start zählen stattdessen ab dem tatsächlichen Start (started_at): ein vorab gestartetes
+ * Turnier (z. B. Schnellstart mit Datum in der Zukunft) wird 48 Stunden nach dem Start abgeschlossen, nicht erst nach dem
+ * Datum; ein wieder aufgenommenes 48 Stunden nach der Wiederaufnahme.
  * Turnierleitung bekommt dazu eine Nachricht ins Postfach. Daten bleiben unverändert; ein späterer Metadaten-Sync aus dem Turnierdokument kann
  * den Status wieder setzen.
  */
@@ -1655,8 +1656,11 @@ async function finishStaleTournaments(env, now = new Date()) {
   const candidates = await db.prepare(`SELECT id, name, owner_id, date, start_time, timezone, status, started_at FROM tournaments
       WHERE status IN ('running', 'registration') AND (date <= ? OR (status = 'running' AND started_at <= ?))`)
     .bind(dateDaysAgo(1, now), new Date(now.getTime() - STALE_TOURNAMENT_HOURS * 3600000).toISOString()).all();
-  const stale = (candidates.results || []).filter((row) => isTournamentStale(tournamentStartUtcIso(row), now)
-    || (row.status === 'running' && row.started_at && isTournamentStale(row.started_at, now)));
+  // Mit tatsächlichem Start zählt nur dieser, nicht das Datum: Eine Wiederaufnahme setzt started_at neu, sonst schlösse
+  // der nächste Lauf ein Tage später wieder aufgenommenes Turnier sofort wieder.
+  const stale = (candidates.results || []).filter((row) => (row.status === 'running' && row.started_at
+    ? isTournamentStale(row.started_at, now)
+    : isTournamentStale(tournamentStartUtcIso(row), now)));
   if (stale.length === 0) return;
   const statement = db.prepare("UPDATE tournaments SET status = 'finished', updated_at = ? WHERE id = ? AND status IN ('running', 'registration')");
   const results = await db.batch(stale.map((row) => statement.bind(now.toISOString(), row.id)));
@@ -6531,8 +6535,11 @@ async function performTournamentStart(env, existing) {
     return existing;
   }
   const now = new Date().toISOString();
-  const result = await db.prepare("UPDATE tournaments SET status = 'running', started_at = COALESCE(started_at, ?), updated_at = ? WHERE id = ? AND status != 'running'")
-    .bind(now, now, existing.id).run();
+  // Wiederaufnahme eines beendeten Turniers: neuer Start, damit das Auto-Beenden (48 Stunden nach started_at) erst ab
+  // jetzt zählt.
+  const result = await db.prepare(`UPDATE tournaments SET status = 'running',
+      started_at = CASE WHEN status = 'finished' THEN ? ELSE COALESCE(started_at, ?) END, updated_at = ? WHERE id = ? AND status != 'running'`)
+    .bind(now, now, now, existing.id).run();
   const updated = await getTournamentById(db, existing.id);
   if (result.meta.changes === 0) {
     // Ein gleichzeitiger Request hat den Statuswechsel bereits durchgeführt -
@@ -6606,8 +6613,9 @@ export async function startTournamentFromSync(request, env, existing) {
   const now = new Date().toISOString();
   const statements = [
     db.prepare(`UPDATE tournaments SET status = 'running', desktop_execution = 1,
-        local_started_at = COALESCE(local_started_at, ?), started_at = COALESCE(started_at, ?), updated_at = ? WHERE id = ?`)
-      .bind(localStartedAt, now, now, existing.id),
+        local_started_at = COALESCE(local_started_at, ?),
+        started_at = CASE WHEN status = 'finished' THEN ? ELSE COALESCE(started_at, ?) END, updated_at = ? WHERE id = ?`)
+      .bind(localStartedAt, now, now, now, existing.id),
   ];
   if (localStartedAt) {
     // Online-Anmeldungen zwischen lokalem Start und dem hier gesetzten `running` werden markiert und nie

@@ -39,7 +39,7 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
   const { tournament, notFound } = useRoutedTournament(tournamentId, tournaments, shareToken);
   // Aktuelle Ankündigung aus dem Spielplan-Abruf (sofort über den WebSocket, sonst alle 2 Minuten).
   const [announcementUpdate, setAnnouncementUpdate] = useState({ tournamentId: null, announcement: null });
-  // Ebenso der Rundenzeit-Timer der Turnierleitung.
+  // Ebenso der Rundenzeit-Timer der Turnierleitung (nur von dort, siehe unten).
   const [timerUpdate, setTimerUpdate] = useState({ tournamentId: null, timer: null });
   const rankingPublished = Boolean(tournament?.rankingPublishedAt);
   // Mit Schlüssel (Anzeige-Link der Turnierleitung) entscheidet der Server, ob der Spielplan sichtbar ist – auch ohne
@@ -69,7 +69,9 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
   }
 
   const announcement = announcementUpdate.tournamentId === tournament.id ? announcementUpdate.announcement : tournament.announcement;
-  const timer = timerUpdate.tournamentId === tournament.id ? timerUpdate.timer : tournament.timer;
+  // Der Timer kommt nur aus dem Spielplan-Abruf (WebSocket bzw. Polling), nicht aus der beim Laden geholten, edge-
+  // gecachten Turnierliste: Ohne sichtbaren Spielplan bliebe er sonst veraltet stehen und gongte womöglich falsch.
+  const timer = scheduleVisible && timerUpdate.tournamentId === tournament.id ? timerUpdate.timer : null;
 
   let content;
   if (rankingPublished) {
@@ -104,7 +106,7 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
         </header>
         <div className="display-actions"><FullscreenButton /></div>
         <AnnouncementBanner announcement={announcement} language={language} />
-        {!rankingPublished && <TimerBanner timer={timer} size="large" sound />}
+        <TimerBanner timer={timer} size="large" sound />
         {content}
       </section>
     </main>
