@@ -18,7 +18,7 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 | Bevorzugte Anmeldungen (Setzliste, Vorrang bei vollem Turnier) | ❌ | ✅ seit 08.11.2026: VIP-Stufen Gold/Silber/Bronze, verdrängen nur niedrigere Stufen; Warteliste und Nachrücken nach Stufe, dann Meldezeit |
 | Öffentliche Warteliste bzw. „Wartet auf Bestätigung“ | ✅ | ✅ seit 25.10.2026: öffentliche Teilnehmerliste mit eigenem Abschnitt für unbestätigte Meldungen und Gesamtzahl |
 | **Automatisches Nachrücken** bei Abmeldung, manuelle Reihenfolge, Warteliste öffentlich | ✅ | ✅ seit 21.10.2026: Option „Automatisch von der Warteliste nachrücken“ (Standard an), bis Turnierstart, Team per Mail + Postbox; keine manuelle Reihenfolge (Meldereihenfolge) |
-| Double-Opt-In per Mail bei Gastanmeldung, E-Mail nur einmal je Turnier | ✅ | ⚠️ geprüft 12.11.2026: Gastanmeldung ohne Konto weiterhin ohne Double-Opt-In; doppelte Anmeldungen seit 25.10.2026 atomar abgewiesen (gleiche Spieler bzw. identische Wiederholung) |
+| Double-Opt-In per Mail bei Gastanmeldung, E-Mail nur einmal je Turnier | ⚠️ korrigiert 12.11.2026: öffentlich nur beim freiwilligen Spielerkonto belegt (Bestätigungslink, Verfall nach 48 h ohne Erinnerung, Link nur als Hash, einmalig); für Turnieranmeldungen weder im Formular noch in der Datenschutzerklärung beschrieben, dort nur Bestätigung durch den Verein (sofort oder Auswahl) | ⚠️ geprüft 12.11.2026: Gastanmeldung ohne Konto weiterhin ohne Double-Opt-In; doppelte Anmeldungen seit 25.10.2026 atomar abgewiesen (gleiche Spieler bzw. identische Wiederholung) |
 | Telefon Pflicht/optional, Lizenz nicht/optional/Pflicht | ✅ | ✅ Telefon seit 21.10.2026: eine Kontaktnummer pro Anmeldung, optional (Standard) oder Pflicht, aus dem Profil vorbelegt, nur für die Turnierleitung sichtbar. Lizenz bewusst weiter Ja/Nein (Standard Nein) |
 | Mail an Veranstalter bei jeder An- und Abmeldung | ✅ | ✅ bewusst nur Postbox (Entscheidung 21.10.2026): Anmeldung und seit 21.10.2026 auch jede Abmeldung durch das Team (Link oder „Absagen“) |
 | Erinnerungsmail mit frei wählbarem Datum und Uhrzeit | ✅ | ⚠️ (fester täglicher Cron) |
@@ -59,7 +59,6 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 9. ~~Zuschauer-Live-Link~~ (umgesetzt als Anzeige-Link, 24.10./08.11.2026); offen: druckbare QR-Karten je Team (QR-Code pro Meldung gibt es bisher nur als Dialog).
 
 **P2b – neu aus dem Abgleich vom 12.11.2026**
-- Double-Opt-In für Gastanmeldungen ohne Konto (Bestätigungslink per Mail, unbestätigte Meldung verfällt).
 - Erinnerungsmail mit frei wählbarem Zeitpunkt statt festem täglichem Cron.
 - Max. Anzahl Nachrücker-Teams (begrenzte Warteliste).
 
@@ -67,6 +66,9 @@ Erhoben wurde mit dem Vereinskonto „Boule Club Linden e.V.“ (Club Master). A
 10. AB-KO bzw. Poule A/B online spielbar (Vorrunde Schweizer oder 4er-Poules mit Barrage → A/B-KO) als neue Strategie in `src/lib/pairing/index.js`.
 11. Turnierserien-Auswertung (Liga bzw. Winterrunde) über mehrere abgeschlossene Turniere.
 12. Spielerdatenbank des Vereins mit Import/Export und E-Mail-Protokoll pro Verein.
+
+**P4 – optional, über petanque-online.de hinaus**
+- Double-Opt-In für Gastanmeldungen ohne Konto (Bestätigungslink per Mail, unbestätigte Meldung verfällt). Keine Lücke, da petanque-online.de das nur beim Spielerkonto macht; als Vorlage taugt deren Ablauf (ein Link, Verfall ohne Erinnerung, Hash, einmalig).
 
 Bewusst nicht übernehmen: den Modus „Mit Auswahl“, denn VIP und Approval decken das größtenteils ab.
 
