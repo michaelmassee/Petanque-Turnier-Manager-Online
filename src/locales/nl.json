@@ -2040,5 +2040,13 @@
   "Die Teams wurden inzwischen geändert (Runde gestartet oder parallel ausgelost). Bitte aktualisieren.": "De teams zijn inmiddels gewijzigd (ronde gestart of gelijktijdig geloot). Vernieuw de pagina.",
   "Endrangliste veröffentlicht und per Postfach und Push gesendet.": "Eindstand gepubliceerd en verstuurd via postvak en push.",
   "finalRankingMailFailed_one": "De e-mail naar {{count}} adres kon niet worden verstuurd. Verstuur later opnieuw.",
-  "finalRankingMailFailed_other": "De e-mails naar {{count}} adressen konden niet worden verstuurd. Verstuur later opnieuw."
+  "finalRankingMailFailed_other": "De e-mails naar {{count}} adressen konden niet worden verstuurd. Verstuur later opnieuw.",
+  "Owner filtern": "Filteren op eigenaar",
+  "Alle Owner": "Alle eigenaren",
+  "Verein filtern": "Filteren op club",
+  "Startdatum (älteste zuerst)": "Startdatum (oudste eerst)",
+  "Startdatum (neueste zuerst)": "Startdatum (nieuwste eerst)",
+  "Erstellt (neueste zuerst)": "Aangemaakt (nieuwste eerst)",
+  "Erstellt (älteste zuerst)": "Aangemaakt (oudste eerst)",
+  "Anmeldungen (meiste zuerst)": "Aanmeldingen (meeste eerst)"
 }

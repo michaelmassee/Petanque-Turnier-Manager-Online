@@ -1438,10 +1438,11 @@ describe('Turniere-Seite: Trennen vom Turnierdokument', () => {
       />,
     );
 
-    const trennen = screen.getAllByRole('button', { name: 'Vom Turnierdokument trennen' });
-    expect(trennen).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Vom Turnierdokument trennen' })).toHaveLength(2);
+    const zeile = (name) => within(screen.getByText(name).closest('article'));
+    expect(zeile('Online-Turnier').queryByRole('button', { name: 'Vom Turnierdokument trennen' })).not.toBeInTheDocument();
 
-    fireEvent.click(trennen[1]);
+    fireEvent.click(zeile('Aus Dokument gestartet').getByRole('button', { name: 'Vom Turnierdokument trennen' }));
     expect(onDisconnect).toHaveBeenCalledWith(expect.objectContaining({ id: 'gestartet' }));
   });
 });

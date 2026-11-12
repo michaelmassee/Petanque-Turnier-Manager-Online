@@ -2040,5 +2040,13 @@
   "Die Teams wurden inzwischen geändert (Runde gestartet oder parallel ausgelost). Bitte aktualisieren.": "Mientras tanto, los equipos han cambiado (ronda iniciada o sorteo simultáneo). Actualiza la página.",
   "Endrangliste veröffentlicht und per Postfach und Push gesendet.": "Clasificación final publicada y enviada por buzón y push.",
   "finalRankingMailFailed_one": "No se pudo enviar el correo a {{count}} dirección. Vuelve a enviarlo más tarde.",
-  "finalRankingMailFailed_other": "No se pudieron enviar los correos a {{count}} direcciones. Vuelve a enviarlos más tarde."
+  "finalRankingMailFailed_other": "No se pudieron enviar los correos a {{count}} direcciones. Vuelve a enviarlos más tarde.",
+  "Owner filtern": "Filtrar por propietario",
+  "Alle Owner": "Todos los propietarios",
+  "Verein filtern": "Filtrar por club",
+  "Startdatum (älteste zuerst)": "Fecha de inicio (más antiguas primero)",
+  "Startdatum (neueste zuerst)": "Fecha de inicio (más recientes primero)",
+  "Erstellt (neueste zuerst)": "Creado (más recientes primero)",
+  "Erstellt (älteste zuerst)": "Creado (más antiguos primero)",
+  "Anmeldungen (meiste zuerst)": "Inscripciones (más primero)"
 }

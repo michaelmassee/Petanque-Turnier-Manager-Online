@@ -688,6 +688,52 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
   );
 }
 
+// Sortierung der Turnierverwaltung. Standard wie die Liste vom Server: Startdatum aufsteigend (Datum, Uhrzeit, Name).
+export const TOURNAMENT_SORT_OPTIONS = [
+  { value: 'start_asc', label: 'Startdatum (älteste zuerst)' },
+  { value: 'start_desc', label: 'Startdatum (neueste zuerst)' },
+  { value: 'created_desc', label: 'Erstellt (neueste zuerst)' },
+  { value: 'created_asc', label: 'Erstellt (älteste zuerst)' },
+  { value: 'registrations_desc', label: 'Anmeldungen (meiste zuerst)' },
+];
+export const DEFAULT_TOURNAMENT_SORT = 'start_asc';
+
+const nameKey = (tournament) => (tournament.name || '').toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const compareText = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
+const compareStart = (left, right) => compareText(left.date || '', right.date || '')
+  || compareText(left.startTime || '', right.startTime || '') || compareText(nameKey(left), nameKey(right));
+
+export function sortManagedTournaments(tournaments, order = DEFAULT_TOURNAMENT_SORT) {
+  const list = [...tournaments];
+  switch (order) {
+    case 'start_desc': return list.sort((left, right) => compareStart(right, left));
+    case 'created_desc': return list.sort((left, right) => compareText(right.createdAt || '', left.createdAt || '') || compareStart(left, right));
+    case 'created_asc': return list.sort((left, right) => compareText(left.createdAt || '', right.createdAt || '') || compareStart(left, right));
+    case 'registrations_desc': return list.sort((left, right) => (Number(right.activeRegistrations) || 0) - (Number(left.activeRegistrations) || 0)
+      || compareStart(left, right));
+    default: return list.sort(compareStart);
+  }
+}
+
+// Owner- und Vereinsauswahl aus den verwaltbaren Turnieren (nicht aus der schon gefilterten Liste, sonst verschwänden
+// Optionen beim Filtern). Owner nach Anzeigename, Vereine nach Namen, jeweils ohne Doppelte.
+export function tournamentOwnerOptions(tournaments) {
+  const owners = new Map();
+  for (const tournament of tournaments) {
+    if (tournament.ownerId && !owners.has(tournament.ownerId)) {
+      owners.set(tournament.ownerId, tournament.owner ? formatUserName(tournament.owner) || tournament.owner.username || tournament.ownerId : tournament.ownerId);
+    }
+  }
+  return [...owners].map(([value, label]) => ({ value, label })).sort((left, right) => left.label.localeCompare(right.label));
+}
+
+const clubOf = (tournament) => (tournament.club || '').trim();
+
+export function tournamentClubOptions(tournaments) {
+  return [...new Set(tournaments.map(clubOf).filter(Boolean))].sort((left, right) => left.localeCompare(right))
+    .map((club) => ({ value: club, label: club }));
+}
+
 export function TournamentList({
   tournaments,
   totalTournaments,
@@ -711,6 +757,13 @@ export function TournamentList({
   onHideCalendarEntriesChange = () => {},
   onlyOwn = false,
   onOnlyOwnChange = () => {},
+  ownerFilter = '',
+  onOwnerFilterChange = () => {},
+  clubFilter = '',
+  onClubFilterChange = () => {},
+  sortOrder = DEFAULT_TOURNAMENT_SORT,
+  onSortOrderChange = () => {},
+  onOpenRegistrations,
   onResetFilters,
   busyId = '',
   setBusyId = () => {},
@@ -719,15 +772,20 @@ export function TournamentList({
   onQrDesignSaved = () => {},
 }) {
   const { t } = useTranslation();
-  const filtered = Boolean(query.trim()) || Boolean(statusFilter) || hideCalendarEntries || onlyOwn;
+  const filtered = Boolean(query.trim()) || Boolean(statusFilter) || hideCalendarEntries || onlyOwn || Boolean(ownerFilter) || Boolean(clubFilter);
   const [shareError, setShareError] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [qrTarget, setQrTarget] = useState(null);
   const [flyerTarget, setFlyerTarget] = useState(null);
   // Kalendereinträge und „Nur meine“ hier filtern; der Zähler zählt danach, sonst stünde „1/76“ über einer leeren Liste.
-  const shownTournaments = tournaments
+  const shownTournaments = sortManagedTournaments(tournaments
     .filter((tournament) => !hideCalendarEntries || !isCalendarEntry(tournament))
-    .filter((tournament) => !onlyOwn || tournament.ownerId === currentUserId);
+    .filter((tournament) => !onlyOwn || tournament.ownerId === currentUserId)
+    .filter((tournament) => !ownerFilter || tournament.ownerId === ownerFilter)
+    .filter((tournament) => !clubFilter || clubOf(tournament) === clubFilter), sortOrder);
+  // Auswahl aus allen verwaltbaren Turnieren; den Owner-Filter gibt es nur, wenn es mehr als einen Owner gibt.
+  const ownerOptions = tournamentOwnerOptions(qrSourceTournaments);
+  const clubOptions = tournamentClubOptions(qrSourceTournaments);
   const visibleTournaments = useInfiniteList(shownTournaments);
 
   // Fester Link /q/<qr_token> – derselbe wie im QR-Code, unabhängig von Sichtbarkeit und Freigabe-Link-Status.
@@ -814,9 +872,16 @@ export function TournamentList({
         searchPlaceholder={t('Name oder Ort suchen')}
         filters={[
           { label: t('Status filtern'), value: statusFilter, onChange: onStatusFilterChange, options: [{ value: '', label: t('Alle Status') }, ...translatedOptions(TOURNAMENT_STATUSES)] },
+          ...(ownerOptions.length > 1 || ownerFilter
+            ? [{ label: t('Owner filtern'), value: ownerFilter, onChange: onOwnerFilterChange, options: [{ value: '', label: t('Alle Owner') }, ...ownerOptions] }]
+            : []),
+          ...(clubOptions.length || clubFilter
+            ? [{ label: t('Verein filtern'), value: clubFilter, onChange: onClubFilterChange, options: [{ value: '', label: t('Alle Vereine') }, ...clubOptions] }]
+            : []),
+          { label: t('Sortieren nach'), value: sortOrder, onChange: onSortOrderChange, options: translatedOptions(TOURNAMENT_SORT_OPTIONS) },
         ]}
         onReset={onResetFilters}
-        resetDisabled={!filtered}
+        resetDisabled={!filtered && sortOrder === DEFAULT_TOURNAMENT_SORT}
       />
       <label className="checkbox-field tournament-list-calendar-filter">
         <input
@@ -884,6 +949,11 @@ export function TournamentList({
                   </>
                 ) : (
                   <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onEdit(tournament)}>{t('Bearbeiten')}</Button>
+                )}
+                {onOpenRegistrations && tournament.registrationEnabled !== false && (
+                  <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onOpenRegistrations(tournament.id)}>
+                    {t('Anmeldungen')} ({tournament.activeRegistrations || 0})
+                  </Button>
                 )}
                 <Button
                   variant="secondary"
@@ -1076,6 +1146,7 @@ export function TournamentManagementPage({
   clubNames = [],
   clubOptions = [],
   onOpenTournament = () => {},
+  onOpenRegistrations,
 }) {
   const { t } = useTranslation();
   const [error, setError] = useState('');
@@ -1084,6 +1155,9 @@ export function TournamentManagementPage({
   const [statusFilter, setStatusFilter] = useState('');
   const [hideCalendarEntries, setHideCalendarEntries] = useState(false);
   const [onlyOwn, setOnlyOwn] = useState(false);
+  const [ownerFilter, setOwnerFilter] = useState('');
+  const [clubFilter, setClubFilter] = useState('');
+  const [sortOrder, setSortOrder] = useState(DEFAULT_TOURNAMENT_SORT);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_TOURNAMENT_FORM);
   const [mode, setMode] = useState('create');
@@ -1352,7 +1426,17 @@ export function TournamentManagementPage({
         onHideCalendarEntriesChange={setHideCalendarEntries}
         onlyOwn={onlyOwn}
         onOnlyOwnChange={setOnlyOwn}
-        onResetFilters={() => { setQuery(''); setStatusFilter(''); setHideCalendarEntries(false); setOnlyOwn(false); }}
+        ownerFilter={ownerFilter}
+        onOwnerFilterChange={setOwnerFilter}
+        clubFilter={clubFilter}
+        onClubFilterChange={setClubFilter}
+        sortOrder={sortOrder}
+        onSortOrderChange={setSortOrder}
+        onOpenRegistrations={onOpenRegistrations}
+        onResetFilters={() => {
+          setQuery(''); setStatusFilter(''); setHideCalendarEntries(false); setOnlyOwn(false);
+          setOwnerFilter(''); setClubFilter(''); setSortOrder(DEFAULT_TOURNAMENT_SORT);
+        }}
         busyId={busyId}
         setBusyId={setBusyId}
         qrSourceTournaments={manageableTournaments}

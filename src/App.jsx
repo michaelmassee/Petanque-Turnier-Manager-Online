@@ -2200,6 +2200,11 @@ function AppContent() {
               setSelectedTournamentId={setSelectedTournamentId}
               onTournamentsChanged={() => loadTournaments(true)}
               onOpenTournament={(tournamentId) => navigate(`/turniere/${tournamentId}`)}
+              onOpenRegistrations={(tournamentId) => {
+                setSelectedTournamentId(tournamentId);
+                setActiveTab('registrations');
+                window.scrollTo(0, 0);
+              }}
             />
           </section>
         </Suspense>

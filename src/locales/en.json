@@ -2040,5 +2040,13 @@
   "Die Teams wurden inzwischen geändert (Runde gestartet oder parallel ausgelost). Bitte aktualisieren.": "The teams have been changed in the meantime (round started or drawn in parallel). Please refresh.",
   "Endrangliste veröffentlicht und per Postfach und Push gesendet.": "Final ranking published and sent via inbox and push.",
   "finalRankingMailFailed_one": "The email to {{count}} address could not be sent. Please send again later.",
-  "finalRankingMailFailed_other": "The emails to {{count}} addresses could not be sent. Please send again later."
+  "finalRankingMailFailed_other": "The emails to {{count}} addresses could not be sent. Please send again later.",
+  "Owner filtern": "Filter by owner",
+  "Alle Owner": "All owners",
+  "Verein filtern": "Filter by club",
+  "Startdatum (älteste zuerst)": "Start date (oldest first)",
+  "Startdatum (neueste zuerst)": "Start date (newest first)",
+  "Erstellt (neueste zuerst)": "Created (newest first)",
+  "Erstellt (älteste zuerst)": "Created (oldest first)",
+  "Anmeldungen (meiste zuerst)": "Registrations (most first)"
 }
