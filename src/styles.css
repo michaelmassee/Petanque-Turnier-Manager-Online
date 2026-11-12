@@ -5247,19 +5247,138 @@ details[open] > .play-round-summary::before {
 }
 
 .announcement-editor,
+.timer-editor,
 .tournament-options {
   margin-bottom: 14px;
 }
 
 .announcement-editor summary,
+.timer-editor summary,
 .tournament-options summary {
   cursor: pointer;
   font-weight: 700;
 }
 
 .announcement-editor[open] summary,
+.timer-editor[open] summary,
 .tournament-options[open] summary {
   margin-bottom: 10px;
+}
+
+/* Rundenzeit-Timer (wie timer.html im Hauptprojekt): dunkler Block, Grün läuft, Gelb pausiert, Rot blinkend abgelaufen. */
+.timer-banner {
+  margin: 0 0 14px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #111;
+  color: #fff;
+  text-align: center;
+}
+
+.timer-banner p {
+  margin: 0;
+}
+
+.timer-banner-label {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.timer-banner-time {
+  font-family: 'Courier New', Courier, monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.05;
+  font-size: 2.6rem;
+}
+
+.timer-banner-status {
+  color: #bbb;
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.timer-running .timer-banner-time { color: #00e040; }
+.timer-paused .timer-banner-time { color: #ffe100; }
+.timer-expired .timer-banner-time { color: #ff2a2a; animation: timer-blink 1s infinite; }
+.timer-expired .timer-banner-status { color: #ff6b6b; }
+
+@keyframes timer-blink {
+  0%, 100% { color: #ff2a2a; }
+  50% { color: #ff9090; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timer-expired .timer-banner-time { animation: none; }
+}
+
+.timer-large {
+  padding: 14px 16px 18px;
+}
+
+.timer-large .timer-banner-label {
+  font-size: clamp(1.2rem, 3.5vw, 2.6rem);
+}
+
+.timer-large .timer-banner-time {
+  font-size: clamp(3.5rem, 16vw, 11rem);
+}
+
+.timer-large .timer-banner-status {
+  font-size: clamp(0.85rem, 2vw, 1.4rem);
+}
+
+.timer-banner-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.timer-sound-button {
+  padding: 8px 16px;
+  border: 2px solid #ffcc00;
+  border-radius: 8px;
+  background: #201600;
+  color: #ffdd44;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.timer-sound-button.is-error {
+  border-color: #ff4444;
+  color: #ff7777;
+}
+
+.row-actions.timer-editor-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.row-actions.timer-editor-controls .button {
+  width: 100%;
+}
+
+.timer-editor-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.timer-editor-duration {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.timer-editor-duration label {
+  flex: 0 1 10rem;
+  min-width: 0;
 }
 
 .tournament-options .form {

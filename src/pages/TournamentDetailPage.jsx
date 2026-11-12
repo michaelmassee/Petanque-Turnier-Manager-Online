@@ -590,7 +590,7 @@ export function TournamentLocation({ tournament }) {
   return <span>{location}</span>;
 }
 
-export function TournamentSchedule({ tournamentId, tournament, language, shareToken = '', onAnnouncement, display = false }) {
+export function TournamentSchedule({ tournamentId, tournament, language, shareToken = '', onAnnouncement, onTimer, display = false }) {
   const { t } = useTranslation();
   const query = useScheduleQuery(tournamentId, shareToken);
   // Bildschirm vor Ort im Querformat: Die Anzeige füllt den Bildschirm, Runde und Rangliste scrollen von selbst durch.
@@ -603,6 +603,11 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
     if (query.data) onAnnouncement?.(announcement || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [announcement?.text, announcement?.at, Boolean(query.data)]);
+  const timer = query.data?.timer;
+  useEffect(() => {
+    if (query.data) onTimer?.(timer || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(timer || null), Boolean(query.data)]);
 
   if (query.isPending) {
     return <p className="muted">{t('Wird geladen…')}</p>;

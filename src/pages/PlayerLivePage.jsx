@@ -10,6 +10,7 @@ import { StandalonePageHeader } from '../components/layout.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
 import { tournamentBoardPath } from '../lib/routing.js';
 import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
+import { TimerBanner } from '../components/TournamentTimer.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { isIosSafari, useLivePushRefresh, useTournamentLiveSocket } from '../lib/hooks.js';
 import { currentBrowserPushSubscription, ensureBrowserPushSubscription, isPushSupported } from '../lib/push.js';
@@ -514,6 +515,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
       <div className="live-view">
         {header}
         <AnnouncementBanner announcement={data.announcement} language={language} />
+        <TimerBanner timer={data.timer} />
         <section className="live-disabled" role="status">
           <span className="live-disabled-icon" aria-hidden="true">⏸</span>
           <div>
@@ -546,6 +548,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
     <div className="live-view">
       {header}
       <AnnouncementBanner announcement={data.announcement} language={language} />
+      <TimerBanner timer={data.timer} />
       {tournament.status === 'finished' && <p className="hint">{t('Das Turnier ist beendet.')}</p>}
       {tournament.status !== 'running' && tournament.status !== 'finished' && <p className="hint">{t('Das Turnier hat noch nicht begonnen.')}</p>}
       {query.error && <Feedback error={query.error.message} />}

@@ -3087,6 +3087,17 @@ export default {
         return await updateTournamentAnnouncement(request, env, tournament, url.origin);
       }
 
+      const timerMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/timer$/);
+      if (timerMatch && request.method === 'PUT') {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, timerMatch[1]);
+        if (!tournament) {
+          throw new HttpError(404, 'Turnier nicht gefunden');
+        }
+        assertCanManageTournament(tournament, session.user);
+        return await updateTournamentTimer(request, env, tournament);
+      }
+
       const publicationMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/publication$/);
       if (publicationMatch && request.method === 'PUT') {
         const session = await requireSession(request, env.DB);
@@ -7093,6 +7104,106 @@ async function updateTournamentAnnouncement(request, env, tournament, appOrigin)
   return json({ announcement: tournamentAnnouncement({ ...tournament, announcement: text || null, announcement_at: text ? now : null }) });
 }
 
+// Rundenzeit-Timer wie im PTM-Hauptprojekt (TimerManager): Dauer bis 99:59, optionale Bezeichnung.
+const TIMER_MAX_SECONDS = 99 * 60 + 59;
+const TIMER_LABEL_MAX_LENGTH = 60;
+const TIMER_ADJUST_MAX_SECONDS = 600;
+
+function parseTimerColumn(row) {
+  if (!row?.timer) return {};
+  try {
+    const value = JSON.parse(row.timer);
+    return value && typeof value === 'object' ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Sichtbarer Timer: läuft (Endzeit) oder pausiert (Restzeit). Ein abgelaufener Timer bleibt als „Zeit abgelaufen“
+ * stehen, bis die Turnierleitung ihn stoppt oder neu startet; mit dem Turnierende verschwindet er.
+ */
+export function tournamentTimer(row) {
+  if (row?.status === 'finished') return null;
+  const timer = parseTimerColumn(row);
+  if (timer.state === 'running' && timer.endsAt) {
+    return { state: 'running', label: timer.label || '', durationSec: timer.durationSec || null, endsAt: timer.endsAt };
+  }
+  if (timer.state === 'paused' && Number.isFinite(timer.remainingSec)) {
+    return { state: 'paused', label: timer.label || '', durationSec: timer.durationSec || null, remainingSec: timer.remainingSec };
+  }
+  return null;
+}
+
+// Vorbelegung des Timer-Panels für die Turnierleitung (zuletzt benutzte Dauer und Bezeichnung).
+export function tournamentTimerSettings(row) {
+  const timer = parseTimerColumn(row);
+  return { label: timer.label || '', durationSec: timer.durationSec || null };
+}
+
+function cleanTimerLabel(value) {
+  const label = String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (label.length > TIMER_LABEL_MAX_LENGTH) {
+    throw new HttpError(400, 'Die Bezeichnung darf maximal 60 Zeichen enthalten.', { field: 'label' });
+  }
+  return label;
+}
+
+/**
+ * Timer steuern: start, pause, resume, adjust (±Sekunden), stop. Gespeichert wird nur die Endzeit bzw. bei Pause die
+ * Restzeit; die Seiten zählen selbst herunter. Jede Änderung meldet der Request-Wrapper dem Live-Hub.
+ */
+async function updateTournamentTimer(request, env, tournament) {
+  if (tournament.status === 'finished') throw new HttpError(409, 'Das Turnier ist bereits abgeschlossen');
+  const body = await readJson(request);
+  const current = parseTimerColumn(tournament);
+  const nowMs = Date.now();
+  const remainingOf = (timer) => (timer.state === 'running'
+    ? Math.max(0, Math.round((Date.parse(timer.endsAt) - nowMs) / 1000))
+    : Math.max(0, Number(timer.remainingSec) || 0));
+  let next;
+  switch (body.action) {
+    case 'start': {
+      const durationSec = Number(body.durationSec);
+      if (!Number.isInteger(durationSec) || durationSec < 1 || durationSec > TIMER_MAX_SECONDS) {
+        throw new HttpError(400, 'Ungültige Dauer. Bitte im Format MM:SS angeben, höchstens 99:59.', { field: 'durationSec' });
+      }
+      next = { state: 'running', label: cleanTimerLabel(body.label), durationSec, endsAt: new Date(nowMs + durationSec * 1000).toISOString() };
+      break;
+    }
+    case 'pause':
+      if (current.state !== 'running') throw new HttpError(409, 'Der Timer läuft nicht.');
+      next = { ...current, state: 'paused', remainingSec: remainingOf(current), endsAt: undefined };
+      break;
+    case 'resume':
+      if (current.state !== 'paused') throw new HttpError(409, 'Der Timer ist nicht pausiert.');
+      next = { ...current, state: 'running', endsAt: new Date(nowMs + remainingOf(current) * 1000).toISOString(), remainingSec: undefined };
+      break;
+    case 'adjust': {
+      const deltaSec = Number(body.deltaSec);
+      if (!Number.isInteger(deltaSec) || deltaSec === 0 || Math.abs(deltaSec) > TIMER_ADJUST_MAX_SECONDS) {
+        throw new HttpError(400, 'Ungültige Zeitänderung.', { field: 'deltaSec' });
+      }
+      if (current.state !== 'running' && current.state !== 'paused') throw new HttpError(409, 'Der Timer läuft nicht.');
+      const remainingSec = Math.min(TIMER_MAX_SECONDS, Math.max(0, remainingOf(current) + deltaSec));
+      next = current.state === 'running'
+        ? { ...current, endsAt: new Date(nowMs + remainingSec * 1000).toISOString() }
+        : { ...current, remainingSec };
+      break;
+    }
+    case 'stop':
+      next = { label: current.label || '', durationSec: current.durationSec || null };
+      break;
+    default:
+      throw new HttpError(400, 'Unbekannte Timer-Aktion.', { field: 'action' });
+  }
+  const timerJson = JSON.stringify(next);
+  await env.DB.prepare('UPDATE tournaments SET timer = ?, updated_at = ? WHERE id = ?')
+    .bind(timerJson, new Date(nowMs).toISOString(), tournament.id).run();
+  const row = { ...tournament, timer: timerJson };
+  return json({ timer: tournamentTimer(row), settings: tournamentTimerSettings(row) });
+}
+
 /** PTM Calc is the exclusive writer for the metadata of a linked tournament. */
 async function syncPutTournamentMetadata(request, env, existing) {
   const db = env.DB;
@@ -8871,8 +8982,9 @@ export async function buildScheduleResponse(request, db, tournament) {
   const snapshot = await getLiveSnapshot(db, tournament, new URL(request.url).origin);
   const dataAsOf = Number(tournament.document_managed || 0) === 1 ? tournament.last_sync_write_at || null : null;
   const announcement = tournamentAnnouncement(tournament);
+  const timer = tournamentTimer(tournament);
   const pollUntil = schedulePollUntilUtcIso(tournament);
-  const extraVersion = (await sha256Hex(JSON.stringify([tournament.status, dataAsOf, announcement, pollUntil]))).slice(0, 12);
+  const extraVersion = (await sha256Hex(JSON.stringify([tournament.status, dataAsOf, announcement, timer, pollUntil]))).slice(0, 12);
   const etag = `"${snapshot.version}-${extraVersion}"`;
   const cacheHeaders = { 'Cache-Control': 'private, no-cache', ETag: etag };
   if (request.headers.get('If-None-Match') === etag) {
@@ -8880,7 +8992,7 @@ export async function buildScheduleResponse(request, db, tournament) {
   }
   return json({ status: tournament.status, rounds: snapshot.rounds, ranking: snapshot.ranking,
     ...(!snapshot.rounds.length && tournament.status !== 'finished' ? { entries: snapshot.entries || [] } : {}),
-    dataAsOf, announcement, pollUntil }, 200, cacheHeaders);
+    dataAsOf, announcement, timer, pollUntil }, 200, cacheHeaders);
 }
 
 function liveRegistrationLabel(registration) {
@@ -8906,6 +9018,7 @@ export async function buildLiveResponse(request, db, registration) {
       tournament: toLiveTournament(tournament),
       registration: { id: registration.id, label: liveRegistrationLabel(registration), participation: registration.participation, status: registration.status },
       announcement: tournamentAnnouncement(tournament),
+      timer: tournamentTimer(tournament),
       dataAsOf: null,
       live: null,
     }, 200, { 'Cache-Control': 'private, no-cache' });
@@ -8931,7 +9044,8 @@ export async function buildLiveResponse(request, db, registration) {
   const dataAsOf = Number(tournament.document_managed || 0) === 1 ? tournament.last_sync_write_at || null : null;
   // Die Ankündigung kommt frisch aus der Turnierzeile; sie fließt ins ETag ein, damit ein Handy sie beim nächsten Abruf bekommt.
   const announcement = tournamentAnnouncement(tournament);
-  const personalVersion = (await sha256Hex(JSON.stringify([personal, dataAsOf, tournament.status, announcement]))).slice(0, 12);
+  const timer = tournamentTimer(tournament);
+  const personalVersion = (await sha256Hex(JSON.stringify([personal, dataAsOf, tournament.status, announcement, timer]))).slice(0, 12);
   const etag = `"${snapshot.version}-${personalVersion}"`;
   const cacheHeaders = { 'Cache-Control': 'private, no-cache', ETag: etag };
   if (request.headers.get('If-None-Match') === etag) {
@@ -8941,6 +9055,7 @@ export async function buildLiveResponse(request, db, registration) {
     tournament: { ...snapshot.tournament, status: tournament.status },
     registration: personal,
     announcement,
+    timer,
     dataAsOf,
     live: buildPlayerLiveView({ registrationId: registration.id, rounds: snapshot.rounds, ranking: snapshot.ranking }),
   }, 200, cacheHeaders);
@@ -13901,6 +14016,8 @@ export function toPublicTournament(row, user) {
     whatsappGroupUrl: canManageTournament(row, user) ? row.whatsapp_group_url || null : undefined,
     paymentInfo: row.payment_info || null,
     announcement: tournamentAnnouncement(row),
+    timer: tournamentTimer(row),
+    timerSettings: canManageTournament(row, user) ? tournamentTimerSettings(row) : undefined,
     activeRegistrations: Number(row.active_registrations || 0),
     waitlistRegistrations: Number(row.waitlist_registrations || 0),
     canManage: canManageTournament(row, user),

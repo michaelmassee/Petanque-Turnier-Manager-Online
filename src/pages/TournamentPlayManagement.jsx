@@ -13,6 +13,7 @@ import { checkRoundRequirements, isMeleeTeamTournament, isOnlinePlayable, minimu
 import { FORMATIONS, PARTICIPATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES } from '../lib/constants.js';
 import { isCalendarEntry, isDocumentBound, labelFor, sanitizeScore, translatedOptions } from '../lib/domain.js';
 import { AnnouncementEditor } from '../components/TournamentAnnouncement.jsx';
+import { TimerEditor } from '../components/TournamentTimer.jsx';
 import { DEFAULT_TOURNAMENT_OPTIONS, TournamentOptionsPanel } from '../components/TournamentOptionsPanel.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
 import { normalizeRanking } from '../lib/live-ranking.js';
@@ -1099,6 +1100,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       {selectedTournament && <TournamentBoardShare tournament={selectedTournament} />}
       {/* Ankündigungen schon vor dem Turnierstart, damit der Veranstalter vorab informieren kann. */}
       {selectedTournament && selectedTournamentStatus !== 'finished' && <AnnouncementEditor tournament={selectedTournament} />}
+      {/* Rundenzeit wie der Timer im Hauptprojekt, direkt unter der Ankündigung. */}
+      {selectedTournament && selectedTournamentStatus !== 'finished' && <TimerEditor tournament={selectedTournament} />}
       {selectedTournament && selectedTournamentStatus !== 'finished' && (
         <TournamentOptionsPanel tournament={selectedTournament} options={tournamentOptions}
           onSaved={(options) => {

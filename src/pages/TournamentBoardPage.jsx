@@ -5,6 +5,7 @@ import { isOnlinePlayable } from '../lib/pairing/index.js';
 import { formatDate, formatWeekdayShort } from '../lib/format.js';
 import { isDocumentBound, formatTournamentStartTime } from '../lib/domain.js';
 import { AnnouncementBanner } from '../components/TournamentAnnouncement.jsx';
+import { TimerBanner } from '../components/TournamentTimer.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
 import { TournamentClub, TournamentLocation, TournamentSchedule } from './TournamentDetailPage.jsx';
 
@@ -38,6 +39,8 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
   const { tournament, notFound } = useRoutedTournament(tournamentId, tournaments, shareToken);
   // Aktuelle Ankündigung aus dem Spielplan-Abruf (sofort über den WebSocket, sonst alle 2 Minuten).
   const [announcementUpdate, setAnnouncementUpdate] = useState({ tournamentId: null, announcement: null });
+  // Ebenso der Rundenzeit-Timer der Turnierleitung.
+  const [timerUpdate, setTimerUpdate] = useState({ tournamentId: null, timer: null });
   const rankingPublished = Boolean(tournament?.rankingPublishedAt);
   // Mit Schlüssel (Anzeige-Link der Turnierleitung) entscheidet der Server, ob der Spielplan sichtbar ist – auch ohne
   // veröffentlichte Teilnehmerliste. Lehnt er ab, zeigt der Spielplan denselben Hinweis wie hier.
@@ -66,6 +69,7 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
   }
 
   const announcement = announcementUpdate.tournamentId === tournament.id ? announcementUpdate.announcement : tournament.announcement;
+  const timer = timerUpdate.tournamentId === tournament.id ? timerUpdate.timer : tournament.timer;
 
   let content;
   if (rankingPublished) {
@@ -80,6 +84,7 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
         language={language}
         shareToken={shareToken}
         onAnnouncement={(next) => setAnnouncementUpdate({ tournamentId: tournament.id, announcement: next })}
+        onTimer={(next) => setTimerUpdate({ tournamentId: tournament.id, timer: next })}
         display
       />
     );
@@ -99,6 +104,7 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
         </header>
         <div className="display-actions"><FullscreenButton /></div>
         <AnnouncementBanner announcement={announcement} language={language} />
+        {!rankingPublished && <TimerBanner timer={timer} size="large" sound />}
         {content}
       </section>
     </main>
