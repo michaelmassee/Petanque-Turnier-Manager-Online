@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import '../lib/i18next-config.js';
@@ -66,6 +67,46 @@ describe('Rundenzeit-Timer (Frontend)', () => {
     fireEvent.change(screen.getByLabelText('Dauer (MM:SS)'), { target: { value: '7:99' } });
     expect(screen.getByRole('button', { name: 'Timer starten' }).disabled).toBe(true);
     expect(authenticatedApi).not.toHaveBeenCalled();
+  });
+
+  // Wie in TournamentPlayManagement: Editor je Turnier (key), gespeicherter Stand je Turnier im Elternteil.
+  function Wechsel({ tournaments }) {
+    const [selectedId, setSelectedId] = useState(tournaments[0].id);
+    const [savedTimers, setSavedTimers] = useState({});
+    const selected = tournaments.find((tournament) => tournament.id === selectedId);
+    return (
+      <>
+        {tournaments.map((tournament) => <button key={tournament.id} type="button" onClick={() => setSelectedId(tournament.id)}>{`Wähle ${tournament.id}`}</button>)}
+        <TimerEditor key={selected.id} tournament={selected} saved={savedTimers[selected.id]}
+          onSaved={(id, saved) => setSavedTimers((current) => ({ ...current, [id]: saved }))} />
+      </>
+    );
+  }
+  const zweiTurniere = [{ id: 'a', timer: null }, { id: 'b', timer: null }];
+
+  it('behält den gestarteten Timer nach einem Turnierwechsel hin und zurück', async () => {
+    authenticatedApi.mockResolvedValue({ timer: { state: 'running', label: '', endsAt: new Date(NOW + 600000).toISOString() }, settings: { label: '', durationSec: 600 } });
+    render(<Wechsel tournaments={zweiTurniere} />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Timer starten' })); });
+    fireEvent.click(screen.getByRole('button', { name: 'Wähle b' }));
+    expect(screen.getByRole('button', { name: 'Timer starten' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Wähle a' }));
+    expect(screen.getByRole('button', { name: 'Neu starten' })).toBeTruthy();
+    expect(screen.getByText('10:00')).toBeTruthy();
+  });
+
+  it('übernimmt eine verspätete Antwort nicht in den Timer des neu gewählten Turniers', async () => {
+    let resolve;
+    authenticatedApi.mockReturnValue(new Promise((done) => { resolve = done; }));
+    render(<Wechsel tournaments={zweiTurniere} />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Timer starten' })); });
+    fireEvent.click(screen.getByRole('button', { name: 'Wähle b' }));
+    await act(async () => { resolve({ timer: { state: 'running', label: '', endsAt: new Date(NOW + 600000).toISOString() }, settings: null }); });
+
+    expect(screen.getByRole('button', { name: 'Timer starten' }).disabled).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Anhalten' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Wähle a' }));
+    expect(screen.getByRole('button', { name: 'Anhalten' })).toBeTruthy();
   });
 
   it('zeigt Serverfehler über Feedback', async () => {

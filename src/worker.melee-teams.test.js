@@ -234,6 +234,26 @@ describe('Mêlée-Teams online', () => {
     expect(roundTwo.some((match) => [match.a, match.b].some((ids) => ids.includes('p13')))).toBe(true);
   });
 
+  it('teilt Nachzügler nicht doppelt ein, wenn parallel ausgelost wurde', async () => {
+    setup('schweizer', 'doublette');
+    spieler(12);
+    await drawMeleeTeams(db, await turnier());
+    await generateTournamentRound(db, await turnier());
+    spieler(4, 13);
+    // Die parallele Auslosung hat zwei der vier Nachzügler schon eingeteilt, nachdem diese hier als frei gelesen wurden.
+    db.vorBatch((sqlite) => sqlite.exec(`INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, created_at)
+      VALUES ('parallel', 't1', '["p13","p15"]', '2026-10-16')`));
+    await expect(drawMeleeTeams(db, await turnier())).rejects.toMatchObject({ status: 409 });
+    const members = teams().flatMap((team) => team.members);
+    expect(members.filter((id) => ['p13', 'p14', 'p15', 'p16'].includes(id)).sort()).toEqual(['p13', 'p15']);
+    expect(new Set(members).size).toBe(members.length);
+
+    const result = await (await drawMeleeTeams(db, await turnier())).json();
+    expect(result).toMatchObject({ drawnCount: 1, unassignedCount: 0 });
+    const after = teams().flatMap((team) => team.members);
+    expect(new Set(after).size).toBe(after.length);
+  });
+
   it('fragt bei doppelten Namen nach, bevor ausgelost wird', async () => {
     setup('schweizer');
     spieler(4);

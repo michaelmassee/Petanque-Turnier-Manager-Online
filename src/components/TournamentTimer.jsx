@@ -152,40 +152,44 @@ export function TimerBanner({ timer, size = 'compact', sound = false }) {
  * Turnierleitung: Rundenzeit starten, pausieren, um eine Minute ändern oder stoppen. Der Timer erscheint auf der
  * Turnierseite und in der Live-Ansicht; offene Seiten bekommen jede Änderung sofort.
  */
-export function TimerEditor({ tournament }) {
+export function TimerEditor({ tournament, saved = null, onSaved }) {
   const { t } = useTranslation();
-  // Die Turnierliste der Seite wird nicht neu geladen, daher den Stand hier selbst nachführen.
-  const [timer, setTimer] = useState(tournament.timer || null);
-  const [duration, setDuration] = useState(formatTimerSeconds(tournament.timerSettings?.durationSec || DEFAULT_DURATION_SECONDS));
-  const [label, setLabel] = useState(tournament.timerSettings?.label || '');
+  // Die Turnierliste der Seite wird nicht neu geladen: Den gespeicherten Stand führt der Elternteil je Turnier nach
+  // (saved/onSaved), sonst zeigte ein Turnierwechsel hin und zurück wieder den alten Stand. Der Elternteil setzt
+  // key={tournament.id}, damit jeder Wechsel einen frischen Editor ergibt.
+  const initialTimer = saved ? saved.timer : tournament.timer;
+  const initialSettings = saved?.settings || tournament.timerSettings;
+  const [timer, setTimer] = useState(initialTimer || null);
+  const [duration, setDuration] = useState(formatTimerSeconds(initialSettings?.durationSec || DEFAULT_DURATION_SECONDS));
+  const [label, setLabel] = useState(initialSettings?.label || '');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const durationSec = parseTimerDuration(duration);
   const remaining = useTimerRemaining(timer);
   const expired = timer?.state === 'running' && remaining === 0;
-
+  // Eine Antwort, die erst nach einem Turnierwechsel eintrifft, darf nur den Stand ihres eigenen Turniers ändern.
+  const mountedRef = useRef(true);
   useEffect(() => {
-    setTimer(tournament.timer || null);
-    setDuration(formatTimerSeconds(tournament.timerSettings?.durationSec || DEFAULT_DURATION_SECONDS));
-    setLabel(tournament.timerSettings?.label || '');
-    setError('');
-    setMessage('');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tournament.id]);
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   async function send(action, extra = {}, successMessage = '') {
+    const tournamentId = tournament.id;
     setError('');
     setMessage('');
     setBusy(action + (extra.deltaSec ? String(extra.deltaSec) : ''));
     try {
-      const data = await authenticatedApi(`/api/tournaments/${tournament.id}/timer`, { method: 'PUT', body: JSON.stringify({ action, ...extra }) });
+      const data = await authenticatedApi(`/api/tournaments/${tournamentId}/timer`, { method: 'PUT', body: JSON.stringify({ action, ...extra }) });
+      onSaved?.(tournamentId, { timer: data.timer || null, settings: data.settings || null });
+      if (!mountedRef.current) return;
       setTimer(data.timer || null);
       if (successMessage) setMessage(successMessage);
     } catch (requestError) {
-      setError(requestError.message);
+      if (mountedRef.current) setError(requestError.message);
     } finally {
-      setBusy('');
+      if (mountedRef.current) setBusy('');
     }
   }
 

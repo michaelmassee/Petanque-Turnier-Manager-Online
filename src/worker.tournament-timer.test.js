@@ -65,6 +65,13 @@ describe('Rundenzeit-Timer', () => {
     expect((await turnier()).timer).toEqual(expected);
   });
 
+  it('verliert bei gleichzeitigen Änderungen keine davon', async () => {
+    await steuern({ action: 'start', durationSec: 600 });
+    const responses = await Promise.all([steuern({ action: 'adjust', deltaSec: 60 }), steuern({ action: 'adjust', deltaSec: 60 })]);
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    expect((await turnier()).timer).toMatchObject({ endsAt: new Date(NOW + 720_000).toISOString() });
+  });
+
   it('pausiert mit Restzeit, setzt fort, passt die Zeit an und stoppt mit Vorbelegung', async () => {
     await steuern({ action: 'start', durationSec: 600, label: 'Runde 1' });
     vi.setSystemTime(NOW + 100_000);

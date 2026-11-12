@@ -84,6 +84,21 @@ describe('Endrangliste veröffentlichen', () => {
     expect(mails()).toEqual([]);
   });
 
+  it('zählt nur gelungene Übergaben an die Mail-Queue', async () => {
+    send.mockImplementation(async (payload) => {
+      if (payload.to) throw new Error('queue down');
+    });
+    const response = await publish({ notify: true });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ mailCount: 0, mailFailedCount: 2 });
+
+    send.mockImplementation(async (payload) => {
+      if (payload.to === 'anna@example.test') throw new Error('queue down');
+    });
+    const again = await publish({ notify: true, resend: true });
+    expect(await again.json()).toMatchObject({ mailCount: 1, mailFailedCount: 1 });
+  });
+
   it('verlangt für einen zweiten Versand eine ausdrückliche Bestätigung', async () => {
     await publish({ notify: true });
     send.mockClear();

@@ -7156,8 +7156,28 @@ function cleanTimerLabel(value) {
 async function updateTournamentTimer(request, env, tournament) {
   if (tournament.status === 'finished') throw new HttpError(409, 'Das Turnier ist bereits abgeschlossen');
   const body = await readJson(request);
-  const current = parseTimerColumn(tournament);
-  const nowMs = Date.now();
+  // Optimistisch: Der neue Stand wird nur geschrieben, wenn der gelesene noch gilt. Sonst überschrieben sich parallele
+  // Änderungen (zweimal „+1 Minute“ ergäbe nur eine Minute); bei Konflikt mit frischem Stand neu rechnen.
+  let row = tournament;
+  for (let attempt = 0; attempt < TIMER_UPDATE_ATTEMPTS; attempt += 1) {
+    const nowMs = Date.now();
+    const timerJson = JSON.stringify(nextTournamentTimer(body, parseTimerColumn(row), nowMs));
+    const result = await env.DB.prepare('UPDATE tournaments SET timer = ?, updated_at = ? WHERE id = ? AND timer IS ?')
+      .bind(timerJson, new Date(nowMs).toISOString(), tournament.id, row.timer ?? null).run();
+    if (Number(result.meta?.changes || 0)) {
+      const saved = { ...row, timer: timerJson };
+      return json({ timer: tournamentTimer(saved), settings: tournamentTimerSettings(saved) });
+    }
+    row = await env.DB.prepare('SELECT id, status, timer FROM tournaments WHERE id = ?').bind(tournament.id).first();
+    if (!row) throw new HttpError(404, 'Turnier nicht gefunden');
+    if (row.status === 'finished') throw new HttpError(409, 'Das Turnier ist bereits abgeschlossen');
+  }
+  throw new HttpError(409, 'Der Timer wurde gleichzeitig geändert. Bitte erneut versuchen.');
+}
+
+const TIMER_UPDATE_ATTEMPTS = 5;
+
+function nextTournamentTimer(body, current, nowMs) {
   const remainingOf = (timer) => (timer.state === 'running'
     ? Math.max(0, Math.round((Date.parse(timer.endsAt) - nowMs) / 1000))
     : Math.max(0, Number(timer.remainingSec) || 0));
@@ -7197,11 +7217,7 @@ async function updateTournamentTimer(request, env, tournament) {
     default:
       throw new HttpError(400, 'Unbekannte Timer-Aktion.', { field: 'action' });
   }
-  const timerJson = JSON.stringify(next);
-  await env.DB.prepare('UPDATE tournaments SET timer = ?, updated_at = ? WHERE id = ?')
-    .bind(timerJson, new Date(nowMs).toISOString(), tournament.id).run();
-  const row = { ...tournament, timer: timerJson };
-  return json({ timer: tournamentTimer(row), settings: tournamentTimerSettings(row) });
+  return next;
 }
 
 /** PTM Calc is the exclusive writer for the metadata of a linked tournament. */
@@ -7851,16 +7867,26 @@ async function assertMeleeTeamsEditable(db, tournament, { allowLate = false } = 
 // afterIso: created_at des letzten bestehenden Teams – neue Teams beginnen dahinter, auch bei rasch aufeinanderfolgenden
 // Auslosungen. Sonst mischten sich die versetzten Zeitstempel und Reihenfolge bzw. Teamnummern sprängen.
 // beforeFirstRound: nur einfügen, solange das Turnier keine Runde hat (im Batch geprüft, nicht nur beim Vorab-Lesen).
+// Außerdem nur, solange keiner der Spieler dieser Auslosung in einem fremden Team steht: Zwei gleichzeitige Auslosungen
+// lesen dieselben freien Spieler, die zweite darf sie nicht noch einmal einteilen. Die eigenen Teams des Batches sind
+// ausgenommen, so gilt die Prüfung für alle Einfügungen gleich – die Auslosung gelingt ganz oder gar nicht.
 function insertMeleeTeams(db, tournamentId, teams, afterIso = null, { beforeFirstRound = false } = {}) {
   // Versetzte Zeitstempel halten die Reihenfolge der Teams stabil (getSchweizerTeams sortiert nach created_at).
   const nowMs = Math.max(Date.now(), afterIso ? Date.parse(afterIso) + 1 : 0);
-  const guard = beforeFirstRound ? ' WHERE NOT EXISTS (SELECT 1 FROM tournament_rounds WHERE tournament_id = ?)' : '';
-  return teams.map((team, index) => db.prepare(`INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at) SELECT ?, ?, ?, ?, ?${guard}`)
-    .bind(crypto.randomUUID(), tournamentId, JSON.stringify(team.members), team.seedPosition, new Date(nowMs + index).toISOString(), ...(beforeFirstRound ? [tournamentId] : [])));
+  const ids = teams.map(() => crypto.randomUUID());
+  const idsJson = JSON.stringify(ids);
+  const membersJson = JSON.stringify(teams.flatMap((team) => team.members));
+  const roundGuard = beforeFirstRound ? ' AND NOT EXISTS (SELECT 1 FROM tournament_rounds WHERE tournament_id = ?)' : '';
+  return teams.map((team, index) => db.prepare(`INSERT INTO tournament_teams (id, tournament_id, member_registration_ids, seed_position, created_at)
+      SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM tournament_teams t, json_each(t.member_registration_ids) m
+        WHERE t.tournament_id = ? AND t.id NOT IN (SELECT value FROM json_each(?)) AND m.value IN (SELECT value FROM json_each(?)))${roundGuard}`)
+    .bind(ids[index], tournamentId, JSON.stringify(team.members), team.seedPosition, new Date(nowMs + index).toISOString(),
+      tournamentId, idsJson, membersJson, ...(beforeFirstRound ? [tournamentId] : [])));
 }
 
 const NO_ROUND_SQL = 'NOT EXISTS (SELECT 1 FROM tournament_rounds WHERE tournament_id = ?)';
 const MELEE_TEAMS_STARTED_MESSAGE = 'Inzwischen wurde die erste Runde gestartet. Teams können nicht mehr neu ausgelost werden. Bitte aktualisieren.';
+const MELEE_TEAMS_CHANGED_MESSAGE = 'Die Teams wurden inzwischen geändert (Runde gestartet oder parallel ausgelost). Bitte aktualisieren.';
 
 // Mêlée-Auslosung wie die Mêlée-Übernahme im Hauptprojekt (AbstractMeleeAnmeldungUebernehmenSheet): nur aktive
 // Spieler ohne Team werden zu neuen Teams gemischt und an die bestehenden angehängt - wiederholbar für Nachzügler,
@@ -7916,7 +7942,7 @@ export async function drawMeleeTeams(db, tournament, body = {}) {
   }
   const last = await db.prepare('SELECT MAX(created_at) AS createdAt FROM tournament_teams WHERE tournament_id = ?').bind(tournament.id).first();
   const [firstInsert] = await db.batch(insertMeleeTeams(db, tournament.id, teams, last?.createdAt || null, { beforeFirstRound: !started }));
-  if (!Number(firstInsert?.meta?.changes || 0)) throw new HttpError(409, MELEE_TEAMS_STARTED_MESSAGE);
+  if (!Number(firstInsert?.meta?.changes || 0)) throw new HttpError(409, MELEE_TEAMS_CHANGED_MESSAGE);
   const drawn = teams.reduce((sum, team) => sum + team.members.length, 0);
   return json({ teams: await getSchweizerTeams(db, tournament), drawnCount: teams.length, unassignedCount: open.length - drawn });
 }
@@ -8692,9 +8718,10 @@ async function publishFinalRanking(request, env, tournament, user, origin) {
           mailed_at = excluded.mailed_at`).bind(tournament.id, JSON.stringify(ranking), now, mailedAt),
     env.DB.prepare('UPDATE tournaments SET final_ranking_published_at = ? WHERE id = ?').bind(now, tournament.id),
   ]);
-  // mailCount: Zahl der verschickten Mails, null bei gesperrtem Mailversand; die Oberfläche meldet damit auch „keine Mail“.
-  const mailCount = body.notify === true ? await notifyFinalRanking(env, tournament, user, origin, share?.token) : undefined;
-  return json({ ranking, publishedAt: now, mailedAt, mailCount });
+  // mailCount: Zahl der an die Mail-Queue übergebenen Mails, null bei gesperrtem Mailversand; die Oberfläche meldet damit
+  // auch „keine Mail“. mailFailedCount: Empfänger, deren Mail nicht übergeben werden konnte.
+  const mail = body.notify === true ? await notifyFinalRanking(env, tournament, user, origin, share?.token) : {};
+  return json({ ranking, publishedAt: now, mailedAt, mailCount: mail.mailCount, mailFailedCount: mail.mailFailedCount });
 }
 
 async function notifyFinalRanking(env, tournament, sender, origin, shareToken = null) {
@@ -8709,10 +8736,12 @@ async function notifyFinalRanking(env, tournament, sender, origin, shareToken = 
     await enqueuePushNotification(env, { userId: accountUser.id, payload: { title: 'Neue Statusmeldung', actor: tournament.name, messageId: id } });
   }
 
-  if (!(await canSendTournamentMail(env.DB, tournament))) return null;
+  if (!(await canSendTournamentMail(env.DB, tournament))) return { mailCount: null, mailFailedCount: 0 };
   const link = `${origin}/turniere/${encodeURIComponent(tournament.id)}/rangliste${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`;
   // Anders als bei der Rundmail bekommt auch die Turnierleitung die Mail, wenn sie selbst mitgespielt hat.
   const recipients = await tournamentEmailRecipients(env.DB, tournament.id, "('confirmed')", null);
+  // Gezählt werden nur gelungene Übergaben an die Mail-Queue, nicht die Empfänger.
+  let queued = 0;
   for (const recipient of recipients.values()) {
     const templates = TOURNAMENT_RANKING_EMAILS[recipient.language] || TOURNAMENT_RANKING_EMAILS.de;
     try {
@@ -8726,11 +8755,12 @@ async function notifyFinalRanking(env, tournament, sender, origin, shareToken = 
         failureContext: `final ranking for tournament ${tournament.id}`,
         allowLogFallback: true,
       });
+      queued += 1;
     } catch (error) {
       console.error('Final ranking email dispatch failed', error);
     }
   }
-  return recipients.size;
+  return { mailCount: queued, mailFailedCount: recipients.size - queued };
 }
 
 // Team-Anzeige der Rangliste (Turnieroption); NAME bleibt die bisherige Bezeichnung aus normalizeRanking.

@@ -46,6 +46,14 @@ describe('Endrangliste veröffentlichen (Spielverwaltung)', () => {
     expect(await screen.findByText(text)).toBeInTheDocument();
   });
 
+  it('meldet nicht übergebene E-Mails als Fehler statt als Versand', async () => {
+    authenticatedApi.mockResolvedValue({ mailCount: 0, mailFailedCount: 6 });
+    render(<FinalRankingPublisher tournament={FINISHED} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Endrangliste veröffentlichen' }));
+    expect(await screen.findByText('Endrangliste veröffentlicht und per Postfach und Push gesendet.')).toBeInTheDocument();
+    expect(screen.getByRole('alert').textContent).toContain('Die E-Mails an 6 Adressen konnten nicht verschickt werden.');
+  });
+
   it('aktiviert bei privaten Turnieren vor dem Versand den Freigabe-Link', async () => {
     authenticatedApi.mockResolvedValue({});
     render(<FinalRankingPublisher tournament={{ ...FINISHED, visibility: 'private' }} />);

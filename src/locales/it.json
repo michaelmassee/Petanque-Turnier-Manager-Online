@@ -2113,5 +2113,10 @@
   "Die Bezeichnung darf maximal 60 Zeichen enthalten.": "Il nome può contenere al massimo 60 caratteri.",
   "Ungültige Dauer. Bitte im Format MM:SS angeben, höchstens 99:59.": "Durata non valida. Indicala nel formato MM:SS, massimo 99:59.",
   "Ungültige Zeitänderung.": "Modifica del tempo non valida.",
-  "Unbekannte Timer-Aktion.": "Azione del timer sconosciuta."
+  "Unbekannte Timer-Aktion.": "Azione del timer sconosciuta.",
+  "Der Timer wurde gleichzeitig geändert. Bitte erneut versuchen.": "Il timer è stato modificato contemporaneamente. Riprova.",
+  "Die Teams wurden inzwischen geändert (Runde gestartet oder parallel ausgelost). Bitte aktualisieren.": "Nel frattempo le squadre sono state modificate (turno avviato o sorteggio in parallelo). Aggiorna la pagina.",
+  "Endrangliste veröffentlicht und per Postfach und Push gesendet.": "Classifica finale pubblicata e inviata tramite casella messaggi e push.",
+  "finalRankingMailFailed_one": "Non è stato possibile inviare l'e-mail a {{count}} indirizzo. Invia di nuovo più tardi.",
+  "finalRankingMailFailed_other": "Non è stato possibile inviare le e-mail a {{count}} indirizzi. Invia di nuovo più tardi."
 }

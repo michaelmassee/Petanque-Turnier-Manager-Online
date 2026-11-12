@@ -2035,5 +2035,10 @@
   "Die Bezeichnung darf maximal 60 Zeichen enthalten.": "De omschrijving mag maximaal 60 tekens bevatten.",
   "Ungültige Dauer. Bitte im Format MM:SS angeben, höchstens 99:59.": "Ongeldige duur. Geef deze op als MM:SS, maximaal 99:59.",
   "Ungültige Zeitänderung.": "Ongeldige tijdswijziging.",
-  "Unbekannte Timer-Aktion.": "Onbekende timeractie."
+  "Unbekannte Timer-Aktion.": "Onbekende timeractie.",
+  "Der Timer wurde gleichzeitig geändert. Bitte erneut versuchen.": "De timer is tegelijkertijd gewijzigd. Probeer het opnieuw.",
+  "Die Teams wurden inzwischen geändert (Runde gestartet oder parallel ausgelost). Bitte aktualisieren.": "De teams zijn inmiddels gewijzigd (ronde gestart of gelijktijdig geloot). Vernieuw de pagina.",
+  "Endrangliste veröffentlicht und per Postfach und Push gesendet.": "Eindstand gepubliceerd en verstuurd via postvak en push.",
+  "finalRankingMailFailed_one": "De e-mail naar {{count}} adres kon niet worden verstuurd. Verstuur later opnieuw.",
+  "finalRankingMailFailed_other": "De e-mails naar {{count}} adressen konden niet worden verstuurd. Verstuur later opnieuw."
 }

@@ -292,5 +292,7 @@
   "QR-Code zur Endrangliste": "QR-Code zur Endrangliste",
   "Schnellstart": "Schnellstart",
   "Formation und System wählen – das private Turnier wird sofort angelegt und gestartet. Danach meldest du die Spieler nach und lost die erste Runde aus.": "Formation und System wählen – das private Turnier wird sofort angelegt und gestartet. Danach meldest du die Spieler nach und lost die erste Runde aus.",
-  "Das Turnier wurde angelegt, konnte aber nicht gestartet werden. Du kannst es unter „Turnier starten“ starten.": "Das Turnier wurde angelegt, konnte aber nicht gestartet werden. Du kannst es unter „Turnier starten“ starten."
+  "Das Turnier wurde angelegt, konnte aber nicht gestartet werden. Du kannst es unter „Turnier starten“ starten.": "Das Turnier wurde angelegt, konnte aber nicht gestartet werden. Du kannst es unter „Turnier starten“ starten.",
+  "finalRankingMailFailed_one": "Die E-Mail an {{count}} Adresse konnte nicht verschickt werden. Bitte später erneut senden.",
+  "finalRankingMailFailed_other": "Die E-Mails an {{count}} Adressen konnten nicht verschickt werden. Bitte später erneut senden."
 }
