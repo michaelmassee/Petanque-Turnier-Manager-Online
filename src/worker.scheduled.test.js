@@ -114,6 +114,29 @@ describe('Cron-Wartung', () => {
     expect(messages()).toBe(1);
   });
 
+  it('beendet nicht, wenn zwischen Prüfung und Speichern ein Sync oder eine Terminverschiebung eintrifft', async () => {
+    sql(`INSERT INTO tournaments (id, owner_id, name, date, start_time, location, formation, status, started_at, document_managed,
+        desktop_execution, last_sync_write_at, visibility, created_at, updated_at)
+      VALUES ('sync', 'owner', 'Dokument', '2026-10-01', '10:00', 'Ort', 'tete', 'running', '2026-10-01T08:00:00.000Z', 1, 1, NULL,
+             'private', '2026-10-01', '2026-10-01'),
+             ('verlegt', 'owner', 'Verlegt', '2026-10-01', '10:00', 'Ort', 'tete', 'registration', NULL, 0, 0, NULL,
+             'public', '2026-10-01', '2026-10-01'),
+             ('alt', 'owner', 'Vergessen', '2026-10-01', '10:00', 'Ort', 'tete', 'running', '2026-10-01T08:00:00.000Z', 0, 0, NULL,
+             'public', '2026-10-01', '2026-10-01')`);
+    env.DB.vorBatch((sqlite) => {
+      sqlite.prepare("UPDATE tournaments SET last_sync_write_at = ? WHERE id = 'sync'").run(new Date(scheduledTime).toISOString());
+      sqlite.prepare("UPDATE tournaments SET date = '2026-12-01' WHERE id = 'verlegt'").run();
+    });
+    vi.useFakeTimers({ toFake: ['Date'], now: scheduledTime });
+    try { await runCron(); } finally { vi.useRealTimers(); }
+
+    expect(row("SELECT status FROM tournaments WHERE id = 'sync'").status).toBe('running');
+    expect(row("SELECT status FROM tournaments WHERE id = 'verlegt'").status).toBe('registration');
+    expect(row("SELECT status FROM tournaments WHERE id = 'alt'").status).toBe('finished');
+    expect(env.DB.sqlite.prepare("SELECT event_data FROM postbox_messages WHERE recipient_id = 'owner'").all()
+      .map((message) => JSON.parse(message.event_data).tournamentId)).toEqual(['alt']);
+  });
+
   it('lässt Turniere innerhalb der 48 Stunden unverändert', async () => {
     // Uhr auf scheduledTime 2026-10-23T01:00Z: Beginn 21.10. 10:00 Berlin liegt 41 Stunden zurück.
     vi.useFakeTimers({ toFake: ['Date'], now: scheduledTime });

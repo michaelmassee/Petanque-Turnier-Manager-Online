@@ -1107,7 +1107,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       {selectedTournament && selectedTournamentStatus !== 'finished' && <AnnouncementEditor tournament={selectedTournament} />}
       {/* Rundenzeit wie der Timer im Hauptprojekt, direkt unter der Ankündigung. */}
       {selectedTournament && selectedTournamentStatus !== 'finished' && <TimerEditor key={selectedTournament.id} tournament={selectedTournament}
-        saved={savedTimers[selectedTournament.id]} onSaved={(id, saved) => setSavedTimers((current) => ({ ...current, [id]: saved }))} />}
+        saved={savedTimers[selectedTournament.id]} onSaved={(id, saved) => setSavedTimers((current) => (
+          (current[id]?.revision || 0) > saved.revision ? current : { ...current, [id]: saved }))} />}
       {selectedTournament && selectedTournamentStatus !== 'finished' && (
         <TournamentOptionsPanel tournament={selectedTournament} options={tournamentOptions}
           onSaved={(options) => {

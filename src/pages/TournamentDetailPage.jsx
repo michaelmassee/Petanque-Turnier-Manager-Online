@@ -602,12 +602,13 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
   useEffect(() => {
     if (query.data) onAnnouncement?.(announcement || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [announcement?.text, announcement?.at, Boolean(query.data)]);
+    // tournamentId: Beim Wechsel zu einem Turnier mit gleichem Inhalt muss die Seite den Stand trotzdem neu erfahren.
+  }, [tournamentId, announcement?.text, announcement?.at, Boolean(query.data)]);
   const timer = query.data?.timer;
   useEffect(() => {
     if (query.data) onTimer?.(timer || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(timer || null), Boolean(query.data)]);
+  }, [tournamentId, JSON.stringify(timer || null), Boolean(query.data)]);
 
   if (query.isPending) {
     return <p className="muted">{t('Wird geladen…')}</p>;

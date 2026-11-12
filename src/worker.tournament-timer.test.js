@@ -54,7 +54,7 @@ describe('Rundenzeit-Timer', () => {
     const response = await steuern({ action: 'start', durationSec: 3000, label: '  Runde\n 3 ' });
     expect(response.status).toBe(200);
     const expected = { state: 'running', label: 'Runde 3', durationSec: 3000, endsAt: '2099-09-28T10:50:00.000Z' };
-    expect(await response.json()).toEqual({ timer: expected, settings: { label: 'Runde 3', durationSec: 3000 } });
+    expect(await response.json()).toEqual({ timer: expected, settings: { label: 'Runde 3', durationSec: 3000 }, revision: 1 });
 
     const liveNachher = await live(liveEtag);
     expect(liveNachher.status).toBe(200);
@@ -65,11 +65,13 @@ describe('Rundenzeit-Timer', () => {
     expect((await turnier()).timer).toEqual(expected);
   });
 
-  it('verliert bei gleichzeitigen Änderungen keine davon', async () => {
+  it('verliert bei gleichzeitigen Änderungen keine davon und zählt die Revision in Speicherreihenfolge', async () => {
     await steuern({ action: 'start', durationSec: 600 });
     const responses = await Promise.all([steuern({ action: 'adjust', deltaSec: 60 }), steuern({ action: 'adjust', deltaSec: 60 })]);
     expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    expect((await Promise.all(responses.map((response) => response.json()))).map((data) => data.revision).sort()).toEqual([2, 3]);
     expect((await turnier()).timer).toMatchObject({ endsAt: new Date(NOW + 720_000).toISOString() });
+    expect((await (await steuern({ action: 'stop' })).json()).revision).toBe(4);
   });
 
   it('pausiert mit Restzeit, setzt fort, passt die Zeit an und stoppt mit Vorbelegung', async () => {
@@ -86,7 +88,7 @@ describe('Rundenzeit-Timer', () => {
       .toMatchObject({ endsAt: new Date(NOW + 200_000 + 500_000).toISOString() });
 
     const gestoppt = await (await steuern({ action: 'stop' })).json();
-    expect(gestoppt).toEqual({ timer: null, settings: { label: 'Runde 1', durationSec: 600 } });
+    expect(gestoppt).toEqual({ timer: null, settings: { label: 'Runde 1', durationSec: 600 }, revision: expect.any(Number) });
     expect((await turnier()).timer).toBeNull();
     expect((await turnier('owner-session')).timerSettings).toEqual({ label: 'Runde 1', durationSec: 600 });
     expect((await turnier()).timerSettings).toBeUndefined();

@@ -1669,8 +1669,12 @@ async function finishStaleTournaments(env, now = new Date()) {
     .bind(dateDaysAgo(1, now), new Date(now.getTime() - STALE_TOURNAMENT_HOURS * 3600000).toISOString()).all();
   const stale = (candidates.results || []).filter((row) => isTournamentStale(staleReferenceUtcIso(row), now));
   if (stale.length === 0) return;
-  const statement = db.prepare("UPDATE tournaments SET status = 'finished', updated_at = ? WHERE id = ? AND status IN ('running', 'registration')");
-  const results = await db.batch(stale.map((row) => statement.bind(now.toISOString(), row.id)));
+  // Nur beenden, wenn sich seit dem Lesen nichts geändert hat, das die 48 Stunden verschiebt (Termin, Start, Sync des
+  // Turnierdokuments, Status); sonst bleibt das Turnier bis zum nächsten Lauf unangetastet.
+  const statement = db.prepare(`UPDATE tournaments SET status = 'finished', updated_at = ? WHERE id = ? AND status = ?
+      AND date IS ? AND start_time IS ? AND timezone IS ? AND started_at IS ? AND last_sync_write_at IS ?`);
+  const results = await db.batch(stale.map((row) => statement.bind(now.toISOString(), row.id, row.status,
+    row.date ?? null, row.start_time ?? null, row.timezone ?? null, row.started_at ?? null, row.last_sync_write_at ?? null)));
   console.log(`Finished ${stale.length} stale tournament(s)`);
   // Nur die Turnierleitung erfährt davon (Postfach + Push), Teilnehmer nicht.
   for (let index = 0; index < stale.length; index += 1) {
@@ -7176,12 +7180,16 @@ async function updateTournamentTimer(request, env, tournament) {
   let row = tournament;
   for (let attempt = 0; attempt < TIMER_UPDATE_ATTEMPTS; attempt += 1) {
     const nowMs = Date.now();
-    const timerJson = JSON.stringify(nextTournamentTimer(body, parseTimerColumn(row), nowMs));
+    const current = parseTimerColumn(row);
+    // revision zählt jede gespeicherte Änderung hoch (dank der Bedingung unten in Speicherreihenfolge); die Verwaltung
+    // erkennt daran eine verspätet eintreffende ältere Antwort.
+    const revision = (Number(current.revision) || 0) + 1;
+    const timerJson = JSON.stringify({ ...nextTournamentTimer(body, current, nowMs), revision });
     const result = await env.DB.prepare('UPDATE tournaments SET timer = ?, updated_at = ? WHERE id = ? AND timer IS ?')
       .bind(timerJson, new Date(nowMs).toISOString(), tournament.id, row.timer ?? null).run();
     if (Number(result.meta?.changes || 0)) {
       const saved = { ...row, timer: timerJson };
-      return json({ timer: tournamentTimer(saved), settings: tournamentTimerSettings(saved) });
+      return json({ timer: tournamentTimer(saved), settings: tournamentTimerSettings(saved), revision });
     }
     row = await env.DB.prepare('SELECT id, status, timer FROM tournaments WHERE id = ?').bind(tournament.id).first();
     if (!row) throw new HttpError(404, 'Turnier nicht gefunden');

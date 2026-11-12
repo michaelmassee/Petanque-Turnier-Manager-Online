@@ -183,6 +183,31 @@ describe('Turnierseite', () => {
     expect(screen.queryByText('Alt')).not.toBeInTheDocument();
   });
 
+  it('zeigt den Timer auch nach dem Wechsel zu einem Turnier mit gleichem Timer', async () => {
+    const timer = { state: 'paused', label: 'Runde 2', remainingSec: 754 };
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({ status: 'running', rounds: [], ranking: [], dataAsOf: null, timer })));
+    const first = tournamentWith({});
+    const second = tournamentWith({ id: 't2', name: 'Winterturnier' });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const page = (tournament) => (
+      <QueryClientProvider client={client}>
+        <TournamentBoardPage tournamentId={tournament.id} tournaments={[first, second]} language="de" />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(page(first));
+    expect(await screen.findByText('12:34')).toBeInTheDocument();
+
+    rerender(page(second));
+    expect(await screen.findByRole('heading', { name: 'Winterturnier' })).toBeInTheDocument();
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/tournaments/t2/schedule', expect.anything()));
+    expect(await screen.findByText('12:34')).toBeInTheDocument();
+
+    // Zurück zum bereits geladenen ersten Turnier: kein Ladezustand, gleicher Timer – trotzdem neu weitergeben.
+    rerender(page(first));
+    expect(await screen.findByRole('heading', { name: 'Herbstturnier' })).toBeInTheDocument();
+    expect(await screen.findByText('12:34')).toBeInTheDocument();
+  });
+
   it('zeigt ohne sichtbaren Spielplan keinen (womöglich veralteten) Timer aus der Turnierliste', () => {
     global.fetch = vi.fn();
     renderBoard(tournamentWith({ participantsPublic: false, timer: { state: 'running', label: 'Alt', endsAt: '2099-06-01T12:00:00.000Z' } }));

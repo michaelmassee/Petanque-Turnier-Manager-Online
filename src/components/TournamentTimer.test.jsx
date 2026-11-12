@@ -78,7 +78,8 @@ describe('Rundenzeit-Timer (Frontend)', () => {
       <>
         {tournaments.map((tournament) => <button key={tournament.id} type="button" onClick={() => setSelectedId(tournament.id)}>{`Wähle ${tournament.id}`}</button>)}
         <TimerEditor key={selected.id} tournament={selected} saved={savedTimers[selected.id]}
-          onSaved={(id, saved) => setSavedTimers((current) => ({ ...current, [id]: saved }))} />
+          onSaved={(id, saved) => setSavedTimers((current) => (
+            (current[id]?.revision || 0) > saved.revision ? current : { ...current, [id]: saved }))} />
       </>
     );
   }
@@ -106,6 +107,28 @@ describe('Rundenzeit-Timer (Frontend)', () => {
 
     expect(screen.getByRole('button', { name: 'Anhalten' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Neu starten' })).toBeTruthy();
+  });
+
+  it('lässt ein verspätetes älteres „Stoppen“ den neu gestarteten Timer nicht überschreiben', async () => {
+    const running = { state: 'running', label: '', endsAt: new Date(NOW + 600000).toISOString() };
+    let resolveStop;
+    authenticatedApi.mockReturnValueOnce(new Promise((done) => { resolveStop = done; }));
+    render(<Wechsel tournaments={[{ id: 'a', timer: running }, { id: 'b', timer: null }]} />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Stoppen' })); });
+    fireEvent.click(screen.getByRole('button', { name: 'Wähle b' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Wähle a' }));
+
+    // Der Server speichert das Stoppen (revision 2) vor dem Neustart (revision 3); die Antworten kommen umgekehrt an.
+    authenticatedApi.mockResolvedValueOnce({ timer: { ...running, endsAt: new Date(NOW + 300000).toISOString() }, settings: null, revision: 3 });
+    fireEvent.change(screen.getByLabelText('Dauer (MM:SS)'), { target: { value: '5:00' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Neu starten' })); });
+    await act(async () => { resolveStop({ timer: null, settings: null, revision: 2 }); });
+
+    expect(screen.getByRole('button', { name: 'Anhalten' })).toBeTruthy();
+    expect(screen.getByText('05:00')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Wähle b' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Wähle a' }));
+    expect(screen.getByText('05:00')).toBeTruthy();
   });
 
   it('übernimmt eine verspätete Antwort nicht in den Timer des neu gewählten Turniers', async () => {

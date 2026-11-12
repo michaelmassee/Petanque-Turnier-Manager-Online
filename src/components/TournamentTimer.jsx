@@ -155,8 +155,8 @@ export function TimerBanner({ timer, size = 'compact', sound = false }) {
 export function TimerEditor({ tournament, saved = null, onSaved }) {
   const { t } = useTranslation();
   // Die Turnierliste der Seite wird nicht neu geladen: Den gespeicherten Stand führt der Elternteil je Turnier nach
-  // (saved/onSaved), sonst zeigte ein Turnierwechsel hin und zurück wieder den alten Stand. Der Elternteil setzt
-  // key={tournament.id}, damit jeder Wechsel einen frischen Editor ergibt.
+  // (saved/onSaved, nur den Stand mit der höchsten revision), sonst zeigte ein Turnierwechsel hin und zurück wieder den
+  // alten Stand. Der Elternteil setzt key={tournament.id}, damit jeder Wechsel einen frischen Editor ergibt.
   const initialTimer = saved ? saved.timer : tournament.timer;
   const initialSettings = saved?.settings || tournament.timerSettings;
   const [timer, setTimer] = useState(initialTimer || null);
@@ -168,10 +168,21 @@ export function TimerEditor({ tournament, saved = null, onSaved }) {
   const durationSec = parseTimerDuration(duration);
   const remaining = useTimerRemaining(timer);
   const expired = timer?.state === 'running' && remaining === 0;
+  // Revision des angezeigten Stands (Server zählt jede Speicherung hoch). Ältere Antworten – etwa ein verspätetes
+  // „Stoppen“ eines früheren Editors nach erneutem Start – dürfen einen neueren Stand nicht überschreiben.
+  const revisionRef = useRef(Number(saved?.revision) || 0);
+  function showIfNewer(data) {
+    const revision = Number(data.revision) || 0;
+    if (revision < revisionRef.current) return false;
+    revisionRef.current = revision;
+    setTimer(data.timer || null);
+    return true;
+  }
   // Trifft die Antwort eines früheren Editors desselben Turniers erst nach der Rückkehr ein (A → B → A), kommt ihr
   // Stand über saved an; diesen übernehmen, sonst bliebe ein laufender Timer unsichtbar.
   useEffect(() => {
-    if (saved) setTimer(saved.timer || null);
+    if (saved) showIfNewer(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saved]);
   // Eine Antwort, die erst nach einem Turnierwechsel eintrifft, darf nur den Stand ihres eigenen Turniers ändern.
   const mountedRef = useRef(true);
@@ -187,9 +198,9 @@ export function TimerEditor({ tournament, saved = null, onSaved }) {
     setBusy(action + (extra.deltaSec ? String(extra.deltaSec) : ''));
     try {
       const data = await authenticatedApi(`/api/tournaments/${tournamentId}/timer`, { method: 'PUT', body: JSON.stringify({ action, ...extra }) });
-      onSaved?.(tournamentId, { timer: data.timer || null, settings: data.settings || null });
+      onSaved?.(tournamentId, { timer: data.timer || null, settings: data.settings || null, revision: Number(data.revision) || 0 });
       if (!mountedRef.current) return;
-      setTimer(data.timer || null);
+      showIfNewer(data);
       if (successMessage) setMessage(successMessage);
     } catch (requestError) {
       if (mountedRef.current) setError(requestError.message);
