@@ -2225,6 +2225,7 @@ function AppContent() {
               approvalInboxActive={approvalInboxTournamentId === selectedTournamentId}
               onExitApprovalInbox={() => setApprovalInboxTournamentId('')}
               currentUserId={currentUser?.id}
+              currentUser={currentUser}
               clubNames={publishedClubNames}
             />
           </section>

@@ -9,6 +9,7 @@ import { playerSearchTurnstileToken } from '../lib/player-search-turnstile.js';
 import { EMPTY_REGISTRATION_FORM } from '../lib/constants.js';
 import { registrationPayload } from '../lib/domain.js';
 import { RegistrationFields } from './RegistrationFields.jsx';
+import { RegistrationForm } from './RegistrationEditDialog.jsx';
 
 vi.mock('../lib/api.js', () => ({ authenticatedApi: vi.fn() }));
 vi.mock('../lib/player-search-turnstile.js', () => ({ playerSearchTurnstileToken: vi.fn() }));
@@ -124,6 +125,22 @@ describe('Registration player selection', () => {
     await user.click(await screen.findByRole('option', { name: /Olga Orga/ }));
     await waitFor(() => expect(detailCalls()).toHaveLength(1));
     expect(JSON.parse(detailCalls()[0][1].body)).toMatchObject({ userId: 'me' });
+  });
+
+  it('offers the organizer their own account in the organizer registration dialog', async () => {
+    const user = userEvent.setup();
+    authenticatedApi.mockImplementation(async (path) => path === '/api/postbox/recipients' ? { recipients: [recipient], tournaments: [] } : { player });
+    function OrganizerHarness() {
+      const [form, setForm] = useState({ ...EMPTY_REGISTRATION_FORM, tournamentId: 't1', feeSelections: [], registrationAnswers: [] });
+      const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+      return <QueryClientProvider client={client}>
+        <RegistrationForm form={form} setForm={setForm} onSubmit={vi.fn()} tournaments={[{ id: 't1', name: 'Turnier', date: '2026-11-15', formation: 'tete', canManage: true }]}
+          selectedTournamentId="t1" manageMode currentUserId={me.id} currentUser={me} turnstileSiteKey="site-key" />
+      </QueryClientProvider>;
+    }
+    render(<OrganizerHarness />);
+    await user.type(screen.getByLabelText(/^Nachname/), 'Orga');
+    expect(await screen.findByRole('option', { name: /Olga Orga/ })).toBeInTheDocument();
   });
 
   it('copies the chosen slot, preserves team information, sends its receipt and clears it when the name changes', async () => {

@@ -559,6 +559,7 @@ export function RegistrationsManagementPage({
   onExitApprovalInbox,
   turnstileSiteKey,
   currentUserId,
+  currentUser,
   clubNames,
 }) {
   const { t } = useTranslation();
@@ -822,6 +823,7 @@ export function RegistrationsManagementPage({
           invalidField={invalidField}
           saving={saving}
           currentUserId={currentUserId}
+          currentUser={currentUser}
           clubNames={clubNames}
         />
       </EditDialog>
@@ -833,6 +835,7 @@ export function RegistrationsManagementPage({
         language={language}
         turnstileSiteKey={turnstileSiteKey}
         currentUserId={currentUserId}
+        currentUser={currentUser}
         clubNames={clubNames}
         onClose={() => setEditRegistrationId('')}
         onChanged={() => load(tournament?.id)}

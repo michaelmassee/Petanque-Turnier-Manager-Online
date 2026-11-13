@@ -1289,6 +1289,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
         language={i18n.language}
         turnstileSiteKey={turnstileSiteKey}
         currentUserId={currentUserId}
+        currentUser={currentUser}
         onClose={() => setEditRegistrationId('')}
         onChanged={() => queryClient.invalidateQueries({ queryKey: [...queryKey, 'registrations'] })}
         onSaved={handleRegistrationSaved}

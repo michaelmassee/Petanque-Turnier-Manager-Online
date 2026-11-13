@@ -8,7 +8,7 @@ import { Button, EditDialog } from './ui.jsx';
 import { RegistrationFields } from './RegistrationFields.jsx';
 import { TournamentPicker } from './TournamentPicker.jsx';
 
-export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false, currentUserId, clubNames, turnstileSiteKey }) {
+export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournaments, selectedTournamentId, manageMode, invalidField, saving = false, currentUserId, currentUser, clubNames, turnstileSiteKey }) {
   const { t } = useTranslation();
   const selectedValue = form.tournamentId || selectedTournamentId;
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedValue);
@@ -25,6 +25,7 @@ export function RegistrationForm({ form, setForm, onSubmit, onCancel, tournament
       <RegistrationFields
         playerSearchEnabled={Boolean(currentUserId)}
         currentUserId={currentUserId}
+        currentUser={currentUser}
         turnstileSiteKey={turnstileSiteKey}
         tournamentId={selectedValue}
         form={form}
@@ -139,7 +140,7 @@ function LiveLinkResend({ registration, busyId, notRecoverable, onResend }) {
 
 // „Anmeldung bearbeiten“: gemeinsamer Dialog für Anmeldeverwaltung und Turnierdurchführung. Nach dem Speichern meldet
 // onSaved die Erfolgsmeldung an die Seite (der Dialog schließt); Konto-Zuordnung und Live-Link bleiben im offenen Dialog.
-export function RegistrationEditDialog({ registration, tournament, tournaments, language, turnstileSiteKey, currentUserId, clubNames, onClose, onSaved, onChanged, children }) {
+export function RegistrationEditDialog({ registration, tournament, tournaments, language, turnstileSiteKey, currentUserId, currentUser, clubNames, onClose, onSaved, onChanged, children }) {
   const { t } = useTranslation();
   const [form, setForm] = useState(EMPTY_REGISTRATION_FORM);
   const [invalidField, setInvalidField] = useState(null);
@@ -212,6 +213,7 @@ export function RegistrationEditDialog({ registration, tournament, tournaments, 
         invalidField={invalidField}
         saving={saving}
         currentUserId={currentUserId}
+        currentUser={currentUser}
         clubNames={clubNames}
       />
       {children}
