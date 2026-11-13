@@ -168,12 +168,13 @@ describe('Ergebnismeldung bei verbundenem Turnierdokument', () => {
     expect(meldungen().map((zeile) => zeile.status)).toEqual(['superseded', 'superseded']);
   });
 
-  it('meldet bei jeder Sync-Antwort Schalter und Zahl der offenen Meldungen (Huckepack)', async () => {
+  it('meldet bei jeder Sync-Antwort Schalter, Zahl der offenen Meldungen und Turnierstatus (Huckepack)', async () => {
     await melden('bert-session', BERT, 13, 7);
 
     const antwort = await sync('PUT', '/rounds/1', rundeMit(null, null));
 
     expect(antwort.headers.get('X-PTM-Result-Reporting')).toBe('1');
     expect(antwort.headers.get('X-PTM-Open-Result-Reports')).toBe('1');
+    expect(antwort.headers.get('X-PTM-Tournament-Status')).toBe('running');
   });
 });

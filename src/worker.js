@@ -5526,21 +5526,23 @@ async function respondSyncEnvelope(db, tournamentId, envelope, context, headers 
     const row = await getTournamentById(db, tournamentId);
     if (row) body.tournament = toPublicTournament(row, context.user || null);
   }
-  return json(body, envelope.status, { ...headers, ...(await resultReportHeaders(db, tournamentId)) });
+  return json(body, envelope.status, { ...headers, ...(await syncPiggybackHeaders(db, tournamentId)) });
 }
 
 /**
- * Huckepack für das Turnierdokument: Jede Sync-Antwort nennt, ob Spieler Ergebnisse melden dürfen und wie viele
- * Meldungen offen sind. So holt PTM Meldungen ohne eigene Abfrage, sobald es ohnehin schreibt (E-27, E-28).
+ * Huckepack für das Turnierdokument: Jede Sync-Antwort nennt, ob Spieler Ergebnisse melden dürfen, wie viele
+ * Meldungen offen sind und den aktuellen Turnierstatus. So holt PTM Meldungen ohne eigene Abfrage, sobald es ohnehin
+ * schreibt (E-27, E-28), und zeigt einen online geänderten Status (z. B. Entwurf → Anmeldung) ohne eigenen Abruf an.
  */
-async function resultReportHeaders(db, tournamentId) {
-  const row = await db.prepare(`SELECT t.player_result_reporting_enabled AS enabled,
+async function syncPiggybackHeaders(db, tournamentId) {
+  const row = await db.prepare(`SELECT t.player_result_reporting_enabled AS enabled, t.status AS status,
       (SELECT COUNT(*) FROM document_result_reports d WHERE d.tournament_id = t.id AND d.status = 'open') AS open
       FROM tournaments t WHERE t.id = ?`).bind(tournamentId).first();
   if (!row) return {};
   return {
     'X-PTM-Result-Reporting': Number(row.enabled || 0) === 1 ? '1' : '0',
     'X-PTM-Open-Result-Reports': String(Number(row.open || 0)),
+    ...(row.status ? { 'X-PTM-Tournament-Status': String(row.status) } : {}),
   };
 }
 
