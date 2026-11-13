@@ -402,6 +402,8 @@ export function registrationStatusLabel(tournament, language) {
     return `${i18next.t('Anmeldung ab', { lng: language })} ${formatTournamentDateTime(tournament.registrationOpensAt, language, tournament.timezone)}`;
   }
   if (kind === 'waitlist') return i18next.t('Anmeldung Warteliste möglich', { lng: language });
+  // Entwurf: Anmeldung noch nicht freigegeben – nicht „nicht mehr möglich“ (z. B. privater Entwurf über Teilen-Link).
+  if (kind === 'draft') return i18next.t('Die Anmeldung ist noch nicht geöffnet', { lng: language });
   if (kind !== 'open') return i18next.t('Anmeldung nicht mehr möglich', { lng: language });
 
   if (!tournament.maxRegistrations) {

@@ -171,6 +171,8 @@ describe('Turnier-Payload', () => {
     expect(registrationStatusLabel({ ...full, waitlistEnabled: false }, 'de')).toBe('Anmeldung nicht mehr möglich');
     expect(registrationStatusLabel({ ...full, waitlistRegistrations: 3, registrationDeadline: '2000-01-01T00:00:00.000Z' }, 'de')).toBe('Anmeldung nicht mehr möglich');
     expect(registrationStatusLabel({ ...full, activeRegistrations: 18 }, 'de')).toBe('2 von 20 Plätzen frei');
+    expect(registrationStatusLabel({ ...full, status: 'draft' }, 'de')).toBe('Die Anmeldung ist noch nicht geöffnet');
+    expect(registrationStatusLabel({ ...full, status: 'draft' }, 'en')).toBe('Registration has not opened yet');
   });
 
   it('nennt beim roten Badge den Grund: Anmeldeschluss abgelaufen oder ausgebucht', () => {
