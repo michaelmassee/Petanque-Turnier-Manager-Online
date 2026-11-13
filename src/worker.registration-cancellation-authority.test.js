@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
-import worker from './worker.js';
+import worker, { listPublicParticipants } from './worker.js';
 
 describe('Abmeldung: Berechtigungen', () => {
   let env;
@@ -66,5 +66,43 @@ describe('Abmeldung: Berechtigungen', () => {
   ])('verweigert die Abmeldung für %s', async (_role, session) => {
     expect((await requestAs(session)).status).toBe(403);
     expect(env.DB.sqlite.prepare("SELECT status FROM registrations WHERE id = 'r1'").get().status).toBe('confirmed');
+  });
+
+  describe('nach dem Turnierstart', () => {
+    const status = () => env.DB.sqlite.prepare("SELECT status FROM registrations WHERE id = 'r1'").get().status;
+    const teilnehmer = async (session) => (await (await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/participants', {
+      headers: { Cookie: `ptm_session=${session}` } }), env)).json()).participants;
+
+    beforeEach(() => {
+      env.DB.sqlite.exec("UPDATE tournaments SET status = 'running', participants_public = 1 WHERE id = 't1'");
+    });
+
+    it('lässt Spieler weder per Button noch per Abmelde-Link absagen', async () => {
+      const antwort = await requestAs('registrant-session');
+      expect(antwort.status).toBe(409);
+      expect((await antwort.json()).error).toBe('Das Turnier läuft bereits. Absagen ist nur noch über die Turnierleitung möglich.');
+      expect((await cancelByToken()).status).toBe(409);
+      expect(status()).toBe('confirmed');
+    });
+
+    it('blendet den Absagen-Button aus', async () => {
+      expect(await teilnehmer('registrant-session')).toEqual([expect.objectContaining({ registrationId: null })]);
+    });
+
+    it('lässt die Turnierleitung weiter absagen', async () => {
+      expect((await requestAs('owner-session')).status).toBe(200);
+      expect(status()).toBe('cancelled');
+    });
+
+    it('sperrt bei verbundenem Turnierdokument auch die Turnierleitung', async () => {
+      env.DB.sqlite.exec("UPDATE tournaments SET desktop_execution = 1 WHERE id = 't1'");
+      expect((await requestAs('owner-session')).status).toBe(409);
+      expect(status()).toBe('confirmed');
+    });
+  });
+
+  it('zeigt den Absagen-Button vor dem Start', async () => {
+    const { participants } = await (await listPublicParticipants(env.DB, 't1', { id: 'registrant', email: 'anmelder@example.test' })).json();
+    expect(participants).toEqual([expect.objectContaining({ registrationId: 'r1' })]);
   });
 });

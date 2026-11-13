@@ -2709,6 +2709,7 @@ export default {
           }
           return await listPublicParticipants(env.DB, tournament.id, session?.user || null, {
             approvalRequired: Boolean(Number(tournament.approval_required || 0)),
+            cancellationOpen: playerCancellationOpen(tournament.status, tournament.desktop_execution),
           });
         }
       }
@@ -2967,9 +2968,13 @@ export default {
           throw new HttpError(404, 'Anmeldung nicht gefunden');
         }
         const isOwnRegistration = canCancelOwnRegistration(registration, session.user);
-        if (!isOwnRegistration && !canManageTournament(registration, session.user)) {
+        const isManager = canManageTournament(registration, session.user);
+        if (!isOwnRegistration && !isManager) {
           throw new HttpError(403, 'Zugriff verweigert');
         }
+        // Wie der Abmelde-Link: Nach dem Start führt das Turnierdokument die Meldeliste, Spieler sagen nicht mehr selbst ab.
+        assertRegistrationOnlineEditable(registration);
+        if (!isManager) assertPlayerCancellationOpen(registration);
         const result = await cancelRegistration(env.DB, registration.id);
         await notifyOrganizerOfCancellation(env, registration, session.user.id);
         try {
@@ -7554,7 +7559,7 @@ async function confirmPendingRegistrations(env, tournament, appOrigin) {
   return json({ confirmedCount: confirmedRegistrations.length });
 }
 
-export async function listPublicParticipants(db, tournamentId, currentUser = null, { approvalRequired = false } = {}) {
+export async function listPublicParticipants(db, tournamentId, currentUser = null, { approvalRequired = false, cancellationOpen = true } = {}) {
   const result = await db
     .prepare(
       `SELECT id, email, first_name, last_name, club, team_name,
@@ -7569,9 +7574,9 @@ export async function listPublicParticipants(db, tournamentId, currentUser = nul
     .all();
 
   const toParticipant = (row) => {
-    // Jedes verknüpfte Teammitglied darf die gemeinsame Anmeldung absagen. Bei
+    // Jedes verknüpfte Teammitglied darf die gemeinsame Anmeldung absagen, solange das Turnier nicht läuft. Bei
     // älteren Meldungen bleibt die E-Mail-Zuordnung als Fallback erhalten.
-    const canCancel = canCancelOwnRegistration(row, currentUser);
+    const canCancel = cancellationOpen && canCancelOwnRegistration(row, currentUser);
     return {
       registrationId: canCancel ? row.id : null,
       firstName: row.first_name,
@@ -9596,6 +9601,7 @@ async function cancelRegistrationByToken(request, env) {
   }
 
   assertRegistrationOnlineEditable(registration);
+  assertPlayerCancellationOpen(registration);
 
   const result = await cancelRegistration(env.DB, registration.id);
   await notifyOrganizerOfCancellation(env, registration);
@@ -10191,6 +10197,24 @@ export async function relinkRegistrationSlot(env, registration, slot, user) {
 function assertRegistrationOnlineEditable(registration) {
   if (Number(registration.desktop_execution || 0) === 1) {
     throw new HttpError(409, 'Die Meldeliste wird nach Turnierstart ausschließlich im Turnierdokument geführt.');
+  }
+}
+
+const STARTED_TOURNAMENT_STATUSES = ['running', 'finished'];
+
+/**
+ * Spieler sagen nur vor dem Turnierstart selbst ab (Button und Abmelde-Link). Danach stehen sie in Runden und
+ * Rangliste; ein Ausstieg geht nur noch über die Turnierleitung (Teilnahme „ausgesetzt“).
+ */
+export function playerCancellationOpen(tournamentStatus, desktopExecution) {
+  return !STARTED_TOURNAMENT_STATUSES.includes(tournamentStatus) && Number(desktopExecution || 0) !== 1;
+}
+
+function assertPlayerCancellationOpen(registration) {
+  if (STARTED_TOURNAMENT_STATUSES.includes(registration.tournament_status)) {
+    throw new HttpError(409, 'Das Turnier läuft bereits. Absagen ist nur noch über die Turnierleitung möglich.', {
+      code: 'tournament_running',
+    });
   }
 }
 
