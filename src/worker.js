@@ -3353,6 +3353,15 @@ export default {
           { user: auth.user });
       }
 
+      const syncFinishMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/finish$/);
+      if (syncFinishMatch && request.method === 'POST') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncFinishMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        return await executeSyncWrite(request, env.DB, tournament,
+          () => finishTournamentFromSync(request, env, tournament, auth.user, url.origin), { user: auth.user });
+      }
+
       const syncRegistrationsMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registrations$/);
       if (syncRegistrationsMatch) {
         const auth = await requireApiKey(request, env.DB);
@@ -3520,7 +3529,7 @@ export default {
       await notifyTournamentChanged(env, changedTournamentId, source);
     }
     if (response.ok && request.method !== 'GET' && env.REGISTRATION_OPENING_SCHEDULER
-      && (/^\/api\/(?:sync\/)?tournaments(?:\/[^/]+(?:\/(?:metadata|publication|registration-closed|start|reset))?)?$/.test(url.pathname)
+      && (/^\/api\/(?:sync\/)?tournaments(?:\/[^/]+(?:\/(?:metadata|publication|registration-closed|start|finish|reset))?)?$/.test(url.pathname)
         || /^\/api\/(?:tournament-reports|admin\/petanque-aktuell\/import)/.test(url.pathname))) {
       try { await synchronizeOpeningSchedule(env); }
       catch (error) {
@@ -9392,6 +9401,69 @@ function assertDesktopExecution(tournament) {
   if (Number(tournament.desktop_execution || 0) !== 1) {
     throw new HttpError(409, 'Dieses Turnier wird online durchgeführt. Runden werden nicht aus dem Turnierdokument übernommen.');
   }
+}
+
+/**
+ * Turnierdokument: Turnier abschließen (Gegenstück zu {@link startTournamentFromSync}). Setzt den Status auf
+ * „abgeschlossen“ und benachrichtigt wie ein Abschluss in der Web-App. Mit publishRanking wird die zuletzt aus dem
+ * Dokument übertragene Rangliste als Endrangliste eingefroren und auf der Turnierseite veröffentlicht; mit notify
+ * erhalten die bestätigten Teilnehmer Postfach-Eintrag, Push und Mail - aber nur beim ersten Versand: Ein erneuter
+ * Abschluss aus dem Dokument schreibt niemanden ein zweites Mal an (alreadyMailed).
+ *
+ *   POST /api/sync/tournaments/:id/finish  { publishRanking?: boolean, notify?: boolean }
+ *        -> { finished: true, rankingPublished, mailed, alreadyMailed }
+ *
+ * Eine spätere Wiederaufnahme (Rundenstart aus dem Dokument) bleibt möglich, siehe startTournamentFromSync.
+ */
+export async function finishTournamentFromSync(request, env, existing, user, origin) {
+  const db = env.DB;
+  const body = await readJson(request).catch(() => ({}));
+  const publishRanking = body.publishRanking === true;
+  const notify = publishRanking && body.notify === true;
+  const now = new Date().toISOString();
+  const statements = [
+    db.prepare("UPDATE tournaments SET status = 'finished', updated_at = ? WHERE id = ?").bind(now, existing.id),
+  ];
+  let shareToken = null;
+  let mailNow = false;
+  if (publishRanking) {
+    const ranking = await computeTournamentRanking(db, existing);
+    if (!ranking.length) throw new HttpError(409, 'Es gibt noch keine Rangliste', { code: 'ranking_missing' });
+    if (notify && existing.visibility === 'private') {
+      const share = await db.prepare('SELECT token FROM tournament_share_links WHERE tournament_id = ?').bind(existing.id).first();
+      if (!share?.token) {
+        throw new HttpError(409, 'Aktiviere zuerst den Freigabelink des privaten Turniers, bevor du die Endrangliste an die Teilnehmer sendest.', {
+          code: 'share_link_missing',
+        });
+      }
+      shareToken = share.token;
+    }
+    const previous = await db.prepare('SELECT mailed_at FROM tournament_final_rankings WHERE tournament_id = ?').bind(existing.id).first();
+    mailNow = notify && !previous?.mailed_at;
+    const mailedAt = mailNow ? now : previous?.mailed_at || null;
+    statements.push(
+      db.prepare(`INSERT INTO tournament_final_rankings (tournament_id, ranking_json, published_at, mailed_at) VALUES (?, ?, ?, ?)
+          ON CONFLICT(tournament_id) DO UPDATE SET ranking_json = excluded.ranking_json, published_at = excluded.published_at,
+            mailed_at = excluded.mailed_at`).bind(existing.id, JSON.stringify(ranking), now, mailedAt),
+      db.prepare('UPDATE tournaments SET final_ranking_published_at = ? WHERE id = ?').bind(now, existing.id),
+    );
+  }
+  return {
+    statements,
+    response: {
+      envelope: {
+        status: 200,
+        body: { finished: true, rankingPublished: publishRanking, mailed: mailNow, alreadyMailed: notify && !mailNow },
+        hydrate: { kind: 'tournament' },
+      },
+    },
+    async afterCommit() {
+      // Live-Hub und Turnierseite benachrichtigt der Router für alle Sync-Schreibzugriffe (Quelle Dokument).
+      const updated = await getTournamentById(db, existing.id);
+      await notifyTournamentPublicationChange(env, existing, updated);
+      if (mailNow) await notifyFinalRanking(env, updated, user, origin, shareToken);
+    },
+  };
 }
 
 /**
