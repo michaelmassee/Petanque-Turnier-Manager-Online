@@ -5145,16 +5145,16 @@ details[open] > .play-round-summary::before {
   border: 0;
 }
 
-.live-ranking summary {
-  cursor: pointer;
-  color: #1677ff;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
+/* Kopf wie die Überschriften der anderen Live-Karten: links, gleiche Größe und Einrückung. */
+.live-ranking > .play-round-summary {
+  justify-content: flex-start;
+  gap: 0;
+  padding: 20px 24px;
+  font-size: 1.1rem;
 }
 
 .live-ranking .table-scroll {
-  max-width: 100%;
+  margin: 0 24px 24px;
   max-height: 60vh;
   overflow: auto;
 }

@@ -335,13 +335,21 @@ function RankingCard({ live, tournament }) {
       <p className="muted">
         {t('Bilanz')}: {live.summary.wins} {t('Siege')} · {live.summary.losses} {t('Niederlagen')} · {t('Punkte')} {live.summary.pointsFor}:{live.summary.pointsAgainst}
       </p>
-      <details className="live-ranking">
-        <summary>{t('Rangliste anzeigen')}</summary>
-        <div className="table-scroll">
-          <RankingTable tournament={tournament} entries={live.ranking} />
-        </div>
-      </details>
     </section>
+  );
+}
+
+// Ganze Rangliste als eigenes, zugeklapptes Panel wie „Rangliste“ in der Spielverwaltung.
+function RankingPanel({ live, tournament }) {
+  const { t } = useTranslation();
+  if (!live.ranking.length || tournament.type === 'ko') return null;
+  return (
+    <details className="panel ranking-panel live-ranking">
+      <summary className="play-round-summary"><span>{t('Rangliste')}</span></summary>
+      <div className="table-scroll">
+        <RankingTable tournament={tournament} entries={live.ranking} />
+      </div>
+    </details>
   );
 }
 
@@ -562,6 +570,7 @@ export function LiveDetail({ queryKey, path, language, navigate = () => {}, toke
         resultReport={registration.resultReport} path={path}
         onResultSaved={(updated) => queryClient.setQueryData(queryKey, updated)} onRefresh={() => query.refetch()} />}
       <RankingCard live={live} tournament={tournament} />
+      <RankingPanel live={live} tournament={tournament} />
       <HistoryCard live={live} />
       {tournament.status === 'running' && <LivePushToggle path={path} registrationId={registration.id} />}
       {refresh}

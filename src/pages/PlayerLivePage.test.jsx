@@ -212,8 +212,9 @@ describe('Live-Ansicht für Spieler', () => {
     Object.assign(payload.live.ranking[0], { bhz: 5, fbhz: 12, wertung: 121, losses: 0, gameDiff: 1, pointsFor: 13, pointsAgainst: 5 });
     global.fetch = vi.fn().mockResolvedValue(jsonResponse(payload));
     renderDetail();
-    const table = (await screen.findByRole('region', { name: 'Mein Platz' })).querySelector('table');
-    fireEvent.click(screen.getByText('Rangliste anzeigen'));
+    await screen.findByRole('region', { name: 'Mein Platz' });
+    fireEvent.click(screen.getByText('Rangliste'));
+    const table = document.querySelector('.live-ranking table');
     expect(within(table).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(headers);
     const own = table.querySelector('.live-own-row');
     expect(within(own).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(values);
@@ -238,8 +239,9 @@ describe('Live-Ansicht für Spieler', () => {
     Object.assign(payload.tournament, { type: 'formule_x', registrationType: 'forme' });
     global.fetch = vi.fn().mockResolvedValue(jsonResponse(payload));
     renderDetail();
-    const table = (await screen.findByRole('region', { name: 'Mein Platz' })).querySelector('table');
-    fireEvent.click(screen.getByText('Rangliste anzeigen'));
+    await screen.findByRole('region', { name: 'Mein Platz' });
+    fireEvent.click(screen.getByText('Rangliste'));
+    const table = document.querySelector('.live-ranking table');
     expect(within(table).getAllByRole('columnheader').map((cell) => cell.textContent))
       .toEqual(['Platz', 'Team', 'Siege', 'Punkte', '+', '−', 'Δ']);
   });
@@ -250,7 +252,7 @@ describe('Live-Ansicht für Spieler', () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse(payload));
     renderDetail();
     await screen.findByText('Sommer-Supermêlée');
-    expect(screen.queryByText('Rangliste anzeigen')).not.toBeInTheDocument();
+    expect(screen.queryByText('Rangliste')).not.toBeInTheDocument();
   });
 
   it('zeigt keinen Beta-Hinweis mehr', () => {
