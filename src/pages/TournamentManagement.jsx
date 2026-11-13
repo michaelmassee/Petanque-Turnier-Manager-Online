@@ -832,7 +832,8 @@ export function TournamentList({
     setShareMessage('');
     try {
       const shareUrl = await tournamentShareUrl(tournament);
-      const shareData = { title: tournament.name, text: `${tournament.name}\n${shareUrl}`, url: shareUrl };
+      // Link nur im Text: mit zusätzlichem url hängt Android ihn ein zweites Mal an.
+      const shareData = { title: tournament.name, text: `${tournament.name}\n${shareUrl}` };
       if (navigator.share) await navigator.share(shareData);
       else {
         if (!navigator.clipboard?.writeText) throw new Error(t('Teilen wird von diesem Gerät nicht unterstützt'));
