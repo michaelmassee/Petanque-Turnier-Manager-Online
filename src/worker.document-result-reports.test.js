@@ -55,6 +55,14 @@ describe('Ergebnismeldung bei verbundenem Turnierdokument', () => {
     JSON.stringify([ANNA]), JSON.stringify([BERT]));
   });
 
+  // Verbundene Turniere haben keine festen Online-Teams; die Nummer kommt aus der Meldeliste des Dokuments.
+  it('zeigt in der Live-Ansicht die Teamnummern aus dem Turnierdokument', async () => {
+    const antwort = await sync('PUT', '/rounds/1', { matches: [{ teamA: [ANNA], teamB: [BERT], teamANumber: 4, teamBNumber: 6 }] });
+    expect(antwort.status).toBe(200);
+
+    expect((await live('anna-session', ANNA)).live.currentMatch).toMatchObject({ ownTeamNumber: 4, opponentTeamNumber: 6 });
+  });
+
   it('speichert die Meldung aus Sicht von Team B richtig herum und lässt die Partie unverändert', async () => {
     expect((await melden('bert-session', BERT, 13, 7)).status).toBe(200);
 

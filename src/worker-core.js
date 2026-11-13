@@ -494,6 +494,16 @@ function syncScore(value) {
   return value === undefined || value === null || value === '' ? null : validateMatchScore(value);
 }
 
+const MAX_SYNC_TEAM_NUMBER = 9999;
+
+// Teamnummer aus dem Turnierdokument (Nr. der Meldeliste); fehlt bei Supermêlée und Mêlée-Spielern ohne feste Teams.
+function syncTeamNumber(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1 || number > MAX_SYNC_TEAM_NUMBER) throw new HttpError(400, 'Ungültige Teamnummer');
+  return number;
+}
+
 function syncRegistrationIds(value, validRegistrationIds, errorMessage) {
   if (!Array.isArray(value) || value.length > 3) throw new HttpError(400, errorMessage);
   const ids = value.map((id) => text(id));
@@ -506,7 +516,8 @@ function syncRegistrationIds(value, validRegistrationIds, errorMessage) {
 /**
  * Prüft die Partien einer Spielrunde aus dem Turnierdokument. Die Runde wird serverseitig
  * komplett ersetzt, daher muss jede Partie vollständig und jede Meldung höchstens einmal
- * vertreten sein. Team B darf leer sein (Freilos), Scores dürfen fehlen (Partie läuft).
+ * vertreten sein. Team B darf leer sein (Freilos), Scores dürfen fehlen (Partie läuft). Die Teamnummern aus dem
+ * Dokument sind optional.
  */
 export function parseSyncRoundMatches(body, validRegistrationIds) {
   const entries = body?.matches;
@@ -531,6 +542,8 @@ export function parseSyncRoundMatches(body, validRegistrationIds) {
       teamB,
       scoreA: syncScore(entry?.scoreA),
       scoreB: syncScore(entry?.scoreB),
+      teamANumber: syncTeamNumber(entry?.teamANumber),
+      teamBNumber: teamB.length ? syncTeamNumber(entry?.teamBNumber) : null,
       court,
       stageLabel: nullableText(entry?.stageLabel),
       matchIndex,

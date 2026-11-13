@@ -1236,7 +1236,7 @@
   "Partien müssen als Array übergeben werden": "Le partite devono essere fornite come array",
   "Ungültige Meldung in einer Partie": "Iscrizione non valida in una partita",
   "Eine Meldung ist in der Runde mehrfach eingeteilt": "Un’iscrizione è sorteggiata più volte nel turno",
-  "Ungültige Bahn": "Campo non valido",
+  "Ungültige Bahn": "Campo non valido", "Ungültige Teamnummer": "Numero di squadra non valido",
   "Ungültige Partie-Nummer": "Numero di partita non valido",
   "Ungültige Rundennummer": "Numero di turno non valido",
   "Rangliste muss als Array übergeben werden": "La classifica deve essere fornita come array",

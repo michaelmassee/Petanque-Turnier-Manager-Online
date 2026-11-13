@@ -7640,18 +7640,21 @@ function toPublicMatch(row, playersById, display = null) {
     parseTeamIds(idsJson).map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' });
   const teamA = resolvePlayers(row.team_a_registration_ids);
   const teamB = resolvePlayers(row.team_b_registration_ids);
+  // Feste Online-Teams nummeriert der Server, bei verbundenem Turnierdokument kommt die Nummer aus dem Dokument.
+  const teamANumber = display?.numbers.get(row.team_a_id) ?? row.team_a_number ?? null;
+  const teamBNumber = teamB.length ? display?.numbers.get(row.team_b_id) ?? row.team_b_number ?? null : null;
   const labels = display && display.mode !== 'NAME' ? {
-    teamALabel: teamDisplayLabel(teamA, display.numbers.get(row.team_a_id), display.mode),
-    teamBLabel: teamB.length ? teamDisplayLabel(teamB, display.numbers.get(row.team_b_id), display.mode) : null,
+    teamALabel: teamDisplayLabel(teamA, teamANumber, display.mode),
+    teamBLabel: teamB.length ? teamDisplayLabel(teamB, teamBNumber, display.mode) : null,
   } : {};
   return {
     id: row.id,
     teamA,
     teamB,
     ...labels,
-    // Teamnummer (Reihenfolge der festen Teams) für Live-Ansicht und Turnierseite; ohne feste Teams null.
-    teamANumber: display?.numbers.get(row.team_a_id) ?? null,
-    teamBNumber: teamB.length ? display?.numbers.get(row.team_b_id) ?? null : null,
+    // Teamnummer für Live-Ansicht und Turnierseite; ohne feste Teams und ohne Nummer aus dem Dokument null.
+    teamANumber,
+    teamBNumber,
     scoreA: row.score_a,
     scoreB: row.score_b,
     noShow: row.no_show,
@@ -9394,6 +9397,7 @@ function assertDesktopExecution(tournament) {
  *   PUT    /api/sync/tournaments/:id/rounds/:roundNumber
  *          { matches: [{ teamA: [registrationId], teamB: [registrationId] (leer = Freilos),
  *                        scoreA, scoreB (0-13 oder null = läuft), court (optional, max. 40 Zeichen),
+ *                        teamANumber, teamBNumber (optional, Teamnummer aus dem Dokument),
  *                        stageLabel (optional), matchIndex (optional, Default = Position) }] }
  *          -> { roundNumber, matchCount }
  *   DELETE /api/sync/tournaments/:id/rounds/:roundNumber  -> { ok, deleted }
@@ -9418,9 +9422,10 @@ async function syncPutRound(request, db, tournament, roundNumberValue) {
   }
   for (const match of matches) {
     statements.push(db.prepare(`INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids,
-        score_a, score_b, match_index, stage_label, court, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        team_a_number, team_b_number, score_a, score_b, match_index, stage_label, court, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(match.teamA), JSON.stringify(match.teamB),
-        match.scoreA, match.scoreB, match.matchIndex, match.stageLabel, match.court, now, now));
+        match.teamANumber, match.teamBNumber, match.scoreA, match.scoreB, match.matchIndex, match.stageLabel, match.court, now, now));
   }
   statements.push(...supersedeResultReportStatements(db, tournament.id, roundNumber, matches, now));
   return {

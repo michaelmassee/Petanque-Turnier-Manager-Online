@@ -97,9 +97,19 @@ describe('Sync von Runden und Rangliste aus dem Turnierdokument', () => {
       { teamA: ['r3'], scoreA: null, stageLabel: 'Finale', matchIndex: 4 },
     ] }, ids);
     expect(matches).toEqual([
-      { teamA: ['r1'], teamB: ['r2'], scoreA: 13, scoreB: 5, court: '12', stageLabel: null, matchIndex: 0 },
-      { teamA: ['r3'], teamB: [], scoreA: null, scoreB: null, court: null, stageLabel: 'Finale', matchIndex: 4 },
+      { teamA: ['r1'], teamB: ['r2'], scoreA: 13, scoreB: 5, teamANumber: null, teamBNumber: null, court: '12', stageLabel: null, matchIndex: 0 },
+      { teamA: ['r3'], teamB: [], scoreA: null, scoreB: null, teamANumber: null, teamBNumber: null, court: null, stageLabel: 'Finale', matchIndex: 4 },
     ]);
+  });
+
+  it('übernimmt die Teamnummern aus dem Dokument, beim Freilos nur die von Team A', () => {
+    const matches = parseSyncRoundMatches({ matches: [
+      { teamA: ['r1'], teamB: ['r2'], teamANumber: 4, teamBNumber: '6' },
+      { teamA: ['r3'], teamANumber: 3, teamBNumber: 9 },
+    ] }, ids);
+    expect(matches.map(({ teamANumber, teamBNumber }) => [teamANumber, teamBNumber])).toEqual([[4, 6], [3, null]]);
+    expect(() => parseSyncRoundMatches({ matches: [{ teamA: ['r1'], teamANumber: 0 }] }, ids)).toThrow('Ungültige Teamnummer');
+    expect(() => parseSyncRoundMatches({ matches: [{ teamA: ['r1'], teamANumber: 1.5 }] }, ids)).toThrow('Ungültige Teamnummer');
   });
 
   it('weist ungültige Partien ab', () => {
