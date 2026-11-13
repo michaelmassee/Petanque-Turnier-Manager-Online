@@ -485,13 +485,29 @@ export function RegistrationsPanel({
         onReset={onResetFilters}
         resetDisabled={!filtered}
       />
-      {choiceSummary.map((question) => (
-        <p className="registration-choice-summary" key={question.id}>
-          <strong className="registration-question-label" data-i18n-skip>{question.label}:</strong>
-          {question.options.map((option) => <span key={option.id}><span data-i18n-skip>{option.label}</span> {option.count}</span>)}
-          {question.open > 0 && <span className="muted">{t('ohne Auswahl')} {question.open}</span>}
-        </p>
-      ))}
+      {choiceSummary.length > 0 && (
+        <table className="registration-choice-summary">
+          {choiceSummary.map((question) => (
+            <tbody key={question.id}>
+              <tr>
+                <th colSpan={2} scope="colgroup" className="registration-question-label" data-i18n-skip>{question.label}</th>
+              </tr>
+              {question.options.map((option) => (
+                <tr key={option.id}>
+                  <td data-i18n-skip>{option.label}</td>
+                  <td className="registration-choice-count">{option.count}</td>
+                </tr>
+              ))}
+              {question.open > 0 && (
+                <tr className="muted">
+                  <td>{t('ohne Auswahl')}</td>
+                  <td className="registration-choice-count">{question.open}</td>
+                </tr>
+              )}
+            </tbody>
+          ))}
+        </table>
+      )}
       {pendingRegistrations.length > 0 && (
         <section className="user-list registration-list" aria-label={t('Offene Anmeldungen')}>
           <div className="section-title">

@@ -398,10 +398,29 @@ a.button {
 
 /* Zählung der Auswahlfragen in der Meldeliste (z. B. Essen für den Einkauf). */
 .registration-choice-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin: 0 0 8px;
+  border-collapse: collapse;
+  margin: 0 0 12px;
+}
+
+.registration-choice-summary th {
+  padding: 10px 0 4px;
+  text-align: left;
+}
+
+.registration-choice-summary tbody:first-child th {
+  padding-top: 0;
+}
+
+.registration-choice-summary td {
+  padding: 2px 0;
+  border-top: 1px solid #e2e7f0;
+  vertical-align: top;
+}
+
+.registration-choice-summary .registration-choice-count {
+  padding-left: 16px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Ältere Beschreibungen ohne Rich-Text-Format: Zeilenumbrüche aus dem früheren Textfeld bleiben sichtbar. */

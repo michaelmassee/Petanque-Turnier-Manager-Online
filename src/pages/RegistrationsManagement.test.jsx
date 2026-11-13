@@ -281,7 +281,7 @@ describe('Anmeldungsverwaltung: Anmeldedetails', () => {
         onEdit={noop} onConfirm={noop} onConfirmAll={noop} onDelete={noop} busyId="" />,
     );
 
-    expect(container.querySelector('.registration-choice-summary')).toHaveTextContent('Essen:Vegetarisch 1Nichts 0ohne Auswahl 1');
+    expect(container.querySelector('.registration-choice-summary')).toHaveTextContent('EssenVegetarisch1Nichts0ohne Auswahl1');
     expect(screen.getByLabelText('Frage beantwortet')).toHaveTextContent('Essen: Vegetarisch');
     fireEvent.click(screen.getByText('Anmeldedetails anzeigen'));
     expect(screen.getByRole('heading', { name: 'Teilnehmerfragen' }).parentElement).toHaveTextContent('Essen: Vegetarisch (Hauptspieler)');
