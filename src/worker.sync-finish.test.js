@@ -110,6 +110,25 @@ describe('Turnier aus dem Turnierdokument abschließen', () => {
     expect(mails()).toEqual([]);
   });
 
+  it.each([
+    ['ein online durchgeführtes Turnier', 'running'],
+    ['einen Entwurf', 'draft'],
+    ['ein Turnier in der Anmeldephase', 'registration'],
+    ['ein online abgeschlossenes Turnier', 'finished'],
+  ])('schließt %s nicht aus dem Dokument ab', async (_name, status) => {
+    sql('UPDATE tournaments SET status = ?, desktop_execution = 0 WHERE id = ?', status, 't1');
+    await ranglisteUebertragen();
+
+    const antwort = await abschliessen({ publishRanking: true, notify: true });
+
+    expect(antwort.status).toBe(409);
+    expect(await antwort.json()).toMatchObject({ details: { code: 'not_desktop_execution' } });
+    expect(turnier()).toEqual({ status, final_ranking_published_at: null });
+    expect(endrangliste()).toBeUndefined();
+    expect(env.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM postbox_messages WHERE event_type = 'tournament_status_changed'").get().n).toBe(0);
+    expect(mails()).toEqual([]);
+  });
+
   it('erlaubt die spätere Wiederaufnahme per Rundenstart aus dem Dokument', async () => {
     await abschliessen({});
 

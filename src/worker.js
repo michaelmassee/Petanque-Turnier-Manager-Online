@@ -9417,6 +9417,13 @@ function assertDesktopExecution(tournament) {
  */
 export async function finishTournamentFromSync(request, env, existing, user, origin) {
   const db = env.DB;
+  // Nur ein vom Dokument geführtes Turnier (Rundenstart aus dem Dokument) schließt das Dokument ab. Entwürfe,
+  // Anmeldephase und online durchgeführte Turniere bleiben unverändert – auch wenn das Dokument noch verbunden ist.
+  if (Number(existing.desktop_execution || 0) !== 1) {
+    throw new HttpError(409, 'Dieses Turnier wird nicht aus dem Turnierdokument durchgeführt und kann dort nicht abgeschlossen werden.', {
+      code: 'not_desktop_execution',
+    });
+  }
   const body = await readJson(request).catch(() => ({}));
   const publishRanking = body.publishRanking === true;
   const notify = publishRanking && body.notify === true;
