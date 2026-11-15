@@ -187,4 +187,26 @@ describe('Cron-Wartung', () => {
     expect(row('SELECT COUNT(*) AS count FROM rental_reservations').count).toBe(16);
     expect(prepare.mock.calls.some(([statement]) => statement.includes('rental_reservations'))).toBe(false);
   });
+
+  it('löscht abgelaufene „Turnier melden“-Einträge samt Protokoll, andere Turniere bleiben unberührt', async () => {
+    sql(`INSERT INTO tournaments (id, owner_id, name, date, start_time, location, formation, status, visibility, created_at, updated_at)
+      VALUES ('unbestaetigt', 'owner', 'Unbestätigt', '2099-01-01', '10:00', 'Ort', 'tete', 'draft', 'public', '2000-01-01', '2000-01-01'),
+             ('vorbei', 'owner', 'Vorbei', '2000-01-01', '10:00', 'Ort', 'tete', 'registration', 'public', '2000-01-01', '2000-01-01'),
+             ('kommt', 'owner', 'Kommt noch', '2099-01-01', '10:00', 'Ort', 'tete', 'registration', 'public', '2000-01-01', '2000-01-01'),
+             ('eigen', 'owner', 'Eigenes Turnier', '2099-01-01', '10:00', 'Ort', 'tete', 'registration', 'public', '2000-01-01', '2000-01-01')`);
+    sql(`INSERT INTO tournament_report_tokens (token_hash, tournament_id, expires_at, created_at, used_at)
+      VALUES ('h1', 'unbestaetigt', '2000-01-02', '2000-01-01', NULL),
+             ('h2', 'vorbei', '2000-01-02', '2000-01-01', '2000-01-01'),
+             ('h3', 'kommt', '2000-01-02', '2000-01-01', '2000-01-01')`);
+    for (const id of ['unbestaetigt', 'vorbei', 'kommt', 'eigen']) {
+      sql(`INSERT INTO audit_log (id, tournament_id, registration_id, actor_role, action, target, created_at)
+        VALUES (?, ?, 'r', 'player', 'registration_created', 'registration', '2000-01-01')`, `a-${id}`, id);
+    }
+
+    await runCron();
+
+    expect(env.DB.sqlite.prepare('SELECT id FROM tournaments ORDER BY id').all().map((r) => r.id)).toEqual(['eigen', 'kommt']);
+    expect(env.DB.sqlite.prepare('SELECT tournament_id FROM audit_log ORDER BY tournament_id').all().map((r) => r.tournament_id))
+      .toEqual(['eigen', 'kommt']);
+  });
 });

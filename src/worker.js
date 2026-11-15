@@ -13714,22 +13714,18 @@ async function cleanupExpiredSessions(db) {
   // reports whose event date is in the past. Only tournaments that originated from
   // "Turnier melden" (i.e. have a tournament_report_tokens row, confirmed or not) are
   // touched - regular manager-created tournaments/calendar entries are unaffected.
+  // Protokolleinträge (T-14) gehen wie beim manuellen Löschen mit dem Turnier; einen Löschnachweis gibt es hier nicht,
+  // die Kalendereinträge laufen nur ab.
   const reportTokenCutoff = new Date(Date.now() - TOURNAMENT_REPORT_TOKEN_TTL_SECONDS * 1000).toISOString();
-  await db
-    .prepare(
-      `DELETE FROM tournaments WHERE id IN (
-        SELECT tournament_id FROM tournament_report_tokens WHERE used_at IS NULL AND created_at <= ?
-      )`,
-    )
-    .bind(reportTokenCutoff)
-    .run();
   const today = new Date().toISOString().slice(0, 10);
-  await db
-    .prepare(
-      `DELETE FROM tournaments WHERE date < ? AND id IN (SELECT tournament_id FROM tournament_report_tokens)`,
-    )
-    .bind(today)
-    .run();
+  const expiredReports = `SELECT tournament_id FROM tournament_report_tokens WHERE used_at IS NULL AND created_at <= ?`;
+  const pastReports = `SELECT id FROM tournaments WHERE date < ? AND id IN (SELECT tournament_id FROM tournament_report_tokens)`;
+  await db.batch([
+    db.prepare(`DELETE FROM audit_log WHERE tournament_id IN (${expiredReports})`).bind(reportTokenCutoff),
+    db.prepare(`DELETE FROM tournaments WHERE id IN (${expiredReports})`).bind(reportTokenCutoff),
+    db.prepare(`DELETE FROM audit_log WHERE tournament_id IN (${pastReports})`).bind(today),
+    db.prepare(`DELETE FROM tournaments WHERE id IN (${pastReports})`).bind(today),
+  ]);
   // Note: verified (used_at IS NOT NULL) tokens are intentionally kept, not cleaned up here -
   // they remain the marker that identifies a tournament as originating from "Turnier melden"
   // for the past-date cleanup above, and cascade-delete automatically once their tournament
