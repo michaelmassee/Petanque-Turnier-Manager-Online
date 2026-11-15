@@ -118,7 +118,7 @@ describe('Turnierdetail-Reiter', () => {
 
     renderDetail(tournamentWith({ status: 'running', announcement: { text: 'Mittagspause', at: '2099-06-01T11:00:00.000Z' } }));
 
-    expect(tabNames()).toEqual(['Info', 'Teilnehmer']);
+    expect(tabNames()).toEqual(['Info', 'Anmeldungen']);
     expect(screen.queryByText('Mittagspause')).not.toBeInTheDocument();
   });
 
@@ -142,7 +142,7 @@ describe('Turnierdetail-Reiter', () => {
 
     renderDetail(tournamentWith({ status: 'finished', rankingPublishedAt: '2099-06-01T18:00:00.000Z' }), 'rangliste');
 
-    expect(tabNames()).toEqual(['Info', 'Teilnehmer', 'Rangliste']);
+    expect(tabNames()).toEqual(['Info', 'Anmeldungen', 'Rangliste']);
     expect(screen.getByRole('button', { name: 'Rangliste' })).toHaveAttribute('aria-current', 'page');
     await screen.findByRole('button', { name: 'PDF herunterladen' });
   });
