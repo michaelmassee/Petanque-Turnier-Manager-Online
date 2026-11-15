@@ -13,6 +13,7 @@ import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteLis
 import { RichTextEditor } from '../components/RichTextEditor.jsx';
 import { LiveQrDialog } from '../components/LiveQrDialog.jsx';
 import { richTextPlainText } from '../lib/rich-text.js';
+import { RegistrationLogDialog } from '../components/RegistrationLogDialog.jsx';
 
 // Bestehende Importe (Tests, Seiten) holen das Formular weiter hier ab.
 export { RegistrationForm };
@@ -411,6 +412,7 @@ export function RegistrationsPanel({
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [csvNamesOnly, setCsvNamesOnly] = useState(false);
   const [csvConfirmedOnly, setCsvConfirmedOnly] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
   const filtered = Boolean(query.trim()) || Boolean(statusFilter) || Boolean(organizerMessageFilter) || Boolean(questionFilter) || Boolean(feeFilter) || Boolean(vipFilter);
   const groups = groupRegistrations(filteredRegistrations);
   const pendingRegistrations = groups.pending;
@@ -461,9 +463,11 @@ export function RegistrationsPanel({
       <div className="section-title">
         <h2>{t('Anmeldungen')}</h2>
         <span className="counter">{filtered ? `${filteredRegistrations.length}/${registrations.length}` : registrations.length}</span>
+        <Button variant="secondary" disabled={!tournament?.canManage} onClick={() => setLogOpen(true)}>{t('Protokoll')}</Button>
         <Button variant="secondary" disabled={registrations.length === 0} onClick={() => setCsvDialogOpen(true)}>{t('CSV exportieren')}</Button>
         <Button onClick={onCreate} disabled={!tournament}>{t('Neue Anmeldung')}</Button>
       </div>
+      {logOpen && tournament && <RegistrationLogDialog tournament={tournament} onClose={() => setLogOpen(false)} />}
       <EditDialog open={csvDialogOpen} title={t('CSV exportieren')} onClose={() => setCsvDialogOpen(false)}>
         <div className="form dense">
           <label className="checkbox-field">

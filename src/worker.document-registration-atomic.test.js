@@ -42,7 +42,7 @@ describe('Online-Anlage einer lokalen Meldung durch das Dokument (T-24)', () => 
     expect(antwort.status).toBe(201);
     expect((await antwort.json()).registration).toMatchObject({ firstName: 'Lokal', status: 'confirmed' });
     expect(angelegt()).toMatchObject({ status: 'confirmed', origin: 'document', over_capacity: 0, participation: 'active' });
-    expect(protokoll()).toEqual([]);
+    expect(protokoll()).toEqual([{ action: 'registration_created', actor_role: 'document' }]);
   });
 
   it('nimmt eine Nachmeldung trotz voller Kapazität an und kennzeichnet sie (P-24)', async () => {
@@ -54,7 +54,10 @@ describe('Online-Anlage einer lokalen Meldung durch das Dokument (T-24)', () => 
 
     expect(antwort.status).toBe(201);
     expect(angelegt()).toMatchObject({ status: 'confirmed', over_capacity: 1 });
-    expect(protokoll()).toEqual([{ action: 'registration_over_capacity', actor_role: 'document' }]);
+    expect(protokoll()).toEqual([
+      { action: 'registration_created', actor_role: 'document' },
+      { action: 'registration_over_capacity', actor_role: 'document' },
+    ]);
   });
 
   it('zählt Warteliste und Stornos nicht als belegte Plätze', async () => {

@@ -753,3 +753,15 @@ describe('Anmeldungsverwaltung: Gruppierung wie im Teilnehmer-Reiter', () => {
     expect(within(pendingSection).getByRole('button', { name: 'Alle bestätigen' })).toBeInTheDocument();
   });
 });
+
+describe('Anmeldungsverwaltung: Protokoll', () => {
+  it('öffnet das Protokoll der Meldeliste über den Button', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ entries: [], limit: 500 }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    renderPanel([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Protokoll' }));
+    expect(await screen.findByRole('dialog', { name: 'Protokoll der Meldeliste' })).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('dialog')).getAllByRole('button')[0]);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+});

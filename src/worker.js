@@ -2688,6 +2688,15 @@ export default {
         }
       }
 
+      const registrationLogMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/registration-log$/);
+      if (registrationLogMatch && request.method === 'GET') {
+        const session = await requireSession(request, env.DB);
+        const tournament = await getTournamentById(env.DB, registrationLogMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        assertCanManageTournament(tournament, session.user);
+        return await listRegistrationLog(env.DB, tournament);
+      }
+
       const tournamentEditorsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/editors$/);
       if (tournamentEditorsMatch) {
         const session = await requireSession(request, env.DB);
@@ -2754,7 +2763,7 @@ export default {
           throw new HttpError(404, 'Turnier nicht gefunden');
         }
         assertCanManageTournament(tournament, session.user);
-        return await confirmPendingRegistrations(env, tournament, new URL(request.url).origin);
+        return await confirmPendingRegistrations(env, tournament, new URL(request.url).origin, session.user);
       }
 
       const tournamentParticipantsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/participants$/);
@@ -3037,7 +3046,8 @@ export default {
         // Wie der Abmelde-Link: Nach dem Start führt das Turnierdokument die Meldeliste, Spieler sagen nicht mehr selbst ab.
         assertRegistrationOnlineEditable(registration);
         if (!isManager) assertPlayerCancellationOpen(registration);
-        const result = await cancelRegistration(env.DB, registration.id);
+        const result = await cancelRegistration(env.DB, registration, { actorUserId: session.user.id,
+          actorRole: isManager ? actorRoleFor(registration, session.user) : 'player' });
         await notifyOrganizerOfCancellation(env, registration, session.user.id);
         try {
           await sendCancellationEmail(env, { ...registration, id: registration.tournament_id }, registration, APP_ORIGIN);
@@ -3310,7 +3320,7 @@ export default {
             }
             await notifyUserByEmail(env, registration.email, 'registration_status_changed', { tournamentId: registration.tournament_id, tournamentName: registration.name, status: 'cancelled', ownRegistration: true }, undefined, registration.owner_id);
           }
-          const deleted = await deleteRegistration(env.DB, registration);
+          const deleted = await deleteRegistration(env.DB, registration, auth.user);
           if (freesCapacity(registration.status, 'cancelled')) await promoteWaitlistSafely(env, registration.tournament_id, new URL(request.url).origin);
           return deleted;
         }
@@ -5804,8 +5814,25 @@ export async function upsertDocumentRegistration(request, env, tournament, local
         SELECT ?, ?, ?, 'document', 'account_unlinked', ?, ?, ? WHERE EXISTS (SELECT 1 FROM registrations WHERE id = ? AND updated_at = ?)`)
       .bind(crypto.randomUUID(), tournament.id, existing.id, `slot:${column.slot}`,
         JSON.stringify({ from: existing[column.userId], reason: 'person_replaced' }), now, existing.id, now)) : [];
+  // Protokoll (T-14) nur, wenn das UPDATE tatsächlich gegriffen hat (Revision und Zeitstempel dieser Änderung).
+  const documentAudit = (action, target, details) => db.prepare(`INSERT INTO audit_log (id, tournament_id, registration_id,
+        actor_role, action, target, details_json, created_at)
+      SELECT ?, ?, ?, 'document', ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM registrations WHERE id = ? AND updated_at = ? AND execution_revision = ?)`)
+    .bind(crypto.randomUUID(), tournament.id, existing.id, action, target, JSON.stringify(details), now, existing.id, now, expected + 1);
+  const changeAudits = [];
+  if (status !== existing.status) changeAudits.push(documentAudit('status_changed', 'registration', { from: existing.status, to: status }));
+  if (documentRegistration) {
+    for (const column of SLOT_COLUMNS) {
+      const before = [existing[column.first], existing[column.last]].filter(Boolean).join(' ');
+      const after = slotNameFromInput(documentRegistration, column.slot).filter(Boolean).join(' ');
+      if (before !== after) changeAudits.push(documentAudit('composition_changed', `slot:${column.slot}`, { from: before, to: after }));
+    }
+    if (String(existing.team_name || '') !== String(documentRegistration.teamName || '')) {
+      changeAudits.push(documentAudit('team_name_changed', 'registration', { from: existing.team_name || '', to: documentRegistration.teamName || '' }));
+    }
+  }
   return {
-    statements: [update, ...unlinkAudits],
+    statements: [update, ...unlinkAudits, ...changeAudits],
     response: {
       sql: `SELECT CASE WHEN EXISTS (SELECT 1 FROM registrations WHERE id = ? AND execution_revision = ? AND updated_at = ?)
           THEN json_object('status', 200, 'body', json_object('created', json('false')),
@@ -5936,6 +5963,9 @@ async function createDocumentRegistration(db, tournament, localUuid, body) {
         ON CONFLICT DO NOTHING`)
         .bind(...Object.values(record), participation, now, localUuid, maxRegistrations, maxRegistrations,
           tournament.id, tournament.id, ...limitCondition.binds),
+      db.prepare(`INSERT INTO audit_log (id, tournament_id, registration_id, actor_role, action, target, details_json, created_at)
+          SELECT ?, ?, ?, 'document', 'registration_created', 'registration', ?, ? WHERE EXISTS (SELECT 1 FROM registrations WHERE id = ?)`)
+        .bind(crypto.randomUUID(), tournament.id, id, JSON.stringify({ status: 'confirmed', participant: displacedTeamLabel(record) }), now, id),
       db.prepare(`INSERT INTO audit_log (id, tournament_id, registration_id, actor_role, action, target, created_at)
           SELECT ?, ?, ?, 'document', 'registration_over_capacity', 'registration', ?
           WHERE EXISTS (SELECT 1 FROM registrations WHERE id = ? AND over_capacity = 1)`)
@@ -7478,6 +7508,49 @@ async function notifyOwnerAboutAction(env, tournament, user, action) {
   }
 }
 
+const REGISTRATION_LOG_LIMIT = 500;
+
+/**
+ * Änderungshistorie der Meldeliste für die Turnierleitung (T-14): alle Protokolleinträge mit Meldungsbezug, neueste
+ * zuerst. Konto-IDs bleiben intern; angezeigt werden Name der handelnden Person bzw. ihre Rolle und das Team.
+ */
+export async function listRegistrationLog(db, tournament) {
+  const [audits, registrations] = await db.batch([
+    db.prepare(`SELECT a.id, a.registration_id, a.actor_role, a.action, a.target, a.details_json, a.created_at,
+          u.first_name AS actor_first_name, u.last_name AS actor_last_name, u.username AS actor_username
+        FROM audit_log a LEFT JOIN users u ON u.id = a.actor_user_id
+        WHERE a.tournament_id = ? AND a.registration_id IS NOT NULL
+        ORDER BY a.created_at DESC, a.id LIMIT ?`).bind(tournament.id, REGISTRATION_LOG_LIMIT),
+    db.prepare(`SELECT id, team_name, first_name, last_name, partner_first_name, partner_last_name,
+          partner2_first_name, partner2_last_name FROM registrations WHERE tournament_id = ?`).bind(tournament.id),
+  ]);
+  const participants = new Map((registrations.results || []).map((row) => [row.id, displacedTeamLabel(row)]));
+  const entries = (audits.results || []).map((row) => {
+    let details = {};
+    try { details = row.details_json ? JSON.parse(row.details_json) || {} : {}; } catch { details = {}; }
+    // Konto-IDs nie ausliefern: Für Verknüpfungen zählt nur, dass sich etwas geändert hat.
+    const { participant, ...rest } = details;
+    const visible = row.action.startsWith('account_')
+      ? { reason: rest.reason || null }
+      : Object.fromEntries(Object.entries(rest).filter(([key]) => !/userid$/i.test(key)));
+    const actorName = [row.actor_first_name, row.actor_last_name].filter(Boolean).join(' ');
+    return {
+      id: row.id,
+      registrationId: row.registration_id,
+      participant: participants.get(row.registration_id) || participant || '',
+      registrationDeleted: !participants.has(row.registration_id),
+      action: row.action,
+      target: row.target,
+      details: visible,
+      actorRole: row.actor_role,
+      actorName: actorName || null,
+      actorUsername: row.actor_username || null,
+      createdAt: row.created_at,
+    };
+  });
+  return json({ entries, limit: REGISTRATION_LOG_LIMIT });
+}
+
 export async function listRegistrations(db, tournament) {
   const result = await db
     .prepare('SELECT * FROM registrations WHERE tournament_id = ? ORDER BY registered_at DESC')
@@ -7614,7 +7687,7 @@ async function notifyAccountConflicts(env, tournamentId) {
   }
 }
 
-async function confirmPendingRegistrations(env, tournament, appOrigin) {
+async function confirmPendingRegistrations(env, tournament, appOrigin, actingUser = null) {
   const pending = await env.DB.prepare("SELECT * FROM registrations WHERE tournament_id = ? AND status = 'pending' ORDER BY registered_at ASC").bind(tournament.id).all();
   const registrations = pending.results || [];
   if (registrations.length === 0) return json({ confirmedCount: 0 });
@@ -7625,6 +7698,12 @@ async function confirmPendingRegistrations(env, tournament, appOrigin) {
       .bind(now, now, registration.id),
   ));
   const confirmedRegistrations = registrations.filter((registration, index) => Number(updateResults[index]?.meta?.changes || 0) > 0);
+  if (confirmedRegistrations.length > 0) {
+    await env.DB.batch(confirmedRegistrations.map((registration) => auditStatement(env.DB, { tournamentId: tournament.id,
+      registrationId: registration.id, actorUserId: actingUser?.id || null,
+      actorRole: actingUser ? actorRoleFor(tournament, actingUser) : 'organizer', action: 'status_changed', target: 'registration',
+      details: { from: 'pending', to: 'confirmed', bulk: true }, now })));
+  }
 
   for (const registration of confirmedRegistrations) {
     await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', { tournamentId: tournament.id, tournamentName: tournament.name, status: 'confirmed', participant: `${registration.first_name} ${registration.last_name}` });
@@ -9636,11 +9715,16 @@ async function syncPutRanking(request, db, tournament) {
   };
 }
 
-async function cancelRegistration(db, id) {
+async function cancelRegistration(db, registration, { actorUserId = null, actorRole }) {
+  const { id } = registration;
   const now = new Date().toISOString();
   const result = await db.prepare("UPDATE registrations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(now, id).run();
   if (result.meta.changes === 0) {
     throw new HttpError(404, 'Anmeldung nicht gefunden');
+  }
+  if (registration.status !== 'cancelled') {
+    await auditStatement(db, { tournamentId: registration.tournament_id, registrationId: id, actorUserId, actorRole,
+      action: 'status_changed', target: 'registration', details: { from: registration.status, to: 'cancelled' }, now }).run();
   }
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(id).first();
   await releaseInvalidMeleeTeams(db, updated.tournament_id);
@@ -9747,6 +9831,8 @@ async function notifyDisplacement(env, tournament, displaced, { wasCancelled, ac
   if (!displaced) return null;
   const status = wasCancelled ? 'cancelled' : 'waitlist';
   const participant = displacedTeamLabel(displaced);
+  await auditStatement(env.DB, { tournamentId: tournament.id, registrationId: displaced.id, actorRole: 'system',
+    action: 'vip_displaced', target: 'registration', details: { to: status } }).run();
   try {
     await sendDisplacementEmail(env, tournament, displaced, wasCancelled, appOrigin);
   } catch (error) {
@@ -9790,7 +9876,7 @@ async function cancelRegistrationByToken(request, env) {
   assertRegistrationOnlineEditable(registration);
   assertPlayerCancellationOpen(registration);
 
-  const result = await cancelRegistration(env.DB, registration.id);
+  const result = await cancelRegistration(env.DB, registration, { actorRole: 'player' });
   await notifyOrganizerOfCancellation(env, registration);
   try {
     await sendCancellationEmail(env, { ...registration, id: registration.tournament_id }, registration, APP_ORIGIN);
@@ -9945,11 +10031,14 @@ export async function createRegistration(request, env, tournament, {
   const displacedId = statements.length > 0 ? results[0]?.results?.[0]?.id : null;
   const appOrigin = new URL(request.url).origin;
   const links = newSlotLinks(null, created, created.id, tournament.id);
-  if (links.length > 0) {
-    await db.batch(links.map((link) => auditStatement(db, { tournamentId: tournament.id, registrationId: created.id,
-      actorUserId: session?.user?.id || null, actorRole: isManager ? actorRoleFor(tournament, session.user) : 'registrant',
-      action: 'account_linked', target: `slot:${link.slot}`, details: { userId: link.userId, reason: 'slot_email' } })));
-  }
+  const creationActor = { tournamentId: tournament.id, registrationId: created.id, actorUserId: session?.user?.id || null,
+    actorRole: syncBootstrap ? 'document' : isManager ? actorRoleFor(tournament, session.user) : 'registrant' };
+  await db.batch([
+    auditStatement(db, { ...creationActor, action: 'registration_created', target: 'registration',
+      details: { status: created.status, participant: displacedTeamLabel(created) } }),
+    ...links.map((link) => auditStatement(db, { ...creationActor,
+      action: 'account_linked', target: `slot:${link.slot}`, details: { userId: link.userId, reason: 'slot_email' } })),
+  ]);
   // Das absendende Konto erfährt nie, ob eine Slot-E-Mail verknüpft wurde (E-22); es selbst erhält keine Nachricht.
   await notifySlotLinks(env, links);
   let displaced = null;
@@ -10335,7 +10424,15 @@ async function auditRegistrationEdit(env, existing, updated, actingUser) {
   }
   if (existing.status !== updated.status) {
     statements.push(auditStatement(db, { ...actor, action: 'status_changed', target: 'registration',
-      details: { from: existing.status, to: updated.status } }));
+      details: { from: existing.status, to: updated.status, ...(updated.status === 'rejected' && updated.rejection_reason ? { reason: updated.rejection_reason } : {}) } }));
+  }
+  if (String(existing.team_name || '') !== String(updated.team_name || '')) {
+    statements.push(auditStatement(db, { ...actor, action: 'team_name_changed', target: 'registration',
+      details: { from: existing.team_name || '', to: updated.team_name || '' } }));
+  }
+  if (vipLevelOf(existing) !== vipLevelOf(updated)) {
+    statements.push(auditStatement(db, { ...actor, action: 'vip_changed', target: 'registration',
+      details: { from: vipLevelOf(existing), to: vipLevelOf(updated) } }));
   }
   if (statements.length > 0) await db.batch(statements);
   await notifySlotLinks(env, newSlotLinks(existing, updated, existing.id, existing.tournament_id));
@@ -10492,11 +10589,16 @@ async function enforceVipPriorityOnUpdate(env, existing, appOrigin, actorUserId 
   return displaceRegistration(env, tournament, displace, appOrigin, actorUserId);
 }
 
-async function deleteRegistration(db, registration) {
+async function deleteRegistration(db, registration, actingUser) {
   const result = await db.prepare('DELETE FROM registrations WHERE id = ?').bind(registration.id).run();
   if (result.meta.changes === 0) {
     throw new HttpError(404, 'Anmeldung nicht gefunden');
   }
+  // Die Meldung ist danach weg: Name und letzter Status bleiben im Protokoll (überlebt die Löschung, siehe 0083).
+  await auditStatement(db, { tournamentId: registration.tournament_id, registrationId: registration.id,
+    actorUserId: actingUser?.id || null, actorRole: actingUser ? actorRoleFor(registration, actingUser) : 'organizer',
+    action: 'registration_deleted', target: 'registration',
+    details: { status: registration.status, participant: displacedTeamLabel(registration) } }).run();
   await releaseInvalidMeleeTeams(db, registration.tournament_id);
   return json({ ok: true });
 }
