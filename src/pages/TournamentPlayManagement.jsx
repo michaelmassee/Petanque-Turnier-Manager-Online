@@ -23,6 +23,7 @@ import { meleeTeamSize } from '../lib/pairing/melee.js';
 import { RegistrationPlayerPicker } from '../components/RegistrationPlayerPicker.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { PHONE_QUERY, useMediaQuery, useTournamentLiveSocket } from '../lib/hooks.js';
+import { displacementWarning } from '../lib/vip.js';
 import { FinalRankingQrPanel, QrImageShare } from '../components/TournamentQrPanel.jsx';
 import { RoundTable, pairingNumbers } from '../components/RoundTable.jsx';
 import { DEFAULT_QR_DESIGN } from '../lib/qr-design.js';
@@ -504,6 +505,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [warning, setWarning] = useState('');
   const [error, setError] = useState('');
   const [finishing, setFinishing] = useState(false);
   const [redrawing, setRedrawing] = useState(false);
@@ -580,7 +582,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const queryError = roundsQuery.error || rankingQuery.error || registrationsQuery.error;
 
   useEffect(() => {
-    setMessage('');
+    setMessage(''); setWarning('');
     setError('');
   }, [selectedTournamentId]);
 
@@ -611,7 +613,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     if (resume && !window.confirm(t('Turnier wieder aufnehmen? Eine veröffentlichte Endrangliste wird zurückgezogen, bis du das Turnier erneut abschließt.'))) return;
     setBusy(true);
     setError('');
-    setMessage('');
+    setMessage(''); setWarning('');
     try {
       await authenticatedApi(`/api/tournaments/${selectedTournamentId}/start`, { method: 'POST' });
       setStartedTournamentIds((current) => new Set(current).add(selectedTournamentId));
@@ -649,9 +651,10 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     }
   }
 
-  async function handleRegistrationSaved(savedMessage) {
+  async function handleRegistrationSaved(savedMessage, displaced) {
     setEditRegistrationId('');
     setMessage(savedMessage);
+    setWarning(displacementWarning(t, displaced));
     await queryClient.invalidateQueries({ queryKey: [...queryKey, 'registrations'] });
     // Mêlée-Teams zeigen die Spielernamen; nach einer Namenskorrektur auch die Teams neu laden.
     if (isMelee) await queryClient.invalidateQueries({ queryKey: [...queryKey, 'rounds'] });
@@ -689,7 +692,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     if (duplicates.length && !window.confirm(t('Bereits angemeldet: {{names}}. Trotzdem hinzufügen?', { names: duplicates.join(', ') }))) return;
     setBusy(true);
     setError('');
-    setMessage('');
+    setMessage(''); setWarning('');
     try {
       const result = await api(`/api/tournaments/${selectedTournamentId}/registrations`, {
         method: 'POST',
@@ -735,7 +738,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   async function handleNewRound() {
     setBusy(true);
     setError('');
-    setMessage('');
+    setMessage(''); setWarning('');
     try {
       await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
       const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/rounds`, { method: 'POST' });
@@ -754,7 +757,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     if (!window.confirm(t('Runde {{round}} neu auslosen? Die bisherige Einteilung wird ersetzt.', { round: currentRound.roundNumber }))) return;
     setRedrawing(true);
     setError('');
-    setMessage('');
+    setMessage(''); setWarning('');
     try {
       await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
       const data = await authenticatedApi(`/api/tournaments/${selectedTournamentId}/rounds/redraw`, { method: 'POST' });
@@ -779,7 +782,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     if (!window.confirm(question)) return;
     setFinishing(true);
     setError('');
-    setMessage('');
+    setMessage(''); setWarning('');
     try {
       await authenticatedApi(`/api/tournaments/${selectedTournamentId}/publication`, {
         method: 'PUT', body: JSON.stringify({ status: 'finished', visibility: selectedTournament.visibility }),
@@ -796,7 +799,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   // Rückfragen wie die Mêlée-Übernahme im Hauptprojekt: doppelte Namen und – ohne Freilos – Neu-Auslosen aller Teams,
   // wenn ein Nachzügler sonst kein eigenes Team bekäme. Der Server meldet beides als 409 mit code.
   async function handleDrawMeleeTeams() {
-    setBusy(true); setError(''); setMessage('');
+    setBusy(true); setError(''); setMessage(''); setWarning('');
     try {
       await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
       const options = {};
@@ -830,7 +833,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
   async function handleResetMeleeTeams() {
     if (!window.confirm(t('Alle ausgelosten Mêlée-Teams auflösen? Alle Spieler sind danach wieder ohne Team.'))) return;
-    setBusy(true); setError(''); setMessage('');
+    setBusy(true); setError(''); setMessage(''); setWarning('');
     try {
       await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
       await authenticatedApi(`/api/tournaments/${selectedTournamentId}/teams`, { method: 'DELETE' });
@@ -860,7 +863,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     if (confirmOverwrite && !confirmResultOverwrite(expectedResult, match)) return;
     setBusy(true);
     setError('');
-    setMessage('');
+    setMessage(''); setWarning('');
     try {
       await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
       const save = () => authenticatedApi(`/api/tournaments/${selectedTournamentId}/matches/${matchId}/result`, {
@@ -895,7 +898,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   async function handleConfirmReports() {
     setConfirmingReports(true);
     setError('');
-    setMessage('');
+    setMessage(''); setWarning('');
     try {
       // Nur die angezeigten Meldungen: Eine inzwischen eingegangene bleibt bis zum nächsten „Gesehen“ offen.
       const matchIds = rounds.flatMap((round) => round.matches).filter((match) => match.reportPending).map((match) => match.id);
@@ -925,7 +928,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     if (!pending.length) return cleared;
     setBusy(true);
     setError('');
-    setMessage('');
+    setMessage(''); setWarning('');
     try {
       await queryClient.cancelQueries({ queryKey: [...queryKey, 'rounds'] });
       const saveBatch = async (results) => {
@@ -1101,6 +1104,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       )}
 
       <Feedback message={message} error={error || queryError?.message} />
+      <Feedback warning={warning} />
 
       {selectedTournament && <TournamentBoardShare tournament={selectedTournament} />}
       {/* Ankündigungen schon vor dem Turnierstart, damit der Veranstalter vorab informieren kann. */}
@@ -1207,7 +1211,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
                 <span className="round-participant-actions">
                   <Button className="button button-secondary icon-action" disabled={busy}
                     aria-label={t('{{name}} bearbeiten', { name: playerLabel(registration) })} title={t('Bearbeiten')}
-                    onClick={() => { setError(''); setMessage(''); setEditRegistrationId(registration.id); }}>
+                    onClick={() => { setError(''); setMessage(''); setWarning(''); setEditRegistrationId(registration.id); }}>
                     <EditIcon />
                   </Button>
                   {selectedTournament?.liveViewEnabled && (

@@ -240,23 +240,25 @@ export function Button({ children, type = 'button', variant = 'primary', loading
   );
 }
 
-export function Feedback({ message, error }) {
+// warning: Die Aktion ist gelungen, hatte aber eine Folge, die man sehen muss (z. B. VIP-Verdrängung).
+export function Feedback({ message, error, warning }) {
   const ref = useRef(null);
 
   // The action button is often far below the message (long dialogs on phones),
   // so bring a new message into view instead of leaving the click without visible effect.
   // `scroll-margin` on .feedback keeps it below the sticky top bar.
   useEffect(() => {
-    if (error || message) ref.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-  }, [error, message]);
+    if (error || warning || message) ref.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [error, warning, message]);
 
-  if (!message && !error) {
+  if (!message && !error && !warning) {
     return null;
   }
 
+  const variant = error ? 'error' : warning ? 'warning' : 'success';
   return (
-    <p ref={ref} className={error ? 'feedback error' : 'feedback success'} role={error ? 'alert' : 'status'}>
-      {error || message}
+    <p ref={ref} className={`feedback ${variant}`} role={error ? 'alert' : 'status'}>
+      {error || warning || message}
     </p>
   );
 }

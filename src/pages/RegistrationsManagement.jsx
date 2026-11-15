@@ -5,7 +5,7 @@ import { EMPTY_REGISTRATION_FORM, REGISTRATION_STATUSES } from '../lib/constants
 import { isCalendarEntry, labelFor, registrationPayload, translatedOptions } from '../lib/domain.js';
 import { filterRegistrations, registrationChoiceSummary } from '../frontend-core.js';
 import { Feedback, Button, ListToolbar, EditDialog, AccountBadge, TextArea, VipBadge } from '../components/ui.jsx';
-import { VIP_LEVELS, vipLevelOf, vipLevelOptions } from '../lib/vip.js';
+import { displacementWarning, VIP_LEVELS, vipLevelOf, vipLevelOptions } from '../lib/vip.js';
 import { RegistrationEditDialog, RegistrationForm } from '../components/RegistrationEditDialog.jsx';
 import { TournamentPicker } from '../components/TournamentPicker.jsx';
 import { formatMoney } from '../lib/format.js';
@@ -214,7 +214,7 @@ function VipHelpDialog({ open, onClose }) {
     <EditDialog open={open} title={t('Was bewirkt VIP?')} onClose={onClose}>
       <div className="vip-help">
         <p><strong>{t('Stufen')}:</strong> {t('VIP Gold hat Vorrang vor VIP Silber, Silber vor VIP Bronze, Bronze vor Meldungen ohne VIP.')}</p>
-        <p><strong>{t('Turnier voll')}:</strong> {t('Ist das Teilnehmerlimit erreicht, verdrängt eine VIP-Meldung die Meldung mit der niedrigsten Stufe unter ihrer eigenen – zuerst Meldungen ohne VIP, dann Bronze, dann Silber; bei gleicher Stufe die zuletzt angemeldete. Diese kommt auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail informiert. Gleiche oder höhere Stufen werden nie verdrängt.')}</p>
+        <p><strong>{t('Turnier voll')}:</strong> {t('Ist das Teilnehmerlimit erreicht, verdrängt eine VIP-Meldung die Meldung mit der niedrigsten Stufe unter ihrer eigenen – zuerst Meldungen ohne VIP, dann Bronze, dann Silber; bei gleicher Stufe die zuletzt angemeldete. Diese kommt auf die Warteliste (ohne Warteliste wird sie storniert) und wird per E-Mail und Postfach informiert; die Turnierleitung sieht nach dem Speichern eine Warnung. Gleiche oder höhere Stufen werden nie verdrängt.')}</p>
         <p><strong>{t('Warteliste')}:</strong> {t('Höhere Stufen stehen vorn, innerhalb einer Stufe zählt der Meldezeitpunkt. In dieser Reihenfolge rücken Meldungen auf freie Plätze nach.')}</p>
         <p><strong>{t('Hochstufen')}:</strong> {t('Eine Meldung auf der Warteliste rückt sofort nach, wenn ein Platz frei ist oder eine Meldung mit niedrigerer Stufe verdrängt werden kann.')}</p>
         <p><strong>{t('Herabstufen oder ausschalten')}:</strong> {t('Ändert nur die Stufe. Keine Meldung wird verschoben, niemand rückt nach.')}</p>
@@ -392,6 +392,7 @@ export function RegistrationsPanel({
   onDelete,
   busyId,
   message,
+  warning = '',
   error,
   currentUserId,
 }) {
@@ -425,6 +426,7 @@ export function RegistrationsPanel({
           <Button variant="secondary" onClick={onExitApprovalInbox}>{t('Alle Anmeldungen anzeigen')}</Button>
         </div>
         <Feedback message={message} />
+        <Feedback warning={warning} />
         <Feedback error={error} />
         {pendingRegistrations.length === 0 ? <p className="muted">{t('Keine offenen Anmeldungen.')}</p> : (
           <section className="user-list registration-list" aria-label={t('Offene Anmeldungen')}>
@@ -462,6 +464,7 @@ export function RegistrationsPanel({
         </div>
       </EditDialog>
       <Feedback message={message} />
+      <Feedback warning={warning} />
       <Feedback error={error} />
       <TournamentPicker
         label={t('Turnier anzeigen')}
@@ -566,6 +569,7 @@ export function RegistrationsManagementPage({
   const [registrations, setRegistrations] = useState([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [warning, setWarning] = useState('');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [organizerMessageFilter, setOrganizerMessageFilter] = useState('');
@@ -641,6 +645,7 @@ export function RegistrationsManagementPage({
   function clearFeedback() {
     setError('');
     setMessage('');
+    setWarning('');
     setInvalidField(null);
   }
 
@@ -663,7 +668,7 @@ export function RegistrationsManagementPage({
 
   async function handleAdminSubmit(event) {
     event.preventDefault();
-    setError(''); setMessage(''); setInvalidField(null);
+    setError(''); setMessage(''); setWarning(''); setInvalidField(null);
 
     const tournamentId = form.tournamentId || selectedTournamentId;
     const payload = registrationPayload({ ...form, tournamentId }, language);
@@ -672,6 +677,7 @@ export function RegistrationsManagementPage({
     try {
       const result = await authenticatedApi(`/api/tournaments/${tournamentId}/registrations`, { method: 'POST', body: JSON.stringify(payload) });
       setMessage(`${t('Neue Meldung hinzugefügt:')} ${result.registration.firstName} ${result.registration.lastName}`);
+      setWarning(displacementWarning(t, result.displaced));
       closeDialog();
       await load(tournamentId);
       onTournamentsChanged?.();
@@ -690,7 +696,7 @@ export function RegistrationsManagementPage({
     if (!window.confirm(`Anmeldung "${registrationLabel}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) {
       return;
     }
-    setError(''); setMessage('');
+    setError(''); setMessage(''); setWarning('');
     setBusyId(`delete-${registration.id}`);
     try {
       await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'DELETE' });
@@ -701,24 +707,26 @@ export function RegistrationsManagementPage({
   }
 
   async function handleVipLevelChange(registration, vipLevel) {
-    setError(''); setMessage('');
+    setError(''); setMessage(''); setWarning('');
     setBusyId(`vip-${registration.id}`);
     try {
       const payload = registrationPayload({ ...registration, seedingPosition: registration.seedingPosition ?? '', vipLevel }, language);
-      await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      const result = await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
       setMessage(t('VIP-Status wurde aktualisiert.'));
+      setWarning(displacementWarning(t, result?.displaced));
       await load(registration.tournamentId);
       onTournamentsChanged?.();
     } catch (err) { setError(err.message); } finally { setBusyId(''); }
   }
 
   async function handleConfirm(registration) {
-    setError(''); setMessage('');
+    setError(''); setMessage(''); setWarning('');
     setBusyId(`confirm-${registration.id}`);
     try {
       const payload = registrationPayload({ ...registration, seedingPosition: registration.seedingPosition ?? '', status: 'confirmed' }, language);
-      await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      const result = await authenticatedApi(`/api/registrations/${registration.id}`, { method: 'PUT', body: JSON.stringify(payload) });
       setMessage(t('Anmeldung wurde bestätigt.'));
+      setWarning(displacementWarning(t, result?.displaced));
       await load(registration.tournamentId);
       onTournamentsChanged?.();
     } catch (err) { setError(err.message); } finally { setBusyId(''); }
@@ -726,7 +734,7 @@ export function RegistrationsManagementPage({
 
   async function handleReject() {
     if (!rejectionRegistration) return;
-    setError(''); setMessage(''); setBusyId(`reject-${rejectionRegistration.id}`);
+    setError(''); setMessage(''); setWarning(''); setBusyId(`reject-${rejectionRegistration.id}`);
     try {
       await authenticatedApi(`/api/registrations/${rejectionRegistration.id}/reject`, { method: 'POST', body: JSON.stringify({ reason: rejectionReason }) });
       setMessage(t('Anmeldung wurde abgelehnt.'));
@@ -748,7 +756,7 @@ export function RegistrationsManagementPage({
 
   async function handleConfirmAll() {
     if (!tournament) return;
-    setError(''); setMessage('');
+    setError(''); setMessage(''); setWarning('');
     setBusyId('confirmAll');
     try {
       const result = await authenticatedApi(`/api/tournaments/${tournament.id}/registrations/confirm-pending`, { method: 'POST' });
@@ -792,6 +800,7 @@ export function RegistrationsManagementPage({
         onDelete={handleDelete}
         busyId={busyId}
         message={message}
+        warning={warning}
         error={error}
         currentUserId={currentUserId}
       />
@@ -839,9 +848,10 @@ export function RegistrationsManagementPage({
         clubNames={clubNames}
         onClose={() => setEditRegistrationId('')}
         onChanged={() => load(tournament?.id)}
-        onSaved={async (savedMessage) => {
+        onSaved={async (savedMessage, displaced) => {
           setEditRegistrationId('');
           setMessage(savedMessage);
+          setWarning(displacementWarning(t, displaced));
           await load(tournament?.id);
           onTournamentsChanged?.();
         }}

@@ -698,3 +698,32 @@ describe('Anmeldungsverwaltung: Teamnummer', () => {
     expect(screen.getByText(/Bert Muster/).closest('strong').querySelector('[title="Teamnummer"]')).toBeNull();
   });
 });
+
+describe('Anmeldungsverwaltung: Warnung bei VIP-Verdrängung', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const registration = { id: 'r1', tournamentId: 't1', firstName: 'Anna', lastName: 'Muster', playerEmail: 'anna@example.test',
+    status: 'waitlist', participation: 'inactive', feeSelections: [], registrationAnswers: [] };
+
+  it('zeigt nach dem Hochstufen, wer auf die Warteliste verschoben wurde', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
+      const body = options.method === 'PUT'
+        ? { registration, displaced: { id: 'r2', participant: 'Bernd Beispiel', teamName: null, status: 'waitlist' } }
+        : { registrations: [registration] };
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+    render(
+      <RegistrationsManagementPage
+        tournaments={[{ id: 't1', name: 'Sommer Cup', canManage: true, registrationEnabled: true }]}
+        selectedTournamentId="t1"
+        setSelectedTournamentId={() => {}}
+        language="de"
+      />,
+    );
+
+    fireEvent.change(await screen.findByRole('combobox', { name: 'VIP-Stufe' }), { target: { value: '3' } });
+
+    expect(await screen.findByText('Bernd Beispiel wurde wegen der VIP-Meldung auf die Warteliste verschoben.')).toHaveClass('feedback', 'warning');
+    expect(screen.getByText('VIP-Status wurde aktualisiert.')).toBeInTheDocument();
+  });
+});

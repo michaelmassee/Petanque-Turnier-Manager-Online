@@ -242,4 +242,75 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
     expect((await stornieren('token-erste')).status).toBe(200);
     expect((await stornieren('unbekannt')).status).toBe(404);
   });
+  describe('Benachrichtigung bei VIP-Verdrängung', () => {
+    const postfach = (recipientId) => env.DB.sqlite.prepare(
+      "SELECT event_data FROM postbox_messages WHERE recipient_id = ? AND event_type = 'registration_status_changed'",
+    ).all(recipientId).map((zeile) => JSON.parse(zeile.event_data));
+
+    function konto(id, email, role = 'user') {
+      env.DB.sqlite.prepare(`INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at)
+        VALUES (?, ?, ?, 'salt', 'hash', '2026-09-01', '2026-09-01')`).run(id, email, role);
+    }
+
+    it('meldet die Verdrängung in der Antwort und im Postfach des Teams, nicht beim selbst speichernden Besitzer', async () => {
+      konto('u-jung', 'jung@example.test');
+      vorhandeneAnmeldung('alt', 'confirmed', '2026-09-01T10:00:00.000Z');
+      vorhandeneAnmeldung('jung', 'confirmed', '2026-09-02T10:00:00.000Z');
+
+      const antwort = await (await anmelden({ vipLevel: 3, playerEmail: 'vip@example.test' }, { session: leitung })).json();
+
+      expect(antwort.displaced).toEqual({ id: 'jung', participant: 'jung Vorhanden', teamName: null, status: 'waitlist' });
+      expect(postfach('u-jung')).toEqual([expect.objectContaining({ status: 'waitlist', displaced: true, ownRegistration: true })]);
+      expect(postfach('u1').filter((daten) => daten.displaced)).toEqual([]);
+    });
+
+    it('informiert den Besitzer per Postfach, wenn jemand anderes (hier ein Admin) verdrängt, und storniert ohne Warteliste', async () => {
+      konto('u-edit', 'edit@example.test', 'admin');
+      env.DB.sqlite.prepare("UPDATE tournaments SET waitlist_enabled = 0 WHERE id = 't1'").run();
+      vorhandeneAnmeldung('a', 'confirmed');
+      vorhandeneAnmeldung('b', 'confirmed', '2026-09-02T10:00:00.000Z');
+
+      const antwort = await (await anmelden({ vipLevel: 1, playerEmail: 'vip@example.test' }, { session: { user: { id: 'u-edit', role: 'admin' } } })).json();
+
+      expect(antwort.displaced).toMatchObject({ id: 'b', status: 'cancelled' });
+      expect(postfach('u1').filter((daten) => daten.displaced)).toEqual([
+        expect.objectContaining({ participant: 'b Vorhanden', status: 'cancelled', displaced: true }),
+      ]);
+    });
+
+    it('benachrichtigt das Team auch ohne Mail-Freischaltung per Postfach, nur die Mail entfällt', async () => {
+      env.DB.sqlite.prepare("UPDATE users SET mail_enabled = 0 WHERE id = 'u1'").run();
+      konto('u-b', 'b@example.test');
+      vorhandeneAnmeldung('a', 'confirmed');
+      vorhandeneAnmeldung('b', 'confirmed', '2026-09-02T10:00:00.000Z');
+
+      await anmelden({ vipLevel: 2, playerEmail: 'vip@example.test' }, { session: leitung });
+
+      expect(postfach('u-b')).toEqual([expect.objectContaining({ displaced: true, status: 'waitlist' })]);
+      expect(env.MAIL_QUEUE.send).not.toHaveBeenCalledWith(expect.objectContaining({ to: 'b@example.test' }));
+    });
+
+    it('liefert beim Hochstufen per PUT die verdrängte Meldung zurück', async () => {
+      konto('u-b', 'b@example.test');
+      vorhandeneAnmeldung('a', 'confirmed');
+      vorhandeneAnmeldung('b', 'confirmed', '2026-09-02T10:00:00.000Z');
+      vorhandeneAnmeldung('warte', 'waitlist', '2026-09-03T10:00:00.000Z');
+      const existing = await getRegistrationWithTournament(env.DB, 'warte');
+      const request = new Request('https://ptm.test/api/registrations/warte', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstName: 'warte', lastName: 'Vorhanden', email: 'warte@example.test', playerEmail: 'warte@example.test', status: 'waitlist', vipLevel: 3 }),
+      });
+
+      const antwort = await (await updateRegistration(request, env, existing, leitung.user)).json();
+
+      expect(antwort.displaced).toMatchObject({ id: 'b', participant: 'b Vorhanden', status: 'waitlist' });
+      expect(postfach('u-b')).toEqual([expect.objectContaining({ displaced: true, ownRegistration: true })]);
+      expect(postfach('u1').filter((daten) => daten.displaced)).toEqual([]);
+    });
+
+    it('liefert kein displaced, wenn niemand verdrängt wurde', async () => {
+      const antwort = await (await anmelden({ vipLevel: 3, playerEmail: 'vip@example.test' }, { session: leitung })).json();
+      expect(antwort.displaced).toBeUndefined();
+    });
+  });
 });

@@ -817,6 +817,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     registrationStatus: { pending: 'Offen', confirmed: 'Bestätigt', waitlist: 'Warteliste', cancelled: 'Storniert', rejected: 'Abgelehnt' },
     registrationFor: (participant) => `Anmeldung von ${participant}`,
     ownRegistration: 'Deine Anmeldung',
+    vipDisplaced: 'Wegen einer VIP-Meldung',
     organizerMessage: 'Nachricht',
     accountEmailUnverified: 'E-Mail nicht bestätigt',
     accountPasswordChangeRequired: 'Passwortänderung erforderlich',
@@ -839,6 +840,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     registrationStatus: { pending: 'Open', confirmed: 'Bevestigd', waitlist: 'Wachtlijst', cancelled: 'Geannuleerd', rejected: 'Afgewezen' },
     registrationFor: (participant) => `Aanmelding van ${participant}`,
     ownRegistration: 'Jouw inschrijving',
+    vipDisplaced: 'Vanwege een VIP-inschrijving',
     organizerMessage: 'Bericht',
     accountEmailUnverified: 'e-mail niet bevestigd',
     accountPasswordChangeRequired: 'wachtwoordwijziging vereist',
@@ -861,6 +863,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     registrationStatus: { pending: 'Pending', confirmed: 'Confirmed', waitlist: 'Waitlist', cancelled: 'Cancelled', rejected: 'Rejected' },
     registrationFor: (participant) => `Registration for ${participant}`,
     ownRegistration: 'Your registration',
+    vipDisplaced: 'Due to a VIP registration',
     organizerMessage: 'Message',
     accountEmailUnverified: 'email not verified',
     accountPasswordChangeRequired: 'password change required',
@@ -883,6 +886,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     registrationStatus: { pending: 'Pendiente', confirmed: 'Confirmado', waitlist: 'Lista de espera', cancelled: 'Cancelado', rejected: 'Rechazado' },
     registrationFor: (participant) => `Inscripción de ${participant}`,
     ownRegistration: 'Tu inscripción',
+    vipDisplaced: 'Debido a una inscripción VIP',
     organizerMessage: 'Mensaje',
     accountEmailUnverified: 'correo no verificado',
     accountPasswordChangeRequired: 'cambio de contraseña requerido',
@@ -905,6 +909,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     registrationStatus: { pending: 'En attente', confirmed: 'Confirmé', waitlist: "Liste d'attente", cancelled: 'Annulé', rejected: 'Refusé' },
     registrationFor: (participant) => `Inscription de ${participant}`,
     ownRegistration: 'Votre inscription',
+    vipDisplaced: 'En raison d’une inscription VIP',
     organizerMessage: 'Message',
     accountEmailUnverified: 'e-mail non confirmé',
     accountPasswordChangeRequired: 'changement de mot de passe requis',
@@ -927,6 +932,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     registrationStatus: { pending: 'In attesa', confirmed: 'Confermata', waitlist: 'Lista d’attesa', cancelled: 'Annullata', rejected: 'Rifiutata' },
     registrationFor: (participant) => `Iscrizione di ${participant}`,
     ownRegistration: 'La tua iscrizione',
+    vipDisplaced: 'A causa di un’iscrizione VIP',
     organizerMessage: 'Messaggio',
     accountEmailUnverified: 'e-mail non confermata',
     accountPasswordChangeRequired: 'cambio password richiesto',
@@ -956,7 +962,8 @@ function buildSystemNotificationPushBody(eventType, eventData, language) {
   }
   if (eventType === 'registration_status_changed') {
     const subject = data.ownRegistration ? texts.ownRegistration : data.participant ? texts.registrationFor(data.participant) : '';
-    const status = `${data.tournamentName}: ${subject ? `${subject} ` : ''}${texts.registrationStatus[data.status] || data.status}`;
+    const statusLine = `${data.tournamentName}: ${subject ? `${subject} ` : ''}${texts.registrationStatus[data.status] || data.status}`;
+    const status = data.displaced ? `${statusLine}\n${texts.vipDisplaced}` : statusLine;
     return data.message ? `${status}\n${texts.organizerMessage}: ${data.message}` : status;
   }
   if (eventType === 'account_status_changed') {
@@ -9632,15 +9639,7 @@ export async function promoteWaitlist(env, tournamentId, appOrigin = APP_ORIGIN)
     const eventData = { tournamentId, tournamentName: tournament.name, status: registration.status, promoted: true };
     await createSystemNotification(env, tournament.owner_id, 'registration_status_changed',
       { ...eventData, participant: `${registration.first_name} ${registration.last_name}` });
-    // Postbox für jedes verknüpfte Konto des Teams; Slot-E-Mails ohne Verknüpfung über das passende Konto.
-    const accountIds = new Set([registration.user_id, registration.partner_user_id, registration.partner2_user_id,
-      registration.registrant_user_id].filter(Boolean));
-    for (const recipient of buildTeamRecipients(registration)) {
-      const user = await db.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').bind(recipient.email).first();
-      if (user) accountIds.add(user.id);
-    }
-    accountIds.delete(tournament.owner_id);
-    for (const userId of accountIds) {
+    for (const userId of await teamAccountIds(db, registration, tournament.owner_id)) {
       await createSystemNotification(env, userId, 'registration_status_changed', { ...eventData, ownRegistration: true });
     }
     try {
@@ -9654,6 +9653,42 @@ export async function promoteWaitlist(env, tournamentId, appOrigin = APP_ORIGIN)
     }
   }
   return promoted;
+}
+
+// Postbox-Empfänger eines Teams: jedes verknüpfte Konto, Slot-E-Mails ohne Verknüpfung über das passende Konto.
+async function teamAccountIds(db, registration, excludeUserId = null) {
+  const accountIds = new Set([registration.user_id, registration.partner_user_id, registration.partner2_user_id,
+    registration.registrant_user_id].filter(Boolean));
+  for (const recipient of buildTeamRecipients(registration)) {
+    const user = await db.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').bind(recipient.email).first();
+    if (user) accountIds.add(user.id);
+  }
+  if (excludeUserId) accountIds.delete(excludeUserId);
+  return accountIds;
+}
+
+/**
+ * Eine VIP-Meldung hat diese Meldung verdrängt (Warteliste bzw. ohne Warteliste storniert): Team per Mail (wenn das
+ * Turnier Mails senden darf) sowie Postbox/Push informieren, den Besitzer per Postbox - außer er hat selbst gespeichert.
+ * Die Zusammenfassung geht in der API-Antwort an die Turnierleitung zurück, die sie als Warnung anzeigt.
+ */
+async function notifyDisplacement(env, tournament, displaced, { wasCancelled, actorUserId = null, appOrigin }) {
+  if (!displaced) return null;
+  const status = wasCancelled ? 'cancelled' : 'waitlist';
+  const participant = `${displaced.first_name || ''} ${displaced.last_name || ''}`.trim();
+  try {
+    await sendDisplacementEmail(env, tournament, displaced, wasCancelled, appOrigin);
+  } catch (error) {
+    console.error(`Failed to send displacement email for registration ${displaced.id}`, error);
+  }
+  const eventData = { tournamentId: tournament.id, tournamentName: tournament.name, status, displaced: true };
+  for (const userId of await teamAccountIds(env.DB, displaced, tournament.owner_id)) {
+    await createSystemNotification(env, userId, 'registration_status_changed', { ...eventData, ownRegistration: true });
+  }
+  if (!actorUserId || actorUserId !== tournament.owner_id) {
+    await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', { ...eventData, participant });
+  }
+  return { id: displaced.id, participant, teamName: displaced.team_name || null, status };
 }
 
 // Nachrücken darf die auslösende Aktion (Storno, Bearbeitung) nie scheitern lassen.
@@ -9846,6 +9881,7 @@ export async function createRegistration(request, env, tournament, {
   }
   // Das absendende Konto erfährt nie, ob eine Slot-E-Mail verknüpft wurde (E-22); es selbst erhält keine Nachricht.
   await notifySlotLinks(env, links);
+  let displaced = null;
   if (!syncBootstrap) {
     await createSystemNotification(env, tournament.owner_id, 'registration_status_changed', {
       tournamentId: tournament.id, tournamentName: tournament.name,
@@ -9855,12 +9891,9 @@ export async function createRegistration(request, env, tournament, {
     });
     await notifyUserByEmail(env, created.email, 'registration_status_changed', { tournamentId: tournament.id, tournamentName: tournament.name, status: created.status, ownRegistration: true }, undefined, tournament.owner_id);
     if (displacedId) {
-      const displaced = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(displacedId).first();
-      try {
-        await sendDisplacementEmail(env, tournament, displaced, !waitlistEnabled, appOrigin);
-      } catch (error) {
-        console.error(`Failed to send displacement email for registration ${displacedId}`, error);
-      }
+      const displacedRow = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(displacedId).first();
+      displaced = await notifyDisplacement(env, tournament, displacedRow,
+        { wasCancelled: !waitlistEnabled, actorUserId: session?.user?.id || null, appOrigin });
     }
   }
 
@@ -9877,7 +9910,7 @@ export async function createRegistration(request, env, tournament, {
     }
   }
 
-  return json({ registration: toPublicRegistration(created), mailEnabled }, 201);
+  return json({ registration: toPublicRegistration(created), mailEnabled, ...(displaced ? { displaced } : {}) }, 201);
 }
 
 function assertRegistrationOpen(tournament, shareAccess) {
@@ -10115,9 +10148,9 @@ export async function updateRegistration(request, env, existing, actingUser = nu
     .run();
   if (!saved.meta.changes) throw participantLimitError();
 
-  if (registration.vipLevel > VIP_NONE && Number(existing.max_registrations)) {
-    await enforceVipPriorityOnUpdate(env, existing, new URL(request.url).origin);
-  }
+  const displaced = registration.vipLevel > VIP_NONE && Number(existing.max_registrations)
+    ? await enforceVipPriorityOnUpdate(env, existing, new URL(request.url).origin, actingUser?.id || null)
+    : null;
   await releaseInvalidMeleeTeams(db, existing.tournament_id);
 
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
@@ -10138,7 +10171,7 @@ export async function updateRegistration(request, env, existing, actingUser = nu
       await promoteWaitlistSafely(env, existing.tournament_id, new URL(request.url).origin);
     }
   }
-  return json({ registration: toManagedRegistration(updated) });
+  return json({ registration: toManagedRegistration(updated), ...(displaced ? { displaced } : {}) });
 }
 
 // Abgelehnt wird nur über POST /api/registrations/:id/reject: Nur dort entstehen Grund, Zeitpunkt, Bearbeiter und die
@@ -10339,12 +10372,13 @@ async function activateVipRegistration(db, registrationId) {
     .run();
 }
 
-async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
+// Liefert die Zusammenfassung der verdrängten Meldung (siehe notifyDisplacement) oder null.
+async function enforceVipPriorityOnUpdate(env, existing, appOrigin, actorUserId = null) {
   const db = env.DB;
   const current = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
   const level = vipLevelOf(current);
   if (!current || level === VIP_NONE) {
-    return;
+    return null;
   }
 
   const tournament = {
@@ -10368,23 +10402,23 @@ async function enforceVipPriorityOnUpdate(env, existing, appOrigin) {
   const isCurrentlyActive = current.status === 'pending' || current.status === 'confirmed';
   // VIP holt nur Wartelisten-Meldungen nach vorn; stornierte oder abgelehnte Meldungen bleiben, wie sie sind.
   if (!isCurrentlyActive && current.status !== 'waitlist') {
-    return;
+    return null;
   }
   const overCapacity = activeCount + 1 > Number(existing.max_registrations);
 
   if (!overCapacity) {
     if (!isCurrentlyActive) await activateVipRegistration(db, existing.id);
-    return;
+    return null;
   }
 
   const displace = await findDisplaceableLowerVip(db, existing.tournament_id, existing.id, level);
   if (!displace) {
-    return;
+    return null;
   }
 
   if (!isCurrentlyActive) await activateVipRegistration(db, existing.id);
 
-  await displaceRegistration(env, tournament, displace, appOrigin);
+  return displaceRegistration(env, tournament, displace, appOrigin, actorUserId);
 }
 
 async function deleteRegistration(db, registration) {
@@ -11148,7 +11182,7 @@ async function findDisplaceableLowerVip(db, tournamentId, excludeId, level) {
     .first();
 }
 
-async function displaceRegistration(env, tournament, registrationToDisplace, appOrigin) {
+async function displaceRegistration(env, tournament, registrationToDisplace, appOrigin, actorUserId = null) {
   const wasCancelled = !Number(tournament.waitlist_enabled ?? 1);
   const now = new Date().toISOString();
   await env.DB
@@ -11156,12 +11190,7 @@ async function displaceRegistration(env, tournament, registrationToDisplace, app
     .bind(wasCancelled ? 'cancelled' : 'waitlist', now, registrationToDisplace.id)
     .run();
   await releaseInvalidMeleeTeams(env.DB, tournament.id);
-
-  try {
-    await sendDisplacementEmail(env, tournament, registrationToDisplace, wasCancelled, appOrigin);
-  } catch (error) {
-    console.error(`Failed to send displacement email for registration ${registrationToDisplace.id}`, error);
-  }
+  return notifyDisplacement(env, tournament, registrationToDisplace, { wasCancelled, actorUserId, appOrigin });
 }
 
 async function addTournamentEditor(request, db, tournament, actingUser) {

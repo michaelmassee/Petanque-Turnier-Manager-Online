@@ -596,6 +596,12 @@ a.button {
   color: #206f3b;
 }
 
+.feedback.warning {
+  background: #fff1d6;
+  color: #7a4b00;
+  border-left: 4px solid #e0a100;
+}
+
 .feedback.offline {
   background: #fff4e0;
   color: #8a5a00;

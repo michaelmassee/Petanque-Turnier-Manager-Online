@@ -224,7 +224,8 @@ function postboxMessageText(message, t) {
   if (message.eventType === 'registration_status_changed') {
     const subject = data.ownRegistration ? t('Deine Anmeldung') : data.participant ? t('registrationFor').replace('{participant}', data.participant) : '';
     const statusLine = `${data.tournamentName}: ${subject ? `${subject} ` : ''}${labelFor(REGISTRATION_STATUSES, data.status)}`;
-    const status = data.promoted ? `${statusLine}\n${t('Von der Warteliste nachgerückt')}` : statusLine;
+    const note = data.promoted ? t('Von der Warteliste nachgerückt') : data.displaced ? t('Wegen einer VIP-Meldung verschoben') : '';
+    const status = note ? `${statusLine}\n${note}` : statusLine;
     const detail = data.reason || data.message;
     return detail ? `${status}\n${data.reason ? t('Ablehnungsgrund') : t('message')}: ${detail}` : status;
   }

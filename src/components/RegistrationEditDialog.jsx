@@ -164,8 +164,8 @@ export function RegistrationEditDialog({ registration, tournament, tournaments, 
     const payload = registrationPayload({ ...form, tournamentId: form.tournamentId || registration.tournamentId }, language);
     setSaving(true);
     try {
-      await authenticatedApi(`/api/registrations/${form.id}`, { method: 'PUT', body: JSON.stringify(payload) });
-      await onSaved?.(t('Anmeldung wurde aktualisiert.'));
+      const result = await authenticatedApi(`/api/registrations/${form.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      await onSaved?.(t('Anmeldung wurde aktualisiert.'), result?.displaced);
     } catch (err) {
       const conflictName = err.payload?.details?.name;
       setError(conflictName ? `${err.message} ("${conflictName}")` : err.message);

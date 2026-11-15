@@ -30,3 +30,12 @@ export function vipLevelInfo(level) {
 export function vipLevelOptions(t) {
   return [{ value: String(VIP_NONE), label: t('ohne VIP') }, ...VIP_LEVELS.map((level) => ({ value: String(level.value), label: t(level.label) }))];
 }
+
+// Warnung für die Turnierleitung, wenn ihr Speichern per VIP-Vorrang eine andere Meldung verdrängt hat (API-Feld displaced).
+export function displacementWarning(t, displaced) {
+  if (!displaced) return '';
+  const name = displaced.participant || displaced.teamName || '';
+  return displaced.status === 'cancelled'
+    ? t('{{name}} wurde wegen der VIP-Meldung storniert, da keine Warteliste aktiv ist.', { name })
+    : t('{{name}} wurde wegen der VIP-Meldung auf die Warteliste verschoben.', { name });
+}
