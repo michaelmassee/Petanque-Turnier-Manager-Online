@@ -3367,7 +3367,7 @@ export default {
         assertRegistrationOnlineEditable(registration);
         const body = await readJson(request);
         const participation = parseParticipation(body.participation);
-        return await setRegistrationParticipation(env.DB, registration, participation);
+        return await setRegistrationParticipation(env.DB, registration, participation, auth.user);
       }
 
       const tournamentParticipationMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/participation$/);
@@ -3378,7 +3378,7 @@ export default {
         assertCanManageTournament(tournament, session.user);
         assertRegistrationOnlineEditable(tournament);
         const body = await readJson(request);
-        return await setTournamentParticipation(env.DB, tournament, parseParticipation(body.participation));
+        return await setTournamentParticipation(env.DB, tournament, parseParticipation(body.participation), session.user);
       }
 
       if (url.pathname === '/api/sync/tournaments' && request.method === 'GET') {
@@ -6709,7 +6709,7 @@ async function startTournament(env, existing, user, appOrigin) {
   }
   const updated = await performTournamentStart(env, existing);
   if (existing.status !== 'running') {
-    await checkInConfirmedRegistrations(env.DB, existing.id);
+    await checkInConfirmedRegistrations(env.DB, existing, user);
   }
   return json({ tournament: toPublicTournament(updated, user) });
 }
@@ -6720,11 +6720,14 @@ async function startTournament(env, existing, user, appOrigin) {
  * Desktop-Durchführung ({@link startTournamentFromSync}) - dort meldet das Turnierdokument die
  * Teilnahme selbst.
  */
-async function checkInConfirmedRegistrations(db, tournamentId) {
+async function checkInConfirmedRegistrations(db, tournament, actingUser = null) {
+  const now = new Date().toISOString();
   const result = await db.prepare(`UPDATE registrations SET participation = 'active', updated_at = ?
       WHERE tournament_id = ? AND status = 'confirmed' AND participation = 'inactive' RETURNING id`)
-    .bind(new Date().toISOString(), tournamentId).all();
-  return (result.results || []).map((row) => row.id);
+    .bind(now, tournament.id).all();
+  const ids = (result.results || []).map((row) => row.id);
+  await auditParticipationChanges(db, tournament, ids, { from: 'inactive', to: 'active', tournamentStart: true }, actingUser, now);
+  return ids;
 }
 
 /**
@@ -9834,7 +9837,11 @@ async function notifyDisplacement(env, tournament, displaced, { wasCancelled, ac
   if (!displaced) return null;
   const status = wasCancelled ? 'cancelled' : 'waitlist';
   const participant = displacedTeamLabel(displaced);
-  await auditStatement(env.DB, { tournamentId: tournament.id, registrationId: displaced.id, actorRole: 'system',
+  // Ausgelöst durch die VIP-Vergabe der Turnierleitung: sie steht als handelnde Person im Protokoll.
+  const actor = actorUserId && actorUserId !== tournament.owner_id
+    ? await env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(actorUserId).first() : null;
+  const actorRole = !actorUserId ? 'system' : actorRoleFor(tournament, actor || { id: actorUserId });
+  await auditStatement(env.DB, { tournamentId: tournament.id, registrationId: displaced.id, actorUserId, actorRole,
     action: 'vip_displaced', target: 'registration', details: { to: status } }).run();
   try {
     await sendDisplacementEmail(env, tournament, displaced, wasCancelled, appOrigin);
@@ -10420,6 +10427,12 @@ async function auditRegistrationEdit(env, existing, updated, actingUser) {
     if (before !== after) {
       statements.push(auditStatement(db, { ...actor, action: 'composition_changed', target, details: { from: before, to: after } }));
     }
+    const clubColumn = column.first.replace('first_name', 'club');
+    for (const [action, key] of [['club_changed', clubColumn], ['license_changed', column.license]]) {
+      const from = String(existing[key] || '').trim();
+      const to = String(updated[key] || '').trim();
+      if (from !== to) statements.push(auditStatement(db, { ...actor, action, target, details: { from, to } }));
+    }
     if ((existing[column.userId] || null) !== (updated[column.userId] || null)) {
       statements.push(auditStatement(db, { ...actor, action: updated[column.userId] ? 'account_linked' : 'account_unlinked',
         target, details: { from: existing[column.userId] || null, to: updated[column.userId] || null } }));
@@ -10437,8 +10450,46 @@ async function auditRegistrationEdit(env, existing, updated, actingUser) {
     statements.push(auditStatement(db, { ...actor, action: 'vip_changed', target: 'registration',
       details: { from: vipLevelOf(existing), to: vipLevelOf(updated) } }));
   }
+  if (existing.status === updated.status && updated.status === 'rejected'
+    && String(existing.rejection_reason || '') !== String(updated.rejection_reason || '')) {
+    statements.push(auditStatement(db, { ...actor, action: 'rejection_reason_changed', target: 'registration',
+      details: { from: existing.rejection_reason || '', to: updated.rejection_reason || '' } }));
+  }
+  const seedingBefore = existing.seeding_position ?? null;
+  const seedingAfter = updated.seeding_position ?? null;
+  if (String(seedingBefore ?? '') !== String(seedingAfter ?? '')) {
+    statements.push(auditStatement(db, { ...actor, action: 'seeding_changed', target: 'registration',
+      details: { from: seedingBefore, to: seedingAfter } }));
+  }
+  if (String(existing.phone || '').trim() !== String(updated.phone || '').trim()) {
+    statements.push(auditStatement(db, { ...actor, action: 'phone_changed', target: 'registration',
+      details: { from: String(existing.phone || '').trim(), to: String(updated.phone || '').trim() } }));
+  }
+  // Gebühren und Zusatzfragen: nur dass sich etwas geändert hat; die Inhalte stehen in der Meldung selbst.
+  if (canonicalJson(existing.fee_selections) !== canonicalJson(updated.fee_selections)) {
+    statements.push(auditStatement(db, { ...actor, action: 'fees_changed', target: 'registration' }));
+  }
+  if (canonicalJson(existing.registration_answers) !== canonicalJson(updated.registration_answers)) {
+    statements.push(auditStatement(db, { ...actor, action: 'answers_changed', target: 'registration' }));
+  }
   if (statements.length > 0) await db.batch(statements);
   await notifySlotLinks(env, newSlotLinks(existing, updated, existing.id, existing.tournament_id));
+}
+
+/** Vergleichbare Form gespeicherter JSON-Spalten: leer, null, {} und [] gelten als gleich, Schlüsselreihenfolge egal. */
+function canonicalJson(value) {
+  let parsed = value;
+  if (typeof value === 'string') {
+    try { parsed = value.trim() ? JSON.parse(value) : null; } catch { return value; }
+  }
+  const sort = (item) => {
+    if (Array.isArray(item)) return item.map(sort);
+    if (item && typeof item === 'object') return Object.fromEntries(Object.keys(item).sort().map((key) => [key, sort(item[key])]));
+    return item;
+  };
+  const normalized = sort(parsed);
+  if (normalized == null || (typeof normalized === 'object' && Object.keys(normalized).length === 0)) return '';
+  return JSON.stringify(normalized);
 }
 
 function sameText(a, b) {
@@ -10509,9 +10560,15 @@ function assertPlayerCancellationOpen(registration) {
  * ein - analog zum Hauptprojekt, wo nur Meldungen mit Aktiv-Spalte 1 in die Paarungsbildung
  * einfließen. Der Anmeldestatus bleibt davon unberührt.
  */
-async function setRegistrationParticipation(db, existing, participation) {
+async function setRegistrationParticipation(db, existing, participation, actingUser = null) {
   const now = new Date().toISOString();
-  await db.prepare('UPDATE registrations SET participation = ?, updated_at = ? WHERE id = ?').bind(participation, now, existing.id).run();
+  const statements = [db.prepare('UPDATE registrations SET participation = ?, updated_at = ? WHERE id = ?').bind(participation, now, existing.id)];
+  if ((existing.participation || 'inactive') !== participation) {
+    statements.push(auditStatement(db, { tournamentId: existing.tournament_id, registrationId: existing.id,
+      actorUserId: actingUser?.id || null, actorRole: actingUser ? actorRoleFor(existing, actingUser) : 'organizer',
+      action: 'participation_changed', target: 'registration', details: { from: existing.participation || 'inactive', to: participation }, now }));
+  }
+  await db.batch(statements);
   await releaseInvalidMeleeTeams(db, existing.tournament_id);
   const updated = await db.prepare('SELECT * FROM registrations WHERE id = ?').bind(existing.id).first();
   return json({ registration: toManagedRegistration(updated) });
@@ -10519,14 +10576,25 @@ async function setRegistrationParticipation(db, existing, participation) {
 
 // „Alle aktivieren/deaktivieren“ in der Turnierdurchführung: betrifft alle bestätigten Meldungen;
 // ausgesetzte (withdrawn) bleiben bewusst ausgesetzt, ausgesetzt wird nur einzeln.
-export async function setTournamentParticipation(db, tournament, participation) {
+export async function setTournamentParticipation(db, tournament, participation, actingUser = null) {
   if (participation === 'withdrawn') throw new HttpError(400, 'Ungültige Teilnahme');
   const now = new Date().toISOString();
   const result = await db.prepare(`UPDATE registrations SET participation = ?, updated_at = ?
-      WHERE tournament_id = ? AND status = 'confirmed' AND participation IN ('active', 'inactive') AND participation != ?`)
-    .bind(participation, now, tournament.id, participation).run();
+      WHERE tournament_id = ? AND status = 'confirmed' AND participation IN ('active', 'inactive') AND participation != ? RETURNING id`)
+    .bind(participation, now, tournament.id, participation).all();
+  const ids = (result.results || []).map((row) => row.id);
+  await auditParticipationChanges(db, tournament, ids, { from: participation === 'active' ? 'inactive' : 'active', to: participation,
+    bulk: true }, actingUser, now);
   await releaseInvalidMeleeTeams(db, tournament.id);
-  return json({ updatedCount: Number(result.meta?.changes || 0) });
+  return json({ updatedCount: ids.length });
+}
+
+/** Protokoll (T-14) für Sammeländerungen der Teilnahme: ein Eintrag je betroffener Meldung, ein Batch. */
+async function auditParticipationChanges(db, tournament, registrationIds, details, actingUser, now) {
+  if (registrationIds.length === 0) return;
+  await db.batch(registrationIds.map((registrationId) => auditStatement(db, { tournamentId: tournament.id, registrationId,
+    actorUserId: actingUser?.id || null, actorRole: actingUser ? actorRoleFor(tournament, actingUser) : 'system',
+    action: 'participation_changed', target: 'registration', details, now })));
 }
 
 // Wie beim Nachrücken: Offen nur bei Bestätigungspflicht, sonst direkt bestätigt.

@@ -273,6 +273,9 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
       const antwort = await (await anmelden({ vipLevel: 1, playerEmail: 'vip@example.test' }, { session: { user: { id: 'u-edit', role: 'admin' } } })).json();
 
       expect(antwort.displaced).toMatchObject({ id: 'b', status: 'cancelled' });
+      // Protokoll (T-14): die Verdrängung steht mit dem auslösenden Admin, nicht als „Automatisch“.
+      expect(env.DB.sqlite.prepare("SELECT actor_user_id, actor_role FROM audit_log WHERE action = 'vip_displaced'").all())
+        .toEqual([{ actor_user_id: 'u-edit', actor_role: 'admin' }]);
       expect(postfach('u1').filter((daten) => daten.displaced)).toEqual([
         expect.objectContaining({ participant: 'b Vorhanden', status: 'cancelled', displaced: true }),
       ]);

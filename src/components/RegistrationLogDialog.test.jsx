@@ -25,6 +25,16 @@ describe('Protokoll der Meldeliste', () => {
     expect(registrationLogText({ action: 'vip_changed', details: { from: 0, to: 3 } }, t)).toBe('VIP-Stufe: kein VIP → VIP Gold');
     expect(registrationLogText({ action: 'status_changed', details: { from: 'pending', to: 'rejected', reason: 'Voll' } }, t))
       .toBe('Status: Offen → Abgelehnt – Voll');
+    expect(registrationLogText({ action: 'club_changed', target: 'slot:1', details: { from: 'BC A', to: '' } }, t))
+      .toBe('Verein Spieler 1: BC A → –');
+    expect(registrationLogText({ action: 'seeding_changed', details: { from: null, to: 2 } }, t)).toBe('Setzposition: – → 2');
+    expect(registrationLogText({ action: 'participation_changed', details: { from: 'inactive', to: 'active', tournamentStart: true } }, t))
+      .toBe('Teilnahme: Inaktiv → Aktiv (beim Turnierstart)');
+    expect(registrationLogText({ action: 'participation_changed', details: { from: 'active', to: 'inactive', bulk: true } }, t))
+      .toBe('Teilnahme: Aktiv → Inaktiv (Alle deaktivieren)');
+    expect(registrationLogText({ action: 'participation_changed', details: { from: 'active', to: 'withdrawn' } }, t))
+      .toBe('Teilnahme: Aktiv → Ausgesetzt');
+    expect(registrationLogText({ action: 'fees_changed', details: {} }, t)).toBe('Gebührenauswahl geändert');
     expect(registrationLogText({ action: 'unbekannt', details: {} }, t)).toBe('unbekannt');
     expect(registrationLogActor({ actorRole: 'player' }, t)).toBe('Spieler');
     expect(registrationLogActor({ actorRole: 'editor', actorName: 'Max M' }, t)).toBe('Max M (Mitverwaltung)');

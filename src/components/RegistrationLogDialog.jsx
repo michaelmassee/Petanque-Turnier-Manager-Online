@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
-import { REGISTRATION_STATUSES } from '../lib/constants.js';
+import { PARTICIPATIONS, REGISTRATION_STATUSES } from '../lib/constants.js';
 import { labelFor } from '../lib/domain.js';
 import { formatTournamentDateTime } from '../lib/format.js';
 import { vipLevelInfo } from '../lib/vip.js';
@@ -15,6 +15,10 @@ function slotNumber(target) {
 
 function statusLabel(status) {
   return status ? labelFor(REGISTRATION_STATUSES, status) : '–';
+}
+
+function participationLabel(participation) {
+  return participation ? labelFor(PARTICIPATIONS, participation) : '–';
 }
 
 function vipLabel(level, t) {
@@ -46,6 +50,26 @@ export function registrationLogText(entry, t) {
       return t('Spieler {{slot}}: {{from}} → {{to}}', { slot, from: details.from || '–', to: details.to || '–' });
     case 'team_name_changed':
       return t('Teamname: {{from}} → {{to}}', { from: details.from || '–', to: details.to || '–' });
+    case 'club_changed':
+      return t('Verein Spieler {{slot}}: {{from}} → {{to}}', { slot, from: details.from || '–', to: details.to || '–' });
+    case 'license_changed':
+      return t('Lizenznummer Spieler {{slot}}: {{from}} → {{to}}', { slot, from: details.from || '–', to: details.to || '–' });
+    case 'phone_changed':
+      return t('Telefon: {{from}} → {{to}}', { from: details.from || '–', to: details.to || '–' });
+    case 'seeding_changed':
+      return t('Setzposition: {{from}} → {{to}}', { from: details.from ?? '–', to: details.to ?? '–' });
+    case 'fees_changed':
+      return t('Gebührenauswahl geändert');
+    case 'answers_changed':
+      return t('Antworten auf Zusatzfragen geändert');
+    case 'rejection_reason_changed':
+      return t('Ablehnungsgrund: {{from}} → {{to}}', { from: details.from || '–', to: details.to || '–' });
+    case 'participation_changed': {
+      const text = t('Teilnahme: {{from}} → {{to}}', { from: participationLabel(details.from), to: participationLabel(details.to) });
+      if (details.tournamentStart) return `${text} (${t('beim Turnierstart')})`;
+      if (details.bulk) return `${text} (${t(details.to === 'active' ? 'Alle aktivieren' : 'Alle deaktivieren')})`;
+      return text;
+    }
     case 'vip_changed':
       return t('VIP-Stufe: {{from}} → {{to}}', { from: vipLabel(details.from, t), to: vipLabel(details.to, t) });
     case 'contact_email_changed':

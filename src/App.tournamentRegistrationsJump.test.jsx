@@ -35,14 +35,15 @@ describe('Turnierverwaltung: Sprung zu den Anmeldungen', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
+  // Volle App unter Testlast: großzügigere Wartezeiten als die 1 s Standard von findBy*.
   it('öffnet die Anmeldungen des gewählten Turniers', async () => {
     render(<App />);
-    fireEvent.click(await screen.findByLabelText('Menü öffnen'));
+    fireEvent.click(await screen.findByLabelText('Menü öffnen', {}, { timeout: 5000 }));
     fireEvent.click(screen.getByText('Turnierverwaltung'));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Anmeldungen (1)' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Anmeldungen (1)' }, { timeout: 5000 }));
 
-    expect(await screen.findByText('Anna Muster')).toBeInTheDocument();
+    expect(await screen.findByText('Anna Muster', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Turnier anzeigen' }).value).toMatch(/^Zweites Turnier/);
     await waitFor(() => expect(calls).toContain('/api/tournaments/t2/registrations'));
   });

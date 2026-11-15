@@ -80,6 +80,48 @@ describe('Protokoll der Meldeliste', () => {
     ]);
   });
 
+  it('protokolliert Verein, Lizenznummer, Telefon und Setzposition beim Bearbeiten', async () => {
+    anmeldung('a', 'confirmed', { first_name: 'Anna', player_email: 'a@example.test', club: 'BC Alt', phone: '+49 1' });
+    const existing = await getRegistrationWithTournament(env.DB, 'a');
+    const request = new Request('https://ptm.test/api/registrations/a', { method: 'PUT', body: JSON.stringify({
+      firstName: 'Anna', lastName: 'Team', email: 'a@example.test', playerEmail: 'a@example.test', status: 'confirmed',
+      club: 'BC Neu', licenseNr: '123', phone: '', seedingPosition: 3, partnerFirstName: 'Paula', partnerLastName: 'Partner',
+    }) });
+    expect((await updateRegistration(request, env, existing, { id: 'owner', role: 'user' })).status).toBe(200);
+
+    expect(protokoll().map(({ action, details, actor_role: role }) => ({ action, details, role }))).toEqual([
+      { action: 'club_changed', details: { from: 'BC Alt', to: 'BC Neu' }, role: 'owner' },
+      { action: 'license_changed', details: { from: '', to: '123' }, role: 'owner' },
+      { action: 'seeding_changed', details: { from: null, to: 3 }, role: 'owner' },
+      { action: 'phone_changed', details: { from: '+49 1', to: '' }, role: 'owner' },
+    ]);
+  });
+
+  it('protokolliert die Teilnahme einzeln und für alle mit der handelnden Turnierleitung', async () => {
+    sql("UPDATE tournaments SET status = 'running' WHERE id = 't1'");
+    anmeldung('a', 'confirmed', { participation: 'inactive' });
+    anmeldung('b', 'confirmed', { participation: 'active' });
+    expect((await anfrage('/api/registrations/a/participation', { method: 'PUT', body: { participation: 'withdrawn' } })).status).toBe(200);
+    expect((await anfrage('/api/tournaments/t1/participation', { method: 'PUT', body: { participation: 'inactive' } })).status).toBe(200);
+
+    expect(protokoll().map(({ registration_id: id, actor_user_id: actor, action, details }) => ({ id, actor, action, details }))).toEqual([
+      { id: 'a', actor: 'owner', action: 'participation_changed', details: { from: 'inactive', to: 'withdrawn' } },
+      { id: 'b', actor: 'owner', action: 'participation_changed', details: { from: 'active', to: 'inactive', bulk: true } },
+    ]);
+  });
+
+  it('protokolliert den automatischen Check-in beim Turnierstart mit der startenden Turnierleitung', async () => {
+    anmeldung('a', 'confirmed', { participation: 'inactive' });
+    anmeldung('b', 'confirmed', { participation: 'withdrawn' });
+    const response = await anfrage('/api/tournaments/t1/start', { method: 'POST', body: {} });
+    expect(response.status).toBe(200);
+
+    expect(protokoll().filter((row) => row.action === 'participation_changed')
+      .map(({ registration_id: id, actor_user_id: actor, actor_role: role, details }) => ({ id, actor, role, details }))).toEqual([
+      { id: 'a', actor: 'owner', role: 'owner', details: { from: 'inactive', to: 'active', tournamentStart: true } },
+    ]);
+  });
+
   it('behält eine gelöschte Meldung mit Namen im Protokoll', async () => {
     anmeldung('a', 'confirmed', { team_name: 'Les Boulistes' });
     const response = await anfrage('/api/registrations/a', { method: 'DELETE' });
