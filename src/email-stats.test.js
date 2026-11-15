@@ -20,9 +20,17 @@ describe('E-Mail-Versandstatistik', () => {
     await Promise.all(Array.from({ length: 40 }, (_, index) => recordEmailSent(db, index % 2 ? 'strato' : 'resend', now)));
     await recordEmailSent(db, 'strato', new Date('2026-10-26T01:00:00+02:00'));
     expect(db.sqlite.prepare('SELECT * FROM email_delivery_daily').all()).toEqual([
-      { day: '2026-10-25', strato: 21, resend: 20 },
+      { day: '2026-10-25', strato: 21, resend: 20, organizer: 0 },
     ]);
     await expect(recordEmailSent(db, 'unknown', now)).rejects.toThrow('Unknown email provider');
+  });
+
+  it('zählt Mails über eigene Gateways der Turnierleitungen getrennt', async () => {
+    await recordEmailSent(db, 'organizer', now);
+    await recordEmailSent(db, 'strato', now);
+    const result = await collectEmailStats(db, 7, now);
+    expect(result.days.at(-1)).toEqual({ day: '2026-10-25', strato: 1, resend: 0, organizer: 1, total: 2 });
+    expect(result.totals.allTime).toEqual({ strato: 1, resend: 0, organizer: 1, total: 2 });
   });
 
   it('liefert heute, Kalenderwoche ab Montag, Zeitraum und Gesamtstand unabhängig voneinander', async () => {
@@ -32,17 +40,17 @@ describe('E-Mail-Versandstatistik', () => {
     }
     const result = await collectEmailStats(db, 7, now);
     expect(result.days).toHaveLength(7);
-    expect(result.days[0]).toEqual({ day: '2026-10-19', strato: 1, resend: 0, total: 1 });
-    expect(result.days[1]).toEqual({ day: '2026-10-20', strato: 0, resend: 0, total: 0 });
+    expect(result.days[0]).toEqual({ day: '2026-10-19', strato: 1, resend: 0, organizer: 0, total: 1 });
+    expect(result.days[1]).toEqual({ day: '2026-10-20', strato: 0, resend: 0, organizer: 0, total: 0 });
     expect(result.trackingSince).toBe('2026-10-01T09:00:00.000Z');
     expect(result.totals).toEqual({
-      today: { strato: 0, resend: 1, total: 1 },
-      week: { strato: 1, resend: 2, total: 3 },
-      range: { strato: 1, resend: 2, total: 3 },
-      allTime: { strato: 2, resend: 3, total: 5 },
+      today: { strato: 0, resend: 1, organizer: 0, total: 1 },
+      week: { strato: 1, resend: 2, organizer: 0, total: 3 },
+      range: { strato: 1, resend: 2, organizer: 0, total: 3 },
+      allTime: { strato: 2, resend: 3, organizer: 0, total: 5 },
     });
     const monday = await collectEmailStats(db, 30, new Date('2026-10-26T00:00:00Z'));
-    expect(monday.totals.week).toEqual({ strato: 1, resend: 0, total: 1 });
+    expect(monday.totals.week).toEqual({ strato: 1, resend: 0, organizer: 0, total: 1 });
   });
 
   it('zeigt auch ohne Versand den Erfassungsbeginn und begrenzt die Zeiträume', async () => {

@@ -7,6 +7,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.js'],
+    // worker-mailer importiert cloudflare:sockets; inline geladen, damit Tests den Socket durch einen simulierten SMTP-Server ersetzen können.
+    server: { deps: { inline: ['worker-mailer'] } },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],

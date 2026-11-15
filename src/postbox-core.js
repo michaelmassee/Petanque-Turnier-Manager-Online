@@ -50,6 +50,9 @@ export function liveViewPathFor(eventData) {
   return eventData?.registrationId ? `/live/${encodeURIComponent(eventData.registrationId)}` : null;
 }
 
+// Eigenes E-Mail-Gateway des Kontos ist in den Fehlerzustand gewechselt (einmal je Wechsel, nicht je Mail).
+export const MAIL_GATEWAY_FAILED_EVENT = 'mail_gateway_failed';
+
 // Platz mieten: neue Anfrage bzw. Storno durch den Mieter (an die Vereinsverwaltung) und Entscheidung des Vereins
 // (an den Mieter, auch Storno durch den Verein).
 export const RENTAL_REQUESTED_EVENT = 'rental_requested';

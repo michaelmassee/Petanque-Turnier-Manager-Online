@@ -63,4 +63,11 @@ describe('Hinweis ohne Mail-Freischaltung', () => {
     await screen.findByRole('button', { name: 'Turnier anlegen' });
     expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
   });
+
+  it('zeigt den Hinweis nicht, wenn ein eigenes E-Mail-Gateway aktiv ist', async () => {
+    renderPage({ id: 'u1', firstName: 'Lea', lastName: 'Leitung', role: 'user', mailEnabled: false, ownMailGateway: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Neues Turnier' }));
+    await screen.findByRole('button', { name: 'Turnier anlegen' });
+    expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+  });
 });

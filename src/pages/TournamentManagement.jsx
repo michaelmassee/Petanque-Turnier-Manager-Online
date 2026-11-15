@@ -318,7 +318,9 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
   const [showFormationHelp, setShowFormationHelp] = useState(false);
   const [showLocationHelp, setShowLocationHelp] = useState(false);
   // Mails zum Turnier hängen an der Freischaltung des Owners: Hinweis beim Anlegen und für den Owner beim Bearbeiten.
-  const showMailNotEnabledHint = !isAdmin && currentUser?.mailEnabled === false && (mode !== 'edit' || form.ownerId === currentUser.id);
+  // Mit eigenem E-Mail-Gateway gehen die Turnier-Mails auch ohne Freischaltung raus.
+  const showMailNotEnabledHint = !isAdmin && currentUser?.mailEnabled === false && !currentUser?.ownMailGateway
+    && (mode !== 'edit' || form.ownerId === currentUser.id);
   // Teilnehmer-Limit des eigenen Kontos (Missbrauchsschutz); bei fremden Turnieren prüft nur der Server die Grenze des Besitzers.
   const participantLimit = currentUser && currentUser.role !== 'admin' && (mode !== 'edit' || form.ownerId === currentUser.id)
     ? currentUser.participantLimit ?? DEFAULT_PARTICIPANT_LIMIT : null;
@@ -336,6 +338,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           <strong>{t('E-Mail-Versand nicht freigeschaltet')}</strong>
           <p>{t('Statusmeldungen zu diesem Turnier (z. B. neue Anmeldungen und Stornierungen) landen nur in deinem internen Postfach und werden nicht per E-Mail verschickt.')}</p>
           <p>{t('Auch Teilnehmer erhalten keine Bestätigungs-, Erinnerungs- oder Broadcast-Mails, bis ein Admin den E-Mail-Versand freischaltet. Anmeldungen und Stornierungen funktionieren normal.')}</p>
+          <p>{t('Alternativ kannst du im Profil ein eigenes E-Mail-Gateway (SMTP-Server oder Resend) einrichten. Dann gehen die Turnier-Mails über deinen eigenen Mailserver.')}</p>
         </div>
       )}
       <TournamentNameField value={form.name} onChange={(name) => setForm({ ...form, name })} />

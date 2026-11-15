@@ -56,7 +56,7 @@ describe('Admin: E-Mail-Statistik', () => {
     fireEvent.click(container.querySelectorAll('.visitor-chart-hit')[0]);
     expect(container.querySelector('.visitor-readout')).toHaveTextContent('26.10.2025 E-Mails: 3');
     const tableRows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
-    const total = tableRows.reduce((sum, row) => sum + Number(within(row).getAllByRole('cell')[3].textContent), 0);
+    const total = tableRows.reduce((sum, row) => sum + Number(within(row).getAllByRole('cell').at(-1).textContent), 0);
     expect(total).toBe(1095);
   });
 

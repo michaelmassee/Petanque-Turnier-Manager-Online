@@ -7,7 +7,7 @@ import { api, authenticatedApi, clearOfflineApiCache, setSessionExpiredHandler }
 import { queryClient } from './lib/query-client.js';
 import { pushRecentRecipientValue } from './lib/postboxRecipientStorage.js';
 import { pruneExpiredFlyerDesigns } from './lib/flyer-background-storage.js';
-import { LIVE_VIEW_EVENTS, liveViewPathFor, rentalPathFor } from './postbox-core.js';
+import { LIVE_VIEW_EVENTS, liveViewPathFor, MAIL_GATEWAY_FAILED_EVENT, rentalPathFor } from './postbox-core.js';
 import { usePath, popStateChangedPath, areaForPath, matchTournamentRoute, matchTournamentBoardRoute, tournamentBoardPath, matchLiveRoute, matchRentalRoute } from './lib/routing.js';
 import { useInstallPrompt, isIosSafari, useRoutedTournament } from './lib/hooks.js';
 import { DISPLAY_LOCALES, TIMEZONE_HINT_TEMPLATES, REGISTRATION_OPENS_TEMPLATES, PASSWORD_STRENGTH_ERROR, PASSWORD_STRENGTH_HINT, detectViewerTimeZone, formatDate, formatWeekdayShort, timezoneAbbrev, formatTournamentDateTime, currencyOptions, formatMoney, formatDateTime, isPasswordStrong } from './lib/format.js';
@@ -33,6 +33,7 @@ const RegistrationsManagement = lazy(() => import('./pages/RegistrationsManageme
 const UserManagementPanel = lazy(() => import('./pages/UserManagementPanel.jsx'));
 const ApiKeysPanel = lazy(() => import('./pages/ApiKeysPanel.jsx'));
 const OwnApiKeysPanel = lazy(() => import('./pages/ApiKeysPanel.jsx').then((module) => ({ default: module.OwnApiKeysPanel })));
+const MailGatewayPanel = lazy(() => import('./pages/MailGatewayPanel.jsx'));
 const TournamentPlayManagement = lazy(() => import('./pages/TournamentPlayManagement.jsx'));
 const TournamentQuickStart = lazy(() => import('./pages/TournamentQuickStart.jsx'));
 const PetanqueAktuellImportPanel = lazy(() => import('./pages/PetanqueAktuellImportPanel.jsx'));
@@ -873,6 +874,11 @@ function AppContent() {
     } else if (message.kind === 'system' && message.eventData?.tournamentId) {
       setPostboxOpen(false);
       navigate(`/turniere/${message.eventData.tournamentId}`);
+    }
+    if (message.eventType === MAIL_GATEWAY_FAILED_EVENT) {
+      setActiveTab('profile');
+      setPostboxOpen(false);
+      if (path !== '/') navigate('/');
     }
     const livePath = LIVE_VIEW_EVENTS.includes(message.eventType) ? liveViewPathFor(message.eventData) : null;
     const targetPath = livePath || rentalPathFor(message.eventType);
@@ -2304,7 +2310,8 @@ function AppContent() {
 
       {activeTab === 'profile' && (
         <section className="single-column">
-          <ProfilePanel currentUser={currentUser} form={profileForm} setForm={setProfileForm} onSubmit={handleUpdateProfile} saving={profileSaving} onDeleteAccount={handleDeleteAccount} deleting={accountDeleting} clubNames={publishedClubNames} />
+          <ProfilePanel currentUser={currentUser} form={profileForm} setForm={setProfileForm} onSubmit={handleUpdateProfile} saving={profileSaving} onDeleteAccount={handleDeleteAccount} deleting={accountDeleting} clubNames={publishedClubNames}
+            onMailGatewayChanged={(active) => setCurrentUser((user) => (user ? { ...user, ownMailGateway: active } : user))} />
         </section>
       )}
     </main>
@@ -2312,7 +2319,7 @@ function AppContent() {
 }
 
 // clubNames: veröffentlichte Vereine als Vorschläge für das Vereinsfeld (Freitext bleibt möglich).
-export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = false, onDeleteAccount, deleting = false, clubNames = [] }) {
+export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = false, onDeleteAccount, deleting = false, clubNames = [], onMailGatewayChanged }) {
   const { t, i18n } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
   // Gleiche Regel wie im Worker (resolveProfileClub): Name eines freigegebenen Vereins, ohne Groß-/Kleinschreibung.
@@ -2420,6 +2427,9 @@ export function ProfilePanel({ currentUser, form, setForm, onSubmit, saving = fa
           </form>
         </div>
       )}
+      <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
+        <MailGatewayPanel onChanged={onMailGatewayChanged} />
+      </Suspense>
       <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}>
         <OwnApiKeysPanel />
       </Suspense>

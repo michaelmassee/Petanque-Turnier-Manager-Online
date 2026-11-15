@@ -45,7 +45,7 @@
     "satori": "^0.41.0",
     "svg2pdf.js": "^2.8.1",
     "tz-lookup": "^6.1.25",
-    "worker-mailer": "^1.2.1"
+    "worker-mailer": "1.2.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

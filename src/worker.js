@@ -2,6 +2,8 @@ import { limitPlayerDetails, registrationPlayerDetails, resolveSelectedRegistrat
 import tzlookup from 'tz-lookup';
 import { sendAdminStatusEmails, sendAdminStatusTestEmail } from './admin-status-email.js';
 import { collectEmailStats, recordEmailSent } from './email-stats.js';
+import { MAIL_GATEWAY_UNREADABLE_MESSAGE, mailGatewayErrorForLanguage } from './mail-gateway-messages.js';
+import { MAIL_GATEWAY_TEST_INTERVAL_MS, MailGatewayError, mailGatewayErrorText, mailGatewayFromRow, normalizeMailGatewayInput, publicMailGateway, sendViaMailGateway } from './mail-gateway.js';
 import { cleanupReadPostboxMessages, DEFAULT_POSTBOX_READ_RETENTION_DAYS } from './postbox-retention.js';
 import { buildAdminPostboxEmail } from './admin-postbox-email.js';
 import { REGISTRATION_OPENED_EVENT, OPENING_MESSAGES, synchronizeOpeningSchedule } from './registration-opening.js';
@@ -10,7 +12,7 @@ import { CHANGE_SOURCE_DOCUMENT, CHANGE_SOURCE_ONLINE, connectTournamentLiveSock
 export { TournamentLiveHub } from './tournament-live-hub.js';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
 import {
-  isAllowedPushEndpoint, LIVE_VIEW_AVAILABLE_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT,
+  isAllowedPushEndpoint, LIVE_VIEW_AVAILABLE_EVENT, MAIL_GATEWAY_FAILED_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT,
   POSTBOX_ADMIN_GROUP_EVENT, POSTBOX_ADMIN_RECIPIENT_ID,
   REGISTRATION_SLOT_LINKED_EVENT, RENTAL_CANCELLED_EVENT, RENTAL_DECIDED_EVENT, RENTAL_REQUESTED_EVENT,
   TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT, unreadPostboxCount,
@@ -834,6 +836,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     rentalRequested: (title, who, slot) => `${title}: Neue Reservierungsanfrage von ${who} für ${slot}`,
     rentalCancelled: (title, who, slot) => `${title}: ${who} hat die Reservierung für ${slot} storniert`,
     rentalDecided: (title, slot, status) => `${title}: Deine Reservierung für ${slot} wurde ${({ confirmed: 'bestätigt', rejected: 'abgelehnt', cancelled: 'vom Verein storniert' })[status] || status}`,
+    mailGatewayFailed: (error) => `Dein eigenes E-Mail-Gateway hat den Versand abgelehnt – Turnier-Mails gehen nicht raus. ${error}`,
   },
   nl: {
     tournamentStatus: { draft: 'Concept', registration: 'Inschrijving open', running: 'Bezig', finished: 'Afgerond' },
@@ -857,6 +860,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     rentalRequested: (title, who, slot) => `${title}: nieuwe reserveringsaanvraag van ${who} voor ${slot}`,
     rentalCancelled: (title, who, slot) => `${title}: ${who} heeft de reservering voor ${slot} geannuleerd`,
     rentalDecided: (title, slot, status) => `${title}: je reservering voor ${slot} is ${({ confirmed: 'bevestigd', rejected: 'afgewezen', cancelled: 'door de club geannuleerd' })[status] || status}`,
+    mailGatewayFailed: (error) => `Je eigen e-mailgateway weigert te verzenden – toernooimails worden niet verstuurd. ${error}`,
   },
   en: {
     tournamentStatus: { draft: 'Draft', registration: 'Registration open', running: 'Running', finished: 'Finished' },
@@ -880,6 +884,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     rentalRequested: (title, who, slot) => `${title}: new reservation request from ${who} for ${slot}`,
     rentalCancelled: (title, who, slot) => `${title}: ${who} cancelled the reservation for ${slot}`,
     rentalDecided: (title, slot, status) => `${title}: your reservation for ${slot} was ${({ confirmed: 'confirmed', rejected: 'declined', cancelled: 'cancelled by the club' })[status] || status}`,
+    mailGatewayFailed: (error) => `Your own email gateway rejected sending – tournament emails are not going out. ${error}`,
   },
   es: {
     tournamentStatus: { draft: 'Borrador', registration: 'Inscripción abierta', running: 'En curso', finished: 'Finalizado' },
@@ -903,6 +908,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     rentalRequested: (title, who, slot) => `${title}: nueva solicitud de reserva de ${who} para ${slot}`,
     rentalCancelled: (title, who, slot) => `${title}: ${who} canceló la reserva para ${slot}`,
     rentalDecided: (title, slot, status) => `${title}: tu reserva para ${slot} ha sido ${({ confirmed: 'confirmada', rejected: 'rechazada', cancelled: 'cancelada por el club' })[status] || status}`,
+    mailGatewayFailed: (error) => `Tu propia pasarela de correo rechazó el envío: los correos del torneo no se envían. ${error}`,
   },
   fr: {
     tournamentStatus: { draft: 'Brouillon', registration: 'Inscriptions ouvertes', running: 'En cours', finished: 'Terminé' },
@@ -926,6 +932,7 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     rentalRequested: (title, who, slot) => `${title} : nouvelle demande de réservation de ${who} pour ${slot}`,
     rentalCancelled: (title, who, slot) => `${title} : ${who} a annulé la réservation pour ${slot}`,
     rentalDecided: (title, slot, status) => `${title} : votre réservation pour ${slot} a été ${({ confirmed: 'confirmée', rejected: 'refusée', cancelled: 'annulée par le club' })[status] || status}`,
+    mailGatewayFailed: (error) => `Ta propre passerelle e-mail a refusé l’envoi – les e-mails du tournoi ne partent pas. ${error}`,
   },
   it: {
     tournamentStatus: { draft: 'Bozza', registration: 'Iscrizioni aperte', running: 'In corso', finished: 'Concluso' },
@@ -949,10 +956,11 @@ const SYSTEM_NOTIFICATION_TEXTS = {
     rentalRequested: (title, who, slot) => `${title}: nuova richiesta di prenotazione da ${who} per ${slot}`,
     rentalCancelled: (title, who, slot) => `${title}: ${who} ha annullato la prenotazione per ${slot}`,
     rentalDecided: (title, slot, status) => `${title}: la tua prenotazione per ${slot} è stata ${({ confirmed: 'confermata', rejected: 'rifiutata', cancelled: 'annullata dal club' })[status] || status}`,
+    mailGatewayFailed: (error) => `Il tuo gateway e-mail ha rifiutato l’invio: le e-mail del torneo non vengono inviate. ${error}`,
   },
 };
 
-function buildSystemNotificationPushBody(eventType, eventData, language) {
+export function buildSystemNotificationPushBody(eventType, eventData, language) {
   if (eventType === REGISTRATION_OPENED_EVENT) return (OPENING_MESSAGES[language] || OPENING_MESSAGES.de).replace('{{name}}', eventData?.tournamentName || '');
   const texts = SYSTEM_NOTIFICATION_TEXTS[language] || SYSTEM_NOTIFICATION_TEXTS.de;
   const data = eventData || {};
@@ -989,6 +997,7 @@ function buildSystemNotificationPushBody(eventType, eventData, language) {
   if (eventType === RENTAL_REQUESTED_EVENT) return texts.rentalRequested(data.offerTitle || '', data.requesterName || '', formatRentalSlot(data, language));
   if (eventType === RENTAL_CANCELLED_EVENT) return texts.rentalCancelled(data.offerTitle || '', data.requesterName || '', formatRentalSlot(data, language));
   if (eventType === RENTAL_DECIDED_EVENT) return texts.rentalDecided(data.offerTitle || '', formatRentalSlot(data, language), data.status);
+  if (eventType === MAIL_GATEWAY_FAILED_EVENT) return texts.mailGatewayFailed(mailGatewayErrorForLanguage(data.error || '', language));
   return null;
 }
 
@@ -1287,11 +1296,15 @@ async function resolveEmailLanguage(db, tournament, registration) {
  * E-Mail-Versand ist pro User erst nach Admin-Freischaltung erlaubt (siehe migrations/0037).
  * Betrifft nur den tatsächlichen Mailversand rund um Turniere; Push/Postfach bleiben unberührt,
  * und die auslösende Aktion (Anmeldung, Stornierung, Broadcast) läuft in jedem Fall normal durch.
+ * Zusatzoption: Hat der Turnierbesitzer ein aktives eigenes Gateway (migrations/0160), gehen die Mails ausschließlich
+ * darüber – auch ohne Freischaltung. Liefert null (kein Versand) oder { gatewayUserId } für die Mail-Payload.
  */
-async function canSendTournamentMail(db, tournament) {
-  const owner = await db.prepare('SELECT role, mail_enabled FROM users WHERE id = ?').bind(tournament.owner_id).first();
-  if (!owner) return true;
-  return owner.role === 'admin' || Boolean(Number(owner.mail_enabled));
+async function tournamentMailRoute(db, tournament) {
+  const owner = await db.prepare(`SELECT u.role, u.mail_enabled, g.user_id AS gateway_user_id FROM users u
+    LEFT JOIN user_mail_gateways g ON g.user_id = u.id AND g.enabled = 1 WHERE u.id = ?`).bind(tournament.owner_id).first();
+  if (!owner) return { gatewayUserId: null };
+  if (owner.gateway_user_id) return { gatewayUserId: owner.gateway_user_id };
+  return owner.role === 'admin' || Boolean(Number(owner.mail_enabled)) ? { gatewayUserId: null } : null;
 }
 
 function buildTeamRecipients(registration) {
@@ -1319,7 +1332,8 @@ export function buildCancelLink(appOrigin, token) {
 }
 
 async function sendRegistrationConfirmationEmail(env, tournament, registration, appOrigin, { promoted = false } = {}) {
-  if (!(await canSendTournamentMail(env.DB, tournament))) return;
+  const mailRoute = await tournamentMailRoute(env.DB, tournament);
+  if (!mailRoute) return;
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_CONFIRMATION_EMAILS[language] || REGISTRATION_CONFIRMATION_EMAILS.de;
   const promotedTemplates = WAITLIST_PROMOTED_EMAILS[language] || WAITLIST_PROMOTED_EMAILS.de;
@@ -1337,6 +1351,7 @@ async function sendRegistrationConfirmationEmail(env, tournament, registration, 
 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
+      ...mailRoute,
       to: recipient.email,
       subject: promoted ? promotedTemplates.subject(tournament.name) : templates.subject(tournament.name),
       text: maybePromotedIntro(templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink, participantsBlock, liveLink), language, promoted) + paymentInfoEmailBlock(tournament, language) + directionsBlock + whatsappBlock,
@@ -1360,7 +1375,8 @@ export async function resendLiveLink(env, registration, user, appOrigin, { renew
   if (registration.status !== 'confirmed') throw new HttpError(409, 'Einen Live-Link gibt es nur für bestätigte Anmeldungen');
   const recipients = buildTeamRecipients(registration);
   if (recipients.length === 0) throw new HttpError(409, 'Die Anmeldung hat keine E-Mail-Adresse');
-  if (!(await canSendTournamentMail(env.DB, tournament))) throw new HttpError(409, 'Für dieses Turnier ist der E-Mail-Versand nicht freigeschaltet');
+  const mailRoute = await tournamentMailRoute(env.DB, tournament);
+  if (!mailRoute) throw new HttpError(409, 'Für dieses Turnier ist der E-Mail-Versand nicht freigeschaltet');
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = LIVE_LINK_EMAILS[language] || LIVE_LINK_EMAILS.de;
   const { token, created, replaced } = await currentLiveToken(env, registration, { renewIfUnrecoverable: renew });
@@ -1369,6 +1385,7 @@ export async function resendLiveLink(env, registration, user, appOrigin, { renew
   const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
   for (const recipient of recipients) {
     await enqueueTransactionalEmail(env, {
+      ...mailRoute,
       to: recipient.email,
       subject: templates.subject(tournament.name),
       text: templates.text(recipient.firstName, tournament.name, liveLink, replaced) + directionsBlock + whatsappBlock,
@@ -1395,7 +1412,8 @@ export async function sendTeamMessage(env, registration, sender, rawBody, appOri
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
   const senderName = `${sender.firstName} ${sender.lastName}`.trim();
   const senderEmail = String(sender.email || '').toLowerCase();
-  const mailAllowed = await canSendTournamentMail(env.DB, tournament);
+  const mailRoute = await tournamentMailRoute(env.DB, tournament);
+  const mailAllowed = Boolean(mailRoute);
   const emailRecipients = mailAllowed ? buildTeamRecipients(registration).filter((recipient) => recipient.email.toLowerCase() !== senderEmail) : [];
   const accountIds = [...new Set([registration.user_id, registration.partner_user_id, registration.partner2_user_id])]
     .filter((id) => id && id !== sender.id);
@@ -1420,6 +1438,7 @@ export async function sendTeamMessage(env, registration, sender, rawBody, appOri
   const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, language);
   for (const recipient of emailRecipients) {
     await enqueueTransactionalEmail(env, {
+      ...mailRoute,
       to: recipient.email,
       subject: templates.subject(tournament.name),
       text: templates.text(recipient.firstName || '', tournament.name, senderName),
@@ -1440,7 +1459,8 @@ export async function sendTeamMessage(env, registration, sender, rawBody, appOri
 }
 
 async function sendRegistrationReceivedEmail(env, tournament, registration, appOrigin, { promoted = false } = {}) {
-  if (!(await canSendTournamentMail(env.DB, tournament))) return;
+  const mailRoute = await tournamentMailRoute(env.DB, tournament);
+  if (!mailRoute) return;
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_RECEIVED_EMAILS[language] || REGISTRATION_RECEIVED_EMAILS.de;
   const promotedTemplates = WAITLIST_PROMOTED_EMAILS[language] || WAITLIST_PROMOTED_EMAILS.de;
@@ -1452,6 +1472,7 @@ async function sendRegistrationReceivedEmail(env, tournament, registration, appO
 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
+      ...mailRoute,
       to: recipient.email,
       subject: promoted ? promotedTemplates.subject(tournament.name) : templates.subject(tournament.name),
       text: maybePromotedIntro(templates.text(recipient.firstName, tournament.name, link, cancelLink, participantsBlock), language, promoted) + paymentInfoEmailBlock(tournament, language) + directionsBlock + whatsappBlock,
@@ -1465,12 +1486,14 @@ async function sendRegistrationReceivedEmail(env, tournament, registration, appO
 }
 
 async function sendRegistrationRejectionEmail(env, tournament, registration, appOrigin, reason) {
-  if (!(await canSendTournamentMail(env.DB, tournament))) return;
+  const mailRoute = await tournamentMailRoute(env.DB, tournament);
+  if (!mailRoute) return;
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_REJECTION_EMAILS[language] || REGISTRATION_REJECTION_EMAILS.de;
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
+      ...mailRoute,
       to: recipient.email, subject: templates.subject(tournament.name), text: templates.text(recipient.firstName, tournament.name, link, reason), actions: tournamentEmailActions(tournament, appOrigin, language), language,
       logFallback: `Registration rejection email for ${recipient.email} (tournament ${tournament.id})`,
       failureContext: `registration rejection for registration ${registration.id}`, allowLogFallback: true,
@@ -1482,13 +1505,12 @@ function createRandomToken() {
   return crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
 }
 
-// Schlüssel für den wiederherstellbaren Live-Link (Secret LIVE_LINK_KEY, 32 Byte Base64). Ohne Schlüssel bleibt es beim
-// Hash; der QR-Code in der Anmeldeverwaltung braucht dann einen neuen Link.
-async function liveLinkCryptoKey(env) {
-  const raw = String(env.LIVE_LINK_KEY || '').trim();
-  if (!raw) return null;
-  const bytes = Uint8Array.from(atob(raw), (char) => char.charCodeAt(0));
-  if (bytes.length !== 32) throw new Error('LIVE_LINK_KEY muss 32 Byte (Base64) lang sein');
+// AES-GCM-Schlüssel aus einem Secret (32 Byte Base64). Ohne Secret null.
+async function aesKeyFromSecret(raw, name) {
+  const value = String(raw || '').trim();
+  if (!value) return null;
+  const bytes = Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+  if (bytes.length !== 32) throw new Error(`${name} muss 32 Byte (Base64) lang sein`);
   return crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
 
@@ -1499,21 +1521,17 @@ function bytesToBase64(bytes) {
 }
 
 // Gespeichert als Base64 von IV (12 Byte) + Chiffrat.
-async function encryptLiveToken(env, token) {
-  const key = await liveLinkCryptoKey(env);
-  if (!key) return null;
+async function encryptWithKey(key, plainText) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(token)));
+  const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plainText)));
   const combined = new Uint8Array(iv.length + cipher.length);
   combined.set(iv);
   combined.set(cipher, iv.length);
   return bytesToBase64(combined);
 }
 
-// null, wenn kein Schlüssel da ist oder der Wert nicht (mehr) passt, z. B. nach einem Schlüsselwechsel.
-async function decryptLiveToken(env, value) {
-  const key = value ? await liveLinkCryptoKey(env) : null;
-  if (!key) return null;
+// null, wenn der Wert nicht (mehr) zum Schlüssel passt, z. B. nach einem Schlüsselwechsel.
+async function decryptWithKey(key, value) {
   try {
     const bytes = Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
     const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes.slice(0, 12) }, key, bytes.slice(12));
@@ -1521,6 +1539,22 @@ async function decryptLiveToken(env, value) {
   } catch {
     return null;
   }
+}
+
+// Schlüssel für den wiederherstellbaren Live-Link (Secret LIVE_LINK_KEY, 32 Byte Base64). Ohne Schlüssel bleibt es beim
+// Hash; der QR-Code in der Anmeldeverwaltung braucht dann einen neuen Link.
+function liveLinkCryptoKey(env) {
+  return aesKeyFromSecret(env.LIVE_LINK_KEY, 'LIVE_LINK_KEY');
+}
+
+async function encryptLiveToken(env, token) {
+  const key = await liveLinkCryptoKey(env);
+  return key ? encryptWithKey(key, token) : null;
+}
+
+async function decryptLiveToken(env, value) {
+  const key = value ? await liveLinkCryptoKey(env) : null;
+  return key ? decryptWithKey(key, value) : null;
 }
 
 /**
@@ -1578,7 +1612,8 @@ export async function liveLinkForQr(env, registration, user, appOrigin, { renew 
 }
 
 async function sendDisplacementEmail(env, tournament, registration, wasCancelled, appOrigin) {
-  if (!(await canSendTournamentMail(env.DB, tournament))) return;
+  const mailRoute = await tournamentMailRoute(env.DB, tournament);
+  if (!mailRoute) return;
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_DISPLACED_EMAILS[language] || REGISTRATION_DISPLACED_EMAILS.de;
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
@@ -1589,6 +1624,7 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
+      ...mailRoute,
       to: recipient.email,
       subject: templates.subject(tournament.name),
       text: wasCancelled
@@ -1604,13 +1640,15 @@ async function sendDisplacementEmail(env, tournament, registration, wasCancelled
 }
 
 async function sendCancellationEmail(env, tournament, registration, appOrigin) {
-  if (!(await canSendTournamentMail(env.DB, tournament))) return;
+  const mailRoute = await tournamentMailRoute(env.DB, tournament);
+  if (!mailRoute) return;
   const language = await resolveEmailLanguage(env.DB, tournament, registration);
   const templates = REGISTRATION_CANCELLED_EMAILS[language] || REGISTRATION_CANCELLED_EMAILS.de;
   const link = `${appOrigin}/turniere/${tournament.id}/info`;
 
   for (const recipient of buildTeamRecipients(registration)) {
     await enqueueTransactionalEmail(env, {
+      ...mailRoute,
       to: recipient.email,
       subject: templates.subject(tournament.name),
       text: templates.text(recipient.firstName, tournament.name, link),
@@ -1809,7 +1847,8 @@ async function sendTournamentReminders(env) {
   const tournaments = await env.DB.prepare("SELECT * FROM tournaments WHERE date = ? AND status != 'draft'").bind(targetDate).all();
 
   for (const tournament of tournaments.results || []) {
-    const mailAllowed = await canSendTournamentMail(env.DB, tournament);
+    const mailRoute = await tournamentMailRoute(env.DB, tournament);
+    const mailAllowed = Boolean(mailRoute);
     const registrations = await env.DB
       .prepare(
         `SELECT * FROM registrations
@@ -1842,6 +1881,7 @@ async function sendTournamentReminders(env) {
         try {
           for (const recipient of recipients) {
             await enqueueTransactionalEmail(env, {
+              ...mailRoute,
               to: recipient.email,
               subject: templates.subject(tournament.name),
               text: templates.text(recipient.firstName, tournament.name, dateTimeLabel, formatLocationAddress(tournament.location), link, cancelLink) + paymentInfoEmailBlock(tournament, language) + directionsBlock + whatsappBlock,
@@ -2034,6 +2074,21 @@ export default {
       if (request.method === 'DELETE' && url.pathname === '/api/me') {
         const session = await requireSession(request, env.DB);
         return await deleteOwnAccount(request, env.DB, url, session.user.id);
+      }
+
+      if (url.pathname === '/api/me/mail-gateway' || url.pathname === '/api/me/mail-gateway/test') {
+        const session = await requireSession(request, env.DB);
+        if (url.pathname.endsWith('/test')) {
+          if (request.method === 'POST') return await testOwnMailGateway(env, session.user);
+        } else if (request.method === 'GET') {
+          return await getOwnMailGateway(env, session.user.id);
+        } else if (request.method === 'PUT') {
+          return await saveOwnMailGateway(request, env, session.user.id);
+        } else if (request.method === 'DELETE') {
+          await env.DB.prepare('DELETE FROM user_mail_gateways WHERE user_id = ?').bind(session.user.id).run();
+          return json({ gateway: publicMailGateway(null, { available: Boolean(env.MAIL_GATEWAY_KEY) }) });
+        }
+        return json({ error: 'Not found' }, 404);
       }
 
       if (request.method === 'GET' && url.pathname === '/api/postbox') {
@@ -4545,13 +4600,14 @@ export async function createBroadcastPostboxMessage(env, { sender, tournament, b
     });
   }
 
-  const mailAllowed = await canSendTournamentMail(env.DB, tournament);
-  for (const recipient of mailAllowed ? uniqueRecipients.values() : []) {
+  const mailRoute = await tournamentMailRoute(env.DB, tournament);
+  for (const recipient of mailRoute ? uniqueRecipients.values() : []) {
     const templates = TOURNAMENT_BROADCAST_EMAILS[recipient.language] || TOURNAMENT_BROADCAST_EMAILS.de;
     const directionsBlock = directionsEmailBlock(tournament, recipient.language);
     const whatsappBlock = await whatsappGroupEmailBlock(env.DB, tournament.id, recipient.language);
     try {
       await enqueueTransactionalEmail(env, {
+        ...mailRoute,
         to: recipient.email,
         subject: templates.subject(tournament.name),
         text: templates.text(recipient.firstName, tournament.name, `${sender.firstName} ${sender.lastName}`),
@@ -8814,7 +8870,8 @@ async function notifyFinalRanking(env, tournament, sender, origin, shareToken = 
     await enqueuePushNotification(env, { userId: accountUser.id, payload: { title: 'Neue Statusmeldung', actor: tournament.name, messageId: id } });
   }
 
-  if (!(await canSendTournamentMail(env.DB, tournament))) return { mailCount: null, mailFailedCount: 0 };
+  const mailRoute = await tournamentMailRoute(env.DB, tournament);
+  if (!mailRoute) return { mailCount: null, mailFailedCount: 0 };
   const link = `${origin}/turniere/${encodeURIComponent(tournament.id)}/rangliste${shareToken ? `?share=${encodeURIComponent(shareToken)}` : ''}`;
   // Anders als bei der Rundmail bekommt auch die Turnierleitung die Mail, wenn sie selbst mitgespielt hat.
   const recipients = await tournamentEmailRecipients(env.DB, tournament.id, "('confirmed')", null);
@@ -8824,6 +8881,7 @@ async function notifyFinalRanking(env, tournament, sender, origin, shareToken = 
     const templates = TOURNAMENT_RANKING_EMAILS[recipient.language] || TOURNAMENT_RANKING_EMAILS.de;
     try {
       await enqueueTransactionalEmail(env, {
+        ...mailRoute,
         to: recipient.email,
         subject: templates.subject(tournament.name),
         text: templates.text(recipient.firstName, tournament.name, link),
@@ -9910,7 +9968,7 @@ export async function createRegistration(request, env, tournament, {
     }
   }
 
-  const mailEnabled = await canSendTournamentMail(db, tournament);
+  const mailEnabled = Boolean(await tournamentMailRoute(db, tournament));
   if (mailEnabled && !syncBootstrap) {
     try {
       if (created.status === 'pending') {
@@ -11024,6 +11082,140 @@ function stratoConfigured(env) {
   return Boolean(env.STRATO_SMTP_USER && env.STRATO_SMTP_PASSWORD);
 }
 
+async function getOwnMailGateway(env, userId) {
+  const row = await env.DB.prepare('SELECT * FROM user_mail_gateways WHERE user_id = ?').bind(userId).first();
+  return json({ gateway: publicMailGateway(row, { available: Boolean(env.MAIL_GATEWAY_KEY) }) });
+}
+
+async function saveOwnMailGateway(request, env, userId) {
+  const key = await mailGatewayKey(env);
+  if (!key) throw new HttpError(503, 'Eigene E-Mail-Gateways sind auf diesem Server nicht verfügbar.');
+  const existing = await env.DB.prepare('SELECT provider, secret_enc FROM user_mail_gateways WHERE user_id = ?').bind(userId).first();
+  const input = normalizeMailGatewayInput(await readJson(request), { hasStoredSecret: Boolean(existing?.secret_enc), storedProvider: existing?.provider });
+  const secretEnc = input.secret ? await encryptWithKey(key, input.secret) : existing.secret_enc;
+  const now = new Date().toISOString();
+  // Jede Änderung setzt den Status zurück: Erst eine Test-Mail oder ein echter Versand zeigt, ob das Gateway funktioniert.
+  await env.DB.prepare(`INSERT INTO user_mail_gateways (user_id, enabled, provider, smtp_host, smtp_port, smtp_security, smtp_user,
+      from_email, from_name, reply_to, secret_enc, config_id, status, last_error, last_error_at, last_success_at, failure_notified_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'untested', NULL, NULL, NULL, NULL, ?)
+    ON CONFLICT(user_id) DO UPDATE SET enabled = excluded.enabled, provider = excluded.provider, smtp_host = excluded.smtp_host,
+      smtp_port = excluded.smtp_port, smtp_security = excluded.smtp_security, smtp_user = excluded.smtp_user,
+      from_email = excluded.from_email, from_name = excluded.from_name, reply_to = excluded.reply_to, secret_enc = excluded.secret_enc,
+      config_id = excluded.config_id, status = 'untested', last_error = NULL, last_error_at = NULL, last_success_at = NULL,
+      failure_notified_at = NULL, updated_at = excluded.updated_at`)
+    .bind(userId, input.enabled ? 1 : 0, input.provider, input.smtpHost, input.smtpPort, input.smtpSecurity, input.smtpUser,
+      input.fromEmail, input.fromName, input.replyTo, secretEnc, crypto.randomUUID(), now).run();
+  return getOwnMailGateway(env, userId);
+}
+
+const MAIL_GATEWAY_TEST_EMAILS = {
+  de: { subject: 'Test-Mail von PTM Online', text: (name) => `Hallo ${name},\n\ndiese Test-Mail wurde über dein eigenes E-Mail-Gateway versendet. Turnier-Mails an deine Teilnehmer gehen ab jetzt über dieses Gateway.` },
+  nl: { subject: 'Testmail van PTM Online', text: (name) => `Hallo ${name},\n\ndeze testmail is via je eigen e-mailgateway verstuurd. Toernooimails aan je deelnemers gaan voortaan via deze gateway.` },
+  en: { subject: 'Test email from PTM Online', text: (name) => `Hello ${name},\n\nthis test email was sent through your own email gateway. Tournament emails to your participants now go through this gateway.` },
+  es: { subject: 'Correo de prueba de PTM Online', text: (name) => `Hola ${name}:\n\neste correo de prueba se envió a través de tu propia pasarela de correo. Los correos del torneo a tus participantes saldrán ahora por esta pasarela.` },
+  fr: { subject: 'E-mail de test de PTM Online', text: (name) => `Bonjour ${name},\n\ncet e-mail de test a été envoyé via ta propre passerelle e-mail. Les e-mails du tournoi à tes participants passent désormais par cette passerelle.` },
+  it: { subject: 'E-mail di prova da PTM Online', text: (name) => `Ciao ${name},\n\nquesta e-mail di prova è stata inviata tramite il tuo gateway e-mail. Le e-mail del torneo ai tuoi partecipanti passano ora da questo gateway.` },
+};
+
+async function mailGatewayResponse(env, userId, extra = {}, status = 200) {
+  const row = await env.DB.prepare('SELECT * FROM user_mail_gateways WHERE user_id = ?').bind(userId).first();
+  return json({ ...extra, gateway: publicMailGateway(row, { available: Boolean(env.MAIL_GATEWAY_KEY) }) }, status);
+}
+
+// Test-Mail an die eigene Konto-Adresse, synchron, damit der Fehler direkt im Profil steht. Gedrosselt je Konto.
+async function testOwnMailGateway(env, user) {
+  const row = await env.DB.prepare('SELECT * FROM user_mail_gateways WHERE user_id = ?').bind(user.id).first();
+  if (!row) throw new HttpError(404, 'Kein eigenes E-Mail-Gateway gespeichert.');
+  const now = Date.now();
+  const earliest = new Date(now - MAIL_GATEWAY_TEST_INTERVAL_MS).toISOString();
+  const claimed = await env.DB.prepare('UPDATE user_mail_gateways SET last_test_at = ? WHERE user_id = ? AND (last_test_at IS NULL OR last_test_at <= ?)')
+    .bind(new Date(now).toISOString(), user.id, earliest).run();
+  if (!claimed.meta?.changes) throw new HttpError(429, 'Bitte warte eine Minute bis zur nächsten Test-Mail.');
+  const language = (await env.DB.prepare('SELECT language FROM users WHERE id = ?').bind(user.id).first())?.language || 'de';
+  const template = MAIL_GATEWAY_TEST_EMAILS[language] || MAIL_GATEWAY_TEST_EMAILS.de;
+  const text = template.text(user.firstName || '');
+  try {
+    // Der Fehler erscheint direkt im Profil, deshalb keine zusätzliche Postfach-Nachricht.
+    await sendViaOwnGateway(env, row, {
+      to: user.email,
+      subject: template.subject,
+      body: appendEmailFooter(text, language),
+      html: renderTransactionalEmailHtml(template.subject, text, language),
+    }, { notifyOnFailure: false });
+  } catch (error) {
+    if (error?.details?.gatewayError) return mailGatewayResponse(env, user.id, { sent: false, error: error.details.gatewayError }, 502);
+    throw error;
+  }
+  return mailGatewayResponse(env, user.id, { sent: true, to: user.email });
+}
+
+async function platformMailAllowed(db, userId) {
+  const user = await db.prepare('SELECT role, mail_enabled FROM users WHERE id = ?').bind(userId).first();
+  return !user || user.role === 'admin' || Boolean(Number(user.mail_enabled));
+}
+
+function mailGatewayKey(env) {
+  return aesKeyFromSecret(env.MAIL_GATEWAY_KEY, 'MAIL_GATEWAY_KEY');
+}
+
+const MAIL_GATEWAY_SUCCESS_REFRESH_MS = 60 * 60 * 1000;
+
+// Genau eine Postfach-Nachricht je Fehlerphase im echten Versand – auch wenn ein Test den Status schon auf error setzte.
+// Nachricht und Marker failure_notified_at entstehen in einer Transaktion: scheitert eines, bleibt der Marker leer.
+async function notifyMailGatewayFailureOnce(env, row, message, now) {
+  const notification = {
+    id: crypto.randomUUID(), recipientId: row.user_id, kind: 'system', eventType: MAIL_GATEWAY_FAILED_EVENT,
+    eventData: { error: message }, createdAt: now, pushTitle: 'Neue Statusmeldung',
+  };
+  const [inserted] = await env.DB.batch([
+    env.DB.prepare(`INSERT INTO postbox_messages (id, sender_id, recipient_id, kind, body, event_type, event_data, created_at, read_at)
+      SELECT ?, NULL, ?, 'system', NULL, ?, ?, ?, NULL
+      WHERE EXISTS (SELECT 1 FROM user_mail_gateways WHERE user_id = ? AND config_id = ? AND failure_notified_at IS NULL)`)
+      .bind(notification.id, row.user_id, MAIL_GATEWAY_FAILED_EVENT, JSON.stringify(notification.eventData), now, row.user_id, row.config_id),
+    env.DB.prepare(`UPDATE user_mail_gateways SET failure_notified_at = ?
+      WHERE user_id = ? AND config_id = ? AND failure_notified_at IS NULL`).bind(now, row.user_id, row.config_id),
+  ]);
+  if (inserted?.meta?.changes) await finishPostboxMessage(env, notification);
+}
+
+// Versand über das eigene Gateway eines Kontos. Kein Fallback: Fehler werden geworfen (Queue-Retry) und am Gateway
+// vermerkt; beim Wechsel in den Fehlerzustand bekommt der Besitzer genau eine Postfach-Nachricht.
+async function sendViaOwnGateway(env, row, mail, { notifyOnFailure = true } = {}) {
+  const key = await mailGatewayKey(env);
+  const secret = key ? await decryptWithKey(key, row.secret_enc) : null;
+  try {
+    if (!secret) throw new MailGatewayError(MAIL_GATEWAY_UNREADABLE_MESSAGE);
+    await sendViaMailGateway(mailGatewayFromRow(row, secret), mail);
+  } catch (error) {
+    const message = mailGatewayErrorText(error, secret);
+    console.error(`Own mail gateway of user ${row.user_id} failed: ${message}`);
+    const now = new Date().toISOString();
+    // Nur die Konfiguration markieren, mit der dieser Versand lief; inzwischen neu gespeicherte bleibt unberührt.
+    await env.DB.prepare(`UPDATE user_mail_gateways SET status = 'error', last_error = ?, last_error_at = ?
+      WHERE user_id = ? AND config_id = ?`).bind(message, now, row.user_id, row.config_id).run();
+    if (notifyOnFailure) {
+      try {
+        await notifyMailGatewayFailureOnce(env, row, message, now);
+      } catch (notifyError) {
+        // Marker und Nachricht sind gemeinsam zurückgerollt; der Queue-Retry versucht die Warnung erneut.
+        console.error('Own mail gateway failure notification failed', notifyError);
+      }
+    }
+    throw new HttpError(503, 'Das eigene E-Mail-Gateway konnte die E-Mail nicht versenden.', { gatewayError: message });
+  }
+  // Statistik- und Statusfehler dürfen keinen Queue-Retry und damit Doppelversand auslösen.
+  try {
+    const now = Date.now();
+    if (row.status !== 'ok' || row.failure_notified_at || !row.last_success_at || now - Date.parse(row.last_success_at) > MAIL_GATEWAY_SUCCESS_REFRESH_MS) {
+      await env.DB.prepare(`UPDATE user_mail_gateways SET status = 'ok', last_error = NULL, failure_notified_at = NULL, last_success_at = ?
+        WHERE user_id = ? AND config_id = ?`).bind(new Date(now).toISOString(), row.user_id, row.config_id).run();
+    }
+    await recordEmailSent(env.DB, 'organizer');
+  } catch (error) {
+    console.error('Own mail gateway status could not be recorded', error);
+  }
+}
+
 const GOOGLE_MAIL_DOMAINS = new Set(['gmail.com', 'googlemail.com']);
 
 function isGoogleMailRecipient(to) {
@@ -11033,7 +11225,34 @@ function isGoogleMailRecipient(to) {
 
 // messageBox: optionale Nutzernachricht (Klartext oder Rich Text), im HTML-Teil formatiert in einer eigenen Box,
 // im Klartext-Teil als Klartext angehängt.
-export async function sendTransactionalEmail(env, { to, subject, text, messageBox = null, textAfterMessageBox = '', actions = [], plainTextActions = false, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false }) {
+// gatewayUserId: Turnier-Mail eines Kontos mit eigenem Gateway (tournamentMailRoute). Dann geht die Mail ausschließlich
+// über dieses Gateway, ohne Ausweichen auf Strato/Resend.
+export async function sendTransactionalEmail(env, { to, subject, text, messageBox = null, textAfterMessageBox = '', actions = [], plainTextActions = false, language = 'de', attachments, logFallback, failureContext, allowLogFallback = false, gatewayUserId = null }) {
+  // Die HTML-Mail zeigt Aktionen als Buttons; in den Reintext kommen sonst nur mailto-Links, mit plainTextActions alle.
+  const buildContent = () => {
+    const textActions = plainTextActions ? actions.filter(Boolean) : actions.filter((action) => action?.url.startsWith('mailto:'));
+    const contactLinks = [...new Map(textActions.map((action) => [action.url, action])).values()]
+      .map((action) => `\n\n${action.label}:\n${action.url}`).join('');
+    return {
+      body: appendEmailFooter((messageBox ? `${text}\n\n${richTextPlainText(messageBox)}${textAfterMessageBox}` : text + textAfterMessageBox) + contactLinks, language),
+      html: renderTransactionalEmailHtml(subject, text, language, messageBox, textAfterMessageBox, actions),
+    };
+  };
+
+  if (gatewayUserId) {
+    const row = await env.DB.prepare('SELECT * FROM user_mail_gateways WHERE user_id = ? AND enabled = 1').bind(gatewayUserId).first();
+    if (row) {
+      const { body, html } = buildContent();
+      await sendViaOwnGateway(env, row, { to, subject, body, html, attachments });
+      return;
+    }
+    // Gateway nach dem Einreihen entfernt/abgeschaltet: Plattformversand nur, wenn das Konto dafür freigeschaltet ist.
+    if (!(await platformMailAllowed(env.DB, gatewayUserId))) {
+      console.log(`Skipping ${failureContext}: own mail gateway removed and platform mail not enabled`);
+      return;
+    }
+  }
+
   const stratoAvailable = stratoConfigured(env);
   const resendAvailable = Boolean(env.RESEND_API_KEY && env.MAIL_FROM);
 
@@ -11045,12 +11264,7 @@ export async function sendTransactionalEmail(env, { to, subject, text, messageBo
     throw new HttpError(503, 'E-Mail-Versand ist nicht konfiguriert.');
   }
 
-  // Die HTML-Mail zeigt Aktionen als Buttons; in den Reintext kommen sonst nur mailto-Links, mit plainTextActions alle.
-  const textActions = plainTextActions ? actions.filter(Boolean) : actions.filter((action) => action?.url.startsWith('mailto:'));
-  const contactLinks = [...new Map(textActions.map((action) => [action.url, action])).values()]
-    .map((action) => `\n\n${action.label}:\n${action.url}`).join('');
-  const body = appendEmailFooter((messageBox ? `${text}\n\n${richTextPlainText(messageBox)}${textAfterMessageBox}` : text + textAfterMessageBox) + contactLinks, language);
-  const html = renderTransactionalEmailHtml(subject, text, language, messageBox, textAfterMessageBox, actions);
+  const { body, html } = buildContent();
 
   // Strato (Absender ptmonline@bclinden.de) hat kein SPF/DKIM-Alignment für sein
   // DMARC(p=reject)-Setup - Strato nimmt die Mail zwar an, Google verwirft sie
@@ -13322,7 +13536,8 @@ async function requireSession(request, db) {
   const row = await db
     .prepare(
       `SELECT users.id, users.first_name, users.last_name, users.username, users.username_changed_at, users.username_confirmed_at, users.email, users.pending_email, users.phone, users.role, users.club, users.club_id, users.license_nr, users.email_verified_at, users.password_change_required,
-              users.tournament_limit, users.participant_limit, users.mail_enabled, users.postbox_read_retention_days, users.created_at, users.updated_at, sessions.expires_at
+              users.tournament_limit, users.participant_limit, users.mail_enabled, users.postbox_read_retention_days, users.created_at, users.updated_at, sessions.expires_at,
+              EXISTS (SELECT 1 FROM user_mail_gateways g WHERE g.user_id = users.id AND g.enabled = 1) AS own_mail_gateway
        FROM sessions
        JOIN users ON users.id = sessions.user_id
        WHERE sessions.id = ?`,
@@ -14033,6 +14248,7 @@ function toPublicUser(row) {
     tournamentLimit: row.tournament_limit === undefined || row.tournament_limit === null ? DEFAULT_TOURNAMENT_LIMIT : Number(row.tournament_limit),
     participantLimit: row.participant_limit === undefined || row.participant_limit === null ? DEFAULT_PARTICIPANT_LIMIT : Number(row.participant_limit),
     mailEnabled: row.mail_enabled === undefined || row.mail_enabled === null ? true : Boolean(Number(row.mail_enabled)),
+    ...(row.own_mail_gateway === undefined ? {} : { ownMailGateway: Boolean(Number(row.own_mail_gateway)) }),
     postboxReadRetentionDays: row.postbox_read_retention_days ?? DEFAULT_POSTBOX_READ_RETENTION_DAYS,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

@@ -16,9 +16,10 @@ import { RichText } from './RichText.jsx';
 import { richTextPlainText } from '../lib/rich-text.js';
 import { AutumnGarland, AutumnPumpkin } from './AutumnDecoration.jsx';
 import { LanguageSelect } from '../auth/AuthForms.jsx';
-import { LIVE_VIEW_AVAILABLE_EVENT, POSTBOX_ADMIN_GROUP_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT, REGISTRATION_SLOT_LINKED_EVENT, RENTAL_CANCELLED_EVENT, RENTAL_DECIDED_EVENT, RENTAL_REQUESTED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT } from '../postbox-core.js';
+import { LIVE_VIEW_AVAILABLE_EVENT, MAIL_GATEWAY_FAILED_EVENT, POSTBOX_ADMIN_GROUP_EVENT, REGISTRATION_ACCOUNT_CONFLICT_EVENT, REGISTRATION_SLOT_LINKED_EVENT, RENTAL_CANCELLED_EVENT, RENTAL_DECIDED_EVENT, RENTAL_REQUESTED_EVENT, TOURNAMENT_ADMIN_ACTION_EVENT, TOURNAMENT_RANKING_PUBLISHED_EVENT } from '../postbox-core.js';
 import { formatRentalSlot } from '../rental-core.js';
 import i18next from '../lib/i18next-config.js';
+import { translateMailGatewayError } from '../mail-gateway-messages.js';
 
 async function subscribeToPush() {
   const result = await ensureBrowserPushSubscription(async () => (await authenticatedApi('/api/push/public-key')).publicKey);
@@ -275,6 +276,10 @@ function postboxMessageText(message, t) {
       : data.status === 'rejected' ? t('{{title}}: Deine Reservierungsanfrage für {{slot}} wurde abgelehnt', values)
         : t('{{title}}: Deine Reservierung für {{slot}} wurde vom Verein storniert', values);
     return data.note ? `${text}\n${t('message')}: ${data.note}` : text;
+  }
+  if (message.eventType === MAIL_GATEWAY_FAILED_EVENT) {
+    const text = t('Dein eigenes E-Mail-Gateway hat den Versand abgelehnt – Turnier-Mails gehen nicht raus, bis du es im Profil korrigierst.');
+    return data.error ? `${text}\n${translateMailGatewayError(t, data.error)}` : text;
   }
   if (message.eventType === TOURNAMENT_ADMIN_ACTION_EVENT) {
     return t('tournamentAdminActionText', { name: data.tournamentName || '', actor: data.actorName || '', action: t(`adminAction_${data.action}`) });

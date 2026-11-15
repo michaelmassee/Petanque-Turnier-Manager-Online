@@ -621,6 +621,16 @@ a.button {
 }
 
 .mail-disabled-notice strong { font-size: 1.05rem; }
+.mail-gateway-status {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f2f4f7;
+  overflow-wrap: anywhere;
+}
+.mail-gateway-status--ok { background: #e7f6ec; color: #1d6b35; }
+.mail-gateway-status--error { background: #fdecec; color: #8a1c1c; }
+.mail-gateway-status code { white-space: pre-wrap; }
 .mail-disabled-notice p { margin: 0; }
 
 .field-invalid {

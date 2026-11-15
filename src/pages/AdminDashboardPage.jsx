@@ -669,6 +669,7 @@ function groupEmailDays(days, range) {
       total: week.reduce((sum, entry) => sum + entry.total, 0),
       strato: week.reduce((sum, entry) => sum + entry.strato, 0),
       resend: week.reduce((sum, entry) => sum + entry.resend, 0),
+      organizer: week.reduce((sum, entry) => sum + (entry.organizer || 0), 0),
     });
     index += size;
   }
@@ -698,11 +699,12 @@ export function EmailStatsPanel() {
   const bars = useMemo(() => (stats ? groupEmailDays(stats.days, stats.range) : []), [stats]);
   const shownBar = bars[activeIndex ?? bars.length - 1];
   const number = numberFormatter(i18n.language);
-  const metrics = [{ key: 'total', label: t('Summe') }, { key: 'strato', label: 'Strato' }, { key: 'resend', label: 'Resend' }];
+  const metrics = [{ key: 'total', label: t('Summe') }, { key: 'strato', label: 'Strato' }, { key: 'resend', label: 'Resend' },
+    { key: 'organizer', label: t('Eigene Gateways') }];
   const barLabel = (bar) => (bar.from === bar.to ? formatDate(bar.from, i18n.language)
     : `${formatDate(bar.from, i18n.language)} – ${formatDate(bar.to, i18n.language)}`);
-  const splitLabel = (counts) => t('Strato: {{strato}} · Resend: {{resend}}', {
-    strato: number.format(counts.strato), resend: number.format(counts.resend),
+  const splitLabel = (counts) => t('Strato: {{strato}} · Resend: {{resend}} · Eigene Gateways: {{organizer}}', {
+    strato: number.format(counts.strato), resend: number.format(counts.resend), organizer: number.format(counts.organizer || 0),
   });
 
   return (
@@ -759,11 +761,11 @@ export function EmailStatsPanel() {
             <summary>{t('Als Tabelle anzeigen')}</summary>
             <div className="table-scroll">
               <table>
-                <thead><tr><th>{stats.range < 365 ? t('Tag') : t('Woche')}</th><th>Strato</th><th>Resend</th><th>{t('Summe')}</th></tr></thead>
+                <thead><tr><th>{stats.range < 365 ? t('Tag') : t('Woche')}</th><th>Strato</th><th>Resend</th><th>{t('Eigene Gateways')}</th><th>{t('Summe')}</th></tr></thead>
                 <tbody>
                   {[...bars].reverse().map((bar) => (
                     <tr key={bar.from}><td>{barLabel(bar)}</td><td>{number.format(bar.strato)}</td>
-                      <td>{number.format(bar.resend)}</td><td>{number.format(bar.total)}</td></tr>
+                      <td>{number.format(bar.resend)}</td><td>{number.format(bar.organizer || 0)}</td><td>{number.format(bar.total)}</td></tr>
                   ))}
                 </tbody>
               </table>
