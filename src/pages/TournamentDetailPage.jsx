@@ -887,7 +887,7 @@ export function TournamentDetailPage({
         <nav className="tournament-detail-tabs" aria-label={t('Turnierdetails')}>
           {[
             ['info', t('Info')],
-            ['anmelden', t('Anmeldung')],
+            ['anmelden', t('Anmelden (Turnier)')],
             ['teilnehmer', t('Teilnehmer')],
             ['mitspieler', t('Mitspieler')],
             ['rangliste', t('Rangliste')],
