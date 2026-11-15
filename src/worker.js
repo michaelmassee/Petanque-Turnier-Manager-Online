@@ -2694,7 +2694,7 @@ export default {
         const tournament = await getTournamentById(env.DB, registrationLogMatch[1]);
         if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
         assertCanManageTournament(tournament, session.user);
-        return await listRegistrationLog(env.DB, tournament);
+        return await cachedRegistrationLog(env.DB, tournament, url.origin);
       }
 
       const tournamentEditorsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/editors$/);
@@ -7515,6 +7515,21 @@ async function notifyOwnerAboutAction(env, tournament, user, action) {
 }
 
 const REGISTRATION_LOG_LIMIT = 500;
+// Obergrenze, falls sich Angaben ohne neuen Protokolleintrag ändern (Name der handelnden Person, Pseudonymisierung).
+const REGISTRATION_LOG_TTL_SECONDS = 3600;
+
+/**
+ * Protokoll aus dem Edge-Cache. Der Schlüssel enthält den Zeitpunkt des jüngsten Eintrags (ein Indexzugriff): Jeder
+ * neue Eintrag ergibt einen neuen Schlüssel, ein Löschen der alten ist nicht nötig. Treffer sparen das Lesen von bis zu
+ * 500 Einträgen samt Meldungen. Die Berechtigung prüft der Aufrufer vorher.
+ */
+async function cachedRegistrationLog(db, tournament, origin) {
+  if (!edgeCache()) return listRegistrationLog(db, tournament);
+  const latest = await db.prepare('SELECT MAX(created_at) AS latest FROM audit_log WHERE tournament_id = ?').bind(tournament.id).first();
+  const version = encodeURIComponent(latest?.latest || 'leer');
+  const key = new Request(`${origin}/__registration-log/${encodeURIComponent(tournament.id)}/${version}`);
+  return cachedJsonResponse(key, REGISTRATION_LOG_TTL_SECONDS, () => listRegistrationLog(db, tournament));
+}
 
 /**
  * Änderungshistorie der Meldeliste für die Turnierleitung (T-14): alle Protokolleinträge mit Meldungsbezug, neueste

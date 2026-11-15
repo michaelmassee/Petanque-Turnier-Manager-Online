@@ -122,6 +122,33 @@ describe('Protokoll der Meldeliste', () => {
     ]);
   });
 
+  it('liefert das Protokoll aus dem Edge-Cache, bis ein neuer Eintrag hinzukommt', async () => {
+    const entries = new Map();
+    vi.stubGlobal('caches', { default: {
+      match: vi.fn(async (request) => entries.get(request.url)?.clone()),
+      put: vi.fn(async (request, response) => { entries.set(request.url, response); }),
+    } });
+    try {
+      anmeldung('a', 'confirmed');
+      sql(`INSERT INTO audit_log (id, tournament_id, registration_id, actor_role, action, target, details_json, created_at)
+        VALUES ('e1', 't1', 'a', 'player', 'registration_created', 'registration', '{"status":"confirmed"}', '2026-09-01T10:00:00.000Z')`);
+      expect((await eintraege()).map((entry) => entry.participant)).toEqual(['a Team + Paula Partner']);
+
+      // Ohne neuen Protokolleintrag kommt der zwischengespeicherte Stand.
+      sql("UPDATE registrations SET first_name = 'Direkt' WHERE id = 'a'");
+      expect((await eintraege()).map((entry) => entry.participant)).toEqual(['a Team + Paula Partner']);
+
+      sql(`INSERT INTO audit_log (id, tournament_id, registration_id, actor_role, action, target, details_json, created_at)
+        VALUES ('e2', 't1', 'a', 'owner', 'team_name_changed', 'registration', '{"from":"","to":"X"}', '2026-09-02T10:00:00.000Z')`);
+      const fresh = await eintraege();
+      expect(fresh.map((entry) => entry.id)).toEqual(['e2', 'e1']);
+      expect(fresh[0].participant).toBe('Direkt Team + Paula Partner');
+      expect(entries.size).toBe(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('behält eine gelöschte Meldung mit Namen im Protokoll', async () => {
     anmeldung('a', 'confirmed', { team_name: 'Les Boulistes' });
     const response = await anfrage('/api/registrations/a', { method: 'DELETE' });
