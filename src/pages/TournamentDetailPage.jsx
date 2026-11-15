@@ -888,7 +888,7 @@ export function TournamentDetailPage({
           {[
             ['info', t('Info')],
             ['anmelden', t('Anmelden (Turnier)')],
-            ['teilnehmer', t('Anmeldungen')],
+            ['teilnehmer', t('Meldeliste')],
             ['mitspieler', t('Mitspieler')],
             ['rangliste', t('Rangliste')],
           ].filter(([key]) => availableViews[key]).map(([key, label]) => (
