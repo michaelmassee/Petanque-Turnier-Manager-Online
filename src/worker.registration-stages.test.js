@@ -401,8 +401,17 @@ describe('Turnieranmeldung Stufe 2 und 3', () => {
       konto('x', 'x@example.test');
       konto('editor', 'editor@example.test');
       anmeldung('r1', { userIds: ['x'] });
+      sql(`INSERT INTO audit_log (id, tournament_id, registration_id, actor_role, action, target, created_at)
+        VALUES ('a1', 't1', 'r1', 'player', 'registration_created', 'registration', '2026-01-01T00:00:00Z'),
+               ('a2', 't2', 'r9', 'player', 'registration_created', 'registration', '2026-01-01T00:00:00Z')`);
 
       await deleteTournament(env, turnier(), { id: 'editor', role: 'admin' });
+
+      // Protokolleinträge des Turniers gehen mit, nur der Löschnachweis bleibt; fremde Turniere unberührt.
+      expect(zeilen('SELECT tournament_id, action FROM audit_log ORDER BY tournament_id')).toEqual([
+        { tournament_id: 't1', action: 'tournament_deleted' },
+        { tournament_id: 't2', action: 'registration_created' },
+      ]);
 
       await expect(getSyncTournament(env.DB, 't1')).rejects.toMatchObject({ status: 410, details: { code: 'tournament_deleted' } });
       await expect(getSyncTournament(env.DB, 'unbekannt')).rejects.toMatchObject({ status: 404 });

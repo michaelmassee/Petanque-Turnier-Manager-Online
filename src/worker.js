@@ -7447,8 +7447,10 @@ export function assertTournamentDeletable(tournament, confirmDocumentManaged) {
 export async function deleteTournament(env, tournament, user = null) {
   const db = env.DB;
   const now = new Date().toISOString();
-  const [, , tournamentResult] = await db.batch([
+  const [, , , tournamentResult] = await db.batch([
     tombstoneStatement(db, 't.id = ?', [tournament.id], user?.id || null, now),
+    // Protokolleinträge des Turniers gehen mit; übrig bleibt nur der Löschnachweis unten.
+    db.prepare('DELETE FROM audit_log WHERE tournament_id = ?').bind(tournament.id),
     db.prepare('DELETE FROM registrations WHERE tournament_id = ?').bind(tournament.id),
     db.prepare('DELETE FROM tournaments WHERE id = ?').bind(tournament.id),
     auditStatement(db, { tournamentId: tournament.id, actorUserId: user?.id || null,
@@ -7482,6 +7484,7 @@ function tombstoneStatement(db, where, binds, deletedByUserId, now) {
 function ownedTournamentDeletionStatements(db, ownerId, { actorUserId, actorRole, reason, now }) {
   return [
     tombstoneStatement(db, 't.owner_id = ?', [ownerId], actorUserId, now),
+    db.prepare('DELETE FROM audit_log WHERE tournament_id IN (SELECT id FROM tournaments WHERE owner_id = ?)').bind(ownerId),
     db.prepare(`INSERT INTO audit_log (id, tournament_id, actor_user_id, actor_role, action, target, details_json, created_at)
         SELECT lower(hex(randomblob(16))), t.id, ?, ?, 'tournament_deleted', 'tournament',
           json_object('status', t.status, 'documentBound', json(CASE WHEN t.sync_document_id IS NULL THEN 'false' ELSE 'true' END),
