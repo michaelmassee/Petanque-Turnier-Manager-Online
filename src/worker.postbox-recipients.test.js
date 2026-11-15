@@ -52,6 +52,26 @@ describe('Postbox-Zusammenfassung fürs Polling', () => {
     });
   });
 
+  it('meldet Wartelisten nur, wenn die Turnierleitung handeln muss', async () => {
+    const db = d1MitSchema();
+    seed(db.sqlite);
+    const user = { id: 'organizer-1', role: 'user' };
+    const wartelisteTodo = async () => (await postboxSummary(db, user)).todos.find((todo) => todo.type === 'waitlist');
+    const aktiv = db.sqlite.prepare("SELECT active_registrations FROM tournaments WHERE id = 'tournament-1'").get().active_registrations;
+
+    // Voll und Nachrücken an: regelt sich selbst, keine Aufgabe.
+    db.sqlite.prepare("UPDATE tournaments SET max_registrations = ?, waitlist_auto_promote = 1 WHERE id = 'tournament-1'").run(aktiv);
+    expect(await wartelisteTodo()).toBeUndefined();
+
+    // Voll, aber Nachrücken aus: Die Turnierleitung muss selbst entscheiden.
+    db.sqlite.exec("UPDATE tournaments SET waitlist_auto_promote = 0 WHERE id = 'tournament-1'");
+    expect(await wartelisteTodo()).toEqual({ type: 'waitlist', count: 1 });
+
+    // Nachrücken an, aber ein Platz frei (z. B. Limit erhöht): Aufgabe.
+    db.sqlite.prepare("UPDATE tournaments SET max_registrations = ?, waitlist_auto_promote = 1 WHERE id = 'tournament-1'").run(aktiv + 1);
+    expect(await wartelisteTodo()).toEqual({ type: 'waitlist', count: 1 });
+  });
+
   it('zählt keine Aufgaben für vergangene oder abgeschlossene Turniere', async () => {
     const db = d1MitSchema();
     seed(db.sqlite);

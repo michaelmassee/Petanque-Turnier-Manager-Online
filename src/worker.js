@@ -4449,8 +4449,13 @@ async function listPostboxTodos(db, user) {
     if (Number(keys?.count)) todos.push({ type: 'api_key_requests', count: Number(keys.count) });
   }
   // Abgelaufene oder abgeschlossene Turniere erzeugen keine Aufgaben mehr – dort ist nichts mehr zu tun.
+  // Warteliste nur, wenn die Turnierleitung handeln muss: Nachrücken ist aus, oder es ist trotz Warteliste ein Platz
+  // frei (selbst auf die Warteliste gesetzt, Limit erhöht, unbegrenzt). Volle Turniere mit Nachrücken regeln sich
+  // selbst. active_registrations pflegen Trigger (Migration 0103), daher keine zusätzlichen gelesenen Zeilen.
   const counts = await db.prepare(
-    `SELECT SUM(r.status = 'pending') AS pending, SUM(r.status = 'waitlist') AS waitlist
+    `SELECT SUM(r.status = 'pending') AS pending,
+       SUM(r.status = 'waitlist' AND (COALESCE(t.waitlist_auto_promote, 1) = 0 OR COALESCE(t.max_registrations, 0) = 0
+         OR t.active_registrations < t.max_registrations)) AS waitlist
      FROM registrations r JOIN tournaments t ON t.id = r.tournament_id
      WHERE t.owner_id = ? AND r.status IN ('pending', 'waitlist') AND t.status <> 'finished' AND t.date >= ?`,
   ).bind(user.id, dateDaysAgo(0)).first();
