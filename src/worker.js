@@ -9667,6 +9667,14 @@ async function teamAccountIds(db, registration, excludeUserId = null) {
   return accountIds;
 }
 
+// Ganzes Team für die Verdrängungs-Warnung: alle Spieler, mit Teamname davor, z. B. „Les Boulistes (Anna A + Bernd B)“.
+function displacedTeamLabel(registration) {
+  const players = SLOT_COLUMNS.map((column) => [registration[column.first], registration[column.last]].filter(Boolean).join(' '))
+    .filter(Boolean).join(' + ');
+  if (!registration.team_name) return players;
+  return players ? `${registration.team_name} (${players})` : registration.team_name;
+}
+
 /**
  * Eine VIP-Meldung hat diese Meldung verdrängt (Warteliste bzw. ohne Warteliste storniert): Team per Mail (wenn das
  * Turnier Mails senden darf) sowie Postbox/Push informieren, den Besitzer per Postbox - außer er hat selbst gespeichert.
@@ -9675,7 +9683,7 @@ async function teamAccountIds(db, registration, excludeUserId = null) {
 async function notifyDisplacement(env, tournament, displaced, { wasCancelled, actorUserId = null, appOrigin }) {
   if (!displaced) return null;
   const status = wasCancelled ? 'cancelled' : 'waitlist';
-  const participant = `${displaced.first_name || ''} ${displaced.last_name || ''}`.trim();
+  const participant = displacedTeamLabel(displaced);
   try {
     await sendDisplacementEmail(env, tournament, displaced, wasCancelled, appOrigin);
   } catch (error) {

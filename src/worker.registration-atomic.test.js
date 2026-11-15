@@ -308,6 +308,17 @@ describe('Atomare Online-Anmeldung (T-12)', () => {
       expect(postfach('u1').filter((daten) => daten.displaced)).toEqual([]);
     });
 
+    it('nennt in der Warnung das ganze Team mit Teamnamen und allen Spielern', async () => {
+      vorhandeneAnmeldung('a', 'confirmed');
+      vorhandeneAnmeldung('fritz', 'confirmed', '2026-09-02T10:00:00.000Z');
+      env.DB.sqlite.prepare(`UPDATE registrations SET first_name = 'Fritz', last_name = 'nn', partner_first_name = 'Anna',
+        partner_last_name = 'Muster', team_name = 'Les Boulistes' WHERE id = 'fritz'`).run();
+
+      const antwort = await (await anmelden({ vipLevel: 3, playerEmail: 'vip@example.test' }, { session: leitung })).json();
+
+      expect(antwort.displaced).toMatchObject({ id: 'fritz', participant: 'Les Boulistes (Fritz nn + Anna Muster)' });
+    });
+
     it('liefert kein displaced, wenn niemand verdrängt wurde', async () => {
       const antwort = await (await anmelden({ vipLevel: 3, playerEmail: 'vip@example.test' }, { session: leitung })).json();
       expect(antwort.displaced).toBeUndefined();
