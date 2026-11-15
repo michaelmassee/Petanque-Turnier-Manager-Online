@@ -360,6 +360,17 @@ function TeamMessageDialog({ registration, onClose, onSent }) {
   );
 }
 
+// Gruppierung wie im öffentlichen Teilnehmer-Reiter (listPublicParticipants): Meldereihenfolge, älteste zuerst; auf der
+// Warteliste in Nachrückreihenfolge (höhere VIP-Stufe zuerst). Stornierte/abgelehnte sieht nur die Turnierleitung.
+const REGISTRATION_GROUP_STATUSES = ['confirmed', 'waitlist', 'pending', 'cancelled', 'rejected'];
+
+export function groupRegistrations(registrations) {
+  const ordered = [...registrations].sort((a, b) => String(a.registeredAt || '').localeCompare(String(b.registeredAt || '')));
+  const groups = Object.fromEntries(REGISTRATION_GROUP_STATUSES.map((status) => [status, ordered.filter((registration) => registration.status === status)]));
+  groups.waitlist.sort((a, b) => vipLevelOf(b) - vipLevelOf(a));
+  return groups;
+}
+
 export function RegistrationsPanel({
   tournament,
   registrations,
@@ -401,10 +412,16 @@ export function RegistrationsPanel({
   const [csvNamesOnly, setCsvNamesOnly] = useState(false);
   const [csvConfirmedOnly, setCsvConfirmedOnly] = useState(false);
   const filtered = Boolean(query.trim()) || Boolean(statusFilter) || Boolean(organizerMessageFilter) || Boolean(questionFilter) || Boolean(feeFilter) || Boolean(vipFilter);
-  const pendingRegistrations = filteredRegistrations.filter((registration) => registration.status === 'pending');
-  const otherRegistrations = filteredRegistrations.filter((registration) => registration.status !== 'pending');
-  const visiblePendingRegistrations = useInfiniteList(pendingRegistrations);
-  const visibleOtherRegistrations = useInfiniteList(otherRegistrations);
+  const groups = groupRegistrations(filteredRegistrations);
+  const pendingRegistrations = groups.pending;
+  const visibleGroups = {
+    confirmed: useInfiniteList(groups.confirmed),
+    waitlist: useInfiniteList(groups.waitlist),
+    pending: useInfiniteList(groups.pending),
+    cancelled: useInfiniteList(groups.cancelled),
+    rejected: useInfiniteList(groups.rejected),
+  };
+  const visiblePendingRegistrations = visibleGroups.pending;
   const questionOptions = (tournament?.registrationQuestions || []).flatMap((question) => (question.type === 'choice'
     ? question.options.map((option) => ({ value: `${question.id}:${option.id}`, label: `${question.label}: ${option.label}` }))
     : [{ value: question.id, label: question.label }]));
@@ -511,29 +528,26 @@ export function RegistrationsPanel({
           ))}
         </table>
       )}
-      {pendingRegistrations.length > 0 && (
-        <section className="user-list registration-list" aria-label={t('Offene Anmeldungen')}>
-          <div className="section-title">
-            <h3>{t('Offene Anmeldungen')}</h3>
-            <span className="counter">{pendingRegistrations.length}</span>
-            <Button loading={busyId === 'confirmAll'} disabled={Boolean(busyId) && busyId !== 'confirmAll'} onClick={onConfirmAll}>{t('Alle bestätigen')}</Button>
-          </div>
-          {visiblePendingRegistrations.items.map((registration) => (
-            <RegistrationRow key={registration.id} registration={registration} tournament={tournament} showConfirm showReject onConfirm={onConfirm} onReject={onReject} onEdit={onEdit} onMessage={onMessage} onDelete={onDelete} {...rowProps(registration)} />
-          ))}
-          <InfiniteListLoadMore hasMore={visiblePendingRegistrations.hasMore} onLoadMore={visiblePendingRegistrations.loadMore} label={t('Weitere Einträge laden')} />
-        </section>
-      )}
-      {(otherRegistrations.length > 0 || (filteredRegistrations.length === 0 && pendingRegistrations.length === 0)) && (
-        <section className="user-list registration-list" aria-label={t('Weitere Anmeldungen')}>
-          {pendingRegistrations.length > 0 && <div className="section-title"><h3>{t('Weitere Anmeldungen')}</h3><span className="counter">{otherRegistrations.length}</span></div>}
-          {visibleOtherRegistrations.items.map((registration) => (
-            <RegistrationRow key={registration.id} registration={registration} tournament={tournament} onEdit={onEdit} onMessage={onMessage} onDelete={onDelete} {...rowProps(registration)} />
-          ))}
-          {filteredRegistrations.length === 0 && <p className="muted">{t('Keine Anmeldungen gefunden.')}</p>}
-          <InfiniteListLoadMore hasMore={visibleOtherRegistrations.hasMore} onLoadMore={visibleOtherRegistrations.loadMore} label={t('Weitere Einträge laden')} />
-        </section>
-      )}
+      {filteredRegistrations.length === 0 && <p className="muted">{t('Keine Anmeldungen gefunden.')}</p>}
+      {REGISTRATION_GROUP_STATUSES.filter((status) => groups[status].length > 0).map((status) => {
+        const title = status === 'pending' ? t('Wartet auf Bestätigung') : labelFor(REGISTRATION_STATUSES, status);
+        const pending = status === 'pending';
+        return (
+          <section key={status} className="user-list registration-list" aria-label={title}>
+            {status !== 'confirmed' && (
+              <div className="section-title">
+                <h3>{title}</h3>
+                <span className="counter">{groups[status].length}</span>
+                {pending && <Button loading={busyId === 'confirmAll'} disabled={Boolean(busyId) && busyId !== 'confirmAll'} onClick={onConfirmAll}>{t('Alle bestätigen')}</Button>}
+              </div>
+            )}
+            {visibleGroups[status].items.map((registration) => (
+              <RegistrationRow key={registration.id} registration={registration} tournament={tournament} showConfirm={pending} showReject={pending} onConfirm={onConfirm} onReject={onReject} onEdit={onEdit} onMessage={onMessage} onDelete={onDelete} {...rowProps(registration)} />
+            ))}
+            <InfiniteListLoadMore hasMore={visibleGroups[status].hasMore} onLoadMore={visibleGroups[status].loadMore} label={t('Weitere Einträge laden')} />
+          </section>
+        );
+      })}
       {registrations.length > 0 && (
         <div className="registration-summary" aria-label={t('Zusammenfassung')}>
           {['pending', 'confirmed', 'waitlist'].map((status) => (

@@ -727,3 +727,29 @@ describe('Anmeldungsverwaltung: Warnung bei VIP-Verdrängung', () => {
     expect(screen.getByText('VIP-Status wurde aktualisiert.')).toBeInTheDocument();
   });
 });
+
+describe('Anmeldungsverwaltung: Gruppierung wie im Teilnehmer-Reiter', () => {
+  it('gruppiert Bestätigt → Warteliste → Wartet auf Bestätigung → Storniert → Abgelehnt, älteste zuerst, Warteliste VIP zuerst', () => {
+    const entry = (id, status, registeredAt, extra = {}) => ({ id, firstName: id, lastName: 'Test', status, registeredAt, feeSelections: [], registrationAnswers: [], ...extra });
+    // API liefert neueste zuerst
+    renderPanel([
+      entry('Rita', 'rejected', '2026-01-09T10:00:00Z'),
+      entry('Sven', 'cancelled', '2026-01-08T10:00:00Z'),
+      entry('Paul', 'pending', '2026-01-07T10:00:00Z'),
+      entry('Wanda', 'waitlist', '2026-01-06T10:00:00Z', { isVip: true, vipLevel: 2 }),
+      entry('Willi', 'waitlist', '2026-01-05T10:00:00Z'),
+      entry('Clara', 'confirmed', '2026-01-04T10:00:00Z'),
+      entry('Carl', 'confirmed', '2026-01-03T10:00:00Z'),
+    ]);
+
+    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent))
+      .toEqual(['Warteliste', 'Wartet auf Bestätigung', 'Storniert', 'Abgelehnt']);
+    const names = ['Carl', 'Clara', 'Wanda', 'Willi', 'Paul', 'Sven', 'Rita'];
+    const positions = names.map((name) => screen.getAllByText(new RegExp(`^${name}\\b`))[0]);
+    positions.slice(1).forEach((node, index) => {
+      expect(positions[index].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+    const pendingSection = screen.getByRole('region', { name: 'Wartet auf Bestätigung' });
+    expect(within(pendingSection).getByRole('button', { name: 'Alle bestätigen' })).toBeInTheDocument();
+  });
+});
