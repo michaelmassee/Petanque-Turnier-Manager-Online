@@ -798,6 +798,7 @@
   "Turnier wurde gelöscht.": "Tournament has been deleted.",
   "Vom Turnierdokument trennen": "Disconnect from tournament document",
   "Turnier „{name}“ vom Turnierdokument trennen? Das Turnierdokument kann danach nichts mehr übertragen. Meldeliste, Runden und Rangliste werden ab dann online geführt; bisher übertragene Runden bleiben erhalten.": "Disconnect tournament “{name}” from the tournament document? The tournament document will no longer be able to transfer anything. From then on, the entry list, rounds and ranking are managed online; rounds transferred so far are kept.",
+  "Turnier „{name}“ wird inzwischen im Turnierdokument geführt. Zum Ändern der Eckdaten zuerst vom Turnierdokument trennen.": "Tournament “{name}” is now managed in the tournament document. Disconnect it from the tournament document first to change its details.",
   "Turnier wurde vom Turnierdokument getrennt und wird online weitergeführt.": "The tournament has been disconnected from the tournament document and will continue online.",
   "Anmeldung wurde aktualisiert.": "Registration has been updated.",
   "Anmeldung wurde gelöscht.": "Registration has been deleted.",

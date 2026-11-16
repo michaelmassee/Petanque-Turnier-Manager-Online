@@ -798,6 +798,7 @@
   "Turnier wurde gelöscht.": "El torneo ha sido eliminado.",
   "Vom Turnierdokument trennen": "Desconectar del documento del torneo",
   "Turnier „{name}“ vom Turnierdokument trennen? Das Turnierdokument kann danach nichts mehr übertragen. Meldeliste, Runden und Rangliste werden ab dann online geführt; bisher übertragene Runden bleiben erhalten.": "¿Desconectar el torneo «{name}» del documento del torneo? El documento del torneo ya no podrá transmitir nada. A partir de entonces, la lista de inscritos, las rondas y la clasificación se gestionan en línea; las rondas transmitidas hasta ahora se conservan.",
+  "Turnier „{name}“ wird inzwischen im Turnierdokument geführt. Zum Ändern der Eckdaten zuerst vom Turnierdokument trennen.": "El torneo «{name}» se gestiona ahora en el documento del torneo. Para cambiar sus datos, desconéctalo primero del documento del torneo.",
   "Turnier wurde vom Turnierdokument getrennt und wird online weitergeführt.": "El torneo se ha desconectado del documento del torneo y continúa en línea.",
   "Anmeldung wurde aktualisiert.": "La inscripción ha sido actualizada.",
   "Anmeldung wurde gelöscht.": "La inscripción ha sido eliminada.",

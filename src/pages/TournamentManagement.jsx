@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_PARTICIPANT_LIMIT, EMPTY_TOURNAMENT_FORM, FORMATIONS, REGISTRATION_TYPES, TOURNAMENT_TYPES, TOURNAMENT_STATUSES, VISIBILITIES } from '../lib/constants.js';
 import { currencyOptions, detectViewerTimeZone, formatDate, formatTournamentDateTime, minorUnitsToAmount, utcIsoToZonedDateTimeInput } from '../lib/format.js';
 import { hasRegistrations, isCalendarEntry, labelFor, formationLabel, formatLocationAddress, formatTournamentStartTime, registrationDeadlinePassed, registrationStatusClass, registrationStatusKind, registrationStatusLabel, registrationStatusReason, tournamentPayload, translatedOptions } from '../lib/domain.js';
@@ -952,7 +952,7 @@ export function TournamentList({
                     <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onEditPublication(tournament)}>{t('Status ändern')}</Button>
                   </>
                 ) : (
-                  <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onEdit(tournament)}>{t('Bearbeiten')}</Button>
+                  <Button variant="secondary" loading={busyId === `edit-${tournament.id}`} disabled={Boolean(busyId) && busyId !== `edit-${tournament.id}`} onClick={() => onEdit(tournament)}>{t('Bearbeiten')}</Button>
                 )}
                 {onOpenRegistrations && tournament.registrationEnabled !== false && (
                   <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onOpenRegistrations(tournament.id)}>
@@ -1137,6 +1137,31 @@ export function tournamentToForm(tournament) {
   };
 }
 
+/**
+ * React Query v5 lädt beim Zurückkehren nur nach einem visibilitychange neu. Liegen Browser und Turnierdokument
+ * nebeneinander, bleibt der Tab sichtbar und die Liste veraltet. Bewusst nur für die Turnierliste und nur, wenn sie
+ * älter als ihre staleTime ist – ein globaler Fokus-Auslöser würde alle Abfragen der App neu laden (D1-Leselimit).
+ */
+function useTournamentListRefreshOnWindowFocus() {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const refreshIfStale = () => queryClient.refetchQueries({ queryKey: ['tournaments'], stale: true, type: 'active' });
+    window.addEventListener('focus', refreshIfStale);
+    return () => window.removeEventListener('focus', refreshIfStale);
+  }, [queryClient]);
+}
+
+/** Fehlt die Antwort (z. B. offline), entscheidet der Server beim Speichern; das Formular öffnet dann normal. */
+async function isNowDocumentManaged(tournamentId) {
+  try {
+    const data = await authenticatedApi(`/api/tournaments/${tournamentId}`);
+    return Boolean(data?.tournament?.documentManaged);
+  } catch (error) {
+    console.warn('Aktueller Turnierstand vor dem Bearbeiten nicht abrufbar:', error);
+    return false;
+  }
+}
+
 export function TournamentManagementPage({
   tournaments = [],
   isAdmin,
@@ -1183,6 +1208,7 @@ export function TournamentManagementPage({
     refetchOnWindowFocus: false,
   });
   const userCandidates = recipientsQuery.data?.recipients || postboxRecipients;
+  useTournamentListRefreshOnWindowFocus();
   const manageableTournaments = useMemo(() => tournaments.filter((tournament) => tournament.canManage), [tournaments]);
   const filteredTournaments = useMemo(
     () => filterTournaments(manageableTournaments, query, statusFilter),
@@ -1207,10 +1233,22 @@ export function TournamentManagementPage({
     setDialogOpen(true);
   }
 
-  function openEdit(tournament) {
+  // Verbindet sich ein Turnierdokument, erfährt die offene Liste davon nichts. Vor dem Bearbeiten daher frisch
+  // nachsehen: Ein inzwischen gebundenes Turnier öffnet kein Formular, das der Server ohnehin ablehnen würde.
+  async function openEdit(tournament) {
+    clearFeedback();
+    setBusyId(`edit-${tournament.id}`);
+    try {
+      if (await isNowDocumentManaged(tournament.id)) {
+        setMessage(t('Turnier „{name}“ wird inzwischen im Turnierdokument geführt. Zum Ändern der Eckdaten zuerst vom Turnierdokument trennen.').replace('{name}', tournament.name));
+        await onTournamentsChanged?.();
+        return;
+      }
+    } finally {
+      setBusyId('');
+    }
     setMode('edit');
     setForm(tournamentToForm(tournament));
-    clearFeedback();
     setDialogOpen(true);
   }
 
