@@ -3521,6 +3521,16 @@ export default {
         return await executeSyncWrite(request, env.DB, tournament, (db) => syncPutRanking(request, db, tournament));
       }
 
+      // Anzeige-Schlüssel für die Turnierleitung im Turnierdokument („Live-Turnierseite öffnen“), damit die Anzeige
+      // auch auf einem nicht angemeldeten Bildschirm vor Ort läuft. Kein Lease: Der Schlüssel ändert keine Turnierdaten.
+      const syncDisplayLinkMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/display-link$/);
+      if (syncDisplayLinkMatch && request.method === 'POST') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncDisplayLinkMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        return json({ displayToken: await ensureTournamentDisplayToken(env.DB, tournament.id) });
+      }
+
       const syncMetadataMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/metadata$/);
       if (syncMetadataMatch && request.method === 'PUT') {
         const auth = await requireApiKey(request, env.DB);

@@ -1,6 +1,7 @@
 // @vitest-environment node
 // Anzeige-Schlüssel der Turnierseite: nur die Turnierleitung bekommt ihn; er öffnet Spielplan und Turnier auch ohne
 // veröffentlichte Meldeliste, aber keine Anmeldung.
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 import worker from './worker.js';
@@ -42,6 +43,23 @@ describe('Anzeige-Link der Turnierseite', () => {
     expect((await web('GET', '/api/tournaments/t1/schedule?share=falsch')).status).toBe(403);
     expect((await web('GET', `/api/tournaments/t1/schedule?share=${schluessel}`)).status).toBe(200);
     expect((await web('GET', `/api/tournaments/t1?share=${schluessel}`)).status).toBe(200);
+  });
+
+  it('gibt denselben Schlüssel über die Sync-API nur an die Turnierleitung im Turnierdokument', async () => {
+    const zugang = (user, secret) => sql(`INSERT INTO api_keys (id, user_id, key_hash, label, status, requested_at, approved_at, created_at, updated_at)
+      VALUES (?, ?, ?, 'PTM', 'approved', '2026-01-01', '2026-01-01', '2026-01-01', '2026-01-01')`,
+    `key-${user}`, user, createHash('sha256').update(secret).digest('hex'));
+    zugang('owner', 'zugang-der-turnierleitung-mit-laenge');
+    zugang('player', 'zugang-eines-spielers-mit-ausreichender-laenge');
+    const sync = (secret) => worker.fetch(new Request('https://ptm.test/api/sync/tournaments/t1/display-link', {
+      method: 'POST', headers: secret ? { Authorization: `Bearer ${secret}` } : {},
+    }), env);
+
+    expect((await sync()).status).toBe(401);
+    expect((await sync('zugang-eines-spielers-mit-ausreichender-laenge')).status).toBe(403);
+    const antwort = await sync('zugang-der-turnierleitung-mit-laenge');
+    expect(antwort.status).toBe(200);
+    expect((await antwort.json()).displayToken).toBe(await schluesselHolen());
   });
 
   it('gibt den Schlüssel nicht in der Turnier-Antwort heraus', async () => {

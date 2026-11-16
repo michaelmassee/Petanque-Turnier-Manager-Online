@@ -132,6 +132,28 @@ describe('TournamentPlayManagement', () => {
     expect(screen.queryByText('Clubabend Supermêlée')).not.toBeInTheDocument();
   });
 
+  it('bietet die Bildschirm-Anzeige für ein im Turnierdokument geführtes, online nicht durchführbares Turnier an', async () => {
+    const calls = [];
+    installFetchMock(calls);
+    const maastrichter = { ...TOURNAMENT, id: 't4', name: 'Maastrichter aus dem Dokument', registrationType: 'forme', type: 'maastrichter', documentManaged: true };
+
+    render(<TournamentPlayManagement tournaments={[maastrichter]} currentUserId="user-1" language="de" />);
+
+    expect(screen.getByText('Maastrichter aus dem Dokument kann nicht online durchgeführt werden.')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Anzeige für Bildschirm' })).toBeInTheDocument();
+    await waitFor(() => expect(calls).toContain('/api/tournaments/t4/display-link'));
+  });
+
+  it('bietet für ein online nicht durchführbares Turnier ohne Turnierdokument keine Bildschirm-Anzeige an', () => {
+    installFetchMock([]);
+    const liga = { ...TOURNAMENT, id: 't3', name: 'Liga ohne Online-Durchführung', registrationType: 'forme', type: 'liga' };
+
+    render(<TournamentPlayManagement tournaments={[liga]} currentUserId="user-1" language="de" />);
+
+    expect(screen.getByText('Liga ohne Online-Durchführung kann nicht online durchgeführt werden.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anzeige für Bildschirm' })).not.toBeInTheDocument();
+  });
+
   it('zeigt nicht online durchführbare Turniere rot markiert in der Auswahl, Desktop-Turniere gar nicht', async () => {
     installFetchMock([]);
     const desktop = { ...TOURNAMENT, id: 't2', name: 'Desktop-Turnier', desktopExecution: true };

@@ -1107,6 +1107,9 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       <Feedback warning={warning} />
 
       {selectedTournament && <TournamentBoardShare tournament={selectedTournament} />}
+      {/* Online nicht durchführbar, aber im Turnierdokument geführt: Spielplan und Rangliste kommen aus dem Dokument,
+          die Anzeige für den Bildschirm vor Ort funktioniert also trotzdem. */}
+      {selectedNonPlayable && isDocumentBound(selectedNonPlayable) && <TournamentBoardShare tournament={selectedNonPlayable} />}
       {/* Ankündigungen schon vor dem Turnierstart, damit der Veranstalter vorab informieren kann. */}
       {selectedTournament && selectedTournamentStatus !== 'finished' && <AnnouncementEditor tournament={selectedTournament} />}
       {/* Rundenzeit wie der Timer im Hauptprojekt, direkt unter der Ankündigung. */}
