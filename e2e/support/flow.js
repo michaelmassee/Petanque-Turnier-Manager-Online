@@ -9,7 +9,7 @@ export async function openPlay(page, tournament) {
   await expect(page.locator('.play-manage')).toBeVisible();
 }
 
-// Teilnehmerliste der laufenden Runde aufklappen und vollständig nachladen. Die Endlosliste lädt beim Hineinscrollen
+// Meldeliste der laufenden Runde aufklappen und vollständig nachladen. Die Endlosliste lädt beim Hineinscrollen
 // auch selbst nach; der Button kann also jederzeit verschwinden – daher nur kurz klicken und bis zur Gesamtzahl wiederholen.
 export async function openParticipants(page, expectedCount) {
   const panel = page.locator('.round-participants:not(.melee-teams)');

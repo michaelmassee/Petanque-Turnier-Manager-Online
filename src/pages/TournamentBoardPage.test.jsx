@@ -215,7 +215,7 @@ describe('Turnierseite', () => {
     expect(screen.queryByRole('region', { name: 'Rundenzeit' })).not.toBeInTheDocument();
   });
 
-  it('lädt bei nicht öffentlicher Teilnehmerliste keinen Spielplan', () => {
+  it('lädt bei nicht öffentlicher Meldeliste keinen Spielplan', () => {
     global.fetch = vi.fn();
     renderBoard(tournamentWith({ participantsPublic: false }));
     expect(screen.getByText('Für dieses Turnier gibt es keinen öffentlichen Spielplan.')).toBeInTheDocument();

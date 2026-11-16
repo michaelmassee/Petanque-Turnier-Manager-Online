@@ -63,12 +63,12 @@ export function DatenschutzPage({ language, setLanguage, menuOpen, setMenuOpen, 
             {t('Freiwillig kannst du in deinem Profil eine Handynummer hinterlegen. Sie ist nur für dich und die Administratoren sichtbar und kann jederzeit im Profil geändert oder gelöscht werden (Art. 6 Abs. 1 lit. a DSGVO). Legst du ein Turnier an, wird sie als Kontakt-Telefon vorgeschlagen; öffentlich auf der Turnierseite sichtbar wird sie erst, wenn du das Turnier mit dieser Nummer speicherst.')}
           </p>
 
-          <h2>{t('5. Turnieranmeldungen und öffentliche Teilnehmerlisten')}</h2>
+          <h2>{t('5. Turnieranmeldungen und öffentliche Meldelisten')}</h2>
           <p>
             {t('Wenn du dich über diese Website für ein Turnier anmeldest, verarbeiten wir Vorname, Nachname, E-Mail-Adresse sowie je nach Turnier optional oder verpflichtend Verein, Lizenznummer und Angaben zu deinem Partner bzw. deinen Partnern (Doublette/Triplette). Diese Daten werden an den jeweiligen Turnierleiter zur Organisation des Turniers weitergegeben (Art. 6 Abs. 1 lit. b DSGVO).')}
           </p>
           <p>
-            {t('Turnierleiter können die Teilnehmerliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.')}
+            {t('Turnierleiter können die Meldeliste eines Turniers öffentlich sichtbar schalten. In diesem Fall werden Vorname, Nachname, Verein und die Namen deiner Partner für jeden Besucher der Turnierseite sichtbar, ohne dass eine Anmeldung erforderlich ist. Wenn du das nicht möchtest, wende dich bitte direkt an den Veranstalter (Turnierleiter) des jeweiligen Turniers, dessen Kontaktdaten auf der Turnierseite angegeben sind.')}
           </p>
 
           <h2>{t('6. Turniermeldungen')}</h2>

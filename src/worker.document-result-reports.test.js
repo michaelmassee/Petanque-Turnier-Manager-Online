@@ -125,7 +125,7 @@ describe('Ergebnismeldung bei verbundenem Turnierdokument', () => {
     ['public', 1, true],
     ['public', 0, false],
     ['private', 1, false],
-  ])('meldet die Turnierseite als offen nur bei öffentlicher Teilnehmerliste (%s, Liste %i)', async (visibility, participantsPublic, expected) => {
+  ])('meldet die Turnierseite als offen nur bei öffentlicher Meldeliste (%s, Liste %i)', async (visibility, participantsPublic, expected) => {
     sql('UPDATE tournaments SET visibility = ?, participants_public = ? WHERE id = ?', visibility, participantsPublic, 't1');
 
     expect((await live('anna-session', ANNA)).tournament.scheduleVisible).toBe(expected);

@@ -2817,7 +2817,7 @@ export function PublicRegistrationPanel({ tournament, form, setForm, onSubmit, o
                   required
                 />
                 <span>
-                  {t('Alle eingetragenen Personen sind einverstanden, dass ihre Anmeldedaten (Name, E-Mail-Adresse) zur Turnierorganisation an den Veranstalter gehen und Name, Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Teilnehmerliste öffentlich schaltet.')}
+                  {t('Alle eingetragenen Personen sind einverstanden, dass ihre Anmeldedaten (Name, E-Mail-Adresse) zur Turnierorganisation an den Veranstalter gehen und Name, Verein, Teamname und Partnernamen auf der öffentlichen Turnierseite erscheinen können, wenn der Veranstalter die Meldeliste öffentlich schaltet.')}
                   <RequiredMark />
                 </span>
               </label>

@@ -6197,7 +6197,7 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
   background: #ffffff;
 }
 
-/* Teamnummer vor dem Namen (Teilnehmerliste, Live-Ansicht), ab feststehenden Teams. */
+/* Teamnummer vor dem Namen (Meldeliste, Live-Ansicht), ab feststehenden Teams. */
 .round-participant-number,
 .team-number {
   display: inline-block;

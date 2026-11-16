@@ -651,7 +651,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               checked={form.participantsPublic}
               onChange={(event) => setForm({ ...form, participantsPublic: event.target.checked })}
             />
-            {t('Teilnehmerliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.')}
+            {t('Meldeliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.')}
           </label>
           <label className="checkbox-field">
             <input

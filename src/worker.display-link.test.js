@@ -1,6 +1,6 @@
 // @vitest-environment node
 // Anzeige-Schlüssel der Turnierseite: nur die Turnierleitung bekommt ihn; er öffnet Spielplan und Turnier auch ohne
-// veröffentlichte Teilnehmerliste, aber keine Anmeldung.
+// veröffentlichte Meldeliste, aber keine Anmeldung.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 import worker from './worker.js';
@@ -34,7 +34,7 @@ describe('Anzeige-Link der Turnierseite', () => {
     expect(await schluesselHolen()).toBe(schluessel);
   });
 
-  it.each(['public', 'private'])('öffnet den Spielplan ohne veröffentlichte Teilnehmerliste (%s)', async (visibility) => {
+  it.each(['public', 'private'])('öffnet den Spielplan ohne veröffentlichte Meldeliste (%s)', async (visibility) => {
     sql('UPDATE tournaments SET visibility = ? WHERE id = ?', visibility, 't1');
     const schluessel = await schluesselHolen();
 

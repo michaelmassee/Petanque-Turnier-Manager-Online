@@ -9430,8 +9430,8 @@ async function participantAccountUserIds(db, tournamentId, excludedUserId, { inc
 }
 
 // Private Turniere stehen nur nicht in der öffentlichen Liste: Mit dem Freigabe-Token der Turnierleitung
-// ist der Spielplan sichtbar, sofern die Teilnehmerliste veröffentlicht ist. Der Anzeige-Schlüssel, den nur die
-// Turnierleitung teilt, öffnet ihn immer – auch ohne veröffentlichte Teilnehmerliste.
+// ist der Spielplan sichtbar, sofern die Meldeliste veröffentlicht ist. Der Anzeige-Schlüssel, den nur die
+// Turnierleitung teilt, öffnet ihn immer – auch ohne veröffentlichte Meldeliste.
 async function assertCanViewSchedule(request, db, tournament, url) {
   const session = await optionalSession(request, db);
   if (canViewParticipants(tournament, session?.user || null)) return;

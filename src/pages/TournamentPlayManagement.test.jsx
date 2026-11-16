@@ -207,7 +207,7 @@ describe('TournamentPlayManagement', () => {
   it.each([
     { visibility: 'private', participantsPublic: true },
     { visibility: 'public', participantsPublic: false },
-  ])('teilt die Turnierseite mit dem Anzeige-Schlüssel ($visibility, Teilnehmerliste öffentlich: $participantsPublic)', async (variant) => {
+  ])('teilt die Turnierseite mit dem Anzeige-Schlüssel ($visibility, Meldeliste öffentlich: $participantsPublic)', async (variant) => {
     const calls = [];
     installFetchMock(calls);
     const fetchMock = global.fetch;
@@ -234,7 +234,7 @@ describe('TournamentPlayManagement', () => {
     }
   });
 
-  it('öffnet die Bildschirm-Anzeige mit dem Anzeige-Schlüssel, auch ohne veröffentlichte Teilnehmerliste', async () => {
+  it('öffnet die Bildschirm-Anzeige mit dem Anzeige-Schlüssel, auch ohne veröffentlichte Meldeliste', async () => {
     const calls = [];
     installFetchMock(calls);
     const fetchMock = global.fetch;
@@ -245,7 +245,7 @@ describe('TournamentPlayManagement', () => {
     vi.spyOn(window, 'open').mockReturnValue(displayWindow);
 
     render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, visibility: 'public', participantsPublic: false }]} language="de" />);
-    expect(await screen.findByText(/auch wenn die Teilnehmerliste nicht veröffentlicht ist/)).toBeInTheDocument();
+    expect(await screen.findByText(/auch wenn die Meldeliste nicht veröffentlicht ist/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Anzeige für Bildschirm' }));
 
     await waitFor(() => expect(displayWindow.location.href).toBe(`${window.location.origin}/turnierseite/t1?share=geheim`));
@@ -272,7 +272,7 @@ describe('TournamentPlayManagement', () => {
     }
   });
 
-  it('bietet Teilen auch ohne veröffentlichte Teilnehmerliste an', async () => {
+  it('bietet Teilen auch ohne veröffentlichte Meldeliste an', async () => {
     installFetchMock([]);
     render(<TournamentPlayManagement tournaments={[{ ...TOURNAMENT, participantsPublic: false }]} language="de" />);
 
@@ -681,7 +681,7 @@ describe('TournamentPlayManagement', () => {
     await waitFor(() => expect(calls).toContain('/api/registrations/p1/live-link/qr'));
   });
 
-  it('nennt in der Teilnehmerliste bei Doublette/Triplette alle Spieler einer Meldung und den Teamnamen', async () => {
+  it('nennt in der Meldeliste bei Doublette/Triplette alle Spieler einer Meldung und den Teamnamen', async () => {
     const registrations = [
       { id: 'd1', firstName: 'Anna', lastName: 'Muster', partnerFirstName: 'Bert', partnerLastName: 'Beispiel' },
       { id: 'd2', firstName: 'Clara', lastName: 'Test', partnerFirstName: 'Dirk', partnerLastName: 'Demo', partner2FirstName: 'Eva', partner2LastName: 'Muster', teamName: 'Les Boulistes' },

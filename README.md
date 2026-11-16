@@ -76,7 +76,7 @@ Ergebnisse synchronisieren.
 4. Installiere die App bei Bedarf über das Browser-Menü auf deinem Gerät.
 
 > **💡 Für Veranstalter:** Ein Turnier kann mit wenigen Angaben angelegt werden.
-> Danach steuerst du Anmeldung, Teilnehmerliste und Kommunikation zentral an
+> Danach steuerst du Anmeldung, Meldeliste und Kommunikation zentral an
 > einem Ort.
 
 ## 🛠️ Entwicklung und Deployment

@@ -43,7 +43,7 @@ export default function TournamentBoardPage({ tournamentId, tournaments, languag
   const [timerUpdate, setTimerUpdate] = useState({ tournamentId: null, timer: null });
   const rankingPublished = Boolean(tournament?.rankingPublishedAt);
   // Mit Schlüssel (Anzeige-Link der Turnierleitung) entscheidet der Server, ob der Spielplan sichtbar ist – auch ohne
-  // veröffentlichte Teilnehmerliste. Lehnt er ab, zeigt der Spielplan denselben Hinweis wie hier.
+  // veröffentlichte Meldeliste. Lehnt er ab, zeigt der Spielplan denselben Hinweis wie hier.
   const participantsVisible = Boolean(tournament && (tournament.participantsPublic || tournament.canManage || shareToken) && tournament.registrationEnabled !== false);
   const playable = Boolean(tournament) && (isOnlinePlayable(tournament) || isDocumentBound(tournament));
   // Der Status aus der Turnierliste stammt vom Laden der App. Eine vor dem Start geöffnete Seite (z. B. Bildschirm vor

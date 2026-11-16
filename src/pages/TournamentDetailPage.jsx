@@ -297,7 +297,7 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
   if (forbidden) {
     return (
       <>
-        <p className="muted">{t('Die Teilnehmerliste ist für dieses Turnier nicht öffentlich.')}</p>
+        <p className="muted">{t('Die Meldeliste ist für dieses Turnier nicht öffentlich.')}</p>
       </>
     );
   }
@@ -305,7 +305,7 @@ function TournamentParticipants({ tournamentId, language, timeZone, onMessage, o
   if (!participants) {
     return (
       <>
-        <p className="muted">{t('Teilnehmerliste wird geladen…')}</p>
+        <p className="muted">{t('Meldeliste wird geladen…')}</p>
       </>
     );
   }
@@ -938,7 +938,7 @@ export function TournamentDetailPage({
           {view === 'teilnehmer' && (
             <>
               <p className="hint">
-                {t('Diese Teilnehmerliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.')}
+                {t('Diese Meldeliste ist öffentlich sichtbar und ohne Anmeldung einsehbar. Wer hier nicht aufgeführt werden möchte, wende sich bitte direkt an den Veranstalter dieses Turniers.')}
               </p>
               <TournamentParticipants tournamentId={tournament.id} language={language} timeZone={tournament.timezone} onMessage={setMessage} onError={setError} />
             </>

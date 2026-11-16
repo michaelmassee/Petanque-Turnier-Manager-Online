@@ -79,7 +79,7 @@ function alreadyRegisteredNames(registrations, quickPlayer, slots) {
     .map(([first, last]) => `${first.trim()} ${last.trim()}`);
 }
 
-// Spieler aus Runden tragen ihre fertige Bezeichnung (teamLabel). Meldungen der Teilnehmerliste bestehen bei
+// Spieler aus Runden tragen ihre fertige Bezeichnung (teamLabel). Meldungen der Meldeliste bestehen bei
 // Doublette/Triplette (Formée) aus einer Meldung mit Partnerfeldern: alle Spieler nennen, ein Teamname steht davor.
 function playerLabel(player) {
   if (player.teamLabel) return player.teamLabel;
@@ -96,7 +96,7 @@ function teamLabel(team) {
 }
 
 // Link zur Turnierseite (Spielplan, Rangliste, Ankündigungen) zum Teilen mit Spielern und Zuschauern. Er trägt den
-// Anzeige-Schlüssel des Turniers: Die Seite öffnet sich ohne Anmeldung und ohne veröffentlichte Teilnehmerliste, auch
+// Anzeige-Schlüssel des Turniers: Die Seite öffnet sich ohne Anmeldung und ohne veröffentlichte Meldeliste, auch
 // die Bildschirm-Anzeige, z. B. auf einem Rechner vor Ort. Den Schlüssel bekommt nur die Turnierleitung.
 function TournamentBoardShare({ tournament }) {
   const { t } = useTranslation();
@@ -156,7 +156,7 @@ function TournamentBoardShare({ tournament }) {
         {' '}<span className="muted">{t('Ohne Menü, z. B. für einen zweiten Bildschirm vor Ort; aktualisiert sich selbst.')}</span>
       </p>
       <p className="hint">
-        {t('Anzeige und geteilter Link öffnen Spielplan und Rangliste ohne Anmeldung, auch wenn die Teilnehmerliste nicht veröffentlicht ist. Gib den Link nur weiter, wenn die Teilnehmer ihn sehen dürfen.')}
+        {t('Anzeige und geteilter Link öffnen Spielplan und Rangliste ohne Anmeldung, auch wenn die Meldeliste nicht veröffentlicht ist. Gib den Link nur weiter, wenn die Teilnehmer ihn sehen dürfen.')}
       </p>
       <Feedback error={displayError} />
       {/* Wie das QR-Panel der Turnierseite (Info): Bild mit Turniername, Teilen, PNG, Link kopieren. */}

@@ -122,7 +122,7 @@ describe('Spielplan-Endpunkt (/schedule)', () => {
     expect((await mitToken(token)).status).toBe(403);
   });
 
-  it('gibt den Spielplan nicht heraus, wenn die Teilnehmerliste nicht öffentlich ist', async () => {
+  it('gibt den Spielplan nicht heraus, wenn die Meldeliste nicht öffentlich ist', async () => {
     sql("UPDATE tournaments SET participants_public = 0 WHERE id = 't1'");
     expect((await abrufen()).status).toBe(403);
   });
