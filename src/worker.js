@@ -6004,7 +6004,7 @@ async function createDocumentRegistration(db, tournament, localUuid, body) {
  * Online-Auslosung dauerhaft gesperrt) und der Desktop-Ranglisten-Snapshot verworfen. Bereits
  * uebertragene Runden bleiben in tournament_matches erhalten.
  */
-export async function disconnectTournament(db, tournamentId) {
+export function disconnectTournament(db, tournamentId) {
   return {
     statements: [db.prepare(`UPDATE tournaments SET document_managed = 0, sync_document_id = NULL, sync_lease_token_hash = NULL,
               sync_takeover_request_id = NULL, desktop_execution = 0, desktop_ranking_json = NULL, updated_at = ? WHERE id = ?`)
