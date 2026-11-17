@@ -239,6 +239,11 @@ function RegistrationRow({ registration, tournament, showConfirm = false, showRe
           {registration.accountConnected && <AccountBadge />}
         </strong>
         <span>{registration.noEmail ? t('ohne E-Mail-Adresse') : registration.email}</span>
+        {registration.phone && (
+          <span className="registration-player-meta" data-i18n-skip>
+            {t('Telefonnummer')}: <a href={`tel:${registration.phone.replace(/[^\d+]/g, '')}`}>{registration.phone}</a>
+          </span>
+        )}
         {registration.club && <span className="registration-player-meta" data-i18n-skip>{registration.club}</span>}
         {registration.licenseNr && <span className="registration-player-meta" data-i18n-skip>{t('Lizenznummer')}: {registration.licenseNr}</span>}
         {registration.partnerFirstName && (
