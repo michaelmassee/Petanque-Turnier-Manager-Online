@@ -3003,8 +3003,11 @@ export default {
 
       if (url.pathname === '/api/me/registration-opening-subscriptions' && request.method === 'GET') {
         const session = await requireSession(request, env.DB);
+        // CROSS JOIN legt in SQLite die Reihenfolge fest: zuerst die (meist keinen) Abos des Nutzers, dann je Abo das
+        // Turnier per Primärschlüssel. Mit JOIN las der Planer alle öffentlichen Turniere über idx_tournaments_visibility
+        // (gemessen 2026-11-17: 63 statt 0 gelesene Zeilen ohne Abo, wächst mit der Zahl der Turniere).
         const rows = await env.DB.prepare(`SELECT s.tournament_id FROM registration_opening_subscriptions s
-          JOIN tournaments t ON t.id = s.tournament_id WHERE s.user_id = ? AND t.registration_opening_pending = 1
+          CROSS JOIN tournaments t ON t.id = s.tournament_id WHERE s.user_id = ? AND t.registration_opening_pending = 1
           AND t.status = 'registration' AND t.visibility = 'public' AND t.registration_closed = 0`).bind(session.user.id).all();
         return json({ tournamentIds: rows.results.map((row) => row.tournament_id) });
       }
