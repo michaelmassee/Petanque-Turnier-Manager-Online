@@ -57,4 +57,24 @@ describe('Migration 0103 (Meldezahlen als Spalten)', () => {
     expect(JSON.parse(liste[0].editors_json)).toEqual([{ id: 'ed', firstName: 'Ede', lastName: 'Editor', username: 'ede' }]);
     expect(liste[1].creator_json).toBeNull();
   });
+
+  // Kurze Listen lesen tournament_editors per Index, lange per Vollscan (D1-Kosten); beide Wege liefern dasselbe.
+  it('lädt Bearbeiter für kurze und lange Listen gleich', async () => {
+    const { db } = aufbauen();
+    const weitere = Array.from({ length: 25 }, (_, index) => `x${String(index).padStart(2, '0')}`);
+    for (const id of weitere) {
+      db.sqlite.prepare(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at)
+        VALUES (?, 'owner', ?, '2099-02-01', 'Ort', 'doublette', 'registration', 'public', '2026-01-01', '2026-01-01')`).run(id, id);
+    }
+    db.sqlite.exec("INSERT INTO tournament_editors (id, tournament_id, user_id, created_at) VALUES ('e3', 'x07', 'ed', '2026-01-01')");
+    const editoren = (liste) => Object.fromEntries(liste.map((row) => [row.id, JSON.parse(row.editors_json).map((editor) => editor.id)]));
+    const zeilen = (where) => db.sqlite.prepare(`SELECT * FROM tournaments ${where} ORDER BY id`).all();
+
+    const kurz = editoren(await withTournamentPeople(db, zeilen("WHERE id IN ('t1', 'x07', 'x08')")));
+    const lang = editoren(await withTournamentPeople(db, zeilen('')));
+
+    expect(kurz).toEqual({ t1: ['ed'], x07: ['ed'], x08: [] });
+    expect(lang).toMatchObject(kurz);
+    expect(Object.keys(lang)).toHaveLength(27);
+  });
 });

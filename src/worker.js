@@ -13644,14 +13644,25 @@ function tournamentEditorIds(tournament) {
 
 // Für Turnierlisten: Bearbeiter, Owner und Ersteller gesammelt nachladen, statt sie per Unterabfrage pro Turnier
 // nachzuschlagen – jeder beteiligte Benutzer wird so nur einmal gelesen (D1-Tageslimit für gelesene Zeilen).
-// tournament_editors wird bewusst ganz gelesen: Index-Lookups per json_each zählen pro Turnier-ID als gelesene Zeilen
-// und kosten mehr als die kleine Tabelle. Liefert dieselben *_json-Felder wie die Unterabfragen unten, die
-// getTournamentById() weiter nutzt.
+// tournament_editors: Ein Index-Lookup zählt in D1 je Turnier-ID plus je Treffer eine gelesene Zeile (gemessen
+// 2026-11-17: 3 IDs per IN-Liste = 3 Zeilen, json_each = 6, 78 IDs = 137 bzw. 215; die ganze Tabelle = 50). Kurze
+// Listen (eigene Turniere eines Nutzers) daher per IN-Liste, lange (öffentliche Liste, Admin) per Vollscan. Liefert
+// dieselben *_json-Felder wie die Unterabfragen unten, die getTournamentById() weiter nutzt.
+const TOURNAMENT_EDITORS_LOOKUP_MAX_IDS = 20;
+
+async function loadTournamentEditorRows(db, tournamentIds) {
+  if (tournamentIds.length <= TOURNAMENT_EDITORS_LOOKUP_MAX_IDS) {
+    return (await db.prepare(`SELECT tournament_id, user_id FROM tournament_editors
+        WHERE tournament_id IN (${tournamentIds.map(() => '?').join(', ')})`).bind(...tournamentIds).all()).results;
+  }
+  const wanted = new Set(tournamentIds);
+  return (await db.prepare('SELECT tournament_id, user_id FROM tournament_editors').all()).results
+    .filter((editor) => wanted.has(editor.tournament_id));
+}
+
 export async function withTournamentPeople(db, rows) {
   if (!rows.length) return rows;
-  const tournamentIds = new Set(rows.map((row) => row.id));
-  const editorRows = (await db.prepare('SELECT tournament_id, user_id FROM tournament_editors').all()).results
-    .filter((editor) => tournamentIds.has(editor.tournament_id));
+  const editorRows = await loadTournamentEditorRows(db, [...new Set(rows.map((row) => row.id))]);
   const userIds = [...new Set([...rows.flatMap((row) => [row.owner_id, row.creator_id]), ...editorRows.map((editor) => editor.user_id)].filter(Boolean))];
   const userResult = await db.prepare('SELECT id, first_name, last_name, username FROM users WHERE id IN (SELECT value FROM json_each(?))')
     .bind(JSON.stringify(userIds)).all();
