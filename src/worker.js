@@ -3597,6 +3597,15 @@ export default {
         return await executeSyncWrite(request, env.DB, tournament, (db) => syncPostRegistrationLinks(request, db, tournament));
       }
 
+      const syncAnnouncementMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/announcement$/);
+      if (syncAnnouncementMatch && request.method === 'PUT') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncAnnouncementMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        return await executeSyncWrite(request, env.DB, tournament,
+          (db) => syncPutAnnouncement(request, env, db, tournament, url.origin));
+      }
+
       const syncRegistrationClosedMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registration-closed$/);
       if (syncRegistrationClosedMatch && request.method === 'PUT') {
         const auth = await requireApiKey(request, env.DB);
@@ -7278,22 +7287,50 @@ export function tournamentAnnouncement(row) {
   return { text: row.announcement, at: row.announcement_at || null };
 }
 
+// Bereinigter Ankündigungstext aus dem Anfrage-Body; leer heißt löschen.
+function announcementTextFromBody(body) {
+  const text = String(body.text ?? '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').trim();
+  if (text.length > ANNOUNCEMENT_MAX_LENGTH) {
+    throw new HttpError(400, 'Die Ankündigung darf maximal 300 Zeichen enthalten.', { field: 'announcement' });
+  }
+  return text;
+}
+
 /**
  * Ankündigung setzen oder mit leerem Text löschen. Es gibt immer nur eine aktuelle Ankündigung; eine neue ersetzt die
  * alte und geht als Live-Push an alle mit Live-Push-Abo. Gilt auch für Turniere aus dem Turnierdokument.
  */
 async function updateTournamentAnnouncement(request, env, tournament, appOrigin) {
   if (tournament.status === 'finished') throw new HttpError(409, 'Das Turnier ist bereits abgeschlossen');
-  const body = await readJson(request);
-  const text = String(body.text ?? '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').trim();
-  if (text.length > ANNOUNCEMENT_MAX_LENGTH) {
-    throw new HttpError(400, 'Die Ankündigung darf maximal 300 Zeichen enthalten.', { field: 'announcement' });
-  }
+  const text = announcementTextFromBody(await readJson(request));
   const now = new Date().toISOString();
   await env.DB.prepare('UPDATE tournaments SET announcement = ?, announcement_at = ?, updated_at = ? WHERE id = ?')
     .bind(text || null, text ? now : null, now, tournament.id).run();
   if (text) await notifyLivePushForAnnouncement(env, tournament, text, appOrigin);
   return json({ announcement: tournamentAnnouncement({ ...tournament, announcement: text || null, announcement_at: text ? now : null }) });
+}
+
+/**
+ * Ankündigung aus dem Turnierdokument (Gegenstück zur Web-App, gleiche Regeln): setzen oder mit leerem Text löschen.
+ * Der Live-Push geht erst nach dem Commit raus und bei einer Wiederholung desselben Auftrags nicht noch einmal.
+ *
+ *   PUT /api/sync/tournaments/:id/announcement  { text }  -> { announcement: { text, at } | null }
+ */
+export async function syncPutAnnouncement(request, env, db, tournament, appOrigin) {
+  if (tournament.status === 'finished') {
+    throw new HttpError(409, 'Das Turnier ist bereits abgeschlossen', { code: 'tournament_finished' });
+  }
+  const text = announcementTextFromBody(await readJson(request));
+  const now = new Date().toISOString();
+  const announcement = tournamentAnnouncement({ ...tournament, announcement: text || null, announcement_at: text ? now : null });
+  return {
+    statements: [
+      db.prepare('UPDATE tournaments SET announcement = ?, announcement_at = ?, updated_at = ? WHERE id = ?')
+        .bind(text || null, text ? now : null, now, tournament.id),
+    ],
+    response: { envelope: { status: 200, body: { announcement } } },
+    afterCommit: text ? () => notifyLivePushForAnnouncement(env, tournament, text, appOrigin) : undefined,
+  };
 }
 
 // Rundenzeit-Timer wie im PTM-Hauptprojekt (TimerManager): Dauer bis 99:59, optionale Bezeichnung.
