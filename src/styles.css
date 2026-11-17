@@ -2646,6 +2646,15 @@ a.left-panel-link {
   background: #f3f6fa;
 }
 
+/* Desktop: Die Aktionsspalte (auto) nimmt sonst ihre volle Einzeilen-Breite und drückt Name/E-Mail/Verein
+   auf wenige Zeichen zusammen. Mindestbreite für die Personenspalte, die Buttons brechen stattdessen um.
+   Unter 921px greift die einspaltige Regel aus dem Media-Query. */
+@media (min-width: 921px) {
+  .registration-list > article.data-row {
+    grid-template-columns: minmax(18rem, 1fr) auto auto;
+  }
+}
+
 /* Doppelte Klasse: die spätere allgemeine .data-row-Regel (minmax/auto/auto)
  * würde das Zwei-Spalten-Raster sonst überschreiben. */
 .data-row.participants-row {
