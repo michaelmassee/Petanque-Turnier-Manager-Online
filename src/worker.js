@@ -3547,6 +3547,19 @@ export default {
         return json(await liveLinkForQr(env, registration, auth.user, url.origin, { renew: request.method === 'POST' }));
       }
 
+      // Freigabelink eines privaten Turniers für das Turnierdokument: GET nennt, ob er nötig und aktiv ist, POST aktiviert
+      // ihn – nur auf ausdrücklichen Wunsch der Turnierleitung (Abschluss mit Benachrichtigung). Kein Lease: Der Link
+      // ändert keine Turnierdaten des Dokuments.
+      const syncShareLinkMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/share-link$/);
+      if (syncShareLinkMatch && (request.method === 'GET' || request.method === 'POST')) {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncShareLinkMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        const isPrivate = tournament.visibility === 'private';
+        if (request.method === 'POST' && isPrivate) await createTournamentShareLink(env.DB, tournament.id, url.origin);
+        return json({ private: isPrivate, active: await isTournamentShareActive(env.DB, tournament) });
+      }
+
       const syncMetadataMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/metadata$/);
       if (syncMetadataMatch && request.method === 'PUT') {
         const auth = await requireApiKey(request, env.DB);
