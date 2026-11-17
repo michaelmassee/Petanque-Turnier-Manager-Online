@@ -3086,25 +3086,24 @@ a.left-panel-link {
   line-height: 1;
 }
 
+/* Raster statt Flex-Wrap: Filter werden gleich breit, die letzte Zeile wird nicht auf volle Breite gestreckt. */
 .user-toolbar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 10px;
   align-items: end;
 }
 
 .user-toolbar input[type="search"] {
-  flex: 2 1 220px;
+  grid-column: span 2;
 }
 
 .user-toolbar label {
-  flex: 1 1 170px;
   gap: 5px;
   font-size: 0.78rem;
 }
 
 .user-toolbar .button {
-  flex: 0 0 auto;
   min-height: 44px;
 }
 
@@ -3488,6 +3487,24 @@ a.left-panel-link {
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 16px;
+}
+
+/* Titel + Zähler links zusammenhalten, Aktionen rechts gebündelt. */
+.section-title-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-title-heading h2 {
+  margin: 0;
+}
+
+.section-title-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
 }
 
 .counter {
@@ -3911,14 +3928,11 @@ a.left-panel-link {
   }
 
   .user-toolbar {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 1fr;
   }
 
-  .user-toolbar input[type="search"],
-  .user-toolbar label,
-  .user-toolbar .button {
-    flex: 0 0 auto;
+  .user-toolbar input[type="search"] {
+    grid-column: auto;
   }
 
   .user-stat-grid {

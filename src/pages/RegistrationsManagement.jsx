@@ -466,11 +466,15 @@ export function RegistrationsPanel({
   return (
     <div className="panel">
       <div className="section-title">
-        <h2>{t('Anmeldungen')}</h2>
-        <span className="counter">{filtered ? `${filteredRegistrations.length}/${registrations.length}` : registrations.length}</span>
-        <Button variant="secondary" disabled={!tournament?.canManage} onClick={() => setLogOpen(true)}>{t('Protokoll')}</Button>
-        <Button variant="secondary" disabled={registrations.length === 0} onClick={() => setCsvDialogOpen(true)}>{t('CSV exportieren')}</Button>
-        <Button onClick={onCreate} disabled={!tournament}>{t('Neue Anmeldung')}</Button>
+        <div className="section-title-heading">
+          <h2>{t('Anmeldungen')}</h2>
+          <span className="counter">{filtered ? `${filteredRegistrations.length}/${registrations.length}` : registrations.length}</span>
+        </div>
+        <div className="section-title-actions">
+          <Button variant="secondary" disabled={!tournament?.canManage} onClick={() => setLogOpen(true)}>{t('Protokoll')}</Button>
+          <Button variant="secondary" disabled={registrations.length === 0} onClick={() => setCsvDialogOpen(true)}>{t('CSV exportieren')}</Button>
+          <Button onClick={onCreate} disabled={!tournament}>{t('Neue Anmeldung')}</Button>
+        </div>
       </div>
       {logOpen && tournament && <RegistrationLogDialog tournament={tournament} onClose={() => setLogOpen(false)} />}
       <EditDialog open={csvDialogOpen} title={t('CSV exportieren')} onClose={() => setCsvDialogOpen(false)}>
