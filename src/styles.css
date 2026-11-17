@@ -2650,8 +2650,48 @@ a.left-panel-link {
    auf wenige Zeichen zusammen. Mindestbreite für die Personenspalte, die Buttons brechen stattdessen um.
    Unter 921px greift die einspaltige Regel aus dem Media-Query. */
 @media (min-width: 921px) {
+  /* Status und Aktionen oben rechts neben dem Namen statt vertikal mittig in hohen Karten;
+     kompaktere Buttons, damit die Aktionen meist in eine Zeile passen. */
   .registration-list > article.data-row {
-    grid-template-columns: minmax(18rem, 1fr) auto auto;
+    grid-template-columns: minmax(18rem, 1fr) auto;
+    grid-template-areas:
+      "main status"
+      "main actions";
+    grid-template-rows: auto 1fr;
+    align-items: start;
+    row-gap: 10px;
+  }
+
+  .registration-list > article.data-row > div:first-child {
+    grid-area: main;
+  }
+
+  .registration-list > article.data-row > .status {
+    grid-area: status;
+    justify-self: end;
+  }
+
+  .registration-list > article.data-row > .row-actions {
+    grid-area: actions;
+    align-items: center;
+    max-width: 44rem;
+  }
+
+  .registration-list .row-actions .button {
+    min-height: 34px;
+    padding: 5px 12px;
+    font-size: 0.9rem;
+  }
+
+  .registration-list .vip-toggle > select {
+    min-height: 34px;
+    padding-block: 4px;
+    font-size: 0.9rem;
+  }
+
+  .registration-list .vip-toggle > .help-btn {
+    min-width: 34px;
+    min-height: 34px;
   }
 }
 

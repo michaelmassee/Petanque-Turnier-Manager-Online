@@ -23,7 +23,7 @@
     "test:ui": "vitest run",
     "test:e2e": "playwright test",
     "test:coverage": "npm run test:checks && vitest run --coverage && node scripts/coverage-gate.mjs",
-    "quality-gate": "npm run lint && npm run build && npm run test:coverage && npm run security:check && npm audit --audit-level=high"
+    "quality-gate": "npm run lint && npm run build && npm run test:coverage && npm run security:check && node scripts/audit-check.mjs"
   },
   "dependencies": {
     "@block65/webcrypto-web-push": "^2.0.0",
