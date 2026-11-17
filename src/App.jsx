@@ -46,6 +46,7 @@ const PlaceEditByTokenPage = lazy(() => import('./pages/PlaceEditByTokenPage.jsx
 const ClubModerationPanel = lazy(() => import('./pages/ClubModerationPanel.jsx'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'));
 const PlayerLivePage = lazy(() => import('./pages/PlayerLivePage.jsx'));
+const LiveQrPage = lazy(() => import('./pages/LiveQrPage.jsx'));
 const RentalsPage = lazy(() => import('./pages/RentalsPage.jsx'));
 
 // Postbox-Badge und offene Postbox fragen alle 2 Minuten nach (wie die Live-Ansicht; halbiert die Last auf dem
@@ -1595,6 +1596,9 @@ function AppContent() {
   }
 
   const liveRoute = matchLiveRoute(path);
+  if (!needsSetup && liveRoute?.qr) {
+    return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><LiveQrPage token={liveRoute.token} /></Suspense>;
+  }
   if (!needsSetup && liveRoute) {
     return <Suspense fallback={<LazyFallback label={t('Wird geladen…')} />}><PlayerLivePage route={liveRoute} language={language} setLanguage={setLanguage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} currentUser={currentUser} isAdmin={isAdmin} onSelectAdminDashboard={() => selectDrawerTab('admin-dashboard')} onLogout={handleLogout} onLogin={loginFromDrawer} drawerContent={drawerContent('live')} postboxControl={renderPostboxControl()} /></Suspense>;
   }

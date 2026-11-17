@@ -69,6 +69,8 @@ export function matchLiveRoute(path) {
   if (segments.length === 2) return { registrationId: decodeURIComponent(segments[1]) };
   // Persönlicher Live-Link aus der Anmeldebestätigung (E-21), ohne Login.
   if (segments.length === 3 && segments[1] === 't') return { token: decodeURIComponent(segments[2]) };
+  // QR-Code zum persönlichen Link, den die Turnierleitung aus dem Turnierdokument öffnet.
+  if (segments.length === 4 && segments[1] === 't' && segments[3] === 'qr') return { token: decodeURIComponent(segments[2]), qr: true };
   return null;
 }
 

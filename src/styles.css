@@ -2151,6 +2151,31 @@ a.left-panel-link {
   overflow-wrap: anywhere;
 }
 
+/* QR-Seite für die Turnierleitung (/live/t/<token>/qr): großformatig zum Vorzeigen oder Ausdrucken. */
+.live-qr-page .live-qr {
+  max-width: 480px;
+  margin: 24px auto;
+}
+
+.live-qr-page .live-qr h1 {
+  margin: 0;
+}
+
+.live-qr-page .live-qr-code {
+  width: min(360px, 100%);
+}
+
+.live-qr-page-tournament {
+  margin: 0;
+  color: #53627a;
+}
+
+@media print {
+  .live-qr-page-actions {
+    display: none !important;
+  }
+}
+
 /* Cluster der Karten (Bouleplätze, Spielerbörse): Kreis mit Anzahl der zusammengefassten Einträge. */
 .leaflet-marker-icon.place-cluster-icon {
   display: flex;

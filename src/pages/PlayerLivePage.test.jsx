@@ -903,6 +903,8 @@ describe('Live-Routen', () => {
     expect(matchLiveRoute('/live')).toEqual({});
     expect(matchLiveRoute('/live/r1')).toEqual({ registrationId: 'r1' });
     expect(matchLiveRoute('/live/t/abc')).toEqual({ token: 'abc' });
+    expect(matchLiveRoute('/live/t/abc/qr')).toEqual({ token: 'abc', qr: true });
+    expect(matchLiveRoute('/live/t/abc/x')).toBeNull();
     expect(matchLiveRoute('/live/t')).toEqual({ registrationId: 't' });
     expect(matchLiveRoute('/live/a/b/c')).toBeNull();
     expect(matchLiveRoute('/turniere')).toBeNull();

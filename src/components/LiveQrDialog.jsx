@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
-import { DEFAULT_QR_DESIGN } from '../lib/qr-design.js';
-import { loadQrLogo, toQrOptions } from '../lib/qr-style.js';
+import { LiveQrCode } from './LiveQrCode.jsx';
 import { Button, EditDialog, Feedback, ShareLinkButton } from './ui.jsx';
-
-const QR_PREVIEW_SIZE = 260;
 
 // QR-Code zum persönlichen Live-Link einer Meldung: Die Turnierleitung zeigt ihn am Turniertag vor (z. B. für Teams ohne
 // E-Mail-Adresse). Der Server liefert den bestehenden Link; nur wenn der alte Link nicht wiederherstellbar ist, kann hier
@@ -17,7 +14,6 @@ export function LiveQrDialog({ registration, onClose }) {
   const [notRecoverable, setNotRecoverable] = useState(false);
   const [loading, setLoading] = useState(false);
   const [renewing, setRenewing] = useState(false);
-  const qrRef = useRef(null);
   const registrationId = registration?.id;
   // Der Dialog bleibt gemountet; eine verspätete Antwort für eine vorher geöffnete Meldung darf nicht in die nächste.
   const currentIdRef = useRef(registrationId);
@@ -37,25 +33,6 @@ export function LiveQrDialog({ registration, onClose }) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [registrationId]);
-
-  useEffect(() => {
-    const container = qrRef.current;
-    if (!url || !container) return undefined;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { default: QRCodeStyling } = await import('qr-code-styling');
-        const logoUrl = await loadQrLogo(DEFAULT_QR_DESIGN);
-        if (cancelled) return;
-        container.replaceChildren();
-        new QRCodeStyling(toQrOptions(DEFAULT_QR_DESIGN, url, { type: 'svg', size: QR_PREVIEW_SIZE, logoUrl })).append(container);
-      } catch (qrError) {
-        console.error('Live QR failed', qrError);
-        if (!cancelled) setError(t('QR-Code konnte nicht erzeugt werden'));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [url, t]);
 
   async function renew() {
     const id = registrationId;
@@ -89,7 +66,7 @@ export function LiveQrDialog({ registration, onClose }) {
         {url && (
           <>
             <p className="hint">{t('Mit dem Handy scannen: öffnet die Live-Ansicht dieses Teams (Runde, Gegner, Bahn), ohne Anmeldung.')}</p>
-            <div className="live-qr-code" ref={qrRef} role="img" aria-label={t('QR-Code Live-Ansicht')} />
+            <LiveQrCode url={url} onError={setError} />
             <p className="live-qr-url" data-i18n-skip>{url}</p>
             <div className="dialog-actions">
               <ShareLinkButton url={url} linkOnly />

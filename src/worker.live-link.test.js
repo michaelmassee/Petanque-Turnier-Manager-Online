@@ -343,3 +343,85 @@ describe('QR-Code Live-Ansicht in der Anmeldeverwaltung', () => {
     expect((await senden(JSON.stringify({ renew: true }))).status).toBe(200);
   });
 });
+
+describe('QR-Code Live-Ansicht über die Sync-API (Turnierdokument)', () => {
+  let env;
+  const sql = (statement, ...params) => env.DB.sqlite.prepare(statement).run(...params);
+  const zeile = (statement, ...params) => env.DB.sqlite.prepare(statement).get(...params);
+  const liveAbrufen = (token) => worker.fetch(new Request(`https://ptm.test/api/live/token/${token}`), env);
+  const LEITUNG = 'zugang-der-turnierleitung-mit-laenge';
+  const SPIELER = 'zugang-eines-spielers-mit-ausreichender-laenge';
+  const KEY = btoa(String.fromCharCode(...new Uint8Array(32).map((_, index) => index + 1)));
+  const tokenAus = (url) => url.match(/\/live\/t\/([0-9a-f]{64})$/)?.[1];
+  const abrufen = (secret, { method = 'GET', turnier = 't1', meldung = ONLINE_ID } = {}) => worker.fetch(new Request(
+    `https://ptm.test/api/sync/tournaments/${turnier}/registrations/${meldung}/live-link`,
+    { method, headers: secret ? { Authorization: `Bearer ${secret}` } : {} },
+  ), env);
+
+  beforeEach(async () => {
+    env = { DB: d1MitSchema(), MAIL_QUEUE: { send: vi.fn() }, LIVE_LINK_KEY: KEY };
+    sql(`INSERT INTO users (id, email, role, password_salt, password_hash, created_at, updated_at, mail_enabled)
+      VALUES ('u1', 'leitung@example.test', 'user', 'salt', 'hash', '2026-09-01', '2026-09-01', 1),
+             ('player', 'spieler@example.test', 'user', 'salt', 'hash', '2026-09-01', '2026-09-01', 0)`);
+    const zugang = async (user, secret) => sql(`INSERT INTO api_keys (id, user_id, key_hash, label, status, requested_at,
+        approved_at, created_at, updated_at)
+      VALUES (?, ?, ?, 'PTM', 'approved', '2026-01-01', '2026-01-01', '2026-01-01', '2026-01-01')`,
+    `key-${user}`, user, await sha256Hex(secret));
+    await zugang('u1', LEITUNG);
+    await zugang('player', SPIELER);
+    sql(`INSERT INTO tournaments (id, owner_id, name, date, location, formation, status, visibility, created_at, updated_at,
+        live_view_enabled)
+      VALUES ('t1', 'u1', 'Turnier', '2099-09-28', 'Ort', 'tete', 'registration', 'public', '2026-09-01', '2026-09-01', 1),
+             ('t2', 'u1', 'Anderes', '2099-09-28', 'Ort', 'tete', 'registration', 'public', '2026-09-01', '2026-09-01', 1)`);
+    sql(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email, status, participation,
+        registered_at, created_at, updated_at, execution_revision, player_email)
+      VALUES (?, 't1', 'Maria', 'Bieder', '', 'confirmed', 'inactive', '2026-09-01', '2026-09-01', '2026-09-01', 1, NULL)`, ONLINE_ID);
+  });
+
+  it('liefert der Turnierleitung den persönlichen Link, immer denselben', async () => {
+    const antwort = await abrufen(LEITUNG);
+    expect(antwort.status).toBe(200);
+    const { url } = await antwort.json();
+    const token = tokenAus(url);
+    expect(token).toBeTruthy();
+    expect(await (await abrufen(LEITUNG)).json()).toEqual({ url });
+    expect((await liveAbrufen(token)).status).toBe(200);
+    expect(zeile("SELECT details_json FROM audit_log WHERE action = 'live_link_issued'").details_json).toContain('qr');
+  });
+
+  it('nur mit API-Schlüssel der Turnierleitung', async () => {
+    expect((await abrufen()).status).toBe(401);
+    expect((await abrufen(SPIELER)).status).toBe(403);
+  });
+
+  it('nur für Meldungen dieses Turniers', async () => {
+    expect((await abrufen(LEITUNG, { turnier: 't2' })).status).toBe(404);
+    expect((await abrufen(LEITUNG, { meldung: 'unbekannt' })).status).toBe(404);
+  });
+
+  it('nennt den Grund, wenn es keinen Link gibt', async () => {
+    sql("UPDATE tournaments SET live_view_enabled = 0 WHERE id = 't1'");
+    const ohneFreischaltung = await abrufen(LEITUNG);
+    expect(ohneFreischaltung.status).toBe(409);
+    expect((await ohneFreischaltung.json()).details).toEqual({ code: 'live_view_disabled' });
+
+    sql("UPDATE tournaments SET live_view_enabled = 1 WHERE id = 't1'");
+    sql("UPDATE registrations SET status = 'pending' WHERE id = ?", ONLINE_ID);
+    const unbestaetigt = await abrufen(LEITUNG);
+    expect(unbestaetigt.status).toBe(409);
+    expect((await unbestaetigt.json()).details).toEqual({ code: 'registration_not_confirmed' });
+  });
+
+  it('ersetzt per POST einen nicht wiederherstellbaren Link', async () => {
+    sql("UPDATE registrations SET live_token_hash = 'alt' WHERE id = ?", ONLINE_ID);
+    const alt = await abrufen(LEITUNG);
+    expect(alt.status).toBe(409);
+    expect((await alt.json()).details).toEqual({ code: 'live_link_not_recoverable' });
+
+    const neu = await abrufen(LEITUNG, { method: 'POST' });
+    expect(neu.status).toBe(200);
+    const { url } = await neu.json();
+    expect(await (await abrufen(LEITUNG)).json()).toEqual({ url });
+    expect(zeile("SELECT action FROM audit_log WHERE action = 'live_link_reissued'")).toBeTruthy();
+  });
+});

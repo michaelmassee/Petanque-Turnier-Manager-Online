@@ -1600,8 +1600,12 @@ async function currentLiveToken(env, registration, { renewIfUnrecoverable = fals
  */
 export async function liveLinkForQr(env, registration, user, appOrigin, { renew = false } = {}) {
   const tournament = await getTournamentById(env.DB, registration.tournament_id);
-  if (!Number(tournament?.live_view_enabled || 0)) throw new HttpError(409, 'Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet');
-  if (registration.status !== 'confirmed') throw new HttpError(409, 'Einen Live-Link gibt es nur für bestätigte Anmeldungen');
+  if (!Number(tournament?.live_view_enabled || 0)) {
+    throw new HttpError(409, 'Die Live-Ansicht ist für dieses Turnier nicht freigeschaltet', { code: 'live_view_disabled' });
+  }
+  if (registration.status !== 'confirmed') {
+    throw new HttpError(409, 'Einen Live-Link gibt es nur für bestätigte Anmeldungen', { code: 'registration_not_confirmed' });
+  }
   const { token, created, replaced } = await currentLiveToken(env, registration, { renewIfUnrecoverable: renew });
   const url = buildLiveLink(appOrigin, token);
   if (!created && !replaced) return { url };
@@ -3529,6 +3533,18 @@ export default {
         const tournament = await getSyncTournament(env.DB, syncDisplayLinkMatch[1]);
         assertCanManageTournament(tournament, auth.user);
         return json({ displayToken: await ensureTournamentDisplayToken(env.DB, tournament.id) });
+      }
+
+      // QR-Code Live-Ansicht einer Meldung für die Turnierleitung im Turnierdokument: GET liefert den bestehenden
+      // persönlichen Link, POST ersetzt einen nicht wiederherstellbaren. Kein Lease: Der Link ändert keine Turnierdaten.
+      const syncLiveLinkMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registrations\/([^/]+)\/live-link$/);
+      if (syncLiveLinkMatch && (request.method === 'GET' || request.method === 'POST')) {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncLiveLinkMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        const registration = await getRegistrationWithTournament(env.DB, decodeURIComponent(syncLiveLinkMatch[2]));
+        if (!registration || registration.tournament_id !== tournament.id) throw new HttpError(404, 'Anmeldung nicht gefunden');
+        return json(await liveLinkForQr(env, registration, auth.user, url.origin, { renew: request.method === 'POST' }));
       }
 
       const syncMetadataMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/metadata$/);
