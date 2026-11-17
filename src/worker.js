@@ -9701,6 +9701,57 @@ export async function finishTournamentFromSync(request, env, existing, user, ori
  *          -> { entryCount }
  * registrationId ist jeweils die Online-ID der Meldung (siehe PtmOnlineRegistrationMapping).
  */
+// Alle Spalten, die ein Rundenauftrag festlegt: übertragene Werte und Spalten, die bei Desktop-Durchführung auf ihrem
+// Standardwert stehen (früher durch Löschen und Neuanlegen der Partie zurückgesetzt).
+const SYNC_ROUND_MATCH_COLUMNS = `id, created_at, team_a_registration_ids, team_b_registration_ids, team_a_number, team_b_number,
+  score_a, score_b, match_index, stage_label, court, no_show, team_a_id, team_b_id, result_reported_by, result_report_pending`;
+
+function syncRoundMatchRow(match) {
+  return {
+    team_a_registration_ids: JSON.stringify(match.teamA), team_b_registration_ids: JSON.stringify(match.teamB),
+    team_a_number: match.teamANumber, team_b_number: match.teamBNumber, score_a: match.scoreA, score_b: match.scoreB,
+    match_index: match.matchIndex, stage_label: match.stageLabel, court: match.court,
+    no_show: null, team_a_id: null, team_b_id: null, result_reported_by: null, result_report_pending: 0,
+  };
+}
+
+/**
+ * Gleicht die Partien einer vorhandenen Runde mit dem Dokumentstand ab, statt sie komplett zu löschen und neu
+ * anzulegen: Jede neu angelegte oder gelöschte Partie kostet in D1 vier geschriebene Zeilen (Zeile, Primärschlüssel,
+ * zwei Indizes), ein geändertes Ergebnis per UPDATE nur eine. Bei einer Ergebniseingabe ändert sich meist nur eine
+ * Partie der Runde. Zuordnung über die Partie-Nummer; unveränderte Partien werden nicht angefasst.
+ */
+function syncRoundMatchStatements(db, tournamentId, roundId, stored, matches, now) {
+  const byIndex = new Map();
+  for (const row of stored) {
+    if (!byIndex.has(row.match_index)) byIndex.set(row.match_index, []);
+    byIndex.get(row.match_index).push(row);
+  }
+  // Neue Partien sortieren sich (ORDER BY created_at, match_index) zu den vorhandenen der Runde.
+  const createdAt = stored.reduce((earliest, row) => (row.created_at < earliest ? row.created_at : earliest), now);
+  const statements = [];
+  for (const match of matches) {
+    const row = syncRoundMatchRow(match);
+    const current = byIndex.get(match.matchIndex)?.shift();
+    const columns = Object.keys(row);
+    if (!current) {
+      statements.push(db.prepare(`INSERT INTO tournament_matches (id, tournament_id, round_id, ${columns.join(', ')}, created_at, updated_at)
+          VALUES (${['?', '?', '?', ...columns.map(() => '?'), '?', '?'].join(', ')})`)
+        .bind(crypto.randomUUID(), tournamentId, roundId, ...columns.map((column) => row[column]), createdAt, now));
+    } else if (columns.some((column) => (current[column] ?? null) !== row[column])) {
+      statements.push(db.prepare(`UPDATE tournament_matches SET ${columns.map((column) => `${column} = ?`).join(', ')}, updated_at = ?
+          WHERE id = ? AND round_id = ?`)
+        .bind(...columns.map((column) => row[column]), now, current.id, roundId));
+    }
+  }
+  const removed = [...byIndex.values()].flat().map((row) => row.id);
+  if (removed.length) {
+    statements.push(db.prepare('DELETE FROM tournament_matches WHERE round_id = ? AND id IN (SELECT value FROM json_each(?))')
+      .bind(roundId, JSON.stringify(removed)));
+  }
+  return statements;
+}
+
 async function syncPutRound(request, db, tournament, roundNumberValue) {
   assertDesktopExecution(tournament);
   const roundNumber = parseSyncRoundNumber(roundNumberValue);
@@ -9710,18 +9761,14 @@ async function syncPutRound(request, db, tournament, roundNumberValue) {
   const roundId = existing?.id || crypto.randomUUID();
   const now = new Date().toISOString();
   const statements = [];
-  if (existing) {
-    statements.push(db.prepare('DELETE FROM tournament_matches WHERE round_id = ?').bind(roundId));
-  } else {
+  const stored = existing
+    ? (await db.prepare(`SELECT ${SYNC_ROUND_MATCH_COLUMNS} FROM tournament_matches WHERE round_id = ?
+        ORDER BY match_index ASC, created_at ASC, id ASC`).bind(roundId).all()).results || []
+    : [];
+  if (!existing) {
     statements.push(db.prepare('INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES (?, ?, ?, ?)').bind(roundId, tournament.id, roundNumber, now));
   }
-  for (const match of matches) {
-    statements.push(db.prepare(`INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids,
-        team_a_number, team_b_number, score_a, score_b, match_index, stage_label, court, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), tournament.id, roundId, JSON.stringify(match.teamA), JSON.stringify(match.teamB),
-        match.teamANumber, match.teamBNumber, match.scoreA, match.scoreB, match.matchIndex, match.stageLabel, match.court, now, now));
-  }
+  statements.push(...syncRoundMatchStatements(db, tournament.id, roundId, stored, matches, now));
   statements.push(...supersedeResultReportStatements(db, tournament.id, roundNumber, matches, now));
   return {
     statements,
