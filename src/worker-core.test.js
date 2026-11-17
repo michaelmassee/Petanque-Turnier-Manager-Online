@@ -54,6 +54,9 @@ describe('Worker-Fachlogik', () => {
       .toMatchObject({ liveViewEnabled: true, playerResultReportingEnabled: true });
     // Ohne freigeschaltete Live-Ansicht gibt es keine Ergebnismeldung durch Spieler.
     expect(normalizeTournamentInput({ ...base, playerResultReportingEnabled: true })).toMatchObject({ playerResultReportingEnabled: false });
+    // Trip-Tête: eine Begegnung aus drei Partien lässt sich nicht mit einem Ergebnis melden.
+    expect(normalizeTournamentInput({ ...base, type: 'trip_tete', formation: 'triplette', liveViewEnabled: true,
+      playerResultReportingEnabled: true })).toMatchObject({ liveViewEnabled: true, playerResultReportingEnabled: false });
   });
 
   it('übernimmt die beim Anlegen aktivierte Anmeldeprüfung', () => {

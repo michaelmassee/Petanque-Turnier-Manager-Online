@@ -63,6 +63,7 @@ import {
 } from './worker-core.js';
 import { normalizeRanking } from './lib/live-ranking.js';
 import { parseStoredQrDesign } from './lib/qr-design.js';
+import { playerResultReportingActive } from './lib/result-reporting.js';
 import { fetchCloudflareUsageDay, fetchCloudflareUsageDays, isCloudflareUsageConfigured } from './cloudflare-usage-core.js';
 import { checkRoundRequirements, getPairingStrategy, isMeleeTeamTournament, isOnlinePlayable, roundRequirementMessage } from './lib/pairing/index.js';
 import { buildMeleeTeams, buildMeleeTeamsWithoutBye, duplicateMeleeNames, isMixedMeleeMode, meleeTeamSize, usablePlayersWithoutBye } from './lib/pairing/melee.js';
@@ -5661,12 +5662,12 @@ async function respondSyncEnvelope(db, tournamentId, envelope, context, headers 
  * schreibt (E-27, E-28), und zeigt einen online geänderten Status (z. B. Entwurf → Anmeldung) ohne eigenen Abruf an.
  */
 async function syncPiggybackHeaders(db, tournamentId) {
-  const row = await db.prepare(`SELECT t.player_result_reporting_enabled AS enabled, t.status AS status,
+  const row = await db.prepare(`SELECT t.player_result_reporting_enabled, t.type, t.status AS status,
       (SELECT COUNT(*) FROM document_result_reports d WHERE d.tournament_id = t.id AND d.status = 'open') AS open
       FROM tournaments t WHERE t.id = ?`).bind(tournamentId).first();
   if (!row) return {};
   return {
-    'X-PTM-Result-Reporting': Number(row.enabled || 0) === 1 ? '1' : '0',
+    'X-PTM-Result-Reporting': playerResultReportingActive(row) ? '1' : '0',
     'X-PTM-Open-Result-Reports': String(Number(row.open || 0)),
     ...(row.status ? { 'X-PTM-Tournament-Status': String(row.status) } : {}),
   };
@@ -8702,7 +8703,7 @@ function assertWinnerReports(ownScore, opponentScore) {
 async function reportLiveMatchResult(request, env, registration, reporterUserId) {
   const db = env.DB;
   const tournament = await getTournamentById(db, registration.tournament_id);
-  if (!tournament || !Number(tournament.live_view_enabled || 0) || !Number(tournament.player_result_reporting_enabled || 0)) {
+  if (!tournament || !Number(tournament.live_view_enabled || 0) || !playerResultReportingActive(tournament)) {
     throw new HttpError(403, 'Die Turnierleitung hat keine Ergebnismeldungen durch Spieler freigegeben');
   }
   if (tournament.status !== 'running') throw new HttpError(409, 'Das Turnier läuft nicht');
@@ -8801,7 +8802,7 @@ function assertDocumentReportingPossible(tournament) {
  * offen (wartet auf die Turnierleitung) oder verworfen. Ohne Meldung oder ohne Ergebnismeldung {@code null}.
  */
 export async function currentDocumentResultReport(db, tournament, registrationId) {
-  if (!tournament.sync_document_id || Number(tournament.player_result_reporting_enabled || 0) !== 1) return null;
+  if (!tournament.sync_document_id || !playerResultReportingActive(tournament)) return null;
   const row = await db.prepare(`SELECT score_a, score_b, status,
       EXISTS (SELECT 1 FROM json_each(team_a_registration_ids) j WHERE j.value = ?) AS in_a
       FROM document_result_reports
@@ -8833,7 +8834,7 @@ export function pendingOwnResultReport(pendingReports, registrationId) {
 
 /** Offene Meldungen für das verbundene Dokument; leer, solange Spieler keine Ergebnisse melden dürfen. */
 export async function syncGetResultReports(db, tournament) {
-  const enabled = Number(tournament.player_result_reporting_enabled || 0) === 1;
+  const enabled = playerResultReportingActive(tournament);
   if (!enabled) return json({ enabled, status: tournament.status, reports: [] });
   const result = await db.prepare(`SELECT d.id, d.round_number, d.team_a_registration_ids, d.team_b_registration_ids,
       d.score_a, d.score_b, d.created_at, r.team_name, r.first_name, r.last_name, r.partner_first_name, r.partner_last_name,
@@ -9183,7 +9184,7 @@ function toLiveTournament(tournament) {
     desktopExecution: Number(tournament.desktop_execution || 0) === 1,
     documentBound: isDocumentBound(tournament),
     liveViewEnabled: Number(tournament.live_view_enabled || 0) === 1,
-    playerResultReportingEnabled: Number(tournament.player_result_reporting_enabled || 0) === 1,
+    playerResultReportingEnabled: playerResultReportingActive(tournament),
     // Meldungen aus der Live-Ansicht gehen an das verbundene Dokument und warten dort auf die Turnierleitung.
     resultReportingViaDocument: Boolean(tournament.sync_document_id),
     // Turnierseite (ganze Runde) für jeden ohne Schlüssel offen; den Anzeige-Schlüssel teilt nur die Turnierleitung.
@@ -11021,7 +11022,7 @@ async function syncTournamentState(db, tournament) {
     runningResetAt: tournament.running_reset_at || null,
     roundsOnline: Number(rounds?.count || 0),
     writeCounter: Number(tournament.sync_write_counter || 0),
-    playerResultReportingEnabled: Number(tournament.player_result_reporting_enabled || 0) === 1,
+    playerResultReportingEnabled: playerResultReportingActive(tournament),
   };
 }
 
@@ -14723,7 +14724,7 @@ export function toPublicTournament(row, user) {
     approvalRequired: Boolean(Number(row.approval_required || 0)),
     registrationClosed: Boolean(Number(row.registration_closed || 0)),
     liveViewEnabled: Boolean(Number(row.live_view_enabled || 0)),
-    playerResultReportingEnabled: Boolean(Number(row.player_result_reporting_enabled || 0)),
+    playerResultReportingEnabled: playerResultReportingActive(row),
     registrationClosesAt: row.date ? registrationClosesAtUtcIso(row) : null,
     runningResetAt: row.running_reset_at || null,
     // Veröffentlichte Endrangliste (Snapshot) gilt nur, solange das Turnier abgeschlossen ist.

@@ -1589,6 +1589,7 @@
   "E-Mail an die Turnierleitung": "Email the tournament organizers",
   "Live-Ansicht freischalten": "Enable live view",
   "Ergebnismeldungen durch Spieler sind nur mit freigeschalteter Live-Ansicht möglich.": "Players can only report results when the live view is enabled.",
+  "Bei Trip-Tête melden Spieler keine Ergebnisse: Eine Begegnung besteht aus drei Partien, die die Turnierleitung einträgt.": "With Trip-Tête, players do not report results: a match consists of three games, which the tournament management enters.",
   "Live-Ansicht nicht aktiviert": "Live view not enabled",
   "Die Turnierleitung hat die Live-Ansicht für dieses Turnier nicht freigeschaltet. Paarungen, Ergebnisse und Rangliste erscheinen hier erst nach der Freischaltung.": "The tournament organizers have not enabled the live view for this tournament. Pairings, results and standings will appear here once it is enabled.",
   "Die Live-Ansicht wurde für dieses Turnier nicht freigeschaltet": "The live view has not been enabled for this tournament",

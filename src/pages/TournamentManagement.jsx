@@ -14,6 +14,7 @@ import { formatUserLabel, formatUserName } from '../lib/userLabel.js';
 import { useClubSuggestions } from '../components/ClubSuggestions.jsx';
 import { InfiniteListLoadMore, useInfiniteList } from '../components/InfiniteListLoadMore.jsx';
 import { isOnlinePlayable } from '../lib/pairing/index.js';
+import { supportsPlayerResultReporting } from '../lib/result-reporting.js';
 import { NotOnlinePlayableNotice } from '../components/NotOnlinePlayableNotice.jsx';
 import { TournamentQrDialog } from '../components/TournamentQrDialog.jsx';
 import { TournamentFlyerDialog } from '../components/TournamentFlyerDialog.jsx';
@@ -665,13 +666,14 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           <label className="checkbox-field">
             <input
               type="checkbox"
-              checked={Boolean(form.liveViewEnabled && form.playerResultReportingEnabled)}
-              disabled={!form.liveViewEnabled}
+              checked={Boolean(form.liveViewEnabled && form.playerResultReportingEnabled && supportsPlayerResultReporting(form.type))}
+              disabled={!form.liveViewEnabled || !supportsPlayerResultReporting(form.type)}
               onChange={(event) => setForm({ ...form, playerResultReportingEnabled: event.target.checked })}
             />
             {t('Spieler dürfen Ergebnisse ihrer laufenden Partie in der Live-Ansicht melden')}
           </label>
           {!form.liveViewEnabled && <p className="hint">{t('Ergebnismeldungen durch Spieler sind nur mit freigeschalteter Live-Ansicht möglich.')}</p>}
+          {form.liveViewEnabled && !supportsPlayerResultReporting(form.type) && <p className="hint">{t('Bei Trip-Tête melden Spieler keine Ergebnisse: Eine Begegnung besteht aus drei Partien, die die Turnierleitung einträgt.')}</p>}
         </>
       )}
       <TextField label={t('Website')} type="url" placeholder="https://…" value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} invalid={invalidField === 'websiteUrl'} />

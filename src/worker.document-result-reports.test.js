@@ -112,6 +112,17 @@ describe('Ergebnismeldung bei verbundenem Turnierdokument', () => {
     expect(meldungen()).toEqual([]);
   });
 
+  // Eine Trip-Tête-Begegnung besteht aus drei Partien; eine Meldung mit einem Ergebnis ließe sich nicht übernehmen.
+  it('nimmt bei Trip-Tête keine Meldung an, auch wenn die Ergebnismeldung gespeichert eingeschaltet ist', async () => {
+    sql("UPDATE tournaments SET type = 'trip_tete', formation = 'triplette' WHERE id = 't1'");
+
+    expect((await melden('anna-session', ANNA, 13, 7)).status).toBe(403);
+    expect(meldungen()).toEqual([]);
+    expect((await live('anna-session', ANNA)).tournament.playerResultReportingEnabled).toBe(false);
+    expect(await (await sync('GET', '/result-reports')).json()).toEqual({ enabled: false, status: 'running', reports: [] });
+    expect((await sync('PUT', '/rounds/1', rundeMit(null, null))).headers.get('X-PTM-Result-Reporting')).toBe('0');
+  });
+
   it('zeigt beiden Teams die offene Meldung aus der eigenen Sicht', async () => {
     await melden('bert-session', BERT, 13, 7);
 

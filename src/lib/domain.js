@@ -3,6 +3,7 @@ import { formatTournamentDateTime, timezoneAbbrev, detectViewerTimeZone, amountT
 import i18next from './i18next-config.js';
 import { formatLocationAddress } from '../location-format.js';
 import { normalizeVipLevel, VIP_NONE } from './vip.js';
+import { supportsPlayerResultReporting } from './result-reporting.js';
 export { formatLocationAddress };
 
 export function authTitle(needsSetup, authView) {
@@ -193,7 +194,8 @@ export function tournamentPayload(form) {
     internalNotes: form.internalNotes || null,
     participantsPublic: Boolean(form.participantsPublic),
     liveViewEnabled: Boolean(form.liveViewEnabled),
-    playerResultReportingEnabled: Boolean(form.liveViewEnabled) && Boolean(form.playerResultReportingEnabled),
+    playerResultReportingEnabled: Boolean(form.liveViewEnabled) && Boolean(form.playerResultReportingEnabled)
+      && supportsPlayerResultReporting(form.type),
     licenseRequired: Boolean(form.licenseRequired),
     teamNameEnabled: Boolean(form.teamNameEnabled),
     waitlistEnabled: Boolean(form.waitlistEnabled),
