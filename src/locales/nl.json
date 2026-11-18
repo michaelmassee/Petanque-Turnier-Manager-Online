@@ -2139,5 +2139,12 @@
   "Anmeldeformular": "Inschrijfformulier",
   "Turnierdokument (PTM)": "Toernooidocument (PTM)",
   "Automatisch": "Automatisch",
-  "Drucken": "Afdrukken"
+  "Drucken": "Afdrukken",
+  "Feld": "Veld",
+  "Sieger": "Winnaar",
+  "Sieger der KO-Runden": "Winnaars van de knock-outrondes",
+  "Vorrunde": "Voorronde",
+  "KO-Sieger müssen als Array übergeben werden": "Knock-outwinnaars moeten als lijst worden doorgegeven",
+  "Ungültiges KO-Feld": "Ongeldig knock-outveld",
+  "Ungültige Meldung bei den KO-Siegern": "Ongeldige inschrijving bij de knock-outwinnaars"
 }

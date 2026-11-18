@@ -2216,5 +2216,12 @@
   "Anmeldeformular": "Modulo di iscrizione",
   "Turnierdokument (PTM)": "Documento del torneo (PTM)",
   "Automatisch": "Automatico",
-  "Drucken": "Stampa"
+  "Drucken": "Stampa",
+  "Feld": "Tabellone",
+  "Sieger": "Vincitore",
+  "Sieger der KO-Runden": "Vincitori dei turni a eliminazione",
+  "Vorrunde": "Turno preliminare",
+  "KO-Sieger müssen als Array übergeben werden": "I vincitori dei turni a eliminazione devono essere inviati come elenco",
+  "Ungültiges KO-Feld": "Tabellone a eliminazione non valido",
+  "Ungültige Meldung bei den KO-Siegern": "Iscrizione non valida tra i vincitori dei turni a eliminazione"
 }

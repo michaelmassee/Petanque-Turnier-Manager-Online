@@ -596,6 +596,28 @@ export function parseSyncRanking(body, validRegistrationIds) {
   });
 }
 
+const MAX_SYNC_KO_WINNERS = 16;
+const MAX_KO_WINNER_LABEL_LENGTH = 60;
+
+/**
+ * Sieger der KO-Felder aus dem Turnierdokument (Maastrichter-Finalrunden), zweiter Teil der Endrangliste neben der
+ * Vorrunden-Rangliste. Optional: Fehlt das Feld, gibt es keine KO-Sieger.
+ */
+export function parseSyncKoWinners(body, validRegistrationIds) {
+  const winners = body?.koWinners;
+  if (winners === undefined || winners === null) return [];
+  if (!Array.isArray(winners) || winners.length > MAX_SYNC_KO_WINNERS) {
+    throw new HttpError(400, 'KO-Sieger müssen als Array übergeben werden');
+  }
+  return winners.map((winner) => {
+    const label = text(winner?.label);
+    if (!label || label.length > MAX_KO_WINNER_LABEL_LENGTH) throw new HttpError(400, 'Ungültiges KO-Feld');
+    const registrationIds = syncRegistrationIds(winner?.registrationIds, validRegistrationIds, 'Ungültige Meldung bei den KO-Siegern');
+    if (registrationIds.length === 0) throw new HttpError(400, 'Ungültige Meldung bei den KO-Siegern');
+    return { label, registrationIds };
+  });
+}
+
 const liveMemberLabel = (member) => [member.firstName, member.lastName].filter(Boolean).join(' ') || member.teamLabel || '?';
 const liveTeamLabel = (members) => members.map((member) => member.teamLabel || liveMemberLabel(member)).join(' + ');
 // Team-Anzeige der Spielrunde (Turnieroption, fertige Bezeichnung teamALabel/teamBLabel der Runde) auch in der

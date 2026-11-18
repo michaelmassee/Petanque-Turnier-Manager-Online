@@ -2139,5 +2139,12 @@
   "Anmeldeformular": "Formulaire d’inscription",
   "Turnierdokument (PTM)": "Document du tournoi (PTM)",
   "Automatisch": "Automatique",
-  "Drucken": "Imprimer"
+  "Drucken": "Imprimer",
+  "Feld": "Tableau",
+  "Sieger": "Vainqueur",
+  "Sieger der KO-Runden": "Vainqueurs des phases finales",
+  "Vorrunde": "Phase de poules",
+  "KO-Sieger müssen als Array übergeben werden": "Les vainqueurs des phases finales doivent être transmis sous forme de liste",
+  "Ungültiges KO-Feld": "Tableau final non valide",
+  "Ungültige Meldung bei den KO-Siegern": "Inscription non valide parmi les vainqueurs des phases finales"
 }

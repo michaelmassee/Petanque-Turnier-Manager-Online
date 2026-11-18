@@ -4,7 +4,8 @@ import { api } from '../lib/api.js';
 import { DISPLAY_FIT_QUERY, useAutoScroll, useMediaQuery } from '../lib/hooks.js';
 import { formatLocationAddress, tournamentImageUrl } from '../lib/domain.js';
 import { formatDate, formatTournamentDateTime } from '../lib/format.js';
-import { normalizeRanking } from '../lib/live-ranking.js';
+import { normalizeKoWinners, normalizeRanking } from '../lib/live-ranking.js';
+import { RankingWithKoWinners } from './KoWinnersTable.jsx';
 import { RankingTable } from './RankingTable.jsx';
 import { Button, Feedback } from './ui.jsx';
 
@@ -66,6 +67,7 @@ export function FinalRankingView({ tournament, language, shareToken = '', displa
   }, [tournament.id, tournament.rankingPublishedAt, shareToken]);
 
   const entries = normalizeRanking(data?.ranking || []);
+  const koWinners = normalizeKoWinners(data?.koWinners);
 
   async function handleDownload() {
     setBusy(true);
@@ -96,9 +98,11 @@ export function FinalRankingView({ tournament, language, shareToken = '', displa
         <img className="final-ranking-logo" src={PTM_LOGO_URL} alt={PTM_NAME} />
       </header>
       <div className="display-scroll" ref={scrollRef}>
-        <div className="table-scroll">
-          <RankingTable tournament={tournament} entries={entries} />
-        </div>
+        <RankingWithKoWinners winners={koWinners}>
+          <div className="table-scroll">
+            <RankingTable tournament={tournament} entries={entries} />
+          </div>
+        </RankingWithKoWinners>
       </div>
       {data.publishedAt && (
         <p className="muted">{t('Veröffentlicht am')} {formatTournamentDateTime(data.publishedAt, language, tournament.timezone)}</p>

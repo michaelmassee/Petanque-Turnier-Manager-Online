@@ -6315,3 +6315,13 @@ button.rental-slot:focus-visible { outline: 3px solid rgb(22 119 255 / 45%); out
   border-bottom: 1px solid #e2e7f0;
   overflow-wrap: anywhere;
 }
+
+/* Zweigeteilte Endrangliste (Maastrichter): Sieger der KO-Runden, dann die Vorrunde. */
+.ranking-part-title {
+  margin: 16px 0 6px;
+  font-size: 1.05em;
+}
+
+.ko-winners-table {
+  margin-bottom: 8px;
+}

@@ -21,6 +21,7 @@ import { RoundTable } from '../components/RoundTable.jsx';
 import { currentRoundView } from '../lib/current-round.js';
 import { TournamentQrPanel } from '../components/TournamentQrPanel.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
+import { RankingWithKoWinners } from '../components/KoWinnersTable.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
 
 export function TournamentInfo({ tournament, language, onShare, showTitle = true, shareToken = '', onNavigate, currentUser = null }) {
@@ -616,6 +617,7 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
   }
   const rounds = query.data?.rounds || [];
   const ranking = query.data?.ranking || [];
+  const koWinners = query.data?.koWinners || [];
   const dataAsOf = query.data?.dataAsOf || null;
   // Mit verbundenem WebSocket kommt jede Änderung sofort (auch nach der Abfrage-Pause); die Uhrzeit des letzten Abrufs
   // sähe dann nur veraltet aus. Ohne Verbindung wie bisher Stand und Countdown bis zum nächsten Abruf.
@@ -666,9 +668,11 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
           <section className="display-ranking">
             <h2>{t('Endrangliste')}</h2>
             <div className="display-scroll" ref={rankingScrollRef}>
-              <div className="table-scroll">
-                <RankingTable tournament={tournament} entries={ranking} />
-              </div>
+              <RankingWithKoWinners winners={koWinners}>
+                <div className="table-scroll">
+                  <RankingTable tournament={tournament} entries={ranking} />
+                </div>
+              </RankingWithKoWinners>
             </div>
           </section>
         </div>
@@ -693,9 +697,11 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
           <section className="display-ranking">
             <h2>{t('Rangliste')}</h2>
             <div className="display-scroll" ref={rankingScrollRef}>
-              <div className="table-scroll">
-                <RankingTable tournament={tournament} entries={ranking} />
-              </div>
+              <RankingWithKoWinners winners={koWinners}>
+                <div className="table-scroll">
+                  <RankingTable tournament={tournament} entries={ranking} />
+                </div>
+              </RankingWithKoWinners>
             </div>
           </section>
         )}

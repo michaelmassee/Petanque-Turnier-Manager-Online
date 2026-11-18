@@ -75,6 +75,31 @@ describe('Turnier aus dem Turnierdokument abschließen', () => {
     expect(oeffentlich.ranking).toHaveLength(2);
   });
 
+  it('friert bei Maastrichter die KO-Sieger als zweiten Teil der Endrangliste mit ein', async () => {
+    sql("UPDATE tournaments SET participants_public = 1 WHERE id = 't1'");
+    expect((await sync('PUT', '/ranking', {
+      entries: [{ place: 1, registrationIds: [ANNA], wins: 3 }, { place: 2, registrationIds: [BERT], wins: 2 }],
+      koWinners: [{ label: 'A-Finale', registrationIds: [BERT] }],
+    })).status).toBe(200);
+    const live = await (await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/ranking'), env)).json();
+    expect(live.koWinners).toEqual([expect.objectContaining({ label: 'A-Finale', registrationIds: [BERT] })]);
+
+    await abschliessen({ publishRanking: true });
+
+    const oeffentlich = await (await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/ranking'), env)).json();
+    expect(oeffentlich.publishedAt).toEqual(expect.any(String));
+    expect(oeffentlich.ranking).toHaveLength(2);
+    expect(oeffentlich.koWinners).toEqual([expect.objectContaining({ label: 'A-Finale', registrationIds: [BERT],
+      members: [expect.objectContaining({ firstName: 'Bert' })] })]);
+  });
+
+  it('übernimmt eine Rangliste ohne KO-Sieger wie bisher', async () => {
+    sql("UPDATE tournaments SET participants_public = 1 WHERE id = 't1'");
+    await ranglisteUebertragen();
+    const live = await (await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/ranking'), env)).json();
+    expect(live.koWinners).toEqual([]);
+  });
+
   it('schreibt die Teilnehmer beim ersten Abschluss an, bei einem erneuten Abschluss nicht noch einmal', async () => {
     await ranglisteUebertragen();
 

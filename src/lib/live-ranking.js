@@ -24,6 +24,14 @@ export function normalizeRanking(ranking) {
   });
 }
 
+// Sieger der KO-Felder (zweiter Teil der Maastrichter-Endrangliste) mit derselben Teambezeichnung wie die Rangliste.
+export function normalizeKoWinners(winners) {
+  return (winners || []).map((winner) => {
+    const [entry] = normalizeRanking([{ ...winner, rank: null }]);
+    return { label: winner.label, registrationIds: entry.registrationIds, team: entry.label };
+  });
+}
+
 const OPTIONAL_COLUMNS = new Set(['bhz', 'fbhz', 'wertung', 'gameDiff']);
 
 /**

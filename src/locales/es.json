@@ -2139,5 +2139,12 @@
   "Anmeldeformular": "Formulario de inscripción",
   "Turnierdokument (PTM)": "Documento del torneo (PTM)",
   "Automatisch": "Automático",
-  "Drucken": "Imprimir"
+  "Drucken": "Imprimir",
+  "Feld": "Cuadro",
+  "Sieger": "Ganador",
+  "Sieger der KO-Runden": "Ganadores de las eliminatorias",
+  "Vorrunde": "Fase previa",
+  "KO-Sieger müssen als Array übergeben werden": "Los ganadores de las eliminatorias deben enviarse como lista",
+  "Ungültiges KO-Feld": "Cuadro eliminatorio no válido",
+  "Ungültige Meldung bei den KO-Siegern": "Inscripción no válida entre los ganadores de las eliminatorias"
 }

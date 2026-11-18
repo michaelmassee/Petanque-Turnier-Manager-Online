@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPlayerLiveView, parseSyncRanking, parseSyncRoundMatches, parseSyncRoundNumber, registrationBelongsToEmail, registrationBelongsToUser, isTournamentStale, dateDaysAgo, buildLiveRoundPush, buildLiveAnnouncementPush, chunk } from './worker-core.js';
+import { buildPlayerLiveView, parseSyncKoWinners, parseSyncRanking, parseSyncRoundMatches, parseSyncRoundNumber, registrationBelongsToEmail, registrationBelongsToUser, isTournamentStale, dateDaysAgo, buildLiveRoundPush, buildLiveAnnouncementPush, chunk } from './worker-core.js';
 
 const player = (id, firstName, lastName = 'X', teamLabel) => ({ id, firstName, lastName, teamLabel: teamLabel || `${firstName} ${lastName}` });
 const anna = player('r1', 'Anna');
@@ -160,6 +160,16 @@ describe('Sync von Runden und Rangliste aus dem Turnierdokument', () => {
     expect(() => parseSyncRanking({ entries: 'x' }, ids)).toThrow('Rangliste muss als Array übergeben werden');
     expect(() => parseSyncRanking({ entries: [{ place: 0, registrationIds: ['r1'] }] }, ids)).toThrow('Ungültiger Ranglistenplatz');
     expect(() => parseSyncRanking({ entries: [{ place: 1, registrationIds: [] }] }, ids)).toThrow('Ungültige Meldung in der Rangliste');
+  });
+
+  it('prüft die KO-Sieger der Endrangliste', () => {
+    expect(parseSyncKoWinners({ entries: [] }, ids)).toEqual([]);
+    expect(parseSyncKoWinners({ koWinners: [{ label: ' A-Finale ', registrationIds: ['r1'] }] }, ids))
+      .toEqual([{ label: 'A-Finale', registrationIds: ['r1'] }]);
+    expect(() => parseSyncKoWinners({ koWinners: 'x' }, ids)).toThrow('KO-Sieger müssen als Array übergeben werden');
+    expect(() => parseSyncKoWinners({ koWinners: [{ label: '', registrationIds: ['r1'] }] }, ids)).toThrow('Ungültiges KO-Feld');
+    expect(() => parseSyncKoWinners({ koWinners: [{ label: 'A', registrationIds: ['fremd'] }] }, ids))
+      .toThrow('Ungültige Meldung bei den KO-Siegern');
   });
 
   it('übernimmt systemabhängige Wertungskriterien aus synchronisierten Ranglisten', () => {

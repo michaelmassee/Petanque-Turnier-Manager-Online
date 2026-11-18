@@ -36,6 +36,7 @@ import {
   normalizeTournamentInput as normalizeCoreTournamentInput,
   parseParticipation,
   parseSyncRanking,
+  parseSyncKoWinners,
   parseSyncRoundMatches,
   parseSyncRoundNumber,
   buildPlayerLiveView,
@@ -61,7 +62,7 @@ import {
   normalizeSyncSettings,
   assertFormationChangeAllowed,
 } from './worker-core.js';
-import { normalizeRanking } from './lib/live-ranking.js';
+import { normalizeKoWinners, normalizeRanking } from './lib/live-ranking.js';
 import { parseStoredQrDesign } from './lib/qr-design.js';
 import { playerResultReportingActive } from './lib/result-reporting.js';
 import { fetchCloudflareUsageDay, fetchCloudflareUsageDays, isCloudflareUsageConfigured } from './cloudflare-usage-core.js';
@@ -6065,7 +6066,8 @@ async function createDocumentRegistration(db, tournament, localUuid, body) {
 export function disconnectTournament(db, tournamentId) {
   return {
     statements: [db.prepare(`UPDATE tournaments SET document_managed = 0, sync_document_id = NULL, sync_lease_token_hash = NULL,
-              sync_takeover_request_id = NULL, desktop_execution = 0, desktop_ranking_json = NULL, updated_at = ? WHERE id = ?`)
+              sync_takeover_request_id = NULL, desktop_execution = 0, desktop_ranking_json = NULL, desktop_ko_winners_json = NULL,
+              updated_at = ? WHERE id = ?`)
       .bind(new Date().toISOString(), tournamentId)],
     response: { envelope: { status: 200, body: { ok: true } } },
   };
@@ -9007,18 +9009,20 @@ async function queueResultReportedPush(env, origin, tournament, registration, re
 
 async function getTournamentRanking(db, tournament, { live = false } = {}) {
   const snapshot = live ? null : await publishedFinalRanking(db, tournament);
-  if (snapshot) return json({ ranking: snapshot.ranking, publishedAt: snapshot.publishedAt });
-  return json({ ranking: await computeTournamentRanking(db, tournament) });
+  if (snapshot) return json({ ranking: snapshot.ranking, koWinners: snapshot.koWinners, publishedAt: snapshot.publishedAt });
+  const [ranking, koWinners] = await Promise.all([computeTournamentRanking(db, tournament), computeKoWinners(db, tournament)]);
+  return json({ ranking, koWinners });
 }
 
 // Veröffentlichte Endrangliste: gilt nur, solange das Turnier abgeschlossen ist (wird es wieder geöffnet, zählt
 // die Live-Berechnung).
 async function publishedFinalRanking(db, tournament) {
   if (!tournament.final_ranking_published_at || tournament.status !== 'finished') return null;
-  const row = await db.prepare('SELECT ranking_json, published_at, mailed_at FROM tournament_final_rankings WHERE tournament_id = ?')
+  const row = await db.prepare('SELECT ranking_json, ko_winners_json, published_at, mailed_at FROM tournament_final_rankings WHERE tournament_id = ?')
     .bind(tournament.id).first();
   if (!row) return null;
-  return { ranking: jsonArray(row.ranking_json), publishedAt: row.published_at, mailedAt: row.mailed_at || null };
+  return { ranking: jsonArray(row.ranking_json), koWinners: jsonArray(row.ko_winners_json), publishedAt: row.published_at,
+    mailedAt: row.mailed_at || null };
 }
 
 function canViewPublishedRanking(tournament, user, shareAccess) {
@@ -9115,10 +9119,14 @@ function withRankingLabels(tournament, teams, entries) {
   return entries.map((entry) => ({ ...entry, displayLabel: teamDisplayLabel(entry.members, numbers.get(entry.teamId), mode) }));
 }
 
+function usesDesktopRankingSnapshot(tournament) {
+  return Number(tournament.desktop_execution || 0) === 1 || (isDocumentBound(tournament) && Boolean(tournament.desktop_ranking_json));
+}
+
 export async function computeTournamentRanking(db, tournament) {
   // Bei einem gebundenen Turnier gilt der Snapshot des Dokuments, auch nach einem Zurücksetzen des Starts: eine
   // Online-Berechnung kennt die Kriterien der Desktop-Systeme (Poule, Kaskade, …) nicht.
-  if (Number(tournament.desktop_execution || 0) === 1 || (isDocumentBound(tournament) && tournament.desktop_ranking_json)) {
+  if (usesDesktopRankingSnapshot(tournament)) {
     return desktopRankingSnapshot(db, tournament);
   }
   const matchesQuery = await db
@@ -9223,6 +9231,22 @@ export async function computeTournamentRanking(db, tournament) {
   });
 }
 
+/**
+ * Sieger der KO-Felder aus dem Turnierdokument (zweiter Teil der Maastrichter-Endrangliste), mit Spielern wie die
+ * Rangliste; ohne verbundenes Dokument bzw. ohne übertragene Sieger leer.
+ */
+export async function computeKoWinners(db, tournament) {
+  if (!usesDesktopRankingSnapshot(tournament)) return [];
+  const winners = jsonArray(tournament.desktop_ko_winners_json);
+  if (!winners.length) return [];
+  const playersById = await getPlayersById(db, tournament.id);
+  return winners.map((winner) => ({
+    label: winner.label,
+    registrationIds: winner.registrationIds,
+    members: winner.registrationIds.map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
+  }));
+}
+
 async function desktopRankingSnapshot(db, tournament) {
   let entries = [];
   try {
@@ -9282,15 +9306,17 @@ async function invalidateLiveSnapshot(origin, tournamentId) {
 }
 
 async function computeLiveSnapshot(db, tournament) {
-  const [{ rounds, pendingReports }, ranking] = await Promise.all([
+  const [{ rounds, pendingReports }, ranking, koWinners] = await Promise.all([
     loadTournamentRounds(db, tournament, { publicTournament: tournament }),
     computeTournamentRanking(db, tournament),
+    computeKoWinners(db, tournament),
   ]);
   // Vor der ersten Runde gehört die Meldeliste zur Anzeige. Sie nutzt denselben kurzen Cache
   // und dasselbe ETag wie der Spielplan; nach der ersten Runde entfällt der zusätzliche Datenabruf.
   const entries = !rounds.length && tournament.status !== 'finished' ? await loadScheduleEntries(db, tournament) : undefined;
   // pendingReports bleibt serverseitig: Nur die beteiligten Teams sehen ihre Meldung (resultReport der Live-Antwort).
-  const content = { tournament: toLiveTournament(tournament), rounds, ranking: normalizeRanking(ranking), entries, pendingReports };
+  const content = { tournament: toLiveTournament(tournament), rounds, ranking: normalizeRanking(ranking),
+    koWinners: normalizeKoWinners(koWinners), entries, pendingReports };
   const version = (await sha256Hex(JSON.stringify(content))).slice(0, 16);
   return { ...content, version };
 }
@@ -9364,7 +9390,7 @@ export async function buildScheduleResponse(request, db, tournament) {
   if (request.headers.get('If-None-Match') === etag) {
     return new Response(null, { status: 304, headers: { ...SECURITY_HEADERS, ...cacheHeaders } });
   }
-  return json({ status: tournament.status, rounds: snapshot.rounds, ranking: snapshot.ranking,
+  return json({ status: tournament.status, rounds: snapshot.rounds, ranking: snapshot.ranking, koWinners: snapshot.koWinners || [],
     ...(!snapshot.rounds.length && tournament.status !== 'finished' ? { entries: snapshot.entries || [] } : {}),
     dataAsOf, announcement, timer, pollUntil }, 200, cacheHeaders);
 }
@@ -9712,7 +9738,7 @@ export async function finishTournamentFromSync(request, env, existing, user, ori
   let shareToken = null;
   let mailNow = false;
   if (publishRanking) {
-    const ranking = await computeTournamentRanking(db, existing);
+    const [ranking, koWinners] = await Promise.all([computeTournamentRanking(db, existing), computeKoWinners(db, existing)]);
     if (!ranking.length) throw new HttpError(409, 'Es gibt noch keine Rangliste', { code: 'ranking_missing' });
     if (notify && existing.visibility === 'private') {
       const share = await db.prepare('SELECT token FROM tournament_share_links WHERE tournament_id = ?').bind(existing.id).first();
@@ -9727,9 +9753,11 @@ export async function finishTournamentFromSync(request, env, existing, user, ori
     mailNow = notify && !previous?.mailed_at;
     const mailedAt = mailNow ? now : previous?.mailed_at || null;
     statements.push(
-      db.prepare(`INSERT INTO tournament_final_rankings (tournament_id, ranking_json, published_at, mailed_at) VALUES (?, ?, ?, ?)
-          ON CONFLICT(tournament_id) DO UPDATE SET ranking_json = excluded.ranking_json, published_at = excluded.published_at,
-            mailed_at = excluded.mailed_at`).bind(existing.id, JSON.stringify(ranking), now, mailedAt),
+      db.prepare(`INSERT INTO tournament_final_rankings (tournament_id, ranking_json, ko_winners_json, published_at, mailed_at)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(tournament_id) DO UPDATE SET ranking_json = excluded.ranking_json, ko_winners_json = excluded.ko_winners_json,
+            published_at = excluded.published_at, mailed_at = excluded.mailed_at`)
+        .bind(existing.id, JSON.stringify(ranking), koWinners.length ? JSON.stringify(koWinners) : null, now, mailedAt),
       db.prepare('UPDATE tournaments SET final_ranking_published_at = ? WHERE id = ?').bind(now, existing.id),
     );
   }
@@ -9906,10 +9934,13 @@ export async function syncPutTournamentSettings(request, db, tournament) {
 async function syncPutRanking(request, db, tournament) {
   assertDesktopExecution(tournament);
   const body = await readJson(request);
-  const entries = parseSyncRanking(body, await tournamentRegistrationIds(db, tournament.id));
+  const registrationIds = await tournamentRegistrationIds(db, tournament.id);
+  const entries = parseSyncRanking(body, registrationIds);
+  const koWinners = parseSyncKoWinners(body, registrationIds);
   // updated_at bleibt unberührt: Der Snapshot ist Ausführungsdatum, keine Turnier-Stammdatenänderung.
   return {
-    statements: [db.prepare('UPDATE tournaments SET desktop_ranking_json = ? WHERE id = ?').bind(JSON.stringify(entries), tournament.id)],
+    statements: [db.prepare('UPDATE tournaments SET desktop_ranking_json = ?, desktop_ko_winners_json = ? WHERE id = ?')
+      .bind(JSON.stringify(entries), koWinners.length ? JSON.stringify(koWinners) : null, tournament.id)],
     response: { envelope: { status: 200, body: { entryCount: entries.length } } },
   };
 }

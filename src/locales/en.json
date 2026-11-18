@@ -2139,5 +2139,12 @@
   "Anmeldeformular": "Registration form",
   "Turnierdokument (PTM)": "Tournament document (PTM)",
   "Automatisch": "Automatic",
-  "Drucken": "Print"
+  "Drucken": "Print",
+  "Feld": "Field",
+  "Sieger": "Winner",
+  "Sieger der KO-Runden": "Knockout winners",
+  "Vorrunde": "Preliminary round",
+  "KO-Sieger müssen als Array übergeben werden": "Knockout winners must be sent as an array",
+  "Ungültiges KO-Feld": "Invalid knockout field",
+  "Ungültige Meldung bei den KO-Siegern": "Invalid entry among the knockout winners"
 }
