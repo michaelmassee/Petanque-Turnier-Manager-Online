@@ -16,6 +16,8 @@ const FONT = 3.1;
 const NUMBER_COLUMN = 15;
 const RANK_COLUMN = 11;
 const FOOTER_HEIGHT = 8;
+const FIELD_COLUMN = 30;
+const SECTION_GAP = 5;
 
 const px = (mm) => Math.round(mm * PX_PER_MM * 100) / 100;
 const n = (value) => Math.round(value * 100) / 100;
@@ -71,6 +73,34 @@ function tableNode(columns, groups, entries, firstIndex, language) {
   ]);
 }
 
+function sectionTitle(text) {
+  return textNode(text, { size: 3.6, weight: 700, color: BRAND });
+}
+
+/**
+ * Erster Teil einer zweigeteilten Endrangliste (Maastrichter): die Sieger der KO-Felder, danach der Titel der
+ * Vorrunden-Rangliste, die als Tabelle folgt.
+ */
+function koWinnersNode(koWinners, t) {
+  const header = el('div', {
+    display: 'flex', flexDirection: 'row', paddingTop: px(1.3), paddingBottom: px(1.3), borderBottom: `${px(0.4)}px solid ${BRAND}`,
+  }, [
+    cell(t('Feld'), { width: FIELD_COLUMN, weight: 700, color: BRAND }),
+    cell(t('Sieger'), { grow: true, weight: 700, color: BRAND }),
+  ]);
+  return stackNode([
+    sectionTitle(t('Sieger der KO-Runden')),
+    stackNode([
+      header,
+      ...koWinners.map((winner, index) => tableRow([
+        cell(winner.label, { width: FIELD_COLUMN, weight: 700 }),
+        cell(winner.team, { grow: true }),
+      ], { background: index % 2 === 1 ? STRIPE : null })),
+    ]),
+    el('div', { display: 'flex', flexDirection: 'column', paddingTop: px(SECTION_GAP) }, [sectionTitle(t('Vorrunde'))]),
+  ], { gap: 1.5 });
+}
+
 function fitLogo(logo, x, y) {
   if (!logo) return null;
   const scale = Math.min(LOGO_BOX / logo.width, LOGO_BOX / logo.height);
@@ -82,12 +112,14 @@ function fitLogo(logo, x, y) {
 /**
  * Seiten der Endrangliste (Maße in mm). Jede Seite trägt Kopf mit Vereins- und PTM-Logo, Tabelle und Fußzeile.
  * @param entries normalisierte Einträge (normalizeRanking)
+ * @param koWinners normalisierte KO-Sieger (normalizeKoWinners); vorhanden, stehen sie auf der ersten Seite vor der
+ *        Rangliste, die dann als Vorrunde überschrieben ist
  * @param header { title, name, lines: string[] } – fertig formatierte Kopfzeilen
  * @param logos { club, ptm } jeweils { dataUrl, width, height } oder null
  * @param footer (page, pages) => string
  * @param language Sprache für das Zahlenformat (Buchholz mit halben Punkten)
  */
-export async function buildRankingPages({ tournament, entries, header, logos, footer, t, typeset, language = 'de' }) {
+export async function buildRankingPages({ tournament, entries, koWinners = [], header, logos, footer, t, typeset, language = 'de' }) {
   const contentWidth = RANKING_PAGE.width - 2 * MARGIN;
   const headerWidth = contentWidth - 2 * (LOGO_BOX + 4);
   const headerBlock = await typeset(stackNode([
@@ -97,6 +129,10 @@ export async function buildRankingPages({ tournament, entries, header, logos, fo
   ], { gap: 1.2, align: 'center' }), headerWidth);
   const tableTop = MARGIN + Math.max(LOGO_BOX, headerBlock.height) + 7;
   const available = RANKING_PAGE.height - MARGIN - FOOTER_HEIGHT - tableTop;
+  const koBlock = koWinners.length ? await typeset(koWinnersNode(koWinners, t), contentWidth) : null;
+  // Auf der ersten Seite beginnt die Tabelle unter den KO-Siegern.
+  const koOffset = koBlock ? n(koBlock.height + 2) : 0;
+  const availableOn = (pageIndex) => (pageIndex === 0 ? available - koOffset : available);
 
   const columns = rankingColumnKeys(tournament, entries);
   const groups = rankingHeaderGroups(columns, tournament, t);
@@ -106,8 +142,9 @@ export async function buildRankingPages({ tournament, entries, header, logos, fo
   do {
     let count = Math.min(entries.length - start, 45);
     let block = await typeset(tableNode(columns, groups, entries.slice(start, start + count), start, language), contentWidth);
-    while (block.height > available && count > 1) {
-      count = Math.max(1, Math.min(count - 1, Math.floor(count * available / block.height)));
+    const space = availableOn(chunks.length);
+    while (block.height > space && count > 1) {
+      count = Math.max(1, Math.min(count - 1, Math.floor(count * space / block.height)));
       block = await typeset(tableNode(columns, groups, entries.slice(start, start + count), start, language), contentWidth);
     }
     chunks.push(block);
@@ -123,7 +160,8 @@ export async function buildRankingPages({ tournament, entries, header, logos, fo
         fitLogo(logos.ptm, RANKING_PAGE.width - MARGIN - LOGO_BOX, MARGIN),
         { type: 'text', x: MARGIN + LOGO_BOX + 4, y: MARGIN, ...headerBlock },
         { type: 'line', x1: MARGIN, x2: RANKING_PAGE.width - MARGIN, y: n(tableTop - 3) },
-        { type: 'text', x: MARGIN, y: tableTop, ...block },
+        index === 0 && koBlock ? { type: 'text', x: MARGIN, y: tableTop, ...koBlock } : null,
+        { type: 'text', x: MARGIN, y: index === 0 ? n(tableTop + koOffset) : tableTop, ...block },
         { type: 'text', x: MARGIN, y: n(RANKING_PAGE.height - MARGIN - footerBlock.height), ...footerBlock },
       ].filter(Boolean),
     };

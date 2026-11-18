@@ -20,7 +20,7 @@ function headerLines(tournament, language) {
  * Erstellt das Ranglisten-PDF im Browser (satori + svg2pdf wie beim Flyer). Die Module werden erst beim Klick
  * geladen, damit die Turnierseite schlank bleibt.
  */
-export async function downloadRankingPdf({ tournament, entries, publishedAt, shareToken, language, t }) {
+export async function downloadRankingPdf({ tournament, entries, koWinners = [], publishedAt, shareToken, language, t }) {
   const [{ buildRankingPages, rankingFileName, renderRankingSvg, RANKING_PAGE }, { typesetFlyerText }, { renderFlyerPdf }, { loadLogo, saveBlob }] = await Promise.all([
     import('../lib/ranking-pdf.js'), import('../lib/flyer-typesetter.js'), import('../lib/flyer-render.js'), import('../lib/image-data.js'),
   ]);
@@ -33,6 +33,7 @@ export async function downloadRankingPdf({ tournament, entries, publishedAt, sha
   const pages = await buildRankingPages({
     tournament,
     entries,
+    koWinners,
     header: { title: t('Endrangliste'), name: tournament.name, lines: [headerLines(tournament, language).join(' · '), published] },
     logos: { club, ptm },
     footer: (page, total) => `${PTM_NAME} · ptmonline.org · ${t('Seite')} ${page} / ${total}`,
@@ -73,7 +74,7 @@ export function FinalRankingView({ tournament, language, shareToken = '', displa
     setBusy(true);
     setError('');
     try {
-      await downloadRankingPdf({ tournament, entries, publishedAt: data?.publishedAt, shareToken, language, t });
+      await downloadRankingPdf({ tournament, entries, koWinners, publishedAt: data?.publishedAt, shareToken, language, t });
     } catch {
       setError(t('Das PDF konnte nicht erstellt werden.'));
     } finally {

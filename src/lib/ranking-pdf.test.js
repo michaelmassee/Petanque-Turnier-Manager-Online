@@ -35,6 +35,20 @@ describe('Ranglisten-PDF', () => {
     }
   });
 
+  it('setzt bei Maastrichter die KO-Sieger auf der ersten Seite vor die Vorrunden-Rangliste', async () => {
+    const koWinners = [{ label: 'A-Finale', registrationIds: ['r1'], team: 'Anna + Bert' }, { label: 'B-Finale', registrationIds: ['r2'], team: 'Carla + Dirk' }];
+    const ohne = await buildRankingPages({ tournament, entries: Array.from({ length: 70 }, (_, index) => entry(index)), header, logos: { club: null, ptm: null }, footer: () => '', t, typeset });
+    const mit = await buildRankingPages({ tournament, entries: Array.from({ length: 70 }, (_, index) => entry(index)), koWinners, header, logos: { club: null, ptm: null }, footer: () => '', t, typeset });
+
+    const bloecke = (page) => page.elements.filter((element) => element.type === 'text' && element.x === 15 && element.y > 30 && element.y < 100);
+    const [koBlock, tabelle] = bloecke(mit[0]);
+    expect(koBlock.y + koBlock.height).toBeLessThanOrEqual(tabelle.y);
+    expect(tabelle.y + tabelle.height).toBeLessThanOrEqual(RANKING_PAGE.height - 15 - 8);
+    expect(bloecke(mit[1])).toHaveLength(1);
+    expect(bloecke(ohne[0])).toHaveLength(1);
+    expect(tabelle.height).toBeLessThan(bloecke(ohne[0])[0].height);
+  });
+
   it('kommt ohne Vereinslogo aus', async () => {
     const [page] = await buildRankingPages({ tournament, entries: [entry(0)], header, logos: { club: null, ptm: logo }, footer: () => '', t, typeset });
     expect(page.elements.filter((element) => element.type === 'image')).toHaveLength(1);
