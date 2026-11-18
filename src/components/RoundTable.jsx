@@ -9,6 +9,19 @@ function teamLabel(team) {
   return team.map(playerLabel).join(' + ');
 }
 
+// Teamnummer als Badge vor dem Namen wie in der Live-Ansicht; entfällt ohne Nummer und bei der Anzeige „nur Nr“, deren
+// Bezeichnung schon die Nummer ist.
+export function TeamCell({ number, label }) {
+  const { t } = useTranslation();
+  const showNumber = number != null && String(number) !== label;
+  return (
+    <td data-i18n-skip>
+      {showNumber && <span className="team-number" title={t('Teamnummer')}>{number}</span>}
+      {label}
+    </td>
+  );
+}
+
 // Laufende Paarungsnummer 1..n wie die Spalte „#“ im Hauptprojekt (Spielbahn „Nur laufende Nr“): Freilose bekommen
 // keine Nummer und verbrauchen keine. Liefert je Partie die Nummer oder null.
 export function pairingNumbers(matches) {
@@ -16,7 +29,7 @@ export function pairingNumbers(matches) {
   return matches.map((match) => (match.teamB?.length ? (next += 1) : null));
 }
 
-// Partien einer Runde als Tabelle wie die Spielrunde im Hauptprojekt (Team A | Team B | Ergebnis A/B). Erste Spalte:
+// Partien einer Runde als Tabelle wie die Spielrunde im Hauptprojekt (Team A | Team B | Ergebnis A/B), Teams mit Teamnummer. Erste Spalte:
 // Bahn, wenn die Runde Bahnen hat, sonst die laufende Nummer (#). Stufe nur, wenn die Runde sie hat. Der zweizeilige Kopf entspricht dem der Rangliste, damit beide auf der Turnierseite
 // nebeneinander auf gleicher Höhe beginnen. Spielverwaltung (beendetes Turnier) und Turnierseite nutzen dieselbe Tabelle.
 export function RoundTable({ round }) {
@@ -45,8 +58,10 @@ export function RoundTable({ round }) {
             <tr key={match.id}>
               <td className="round-table-number" data-i18n-skip>{hasCourt ? match.court || '' : numbers[index] ?? ''}</td>
               {hasStage && <td data-i18n-skip>{match.stageLabel || ''}</td>}
-              <td data-i18n-skip>{match.teamALabel ?? teamLabel(match.teamA)}</td>
-              {match.teamB?.length ? <td data-i18n-skip>{match.teamBLabel ?? teamLabel(match.teamB)}</td> : <td className="muted">{t('Freilos')}</td>}
+              <TeamCell number={match.teamANumber} label={match.teamALabel ?? teamLabel(match.teamA)} />
+              {match.teamB?.length
+                ? <TeamCell number={match.teamBNumber} label={match.teamBLabel ?? teamLabel(match.teamB)} />
+                : <td className="muted">{t('Freilos')}</td>}
               {match.noShow
                 ? <td colSpan={2}>{t('Nicht angetreten')}</td>
                 : <>
