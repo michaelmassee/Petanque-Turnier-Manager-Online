@@ -6066,9 +6066,9 @@ async function createDocumentRegistration(db, tournament, localUuid, body) {
 export function disconnectTournament(db, tournamentId) {
   return {
     statements: [db.prepare(`UPDATE tournaments SET document_managed = 0, sync_document_id = NULL, sync_lease_token_hash = NULL,
-              sync_takeover_request_id = NULL, desktop_execution = 0, desktop_ranking_json = NULL, desktop_ko_winners_json = NULL,
-              updated_at = ? WHERE id = ?`)
-      .bind(new Date().toISOString(), tournamentId)],
+              sync_takeover_request_id = NULL, desktop_execution = 0, desktop_ranking_json = NULL, updated_at = ? WHERE id = ?`)
+      .bind(new Date().toISOString(), tournamentId),
+    db.prepare('DELETE FROM tournament_document_ko_winners WHERE tournament_id = ?').bind(tournamentId)],
     response: { envelope: { status: 200, body: { ok: true } } },
   };
 }
@@ -9237,7 +9237,10 @@ export async function computeTournamentRanking(db, tournament) {
  */
 export async function computeKoWinners(db, tournament) {
   if (!usesDesktopRankingSnapshot(tournament)) return [];
-  const winners = jsonArray(tournament.desktop_ko_winners_json);
+  // Eigene Tabelle: tournaments steht am D1-Limit von 100 Ergebnisspalten (siehe Migration 0162).
+  const row = await db.prepare('SELECT winners_json FROM tournament_document_ko_winners WHERE tournament_id = ?')
+    .bind(tournament.id).first();
+  const winners = jsonArray(row?.winners_json);
   if (!winners.length) return [];
   const playersById = await getPlayersById(db, tournament.id);
   return winners.map((winner) => ({
@@ -9939,8 +9942,13 @@ async function syncPutRanking(request, db, tournament) {
   const koWinners = parseSyncKoWinners(body, registrationIds);
   // updated_at bleibt unberührt: Der Snapshot ist Ausführungsdatum, keine Turnier-Stammdatenänderung.
   return {
-    statements: [db.prepare('UPDATE tournaments SET desktop_ranking_json = ?, desktop_ko_winners_json = ? WHERE id = ?')
-      .bind(JSON.stringify(entries), koWinners.length ? JSON.stringify(koWinners) : null, tournament.id)],
+    statements: [
+      db.prepare('UPDATE tournaments SET desktop_ranking_json = ? WHERE id = ?').bind(JSON.stringify(entries), tournament.id),
+      koWinners.length
+        ? db.prepare(`INSERT INTO tournament_document_ko_winners (tournament_id, winners_json) VALUES (?, ?)
+            ON CONFLICT(tournament_id) DO UPDATE SET winners_json = excluded.winners_json`).bind(tournament.id, JSON.stringify(koWinners))
+        : db.prepare('DELETE FROM tournament_document_ko_winners WHERE tournament_id = ?').bind(tournament.id),
+    ],
     response: { envelope: { status: 200, body: { entryCount: entries.length } } },
   };
 }
