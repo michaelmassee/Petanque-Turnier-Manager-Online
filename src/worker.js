@@ -5566,6 +5566,8 @@ export async function requireSyncLease(request, tournament) {
  *  - statements: fachliche Änderungen; jede trägt ihre Vorbedingungen selbst im SQL.
  *  - response: { sql, binds } - SELECT mit genau einer Spalte, die den Antwort-Umschlag {status, body} als JSON
  *    aus dem Zustand NACH den Änderungen berechnet - oder { envelope } mit einer vorab feststehenden Antwort.
+ *  - retryOn(error)?: true, wenn der Batch an einer veralteten Vorab-Lesung scheiterte; dann wird build() erneut
+ *    aufgerufen (höchstens SYNC_WRITE_ATTEMPTS Versuche), danach greift mapError.
  *  - afterCommit(envelope): Benachrichtigungen o. Ä.; läuft nur bei der ersten Ausführung, nie beim Replay.
  *
  * Protokoll 2 (neuer PTM): Auftrags-ID und Schreibzähler sind Pflicht. Eintrag in sync_requests (Trigger prüfen
@@ -5573,17 +5575,25 @@ export async function requireSyncLease(request, tournament) {
  * Wiederholung mit gleicher Nutzlast liefert die gespeicherte Antwort (X-PTM-Replayed), mit anderer Nutzlast
  * idempotency_mismatch. Protokoll 1 (bisheriger PTM): gleiche Änderungen in einem Batch, ohne Zähler.
  */
+// Wie oft ein Sync-Auftrag neu aufgebaut wird, wenn seine Vorbedingung (retryOn) durch eine parallele Änderung verletzt ist.
+const SYNC_WRITE_ATTEMPTS = 3;
+
 export async function executeSyncWrite(request, db, tournament, build, context = {}) {
   await requireSyncLease(request, tournament);
   const url = new URL(request.url);
   if (Number(tournament.sync_protocol || 1) !== 2) {
-    const plan = await build(db);
-    try {
-      await db.batch([...plan.statements, db.prepare('UPDATE tournaments SET last_sync_write_at = ? WHERE id = ?')
-        .bind(new Date().toISOString(), tournament.id)]);
-    } catch (error) {
-      if (plan.mapError) plan.mapError(error);
-      throw error;
+    let plan;
+    for (let attempt = 1; ; attempt += 1) {
+      plan = await build(db);
+      try {
+        await db.batch([...plan.statements, db.prepare('UPDATE tournaments SET last_sync_write_at = ? WHERE id = ?')
+          .bind(new Date().toISOString(), tournament.id)]);
+        break;
+      } catch (error) {
+        if (attempt < SYNC_WRITE_ATTEMPTS && plan.retryOn?.(error)) continue;
+        if (plan.mapError) plan.mapError(error);
+        throw error;
+      }
     }
     const envelope = await syncResponseEnvelope(db, plan.response);
     if (plan.afterCommit) await plan.afterCommit(envelope);
@@ -5599,38 +5609,44 @@ export async function executeSyncWrite(request, db, tournament, build, context =
   const replay = await syncReplay(db, tournament.id, requestId, payloadHash, context);
   if (replay) return replay;
 
-  const plan = await build(db);
-  const now = new Date().toISOString();
-  const finalize = plan.response.sql
-    ? db.prepare(`UPDATE sync_requests SET state = 'done', response_json = (${plan.response.sql})
-        WHERE tournament_id = ? AND request_id = ?`).bind(...(plan.response.binds || []), tournament.id, requestId)
-    : db.prepare(`UPDATE sync_requests SET state = 'done', response_json = ? WHERE tournament_id = ? AND request_id = ?`)
-      .bind(JSON.stringify(plan.response.envelope), tournament.id, requestId);
-  try {
-    await db.batch([
-      db.prepare(`INSERT INTO sync_requests (tournament_id, request_id, payload_hash, counter, sync_document_id,
-          lease_token_hash, state, created_at) VALUES (?, ?, ?, ?, ?, ?, 'claimed', ?)`)
-        .bind(tournament.id, requestId, payloadHash, counter, tournament.sync_document_id,
-          tournament.sync_lease_token_hash, now),
-      db.prepare('UPDATE tournaments SET sync_write_counter = ?, last_sync_write_at = ? WHERE id = ?').bind(counter, now, tournament.id),
-      ...plan.statements,
-      finalize,
-    ]);
-  } catch (error) {
-    const message = String(error?.message || error);
-    if (message.includes('document_forked')) {
-      throw new HttpError(409, 'Dieses Dokument wurde parallel verändert – ist eine Kopie der Turnierdatei im Einsatz?', {
-        code: 'document_forked',
-      });
+  let plan;
+  for (let attempt = 1; ; attempt += 1) {
+    plan = await build(db);
+    const now = new Date().toISOString();
+    const finalize = plan.response.sql
+      ? db.prepare(`UPDATE sync_requests SET state = 'done', response_json = (${plan.response.sql})
+          WHERE tournament_id = ? AND request_id = ?`).bind(...(plan.response.binds || []), tournament.id, requestId)
+      : db.prepare(`UPDATE sync_requests SET state = 'done', response_json = ? WHERE tournament_id = ? AND request_id = ?`)
+        .bind(JSON.stringify(plan.response.envelope), tournament.id, requestId);
+    try {
+      await db.batch([
+        db.prepare(`INSERT INTO sync_requests (tournament_id, request_id, payload_hash, counter, sync_document_id,
+            lease_token_hash, state, created_at) VALUES (?, ?, ?, ?, ?, ?, 'claimed', ?)`)
+          .bind(tournament.id, requestId, payloadHash, counter, tournament.sync_document_id,
+            tournament.sync_lease_token_hash, now),
+        db.prepare('UPDATE tournaments SET sync_write_counter = ?, last_sync_write_at = ? WHERE id = ?').bind(counter, now, tournament.id),
+        ...plan.statements,
+        finalize,
+      ]);
+    } catch (error) {
+      const message = String(error?.message || error);
+      if (message.includes('document_forked')) {
+        throw new HttpError(409, 'Dieses Dokument wurde parallel verändert – ist eine Kopie der Turnierdatei im Einsatz?', {
+          code: 'document_forked',
+        });
+      }
+      if (message.includes('binding_changed')) {
+        throw new HttpError(409, 'Dieses Dokument wurde durch ein anderes Dokument abgelöst', { code: 'document_replaced' });
+      }
+      // Gleichzeitige Wiederholung desselben Auftrags: Primärschlüssel verletzt, Ergebnis des anderen Laufs liefern.
+      const concurrentReplay = await syncReplay(db, tournament.id, requestId, payloadHash, context);
+      if (concurrentReplay) return concurrentReplay;
+      // Der Batch wurde komplett zurückgerollt (auch der sync_requests-Eintrag), ein Neuaufbau ist also sicher.
+      if (attempt < SYNC_WRITE_ATTEMPTS && plan.retryOn?.(error)) continue;
+      if (plan.mapError) plan.mapError(error);
+      throw error;
     }
-    if (message.includes('binding_changed')) {
-      throw new HttpError(409, 'Dieses Dokument wurde durch ein anderes Dokument abgelöst', { code: 'document_replaced' });
-    }
-    // Gleichzeitige Wiederholung desselben Auftrags: Primärschlüssel verletzt, Ergebnis des anderen Laufs liefern.
-    const concurrentReplay = await syncReplay(db, tournament.id, requestId, payloadHash, context);
-    if (concurrentReplay) return concurrentReplay;
-    if (plan.mapError) plan.mapError(error);
-    throw error;
+    break;
   }
   const envelope = await storedSyncEnvelope(db, tournament.id, requestId);
   if (plan.afterCommit) await plan.afterCommit(envelope);
@@ -9747,6 +9763,17 @@ export async function finishTournamentFromSync(request, env, existing, user, ori
 const SYNC_ROUND_MATCH_COLUMNS = `id, created_at, team_a_registration_ids, team_b_registration_ids, team_a_number, team_b_number,
   score_a, score_b, match_index, stage_label, court, no_show, team_a_id, team_b_id, result_reported_by, result_report_pending`;
 
+// Fingerabdruck aller Partien einer Runde (Parameter: round_id) über alle abgeglichenen Spalten.
+const SYNC_ROUND_FINGERPRINT_SQL = `SELECT json_group_array(json_array(${SYNC_ROUND_MATCH_COLUMNS}))
+  FROM (SELECT ${SYNC_ROUND_MATCH_COLUMNS} FROM tournament_matches WHERE round_id = ? ORDER BY id)`;
+// Ungültiges JSON: json() bricht damit den Batch ab. Der Wert hängt vom Fingerabdruck ab, SQLite wertet ihn also nicht
+// vorab als Konstante aus.
+const SYNC_ROUND_STALE_MARKER = 'sync_round_stale';
+
+function isSyncRoundStale(error) {
+  return /malformed JSON/i.test(String(error?.message || error || ''));
+}
+
 function syncRoundMatchRow(match) {
   return {
     team_a_registration_ids: JSON.stringify(match.teamA), team_b_registration_ids: JSON.stringify(match.teamB),
@@ -9796,25 +9823,37 @@ function syncRoundMatchStatements(db, tournamentId, roundId, stored, matches, no
 async function syncPutRound(request, db, tournament, roundNumberValue) {
   assertDesktopExecution(tournament);
   const roundNumber = parseSyncRoundNumber(roundNumberValue);
-  const body = await readJson(request);
+  // Aus einem Klon lesen: executeSyncWrite baut den Auftrag bei einer parallelen Änderung neu auf (retryOn).
+  const body = await readJson(request.clone());
   const matches = parseSyncRoundMatches(body, await tournamentRegistrationIds(db, tournament.id));
   const existing = await db.prepare('SELECT id FROM tournament_rounds WHERE tournament_id = ? AND round_number = ?').bind(tournament.id, roundNumber).first();
   const roundId = existing?.id || crypto.randomUUID();
   const now = new Date().toISOString();
   const statements = [];
+  // Partien und ihr Fingerabdruck stammen aus derselben Abfrage, also aus demselben Stand.
   const stored = existing
-    ? (await db.prepare(`SELECT ${SYNC_ROUND_MATCH_COLUMNS} FROM tournament_matches WHERE round_id = ?
-        ORDER BY match_index ASC, created_at ASC, id ASC`).bind(roundId).all()).results || []
+    ? (await db.prepare(`SELECT ${SYNC_ROUND_MATCH_COLUMNS}, (${SYNC_ROUND_FINGERPRINT_SQL}) AS fingerprint
+        FROM tournament_matches WHERE round_id = ? ORDER BY match_index ASC, created_at ASC, id ASC`).bind(roundId, roundId).all()).results || []
     : [];
   if (!existing) {
     statements.push(db.prepare('INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES (?, ?, ?, ?)').bind(roundId, tournament.id, roundNumber, now));
+  } else {
+    // Der Abgleich gilt nur für den gelesenen Stand. Hat ein paralleler Auftrag die Runde inzwischen geändert, bricht
+    // diese Prüfung den ganzen Batch ab; executeSyncWrite baut den Auftrag dann auf dem neuen Stand neu auf.
+    statements.push(db.prepare(`SELECT json(CASE WHEN current.fingerprint = ? THEN '0' ELSE '${SYNC_ROUND_STALE_MARKER}' END)
+        FROM (SELECT (${SYNC_ROUND_FINGERPRINT_SQL}) AS fingerprint) AS current`).bind(stored[0]?.fingerprint ?? '[]', roundId));
   }
   statements.push(...syncRoundMatchStatements(db, tournament.id, roundId, stored, matches, now));
   statements.push(...supersedeResultReportStatements(db, tournament.id, roundNumber, matches, now));
   return {
     statements,
     response: { envelope: { status: 200, body: { roundNumber, matchCount: matches.length, created: !existing } } },
+    // Parallel geänderte oder zeitgleich angelegte Runde: Auftrag auf dem aktuellen Stand neu berechnen.
+    retryOn: (error) => isSyncRoundStale(error) || isTournamentRoundNumberConflict(error),
     mapError(error) {
+      if (isSyncRoundStale(error)) {
+        throw new HttpError(409, 'Die Runde wurde zeitgleich geändert. Bitte erneut senden.', { code: 'round_changed' });
+      }
       if (isTournamentRoundNumberConflict(error)) {
         throw new HttpError(409, 'Eine neue Runde wurde bereits zeitgleich erstellt. Bitte aktualisieren.');
       }

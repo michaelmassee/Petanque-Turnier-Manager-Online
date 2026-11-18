@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 import { bindeDokument, syncAnfrage } from './test-support/sync.js';
@@ -15,8 +15,8 @@ describe('Rundenauftrag gleicht Partien ab statt sie neu anzulegen', () => {
   const sql = (statement, ...params) => env.DB.sqlite.prepare(statement).run(...params);
   const partien = () => env.DB.sqlite.prepare(`SELECT id, team_a_registration_ids AS teamA, team_b_registration_ids AS teamB,
       score_a, score_b, match_index, court, no_show, updated_at FROM tournament_matches ORDER BY created_at, match_index`).all();
-  const runde = async (matches) => {
-    const request = syncAnfrage('PUT', '/api/sync/tournaments/t1/rounds/1', { matches });
+  const runde = async (matches, optionen) => {
+    const request = syncAnfrage('PUT', '/api/sync/tournaments/t1/rounds/1', { matches }, optionen);
     request.headers.set('Authorization', `Bearer ${PTM_ZUGANG}`);
     const response = await worker.fetch(request, env);
     expect(response.status).toBe(200);
@@ -78,6 +78,43 @@ describe('Rundenauftrag gleicht Partien ab statt sie neu anzulegen', () => {
 
     await runde([{ teamA: [A], teamB: [B] }, { teamA: [C], teamB: [D] }, { teamA: [E], teamB: [F] }]);
     expect(partien().map((partie) => [JSON.parse(partie.teamA)[0], partie.match_index])).toEqual([[A, 0], [C, 1], [E, 2]]);
+  });
+
+  it('legt bei zeitgleicher identischer Erweiterung keine doppelten Partien an', async () => {
+    await runde(grundstand.slice(0, 2));
+    // Ein paralleler Auftrag legt die dritte Partie an, nachdem dieser Auftrag die Runde gelesen hat.
+    env.DB.vorBatch((sqlite) => sqlite.prepare(`INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids,
+        team_b_registration_ids, match_index, court, result_report_pending, created_at, updated_at)
+      SELECT 'parallel', 't1', round_id, ?, ?, 2, '3', 0, created_at, updated_at FROM tournament_matches LIMIT 1`)
+      .run(JSON.stringify([E]), JSON.stringify([F])));
+
+    expect(await runde(grundstand)).toMatchObject({ matchCount: 3 });
+
+    expect(partien().map((partie) => [JSON.parse(partie.teamA)[0], partie.match_index])).toEqual([[A, 0], [C, 1], [E, 2]]);
+  });
+
+  it('übernimmt den eigenen Stand, wenn ein paralleler Auftrag die Runde zwischen Lesen und Schreiben ändert', async () => {
+    await runde(grundstand);
+    // Paralleler (älterer) Auftrag trägt ein Ergebnis ein, das der Dokumentstand dieses Auftrags nicht mehr enthält.
+    env.DB.vorBatch((sqlite) => sqlite.prepare("UPDATE tournament_matches SET score_a = 13, score_b = 5, updated_at = 'parallel' WHERE match_index = 0").run());
+
+    await runde(grundstand.map((match, index) => (index === 1 ? { ...match, scoreA: 7, scoreB: 13 } : match)));
+
+    expect(partien().map((partie) => [partie.score_a, partie.score_b])).toEqual([[null, null], [7, 13], [null, null]]);
+  });
+
+  it('baut den Auftrag auch mit Protokoll 2 (Schreibzähler) auf dem parallel geänderten Stand neu auf', async () => {
+    bindeDokument(env.DB.sqlite, 't1', { protocol: 2 });
+    await runde(grundstand.slice(0, 2), { counter: 1, requestId: randomUUID() });
+    env.DB.vorBatch((sqlite) => sqlite.prepare(`INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids,
+        team_b_registration_ids, match_index, court, result_report_pending, created_at, updated_at)
+      SELECT 'parallel', 't1', round_id, ?, ?, 2, '3', 0, created_at, updated_at FROM tournament_matches LIMIT 1`)
+      .run(JSON.stringify([E]), JSON.stringify([F])));
+
+    expect(await runde(grundstand, { counter: 2, requestId: randomUUID() })).toMatchObject({ matchCount: 3 });
+
+    expect(partien()).toHaveLength(3);
+    expect(env.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM sync_requests WHERE state = 'done'").get().n).toBe(2);
   });
 
   it('setzt online gesetzte Zusatzwerte wie bisher auf den Standard zurück', async () => {

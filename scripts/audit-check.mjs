@@ -18,9 +18,18 @@ try {
   process.exit(1)
 }
 
+// npm audit endet auch bei Funden mit Exitcode 1, der Exitcode unterscheidet Funde also nicht von Fehlern. Eine
+// Fehlerantwort (z. B. Registry nicht erreichbar) kommt als {"error": {...}} ohne vulnerabilities - die Prüfung hat
+// dann nicht stattgefunden und darf nicht als bestanden gelten.
+if (report?.error || !report?.vulnerabilities || typeof report.vulnerabilities !== 'object' || !report.metadata) {
+  const detail = [report?.message, report?.error?.code, report?.error?.summary, report?.error?.detail].filter(Boolean).join(' – ')
+  console.error(`npm audit fehlgeschlagen (Exitcode ${result.status}): ${detail || 'Antwort ohne vulnerabilities/metadata'}`)
+  process.exit(1)
+}
+
 // Advisories stehen als Objekte in via[]; Strings dort verweisen nur auf andere Pakete der Liste.
 const advisories = new Map()
-for (const vulnerability of Object.values(report.vulnerabilities ?? {})) {
+for (const vulnerability of Object.values(report.vulnerabilities)) {
   for (const via of vulnerability.via ?? []) {
     if (typeof via === 'object' && via.url) advisories.set(via.url, via)
   }
