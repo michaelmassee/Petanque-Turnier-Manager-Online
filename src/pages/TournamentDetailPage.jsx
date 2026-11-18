@@ -18,6 +18,7 @@ import { TournamentPlayerListings } from '../components/TournamentPlayerListings
 import { PublicRegistrationPanel } from '../App.jsx';
 import { RegistrationOpeningReminder, TournamentRegistrationAction } from '../components/TournamentRegistrationAction.jsx';
 import { RoundTable } from '../components/RoundTable.jsx';
+import { currentRoundView } from '../lib/current-round.js';
 import { TournamentQrPanel } from '../components/TournamentQrPanel.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { FinalRankingView } from '../components/FinalRankingView.jsx';
@@ -652,7 +653,7 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
     );
   }
 
-  const currentRound = rounds[rounds.length - 1];
+  const currentRound = currentRoundView(rounds);
   const showRanking = ranking.length > 0 && tournament?.type !== 'ko';
   // Bildschirm vor Ort nach Turnierende: statt der letzten Runde nur noch die komplette Rangliste über die volle Breite.
   const finalStanding = display && showRanking && query.data?.status === 'finished';

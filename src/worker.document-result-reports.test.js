@@ -123,6 +123,33 @@ describe('Ergebnismeldung bei verbundenem Turnierdokument', () => {
     expect((await sync('PUT', '/rounds/1', rundeMit(null, null))).headers.get('X-PTM-Result-Reporting')).toBe('0');
   });
 
+  // Gleichzeitig gespielte KO-Bäume: Baum A ist schon eine Runde weiter, Anna und Bert spielen noch ihr Viertelfinale.
+  it('nimmt die Meldung einer offenen Partie aus einer früheren Runde an, solange die Teams nicht neu eingeteilt sind', async () => {
+    const CARL = '33333333-3333-4333-8333-cccccccccccc';
+    const DORA = '44444444-4444-4444-8444-dddddddddddd';
+    sql(`INSERT INTO registrations (id, tournament_id, first_name, last_name, email, status, participation, registered_at, created_at, updated_at)
+      VALUES (?, 't1', 'Carl', 'C', 'carl@example.test', 'confirmed', 'active', '2026-01-01', '2026-01-01', '2026-01-01'),
+             (?, 't1', 'Dora', 'D', 'dora@example.test', 'confirmed', 'active', '2026-01-01', '2026-01-01', '2026-01-01')`, CARL, DORA);
+    sql("INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES ('round2', 't1', 2, '2026-01-01')");
+    sql(`INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, created_at, updated_at)
+      VALUES ('match2', 't1', 'round2', ?, ?, '2026-01-01', '2026-01-01')`, JSON.stringify([CARL]), JSON.stringify([DORA]));
+
+    expect((await live('anna-session', ANNA)).live.currentMatch).toMatchObject({ matchId: 'match1', roundNumber: 1 });
+    expect((await melden('bert-session', BERT, 13, 7)).status).toBe(200);
+
+    expect(await offeneMeldungen()).toEqual([expect.objectContaining({ roundNumber: 1, teamA: [ANNA], teamB: [BERT] })]);
+    expect((await live('anna-session', ANNA)).registration.resultReport).toEqual({ ownScore: 7, opponentScore: 13, status: 'open' });
+  });
+
+  it('nimmt keine Meldung für eine alte Partie an, wenn das Team danach neu eingeteilt ist', async () => {
+    sql("INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES ('round2', 't1', 2, '2026-01-01')");
+    sql(`INSERT INTO tournament_matches (id, tournament_id, round_id, team_a_registration_ids, team_b_registration_ids, created_at, updated_at)
+      VALUES ('match2', 't1', 'round2', ?, '[]', '2026-01-01', '2026-01-01')`, JSON.stringify([BERT]));
+
+    expect((await melden('bert-session', BERT, 13, 7)).status).toBe(403);
+    expect(meldungen()).toEqual([]);
+  });
+
   it('zeigt beiden Teams die offene Meldung aus der eigenen Sicht', async () => {
     await melden('bert-session', BERT, 13, 7);
 

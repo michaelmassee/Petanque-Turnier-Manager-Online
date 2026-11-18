@@ -44,6 +44,21 @@ describe('Live-Ansicht eines Spielers', () => {
     expect(view.history).toHaveLength(1);
   });
 
+  it('behält eine offene Partie einer früheren Runde als aktuelle, solange der Spieler nicht neu eingeteilt ist', () => {
+    // Gleichzeitig gespielte KO-Bäume: Baum A (Anna/Ben) ist im Halbfinale, Baum B (Carl/Dora) noch im Viertelfinale.
+    const parallel = [
+      { roundNumber: 1, matches: [
+        { id: 'a1', teamA: [anna], teamB: [eva], scoreA: 13, scoreB: 2, noShow: null },
+        { id: 'b1', teamA: [carl], teamB: [dora], scoreA: null, scoreB: null, noShow: null, stageLabel: 'B · Viertelfinale' },
+      ] },
+      { roundNumber: 2, matches: [{ id: 'a2', teamA: [anna], teamB: [ben], scoreA: null, scoreB: null, noShow: null }] },
+    ];
+    expect(buildPlayerLiveView({ registrationId: 'r3', rounds: parallel }).currentMatch)
+      .toMatchObject({ matchId: 'b1', roundNumber: 1, stageLabel: 'B · Viertelfinale', outcome: 'open' });
+    expect(buildPlayerLiveView({ registrationId: 'r1', rounds: parallel }).currentMatch).toMatchObject({ matchId: 'a2' });
+    expect(buildPlayerLiveView({ registrationId: 'r5', rounds: parallel }).currentMatch).toBeNull();
+  });
+
   it('reicht Begegnungsnummer und Teamnummern aus Sicht des Spielers durch', () => {
     const numbered = [{ roundNumber: 1, matches: [{ ...rounds[0].matches[0], pairingNumber: 3, teamANumber: 5, teamBNumber: 2 }] }];
     expect(buildPlayerLiveView({ registrationId: 'r1', rounds: numbered }).currentMatch).toMatchObject({ pairingNumber: 3, ownTeamNumber: 5, opponentTeamNumber: 2 });

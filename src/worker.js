@@ -8723,7 +8723,15 @@ export async function setTournamentRoundResults(request, db, tournament, roundId
   return json({ ...data, savedMatchIds, conflicts });
 }
 
-// Eine Ergebnismeldung ist nur für die eigene, noch offene Partie der letzten Runde möglich.
+// Eine Ergebnismeldung ist nur für die eigene, noch offene Partie möglich: die letzte, in die die Anmeldung eingeteilt
+// ist. Meist liegt sie in der letzten Runde; bei gleichzeitig gespielten KO-Bäumen kann sie eine Runde früher liegen
+// (Baum A schon im Halbfinale, Baum B noch im Viertelfinale). Zwei Platzhalter: die Meldungs-ID.
+const NO_LATER_MATCH_OF_REGISTRATION_SQL = `NOT EXISTS (SELECT 1 FROM tournament_matches later
+          JOIN tournament_rounds later_round ON later_round.id = later.round_id
+          WHERE later.tournament_id = m.tournament_id AND later_round.round_number > r.round_number
+            AND (EXISTS (SELECT 1 FROM json_each(later.team_a_registration_ids) j WHERE j.value = ?)
+              OR EXISTS (SELECT 1 FROM json_each(later.team_b_registration_ids) j WHERE j.value = ?)))`;
+
 // Persönliche Live-Links reichen absichtlich nicht: Der Spieler muss über sein Konto einer Anmeldung zugeordnet sein.
 /**
  * Keine offene eigene Partie in der aktuellen Runde: Steht dort schon ein Ergebnis, sagt die Meldung, von wem
@@ -8734,12 +8742,12 @@ async function throwNoOpenMatch(db, tournamentId, registrationId) {
       FROM tournament_matches m
       JOIN tournament_rounds r ON r.id = m.round_id
       WHERE m.tournament_id = ?
-        AND r.round_number = (SELECT MAX(round_number) FROM tournament_rounds WHERE tournament_id = ?)
+        AND ${NO_LATER_MATCH_OF_REGISTRATION_SQL}
         AND (m.score_a IS NOT NULL OR m.score_b IS NOT NULL OR m.no_show IS NOT NULL)
         AND json_array_length(m.team_b_registration_ids) > 0
         AND (EXISTS (SELECT 1 FROM json_each(m.team_a_registration_ids) j WHERE j.value = ?)
           OR EXISTS (SELECT 1 FROM json_each(m.team_b_registration_ids) j WHERE j.value = ?))`)
-    .bind(tournamentId, tournamentId, registrationId, registrationId).first();
+    .bind(tournamentId, registrationId, registrationId, registrationId, registrationId).first();
   if (decided) {
     throw new HttpError(409, decided.result_reported_by
       ? 'Für deine Partie wurde bereits ein Ergebnis gemeldet.'
@@ -8776,12 +8784,12 @@ async function reportLiveMatchResult(request, env, registration, reporterUserId)
       FROM tournament_matches m
       JOIN tournament_rounds r ON r.id = m.round_id
       WHERE m.tournament_id = ?
-        AND r.round_number = (SELECT MAX(round_number) FROM tournament_rounds WHERE tournament_id = ?)
+        AND ${NO_LATER_MATCH_OF_REGISTRATION_SQL}
         AND m.score_a IS NULL AND m.score_b IS NULL AND m.no_show IS NULL
         AND json_array_length(m.team_b_registration_ids) > 0
         AND (EXISTS (SELECT 1 FROM json_each(m.team_a_registration_ids) j WHERE j.value = ?)
           OR EXISTS (SELECT 1 FROM json_each(m.team_b_registration_ids) j WHERE j.value = ?))`)
-    .bind(registration.id, tournament.id, tournament.id, registration.id, registration.id).first();
+    .bind(registration.id, tournament.id, registration.id, registration.id, registration.id, registration.id).first();
   if (!match) await throwNoOpenMatch(db, tournament.id, registration.id);
 
   const body = await readJson(request);
@@ -8819,12 +8827,12 @@ async function reportDocumentMatchResult(request, db, tournament, registration, 
       FROM tournament_matches m
       JOIN tournament_rounds r ON r.id = m.round_id
       WHERE m.tournament_id = ?
-        AND r.round_number = (SELECT MAX(round_number) FROM tournament_rounds WHERE tournament_id = ?)
+        AND ${NO_LATER_MATCH_OF_REGISTRATION_SQL}
         AND m.score_a IS NULL AND m.score_b IS NULL AND m.no_show IS NULL
         AND json_array_length(m.team_b_registration_ids) > 0
         AND (EXISTS (SELECT 1 FROM json_each(m.team_a_registration_ids) j WHERE j.value = ?)
           OR EXISTS (SELECT 1 FROM json_each(m.team_b_registration_ids) j WHERE j.value = ?))`)
-    .bind(registration.id, tournament.id, tournament.id, registration.id, registration.id).first();
+    .bind(registration.id, tournament.id, registration.id, registration.id, registration.id, registration.id).first();
   if (!match) await throwNoOpenMatch(db, tournament.id, registration.id);
 
   const body = await readJson(request);
@@ -8854,7 +8862,7 @@ function assertDocumentReportingPossible(tournament) {
 }
 
 /**
- * Letzte eigene Meldung der aktuellen Runde bei einem im Dokument geführten Turnier, aus Sicht der Anmeldung:
+ * Letzte eigene Meldung zur jüngsten eigenen Partie bei einem im Dokument geführten Turnier, aus Sicht der Anmeldung:
  * offen (wartet auf die Turnierleitung) oder verworfen. Ohne Meldung oder ohne Ergebnismeldung {@code null}.
  */
 export async function currentDocumentResultReport(db, tournament, registrationId) {
@@ -8863,11 +8871,15 @@ export async function currentDocumentResultReport(db, tournament, registrationId
       EXISTS (SELECT 1 FROM json_each(team_a_registration_ids) j WHERE j.value = ?) AS in_a
       FROM document_result_reports
       WHERE tournament_id = ? AND status IN ('open', 'dismissed')
-        AND round_number = (SELECT MAX(round_number) FROM tournament_rounds WHERE tournament_id = ?)
+        AND round_number = (SELECT MAX(r.round_number) FROM tournament_matches m
+          JOIN tournament_rounds r ON r.id = m.round_id
+          WHERE m.tournament_id = ?
+            AND (EXISTS (SELECT 1 FROM json_each(m.team_a_registration_ids) j WHERE j.value = ?)
+              OR EXISTS (SELECT 1 FROM json_each(m.team_b_registration_ids) j WHERE j.value = ?)))
         AND (EXISTS (SELECT 1 FROM json_each(team_a_registration_ids) j WHERE j.value = ?)
           OR EXISTS (SELECT 1 FROM json_each(team_b_registration_ids) j WHERE j.value = ?))
       ORDER BY created_at DESC LIMIT 1`)
-    .bind(registrationId, tournament.id, tournament.id, registrationId, registrationId).first();
+    .bind(registrationId, tournament.id, tournament.id, registrationId, registrationId, registrationId, registrationId).first();
   if (!row) return null;
   const inA = Number(row.in_a) === 1;
   return {

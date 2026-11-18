@@ -651,7 +651,10 @@ export function buildPlayerLiveView({ registrationId, rounds, ranking }) {
 
   const lastRoundNumber = rounds?.length ? rounds[rounds.length - 1].roundNumber : null;
   const latest = history[history.length - 1] || null;
-  const currentMatch = latest && latest.roundNumber === lastRoundNumber ? latest : null;
+  // Eine offene Partie aus einer früheren Runde bleibt aktuell, solange der Spieler danach nicht neu eingeteilt ist
+  // (gleichzeitig gespielte KO-Bäume: Baum A ist schon im Halbfinale, Baum B noch im Viertelfinale).
+  const currentMatch = latest && (latest.roundNumber === lastRoundNumber || (!latest.bye && latest.outcome === 'open'))
+    ? latest : null;
   const played = history.filter((entry) => entry.outcome !== 'open');
   const summary = {
     played: played.length,
