@@ -185,8 +185,11 @@ describe('Maastrichter online', () => {
     await playPreliminaryRounds();
     // Zwischen Vorab-Prüfung und Speichern lost jemand die erste Finalrunde aus (Finalgruppen gesetzt).
     env.DB.vorBatch((sqlite) => sqlite.prepare("UPDATE tournament_teams SET bracket_group = 'A', ko_seed = 1 WHERE tournament_id = 't1'").run());
-    const response = await update({ name: 'Umbenannt', maastrichterPreliminaryRounds: 3 });
+    const response = await update({ name: 'Umbenannt', maastrichterPreliminaryRounds: 3,
+      liveViewEnabled: true, playerResultReportingEnabled: true, resultReportConfirmationRequired: true });
     expect(response.status).toBe(409);
+    // Auch die Turnieroptionen im selben Batch bleiben ungespeichert.
+    expect(rows("SELECT * FROM tournament_options WHERE tournament_id = 't1'")).toEqual([]);
     expect((await response.json()).error).toBe('Die Maastrichter-Einstellungen können nach Beginn der Finalrunde nicht mehr geändert werden');
     expect(storedSettings()).toEqual([{ preliminary_rounds: 2, group_mode: 'NACH_GROESSE' }]);
     expect(rows("SELECT name FROM tournaments WHERE id = 't1'")).toEqual([{ name: 'Maastrichter' }]);

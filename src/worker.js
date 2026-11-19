@@ -6703,13 +6703,14 @@ async function updateTournament(request, env, existing, user) {
       existing.id,
       ...(maastrichterChange ? maastrichterSettingsAppliedParams(existing.id, maastrichterChange) : []),
     );
-  if (maastrichterChange) {
-    const [, updatedRow] = await db.batch([maastrichterSettingsStatement(db, existing.id, maastrichterChange), tournamentUpdate]);
-    if (!Number(updatedRow?.meta?.changes || 0)) await throwMaastrichterSettingsLocked(db, existing.id, maastrichterChange);
-  } else {
-    await tournamentUpdate.run();
-  }
-  await tournamentOptionsStatement(db, existing.id, tournament)?.run();
+  // Optionen im selben Batch (eine Transaktion): Sonst könnte eine Spielermeldung zwischen „Ergebnismeldung an“ und
+  // „erst nach Bestätigung“ den Standard sehen und sofort veröffentlicht werden. Sie gelten nur, wenn das Eckdaten-Update
+  // angekommen ist (updated_at = now), also nicht, wenn die Maastrichter-Sperre greift.
+  const optionsUpdate = tournamentOptionsStatement(db, existing.id, tournament, { appliedAt: now });
+  const statements = [...(maastrichterChange ? [maastrichterSettingsStatement(db, existing.id, maastrichterChange)] : []),
+    tournamentUpdate, ...(optionsUpdate ? [optionsUpdate] : [])];
+  const results = await db.batch(statements);
+  if (maastrichterChange && !Number(results[1]?.meta?.changes || 0)) await throwMaastrichterSettingsLocked(db, existing.id, maastrichterChange);
 
   const feeTiers = tournament.feeTiersProvided ? tournament.feeTiers : jsonArray(existing.fee_tiers).filter((tier) => tier?.id !== 'legacy-standard');
   await db.prepare('UPDATE tournaments SET fee_tiers = ? WHERE id = ?').bind(JSON.stringify(feeTiers), existing.id).run();
@@ -8721,12 +8722,14 @@ async function getTournamentOptions(db, tournamentId) {
 }
 
 // Speichert die übermittelten Optionen; null, wenn keine mitgeschickt wurden (Teil-Update, Sync) – dann bleibt die Zeile.
-function tournamentOptionsStatement(db, tournamentId, tournament) {
+// appliedAt: nur schreiben, wenn das Turnier im selben Batch mit diesem updated_at gespeichert wurde.
+function tournamentOptionsStatement(db, tournamentId, tournament, { appliedAt = null } = {}) {
   if (!tournament.resultReportConfirmationRequiredProvided) return null;
   const value = tournament.resultReportConfirmationRequired ? 1 : 0;
-  return db.prepare(`INSERT INTO tournament_options (tournament_id, result_report_confirmation_required) VALUES (?, ?)
+  return db.prepare(`INSERT INTO tournament_options (tournament_id, result_report_confirmation_required)
+      SELECT ?, ? WHERE ? IS NULL OR EXISTS (SELECT 1 FROM tournaments WHERE id = ? AND updated_at = ?)
       ON CONFLICT(tournament_id) DO UPDATE SET result_report_confirmation_required = excluded.result_report_confirmation_required`)
-    .bind(tournamentId, value);
+    .bind(tournamentId, value, appliedAt, tournamentId, appliedAt);
 }
 
 // Maastrichter-Einstellungen in eigener Tabelle: tournaments steht am D1-Limit von 100 Ergebnisspalten (Migration 0162).

@@ -45,6 +45,26 @@ describe('Turnieroptionen (tournament_options)', () => {
     expect(stored(tournament.id)).toBe(0);
   });
 
+  // Sonst könnte eine Spielermeldung zwischen den beiden Schreibvorgängen den Standard sehen und sofort öffentlich werden.
+  it('schaltet Ergebnismeldung und Bestätigungspflicht in einem Schritt ein', async () => {
+    const tournament = await create({ playerResultReportingEnabled: false });
+    const sichtbar = [];
+    const zustand = () => sichtbar.push(env.DB.sqlite.prepare(`SELECT t.player_result_reporting_enabled AS meldung,
+        COALESCE(o.result_report_confirmation_required, 0) AS bestaetigung
+      FROM tournaments t LEFT JOIN tournament_options o ON o.tournament_id = t.id WHERE t.id = ?`).get(tournament.id));
+    // Jeden Schreibvorgang außerhalb eines Batches und jeden Batch als Ganzes beobachten.
+    const prepare = env.DB.prepare.bind(env.DB);
+    const beobachten = (statement) => ({ ...statement, bind: (...values) => beobachten(statement.bind(...values)),
+      run: async () => { const result = await statement.run(); zustand(); return result; } });
+    env.DB.prepare = (statementSql) => beobachten(prepare(statementSql));
+    const batch = env.DB.batch.bind(env.DB);
+    env.DB.batch = async (statements) => { const result = await batch(statements); zustand(); return result; };
+
+    expect((await update(tournament.id, { resultReportConfirmationRequired: true })).status).toBe(200);
+    expect(sichtbar.at(-1)).toEqual({ meldung: 1, bestaetigung: 1 });
+    expect(sichtbar).not.toContainEqual({ meldung: 1, bestaetigung: 0 });
+  });
+
   it('lässt den gespeicherten Wert stehen, wenn ein Update die Option nicht mitschickt', async () => {
     const tournament = await create({ resultReportConfirmationRequired: true });
     expect((await update(tournament.id, {})).status).toBe(200);
