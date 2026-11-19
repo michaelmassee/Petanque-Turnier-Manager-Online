@@ -65,7 +65,7 @@ import {
 } from './worker-core.js';
 import { normalizeKoWinners, normalizeRanking } from './lib/live-ranking.js';
 import { parseStoredQrDesign } from './lib/qr-design.js';
-import { playerResultReportingActive } from './lib/result-reporting.js';
+import { playerResultReportingActive, supportsPlayerResultReporting } from './lib/result-reporting.js';
 import { fetchCloudflareUsageDay, fetchCloudflareUsageDays, isCloudflareUsageConfigured } from './cloudflare-usage-core.js';
 import { checkRoundRequirements, getPairingStrategy, isMeleeTeamTournament, isOnlinePlayable, roundRequirementMessage } from './lib/pairing/index.js';
 import { buildMeleeTeams, buildMeleeTeamsWithoutBye, duplicateMeleeNames, isMixedMeleeMode, meleeTeamSize, usablePlayersWithoutBye } from './lib/pairing/melee.js';
@@ -6698,8 +6698,7 @@ async function updateTournament(request, env, existing, user) {
       geo.geocodedAt,
       timezone,
       selectedPlace?.id || null,
-      tournament.liveViewEnabled ? 1 : 0,
-      tournament.playerResultReportingEnabled ? 1 : 0,
+      ...liveViewColumns(tournament, existing),
       now,
       existing.id,
       ...(maastrichterChange ? maastrichterSettingsAppliedParams(existing.id, maastrichterChange) : []),
@@ -6733,6 +6732,19 @@ async function updateTournament(request, env, existing, user) {
 }
 
 /** Veröffentlichung (gespeicherte Suchen) und Statuswechsel (Postfach) nach einer Turnieränderung melden. */
+/**
+ * Live-Ansicht und Ergebnismeldung beim Bearbeiten über das Turnierformular: Sie stehen in der Spielverwaltung
+ * (PUT …/options), das Formular schickt sie nicht mehr – dann bleibt der gespeicherte Wert. Ein Systemwechsel auf
+ * Trip-Tête schaltet die Ergebnismeldung trotzdem ab.
+ */
+function liveViewColumns(tournament, existing) {
+  const liveView = tournament.liveViewEnabledProvided ? tournament.liveViewEnabled : Number(existing.live_view_enabled || 0) === 1;
+  const reporting = tournament.playerResultReportingEnabledProvided
+    ? tournament.playerResultReportingEnabled
+    : liveView && Number(existing.player_result_reporting_enabled || 0) === 1 && supportsPlayerResultReporting(tournament.type);
+  return [liveView ? 1 : 0, reporting ? 1 : 0];
+}
+
 async function notifyTournamentPublicationChange(env, existing, updated) {
   if (isNewlyPublicTournament(existing, updated)) {
     await notifySavedSearchesForPublishedTournament(env, updated);
@@ -8845,11 +8857,25 @@ export async function setTournamentOptions(request, db, tournament) {
   if (tournament.status === 'finished') throw new HttpError(409, 'Das Turnier ist beendet.');
   const body = await readJson(request);
   const columns = normalizeTournamentOptions(body);
+  const liveInput = columns.live_view_enabled !== undefined || columns.player_result_reporting_enabled !== undefined;
+  // Im Turnierdokument geführt: Das Dokument ist Master (PUT /api/sync/…/settings), sonst überschriebe der nächste Sync.
+  if (liveInput && isDocumentBound(tournament)) {
+    throw new HttpError(409, 'Live-Ansicht und Ergebnismeldung werden bei diesem Turnier im Turnierdokument eingestellt.');
+  }
+  // Ergebnismeldung nur mit Live-Ansicht und bei Systemen mit einem Ergebnis je Partie (wie im Turnierformular).
+  if (liveInput) {
+    const liveView = columns.live_view_enabled ?? Number(tournament.live_view_enabled || 0);
+    const reporting = columns.player_result_reporting_enabled ?? Number(tournament.player_result_reporting_enabled || 0);
+    columns.player_result_reporting_enabled = liveView === 1 && reporting === 1 && supportsPlayerResultReporting(tournament.type) ? 1 : 0;
+  }
+  if (body?.resultReportConfirmationRequired !== undefined && typeof body.resultReportConfirmationRequired !== 'boolean') {
+    throw new HttpError(400, 'Ungültige Einstellung Bestätigung der Ergebnismeldungen');
+  }
   // Maastrichter: Vorrunden und Finalgruppen-Bildung wie in der Konfiguration des Hauptprojekts hier statt im
   // Turnierformular; eigene Tabelle mit Sperre ab der Finalrunde (siehe maastrichterSettingsStatement).
   const maastrichterInput = tournament.type === 'maastrichter' ? normalizeMaastrichterSettings(body) : null;
   const names = Object.keys(columns);
-  if (!names.length && !maastrichterInput) throw new HttpError(400, 'Keine Turnieroptionen übergeben');
+  if (!names.length && !maastrichterInput && body?.resultReportConfirmationRequired === undefined) throw new HttpError(400, 'Keine Turnieroptionen übergeben');
   const maastrichterChange = await plannedMaastrichterSettings(db, tournament.id, maastrichterInput);
   const updated = { ...tournament, ...columns };
   const now = new Date().toISOString();
@@ -8884,10 +8910,20 @@ export async function setTournamentOptions(request, db, tournament) {
         .bind(columns.bye_points_for, columns.bye_points_against, now, tournament.id));
     }
   }
+  // Wirkt nur bei Online-Durchführung; im selben Batch und nur, wenn das Turnier-Update oben angekommen ist.
+  if (body?.resultReportConfirmationRequired !== undefined) {
+    statements.push(tournamentOptionsStatement(db, tournament.id, {
+      resultReportConfirmationRequiredProvided: true,
+      resultReportConfirmationRequired: body.resultReportConfirmationRequired && playerResultReportingActive(updated),
+    }, { appliedAt: now }));
+  }
   const results = await db.batch(statements);
   if (maastrichterChange && !Number(results[1]?.meta?.changes || 0)) await throwMaastrichterSettingsLocked(db, tournament.id, maastrichterChange);
   return json({
     ...tournamentOptions(updated),
+    liveViewEnabled: Number(updated.live_view_enabled || 0) === 1,
+    playerResultReportingEnabled: playerResultReportingActive(updated),
+    ...(await getTournamentOptions(db, tournament.id)),
     ...(tournament.type === 'maastrichter' ? { maastrichter: await maastrichterSettingsState(db, tournament.id) } : {}),
   });
 }
@@ -10211,7 +10247,8 @@ async function syncDeleteRound(db, tournament, roundNumberValue) {
 }
 
 /**
- * Spieleinstellungen aus dem Turnierdokument (Formation, Schweizer Ranglistenmodus, Spiel um Platz 3). Das Dokument ist Master; anders als im Web-Bearbeiten gilt keine Sperre nach dem Start.
+ * Spieleinstellungen aus dem Turnierdokument (Formation, Schweizer Ranglistenmodus, Spiel um Platz 3, Live-Ansicht,
+ * Ergebnismeldung durch Spieler). Das Dokument ist Master; anders als im Web-Bearbeiten gilt keine Sperre nach dem Start.
  */
 export async function syncPutTournamentSettings(request, db, tournament) {
   const columns = normalizeSyncSettings(await readJson(request), tournament);

@@ -59,12 +59,12 @@ export function quickStartPayload(template, { currentUser, today = localIsoDate(
     visibility: 'private',
     status: 'draft',
     registrationEnabled: true,
-    liveViewEnabled: true,
-    playerResultReportingEnabled: true,
     contactName: currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '',
     contactEmail: currentUser?.email || '',
     contactPhone: currentUser?.phone || '',
   });
   // Der Server merkt sich das für die Liste „Meine Schnellstart-Turniere“.
-  return { ...payload, quickStart: true };
+  // Live-Ansicht und Ergebnismeldung stehen nicht im Turnierformular (tournamentPayload), beim Schnellstart gleich an;
+  // die Kopplung an das Turniersystem (Trip-Tête) prüft der Server.
+  return { ...payload, liveViewEnabled: true, playerResultReportingEnabled: true, quickStart: true };
 }

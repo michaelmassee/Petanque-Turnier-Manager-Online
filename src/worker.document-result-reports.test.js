@@ -206,6 +206,33 @@ describe('Ergebnismeldung bei verbundenem Turnierdokument', () => {
     expect(meldungen().map((zeile) => zeile.status)).toEqual(['superseded', 'superseded']);
   });
 
+  it('übernimmt Live-Ansicht und Ergebnismeldung aus dem Dokument; die Spielverwaltung darf sie nicht ändern', async () => {
+    sql("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES ('owner-session', 'owner', '2099-01-01T00:00:00.000Z', '2026-01-01')");
+    const flags = () => env.DB.sqlite.prepare("SELECT live_view_enabled AS live, player_result_reporting_enabled AS meldung FROM tournaments WHERE id = 't1'").get();
+
+    expect((await sync('PUT', '/settings', { playerResultReportingEnabled: false })).status).toBe(200);
+    expect(flags()).toEqual({ live: 1, meldung: 0 });
+    expect((await sync('PUT', '/rounds/1', rundeMit(null, null))).headers.get('X-PTM-Result-Reporting')).toBe('0');
+    expect((await (await sync('GET', '/result-reports')).json()).enabled).toBe(false);
+    expect((await melden('anna-session', ANNA, 13, 7)).status).not.toBe(200);
+
+    expect((await sync('PUT', '/settings', { liveViewEnabled: true, playerResultReportingEnabled: true })).status).toBe(200);
+    expect((await sync('PUT', '/rounds/1', rundeMit(null, null))).headers.get('X-PTM-Result-Reporting')).toBe('1');
+    expect((await melden('anna-session', ANNA, 13, 7)).status).toBe(200);
+
+    // Live-Ansicht aus: Ergebnismeldung mit aus; ungültige Werte abgelehnt.
+    expect((await sync('PUT', '/settings', { liveViewEnabled: false })).status).toBe(200);
+    expect(flags()).toEqual({ live: 0, meldung: 0 });
+    expect((await sync('PUT', '/settings', { liveViewEnabled: 'ja' })).status).toBe(400);
+
+    // Dokument ist Master: Die Spielverwaltung lehnt eine Änderung ab.
+    const online = await worker.fetch(new Request('https://ptm.test/api/tournaments/t1/options', {
+      method: 'PUT', headers: { Cookie: 'ptm_session=owner-session', 'Content-Type': 'application/json' }, body: JSON.stringify({ liveViewEnabled: true }),
+    }), env);
+    expect(online.status).toBe(409);
+    expect(flags()).toEqual({ live: 0, meldung: 0 });
+  });
+
   it('meldet bei jeder Sync-Antwort Schalter, Zahl der offenen Meldungen und Turnierstatus (Huckepack)', async () => {
     await melden('bert-session', BERT, 13, 7);
 

@@ -2,23 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { EMPTY_TOURNAMENT_FORM } from './constants.js';
 import { tournamentPayload } from './domain.js';
 
-const form = { ...EMPTY_TOURNAMENT_FORM, name: 'Turnier', date: '2026-12-01', location: 'Ort', type: 'schweizer',
-  liveViewEnabled: true, playerResultReportingEnabled: true };
+const form = { ...EMPTY_TOURNAMENT_FORM, name: 'Turnier', date: '2026-12-01', location: 'Ort', type: 'schweizer' };
 
-describe('tournamentPayload: Bestätigungspflicht für Ergebnismeldungen', () => {
-  it('schickt beim Anlegen den Standard „sofort übernehmen“ mit', () => {
-    expect(tournamentPayload(form)).toMatchObject({ resultReportConfirmationRequired: false });
-    expect(tournamentPayload({ ...form, resultReportConfirmationRequired: true })).toMatchObject({ resultReportConfirmationRequired: true });
-  });
-
-  it('schickt beim Bearbeiten nichts, solange der gespeicherte Wert nicht geladen ist', () => {
-    expect(tournamentPayload({ ...form, id: 't1' })).not.toHaveProperty('resultReportConfirmationRequired');
-    expect(tournamentPayload({ ...form, id: 't1', settingsLoadedFor: 't1', resultReportConfirmationRequired: true }))
-      .toMatchObject({ resultReportConfirmationRequired: true });
-  });
-
-  it('schickt „aus“, wenn Spieler keine Ergebnisse melden dürfen', () => {
-    expect(tournamentPayload({ ...form, playerResultReportingEnabled: false, resultReportConfirmationRequired: true }))
-      .toMatchObject({ resultReportConfirmationRequired: false });
+// Live-Ansicht und Ergebnismeldung stehen in der Spielverwaltung: Das Formular darf sie nicht mit einem alten Stand
+// überschreiben.
+describe('tournamentPayload: Live-Ansicht und Ergebnismeldung', () => {
+  it('schickt keine der drei Einstellungen mit', () => {
+    const payload = tournamentPayload({ ...form, id: 't1', liveViewEnabled: true, playerResultReportingEnabled: true, resultReportConfirmationRequired: true });
+    expect(payload).not.toHaveProperty('liveViewEnabled');
+    expect(payload).not.toHaveProperty('playerResultReportingEnabled');
+    expect(payload).not.toHaveProperty('resultReportConfirmationRequired');
   });
 });

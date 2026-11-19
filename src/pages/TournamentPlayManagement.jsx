@@ -15,6 +15,7 @@ import { isCalendarEntry, isDocumentBound, labelFor, sanitizeScore, translatedOp
 import { AnnouncementEditor } from '../components/TournamentAnnouncement.jsx';
 import { TimerEditor } from '../components/TournamentTimer.jsx';
 import { DEFAULT_TOURNAMENT_OPTIONS, TournamentOptionsPanel } from '../components/TournamentOptionsPanel.jsx';
+import { LiveViewOptionsPanel } from '../components/LiveViewOptionsPanel.jsx';
 import { CourtLabel } from '../components/CourtLabel.jsx';
 import { normalizeRanking } from '../lib/live-ranking.js';
 import { RankingTable } from '../components/RankingTable.jsx';
@@ -485,8 +486,11 @@ export function FinalRankingPublisher({ tournament, onPublished }) {
 
 export default function TournamentPlayManagement({ tournaments: managedTournaments, currentUserId, currentUser, turnstileSiteKey, focus = null }) {
   const { t, i18n } = useTranslation();
+  // Gespeicherte Live-Freigabe je Turnier: Der `tournaments`-Prop wird nicht sofort neu geladen.
+  const [savedLiveOptions, setSavedLiveOptions] = useState({});
   // Kalendereinträge sind reine Termine ohne Teilnehmer und tauchen hier gar nicht auf.
-  const allTournaments = managedTournaments.filter((tournament) => !isCalendarEntry(tournament));
+  const allTournaments = managedTournaments.filter((tournament) => !isCalendarEntry(tournament))
+    .map((tournament) => (savedLiveOptions[tournament.id] ? { ...tournament, ...savedLiveOptions[tournament.id] } : tournament));
   // Nur Turniere mit implementiertem Paarungssystem sind online spielbar (siehe isOnlinePlayable). Die übrigen stehen
   // trotzdem in der Auswahl – rot als „nicht online durchführbar“ markiert, mit Grund statt Start-Button.
   // Mit einem Turnierdokument verbundene Turniere führt das Dokument – schon ab dem Verbinden, nicht erst ab seinem
@@ -494,11 +498,12 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const tournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && !isDocumentBound(tournament));
   const nonPlayableTournaments = allTournaments.filter((tournament) => !isOnlinePlayable(tournament));
   const desktopExecutionTournaments = allTournaments.filter((tournament) => isOnlinePlayable(tournament) && isDocumentBound(tournament));
-  const pickerTournaments = [...tournaments, ...nonPlayableTournaments];
-  const [selectedTournamentId, setSelectedTournamentId] = useState((tournaments[0] || nonPlayableTournaments[0])?.id || '');
+  // Im Dokument geführte Turniere stehen in der Auswahl, damit Live-Ansicht und Ergebnismeldung einstellbar sind.
+  const pickerTournaments = [...tournaments, ...desktopExecutionTournaments, ...nonPlayableTournaments];
+  const [selectedTournamentId, setSelectedTournamentId] = useState((tournaments[0] || desktopExecutionTournaments[0] || nonPlayableTournaments[0])?.id || '');
   // Aus einer Push-Benachrichtigung gewähltes Turnier übernehmen, sobald es in der Liste ist.
   const focusTournamentId = focus?.tournamentId || '';
-  const focusAvailable = tournaments.some((tournament) => tournament.id === focusTournamentId);
+  const focusAvailable = pickerTournaments.some((tournament) => tournament.id === focusTournamentId);
   useEffect(() => {
     if (focusAvailable) setSelectedTournamentId(focusTournamentId);
   }, [focus, focusTournamentId, focusAvailable]);
@@ -528,6 +533,8 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
 
   const selectedTournament = tournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
   const selectedNonPlayable = nonPlayableTournaments.find((tournament) => tournament.id === selectedTournamentId) || null;
+  const selectedDocumentTournament = selectedTournament ? null
+    : allTournaments.find((tournament) => tournament.id === selectedTournamentId && isDocumentBound(tournament)) || null;
   const quickSlots = selectedTournament ? quickPlayerSlots(selectedTournament) : [];
   const isTeamQuickAdd = quickSlots.length > 1;
   const selectedTournamentStatus = selectedTournament
@@ -972,9 +979,6 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
     return (
       <div className="panel">
         <p className="muted">{t('Keine Turniere mit Online-Durchführung verfügbar.')}</p>
-        {desktopExecutionTournaments.length > 0 && (
-          <p className="hint">{t('Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.')}</p>
-        )}
       </div>
     );
   }
@@ -1099,7 +1103,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
           system={labelFor(TOURNAMENT_TYPES, selectedNonPlayable.type)}
         />
       )}
-      {!tournaments.length && desktopExecutionTournaments.length > 0 && (
+      {selectedDocumentTournament && (
         <p className="hint">{t('Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.')}</p>
       )}
 
@@ -1109,7 +1113,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
       {selectedTournament && <TournamentBoardShare tournament={selectedTournament} />}
       {/* Online nicht durchführbar, aber im Turnierdokument geführt: Spielplan und Rangliste kommen aus dem Dokument,
           die Anzeige für den Bildschirm vor Ort funktioniert also trotzdem. */}
-      {selectedNonPlayable && isDocumentBound(selectedNonPlayable) && <TournamentBoardShare tournament={selectedNonPlayable} />}
+      {selectedDocumentTournament && <TournamentBoardShare tournament={selectedDocumentTournament} />}
       {/* Ankündigungen schon vor dem Turnierstart, damit der Veranstalter vorab informieren kann. */}
       {selectedTournament && selectedTournamentStatus !== 'finished' && <AnnouncementEditor tournament={selectedTournament} />}
       {/* Rundenzeit wie der Timer im Hauptprojekt, direkt unter der Ankündigung. */}
@@ -1123,6 +1127,12 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
             // Optionen wirken sofort (Bahnen, Team-Anzeige, Freilos-Punkte): Runden und Rangliste neu laden.
             queryClient.invalidateQueries({ queryKey });
           }} />
+      )}
+      {/* Live-Ansicht und Ergebnismeldung: der Desktop liest die Freigabe über die Sync-Antworten. */}
+      {(selectedTournament || selectedDocumentTournament)
+        && (selectedTournament ? selectedTournamentStatus : selectedDocumentTournament.status) !== 'finished' && (
+        <LiveViewOptionsPanel tournament={selectedTournament || selectedDocumentTournament}
+          onSaved={(state) => setSavedLiveOptions((current) => ({ ...current, [selectedTournamentId]: state }))} />
       )}
 
       {canEditMeleeTeams && selectedTournamentStatus === 'running' && (

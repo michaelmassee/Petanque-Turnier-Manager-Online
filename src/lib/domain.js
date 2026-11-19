@@ -192,15 +192,7 @@ export function tournamentPayload(form) {
     visibility: form.visibility,
     internalNotes: form.internalNotes || null,
     participantsPublic: Boolean(form.participantsPublic),
-    liveViewEnabled: Boolean(form.liveViewEnabled),
-    playerResultReportingEnabled: Boolean(form.liveViewEnabled) && Boolean(form.playerResultReportingEnabled)
-      && supportsPlayerResultReporting(form.type),
-    // Steht in tournament_options und wird beim Bearbeiten nachgeladen: nur mitschicken, wenn der Stand bekannt ist
-    // (neues Turnier oder geladen), sonst überschriebe ein zu früh gespeichertes Formular den gespeicherten Wert.
-    ...(!form.id || form.settingsLoadedFor === form.id ? {
-      resultReportConfirmationRequired: Boolean(form.liveViewEnabled) && Boolean(form.playerResultReportingEnabled)
-        && Boolean(form.resultReportConfirmationRequired),
-    } : {}),
+    // Live-Ansicht und Ergebnismeldung stehen in der Spielverwaltung (LiveViewOptionsPanel), nicht im Formular.
     licenseRequired: Boolean(form.licenseRequired),
     teamNameEnabled: Boolean(form.teamNameEnabled),
     waitlistEnabled: Boolean(form.waitlistEnabled),

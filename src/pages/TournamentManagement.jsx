@@ -313,45 +313,6 @@ function RegistrationQuestionEditor({ question, index, onChange, onRemove }) {
   );
 }
 
-// Ergebnismeldungen erst nach „Gesehen“ der Turnierleitung veröffentlichen (Standard: sofort übernommen). Der Wert steht
-// in tournament_options (nicht im Turnierobjekt) und wird beim Bearbeiten nachgeladen; bis dahin ist das Feld gesperrt
-// und wird nicht mitgespeichert (tournamentPayload).
-function ResultReportConfirmationField({ form, setForm }) {
-  const { t } = useTranslation();
-  const waiting = Boolean(form.id) && form.settingsLoadedFor !== form.id;
-  return (
-    <>
-      {form.id && <TournamentSettingsLoader tournamentId={form.id} setForm={setForm} />}
-      <label className="checkbox-field checkbox-field-nested">
-        <input
-          type="checkbox"
-          checked={Boolean(form.resultReportConfirmationRequired)}
-          disabled={waiting}
-          onChange={(event) => setForm({ ...form, resultReportConfirmationRequired: event.target.checked })}
-        />
-        {t('Gemeldete Ergebnisse erst nach Bestätigung durch die Turnierleitung veröffentlichen')}
-      </label>
-    </>
-  );
-}
-
-// Lädt beim Bearbeiten die Optionen aus tournament_options einmal ins Formular (settingsLoadedFor).
-function TournamentSettingsLoader({ tournamentId, setForm }) {
-  const { data } = useQuery({
-    queryKey: ['tournament-settings', tournamentId],
-    queryFn: () => authenticatedApi(`/api/tournaments/${tournamentId}/settings`),
-    // Kein Cache über das Schließen des Formulars hinaus: Sonst übernähme das nächste Öffnen kurz den alten Stand.
-    gcTime: 0,
-  });
-  useEffect(() => {
-    if (!data) return;
-    setForm((current) => (current.id === tournamentId && current.settingsLoadedFor !== tournamentId
-      ? { ...current, resultReportConfirmationRequired: Boolean(data.resultReportConfirmationRequired), settingsLoadedFor: tournamentId }
-      : current));
-  }, [data, tournamentId, setForm]);
-  return null;
-}
-
 export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, owner, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [], clubOptions = [], formationLocked = false }) {
   const { t } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
@@ -690,28 +651,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
             />
             {t('Meldeliste öffentlich sichtbar. Ich bestätige, dass ich als Turnierersteller für diese Veröffentlichung verantwortlich bin und die Teilnehmer ausdrücklich darauf hinweisen muss.')}
           </label>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={Boolean(form.liveViewEnabled)}
-              onChange={(event) => setForm({ ...form, liveViewEnabled: event.target.checked,
-                ...(event.target.checked ? {} : { playerResultReportingEnabled: false }) })}
-            />
-            {t('Live-Ansicht freischalten')}
-          </label>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={Boolean(form.liveViewEnabled && form.playerResultReportingEnabled && supportsPlayerResultReporting(form.type))}
-              disabled={!form.liveViewEnabled || !supportsPlayerResultReporting(form.type)}
-              onChange={(event) => setForm({ ...form, playerResultReportingEnabled: event.target.checked })}
-            />
-            {t('Spieler dürfen Ergebnisse ihrer laufenden Partie in der Live-Ansicht melden')}
-          </label>
-          {form.liveViewEnabled && form.playerResultReportingEnabled && supportsPlayerResultReporting(form.type)
-            && <ResultReportConfirmationField form={form} setForm={setForm} />}
-          {!form.liveViewEnabled && <p className="hint">{t('Ergebnismeldungen durch Spieler sind nur mit freigeschalteter Live-Ansicht möglich.')}</p>}
-          {form.liveViewEnabled && !supportsPlayerResultReporting(form.type) && <p className="hint">{t('Bei Trip-Tête melden Spieler keine Ergebnisse: Eine Begegnung besteht aus drei Partien, die die Turnierleitung einträgt.')}</p>}
+          <p className="hint">{t('Live-Ansicht und Ergebnismeldung durch Spieler stehen in der Spielverwaltung.')}</p>
         </>
       )}
       <TextField label={t('Website')} type="url" placeholder="https://…" value={form.websiteUrl} onChange={(websiteUrl) => setForm({ ...form, websiteUrl })} invalid={invalidField === 'websiteUrl'} />
@@ -1158,8 +1098,6 @@ export function tournamentToForm(tournament) {
     internalNotes: tournament.internalNotes || '',
     club: tournament.club || '',
     participantsPublic: Boolean(tournament.participantsPublic),
-    liveViewEnabled: Boolean(tournament.liveViewEnabled),
-    playerResultReportingEnabled: Boolean(tournament.playerResultReportingEnabled),
     approvalRequired: Boolean(tournament.approvalRequired),
     licenseRequired: Boolean(tournament.licenseRequired),
     teamNameEnabled: Boolean(tournament.teamNameEnabled),

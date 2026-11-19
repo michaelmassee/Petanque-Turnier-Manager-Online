@@ -1554,32 +1554,12 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     expect(screen.getByRole('button', { name: 'Überschrift' })).toBeInTheDocument();
   });
 
-  it('bietet die optionale Ergebnismeldung durch Spieler im Turnierformular an', () => {
-    function LiveOptionHarness() {
-      const [form, setForm] = useState({ ...EMPTY_TOURNAMENT_FORM, name: 'Sommerturnier', date: '2026-06-01', location: 'Musterstadt' });
-      return <TournamentForm form={form} setForm={setForm} onSubmit={(event) => event.preventDefault()} onCancel={() => {}} mode="create" isAdmin={false} language="de" />;
-    }
-    render(<LiveOptionHarness />);
-
-    const liveView = screen.getByRole('checkbox', { name: 'Live-Ansicht freischalten' });
-    const playerResults = screen.getByRole('checkbox', { name: /Spieler dürfen Ergebnisse/ });
-    expect(liveView).not.toBeChecked();
-    expect(playerResults).toBeDisabled();
-    fireEvent.click(liveView);
-    expect(playerResults).not.toBeDisabled();
-    expect(screen.queryByRole('checkbox', { name: /erst nach Bestätigung/ })).not.toBeInTheDocument();
-    fireEvent.click(playerResults);
-    expect(playerResults).toBeChecked();
-    // Unteroption: Standard ist sofort übernehmen, Bestätigungspflicht wählbar.
-    const confirmation = screen.getByRole('checkbox', { name: /erst nach Bestätigung/ });
-    expect(confirmation).not.toBeChecked();
-    expect(confirmation).not.toBeDisabled();
-    fireEvent.click(confirmation);
-    expect(confirmation).toBeChecked();
-    // Live-Ansicht wieder aus: Ergebnismeldung wird mit abgeschaltet.
-    fireEvent.click(liveView);
-    expect(playerResults).toBeDisabled();
-    expect(playerResults).not.toBeChecked();
+  it('verweist für Live-Ansicht und Ergebnismeldung auf die Spielverwaltung', () => {
+    render(<TournamentForm form={{ ...EMPTY_TOURNAMENT_FORM, name: 'Sommerturnier', date: '2026-06-01', location: 'Musterstadt' }}
+      setForm={() => {}} onSubmit={(event) => event.preventDefault()} onCancel={() => {}} mode="create" isAdmin={false} language="de" />);
+    expect(screen.queryByRole('checkbox', { name: 'Live-Ansicht freischalten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /Spieler dürfen Ergebnisse/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Live-Ansicht und Ergebnismeldung durch Spieler stehen in der Spielverwaltung.')).toBeInTheDocument();
   });
 
   it('bietet beim Bearbeiten eines Kalendereintrags Logo- und Flyer-Bildlink an', () => {

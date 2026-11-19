@@ -83,6 +83,55 @@ describe('Turnieroptionen (tournament_options)', () => {
     expect(stored((await copy.json()).tournament.id)).toBe(1);
   });
 
+  describe('Live-Ansicht und Ergebnismeldung in der Spielverwaltung (PUT …/options)', () => {
+    const putOptions = (id, body) => request(`/api/tournaments/${id}/options`, { method: 'PUT', body: JSON.stringify(body) });
+    const flags = (id) => env.DB.sqlite.prepare('SELECT live_view_enabled AS live, player_result_reporting_enabled AS meldung FROM tournaments WHERE id = ?').get(id);
+
+    it('setzt alle drei Einstellungen und liefert den Stand zurück', async () => {
+      const tournament = await create({ liveViewEnabled: false, playerResultReportingEnabled: false });
+      const response = await putOptions(tournament.id, { liveViewEnabled: true, playerResultReportingEnabled: true, resultReportConfirmationRequired: true });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ liveViewEnabled: true, playerResultReportingEnabled: true, resultReportConfirmationRequired: true });
+      expect(flags(tournament.id)).toEqual({ live: 1, meldung: 1 });
+      expect(stored(tournament.id)).toBe(1);
+    });
+
+    it('schaltet mit der Live-Ansicht die Ergebnismeldung und die Bestätigungspflicht ab', async () => {
+      const tournament = await create({ resultReportConfirmationRequired: true });
+      expect((await putOptions(tournament.id, { liveViewEnabled: false, playerResultReportingEnabled: true, resultReportConfirmationRequired: true })).status).toBe(200);
+      expect(flags(tournament.id)).toEqual({ live: 0, meldung: 0 });
+      expect(stored(tournament.id)).toBe(0);
+      // Nur die Live-Ansicht mitgeschickt: Die Ergebnismeldung bleibt aus, solange die Live-Ansicht aus ist.
+      expect((await putOptions(tournament.id, { playerResultReportingEnabled: true })).status).toBe(200);
+      expect(flags(tournament.id)).toEqual({ live: 0, meldung: 0 });
+    });
+
+    it('lässt bei Trip-Tête keine Ergebnismeldung zu', async () => {
+      const tournament = await create({ type: 'trip_tete', formation: 'triplette', liveViewEnabled: false, playerResultReportingEnabled: false });
+      expect((await putOptions(tournament.id, { liveViewEnabled: true, playerResultReportingEnabled: true })).status).toBe(200);
+      expect(flags(tournament.id)).toEqual({ live: 1, meldung: 0 });
+    });
+
+    it('lehnt ungültige Werte und beendete Turniere ab', async () => {
+      const tournament = await create({});
+      expect((await putOptions(tournament.id, { liveViewEnabled: 'ja' })).status).toBe(400);
+      expect((await putOptions(tournament.id, { resultReportConfirmationRequired: 1 })).status).toBe(400);
+      sql("UPDATE tournaments SET status = 'finished' WHERE id = ?", tournament.id);
+      expect((await putOptions(tournament.id, { liveViewEnabled: false })).status).toBe(409);
+    });
+
+    it('das Turnierformular ohne die Felder lässt sie stehen; ein Wechsel auf Trip-Tête schaltet die Meldung ab', async () => {
+      const tournament = await create({});
+      const { liveViewEnabled, playerResultReportingEnabled, ...withoutLive } = BODY;
+      expect(liveViewEnabled && playerResultReportingEnabled).toBe(true);
+      const formUpdate = (body) => request(`/api/tournaments/${tournament.id}`, { method: 'PUT', body: JSON.stringify({ ...withoutLive, ...body }) });
+      expect((await formUpdate({ name: 'Umbenannt' })).status).toBe(200);
+      expect(flags(tournament.id)).toEqual({ live: 1, meldung: 1 });
+      expect((await formUpdate({ type: 'trip_tete', formation: 'triplette' })).status).toBe(200);
+      expect(flags(tournament.id)).toEqual({ live: 1, meldung: 0 });
+    });
+  });
+
   it('zeigt die Optionen nur Verwaltenden', async () => {
     const tournament = await create({});
     expect((await settings(tournament.id, 'fremd-session')).status).toBe(403);

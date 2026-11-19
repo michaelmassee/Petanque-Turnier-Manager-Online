@@ -154,13 +154,10 @@ describe('TournamentPlayManagement', () => {
     expect(screen.queryByRole('button', { name: 'Anzeige für Bildschirm' })).not.toBeInTheDocument();
   });
 
-  it('zeigt nicht online durchführbare Turniere rot markiert in der Auswahl, Desktop-Turniere gar nicht', async () => {
+  it('zeigt nicht online durchführbare Turniere rot markiert in der Auswahl, Desktop-Turniere ohne Markierung', async () => {
     installFetchMock([]);
     const desktop = { ...TOURNAMENT, id: 't2', name: 'Desktop-Turnier', desktopExecution: true };
     const liga = { ...TOURNAMENT, id: 't3', name: 'Liga ohne Online-Durchführung', registrationType: 'forme', type: 'liga' };
-    // Favoriten und Verlauf stammen ggf. von der Meldungsseite; das Desktop-Turnier darf auch darüber nicht auftauchen.
-    localStorage.setItem('ptm_tournament_favorites_user-1', JSON.stringify(['t2']));
-    localStorage.setItem('ptm_tournament_recents_user-1', JSON.stringify(['t2']));
 
     render(<TournamentPlayManagement tournaments={[liga, TOURNAMENT, desktop]} currentUserId="user-1" language="de" />);
     // Vorausgewählt ist das erste durchführbare Turnier, nicht das gesperrte.
@@ -171,13 +168,25 @@ describe('TournamentPlayManagement', () => {
     const options = within(screen.getByRole('listbox')).getAllByRole('option');
     expect(options.map((option) => option.textContent)).toEqual([
       expect.stringContaining('Clubabend Supermêlée'),
+      // Im Dokument geführt: auswählbar für Live-Ansicht und Ergebnismeldung.
+      expect.stringContaining('Desktop-Turnier'),
       expect.stringContaining('Liga ohne Online-Durchführung'),
     ]);
-    expect(options[1]).toHaveClass('is-unavailable');
-    expect(options[1]).toHaveTextContent('Nicht online durchführbar');
+    expect(options[2]).toHaveClass('is-unavailable');
+    expect(options[2]).toHaveTextContent('Nicht online durchführbar');
     expect(options[0]).not.toHaveClass('is-unavailable');
-    expect(screen.queryByText('Favoriten')).not.toBeInTheDocument();
-    localStorage.clear();
+    expect(options[1]).not.toHaveClass('is-unavailable');
+  });
+
+  it('zeigt bei einem im Turnierdokument geführten Turnier nur Bildschirmanzeige und Live-Einstellungen', async () => {
+    installFetchMock([]);
+    const desktop = { ...TOURNAMENT, id: 't2', name: 'Desktop-Turnier', desktopExecution: true, liveViewEnabled: true };
+    render(<TournamentPlayManagement tournaments={[desktop]} currentUserId="user-1" language="de" />);
+    expect(await screen.findByText('Dieses Turnier wird nicht online durchgeführt. Der Spielplan wird im Turnierdokument geführt.')).toBeInTheDocument();
+    expect(screen.getByText('Live-Ansicht und Ergebnismeldung')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Live-Ansicht freischalten' })).toBeChecked();
+    expect(screen.queryByRole('button', { name: 'Turnier starten' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Turnieroptionen')).not.toBeInTheDocument();
   });
 
   it('zeigt für ein nicht online durchführbares Turnier einen roten Hinweis mit PTM Desktop statt „Turnier starten“', async () => {
@@ -1475,7 +1484,7 @@ describe('TournamentPlayManagement', () => {
     expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeDisabled();
 
     fireEvent.click(screen.getByLabelText('Rückrunde spielen (Hin- und Rückrunde mit getauschten Seiten)'));
-    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    fireEvent.click(within(document.querySelector('.tournament-options')).getByRole('button', { name: 'Speichern' }));
     expect(await screen.findByText('Turnieroptionen gespeichert.')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Nächste Runde starten' })).toBeEnabled());
   });
