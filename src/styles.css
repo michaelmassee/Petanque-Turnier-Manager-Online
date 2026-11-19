@@ -4481,6 +4481,12 @@ a.left-panel-link {
   background: #fff;
 }
 
+/* Reihenfolge der Kriterien unter der Rangliste, wie die Fußzeile im Turnierdokument. */
+.ranking-order-note {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+}
+
 /* Spielrunde als Tabelle: Aufbau wie im Hauptprojekt (Bahn/Stufe, Team A, Team B, Ergebnis), Aussehen wie die
    Rangliste daneben (.ranking-table: ohne Rahmen, heller Kopf, Zeilen abwechselnd weiß/hellgrau). */
 .round-table {

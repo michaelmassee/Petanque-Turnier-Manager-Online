@@ -2173,5 +2173,10 @@
   "Die Maastrichter-Einstellungen können nach Beginn der Finalrunde nicht mehr geändert werden": "Les réglages Maastricht ne peuvent plus être modifiés une fois la phase finale commencée",
   "Es sind bereits mehr Vorrunden ausgelost, als eingestellt werden sollen": "Plus de tours préliminaires ont déjà été tirés que le nouveau réglage ne le permet",
   "Für die Finalrunde fehlen die Finalgruppen.": "Les groupes finaux de la phase finale manquent.",
-  "Die Maastrichter-Einstellungen wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut auslosen.": "Les réglages Maastricht ont été modifiés entre-temps. Veuillez actualiser et tirer à nouveau le tour."
+  "Die Maastrichter-Einstellungen wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut auslosen.": "Les réglages Maastricht ont été modifiés entre-temps. Veuillez actualiser et tirer à nouveau le tour.",
+  "Gr": "Gr",
+  "FL": "Exempt",
+  "Runden mit Freilos": "Tours exempts",
+  "Reihenfolge zur Ermittlung der Platzierung: 1. Siege +, 2. Buchholz +, 3. Feinbuchholz +, 4. Spielpunkte-Δ, 5. Punkte +": "Ordre de classement : 1. Victoires +, 2. Buchholz +, 3. Buchholz fin +, 4. Différence de points Δ, 5. Points +",
+  "Reihenfolge zur Ermittlung der Platzierung: 1. Siege +, 2. Spielpunkte-Δ, 3. Punkte +": "Ordre de classement : 1. Victoires +, 2. Différence de points Δ, 3. Points +"
 }

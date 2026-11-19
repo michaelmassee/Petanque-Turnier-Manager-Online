@@ -2173,5 +2173,10 @@
   "Die Maastrichter-Einstellungen können nach Beginn der Finalrunde nicht mehr geändert werden": "The Maastricht settings can no longer be changed once the final stage has started",
   "Es sind bereits mehr Vorrunden ausgelost, als eingestellt werden sollen": "More preliminary rounds have already been drawn than the new setting allows",
   "Für die Finalrunde fehlen die Finalgruppen.": "The final groups for the final stage are missing.",
-  "Die Maastrichter-Einstellungen wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut auslosen.": "The Maastricht settings have been changed in the meantime. Please refresh and draw the round again."
+  "Die Maastrichter-Einstellungen wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut auslosen.": "The Maastricht settings have been changed in the meantime. Please refresh and draw the round again.",
+  "Gr": "Gr",
+  "FL": "Bye",
+  "Runden mit Freilos": "Rounds with a bye",
+  "Reihenfolge zur Ermittlung der Platzierung: 1. Siege +, 2. Buchholz +, 3. Feinbuchholz +, 4. Spielpunkte-Δ, 5. Punkte +": "Order for determining the ranking: 1. Wins +, 2. Buchholz +, 3. Fine Buchholz +, 4. Point difference Δ, 5. Points +",
+  "Reihenfolge zur Ermittlung der Platzierung: 1. Siege +, 2. Spielpunkte-Δ, 3. Punkte +": "Order for determining the ranking: 1. Wins +, 2. Point difference Δ, 3. Points +"
 }

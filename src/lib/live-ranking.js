@@ -20,6 +20,8 @@ export function normalizeRanking(ranking) {
       pointsFor: entry.pointsFor ?? null,
       pointsAgainst: entry.pointsAgainst ?? null,
       pointsDiff: entry.pointsDiff ?? (entry.pointsFor != null && entry.pointsAgainst != null ? entry.pointsFor - entry.pointsAgainst : null),
+      group: entry.group ?? null,
+      byeRounds: entry.byeRounds ?? null,
     };
   });
 }
@@ -32,12 +34,16 @@ export function normalizeKoWinners(winners) {
   });
 }
 
-const OPTIONAL_COLUMNS = new Set(['bhz', 'fbhz', 'wertung', 'gameDiff']);
+const OPTIONAL_COLUMNS = new Set(['bhz', 'fbhz', 'wertung', 'gameDiff', 'group', 'byeRounds']);
+
+// Gruppe und Freilos-Runden sind Text; eine leere Zelle bleibt wie im Turnierdokument leer.
+const TEXT_COLUMNS = new Set(['group', 'byeRounds']);
 
 /**
  * Spalten-Schlüssel der Rangliste je Turniersystem (wie im Turnierdokument): Schweizer/Maastrichter mit Buchholz,
- * Formule X mit Wertung, sonst Spieldifferenz; Niederlagen zeigt die Rangliste nicht. Wertungskriterien, die kein Eintrag führt (z. B. weil
- * das verbundene Dokument sie nicht überträgt), entfallen.
+ * Formule X mit Wertung, sonst Spieldifferenz; Niederlagen zeigt die Rangliste nicht. Dahinter Gruppe (Gr) und
+ * Freilos-Runden (FL), solange das verbundene Dokument sie zeigt. Spalten, die kein Eintrag führt (z. B. weil das
+ * verbundene Dokument sie nicht überträgt), entfallen.
  */
 export function rankingColumnKeys(tournament, entries) {
   const swiss = tournament?.type === 'schweizer' || tournament?.type === 'maastrichter';
@@ -48,6 +54,7 @@ export function rankingColumnKeys(tournament, entries) {
     ...(formuleX ? ['wertung'] : []),
     ...(!swiss && !formuleX ? ['gameDiff'] : []),
     'pointsFor', 'pointsAgainst', 'pointsDiff',
+    'group', 'byeRounds',
   ];
   return keys.filter((key) => !OPTIONAL_COLUMNS.has(key) || entries.some((entry) => entry[key] != null));
 }
@@ -64,8 +71,29 @@ export function rankingColumnLabel(key, tournament, t) {
     case 'gameDiff': return t('Spieldifferenz');
     case 'pointsFor': return t('Punkte+');
     case 'pointsAgainst': return t('Punkte−');
+    case 'group': return t('Gr');
+    case 'byeRounds': return t('FL');
     default: return t('Δ');
   }
+}
+
+/** Ausgeschriebene Bedeutung der Kurzspalten Gr und FL (Tooltip im Tabellenkopf). */
+export function rankingColumnTitle(key, t) {
+  if (key === 'group') return t('Gruppe');
+  if (key === 'byeRounds') return t('Runden mit Freilos');
+  return undefined;
+}
+
+/**
+ * Hinweis unter der Rangliste wie im Turnierdokument: die Reihenfolge der Kriterien. Sie hängt vom Ranglistenmodus ab
+ * (mit oder ohne Buchholz) – maßgeblich sind die tatsächlich gezeigten Buchholz-Spalten. Nur für Schweizer und
+ * Maastrichter, deren Online-Sortierung der des Dokuments entspricht; sonst null.
+ */
+export function rankingOrderNote(tournament, columns, t) {
+  if (tournament?.type !== 'schweizer' && tournament?.type !== 'maastrichter') return null;
+  return columns.includes('bhz')
+    ? t('Reihenfolge zur Ermittlung der Platzierung: 1. Siege +, 2. Buchholz +, 3. Feinbuchholz +, 4. Spielpunkte-Δ, 5. Punkte +')
+    : t('Reihenfolge zur Ermittlung der Platzierung: 1. Siege +, 2. Spielpunkte-Δ, 3. Punkte +');
 }
 
 const POINT_SUB_LABELS = { pointsFor: '+', pointsAgainst: '−', pointsDiff: 'Δ' };
@@ -103,6 +131,7 @@ const BUCHHOLZ_KEYS = new Set(['bhz', 'fbhz']);
  * Zahlenformat der Sprache (2 bzw. 1,5/1.5), fehlende Werte als Gedankenstrich.
  */
 export function rankingValue(key, value, language = 'de') {
+  if (TEXT_COLUMNS.has(key)) return value ?? '';
   if (value == null) return '—';
   if ((key === 'gameDiff' || key === 'pointsDiff') && value !== 0) return value > 0 ? `+${value}` : `−${Math.abs(value)}`;
   if (BUCHHOLZ_KEYS.has(key)) {

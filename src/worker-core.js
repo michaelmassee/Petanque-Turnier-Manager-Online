@@ -633,8 +633,24 @@ export function parseSyncRanking(body, validRegistrationIds) {
       pointsFor,
       pointsAgainst,
       pointsDiff: pointsFor === null || pointsAgainst === null ? null : pointsFor - pointsAgainst,
+      ...rankingExtraColumns(entry),
     };
   });
+}
+
+const MAX_RANKING_EXTRA_LENGTH = 20;
+
+// Spalten ohne Einfluss auf den Platz, die das Dokument je nach Stand zeigt: Gruppe der Finalrunde (Maastrichter)
+// und Runden mit Freilos. Fehlt ein Wert, zeigt das Dokument die Spalte (noch) nicht.
+function rankingExtraColumns(entry) {
+  const extra = {};
+  for (const key of ['group', 'byeRounds']) {
+    if (entry[key] === undefined || entry[key] === null) continue;
+    const value = text(entry[key]);
+    if (value.length > MAX_RANKING_EXTRA_LENGTH) throw new HttpError(400, 'Ungültige Ranglistenwerte');
+    if (value) extra[key] = value;
+  }
+  return extra;
 }
 
 const MAX_SYNC_KO_WINNERS = 16;

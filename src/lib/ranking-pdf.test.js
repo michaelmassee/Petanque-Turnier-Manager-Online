@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { createFlyerTypesetter } from './flyer-text.js';
-import { rankingColumnKeys, rankingHeaderGroups, rankingValue } from './live-ranking.js';
+import { normalizeRanking, rankingColumnKeys, rankingHeaderGroups, rankingOrderNote, rankingValue } from './live-ranking.js';
 import { buildRankingPages, rankingFileName, renderRankingSvg, RANKING_PAGE } from './ranking-pdf.js';
 
 const require = createRequire(import.meta.url);
@@ -78,6 +78,21 @@ describe('Ranglisten-Spalten (Tabelle und PDF)', () => {
   it('behält Siege als Einzelspalte, wenn es keine Spieldifferenz gibt (Schweizer)', () => {
     const columns = rankingColumnKeys(tournament, [entry(0)]);
     expect(rankingHeaderGroups(columns, tournament, t).map((group) => group.label)).toEqual(['Platz', 'Team', 'Siege', 'BHZ', 'FBHZ', 'Punkte']);
+  });
+
+  it('hängt Gruppe und Freilos-Runden an, solange das Dokument sie zeigt', () => {
+    const maastrichter = { type: 'maastrichter', schweizerRankingMode: 'mit_buchholz' };
+    const mitZusatz = normalizeRanking([{ ...entry(0), group: 'A', byeRounds: '2' }, { ...entry(1) }]);
+
+    expect(rankingColumnKeys(maastrichter, mitZusatz)).toEqual(['rank', 'label', 'wins', 'bhz', 'fbhz', 'pointsFor', 'pointsAgainst', 'pointsDiff', 'group', 'byeRounds']);
+    expect(rankingColumnKeys(maastrichter, normalizeRanking([entry(0)]))).not.toContain('group');
+    expect([rankingValue('byeRounds', '1, 3'), rankingValue('byeRounds', null)]).toEqual(['1, 3', '']);
+  });
+
+  it('nennt die Reihenfolge der Kriterien wie das Dokument, abhängig von den Buchholz-Spalten', () => {
+    expect(rankingOrderNote(tournament, ['rank', 'label', 'wins', 'bhz', 'fbhz', 'pointsDiff'], t)).toContain('2. Buchholz +');
+    expect(rankingOrderNote(tournament, ['rank', 'label', 'wins', 'pointsDiff'], t)).toBe('Reihenfolge zur Ermittlung der Platzierung: 1. Siege +, 2. Spielpunkte-Δ, 3. Punkte +');
+    expect(rankingOrderNote({ type: 'ko' }, ['rank', 'label', 'wins'], t)).toBeNull();
   });
 
   it('zeigt Differenzen mit Vorzeichen', () => {

@@ -162,6 +162,17 @@ describe('Sync von Runden und Rangliste aus dem Turnierdokument', () => {
     expect(() => parseSyncRanking({ entries: [{ place: 1, registrationIds: [] }] }, ids)).toThrow('Ungültige Meldung in der Rangliste');
   });
 
+  it('übernimmt Gruppe und Freilos-Runden nur, wenn das Dokument sie zeigt', () => {
+    expect(parseSyncRanking({ entries: [
+      { place: 1, registrationIds: ['r1'], group: ' A ', byeRounds: '1, 3' },
+      { place: 2, registrationIds: ['r2'], group: '', byeRounds: null },
+    ] }, ids).map(({ group, byeRounds }) => ({ group, byeRounds }))).toEqual([
+      { group: 'A', byeRounds: '1, 3' }, { group: undefined, byeRounds: undefined },
+    ]);
+    expect(() => parseSyncRanking({ entries: [{ place: 1, registrationIds: ['r1'], byeRounds: 'x'.repeat(21) }] }, ids))
+      .toThrow('Ungültige Ranglistenwerte');
+  });
+
   it('prüft die KO-Sieger der Endrangliste', () => {
     expect(parseSyncKoWinners({ entries: [] }, ids)).toEqual([]);
     expect(parseSyncKoWinners({ koWinners: [{ label: ' A-Finale ', registrationIds: ['r1'] }] }, ids))
