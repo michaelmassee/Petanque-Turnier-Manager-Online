@@ -164,6 +164,7 @@ export const EMPTY_TOURNAMENT_FORM = {
   participantsPublic: false,
   liveViewEnabled: false,
   playerResultReportingEnabled: false,
+  resultReportConfirmationRequired: false,
   licenseRequired: false,
   teamNameEnabled: false,
   waitlistEnabled: true,

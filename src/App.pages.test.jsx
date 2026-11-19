@@ -1567,8 +1567,15 @@ describe('Turniere-Seite: Liste + Dialog', () => {
     expect(playerResults).toBeDisabled();
     fireEvent.click(liveView);
     expect(playerResults).not.toBeDisabled();
+    expect(screen.queryByRole('checkbox', { name: /erst nach Bestätigung/ })).not.toBeInTheDocument();
     fireEvent.click(playerResults);
     expect(playerResults).toBeChecked();
+    // Unteroption: Standard ist sofort übernehmen, Bestätigungspflicht wählbar.
+    const confirmation = screen.getByRole('checkbox', { name: /erst nach Bestätigung/ });
+    expect(confirmation).not.toBeChecked();
+    expect(confirmation).not.toBeDisabled();
+    fireEvent.click(confirmation);
+    expect(confirmation).toBeChecked();
     // Live-Ansicht wieder aus: Ergebnismeldung wird mit abgeschaltet.
     fireEvent.click(liveView);
     expect(playerResults).toBeDisabled();

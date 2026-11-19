@@ -1619,6 +1619,8 @@ a.left-panel-link {
 }
 
 .checkbox-field > span { min-width: 0; overflow-wrap: anywhere; }
+/* Unteroption, die nur mit der Checkbox darüber gilt: eingerückt um Checkbox + Abstand. */
+.checkbox-field-nested { margin-left: 28px; }
 .checkbox-field .link-button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 
 .checkbox-row {

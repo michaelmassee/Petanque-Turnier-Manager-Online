@@ -2899,6 +2899,17 @@ export default {
         return json(await maastrichterSettingsState(env.DB, tournament.id));
       }
 
+      // Optionen aus tournament_options fürs Turnierformular (eigene Tabelle, nicht Teil des Turnierobjekts). Nicht zu
+      // verwechseln mit PUT …/options oben (Spielverwaltung, Spalten an tournaments).
+      const tournamentSettingsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/settings$/);
+      if (tournamentSettingsMatch && request.method === 'GET') {
+        const tournament = await getTournamentById(env.DB, tournamentSettingsMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await requireSession(request, env.DB);
+        assertCanManageTournament(tournament, session.user);
+        return json(await getTournamentOptions(env.DB, tournament.id));
+      }
+
       // Händisch eingetragene Bahn einer Partie (Spielbahn „Leere Spalte“).
       const tournamentMatchCourtMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/matches\/([^/]+)\/court$/);
       if (tournamentMatchCourtMatch && request.method === 'PUT') {
@@ -6338,6 +6349,7 @@ async function createTournament(request, env, user) {
   await db.prepare('UPDATE tournaments SET fee_tiers = ? WHERE id = ?').bind(JSON.stringify(tournament.feeTiers), id).run();
   await db.prepare('UPDATE tournaments SET registration_questions = ? WHERE id = ?').bind(JSON.stringify(tournament.registrationQuestions), id).run();
   await db.prepare('UPDATE tournaments SET whatsapp_group_url = ? WHERE id = ?').bind(normalizePresentationUrl(body.whatsappGroupUrl, 'whatsappGroupUrl'), id).run();
+  await tournamentOptionsStatement(db, id, tournament)?.run();
   // Neues Turnier: keine Runden, keine Finalgruppen – das Speichern kann nicht gesperrt sein.
   if (maastrichterInput) {
     await maastrichterSettingsStatement(db, id, {
@@ -6435,6 +6447,9 @@ export async function duplicateTournament(db, existing, actingUser) {
   // Maastrichter-Einstellungen stehen in eigener Tabelle und werden mitkopiert.
   await db.prepare(`INSERT INTO tournament_maastrichter_settings (tournament_id, preliminary_rounds, group_mode)
       SELECT ?, preliminary_rounds, group_mode FROM tournament_maastrichter_settings WHERE tournament_id = ?`).bind(id, existing.id).run();
+  // Turnieroptionen ebenso.
+  await db.prepare(`INSERT INTO tournament_options (tournament_id, result_report_confirmation_required)
+      SELECT ?, result_report_confirmation_required FROM tournament_options WHERE tournament_id = ?`).bind(id, existing.id).run();
 
   return await getTournamentById(db, id);
 }
@@ -6694,6 +6709,7 @@ async function updateTournament(request, env, existing, user) {
   } else {
     await tournamentUpdate.run();
   }
+  await tournamentOptionsStatement(db, existing.id, tournament)?.run();
 
   const feeTiers = tournament.feeTiersProvided ? tournament.feeTiers : jsonArray(existing.fee_tiers).filter((tier) => tier?.id !== 'legacy-standard');
   await db.prepare('UPDATE tournaments SET fee_tiers = ? WHERE id = ?').bind(JSON.stringify(feeTiers), existing.id).run();
@@ -8696,6 +8712,23 @@ function roundCourtMode(tournament, roundNumber, maastrichter = null) {
 
 const MAASTRICHTER_SETTINGS_CONFLICT_MESSAGE = 'Die Maastrichter-Einstellungen wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut auslosen.';
 
+// Turnieroptionen in eigener Tabelle (Migration 0164): tournaments steht am D1-Limit von 100 Ergebnisspalten. Keine
+// Zeile = Standardwerte. Nur dort lesen, wo eine Option gebraucht wird – nie im Polling-Pfad oder in Listen.
+async function getTournamentOptions(db, tournamentId) {
+  const row = await db.prepare('SELECT result_report_confirmation_required FROM tournament_options WHERE tournament_id = ?')
+    .bind(tournamentId).first();
+  return { resultReportConfirmationRequired: Number(row?.result_report_confirmation_required || 0) === 1 };
+}
+
+// Speichert die übermittelten Optionen; null, wenn keine mitgeschickt wurden (Teil-Update, Sync) – dann bleibt die Zeile.
+function tournamentOptionsStatement(db, tournamentId, tournament) {
+  if (!tournament.resultReportConfirmationRequiredProvided) return null;
+  const value = tournament.resultReportConfirmationRequired ? 1 : 0;
+  return db.prepare(`INSERT INTO tournament_options (tournament_id, result_report_confirmation_required) VALUES (?, ?)
+      ON CONFLICT(tournament_id) DO UPDATE SET result_report_confirmation_required = excluded.result_report_confirmation_required`)
+    .bind(tournamentId, value);
+}
+
 // Maastrichter-Einstellungen in eigener Tabelle: tournaments steht am D1-Limit von 100 Ergebnisspalten (Migration 0162).
 async function maastrichterSettings(db, tournamentId) {
   const row = await db.prepare('SELECT preliminary_rounds, group_mode FROM tournament_maastrichter_settings WHERE tournament_id = ?').bind(tournamentId).first();
@@ -9006,11 +9039,13 @@ async function reportLiveMatchResult(request, env, registration, reporterUserId)
   assertWinnerReports(ownScore, opponentScore);
   const scoreA = Number(match.in_a) === 1 ? ownScore : opponentScore;
   const scoreB = Number(match.in_a) === 1 ? opponentScore : ownScore;
-  // Öffentlich (Turnierseite, Rangliste, Live-Ansichten) erst nach Bestätigung durch die Turnierleitung (E-27).
+  // Standard: sofort übernommen und öffentlich. Mit der Turnieroption erst nach Bestätigung durch die Turnierleitung
+  // (Turnierseite, Rangliste, Live-Ansichten; E-27).
+  const { resultReportConfirmationRequired } = await getTournamentOptions(db, tournament.id);
   const saved = await db.prepare(`UPDATE tournament_matches SET score_a = ?, score_b = ?, no_show = NULL, result_reported_by = ?,
-        result_report_pending = 1, updated_at = ?
+        result_report_pending = ?, updated_at = ?
       WHERE id = ? AND score_a IS NULL AND score_b IS NULL AND no_show IS NULL`)
-    .bind(scoreA, scoreB, registration.id, new Date().toISOString(), match.id).run();
+    .bind(scoreA, scoreB, registration.id, resultReportConfirmationRequired ? 1 : 0, new Date().toISOString(), match.id).run();
   if (!saved.meta.changes) await throwNoOpenMatch(db, tournament.id, registration.id);
   await invalidateLiveSnapshot(new URL(request.url).origin, tournament.id);
   await notifyTournamentChanged(env, tournament.id);

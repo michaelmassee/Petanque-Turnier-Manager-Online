@@ -134,6 +134,28 @@ describe('Ergebnismeldung durch Spieler', () => {
     consoleError.mockRestore();
   });
 
+  describe('ohne Bestätigungspflicht (Standard)', () => {
+    const abrufen = async (path, session = 'player-session') => (await worker.fetch(new Request(`https://ptm.test${path}`, {
+      headers: { Cookie: `ptm_session=${session}` },
+    }), env)).json();
+
+    it('übernimmt die Meldung sofort und veröffentlicht sie', async () => {
+      expect((await melden('other-session', { ownScore: 13, opponentScore: 7 }, 'r2')).status).toBe(200);
+
+      expect(env.DB.sqlite.prepare("SELECT result_report_pending FROM tournament_matches WHERE id = 'match1'").get().result_report_pending).toBe(0);
+      const { rounds, ranking } = await abrufen('/api/tournaments/t1/schedule');
+      expect(rounds[0].matches[0]).toMatchObject({ scoreA: 7, scoreB: 13, reportPending: false });
+      expect(ranking.some((entry) => entry.wins)).toBe(true);
+      expect((await abrufen('/api/live/registrations/r2', 'other-session')).registration.resultReport).toBeNull();
+    });
+
+    it('gilt auch bei ausdrücklich abgeschalteter Option', async () => {
+      sql("INSERT INTO tournament_options (tournament_id, result_report_confirmation_required) VALUES ('t1', 0)");
+      expect((await melden('other-session', { ownScore: 13, opponentScore: 7 }, 'r2')).status).toBe(200);
+      expect(env.DB.sqlite.prepare("SELECT result_report_pending FROM tournament_matches WHERE id = 'match1'").get().result_report_pending).toBe(0);
+    });
+  });
+
   describe('Bestätigung durch die Turnierleitung (E-27)', () => {
     const abrufen = async (path, session = 'player-session') => (await worker.fetch(new Request(`https://ptm.test${path}`, {
       headers: { Cookie: `ptm_session=${session}` },
@@ -145,6 +167,8 @@ describe('Ergebnismeldung durch Spieler', () => {
     const pending = () => env.DB.sqlite.prepare("SELECT result_report_pending FROM tournament_matches WHERE id = 'match1'").get().result_report_pending;
 
     beforeEach(async () => {
+      // Turnieroption „erst nach Bestätigung veröffentlichen“ (Standard: aus).
+      sql("INSERT INTO tournament_options (tournament_id, result_report_confirmation_required) VALUES ('t1', 1)");
       // Bert (Team B) meldet seinen Sieg 13:7.
       expect((await melden('other-session', { ownScore: 13, opponentScore: 7 }, 'r2')).status).toBe(200);
     });

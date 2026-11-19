@@ -201,6 +201,12 @@ export function tournamentPayload(form) {
     liveViewEnabled: Boolean(form.liveViewEnabled),
     playerResultReportingEnabled: Boolean(form.liveViewEnabled) && Boolean(form.playerResultReportingEnabled)
       && supportsPlayerResultReporting(form.type),
+    // Steht in tournament_options und wird beim Bearbeiten nachgeladen: nur mitschicken, wenn der Stand bekannt ist
+    // (neues Turnier oder geladen), sonst überschriebe ein zu früh gespeichertes Formular den gespeicherten Wert.
+    ...(!form.id || form.settingsLoadedFor === form.id ? {
+      resultReportConfirmationRequired: Boolean(form.liveViewEnabled) && Boolean(form.playerResultReportingEnabled)
+        && Boolean(form.resultReportConfirmationRequired),
+    } : {}),
     licenseRequired: Boolean(form.licenseRequired),
     teamNameEnabled: Boolean(form.teamNameEnabled),
     waitlistEnabled: Boolean(form.waitlistEnabled),
