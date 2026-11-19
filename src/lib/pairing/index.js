@@ -3,6 +3,7 @@ import { generateRound as generateSchweizerRound, checkRequirements as checkSchw
 import { generateRound as generateRoundRobinRound, checkRequirements as checkRoundRobinRequirements, MIN_TEAMS as ROUND_ROBIN_MIN_TEAMS } from './roundrobin.js';
 import { generateRound as generateFormuleXRound, checkRequirements as checkFormuleXRequirements, MIN_TEAMS as FORMULE_X_MIN_TEAMS } from './formulex.js';
 import { generateRound as generateKoRound, checkRequirements as checkKoRequirements, MIN_TEAMS as KO_MIN_TEAMS } from './ko.js';
+import { generateRound as generateMaastrichterRound, checkRequirements as checkMaastrichterRequirements, MIN_TEAMS as MAASTRICHTER_MIN_TEAMS } from './maastrichter.js';
 
 export const PAIRING_STRATEGIES = {
   schweizer: { label: 'Schweizer-System', generateRound: generateSchweizerRound, checkRequirements: checkSchweizerRequirements, minTeams: SCHWEIZER_MIN_TEAMS },
@@ -10,6 +11,7 @@ export const PAIRING_STRATEGIES = {
   jeder_gegen_jeden: { label: 'Jeder gegen Jeden', generateRound: generateRoundRobinRound, checkRequirements: checkRoundRobinRequirements, minTeams: ROUND_ROBIN_MIN_TEAMS },
   formule_x: { label: 'Formule X', generateRound: generateFormuleXRound, checkRequirements: checkFormuleXRequirements, minTeams: FORMULE_X_MIN_TEAMS },
   ko: { label: 'K.O.', generateRound: generateKoRound, checkRequirements: checkKoRequirements, minTeams: KO_MIN_TEAMS },
+  maastrichter: { label: 'Maastrichter', generateRound: generateMaastrichterRound, checkRequirements: checkMaastrichterRequirements, minTeams: MAASTRICHTER_MIN_TEAMS },
 };
 
 // Supermêlée ist über registrationType codiert, alle anderen Systeme über type
@@ -59,15 +61,16 @@ export function getPairingStrategy(tournament) {
 // supermelee.js) - UI-Code muss dadurch nicht wissen, welches System aktuell
 // online spielbar ist bzw. welche Regeln dafür gelten. roundsPlayed und teamCount (feste
 // Teams seit der ersten Runde) werden nur von Systemen mit natürlichem Ende (Jeder gegen
-// Jeden, K.O.) ausgewertet, andere ignorieren sie.
-export function checkRoundRequirements(tournament, confirmedCount, roundsPlayed = 0, { teamCount } = {}) {
+// Jeden, K.O.) ausgewertet, andere ignorieren sie. allRoundsPlayed meldet der Server, wo der
+// Client das Ende nicht selbst berechnen kann (Maastrichter: hängt an den Finalgruppen).
+export function checkRoundRequirements(tournament, confirmedCount, roundsPlayed = 0, { teamCount, allRoundsPlayed, preliminaryRounds } = {}) {
   const strategy = getPairingStrategy(tournament);
   if (!strategy?.checkRequirements) {
     return [];
   }
   const registrationType = tournament.registrationType ?? tournament.registration_type;
   const returnRound = Boolean(tournament.roundRobinReturn ?? Number(tournament.round_robin_return || 0));
-  return strategy.checkRequirements(confirmedCount, { formation: tournament.formation, registrationType, roundsPlayed, teamCount, returnRound });
+  return strategy.checkRequirements(confirmedCount, { formation: tournament.formation, registrationType, roundsPlayed, teamCount, returnRound, allRoundsPlayed, preliminaryRounds });
 }
 
 // Die UI zeigt diese Texte vorab, der Worker verwendet sie ebenfalls für direkte

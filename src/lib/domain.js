@@ -172,6 +172,11 @@ export function tournamentPayload(form) {
     registrationType: form.registrationType,
     schweizerRankingMode: form.schweizerRankingMode || 'mit_buchholz',
     koPlatz3: form.koPlatz3 === undefined ? true : Boolean(form.koPlatz3),
+    // Maastrichter-Einstellungen einzeln und nur, wenn bekannt (beim Bearbeiten erst nach dem Nachladen): Ein leeres
+    // Vorrunden-Feld darf den gewählten Gruppenmodus nicht mit verwerfen; der Server behält fehlende Werte bei.
+    ...(form.type === 'maastrichter' && Number.isInteger(form.maastrichterPreliminaryRounds)
+      ? { maastrichterPreliminaryRounds: form.maastrichterPreliminaryRounds } : {}),
+    ...(form.type === 'maastrichter' && form.maastrichterGroupMode ? { maastrichterGroupMode: form.maastrichterGroupMode } : {}),
     status: form.status,
     maxRegistrations: Number(form.maxRegistrations || 0),
     registrationDeadline: form.registrationDeadline || null,

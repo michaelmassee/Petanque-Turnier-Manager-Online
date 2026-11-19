@@ -52,6 +52,7 @@ import {
   assignCourts,
   normalizeCourt,
   normalizeTournamentOptions,
+  normalizeMaastrichterSettings,
   registrationOpenStatus as coreRegistrationOpenStatus,
   tournamentMatchesSavedSearch,
   validateMatchScore,
@@ -72,6 +73,7 @@ import { competitionRanks, computeRanking, computeSupermeleeRanking, sameStandar
 import { sameSwissRankingPlace, sortSwiss, swissStats } from './lib/pairing/schweizer.js';
 import { formuleXRoundsPlayed, formuleXStats, sameFormuleXRankingPlace, sortFormuleX } from './lib/pairing/formulex.js';
 import { assignGroups as assignKoGroups, orderBySeed as orderKoSeeds } from './lib/pairing/ko.js';
+import { totalRounds as maastrichterTotalRounds, assignFinalGroups as assignMaastrichterGroups, DEFAULT_GROUP_MODE as MAASTRICHTER_DEFAULT_GROUP_MODE, DEFAULT_PRELIMINARY_ROUNDS as MAASTRICHTER_DEFAULT_PRELIMINARY_ROUNDS } from './lib/pairing/maastrichter.js';
 import { createPlaceholderEmail, isPlaceholderEmail } from './lib/registration-email.js';
 import { normalizeVipLevel, VIP_MAX_LEVEL, VIP_NONE, vipLevelOf } from './lib/vip.js';
 import { firstFreeUsername, normalizeUsername, usernameCandidates, usernameProblem, USERNAME_CHANGE_INTERVAL_DAYS } from './lib/username.js';
@@ -2885,6 +2887,16 @@ export default {
         const session = await requireSession(request, env.DB);
         assertCanManageTournament(tournament, session.user);
         return await setTournamentOptions(request, env.DB, tournament);
+      }
+
+      // Maastrichter-Einstellungen fürs Turnierformular (eigene Tabelle, nicht Teil des Turnierobjekts).
+      const maastrichterSettingsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/maastrichter-settings$/);
+      if (maastrichterSettingsMatch && request.method === 'GET') {
+        const tournament = await getTournamentById(env.DB, maastrichterSettingsMatch[1]);
+        if (!tournament) throw new HttpError(404, 'Turnier nicht gefunden');
+        const session = await requireSession(request, env.DB);
+        assertCanManageTournament(tournament, session.user);
+        return json(await maastrichterSettingsState(env.DB, tournament.id));
       }
 
       // Händisch eingetragene Bahn einer Partie (Spielbahn „Leere Spalte“).
@@ -6237,6 +6249,8 @@ async function createTournament(request, env, user) {
   const tournament = normalizeCoreTournamentInput(body);
   assertTournamentSystemAllowed(tournament);
   assertMaxRegistrationsWithinLimit(tournament.maxRegistrations, participantLimitOfUser(user));
+  // Vor dem ersten Schreibzugriff prüfen: Ein ungültiger Wert darf kein halb angelegtes Turnier hinterlassen.
+  const maastrichterInput = tournament.type === 'maastrichter' ? normalizeMaastrichterSettings(body) : null;
 
   if (user.role !== 'admin' && tournament.registrationEnabled !== false) {
     const limit = user.tournamentLimit ?? DEFAULT_TOURNAMENT_LIMIT;
@@ -6324,6 +6338,13 @@ async function createTournament(request, env, user) {
   await db.prepare('UPDATE tournaments SET fee_tiers = ? WHERE id = ?').bind(JSON.stringify(tournament.feeTiers), id).run();
   await db.prepare('UPDATE tournaments SET registration_questions = ? WHERE id = ?').bind(JSON.stringify(tournament.registrationQuestions), id).run();
   await db.prepare('UPDATE tournaments SET whatsapp_group_url = ? WHERE id = ?').bind(normalizePresentationUrl(body.whatsappGroupUrl, 'whatsappGroupUrl'), id).run();
+  // Neues Turnier: keine Runden, keine Finalgruppen – das Speichern kann nicht gesperrt sein.
+  if (maastrichterInput) {
+    await maastrichterSettingsStatement(db, id, {
+      preliminaryRounds: maastrichterInput.preliminaryRounds ?? MAASTRICHTER_DEFAULT_PRELIMINARY_ROUNDS,
+      groupMode: maastrichterInput.groupMode ?? MAASTRICHTER_DEFAULT_GROUP_MODE,
+    }).run();
+  }
 
   await fillTournamentClubFromPlace(db, id);
 
@@ -6411,6 +6432,9 @@ export async function duplicateTournament(db, existing, actingUser) {
       .bind(crypto.randomUUID(), id, editorId, actingUser.id, now)
       .run();
   }
+  // Maastrichter-Einstellungen stehen in eigener Tabelle und werden mitkopiert.
+  await db.prepare(`INSERT INTO tournament_maastrichter_settings (tournament_id, preliminary_rounds, group_mode)
+      SELECT ?, preliminary_rounds, group_mode FROM tournament_maastrichter_settings WHERE tournament_id = ?`).bind(id, existing.id).run();
 
   return await getTournamentById(db, id);
 }
@@ -6597,23 +6621,28 @@ async function updateTournament(request, env, existing, user) {
   await assertDraftTransitionAllowed(db, existing, tournament.status);
   assertFormationChangeAllowed(existing, tournament.formation, tournament.formationOther);
   assertTournamentSystemAllowed(tournament, existing);
-  if (existing.type === 'schweizer' && existing.status === 'running'
+  if ((existing.type === 'schweizer' || existing.type === 'maastrichter') && existing.status === 'running'
     && tournament.schweizerRankingMode !== (existing.schweizer_ranking_mode || 'mit_buchholz')) {
     throw new HttpError(409, 'Der Schweizer Ranglistenmodus kann nach Turnierstart nicht geändert werden');
   }
+  // Nur prüfen; gespeichert wird zusammen mit den Eckdaten, wenn alle Prüfungen (auch Fristen unten) bestanden sind.
+  const maastrichterChange = tournament.type === 'maastrichter'
+    ? await plannedMaastrichterSettings(db, existing.id, normalizeMaastrichterSettings(body)) : null;
   const now = new Date().toISOString();
   const geo = await resolveTournamentGeolocation(tournament, existing, now, request.headers.get('CF-IPCountry'));
   const timezone = resolveTournamentTimezone(geo, existing.timezone || 'Europe/Berlin');
   const registrationTimes = resolveRegistrationTimes(tournament, timezone);
 
-  await db
+  // Mit Maastrichter-Änderung ein Batch: erst die Einstellungen (mit Sperre), dann die Eckdaten nur, wenn die
+  // Einstellungen danach wie gewünscht stehen. Greift die Sperre (Finalrunde zeitgleich begonnen), ändert sich nichts.
+  const tournamentUpdate = db
     .prepare(
       `UPDATE tournaments
        SET organizer_club_id = ?, name = ?, club = ?, date = ?, start_time = ?, location = ?, description = ?, type = ?,
            formation = ?, formation_other = ?, registration_type = ?, status = ?, max_registrations = ?, registration_deadline = ?, registration_opens_at = ?, entry_fee_cents = ?, currency = ?, schweizer_ranking_mode = ?, ko_platz3 = ?,
            contact_name = ?, contact_email = ?, contact_phone = ?, visibility = ?, internal_notes = ?,
            participants_public = ?, license_required = ?, team_name_enabled = ?, waitlist_enabled = ?, waitlist_auto_promote = ?, registration_enabled = ?, approval_required = ?, phone_required = ?, latitude = ?, longitude = ?, geocoded_at = ?, timezone = ?, boule_place_id = ?, live_view_enabled = ?, player_result_reporting_enabled = ?, updated_at = ?
-       WHERE id = ?`,
+       WHERE id = ?${maastrichterChange ? ` AND ${MAASTRICHTER_SETTINGS_APPLIED_SQL}` : ''}`,
     )
     .bind(
       organizerClubId,
@@ -6657,8 +6686,14 @@ async function updateTournament(request, env, existing, user) {
       tournament.playerResultReportingEnabled ? 1 : 0,
       now,
       existing.id,
-    )
-    .run();
+      ...(maastrichterChange ? maastrichterSettingsAppliedParams(existing.id, maastrichterChange) : []),
+    );
+  if (maastrichterChange) {
+    const [, updatedRow] = await db.batch([maastrichterSettingsStatement(db, existing.id, maastrichterChange), tournamentUpdate]);
+    if (!Number(updatedRow?.meta?.changes || 0)) await throwMaastrichterSettingsLocked(db, existing.id, maastrichterChange);
+  } else {
+    await tournamentUpdate.run();
+  }
 
   const feeTiers = tournament.feeTiersProvided ? tournament.feeTiers : jsonArray(existing.fee_tiers).filter((tier) => tier?.id !== 'legacy-standard');
   await db.prepare('UPDATE tournaments SET fee_tiers = ? WHERE id = ?').bind(JSON.stringify(feeTiers), existing.id).run();
@@ -8072,7 +8107,7 @@ function teamDisplayLabel(players, number, mode) {
 
 async function getSchweizerTeams(db, tournament) {
   const result = await db.prepare(`SELECT *, ${TEAM_NUMBER_SQL} FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id`).bind(tournament.id).all();
-  return result.results.map((row) => ({ id: row.id, members: JSON.parse(row.member_registration_ids), seedPosition: Number(row.seed_position || 0), bracketGroup: row.bracket_group || null, teamNumber: teamNumberOf(tournament, row) }));
+  return result.results.map((row) => ({ id: row.id, members: JSON.parse(row.member_registration_ids), seedPosition: Number(row.seed_position || 0), bracketGroup: row.bracket_group || null, koSeed: row.ko_seed == null ? null : Number(row.ko_seed), teamNumber: teamNumberOf(tournament, row) }));
 }
 
 // Ordnet KO-Teams einmalig (vor der ersten Runde) einem unabhängigen Teilbaum zu (siehe
@@ -8316,7 +8351,7 @@ async function loadTournamentRounds(db, tournament, { publicTournament = null } 
   const tournamentId = tournament.id;
   const roundsResult = await db.prepare('SELECT * FROM tournament_rounds WHERE tournament_id = ? ORDER BY round_number ASC').bind(tournamentId).all();
   const matchesResult = await db.prepare('SELECT * FROM tournament_matches WHERE tournament_id = ? ORDER BY created_at ASC, match_index ASC').bind(tournamentId).all();
-  const teamsResult = await db.prepare(`SELECT id, member_registration_ids, seed_position, ${TEAM_NUMBER_SQL} FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id`).bind(tournamentId).all();
+  const teamsResult = await db.prepare(`SELECT id, member_registration_ids, seed_position, bracket_group, ${TEAM_NUMBER_SQL} FROM tournament_teams WHERE tournament_id = ? ORDER BY created_at, id`).bind(tournamentId).all();
   const playersById = await getPlayersById(db, tournamentId);
   const teamRows = teamsResult.results.map((team) => ({ ...team, teamNumber: teamNumberOf(tournament, team) }));
   const display = { mode: tournamentOptions(tournament).teamDisplayRound, numbers: teamNumbers(teamRows) };
@@ -8347,7 +8382,21 @@ async function loadTournamentRounds(db, tournament, { publicTournament = null } 
       matches: matchesByRound.get(round.id) || [],
     })),
     ...(publicTournament ? { pendingReports } : {}),
+    // Nur für die Spielverwaltung (nicht im Live-Pfad, der gepollt wird): Rundenende, das der Client nicht kennt.
+    ...(!publicTournament && tournament.type === 'maastrichter'
+      ? await maastrichterRoundState(db, tournament, roundsResult.results.length, teamsResult.results)
+      : {}),
   };
+}
+
+// Maastrichter: Vorrunden-Zahl (Phase und Mindestzahl im Client) und ob Vorrunden + längste Finalgruppe ausgelost sind.
+// Vor dem Übergang (keine Finalgruppen) nie Schluss.
+async function maastrichterRoundState(db, tournament, roundCount, teamRows) {
+  const { preliminaryRounds } = await maastrichterSettings(db, tournament.id);
+  const sizes = new Map();
+  for (const row of teamRows) if (row.bracket_group) sizes.set(row.bracket_group, (sizes.get(row.bracket_group) || 0) + 1);
+  const total = maastrichterTotalRounds(preliminaryRounds, [...sizes.values()]);
+  return { preliminaryRounds, allRoundsPlayed: total !== null && roundCount >= total };
 }
 
 /**
@@ -8383,7 +8432,11 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
   if (melee && !Number(activeConfirmed.count)) throw new HttpError(400, 'Bitte zuerst Mêlée-Teams auslosen');
   // Beim Neuauslosen zählt die zu ersetzende Runde nicht mit (z. B. Rundenende bei Jeder gegen Jeden).
   const roundsBefore = Number(existingRounds.count) - (redraw ? 1 : 0);
-  const requirement = checkRoundRequirements(tournament, Number(activeConfirmed.count), roundsBefore, { teamCount: Number(fixedTeamCount.count) })[0];
+  // Maastrichter: Die Vorrunden-Zahl bestimmt Phase und Mindestzahl (Vorrunden 6 Teams, Finalrunde wie K.O.).
+  const maastrichter = tournament.type === 'maastrichter' ? await maastrichterSettings(db, tournament.id) : null;
+  const requirement = checkRoundRequirements(tournament, Number(activeConfirmed.count), roundsBefore, {
+    teamCount: Number(fixedTeamCount.count), preliminaryRounds: maastrichter?.preliminaryRounds,
+  })[0];
   if (requirement) {
     throw new HttpError(400, roundRequirementMessage(requirement, { teams: melee }));
   }
@@ -8419,10 +8472,13 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
   const isRoundRobin = tournament.type === 'jeder_gegen_jeden';
   const isFormuleX = tournament.type === 'formule_x';
   const isKo = tournament.type === 'ko';
-  // Schweizer, Jeder gegen Jeden, Formule X und K.O. spielen mit festen Teams über alle
+  const isMaastrichter = tournament.type === 'maastrichter';
+  // Maastrichter: Schweizer Vorrunden, danach K.O. in den Finalgruppen (lib/pairing/maastrichter.js).
+  const maastrichterFinal = isMaastrichter && roundsBefore >= maastrichter.preliminaryRounds;
+  // Schweizer, Jeder gegen Jeden, Formule X, K.O. und Maastrichter spielen mit festen Teams über alle
   // Runden: bei Formée eine Meldung je Team, bei Mêlée die vor der ersten Runde
   // ausgelosten Teams (siehe fixedTeams, lib/pairing/melee.js).
-  const usesFixedTeams = isSchweizer || isRoundRobin || isFormuleX || isKo;
+  const usesFixedTeams = isSchweizer || isRoundRobin || isFormuleX || isKo || isMaastrichter;
   let players;
   let teamsById = new Map();
   // Neu gebildete Formée-Teams beim Neuauslosen der ersten Runde; werden im selben Batch wie die Runde gespeichert.
@@ -8442,7 +8498,7 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
       teams = await fixedTeams(db, tournament);
       if (isKo) teams = await assignKoBracketGroups(db, tournament, teams);
     }
-    if ((isSchweizer || isFormuleX) && !melee && !rebuiltTeams) {
+    if ((isSchweizer || isFormuleX || (isMaastrichter && !maastrichterFinal)) && !melee && !rebuiltTeams) {
       // Schweizer/Formule X paaren wie das Hauptprojekt jede Runde nur aktive Teams; nachgemeldete aktive Teams
       // bekommen dabei ihr Team. Partien gegen inzwischen inaktive Teams zählen für die Setzliste bewusst nicht mit –
       // so auch das Hauptprojekt (gespieltenRundenEinlesen/leseRundeEin mit aktiveMeldungen: „Team inaktiv, überspringen“).
@@ -8477,11 +8533,25 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
     roundNumber: row.round_number, matchIndex: row.match_index,
   }));
 
+  // Erste Finalrunde (auch beim Neuauslosen): Finalgruppen aus der Vorrunden-Rangliste bilden; danach bleiben sie fest.
+  // Gespeichert werden sie unten im Runden-Batch.
+  let maastrichterGroups = null;
+  if (maastrichterFinal) {
+    if (roundsBefore === maastrichter.preliminaryRounds && (redraw || !players.some((team) => team.bracketGroup))) {
+      players = await planMaastrichterFinalGroups(db, tournament, players, history, maastrichter);
+      teamsById = new Map(players.map((team) => [team.id, team]));
+      maastrichterGroups = players;
+    }
+    players = players.filter((team) => team.bracketGroup);
+  }
+
   const strategy = getPairingStrategy(tournament);
   let matches;
   try {
     const strategyOptions = isSchweizer
       ? { mode: tournament.schweizer_ranking_mode, byeBuchholz: tournamentOptions(tournament).byeBuchholz }
+      : isMaastrichter
+        ? { preliminaryRounds: maastrichter.preliminaryRounds, mode: tournament.schweizer_ranking_mode, byeBuchholz: tournamentOptions(tournament).byeBuchholz, platz3: !!tournament.ko_platz3 }
       : isKo
         ? { platz3: !!tournament.ko_platz3 }
         : { formation: tournament.formation, returnRound: Number(tournament.round_robin_return || 0) === 1 };
@@ -8500,12 +8570,18 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
 
   // Beim Neuauslosen nicht: Dort löscht derselbe Batch die alte Runde, und nach Runde 1 sind Mêlée-Teams gesperrt.
   const guardedTeamIds = usesFixedTeams && !redraw && !rebuiltTeams ? [...teamsById.keys()] : null;
+  const maastrichterGuardParams = isMaastrichter
+    ? [tournament.id, maastrichter.preliminaryRounds, tournament.id, maastrichter.groupMode] : [];
   const statements = [
     // Neuauslosen: Die Ergebnisprüfung oben ist nur ein Vorab-Lesen. Kommt bis hierher noch eine Meldung, bleibt die
     // alte Runde stehen, das INSERT der neuen Runde mit derselben Nummer verletzt den Unique-Index und D1 rollt den
     // ganzen Batch zurück (409 unten) - so wird kein Ergebnis still gelöscht.
+    // Maastrichter: Wurden die Einstellungen seit dem Lesen geändert, bleibt die alte Runde ebenso stehen (Rollback).
     ...(redraw ? [
-      db.prepare(`DELETE FROM tournament_rounds WHERE id = ? AND NOT EXISTS (${DECIDED_MATCH_IN_ROUND_SQL})`).bind(lastRound.id, lastRound.id),
+      isMaastrichter
+        ? db.prepare(`DELETE FROM tournament_rounds WHERE id = ? AND NOT EXISTS (${DECIDED_MATCH_IN_ROUND_SQL}) AND ${MAASTRICHTER_SETTINGS_UNCHANGED_SQL}`)
+          .bind(lastRound.id, lastRound.id, ...maastrichterGuardParams)
+        : db.prepare(`DELETE FROM tournament_rounds WHERE id = ? AND NOT EXISTS (${DECIDED_MATCH_IN_ROUND_SQL})`).bind(lastRound.id, lastRound.id),
       db.prepare('DELETE FROM tournament_matches WHERE round_id = ? AND NOT EXISTS (SELECT 1 FROM tournament_rounds WHERE id = ?)').bind(lastRound.id, lastRound.id),
     ] : []),
     ...(rebuiltTeams ? [
@@ -8515,17 +8591,24 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
     ] : []),
     // Feste Teams sind nur vorab gelesen: Wurden sie inzwischen gelöscht (z. B. Mêlée-Teams parallel neu ausgelost),
     // legt der Batch weder Runde noch Partien an, statt auf gelöschte Teams zu verweisen (409 unten).
+    // Maastrichter zusätzlich: nur mit den gelesenen Einstellungen (Vorrunden-Zahl bestimmt die Phase).
     guardedTeamIds
       ? db.prepare(`INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) SELECT ?, ?, ?, ?
-          WHERE NOT EXISTS (SELECT 1 FROM json_each(?) j WHERE NOT EXISTS (SELECT 1 FROM tournament_teams t WHERE t.id = j.value AND t.tournament_id = ?))`)
-        .bind(roundId, tournament.id, roundNumber, now, JSON.stringify(guardedTeamIds), tournament.id)
+          WHERE NOT EXISTS (SELECT 1 FROM json_each(?) j WHERE NOT EXISTS (SELECT 1 FROM tournament_teams t WHERE t.id = j.value AND t.tournament_id = ?))
+          ${isMaastrichter ? `AND ${MAASTRICHTER_SETTINGS_UNCHANGED_SQL}` : ''}`)
+        .bind(roundId, tournament.id, roundNumber, now, JSON.stringify(guardedTeamIds), tournament.id, ...(isMaastrichter ? maastrichterGuardParams : []))
       : db.prepare('INSERT INTO tournament_rounds (id, tournament_id, round_number, created_at) VALUES (?, ?, ?, ?)').bind(roundId, tournament.id, roundNumber, now),
     // Wer die nächste Runde startet, hat die Ergebnisse geprüft: offene Spielermeldungen gelten als bestätigt.
     db.prepare('UPDATE tournament_matches SET result_report_pending = 0 WHERE tournament_id = ? AND result_report_pending = 1 AND EXISTS (SELECT 1 FROM tournament_rounds WHERE id = ?)').bind(tournament.id, roundId),
   ];
   const roundInsertIndex = statements.length - 2;
+  // Finalgruppen nur zusammen mit der Runde: Scheitert der Batch oder legt er keine Runde an, bleiben sie unverändert.
+  if (maastrichterGroups) {
+    const update = db.prepare('UPDATE tournament_teams SET bracket_group = ?, ko_seed = ? WHERE id = ? AND EXISTS (SELECT 1 FROM tournament_rounds WHERE id = ?)');
+    statements.push(...maastrichterGroups.map((team) => update.bind(team.bracketGroup, team.koSeed, team.id, roundId)));
+  }
   // Spielbahn wie im Hauptprojekt: beim Auslosen vergeben (N/R), sonst leer (X, L = später händisch).
-  const courts = assignCourts(matches, roundCourtMode(tournament, roundNumber));
+  const courts = assignCourts(matches, roundCourtMode(tournament, roundNumber, maastrichter));
   matches.forEach((match, matchIndex) => {
     const teamA = usesFixedTeams ? teamsById.get(match.teamA[0]) : null;
     const teamB = usesFixedTeams && match.teamB.length ? teamsById.get(match.teamB[0]) : null;
@@ -8546,6 +8629,10 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
   try {
     const results = await db.batch(statements);
     if (!Number(results[roundInsertIndex]?.meta?.changes || 0)) {
+      const current = isMaastrichter ? await maastrichterSettings(db, tournament.id) : null;
+      if (current && (current.preliminaryRounds !== maastrichter.preliminaryRounds || current.groupMode !== maastrichter.groupMode)) {
+        throw new HttpError(409, MAASTRICHTER_SETTINGS_CONFLICT_MESSAGE);
+      }
       throw new HttpError(409, 'Die Teams wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut starten.');
     }
   } catch (error) {
@@ -8553,6 +8640,12 @@ export async function generateTournamentRound(db, tournament, { redraw = false }
     // gleichzeitig sehen. Der eindeutige Zähler entscheidet atomar, welche
     // Anfrage gewinnt; die andere ist ein erwartbarer Konflikt, kein 500er.
     if (isTournamentRoundNumberConflict(error)) {
+      if (redraw && isMaastrichter) {
+        const current = await maastrichterSettings(db, tournament.id);
+        if (current.preliminaryRounds !== maastrichter.preliminaryRounds || current.groupMode !== maastrichter.groupMode) {
+          throw new HttpError(409, MAASTRICHTER_SETTINGS_CONFLICT_MESSAGE);
+        }
+      }
       if (redraw) throw new HttpError(409, REDRAW_CONFLICT_MESSAGE);
       throw new HttpError(409, 'Eine neue Runde wurde bereits zeitgleich erstellt. Bitte aktualisieren.');
     }
@@ -8593,11 +8686,122 @@ function koGroupOptions(tournament) {
 }
 
 // K.O. „Bahn nur Runde 1“ (Hauptprojekt-Standard): ab Runde 2 keine Bahn. Eine Cadrage ist online Runde 1.
-function roundCourtMode(tournament, roundNumber) {
+// Maastrichter: gilt für die Finalrunden, deren erste Runde folgt auf die letzte Vorrunde (maastrichter = Einstellungen).
+function roundCourtMode(tournament, roundNumber, maastrichter = null) {
   const options = tournamentOptions(tournament);
   if (tournament.type === 'ko' && options.koCourtFirstRoundOnly && roundNumber > 1) return 'X';
+  if (tournament.type === 'maastrichter' && maastrichter && options.koCourtFirstRoundOnly && roundNumber > maastrichter.preliminaryRounds + 1) return 'X';
   return options.courtMode;
 }
+
+const MAASTRICHTER_SETTINGS_CONFLICT_MESSAGE = 'Die Maastrichter-Einstellungen wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut auslosen.';
+
+// Maastrichter-Einstellungen in eigener Tabelle: tournaments steht am D1-Limit von 100 Ergebnisspalten (Migration 0162).
+async function maastrichterSettings(db, tournamentId) {
+  const row = await db.prepare('SELECT preliminary_rounds, group_mode FROM tournament_maastrichter_settings WHERE tournament_id = ?').bind(tournamentId).first();
+  return {
+    preliminaryRounds: Number(row?.preliminary_rounds || MAASTRICHTER_DEFAULT_PRELIMINARY_ROUNDS),
+    groupMode: row?.group_mode || MAASTRICHTER_DEFAULT_GROUP_MODE,
+  };
+}
+
+// Einstellungen mit Bearbeitungsstand: Nach Beginn der Finalrunde sind sie fest, die Vorrunden-Zahl darf nicht unter
+// die schon ausgelosten Runden sinken.
+async function maastrichterSettingsState(db, tournamentId) {
+  const [settings, rounds, final] = await Promise.all([
+    maastrichterSettings(db, tournamentId),
+    db.prepare('SELECT COUNT(*) AS count FROM tournament_rounds WHERE tournament_id = ?').bind(tournamentId).first(),
+    db.prepare('SELECT 1 AS started FROM tournament_teams WHERE tournament_id = ? AND bracket_group IS NOT NULL LIMIT 1').bind(tournamentId).first(),
+  ]);
+  return { ...settings, roundsDrawn: Number(rounds?.count || 0), finalStarted: Boolean(final?.started) };
+}
+
+// Formular-Eingabe (Teilangaben, normalizeMaastrichterSettings) mit dem gespeicherten Stand zusammenführen und vorab
+// prüfen. Liefert null, wenn sich nichts ändert, sonst die neuen Einstellungen.
+// Liefert nur die übermittelten Felder, die sich vom aktuellen Stand unterscheiden (null: nichts zu tun). Nicht
+// übermittelte Felder werden nicht aus dem Vorab-Stand ergänzt – sonst überschriebe eine reine Gruppenmodus-Änderung
+// eine zeitgleich gespeicherte Vorrunden-Zahl.
+async function plannedMaastrichterSettings(db, tournamentId, input) {
+  if (!input) return null;
+  const state = await maastrichterSettingsState(db, tournamentId);
+  const change = {};
+  if (input.preliminaryRounds !== undefined && input.preliminaryRounds !== state.preliminaryRounds) change.preliminaryRounds = input.preliminaryRounds;
+  if (input.groupMode !== undefined && input.groupMode !== state.groupMode) change.groupMode = input.groupMode;
+  if (!Object.keys(change).length) return null;
+  assertMaastrichterSettingsChangeAllowed(state, change);
+  return change;
+}
+
+function assertMaastrichterSettingsChangeAllowed(state, change) {
+  if (state.finalStarted) throw new HttpError(409, 'Die Maastrichter-Einstellungen können nach Beginn der Finalrunde nicht mehr geändert werden');
+  if (change.preliminaryRounds !== undefined && change.preliminaryRounds < state.roundsDrawn) {
+    throw new HttpError(409, 'Es sind bereits mehr Vorrunden ausgelost, als eingestellt werden sollen');
+  }
+}
+
+// Speichern mit der Sperre in derselben Anweisung: Eine zeitgleich ausgeloste erste Finalrunde (sie setzt die
+// Finalgruppen im selben Batch) oder eine weitere Vorrunde kann nicht zwischen Prüfung und Schreiben rutschen.
+// Umgekehrt prüft das Auslosen, ob die gelesenen Einstellungen noch gelten (MAASTRICHTER_SETTINGS_UNCHANGED_SQL).
+// change: Teilangaben ({ preliminaryRounds?, groupMode? }); nur diese Spalten werden geschrieben, die übrigen behalten
+// ihren aktuellen Datenbankwert (bzw. beim ersten Speichern den Standard). Die Rundenzahl-Sperre gilt nur, wenn die
+// Vorrunden-Zahl geändert wird.
+function maastrichterSettingsStatement(db, tournamentId, change) {
+  const rounds = change.preliminaryRounds ?? null;
+  const mode = change.groupMode ?? null;
+  return db.prepare(`INSERT INTO tournament_maastrichter_settings (tournament_id, preliminary_rounds, group_mode)
+      SELECT ?, COALESCE(?, ${MAASTRICHTER_DEFAULT_PRELIMINARY_ROUNDS}), COALESCE(?, '${MAASTRICHTER_DEFAULT_GROUP_MODE}')
+      WHERE NOT EXISTS (SELECT 1 FROM tournament_teams WHERE tournament_id = ? AND bracket_group IS NOT NULL)
+        AND (? IS NULL OR (SELECT COUNT(*) FROM tournament_rounds WHERE tournament_id = ?) <= ?)
+      ON CONFLICT(tournament_id) DO UPDATE SET preliminary_rounds = COALESCE(?, preliminary_rounds), group_mode = COALESCE(?, group_mode)`)
+    .bind(tournamentId, rounds, mode, tournamentId, rounds, tournamentId, rounds, rounds, mode);
+}
+
+// Bedingung „die übermittelten Maastrichter-Felder stehen wie gewünscht“ für das UPDATE der Eckdaten im selben Batch.
+const MAASTRICHTER_SETTINGS_APPLIED_SQL = `(? IS NULL OR COALESCE((SELECT preliminary_rounds FROM tournament_maastrichter_settings WHERE tournament_id = ?), ${MAASTRICHTER_DEFAULT_PRELIMINARY_ROUNDS}) = ?)
+  AND (? IS NULL OR COALESCE((SELECT group_mode FROM tournament_maastrichter_settings WHERE tournament_id = ?), '${MAASTRICHTER_DEFAULT_GROUP_MODE}') = ?)`;
+function maastrichterSettingsAppliedParams(tournamentId, change) {
+  const rounds = change.preliminaryRounds ?? null;
+  const mode = change.groupMode ?? null;
+  return [rounds, tournamentId, rounds, mode, tournamentId, mode];
+}
+
+// Nach einem Speichern ohne Wirkung (gesperrt): die passende Meldung aus dem dann aktuellen Stand.
+async function throwMaastrichterSettingsLocked(db, tournamentId, settings) {
+  assertMaastrichterSettingsChangeAllowed(await maastrichterSettingsState(db, tournamentId), settings);
+  throw new HttpError(409, 'Die Maastrichter-Einstellungen können nach Beginn der Finalrunde nicht mehr geändert werden');
+}
+
+// Finalgruppen wie MaastrichterFinalrundeSheet: Vorrunden-Rangliste über alle Teams (ausgestiegene behalten ihren
+// Platz), in die Gruppen kommen nur die aktiven. Gruppe und Setzrang werden gespeichert, damit die K.O.-Bäume stabil
+// bleiben, auch wenn danach noch ein Vorrunden-Ergebnis korrigiert wird. Teams ohne Gruppe spielen kein K.O.
+// Schreibt nichts: Die Zuordnung speichert generateTournamentRound im selben Batch wie die erste Finalrunde, sonst
+// bliebe sie nach einem gescheiterten Auslosen (z. B. Neuauslosen gegen ein gerade gemeldetes Ergebnis) stehen.
+async function planMaastrichterFinalGroups(db, tournament, teams, history, settings) {
+  let allTeams = await fixedTeams(db, tournament);
+  let activeTeams = allTeams;
+  if (tournament.registration_type !== 'melee') {
+    // Legt für gerade aktivierte Formée-Meldungen das Team an; danach die Teamliste neu lesen, sonst fehlte es in den
+    // Finalgruppen (und in den Gruppen-Updates des Runden-Batches).
+    activeTeams = await activeTeamsForRound(db, tournament.id, allTeams);
+    allTeams = await fixedTeams(db, tournament);
+  }
+  const activeIds = new Set(activeTeams.map((team) => team.id));
+  const mode = tournament.schweizer_ranking_mode;
+  const preliminary = history.filter((match) => match.roundNumber <= settings.preliminaryRounds);
+  const ranked = sortSwiss(swissStats(allTeams, preliminary, mode, { byeBuchholz: tournamentOptions(tournament).byeBuchholz }), mode)
+    .filter((entry) => activeIds.has(entry.teamId));
+  const assignment = assignMaastrichterGroups(ranked.map((entry) => ({ teamId: entry.teamId, wins: entry.wins })), {
+    groupMode: settings.groupMode, preliminaryRounds: settings.preliminaryRounds, ...koGroupOptions(tournament),
+  });
+  const byId = new Map(assignment.map((entry) => [entry.teamId, entry]));
+  const known = new Map(teams.map((team) => [team.id, team]));
+  return allTeams.map((team) => ({ ...(known.get(team.id) || team), bracketGroup: byId.get(team.id)?.group || null, koSeed: byId.get(team.id)?.koSeed || null }));
+}
+
+// Bedingung „Maastrichter-Einstellungen unverändert“ für den Runden-Batch (Platzhalter: tournament_id, Vorrunden,
+// tournament_id, Gruppenmodus). Ohne gespeicherte Zeile gelten die Standardwerte wie in maastrichterSettings().
+const MAASTRICHTER_SETTINGS_UNCHANGED_SQL = `COALESCE((SELECT preliminary_rounds FROM tournament_maastrichter_settings WHERE tournament_id = ?), ${MAASTRICHTER_DEFAULT_PRELIMINARY_ROUNDS}) = ?
+  AND COALESCE((SELECT group_mode FROM tournament_maastrichter_settings WHERE tournament_id = ?), '${MAASTRICHTER_DEFAULT_GROUP_MODE}') = ?`;
 
 export async function setTournamentOptions(request, db, tournament) {
   if (tournament.status === 'finished') throw new HttpError(409, 'Das Turnier ist beendet.');
@@ -8616,10 +8820,11 @@ export async function setTournamentOptions(request, db, tournament) {
         .bind(tournament.id).first();
       // Das Formular schickt alle Optionen mit: Nur ein tatsächlich geänderter Bahnmodus der Runde verteilt die Bahnen neu,
       // sonst würfelte z. B. schon eine geänderte Ranglistenanzeige bei „Zufällig“ laufende Partien auf andere Bahnen.
-      if (lastRound && roundCourtMode(updated, lastRound.round_number) !== roundCourtMode(tournament, lastRound.round_number)) {
+      const maastrichter = tournament.type === 'maastrichter' && lastRound ? await maastrichterSettings(db, tournament.id) : null;
+      if (lastRound && roundCourtMode(updated, lastRound.round_number, maastrichter) !== roundCourtMode(tournament, lastRound.round_number, maastrichter)) {
         const { results: matches = [] } = await db.prepare('SELECT id, team_b_registration_ids FROM tournament_matches WHERE round_id = ? ORDER BY match_index')
           .bind(lastRound.id).all();
-        const courts = assignCourts(matches.map((match) => ({ teamB: parseTeamIds(match.team_b_registration_ids) })), roundCourtMode(updated, lastRound.round_number));
+        const courts = assignCourts(matches.map((match) => ({ teamB: parseTeamIds(match.team_b_registration_ids) })), roundCourtMode(updated, lastRound.round_number, maastrichter));
         const update = db.prepare('UPDATE tournament_matches SET court = ?, updated_at = ? WHERE id = ?');
         matches.forEach((match, index) => statements.push(update.bind(courts[index], now, match.id)));
       }
@@ -9142,10 +9347,12 @@ export async function computeTournamentRanking(db, tournament) {
     scoreB: row.score_b,
     noShow: row.no_show,
   }));
-  if (tournament.type === 'schweizer' && tournament.registration_type !== 'supermelee') {
+  if ((tournament.type === 'schweizer' || tournament.type === 'maastrichter') && tournament.registration_type !== 'supermelee') {
     const teams = await getSchweizerTeams(db, tournament);
     const teamsById = new Map(teams.map((team) => [team.id, team]));
-    const swissMatches = matchesResult.results.map((row) => ({
+    // Maastrichter: Die Rangliste ist die Vorrunden-Rangliste; die Finalrunden ergeben die KO-Sieger (computeKoWinners).
+    const preliminaryRoundIds = tournament.type === 'maastrichter' ? await maastrichterPreliminaryRoundIds(db, tournament.id) : null;
+    const swissMatches = matchesResult.results.filter((row) => !preliminaryRoundIds || preliminaryRoundIds.has(row.round_id)).map((row) => ({
       teamA: row.team_a_id ? [row.team_a_id] : [], teamB: row.team_b_id ? [row.team_b_id] : [], scoreA: row.score_a, scoreB: row.score_b, noShow: row.no_show,
       roundId: row.round_id,
     }));
@@ -9236,6 +9443,7 @@ export async function computeTournamentRanking(db, tournament) {
  * Rangliste; ohne verbundenes Dokument bzw. ohne übertragene Sieger leer.
  */
 export async function computeKoWinners(db, tournament) {
+  if (tournament.type === 'maastrichter' && !usesDesktopRankingSnapshot(tournament)) return onlineMaastrichterKoWinners(db, tournament);
   if (!usesDesktopRankingSnapshot(tournament)) return [];
   // Eigene Tabelle: tournaments steht am D1-Limit von 100 Ergebnisspalten (siehe Migration 0162).
   const row = await db.prepare('SELECT winners_json FROM tournament_document_ko_winners WHERE tournament_id = ?')
@@ -9246,6 +9454,36 @@ export async function computeKoWinners(db, tournament) {
   return winners.map((winner) => ({
     label: winner.label,
     registrationIds: winner.registrationIds,
+    members: winner.registrationIds.map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
+  }));
+}
+
+async function maastrichterPreliminaryRoundIds(db, tournamentId) {
+  const { preliminaryRounds } = await maastrichterSettings(db, tournamentId);
+  const { results = [] } = await db.prepare('SELECT id FROM tournament_rounds WHERE tournament_id = ? AND round_number <= ?')
+    .bind(tournamentId, preliminaryRounds).all();
+  return new Set(results.map((row) => row.id));
+}
+
+// Online gespieltes Maastrichter: Sieger jedes entschiedenen Gruppenfinales, im Format der KO-Sieger aus dem
+// Turnierdokument (Feld wie SheetNamen.koFinaleGruppe im Hauptprojekt: „A-Finale“).
+async function onlineMaastrichterKoWinners(db, tournament) {
+  const { results: finals = [] } = await db.prepare(`SELECT team_a_registration_ids, team_b_registration_ids, score_a, score_b, no_show, result_report_pending, stage_label
+      FROM tournament_matches WHERE tournament_id = ? AND stage_label LIKE 'Finale – Gruppe %' ORDER BY stage_label`)
+    .bind(tournament.id).all();
+  const decided = finals.map((row) => {
+    const match = withoutUnconfirmedReport(row, tournament);
+    const teamA = parseTeamIds(match.team_a_registration_ids);
+    const teamB = parseTeamIds(match.team_b_registration_ids);
+    const winnerSide = match.no_show === 'a' ? 'b' : match.no_show === 'b' ? 'a'
+      : match.score_a == null || match.score_b == null || match.score_a === match.score_b ? null : (match.score_a > match.score_b ? 'a' : 'b');
+    if (!winnerSide) return null;
+    return { label: `${row.stage_label.slice('Finale – Gruppe '.length)}-Finale`, registrationIds: winnerSide === 'a' ? teamA : teamB };
+  }).filter((winner) => winner?.registrationIds.length);
+  if (!decided.length) return [];
+  const playersById = await getPlayersById(db, tournament.id);
+  return decided.map((winner) => ({
+    ...winner,
     members: winner.registrationIds.map((id) => playersById.get(id) || { id, firstName: '?', lastName: '' }),
   }));
 }

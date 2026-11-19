@@ -2146,5 +2146,19 @@
   "Vorrunde": "Voorronde",
   "KO-Sieger müssen als Array übergeben werden": "Knock-outwinnaars moeten als lijst worden doorgegeven",
   "Ungültiges KO-Feld": "Ongeldig knock-outveld",
-  "Ungültige Meldung bei den KO-Siegern": "Ongeldige inschrijving bij de knock-outwinnaars"
+  "Ungültige Meldung bei den KO-Siegern": "Ongeldige inschrijving bij de knock-outwinnaars",
+  "Anzahl Vorrunden (Schweizer System)": "Aantal voorrondes (Zwitsers systeem)",
+  "Finalgruppen bilden": "Finalegroepen vormen",
+  "Nach Gruppengröße (Plätze der Vorrunden-Rangliste)": "Op groepsgrootte (plaatsen in de voorrondestand)",
+  "Nach Siegen (A = alle Vorrunden gewonnen, B = eine Niederlage, …)": "Op overwinningen (A = alle voorrondes gewonnen, B = één nederlaag, …)",
+  "Die Finalrunde läuft bereits; Vorrunden und Finalgruppen stehen fest.": "De finaleronde loopt al; voorrondes en finalegroepen liggen vast.",
+  "Nach den Vorrunden bildet „Nächste Runde auslosen“ die Finalgruppen A, B, C … aus der Vorrunden-Rangliste. Jede Gruppe spielt K.O. mit Cadrage; die Gruppengröße steht in den Turnieroptionen der Spielverwaltung.": "Na de voorrondes vormt „Volgende ronde loten” de finalegroepen A, B, C … uit de voorrondestand. Elke groep speelt knock-out met cadrage; de groepsgrootte staat in de toernooiopties van het wedstrijdbeheer.",
+  "Nach den Vorrunden wird die Rangliste in Finalgruppen A, B, C … dieser Größe geteilt (Gruppenmodus „Nach Gruppengröße“); eine zu kleine letzte Gruppe wird in die vorherige aufgenommen. Gilt beim Auslosen der ersten Finalrunde.": "Na de voorrondes wordt de stand verdeeld in finalegroepen A, B, C … van deze grootte (groepsmodus „Op groepsgrootte”); een te kleine laatste groep wordt bij de vorige gevoegd. Geldt bij het loten van de eerste finaleronde.",
+  "Bahn in der Finalrunde nur in deren erster Runde": "Banen in de finaleronde alleen in de eerste ronde daarvan",
+  "Ungültige Anzahl Vorrunden": "Ongeldig aantal voorrondes",
+  "Ungültiger Gruppenmodus": "Ongeldige groepsmodus",
+  "Die Maastrichter-Einstellungen können nach Beginn der Finalrunde nicht mehr geändert werden": "De Maastrichter-instellingen kunnen na het begin van de finaleronde niet meer worden gewijzigd",
+  "Es sind bereits mehr Vorrunden ausgelost, als eingestellt werden sollen": "Er zijn al meer voorrondes geloot dan de nieuwe instelling toestaat",
+  "Für die Finalrunde fehlen die Finalgruppen.": "De finalegroepen voor de finaleronde ontbreken.",
+  "Die Maastrichter-Einstellungen wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut auslosen.": "De Maastrichter-instellingen zijn intussen gewijzigd. Vernieuw de pagina en loot de ronde opnieuw."
 }

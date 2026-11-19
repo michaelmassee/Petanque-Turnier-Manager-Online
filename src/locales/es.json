@@ -2146,5 +2146,19 @@
   "Vorrunde": "Fase previa",
   "KO-Sieger müssen als Array übergeben werden": "Los ganadores de las eliminatorias deben enviarse como lista",
   "Ungültiges KO-Feld": "Cuadro eliminatorio no válido",
-  "Ungültige Meldung bei den KO-Siegern": "Inscripción no válida entre los ganadores de las eliminatorias"
+  "Ungültige Meldung bei den KO-Siegern": "Inscripción no válida entre los ganadores de las eliminatorias",
+  "Anzahl Vorrunden (Schweizer System)": "Número de rondas preliminares (sistema suizo)",
+  "Finalgruppen bilden": "Formar grupos finales",
+  "Nach Gruppengröße (Plätze der Vorrunden-Rangliste)": "Por tamaño de grupo (puestos en la clasificación preliminar)",
+  "Nach Siegen (A = alle Vorrunden gewonnen, B = eine Niederlage, …)": "Por victorias (A = todas las rondas preliminares ganadas, B = una derrota, …)",
+  "Die Finalrunde läuft bereits; Vorrunden und Finalgruppen stehen fest.": "La fase final ya está en curso; las rondas preliminares y los grupos finales están fijados.",
+  "Nach den Vorrunden bildet „Nächste Runde auslosen“ die Finalgruppen A, B, C … aus der Vorrunden-Rangliste. Jede Gruppe spielt K.O. mit Cadrage; die Gruppengröße steht in den Turnieroptionen der Spielverwaltung.": "Tras las rondas preliminares, «Sortear la siguiente ronda» forma los grupos finales A, B, C … a partir de la clasificación preliminar. Cada grupo juega eliminatoria con cadrage; el tamaño de grupo se ajusta en las opciones del torneo de la gestión de partidas.",
+  "Nach den Vorrunden wird die Rangliste in Finalgruppen A, B, C … dieser Größe geteilt (Gruppenmodus „Nach Gruppengröße“); eine zu kleine letzte Gruppe wird in die vorherige aufgenommen. Gilt beim Auslosen der ersten Finalrunde.": "Tras las rondas preliminares, la clasificación se divide en grupos finales A, B, C … de este tamaño (modo «Por tamaño de grupo»); un último grupo demasiado pequeño se une al anterior. Se aplica al sortear la primera ronda final.",
+  "Bahn in der Finalrunde nur in deren erster Runde": "Pistas en la fase final solo en su primera ronda",
+  "Ungültige Anzahl Vorrunden": "Número de rondas preliminares no válido",
+  "Ungültiger Gruppenmodus": "Modo de grupos no válido",
+  "Die Maastrichter-Einstellungen können nach Beginn der Finalrunde nicht mehr geändert werden": "Los ajustes Maastricht ya no se pueden cambiar una vez iniciada la fase final",
+  "Es sind bereits mehr Vorrunden ausgelost, als eingestellt werden sollen": "Ya se han sorteado más rondas preliminares de las que permite el nuevo ajuste",
+  "Für die Finalrunde fehlen die Finalgruppen.": "Faltan los grupos finales para la fase final.",
+  "Die Maastrichter-Einstellungen wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut auslosen.": "Los ajustes Maastricht se han modificado mientras tanto. Actualiza y vuelve a sortear la ronda."
 }

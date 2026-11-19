@@ -2223,5 +2223,19 @@
   "Vorrunde": "Turno preliminare",
   "KO-Sieger müssen als Array übergeben werden": "I vincitori dei turni a eliminazione devono essere inviati come elenco",
   "Ungültiges KO-Feld": "Tabellone a eliminazione non valido",
-  "Ungültige Meldung bei den KO-Siegern": "Iscrizione non valida tra i vincitori dei turni a eliminazione"
+  "Ungültige Meldung bei den KO-Siegern": "Iscrizione non valida tra i vincitori dei turni a eliminazione",
+  "Anzahl Vorrunden (Schweizer System)": "Numero di turni preliminari (sistema svizzero)",
+  "Finalgruppen bilden": "Formare i gruppi finali",
+  "Nach Gruppengröße (Plätze der Vorrunden-Rangliste)": "Per dimensione del gruppo (posizioni nella classifica preliminare)",
+  "Nach Siegen (A = alle Vorrunden gewonnen, B = eine Niederlage, …)": "Per vittorie (A = tutti i turni preliminari vinti, B = una sconfitta, …)",
+  "Die Finalrunde läuft bereits; Vorrunden und Finalgruppen stehen fest.": "La fase finale è già in corso; turni preliminari e gruppi finali sono fissati.",
+  "Nach den Vorrunden bildet „Nächste Runde auslosen“ die Finalgruppen A, B, C … aus der Vorrunden-Rangliste. Jede Gruppe spielt K.O. mit Cadrage; die Gruppengröße steht in den Turnieroptionen der Spielverwaltung.": "Dopo i turni preliminari, «Sorteggia il turno successivo» forma i gruppi finali A, B, C … dalla classifica preliminare. Ogni gruppo gioca a eliminazione diretta con cadrage; la dimensione dei gruppi si imposta nelle opzioni del torneo della gestione partite.",
+  "Nach den Vorrunden wird die Rangliste in Finalgruppen A, B, C … dieser Größe geteilt (Gruppenmodus „Nach Gruppengröße“); eine zu kleine letzte Gruppe wird in die vorherige aufgenommen. Gilt beim Auslosen der ersten Finalrunde.": "Dopo i turni preliminari, la classifica viene suddivisa in gruppi finali A, B, C … di questa dimensione (modalità «Per dimensione del gruppo»); un ultimo gruppo troppo piccolo viene unito al precedente. Vale al sorteggio del primo turno finale.",
+  "Bahn in der Finalrunde nur in deren erster Runde": "Campi nella fase finale solo nel suo primo turno",
+  "Ungültige Anzahl Vorrunden": "Numero di turni preliminari non valido",
+  "Ungültiger Gruppenmodus": "Modalità dei gruppi non valida",
+  "Die Maastrichter-Einstellungen können nach Beginn der Finalrunde nicht mehr geändert werden": "Le impostazioni Maastricht non possono più essere modificate dopo l’inizio della fase finale",
+  "Es sind bereits mehr Vorrunden ausgelost, als eingestellt werden sollen": "Sono già stati sorteggiati più turni preliminari di quanti ne consenta la nuova impostazione",
+  "Für die Finalrunde fehlen die Finalgruppen.": "Mancano i gruppi finali per la fase finale.",
+  "Die Maastrichter-Einstellungen wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut auslosen.": "Le impostazioni Maastricht sono state modificate nel frattempo. Aggiorna e sorteggia di nuovo il turno."
 }

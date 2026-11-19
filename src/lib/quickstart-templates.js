@@ -12,6 +12,7 @@ const QUICK_START_SYSTEMS = [
   { id: 'formule-x', type: 'formule_x', registrationType: 'forme' },
   { id: 'jeder-gegen-jeden', type: 'jeder_gegen_jeden', registrationType: 'forme' },
   { id: 'ko', type: 'ko', registrationType: 'forme' },
+  { id: 'maastrichter', type: 'maastrichter', registrationType: 'forme' },
 ];
 
 export function quickStartTemplates(formation) {

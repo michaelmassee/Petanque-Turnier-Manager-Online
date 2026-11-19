@@ -89,7 +89,12 @@ export function totalRounds(teamCount) {
   for (const { group } of assignGroups(Array.from({ length: teamCount }, (_, index) => index))) {
     sizes.set(group, (sizes.get(group) || 0) + 1);
   }
-  return Math.max(0, ...[...sizes.values()].map((size) => groupStagePlan(size, false).stages.length));
+  return Math.max(0, ...[...sizes.values()].map(groupRoundCount));
+}
+
+// Runden eines einzelnen Teilbaums (Cadrage + Hauptrunden); das Spiel um Platz 3 läuft parallel zum Finale.
+export function groupRoundCount(groupSize) {
+  return groupStagePlan(groupSize, false).stages.length;
 }
 
 // teamCount: Zahl der festen Teams ab der ersten Runde. Ausgeschiedene dürfen danach inaktiv sein, ohne dass das

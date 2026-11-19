@@ -173,6 +173,8 @@ export const EMPTY_TOURNAMENT_FORM = {
   approvalRequired: false,
   schweizerRankingMode: 'mit_buchholz',
   koPlatz3: true,
+  maastrichterPreliminaryRounds: 3,
+  maastrichterGroupMode: 'NACH_GROESSE',
   websiteUrl: '',
   logoUrl: '',
   flyerUrl: '',

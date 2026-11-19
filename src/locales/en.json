@@ -2146,5 +2146,19 @@
   "Vorrunde": "Preliminary round",
   "KO-Sieger müssen als Array übergeben werden": "Knockout winners must be sent as an array",
   "Ungültiges KO-Feld": "Invalid knockout field",
-  "Ungültige Meldung bei den KO-Siegern": "Invalid entry among the knockout winners"
+  "Ungültige Meldung bei den KO-Siegern": "Invalid entry among the knockout winners",
+  "Anzahl Vorrunden (Schweizer System)": "Number of preliminary rounds (Swiss system)",
+  "Finalgruppen bilden": "Form final groups",
+  "Nach Gruppengröße (Plätze der Vorrunden-Rangliste)": "By group size (places in the preliminary ranking)",
+  "Nach Siegen (A = alle Vorrunden gewonnen, B = eine Niederlage, …)": "By wins (A = won all preliminary rounds, B = one loss, …)",
+  "Die Finalrunde läuft bereits; Vorrunden und Finalgruppen stehen fest.": "The final stage is already running; preliminary rounds and final groups are fixed.",
+  "Nach den Vorrunden bildet „Nächste Runde auslosen“ die Finalgruppen A, B, C … aus der Vorrunden-Rangliste. Jede Gruppe spielt K.O. mit Cadrage; die Gruppengröße steht in den Turnieroptionen der Spielverwaltung.": "After the preliminary rounds, “Draw next round” forms the final groups A, B, C … from the preliminary ranking. Each group plays knockout with cadrage; the group size is set in the tournament options of the match management.",
+  "Nach den Vorrunden wird die Rangliste in Finalgruppen A, B, C … dieser Größe geteilt (Gruppenmodus „Nach Gruppengröße“); eine zu kleine letzte Gruppe wird in die vorherige aufgenommen. Gilt beim Auslosen der ersten Finalrunde.": "After the preliminary rounds, the ranking is split into final groups A, B, C … of this size (group mode “By group size”); a last group that is too small is merged into the previous one. Applies when drawing the first final round.",
+  "Bahn in der Finalrunde nur in deren erster Runde": "Courts in the final stage only in its first round",
+  "Ungültige Anzahl Vorrunden": "Invalid number of preliminary rounds",
+  "Ungültiger Gruppenmodus": "Invalid group mode",
+  "Die Maastrichter-Einstellungen können nach Beginn der Finalrunde nicht mehr geändert werden": "The Maastricht settings can no longer be changed once the final stage has started",
+  "Es sind bereits mehr Vorrunden ausgelost, als eingestellt werden sollen": "More preliminary rounds have already been drawn than the new setting allows",
+  "Für die Finalrunde fehlen die Finalgruppen.": "The final groups for the final stage are missing.",
+  "Die Maastrichter-Einstellungen wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut auslosen.": "The Maastricht settings have been changed in the meantime. Please refresh and draw the round again."
 }

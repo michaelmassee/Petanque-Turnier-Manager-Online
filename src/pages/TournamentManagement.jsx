@@ -313,6 +313,59 @@ function RegistrationQuestionEditor({ question, index, onChange, onRemove }) {
   );
 }
 
+// Maastrichter: Zahl der Schweizer Vorrunden und Bildung der Finalgruppen. Die Werte stehen in einer eigenen Tabelle
+// (nicht im Turnierobjekt) und werden beim Bearbeiten nachgeladen; nach Beginn der Finalrunde sind sie gesperrt.
+const MAASTRICHTER_GROUP_MODE_OPTIONS = [
+  { value: 'NACH_GROESSE', label: 'Nach Gruppengröße (Plätze der Vorrunden-Rangliste)' },
+  { value: 'NACH_SIEGEN', label: 'Nach Siegen (A = alle Vorrunden gewonnen, B = eine Niederlage, …)' },
+];
+
+function MaastrichterSettingsFields({ form, setForm }) {
+  const { t } = useTranslation();
+  const settingsQuery = useQuery({
+    queryKey: ['maastrichter-settings', form.id],
+    queryFn: () => authenticatedApi(`/api/tournaments/${form.id}/maastrichter-settings`),
+    enabled: Boolean(form.id),
+    // Kein Cache über das Schließen des Formulars hinaus: Sonst übernähme das nächste Öffnen kurz den alten Stand.
+    gcTime: 0,
+  });
+  const loaded = settingsQuery.data;
+  useEffect(() => {
+    if (!loaded) return;
+    setForm((current) => (current.id === form.id && current.maastrichterLoadedFor !== form.id
+      ? { ...current, maastrichterPreliminaryRounds: loaded.preliminaryRounds, maastrichterGroupMode: loaded.groupMode, maastrichterLoadedFor: form.id }
+      : current));
+  }, [loaded, form.id, setForm]);
+  const locked = Boolean(loaded?.finalStarted);
+  const waiting = Boolean(form.id) && !loaded;
+  return (
+    <>
+      <div className="form-grid">
+        <IntegerField
+          label={t('Anzahl Vorrunden (Schweizer System)')}
+          min={Math.max(1, loaded?.roundsDrawn || 0)}
+          max={10}
+          value={form.maastrichterPreliminaryRounds ?? ''}
+          onChange={(value) => setForm({ ...form, maastrichterPreliminaryRounds: value === '' ? '' : Number(value) })}
+          disabled={locked || waiting}
+          required={!locked && !waiting}
+        />
+        <SelectField
+          label={t('Finalgruppen bilden')}
+          value={form.maastrichterGroupMode ?? 'NACH_GROESSE'}
+          onChange={(maastrichterGroupMode) => setForm({ ...form, maastrichterGroupMode })}
+          options={MAASTRICHTER_GROUP_MODE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
+          disabled={locked || waiting}
+        />
+      </div>
+      <p className="hint">{locked
+        ? t('Die Finalrunde läuft bereits; Vorrunden und Finalgruppen stehen fest.')
+        : t('Nach den Vorrunden bildet „Nächste Runde auslosen“ die Finalgruppen A, B, C … aus der Vorrunden-Rangliste. Jede Gruppe spielt K.O. mit Cadrage; die Gruppengröße steht in den Turnieroptionen der Spielverwaltung.')}</p>
+      <Feedback error={settingsQuery.error?.message || ''} />
+    </>
+  );
+}
+
 export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, owner, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [], clubOptions = [], formationLocked = false }) {
   const { t } = useTranslation();
   const clubSuggestions = useClubSuggestions(clubNames);
@@ -468,7 +521,7 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
           {!isOnlinePlayable(form) && !isDocumentBound(form) && (
             <NotOnlinePlayableNotice title={t('Nicht online durchführbar')} system={labelFor(TOURNAMENT_TYPES, form.type)} />
           )}
-          {form.type === 'schweizer' && (
+          {(form.type === 'schweizer' || form.type === 'maastrichter') && (
             <SelectField
               label={t('Schweizer Ranglistenmodus')}
               value={form.schweizerRankingMode || 'mit_buchholz'}
@@ -480,7 +533,8 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               disabled={form.status === 'running' || form.status === 'finished'}
             />
           )}
-          {form.type === 'ko' && (
+          {form.type === 'maastrichter' && <MaastrichterSettingsFields form={form} setForm={setForm} />}
+          {(form.type === 'ko' || form.type === 'maastrichter') && (
             <label className="checkbox-field">
               <input
                 type="checkbox"

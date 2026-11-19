@@ -1,5 +1,9 @@
 import { MELEE_TEAM_MODES } from './lib/pairing/melee.js';
 import { BYE_BUCHHOLZ_MODES } from './lib/pairing/schweizer.js';
+import {
+  GROUP_MODES as MAASTRICHTER_GROUP_MODES, MAX_PRELIMINARY_ROUNDS as MAASTRICHTER_MAX_PRELIMINARY_ROUNDS,
+  MIN_PRELIMINARY_ROUNDS as MAASTRICHTER_MIN_PRELIMINARY_ROUNDS,
+} from './lib/pairing/maastrichter.js';
 import { CURRENCY_CODES } from './currencies.js';
 import { HttpError } from './errors.js';
 import { sanitizeQrDesign } from './lib/qr-design.js';
@@ -433,6 +437,26 @@ export function assignCourts(matches, mode, random = Math.random) {
 }
 
 export const TEAM_DISPLAYS = ['NR', 'SPIELERNAMEN', 'NAME'];
+
+// Maastrichter-Einstellungen aus dem Turnierformular (eigene Tabelle tournament_maastrichter_settings). Jedes Feld ist
+// einzeln optional: Ein fehlendes behält den gespeicherten Wert (bzw. den Standard), ein mitgeschickter Gruppenmodus
+// gilt also auch ohne Vorrunden-Zahl. Ohne beide Felder null.
+export function normalizeMaastrichterSettings(body) {
+  if (body?.maastrichterPreliminaryRounds === undefined && body?.maastrichterGroupMode === undefined) return null;
+  const settings = {};
+  if (body.maastrichterPreliminaryRounds !== undefined) {
+    const preliminaryRounds = body.maastrichterPreliminaryRounds;
+    if (!Number.isInteger(preliminaryRounds) || preliminaryRounds < MAASTRICHTER_MIN_PRELIMINARY_ROUNDS || preliminaryRounds > MAASTRICHTER_MAX_PRELIMINARY_ROUNDS) {
+      throw new HttpError(400, 'Ungültige Anzahl Vorrunden');
+    }
+    settings.preliminaryRounds = preliminaryRounds;
+  }
+  if (body.maastrichterGroupMode !== undefined) {
+    if (!MAASTRICHTER_GROUP_MODES.includes(body.maastrichterGroupMode)) throw new HttpError(400, 'Ungültiger Gruppenmodus');
+    settings.groupMode = body.maastrichterGroupMode;
+  }
+  return settings;
+}
 
 // Turnieroptionen der Spielverwaltung (PUT /api/tournaments/:id/options) wie die Konfiguration im Hauptprojekt.
 // Jede Option ist optional; nur übergebene Werte werden geprüft. Liefert DB-Spalten mit ihren neuen Werten.

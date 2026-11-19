@@ -135,11 +135,11 @@ describe('TournamentPlayManagement', () => {
   it('bietet die Bildschirm-Anzeige für ein im Turnierdokument geführtes, online nicht durchführbares Turnier an', async () => {
     const calls = [];
     installFetchMock(calls);
-    const maastrichter = { ...TOURNAMENT, id: 't4', name: 'Maastrichter aus dem Dokument', registrationType: 'forme', type: 'maastrichter', documentManaged: true };
+    const poule = { ...TOURNAMENT, id: 't4', name: 'Poule aus dem Dokument', registrationType: 'forme', type: 'poule_ab', documentManaged: true };
 
-    render(<TournamentPlayManagement tournaments={[maastrichter]} currentUserId="user-1" language="de" />);
+    render(<TournamentPlayManagement tournaments={[poule]} currentUserId="user-1" language="de" />);
 
-    expect(screen.getByText('Maastrichter aus dem Dokument kann nicht online durchgeführt werden.')).toBeInTheDocument();
+    expect(screen.getByText('Poule aus dem Dokument kann nicht online durchgeführt werden.')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Anzeige für Bildschirm' })).toBeInTheDocument();
     await waitFor(() => expect(calls).toContain('/api/tournaments/t4/display-link'));
   });

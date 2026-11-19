@@ -44,15 +44,15 @@ export function tournamentOptionFields(tournament) {
   const system = getPlaySystemKey(tournament);
   const fixedTeams = system !== 'supermelee';
   return {
-    bye: ['schweizer', 'jeder_gegen_jeden', 'formule_x'].includes(system),
+    bye: ['schweizer', 'jeder_gegen_jeden', 'formule_x', 'maastrichter'].includes(system),
     missedRound: system === 'supermelee',
-    ko: system === 'ko',
+    ko: system === 'ko' || system === 'maastrichter',
     teamDisplayRound: fixedTeams,
     teamDisplayRanking: fixedTeams && system !== 'ko',
     roundRobinReturn: system === 'jeder_gegen_jeden',
     meleeTeamMode: fixedTeams && (tournament.registrationType ?? tournament.registration_type) === 'melee',
     // Nur mit Buchholz-Wertung sinnvoll; bei „Ohne Buchholz“ hat die Einstellung keine Wirkung.
-    byeBuchholz: system === 'schweizer'
+    byeBuchholz: (system === 'schweizer' || system === 'maastrichter')
       && (tournament.schweizerRankingMode ?? tournament.schweizer_ranking_mode ?? 'mit_buchholz') === 'mit_buchholz',
   };
 }
@@ -77,6 +77,7 @@ function payloadFor(fields, options) {
 export function TournamentOptionsPanel({ tournament, options, onSaved }) {
   const { t } = useTranslation();
   const fields = tournamentOptionFields(tournament);
+  const maastrichter = getPlaySystemKey(tournament) === 'maastrichter';
   const [draft, setDraft] = useState(options);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -127,7 +128,9 @@ export function TournamentOptionsPanel({ tournament, options, onSaved }) {
       <div className="form">
         <SelectField label={t('Spielbahn')} value={draft.courtMode} onChange={set('courtMode')} disabled={busy}
           options={COURT_MODE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))} />
-        {fields.ko && checkbox('koCourtFirstRoundOnly', t('Bahn nur in Runde 1 (bei Cadrage die Cadrage-Runde)'))}
+        {fields.ko && checkbox('koCourtFirstRoundOnly', maastrichter
+          ? t('Bahn in der Finalrunde nur in deren erster Runde')
+          : t('Bahn nur in Runde 1 (bei Cadrage die Cadrage-Runde)'))}
         <p className="hint">{t('Gilt sofort für die aktuelle Runde und jede weitere. Frühere Runden bleiben unverändert. Freilose bekommen keine Bahn.')}</p>
 
         {fields.bye && (
@@ -161,7 +164,9 @@ export function TournamentOptionsPanel({ tournament, options, onSaved }) {
             <legend>{t('Turnierbaum')}</legend>
             <IntegerField label={t('Maximale Teams pro Gruppe')} min={2} max={256} value={draft.koGroupSize} onChange={setNumber('koGroupSize')} disabled={busy} />
             <IntegerField label={t('Mindestgröße der letzten Gruppe')} min={2} max={256} value={draft.koMinLastGroupSize} onChange={setNumber('koMinLastGroupSize')} disabled={busy} />
-            <p className="hint">{t('Bei mehr Teams entstehen mehrere Gruppen A, B, C …; eine zu kleine letzte Gruppe wird in die vorherige aufgenommen. Gilt beim Auslosen der ersten Runde.')}</p>
+            <p className="hint">{maastrichter
+              ? t('Nach den Vorrunden wird die Rangliste in Finalgruppen A, B, C … dieser Größe geteilt (Gruppenmodus „Nach Gruppengröße“); eine zu kleine letzte Gruppe wird in die vorherige aufgenommen. Gilt beim Auslosen der ersten Finalrunde.')
+              : t('Bei mehr Teams entstehen mehrere Gruppen A, B, C …; eine zu kleine letzte Gruppe wird in die vorherige aufgenommen. Gilt beim Auslosen der ersten Runde.')}</p>
           </fieldset>
         )}
 

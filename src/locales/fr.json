@@ -2146,5 +2146,19 @@
   "Vorrunde": "Phase de poules",
   "KO-Sieger müssen als Array übergeben werden": "Les vainqueurs des phases finales doivent être transmis sous forme de liste",
   "Ungültiges KO-Feld": "Tableau final non valide",
-  "Ungültige Meldung bei den KO-Siegern": "Inscription non valide parmi les vainqueurs des phases finales"
+  "Ungültige Meldung bei den KO-Siegern": "Inscription non valide parmi les vainqueurs des phases finales",
+  "Anzahl Vorrunden (Schweizer System)": "Nombre de tours préliminaires (système suisse)",
+  "Finalgruppen bilden": "Former les groupes finaux",
+  "Nach Gruppengröße (Plätze der Vorrunden-Rangliste)": "Par taille de groupe (places du classement préliminaire)",
+  "Nach Siegen (A = alle Vorrunden gewonnen, B = eine Niederlage, …)": "Par victoires (A = tous les tours préliminaires gagnés, B = une défaite, …)",
+  "Die Finalrunde läuft bereits; Vorrunden und Finalgruppen stehen fest.": "La phase finale est déjà en cours ; tours préliminaires et groupes finaux sont fixés.",
+  "Nach den Vorrunden bildet „Nächste Runde auslosen“ die Finalgruppen A, B, C … aus der Vorrunden-Rangliste. Jede Gruppe spielt K.O. mit Cadrage; die Gruppengröße steht in den Turnieroptionen der Spielverwaltung.": "Après les tours préliminaires, « Tirer le tour suivant » forme les groupes finaux A, B, C … à partir du classement préliminaire. Chaque groupe joue en élimination directe avec cadrage ; la taille des groupes se règle dans les options du tournoi de la gestion des parties.",
+  "Nach den Vorrunden wird die Rangliste in Finalgruppen A, B, C … dieser Größe geteilt (Gruppenmodus „Nach Gruppengröße“); eine zu kleine letzte Gruppe wird in die vorherige aufgenommen. Gilt beim Auslosen der ersten Finalrunde.": "Après les tours préliminaires, le classement est réparti en groupes finaux A, B, C … de cette taille (mode « Par taille de groupe ») ; un dernier groupe trop petit est intégré au précédent. S’applique au tirage du premier tour final.",
+  "Bahn in der Finalrunde nur in deren erster Runde": "Terrains en phase finale uniquement au premier tour de celle-ci",
+  "Ungültige Anzahl Vorrunden": "Nombre de tours préliminaires invalide",
+  "Ungültiger Gruppenmodus": "Mode de groupes invalide",
+  "Die Maastrichter-Einstellungen können nach Beginn der Finalrunde nicht mehr geändert werden": "Les réglages Maastricht ne peuvent plus être modifiés une fois la phase finale commencée",
+  "Es sind bereits mehr Vorrunden ausgelost, als eingestellt werden sollen": "Plus de tours préliminaires ont déjà été tirés que le nouveau réglage ne le permet",
+  "Für die Finalrunde fehlen die Finalgruppen.": "Les groupes finaux de la phase finale manquent.",
+  "Die Maastrichter-Einstellungen wurden inzwischen geändert. Bitte aktualisieren und die Runde erneut auslosen.": "Les réglages Maastricht ont été modifiés entre-temps. Veuillez actualiser et tirer à nouveau le tour."
 }

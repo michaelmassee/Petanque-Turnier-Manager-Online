@@ -1010,7 +1010,7 @@ export default function TournamentPlayManagement({ tournaments: managedTournamen
   const strategyRequirementGaps = selectedTournament && selectedTournamentStatus === 'running' && !missingMeleeDraw
     // Mit den zuletzt gespeicherten Optionen: Die Turnierliste wird nach dem Speichern nicht neu geladen, eine gerade
     // aktivierte Rückrunde muss den Start der nächsten Runde aber sofort freigeben.
-    ? checkRoundRequirements({ ...selectedTournament, roundRobinReturn: tournamentOptions.roundRobinReturn }, isMelee ? swissTeams.length : activeConfirmedCount, rounds.length, { teamCount: swissTeams.length })
+    ? checkRoundRequirements({ ...selectedTournament, roundRobinReturn: tournamentOptions.roundRobinReturn }, isMelee ? swissTeams.length : activeConfirmedCount, rounds.length, { teamCount: swissTeams.length, allRoundsPlayed: roundsQuery.data?.allRoundsPlayed, preliminaryRounds: roundsQuery.data?.preliminaryRounds })
     : [];
   const openResultCount = currentRound ? currentRound.matches.filter((match) => !isMatchDecided(match)).length : 0;
   const missingRequirements = [

@@ -39,9 +39,9 @@ describe('Schnellstart-Vorlagen', () => {
   });
 
   it('bietet jedes System in jeder Formation an, Supermêlée aber nicht als Tête', () => {
-    expect(quickStartTemplates('tete').map(quickStartSystemLabel)).toEqual(['Schweizer', 'Formule X', 'Jeder gegen Jeden', 'K.O.']);
-    expect(quickStartTemplates('triplette').map(quickStartSystemLabel)).toEqual(['Supermêlée', 'Schweizer', 'Formule X', 'Jeder gegen Jeden', 'K.O.']);
-    expect(ALL_TEMPLATES).toHaveLength(14);
+    expect(quickStartTemplates('tete').map(quickStartSystemLabel)).toEqual(['Schweizer', 'Formule X', 'Jeder gegen Jeden', 'K.O.', 'Maastrichter']);
+    expect(quickStartTemplates('triplette').map(quickStartSystemLabel)).toEqual(['Supermêlée', 'Schweizer', 'Formule X', 'Jeder gegen Jeden', 'K.O.', 'Maastrichter']);
+    expect(ALL_TEMPLATES).toHaveLength(17);
     expect(new Set(ALL_TEMPLATES.map(quickStartTemplateLabel)).size).toBe(ALL_TEMPLATES.length);
     expect(new Set(ALL_TEMPLATES.map((template) => template.id)).size).toBe(ALL_TEMPLATES.length);
   });
