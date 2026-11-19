@@ -89,6 +89,13 @@ describe('Ranglisten-Spalten (Tabelle und PDF)', () => {
     expect([rankingValue('byeRounds', '1, 3'), rankingValue('byeRounds', null)]).toEqual(['1, 3', '']);
   });
 
+  it('beginnt wie das Dokument mit Nr und Team, wenn es die Nr überträgt, danach der Platz', () => {
+    const mitNr = normalizeRanking([{ ...entry(0), teamNumber: 7 }]);
+
+    expect(rankingColumnKeys(tournament, mitNr).slice(0, 4)).toEqual(['number', 'label', 'rank', 'wins']);
+    expect(rankingColumnKeys(tournament, normalizeRanking([entry(0)])).slice(0, 3)).toEqual(['rank', 'label', 'wins']);
+  });
+
   it('nennt die Reihenfolge der Kriterien wie das Dokument, abhängig von den Buchholz-Spalten', () => {
     expect(rankingOrderNote(tournament, ['rank', 'label', 'wins', 'bhz', 'fbhz', 'pointsDiff'], t)).toContain('2. Buchholz +');
     expect(rankingOrderNote(tournament, ['rank', 'label', 'wins', 'pointsDiff'], t)).toBe('Reihenfolge zur Ermittlung der Platzierung: 1. Siege +, 2. Spielpunkte-Δ, 3. Punkte +');

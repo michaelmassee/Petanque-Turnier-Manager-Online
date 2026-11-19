@@ -634,11 +634,19 @@ export function parseSyncRanking(body, validRegistrationIds) {
       pointsAgainst,
       pointsDiff: pointsFor === null || pointsAgainst === null ? null : pointsFor - pointsAgainst,
       ...rankingExtraColumns(entry),
+      ...(entry.teamNumber !== undefined && entry.teamNumber !== null ? { teamNumber: rankingTeamNumber(entry.teamNumber) } : {}),
     };
   });
 }
 
 const MAX_RANKING_EXTRA_LENGTH = 20;
+
+// Nr des Teams bzw. Spielers im Turnierdokument (Spalte „Nr“), eine positive Ganzzahl.
+function rankingTeamNumber(value) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 1) throw new HttpError(400, 'Ungültige Ranglistenwerte');
+  return number;
+}
 
 // Spalten ohne Einfluss auf den Platz, die das Dokument je nach Stand zeigt: Gruppe der Finalrunde (Maastrichter)
 // und Runden mit Freilos. Fehlt ein Wert, zeigt das Dokument die Spalte (noch) nicht.

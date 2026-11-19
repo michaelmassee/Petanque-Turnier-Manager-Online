@@ -20,6 +20,7 @@ export function normalizeRanking(ranking) {
       pointsFor: entry.pointsFor ?? null,
       pointsAgainst: entry.pointsAgainst ?? null,
       pointsDiff: entry.pointsDiff ?? (entry.pointsFor != null && entry.pointsAgainst != null ? entry.pointsFor - entry.pointsAgainst : null),
+      number: entry.teamNumber ?? null,
       group: entry.group ?? null,
       byeRounds: entry.byeRounds ?? null,
     };
@@ -43,13 +44,15 @@ const TEXT_COLUMNS = new Set(['group', 'byeRounds']);
  * Spalten-Schlüssel der Rangliste je Turniersystem (wie im Turnierdokument): Schweizer/Maastrichter mit Buchholz,
  * Formule X mit Wertung, sonst Spieldifferenz; Niederlagen zeigt die Rangliste nicht. Dahinter Gruppe (Gr) und
  * Freilos-Runden (FL), solange das verbundene Dokument sie zeigt. Spalten, die kein Eintrag führt (z. B. weil das
- * verbundene Dokument sie nicht überträgt), entfallen.
+ * verbundene Dokument sie nicht überträgt), entfallen. Überträgt das Dokument die Nr, beginnt die Tabelle wie dort mit
+ * Nr und Team, danach der Platz; sonst steht der Platz vorn.
  */
 export function rankingColumnKeys(tournament, entries) {
   const swiss = tournament?.type === 'schweizer' || tournament?.type === 'maastrichter';
   const formuleX = tournament?.type === 'formule_x';
+  const withNumber = entries.some((entry) => entry.number != null);
   const keys = [
-    'rank', 'label', 'wins',
+    ...(withNumber ? ['number', 'label', 'rank'] : ['rank', 'label']), 'wins',
     ...(swiss && tournament?.schweizerRankingMode !== 'ohne_buchholz' ? ['bhz', 'fbhz'] : []),
     ...(formuleX ? ['wertung'] : []),
     ...(!swiss && !formuleX ? ['gameDiff'] : []),
@@ -63,6 +66,7 @@ export function rankingColumnKeys(tournament, entries) {
 export function rankingColumnLabel(key, tournament, t) {
   switch (key) {
     case 'rank': return t('Platz');
+    case 'number': return t('Nr');
     case 'label': return tournament?.registrationType === 'supermelee' ? t('Spieler') : t('Team');
     case 'wins': return t('Siege');
     case 'bhz': return t('BHZ');

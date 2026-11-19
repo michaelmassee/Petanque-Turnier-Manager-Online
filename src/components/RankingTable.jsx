@@ -15,7 +15,7 @@ export function RankingTable({ tournament, entries }) {
   const orderNote = rankingOrderNote(tournament, columns, t);
   return (
     <>
-      <table className="ranking-table">
+      <table className={`ranking-table${columns[0] === 'number' ? ' has-number' : ''}`}>
         <thead>
           <tr>
             {groups.map((group) => (group.subLabels
@@ -31,7 +31,7 @@ export function RankingTable({ tournament, entries }) {
         <tbody>
           {entries.map((entry) => (
             <tr key={entry.registrationIds.join('-')} className={entry.own ? 'live-own-row' : undefined}>
-              {columns.map((key) => <td key={key} data-i18n-skip={key === 'label' || undefined}>{key === 'label' ? entry[key] ?? '—' : rankingValue(key, entry[key], i18n.language)}</td>)}
+              {columns.map((key) => <td key={key} className={`ranking-${key}`} data-i18n-skip={key === 'label' || undefined}>{key === 'label' ? entry[key] ?? '—' : rankingValue(key, entry[key], i18n.language)}</td>)}
             </tr>
           ))}
         </tbody>

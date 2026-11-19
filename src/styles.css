@@ -4490,6 +4490,15 @@ a.left-panel-link {
   background: #fff;
 }
 
+/* Mit Nr wie im Turnierdokument: Nr gedämpft, der Platz hinter dem Namen hervorgehoben. */
+.ranking-table td.ranking-number {
+  color: #53627a;
+}
+
+.ranking-table.has-number td.ranking-rank {
+  font-weight: 700;
+}
+
 /* Reihenfolge der Kriterien unter der Rangliste, wie die Fußzeile im Turnierdokument. */
 .ranking-order-note {
   margin: 8px 0 0;

@@ -39,7 +39,7 @@ function tableRow(cells, { background } = {}) {
   }, cells);
 }
 
-const columnWidth = (key) => (key === 'rank' ? RANK_COLUMN : NUMBER_COLUMN);
+const columnWidth = (key) => (key === 'rank' || key === 'number' ? RANK_COLUMN : NUMBER_COLUMN);
 
 function columnCell(key, value, options = {}) {
   if (key === 'label') return cell(value, { grow: true, ...options });

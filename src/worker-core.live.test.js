@@ -162,7 +162,7 @@ describe('Sync von Runden und Rangliste aus dem Turnierdokument', () => {
     expect(() => parseSyncRanking({ entries: [{ place: 1, registrationIds: [] }] }, ids)).toThrow('Ungültige Meldung in der Rangliste');
   });
 
-  it('übernimmt Gruppe und Freilos-Runden nur, wenn das Dokument sie zeigt', () => {
+  it('übernimmt Nr, Gruppe und Freilos-Runden nur, wenn das Dokument sie zeigt', () => {
     expect(parseSyncRanking({ entries: [
       { place: 1, registrationIds: ['r1'], group: ' A ', byeRounds: '1, 3' },
       { place: 2, registrationIds: ['r2'], group: '', byeRounds: null },
@@ -170,6 +170,9 @@ describe('Sync von Runden und Rangliste aus dem Turnierdokument', () => {
       { group: 'A', byeRounds: '1, 3' }, { group: undefined, byeRounds: undefined },
     ]);
     expect(() => parseSyncRanking({ entries: [{ place: 1, registrationIds: ['r1'], byeRounds: 'x'.repeat(21) }] }, ids))
+      .toThrow('Ungültige Ranglistenwerte');
+    expect(parseSyncRanking({ entries: [{ place: 1, registrationIds: ['r1'], teamNumber: 7 }] }, ids)[0].teamNumber).toBe(7);
+    expect(() => parseSyncRanking({ entries: [{ place: 1, registrationIds: ['r1'], teamNumber: 0 }] }, ids))
       .toThrow('Ungültige Ranglistenwerte');
   });
 
