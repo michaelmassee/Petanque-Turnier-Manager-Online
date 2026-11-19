@@ -6678,7 +6678,8 @@ async function updateTournament(request, env, existing, user) {
       tournament.entryFeeCents,
       tournament.currency,
       tournament.schweizerRankingMode,
-      tournament.koPlatz3 ? 1 : 0,
+      // Steht in den Turnieroptionen der Spielverwaltung; das Formular schickt es nicht mehr, dann bleibt der Wert.
+      tournament.koPlatz3Provided ? (tournament.koPlatz3 ? 1 : 0) : Number(existing.ko_platz3 ?? 1),
       tournament.contactName,
       tournament.contactEmail,
       tournament.contactPhone,
@@ -8689,6 +8690,7 @@ function tournamentOptions(row) {
     roundRobinReturn: number(row.round_robin_return, 0) === 1,
     meleeTeamMode: row.melee_team_mode || 'EINFACH',
     byeBuchholz: row.schweizer_bye_buchholz || 'null',
+    koPlatz3: number(row.ko_platz3, 1) === 1,
   };
 }
 
@@ -8841,13 +8843,22 @@ const MAASTRICHTER_SETTINGS_UNCHANGED_SQL = `COALESCE((SELECT preliminary_rounds
 
 export async function setTournamentOptions(request, db, tournament) {
   if (tournament.status === 'finished') throw new HttpError(409, 'Das Turnier ist beendet.');
-  const columns = normalizeTournamentOptions(await readJson(request));
+  const body = await readJson(request);
+  const columns = normalizeTournamentOptions(body);
+  // Maastrichter: Vorrunden und Finalgruppen-Bildung wie in der Konfiguration des Hauptprojekts hier statt im
+  // Turnierformular; eigene Tabelle mit Sperre ab der Finalrunde (siehe maastrichterSettingsStatement).
+  const maastrichterInput = tournament.type === 'maastrichter' ? normalizeMaastrichterSettings(body) : null;
   const names = Object.keys(columns);
-  if (!names.length) throw new HttpError(400, 'Keine Turnieroptionen übergeben');
+  if (!names.length && !maastrichterInput) throw new HttpError(400, 'Keine Turnieroptionen übergeben');
+  const maastrichterChange = await plannedMaastrichterSettings(db, tournament.id, maastrichterInput);
   const updated = { ...tournament, ...columns };
   const now = new Date().toISOString();
-  const statements = [db.prepare(`UPDATE tournaments SET ${names.map((name) => `${name} = ?`).join(', ')}, updated_at = ? WHERE id = ?`)
-    .bind(...names.map((name) => columns[name]), now, tournament.id)];
+  // Mit Maastrichter-Änderung erst die Einstellungen (mit Sperre), die übrigen Optionen nur, wenn sie danach stehen.
+  const statements = [...(maastrichterChange ? [maastrichterSettingsStatement(db, tournament.id, maastrichterChange)] : []),
+    db.prepare(`UPDATE tournaments SET ${names.map((name) => `${name} = ?, `).join('')}updated_at = ?
+        WHERE id = ?${maastrichterChange ? ` AND ${MAASTRICHTER_SETTINGS_APPLIED_SQL}` : ''}`)
+      .bind(...names.map((name) => columns[name]), now, tournament.id,
+        ...(maastrichterChange ? maastrichterSettingsAppliedParams(tournament.id, maastrichterChange) : []))];
   if (!isDocumentBound(tournament)) {
     // Spielbahn sofort für die aktuelle (letzte) Runde, frühere Runden bleiben. Bei „Leer“ bleiben eingetragene Bahnen
     // stehen, damit die Turnierleitung sie nur noch korrigiert.
@@ -8856,7 +8867,8 @@ export async function setTournamentOptions(request, db, tournament) {
         .bind(tournament.id).first();
       // Das Formular schickt alle Optionen mit: Nur ein tatsächlich geänderter Bahnmodus der Runde verteilt die Bahnen neu,
       // sonst würfelte z. B. schon eine geänderte Ranglistenanzeige bei „Zufällig“ laufende Partien auf andere Bahnen.
-      const maastrichter = tournament.type === 'maastrichter' && lastRound ? await maastrichterSettings(db, tournament.id) : null;
+      const maastrichter = tournament.type === 'maastrichter' && lastRound
+        ? { ...await maastrichterSettings(db, tournament.id), ...maastrichterChange } : null;
       if (lastRound && roundCourtMode(updated, lastRound.round_number, maastrichter) !== roundCourtMode(tournament, lastRound.round_number, maastrichter)) {
         const { results: matches = [] } = await db.prepare('SELECT id, team_b_registration_ids FROM tournament_matches WHERE round_id = ? ORDER BY match_index')
           .bind(lastRound.id).all();
@@ -8872,8 +8884,12 @@ export async function setTournamentOptions(request, db, tournament) {
         .bind(columns.bye_points_for, columns.bye_points_against, now, tournament.id));
     }
   }
-  await db.batch(statements);
-  return json(tournamentOptions(updated));
+  const results = await db.batch(statements);
+  if (maastrichterChange && !Number(results[1]?.meta?.changes || 0)) await throwMaastrichterSettingsLocked(db, tournament.id, maastrichterChange);
+  return json({
+    ...tournamentOptions(updated),
+    ...(tournament.type === 'maastrichter' ? { maastrichter: await maastrichterSettingsState(db, tournament.id) } : {}),
+  });
 }
 
 export async function setTournamentMatchCourt(request, db, tournament, matchId) {

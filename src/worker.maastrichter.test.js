@@ -220,9 +220,50 @@ describe('Maastrichter online', () => {
     expect(inFinal[0].count).toBe(1);
   });
 
+  it('behält Spiel um Platz 3 beim Speichern des Turnierformulars, das den Wert nicht mehr schickt', async () => {
+    sql("UPDATE tournaments SET ko_platz3 = 1 WHERE id = 't1'");
+    expect((await update({ name: 'Umbenannt' })).status).toBe(200);
+    expect(rows("SELECT ko_platz3 FROM tournaments WHERE id = 't1'")).toEqual([{ ko_platz3: 1 }]);
+    expect((await update({ koPlatz3: false })).status).toBe(200);
+    expect(rows("SELECT ko_platz3 FROM tournaments WHERE id = 't1'")).toEqual([{ ko_platz3: 0 }]);
+  });
+
   it('übernimmt einen Gruppenmodus auch ohne Vorrunden-Zahl und behält diese', async () => {
     expect((await update({ maastrichterGroupMode: 'NACH_SIEGEN' })).status).toBe(200);
     expect(storedSettings()).toEqual([{ preliminary_rounds: 2, group_mode: 'NACH_SIEGEN' }]);
+  });
+
+  describe('Turnieroptionen der Spielverwaltung', () => {
+    const putOptions = (body) => request('/api/tournaments/t1/options', { method: 'PUT', body: JSON.stringify({ courtMode: 'X', ...body }) });
+
+    it('speichert Vorrunden, Gruppenmodus und Spiel um Platz 3 und liefert den Stand zurück', async () => {
+      const response = await putOptions({ koPlatz3: true, maastrichterPreliminaryRounds: 4, maastrichterGroupMode: 'NACH_SIEGEN' });
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.koPlatz3).toBe(true);
+      expect(data.maastrichter).toEqual({ preliminaryRounds: 4, groupMode: 'NACH_SIEGEN', roundsDrawn: 0, finalStarted: false });
+      expect(storedSettings()).toEqual([{ preliminary_rounds: 4, group_mode: 'NACH_SIEGEN' }]);
+      expect(rows("SELECT ko_platz3 FROM tournaments WHERE id = 't1'")).toEqual([{ ko_platz3: 1 }]);
+    });
+
+    it('lehnt weniger Vorrunden als bereits ausgelost ab', async () => {
+      expect((await nextRound()).status).toBe(200);
+      playOpenMatches();
+      expect((await nextRound()).status).toBe(200);
+      const response = await putOptions({ maastrichterPreliminaryRounds: 1 });
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toBe('Es sind bereits mehr Vorrunden ausgelost, als eingestellt werden sollen');
+    });
+
+    it('speichert weder Einstellungen noch übrige Optionen, wenn die Finalrunde zeitgleich beginnt', async () => {
+      await playPreliminaryRounds();
+      env.DB.vorBatch((sqlite) => sqlite.prepare("UPDATE tournament_teams SET bracket_group = 'A', ko_seed = 1 WHERE tournament_id = 't1'").run());
+      const response = await putOptions({ courtMode: 'N', koPlatz3: true, maastrichterPreliminaryRounds: 3 });
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toBe('Die Maastrichter-Einstellungen können nach Beginn der Finalrunde nicht mehr geändert werden');
+      expect(storedSettings()).toEqual([{ preliminary_rounds: 2, group_mode: 'NACH_GROESSE' }]);
+      expect(rows("SELECT court_mode, ko_platz3 FROM tournaments WHERE id = 't1'")).toEqual([{ court_mode: 'X', ko_platz3: 0 }]);
+    });
   });
 
   it('übernimmt die Einstellungen beim Anlegen und prüft sie', async () => {

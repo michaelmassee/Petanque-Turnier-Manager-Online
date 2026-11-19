@@ -313,13 +313,6 @@ function RegistrationQuestionEditor({ question, index, onChange, onRemove }) {
   );
 }
 
-// Maastrichter: Zahl der Schweizer Vorrunden und Bildung der Finalgruppen. Die Werte stehen in einer eigenen Tabelle
-// (nicht im Turnierobjekt) und werden beim Bearbeiten nachgeladen; nach Beginn der Finalrunde sind sie gesperrt.
-const MAASTRICHTER_GROUP_MODE_OPTIONS = [
-  { value: 'NACH_GROESSE', label: 'Nach Gruppengröße (Plätze der Vorrunden-Rangliste)' },
-  { value: 'NACH_SIEGEN', label: 'Nach Siegen (A = alle Vorrunden gewonnen, B = eine Niederlage, …)' },
-];
-
 // Ergebnismeldungen erst nach „Gesehen“ der Turnierleitung veröffentlichen (Standard: sofort übernommen). Der Wert steht
 // in tournament_options (nicht im Turnierobjekt) und wird beim Bearbeiten nachgeladen; bis dahin ist das Feld gesperrt
 // und wird nicht mitgespeichert (tournamentPayload).
@@ -357,52 +350,6 @@ function TournamentSettingsLoader({ tournamentId, setForm }) {
       : current));
   }, [data, tournamentId, setForm]);
   return null;
-}
-
-function MaastrichterSettingsFields({ form, setForm }) {
-  const { t } = useTranslation();
-  const settingsQuery = useQuery({
-    queryKey: ['maastrichter-settings', form.id],
-    queryFn: () => authenticatedApi(`/api/tournaments/${form.id}/maastrichter-settings`),
-    enabled: Boolean(form.id),
-    // Kein Cache über das Schließen des Formulars hinaus: Sonst übernähme das nächste Öffnen kurz den alten Stand.
-    gcTime: 0,
-  });
-  const loaded = settingsQuery.data;
-  useEffect(() => {
-    if (!loaded) return;
-    setForm((current) => (current.id === form.id && current.maastrichterLoadedFor !== form.id
-      ? { ...current, maastrichterPreliminaryRounds: loaded.preliminaryRounds, maastrichterGroupMode: loaded.groupMode, maastrichterLoadedFor: form.id }
-      : current));
-  }, [loaded, form.id, setForm]);
-  const locked = Boolean(loaded?.finalStarted);
-  const waiting = Boolean(form.id) && !loaded;
-  return (
-    <>
-      <div className="form-grid">
-        <IntegerField
-          label={t('Anzahl Vorrunden (Schweizer System)')}
-          min={Math.max(1, loaded?.roundsDrawn || 0)}
-          max={10}
-          value={form.maastrichterPreliminaryRounds ?? ''}
-          onChange={(value) => setForm({ ...form, maastrichterPreliminaryRounds: value === '' ? '' : Number(value) })}
-          disabled={locked || waiting}
-          required={!locked && !waiting}
-        />
-        <SelectField
-          label={t('Finalgruppen bilden')}
-          value={form.maastrichterGroupMode ?? 'NACH_GROESSE'}
-          onChange={(maastrichterGroupMode) => setForm({ ...form, maastrichterGroupMode })}
-          options={MAASTRICHTER_GROUP_MODE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
-          disabled={locked || waiting}
-        />
-      </div>
-      <p className="hint">{locked
-        ? t('Die Finalrunde läuft bereits; Vorrunden und Finalgruppen stehen fest.')
-        : t('Nach den Vorrunden bildet „Nächste Runde auslosen“ die Finalgruppen A, B, C … aus der Vorrunden-Rangliste. Jede Gruppe spielt K.O. mit Cadrage; die Gruppengröße steht in den Turnieroptionen der Spielverwaltung.')}</p>
-      <Feedback error={settingsQuery.error?.message || ''} />
-    </>
-  );
 }
 
 export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmin, owner, editorCandidates, ownerCandidates, onOwnerChanged, language, currentUser, boulePlaces = [], saving = false, invalidField = null, clubNames = [], clubOptions = [], formationLocked = false }) {
@@ -572,16 +519,12 @@ export function TournamentForm({ form, setForm, onSubmit, onCancel, mode, isAdmi
               disabled={form.status === 'running' || form.status === 'finished'}
             />
           )}
-          {form.type === 'maastrichter' && <MaastrichterSettingsFields form={form} setForm={setForm} />}
-          {(form.type === 'ko' || form.type === 'maastrichter') && (
-            <label className="checkbox-field">
-              <input
-                type="checkbox"
-                checked={form.koPlatz3}
-                onChange={(event) => setForm({ ...form, koPlatz3: event.target.checked })}
-              />
-              {t('Spiel um Platz 3 austragen')}
-            </label>
+          {/* Wie in der Konfiguration des Hauptprojekts: in den Turnieroptionen der Spielverwaltung, nicht im Formular. */}
+          {form.type === 'maastrichter' && (
+            <p className="hint">{t('Vorrunden, Finalgruppen und Spiel um Platz 3 stehen in den Turnieroptionen der Spielverwaltung.')}</p>
+          )}
+          {form.type === 'ko' && (
+            <p className="hint">{t('Spiel um Platz 3 steht in den Turnieroptionen der Spielverwaltung.')}</p>
           )}
           {showFormationHelp && (
             <FormationHelpDialog onClose={() => setShowFormationHelp(false)} />
@@ -1199,7 +1142,6 @@ export function tournamentToForm(tournament) {
     formation: tournament.formationOther ? 'andere' : (tournament.formation || 'doublette'),
     registrationType: tournament.registrationType || 'forme',
     schweizerRankingMode: tournament.schweizerRankingMode || 'mit_buchholz',
-    koPlatz3: tournament.koPlatz3 === undefined ? true : Boolean(tournament.koPlatz3),
     status: tournament.status || 'draft',
     maxRegistrations: tournament.maxRegistrations || 0,
     registrationDeadline: utcIsoToZonedDateTimeInput(tournament.registrationDeadline, tournament.timezone),

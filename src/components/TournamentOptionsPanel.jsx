@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { authenticatedApi } from '../lib/api.js';
 import { getPlaySystemKey } from '../lib/pairing/index.js';
@@ -32,11 +33,17 @@ export const BYE_BUCHHOLZ_OPTIONS = [
   { value: 'neutral', label: 'Neutral (fiktiver Durchschnittsgegner)' },
 ];
 
+// Maastrichter: Bildung der Finalgruppen wie MaastrichterGruppenModus im Hauptprojekt.
+export const MAASTRICHTER_GROUP_MODE_OPTIONS = [
+  { value: 'NACH_GROESSE', label: 'Nach Gruppengröße (Plätze der Vorrunden-Rangliste)' },
+  { value: 'NACH_SIEGEN', label: 'Nach Siegen (A = alle Vorrunden gewonnen, B = eine Niederlage, …)' },
+];
+
 // Standardwerte wie Migrationen 0154/0155/0157 bzw. Hauptprojekt.
 export const DEFAULT_TOURNAMENT_OPTIONS = {
   courtMode: 'X', byePointsFor: 13, byePointsAgainst: 7, missedRoundPointsFor: 0, missedRoundPointsAgainst: 13,
   koGroupSize: 16, koMinLastGroupSize: 4, koCourtFirstRoundOnly: true, teamDisplayRound: 'NAME', teamDisplayRanking: 'NAME',
-  roundRobinReturn: false, meleeTeamMode: 'EINFACH', byeBuchholz: 'null',
+  roundRobinReturn: false, meleeTeamMode: 'EINFACH', byeBuchholz: 'null', koPlatz3: true,
 };
 
 // Welche Optionen das Turniersystem kennt – wie die Konfiguration je System im Hauptprojekt.
@@ -47,6 +54,8 @@ export function tournamentOptionFields(tournament) {
     bye: ['schweizer', 'jeder_gegen_jeden', 'formule_x', 'maastrichter'].includes(system),
     missedRound: system === 'supermelee',
     ko: system === 'ko' || system === 'maastrichter',
+    // Wie die Maastrichter-Konfiguration im Hauptprojekt (Vorrunden, Gruppen-Modus); Spiel um Platz 3 gehört zu fields.ko.
+    maastrichter: system === 'maastrichter',
     teamDisplayRound: fixedTeams,
     teamDisplayRanking: fixedTeams && system !== 'ko',
     roundRobinReturn: system === 'jeder_gegen_jeden',
@@ -58,9 +67,13 @@ export function tournamentOptionFields(tournament) {
 }
 
 // Nur die Werte, die das System kennt – der Server prüft Paare (Plus/Minus, Gruppengrößen) gemeinsam.
-function payloadFor(fields, options) {
+// maastrichter: geladener Stand der Maastrichter-Einstellungen; ohne ihn oder ab der Finalrunde nicht mitschicken.
+function payloadFor(fields, options, maastrichter) {
+  const maastrichterEditable = fields.maastrichter && maastrichter && !maastrichter.finalStarted;
   return {
     courtMode: options.courtMode,
+    ...(fields.ko ? { koPlatz3: Boolean(options.koPlatz3) } : {}),
+    ...(maastrichterEditable ? { maastrichterPreliminaryRounds: options.maastrichterPreliminaryRounds, maastrichterGroupMode: options.maastrichterGroupMode } : {}),
     ...(fields.bye ? { byePointsFor: options.byePointsFor, byePointsAgainst: options.byePointsAgainst } : {}),
     ...(fields.missedRound ? { missedRoundPointsFor: options.missedRoundPointsFor, missedRoundPointsAgainst: options.missedRoundPointsAgainst } : {}),
     ...(fields.ko ? { koGroupSize: options.koGroupSize, koMinLastGroupSize: options.koMinLastGroupSize, koCourtFirstRoundOnly: options.koCourtFirstRoundOnly } : {}),
@@ -76,9 +89,22 @@ function payloadFor(fields, options) {
 // onSaved(options): die Seite führt den Stand selbst nach, weil die Turnierliste nicht neu geladen wird.
 export function TournamentOptionsPanel({ tournament, options, onSaved }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const fields = tournamentOptionFields(tournament);
-  const maastrichter = getPlaySystemKey(tournament) === 'maastrichter';
-  const [draft, setDraft] = useState(options);
+  const maastrichter = fields.maastrichter;
+  // Maastrichter-Einstellungen stehen in eigener Tabelle, nicht im Turnierobjekt: nachladen.
+  const maastrichterQueryKey = ['maastrichter-settings', tournament.id];
+  const maastrichterQuery = useQuery({
+    queryKey: maastrichterQueryKey,
+    queryFn: () => authenticatedApi(`/api/tournaments/${tournament.id}/maastrichter-settings`),
+    enabled: maastrichter,
+  });
+  const maastrichterState = maastrichter ? maastrichterQuery.data : null;
+  const baseline = maastrichterState
+    ? { ...options, maastrichterPreliminaryRounds: maastrichterState.preliminaryRounds, maastrichterGroupMode: maastrichterState.groupMode }
+    : options;
+  const maastrichterLocked = Boolean(maastrichterState?.finalStarted);
+  const [draft, setDraft] = useState(baseline);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -86,7 +112,7 @@ export function TournamentOptionsPanel({ tournament, options, onSaved }) {
   // Inhaltlich vergleichen: Die Seite liefert bei jedem Rendern ein neues Objekt, der Entwurf soll nur bei echten
   // Änderungen (Turnierwechsel, gespeicherter Stand) zurückgesetzt werden. Der Turnierwechsel zählt auch dann, wenn
   // beide Turniere dieselben gespeicherten Optionen haben – sonst landete ein ungespeicherter Entwurf im anderen Turnier.
-  const optionsKey = JSON.stringify(options);
+  const optionsKey = JSON.stringify(baseline);
   useEffect(() => setDraft(JSON.parse(optionsKey)), [optionsKey, tournament.id]);
   // Nur beim Turnierwechsel leeren – sonst verschwände die Erfolgsmeldung, sobald der gespeicherte Stand ankommt.
   useEffect(() => {
@@ -94,8 +120,8 @@ export function TournamentOptionsPanel({ tournament, options, onSaved }) {
     setMessage('');
   }, [tournament.id]);
 
-  const payload = payloadFor(fields, draft);
-  const changed = JSON.stringify(payload) !== JSON.stringify(payloadFor(fields, options));
+  const payload = payloadFor(fields, draft, maastrichterState);
+  const changed = JSON.stringify(payload) !== JSON.stringify(payloadFor(fields, baseline, maastrichterState));
   const incomplete = Object.values(payload).some((value) => value === '');
   const set = (key) => (value) => setDraft((current) => ({ ...current, [key]: value }));
   const setNumber = (key) => (value) => set(key)(value === '' ? '' : Number(value));
@@ -112,11 +138,14 @@ export function TournamentOptionsPanel({ tournament, options, onSaved }) {
     setMessage('');
     setBusy(true);
     try {
-      const data = await authenticatedApi(`/api/tournaments/${tournament.id}/options`, { method: 'PUT', body: JSON.stringify(payload) });
+      const { maastrichter: savedMaastrichter, ...data } = await authenticatedApi(`/api/tournaments/${tournament.id}/options`, { method: 'PUT', body: JSON.stringify(payload) });
+      if (savedMaastrichter) queryClient.setQueryData(maastrichterQueryKey, savedMaastrichter);
       onSaved(data);
       setMessage(t('Turnieroptionen gespeichert.'));
     } catch (requestError) {
       setError(requestError.message);
+      // Z. B. Finalrunde inzwischen begonnen: aktuellen Stand (Sperre, ausgeloste Runden) zeigen.
+      if (maastrichter) queryClient.invalidateQueries({ queryKey: maastrichterQueryKey });
     } finally {
       setBusy(false);
     }
@@ -159,6 +188,31 @@ export function TournamentOptionsPanel({ tournament, options, onSaved }) {
           </fieldset>
         )}
 
+        {maastrichter && (
+          <fieldset className="options-pair options-stack-narrow">
+            <legend>{t('Vorrunden und Finalgruppen')}</legend>
+            <IntegerField
+              label={t('Anzahl Vorrunden (Schweizer System)')}
+              min={Math.max(1, maastrichterState?.roundsDrawn || 0)}
+              max={10}
+              value={draft.maastrichterPreliminaryRounds ?? ''}
+              onChange={setNumber('maastrichterPreliminaryRounds')}
+              disabled={busy || !maastrichterState || maastrichterLocked}
+            />
+            <SelectField
+              label={t('Finalgruppen bilden')}
+              value={draft.maastrichterGroupMode ?? 'NACH_GROESSE'}
+              onChange={set('maastrichterGroupMode')}
+              options={MAASTRICHTER_GROUP_MODE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
+              disabled={busy || !maastrichterState || maastrichterLocked}
+            />
+            <p className="hint">{maastrichterLocked
+              ? t('Die Finalrunde läuft bereits; Vorrunden und Finalgruppen stehen fest.')
+              : t('Nach den Vorrunden bildet „Nächste Runde auslosen“ die Finalgruppen A, B, C … aus der Vorrunden-Rangliste. Jede Gruppe spielt K.O. mit Cadrage.')}</p>
+          </fieldset>
+        )}
+        <Feedback error={maastrichter ? maastrichterQuery.error?.message || '' : ''} />
+
         {fields.ko && (
           <fieldset className="options-pair">
             <legend>{t('Turnierbaum')}</legend>
@@ -167,6 +221,7 @@ export function TournamentOptionsPanel({ tournament, options, onSaved }) {
             <p className="hint">{maastrichter
               ? t('Nach den Vorrunden wird die Rangliste in Finalgruppen A, B, C … dieser Größe geteilt (Gruppenmodus „Nach Gruppengröße“); eine zu kleine letzte Gruppe wird in die vorherige aufgenommen. Gilt beim Auslosen der ersten Finalrunde.')
               : t('Bei mehr Teams entstehen mehrere Gruppen A, B, C …; eine zu kleine letzte Gruppe wird in die vorherige aufgenommen. Gilt beim Auslosen der ersten Runde.')}</p>
+            {checkbox('koPlatz3', t('Spiel um Platz 3 austragen'))}
           </fieldset>
         )}
 

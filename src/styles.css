@@ -5531,6 +5531,17 @@ details[open] > .play-round-summary::before {
   margin: 0;
 }
 
+.tournament-options .options-pair .checkbox-field {
+  grid-column: 1 / -1;
+}
+
+/* Lange Auswahltexte (Finalgruppen bilden) am Handy untereinander statt abgeschnitten. */
+@media (max-width: 640px) {
+  .tournament-options .options-pair.options-stack-narrow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .live-disabled {
   display: flex;
   gap: 14px;

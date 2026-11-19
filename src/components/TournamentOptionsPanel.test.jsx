@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '../lib/i18next-config.js';
 import { authenticatedApi } from '../lib/api.js';
@@ -10,7 +11,13 @@ vi.mock('../lib/api.js', () => ({ authenticatedApi: vi.fn() }));
 const SCHWEIZER = { id: 't1', type: 'schweizer', registrationType: 'forme' };
 
 // Wie die Spielverwaltung: der gespeicherte Stand kommt als neues options-Objekt zurück.
-function Page({ tournament = SCHWEIZER, onSaved = vi.fn() }) {
+// Ein QueryClient je Seite: Die Maastrichter-Einstellungen lädt das Panel selbst nach.
+function Page(props) {
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  return <QueryClientProvider client={queryClient}><PanelPage {...props} /></QueryClientProvider>;
+}
+
+function PanelPage({ tournament = SCHWEIZER, onSaved = vi.fn() }) {
   const [options, setOptions] = useState(DEFAULT_TOURNAMENT_OPTIONS);
   return <TournamentOptionsPanel tournament={tournament} options={{ ...options }} onSaved={(next) => { onSaved(next); setOptions(next); }} />;
 }
@@ -47,6 +54,7 @@ describe('TournamentOptionsPanel', () => {
     const { unmount } = render(<Page tournament={{ id: 'k', type: 'ko', registrationType: 'forme' }} />);
     expect(screen.getByLabelText('Maximale Teams pro Gruppe')).toHaveValue('16');
     expect(screen.getByLabelText('Mindestgröße der letzten Gruppe')).toHaveValue('4');
+    expect(screen.getByLabelText('Spiel um Platz 3 austragen')).toBeChecked();
     expect(screen.getByLabelText('Bahn nur in Runde 1 (bei Cadrage die Cadrage-Runde)')).toBeChecked();
     expect(screen.queryByLabelText('Team-Anzeige in der Rangliste')).toBeNull();
     expect(screen.queryByText('Freilos')).toBeNull();
@@ -90,6 +98,49 @@ describe('TournamentOptionsPanel', () => {
     rerender(<Page tournament={{ ...SCHWEIZER, id: 't2' }} />);
     expect(screen.getByLabelText('Spielbahn')).toHaveValue('X');
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+
+  it('Maastrichter: lädt Vorrunden und Finalgruppen nach und speichert sie mit Spiel um Platz 3', async () => {
+    const state = { preliminaryRounds: 3, groupMode: 'NACH_GROESSE', roundsDrawn: 1, finalStarted: false };
+    authenticatedApi.mockImplementation(async (path, init) => {
+      if (path.endsWith('/maastrichter-settings')) return state;
+      const body = JSON.parse(init.body);
+      return { ...DEFAULT_TOURNAMENT_OPTIONS, ...body, maastrichter: { ...state, preliminaryRounds: body.maastrichterPreliminaryRounds, groupMode: body.maastrichterGroupMode } };
+    });
+    const onSaved = vi.fn();
+    render(<Page tournament={{ id: 'ma', type: 'maastrichter', registrationType: 'forme' }} onSaved={onSaved} />);
+
+    const rounds = screen.getByLabelText('Anzahl Vorrunden (Schweizer System)');
+    await waitFor(() => expect(rounds).toHaveDisplayValue('3'));
+    fireEvent.change(rounds, { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText('Finalgruppen bilden'), { target: { value: 'NACH_SIEGEN' } });
+    fireEvent.click(screen.getByLabelText('Spiel um Platz 3 austragen'));
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const sent = JSON.parse(authenticatedApi.mock.calls.find(([path]) => path.endsWith('/options'))[1].body);
+    expect(sent).toMatchObject({ koPlatz3: false, maastrichterPreliminaryRounds: 4, maastrichterGroupMode: 'NACH_SIEGEN' });
+    // Der Maastrichter-Stand geht nicht in die Turnieroptionen der Seite.
+    expect(onSaved.mock.calls[0][0]).not.toHaveProperty('maastrichter');
+    expect(await screen.findByText('Turnieroptionen gespeichert.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+
+  it('Maastrichter: sperrt Vorrunden und Finalgruppen nach Beginn der Finalrunde und schickt sie nicht mit', async () => {
+    authenticatedApi.mockImplementation(async (path, init) => (path.endsWith('/maastrichter-settings')
+      ? { preliminaryRounds: 2, groupMode: 'NACH_GROESSE', roundsDrawn: 3, finalStarted: true }
+      : { ...DEFAULT_TOURNAMENT_OPTIONS, ...JSON.parse(init.body) }));
+    const onSaved = vi.fn();
+    render(<Page tournament={{ id: 'mb', type: 'maastrichter', registrationType: 'forme' }} onSaved={onSaved} />);
+    expect(await screen.findByText('Die Finalrunde läuft bereits; Vorrunden und Finalgruppen stehen fest.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Anzahl Vorrunden (Schweizer System)')).toBeDisabled();
+    expect(screen.getByLabelText('Finalgruppen bilden')).toBeDisabled();
+    fireEvent.click(screen.getByLabelText('Spiel um Platz 3 austragen'));
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const sent = JSON.parse(authenticatedApi.mock.calls.find(([path]) => path.endsWith('/options'))[1].body);
+    expect(sent).not.toHaveProperty('maastrichterPreliminaryRounds');
+    expect(sent.koPlatz3).toBe(false);
   });
 
   it('zeigt Fehler beim Speichern an', async () => {
