@@ -905,6 +905,7 @@ export function TournamentList({
               )}
             </button>
             <div className="badges">
+              {tournament.documentManaged && <span className="role role-turnierleiter">{t('Eckdaten im Turnierdokument')}</span>}
               {tournament.registrationEnabled === false ? (
                 <span className={`status ${tournament.status === 'draft' ? 'status-draft' : 'status-calendar'}`}>
                   {t(tournament.status === 'draft' ? 'Unsichtbar' : 'Sichtbar')}
@@ -927,10 +928,7 @@ export function TournamentList({
             {tournament.canManage && (
               <div className="row-actions">
                 {tournament.documentManaged ? (
-                  <>
-                    <span className="muted">{t('Eckdaten im Turnierdokument')}</span>
-                    <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onEditPublication(tournament)}>{t('Status ändern')}</Button>
-                  </>
+                  <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => onEditPublication(tournament)}>{t('Status ändern')}</Button>
                 ) : (
                   <Button variant="secondary" loading={busyId === `edit-${tournament.id}`} disabled={Boolean(busyId) && busyId !== `edit-${tournament.id}`} onClick={() => onEdit(tournament)}>{t('Bearbeiten')}</Button>
                 )}

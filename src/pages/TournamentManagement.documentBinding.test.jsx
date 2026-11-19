@@ -53,6 +53,20 @@ describe('Turnierverwaltung: inzwischen verbundenes Turnierdokument', () => {
     expect(onTournamentsChanged).not.toHaveBeenCalled();
   });
 
+  it('zeigt ein gebundenes Turnier mit Badge "Eckdaten im Turnierdokument" bei den Status-Badges', () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({}));
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <TournamentManagementPage tournaments={[{ ...tournament, documentManaged: true }]} currentUser={currentUser}
+          language="de" setSelectedTournamentId={() => {}} onTournamentsChanged={() => {}} />
+      </QueryClientProvider>,
+    );
+
+    const badge = screen.getByText('Eckdaten im Turnierdokument');
+    expect(badge).toHaveClass('role');
+    expect(badge.closest('.badges')).not.toBeNull();
+  });
+
   it('lädt die veraltete Turnierliste beim Fensterfokus neu, eine frische nicht', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } });
     const loadList = vi.fn(async () => ({ tournaments: [] }));
