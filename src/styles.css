@@ -2326,6 +2326,10 @@ a.left-panel-link {
   font-size: 1.3em;
 }
 
+.display-columns h2.display-ko-history-title {
+  margin-top: 16px;
+}
+
 /* Runde und Rangliste nebeneinander, sobald beide genug Platz haben (die Rangliste braucht ~46em ohne seitliches
    Scrollen), sonst untereinander. In em gerechnet, damit es mit der Schriftgröße der Anzeige mitwächst.
    Ohne Rangliste (KO) nutzt die Runde die volle Breite. */
@@ -2428,6 +2432,11 @@ a.left-panel-link {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     min-height: 0;
+  }
+
+  /* Aktuelle Runde und gespielte KO-Partien teilen sich die linke Spalte; jede Hälfte scrollt für sich. */
+  .is-display .display-columns > section.has-ko-history {
+    grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1fr);
   }
 
   .is-display .display-scroll {

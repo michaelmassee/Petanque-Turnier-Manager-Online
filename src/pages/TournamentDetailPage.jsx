@@ -18,7 +18,7 @@ import { TournamentPlayerListings } from '../components/TournamentPlayerListings
 import { PublicRegistrationPanel } from '../App.jsx';
 import { RegistrationOpeningReminder, TournamentRegistrationAction } from '../components/TournamentRegistrationAction.jsx';
 import { RoundTable } from '../components/RoundTable.jsx';
-import { currentRoundView } from '../lib/current-round.js';
+import { currentRoundView, playedKoMatches } from '../lib/current-round.js';
 import { TournamentQrPanel } from '../components/TournamentQrPanel.jsx';
 import { RankingTable } from '../components/RankingTable.jsx';
 import { RankingWithKoWinners } from '../components/KoWinnersTable.jsx';
@@ -600,6 +600,7 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
   const autoScroll = display && fitsScreen;
   const roundScrollRef = useAutoScroll(autoScroll);
   const rankingScrollRef = useAutoScroll(autoScroll);
+  const koHistoryScrollRef = useAutoScroll(autoScroll);
   const announcement = query.data?.announcement;
   useEffect(() => {
     if (query.data) onAnnouncement?.(announcement || null);
@@ -656,6 +657,7 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
   }
 
   const currentRound = currentRoundView(rounds);
+  const koHistory = playedKoMatches(rounds, currentRound, tournament?.type);
   const showRanking = ranking.length > 0 && tournament?.type !== 'ko';
   // Bildschirm vor Ort nach Turnierende: statt der letzten Runde nur noch die komplette Rangliste über die volle Breite.
   const finalStanding = display && showRanking && query.data?.status === 'finished';
@@ -687,11 +689,20 @@ export function TournamentSchedule({ tournamentId, tournament, language, shareTo
     <div className={`play-schedule${display ? ' is-display' : ''}`}>
       <Feedback error={query.error?.message} />
       <div className={`display-columns${showRanking ? ' has-ranking' : ''}`}>
-        <section className="display-current-round">
+        <section className={`display-current-round${koHistory.matches.length ? ' has-ko-history' : ''}`}>
           <h2>{t('Runde')} {currentRound.roundNumber}</h2>
           <div className="display-scroll" ref={roundScrollRef}>
             <RoundTable round={currentRound} />
           </div>
+          {/* KO-Phase: Bereits gespielte KO-Partien bleiben unter der aktuellen Runde stehen, neueste zuerst. */}
+          {koHistory.matches.length > 0 && (
+            <>
+              <h2 className="display-ko-history-title">{t('Gespielte KO-Spiele')}</h2>
+              <div className="display-scroll" ref={koHistoryScrollRef}>
+                <RoundTable round={koHistory} />
+              </div>
+            </>
+          )}
         </section>
         {showRanking && (
           <section className="display-ranking">

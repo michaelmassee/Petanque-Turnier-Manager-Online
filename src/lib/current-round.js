@@ -23,3 +23,30 @@ export function currentRoundView(rounds) {
   }
   return { ...last, matches: [...carriedOver, ...last.matches] };
 }
+
+const isDecided = (match) => Boolean(match.noShow)
+  || (match.scoreA !== null && match.scoreA !== undefined && match.scoreB !== null && match.scoreB !== undefined);
+
+// KO-Partien je Turnierart: beim KO-Turnier jede Partie, bei Maastrichter die Finalrunden (nur sie tragen eine Stufe
+// wie „A-Finale · 1/4-Finale“). Poule und Kaskade bleiben außen vor: Dort tragen auch Gruppenspiele eine Stufe.
+const KO_MATCH = {
+  ko: () => true,
+  maastrichter: (match) => Boolean(match.stageLabel),
+};
+
+/**
+ * Bereits gespielte KO-Partien früherer Runden, die die aktuelle Anzeige nicht mehr zeigt – damit Ergebnisse der
+ * KO-Phase auf der Turnierseite stehen bleiben. Neueste Runde zuerst, innerhalb einer Runde in Spielplanreihenfolge;
+ * ohne Freilose.
+ *
+ * @param current Ergebnis von currentRoundView
+ * @returns {{ matches: object[] }} leer bei anderen Turnierarten oder ohne gespielte KO-Partien
+ */
+export function playedKoMatches(rounds, current, tournamentType) {
+  const isKoMatch = KO_MATCH[tournamentType];
+  if (!isKoMatch) return { matches: [] };
+  const shown = new Set((current?.matches || []).map((match) => match.id));
+  const matches = [...(rounds || [])].reverse().flatMap((round) => round.matches.filter((match) => isKoMatch(match)
+    && match.teamB?.length > 0 && isDecided(match) && !shown.has(match.id)));
+  return { matches };
+}

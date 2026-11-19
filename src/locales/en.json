@@ -2178,5 +2178,6 @@
   "FL": "Bye",
   "Runden mit Freilos": "Rounds with a bye",
   "Reihenfolge zur Ermittlung der Platzierung: 1. Siege +, 2. Buchholz +, 3. Feinbuchholz +, 4. Spielpunkte-Δ, 5. Punkte +": "Order for determining the ranking: 1. Wins +, 2. Buchholz +, 3. Fine Buchholz +, 4. Point difference Δ, 5. Points +",
-  "Reihenfolge zur Ermittlung der Platzierung: 1. Siege +, 2. Spielpunkte-Δ, 3. Punkte +": "Order for determining the ranking: 1. Wins +, 2. Point difference Δ, 3. Points +"
+  "Reihenfolge zur Ermittlung der Platzierung: 1. Siege +, 2. Spielpunkte-Δ, 3. Punkte +": "Order for determining the ranking: 1. Wins +, 2. Point difference Δ, 3. Points +",
+  "Gespielte KO-Spiele": "Completed knockout matches"
 }

@@ -127,6 +127,31 @@ describe('TournamentSchedule (öffentliche Ansicht)', () => {
     expect(screen.getByText(/Stand:/)).toBeInTheDocument();
   });
 
+  it('lässt auf der Anzeige bereits gespielte KO-Partien in einem zweiten Bereich unter der Runde stehen', async () => {
+    mockSchedule({
+      rounds: [
+        { id: 'r1', roundNumber: 1, matches: [{ id: 'm1', teamA: [anna], teamB: [clara], scoreA: 13, scoreB: 11, noShow: null }] },
+        { id: 'r2', roundNumber: 2, matches: [
+          { id: 'm2', stageLabel: 'A-Finale · 1/2-Finale', teamA: [anna], teamB: [bert], scoreA: 13, scoreB: 4, noShow: null },
+          { id: 'm3', stageLabel: 'A-Finale · 1/2-Finale', teamA: [clara], teamB: [dieter], scoreA: 9, scoreB: 13, noShow: null },
+        ] },
+        { id: 'r3', roundNumber: 3, matches: [
+          { id: 'm4', stageLabel: 'A-Finale · Finale', teamA: [anna], teamB: [dieter], scoreA: null, scoreB: null, noShow: null },
+        ] },
+      ],
+    });
+
+    asLandscapeScreen();
+    render(<TournamentSchedule tournamentId="t1" tournament={{ id: 't1', type: 'maastrichter' }} language="de" display />);
+
+    expect(await screen.findByRole('heading', { name: 'Runde 3' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Gespielte KO-Spiele' })).toBeInTheDocument();
+    const tabellen = document.querySelectorAll('.display-current-round table');
+    expect(tabellen).toHaveLength(2);
+    expect([...tabellen[1].querySelectorAll('tbody tr')].map((row) => row.cells[2].textContent))
+      .toEqual(['Anna Muster', 'Clara Klar']);
+  });
+
   it('zeigt als reine Anzeige nach Turnierende nur noch die komplette Rangliste', async () => {
     mockSchedule({
       status: 'finished',
