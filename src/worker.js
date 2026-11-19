@@ -3630,6 +3630,14 @@ export default {
           (db) => syncPutAnnouncement(request, env, db, tournament, url.origin));
       }
 
+      const syncTimerMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/timer$/);
+      if (syncTimerMatch && request.method === 'PUT') {
+        const auth = await requireApiKey(request, env.DB);
+        const tournament = await getSyncTournament(env.DB, syncTimerMatch[1]);
+        assertCanManageTournament(tournament, auth.user);
+        return await executeSyncWrite(request, env.DB, tournament, (db) => syncPutTimer(request, db, tournament));
+      }
+
       const syncRegistrationClosedMatch = url.pathname.match(/^\/api\/sync\/tournaments\/([^/]+)\/registration-closed$/);
       if (syncRegistrationClosedMatch && request.method === 'PUT') {
         const auth = await requireApiKey(request, env.DB);
@@ -7545,6 +7553,47 @@ function nextTournamentTimer(body, current, nowMs) {
       throw new HttpError(400, 'Unbekannte Timer-Aktion.', { field: 'action' });
   }
   return next;
+}
+
+/**
+ * Timer aus dem Turnierdokument: PTM überträgt den absoluten Stand (läuft mit Restzeit, pausiert mit Restzeit oder
+ * gestoppt). Die Endzeit rechnet der Server ab Eingang – die Uhr des Turnier-PCs spielt keine Rolle.
+ *
+ *   PUT /api/sync/tournaments/:id/timer  { state: running|paused|stopped, remainingSec?, durationSec?, label? }
+ *     -> { timer: {...} | null }
+ */
+export async function syncPutTimer(request, db, tournament) {
+  if (tournament.status === 'finished') {
+    throw new HttpError(409, 'Das Turnier ist bereits abgeschlossen', { code: 'tournament_finished' });
+  }
+  const body = await readJson(request);
+  const nowMs = Date.now();
+  const revision = (Number(parseTimerColumn(tournament).revision) || 0) + 1;
+  const next = documentTimer(body, nowMs);
+  const timerJson = JSON.stringify({ ...next, revision });
+  return {
+    statements: [
+      db.prepare('UPDATE tournaments SET timer = ?, updated_at = ? WHERE id = ?')
+        .bind(timerJson, new Date(nowMs).toISOString(), tournament.id),
+    ],
+    response: { envelope: { status: 200, body: { timer: tournamentTimer({ ...tournament, timer: timerJson }) } } },
+  };
+}
+
+function documentTimer(body, nowMs) {
+  const label = cleanTimerLabel(body.label);
+  const durationSec = Number.isInteger(body.durationSec) && body.durationSec >= 1 && body.durationSec <= TIMER_MAX_SECONDS
+    ? body.durationSec : null;
+  if (body.state === 'stopped') return { label, durationSec };
+  const remainingSec = Number(body.remainingSec);
+  if (!Number.isInteger(remainingSec) || remainingSec < 0 || remainingSec > TIMER_MAX_SECONDS) {
+    throw new HttpError(400, 'Ungültige Restzeit.', { field: 'remainingSec' });
+  }
+  if (body.state === 'running') {
+    return { state: 'running', label, durationSec, endsAt: new Date(nowMs + remainingSec * 1000).toISOString() };
+  }
+  if (body.state === 'paused') return { state: 'paused', label, durationSec, remainingSec };
+  throw new HttpError(400, 'Unbekannter Timer-Zustand.', { field: 'state' });
 }
 
 /** PTM Calc is the exclusive writer for the metadata of a linked tournament. */
