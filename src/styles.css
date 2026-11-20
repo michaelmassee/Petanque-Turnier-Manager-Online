@@ -5155,6 +5155,16 @@ details[open] > .play-round-summary::before {
   vertical-align: middle;
 }
 
+/* Eigene Teamnummer in „Meine Anmeldung“: auffällig blau wie im Kopf der Live-Ansicht. */
+.live-team-number-badge {
+  background: #1677ff;
+  color: #ffffff;
+}
+
+.live-team-number-badge strong {
+  font-size: 1.15em;
+}
+
 /* In der Meldeliste etwas kleiner, damit die Zeilen flach bleiben. */
 .board-entry .team-number.prominent { margin-right: 0; font-size: 1.15em; }
 

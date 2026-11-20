@@ -379,10 +379,24 @@ describe('Live-Ansicht für Spieler', () => {
 
     expect(await screen.findByText('Das Turnier hat noch nicht begonnen.')).toBeInTheDocument();
     expect(screen.getByText('Anmeldestatus: Warteliste')).toBeInTheDocument();
-    expect(screen.getByText('Noch nicht eingecheckt.')).toBeInTheDocument();
+    expect(screen.getByText('Noch nicht eingecheckt')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Teamnummer/)).not.toBeInTheDocument();
     expect(screen.getByText('Team noch unvollständig.')).toBeInTheDocument();
     expect(screen.getByText('Dein Team wird kurz vor Turnierstart gebildet.')).toBeInTheDocument();
     expect(screen.queryByText('Noch keine Runde gestartet.')).not.toBeInTheDocument();
+  });
+
+  it('zeigt nach dem Check-in Status-Badge und Teamnummer in der eigenen Anmeldung', async () => {
+    const payload = livePayload({ lastRoundNumber: null, currentMatch: null, history: [], ranking: [], rankingPlace: null, rankingSize: 0 });
+    payload.tournament.status = 'registration';
+    Object.assign(payload.registration, { status: 'confirmed', participation: 'active', registrationType: 'forme', teamNumber: 7 });
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse(payload)));
+    renderDetail();
+
+    const anmeldung = await screen.findByRole('region', { name: 'Meine Anmeldung' });
+    expect(within(anmeldung).getByText('Eingecheckt')).toHaveClass('status');
+    expect(within(anmeldung).getByLabelText('Teamnummer 7')).toBeInTheDocument();
+    expect(within(anmeldung).queryByText(/^Anmeldestatus/)).not.toBeInTheDocument();
   });
 
   it.each([

@@ -406,15 +406,39 @@ function HistoryCard({ live }) {
   );
 }
 
+// Teilnahme als Badge: Klasse und Text je Check-in-Zustand.
+const PARTICIPATION_BADGES = {
+  active: { className: 'registration-confirmed', label: 'Eingecheckt' },
+  inactive: { className: 'status-calendar', label: 'Noch nicht eingecheckt' },
+  withdrawn: { className: 'status-waitlist', label: 'Pausiert' },
+};
+
+// Anmeldestatus, Check-in und – nach dem Check-in – die Teamnummer als Badges.
+function RegistrationBadges({ registration }) {
+  const { t } = useTranslation();
+  const participation = PARTICIPATION_BADGES[registration.participation];
+  const showNumber = registration.participation === 'active' && registration.teamNumber != null;
+  return (
+    <div className="badges live-registration-badges">
+      {registration.status !== 'confirmed' && (
+        <span className={`status registration-${registration.status}`}>
+          {`${t('Anmeldestatus')}: ${labelFor(REGISTRATION_STATUSES, registration.status)}`}
+        </span>
+      )}
+      {participation && <span className={`status ${participation.className}`}>{t(participation.label)}</span>}
+      {showNumber && (
+        <span className="status live-team-number-badge" aria-label={`${t('Teamnummer')} ${registration.teamNumber}`}>
+          {t('Teamnummer')} <strong data-i18n-skip>{registration.teamNumber}</strong>
+        </span>
+      )}
+    </div>
+  );
+}
+
 // Phase der Anmeldung vor der Auslosung (KP-12): Anmeldestatus, Check-in und Teambildung.
 function RegistrationPhase({ registration, tournament }) {
   const { t } = useTranslation();
   const lines = [];
-  if (registration.status !== 'confirmed') {
-    lines.push(`${t('Anmeldestatus')}: ${labelFor(REGISTRATION_STATUSES, registration.status)}`);
-  }
-  if (registration.participation === 'inactive') lines.push(t('Noch nicht eingecheckt.'));
-  if (registration.participation === 'active') lines.push(t('Eingecheckt.'));
   if (registration.incomplete) lines.push(t('Team noch unvollständig.'));
   if (registration.registrationType === 'melee' && registration.meleeTeammates === null && tournament.status !== 'finished') {
     lines.push(t('Dein Team wird kurz vor Turnierstart gebildet.'));
@@ -423,6 +447,7 @@ function RegistrationPhase({ registration, tournament }) {
   return (
     <section className="panel live-card" aria-label={t('Meine Anmeldung')}>
       <h2>{t('Meine Anmeldung')}</h2>
+      <RegistrationBadges registration={registration} />
       {lines.map((line) => <p key={line} className="live-phase">{line}</p>)}
       {/* Die Besetzung nur, wenn der Kopf sie nicht schon zeigt (z. B. weil dort der Teamname steht). */}
       {registration.unit === 'team' && registration.persons?.length > 0 && registration.persons.join(' + ') !== registration.label && (
