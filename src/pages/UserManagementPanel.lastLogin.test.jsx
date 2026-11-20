@@ -32,6 +32,22 @@ describe('Letzte Anmeldung in der Admin-Benutzerliste', () => {
     expect(unknownRow.querySelector('time')).toBeNull();
   });
 
+  it.each([
+    ['de', 'Registriert seit'],
+    ['en', 'Registered since'],
+  ])('zeigt das Registrierungsdatum auf %s an', async (language, label) => {
+    await i18next.changeLanguage(language);
+    const createdAt = '2026-03-14T09:15:00.000Z';
+    vi.spyOn(api, 'authenticatedApi').mockImplementation(async (path) => path === '/api/users' ? { users: [
+      { id: 'anna', firstName: 'Anna', lastName: 'Schmidt', email: 'anna@example.test', role: 'user', createdAt },
+    ] } : { reports: [] });
+    render(<UserManagementPanel currentUser={{ id: 'admin' }} />);
+    const row = (await screen.findByText('Anna Schmidt')).closest('article');
+    const time = row.querySelector(`time[datetime="${createdAt}"]`);
+    expect(time).toHaveTextContent(new Intl.DateTimeFormat(language, { dateStyle: 'short' }).format(new Date(createdAt)));
+    expect(time.parentElement).toHaveTextContent(`${label}:`);
+  });
+
   it('sortiert die Liste nach Name, zuletzt online oder Verein und zeigt „zuletzt online“ an', async () => {
     vi.spyOn(api, 'authenticatedApi').mockImplementation(async (path) => path === '/api/users' ? { users: [
       { id: 'bert', firstName: 'Bert', lastName: 'Bauer', email: 'bert@example.test', role: 'user', club: 'BC Linden', lastSeenAt: '2026-10-20T10:00:00.000Z' },

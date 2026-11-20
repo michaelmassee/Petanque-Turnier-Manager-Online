@@ -300,6 +300,13 @@ function UserRow({ user, currentUser, selected, busy, busyOther, onEdit, onDelet
             </time>
           ) : t('Bisher nicht erfasst')}
         </span>
+        {user.createdAt && (
+          <span className="muted">
+            {t('Registriert seit')}: <time dateTime={user.createdAt} data-i18n-skip>
+              {new Intl.DateTimeFormat(i18n.resolvedLanguage || i18n.language, { dateStyle: 'short' }).format(new Date(user.createdAt))}
+            </time>
+          </span>
+        )}
       </div>
       <div className="badges">
         <span className={`role role-${user.role}`}>{roleName(user.role)}</span>
