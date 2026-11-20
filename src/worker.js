@@ -9784,6 +9784,15 @@ function liveRegistrationLabel(registration) {
 }
 
 /**
+ * Eigene Teamnummer für die Live-Ansicht: bei online durchgeführten Turnieren die vergebene, bei Turnieren aus dem
+ * Dokument die vom Plugin übertragene Nr. der Meldeliste. Mêlée/Supermêlée haben keine feste Teamnummer.
+ */
+function liveTeamNumber(tournament, registration) {
+  if ((tournament.registration_type || 'forme') !== 'forme' || registration.team_number == null) return null;
+  return Number(registration.team_number);
+}
+
+/**
  * Persönliche Live-Antwort. Das ETag setzt sich aus der Snapshot-Version und dem eigenen
  * Teilnahme-Status zusammen: Hat sich nichts geändert, antwortet der Server mit 304 ohne Inhalt.
  * Der Browser revalidiert dank "no-cache" jeden Abruf selbst (If-None-Match) und reicht bei 304
@@ -9796,7 +9805,10 @@ export async function buildLiveResponse(request, db, registration) {
   if (Number(tournament.live_view_enabled || 0) !== 1) {
     return json({
       tournament: toLiveTournament(tournament),
-      registration: { id: registration.id, label: liveRegistrationLabel(registration), participation: registration.participation, status: registration.status },
+      registration: {
+        id: registration.id, label: liveRegistrationLabel(registration), participation: registration.participation,
+        status: registration.status, teamNumber: liveTeamNumber(tournament, registration),
+      },
       announcement: tournamentAnnouncement(tournament),
       timer: tournamentTimer(tournament),
       dataAsOf: null,
@@ -9813,7 +9825,7 @@ export async function buildLiveResponse(request, db, registration) {
     persons: registrationSlots(registration).map((slot) => [slot.firstName, slot.lastName].filter(Boolean).join(' ')),
     unit: registrationUnit(tournament).kind,
     registrationType: tournament.registration_type || 'forme',
-    teamNumber: usesRegistrationTeamNumbers(tournament) && registration.team_number != null ? Number(registration.team_number) : null,
+    teamNumber: liveTeamNumber(tournament, registration),
     incomplete: isIncompleteTeam(tournament, registration),
     meleeTeammates: await liveMeleeTeammates(db, tournament.id, registration.id),
     // Bei Turnieren aus dem Dokument: eigene Meldung der aktuellen Runde, bis die Turnierleitung entschieden hat.
@@ -11717,7 +11729,12 @@ async function syncPostResults(request, env, tournamentId) {
     if (expectedExecutionRevision !== null && (!Number.isInteger(expectedExecutionRevision) || expectedExecutionRevision < 1)) {
       throw new HttpError(400, `Ungültige Ausführungsrevision für Anmeldung ${id}`);
     }
-    parsed.push({ id, status, seedingPosition, participation, expectedExecutionRevision, notify: entry.notify === true });
+    // Teamnummer der Meldeliste im Dokument (Nr-Spalte); fehlt sie, bleibt die gespeicherte.
+    const teamNumber = entry.teamNumber === undefined || entry.teamNumber === null ? null : Number(entry.teamNumber);
+    if (teamNumber !== null && (!Number.isInteger(teamNumber) || teamNumber < 1)) {
+      throw new HttpError(400, 'Ungültige Teamnummer');
+    }
+    parsed.push({ id, status, seedingPosition, participation, teamNumber, expectedExecutionRevision, notify: entry.notify === true });
   }
 
   const statusChangeIds = parsed.filter((entry) => entry.status !== null).map((entry) => entry.id);
@@ -11761,7 +11778,8 @@ async function syncPostResults(request, env, tournamentId) {
          rejection_reason = CASE WHEN COALESCE(?, status) = 'rejected' THEN rejection_reason END,
          rejected_at = CASE WHEN COALESCE(?, status) = 'rejected' THEN rejected_at END,
          rejected_by = CASE WHEN COALESCE(?, status) = 'rejected' THEN rejected_by END,
-         seeding_position = ?, participation = COALESCE(?, participation), execution_revision = execution_revision + 1, updated_at = ?
+         seeding_position = ?, participation = COALESCE(?, participation), team_number = COALESCE(?, team_number),
+         execution_revision = execution_revision + 1, updated_at = ?
      WHERE id = ? AND tournament_id = ? AND (? IS NULL OR execution_revision = ?)`,
   );
   const ids = parsed.map((entry) => entry.id);
@@ -11778,7 +11796,7 @@ async function syncPostResults(request, env, tournamentId) {
   return {
     statements: parsed.map((entry) => updateStatement.bind(entry.status, entry.status, now, entry.status,
       entry.status, entry.status, entry.status, entry.seedingPosition,
-      entry.participation, now, entry.id, tournamentId, entry.expectedExecutionRevision, entry.expectedExecutionRevision)),
+      entry.participation, entry.teamNumber, now, entry.id, tournamentId, entry.expectedExecutionRevision, entry.expectedExecutionRevision)),
     response: { sql: responseSql, binds: [tournamentId, now, JSON.stringify(expectedIds), expectedIds.length, tournamentId, now, JSON.stringify(ids)] },
     mapError: mapParticipantLimitAbort,
     async afterCommit(envelope) {

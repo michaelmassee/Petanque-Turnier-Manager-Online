@@ -50,6 +50,14 @@ describe('Persönlicher Live-Link (E-21)', () => {
     expect((await antwort.json()).registration).toMatchObject({ id: ONLINE_ID, persons: ['Maria Bieder'] });
   });
 
+  it.each([1, 0])('liefert bei Turnieren aus dem Dokument die übertragene Teamnummer (Live-Ansicht freigeschaltet: %i)', async (freigeschaltet) => {
+    bindeDokument(env.DB.sqlite, 't1');
+    sql('UPDATE tournaments SET live_view_enabled = ? WHERE id = ?', freigeschaltet, 't1');
+    sql("UPDATE registrations SET participation = 'active', team_number = 4 WHERE id = ?", ONLINE_ID);
+
+    expect((await (await liveAbrufen(TOKEN)).json()).registration).toMatchObject({ participation: 'active', teamNumber: 4 });
+  });
+
   it('meldet ohne Freischaltung nur den Status, ohne Runden, und nimmt kein Push-Abo an', async () => {
     sql("UPDATE tournaments SET live_view_enabled = 0 WHERE id = 't1'");
     const antwort = await liveAbrufen(TOKEN);

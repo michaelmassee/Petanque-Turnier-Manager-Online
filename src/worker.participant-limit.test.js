@@ -225,6 +225,19 @@ describe('Teilnehmer-Limit pro Turnier', () => {
       expect(hubCalls).toEqual([]);
     });
 
+    it('übernimmt die Teamnummer aus dem Dokument und behält sie, wenn ein Auftrag keine mitschickt', async () => {
+      bindeDokument(env.DB.sqlite, 't1');
+      vorhanden('a', 'confirmed');
+      const teamNummer = () => env.DB.sqlite.prepare("SELECT team_number FROM registrations WHERE id = 'a'").get().team_number;
+
+      expect((await uebernehmen([{ id: 'a', participation: 'active', teamNumber: 5 }])).status).toBe(200);
+      expect(teamNummer()).toBe(5);
+      expect((await uebernehmen([{ id: 'a', participation: 'inactive' }])).status).toBe(200);
+      expect(teamNummer()).toBe(5);
+      expect((await uebernehmen([{ id: 'a', teamNumber: 0 }])).status).toBe(400);
+      expect(teamNummer()).toBe(5);
+    });
+
     // D1 erlaubt höchstens 100 gebundene Parameter; die ID-Listen gehen deshalb als JSON in die Abfragen.
     it.each([1, 2])('verarbeitet einen Auftrag mit 60 Statusübernahmen (Protokoll %i)', async (protocol) => {
       bindeDokument(env.DB.sqlite, 't1', { protocol });
