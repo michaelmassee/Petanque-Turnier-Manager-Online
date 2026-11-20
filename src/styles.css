@@ -2467,6 +2467,90 @@ a.left-panel-link {
   }
 }
 
+/* Bildschirm vor Ort, TV mit niedriger Auflösung (1280×720, 1920×1080 …): Schrift, Titel, Ankündigung und Timer
+   richten sich nach Breite UND Höhe, sonst ist auf allem unter 4K alles zu groß. Gleiche Query wie oben bzw.
+   DISPLAY_FIT_QUERY (lib/hooks.js); die Handy-Ansicht bleibt unberührt. */
+@media (min-width: 900px) and (orientation: landscape) {
+  .tournament-display {
+    font-size: clamp(0.75rem, min(1.05vw, 1.9vh), 1.6rem);
+    padding: clamp(8px, 1.5vh, 16px) clamp(12px, 1.2vw, 20px);
+  }
+
+  .tournament-display .tournament-board-page {
+    gap: clamp(6px, 1.1vh, 12px);
+  }
+
+  .tournament-display .tournament-detail-heading {
+    padding: 0;
+    padding-right: 8em;
+  }
+
+  .tournament-display .tournament-detail-heading h1 {
+    margin: 0;
+    font-size: 1.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Datum, Verein und Ort in einer Zeile statt untereinander. */
+  .tournament-display .tournament-detail-meta {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0 1.2em;
+    margin-top: 0.2em;
+  }
+
+  .tournament-display .announcement-banner {
+    margin: 0;
+    padding: 0.5em 0.8em;
+    border-left-width: 6px;
+  }
+
+  .tournament-display .announcement-banner-icon {
+    font-size: 1.3em;
+  }
+
+  .tournament-display .announcement-banner-text {
+    font-size: 1em;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .tournament-display .timer-large {
+    margin: 0;
+    padding: 0.3em 1em 0.5em;
+  }
+
+  .tournament-display .timer-large .timer-banner-label {
+    font-size: clamp(1rem, 3.2vh, 2.6rem);
+  }
+
+  .tournament-display .timer-large .timer-banner-time {
+    font-size: clamp(2.5rem, 11vh, 11rem);
+  }
+
+  .tournament-display .timer-large .timer-banner-status {
+    font-size: clamp(0.75rem, 1.6vh, 1.4rem);
+  }
+
+  /* Rangliste etwas breiter als die Runde; lange Namen kürzen statt seitlich zu scrollen. */
+  .is-display .display-columns.has-ranking {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: clamp(12px, 1.5vw, 24px);
+  }
+
+  .is-display .ranking-table th,
+  .is-display .ranking-table td,
+  .is-display .round-table th,
+  .is-display .round-table td {
+    padding: 0.2em 0.5em;
+  }
+}
+
 @media (max-width: 560px) {
   .tournament-display {
     font-size: 1rem;
