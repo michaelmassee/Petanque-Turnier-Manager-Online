@@ -20,6 +20,7 @@ const USER_STATUS_FILTERS = [
 const USER_SORT_OPTIONS = [
   { value: 'name', label: 'Name' },
   { value: 'lastSeen', label: 'Zuletzt online' },
+  { value: 'registered', label: 'Registriert seit' },
   { value: 'club', label: 'Verein' },
 ];
 

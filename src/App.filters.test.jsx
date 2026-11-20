@@ -125,6 +125,15 @@ describe('sortUsers', () => {
     expect(ids('club')).toEqual(['anna-a', 'max', 'zoe', 'anna-b']);
   });
 
+  it('sortiert nach Registrierungsdatum, neueste zuerst, ohne Datum am Ende', () => {
+    const registered = [
+      { id: 'alt', firstName: 'Alt', createdAt: '2026-01-10T08:00:00.000Z' },
+      { id: 'ohne', firstName: 'Ohne', createdAt: null },
+      { id: 'neu', firstName: 'Neu', createdAt: '2026-11-19T08:00:00.000Z' },
+    ];
+    expect(sortUsers(registered, 'registered').map((user) => user.id)).toEqual(['neu', 'alt', 'ohne']);
+  });
+
   it('sortiert bei Gleichstand und fehlenden Namensteilen stabil nach Name', () => {
     const ties = [
       { id: 'ohne-nachname', firstName: 'Ida', club: null, lastSeenAt: null },
@@ -133,6 +142,7 @@ describe('sortUsers', () => {
     ];
     expect(sortUsers(ties, 'lastSeen').map((user) => user.id)).toEqual(['ohne-vorname', 'ohne-nachname', 'ida-a']);
     expect(sortUsers(ties, 'club').map((user) => user.id)).toEqual(['ohne-vorname', 'ohne-nachname', 'ida-a']);
+    expect(sortUsers(ties, 'registered').map((user) => user.id)).toEqual(['ohne-vorname', 'ohne-nachname', 'ida-a']);
   });
 
   it('verändert die übergebene Liste nicht', () => {

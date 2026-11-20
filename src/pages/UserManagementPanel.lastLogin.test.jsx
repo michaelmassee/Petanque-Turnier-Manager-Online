@@ -48,6 +48,18 @@ describe('Letzte Anmeldung in der Admin-Benutzerliste', () => {
     expect(time.parentElement).toHaveTextContent(`${label}:`);
   });
 
+  it('sortiert nach Registrierungsdatum, neueste zuerst, ohne Datum am Ende', async () => {
+    vi.spyOn(api, 'authenticatedApi').mockImplementation(async (path) => path === '/api/users' ? { users: [
+      { id: 'anna', firstName: 'Anna', lastName: 'Schmidt', email: 'anna@example.test', role: 'user', createdAt: '2026-01-10T08:00:00.000Z' },
+      { id: 'bert', firstName: 'Bert', lastName: 'Bauer', email: 'bert@example.test', role: 'user', createdAt: null },
+      { id: 'carl', firstName: 'Carl', lastName: 'Clas', email: 'carl@example.test', role: 'user', createdAt: '2026-11-19T08:00:00.000Z' },
+    ] } : { reports: [] });
+    render(<UserManagementPanel currentUser={{ id: 'admin' }} />);
+    await screen.findByText('Anna Schmidt');
+    fireEvent.change(screen.getByLabelText('Sortieren nach'), { target: { value: 'registered' } });
+    expect([...document.querySelectorAll('.user-row strong')].map((node) => node.textContent)).toEqual(['Carl Clas', 'Anna Schmidt', 'Bert Bauer']);
+  });
+
   it('sortiert die Liste nach Name, zuletzt online oder Verein und zeigt „zuletzt online“ an', async () => {
     vi.spyOn(api, 'authenticatedApi').mockImplementation(async (path) => path === '/api/users' ? { users: [
       { id: 'bert', firstName: 'Bert', lastName: 'Bauer', email: 'bert@example.test', role: 'user', club: 'BC Linden', lastSeenAt: '2026-10-20T10:00:00.000Z' },

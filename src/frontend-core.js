@@ -62,6 +62,9 @@ export function sortUsers(users, sortBy = 'name') {
     name: compareUserNames,
     lastSeen: (left, right) => missingLast(left.lastSeenAt, right.lastSeenAt)
       || compareText(right.lastSeenAt, left.lastSeenAt) || compareUserNames(left, right),
+    // Neueste Registrierung zuerst, wie bei „zuletzt online“.
+    registered: (left, right) => missingLast(left.createdAt, right.createdAt)
+      || compareText(right.createdAt, left.createdAt) || compareUserNames(left, right),
     club: (left, right) => missingLast(left.club, right.club) || compareText(left.club, right.club) || compareUserNames(left, right),
   };
   return [...users].sort(comparators[sortBy] || comparators.name);
