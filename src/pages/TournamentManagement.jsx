@@ -1394,16 +1394,22 @@ export function TournamentManagementPage({
       try {
         await deleteTournamentRequest(tournament.id, documentManaged);
       } catch (requestError) {
-        if (!isDocumentManagedConflict(requestError)) throw requestError;
-        // Erst nach dem Laden der Liste verbunden: mit Warnung erneut fragen.
-        if (!window.confirm(deleteTournamentConfirmation(t, tournament, true))) return;
-        await deleteTournamentRequest(tournament.id, true);
+        // 404: Das Turnier ist schon weg (z. B. erster Versuch lief in die Zeitüberschreitung, kam aber an, oder
+        // anderswo gelöscht). Ziel erreicht – nur die veraltete Liste muss neu geladen werden.
+        if (requestError?.status !== 404) {
+          if (!isDocumentManagedConflict(requestError)) throw requestError;
+          // Erst nach dem Laden der Liste verbunden: mit Warnung erneut fragen.
+          if (!window.confirm(deleteTournamentConfirmation(t, tournament, true))) return;
+          await deleteTournamentRequest(tournament.id, true);
+        }
       }
       setMessage(t('Turnier wurde gelöscht.'));
       setSelectedTournamentId('');
       await onTournamentsChanged?.();
     } catch (requestError) {
       setError(requestError.message);
+      // Nach Zeitüberschreitung o. Ä. kann das Löschen trotzdem angekommen sein: Liste mit dem Serverstand abgleichen.
+      await onTournamentsChanged?.();
     } finally {
       setBusyId('');
     }
