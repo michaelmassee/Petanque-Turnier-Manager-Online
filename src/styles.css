@@ -2472,7 +2472,7 @@ a.left-panel-link {
    DISPLAY_FIT_QUERY (lib/hooks.js); die Handy-Ansicht bleibt unberührt. */
 @media (min-width: 900px) and (orientation: landscape) {
   .tournament-display {
-    font-size: clamp(0.75rem, min(1.05vw, 1.9vh), 1.6rem);
+    font-size: clamp(0.75rem, min(1.05vw, 2.3vh), 1.6rem);
     padding: clamp(8px, 1.5vh, 16px) clamp(12px, 1.2vw, 20px);
   }
 
