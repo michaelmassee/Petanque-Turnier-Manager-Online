@@ -236,6 +236,74 @@ describe('Geplante Freigabe und einmalige Öffnungsnachrichten', () => {
     expect(env.MAIL_QUEUE.sendBatch).not.toHaveBeenCalled();
   });
 
+  describe('E-Mail an die Abonnenten', () => {
+    const mails = () => env.MAIL_QUEUE.sendBatch.mock.calls.flatMap(([batch]) => batch).map((item) => item.body).filter((body) => body.to);
+    const outboxCount = () => env.DB.sqlite.prepare('SELECT COUNT(*) AS count FROM registration_opening_mail_outbox').get().count;
+    beforeEach(() => {
+      sql("UPDATE users SET email_verified_at = '2026-10-13'");
+      sql("UPDATE users SET first_name = 'Anna' WHERE id = 'u2'");
+    });
+
+    it('schickt jedem Abonnenten eine Mail in seiner Sprache, auch ohne Push-Abo', async () => {
+      subscribe(); subscribe('u2'); sql('DELETE FROM push_subscriptions');
+      await releaseRegistrationOpenings(env, new Date(opening));
+      const sent = mails();
+      expect(sent).toHaveLength(2);
+      const english = sent.find((mail) => mail.to === 'two@example.test');
+      expect(english).toMatchObject({ subject: 'Registration open: Sommerturnier', language: 'en', gatewayUserId: null, allowLogFallback: true });
+      expect(english.text).toContain('Hi Anna,');
+      expect(english.text).toContain('https://ptmonline.org/turniere/t1/anmelden');
+      expect(english.actions).toEqual([expect.objectContaining({ url: 'https://ptmonline.org/turniere/t1/anmelden', label: 'View tournament' })]);
+      const german = sent.find((mail) => mail.to === 'one@example.test');
+      expect(german.subject).toBe('Anmeldung geöffnet: Sommerturnier');
+      expect(german.text.startsWith('Hallo,')).toBe(true);
+      expect(outboxCount()).toBe(0);
+      await releaseRegistrationOpenings(env, new Date(opening));
+      expect(mails()).toHaveLength(2);
+    });
+
+    it('schickt Push und Mail, wenn beides möglich ist', async () => {
+      subscribe();
+      await releaseRegistrationOpenings(env, new Date(opening));
+      const bodies = env.MAIL_QUEUE.sendBatch.mock.calls.flatMap(([batch]) => batch).map((item) => item.body);
+      expect(bodies.filter((body) => body.kind === 'push')).toHaveLength(1);
+      expect(mails()).toHaveLength(1);
+    });
+
+    it('verschickt keine Mail, wenn der Veranstalter keine Mails senden darf', async () => {
+      subscribe('u2'); sql("UPDATE users SET mail_enabled = 0 WHERE id = 'u1'");
+      await releaseRegistrationOpenings(env, new Date(opening));
+      expect(mails()).toHaveLength(0);
+      expect(outboxCount()).toBe(0);
+      expect(env.DB.sqlite.prepare('SELECT COUNT(*) AS count FROM postbox_messages').get().count).toBe(1);
+    });
+
+    it('nutzt das eigene Mail-Gateway des Veranstalters', async () => {
+      subscribe('u2');
+      sql("UPDATE users SET mail_enabled = 0 WHERE id = 'u1'");
+      sql(`INSERT INTO user_mail_gateways (user_id, provider, from_email, secret_enc, config_id, updated_at)
+        VALUES ('u1', 'resend', 'verein@example.test', 'enc', 'c1', '2026-10-13')`);
+      await releaseRegistrationOpenings(env, new Date(opening));
+      expect(mails()).toEqual([expect.objectContaining({ to: 'two@example.test', gatewayUserId: 'u1' })]);
+    });
+
+    it('überspringt unbestätigte E-Mail-Adressen', async () => {
+      subscribe(); subscribe('u2'); sql("UPDATE users SET email_verified_at = NULL WHERE id = 'u1'");
+      await releaseRegistrationOpenings(env, new Date(opening));
+      expect(mails().map((mail) => mail.to)).toEqual(['two@example.test']);
+    });
+
+    it('holt Mails nach einem Queue-Fehler aus der Outbox nach', async () => {
+      subscribe(); sql('DELETE FROM push_subscriptions');
+      env.MAIL_QUEUE.sendBatch.mockRejectedValueOnce(new Error('queue offline'));
+      await expect(releaseRegistrationOpenings(env, new Date(opening))).rejects.toThrow('queue offline');
+      expect(outboxCount()).toBe(1);
+      await releaseRegistrationOpenings(env, new Date(opening));
+      expect(outboxCount()).toBe(0);
+      expect(env.MAIL_QUEUE.sendBatch).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('hält die Postbox auch mit einer Öffnungsnachricht bei höchstens 25 Einträgen', async () => {
     subscribe();
     for (let index = 0; index < 25; index++) sql("INSERT INTO postbox_messages (id, recipient_id, kind, created_at) VALUES (?, 'u1', 'system', '2026-10-13')", `old-${index}`);

@@ -1,5 +1,5 @@
 import { registrationOpenStatus } from './worker-core.js';
-import { registrationClosesAtUtcIso } from './worker.js';
+import { emailAction, registrationClosesAtUtcIso, tournamentMailRoute } from './worker.js';
 
 export const REGISTRATION_OPENED_EVENT = 'tournament_registration_opened';
 export const OPENING_MESSAGES = {
@@ -10,6 +10,38 @@ export const OPENING_MESSAGES = {
   fr: '{{name}} : Les inscriptions sont maintenant ouvertes.',
   it: '{{name}}: le iscrizioni sono ora aperte.',
 };
+
+// E-Mail an jeden Abonnenten der Glocke (zusätzlich zu Postfach und Push). Ohne Vorname nur die Grußformel.
+export const OPENING_EMAILS = {
+  de: {
+    subject: (name) => `Anmeldung geöffnet: ${name}`,
+    text: (firstName, name, link) => `Hallo${firstName ? ` ${firstName}` : ''},\n\ndie Anmeldung für "${name}" ist jetzt geöffnet. Du wolltest daran erinnert werden.\n\nZur Anmeldung:\n${link}`,
+  },
+  nl: {
+    subject: (name) => `Inschrijving geopend: ${name}`,
+    text: (firstName, name, link) => `Hallo${firstName ? ` ${firstName}` : ''},\n\nde inschrijving voor "${name}" is nu geopend. Je wilde hieraan herinnerd worden.\n\nNaar de inschrijving:\n${link}`,
+  },
+  en: {
+    subject: (name) => `Registration open: ${name}`,
+    text: (firstName, name, link) => `Hi${firstName ? ` ${firstName}` : ''},\n\nregistration for "${name}" is now open. You asked to be reminded.\n\nRegister here:\n${link}`,
+  },
+  es: {
+    subject: (name) => `Inscripción abierta: ${name}`,
+    text: (firstName, name, link) => `Hola${firstName ? ` ${firstName}` : ''}:\n\nla inscripción para "${name}" ya está abierta. Pediste que te lo recordáramos.\n\nIr a la inscripción:\n${link}`,
+  },
+  fr: {
+    subject: (name) => `Inscriptions ouvertes : ${name}`,
+    text: (firstName, name, link) => `Bonjour${firstName ? ` ${firstName}` : ''},\n\nles inscriptions pour « ${name} » sont maintenant ouvertes. Tu avais demandé à être prévenu(e).\n\nS’inscrire :\n${link}`,
+  },
+  it: {
+    subject: (name) => `Iscrizioni aperte: ${name}`,
+    text: (firstName, name, link) => `Ciao${firstName ? ` ${firstName}` : ''},\n\nle iscrizioni a "${name}" sono ora aperte. Avevi chiesto di ricevere un promemoria.\n\nVai all’iscrizione:\n${link}`,
+  },
+};
+
+function openingRegistrationUrl(tournamentId) {
+  return `https://ptmonline.org/turniere/${encodeURIComponent(tournamentId)}/anmelden`;
+}
 
 // The stored gate is released together with the one-shot subscriptions and their
 // postbox messages. A persistent outbox retains pushes if queue submission fails.
@@ -47,6 +79,13 @@ export async function releaseRegistrationOpenings(env, now = new Date()) {
           AND EXISTS (SELECT 1 FROM push_subscriptions ps WHERE ps.user_id = s.user_id
             AND (ps.expiration_time IS NULL OR CAST(ps.expiration_time AS REAL) > ?))`)
         .bind(eventId, now.getTime()),
+      // Mail an jeden Abonnenten mit bestätigter Adresse, unabhängig vom Push-Abo; dieselben Bedingungen wie die
+      // Postfach-Nachricht (Join auf postbox_messages).
+      env.DB.prepare(`INSERT OR IGNORE INTO registration_opening_mail_outbox (id, user_id, tournament_id, tournament_name, email, first_name, language)
+        SELECT s.id, s.user_id, t.id, t.name, u.email, u.first_name, COALESCE(u.language, 'de')
+        FROM registration_opening_subscriptions s JOIN tournaments t ON t.id = s.tournament_id JOIN users u ON u.id = s.user_id
+        JOIN postbox_messages p ON p.id = s.id WHERE t.registration_opening_event_id = ? AND u.email_verified_at IS NOT NULL`)
+        .bind(eventId),
       env.DB.prepare(`DELETE FROM postbox_messages WHERE recipient_id IN (
         SELECT s.user_id FROM registration_opening_subscriptions s JOIN tournaments t ON t.id = s.tournament_id
         WHERE t.registration_opening_event_id = ?
@@ -65,6 +104,7 @@ export async function releaseRegistrationOpenings(env, now = new Date()) {
     ]);
   }
   await dispatchOpeningPushes(env);
+  await dispatchOpeningMails(env);
 }
 
 export async function dispatchOpeningPushes(env) {
@@ -74,10 +114,41 @@ export async function dispatchOpeningPushes(env) {
   await env.MAIL_QUEUE.sendBatch(results.map((row) => ({ body: {
     kind: 'push', userId: row.user_id,
       payload: { title: row.tournament_name, messageId: row.id, eventType: REGISTRATION_OPENED_EVENT, tournamentId: row.tournament_id,
-        url: `https://ptmonline.org/turniere/${encodeURIComponent(row.tournament_id)}/anmelden`,
+        url: openingRegistrationUrl(row.tournament_id),
       body: (OPENING_MESSAGES[row.language] || OPENING_MESSAGES.de).replace('{{name}}', row.tournament_name) },
   } })));
   await env.DB.prepare(`DELETE FROM registration_opening_push_outbox WHERE id IN (${results.map(() => '?').join(',')})`)
+    .bind(...results.map((row) => row.id)).run();
+}
+
+// Mails laufen wie alle Turnier-Mails über die Route des Veranstalters (Mail-Freigabe bzw. eigenes Gateway). Ohne
+// Route entfällt die Mail; Postfach und Push sind davon unberührt.
+export async function dispatchOpeningMails(env) {
+  const { results } = await env.DB.prepare(`SELECT o.*, t.owner_id FROM registration_opening_mail_outbox o
+    JOIN tournaments t ON t.id = o.tournament_id ORDER BY o.id LIMIT 100`).all();
+  if (!results.length) return;
+  const routes = new Map();
+  for (const row of results) {
+    if (!routes.has(row.tournament_id)) routes.set(row.tournament_id, await tournamentMailRoute(env.DB, { owner_id: row.owner_id }));
+  }
+  const mails = results.filter((row) => routes.get(row.tournament_id)).map((row) => {
+    const language = OPENING_EMAILS[row.language] ? row.language : 'de';
+    const templates = OPENING_EMAILS[language];
+    const link = openingRegistrationUrl(row.tournament_id);
+    return { body: {
+      ...routes.get(row.tournament_id),
+      to: row.email,
+      subject: templates.subject(row.tournament_name),
+      text: templates.text(row.first_name, row.tournament_name, link),
+      actions: [emailAction('tournament', link, language)],
+      language,
+      logFallback: `Registration opening email for ${row.email} (tournament ${row.tournament_id})`,
+      failureContext: `registration opening reminder ${row.id}`,
+      allowLogFallback: true,
+    } };
+  });
+  if (mails.length) await env.MAIL_QUEUE.sendBatch(mails);
+  await env.DB.prepare(`DELETE FROM registration_opening_mail_outbox WHERE id IN (${results.map(() => '?').join(',')})`)
     .bind(...results.map((row) => row.id)).run();
 }
 
@@ -89,7 +160,8 @@ export class RegistrationOpeningScheduler {
   async schedule() {
     const row = await this.env.DB.prepare(`SELECT registration_opens_at FROM tournaments
       WHERE registration_opening_pending = 1 ORDER BY registration_opens_at LIMIT 1`).first();
-    const outbox = await this.env.DB.prepare('SELECT id FROM registration_opening_push_outbox WHERE queued = 0 LIMIT 1').first();
+    const outbox = await this.env.DB.prepare(`SELECT id FROM registration_opening_push_outbox WHERE queued = 0
+      UNION ALL SELECT id FROM registration_opening_mail_outbox LIMIT 1`).first();
     const time = outbox ? Date.now() + 1000 : row ? Math.max(Date.now() + 1, new Date(row.registration_opens_at || 0).getTime()) : null;
     const current = await this.ctx.storage.getAlarm();
     if (time === null && current !== null) await this.ctx.storage.deleteAlarm();

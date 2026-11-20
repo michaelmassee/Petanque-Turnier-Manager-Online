@@ -1303,7 +1303,7 @@ async function resolveEmailLanguage(db, tournament, registration) {
  * Zusatzoption: Hat der Turnierbesitzer ein aktives eigenes Gateway (migrations/0160), gehen die Mails ausschließlich
  * darüber – auch ohne Freischaltung. Liefert null (kein Versand) oder { gatewayUserId } für die Mail-Payload.
  */
-async function tournamentMailRoute(db, tournament) {
+export async function tournamentMailRoute(db, tournament) {
   const owner = await db.prepare(`SELECT u.role, u.mail_enabled, g.user_id AS gateway_user_id FROM users u
     LEFT JOIN user_mail_gateways g ON g.user_id = u.id AND g.enabled = 1 WHERE u.id = ?`).bind(tournament.owner_id).first();
   if (!owner) return { gatewayUserId: null };
