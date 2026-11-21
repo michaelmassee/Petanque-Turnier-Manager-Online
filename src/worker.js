@@ -11511,6 +11511,8 @@ export async function syncGetRegistrations(db, tournament, url) {
       // Personen-Slots mit Benutzer-ID (T-17, T-18); die Benutzer-ID ist der Personenschlüssel registrierter Teilnehmer.
       persons: syncPersons(row),
       meleeTeamUuid: teams.get(row.id) || null,
+      // Gespeicherte Teamnummer, damit der Abgleich eine im Dokument geänderte Nr. erkennt und erneut sendet.
+      teamNumber: row.team_number == null ? null : Number(row.team_number),
       registrationAnswers: registration.registrationAnswers.map(syncAnswer),
     };
   });

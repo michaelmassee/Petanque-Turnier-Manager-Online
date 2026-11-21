@@ -5,7 +5,9 @@ import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { d1MitSchema } from './test-support/d1.js';
 import { bindeDokument, syncAnfrage } from './test-support/sync.js';
-import worker, { createRegistration, executeSyncWrite, getRegistrationWithTournament, updateRegistration, upsertDocumentRegistration } from './worker.js';
+import worker, {
+  createRegistration, executeSyncWrite, getRegistrationWithTournament, syncGetRegistrations, updateRegistration, upsertDocumentRegistration,
+} from './worker.js';
 
 const LOKALE_ID = '55555555-5555-4555-8555-555555555555';
 const LIMIT_ERREICHT = { status: 409, details: { code: 'participant_limit_reached' } };
@@ -236,6 +238,18 @@ describe('Teilnehmer-Limit pro Turnier', () => {
       expect(teamNummer()).toBe(5);
       expect((await uebernehmen([{ id: 'a', teamNumber: 0 }])).status).toBe(400);
       expect(teamNummer()).toBe(5);
+    });
+
+    it('liefert die gespeicherte Teamnummer im Abgleich mit, damit das Dokument Abweichungen erkennt', async () => {
+      bindeDokument(env.DB.sqlite, 't1');
+      vorhanden('a', 'confirmed');
+      vorhanden('b', 'confirmed');
+      const teamNummern = async () => Object.fromEntries((await (await syncGetRegistrations(env.DB, turnier(),
+        new URL('https://ptm.test/x'))).json()).registrations.map((registration) => [registration.id, registration.teamNumber]));
+
+      expect(await teamNummern()).toEqual({ a: null, b: null });
+      expect((await uebernehmen([{ id: 'a', participation: 'active', teamNumber: 42 }])).status).toBe(200);
+      expect(await teamNummern()).toEqual({ a: 42, b: null });
     });
 
     // D1 erlaubt höchstens 100 gebundene Parameter; die ID-Listen gehen deshalb als JSON in die Abfragen.
